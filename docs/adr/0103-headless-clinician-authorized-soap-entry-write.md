@@ -95,10 +95,19 @@ frozen, senza campi e legato per identita al parent e alla sessione figlia.
 
 Il lease scade esattamente dopo cinque minuti, senza rinnovo. La validita e
 half-open: e corrente per `now < expiresAt` e scaduto per `now >= expiresAt`.
+Il clock viene campionato nella continuation sincrona finale di apertura,
+dopo l'emissione H2a-A e immediatamente prima dell'attach; `expiresAt` e quel
+campione piu cinque minuti. Un clock non sicuro, negativo o che non consente
+la somma esatta nega l'apertura.
 La sua validita effettiva e sempre la congiunzione con il grant H2a-A: open
 emette e verifica il parent corrente, mentre consumo e recheck lo rivalidano.
 Il disposer privato garantisce la cascata immediata anche senza un uso
 successivo del lease.
+Il seam privato esegue publication, recheck e consumo H2b come callback
+sincrone nella stessa continuation dell'ultima validazione H2a-A, prima di
+risolvere al facade H2b. Le callback sono closure host-owned, non accettano
+input authority e un throw, un risultato asincrono o il fallimento del final
+fence terminalizzano il parent coinvolto.
 
 I record H2b di parent, child e lease nascono ciascuno con contract version
 `1`, generation `1` e revocation generation `0`; il figlio nasce inoltre con
@@ -113,6 +122,27 @@ child e il relativo lease, senza revocare parent o sibling. Il restart
 distrugge invece record e controller: una
 nuova istanza nega il vecchio lease per identita assente, senza ricostruire o
 simulare una transizione persistita.
+
+Il service H2b espone esattamente `open()`, `recheck(lease)`,
+`consumeProposalBudget(lease)` e `terminate(lease)`. `open()` non ha argomenti;
+recheck e il primo consumo restituiscono la stessa identita lease. Un secondo
+consumo nega con `proposal_budget_exhausted`, ma il lease resta recheckable.
+`terminate` e idempotente come esito booleano: `true` solo per la prima
+transizione terminale, poi `false`. I denial pubblici PHI-safe sono fissati a
+`active_role_unavailable`, `child_unavailable`, `lease_unavailable`,
+`lease_expired`, `proposal_budget_exhausted` e `lifecycle_unavailable`; cause e
+identita H2a-A non attraversano questo boundary.
+
+La precedenza dei denial e deterministica. Un'identita assente, foreign,
+riavviata o gia terminale all'ingresso e `lease_unavailable`. Un lease noto e
+corrente che raggiunge il boundary temporale e `lease_expired`; clock invalido
+o somma TTL non sicura sono `lifecycle_unavailable`, mentre rollback e perdita
+del child durante un'operazione in flight sono `child_unavailable`. Il failure
+di emissione o recheck H2a-A e `active_role_unavailable` e drena il parent;
+failure di attach o final fence con parent ancora presente e
+`lifecycle_unavailable`. Solo `consumeProposalBudget` su un lease altrimenti
+corrente con budget gia zero e `proposal_budget_exhausted`. I check avvengono
+nell'ordine identita, tempo, recheck H2a-A, final fence e budget.
 
 In H2b parent, child e lease restano identita object process-local host-owned;
 non esiste ancora una proiezione serializzabile dei relativi binding. Il
