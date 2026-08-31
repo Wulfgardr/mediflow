@@ -12,12 +12,15 @@ const ATTESTATION_SCHEMA = 'mediflow.headless-soap-active-role-attestation.v1', 
 const TTL_MS = 8 * 60 * 60 * 1_000, sessionIdPattern = /^[0-9a-f]{64}$/u, attestationRefPattern = /^hsar_[0-9a-f]{32}$/u, issuerRefPattern = /^hsari_[0-9a-f]{32}$/u;
 const objectAssign = Object.assign, objectCreate = Object.create, objectFreeze = Object.freeze, objectGetPrototypeOf = Object.getPrototypeOf;
 const objectGetOwnPropertyDescriptors = Object.getOwnPropertyDescriptors, objectIsFrozen = Object.isFrozen, reflectOwnKeys = Reflect.ownKeys;
-const reflectApply = Reflect.apply, regexpExec = RegExp.prototype.exec, stringTrim = String.prototype.trim, numberIsSafeInteger = Number.isSafeInteger, isProxy = types.isProxy;
-const datePrototype = Date.prototype, dateGetTime = Date.prototype.getTime, defaultClock = Date.now;
+const reflectApply = Reflect.apply, regexpExec = RegExp.prototype.exec, stringTrim = String.prototype.trim, numberIsSafeInteger = Number.isSafeInteger;
+const isAsyncFunction = types.isAsyncFunction, isGeneratorFunction = types.isGeneratorFunction, isProxy = types.isProxy;
+const datePrototype = Date.prototype, dateGetTime = Date.prototype.getTime, functionPrototype = Function.prototype, defaultClock = Date.now;
 const WeakMapConstructor = WeakMap, MapConstructor = Map, weakMapGet = WeakMap.prototype.get, weakMapSet = WeakMap.prototype.set, weakMapDelete = WeakMap.prototype.delete;
 const mapGet = Map.prototype.get, mapSet = Map.prototype.set, mapDelete = Map.prototype.delete;
 declare const grantIdentity: unique symbol;
+declare const dependentRegistrationIdentity: unique symbol;
 export type HeadlessSoapActiveRoleSessionGrantV1 = Readonly<{ readonly [grantIdentity]?: never }>;
+export type HeadlessSoapActiveRoleDependentRegistrationV1 = Readonly<{ readonly [dependentRegistrationIdentity]?: never }>;
 export type HeadlessSoapActiveRoleSessionGrantErrorCode = 'session_unavailable' | 'session_ineligible' | 'attestation_unavailable' | 'attestation_inactive' | 'attestation_expired' | 'attestation_revoked' | 'projection_stale' | 'grant_unavailable' | 'lifecycle_unavailable';
 export class HeadlessSoapActiveRoleSessionGrantError extends Error {
     constructor(readonly code: HeadlessSoapActiveRoleSessionGrantErrorCode) { super(`Headless SOAP active-role session grant rejected: ${code}`); this.name = 'HeadlessSoapActiveRoleSessionGrantError'; }
@@ -29,7 +32,8 @@ export type HeadlessSoapActiveRoleSessionGrantSources = Readonly<{
 }>;
 type Session = Readonly<{ id: string; userId: string; username: string; role: 'admin'; authChannel: 'web'; createdAt: number; expiresAt: number }>;
 type Snapshot = Readonly<{ session: Session; attestationRef: string; issuerRef: string; activatedAt: number; attestationExpiresAt: number; updatedAt: number; expiresAt: number }>;
-type GrantRecord = { grant: HeadlessSoapActiveRoleSessionGrantV1; snapshot: Snapshot; active: boolean; port: WebResourcePort | null; registration: WebResourceRegistration | null };
+type DependentRecord = { registration: HeadlessSoapActiveRoleDependentRegistrationV1; owner: GrantRecord; dispose: () => void; active: boolean; next: DependentRecord | null };
+type GrantRecord = { grant: HeadlessSoapActiveRoleSessionGrantV1; snapshot: Snapshot; active: boolean; port: WebResourcePort | null; registration: WebResourceRegistration | null; dependents: DependentRecord | null };
 function fail(code: HeadlessSoapActiveRoleSessionGrantErrorCode): never { throw new HeadlessSoapActiveRoleSessionGrantError(code); }
 function exact(value: unknown, keys: readonly string[]): Record<string, unknown> | null {
     try {
@@ -77,11 +81,22 @@ function weakDelete<T>(registry: WeakMap<object, T>, key: object): void { reflec
 function currentGet(registry: Map<string, GrantRecord>, key: string): GrantRecord | undefined { return reflectApply(mapGet, registry, [key]) as GrantRecord | undefined; }
 function currentSet(registry: Map<string, GrantRecord>, key: string, value: GrantRecord): void { reflectApply(mapSet, registry, [key, value]); }
 function currentDelete(registry: Map<string, GrantRecord>, key: string): void { reflectApply(mapDelete, registry, [key]); }
-/** Owns one opaque, process-local prerequisite; it contains no patient, proposal, proof, or write authority. */
-export function createHeadlessSoapActiveRoleSessionGrantService(sources: HeadlessSoapActiveRoleSessionGrantSources) {
-    const issued = new WeakMapConstructor<object, GrantRecord>(), current = new MapConstructor<string, GrantRecord>(), clock = sources.clock ?? defaultClock;
+/** Owns the public grant service and its closure-bound dependent lifecycle controller. */
+export function createHeadlessSoapActiveRoleSessionGrantOwner(sources: HeadlessSoapActiveRoleSessionGrantSources) {
+    const issued = new WeakMapConstructor<object, GrantRecord>(), dependentRegistrations = new WeakMapConstructor<object, DependentRecord>();
+    const current = new MapConstructor<string, GrantRecord>(), clock = sources.clock ?? defaultClock;
+    const unlinkDependent = (dependent: DependentRecord): void => { const owner = dependent.owner;
+        if (owner.dependents === dependent) owner.dependents = dependent.next;
+        else { let previous = owner.dependents; while (previous && previous.next !== dependent) previous = previous.next; if (previous) previous.next = dependent.next; }
+        dependent.next = null; };
+    const drainDependents = (record: GrantRecord): void => { let dependent = record.dependents; record.dependents = null;
+        while (dependent) { const next = dependent.next; dependent.next = null;
+            if (dependent.active) { dependent.active = false; weakDelete(dependentRegistrations, dependent.registration);
+                try { reflectApply(dependent.dispose, undefined, []); } catch { /* dependent failure cannot retain siblings */ } }
+            dependent = next; } };
     const discard = (record: GrantRecord, ownerCleanup = false): void => { if (!record.active) return; record.active = false;
         if (currentGet(current, record.snapshot.session.id) === record) currentDelete(current, record.snapshot.session.id); weakDelete(issued, record.grant);
+        drainDependents(record);
         const port = record.port, registration = record.registration; record.port = null; record.registration = null;
         if (!ownerCleanup) { if (port && registration) unregisterPrivateResource(port, registration); if (port) releaseResourcePort(port); } };
     const capture = (value: unknown): Snapshot => {
@@ -94,14 +109,14 @@ export function createHeadlessSoapActiveRoleSessionGrantService(sources: Headles
     const confirmResource = (record: GrantRecord): boolean => { const port = record.port; if (!record.active || !port) return false; let resourceUse: WebResourceUse | null = null, committed = false;
         try { resourceUse = beginResourceUse(port); committed = !!resourceUse && commitResourceUse(resourceUse); return committed; }
         catch { return false; } finally { if (resourceUse && !committed) abortResourceUse(resourceUse); } };
-    return objectFreeze({
+    const service = objectFreeze({
         async issue(): Promise<HeadlessSoapActiveRoleSessionGrantV1> {
             const before = await read(); let value: unknown; try { value = await sources.readCurrentSession(); } catch { return fail('session_unavailable'); }
             const snapshot = capture(value); if (!sameSnapshot(before, snapshot)) return fail('projection_stale'); const existing = currentGet(current, snapshot.session.id);
             if (existing && sameSnapshot(existing.snapshot, snapshot) && confirmResource(existing)) return existing.grant;
             if (existing) discard(existing);
             const grant = objectFreeze(objectCreate(null)) as HeadlessSoapActiveRoleSessionGrantV1;
-            const record: GrantRecord = { grant, snapshot, active: true, port: null, registration: null };
+            const record: GrantRecord = { grant, snapshot, active: true, port: null, registration: null, dependents: null };
             let port: WebResourcePort | null = null, registration: WebResourceRegistration | null = null, resourceUse: WebResourceUse | null = null, committed = false;
             try { port = mintResourcePort(snapshot.session); if (!port) return fail('lifecycle_unavailable');
                 resourceUse = beginResourceUse(port); if (!resourceUse) return fail('lifecycle_unavailable');
@@ -124,4 +139,36 @@ export function createHeadlessSoapActiveRoleSessionGrantService(sources: Headles
         dispose(candidate: unknown): boolean { const record = typeof candidate === 'object' && candidate !== null ? weakGet(issued, candidate) : undefined;
             if (!record || !record.active) return false; discard(record); return true; },
     });
+    const lifecycleController = objectFreeze({
+        registerDependent(candidate: unknown, dispose: () => void): HeadlessSoapActiveRoleDependentRegistrationV1 | null {
+            if (typeof candidate !== 'object' || candidate === null || typeof dispose !== 'function' || isProxy(dispose)
+                || isAsyncFunction(dispose) || isGeneratorFunction(dispose) || objectGetPrototypeOf(dispose) !== functionPrototype) return null;
+            const owner = weakGet(issued, candidate); if (!owner || !owner.active) return null;
+            const registration = objectFreeze(objectCreate(null)) as HeadlessSoapActiveRoleDependentRegistrationV1;
+            const dependent: DependentRecord = { registration, owner, dispose, active: true, next: owner.dependents };
+            owner.dependents = dependent;
+            try { weakSet(dependentRegistrations, registration, dependent);
+                if (!owner.active || weakGet(issued, candidate) !== owner || weakGet(dependentRegistrations, registration) !== dependent) throw new Error('dependent_attach_failed');
+            } catch { dependent.active = false; try { weakDelete(dependentRegistrations, registration); } catch { /* an unpublished identity cannot retain authority */ }
+                unlinkDependent(dependent); discard(owner); return null; }
+            return registration;
+        },
+        confirmDependent(candidate: unknown, registration: unknown): boolean {
+            if (typeof candidate !== 'object' || candidate === null || typeof registration !== 'object' || registration === null) return false;
+            const owner = weakGet(issued, candidate), dependent = weakGet(dependentRegistrations, registration);
+            return !!owner && owner.active && !!dependent && dependent.active && dependent.owner === owner && dependent.registration === registration;
+        },
+        unregisterDependent(candidate: unknown, registration: unknown): boolean {
+            if (typeof candidate !== 'object' || candidate === null || typeof registration !== 'object' || registration === null) return false;
+            const owner = weakGet(issued, candidate), dependent = weakGet(dependentRegistrations, registration);
+            if (!owner || !dependent || !dependent.active || dependent.owner !== owner || dependent.registration !== registration) return false;
+            dependent.active = false; weakDelete(dependentRegistrations, registration); unlinkDependent(dependent); return true;
+        },
+    });
+    return objectFreeze({ service, lifecycleController });
+}
+
+/** Owns one opaque, process-local prerequisite; it contains no downstream authority. */
+export function createHeadlessSoapActiveRoleSessionGrantService(sources: HeadlessSoapActiveRoleSessionGrantSources) {
+    return createHeadlessSoapActiveRoleSessionGrantOwner(sources).service;
 }

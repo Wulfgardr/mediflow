@@ -1,8 +1,9 @@
 /* @Codex */
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import { afterEach, test } from 'node:test';
-import { createHeadlessSoapActiveRoleSessionGrantService, HeadlessSoapActiveRoleSessionGrantError } from './headless-soap-active-role-session-grant.ts';
+import { createHeadlessSoapActiveRoleSessionGrantOwner, createHeadlessSoapActiveRoleSessionGrantService, HeadlessSoapActiveRoleSessionGrantError } from './headless-soap-active-role-session-grant.ts';
 import type { ServerSession } from './server-session.ts';
 import { issueSyntheticWebSession, retireSyntheticWebSession } from './web-auth-lifecycle-owner-test-fixture.ts';
 const ACTOR = 'synthetic-soap-grant-actor';
@@ -20,8 +21,9 @@ function fixture(onSessionRead?: (state: FixtureState, readNumber: number) => vo
     const session = issueSyntheticWebSession({ id: ACTOR, username: 'synthetic-soap-admin', role: 'admin' }, `soap-grant-${sequence += 1}`);
     sessions.push(session); const state: FixtureState = { now: Math.max(Date.now(), session.createdAt), session, attestation: null }; let sessionReads = 0;
     state.attestation = activeAttestation(state.now);
-    const service = createHeadlessSoapActiveRoleSessionGrantService({ readCurrentSession: async () => { onSessionRead?.(state, sessionReads += 1); return state.session; }, readAttestation: () => { onAttestationRead?.(state); return state.attestation; }, clock: () => state.now });
-    return { service, session, state };
+    const sources = { readCurrentSession: async () => { onSessionRead?.(state, sessionReads += 1); return state.session; }, readAttestation: () => { onAttestationRead?.(state); return state.attestation; }, clock: () => state.now };
+    const service = createHeadlessSoapActiveRoleSessionGrantService(sources);
+    return { service, session, sources, state };
 }
 function denied(code: string) {
     return (error: unknown) => error instanceof HeadlessSoapActiveRoleSessionGrantError && error.code === code && !error.message.includes(ACTOR) && !/hsar_|sqlite/iu.test(error.message);
@@ -69,6 +71,41 @@ test('explicit disposal is idempotent and removes authority before any next use'
     const { service } = fixture(); const grant = await service.issue();
     assert.equal(service.dispose(grant), true); assert.equal(service.dispose(grant), false);
     await assert.rejects(service.recheck(grant), denied('grant_unavailable'));
+});
+test('private owner controller atomically attaches, fences, unregisters, and drains dependents', async () => {
+    const current = fixture(); const owner = createHeadlessSoapActiveRoleSessionGrantOwner(current.sources); const grant = await owner.service.issue();
+    assert.deepEqual(Reflect.ownKeys(owner.service).sort(), ['dispose', 'issue', 'recheck']);
+    assert.deepEqual(Reflect.ownKeys(owner.lifecycleController).sort(), ['confirmDependent', 'registerDependent', 'unregisterDependent']);
+    let calls = 0;
+    const first = owner.lifecycleController.registerDependent(grant, () => { calls += 1; assert.equal(owner.lifecycleController.confirmDependent(grant, first), false); assert.equal(owner.lifecycleController.registerDependent(grant, () => undefined), null); });
+    const throwing = owner.lifecycleController.registerDependent(grant, () => { calls += 1; throw new Error('synthetic dependent failure'); });
+    const removed = owner.lifecycleController.registerDependent(grant, () => { calls += 100; });
+    assert.ok(first); assert.ok(throwing); assert.ok(removed); assert.equal(owner.lifecycleController.confirmDependent(grant, first), true);
+    assert.equal(Object.getPrototypeOf(first), null); assert.equal(Object.isFrozen(first), true); assert.deepEqual(Reflect.ownKeys(first), []);
+    assert.equal(owner.lifecycleController.confirmDependent(grant, structuredClone(first)), false);
+    assert.equal(owner.lifecycleController.unregisterDependent(grant, removed), true); assert.equal(owner.lifecycleController.unregisterDependent(grant, removed), false);
+    assert.equal(owner.lifecycleController.registerDependent(grant, async () => undefined), null);
+    assert.equal(owner.lifecycleController.registerDependent(grant, new Proxy(() => undefined, {})), null);
+    assert.equal(owner.service.dispose(grant), true); assert.equal(calls, 2);
+    assert.equal(owner.lifecycleController.confirmDependent(grant, first), false); assert.equal(owner.lifecycleController.confirmDependent(grant, throwing), false);
+});
+test('private owner rejects an async disposer whose public prototype is spoofed', async () => {
+    const current = fixture(); const owner = createHeadlessSoapActiveRoleSessionGrantOwner(current.sources); const grant = await owner.service.issue(); let completed = false;
+    const disposer = async () => { await Promise.resolve(); completed = true; };
+    Object.setPrototypeOf(disposer, Function.prototype);
+    assert.equal(owner.lifecycleController.registerDependent(grant, disposer), null);
+    assert.equal(owner.service.dispose(grant), true); assert.equal(completed, false);
+    await Promise.resolve(); assert.equal(completed, false);
+});
+test('private owner rolls back and terminalizes an apply-then-throw dependent attach', () => {
+    const result = spawnSync(process.execPath, ['scripts/run-strip-types.mjs', 'lib/security/headless-soap-active-role-session-grant-attach-failure-fixture.ts'], { cwd: process.cwd(), encoding: 'utf8' });
+    assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+});
+test('private dependent drain follows Web owner retirement before the next use', async () => {
+    const current = fixture(); const owner = createHeadlessSoapActiveRoleSessionGrantOwner(current.sources); const grant = await owner.service.issue(); let calls = 0;
+    const registration = owner.lifecycleController.registerDependent(grant, () => { calls += 1; }); assert.ok(registration);
+    retireSyntheticWebSession(current.session); assert.equal(calls, 1); assert.equal(owner.lifecycleController.confirmDependent(grant, registration), false);
+    await assert.rejects(owner.service.recheck(grant), denied('grant_unavailable'));
 });
 test('keeps opaque identity closed after hostile post-import WeakMap and Map mutation', async () => {
     const { service } = fixture(); const forged = Object.freeze(Object.create(null));
