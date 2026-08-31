@@ -52,12 +52,12 @@ test('paired therapy write requires capability, session, scope, version, and PHI
 
         const login = await loginWithWebAuthControl(BASE_URL, { username: USERNAME, password: PIN });
         assert.equal(login.response.status, 200);
-        const sessionCookie = extractSessionCookie(login.response);
+        const cookieHeader = login.cookieHeader;
 
         const readOnlyCreate = await request('POST', `/api/v1/network/patients/${patientId}/therapies`, {
             headers: {
                 ...pairedHeaders(readOnlyClient),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
             body: {
                 drugName: 'Metformina',
@@ -82,7 +82,7 @@ test('paired therapy write requires capability, session, scope, version, and PHI
         const plaintextMotivation = await request('POST', `/api/v1/network/patients/${patientId}/therapies`, {
             headers: {
                 ...pairedHeaders(therapyWriter),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
             body: {
                 drugName: 'Metformina',
@@ -98,7 +98,7 @@ test('paired therapy write requires capability, session, scope, version, and PHI
         const create = await request('POST', `/api/v1/network/patients/${patientId}/therapies`, {
             headers: {
                 ...pairedHeaders(therapyWriter),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
             body: {
                 drugName: 'Metformina',
@@ -113,10 +113,23 @@ test('paired therapy write requires capability, session, scope, version, and PHI
         assert.ok(typeof therapyId === 'string' && therapyId.length > 0);
         assert.equal(create.json?.version, 1);
 
+        const therapyList = await request('GET', `/api/v1/network/patients/${patientId}/therapies?status=active&limit=10`, {
+            headers: {
+                ...pairedHeaders(therapyWriter),
+                Cookie: cookieHeader,
+            },
+        });
+        assert.equal(therapyList.response.status, 200);
+        assert.ok(Array.isArray(therapyList.json));
+        const listedTherapy = therapyList.json.find((therapy) => therapy.id === therapyId);
+        assert.ok(listedTherapy, 'Patient-scoped therapy list must include the synthetic therapy');
+        assert.equal(listedTherapy.drugName, 'Metformina');
+        assert.equal(listedTherapy.version, 1);
+
         const detail = await request('GET', `/api/v1/network/patients/${patientId}/therapies/${therapyId}`, {
             headers: {
                 ...pairedHeaders(therapyWriter),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
         });
         assert.equal(detail.response.status, 200);
@@ -128,7 +141,7 @@ test('paired therapy write requires capability, session, scope, version, and PHI
         const update = await request('PUT', `/api/v1/network/patients/${patientId}/therapies/${therapyId}`, {
             headers: {
                 ...pairedHeaders(therapyWriter),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
             body: {
                 version: 1,
@@ -141,7 +154,7 @@ test('paired therapy write requires capability, session, scope, version, and PHI
         const updatedDetail = await request('GET', `/api/v1/network/patients/${patientId}/therapies/${therapyId}`, {
             headers: {
                 ...pairedHeaders(therapyWriter),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
         });
         assert.equal(updatedDetail.response.status, 200);
@@ -151,7 +164,7 @@ test('paired therapy write requires capability, session, scope, version, and PHI
         const conflict = await request('PUT', `/api/v1/network/patients/${patientId}/therapies/${therapyId}`, {
             headers: {
                 ...pairedHeaders(therapyWriter),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
             body: {
                 version: 1,
@@ -168,7 +181,7 @@ test('paired therapy write requires capability, session, scope, version, and PHI
         const aiField = await request('PUT', `/api/v1/network/patients/${patientId}/therapies/${therapyId}`, {
             headers: {
                 ...pairedHeaders(therapyWriter),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
             body: {
                 version: 2,
@@ -181,7 +194,7 @@ test('paired therapy write requires capability, session, scope, version, and PHI
         const plaintextDeletionReason = await request('PUT', `/api/v1/network/patients/${patientId}/therapies/${therapyId}`, {
             headers: {
                 ...pairedHeaders(therapyWriter),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
             body: {
                 version: 2,
@@ -195,7 +208,7 @@ test('paired therapy write requires capability, session, scope, version, and PHI
         const softDelete = await request('PUT', `/api/v1/network/patients/${patientId}/therapies/${therapyId}`, {
             headers: {
                 ...pairedHeaders(therapyWriter),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
             body: {
                 version: 2,
@@ -208,7 +221,7 @@ test('paired therapy write requires capability, session, scope, version, and PHI
         const deletedDetail = await request('GET', `/api/v1/network/patients/${patientId}/therapies/${therapyId}`, {
             headers: {
                 ...pairedHeaders(therapyWriter),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
         });
         assert.equal(deletedDetail.response.status, 200);
@@ -218,7 +231,7 @@ test('paired therapy write requires capability, session, scope, version, and PHI
         const remoteHardDelete = await request('DELETE', `/api/v1/network/patients/${patientId}/therapies/${therapyId}`, {
             headers: {
                 ...pairedHeaders(therapyWriter),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
             body: {
                 version: 3,
@@ -226,7 +239,7 @@ test('paired therapy write requires capability, session, scope, version, and PHI
         });
         assert.equal(remoteHardDelete.response.status, 405);
 
-        const createdAudit = await findAuditEvent('therapy.created', therapyId, sessionCookie);
+        const createdAudit = await findAuditEvent('therapy.created', therapyId, cookieHeader);
         assert.equal(createdAudit.actorType, 'user');
         assert.equal(createdAudit.sourceSurface, 'native');
         assert.ok(createdAudit.redactedMetadata?.flags?.includes('auth:paired-client'));
@@ -234,11 +247,11 @@ test('paired therapy write requires capability, session, scope, version, and PHI
         assert.deepEqual(createdAudit.redactedMetadata?.changedFields, ['drugName', 'dosage', 'status', 'startDate', 'motivation']);
         assert.equal(createdAudit.redactedMetadata?.resourceVersion, 1);
 
-        const updatedAudit = await findAuditEvent('therapy.updated', therapyId, sessionCookie);
+        const updatedAudit = await findAuditEvent('therapy.updated', therapyId, cookieHeader);
         assert.deepEqual(updatedAudit.redactedMetadata?.changedFields, ['dosage']);
         assert.equal(updatedAudit.redactedMetadata?.resourceVersion, 2);
 
-        const deletedAudit = await findAuditEvent('therapy.deleted', therapyId, sessionCookie);
+        const deletedAudit = await findAuditEvent('therapy.deleted', therapyId, cookieHeader);
         assert.deepEqual(deletedAudit.redactedMetadata?.changedFields, ['deletedAt', 'deletionReason']);
         assert.equal(deletedAudit.redactedMetadata?.resourceVersion, 3);
 
@@ -262,10 +275,10 @@ test('paired therapy write requires capability, session, scope, version, and PHI
     }
 });
 
-async function findAuditEvent(eventType, subjectRef, sessionCookie) {
+async function findAuditEvent(eventType, subjectRef, cookieHeader) {
     const audit = await request('GET', `/api/system/audit?eventType=${eventType}&subjectType=therapy&limit=20`, {
         headers: {
-            Cookie: sessionCookie,
+            Cookie: cookieHeader,
         },
     });
     assert.equal(audit.response.status, 200);
@@ -393,19 +406,6 @@ function pairedHeaders(client) {
         'x-mediflow-paired-client-id': client.pairedClientId,
         'x-mediflow-paired-client-token': client.pairedClientToken,
     };
-}
-
-function extractSessionCookie(response) {
-    const setCookies = typeof response.headers.getSetCookie === 'function'
-        ? response.headers.getSetCookie()
-        : [];
-    const cookieSource = setCookies.find((cookie) => cookie.startsWith('mediflow_session='))
-        ?? response.headers.get('set-cookie');
-    if (!cookieSource) {
-        throw new Error('mediflow_session cookie was not returned by /api/auth/login');
-    }
-
-    return cookieSource.split(';')[0];
 }
 
 async function request(method, pathname, { headers = {}, body } = {}) {

@@ -42,6 +42,10 @@ test('bootstraps one control and binds the synthetic login mutation to its cooki
     assert.equal(result.response.status, 200);
     assert.deepEqual(result.json, { id: 'synthetic-user' });
     assert.equal(result.sessionCookie, `mediflow_session=${SESSION_ID}`);
+    assert.equal(
+        result.cookieHeader,
+        `mediflow_session=${SESSION_ID}; mediflow_auth_control=${CONTROL_ID}`,
+    );
     assert.equal(result.controlEtag, SUCCESSOR_ETAG);
 });
 
@@ -82,5 +86,23 @@ test('Node smoke callers delegate login to the exact control helper', () => {
         assert.match(source, /loginWithWebAuthControl/u, caller);
         assert.doesNotMatch(source, /request\(\s*['"]POST['"]\s*,\s*['"]\/api\/auth\/login['"]/u, caller);
         assert.doesNotMatch(source, /fetch\([^)]*\/api\/auth\/login/u, caller);
+        assert.match(source, /\.cookieHeader\b/u, caller);
+        assert.doesNotMatch(source, /extractSessionCookie/u, caller);
+        assert.doesNotMatch(source, /\.sessionCookie\b/u, caller);
+    }
+});
+
+test('network smoke workspaces externalize the real web auth lifecycle owner', () => {
+    for (const script of [
+        'network-home-base-readonly-smoke.sh',
+        'network-home-base-catalog-read-smoke.sh',
+        'network-home-base-write-smoke.sh',
+    ]) {
+        const source = readFileSync(new URL(script, import.meta.url), 'utf8');
+        assert.match(
+            source,
+            /serverExternalPackages:\s*\[[^\]]*['"]@mediflow\/web-auth-lifecycle-owner['"]/u,
+            script,
+        );
     }
 });

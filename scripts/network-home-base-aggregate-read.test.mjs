@@ -58,10 +58,10 @@ test('paired aggregate reads cover agenda, global diary, diagnoses opt-in, and c
 
         const login = await loginWithWebAuthControl(BASE_URL, { username: USERNAME, password: PIN });
         assert.equal(login.response.status, 200);
-        const sessionCookie = extractSessionCookie(login.response);
+        const cookieHeader = login.cookieHeader;
         const authenticatedPairedHeaders = {
             ...pairedHeaders(pairedClient),
-            Cookie: sessionCookie,
+            Cookie: cookieHeader,
         };
 
         const capabilities = await request('GET', '/api/v1/network/capabilities', {
@@ -434,19 +434,6 @@ function pairedHeaders(client) {
         'x-mediflow-paired-client-id': client.pairedClientId,
         'x-mediflow-paired-client-token': client.pairedClientToken,
     };
-}
-
-function extractSessionCookie(response) {
-    const setCookies = typeof response.headers.getSetCookie === 'function'
-        ? response.headers.getSetCookie()
-        : [];
-    const cookieSource = setCookies.find((cookie) => cookie.startsWith('mediflow_session='))
-        ?? response.headers.get('set-cookie');
-    if (!cookieSource) {
-        throw new Error('mediflow_session cookie was not returned by /api/auth/login');
-    }
-
-    return cookieSource.split(';')[0];
 }
 
 async function request(method, pathname, { headers = {}, body } = {}) {

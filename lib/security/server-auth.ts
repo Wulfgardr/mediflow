@@ -38,6 +38,7 @@ const SESSION_ID = /^[a-f0-9]{64}$/u;
 const CONTROL_ID = /^[A-Za-z0-9_-]{32,256}$/u;
 const AUTH_SESSION_KEYS = ['id', 'userId', 'username', 'role', 'authChannel', 'createdAt', 'expiresAt'] as const;
 const AUTH_COOKIE_KEYS = ['name', 'value'] as const;
+const AUTH_COOKIE_WITH_PATH_KEYS = ['name', 'value', 'path'] as const;
 const AUTH_USER_KEYS = ['id', 'username', 'role'] as const;
 const OWNER_METHOD_KEYS = [
     'snapshotSelectionEpoch',
@@ -131,8 +132,11 @@ function exactFrozenOwnerRecord(value: unknown, keys: readonly string[]): Record
 }
 
 function exactCookieValue(value: unknown, name: string, pattern: RegExp): string | null {
-    const record = exactDataRecord(value, AUTH_COOKIE_KEYS, ObjectPrototype);
-    return record?.name === name && typeof record.value === 'string' && pattern.test(record.value)
+    const record = exactDataRecord(value, AUTH_COOKIE_KEYS, ObjectPrototype)
+        ?? exactDataRecord(value, AUTH_COOKIE_WITH_PATH_KEYS, ObjectPrototype);
+    const path = record ? ObjectGetOwnPropertyDescriptor(record, 'path') : null;
+    return record?.name === name && typeof record.value === 'string'
+        && (!path || path.value === '/') && pattern.test(record.value)
         ? record.value
         : null;
 }

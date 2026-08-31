@@ -45,7 +45,7 @@ const nextConfig: NextConfig = {
   output: "standalone",
   distDir: ".next-network-smoke",
   turbopack: {},
-  serverExternalPackages: ['pdfjs-dist', 'pm2'],
+  serverExternalPackages: ['@mediflow/web-auth-lifecycle-owner', 'pdfjs-dist', 'pm2'],
   webpack: (config) => {
     config.resolve.alias.canvas = false;
     return config;

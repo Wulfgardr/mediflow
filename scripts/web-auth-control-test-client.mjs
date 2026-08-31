@@ -59,5 +59,6 @@ export async function loginWithWebAuthControl(baseUrl, credentials, fetchImpleme
     const successorEtag = strongEtag(response, 'Auth login');
     const json = await responseJson(response);
     const sessionCookie = exactCookie(response, 'mediflow_session', SESSION_COOKIE, false);
-    return Object.freeze({ response, json, sessionCookie, controlCookie, controlEtag: successorEtag });
+    const cookieHeader = sessionCookie ? `${sessionCookie}; ${controlCookie}` : null;
+    return Object.freeze({ response, json, sessionCookie, controlCookie, cookieHeader, controlEtag: successorEtag });
 }
