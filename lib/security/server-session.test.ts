@@ -1,7 +1,7 @@
 /* @Codex */
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
@@ -69,6 +69,8 @@ const RESOURCE_PORT_PRIMITIVES = new Set([
     'abortActiveWebSessionResourceUse', 'beginActiveWebSessionResourceUse', 'commitActiveWebSessionResourceUse',
     'mintActiveWebSessionResourcePort', 'releaseActiveWebSessionResourcePort',
 ]);
+const LEGACY_OWNER_BRIDGE_FILE = 'lib/security/web-auth-lifecycle-owner-legacy.ts';
+const LEGACY_OWNER_BRIDGE_SHA256 = '05f5f0b290a1e00b3c9a32a9a681627a63f80cde37b1a1f4e59a6de2710c4ae8';
 const PROJECTION_OWNER_FILES = [
     'lib/security/server-session-projection-owner.ts', 'lib/security/server-session-projection-owner.test.ts',
 ] as const;
@@ -192,6 +194,9 @@ const validateSessionImports = (sources: Readonly<Record<string, string>>) => {
     const ownerUses = Object.entries(sources).flatMap(([file, source]) => inventoryModuleImports({
         file, source, target: PROJECTION_OWNER_MODULE, repositoryRoot: REPOSITORY_ROOT, allowUnresolvedExpressions: allowedGenericLoaderExpressions,
     }));
+    const legacyOwnerBridgeExact = LEGACY_OWNER_BRIDGE_FILE in sources
+        && createHash('sha256').update(sources[LEGACY_OWNER_BRIDGE_FILE] ?? '').digest('hex') === LEGACY_OWNER_BRIDGE_SHA256;
+    if (LEGACY_OWNER_BRIDGE_FILE in sources && !legacyOwnerBridgeExact) errors.push(`${LEGACY_OWNER_BRIDGE_FILE}:shape`);
     const logout = new Map([
         ['lib/security/web-auth-logout-server.ts', new Set([
             'dispatchActiveWebServerSessionRetirement', 'resolveActiveWebServerSession', 'SESSION_COOKIE_NAME',
@@ -217,7 +222,8 @@ const validateSessionImports = (sources: Readonly<Record<string, string>>) => {
         const ownReload = use.form === 'require' && use.file === 'lib/security/server-session.test.ts';
         if (use.form !== 'named' && !provenDynamic && !ownReload) errors.push(`${use.file}:${use.form}`);
         if (!use.typeOnly && use.symbol === 'dispatchActiveWebServerSessionRetirement'
-            && use.file !== 'lib/security/server-session.test.ts' && !logout.has(use.file)) errors.push(`${use.file}:dispatch`);
+            && use.file !== 'lib/security/server-session.test.ts' && !logout.has(use.file)
+            && !(legacyOwnerBridgeExact && use.file === LEGACY_OWNER_BRIDGE_FILE)) errors.push(`${use.file}:dispatch`);
     }
     for (const [file, exact] of logout) {
         if (!(file in sources)) continue;
@@ -244,13 +250,15 @@ const validateSessionImports = (sources: Readonly<Record<string, string>>) => {
         if (use.file === 'lib/security/server-session.test.ts') continue;
         const projectionOwner = PROJECTION_OWNER_FILES.includes(use.file as typeof PROJECTION_OWNER_FILES[number]);
         const projectionBroker = brokerPaired && PROJECTION_BROKER_FILES.includes(use.file as typeof PROJECTION_BROKER_FILES[number]);
-        if (!projectionOwner && !projectionBroker) errors.push(`${use.file}:resource-owner`);
+        const legacyOwnerBridge = legacyOwnerBridgeExact && use.file === LEGACY_OWNER_BRIDGE_FILE;
+        if (!projectionOwner && !projectionBroker && !legacyOwnerBridge) errors.push(`${use.file}:resource-owner`);
         if (use.form !== 'named' || use.typeOnly) errors.push(`${use.file}:resource-form`);
     }
     const selfFile = 'lib/security/server-session.test.ts';
     if (selfFile in sources && !hasExactProjectionOwnerResourceImport(sources[selfFile] ?? '', true)) errors.push(`${selfFile}:resource-shape`);
     const adoptionResourceUses = resourceUses.filter((use) => use.file !== selfFile
-        && !PROJECTION_BROKER_FILES.includes(use.file as typeof PROJECTION_BROKER_FILES[number]));
+        && !PROJECTION_BROKER_FILES.includes(use.file as typeof PROJECTION_BROKER_FILES[number])
+        && !(legacyOwnerBridgeExact && use.file === LEGACY_OWNER_BRIDGE_FILE));
     const ownerAdopters = new Set(adoptionResourceUses.map((use) => use.file));
     const ownerTestDynamic = ownerUses.filter((use) => use.file === PROJECTION_OWNER_DYNAMIC_TEST
         && use.form === 'dynamic' && use.symbol === '*' && !use.typeOnly);
@@ -864,7 +872,13 @@ test('ACTIVE resource port has no callback surface or production importer before
 });
 
 test('inventories exact session imports by AST and closes the logout authority boundary', () => {
-    assert.deepEqual(validateSessionImports(typescriptSources()).errors, []);
+    const currentSources = typescriptSources();
+    assert.deepEqual(validateSessionImports(currentSources).errors, []);
+    const legacyBridge = currentSources[LEGACY_OWNER_BRIDGE_FILE]; assert.ok(legacyBridge);
+    assert.deepEqual(validateSessionImports({ [LEGACY_OWNER_BRIDGE_FILE]: legacyBridge }).errors, []);
+    assert.ok(validateSessionImports({
+        [LEGACY_OWNER_BRIDGE_FILE]: legacyBridge.replace('peekSession,', 'peekSession as peekHistoricalSession,'),
+    }).errors.includes(`${LEGACY_OWNER_BRIDGE_FILE}:shape`));
     for (const [file, specifier] of SESSION_TEST_DYNAMIC_SPECIFIERS) {
         const source = typescriptSources()[file]; assert.ok(source?.includes(`import('${specifier}')`));
         const drift = validateSessionImports({ [file]: source.replace(`import('${specifier}')`, `import('${specifier}?copy=1')`) });

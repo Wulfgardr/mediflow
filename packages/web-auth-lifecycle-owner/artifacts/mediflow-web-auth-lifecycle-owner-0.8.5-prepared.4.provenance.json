@@ -1,0 +1,167 @@
+{
+  "schemaVersion": "mediflow.web-auth-lifecycle-owner.package-provenance.v1",
+  "acceptedBase": "53f3d6be10799aaf982917561d246feef496095f",
+  "predecessor": {
+    "version": "0.8.5-prepared.3",
+    "tarSha256": "b770719d80a33a3ebe8dd7fd810f101fa73f1f32861e43765ca9779d4f1e53f6",
+    "provenanceSha256": "38173d5c6b463f1c1564507c08d6cebd21f58926385fce38e168e4562ba6fa53"
+  },
+  "package": {
+    "name": "@mediflow/web-auth-lifecycle-owner",
+    "version": "0.8.5-prepared.4"
+  },
+  "toolchain": {
+    "node": "v24.19.0",
+    "npm": "11.17.0"
+  },
+  "pack": {
+    "command": "npm pack --ignore-scripts --pack-destination ./artifacts",
+    "runs": 2,
+    "network": "offline",
+    "scripts": "ignored",
+    "cache": "empty_temporary",
+    "byteIdentical": true
+  },
+  "artifact": {
+    "path": "packages/web-auth-lifecycle-owner/artifacts/mediflow-web-auth-lifecycle-owner-0.8.5-prepared.4.tgz",
+    "bytes": 15291,
+    "sha256": "c8652cdee4d61a5742b3eff6aea57f949eafd917b551c556854b0b458d90d76c",
+    "integrity": "sha512-WK3TnWAH3mGi/3IJ1eg8Dpj9qlizq3BK+28Uk946eJ9I/MGAZ6+f2xTvX6rjlTLWoiBTgA7wJcNcCGkKPkuRAw=="
+  },
+  "inputs": [
+    {
+      "path": "index.js",
+      "bytes": 80,
+      "sha256": "7bc72383ad0639480702aadb8bad2cacf135c2c1b1cb7013a68ed5eef6d26a4f"
+    },
+    {
+      "path": "internal/control-record.cjs",
+      "bytes": 18237,
+      "sha256": "a15689f13f2af33a5451bd05c5c3dace735dcf3aeca2883f1be3f465fff79adb"
+    },
+    {
+      "path": "internal/owner.cjs",
+      "bytes": 18727,
+      "sha256": "ea7bf775c6c4e25bc4ab6914932fe33e366d04457ad68e335955326bef087792"
+    },
+    {
+      "path": "internal/session-activation.cjs",
+      "bytes": 6143,
+      "sha256": "5ed4c9543f8bc15903c0915a8565b997d697d004e9ccfaaa54a3da6236a2aa96"
+    },
+    {
+      "path": "internal/session-cell.cjs",
+      "bytes": 23897,
+      "sha256": "4cd0c2e9f8b40b346d43a93de561e20e85c5662fc8a2f9a0a170403fc80c2e31"
+    },
+    {
+      "path": "internal/session-resolver.cjs",
+      "bytes": 2965,
+      "sha256": "75409d670b8411dbadcc95e4bd9bfebeff47d2f687bde0d638809bb9114b5fa0"
+    },
+    {
+      "path": "internal/session-resource.cjs",
+      "bytes": 12008,
+      "sha256": "dcdc06fcd35068d42537b9233bc8f2f1ddec276488e3898c6b3e9409c59eb921"
+    },
+    {
+      "path": "internal/session-retirement.cjs",
+      "bytes": 5664,
+      "sha256": "8848c92cb88635c6c09baf685839e7c6f1aca40d667ea6580e84e275349f1516"
+    },
+    {
+      "path": "internal/support/successor-fence.cjs",
+      "bytes": 1172,
+      "sha256": "7e36178331d5f899d81d877603acb0100eef1436d1873287ad4b27ccc227e7ff"
+    },
+    {
+      "path": "internal/support/value.cjs",
+      "bytes": 47,
+      "sha256": "9f0968a0290c6184c898f06de2c408540d4eda1ecd0e3e80ae013bb37a782be1"
+    },
+    {
+      "path": "package.json",
+      "bytes": 251,
+      "sha256": "b946aad1961beca4b8dbd8ad938c10852dc4674b5fb2e3dcac0b0534d9a0430c"
+    }
+  ],
+  "roster": [
+    {
+      "path": "package/internal/control-record.cjs",
+      "type": "file",
+      "mode": "0644",
+      "bytes": 18237,
+      "sha256": "a15689f13f2af33a5451bd05c5c3dace735dcf3aeca2883f1be3f465fff79adb"
+    },
+    {
+      "path": "package/internal/owner.cjs",
+      "type": "file",
+      "mode": "0644",
+      "bytes": 18727,
+      "sha256": "ea7bf775c6c4e25bc4ab6914932fe33e366d04457ad68e335955326bef087792"
+    },
+    {
+      "path": "package/internal/session-activation.cjs",
+      "type": "file",
+      "mode": "0644",
+      "bytes": 6143,
+      "sha256": "5ed4c9543f8bc15903c0915a8565b997d697d004e9ccfaaa54a3da6236a2aa96"
+    },
+    {
+      "path": "package/internal/session-cell.cjs",
+      "type": "file",
+      "mode": "0644",
+      "bytes": 23897,
+      "sha256": "4cd0c2e9f8b40b346d43a93de561e20e85c5662fc8a2f9a0a170403fc80c2e31"
+    },
+    {
+      "path": "package/internal/session-resolver.cjs",
+      "type": "file",
+      "mode": "0644",
+      "bytes": 2965,
+      "sha256": "75409d670b8411dbadcc95e4bd9bfebeff47d2f687bde0d638809bb9114b5fa0"
+    },
+    {
+      "path": "package/internal/session-resource.cjs",
+      "type": "file",
+      "mode": "0644",
+      "bytes": 12008,
+      "sha256": "dcdc06fcd35068d42537b9233bc8f2f1ddec276488e3898c6b3e9409c59eb921"
+    },
+    {
+      "path": "package/internal/session-retirement.cjs",
+      "type": "file",
+      "mode": "0644",
+      "bytes": 5664,
+      "sha256": "8848c92cb88635c6c09baf685839e7c6f1aca40d667ea6580e84e275349f1516"
+    },
+    {
+      "path": "package/internal/support/successor-fence.cjs",
+      "type": "file",
+      "mode": "0644",
+      "bytes": 1172,
+      "sha256": "7e36178331d5f899d81d877603acb0100eef1436d1873287ad4b27ccc227e7ff"
+    },
+    {
+      "path": "package/internal/support/value.cjs",
+      "type": "file",
+      "mode": "0644",
+      "bytes": 47,
+      "sha256": "9f0968a0290c6184c898f06de2c408540d4eda1ecd0e3e80ae013bb37a782be1"
+    },
+    {
+      "path": "package/index.js",
+      "type": "file",
+      "mode": "0644",
+      "bytes": 80,
+      "sha256": "7bc72383ad0639480702aadb8bad2cacf135c2c1b1cb7013a68ed5eef6d26a4f"
+    },
+    {
+      "path": "package/package.json",
+      "type": "file",
+      "mode": "0644",
+      "bytes": 251,
+      "sha256": "b946aad1961beca4b8dbd8ad938c10852dc4674b5fb2e3dcac0b0534d9a0430c"
+    }
+  ]
+}
