@@ -4,7 +4,10 @@ import { afterEach, test } from 'node:test';
 
 import { createFullPortProjectionOwnerProcessOwner } from './server-session-projection-owner.ts';
 import type { ServerSession } from './server-session.ts';
-import { issueSyntheticWebSession, retireSyntheticWebSession } from './web-auth-lifecycle-owner-test-fixture.ts';
+import { resolve } from './web-auth-lifecycle-owner-adapter.ts';
+import {
+    issueSyntheticWebSession, issueSyntheticWebSessionContext, retireSyntheticWebSession,
+} from './web-auth-lifecycle-owner-test-fixture.ts';
 
 const USER = Object.freeze({ id: 'synthetic-user', username: 'synthetic-clinician', role: 'clinician' }); const PAIR = Object.freeze({ patientId: 'patient.synthetic.01', ambulatoryId: 'ambulatory.synthetic.01' });
 const sessions = new Set<ServerSession>();
@@ -39,6 +42,18 @@ test('selection lifecycle publishes only opaque scope and registration behind th
     }), false);
     assert.equal(Reflect.get(registry, 'selectionLifecycleController'), undefined);
     assert.equal(Reflect.get(owner, 'selectionLifecycleController'), undefined);
+});
+
+test('selection lifecycle accepts a fresh authenticated projection of the same current Web session', () => {
+    const context = issueSyntheticWebSessionContext(USER, `projection-selection-${sequence += 1}`); sessions.add(context.session);
+    const processOwner = createFullPortProjectionOwnerProcessOwner({ resolve: (_session, pair) => pair });
+    const { registry, selectionLifecycleController: lifecycle } = processOwner; const owner = registry.acquire(context.session);
+    owner.issueSelection({ expectedEpoch: 0, ...PAIR });
+    const refreshed = resolve(context.session.id, context.controlId);
+    assert.equal(refreshed.status, 'active'); if (refreshed.status !== 'active') assert.fail('expected refreshed projection');
+    assert.notEqual(refreshed.projection, context.session); let scope: unknown = null;
+    assert.equal(lifecycle.withCurrentSelection(refreshed.projection as ServerSession, (candidate) => { scope = candidate; }), true);
+    assert.ok(scope);
 });
 
 test('selection lifecycle snapshots every dependent before reselection, expiry, and disposal', () => {
