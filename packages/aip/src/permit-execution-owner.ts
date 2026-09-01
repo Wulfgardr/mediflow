@@ -2,9 +2,11 @@
 
 declare const PERMIT_BRAND: unique symbol;
 declare const EXECUTION_BRAND: unique symbol;
+declare const BOUND_EXECUTION_BRAND: unique symbol;
 
 export type AipAuthorizationPermitV1 = Readonly<{ [PERMIT_BRAND]: true }>;
 export type AipPermitExecutionV1 = Readonly<{ [EXECUTION_BRAND]: true }>;
+export type AipBoundPermitExecutionV1 = Readonly<{ [BOUND_EXECUTION_BRAND]: true }>;
 
 type PermitRecord<Authority> = {
     authority: Authority;
@@ -15,13 +17,16 @@ type PermitRecord<Authority> = {
 type ExecutionRecord<Authority> = {
     permit: PermitRecord<Authority>;
     state: 'active' | 'pending' | 'consumed' | 'revoked';
+    binding?: readonly unknown[];
 };
 type Sources<Authority, Code extends string> = Readonly<{
     enter: () => void;
     now: () => number;
     parseCurrent: (value: unknown) => readonly unknown[];
     parseClaim: (value: unknown) => readonly unknown[];
+    parseBinding: (value: unknown) => readonly unknown[];
     validate: (authority: Authority, current: readonly unknown[], claim: readonly unknown[], timestamp: number) => Code | null;
+    validateBinding: (authority: Authority, binding: readonly unknown[]) => Code | null;
     error: (code: Code) => Error;
     permitInvalid: Code;
     permitReplay: Code;
@@ -39,6 +44,7 @@ function same(left: readonly unknown[], right: readonly unknown[]): boolean {
 export function createAipPermitExecutionOwnerV1<Authority, Code extends string>(sources: Sources<Authority, Code>) {
     const permits = new WeakMap<object, PermitRecord<Authority>>();
     const executions = new WeakMap<object, ExecutionRecord<Authority>>();
+    const boundExecutions = new WeakMap<object, ExecutionRecord<Authority>>();
 
     const fail = (permit: PermitRecord<Authority>, code: Code): never => {
         permit.state = 'revoked';
@@ -78,6 +84,38 @@ export function createAipPermitExecutionOwnerV1<Authority, Code extends string>(
         executions.set(execution, { permit, state: 'active' });
         return execution;
     };
+    const bind = (executionValue: unknown, bindingValue: unknown, currentValue: unknown,
+        claimValue: unknown): AipBoundPermitExecutionV1 => {
+        sources.enter();
+        if (!executionValue || typeof executionValue !== 'object') throw sources.error(sources.permitInvalid);
+        const execution = executions.get(executionValue as object);
+        if (!execution) throw sources.error(sources.permitInvalid);
+        if (execution.state !== 'active') throw sources.error(
+            execution.state === 'revoked' ? sources.permitRevoked : sources.permitReplay);
+        if (execution.binding) {
+            execution.state = 'revoked'; fail(execution.permit, sources.permitReplay);
+        }
+        execution.state = 'pending';
+        let binding: readonly unknown[];
+        try { binding = sources.parseBinding(bindingValue); } catch (error) {
+            execution.permit.state = 'revoked'; execution.state = 'revoked'; throw error;
+        }
+        let denial: Code | null;
+        try { denial = sources.validateBinding(execution.permit.authority, binding); } catch (error) {
+            execution.permit.state = 'revoked'; execution.state = 'revoked'; throw error;
+        }
+        if (denial) {
+            execution.permit.state = 'revoked'; execution.state = 'revoked'; throw sources.error(denial);
+        }
+        try { parseAndValidate(execution.permit, currentValue, claimValue); } catch (error) {
+            execution.state = 'revoked'; throw error;
+        }
+        execution.binding = binding;
+        execution.state = 'active';
+        const bound = handle<AipBoundPermitExecutionV1>();
+        boundExecutions.set(bound, execution);
+        return bound;
+    };
     const finalize = (executionValue: unknown, currentValue: unknown, claimValue: unknown): true => {
         sources.enter();
         if (!executionValue || typeof executionValue !== 'object') throw sources.error(sources.permitInvalid);
@@ -85,6 +123,9 @@ export function createAipPermitExecutionOwnerV1<Authority, Code extends string>(
         if (!execution) throw sources.error(sources.permitInvalid);
         if (execution.state !== 'active') throw sources.error(
             execution.state === 'revoked' ? sources.permitRevoked : sources.permitReplay);
+        if (execution.binding) {
+            execution.state = 'revoked'; fail(execution.permit, sources.permitRevoked);
+        }
         execution.state = 'pending';
         try { parseAndValidate(execution.permit, currentValue, claimValue); } catch (error) {
             execution.state = 'revoked';
@@ -92,6 +133,33 @@ export function createAipPermitExecutionOwnerV1<Authority, Code extends string>(
         }
         execution.permit.state = 'consumed';
         execution.state = 'consumed';
+        return true;
+    };
+    const finalizeBound = (boundValue: unknown, bindingValue: unknown, currentValue: unknown,
+        claimValue: unknown): true => {
+        sources.enter();
+        if (!boundValue || typeof boundValue !== 'object') throw sources.error(sources.permitInvalid);
+        const execution = boundExecutions.get(boundValue as object);
+        if (!execution) throw sources.error(sources.permitInvalid);
+        if (execution.state !== 'active' || !execution.binding) throw sources.error(
+            execution.state === 'revoked' ? sources.permitRevoked : sources.permitReplay);
+        execution.state = 'pending';
+        let binding: readonly unknown[];
+        try { binding = sources.parseBinding(bindingValue); } catch (error) {
+            execution.permit.state = 'revoked'; execution.state = 'revoked'; throw error;
+        }
+        let denial: Code | null;
+        try { denial = sources.validateBinding(execution.permit.authority, binding); } catch (error) {
+            execution.permit.state = 'revoked'; execution.state = 'revoked'; throw error;
+        }
+        if (denial || !same(binding, execution.binding)) {
+            execution.permit.state = 'revoked'; execution.state = 'revoked';
+            throw sources.error(denial ?? sources.permitRevoked);
+        }
+        try { parseAndValidate(execution.permit, currentValue, claimValue); } catch (error) {
+            execution.state = 'revoked'; throw error;
+        }
+        execution.permit.state = 'consumed'; execution.state = 'consumed';
         return true;
     };
     const deny = (executionValue: unknown): boolean => {
@@ -109,5 +177,5 @@ export function createAipPermitExecutionOwnerV1<Authority, Code extends string>(
         return finalize(execution, current, claim);
     };
 
-    return Object.freeze({ issue, begin, finalize, deny, consume });
+    return Object.freeze({ issue, begin, bind, finalize, finalizeBound, deny, consume });
 }
