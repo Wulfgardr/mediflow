@@ -126,11 +126,11 @@ test('Smart Import exposes only the Fabric review preview and never calls legacy
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
   await setAiLaneKillSwitch(page, 'aiSmartImportKillSwitch', 'enabled');
   const patientId = await createPatient(page);
-  await page.goto(`/patients/${patientId}/modules`);
+  await page.goto(`/patients/${patientId}/modules#documenti`);
 
   const documents = page.getByRole('button', { name: /Documenti Archivio documenti ed evidenze/u });
   await expect(documents).toBeVisible({ timeout: 20_000 });
-  if (await documents.getAttribute('aria-expanded') !== 'true') await documents.click();
+  await expect(documents).toHaveAttribute('aria-expanded', 'true');
 
   const card = page.getByTestId('fabric-preview-card');
   await expect(card).toContainText('Fabric · anteprima sola lettura');
