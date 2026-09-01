@@ -1245,9 +1245,11 @@ Il golden H9 tracciato e unico e contiene soltanto dati sintetici. Congela:
   `receiptRef = hser_e5bdc96f3ec004423c2ca2716bf49e40ade4e1f7ab196a6b7a3ac6699bf57b14`;
 - l'ordine delle key e il JSON canonico compatto UTF-8, senza BOM o whitespace,
   di entrambi i DTO;
-- il `receiptDigest` golden
-  `4374289aaf2aff0ea046e7c3bc301d940d41f3fc38d905dee1496051139fe483`,
-  calcolato come SHA-256 di
+- i campi canonical self-describing `receiptDigestCodec =
+  mediflow.headless.soap-entry-commit-receipt-digest.v1` e
+  `receiptDigestHex =
+  4374289aaf2aff0ea046e7c3bc301d940d41f3fc38d905dee1496051139fe483`,
+  con il digest calcolato come SHA-256 di
   `mediflow.headless.soap-entry-commit-receipt-digest.v1 + NUL +`
   `canonicalReceiptJSON`.
 
