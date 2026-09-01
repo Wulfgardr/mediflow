@@ -32,6 +32,17 @@ test('system diagnostics do not expose a runnable OCR health check', () => {
     assert.doesNotMatch(diagnostics, /\/api\/ocr\/extract|DeepSeek OCR|id:\s*['"]ocr['"]/u);
 });
 
+test('current review surfaces do not advertise an available OCR workflow', () => {
+    const reviewArea = source('../components/kree8/areas/revisione-area.tsx');
+    const nativeDocuments = source('../native/MediFlowMac/Sources/MediFlowAppleShared/AppleFoundation/PairedPatientDocumentsSection.swift');
+    const reviewQueue = source('./domain/documents/patient-review-queue-summary.ts');
+
+    assert.doesNotMatch(reviewArea, /Anteprima OCR/u);
+    assert.doesNotMatch(nativeDocuments, /OCR e sintesi restano|Stato coda OCR/u);
+    assert.match(nativeDocuments, /AnyDoc/u);
+    assert.doesNotMatch(reviewQueue, /OCR o sintesi da completare/u);
+});
+
 test('AI settings and model labels have no writable or selectable OCR model', () => {
     const settingsController = source('./hooks/use-ai-settings-controller.ts');
     const modelsPage = source('../app/settings/ai/modelli/page.tsx');

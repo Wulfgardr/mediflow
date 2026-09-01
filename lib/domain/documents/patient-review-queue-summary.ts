@@ -252,6 +252,7 @@ function buildSmartImportRow(input: PatientReviewQueueInput['smartImport']): Pat
     );
 }
 
+/* @Codex */
 function buildArchiveRow(input: PatientReviewQueueInput['archive']): PatientReviewQueueRow {
     const anchor = DOCUMENTS_PANEL_ANCHOR;
 
@@ -270,7 +271,7 @@ function buildArchiveRow(input: PatientReviewQueueInput['archive']): PatientRevi
             'archive',
             'Archivio documenti',
             'serve-testo',
-            `${input.missingTextCount} allegati su ${input.attachmentsCount} senza testo estratto: OCR o sintesi da completare.`,
+            `${input.missingTextCount} allegati su ${input.attachmentsCount} senza testo estratto: estrazione locale o revisione manuale da completare.`,
             { anchor },
         );
     }

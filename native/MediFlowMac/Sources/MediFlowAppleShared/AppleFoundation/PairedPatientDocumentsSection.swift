@@ -121,7 +121,7 @@ struct PairedPatientDocumentsSection: View {
                 .disabled(!model.canUploadAttachment)
                 .accessibilityIdentifier("attachment-upload-photo-button")
             }
-            Text("Solo caricamento manuale. OCR e sintesi restano sull'home-base: il documento entra in coda in attesa.")
+            Text("Solo caricamento manuale. AnyDoc è l'unica estrazione automatica locale; immagini e scansioni richiedono revisione.")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
             Text("Disponibile solo online: se il Mac non risponde, il documento non viene accodato.")
@@ -232,7 +232,7 @@ struct PairedPatientDocumentsSection: View {
                                     InfoRow("Caricato il", PairedPatientsWorkspaceSupport.entryDateFormatter.string(from: createdAt))
                                 }
                                 if let queueLabel = HomeBaseDocumentOcrQueuePresentation.describe(state: detail.ocrQueueState, reason: detail.ocrQueueReason) {
-                                    InfoRow("Stato coda OCR", queueLabel)
+                                    InfoRow("Stato revisione documento", queueLabel)
                                 }
                                 if let summarySnapshot = cleanedPatientWorkspaceValue(detail.summarySnapshot) {
                                     InfoRow("Sintesi", summarySnapshot)
