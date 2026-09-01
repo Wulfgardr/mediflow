@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useRef, useEffect, useId } from 'react';
-import { searchICDHybrid, ICDSearchResult } from '@/lib/icd-service'; // UPDATED Import
+import { icdClientErrorMessage, searchICDHybrid } from '@/lib/icd-service';
+import type { ICDSearchResult } from '@/lib/icd-service';
 import { createLatestRequestGuard } from '@/lib/latest-request-guard'; // @Codex
 import { Search, X, Server } from 'lucide-react';
 
@@ -54,11 +55,12 @@ export default function ICDAutocomplete({ value, onChange, initialValue, onSelec
 
     // @Codex WUL-311 - prevent delayed ICD lookups from updating an unmounted autocomplete.
     useEffect(() => {
+        const latestSearch = latestSearchRef.current;
         return () => {
             if (debounceRef.current) {
                 clearTimeout(debounceRef.current);
             }
-            latestSearchRef.current.discard();
+            latestSearch.discard();
         };
     }, []);
 
@@ -86,9 +88,9 @@ export default function ICDAutocomplete({ value, onChange, initialValue, onSelec
                         setActiveIndex(-1); // @Codex WUL-UIUX
                         setIsOpen(true); // @Codex
                     }) // @Codex
-                    .catch(() => { // @Codex
+                    .catch((error) => { // @Codex
                         if (!latestSearchRef.current.isLatest(requestId)) return; // @Codex
-                        setSearchError('Servizio ICD-11 locale non raggiungibile. Verifica Docker e sessione attiva.'); // @Codex
+                        setSearchError(icdClientErrorMessage(error)); // @Codex
                         setResults([]); // @Codex
                         setIsOpen(true); // @Codex
                     }) // @Codex

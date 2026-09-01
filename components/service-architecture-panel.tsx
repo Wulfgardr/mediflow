@@ -5,7 +5,6 @@ import {
     Server,
     Brain,
     Stethoscope,
-    Play,
     RefreshCw,
     CheckCircle2,
     XCircle,
@@ -14,12 +13,13 @@ import {
     Copy,
     Check
 } from 'lucide-react';
+import { getICDReadiness, icdClientErrorMessage, icdReadinessMessage } from '@/lib/icd-service';
 
 interface ServiceStatus {
     status: 'running' | 'stopped' | 'checking';
-    url: string;
     port: string;
-    env: 'native' | 'docker';
+    env: 'native' | 'host';
+    detail?: string;
     lastCheck?: Date;
 }
 
@@ -31,9 +31,9 @@ interface Services {
 
 export default function ServiceArchitecturePanel() {
     const [services, setServices] = useState<Services>({
-        app: { status: 'running', url: 'http://localhost', port: '3000', env: 'native' },
-        ai: { status: 'checking', url: 'http://127.0.0.1', port: '11434', env: 'native' },
-        icd: { status: 'checking', url: 'http://localhost', port: '8888', env: 'docker' }
+        app: { status: 'running', port: '3000', env: 'native' },
+        ai: { status: 'checking', port: '11434', env: 'native' },
+        icd: { status: 'checking', port: '2026-01', env: 'host' }
     });
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [copiedCommand, setCopiedCommand] = useState<string | null>(null);
@@ -68,19 +68,28 @@ export default function ServiceArchitecturePanel() {
             }));
         }
 
-        // Check ICD-11
+        // @Codex: readiness only; never send a synthetic diagnosis to WHO.
         try {
-            const icdResponse = await fetch('/api/icd/proxy?uri=/icd/release/11/2024-01/mms', {
-                signal: AbortSignal.timeout(5000)
-            });
+            const readiness = await getICDReadiness();
             setServices(prev => ({
                 ...prev,
-                icd: { ...prev.icd, status: icdResponse.ok ? 'running' : 'stopped', lastCheck: new Date() }
+                icd: {
+                    ...prev.icd,
+                    status: readiness.status === 'available' ? 'running' : 'stopped',
+                    port: readiness.releaseId,
+                    detail: icdReadinessMessage(readiness.status),
+                    lastCheck: new Date(),
+                }
             }));
-        } catch {
+        } catch (error: unknown) {
             setServices(prev => ({
                 ...prev,
-                icd: { ...prev.icd, status: 'stopped', lastCheck: new Date() }
+                icd: {
+                    ...prev.icd,
+                    status: 'stopped',
+                    detail: icdClientErrorMessage(error),
+                    lastCheck: new Date(),
+                }
             }));
         }
 
@@ -261,7 +270,7 @@ export default function ServiceArchitecturePanel() {
                                 <p className="text-xs" style={{ color: 'var(--lume-ink-muted)' }}>WHO API</p>
                             </div>
                             <div className="lume-registro text-xs" style={{ color: 'var(--lume-ink-muted)' }}>
-                                :{services.icd.port}
+                                release {services.icd.port}
                             </div>
                             <div className="flex items-center gap-1.5">
                                 {getStatusIcon(services.icd.status)}
@@ -271,22 +280,10 @@ export default function ServiceArchitecturePanel() {
                                 {services.icd.env}
                             </span>
 
-                            {services.icd.status === 'stopped' && (
-                                <div className="mt-2 space-y-2 w-full">
-                                    <button
-                                        onClick={() => copyCommand('docker compose up -d icd-api', 'icd')}
-                                        className="w-full px-3 py-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg flex items-center justify-center gap-1.5 transition-colors"
-                                    >
-                                        {copiedCommand === 'icd' ? (
-                                            <><Check className="w-3 h-3" /> Copiato!</>
-                                        ) : (
-                                            <><Play className="w-3 h-3" /> Avvia Docker</>
-                                        )}
-                                    </button>
-                                    <p className="text-[10px] text-gray-500">
-                                        docker compose up -d icd-api
-                                    </p>
-                                </div>
+                            {services.icd.detail && (
+                                <p className="mt-2 text-[10px] leading-4" style={{ color: 'var(--lume-ink-muted)' }}>
+                                    {services.icd.detail}
+                                </p>
                             )}
                         </div>
                     </div>
@@ -313,8 +310,8 @@ export default function ServiceArchitecturePanel() {
                         <span>= Sul tuo computer</span>
                     </div>
                     <div className="flex items-center gap-2">
-                        <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase bg-sky-100 dark:bg-sky-900/50 text-sky-700 dark:text-sky-300 rounded">DOCKER</span>
-                        <span>= In container</span>
+                        <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase bg-sky-100 dark:bg-sky-900/50 text-sky-700 dark:text-sky-300 rounded">HOST</span>
+                        <span>= Confine governato</span>
                     </div>
                 </div>
             </div>
