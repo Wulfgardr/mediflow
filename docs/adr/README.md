@@ -6,6 +6,7 @@ Questa cartella contiene le decisioni di MediFlow (web + native).
 
 ## ADR piu recente
 
+- [0116-agentic-checkup-status-transition.md](./0116-agentic-checkup-status-transition.md): accetta il primo write agentico non-SOAP come sola transizione `pending -> completed|cancelled` di un checkup esistente, con proposta AIP, conferma UI operation-specific, CAS, idempotenza e receipt PHI-safe; il packet resta docs-only.
 - [0115-icd11-who-reference-data-adapter.md](./0115-icd11-who-reference-data-adapter.md): accetta un Application Service ICD-11 host-owned con binding WHO API v2/MMS/release esplicita, egress opt-in, cache exact-binding e transport ufficiale separato; il primo packet resta fake-transport e non migra i caller.
 - [0114-intelligent-host-aip-mcp-isolation.md](./0114-intelligent-host-aip-mcp-isolation.md): accetta un processo MCP `stdio` modern-only separato e un broker AIP locale come unico futuro passaggio verso Application Services nominati; la prima slice espone soltanto stato non-PHI.
 - [0113-recording-visita-trascrizione-locale-085.md](./0113-recording-visita-trascrizione-locale-085.md): accetta recording e trascrizione Apple on-device nel solo target macOS, con consenso esplicito, audio bounded in RAM, transcript effimero e review separata da ogni writer clinico.
