@@ -1,5 +1,7 @@
 import { types } from 'node:util';
 
+import { validateHeadlessSoapEntryCommitSemanticChain } from './security/headless-soap-entry-commit-semantic-validator';
+
 export const BACKUP_ARTIFACT_FORMAT = 'mediflow-backup' as const;
 export const BACKUP_ARTIFACT_VERSION = 1 as const;
 export const BACKUP_ARTIFACT_SCOPE = 'mediflow-web-local-backup' as const;
@@ -22,6 +24,7 @@ export const BACKUP_COLLECTIONS = [
     'patients',
     'physicianReviewAttestations',
     'headlessSoapActiveRoleAttestations',
+    'headlessSoapEntryCommits',
     'prostheticPrescriptions',
     'serviceCatalogEntries',
     'servicePrescriptionItems',
@@ -33,21 +36,33 @@ export const BACKUP_COLLECTIONS = [
 
 export type BackupCollectionName = (typeof BACKUP_COLLECTIONS)[number];
 export type BackupRecord = Record<string, unknown>;
-type AuditDependentCommandCollection = 'durableReviewCommandStates' | 'durableReviewCommandOperations';
-export type BackupDataset = Record<Exclude<BackupCollectionName, AuditDependentCommandCollection>, BackupRecord[]>
-    & Partial<Record<AuditDependentCommandCollection, BackupRecord[]>>;
+type AdditiveBackupCollection = 'durableReviewCommandStates' | 'durableReviewCommandOperations' | 'headlessSoapEntryCommits';
+export type BackupDataset = Record<Exclude<BackupCollectionName, AdditiveBackupCollection>, BackupRecord[]>
+    & Partial<Record<AdditiveBackupCollection, BackupRecord[]>>;
 
 /* @Codex */
 const DURABLE_REVIEW_AUTHORITY_COLLECTIONS = new Set<BackupCollectionName>([
     'durableReviewPatientLinks',
     'physicianReviewAttestations',
 ]);
-/* @Codex Artifacts created before H2a-S have no SOAP active-role attestation rows. */
-const PRE_HEADLESS_SOAP_ATTESTATION_COLLECTIONS = BACKUP_COLLECTIONS.filter(
+/* @Codex Artifacts created before H7b have no durable SOAP commit ledger. */
+const PRE_HEADLESS_SOAP_COMMIT_COLLECTIONS = BACKUP_COLLECTIONS.filter(
+    (collection) => collection !== 'headlessSoapEntryCommits',
+);
+/* @Codex v1 also tolerates an explicitly empty H7b generation without the earlier H2a-S collection. */
+const WITHOUT_HEADLESS_SOAP_ATTESTATION_COLLECTIONS = BACKUP_COLLECTIONS.filter(
+    (collection) => collection !== 'headlessSoapActiveRoleAttestations',
+);
+/* @Codex Artifacts created before H2a-S have neither SOAP authority nor the later H7b ledger. */
+const PRE_HEADLESS_SOAP_ATTESTATION_COLLECTIONS = PRE_HEADLESS_SOAP_COMMIT_COLLECTIONS.filter(
     (collection) => collection !== 'headlessSoapActiveRoleAttestations',
 );
 /* @Codex Artifacts created before durable review authority was added have no such collections. */
 const PRE_DURABLE_REVIEW_AUTHORITY_COLLECTIONS = PRE_HEADLESS_SOAP_ATTESTATION_COLLECTIONS.filter(
+    (collection) => !DURABLE_REVIEW_AUTHORITY_COLLECTIONS.has(collection),
+);
+/* @Codex Known v1 omissions remain recognizable when a later producer adds an empty H7b ledger. */
+const WITHOUT_DURABLE_REVIEW_AUTHORITY_COLLECTIONS = WITHOUT_HEADLESS_SOAP_ATTESTATION_COLLECTIONS.filter(
     (collection) => !DURABLE_REVIEW_AUTHORITY_COLLECTIONS.has(collection),
 );
 /* @Codex */
@@ -58,8 +73,13 @@ const LEGACY_OMITTED_COLLECTION_SETS: readonly (readonly BackupCollectionName[])
 ];
 /* @Codex v1 recognizes both the authority-era and pre-authority collection generations. */
 const LEGACY_COLLECTION_SETS: readonly (readonly BackupCollectionName[])[] = [
+    WITHOUT_HEADLESS_SOAP_ATTESTATION_COLLECTIONS,
+    PRE_HEADLESS_SOAP_COMMIT_COLLECTIONS,
     PRE_HEADLESS_SOAP_ATTESTATION_COLLECTIONS,
     ...LEGACY_OMITTED_COLLECTION_SETS.map((omitted) => BACKUP_COLLECTIONS.filter((collection) => !omitted.includes(collection))),
+    ...LEGACY_OMITTED_COLLECTION_SETS.map((omitted) => PRE_HEADLESS_SOAP_COMMIT_COLLECTIONS.filter((collection) => !omitted.includes(collection))),
+    ...LEGACY_OMITTED_COLLECTION_SETS.map((omitted) => WITHOUT_HEADLESS_SOAP_ATTESTATION_COLLECTIONS.filter((collection) => !omitted.includes(collection))),
+    ...LEGACY_OMITTED_COLLECTION_SETS.map((omitted) => WITHOUT_DURABLE_REVIEW_AUTHORITY_COLLECTIONS.filter((collection) => !omitted.includes(collection))),
     ...LEGACY_OMITTED_COLLECTION_SETS.map((omitted) => PRE_HEADLESS_SOAP_ATTESTATION_COLLECTIONS.filter((collection) => !omitted.includes(collection))),
     ...LEGACY_OMITTED_COLLECTION_SETS.map((omitted) => PRE_DURABLE_REVIEW_AUTHORITY_COLLECTIONS.filter((collection) => !omitted.includes(collection))),
 ];
@@ -100,6 +120,23 @@ const HEADLESS_SOAP_ACTIVE_ROLE_OPERATION = 'mediflow.clinical_diary.append_soap
 const HEADLESS_SOAP_ACTIVE_ROLE_POLICY = 'clinician_confirmed_single_use.v1';
 const HEADLESS_SOAP_ACTIVE_ROLE_ATTESTATION_REF = /^hsar_[0-9a-f]{32}$/;
 const HEADLESS_SOAP_ACTIVE_ROLE_ISSUER_REF = /^hsari_[0-9a-f]{32}$/;
+const HEADLESS_SOAP_COMMAND_ID = /^hsac_[0-9a-f]{64}$/;
+const HEADLESS_SOAP_APPROVAL_REF = /^hsaa_[0-9a-f]{64}$/;
+const HEADLESS_SOAP_IDEMPOTENCY_KEY = /^hsai_[0-9a-f]{64}$/;
+const HEADLESS_SOAP_ENTRY_ID = /^hsei_[0-9a-f]{64}$/;
+const HEADLESS_SOAP_AUDIT_EVENT_ID = /^hsea_[0-9a-f]{64}$/;
+const HEADLESS_SOAP_RECEIPT_REF = /^hser_[0-9a-f]{64}$/;
+const HEADLESS_SOAP_BINDING_DIGEST_DOMAIN = 'mediflow.headless.soap-entry-commit-binding-digest.v1';
+const HEADLESS_SOAP_AUDIT_DIGEST_DOMAIN = 'mediflow.headless.soap-entry-commit-audit-digest.v1';
+const HEADLESS_SOAP_RECEIPT_DIGEST_DOMAIN = 'mediflow.headless.soap-entry-commit-receipt-digest.v1';
+const HEADLESS_SOAP_ENTRY_DIGEST_DOMAIN = 'mediflow.headless.soap-entry-commit-entry-digest.v1';
+const HEADLESS_SOAP_PATIENT_ID_DIGEST_DOMAIN = 'mediflow.headless.soap-entry-commit-patient-id-digest.v1';
+const HEADLESS_SOAP_ENTRY_ID_DOMAIN = 'mediflow.headless.soap-entry-id.v1';
+const HEADLESS_SOAP_AUDIT_ID_DOMAIN = 'mediflow.headless.soap-entry-audit-id.v1';
+const HEADLESS_SOAP_RECEIPT_ID_DOMAIN = 'mediflow.headless.soap-entry-receipt-ref.v1';
+const HEADLESS_SOAP_COMMIT_KEYS = ['idempotencyKey', 'approvalRef', 'authorizationProofDigest', 'commandId', 'entryId', 'auditEventId', 'receiptRef', 'bindingSnapshot', 'bindingDigest', 'entryDigest', 'auditSnapshot', 'auditDigest', 'receiptSnapshot', 'receiptDigest', 'committedAt'] as const;
+const HEADLESS_SOAP_AUDIT_KEYS = ['eventId', 'schemaVersion', 'eventType', 'occurredAt', 'outcome', 'actorType', 'actorRef', 'subjectType', 'subjectRef', 'sourceSurface', 'requestId', 'redactedMetadata', 'createdAt'] as const;
+const HEADLESS_SOAP_RECEIPT_KEYS = ['schema', 'receiptRef', 'operationId', 'outcome', 'commandId', 'entryRef', 'auditEventRef', 'patientVersion', 'entryVersion', 'committedAt', 'bindingDigest', 'entryDigest', 'auditDigest'] as const;
 const BACKUP_ARTIFACT_ROOT_KEYS = ['format', 'version', 'manifest', 'payload'] as const;
 
 export interface BackupArtifactManifest {
@@ -311,6 +348,140 @@ function assertHeadlessSoapActiveRoleAttestationRows(
         }
         attestationRefs.add(attestation.attestationRef);
         actorRefs.add(attestation.actorRef);
+    }
+}
+
+/* @Codex H7b embeds only its own exact audit snapshot; audit_events never becomes a backup collection. */
+function parseCanonicalSnapshot(value: unknown, keys?: readonly string[]): Record<string, unknown> | null {
+    if (typeof value !== 'string') return null;
+    try {
+        const parsed = JSON.parse(value) as unknown;
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed) || Object.getPrototypeOf(parsed) !== Object.prototype
+            || JSON.stringify(parsed) !== value) return null;
+        if (keys && (Object.keys(parsed).length !== keys.length
+            || keys.some((key, index) => Object.keys(parsed)[index] !== key))) return null;
+        return parsed as Record<string, unknown>;
+    } catch {
+        return null;
+    }
+}
+
+/* @Codex Backup preflight binds the ledger to its embedded audit and exported entry before target mutation. */
+async function assertHeadlessSoapEntryCommitRows(
+    payload: Partial<Record<BackupCollectionName, BackupRecord[]>>,
+    serialized: boolean,
+): Promise<void> {
+    const entriesById = new Map<string, BackupRecord>();
+    for (const entry of payload.entries ?? []) {
+        if (typeof entry.id === 'string') entriesById.set(entry.id, entry);
+    }
+    const patientsById = new Map<string, BackupRecord>();
+    for (const patient of payload.patients ?? []) {
+        if (typeof patient.id === 'string') patientsById.set(patient.id, patient);
+    }
+    const unique = {
+        idempotencyKey: new Set<string>(), commandId: new Set<string>(), entryId: new Set<string>(),
+        auditEventId: new Set<string>(), receiptRef: new Set<string>(),
+    };
+    let previousIdempotencyKey: string | null = null;
+    for (const row of payload.headlessSoapEntryCommits ?? []) {
+        if (!hasExactKeys(row, HEADLESS_SOAP_COMMIT_KEYS)) {
+            throw new BackupArtifactError('invalid-manifest', 'headlessSoapEntryCommits contains an invalid ledger row.');
+        }
+        const committedAtMs = headlessSoapTimestampMilliseconds(row.committedAt, serialized);
+        const committedAt = committedAtMs === null ? null : new Date(committedAtMs).toISOString();
+        const binding = parseCanonicalSnapshot(row.bindingSnapshot);
+        const audit = parseCanonicalSnapshot(row.auditSnapshot, HEADLESS_SOAP_AUDIT_KEYS);
+        const receipt = parseCanonicalSnapshot(row.receiptSnapshot, HEADLESS_SOAP_RECEIPT_KEYS);
+        const redactedMetadata = audit ? parseCanonicalSnapshot(audit.redactedMetadata) : null;
+        const strings = [row.authorizationProofDigest, row.bindingDigest, row.entryDigest, row.auditDigest, row.receiptDigest];
+        const validIds = typeof row.idempotencyKey === 'string' && HEADLESS_SOAP_IDEMPOTENCY_KEY.test(row.idempotencyKey)
+            && typeof row.approvalRef === 'string' && HEADLESS_SOAP_APPROVAL_REF.test(row.approvalRef)
+            && typeof row.commandId === 'string' && HEADLESS_SOAP_COMMAND_ID.test(row.commandId)
+            && typeof row.entryId === 'string' && HEADLESS_SOAP_ENTRY_ID.test(row.entryId)
+            && typeof row.auditEventId === 'string' && HEADLESS_SOAP_AUDIT_EVENT_ID.test(row.auditEventId)
+            && typeof row.receiptRef === 'string' && HEADLESS_SOAP_RECEIPT_REF.test(row.receiptRef);
+        const duplicated = validIds && (unique.idempotencyKey.has(row.idempotencyKey as string)
+            || unique.commandId.has(row.commandId as string) || unique.entryId.has(row.entryId as string)
+            || unique.auditEventId.has(row.auditEventId as string) || unique.receiptRef.has(row.receiptRef as string));
+        const auditSeconds = committedAtMs === null ? null : committedAtMs / 1000;
+        const domainDigest = (domain: string, snapshot: string) => sha256Hex(`${domain}\0${snapshot}`);
+        const expectedEntryId = validIds ? `hsei_${await domainDigest(HEADLESS_SOAP_ENTRY_ID_DOMAIN, row.commandId as string)}` : null;
+        const expectedAuditEventId = validIds ? `hsea_${await domainDigest(HEADLESS_SOAP_AUDIT_ID_DOMAIN, row.commandId as string)}` : null;
+        const expectedReceiptRef = validIds ? `hser_${await domainDigest(HEADLESS_SOAP_RECEIPT_ID_DOMAIN, row.commandId as string)}` : null;
+        const expectedBindingDigest = binding ? await domainDigest(HEADLESS_SOAP_BINDING_DIGEST_DOMAIN, row.bindingSnapshot as string) : null;
+        const expectedAuditDigest = audit ? await domainDigest(HEADLESS_SOAP_AUDIT_DIGEST_DOMAIN, row.auditSnapshot as string) : null;
+        const expectedReceiptDigest = receipt ? await domainDigest(HEADLESS_SOAP_RECEIPT_DIGEST_DOMAIN, row.receiptSnapshot as string) : null;
+        const entry = validIds ? entriesById.get(row.entryId as string) : undefined;
+        const entryDateMs = entry ? timestampMilliseconds(entry.date) : null;
+        const entryCreatedAtMs = entry ? timestampMilliseconds(entry.createdAt) : null;
+        const entryUpdatedAtMs = entry ? timestampMilliseconds(entry.updatedAt) : null;
+        const entrySnapshot = entry && typeof entry.patientId === 'string'
+            && entryDateMs !== null && entryDateMs % 1000 === 0
+            && entryCreatedAtMs !== null && entryCreatedAtMs % 1000 === 0
+            && entryUpdatedAtMs !== null && entryUpdatedAtMs % 1000 === 0
+            ? JSON.stringify({
+                schema: 'mediflow.headless.soap-entry-record.v1', entryId: entry.id,
+                patientIdDigest: await domainDigest(HEADLESS_SOAP_PATIENT_ID_DIGEST_DOMAIN, entry.patientId),
+                type: entry.type, title: entry.title, date: entryDateMs / 1000, content: entry.content,
+                setting: entry.setting, metadata: entry.metadata, attachments: entry.attachments ?? null,
+                deletedAt: entry.deletedAt ?? null, deletionReason: entry.deletionReason ?? null, version: entry.version,
+                createdAt: entryCreatedAtMs / 1000, updatedAt: entryUpdatedAtMs / 1000,
+            })
+            : null;
+        const expectedEntryDigest = entrySnapshot ? await domainDigest(HEADLESS_SOAP_ENTRY_DIGEST_DOMAIN, entrySnapshot) : null;
+        const patient = entry && typeof entry.patientId === 'string' ? patientsById.get(entry.patientId) : undefined;
+        const ambulatoryIds = patient ? [...new Set([
+            typeof patient.ambulatoryId === 'string' ? patient.ambulatoryId : null,
+            ...parseAssignedAmbulatoryIds(patient.assignedAmbulatoryIds),
+            ...parseAssignedAmbulatoryMemberships(patient.assignedAmbulatoryMemberships)
+                .map((membership) => membership.ambulatoryId),
+        ].filter((value): value is string => typeof value === 'string' && value.length > 0))] : [];
+        const semanticChainValid = entrySnapshot !== null && entry && typeof entry.patientId === 'string'
+            && validateHeadlessSoapEntryCommitSemanticChain({
+                idempotencyKey: row.idempotencyKey,
+                approvalRef: row.approvalRef,
+                authorizationProofDigest: row.authorizationProofDigest,
+                commandId: row.commandId,
+                entryId: row.entryId,
+                auditEventId: row.auditEventId,
+                receiptRef: row.receiptRef,
+                bindingSnapshot: row.bindingSnapshot,
+                bindingDigest: row.bindingDigest,
+                entrySnapshot,
+                entryDigest: row.entryDigest,
+                auditSnapshot: row.auditSnapshot,
+                auditDigest: row.auditDigest,
+                receiptSnapshot: row.receiptSnapshot,
+                receiptDigest: row.receiptDigest,
+                committedAtSeconds: auditSeconds,
+                patientId: entry.patientId,
+                ambulatoryIds,
+            });
+        if (!validIds || duplicated || !entry || strings.some((value) => typeof value !== 'string' || !SHA256.test(value))
+            || !binding || !audit || !receipt || !redactedMetadata || committedAt === null
+            || !semanticChainValid
+            || row.entryId !== expectedEntryId || row.auditEventId !== expectedAuditEventId || row.receiptRef !== expectedReceiptRef
+            || row.bindingDigest !== expectedBindingDigest || row.entryDigest !== expectedEntryDigest
+            || row.auditDigest !== expectedAuditDigest || row.receiptDigest !== expectedReceiptDigest
+            || audit.eventId !== row.auditEventId || audit.schemaVersion !== 1 || audit.eventType !== 'entry.created'
+            || audit.occurredAt !== auditSeconds || audit.outcome !== 'success' || audit.actorType !== 'user'
+            || typeof audit.actorRef !== 'string' || audit.actorRef.length === 0 || audit.subjectType !== 'entry'
+            || audit.subjectRef !== row.entryId || audit.sourceSurface !== 'web' || audit.requestId !== null
+            || audit.createdAt !== auditSeconds
+            || receipt.schema !== 'mediflow.headless.soap-entry-commit-receipt.v1'
+            || receipt.receiptRef !== row.receiptRef || receipt.operationId !== HEADLESS_SOAP_ACTIVE_ROLE_OPERATION
+            || receipt.outcome !== 'entry_committed' || receipt.commandId !== row.commandId
+            || receipt.entryRef !== row.entryId || receipt.auditEventRef !== row.auditEventId
+            || typeof receipt.patientVersion !== 'number' || !Number.isSafeInteger(receipt.patientVersion) || receipt.patientVersion < 1
+            || receipt.entryVersion !== 1 || receipt.committedAt !== committedAt
+            || receipt.bindingDigest !== row.bindingDigest || receipt.entryDigest !== row.entryDigest || receipt.auditDigest !== row.auditDigest
+            || (serialized && previousIdempotencyKey !== null && previousIdempotencyKey.localeCompare(row.idempotencyKey as string) >= 0)) {
+            throw new BackupArtifactError('invalid-manifest', 'headlessSoapEntryCommits contains an invalid ledger row.');
+        }
+        unique.idempotencyKey.add(row.idempotencyKey as string); unique.commandId.add(row.commandId as string);
+        unique.entryId.add(row.entryId as string); unique.auditEventId.add(row.auditEventId as string);
+        unique.receiptRef.add(row.receiptRef as string); previousIdempotencyKey = row.idempotencyKey as string;
     }
 }
 
@@ -562,6 +733,7 @@ async function assertCollectionReferences(
     await assertDurableReviewLedger(payload);
     assertDurableReviewAuthorityRows(payload, durableReviewIds, patientIds);
     assertHeadlessSoapActiveRoleAttestationRows(payload, serialized);
+    await assertHeadlessSoapEntryCommitRows(payload, serialized);
 }
 
 /* @Codex Backup producers canonicalize the H2a-S collection after exact-row validation. */
@@ -572,6 +744,11 @@ function sortHeadlessSoapActiveRoleAttestations(rows: BackupRecord[]): BackupRec
     });
 }
 
+/* @Codex */
+function sortHeadlessSoapEntryCommits(rows: BackupRecord[]): BackupRecord[] {
+    return [...rows].sort((left, right) => String(left.idempotencyKey).localeCompare(String(right.idempotencyKey)));
+}
+
 export async function createBackupArtifact(payload: BackupDataset, createdAt = new Date()): Promise<BackupArtifact> {
     /* @Codex Existing v1 producers add the audit-dependent collections as empty until audit restore is separately contracted. */
     const currentPayload = { ...createEmptyDataset(), ...payload } as BackupDataset;
@@ -580,6 +757,7 @@ export async function createBackupArtifact(payload: BackupDataset, createdAt = n
     const canonicalPayload = {
         ...currentPayload,
         headlessSoapActiveRoleAttestations: sortHeadlessSoapActiveRoleAttestations(currentPayload.headlessSoapActiveRoleAttestations),
+        headlessSoapEntryCommits: sortHeadlessSoapEntryCommits(currentPayload.headlessSoapEntryCommits ?? []),
     } as BackupDataset;
 
     const recordCounts = createEmptyCounts();
