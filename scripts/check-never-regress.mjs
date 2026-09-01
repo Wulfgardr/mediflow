@@ -49,9 +49,93 @@ function main() {
     runExternalUrlChecks(runtimeFiles);
     runTelemetryChecks(runtimeFiles);
     runZeroKnowledgeChecks(runtimeFiles);
+    runIcd11WhoRouteCheck();
     runLegacyOcrRetirementCheck();
     runLegacyPdfRetirementCheck();
     reportAndExit();
+}
+
+/* @Codex */
+export function validateIcd11WhoRouteSource(source) {
+    const issues = new Set();
+    const sourceFile = ts.createSourceFile(
+        'app/api/icd/proxy/route.ts',
+        source,
+        ts.ScriptTarget.Latest,
+        true,
+        ts.ScriptKind.TS,
+    );
+    if (sourceFile.parseDiagnostics.length > 0) issues.add('route source has syntax errors');
+
+    const imports = sourceFile.statements.filter(ts.isImportDeclaration);
+    if (imports.length !== 4) issues.add('route must have exactly four static imports');
+    if (!imports.some(isCanonicalIcdNextServerImport)) issues.add('NextRequest must remain a type-only canonical import');
+    if (!imports.some((node) => isCanonicalNamedImport(
+        node,
+        '@/lib/reference-data/icd11-who-http-route',
+        ['createIcd11WhoHttpRoute'],
+    ))) issues.add('WHO HTTP route factory import must remain canonical and unaliased');
+    if (!imports.some((node) => isCanonicalNamedImport(
+        node,
+        '@/lib/reference-data/icd11-who-production',
+        ['getIcd11WhoProductionRuntime'],
+    ))) issues.add('WHO production runtime import must remain canonical and unaliased');
+    if (!imports.some((node) => isCanonicalNamedImport(
+        node,
+        '@/lib/security/server-auth',
+        ['requireSession'],
+    ))) issues.add('web session import must remain canonical and unaliased');
+
+    let compositionSeen = false;
+    let getSeen = false;
+    for (const statement of sourceFile.statements) {
+        if (ts.isImportDeclaration(statement) || isInertStringStatement(statement)) continue;
+        if (isCanonicalIcdComposition(statement, sourceFile) && !compositionSeen) {
+            compositionSeen = true;
+            continue;
+        }
+        if (isCanonicalIcdGetHandler(statement, sourceFile) && !getSeen) {
+            getSeen = true;
+            continue;
+        }
+        issues.add('route may contain only canonical imports, composition and GET delegation');
+    }
+    if (!compositionSeen) issues.add('server-owned WHO composition is missing or changed');
+    if (!getSeen) issues.add('thin GET delegation is missing or changed');
+    return [...issues];
+}
+
+function isCanonicalIcdNextServerImport(node) {
+    if (!ts.isStringLiteral(node.moduleSpecifier) || node.moduleSpecifier.text !== 'next/server') return false;
+    if (node.attributes || node.assertClause) return false;
+    const clause = node.importClause;
+    if (!clause || !clause.isTypeOnly || clause.name || !clause.namedBindings || !ts.isNamedImports(clause.namedBindings)) return false;
+    const elements = clause.namedBindings.elements;
+    return elements.length === 1 && !elements[0].isTypeOnly && !elements[0].propertyName
+        && elements[0].name.text === 'NextRequest';
+}
+
+function compactSource(node, sourceFile) {
+    return node.getText(sourceFile).replace(/\s+/gu, '');
+}
+
+function isCanonicalIcdComposition(node, sourceFile) {
+    if (!ts.isVariableStatement(node)) return false;
+    return compactSource(node, sourceFile) === [
+        'consthandleIcd11WhoRequest=createIcd11WhoHttpRoute(Object.freeze({',
+        'authorize:async()=>(awaitrequireSession())!==null,',
+        'getRuntime:getIcd11WhoProductionRuntime,',
+        '}));',
+    ].join('');
+}
+
+function isCanonicalIcdGetHandler(node, sourceFile) {
+    if (!ts.isFunctionDeclaration(node)) return false;
+    return compactSource(node, sourceFile) === [
+        'exportasyncfunctionGET(request:NextRequest):Promise<Response>{',
+        'returnhandleIcd11WhoRequest(request);',
+        '}',
+    ].join('');
 }
 
 /* @Codex */
@@ -286,6 +370,18 @@ function runLegacyOcrRetirementCheck() {
     }
 }
 
+function runIcd11WhoRouteCheck() {
+    const relativePath = 'app/api/icd/proxy/route.ts';
+    const source = fs.readFileSync(path.join(ROOT_DIR, relativePath), 'utf8');
+    for (const issue of validateIcd11WhoRouteSource(source)) addFinding({
+        code: 'NR-ICD-WHO-ROUTE',
+        file: relativePath,
+        line: 1,
+        message: issue,
+        snippet: 'authenticated server-owned WHO route boundary',
+    });
+}
+
 function runLegacyPdfRetirementCheck() {
     const relativePath = 'app/api/pdf-extract/route.ts';
     const source = fs.readFileSync(path.join(ROOT_DIR, relativePath), 'utf8');
@@ -379,15 +475,7 @@ function runExternalUrlChecks(runtimeFiles) {
             const matches = Array.from(line.matchAll(urlRegex));
             for (const match of matches) {
                 const rawUrl = match[0];
-                let parsed;
-                try {
-                    parsed = new URL(rawUrl);
-                } catch {
-                    continue;
-                }
-
-                if (LOCAL_HOSTS.has(parsed.hostname)) continue;
-                if (isAllowlisted('externalUrls', relativePath, line)) continue;
+                if (isExternalUrlLiteralAllowed(relativePath, rawUrl, line)) continue;
 
                 addFinding({
                     code: 'NR-EGRESS',
@@ -399,6 +487,17 @@ function runExternalUrlChecks(runtimeFiles) {
             }
         });
     }
+}
+
+/* @Codex */
+export function isExternalUrlLiteralAllowed(relativePath, rawUrl, sourceLine = rawUrl) {
+    let parsed;
+    try {
+        parsed = new URL(rawUrl);
+    } catch {
+        return true;
+    }
+    return LOCAL_HOSTS.has(parsed.hostname) || isAllowlisted('externalUrls', relativePath, sourceLine);
 }
 
 function runTelemetryChecks(runtimeFiles) {
@@ -546,11 +645,6 @@ function runZeroKnowledgeChecks(runtimeFiles) {
     }
 
     const localValidationChecks = [
-        {
-            file: 'app/api/icd/proxy/route.ts',
-            token: 'validateLocalTarget(ICD_LOCAL_URL)',
-            message: 'ICD proxy must validate configured local endpoint before fetching',
-        },
         {
             file: 'app/api/proxy/ollama/chat/route.ts',
             token: 'attestLocalOllamaModel(baseUrl, body?.model, req.signal)',

@@ -33,3 +33,21 @@ test('service architecture and catalog surfaces describe the governed WHO bounda
     assert.match(catalogs, /readiness governata/u);
     assert.doesNotMatch(catalogs, /ICD-11 locale|porta 8888|gestito dal launcher/iu);
 });
+
+test('document import E2E mocks the exact MediFlow WHO envelope and no raw provider payload', () => {
+    const documentImport = source('../e2e/document-import.spec.ts');
+    assert.match(documentImport, /schemaVersion:\s*['"]mediflow\.reference-data\.icd11-search-response\.v1['"]/u);
+    assert.match(documentImport, /entries:\s*\[/u);
+    assert.match(documentImport, /code:\s*['"]5A11['"]/u);
+    assert.match(documentImport, /description:\s*diagnosisLabel/u);
+    assert.match(documentImport, /system:\s*['"]ICD-11['"]/u);
+    assert.match(documentImport, /schemaVersion:\s*['"]mediflow\.reference-data\.icd11-search-receipt\.v1['"]/u);
+    assert.match(documentImport, /operation:\s*['"]mediflow\.reference_data\.icd11\.search\.v1['"]/u);
+    assert.match(documentImport, /releaseId:\s*['"]2026-01['"]/u);
+    assert.match(documentImport, /language:\s*['"]en['"]/u);
+    assert.match(documentImport, /source:\s*['"]live['"]/u);
+    assert.match(documentImport, /resultCount:\s*1/u);
+    assert.match(documentImport, /latencyMs:\s*\d+/u);
+    assert.match(documentImport, /completedAt:\s*['"][^'"]+['"]/u);
+    assert.doesNotMatch(documentImport, /destinationEntities|theCode/u);
+});
