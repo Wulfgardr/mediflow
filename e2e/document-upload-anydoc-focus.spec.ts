@@ -4,6 +4,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { assertNoHorizontalOverflow, bootstrapUnlockedSession } from './utils';
 
 const SYNTHETIC_ATTACHMENT_NAME = 'allegato-anydoc-focus-sintetico.pdf';
+const SYNTHETIC_RTF_TEXT = 'Synthetic AnyDoc browser route evidence.';
 
 async function createSyntheticFixture(page: Page): Promise<string> {
   const marker = `${Date.now()}`.slice(-8);
@@ -42,6 +43,30 @@ async function createSyntheticFixture(page: Page): Promise<string> {
     if (!attachmentResponse.ok) throw new Error(`Fixture allegato AnyDoc focus: HTTP ${attachmentResponse.status}`);
     return patientId;
   }, { attachmentName: SYNTHETIC_ATTACHMENT_NAME, suffix: marker });
+}
+
+async function createExtractableRtf(page: Page, patientId: string): Promise<Readonly<{ id: string; name: string }>> {
+  const suffix = `${Date.now()}`.slice(-8);
+  return page.evaluate(async ({ id, marker, expectedText }) => {
+    const attachmentId = `attachment-anydoc-route-${marker}`;
+    const name = `allegato-anydoc-route-${marker}.rtf`;
+    const source = `{\\rtf1\\ansi ${expectedText}}`;
+    const response = await fetch('/api/attachments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: attachmentId,
+        patientId: id,
+        name,
+        type: 'application/rtf',
+        size: new TextEncoder().encode(source).byteLength,
+        path: `uploads/${name}`,
+        data: `data:application/rtf;base64,${btoa(source)}`,
+      }),
+    });
+    if (!response.ok) throw new Error(`Fixture RTF AnyDoc: HTTP ${response.status}`);
+    return { id: attachmentId, name };
+  }, { id: patientId, marker: suffix, expectedText: SYNTHETIC_RTF_TEXT });
 }
 
 async function establishSyntheticSession(page: Page): Promise<void> {
@@ -102,4 +127,42 @@ test('AnyDoc: le azioni allegato restano visibili al focus e sui viewport strett
     { label: 'card allegato AnyDoc mobile', selector: '.lume-card:has(button[aria-label^="Estrai testo localmente da"])' },
   ]);
   expect(consoleErrors).toEqual([]);
+});
+
+test('AnyDoc: il browser usa la route autenticata e mostra solo l’anteprima locale', async ({ page }) => {
+  await establishSyntheticSession(page);
+  const patientId = await createSyntheticFixture(page);
+  const attachment = await createExtractableRtf(page, patientId);
+  await openDocumentArchive(page, patientId);
+
+  const responsePromise = page.waitForResponse((response) => (
+    response.request().method() === 'POST'
+    && response.url().endsWith(`/api/attachments/${attachment.id}/local-extraction`)
+  ));
+  await page.getByRole('button', { name: `Estrai testo localmente da ${attachment.name}` }).click();
+
+  const response = await responsePromise;
+  expect(response.status()).toBe(200);
+  const body = await response.json() as {
+    provenance?: { attachmentId?: string };
+    status?: string;
+    review?: string;
+    writes?: number;
+    apply?: string;
+    candidateUse?: string;
+  };
+  expect(body).toMatchObject({
+    provenance: { attachmentId: attachment.id },
+    status: 'extracted',
+    review: 'required',
+    writes: 0,
+    apply: 'none',
+    candidateUse: 'review_only',
+  });
+
+  const preview = page.getByTestId('anydoc-local-extraction-preview');
+  await expect(preview).toBeVisible();
+  await expect(preview).toContainText('Anteprima AnyDoc locale · sola lettura');
+  await expect(preview).toContainText(SYNTHETIC_RTF_TEXT);
+  await expect(page.getByText('review_required · unsupported_local_extraction', { exact: false })).toHaveCount(0);
 });
