@@ -28,5 +28,7 @@
 	</array>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>MediFlow cerca il tuo home-base sulla rete locale per collegarsi in modo paired e cifrato.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>MediFlow usa il microfono solo dopo il tuo consenso per trascrivere localmente la visita; l'audio non viene salvato.</string>
 </dict>
 </plist>
