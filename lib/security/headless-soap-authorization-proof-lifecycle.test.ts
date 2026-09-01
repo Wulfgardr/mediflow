@@ -94,7 +94,7 @@ test('issues one digest-only H5b proof after attaching H5a and verifying a fresh
 test('keeps foreign inputs inert and exposes only the exact frozen service and controller', async () => {
     const { owner } = fixture();
     assert.equal(Object.isFrozen(owner), true);
-    assert.deepEqual(Reflect.ownKeys(owner).sort(), ['lifecycleController', 'service']);
+    assert.deepEqual(Reflect.ownKeys(owner).sort(), ['bindingController', 'lifecycleController', 'service']);
     assert.deepEqual(Reflect.ownKeys(owner.service).sort(), ['issue', 'wipe']);
     assert.deepEqual(Reflect.ownKeys(owner.lifecycleController).sort(), [
         'confirmDependent', 'registerDependent', 'unregisterDependent', 'withCurrentDependent',

@@ -29,6 +29,7 @@ const freshPinVerifier = createHeadlessSoapFreshPinVerifier({
 /** Shared process owner for non-executable H5b authorization-proof currentness. */
 export const headlessSoapAuthorizationProofProductionOwner = createHeadlessSoapAuthorizationProofLifecycleOwner({
     presentationLifecycle: headlessSoapEntryPresentationLifecycleProductionOwner.lifecycleController,
+    presentationBinding: headlessSoapEntryPresentationLifecycleProductionOwner.presentationBindingController,
     presentationService: headlessSoapEntryPresentationLifecycleProductionOwner.service,
     verifyFreshPin: freshPinVerifier.verify,
     entropy: () => reflectApply(hostUint8ArrayFrom, hostUint8Array, [hostRandomBytes(32)]),

@@ -9,6 +9,16 @@ import {
     isHeadlessSoapFreshPinVerificationV1,
     type HeadlessSoapFreshPinVerificationV1,
 } from './headless-soap-fresh-pin-verification';
+import {
+    createHeadlessSoapAuthorizationLineage,
+    HEADLESS_SOAP_AUTHORIZATION_LINEAGE_SCHEMA,
+    HEADLESS_SOAP_AUTHORIZATION_POLICY_DIGEST,
+    type HeadlessSoapAuthorizationLineageV1,
+} from './headless-soap-authorization-lineage';
+import type {
+    HeadlessSoapEntryPresentationBindingV1,
+} from './headless-soap-entry-presentation-lifecycle';
+import type { ClinicianSoapEntrySealV1 } from '../headless/clinician-soap-entry-seal';
 
 export const HEADLESS_SOAP_AUTHORIZATION_PROOF_TTL_MS = 30_000;
 declare const proofDependentRegistrationIdentity: unique symbol;
@@ -28,8 +38,14 @@ type PresentationLifecyclePort = Readonly<{
     unregisterDependent(candidate: unknown, registration: unknown): boolean;
     withCurrentDependent(candidate: unknown, registration: unknown, operation: () => void): Promise<boolean>;
 }>;
+type PresentationBindingPort = Readonly<{
+    withCurrentDependentBinding(candidate: unknown, registration: unknown,
+        operation: (binding: HeadlessSoapEntryPresentationBindingV1,
+            sealBundle: ClinicianSoapEntrySealV1) => void): Promise<boolean>;
+}>;
 export type HeadlessSoapAuthorizationProofLifecycleSources = Readonly<{
     presentationLifecycle: PresentationLifecyclePort;
+    presentationBinding?: PresentationBindingPort;
     presentationService: Readonly<{ cancel(candidate: unknown): boolean }>;
     verifyFreshPin(candidate: unknown): Promise<unknown>;
     entropy(): unknown;
@@ -51,6 +67,14 @@ export type HeadlessSoapAuthorizationProofLifecycleControllerV1 = Readonly<{
     unregisterDependent(candidate: unknown, registration: unknown): boolean;
     withCurrentDependent(candidate: unknown, registration: unknown, operation: () => void): Promise<boolean>;
     withSingleUseProof(candidate: unknown, operation: () => void): Promise<boolean>;
+}>;
+export type HeadlessSoapAuthorizationProofBindingControllerV1 = Readonly<{
+    withCurrentDependentBinding(candidate: unknown, registration: unknown,
+        operation: (lineage: HeadlessSoapAuthorizationLineageV1,
+            sealBundle: ClinicianSoapEntrySealV1) => void): Promise<boolean>;
+    withSingleUseDependentBinding(candidate: unknown, registration: unknown,
+        operation: (lineage: HeadlessSoapAuthorizationLineageV1,
+            sealBundle: ClinicianSoapEntrySealV1) => void): Promise<boolean>;
 }>;
 type State = 'minted' | 'in_flight' | 'spent';
 type ProofRecord = { active: boolean; state: State; digest: string; token: unknown; presentationRegistration: unknown;
@@ -75,7 +99,7 @@ function result(authorizationProof: string): HeadlessSoapAuthorizationProofIssue
 }
 function synchronous(value: unknown): value is (...args: never[]) => void { return typeof value === 'function' && !isProxy(value)
     && !isAsyncFunction(value) && !isGeneratorFunction(value) && objectGetPrototypeOf(value) === functionPrototype; }
-function callbackSucceeded(callback: () => void): boolean { try { const value = apply(callback, undefined, []); if (value === undefined) return true;
+function callbackSucceeded(callback: (...args: never[]) => void, args: unknown[] = []): boolean { try { const value = apply(callback, undefined, args); if (value === undefined) return true;
         if (isPromise(value)) try { apply(promiseThen, value, [undefined, () => undefined]); } catch { /* denial remains local */ }
     } catch { /* fixed false below */ } return false; }
 
@@ -83,6 +107,7 @@ function callbackSucceeded(callback: () => void): boolean { try { const value = 
 export function createHeadlessSoapAuthorizationProofLifecycleOwner(sources: HeadlessSoapAuthorizationProofLifecycleSources): Readonly<{
     service: HeadlessSoapAuthorizationProofLifecycleServiceV1;
     lifecycleController: HeadlessSoapAuthorizationProofLifecycleControllerV1;
+    bindingController: HeadlessSoapAuthorizationProofBindingControllerV1;
 }> {
     const proofs = new Map<string, ProofRecord>(), tombstones = new Set<string>();
     const registrations = new WeakMap<object, DependentRecord>(); let operation: Operation | null = null, drainActive = false;
@@ -129,6 +154,26 @@ export function createHeadlessSoapAuthorizationProofLifecycleOwner(sources: Head
     const abortIssue = (token: unknown, registration: unknown, code: HeadlessSoapAuthorizationProofLifecycleErrorCode): never => {
         try { sources.presentationLifecycle.unregisterDependent(token, registration); } catch { /* cancel remains */ }
         try { sources.presentationService.cancel(token); } catch { /* denial remains */ } return fail(code); };
+    const materializeLineage = (record: ProofRecord,
+        binding: HeadlessSoapEntryPresentationBindingV1): HeadlessSoapAuthorizationLineageV1 | null => {
+        const webSession = record.verifiedSession; if (!webSession) return null;
+        const candidate = objectCreate(null) as Record<string, unknown>;
+        candidate.schema = HEADLESS_SOAP_AUTHORIZATION_LINEAGE_SCHEMA;
+        candidate.operationId = 'mediflow.clinical_diary.append_soap.v1';
+        candidate.webSession = webSession;
+        candidate.activeRole = binding.activeRole;
+        candidate.childLease = binding.childLease;
+        candidate.selection = binding.selection;
+        candidate.patientVersion = binding.patientVersion;
+        candidate.action = 'append';
+        candidate.purpose = 'clinician_requested_documentation';
+        candidate.proposal = binding.proposal;
+        candidate.entryIdentity = binding.entryIdentity;
+        candidate.payloadDigest = binding.payloadDigest;
+        candidate.sealDigest = binding.sealDigest;
+        candidate.policyDigest = HEADLESS_SOAP_AUTHORIZATION_POLICY_DIGEST;
+        return createHeadlessSoapAuthorizationLineage(objectFreeze(candidate));
+    };
     const issue = async (token: unknown, candidatePin: unknown): Promise<HeadlessSoapAuthorizationProofIssueResultV1> => {
         if (rejectReentry(null)) return fail('lifecycle_unavailable'); let record: ProofRecord | null = null, upstreamGone = false;
         let registration: unknown = null; try { registration = sources.presentationLifecycle.registerDependent(token, () => {
@@ -191,6 +236,58 @@ export function createHeadlessSoapAuthorizationProofLifecycleOwner(sources: Head
             && (!requiresDependent || dependentFor(record, registration) === dependent);
         if (!finalCurrent) { retire(record); return fail('presentation_unavailable'); } return true;
     };
+    const runBinding = async (candidate: unknown, registration: unknown,
+        callback: (lineage: HeadlessSoapAuthorizationLineageV1, sealBundle: ClinicianSoapEntrySealV1) => void,
+        singleUse: boolean): Promise<boolean> => {
+        const record = proofFor(candidate); if (!record || rejectReentry(record) || record.state !== 'minted') return false;
+        const dependent = dependentFor(record, registration); if (!dependent) return false;
+        if (!sources.presentationBinding || !synchronous(callback)) { retire(record); return false; }
+        const currentOperation: Operation = { record, poisoned: false, callbackActive: false, timeFailure: null };
+        operation = currentOperation; let invoked = false, accepted = false, upstreamCurrent = false;
+        try {
+            upstreamCurrent = await sources.presentationBinding.withCurrentDependentBinding(
+                record.token,
+                record.presentationRegistration,
+                (binding, sealBundle) => {
+                    if (operation !== currentOperation || invoked || currentOperation.callbackActive
+                        || !record.active || record.state !== 'minted'
+                        || dependentFor(record, registration) !== dependent) {
+                        currentOperation.poisoned = true; retire(record); return;
+                    }
+                    currentOperation.timeFailure = readTime(record); if (currentOperation.timeFailure) return;
+                    const lineage = materializeLineage(record, binding);
+                    if (!lineage || operation !== currentOperation || currentOperation.poisoned
+                        || !record.active || record.state !== 'minted'
+                        || dependentFor(record, registration) !== dependent) {
+                        currentOperation.poisoned = true; retire(record); return;
+                    }
+                    if (singleUse) record.state = 'in_flight';
+                    currentOperation.callbackActive = true; invoked = true;
+                    accepted = callbackSucceeded(callback as (...args: never[]) => void, [lineage, sealBundle]);
+                    currentOperation.callbackActive = false;
+                    const after = readTime(record); if (after) currentOperation.timeFailure = after;
+                    if (singleUse) retire(record);
+                },
+            );
+        } catch { upstreamCurrent = false; }
+        finally { currentOperation.callbackActive = false; operation = null; }
+        if (singleUse) {
+            const finalTime = readTime(record), finalCurrent = upstreamCurrent && !record.upstreamGone;
+            retire(record); cleanup(record);
+            if (currentOperation.timeFailure) return fail(currentOperation.timeFailure);
+            if (finalCurrent && finalTime) return fail(finalTime);
+            return !currentOperation.poisoned && invoked && accepted && finalCurrent;
+        }
+        if (currentOperation.poisoned) { retire(record); return false; }
+        if (currentOperation.timeFailure) { retire(record); return fail(currentOperation.timeFailure); }
+        if (!invoked || !accepted) { retire(record); return false; }
+        const finalTime = readTime(record); if (finalTime) { retire(record); return fail(finalTime); }
+        if (!upstreamCurrent || record.upstreamGone || !record.active) { retire(record); return fail('presentation_unavailable'); }
+        const finalCurrent = presentationCurrent(record.token, record.presentationRegistration)
+            && dependentFor(record, registration) === dependent;
+        if (!finalCurrent) { retire(record); return fail('presentation_unavailable'); }
+        return true;
+    };
     const service: HeadlessSoapAuthorizationProofLifecycleServiceV1 = objectFreeze({ issue,
         wipe(candidate: unknown): boolean { const record = proofFor(candidate); if (!record || rejectReentry(record)) return false; return retire(record); } });
     const lifecycleController: HeadlessSoapAuthorizationProofLifecycleControllerV1 = objectFreeze({
@@ -210,5 +307,15 @@ export function createHeadlessSoapAuthorizationProofLifecycleOwner(sources: Head
         withCurrentDependent(candidate: unknown, registration: unknown, callback: () => void) { return run(candidate, registration, callback, true, false); },
         withSingleUseProof(candidate: unknown, callback: () => void) { return run(candidate, null, callback, false, true); },
     });
-    return objectFreeze({ service, lifecycleController });
+    const bindingController: HeadlessSoapAuthorizationProofBindingControllerV1 = objectFreeze({
+        withCurrentDependentBinding(candidate: unknown, registration: unknown,
+            callback: (lineage: HeadlessSoapAuthorizationLineageV1, sealBundle: ClinicianSoapEntrySealV1) => void) {
+            return runBinding(candidate, registration, callback, false);
+        },
+        withSingleUseDependentBinding(candidate: unknown, registration: unknown,
+            callback: (lineage: HeadlessSoapAuthorizationLineageV1, sealBundle: ClinicianSoapEntrySealV1) => void) {
+            return runBinding(candidate, registration, callback, true);
+        },
+    });
+    return objectFreeze({ service, lifecycleController, bindingController });
 }

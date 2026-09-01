@@ -27,7 +27,7 @@ test('shares one H5b owner while exposing only its frozen proof service', async 
     const owner = internal.headlessSoapAuthorizationProofProductionOwner;
     assert.equal(owner, repeated.headlessSoapAuthorizationProofProductionOwner);
     assert.equal(Object.isFrozen(owner), true);
-    assert.deepEqual(Reflect.ownKeys(owner).sort(), ['lifecycleController', 'service']);
+    assert.deepEqual(Reflect.ownKeys(owner).sort(), ['bindingController', 'lifecycleController', 'service']);
     assert.equal(facade.headlessSoapAuthorizationProofService, owner.service);
     assert.equal(Object.isFrozen(owner.service), true);
     assert.deepEqual(Reflect.ownKeys(owner.service).sort(), ['issue', 'wipe']);
@@ -36,6 +36,10 @@ test('shares one H5b owner while exposing only its frozen proof service', async 
     assert.deepEqual(Reflect.ownKeys(owner.lifecycleController).sort(), [
         'confirmDependent', 'registerDependent', 'unregisterDependent', 'withCurrentDependent',
         'withCurrentProof', 'withSingleUseProof',
+    ]);
+    assert.equal(Object.isFrozen(owner.bindingController), true);
+    assert.deepEqual(Reflect.ownKeys(owner.bindingController), [
+        'withCurrentDependentBinding', 'withSingleUseDependentBinding',
     ]);
 });
 
@@ -51,7 +55,12 @@ test('keeps foreign proof identities inert without exposing the private H6 contr
     assert.equal(lifecycle.unregisterDependent(foreignProof, foreignRegistration), false);
     assert.equal(await lifecycle.withCurrentDependent(foreignProof, foreignRegistration, () => undefined), false);
     assert.equal(await lifecycle.withSingleUseProof(foreignProof, () => undefined), false);
+    assert.equal(await internal.headlessSoapAuthorizationProofProductionOwner.bindingController
+        .withCurrentDependentBinding(foreignProof, foreignRegistration, () => undefined), false);
+    assert.equal(await internal.headlessSoapAuthorizationProofProductionOwner.bindingController
+        .withSingleUseDependentBinding(foreignProof, foreignRegistration, () => undefined), false);
     assert.equal('lifecycleController' in facade, false);
+    assert.equal('bindingController' in facade, false);
     assert.equal('headlessSoapAuthorizationProofProductionOwner' in facade, false);
 });
 
@@ -73,6 +82,7 @@ test('composes H5a, fresh host PIN verification and captured process primitives 
     assert.equal(ownerSource.match(/\bcreateHeadlessSoapAuthorizationProofLifecycleOwner\s*\(/gu)?.length, 1);
     assert.equal(ownerSource.match(/\bcreateHeadlessSoapFreshPinVerifier\s*\(/gu)?.length, 1);
     assert.match(ownerSource, /presentationLifecycle\s*:\s*headlessSoapEntryPresentationLifecycleProductionOwner\.lifecycleController/u);
+    assert.match(ownerSource, /presentationBinding\s*:\s*headlessSoapEntryPresentationLifecycleProductionOwner\.presentationBindingController/u);
     assert.match(ownerSource, /presentationService\s*:\s*headlessSoapEntryPresentationLifecycleProductionOwner\.service/u);
     assert.match(ownerSource, /verifyFreshPin\s*:\s*freshPinVerifier\.verify/u);
     assert.match(ownerSource, /resolveCurrentWebAdmin/u);
