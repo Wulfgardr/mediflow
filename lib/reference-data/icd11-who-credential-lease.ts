@@ -154,13 +154,13 @@ export function createIcd11WhoCredentialLeaseManager(sourcesValue: unknown) {
                     throw new Icd11WhoCredentialLeaseError('token_unavailable');
                 written = true; return Reflect.apply(sinkRecord.set as Callable, sink, [clientId, clientSecret]);
             } });
+            presented = true;
             try { Reflect.apply(secret.presentCredentials as Callable, undefined, [boundedSink]); }
             catch { throw new Icd11WhoCredentialLeaseError('token_unavailable'); }
             if (!written) throw new Icd11WhoCredentialLeaseError('token_unavailable');
             if (runtimeEpoch !== epoch) throw new Icd11WhoCredentialLeaseError('runtime_restarted');
             if (disposed || config?.state !== 'enabled' || config.generation !== generation)
                 throw new Icd11WhoCredentialLeaseError(disposed ? 'manager_disposed' : 'lease_revoked');
-            presented = true;
         });
         let response: unknown;
         try {
@@ -253,9 +253,9 @@ export function createIcd11WhoCredentialLeaseManager(sourcesValue: unknown) {
             try {
                 const sinkRecord = exactRecord(sink, ['set'], 'injection_failed');
                 if (!safeFunction(sinkRecord.set)) throw new Error('setter');
+                injected = true;
                 Reflect.apply(sinkRecord.set, sink, ['Authorization', `Bearer ${lease.token.value}`]);
             } catch { throw new Icd11WhoCredentialLeaseError('injection_failed'); }
-            injected = true;
         });
         try {
             let returned: unknown;

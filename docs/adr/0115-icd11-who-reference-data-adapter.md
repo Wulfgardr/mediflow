@@ -109,12 +109,15 @@ non dichiara revoca WHO.
 
 Il packet credenziali fissa un solo reference logico host-owned:
 `host_secret/mediflow.who.icd-api.oauth-client.v1`. Il resolver e l'issuer
-ricevono target opachi e operano entro limiti e cancellazione host-owned; la lease bearer e
-monouso, dura al massimo 30 secondi e riusa tramite single-flight soltanto un
-token RAM della stessa generation. Il token viene ritirato almeno 60 secondi
-prima della scadenza vendor e viene invalidato su disable, revoca locale,
-restart o dispose. Questo packet usa soltanto resolver e issuer fake: non
-introduce URL, HTTP, fetch, rete o smoke live.
+ricevono target opachi. I timeout e la cancellazione limitano le `Promise`
+native ancora pendenti dopo il ritorno delle callback; lavoro JavaScript
+sincrono dentro resolver, presenter o issuer resta cooperativo e non e
+preemptable nello stesso processo. La lease bearer e monouso, dura al massimo
+30 secondi e riusa tramite single-flight soltanto un token RAM della stessa
+generation. Il token viene ritirato almeno 60 secondi prima della scadenza
+vendor e viene invalidato su disable, revoca locale, restart o dispose. Questo
+packet usa soltanto resolver e issuer fake: non introduce URL, HTTP, fetch,
+rete o smoke live.
 
 La query in uscita contiene soltanto i termini necessari alla ricerca ICD-11:
 nessun patient ID, nome, codice fiscale, documento, nota, prompt o contesto
