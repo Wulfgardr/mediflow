@@ -11,6 +11,11 @@ import {
     type FabricVenue,
 } from './contract';
 import { FABRIC_CAPABILITY_DESCRIPTORS } from './catalog';
+import {
+    buildProviderDisclosureSnapshot,
+    type ProviderDisclosureSnapshot,
+    type ProviderDisclosureSources,
+} from './provider-disclosure';
 
 type FabricStatusCapability = Readonly<{
     id: FabricCapabilityId;
@@ -29,10 +34,18 @@ export type FabricStatusSnapshot = Readonly<{
     contractVersion: typeof FABRIC_SCHEMA_VERSION;
     egressGateOpen: boolean;
     readinessNote: 'available_unqualified';
+    providerDisclosure: ProviderDisclosureSnapshot;
     capabilities: readonly FabricStatusCapability[];
 }>;
 
-export function buildFabricStatusSnapshot(): FabricStatusSnapshot {
+const UNOBSERVED_PROVIDER_SOURCES: ProviderDisclosureSources = Object.freeze({
+    ollama: () => Object.freeze({ status: 'denied', reason: 'unavailable' }),
+    athena: () => Object.freeze({ status: 'denied', reason: 'unavailable' }),
+});
+
+export function buildFabricStatusSnapshot(
+    providerSources: ProviderDisclosureSources = UNOBSERVED_PROVIDER_SOURCES,
+): FabricStatusSnapshot {
     const capabilities = Object.values(FABRIC_CAPABILITY_DESCRIPTORS)
         .sort((left, right) => left.id.localeCompare(right.id))
         .map((descriptor) => {
@@ -59,6 +72,7 @@ export function buildFabricStatusSnapshot(): FabricStatusSnapshot {
         contractVersion: FABRIC_SCHEMA_VERSION,
         egressGateOpen: isEgressGateOpen(),
         readinessNote: 'available_unqualified',
+        providerDisclosure: buildProviderDisclosureSnapshot(providerSources),
         capabilities: Object.freeze(capabilities),
     });
 }
