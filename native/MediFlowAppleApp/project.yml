@@ -74,6 +74,8 @@ targets:
         NSLocalNetworkUsageDescription: "MediFlow cerca il tuo home-base sulla rete locale per collegarsi in modo paired e cifrato."
         NSBonjourServices:
           - _mediflow-homebase._tcp
+        # Recording remains macOS 26-gated; the general app deployment stays 14.
+        NSMicrophoneUsageDescription: "MediFlow usa il microfono solo dopo il tuo consenso per trascrivere localmente la visita; l'audio non viene salvato."
     settings:
       base:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
