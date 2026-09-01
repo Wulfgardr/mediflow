@@ -106,7 +106,7 @@ public struct HomeBaseRuntimeStatusView: View {
 
             optionalServicesSection
 
-            Text("Backend web e proxy TLS sono gli unici servizi gestiti dalla app. Ollama e Docker/ICD sono mostrati a scopo diagnostico e non vengono mai installati o avviati automaticamente.")
+            Text("Backend web e proxy TLS sono gli unici servizi gestiti dalla app. Ollama e MLX sono mostrati a scopo diagnostico e non vengono mai installati o avviati automaticamente.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -205,8 +205,6 @@ public struct HomeBaseRuntimeStatusView: View {
         switch service.id {
         case "optional-ollama":
             return "homebase-runtime-optional-ollama"
-        case "optional-docker-icd":
-            return "homebase-runtime-optional-docker"
         default:
             return "homebase-runtime-\(service.id)"
         }
