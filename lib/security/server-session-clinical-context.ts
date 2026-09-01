@@ -18,7 +18,8 @@ import {
 type ClinicalContextDatabase = Pick<typeof dbServer, 'select'>;
 
 export type ServerSessionClinicalContextErrorCode =
-    | 'ambulatory_missing' | 'input_invalid' | 'membership_missing' | 'patient_missing' | 'session_ineligible';
+    | 'ambulatory_missing' | 'input_invalid' | 'membership_missing' | 'patient_missing'
+    | 'patient_version_invalid' | 'session_ineligible';
 
 export class ServerSessionClinicalContextError extends Error {
     constructor(readonly code: ServerSessionClinicalContextErrorCode) {
@@ -58,9 +59,10 @@ export function createCanonicalClinicalContextResolver(database: ClinicalContext
             if (!port) return fail('session_ineligible');
             use = beginResourceUse(port);
             if (!use || session.authChannel !== 'web' || session.id === 'local-api') return fail('session_ineligible');
-            const patient = database.select({ id: patients.id })
+            const patient = database.select({ id: patients.id, version: patients.version })
                 .from(patients).where(eq(patients.id, request.patientId)).get();
             if (!patient) return fail('patient_missing');
+            if (!Number.isSafeInteger(patient.version) || patient.version < 1) return fail('patient_version_invalid');
             const ambulatory = database.select({ id: ambulatories.id })
                 .from(ambulatories).where(eq(ambulatories.id, request.ambulatoryId)).get();
             if (!ambulatory) return fail('ambulatory_missing');
@@ -73,7 +75,7 @@ export function createCanonicalClinicalContextResolver(database: ClinicalContext
             if (!membership) return fail('membership_missing');
             committed = commitResourceUse(use);
             if (!committed) return fail('session_ineligible');
-            return Object.freeze({ patientId: patient.id, ambulatoryId: ambulatory.id });
+            return Object.freeze({ patientId: patient.id, ambulatoryId: ambulatory.id, patientVersion: patient.version });
         } finally {
             if (use && !committed) abortResourceUse(use);
             if (port) releaseResourcePort(port);
