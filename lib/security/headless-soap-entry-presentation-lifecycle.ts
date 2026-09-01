@@ -6,6 +6,7 @@ import { createHeadlessSoapEntryPresentationHandoff,
 import type { ClinicianSoapEntryFieldSetV1 } from '../headless/clinician-soap-entry-field-set';
 import type { ClinicianSoapEntrySealV1 } from '../headless/clinician-soap-entry-seal';
 import { verifyHeadlessSoapEntryGestureSealBundle } from './headless-soap-entry-seal-binding';
+import type { HeadlessSoapEntryFieldSetBindingV1 } from './headless-soap-entry-field-set-lifecycle';
 declare const presentationDependentRegistrationIdentity: unique symbol;
 export type HeadlessSoapEntryPresentationDependentRegistrationV1 =
     Readonly<{ readonly [presentationDependentRegistrationIdentity]?: never }>;
@@ -24,6 +25,10 @@ type EntryLifecyclePort = Readonly<{
 }>;
 export type HeadlessSoapEntryPresentationLifecycleSources = Readonly<{
     entryLifecycle: EntryLifecyclePort;
+    entryBinding?: Readonly<{
+        withCurrentDependentBinding(candidate: unknown, registration: unknown,
+            operation: (binding: HeadlessSoapEntryFieldSetBindingV1) => void): Promise<boolean>;
+    }>;
     entryService: Readonly<{ wipe(candidate: unknown): boolean }>;
     entropy(): unknown;
 }>;
@@ -41,6 +46,21 @@ export type HeadlessSoapEntryPresentationLifecycleControllerV1 = Readonly<{
 }>;
 export type HeadlessSoapEntryPresentationSealBindingControllerV1 = Readonly<{
     bindGestureSeal(correlationToken: unknown, sealBundle: unknown): Promise<boolean>;
+}>;
+export type HeadlessSoapEntryPresentationBindingV1 = Readonly<{
+    activeRole: HeadlessSoapEntryFieldSetBindingV1['activeRole'];
+    childLease: HeadlessSoapEntryFieldSetBindingV1['childLease'];
+    selection: HeadlessSoapEntryFieldSetBindingV1['selection'];
+    patientVersion: HeadlessSoapEntryFieldSetBindingV1['patientVersion'];
+    proposal: HeadlessSoapEntryFieldSetBindingV1['proposal'];
+    entryIdentity: HeadlessSoapEntryFieldSetBindingV1['entryIdentity'];
+    payloadDigest: HeadlessSoapEntryFieldSetBindingV1['payloadDigest'];
+    sealDigest: ClinicianSoapEntrySealV1['sealDigest'];
+}>;
+export type HeadlessSoapEntryPresentationBindingControllerV1 = Readonly<{
+    withCurrentDependentBinding(correlationToken: unknown, registration: unknown,
+        operation: (binding: HeadlessSoapEntryPresentationBindingV1,
+            sealBundle: ClinicianSoapEntrySealV1) => void): Promise<boolean>;
 }>;
 type PresentationRecord = {
     active: boolean;
@@ -97,9 +117,9 @@ function synchronousCallback(value: unknown): value is (...args: never[]) => voi
     return typeof value === 'function' && !isProxy(value) && !isAsyncFunction(value) && !isGeneratorFunction(value)
         && objectGetPrototypeOf(value) === functionPrototype;
 }
-function callbackSucceeded(operation: (...args: never[]) => void): boolean {
+function callbackSucceeded(operation: (...args: never[]) => void, args: unknown[] = []): boolean {
     try {
-        const result = apply(operation, undefined, []);
+        const result = apply(operation, undefined, args);
         if (result === undefined) return true;
         if (isPromise(result)) try { apply(promiseThen, result, [undefined, () => undefined]); } catch { /* denial remains local */ }
     } catch { /* fixed false below */ }
@@ -112,6 +132,7 @@ export function createHeadlessSoapEntryPresentationLifecycleOwner(
     service: HeadlessSoapEntryPresentationLifecycleServiceV1;
     lifecycleController: HeadlessSoapEntryPresentationLifecycleControllerV1;
     sealBindingController: HeadlessSoapEntryPresentationSealBindingControllerV1;
+    presentationBindingController: HeadlessSoapEntryPresentationBindingControllerV1;
 }> {
     const pendingEntries = new WeakSet<object>(), claimedEntries = new WeakSet<object>();
     const presentations = new Map<string, PresentationRecord>(), pendingTokens = new Set<string>(), claimedTokens = new Set<string>();
@@ -335,5 +356,63 @@ export function createHeadlessSoapEntryPresentationLifecycleOwner(
             return true;
         },
     });
-    return objectFreeze({ service, lifecycleController, sealBindingController });
+    const presentationBindingController: HeadlessSoapEntryPresentationBindingControllerV1 = objectFreeze({
+        async withCurrentDependentBinding(candidate: unknown, registration: unknown,
+            operation: (binding: HeadlessSoapEntryPresentationBindingV1,
+                sealBundle: ClinicianSoapEntrySealV1) => void): Promise<boolean> {
+            if (poisonReentry()) return false;
+            const record = recordFor(candidate); if (!record) return false;
+            const dependent = dependentFor(record, registration); if (!dependent) return false;
+            if (record.state !== 'gesture_bound' || !record.sealBundle || !sources.entryBinding
+                || !synchronousCallback(operation)) {
+                terminalize(record, false); return false;
+            }
+            if (h4CallInFlight) { poisonReentry(); return false; }
+            const activeOperation: LifecycleOperation = { lifecycle: record, dependent, created: null, poisoned: false };
+            h4CallInFlight = true; lifecycleOperation = activeOperation;
+            const sealBundle = record.sealBundle;
+            const locallyCurrent = (): boolean => recordFor(candidate) === record
+                && dependentFor(record, registration) === dependent && record.state === 'gesture_bound'
+                && record.sealBundle === sealBundle;
+            let invoked = false, callbackAccepted = false, h4Current = false;
+            try {
+                h4Current = await sources.entryBinding.withCurrentDependentBinding(
+                    record.entryRef,
+                    record.entryRegistration,
+                    (upstream) => {
+                        if (callbackActive || invoked || !locallyCurrent()) { activeOperation.poisoned = true; return; }
+                        callbackActive = true; invoked = true;
+                        const binding = objectCreate(null) as Record<string, unknown>;
+                        binding.activeRole = upstream.activeRole;
+                        binding.childLease = upstream.childLease;
+                        binding.selection = upstream.selection;
+                        binding.patientVersion = upstream.patientVersion;
+                        binding.proposal = upstream.proposal;
+                        binding.entryIdentity = upstream.entryIdentity;
+                        binding.payloadDigest = upstream.payloadDigest;
+                        binding.sealDigest = sealBundle.sealDigest;
+                        callbackAccepted = callbackSucceeded(
+                            operation as (...args: never[]) => void,
+                            [objectFreeze(binding), sealBundle],
+                        );
+                        callbackActive = false;
+                    },
+                );
+            } catch { h4Current = false; }
+            finally {
+                callbackActive = false; h4CallInFlight = false;
+                if (lifecycleOperation === activeOperation) lifecycleOperation = null;
+            }
+            let attached = false;
+            if (!activeOperation.poisoned && invoked && callbackAccepted && h4Current && locallyCurrent()) {
+                try { attached = sources.entryLifecycle.confirmDependent(record.entryRef, record.entryRegistration); }
+                catch { attached = false; }
+            }
+            const accepted = !activeOperation.poisoned && invoked && callbackAccepted && h4Current && attached
+                && locallyCurrent();
+            if (!accepted) terminalize(record, false);
+            return accepted;
+        },
+    });
+    return objectFreeze({ service, lifecycleController, sealBindingController, presentationBindingController });
 }
