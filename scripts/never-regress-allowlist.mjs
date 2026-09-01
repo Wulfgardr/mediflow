@@ -209,6 +209,16 @@ export const NEVER_REGRESS_ALLOWLIST = {
     ],
     externalUrls: [
         {
+            path: 'lib/ai-providers/v2/openai-responses-official-transport.ts',
+            pattern: 'https://api\\.openai\\.com/v1/responses',
+            reason: 'The provider-v2 transport pins the sole OpenAI Responses egress target; it is server-only, opt-in, policy-gated and cannot be replaced by caller input.',
+        },
+        {
+            path: 'lib/ai-providers/v2/provider-lifecycle.test.ts',
+            pattern: 'https://api\\.openai\\.com',
+            reason: 'The lifecycle test supplies an endpoint-shaped forbidden field to prove that the strict provider binding rejects caller-selected destinations without network access.',
+        },
+        {
             path: 'lib/aifa-catalog.ts',
             pattern: 'https://www\\.aifa\\.gov\\.it/open-data',
             reason: 'The official AIFA Open Data page is stored as user-reviewed provenance and opened only through an explicit settings link; the catalog importer reads a user-selected local file and performs no network fetch.',
