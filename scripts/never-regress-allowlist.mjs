@@ -91,12 +91,137 @@ export const NEVER_REGRESS_ALLOWLIST = {
             pattern: "username:\\s*'policy-user'",
             reason: 'Settings write-policy tests build a synthetic ServerSession fixture to exercise the per-channel write allowlist matrix without real credentials.',
         },
+        {
+            path: 'lib/ai-providers/fabric/document-synthesis-production-operation.test.ts',
+            pattern: "username:\\s*'clinician\\.synthetic'",
+            reason: 'Document Synthesis production-operation tests use an explicit synthetic clinician identity with mocked local authority.',
+        },
+        {
+            path: 'lib/ai-providers/fabric/patient-insight-authenticated-preview.test.ts',
+            pattern: "username:\\s*'synthetic'",
+            reason: 'Patient Insight preview tests use a synthetic authenticated session fixture and no live credential.',
+        },
+        {
+            path: 'lib/ai-providers/fabric/treatment-reasoning-authenticated-projection.test.ts',
+            pattern: "username:\\s*'synthetic'",
+            reason: 'Treatment Reasoning projection tests use a synthetic authenticated session fixture and no live credential.',
+        },
+        {
+            path: 'lib/legacy-smart-import-apply-retired-route.test.ts',
+            pattern: "username:\\s*'synthetic\\.smart-import\\.retirement'",
+            reason: 'The retired Smart Import apply-route test uses a named synthetic session to verify the authenticated denial.',
+        },
+        {
+            path: 'lib/security/client-application-lock.test.ts',
+            pattern: "(?:username|password):\\s*'(?:admin|654321|123456)'",
+            reason: 'Client lock tests use fixed local-only credentials to exercise synthetic lock, unlock and password-rejection paths.',
+        },
+        {
+            path: 'lib/security/headless-soap-active-role-enrollment.test.ts',
+            pattern: "username:\\s*'other'",
+            reason: 'Active-role enrollment tests use a synthetic alternate username to verify identity mismatch rejection.',
+        },
+        {
+            path: 'lib/security/headless-soap-active-role-session-grant-attach-failure-fixture.ts',
+            pattern: "username:\\s*'synthetic-soap-admin'",
+            reason: 'The attach-failure fixture carries a synthetic SOAP administrator identity for an isolated failure process.',
+        },
+        {
+            path: 'lib/security/headless-soap-active-role-session-grant-binding.test.ts',
+            pattern: "username:\\s*'synthetic-h6-admin'",
+            reason: 'The H6 session-grant binding test uses a synthetic administrator identity for exact subject binding.',
+        },
+        {
+            path: 'lib/security/headless-soap-active-role-session-grant-rejection-fixture.ts',
+            pattern: "username:\\s*'synthetic-soap-admin'",
+            reason: 'The rejection fixture carries a synthetic SOAP administrator identity for an isolated failure process.',
+        },
+        {
+            path: 'lib/security/headless-soap-active-role-session-grant.test.ts',
+            pattern: "username:\\s*'synthetic-soap-admin'",
+            reason: 'Session-grant tests reuse one synthetic SOAP administrator identity across local lifecycle cases.',
+        },
+        {
+            path: 'lib/security/headless-soap-authorization-lineage.test.ts',
+            pattern: "username:\\s*'synthetic\\.clinician'",
+            reason: 'Authorization-lineage tests bind receipts to an explicit synthetic clinician identity.',
+        },
+        {
+            path: 'lib/security/headless-soap-authorization-proof-binding.test.ts',
+            pattern: "username\\s*[:=]\\s*'(?:synthetic\\.clinician|synthetic-h6-exact-session(?:-positive)?)'",
+            reason: 'Authorization-proof binding tests use named synthetic identities to distinguish positive and adversarial sessions.',
+        },
+        {
+            path: 'lib/security/headless-soap-authorization-proof-lifecycle-adversarial.test.ts',
+            pattern: "username:\\s*'synthetic-admin'",
+            reason: 'Adversarial authorization-proof tests use a synthetic administrator identity and isolated stores.',
+        },
+        {
+            path: 'lib/security/headless-soap-authorization-proof-lifecycle.test.ts',
+            pattern: "username:\\s*'synthetic-admin'",
+            reason: 'Authorization-proof lifecycle tests use a synthetic administrator identity and isolated stores.',
+        },
+        {
+            path: 'lib/security/headless-soap-command-binding-test-fixture.ts',
+            pattern: "username:\\s*'synthetic\\.clinician'",
+            reason: 'The command-binding fixture exposes a synthetic clinician identity only to local contract tests.',
+        },
+        {
+            path: 'lib/security/headless-soap-fresh-pin-verification.test.ts',
+            pattern: "username:\\s*(?:`\\$\\{USERNAME\\} `|'other'|'synthetic-other-admin')",
+            reason: 'Fresh-PIN verification tests use explicit synthetic current, alternate and whitespace-variant identities.',
+        },
+        {
+            path: 'lib/security/pin-change-service.test.ts',
+            pattern: 'username:\\s*`synthetic-\\$\\{suffix\\}`',
+            reason: 'PIN-change tests derive a unique synthetic username per isolated database fixture.',
+        },
+        {
+            path: 'lib/security/server-auth.test.ts',
+            pattern: "username:\\s*'(?:synthetic-auth-operator|username|different-synthetic-user)'",
+            reason: 'Server-auth tests use explicit synthetic identities to cover accepted and mismatched sessions.',
+        },
+        {
+            path: 'lib/security/server-session-native-system-owner.test.ts',
+            pattern: "username:\\s*'synthetic-(?:user|other)'",
+            reason: 'Native system-owner tests distinguish two synthetic local identities without real credentials.',
+        },
+        {
+            path: 'lib/security/server-session-projection-owner-selection-lifecycle.test.ts',
+            pattern: "username:\\s*'synthetic-clinician'",
+            reason: 'Projection-owner lifecycle tests use an explicit synthetic clinician session.',
+        },
+        {
+            path: 'lib/security/web-auth-lifecycle-owner-adapter.test.ts',
+            pattern: 'username:\\s*`synthetic-\\$\\{suffix\\}`',
+            reason: 'Web-auth adapter tests derive unique synthetic identities for isolated owner stores.',
+        },
+        {
+            path: 'lib/security/web-auth-lifecycle-owner-process.test.ts',
+            pattern: "username\\s*:\\s*'(?:synthetic-|forged|synthetic-late|synthetic-fresh|synthetic-poisoned|synthetic-capability-(?:pending|stale|post-abort)|synthetic-invalid|synthetic-process)'",
+            reason: 'Web-auth owner process tests use named synthetic identities to separate race, forgery and lifecycle cases.',
+        },
+        {
+            path: 'lib/security/web-auth-logout-server.test.ts',
+            pattern: "username:\\s*'synthetic-logout-operator'",
+            reason: 'Logout server tests use a synthetic operator identity against an isolated local session store.',
+        },
     ],
     externalUrls: [
         {
             path: 'lib/aifa-catalog.ts',
             pattern: 'https://www\\.aifa\\.gov\\.it/open-data',
             reason: 'The official AIFA Open Data page is stored as user-reviewed provenance and opened only through an explicit settings link; the catalog importer reads a user-selected local file and performs no network fetch.',
+        },
+        {
+            path: 'lib/compliance-evidence-inventory.ts',
+            pattern: 'https://eur-lex\\.europa\\.eu/eli/(?:reg/2016/679/art_(?:25|32)|reg/2024/1689)/',
+            reason: 'Official EUR-Lex URLs are read-only legal provenance rendered for explicit user review; the inventory performs no fetch or background egress.',
+        },
+        {
+            path: 'lib/compliance-evidence-inventory.test.ts',
+            pattern: 'https://eur-lex\\.europa\\.eu/eli/(?:reg/2016/679/art_(?:25|32)|reg/2024/1689)/',
+            reason: 'Compliance inventory tests assert official EUR-Lex provenance strings without issuing network requests.',
         },
         {
             path: 'lib/aifa-catalog.ts',
