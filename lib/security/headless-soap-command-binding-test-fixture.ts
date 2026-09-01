@@ -62,7 +62,7 @@ export function syntheticProof(byte: number): string {
     assert.ok(minted); return minted.authorizationProof;
 }
 
-export function commandBindingFixture(entropyByte = 0x44) {
+export function commandBindingFixture(entropyByte = 0x44, singleUseGate: Promise<void> | null = null) {
     const trace: string[] = [], registrations = new Map<string, { registration: object; dispose: () => void }>();
     let current = syntheticBinding(), entropyCalls = 0, wipes = 0, currentFailure: unknown = null;
     const owner = createHeadlessSoapCommandBindingOwner({
@@ -85,6 +85,7 @@ export function commandBindingFixture(entropyByte = 0x44) {
                 operation: (lineage: unknown, sealBundle: unknown) => void) {
                 trace.push('single-use'); const dependent = registrations.get(String(proof));
                 if (!dependent || dependent.registration !== registration) return false;
+                if (singleUseGate) await singleUseGate;
                 operation(current.lineage, current.sealBundle); dependent.dispose(); registrations.delete(String(proof)); return true;
             },
         },
