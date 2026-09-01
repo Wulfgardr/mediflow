@@ -7,7 +7,7 @@ read_when:
 
 # Repository Topology: MediFlow
 
-Ultimo aggiornamento: 2026-08-07
+Ultimo aggiornamento: 2026-09-01
 
 Mappa concisa delle aree top-level del repository, pensata per orientare agent e
 contributor: distingue il **runtime clinico** (codice che gira con dati paziente)
@@ -51,35 +51,96 @@ runtime artifact e fonti riservate restano fuori da Git secondo
 | `Farmaci/` | dati di riferimento | Dataset farmaceutici di riferimento. |
 | `certs/` | dev tooling | Certificati TLS locali per dev. |
 
-## Confine AI e integrazioni opzionali
+## Confine Application Services, Fabric e integrazioni opzionali
 
-La topologia AI implementata resta locale:
+La topologia intelligente del candidato sorgente locale 0.8.5 resta
+host-owned e locale:
 
-- `lib/ai-service.ts` è la facciata usata dalle funzioni applicative;
-- `lib/ai-providers/` contiene il connettore operativo Ollama;
-- `lib/ai-egress-gate.ts` e `lib/ai-egress-audit.ts` applicano una chiusura
-  sicura in caso di errore (`fail-closed`) e scrivono un registro locale privo
-  di contenuto clinico.
+- `app/api/ai/{patient-insight,smart-import,document-synthesis,treatment-reasoning}/`
+  contiene gli adapter HTTP autenticati dei quattro smart path generativi;
+- `lib/ai-providers/fabric/` contiene resolver, production root, lifecycle,
+  receipt e provenienza governati dall'host;
+- quando configurato, Ollama serve Patient Insight, Smart Import e Document
+  Synthesis;
+- quando configurata, ATHENA su MLX serve soltanto Treatment Reasoning, con
+  lifecycle separato da Ollama;
+- AnyDoc esegue l'unica estrazione automatica deterministica locale degli
+  allegati e non è un provider o una venue Fabric;
+- `lib/ai-egress-gate.ts` e `lib/ai-egress-audit.ts` mantengono la chiusura
+  sicura in caso di errore (`fail-closed`) e un registro locale privo di
+  contenuto clinico.
 
-Non esistono fornitori cloud operativi, registri esterni o una superficie di
-consenso per l'invio esterno. Il controllo resta
-`closed_pending_redaction_lane`.
+ATHENA è inclusa soltanto con runner e modello locali configurati. L'override
+host-owned `MEDIFLOW_ATHENA_MLX_GENERATE_BIN` accetta un eseguibile assoluto
+`mlx_lm.generate`, senza argomenti o shell. Il launcher `uvx` predefinito opera
+offline e fallisce chiuso se la cache richiesta non è disponibile; non prova
+readiness universale.
+
+Il caller presenta soltanto input applicativo tipizzato. Non sceglie provider,
+modello, endpoint, venue, prompt, fallback o apply. Ogni smart path restituisce
+una proposta review-only con receipt, provenienza e currentness; il production
+root host-owned resta l'unico punto di composizione.
+
+La capability `ocr` resta `unavailable` nel runtime corrente. AnyDoc fallisce
+chiusa per immagini o PDF scansionati senza text layer e le route OCR legacy,
+dopo l'autenticazione, rispondono `410`. DeepSeek-OCR 2 è
+`RELEASE_SCOPE_EXCLUDED`: mancano adapter, E2E e benchmark. Un workstream
+post-0.8.5 può ricevere soltanto pagine `needsOcr` e deve ricomporle con
+provenienza, hash e qualità per pagina. Benchmark sintetico italiano, soglie
+dichiarate e prova che nessun dato lascia il processo locale devono precedere
+ogni abilitazione. Apple Vision non appartiene al target.
+
+Non esistono provider cloud operativi o una superficie di consenso per l'invio
+esterno. OpenAI e Anthropic compaiono soltanto nel registro informativo e hanno
+esecuzione disabilitata. Il controllo resta `closed_pending_redaction_lane`.
+
+La disclosure implementata non chiude F7. Il modello provider completo non è
+implementato ed è `RELEASE_SCOPE_EXCLUDED`. Un contratto post-0.8.5 dovrà
+separare provider type, istanza, autenticazione, modello, capability, gruppi,
+binding e function allowlist. Le classi `local_model`, `api_key`,
+`provider_oauth` ufficiale e `host_subscription` restano distinte. Login
+consumer e subscription non equivalgono a una credenziale di inferenza.
 
 Un futuro plug-in non può accedere direttamente al database. Può ricevere solo
 il contenuto minimo dopo regole, attivazione esplicita, controlli verificati e
 registrazione. La redazione o pseudonimizzazione deve essere dimostrata per il
 flusso specifico. MediFlow non dichiara anonimizzazione garantita.
 
-Le funzioni deterministiche restano disponibili senza plug-in. Il percorso AI
-locale richiede Ollama configurato. L'output esterno resta una proposta:
-chiarimento interattivo e scrittura autorizzata sono fasi separate. Questa
-regola descrive il confine, non una funzione cloud già consegnata.
+Le funzioni deterministiche restano disponibili senza provider. Receipt e
+provenienza descrivono l'esecuzione, ma non autorizzano un apply o una scrittura
+clinica.
 
 L'[ADR 0086](./adr/0086-intelligent-scaffold-and-graded-automation-boundary.md)
 propone la sequenza comune
 `pipeline locale -> proposta -> chiarimento -> anteprima -> autorizzazione ->
 eventuale scrittura auditata`. Non aggiunge una nuova area runtime. La inbox
 conversazionale e l'automazione graduata restano roadmap.
+
+## Confine Headless 0.8.5
+
+La foundation Headless non espone un runtime agentico generale esterno. Non
+espone listener, installer, onboarding o operazioni Headless eseguibili
+generalizzate. Gli adapter non importano SQLite e non duplicano regole di
+dominio: invocano solo Application Services host-owned.
+
+L'unica eccezione di scrittura accettata è
+`mediflow.clinical_diary.append_soap.v1` con
+`clinician_confirmed_single_use.v1`. Il chiamante non fornisce authority, dati
+di sessione, idempotenza o binding clinici. L'Application Service ricontrolla
+la currentness e delega il commit atomico al solo owner SQLite. L'eccezione non
+autorizza altre capability, il Fabric o un canale Headless generale esterno.
+
+La topologia distingue due modalità e non le unisce:
+
+- **provider-in-MediFlow**: il Fabric governa il provider che esegue una
+  capability MediFlow; i quattro path locali appartengono a questa modalità;
+- **MediFlow-in-intelligent-host**: un host futuro usa un adapter MCP, App o
+  Headless sopra gli stessi Application Services.
+
+La seconda modalità è `RELEASE_SCOPE_EXCLUDED`. Il tree corrente non promette
+server MCP, installer, onboarding o integrazione con sessioni consumer.
+Qualunque OAuth provider futuro deve usare soltanto un contratto ufficiale,
+senza token privati o flussi ricostruiti.
 
 ## ⚠️ Regole operative
 
@@ -144,9 +205,10 @@ traduzione eseguibile di [ADR 0084](./adr/0084-document-diagnoses-review-only.md
 [ADR 0086](./adr/0086-intelligent-scaffold-and-graded-automation-boundary.md), fino a
 oggi affidate alla sola disciplina.
 
-MediFlow è local-first: i servizi AI sono invocati direttamente dai componenti, non
-dietro una route. Il punto di enforcement è quindi il **writer del servizio**, non la
-route — un gate route-based passerebbe a vuoto, ed è l'errore che questo gate evita.
+Nel candidato 0.8.5 i quattro smart path attraversano route autenticate. La
+route resta un adapter: il punto di enforcement è il **production root e il
+writer del servizio**. Un controllo limitato ai nomi delle route non dimostra
+la separazione tra proposta e scrittura.
 
 Il confine ha due lati e il gate controlla entrambi:
 

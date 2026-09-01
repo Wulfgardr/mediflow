@@ -33,12 +33,22 @@ destinazione di export. Dati e artifact sensibili restano fuori da Git secondo
 - Node.js **24.x**, come fissato da `.nvmrc` e `package.json`
 - npm (incluso con Node)
 - Docker Desktop (opzionale, per API ICD-11)
-- Ollama (opzionale, per AI/OCR locale)
+- Ollama (opzionale, per Patient Insight, Smart Import e Document Synthesis)
+- Apple Silicon, artifact locale ATHENA e toolchain MLX (opzionali, solo per
+  Treatment Reasoning)
 
-Nota OCR: Ollama resta il motore primario locale. Su macOS il runtime puo usare
-Apple Vision come fallback locale (ADR 0059) quando l'OCR primario produce
-output vuoto o degenerato. Windows e Linux non hanno oggi un fallback OCR
-platform-specific equivalente in MediFlow.
+Nota documentale 0.8.5: AnyDoc è l'unica estrazione automatica locale degli
+allegati e la capability `ocr` resta `unavailable` nel runtime corrente.
+Immagini e PDF scansionati senza text layer richiedono revisione manuale; dopo
+l'autenticazione, le route OCR legacy rispondono `410`. DeepSeek-OCR 2 e Apple
+Vision sono `RELEASE_SCOPE_EXCLUDED` dalla 0.8.5.
+
+Nota ATHENA 0.8.5: Treatment Reasoning è incluso solo con artifact del modello
+e runner MLX locali configurati. L'override host-owned
+`MEDIFLOW_ATHENA_MLX_GENERATE_BIN` accetta soltanto il percorso assoluto di un
+eseguibile `mlx_lm.generate`, senza argomenti o shell. Senza override, `uvx`
+resta offline e fallisce chiuso quando la cache richiesta non è già presente.
+La disponibilità del runner non prova readiness universale.
 
 ---
 
@@ -173,21 +183,74 @@ Per verificare la first slice runtime del `document evidence ledger`:
 npm run test:document-synthesis
 npm run test:ai-context
 npm run test:pdf-service
+npm run check:anydoc-local-only
+npm run test:anydoc-local-only
 ```
 
 Usalo quando tocchi:
-- `lib/document-synthesis-service.ts`
-- `lib/document-parse-evidence-artifact.ts`
+- `lib/domain/documents/document-synthesis-service.ts`
+- `lib/domain/documents/document-parse-evidence-artifact.ts`
 - `lib/ai-context.ts`
-- `lib/ocr-service.ts`
-- `app/api/ocr/extract/route.ts`
+- `lib/domain/documents/anydoc-*`
+- `lib/domain/documents/ocr-service.ts` e le route OCR legacy fail-closed
 - `components/document-upload.tsx`
 - `app/api/attachments/route.ts`
 - la persistenza/lettura di `summarySnapshot` o `parseEvidenceArtifactSnapshot`
 
-Se tocchi il fallback OCR macOS, documenta nella PR che Apple Vision e stato
-verificato solo su macOS e che Windows/Linux restano senza fallback
-platform-specific certificato.
+Se tocchi il confine OCR della 0.8.5, preserva AnyDoc come unica estrazione
+automatica per testo estraibile, failure fail-closed verso review manuale e
+`410` sulle route legacy autenticate. AnyDoc non deve essere classificato come
+OCR, provider o venue Fabric.
+
+DeepSeek-OCR 2 è `RELEASE_SCOPE_EXCLUDED`. Un workstream post-0.8.5 dovrà
+fornire adapter, E2E, benchmark sintetico italiano e soglie dichiarate prima
+dell'implementazione. Potrà ricevere soltanto pagine `needsOcr` e dovrà
+ricomporre il documento con provenienza, hash e qualità per pagina, senza
+permettere a dati clinici di lasciare il processo locale.
+
+### Verifica del crosswalk Fabric 0.8.5
+
+Se tocchi uno dei quattro smart path, il production root, il wire contract o la
+UI che mostra receipt e provenienza, esegui:
+
+```bash
+npm run check:fabric-generative-runtime-crosswalk
+npm run test:fabric-generative-runtime-crosswalk
+```
+
+I quattro path sono Patient Insight, Smart Import, Document Synthesis e
+Treatment Reasoning. Il caller non deve scegliere provider, modello, endpoint,
+venue, prompt, fallback o apply. I production root host-owned devono mantenere
+lo stadio massimo `proposal_only`.
+
+### Gate del modello provider F7
+
+La disclosure corrente distingue i provider locali da OpenAI e Anthropic,
+presenti soltanto come righe informative con esecuzione disabilitata. Non
+trattarla come completamento del modello provider.
+
+Il modello F7 completo non è implementato ed è `RELEASE_SCOPE_EXCLUDED`. Un
+contratto post-0.8.5 dovrà separare tipo e istanza del provider,
+autenticazione, modello, capability, gruppi, binding e allowlist delle funzioni.
+Le classi di credenziale previste dal requisito sono:
+
+- `local_model`;
+- `api_key`;
+- `provider_oauth`, soltanto tramite flusso ufficiale del provider;
+- `host_subscription`, come classe distinta e non come accesso API implicito.
+
+Un login consumer, un abbonamento ChatGPT/Claude o una subscription dell'host
+non autorizzano inferenza API. Configurazione credenziali ed esecuzione
+OpenAI/Anthropic sono `RELEASE_SCOPE_EXCLUDED`. Un workstream futuro richiede
+contratto ufficiale, egress esplicito e credenziali autorizzate. Non copiare
+codice GPL né implementare OAuth privati, reverse-engineered o dipendenti da
+sessioni consumer.
+
+Mantieni inoltre separate le due modalità architetturali: un provider eseguito
+dentro MediFlow e MediFlow invocato come servizio governato da un host
+intelligente. La seconda modalità è `RELEASE_SCOPE_EXCLUDED` e non autorizza
+server MCP, installer, onboarding o un runtime Headless generale esposto
+all'esterno.
 
 ---
 
@@ -304,6 +367,15 @@ Una PR è considerata conclusa quando:
 - se cambi `/api/v1/*`, `npm run check:openapi:drift` passa
 - se cambi la concorrenza pazienti o i write path `/api/patients/*` / `/api/v1/patients/*`, `npm run test:concurrency:patients` passa
 - se cambi il create-flow da documento della nuova anagrafica, `npm run test:patient-document-import` passa
+- se cambi un path Fabric 0.8.5, il check e il test del crosswalk generativo
+  passano
+- se cambi l'estrazione degli allegati, i check AnyDoc local-only passano,
+  immagini/scansioni falliscono chiuse e le route OCR legacy autenticate
+  restano `410`
+- se avvii un workstream post-0.8.5 sul modello provider, tipo, istanza, auth,
+  modello, capability, gruppi, binding, allowlist e classi di credenziale
+  restano separati; i provider cloud restano `RELEASE_SCOPE_EXCLUDED` senza
+  contratto ufficiale
 - Nessun PHI/PII introdotto in repo, fixture, log o screenshot
 - Se una feature è user-facing e interagibile, deve avere una UI/UX esplicita e coerente
   (CTA/pulsante, label comprensibile, percorso utente verificabile).
