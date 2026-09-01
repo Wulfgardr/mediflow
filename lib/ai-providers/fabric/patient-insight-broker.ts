@@ -26,10 +26,11 @@ export type PatientInsightBroker = Readonly<{
 }>;
 
 type Currentness = Readonly<{ selectionEpoch: number; revision: number; freshnessToken: string }>;
-type RecordEntry = Readonly<{ entropyHandle: string; currentness: Currentness; accepted: Extract<PatientInsightHostResult, { status: 'available' }> }>;
-type ReservationEntry = Readonly<{ entropyHandle: string; handle: string; currentness: Currentness; accepted: Extract<PatientInsightHostResult, { status: 'available' }> }>;
+type RecordEntry = Readonly<{ entropyHandle: string; currentness: Currentness; projection: PatientInsightProjection; accepted: Extract<PatientInsightHostResult, { status: 'available' }> }>;
+type ReservationEntry = Readonly<{ entropyHandle: string; handle: string; currentness: Currentness; projection: PatientInsightProjection; accepted: Extract<PatientInsightHostResult, { status: 'available' }> }>;
 const handlePattern = /^pib_[0-9a-f]{32}$/u;
 const tokenPattern = /^[A-Za-z][A-Za-z0-9._:-]{15,159}$/u;
+const projectionConsumers = new WeakMap<PatientInsightBroker, (input: unknown) => PatientInsightProjection>();
 
 function fail(code: PatientInsightBrokerErrorCode): never { throw new PatientInsightBrokerError(code); }
 function callable(value: unknown): value is () => unknown { return typeof value === 'function' && !types.isProxy(value); }
@@ -125,7 +126,7 @@ export function createPatientInsightBroker(value: PatientInsightBrokerHost): Pat
         const result = accepted(output); if (!result) fail('proposal_invalid'); const entropyHandle = issueHandle();
         if (liveEntropyHandles.has(entropyHandle)) fail('handle_collision'); const handle = availableHandle(entropyHandle);
         const current = readCurrentness(); ensureNotPoisoned(); currentnessChanged(snapshot, current);
-        const reservation = Object.freeze(Object.create(null)) as object; const entry = Object.freeze({ entropyHandle, handle, currentness: snapshot, accepted: result });
+        const reservation = Object.freeze(Object.create(null)) as object; const entry = Object.freeze({ entropyHandle, handle, currentness: snapshot, projection, accepted: result });
         reservations.set(reservation, entry); liveEntropyHandles.add(entropyHandle); reservedHandles.add(handle);
         operationCleanup = () => { if (reservations.get(reservation) === entry) { reservations.delete(reservation); liveEntropyHandles.delete(entry.entropyHandle); reservedHandles.delete(entry.handle); } };
         ensureNotPoisoned();
@@ -136,7 +137,7 @@ export function createPatientInsightBroker(value: PatientInsightBrokerHost): Pat
         if (verifyCurrentness) { readClock(); ensureNotPoisoned(); const current = readCurrentness(); ensureNotPoisoned(); currentnessChanged(entry.currentness, current); }
         ensureNotPoisoned();
         if (records.has(entry.handle)) fail('handle_collision');
-        const record = Object.freeze({ entropyHandle: entry.entropyHandle, currentness: entry.currentness, accepted: entry.accepted });
+        const record = Object.freeze({ entropyHandle: entry.entropyHandle, currentness: entry.currentness, projection: entry.projection, accepted: entry.accepted });
         reservations.delete(reservation); reservedHandles.delete(entry.handle); records.set(entry.handle, record);
         operationCleanup = () => { if (records.get(entry.handle) === record) { records.delete(entry.handle); liveEntropyHandles.delete(record.entropyHandle); } };
         ensureNotPoisoned();
@@ -155,19 +156,29 @@ export function createPatientInsightBroker(value: PatientInsightBrokerHost): Pat
             return result;
         } finally { operationActive = false; operationPoisoned = false; operationCleanup = null; }
     };
-    return Object.freeze({
+    const consumeRecord = (inputValue: unknown): RecordEntry => {
+        const input = exact(inputValue, ['handle']); if (!input || typeof input.handle !== 'string' || !handlePattern.test(input.handle)) fail('input_invalid');
+        if (consumed.has(input.handle)) fail('handle_replayed'); const entry = records.get(input.handle); if (!entry) fail('handle_missing'); records.delete(input.handle); liveEntropyHandles.delete(entry.entropyHandle); consumed.add(input.handle);
+        readClock(); ensureNotPoisoned(); const current = readCurrentness(); ensureNotPoisoned(); currentnessChanged(entry.currentness, current); return entry;
+    };
+    const broker = Object.freeze({
         stage() { return exclusive(stage); },
-        publish(inputValue) { return exclusive(() => publish(inputValue)); },
-        abort(inputValue) { return exclusive(() => abort(inputValue)); },
+        publish(inputValue: unknown) { return exclusive(() => publish(inputValue)); },
+        abort(inputValue: unknown) { return exclusive(() => abort(inputValue)); },
         issue() {
             return exclusive(() => publish(stage(), false));
         },
-        consume(inputValue) {
-            return exclusive(() => {
-                const input = exact(inputValue, ['handle']); if (!input || typeof input.handle !== 'string' || !handlePattern.test(input.handle)) fail('input_invalid');
-                if (consumed.has(input.handle)) fail('handle_replayed'); const entry = records.get(input.handle); if (!entry) fail('handle_missing'); records.delete(input.handle); liveEntropyHandles.delete(entry.entropyHandle); consumed.add(input.handle);
-                readClock(); ensureNotPoisoned(); const current = readCurrentness(); ensureNotPoisoned(); currentnessChanged(entry.currentness, current); return entry.accepted;
-            });
+        consume(inputValue: unknown) {
+            return exclusive(() => consumeRecord(inputValue).accepted);
         },
     });
+    projectionConsumers.set(broker, (inputValue) => exclusive(() => consumeRecord(inputValue).projection));
+    return broker;
+}
+
+/** Host-only one-time dereference of the projection bound to an authentic broker handle. */
+export function consumePatientInsightProjection(broker: PatientInsightBroker, input: unknown): PatientInsightProjection {
+    const consume = projectionConsumers.get(broker);
+    if (!consume) fail('input_invalid');
+    return consume(input);
 }

@@ -4,7 +4,12 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import { createPatientInsightHostBoundary } from './patient-insight-host-boundary.ts';
-import { PatientInsightBrokerError, createPatientInsightBroker, type PatientInsightBrokerHost } from './patient-insight-broker.ts';
+import {
+    PatientInsightBrokerError,
+    consumePatientInsightProjection,
+    createPatientInsightBroker,
+    type PatientInsightBrokerHost,
+} from './patient-insight-broker.ts';
 
 const ref = (prefix: string) => `${prefix}_${'a'.repeat(32)}`;
 const now = '2026-08-23T12:00:00.000Z';
@@ -36,6 +41,25 @@ test('issues unique opaque handles and consumes only the accepted frozen review 
     assert.equal(accepted.status, 'available'); assert.equal(accepted.writesPerformed, 0); assert.equal(accepted.applyPolicy, 'none');
     assert.equal(accepted.proposal.reviewOnly, true); assert.equal(Object.isFrozen(accepted), true); assert.equal(Object.isFrozen(accepted.proposal), true);
     reject(() => broker.consume({ handle: first }), 'handle_replayed');
+});
+
+test('lets the authenticated host consume the detached typed projection exactly once', () => {
+    const fixture = host();
+    const broker = createPatientInsightBroker(fixture.value);
+    const handle = broker.issue();
+    const projection = consumePatientInsightProjection(broker, Object.freeze({ handle }));
+
+    assert.deepEqual(projection, {
+        schemaVersion: 'mediflow.patient-insight.projection.v1',
+        clinicalFocus: 'synthetic follow-up',
+        activeConditions: ['synthetic condition'],
+        currentTherapies: ['synthetic therapy'],
+        recentClinicalEvents: ['synthetic review'],
+    });
+    assert.equal(Object.isFrozen(projection), true);
+    assert.equal(Object.isFrozen(projection.activeConditions), true);
+    reject(() => broker.consume({ handle }), 'handle_replayed');
+    reject(() => consumePatientInsightProjection(broker, { handle }), 'handle_replayed');
 });
 
 test('stages an opaque reservation, publishes exactly once, and keeps the legacy issue boundary', () => {
