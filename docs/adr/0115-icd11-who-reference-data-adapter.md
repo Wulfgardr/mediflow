@@ -82,7 +82,8 @@ Il primo binding e immutabile:
 - provider `who`, API `v2`, linearizzazione `mms`;
 - release `2026-01`, lingua `en`;
 - massimo 160 byte UTF-8 di query, 25 risultati, 64 KiB di risposta;
-- timeout 5 secondi, nessun retry e nessun fallback.
+- timeout transport 5 secondi e timeout audit 1 secondo, nessun retry e nessun
+  fallback.
 
 Il core usa soltanto un target opaco WHO. Il live transport successivo puo
 risolverlo esclusivamente verso i due host HTTPS ufficiali documentati:

@@ -1,7 +1,8 @@
 /* @Codex */
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createIcd11WhoReferenceDataService, Icd11WhoServiceError } from './icd11-who-service.ts';
+import { createIcd11WhoReferenceDataService, ICD11_WHO_BINDING,
+    Icd11WhoServiceError } from './icd11-who-service.ts';
 
 const ENABLED = Object.freeze({
     schemaVersion: 'mediflow.reference-data.icd11-who-runtime.v1',
@@ -305,4 +306,63 @@ test('nega un thenable transport che dispone il servizio e lancia un errore vend
         error instanceof Icd11WhoServiceError && error.code === 'service_disposed'
         && !error.message.includes('vendor-sensitive-detail'));
     assert.deepEqual({ thenReads, audits }, { thenReads: 1, audits: 0 });
+});
+
+test('nega bounded un audit che non completa', async (context) => {
+    context.mock.timers.enable({ apis: ['setTimeout'] });
+    let enteredAudit!: () => void;
+    const auditEntered = new Promise<void>((resolve) => { enteredAudit = resolve; });
+    const service = createIcd11WhoReferenceDataService({
+        readRuntimeState: () => ENABLED, now: () => 13_000,
+        audit: async () => { enteredAudit(); await new Promise(() => undefined); },
+        transport: async () => ({ schemaVersion: 'mediflow.reference-data.icd11-who-transport-result.v1',
+            releaseId: '2026-01', language: 'en', entries: [] }),
+    });
+    const pending = service.search({ query: 'synthetic term' });
+    await auditEntered;
+    context.mock.timers.tick(ICD11_WHO_BINDING.auditTimeoutMs);
+    const outcome = await Promise.race([
+        pending.then(() => 'published', (error: unknown) => error instanceof Icd11WhoServiceError ? error.code : 'raw'),
+        new Promise<string>((resolve) => setImmediate(() => resolve('still_pending'))),
+    ]);
+    assert.equal(outcome, 'audit_unavailable');
+});
+
+test('dispose durante un audit pending nega subito la pubblicazione', async () => {
+    let enteredAudit!: () => void;
+    const auditEntered = new Promise<void>((resolve) => { enteredAudit = resolve; });
+    const service = createIcd11WhoReferenceDataService({
+        readRuntimeState: () => ENABLED, now: () => 13_500,
+        audit: async () => { enteredAudit(); await new Promise(() => undefined); },
+        transport: async () => ({ schemaVersion: 'mediflow.reference-data.icd11-who-transport-result.v1',
+            releaseId: '2026-01', language: 'en', entries: [] }),
+    });
+    const pending = service.search({ query: 'synthetic term' });
+    await auditEntered;
+    assert.equal(service.dispose(), true);
+    const outcome = await Promise.race([
+        pending.then(() => 'published', (error: unknown) => error instanceof Icd11WhoServiceError ? error.code : 'raw'),
+        new Promise<string>((resolve) => setImmediate(() => resolve('still_pending'))),
+    ]);
+    assert.equal(outcome, 'service_disposed');
+});
+
+test('nega risultati audit sync, async e thenable non conformi senza osservare accessor', async () => {
+    let thenReads = 0;
+    const auditResults: unknown[] = [
+        123,
+        Promise.resolve(123),
+        Object.defineProperty({}, 'then', { get() { thenReads += 1; throw new Error('sensitive'); } }),
+    ];
+    for (const auditResult of auditResults) {
+        const service = createIcd11WhoReferenceDataService({
+            readRuntimeState: () => ENABLED, now: () => 14_000,
+            audit: (() => auditResult) as unknown as () => void,
+            transport: async () => ({ schemaVersion: 'mediflow.reference-data.icd11-who-transport-result.v1',
+                releaseId: '2026-01', language: 'en', entries: [] }),
+        });
+        await assert.rejects(service.search({ query: 'synthetic term' }),
+            (error: unknown) => error instanceof Icd11WhoServiceError && error.code === 'audit_unavailable');
+    }
+    assert.equal(thenReads, 0);
 });
