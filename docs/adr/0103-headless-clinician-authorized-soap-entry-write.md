@@ -1216,9 +1216,10 @@ database, schema, owner, route, Fabric, provider, venue, egress o UI e non
 esegue I/O.
 
 Il parser accetta soltanto un ordinary object intrinseco, come quello prodotto
-da `JSON.parse`, oppure un record null-prototype. L'input non puo essere un
-Proxy e deve avere esattamente le tredici own data property enumerabili,
-nell'ordine canonico, senza accessor, symbol, key mancante o extra. I literal,
+da `JSON.parse`, oppure un record null-prototype gia frozen con property non
+scrivibili e non configurabili. L'input non puo essere un Proxy e deve avere
+esattamente le tredici own data property enumerabili, nell'ordine canonico,
+senza accessor, symbol, key mancante o extra. I literal,
 i pattern dei ref e dei digest, le versioni positive e il timestamp UTC a
 precisione di secondo devono rispettare H7b. L'output e sempre una nuova copia
 null-prototype, frozen e chiusa. Il parser non dimostra l'integrita del ledger,
