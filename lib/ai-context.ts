@@ -531,53 +531,10 @@ function renderRecoveredAttachmentContext(
 }
 
 /* @Codex */
-async function attachmentToFile(attachment: Attachment): Promise<File | null> {
-    const dataUrl = typeof attachment.data === 'string' ? attachment.data.trim() : '';
-    if (!dataUrl.startsWith('data:')) return null;
-
-    try {
-        const response = await fetch(dataUrl);
-        const blob = await response.blob();
-        const fileName = compactText(attachment.name, 80) || 'attachment';
-        const mimeType = attachment.type || blob.type || 'application/octet-stream';
-        return new File([blob], fileName, { type: mimeType });
-    } catch {
-        return null;
-    }
-}
-
-/* @Codex */
-async function defaultRecoverAttachmentText(attachment: Attachment): Promise<string> {
-    const file = await attachmentToFile(attachment);
-    if (!file) return '';
-
-    const {
-        extractDocumentTextForSummary,
-        extractTextFromPdf,
-        isImageDocumentInput,
-        isPdfDocumentInput,
-    } = await import('@/lib/pdf-service');
-
-    if (isPdfDocumentInput(file)) {
-        try {
-            const extracted = await extractTextFromPdf(file);
-            if (extracted.trim().length >= 120) {
-                return extracted;
-            }
-        } catch {
-            // Fall through to OCR-backed extraction below.
-        }
-    }
-
-    if (!isPdfDocumentInput(file) && !isImageDocumentInput(file)) {
-        return '';
-    }
-
-    try {
-        return await extractDocumentTextForSummary(file);
-    } catch {
-        return '';
-    }
+async function defaultRecoverAttachmentText(_attachment: Attachment): Promise<string> {
+    // Persisted parse/evidence artifacts are the only automatic context source.
+    // Raw attachment bytes are never re-extracted invisibly from this caller.
+    return '';
 }
 
 /* @Codex */
