@@ -133,10 +133,54 @@ test('nega link con chiavi extra o accessor senza materializzare authority calle
     assert.equal(lifecycleReads, 0);
 });
 
+test('nega proxy e accessor lifecycle root o nested senza eseguire trap o getter', () => {
+    let rootProxyTraps = 0;
+    let nestedProxyTraps = 0;
+    let rootAccessorReads = 0;
+    let nestedAccessorReads = 0;
+    const proxyHandler = (recordTrap: () => void): ProxyHandler<object> => ({
+        get() { recordTrap(); throw new Error('get trap'); },
+        getOwnPropertyDescriptor() { recordTrap(); throw new Error('descriptor trap'); },
+        getPrototypeOf() { recordTrap(); throw new Error('prototype trap'); },
+        ownKeys() { recordTrap(); throw new Error('ownKeys trap'); },
+    });
+    const configured = lifecycle();
+    const rootProxy = new Proxy(configured, proxyHandler(() => { rootProxyTraps += 1; }));
+    const nestedProxy = {
+        ...configured,
+        binding: new Proxy(configured.binding!, proxyHandler(() => { nestedProxyTraps += 1; })),
+    };
+    const rootAccessor = Object.defineProperty({ ...configured }, 'status', {
+        enumerable: true,
+        get() { rootAccessorReads += 1; return 'configured'; },
+    });
+    const nestedAccessor = {
+        ...configured,
+        binding: Object.defineProperty({ ...configured.binding }, 'model', {
+            enumerable: true,
+            get() { nestedAccessorReads += 1; return 'gpt-5.4-mini'; },
+        }),
+    };
+
+    for (const rawLifecycle of [rootProxy, nestedProxy, rootAccessor, nestedAccessor]) {
+        assert.throws(() => bindProviderLifecycleToInstanceProfileV2({
+            schemaVersion: 'mediflow.ai.provider-instance-lifecycle-binding.v2',
+            providerInstanceRef: 'pvi_0123456789abcdef0123456789abcdef',
+            profile: PROFILE,
+            lifecycle: rawLifecycle,
+        }), (error: unknown) => error instanceof Error && 'code' in error && error.code === 'lifecycle_mismatch');
+    }
+    assert.deepEqual([rootProxyTraps, nestedProxyTraps, rootAccessorReads, nestedAccessorReads], [0, 0, 0, 0]);
+});
+
 test('nega endpoint, secret inline e reference di policy fuori namespace', () => {
     for (const profile of [
         { ...PROFILE, model: ['https:', '', 'api.openai.com', 'v1', 'responses'].join('/') },
+        { ...PROFILE, model: 'api.openai.com/v1/responses' },
+        { ...PROFILE, model: 'gpt-5.4' },
         { ...PROFILE, egressProfileRef: 'sk-proj-synthetic-inline-secret' },
+        { ...PROFILE, egressProfileRef: 'egress.sk-proj-synthetic-inline-secret' },
+        { ...PROFILE, egressProfileRef: 'egress.other.v1' },
         { ...PROFILE, egressProfileRef: 'egress.' },
         { ...PROFILE, apiKey: 'sk-proj-synthetic-inline-secret' },
     ]) {
@@ -144,6 +188,24 @@ test('nega endpoint, secret inline e reference di policy fuori namespace', () =>
             error instanceof Error && 'code' in error && error.code === 'profile_invalid'
         ));
     }
+});
+
+test('risolve model ed egress da allowlist host-owned per provider e capability', () => {
+    const anthropic = snapshotProviderInstanceProfileV2({
+        ...PROFILE,
+        providerType: 'anthropic',
+        model: 'claude-sonnet-4-6',
+    });
+    assert.equal(anthropic.providerType, 'anthropic');
+    assert.equal(anthropic.model, 'claude-sonnet-4-6');
+    assert.equal(anthropic.egressProfileRef, 'egress.synthetic.v1');
+
+    rejectsProfile({ ...PROFILE, providerType: 'anthropic' });
+    rejectsProfile({
+        ...PROFILE,
+        capabilities: ['patient_insight'],
+        bindings: [{ operation: 'patient_insight', groupRef: 'group.review-only.v1' }],
+    });
 });
 
 test('nega record ostili, duplicati, binding impliciti e function escalation', () => {

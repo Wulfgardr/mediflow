@@ -87,12 +87,24 @@ soltanto `local_model`. Le classi `provider_oauth` e `host_subscription`
 restano distinte ma non sono una credenziale eseguibile per questi provider
 nella prima slice.
 
+Modello, capability, classe dato ed egress non vengono validati per forma o
+namespace: devono corrispondere a una tupla host-owned exact-allowlist. La
+prima slice ammette `document_synthesis` con `gpt-5.4-mini` per OpenAI,
+`claude-sonnet-4-6` per Anthropic e `qwen3.5:35b-a3b` per Ollama; i due cloud
+usano soltanto `egress.synthetic.v1` con dati sintetici non clinici, mentre
+Ollama usa `egress.local.v1` sul dispositivo locale. URL anche senza schema,
+nomi di segreto namespaced e riferimenti policy solo sintatticamente validi
+restano negati.
+
 Il link host-owned
 `mediflow.ai.provider-instance-lifecycle-binding.v2` conserva invariata la
 forma byte-exact del lifecycle per-operation. Riceve un solo profilo e un solo
 lifecycle, entrambi strict, insieme all'`instanceRef` atteso dall'host. Pubblica
 un link immutabile soltanto se instance, provider, modello, operation, venue,
 data use, egress e retention coincidono.
+Prima del parser lifecycle esistente, il linker valida root e binding nested
+come record data-only exact-key e li copia in un valore plain; proxy e accessor
+vengono negati senza eseguire trap o getter.
 L'output nomina una sola instance, il gruppo dell'operation e la function
 allowlist vuota. Il link non e una receipt di esecuzione, non abilita egress e
 non autorizza una capability non dichiarata.
