@@ -181,6 +181,14 @@ L'adapter usa `POST https://api.anthropic.com/v1/messages` con header
 `x-api-key: <secret>`, `anthropic-version` pinnata, content type JSON, modello
 risolto, input/output bounded e timeout/cancel.
 
+Il workspace resta host-owned. Una API key scoped al singolo workspace puo
+omettere `anthropic-workspace-id`; una key multi-workspace deve ricevere il
+workspace ID vendor dalla authority server-side. In entrambi i casi una
+risposta riuscita viene accettata solo se l'header di risposta
+`anthropic-workspace-id` coincide con il workspace atteso. Il riferimento
+opaco `pws_*` e il workspace ID vendor non entrano nel payload clinico o nella
+receipt.
+
 La prima slice supporta soltanto API key. Workload Identity Federation puo
 essere aggiunta quando esiste una workload identity reale; non viene emulata
 con login consumer. La retention viene dichiarata dal profilo operativo e non
