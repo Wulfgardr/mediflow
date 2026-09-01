@@ -26,7 +26,7 @@ function rejectsOwner(code: string) {
 }
 
 test('acquires once, issues once, and returns only the owner opaque lease', async () => {
-    const registry = createServerSessionProjectionOwnerRegistry({ resolve: (_session, pair) => pair });
+    const registry = createServerSessionProjectionOwnerRegistry({ resolve: (_session, pair) => Object.freeze({ ...pair, patientVersion: 1 }) });
     const session = createSession(USER); const owner = registry.acquire(session);
     let acquisitions = 0; let issues = 0;
     const service = createAuthenticatedWebSessionSelectionService({ acquireOwner: async () => {
@@ -52,7 +52,7 @@ test('fails closed with one fixed error when authentication cannot acquire an ow
 });
 
 test('maps hostile caller input to typed errors without exposing raw details', async () => {
-    const registry = createServerSessionProjectionOwnerRegistry({ resolve: (_session, pair) => pair });
+    const registry = createServerSessionProjectionOwnerRegistry({ resolve: (_session, pair) => Object.freeze({ ...pair, patientVersion: 1 }) });
     const session = createSession(USER); const owner = registry.acquire(session);
     const service = createAuthenticatedWebSessionSelectionService({ acquireOwner: async () => owner });
     const hostile = new Proxy({}, { getPrototypeOf() { throw new Error('synthetic raw detail'); } });
@@ -70,7 +70,7 @@ test('maps hostile caller input to typed errors without exposing raw details', a
 test('propagates owner epoch and canonical selection failures without retry', async () => {
     const registry = createServerSessionProjectionOwnerRegistry({ resolve: (_session, pair) => {
         if (pair.patientId !== PAIR.patientId || pair.ambulatoryId !== PAIR.ambulatoryId) throw new Error('synthetic mismatch');
-        return pair;
+        return Object.freeze({ ...pair, patientVersion: 1 });
     } });
     const session = createSession(USER); const owner = registry.acquire(session);
     let acquisitions = 0;
@@ -84,7 +84,7 @@ test('propagates owner epoch and canonical selection failures without retry', as
 });
 
 test('re-acquires the current owner without resetting its selection epoch', async () => {
-    const registry = createServerSessionProjectionOwnerRegistry({ resolve: (_session, pair) => pair });
+    const registry = createServerSessionProjectionOwnerRegistry({ resolve: (_session, pair) => Object.freeze({ ...pair, patientVersion: 1 }) });
     const session = createSession(USER); const owner = registry.acquire(session);
     const service = createAuthenticatedWebSessionSelectionService({ acquireOwner: async () => registry.acquire(session) });
 

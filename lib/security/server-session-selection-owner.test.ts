@@ -29,7 +29,7 @@ function setup(onResolve: () => void = () => undefined, overrides: Parameters<ty
         resolve: (_session, pair) => {
             onResolve();
             if (!memberships.has(`${pair.patientId}|${pair.ambulatoryId}`)) throw new Error('synthetic mismatch');
-            return Object.freeze({ ...pair });
+            return Object.freeze({ ...pair, patientVersion: 1 });
         },
         ...overrides,
     });
@@ -112,6 +112,26 @@ test('projection broker is lookup-only until one lazy ingest acquisition', (cont
     assert.equal(owner.acquireProjectionIngest(session, tuple(lease)), ingest);
     assert.equal(Object.isFrozen(owner.resolveProjectionService(session)), true);
     assert.deepEqual(configs, [{ ...tuple(lease), expiresAt: new Date(lease.expiresAt).toISOString() }]);
+});
+
+test('patient version drift denies broker acquisition, service resolution, and retained broker use', () => {
+    for (const path of ['acquire', 'resolve', 'ingest', 'service'] as const) {
+        let patientVersion = 1;
+        const { session, owner } = setup(undefined, {
+            resolve: (_session, pair) => Object.freeze({ ...pair, patientVersion }),
+        });
+        const lease = issue(owner);
+        const ingest = path === 'acquire' ? null : owner.acquireProjectionIngest(session, tuple(lease));
+        const service = path === 'service' ? owner.resolveProjectionService(session) : null;
+        patientVersion = 2;
+
+        if (path === 'acquire') assert.throws(() => owner.acquireProjectionIngest(session, tuple(lease)), rejects('stale_selection'));
+        else if (path === 'resolve') assert.throws(() => owner.resolveProjectionService(session), rejects('stale_selection'));
+        else if (path === 'ingest') assert.throws(() => ingest!.ingest({} as never),
+            (error: unknown) => error instanceof ProjectionBrokerError && error.code === 'broker_revoked');
+        else assert.throws(() => service!.consume({} as never),
+            (error: unknown) => error instanceof ProjectionBrokerError && error.code === 'broker_revoked');
+    }
 });
 
 test('session brokers isolate handles without consuming the owning record', (context) => {
