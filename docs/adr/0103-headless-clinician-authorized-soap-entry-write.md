@@ -1164,6 +1164,183 @@ Claim ceiling H8: **due alias server-only locali dello stesso facade H7 e una
 proiezione Mini referenziale deny-only; nessuna route, chat runtime, operazione
 Mini, authority, transport, parity, integrazione remota o release.**
 
+### Costanti H9 per 0.8.5
+
+H9 congela due DTO language-neutral gia definiti dai gate precedenti. Non
+aggiunge un nuovo stadio applicativo e non rende eseguibile il draft su un
+client shared-core.
+
+Il draft e il solo record H1 a sei key, nello stesso ordine:
+
+```text
+schema
+operationId
+subjective
+objective
+assessment
+plan
+```
+
+`schema = mediflow.soap-draft.v1` e
+`operationId = mediflow.clinical_diary.append_soap.v1`. Le quattro sezioni
+sono stringhe. Il tipo condiviso e `ClinicianSoapDraftV1`; la costante
+`CLINICIAN_SOAP_DRAFT_KEYS` e l'unica lista autorevole delle sei key. Il DTO
+non include `status`, digest, paziente, ambulatorio, actor, sessione, proposal,
+approval, proof, idempotenza, receipt, provider, venue, egress o authority.
+Normalizzazione, limiti, non-vuoto e digest restano responsabilita del
+validator H1 host: il codec H9 non li reinterpreta.
+
+La receipt e il record H7b a tredici key, nello stesso ordine:
+
+```text
+schema
+receiptRef
+operationId
+outcome
+commandId
+entryRef
+auditEventRef
+patientVersion
+entryVersion
+committedAt
+bindingDigest
+entryDigest
+auditDigest
+```
+
+Il modulo puro condiviso espone il tipo
+`ClinicianSoapEntryCommitReceiptV1`, le costanti letterali H7b e
+`CLINICIAN_SOAP_ENTRY_COMMIT_RECEIPT_KEYS`, piu il solo parser
+`snapshotClinicianSoapEntryCommitReceipt(value)`. Non importa `server-only`,
+database, schema, owner, route, Fabric, provider, venue, egress o UI e non
+esegue I/O.
+
+Il parser accetta soltanto un ordinary object intrinseco, come quello prodotto
+da `JSON.parse`, oppure un record null-prototype. L'input non puo essere un
+Proxy e deve avere esattamente le tredici own data property enumerabili,
+nell'ordine canonico, senza accessor, symbol, key mancante o extra. I literal,
+i pattern dei ref e dei digest, le versioni positive e il timestamp UTC a
+precisione di secondo devono rispettare H7b. L'output e sempre una nuova copia
+null-prototype, frozen e chiusa. Il parser non dimostra l'integrita del ledger,
+la relazione deterministica tra i ref o l'esistenza di entry e audit: queste
+verifiche restano nell'owner H7b.
+
+Il golden H9 tracciato e unico e contiene soltanto dati sintetici. Congela:
+
+- il draft a sei key usando le stesse quattro sezioni sintetiche del golden H4;
+- una receipt a tredici key con `patientVersion = 7`, `entryVersion = 1`,
+  `committedAt = 2026-08-31T23:45:12.000Z`,
+  `commandId = hsac_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb`,
+  `bindingDigest` composto da 64 `e`, `entryDigest` da 64 `f` e
+  `auditDigest` da 64 `0`;
+- i tre ref derivati dal `commandId` con gli esatti domini H7b e la funzione
+  `SHA-256(domain + NUL + commandId)`:
+  `mediflow.headless.soap-entry-id.v1`,
+  `mediflow.headless.soap-entry-audit-id.v1` e
+  `mediflow.headless.soap-entry-receipt-ref.v1`; i risultati sono
+  `entryRef = hsei_36647f110c8e0f4271a40a0bff529323bb5dfcf83615d1384703560aaa82d19f`,
+  `auditEventRef = hsea_3be641fc6ff30e2cebb20f7cb14b3ce99dfab5065b3a7dc9b4d2130b6ef3fcce`
+  e
+  `receiptRef = hser_e5bdc96f3ec004423c2ca2716bf49e40ade4e1f7ab196a6b7a3ac6699bf57b14`;
+- l'ordine delle key e il JSON canonico compatto UTF-8, senza BOM o whitespace,
+  di entrambi i DTO;
+- il `receiptDigest` golden
+  `4374289aaf2aff0ea046e7c3bc301d940d41f3fc38d905dee1496051139fe483`,
+  calcolato come SHA-256 di
+  `mediflow.headless.soap-entry-commit-receipt-digest.v1 + NUL +`
+  `canonicalReceiptJSON`.
+
+Un generatore deterministico possiede i valori sintetici e supporta una
+modalita `--check` che confronta il golden tracciato senza riscriverlo. Il test
+TypeScript usa i codec di riferimento. Il test `MediFlowCore` decodifica il
+medesimo artifact, verifica literal e tipi e ricostruisce i due JSON canonici
+byte-per-byte con un encoder a ordine esplicito. `JSONEncoder` con ordine non
+dimostrato non e un oracolo equivalente.
+
+Il gate CI H9 deve osservare lo stesso commit candidato su tutte le gambe:
+
+- il drift check del generatore e il test TypeScript;
+- il test `MediFlowCore` su Linux e Windows nel required check
+  `core-tri-os`;
+- lo stesso test Swift nella suite macOS Apple.
+
+Un test locale, una singola gamba verde, esiti su commit diversi o un check
+skipped non provano tri-OS. Fino a quando i check Linux, Windows e macOS non
+sono verdi sulla stessa SHA, lo stato resta `HOLD_TRI_OS_CI_SAME_SHA`.
+
+Il golden non contiene ID paziente o ambulatorio raw, identita utente, SOAP
+reale, proof, PIN, token, sessione, route, transport o authority. Draft e
+receipt sono dati: nessuno dei due e un grant, un envelope H7 o una chiamata a
+`execute`.
+
+Claim ceiling H9: **contratto DTO e golden sintetico byte-exact verificabili
+localmente; la portabilita tri-OS resta in HOLD fino a CI Linux, Windows e
+macOS verde sulla stessa SHA; nessuna authority, route, transport, UI, parity
+applicativa, integrazione o release.**
+
+### Costanti H10 per 0.8.5
+
+H10 aggiunge una sola suite integrata evidence-only sul tree candidato esatto.
+La suite usa fixture sintetiche, un database temporaneo isolato e le
+composition production gia esistenti da H1 a H8. Non aggiunge codice runtime,
+una seconda composition, un owner, un controller, una porta o un export per i
+test.
+
+La suite contiene sei gruppi di prova, in questo ordine:
+
+1. **Denial.** Un draft, envelope, proof, binding o receipt malformed,
+   foreign, scaduto o stantio deve negare con il codice PHI-safe previsto. Il
+   test confronta prima e dopo i conteggi di entry, audit e ledger e richiede
+   zero delta.
+2. **Race.** Due dispatch concorrenti dell'envelope esatto possono
+   materializzare al massimo una entry, un audit e una riga ledger. Ogni
+   successo osservabile deve restituire la stessa receipt canonica; nessuna
+   seconda proof, approval o idempotency authority viene coniata.
+3. **Rollback.** Un trigger SQLite creato soltanto nel database temporaneo del
+   test forza un abort dopo l'inizio della transazione e prima del ledger
+   completo. L'esito deve lasciare zero entry, audit e ledger H7b per il
+   comando; approval e proof restano consumate e lo stesso envelope non puo
+   riprendere il commit dopo la rimozione del trigger.
+4. **Replay.** Dopo un commit completo, la tripla envelope esatta restituisce
+   byte-per-byte la receipt durevole anche quando l'authority upstream non e
+   piu corrente. Il replay non entra in H6, non ricrea currentness e non
+   modifica entry, audit o ledger.
+5. **Conflict.** La stessa `idempotencyKey` con `approvalRef` o
+   `authorizationProofDigest` differente deve produrre
+   `idempotency_conflict` prima di qualunque write o consumo di authority
+   estranea. Entry, audit e receipt originarie restano invariate. Un binding o
+   una chain durevole tampered e invece `receipt_unavailable`, mai conflict.
+6. **Assenza di authority union.** Gli alias Web e chat devono essere la
+   stessa identita del facade H7; Mini resta senza transport. Un oggetto che
+   unisce l'envelope a receipt Fabric, provider, venue, Mini, patient ID,
+   operation o altre key deve fallire la shape H7 con zero write. Nessun
+   oggetto Fabric, Mini, route, adapter o DTO H9 puo sostituire
+   `approvalRef,idempotencyKey,authorizationProof` o ampliare la singola
+   operazione SOAP.
+
+Il test puo osservare il database temporaneo e installare o rimuovere il
+trigger di failure. Questo accesso e sola strumentazione evidence-only: non
+diventa un percorso applicativo e non viene importato da moduli production.
+Sono vietati `NODE_ENV` branch, hook di failure runtime, dependency opzionali
+solo per i test, timer ambientali aggiuntivi, monkeypatch production e nuovi
+export da file `*-production*`. I failure vengono indotti ai boundary reali
+con input ostili, concorrenza e primitive SQLite limitate alla fixture.
+
+Ogni gruppo parte da uno stato sintetico noto oppure registra la baseline
+prima del gesto. La suite verifica insieme esito pubblico, terminalita delle
+authority coinvolte e stato durevole; un solo assert sul codice errore o sul
+conteggio non chiude il gate. Nessun log o failure output contiene SOAP,
+identita cliniche raw, proof o payload persistiti.
+
+H10 e verde soltanto sul commit che contiene H1-H9 e tutte le composition
+production corrispondenti. Non sostituisce la review indipendente successiva,
+non prova host compromesso, crash recovery generale, multiprocesso, UI, route,
+transport, parity, integrazione remota o release.
+
+Claim ceiling H10: **evidenza integrata locale sul tree candidato esatto per
+denial, race, rollback, replay, conflict e assenza di authority union; nessun
+nuovo seam runtime e nessun claim di release readiness o release.**
+
 L'approval artifact, audit e receipt sono PHI-safe. Contengono solo riferimenti
 opachi, esito, timestamp, digest e versioni necessari. Non contengono SOAP,
 PIN, proof, projection, identita dirette, provider, venue, egress o testo di
