@@ -59,8 +59,9 @@ test('standalone checker proves web auth owner physical copy and restart denial'
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
 
   const source = fs.readFileSync(checker, 'utf8');
-  assert.match(source, /WEB_AUTH_OWNER_VERSION = '0\.8\.5'/);
-  assert.match(source, /root is not the frozen exact 17-function API/);
+  assert.match(source, /WEB_AUTH_OWNER_VERSION = '0\.8\.6'/);
+  assert.match(source, /['"]withCurrentResourceBinding['"]/);
+  assert.match(source, /root is not the frozen exact 21-function API/);
   assert.match(source, /does not match the exact final file roster/);
   assert.match(source, /process A emitted data other than exact synthetic locators/);
   assert.match(source, /process B did not deny process A authority as absent/);

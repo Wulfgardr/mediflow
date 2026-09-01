@@ -41,7 +41,7 @@ assert.deepEqual(Reflect.ownKeys(entry).slice().sort(), [
     'bootstrapControl', 'commitAdminReset', 'commitResourceUse', 'commitUserRetirement', 'issue',
     'mintResourcePort', 'prepareAdminReset', 'prepareUserRetirement', 'registerPrivateResource',
     'releaseResourcePort', 'resolve', 'retire', 'retireForUser',
-    'unregisterPrivateResource',
+    'unregisterPrivateResource', 'withCurrentResourceBinding',
 ]);
 assert.equal('createOwner' in entry, false);
 

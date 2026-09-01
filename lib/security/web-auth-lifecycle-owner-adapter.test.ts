@@ -9,7 +9,7 @@ const ADAPTER_FILE = 'web-auth-lifecycle-owner-adapter.ts';
 const read = (file: string) => readFileSync(new URL(`./${file}`, import.meta.url), 'utf8');
 const parse = (file: string, source: string) => ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
 const requireFromHere = createRequire(import.meta.url);
-const sourceOwner = requireFromHere('../../packages/web-auth-lifecycle-owner/index.js') as Record<string, (...args: unknown[]) => unknown>;
+const installedOwner = requireFromHere('@mediflow/web-auth-lifecycle-owner') as Record<string, (...args: unknown[]) => unknown>;
 
 function runtimeImports(sourceFile: ts.SourceFile): ts.ImportDeclaration[] {
     return sourceFile.statements.filter((statement): statement is ts.ImportDeclaration =>
@@ -26,6 +26,7 @@ test('loads only server-only and the one external owner package', () => {
     assert.match(source, /lifecycleOwnerAdapterState = ['"]external_owner_active['"]/u);
     assert.doesNotMatch(source, /web-auth-lifecycle-owner-legacy|legacy_bridge|dormant_prepared/u);
     assert.doesNotMatch(source, /\b(?:Map|WeakMap|Set|globalThis|process|generation|cache|selector|native|system)\b/u);
+    assert.doesNotMatch(source, /owner\s+as\s+typeof|withCurrentResourceBinding\s*:\s*\{/u);
 });
 
 test('delegates the complete frozen root surface without local authority state', () => {
@@ -46,23 +47,23 @@ test('delegates the complete frozen root surface without local authority state',
 });
 
 function issueSourceSession(userId: string, suffix: string) {
-    const control = sourceOwner.bootstrapControl();
+    const control = installedOwner.bootstrapControl();
     assert.ok(control && typeof control === 'object');
     const transport = control as { controlId: string; etag: string };
-    const attempt = sourceOwner.begin('login', {
+    const attempt = installedOwner.begin('login', {
         controlId: transport.controlId,
         ifMatch: transport.etag,
         idempotencyKey: `synthetic-h6-web-binding-${suffix}`,
     });
     assert.ok(attempt);
-    const issued = sourceOwner.issue(attempt, {
+    const issued = installedOwner.issue(attempt, {
         id: userId,
         username: `synthetic-${suffix}`,
         role: 'admin',
     });
     assert.ok(issued && typeof issued === 'object');
     const session = issued as { sessionId: string };
-    const resolved = sourceOwner.resolve(session.sessionId, transport.controlId);
+    const resolved = installedOwner.resolve(session.sessionId, transport.controlId);
     assert.ok(resolved && typeof resolved === 'object');
     const resolution = resolved as { status: string; projection?: object };
     assert.equal(resolution.status, 'active');
@@ -70,20 +71,20 @@ function issueSourceSession(userId: string, suffix: string) {
     return resolution.projection;
 }
 
-test('source owner emits one fieldless authentication generation for the exact active cell', () => {
+test('installed owner emits one fieldless authentication generation for the exact active cell', () => {
     const firstSession = issueSourceSession('synthetic-h6-principal', 'first');
-    const firstPort = sourceOwner.mintResourcePort(firstSession);
-    const siblingPort = sourceOwner.mintResourcePort(firstSession);
+    const firstPort = installedOwner.mintResourcePort(firstSession);
+    const siblingPort = installedOwner.mintResourcePort(firstSession);
     assert.ok(firstPort); assert.ok(siblingPort);
 
     const bindings: Array<Record<string, unknown>> = [];
     for (const port of [firstPort, siblingPort]) {
-        const use = sourceOwner.beginResourceUse(port);
+        const use = installedOwner.beginResourceUse(port);
         assert.ok(use);
-        assert.equal(sourceOwner.withCurrentResourceBinding(use, (binding: Record<string, unknown>) => {
+        assert.equal(installedOwner.withCurrentResourceBinding(use, (binding: Record<string, unknown>) => {
             bindings.push(binding);
         }), true);
-        assert.equal(sourceOwner.commitResourceUse(use), true);
+        assert.equal(installedOwner.commitResourceUse(use), true);
     }
 
     assert.equal(bindings.length, 2);
@@ -100,39 +101,39 @@ test('source owner emits one fieldless authentication generation for the exact a
     assert.equal(bindings[0]!.authenticationGeneration, bindings[1]!.authenticationGeneration);
 
     const replacementSession = issueSourceSession('synthetic-h6-principal', 'replacement');
-    const replacementPort = sourceOwner.mintResourcePort(replacementSession);
-    const replacementUse = sourceOwner.beginResourceUse(replacementPort);
+    const replacementPort = installedOwner.mintResourcePort(replacementSession);
+    const replacementUse = installedOwner.beginResourceUse(replacementPort);
     const replacementBindings: Array<Record<string, unknown>> = [];
-    assert.equal(sourceOwner.withCurrentResourceBinding(replacementUse, (binding: Record<string, unknown>) => {
+    assert.equal(installedOwner.withCurrentResourceBinding(replacementUse, (binding: Record<string, unknown>) => {
         replacementBindings.push(binding);
     }), true);
-    assert.equal(sourceOwner.commitResourceUse(replacementUse), true);
+    assert.equal(installedOwner.commitResourceUse(replacementUse), true);
     const replacementBinding = replacementBindings[0];
     assert.ok(replacementBinding);
     assert.notEqual(replacementBinding.authenticationGeneration, bindings[0]!.authenticationGeneration);
 });
 
-test('source owner binding port denies foreign, asynchronous, and reentrant resource uses', async () => {
+test('installed owner binding port denies foreign, asynchronous, and reentrant resource uses', async () => {
     const session = issueSourceSession('synthetic-h6-denial', 'denial');
-    const port = sourceOwner.mintResourcePort(session);
+    const port = installedOwner.mintResourcePort(session);
     const foreign = Object.freeze(Object.create(null));
     let calls = 0;
-    assert.equal(sourceOwner.withCurrentResourceBinding(foreign, () => { calls += 1; }), false);
+    assert.equal(installedOwner.withCurrentResourceBinding(foreign, () => { calls += 1; }), false);
     assert.equal(calls, 0);
 
-    const asynchronousUse = sourceOwner.beginResourceUse(port);
+    const asynchronousUse = installedOwner.beginResourceUse(port);
     assert.ok(asynchronousUse);
-    assert.equal(sourceOwner.withCurrentResourceBinding(asynchronousUse, async () => { calls += 1; }), false);
+    assert.equal(installedOwner.withCurrentResourceBinding(asynchronousUse, async () => { calls += 1; }), false);
     assert.equal(calls, 0);
-    assert.equal(sourceOwner.abortResourceUse(asynchronousUse), true);
+    assert.equal(installedOwner.abortResourceUse(asynchronousUse), true);
 
-    const reentrantUse = sourceOwner.beginResourceUse(port);
+    const reentrantUse = installedOwner.beginResourceUse(port);
     assert.ok(reentrantUse);
-    assert.equal(sourceOwner.withCurrentResourceBinding(reentrantUse, () => {
+    assert.equal(installedOwner.withCurrentResourceBinding(reentrantUse, () => {
         calls += 1;
-        assert.equal(sourceOwner.commitResourceUse(reentrantUse), false);
+        assert.equal(installedOwner.commitResourceUse(reentrantUse), false);
     }), false);
     assert.equal(calls, 1);
-    assert.equal(sourceOwner.abortResourceUse(reentrantUse), true);
+    assert.equal(installedOwner.abortResourceUse(reentrantUse), true);
     await Promise.resolve();
 });

@@ -14,27 +14,27 @@ const PDF_ROUTE_DIRECTORY = path.join('server', 'app', 'api', 'pdf-extract');
 const PDF_RUNTIME_REFERENCE = /(?:pdf-inspector-worker\.mjs|pdf-inspector-router|(?:node_modules[\\/])?@firecrawl[\\/]pdf-inspector(?:[-/]|$))/i;
 const SYNTHETIC_RTF = Buffer.from('{\\rtf1\\ansi Synthetic standalone note.}', 'utf8');
 const WEB_AUTH_OWNER_PACKAGE = '@mediflow/web-auth-lifecycle-owner';
-const WEB_AUTH_OWNER_VERSION = '0.8.5';
+const WEB_AUTH_OWNER_VERSION = '0.8.6';
 const WEB_AUTH_OWNER_KEYS = Object.freeze([
   'abort', 'abortAdminReset', 'abortResourceUse', 'abortUserRetirement', 'begin', 'beginResourceUse',
   'bootstrapControl', 'commitAdminReset', 'commitResourceUse', 'commitUserRetirement', 'issue',
   'mintResourcePort', 'prepareAdminReset', 'prepareUserRetirement', 'registerPrivateResource',
   'releaseResourcePort', 'resolve', 'retire', 'retireForUser',
-  'unregisterPrivateResource',
+  'unregisterPrivateResource', 'withCurrentResourceBinding',
 ]);
 const WEB_AUTH_OWNER_FILES = Object.freeze([
-  ['index.d.ts', '00ab94b147ca1d067873aef8046996423a4a5778634878760b4f80536c796c8b'],
+  ['index.d.ts', '647385b9d57d2bd2309f70de08866d326736c200f2fce201e54857ec63da3987'],
   ['index.js', '1abc52ee8abe9fd25b28046f1f00ecc2f09d699ba220c61e6222730c22ca44c5'],
   ['internal/control-record.cjs', '3d443096679799ffde96e744060de5be59c9a86ddb383bdd975de75c913b9aa4'],
-  ['internal/owner.cjs', '4bc41e902e6193108d1551055639ffa34e91b59e5881542a549c2eb648ee7778'],
+  ['internal/owner.cjs', 'f9d5e54e89a41788ecdf228841473a7210616fc054d9b3e3ded6316a91c94d2d'],
   ['internal/session-activation.cjs', '5ed4c9543f8bc15903c0915a8565b997d697d004e9ccfaaa54a3da6236a2aa96'],
   ['internal/session-cell.cjs', '4cd0c2e9f8b40b346d43a93de561e20e85c5662fc8a2f9a0a170403fc80c2e31'],
   ['internal/session-resolver.cjs', '75409d670b8411dbadcc95e4bd9bfebeff47d2f687bde0d638809bb9114b5fa0'],
-  ['internal/session-resource.cjs', 'dcdc06fcd35068d42537b9233bc8f2f1ddec276488e3898c6b3e9409c59eb921'],
+  ['internal/session-resource.cjs', '127de77dfb73f91f313e5318fd64e838f3f5e3147e801e19b492e0876127d876'],
   ['internal/session-retirement.cjs', '8848c92cb88635c6c09baf685839e7c6f1aca40d667ea6580e84e275349f1516'],
   ['internal/support/successor-fence.cjs', '7e36178331d5f899d81d877603acb0100eef1436d1873287ad4b27ccc227e7ff'],
   ['internal/support/value.cjs', '9f0968a0290c6184c898f06de2c408540d4eda1ecd0e3e80ae013bb37a782be1'],
-  ['package.json', '6dee73e802f596cfd44d8b17a4d3e4a14ba4d0e07f3bf7a7b676629c06a42abc'],
+  ['package.json', '06f785441953621ac6b2fd6f313471f8bbd33bd730d1e603de94b45da382f99d'],
 ]);
 
 /* @Codex: P12 proves that the externalized final owner is a physical standalone copy
@@ -237,7 +237,7 @@ function standaloneWebAuthOwnerInspection(standaloneDir, requireFromStandalone) 
         || keys.some((key, index) => key !== WEB_AUTH_OWNER_KEYS[index])
         || WEB_AUTH_OWNER_KEYS.some((key) => typeof owner[key] !== 'function')
         || Reflect.has(owner, 'createOwner')) {
-      return { failure: `Standalone runtime ${WEB_AUTH_OWNER_PACKAGE} root is not the frozen exact 17-function API.` };
+      return { failure: `Standalone runtime ${WEB_AUTH_OWNER_PACKAGE} root is not the frozen exact 21-function API.` };
     }
 
     return { failure: null, entryPath: expectedEntry };

@@ -257,6 +257,40 @@ lockfile e unica copia fisica avanzano insieme allo stesso `N`. Non sono ammessi
 un commit preparatorio fisico, un pin anticipato, valori sintetici, due versioni
 correnti o un elemento ancora riferito al predecessore storico.
 
+### Addendum H6: successore immutabile del package dopo il cutover
+
+Il cutover finale `0.8.5` e un artifact accettato e immutabile. Dopo il cutover,
+qualunque modifica di un solo byte agli input del package usa la versione patch
+successiva `0.8.6`; non puo rigenerare, sostituire o riutilizzare il nome
+`0.8.5` e non puo riaprire la serie `0.8.5-prepared.N`.
+
+La versione del package privato e indipendente dalla versione o dalla linea
+candidata del prodotto. L'avanzamento a
+`@mediflow/web-auth-lifecycle-owner@0.8.6` non cambia la linea candidata
+MediFlow `0.8.5` e non autorizza un bump applicativo, un tag o una release.
+
+La provenienza `0.8.6` registra come predecessore esatto il package finale
+accettato `0.8.5` tramite
+`{version,tarSha256,provenanceSha256}`. Gli artifact e la provenienza `0.8.5`
+restano tracciati e byte-identici come evidenza storica inerte. Nessuna
+dipendenza, lock entry, copia installata, adapter, test runtime o standalone
+puo continuare a caricarli come versione corrente.
+
+Il packet successore e atomico: manifest sorgente, tarball, provenienza,
+dipendenza root, lockfile, unica copia fisica in `node_modules`, adapter,
+boundary guard e standalone guard avanzano insieme a `0.8.6`. Due copie
+temporanee pulite della stessa sorgente devono produrre offline, senza script e
+con cache vuote due tarball byte-identici al tarball tracciato. La prova di
+installazione usa quel tarball in uno scratch package vuoto e deve produrre una
+directory fisica, mai un symlink o un hardlink.
+
+I test runtime risolvono soltanto il package installato tramite il suo export
+root. Redirect verso `packages/web-auth-lifecycle-owner/`, deep import e cast
+che simulano API assenti dalla copia installata sono falsificatori
+`HOLD_SUPPLY_CHAIN`. Il claim massimo dell'addendum e: **successore privato
+`0.8.6` riproducibile e installato fisicamente per la linea candidata prodotto
+`0.8.5`; nessun bump applicativo, push, tag o release**.
+
 ### Sorgente, manifest e root CommonJS
 
 Per la prima versione preparata `0.8.5-prepared.0`, nomi e percorsi sono fissi:

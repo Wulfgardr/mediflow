@@ -2,14 +2,21 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import {
+    copyFileSync,
     existsSync,
     lstatSync,
+    mkdirSync,
+    mkdtempSync,
     readFileSync,
     readdirSync,
     realpathSync,
+    rmSync,
+    statSync,
 } from 'node:fs';
 import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
 import { basename, dirname, join, relative, resolve } from 'node:path';
+import { spawnSync } from 'node:child_process';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { gunzipSync } from 'node:zlib';
@@ -17,32 +24,42 @@ import { gunzipSync } from 'node:zlib';
 const REPOSITORY_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const PACKAGE_DIRECTORY = join(REPOSITORY_ROOT, 'packages/web-auth-lifecycle-owner');
 const ARTIFACT_RELATIVE_PATH =
-    'packages/web-auth-lifecycle-owner/artifacts/mediflow-web-auth-lifecycle-owner-0.8.5.tgz';
+    'packages/web-auth-lifecycle-owner/artifacts/mediflow-web-auth-lifecycle-owner-0.8.6.tgz';
 const ARTIFACT_PATH = join(REPOSITORY_ROOT, ARTIFACT_RELATIVE_PATH);
 const PROVENANCE_PATH = join(
     REPOSITORY_ROOT,
-    'packages/web-auth-lifecycle-owner/artifacts/mediflow-web-auth-lifecycle-owner-0.8.5.provenance.json',
+    'packages/web-auth-lifecycle-owner/artifacts/mediflow-web-auth-lifecycle-owner-0.8.6.provenance.json',
 );
 const DEPENDENCY_SPECIFIER = `file:${ARTIFACT_RELATIVE_PATH}`;
-const ARTIFACT_SHA256 = 'c9e64cd0857a8c9e0e869857af9f023654e79ac2959d630dd2eff14fc90bcf2c';
+const ARTIFACT_SHA256 = '044dfb1a9aedfc52da181707ddab2c582c097909d2f54cff886f6f33273f2b45';
 const ARTIFACT_INTEGRITY =
-    'sha512-xWBTSxW5cOziEDgPZMHftjkOM+FyuXEXtby5lU32NMYLUhrXEk3/kGVAF6JXBSetVs7nfSnxi9l97EGo0Z0DGQ==';
-const PROVENANCE_SHA256 = '1d745decc7676c7ef11d0837e7300e8da5159785b10e7a79ef581ddd050696f3';
-const ACCEPTED_BASE = 'a4a263a8f3c91196e2de6974f9ae0dbdf3311c77';
+    'sha512-itcn0K8Ru1BHWcpd4sVOrzl0qMX4+8gZr+EX+JABsdOid0yYz2qgYJX5naSBPLp+6xkz7X/a5TieIJ25OKQlmw==';
+const PROVENANCE_SHA256 = '66c4e11cd29657fc824308a4ded5bfa6fe212fdc6ccef869dcddb6d86bddfca4';
+const ACCEPTED_BASE = '5fa27923613b1932993a57f46b06e51264193e01';
+const PREDECESSOR_ARTIFACT_PATH = join(
+    PACKAGE_DIRECTORY,
+    'artifacts/mediflow-web-auth-lifecycle-owner-0.8.5.tgz',
+);
+const PREDECESSOR_PROVENANCE_PATH = join(
+    PACKAGE_DIRECTORY,
+    'artifacts/mediflow-web-auth-lifecycle-owner-0.8.5.provenance.json',
+);
+const PREDECESSOR_ARTIFACT_SHA256 = 'c9e64cd0857a8c9e0e869857af9f023654e79ac2959d630dd2eff14fc90bcf2c';
+const PREDECESSOR_PROVENANCE_SHA256 = '1d745decc7676c7ef11d0837e7300e8da5159785b10e7a79ef581ddd050696f3';
 
 const EXPECTED_INPUTS = [
     ['index.js', 116, '1abc52ee8abe9fd25b28046f1f00ecc2f09d699ba220c61e6222730c22ca44c5'],
-    ['index.d.ts', 3085, '00ab94b147ca1d067873aef8046996423a4a5778634878760b4f80536c796c8b'],
+    ['index.d.ts', 3529, '647385b9d57d2bd2309f70de08866d326736c200f2fce201e54857ec63da3987'],
     ['internal/control-record.cjs', 19478, '3d443096679799ffde96e744060de5be59c9a86ddb383bdd975de75c913b9aa4'],
-    ['internal/owner.cjs', 37526, '4bc41e902e6193108d1551055639ffa34e91b59e5881542a549c2eb648ee7778'],
+    ['internal/owner.cjs', 37866, 'f9d5e54e89a41788ecdf228841473a7210616fc054d9b3e3ded6316a91c94d2d'],
     ['internal/session-activation.cjs', 6143, '5ed4c9543f8bc15903c0915a8565b997d697d004e9ccfaaa54a3da6236a2aa96'],
     ['internal/session-cell.cjs', 23897, '4cd0c2e9f8b40b346d43a93de561e20e85c5662fc8a2f9a0a170403fc80c2e31'],
     ['internal/session-resolver.cjs', 2965, '75409d670b8411dbadcc95e4bd9bfebeff47d2f687bde0d638809bb9114b5fa0'],
-    ['internal/session-resource.cjs', 12008, 'dcdc06fcd35068d42537b9233bc8f2f1ddec276488e3898c6b3e9409c59eb921'],
+    ['internal/session-resource.cjs', 14096, '127de77dfb73f91f313e5318fd64e838f3f5e3147e801e19b492e0876127d876'],
     ['internal/session-retirement.cjs', 5664, '8848c92cb88635c6c09baf685839e7c6f1aca40d667ea6580e84e275349f1516'],
     ['internal/support/successor-fence.cjs', 1172, '7e36178331d5f899d81d877603acb0100eef1436d1873287ad4b27ccc227e7ff'],
     ['internal/support/value.cjs', 47, '9f0968a0290c6184c898f06de2c408540d4eda1ecd0e3e80ae013bb37a782be1'],
-    ['package.json', 281, '6dee73e802f596cfd44d8b17a4d3e4a14ba4d0e07f3bf7a7b676629c06a42abc'],
+    ['package.json', 281, '06f785441953621ac6b2fd6f313471f8bbd33bd730d1e603de94b45da382f99d'],
 ] as const;
 
 const EXPECTED_TAR_PATHS = [
@@ -79,6 +96,7 @@ const ROOT_KEYS = [
     'beginResourceUse',
     'commitResourceUse',
     'abortResourceUse',
+    'withCurrentResourceBinding',
     'registerPrivateResource',
     'unregisterPrivateResource',
 ] as const;
@@ -150,11 +168,16 @@ function walkFiles(directory: string): string[] {
     return files;
 }
 
+test('preserves the accepted 0.8.5 artifact and provenance as immutable predecessor evidence', () => {
+    assert.equal(sha256(readFileSync(PREDECESSOR_ARTIFACT_PATH)), PREDECESSOR_ARTIFACT_SHA256);
+    assert.equal(sha256(readFileSync(PREDECESSOR_PROVENANCE_PATH)), PREDECESSOR_PROVENANCE_SHA256);
+});
+
 test('pins the exact final source manifest and immutable input bytes', () => {
     const manifest = readJson(join(PACKAGE_DIRECTORY, 'package.json'));
     assert.deepEqual(manifest, {
         name: '@mediflow/web-auth-lifecycle-owner',
-        version: '0.8.5',
+        version: '0.8.6',
         private: true,
         type: 'commonjs',
         main: './index.js',
@@ -179,7 +202,7 @@ test('pins the exact final source manifest and immutable input bytes', () => {
 
 test('pins the final tarball and its normalized regular-file roster', () => {
     const archive = readFileSync(ARTIFACT_PATH);
-    assert.equal(archive.length, 19_245);
+    assert.equal(archive.length, 19_785);
     assert.equal(sha256(archive), ARTIFACT_SHA256);
     assert.equal(`sha512-${createHash('sha512').update(archive).digest('base64')}`, ARTIFACT_INTEGRITY);
 
@@ -214,33 +237,72 @@ test('pins the final tarball and its normalized regular-file roster', () => {
     );
 });
 
+test('reproduces the tracked artifact byte-for-byte from two clean offline source copies', () => {
+    const temporaryRoot = mkdtempSync(join(tmpdir(), 'mediflow-owner-086-pack-'));
+    const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+    try {
+        const artifacts: Buffer[] = [];
+        for (const suffix of ['a', 'b']) {
+            const source = join(temporaryRoot, `source-${suffix}`);
+            const output = join(temporaryRoot, `output-${suffix}`);
+            const cache = join(temporaryRoot, `cache-${suffix}`);
+            mkdirSync(output, { recursive: true });
+            for (const [path] of EXPECTED_INPUTS) {
+                const target = join(source, path);
+                mkdirSync(dirname(target), { recursive: true });
+                copyFileSync(join(PACKAGE_DIRECTORY, path), target);
+            }
+            const packed = spawnSync(npmCommand, [
+                'pack', source, '--ignore-scripts', '--offline', '--cache', cache,
+                '--pack-destination', output,
+            ], { cwd: REPOSITORY_ROOT, encoding: 'utf8' });
+            assert.equal(packed.status, 0, `${packed.stdout}\n${packed.stderr}`);
+            artifacts.push(readFileSync(join(output, 'mediflow-web-auth-lifecycle-owner-0.8.6.tgz')));
+        }
+        assert.ok(artifacts[0]);
+        assert.ok(artifacts[1]);
+        assert.equal(artifacts[0].equals(artifacts[1]), true);
+        assert.equal(artifacts[0].equals(readFileSync(ARTIFACT_PATH)), true);
+    } finally {
+        rmSync(temporaryRoot, { recursive: true, force: true });
+    }
+});
+
 test('binds provenance to the accepted base, predecessor, inputs, and tar roster', () => {
     const bytes = readFileSync(PROVENANCE_PATH);
-    assert.equal(bytes.length, 5_648);
+    assert.equal(bytes.length, 5_898);
     assert.equal(sha256(bytes), PROVENANCE_SHA256);
     const provenance = JSON.parse(bytes.toString('utf8')) as JsonRecord;
     assert.equal(provenance.schemaVersion, 'mediflow.web-auth-lifecycle-owner.package-provenance.v1');
     assert.equal(provenance.acceptedBase, ACCEPTED_BASE);
     assert.deepEqual(provenance.predecessor, {
-        version: '0.8.5-prepared.4',
-        tarSha256: 'c8652cdee4d61a5742b3eff6aea57f949eafd917b551c556854b0b458d90d76c',
-        provenanceSha256: '7acf1f55961908cc6fa39dce31bc99d6d99ac88ce2f9cdad78a0b04180b65b04',
+        version: '0.8.5',
+        tarSha256: PREDECESSOR_ARTIFACT_SHA256,
+        provenanceSha256: PREDECESSOR_PROVENANCE_SHA256,
     });
     assert.deepEqual(provenance.package, {
         name: '@mediflow/web-auth-lifecycle-owner',
-        version: '0.8.5',
+        version: '0.8.6',
     });
     assert.deepEqual(provenance.pack, {
-        command: 'npm pack ./packages/web-auth-lifecycle-owner --ignore-scripts --offline --cache <empty-temporary-cache> --pack-destination <temporary-directory>',
+        command: 'npm pack <clean-temporary-copy> --ignore-scripts --offline --cache <empty-temporary-cache> --pack-destination <temporary-directory>',
         runs: 2,
+        sourceCopies: 2,
         network: 'offline',
         scripts: 'ignored',
         cache: 'empty_temporary',
         byteIdentical: true,
     });
+    assert.deepEqual(provenance.installation, {
+        command: 'npm install --offline --ignore-scripts --no-audit --no-fund --cache <empty-temporary-cache> <tracked-tarball>',
+        scratch: 'empty_package',
+        physical: true,
+        symlink: false,
+        hardlink: false,
+    });
     assert.deepEqual(provenance.artifact, {
         path: ARTIFACT_RELATIVE_PATH,
-        bytes: 19_245,
+        bytes: 19_785,
         sha256: ARTIFACT_SHA256,
         integrity: ARTIFACT_INTEGRITY,
     });
@@ -271,19 +333,29 @@ test('installs exactly one physical package copy from the pinned artifact', () =
     assert.equal(dependencies['@mediflow/web-auth-lifecycle-owner'], DEPENDENCY_SPECIFIER);
     assert.equal(lockRootDependencies['@mediflow/web-auth-lifecycle-owner'], DEPENDENCY_SPECIFIER);
     assert.deepEqual(lockEntry, {
-        version: '0.8.5',
+        version: '0.8.6',
         resolved: DEPENDENCY_SPECIFIER,
         integrity: ARTIFACT_INTEGRITY,
         engines: { node: '>=24 <25' },
     });
 
     const installedDirectory = join(REPOSITORY_ROOT, 'node_modules/@mediflow/web-auth-lifecycle-owner');
-    assert.equal(lstatSync(installedDirectory).isSymbolicLink(), false);
+    const installedDirectoryStat = lstatSync(installedDirectory);
+    assert.equal(installedDirectoryStat.isDirectory(), true);
+    assert.equal(installedDirectoryStat.isSymbolicLink(), false);
+    assert.equal(realpathSync(installedDirectory), installedDirectory);
     assert.notEqual(realpathSync(installedDirectory), realpathSync(PACKAGE_DIRECTORY));
     const installedManifest = readJson(join(installedDirectory, 'package.json'));
-    assert.equal(installedManifest.version, '0.8.5');
+    assert.equal(installedManifest.version, '0.8.6');
     for (const [path, bytes, expectedSha256] of EXPECTED_INPUTS) {
-        const content = readFileSync(join(installedDirectory, path));
+        const installedPath = join(installedDirectory, path);
+        const installedLstat = lstatSync(installedPath);
+        const installedStat = statSync(installedPath);
+        assert.equal(installedLstat.isFile(), true, `installed regular file ${path}`);
+        assert.equal(installedLstat.isSymbolicLink(), false, `installed symlink ${path}`);
+        assert.equal(installedStat.nlink, 1, `installed hardlink ${path}`);
+        assert.equal(realpathSync(installedPath), installedPath, `installed realpath ${path}`);
+        const content = readFileSync(installedPath);
         assert.equal(content.length, bytes, `installed ${path}`);
         assert.equal(sha256(content), expectedSha256, `installed ${path}`);
     }
@@ -298,6 +370,41 @@ test('installs exactly one physical package copy from the pinned artifact', () =
             }
         });
     assert.deepEqual(installedCopies, [join(installedDirectory, 'package.json')]);
+});
+
+test('installs the tracked artifact offline as one physical scratch package', () => {
+    const temporaryRoot = mkdtempSync(join(tmpdir(), 'mediflow-owner-086-install-'));
+    const application = join(temporaryRoot, 'application');
+    const cache = join(temporaryRoot, 'cache');
+    const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+    try {
+        mkdirSync(application, { recursive: true });
+        const installed = spawnSync(npmCommand, [
+            'install', '--prefix', application, '--offline', '--ignore-scripts',
+            '--no-audit', '--no-fund', '--cache', cache, ARTIFACT_PATH,
+        ], { cwd: REPOSITORY_ROOT, encoding: 'utf8' });
+        assert.equal(installed.status, 0, `${installed.stdout}\n${installed.stderr}`);
+        const packageDirectory = join(application, 'node_modules/@mediflow/web-auth-lifecycle-owner');
+        const packageStat = lstatSync(packageDirectory);
+        assert.equal(packageStat.isDirectory(), true);
+        assert.equal(packageStat.isSymbolicLink(), false);
+        assert.equal(
+            realpathSync(packageDirectory),
+            join(realpathSync(application), 'node_modules/@mediflow/web-auth-lifecycle-owner'),
+        );
+        for (const [path, bytes, expectedSha256] of EXPECTED_INPUTS) {
+            const installedPath = join(packageDirectory, path);
+            const installedLstat = lstatSync(installedPath);
+            assert.equal(installedLstat.isFile(), true, path);
+            assert.equal(installedLstat.isSymbolicLink(), false, path);
+            assert.equal(statSync(installedPath).nlink, 1, path);
+            const content = readFileSync(installedPath);
+            assert.equal(content.length, bytes, path);
+            assert.equal(sha256(content), expectedSha256, path);
+        }
+    } finally {
+        rmSync(temporaryRoot, { recursive: true, force: true });
+    }
 });
 
 test('exposes only the frozen final root and keeps the adapter package-only', () => {
