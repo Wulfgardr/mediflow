@@ -4,7 +4,7 @@ import { ICD11_WHO_BINDING } from './icd11-who-service.ts';
 
 const RESULT_KEYS = ['destinationEntities', 'error', 'errorMessage', 'resultChopped',
     'wordSuggestionsChopped', 'guessType', 'uniqueSearchId', 'words'] as const;
-const RESULT_REQUIRED = ['destinationEntities', 'error', 'errorMessage', 'resultChopped'] as const;
+const RESULT_REQUIRED = ['destinationEntities', 'error', 'resultChopped'] as const;
 const ENTITY_KEYS = ['id', 'title', 'stemId', 'isLeaf', 'postcoordinationAvailability',
     'hasCodingNote', 'hasMaternalChapterLink', 'hasPerinatalChapterLink', 'matchingPVs',
     'propertiesTruncated', 'isResidualOther', 'isResidualUnspecified', 'chapter', 'theCode',
@@ -111,7 +111,8 @@ export function parseIcd11WhoOfficialSearchBody(body: string) {
     let parsed: unknown;
     try { parsed = JSON.parse(body); } catch { return null; }
     const result = dataRecord(parsed, RESULT_KEYS, RESULT_REQUIRED);
-    if (!result || result.error !== false || result.errorMessage !== null
+    if (!result || result.error !== false
+        || (present(result, 'errorMessage') && result.errorMessage !== null)
         || typeof result.resultChopped !== 'boolean'
         || !optionalBoolean(result, 'wordSuggestionsChopped')
         || !optionalEnum(result, 'guessType', 2)

@@ -187,6 +187,21 @@ test('accetta i soli campi opzionali data-only documentati dallo Swagger WHO', a
         [{ code: 'BA00', description: 'Essential hypertension' }]);
 });
 
+test('accetta errorMessage omesso quando i campi semantici dichiarano successo', async () => {
+    const transport = createIcd11WhoOfficialSearchTransport({
+        credentials: createCredentials(),
+        client: async () => Object.freeze({
+            status: 200,
+            finalUrl: `${ICD11_WHO_OFFICIAL_SEARCH_FINAL_URL_PREFIX}hypertension`
+                + '&flatResults=true&highlightingEnabled=false&medicalCodingMode=true&includeKeywordResult=false',
+            redirected: false,
+            body: JSON.stringify({ destinationEntities: [], error: false, resultChopped: false }),
+        }),
+    });
+
+    assert.deepEqual((await transport(transportRequest())).entries, []);
+});
+
 test('nega factory e request caller-supplied ostili prima di lease e HTTP', async () => {
     let getterReads = 0; let proxyTraps = 0; let clientCalls = 0;
     const client = async () => { clientCalls += 1; return envelope(); };
