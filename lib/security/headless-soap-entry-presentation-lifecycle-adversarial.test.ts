@@ -2,13 +2,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { createClinicianSoapEntryFieldSet } from '../headless/clinician-soap-entry-field-set.ts';
-import {
-    CLINICIAN_SOAP_DRAFT_SCHEMA, CLINICIAN_SOAP_OPERATION_ID, validateClinicianSoapWriteDraft,
-} from '../headless/clinician-soap-write-contract.ts';
 import {
     createHeadlessSoapEntryPresentationLifecycleOwner,
 } from './headless-soap-entry-presentation-lifecycle.ts';
+import {
+    bindHeadlessSoapEntryPresentationGoldenSeal,
+    createHeadlessSoapEntryPresentationGoldenFieldSet,
+    HEADLESS_SOAP_ENTRY_PRESENTATION_GOLDEN_H4,
+} from './headless-soap-entry-presentation-lifecycle-fixture.test.ts';
 
 const CANONICAL_TOKEN = 'AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8';
 
@@ -16,19 +17,8 @@ function opaque(): Readonly<Record<never, never>> {
     return Object.freeze(Object.create(null)) as Readonly<Record<never, never>>;
 }
 
-function canonicalFieldSet() {
-    const draft = Object.assign(Object.create(null), {
-        schema: CLINICIAN_SOAP_DRAFT_SCHEMA, operationId: CLINICIAN_SOAP_OPERATION_ID,
-        subjective: 'Sintomo sintetico', objective: 'Parametro sintetico',
-        assessment: 'Valutazione sintetica', plan: 'Piano sintetico',
-    });
-    const accepted = validateClinicianSoapWriteDraft(draft); assert.equal(accepted.status, 'accepted');
-    if (accepted.status !== 'accepted') throw new Error('synthetic H1 fixture denied');
-    const fieldSet = createClinicianSoapEntryFieldSet(accepted, 1_704_067_200_987); assert.ok(fieldSet); return fieldSet;
-}
-
 function fixture(count = 1) {
-    const fieldSet = canonicalFieldSet();
+    const fieldSet = createHeadlessSoapEntryPresentationGoldenFieldSet();
     const records = Array.from({ length: count }, () => ({
         entryRef: opaque(), registration: opaque(), current: true, returnCurrent: true, returnDependentCurrent: true,
         allowRegister: true, allowConfirm: true, dispose: null as (() => void) | null,
@@ -150,6 +140,7 @@ test('keeps foreign, noncanonical, and stale correlation tokens completely inert
 test('H4 drain wins over cancel and drains its H5b dependent exactly once', async () => {
     const current = fixture(); const owner = createHeadlessSoapEntryPresentationLifecycleOwner(current.sources);
     const handoff = await owner.service.present(current.records[0]!.entryRef);
+    await bindHeadlessSoapEntryPresentationGoldenSeal(owner, handoff.correlationToken);
     let drainCalls = 0; let reentrantCancel: boolean | null = null; let registration: unknown = null;
     assert.equal(await owner.lifecycleController.withCurrentPresentation(handoff.correlationToken, () => {
         registration = owner.lifecycleController.registerDependent(handoff.correlationToken, () => {
@@ -163,11 +154,26 @@ test('H4 drain wins over cancel and drains its H5b dependent exactly once', asyn
     assert.equal(current.records[0]!.wipeCalls, 0);
 });
 
+test('terminalizes seal binding when the final H4 currentness fence is lost', async () => {
+    const current = fixture(); const owner = createHeadlessSoapEntryPresentationLifecycleOwner(current.sources);
+    const handoff = await owner.service.present(current.records[0]!.entryRef);
+    current.records[0]!.returnDependentCurrent = false;
+
+    assert.equal(await owner.sealBindingController.bindGestureSeal(
+        handoff.correlationToken,
+        HEADLESS_SOAP_ENTRY_PRESENTATION_GOLDEN_H4.seal,
+    ), false);
+    assert.equal(current.records[0]!.wipeCalls, 1);
+    assert.equal(owner.service.cancel(handoff.correlationToken), false);
+    assert.equal(owner.lifecycleController.registerDependent(handoff.correlationToken, () => undefined), null);
+});
+
 test('blocks cross-entry presentation and currentness reentry for the whole H5b drain', async () => {
     const current = fixture(3); const owner = createHeadlessSoapEntryPresentationLifecycleOwner(current.sources);
     const first = await owner.service.present(current.records[0]!.entryRef);
     current.setEntropy(() => Uint8Array.from({ length: 32 }, (_, index) => index + 1));
     const second = await owner.service.present(current.records[1]!.entryRef);
+    await bindHeadlessSoapEntryPresentationGoldenSeal(owner, first.correlationToken);
     let nestedPresentation: Promise<'fulfilled' | 'rejected'> | null = null;
     let nestedCurrentness: Promise<boolean> | null = null;
     let siblingCallbacks = 0;
@@ -243,6 +249,7 @@ test('contains throwing, Promise-returning, and reentrant H5b disposers fail-clo
     await Promise.all(['throw', 'promise', 'reentry'].map(async (mode) => {
         const current = fixture(); const owner = createHeadlessSoapEntryPresentationLifecycleOwner(current.sources);
         const handoff = await owner.service.present(current.records[0]!.entryRef);
+        await bindHeadlessSoapEntryPresentationGoldenSeal(owner, handoff.correlationToken);
         let drainCalls = 0; let reentrantCancel: boolean | null = null; let reentrantRegistration: unknown = undefined;
         const disposer = (() => {
             drainCalls += 1;
@@ -281,6 +288,7 @@ test('async, generator, Proxy, and non-void callbacks never obtain presentation 
         const handoff = await owner.service.present(current.records[0]!.entryRef);
         const observed = { calls: 0, traps: 0 }; let registration: unknown = null; let dependentDrains = 0;
         if (surface === 'dependent') {
+            await bindHeadlessSoapEntryPresentationGoldenSeal(owner, handoff.correlationToken);
             assert.equal(await owner.lifecycleController.withCurrentPresentation(handoff.correlationToken, () => {
                 registration = owner.lifecycleController.registerDependent(handoff.correlationToken, () => { dependentDrains += 1; });
             }), true);
