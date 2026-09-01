@@ -11,7 +11,9 @@ import { initSqlitePragmas } from '@/lib/sqlite-pragmas';
 
 // Ensure the data directory exists in production or use project root for dev
 /* @Codex */
-const dbPath = resolveDataPath('medical.db');
+const isNextProductionBuild = process.env.NEXT_PHASE === 'phase-production-build';
+/* @Codex */
+const dbPath = isNextProductionBuild ? ':memory:' : resolveDataPath('medical.db');
 const legacyDbPath = path.join(process.cwd(), 'medical.db');
 
 // A crash inside replaceSqliteDatabase can leave medical.db.repair-tmp-* /
@@ -53,9 +55,9 @@ function recoverSwapArtifacts(): void {
         if (fs.existsSync(stalePath)) fs.rmSync(stalePath, { force: true });
     }
 }
-recoverSwapArtifacts();
+if (!isNextProductionBuild) recoverSwapArtifacts();
 
-if (!fs.existsSync(dbPath) && fs.existsSync(legacyDbPath)) {
+if (!isNextProductionBuild && !fs.existsSync(dbPath) && fs.existsSync(legacyDbPath)) {
     // Copy through SQLite (recovers pages still in the legacy -wal sidecar)
     // and stage + rename so a failed copy never leaves a torn medical.db:
     // a plain fs.copyFileSync here was the same bug WUL-321 fixes (boot path).
@@ -949,7 +951,11 @@ function applySchemaGuardsSerially(): void {
     }).immediate();
 }
 
-applySchemaGuardsSerially();
+// Next evaluates route modules while collecting build metadata. That phase has
+// no runtime authority and must never open, copy, inspect, or migrate the
+// persistent clinical database. The in-memory handle above keeps imports
+// structurally valid; real bootstrap remains unchanged for dev/server phases.
+if (!isNextProductionBuild) applySchemaGuardsSerially();
 
 /**
  * Replaces the SQLite file from sourcePath without writing under the open

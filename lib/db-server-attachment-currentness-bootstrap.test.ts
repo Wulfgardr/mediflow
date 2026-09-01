@@ -28,9 +28,9 @@ function prepare(dataDir: string, seed = true): string {
     return dbPath;
 }
 
-function bootstrap(dataDir: string) {
+function bootstrap(dataDir: string, env: NodeJS.ProcessEnv = {}) {
     return spawnSync(process.execPath, [RUNNER, WORKER], {
-        cwd: ROOT, env: { ...process.env, MEDIFLOW_DATA_DIR: dataDir }, encoding: 'utf8',
+        cwd: ROOT, env: { ...process.env, ...env, MEDIFLOW_DATA_DIR: dataDir }, encoding: 'utf8',
     });
 }
 
@@ -117,6 +117,22 @@ test('rolls back malformed canonical and orphan legacy data without leaving a re
         assert.notEqual(result.status, 0); assert.match(`${result.stdout}${result.stderr}`, /ATTACHMENT_CURRENTNESS_MIGRATION_UNSUPPORTED/u);
         assert.equal(attachmentSnapshot(canonical.dbPath), before);
     } finally { fs.rmSync(canonical.dataDir, { recursive: true, force: true }); }
+});
+
+test('production build bootstrap leaves persistent attachment storage unopened and unchanged', () => {
+    const current = tempCase();
+    try {
+        const db = new Database(current.dbPath);
+        db.exec('ALTER TABLE attachments ADD COLUMN unsupported_build_fixture TEXT');
+        db.close();
+        const before = attachmentSnapshot(current.dbPath);
+
+        const result = bootstrap(current.dataDir, { NEXT_PHASE: 'phase-production-build' });
+
+        assert.equal(result.status, 0, `${result.stdout}${result.stderr}`);
+        assert.match(result.stdout, /\[db-bootstrap-worker\] ready/u);
+        assert.equal(attachmentSnapshot(current.dbPath), before);
+    } finally { fs.rmSync(current.dataDir, { recursive: true, force: true }); }
 });
 
 test('serializes concurrent O1b workers without busy errors or duplicate renames', { timeout: 30_000 }, async () => {
