@@ -208,7 +208,7 @@ test('copies bytes before async rendering and denies malformed, hostile and over
     if (result.status === 'review_required') assert.equal(result.reason, 'page_evidence_mismatch');
 });
 
-test('bounds the render deadline and stalled cleanup through an internal fake-engine seam', async () => {
+test('post-fences stalled render and cooperatively observes cleanup through an internal fake-engine seam', async () => {
     const pending = new Promise<void>(() => undefined); let cancelled = 0; let pageCleaned = 0;
     let documentCleaned = 0; let loadingDestroyed = 0;
     const page = { getViewport: () => ({ width: 1, height: 1 }),
@@ -226,6 +226,34 @@ test('bounds the render deadline and stalled cleanup through an internal fake-en
     });
     assert.ok(performance.now() - started < 500);
     assert.deepEqual([cancelled, pageCleaned, documentCleaned, loadingDestroyed], [1, 1, 1, 1]);
+});
+
+test('denies synchronous PNG encoding that returns after the page deadline', async () => {
+    const page = { getViewport: () => ({ width: 1, height: 1 }),
+        render: () => ({ promise: Promise.resolve(), cancel: () => undefined }), cleanup: () => undefined };
+    const document = { numPages: 1, getPage: async () => page, cleanup: async () => undefined };
+    const loading = { promise: Promise.resolve(document), destroy: async () => undefined };
+    const engine = { getDocument: () => loading, createCanvas: () => ({ width: 1, height: 1, getContext: () => ({}),
+        toBuffer: () => { const until = performance.now() + 35; while (performance.now() < until) { /* cooperative stall */ }
+            return Buffer.concat([PNG_SIGNATURE, Buffer.from([1])]); } }) };
+    await assert.rejects(ANYDOC_PDF_PAGE_RENDERER_INTERNAL_TEST_SEAM.renderPage(engine, Buffer.from('%PDF-test')), {
+        name: 'PageRenderTimeout',
+    });
+});
+
+test('post-fences cooperative synchronous cleanup that returns after the page deadline', async () => {
+    const stall = () => { const until = performance.now() + 35; while (performance.now() < until) { /* cooperative stall */ } };
+    const page = { getViewport: () => ({ width: 1, height: 1 }),
+        render: () => ({ promise: Promise.resolve(), cancel: () => undefined }), cleanup: stall };
+    const document = { numPages: 1, getPage: async () => page, cleanup: async () => undefined };
+    const loading = { promise: Promise.resolve(document), destroy: async () => undefined };
+    const engine = { getDocument: () => loading, createCanvas: () => ({ width: 1, height: 1, getContext: () => ({}),
+        toBuffer: () => Buffer.concat([PNG_SIGNATURE, Buffer.from([1])]) }) };
+    const started = performance.now();
+    await assert.rejects(ANYDOC_PDF_PAGE_RENDERER_INTERNAL_TEST_SEAM.renderPage(engine, Buffer.from('%PDF-test')), {
+        name: 'PageRenderTimeout',
+    });
+    assert.ok(performance.now() - started >= 35);
 });
 
 test('enforces per-page and cumulative PNG byte limits without returning partial rasters', async () => {
@@ -265,11 +293,12 @@ test('pins the local engine graph and excludes URL, worker, path, model, parser 
     assert.match(source, /disableWorker: true/u); assert.match(source, /isEvalSupported: false/u);
     assert.match(source, /useSystemFonts: false/u); assert.match(source, /\.cancel\(\)/u);
     assert.match(source, /\.cleanup\(\)/u); assert.match(source, /\.destroy\(\)/u);
+    assert.doesNotMatch(source, /Math\.min\(ANYDOC_PDF_PAGE_RENDERER_PAGE_TIMEOUT_MS/u);
     assert.doesNotMatch(source, /\b(?:url|workerSrc|GlobalWorkerOptions)\s*:|fetch\(|https?:|readFile|writeFile|child_process|spawn\(|exec\(|DeepSeek|Ollama|Apple Vision|@firecrawl\/anydoc|app\/api|dbServer|lib\/schema|markdown(?:Bytes|Text|\s*:)/iu);
     assert.equal(renderAnyDocNeedsOcrPages.length, 2);
     assert.equal(ANYDOC_PDF_PAGE_RENDERER_RUNTIME_PROFILE_ID, 'mediflow.pdfjs_png.node24.darwin_arm64.v1');
     assert.equal(sha256(ANYDOC_PDF_PAGE_RENDERER_ENGINE_DESCRIPTOR), ANYDOC_PDF_PAGE_RENDERER_ENGINE_SHA256);
-    assert.equal(ANYDOC_PDF_PAGE_RENDERER_ENGINE_SHA256, '34bac55f24210b0e224bedc5b60f0eeb8d74398dbd0546018871ef441ed4f8ce');
+    assert.equal(ANYDOC_PDF_PAGE_RENDERER_ENGINE_SHA256, 'bad022a53e98dd0449e6a4e4b643da80aeabcc80252c949ae2cf2674b757f6d2');
     assert.match(source, /1011b38553532d7078c59f26b15a471f8dae00f101b60e2add9b8511737a1ce0/u);
     assert.match(source, /ec7dc504d4ade7fd36846d16643e50eed5c914335f3a86b6a2a8d632391e5bfa/u);
     assert.match(source, /c7c8dcb69aae6ddb58fe23e5f20d1c772a8065b077560f5a18336307779add91/u);
