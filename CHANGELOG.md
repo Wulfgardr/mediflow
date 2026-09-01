@@ -5,58 +5,87 @@ Questo file raccoglie i cambiamenti rilevanti di MediFlow.
 Il formato è basato su [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Non rilasciato] - linea post-0.8
+## [Non rilasciato] — candidato sorgente locale 0.8.5
 
-> Voci della linea di sviluppo post-0.8. Nessuna e' parte della release 0.8.0.
+> Questa sezione descrive il tree locale della patch `0.8.5`. Non dichiara CI
+> remota sulla stessa SHA, tag, GitHub Release, distribuzione o release
+> readiness. La release sorgente `0.8.2` conserva lo storico separato.
 
-### Documentazione pubblica
+### Intelligence Fabric review-only
+
+- `AI Patient Insight`, Smart Import, Document Synthesis e Treatment Reasoning
+  passano da ingressi e production root Fabric distinti.
+- I quattro percorsi hanno disposition `proposal_only`. Le UI mostrano
+  receipt, provenienza e currentness; nessuna preview applica dati clinici.
+- Il crosswalk machine-readable
+  `docs/capability-mapping/fabric-generative-runtime-crosswalk.v1.json` lega
+  capability, entrypoint, production root, route, evidenza wire e UI. Un guard
+  dedicato controlla il drift.
+- La receipt storica `fabric-product-crosswalk-receipt.v1.json` resta
+  immutabile con stato `candidate_not_integrated`. Non viene rietichettata come
+  prova del runtime corrente.
+
+### Estrazione locale degli allegati
+
+- AnyDoc è l'unica corsia automatica locale per i formati supportati. La
+  conversione a Markdown è bounded, non usa rete e non è OCR.
+- Immagini, PDF scansionati senza text layer, documenti cifrati e formati non
+  supportati falliscono chiusi come
+  `review_required/unsupported_local_extraction`. Non producono sintesi o
+  proposte cliniche.
+- La capability `ocr` è `unavailable` nel runtime corrente e le route OCR
+  legacy rispondono `410`.
+
+### Headless e SOAP
+
+- Il piano Headless conserva 66 esiti terminali e zero operazioni generali
+  eseguibili. I 32 `GET` network osservati restano evidence candidate.
+- La sola eccezione stretta è la append SOAP locale server-side H1-H10:
+  sessione physician active-role, currentness, revisione clinica, gesto e
+  step-up monouso, CAS, audit, ledger e receipt.
+- L'eccezione SOAP non abilita Mini, apply generale, authority Fabric o un
+  trasporto agentico.
+
+### Provider e perimetro
+
+- Ollama e ATHENA/MLX sono provider locali capability-specific. ATHENA/MLX è
+  ammesso soltanto per Treatment Reasoning; nessun provider è un fallback
+  generico.
+- Il runtime ATHENA accetta un runner MLX offline pre-provisioned tramite
+  `MEDIFLOW_ATHENA_MLX_GENERATE_BIN`, come percorso eseguibile assoluto
+  host-owned. Richiede runner e modello locali già presenti; non dichiara
+  readiness universale.
+- Il supporto del runner (`2574cf5fc`) ha superato TDD 6/6, typecheck ed ESLint.
+  Uno smoke sintetico sul percorso di produzione con modello BF16 locale ha
+  completato in 10,6 secondi, con 64 token e 211 caratteri, senza registrare il
+  raw output. È una singola osservazione, non un benchmark o una prova clinica.
+- Il registro e la UI elencano OpenAI e Anthropic come disclosure informative,
+  con esecuzione ed egress disabilitati. Non accettano configurazione di
+  credenziali; un login o abbonamento consumer non costituisce accesso API.
+- Cloud, egress, MCP, visita registrabile, semantic query planner, SQL diretto
+  e invocazione AI dai client paired restano fuori scope.
+
+### Esiti di perimetro F6/F7
+
+- **F6 — `RELEASE_SCOPE_EXCLUDED`**: DeepSeek-OCR 2 selettivo sulle pagine
+  `needsOcr`, provenance/hash/quality per pagina, benchmark sintetico italiano
+  con soglie ed E2E non sono implementati o verificati. La patch include solo
+  AnyDoc per testo estraibile e il fallimento chiuso a revisione manuale per
+  immagini e scansioni.
+- **F7 — `RELEASE_SCOPE_EXCLUDED`**: esecuzione/configurazione credenziali
+  OpenAI o Anthropic e il contratto completo
+  type/instance/auth/model/capabilities/groups/bindings/allowlist/credential
+  classes non sono inclusi. I soli provider effettivi restano Ollama locale e
+  ATHENA/MLX, dove configurati e per le capability assegnate.
+
+### Altri cambiamenti non rilasciati
 
 - La galleria usa una cattura reale dell'app macOS corrente con fixture
-  sintetiche. Rimuove lo screenshot della shell Apple precedente.
-- Il README distingue il rapporto operativo tra Mac home-base, localhost e
-  client paired dalla direzione futura Intelligence Fabric.
-- Il dashboard dei token usa gli aggregati locali CodexBar e dichiara il
-  periodo e l'ambiente di registrazione.
-
-### App native
-
+  sintetiche e non presenta la shell Apple precedente come stato attuale.
+- Il dashboard dei token dichiara periodo e ambiente degli aggregati locali
+  CodexBar.
 - La modalità demo Apple tratta il dataset sintetico come fixture UI. Il
   caricamento documenti non mostra più un falso errore di sessione paired.
-
-### Stack intelligente locale
-
-- **Modifica**: consolidato lo stack provider post-0.8 (WUL-269, WUL-418,
-  WUL-502): locality Ollama loopback, registry locale per task senza fallback,
-  matrice serving e limite digest-bound (ADR 0088).
-  **Stato**: integrato nella branch di programma WUL-522 e verificato in
-  locale (typecheck, lint, guard e suite unit complete).
-  **Limite**: il digest resta identita osservata, non prova causale
-  (`observed_not_causal`); la qualified readiness resta `HOLD`.
-- **Modifica**: contratto Intelligence Fabric (ADR 0089) con scaffold locale:
-  capability generative e deterministiche, venue esplicite, profili egress
-  versionati, resolver fail-closed e stato read-only.
-  **Stato**: scaffold locale con test dedicati; nessun provider nuovo.
-  **Limite**: il profilo cloud esiste ed e' chiuso per costruzione; nessun
-  egress, credenziale o consenso e' stato aggiunto.
-- **Modifica**: giunture fabric (ADR 0090): ciclo di vita del trust paired
-  con revoca host-side dei client, onboarding provider fail-closed per classe
-  di credenziale, decisioni di routing osservabili con fallback negato e
-  contratto di interazione clinica (incertezza con origine, campi illeggibili
-  distinti dagli assenti, revisione deny-by-default senza stato applicato).
-  **Stato**: contratti e runtime locali con test dedicati; route
-  `/api/ai/fabric/observability` e revoca `DELETE
-  /api/v1/network/pairing-clients/{clientId}`.
-  **Limite**: nessuna UI nuova e nessuna adozione nativa in questa fase; la
-  scrittura clinica resta un comando applicativo separato.
-- **Modifica**: candidato locale Fabric (ADR 0091) con lifecycle provider
-  dichiarativo, admissione e continuita fail-closed, proiezione paired
-  `status_only`, decode Swift condiviso e harness sintetico
-  receipt-provenance-review.
-  **Stato**: candidato locale sulla branch CoS post-0.8, senza credenziali o
-  servizi esterni.
-  **Limite**: il router non governa ancora tutti i call path AI; lifecycle
-  vendor, cloud, on-device, AI paired e persistenza della review restano
-  bloccati o fuori scope. Nessuna voce promuove la release 0.8.
 
 ## [0.8.2] - 2026-08-11
 
