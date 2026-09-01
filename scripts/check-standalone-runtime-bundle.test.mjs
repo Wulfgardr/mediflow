@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const checker = path.join(root, 'scripts', 'check-standalone-runtime-bundle.mjs');
 const node = process.execPath;
+const detectLibcTracePattern = './node_modules/detect-libc/**/*';
 const webAuthOwnerPackage = '@mediflow/web-auth-lifecycle-owner';
 const webAuthOwnerTracePattern = './node_modules/@mediflow/web-auth-lifecycle-owner/**/*';
 const webAuthOwnerRoster = [
@@ -66,6 +67,13 @@ test('standalone checker proves web auth owner physical copy and restart denial'
   assert.match(source, /process A emitted data other than exact synthetic locators/);
   assert.match(source, /process B did not deny process A authority as absent/);
   assert.doesNotMatch(source, /@mediflow\/web-auth-lifecycle-owner\/internal/);
+});
+
+test('standalone config traces the complete sharp libc detector', () => {
+  const configSource = fs.readFileSync(path.join(root, 'next.config.ts'), 'utf8');
+  const includes = configSource.match(/outputFileTracingIncludes:\s*\{[\s\S]*?["']\/\*["']:\s*\[([\s\S]*?)\]/u)?.[1];
+  assert.ok(includes, 'missing global outputFileTracingIncludes roster');
+  assert.ok(includes.includes(`"${detectLibcTracePattern}"`), 'detect-libc implementation is not traced for standalone sharp');
 });
 
 test('standalone config externalizes and traces the exact web auth owner package roster', () => {
