@@ -64,6 +64,24 @@ export type ServerSessionSelectionBindingControllerV1 = Readonly<{
     withCurrentDependentBinding(scope: unknown, registration: unknown,
         operation: (binding: ServerSessionSelectionBindingSnapshotV1) => void): boolean;
 }>;
+export type ServerSessionSelectionCommitExpectedV1 = Readonly<{
+    webSessionId: string;
+    sessionRef: string;
+    patientRef: string;
+    ambulatoryRef: string;
+    leaseRef: string;
+    selectionEpoch: number;
+    patientVersion: number;
+}>;
+export type ServerSessionSelectionCommitBindingV1 = Readonly<{
+    patientId: string;
+    ambulatoryId: string;
+    patientVersion: number;
+}>;
+export type ServerSessionSelectionCommitBindingControllerV1 = Readonly<{
+    withCurrentCommitBinding(scopeIdentity: unknown, expected: ServerSessionSelectionCommitExpectedV1,
+        operation: (binding: ServerSessionSelectionCommitBindingV1) => void): boolean;
+}>;
 type SelectionScopeRecord = { scope: ServerSessionSelectionScopeV1; session: ServerSession; selection: SelectionState;
     active: boolean; dependents: SelectionDependentRecord | null; current(): boolean };
 type SelectionDependentRecord = { registration: ServerSessionSelectionDependentRegistrationV1; scope: SelectionScopeRecord;
@@ -347,6 +365,25 @@ function frozenExact(input: unknown, keys: readonly string[]): Record<string, un
     } catch { return null; }
 }
 
+function closedFrozenExact(input: unknown, keys: readonly string[]): Record<string, unknown> | null {
+    if (typeof input !== 'object' || input === null || isProxy(input)) return null;
+    try {
+        if (!ObjectIsFrozen(input) || getPrototypeOf(input) !== null) return null;
+        const inputKeys = ownKeysIntrinsic(input);
+        if (inputKeys.length !== keys.length) return null;
+        const result: Record<string, unknown> = ObjectCreate(null);
+        for (let index = 0; index < keys.length; index += 1) {
+            const key = keys[index];
+            if (inputKeys[index] !== key) return null;
+            const descriptor = getOwnPropertyDescriptor(input, key);
+            if (!descriptor || !descriptor.enumerable || !('value' in descriptor)
+                || descriptor.writable || descriptor.configurable) return null;
+            result[key] = descriptor.value;
+        }
+        return result;
+    } catch { return null; }
+}
+
 function canonicalClinicalContext(input: unknown, requested: CanonicalPair): CanonicalClinicalContext | null {
     const value = frozenExact(input, ['patientId', 'ambulatoryId', 'patientVersion']);
     if (!value || value.patientId !== requested.patientId || value.ambulatoryId !== requested.ambulatoryId
@@ -362,6 +399,7 @@ function createProjectionOwnerProcessOwner<Owner extends ProjectionOwnerSurface>
         registry: ProjectionOwnerRegistry<Owner>;
         selectionLifecycleController: ServerSessionSelectionLifecycleControllerV1;
         selectionBindingController: ServerSessionSelectionBindingControllerV1;
+        selectionCommitBindingController: ServerSessionSelectionCommitBindingControllerV1;
     }> {
     const sources = ObjectFreeze({ ...defaultSources, ...sourceOverrides });
     const owners = new MapConstructor<string, ProjectionOwnerSurface>();
@@ -375,7 +413,7 @@ function createProjectionOwnerProcessOwner<Owner extends ProjectionOwnerSurface>
     const sessionIdScopes = new MapConstructor<string, SelectionScopeRecord>();
     const selectionRegistrations = new WeakMapConstructor<object, SelectionDependentRecord>();
     let selectionOperation: { scope: SelectionScopeRecord; dependent: SelectionDependentRecord | null;
-        created: SelectionDependentRecord | null; poisoned: boolean } | null = null;
+        created: SelectionDependentRecord | null; poisoned: boolean; allowDependentRegistration: boolean } | null = null;
     const scopeRecord = (candidate: unknown): SelectionScopeRecord | null => typeof candidate === 'object' && candidate !== null
         && !isProxy(candidate) ? applyIntrinsic(weakMapGet, selectionScopes, [candidate]) ?? null : null;
     const dependentRecord = (candidate: unknown): SelectionDependentRecord | null => typeof candidate === 'object' && candidate !== null
@@ -416,9 +454,11 @@ function createProjectionOwnerProcessOwner<Owner extends ProjectionOwnerSurface>
             try { applyIntrinsic(pending.dispose, undefined, []); } catch { /* drain continues */ }
             pending = next; }
     };
-    const beginSelectionOperation = (scope: SelectionScopeRecord, dependent: SelectionDependentRecord | null) => {
+    const beginSelectionOperation = (scope: SelectionScopeRecord, dependent: SelectionDependentRecord | null,
+        allowDependentRegistration = false) => {
         if (selectionOperation) { selectionOperation.poisoned = true; return null; }
-        selectionOperation = { scope, dependent, created: null, poisoned: false }; return selectionOperation;
+        selectionOperation = { scope, dependent, created: null, poisoned: false, allowDependentRegistration };
+        return selectionOperation;
     };
     const endSelectionOperation = (operation: NonNullable<typeof selectionOperation>, success: boolean) => {
         const accepted = success && !operation.poisoned; selectionOperation = null;
@@ -436,7 +476,7 @@ function createProjectionOwnerProcessOwner<Owner extends ProjectionOwnerSurface>
                 ? applyIntrinsic(weakMapGet, sessionScopes, [presented]) ?? null : null;
             if (!scope) { try { if (eligible(presented, false)) scope = getMapValue(sessionIdScopes, presented.id) ?? null; } catch { scope = null; } }
             if (!scope || !scope.active || !scope.current()) return false;
-            const activeOperation = beginSelectionOperation(scope, null); if (!activeOperation) return false;
+            const activeOperation = beginSelectionOperation(scope, null, true); if (!activeOperation) return false;
             const succeeded = selectionCallbackSucceeded(operation, [scope.scope]) && scope.active && scope.current()
                 && (!activeOperation.created || activeOperation.created.active);
             return endSelectionOperation(activeOperation, succeeded);
@@ -446,6 +486,9 @@ function createProjectionOwnerProcessOwner<Owner extends ProjectionOwnerSurface>
             if (!scope || !scope.active || !supportedSelectionCallback(dispose)
                 || (selectionOperation && selectionOperation.scope !== scope)) {
                 if (selectionOperation) selectionOperation.poisoned = true; return null;
+            }
+            if (selectionOperation && !selectionOperation.allowDependentRegistration) {
+                selectionOperation.poisoned = true; return null;
             }
             if (selectionOperation?.dependent || selectionOperation?.created || !scope.current()) {
                 if (selectionOperation) selectionOperation.poisoned = true; return null;
@@ -505,6 +548,35 @@ function createProjectionOwnerProcessOwner<Owner extends ProjectionOwnerSurface>
             const succeeded = selectionCallbackSucceeded(operation, [binding]) && scope.active && record.active
                 && dependentRecord(registration) === record && scope.current();
             return endSelectionOperation(activeOperation, succeeded);
+        },
+    });
+    const selectionCommitBindingController: ServerSessionSelectionCommitBindingControllerV1 = ObjectFreeze({
+        withCurrentCommitBinding(candidate: unknown, expected: ServerSessionSelectionCommitExpectedV1,
+            operation: (binding: ServerSessionSelectionCommitBindingV1) => void): boolean {
+            if (selectionOperation) { selectionOperation.poisoned = true; return false; }
+            if (!supportedSelectionCallback(operation)) return false;
+            const scope = scopeRecord(candidate);
+            const requested = closedFrozenExact(expected, [
+                'webSessionId', 'sessionRef', 'patientRef', 'ambulatoryRef', 'leaseRef', 'selectionEpoch', 'patientVersion',
+            ]);
+            if (!scope || !requested || !scope.active || !scope.current()) return false;
+            const current = scope.selection;
+            const matches = () => scope.session.id === requested.webSessionId
+                && current.sessionRef === requested.sessionRef
+                && current.patientRef === requested.patientRef
+                && current.ambulatoryRef === requested.ambulatoryRef
+                && current.leaseRef === requested.leaseRef
+                && current.selectionEpoch === requested.selectionEpoch
+                && current.patientVersion === requested.patientVersion;
+            if (!matches()) return false;
+            const activeOperation = beginSelectionOperation(scope, null); if (!activeOperation) return false;
+            const binding = closedFrozenRecord([
+                ['patientId', current.patientId], ['ambulatoryId', current.ambulatoryId],
+                ['patientVersion', current.patientVersion],
+            ]) as ServerSessionSelectionCommitBindingV1;
+            const callbackSucceeded = selectionCallbackSucceeded(operation, [binding]);
+            const bindingRemainedCurrent = scope.active && matches() && scope.current();
+            return endSelectionOperation(activeOperation, callbackSucceeded && bindingRemainedCurrent);
         },
     });
     type PortRegistryNode = { owner: ProjectionOwnerSurface; authority: WebResourcePort;
@@ -1274,7 +1346,8 @@ function createProjectionOwnerProcessOwner<Owner extends ProjectionOwnerSurface>
             }
         },
     };
-    return ObjectFreeze({ registry: ObjectFreeze(registry), selectionLifecycleController, selectionBindingController });
+    return ObjectFreeze({ registry: ObjectFreeze(registry), selectionLifecycleController, selectionBindingController,
+        selectionCommitBindingController });
 }
 
 export function createLegacyProjectionOwnerFactory(sourceOverrides: Partial<SelectionSources> = {}) {

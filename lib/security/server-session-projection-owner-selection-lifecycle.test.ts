@@ -23,13 +23,14 @@ afterEach(() => { for (const value of sessions) retireSyntheticWebSession(value)
 
 test('selection lifecycle publishes only opaque scope and registration behind the unchanged registry', () => {
     const processOwner = createFullPortProjectionOwnerProcessOwner({ resolve: (_session, pair) => resolved(pair) });
-    const { registry, selectionLifecycleController: lifecycle, selectionBindingController: binding } = processOwner;
+    const { registry, selectionLifecycleController: lifecycle, selectionBindingController: binding,
+        selectionCommitBindingController: commitBinding } = processOwner;
     const value = session(); const owner = registry.acquire(value);
     const lease = owner.issueSelection({ expectedEpoch: 0, ...PAIR });
     let scope: object | null = null; let uses = 0;
 
     assert.deepEqual(Reflect.ownKeys(processOwner), [
-        'registry', 'selectionLifecycleController', 'selectionBindingController',
+        'registry', 'selectionLifecycleController', 'selectionBindingController', 'selectionCommitBindingController',
     ]);
     assert.deepEqual(Reflect.ownKeys(lease), [
         'sessionRef', 'selectionEpoch', 'patientRef', 'ambulatoryRef', 'leaseRef', 'expiresAt',
@@ -39,6 +40,7 @@ test('selection lifecycle publishes only opaque scope and registration behind th
         'withCurrentSelection', 'registerDependent', 'confirmDependent', 'unregisterDependent', 'withCurrentDependent',
     ]);
     assert.deepEqual(Reflect.ownKeys(binding), ['withCurrentDependentBinding']);
+    assert.deepEqual(Reflect.ownKeys(commitBinding), ['withCurrentCommitBinding']);
     assert.equal(lifecycle.withCurrentSelection(value, (candidate) => { scope = candidate; }), true);
     assert.ok(scope); assert.equal(Object.isFrozen(scope), true); assert.deepEqual(Reflect.ownKeys(scope), []);
     const registration = lifecycle.registerDependent(scope, () => { uses = -100; });
@@ -68,8 +70,10 @@ test('selection lifecycle publishes only opaque scope and registration behind th
     }), false);
     assert.equal(Reflect.get(registry, 'selectionLifecycleController'), undefined);
     assert.equal(Reflect.get(registry, 'selectionBindingController'), undefined);
+    assert.equal(Reflect.get(registry, 'selectionCommitBindingController'), undefined);
     assert.equal(Reflect.get(owner, 'selectionLifecycleController'), undefined);
     assert.equal(Reflect.get(owner, 'selectionBindingController'), undefined);
+    assert.equal(Reflect.get(owner, 'selectionCommitBindingController'), undefined);
 });
 
 test('selection lifecycle accepts a fresh authenticated projection of the same current Web session', () => {
