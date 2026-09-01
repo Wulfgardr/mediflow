@@ -5,11 +5,22 @@ import { types } from 'node:util';
 export const CLINICIAN_SOAP_DRAFT_SCHEMA = 'mediflow.soap-draft.v1';
 export const CLINICIAN_SOAP_OPERATION_ID = 'mediflow.clinical_diary.append_soap.v1';
 export const CLINICIAN_SOAP_DIGEST_CODEC = 'mediflow.headless.soap-draft-digest.v1';
+export const CLINICIAN_SOAP_DRAFT_KEYS = Object.freeze([
+    'schema', 'operationId', 'subjective', 'objective', 'assessment', 'plan',
+] as const);
+export type ClinicianSoapDraftV1 = Readonly<{
+    schema: typeof CLINICIAN_SOAP_DRAFT_SCHEMA;
+    operationId: typeof CLINICIAN_SOAP_OPERATION_ID;
+    subjective: string;
+    objective: string;
+    assessment: string;
+    plan: string;
+}>;
 export type ClinicianSoapWriteDenial = Readonly<{ status: 'denied'; code: 'invalid_input' | 'invalid_content' | 'content_limit' | 'empty_content' }>;
 export type ClinicianSoapWriteAccepted = Readonly<{ status: 'accepted'; schema: typeof CLINICIAN_SOAP_DRAFT_SCHEMA; operationId: typeof CLINICIAN_SOAP_OPERATION_ID; subjective: string; objective: string; assessment: string; plan: string; digest: Readonly<{ codec: typeof CLINICIAN_SOAP_DIGEST_CODEC; sha256: Readonly<{ bytes: readonly number[]; hex: string }> }> }>;
 export type ClinicianSoapWriteContract = ClinicianSoapWriteAccepted | ClinicianSoapWriteDenial;
 
-const KEYS = ['schema', 'operationId', 'subjective', 'objective', 'assessment', 'plan'] as const;
+const KEYS = CLINICIAN_SOAP_DRAFT_KEYS;
 const SECTIONS = ['subjective', 'objective', 'assessment', 'plan'] as const;
 const encoder = new TextEncoder(); const apply = Reflect.apply; const isProxy = types.isProxy;
 const ownKeys = Reflect.ownKeys; const descriptorsOf = Object.getOwnPropertyDescriptors; const descriptorOf = Object.getOwnPropertyDescriptor; const prototypeOf = Object.getPrototypeOf;
