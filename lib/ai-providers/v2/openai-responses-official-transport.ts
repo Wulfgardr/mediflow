@@ -4,18 +4,25 @@ import {
     OPENAI_RESPONSES_V2_TARGET,
     type OpenAIResponsesTransportV2,
 } from './openai-responses-adapter';
-import { PROVIDER_BINDING_V2_LIMITS } from './provider-lifecycle';
+import {
+    bindProviderLifecycleToInstanceProfileV2,
+    snapshotProviderInstanceProfileV2,
+} from './provider-instance-profile';
+import { PROVIDER_BINDING_V2_LIMITS, snapshotProviderLifecycleV2 } from './provider-lifecycle';
 
 export const OPENAI_RESPONSES_OFFICIAL_URL = 'https://api.openai.com/v1/responses' as const;
 export const OPENAI_RESPONSES_OFFICIAL_MAX_REQUEST_BYTES = 1_048_576 as const;
 
-const FACTORY_KEYS = ['fetch'] as const;
+const FACTORY_KEYS = ['instanceBinding', 'fetch'] as const;
+const INSTANCE_BINDING_KEYS = ['schemaVersion', 'providerInstanceRef', 'profile', 'lifecycle'] as const;
 const REQUEST_KEYS = ['target', 'method', 'headers', 'body', 'signal', 'maxResponseBytes'] as const;
 const BODY_KEYS = ['model', 'input', 'store', 'background'] as const;
 const HEADER_NAMES = ['authorization', 'content-type', 'user-agent'] as const;
 const ENCODER = new TextEncoder();
 const DECODER = new TextDecoder('utf-8', { fatal: true });
 const SIGNAL_ABORTED = Object.getOwnPropertyDescriptor(AbortSignal.prototype, 'aborted')?.get;
+const ADD_EVENT_LISTENER = EventTarget.prototype.addEventListener;
+const REMOVE_EVENT_LISTENER = EventTarget.prototype.removeEventListener;
 const HEADERS_ENTRIES = Headers.prototype.entries;
 const HEADERS_DELETE = Headers.prototype.delete;
 const RESPONSE_STATUS = Object.getOwnPropertyDescriptor(Response.prototype, 'status')?.get;
@@ -58,6 +65,32 @@ function exact(value: unknown, keys: readonly string[], frozen = false): Record<
 function safeFunction(value: unknown): value is FetchLike {
     try { return typeof value === 'function' && !types.isProxy(value); }
     catch { return false; }
+}
+
+function checkedFactory(value: unknown) {
+    const factory = exact(value, FACTORY_KEYS, true);
+    const instanceBinding = exact(factory?.instanceBinding, INSTANCE_BINDING_KEYS, true);
+    if (!factory || !instanceBinding || !safeFunction(factory.fetch)) {
+        throw new OpenAIResponsesOfficialHttpsTransportError('input_invalid');
+    }
+    let profile; let link; let lifecycle;
+    try {
+        profile = snapshotProviderInstanceProfileV2(instanceBinding.profile);
+        link = bindProviderLifecycleToInstanceProfileV2(factory.instanceBinding);
+        lifecycle = snapshotProviderLifecycleV2(instanceBinding.lifecycle);
+    } catch { throw new OpenAIResponsesOfficialHttpsTransportError('input_invalid'); }
+    if (lifecycle.status !== 'enabled' || profile.providerType !== 'openai' || profile.model !== 'gpt-5.4-mini'
+        || profile.auth.credentialClass !== 'api_key' || profile.auth.authRef === null
+        || link.providerType !== 'openai' || link.providerInstanceRef !== profile.providerInstance.instanceRef
+        || link.operation !== 'document_synthesis' || link.model !== profile.model
+        || link.groupRef !== 'group.review-only.v1' || link.venue !== 'cloud'
+        || link.egress !== 'official_provider_api' || link.egressProfileRef !== 'egress.synthetic.v1'
+        || link.retention !== 'provider_declared' || link.retentionProfileRef !== 'retention.standard.v1'
+        || link.dataUse !== 'synthetic_nonclinical' || link.dataUseProfileRef !== 'data-use.synthetic-nonclinical.v1'
+        || link.functionAllowlist.length !== 0) {
+        throw new OpenAIResponsesOfficialHttpsTransportError('input_invalid');
+    }
+    return Object.freeze({ fetch: factory.fetch });
 }
 
 function nativePromise(value: unknown): Promise<unknown> | null {
@@ -193,20 +226,24 @@ function clearHeaders(headers: Headers): void {
     }
 }
 
-export function createOpenAIResponsesOfficialHttpsTransport(factoryValue?: unknown): OpenAIResponsesTransportV2 {
-    const defaultFactory = Object.freeze({ fetch: globalThis.fetch });
-    const factory = exact(factoryValue === undefined ? defaultFactory : factoryValue, FACTORY_KEYS, true);
-    if (!factory || !safeFunction(factory.fetch)) {
-        throw new OpenAIResponsesOfficialHttpsTransportError('input_invalid');
-    }
+export function createOpenAIResponsesOfficialHttpsTransport(factoryValue: unknown): OpenAIResponsesTransportV2 {
+    const factory = checkedFactory(factoryValue);
     const fetchImpl = factory.fetch;
     return async (requestValue) => {
         const request = checkedRequest(requestValue);
-        if (aborted(request.signal)) {
+        let retired = false;
+        const retire = () => {
+            if (retired) return;
+            retired = true;
             clearHeaders(request.headers.source); clearHeaders(request.headers.copy);
-            throw new OpenAIResponsesOfficialHttpsTransportError('request_cancelled');
+        };
+        try { Reflect.apply(ADD_EVENT_LISTENER, request.signal, ['abort', retire, { once: true }]); }
+        catch {
+            retire();
+            throw new OpenAIResponsesOfficialHttpsTransportError('input_invalid');
         }
         try {
+            if (aborted(request.signal)) throw new OpenAIResponsesOfficialHttpsTransportError('request_cancelled');
             let returned: unknown;
             try {
                 returned = Reflect.apply(fetchImpl, undefined, [OPENAI_RESPONSES_OFFICIAL_URL, Object.freeze({
@@ -227,8 +264,8 @@ export function createOpenAIResponsesOfficialHttpsTransport(factoryValue?: unkno
             const body = await boundedBody(response.body, request.maxResponseBytes);
             return Object.freeze({ status: response.status, body });
         } finally {
-            clearHeaders(request.headers.source);
-            clearHeaders(request.headers.copy);
+            try { Reflect.apply(REMOVE_EVENT_LISTENER, request.signal, ['abort', retire]); } catch { /* native signal validated */ }
+            retire();
         }
     };
 }
