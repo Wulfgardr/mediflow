@@ -55,12 +55,14 @@ export const AUDIT_EVENT_TYPES = [
     'ambulatory.cleared',
     'ai.review.accepted',
     'ai.review.rejected',
+    /* @Codex: PHI-safe receipt for the host-owned WHO reference-data boundary. */
+    'reference_data.icd11.search',
 ] as const;
 
 export type AuditEventType = (typeof AUDIT_EVENT_TYPES)[number];
 export type AuditOutcome = 'success' | 'failure' | 'denied';
 export type AuditActorType = 'user' | 'system';
-export type AuditSubjectType = 'session' | 'active_role_attestation' | 'patient' | 'ambulatory' | 'checkup' | 'entry' | 'therapy' | 'observation' | 'attachment' | 'prosthetic_prescription' | 'service_prescription' | 'service_prescription_item' | 'siss_handoff' | 'settings' | 'ai_review';
+export type AuditSubjectType = 'session' | 'active_role_attestation' | 'patient' | 'ambulatory' | 'checkup' | 'entry' | 'therapy' | 'observation' | 'attachment' | 'prosthetic_prescription' | 'service_prescription' | 'service_prescription_item' | 'siss_handoff' | 'settings' | 'ai_review' | 'reference_data';
 export type AuditSourceSurface = 'web' | 'native' | 'api' | 'job';
 export type AuditAuthContext = 'session' | 'local-token' | 'anonymous';
 
@@ -395,6 +397,7 @@ export function summarizeAuditEvents(records: AuditRecord[], isTruncated = false
         siss_handoff: 0,
         settings: 0,
         ai_review: 0,
+        reference_data: 0,
     };
     const eventTypeCounts = new Map<AuditEventType, number>();
     const actors = new Set<string>();
