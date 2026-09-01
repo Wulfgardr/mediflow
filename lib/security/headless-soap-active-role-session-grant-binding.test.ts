@@ -1,26 +1,9 @@
 /* @Codex */
 import assert from 'node:assert/strict';
-import * as nodeModule from 'node:module';
 import test, { afterEach } from 'node:test';
 
-const sourceOwnerUrl = new URL('../../packages/web-auth-lifecycle-owner/index.js', import.meta.url).href;
-const registerHooks = (nodeModule as unknown as { registerHooks(hooks: {
-    resolve(
-        specifier: string,
-        context: unknown,
-        nextResolve: (candidate: string, nextContext: unknown) => unknown,
-    ): unknown;
-}): void }).registerHooks;
-registerHooks({
-    resolve(specifier, context, nextResolve) {
-        if (specifier === '@mediflow/web-auth-lifecycle-owner') {
-            return { shortCircuit: true, url: sourceOwnerUrl };
-        }
-        return nextResolve(specifier, context);
-    },
-});
+import * as installedOwner from '@mediflow/web-auth-lifecycle-owner';
 
-const sourceOwner = (await import(sourceOwnerUrl)) as Record<string, (...args: unknown[]) => unknown>;
 const grantModule = await import('./headless-soap-active-role-session-grant.ts');
 const fixtureModule = await import('./web-auth-lifecycle-owner-test-fixture.ts');
 const lineageModule = await import('./headless-soap-authorization-lineage.ts');
@@ -147,7 +130,7 @@ test('applies the Web resource final fence after the binding callback and termin
         originalGrant = grant;
         calls += 1;
         assert.equal(activeRole.principalRef, ACTOR);
-        const retirement = sourceOwner.retire(session, 'dispose');
+        const retirement = installedOwner.retire(session, 'dispose');
         assert.deepEqual(retirement, Object.freeze(Object.assign(Object.create(null), { outcome: 'denied' })));
     }), false);
     assert.equal(calls, 1);
