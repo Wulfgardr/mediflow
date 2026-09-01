@@ -4,6 +4,7 @@ import {
     EGRESS_PROFILES,
     FABRIC_SCHEMA_VERSION,
     type EgressProfile,
+    type FabricAvailabilityDisposition,
     type FabricCapabilityId,
     type FabricOperation,
     type FabricReviewPolicy,
@@ -16,6 +17,7 @@ type FabricStatusCapability = Readonly<{
     class: 'generative' | 'deterministic';
     operation: FabricOperation;
     review: FabricReviewPolicy;
+    availabilityDisposition: FabricAvailabilityDisposition;
     venues: readonly FabricVenue[];
     egressProfile: Readonly<Pick<EgressProfile, 'id' | 'version' | 'egress'>>;
     killSwitch: string | null;
@@ -40,6 +42,7 @@ export function buildFabricStatusSnapshot(): FabricStatusSnapshot {
                 class: descriptor.class,
                 operation: descriptor.operation,
                 review: descriptor.review,
+                availabilityDisposition: descriptor.availabilityDisposition,
                 venues: Object.freeze([...descriptor.venues]),
                 egressProfile: Object.freeze({
                     id: profile.id,

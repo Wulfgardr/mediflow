@@ -1,11 +1,10 @@
 /* @Codex */
 import Link from 'next/link';
 import {
-    EGRESS_PROFILE_LABELS,
     FABRIC_CAPABILITY_LABELS,
     FABRIC_OPERATION_LABELS,
     FABRIC_REVIEW_LABELS,
-    FABRIC_VENUE_COPY,
+    describeFabricCapabilityAvailability,
     groupFabricCapabilities,
 } from '@/lib/fabric-settings-view';
 import type { FabricStatusSnapshot } from '@/lib/ai-providers/fabric/status';
@@ -38,12 +37,14 @@ export function FabricCapabilityRegistry({ snapshot }: { snapshot: FabricStatusS
                         </header>
 
                         <ol className={styles.fabricCapabilityList}>
-                            {group.capabilities.map((capability) => (
-                                <li
-                                    key={capability.id}
-                                    className={styles.fabricCapabilityRow}
-                                    data-testid={`fabric-capability-${capability.id}`}
-                                >
+                            {group.capabilities.map((capability) => {
+                                const availability = describeFabricCapabilityAvailability(capability);
+                                return (
+                                    <li
+                                        key={capability.id}
+                                        className={styles.fabricCapabilityRow}
+                                        data-testid={`fabric-capability-${capability.id}`}
+                                    >
                                     <div className={styles.fabricCapabilityName}>
                                         <strong>{FABRIC_CAPABILITY_LABELS[capability.id]}</strong>
                                         <code className="lume-registro">{capability.id}</code>
@@ -59,17 +60,29 @@ export function FabricCapabilityRegistry({ snapshot }: { snapshot: FabricStatusS
                                             <dd>{FABRIC_REVIEW_LABELS[capability.review]}</dd>
                                         </div>
                                         <div>
+                                            <dt>Disponibilità applicativa</dt>
+                                            <dd
+                                                data-disposition={capability.availabilityDisposition}
+                                                data-testid={`fabric-availability-${capability.id}`}
+                                            >
+                                                {availability.status.title}
+                                                <small className="block">{availability.status.description}</small>
+                                            </dd>
+                                        </div>
+                                        <div>
                                             <dt>Sedi ammesse</dt>
-                                            <dd>{capability.venues.map((venue) => FABRIC_VENUE_COPY[venue].title).join(' · ')}</dd>
+                                            <dd>{availability.venues}</dd>
                                         </div>
                                         <div>
                                             <dt>Uscita dati</dt>
-                                            <dd>{EGRESS_PROFILE_LABELS[capability.egressProfile.id].title}</dd>
+                                            <dd>{availability.egress}</dd>
                                         </div>
                                     </dl>
 
                                     <div className={styles.fabricKillSwitch}>
-                                        {capability.killSwitch ? (
+                                        {availability.terminalUnavailable ? (
+                                            <span>Stato terminale: nessun interruttore può riattivarla</span>
+                                        ) : capability.killSwitch ? (
                                             <>
                                                 <Link href="/settings/ai/funzioni">Vai agli interruttori delle funzioni</Link>
                                                 <code className="lume-registro">{capability.killSwitch}</code>
@@ -78,8 +91,9 @@ export function FabricCapabilityRegistry({ snapshot }: { snapshot: FabricStatusS
                                             <span>Nessun interruttore dedicato</span>
                                         )}
                                     </div>
-                                </li>
-                            ))}
+                                    </li>
+                                );
+                            })}
                         </ol>
                     </section>
                 ))}
