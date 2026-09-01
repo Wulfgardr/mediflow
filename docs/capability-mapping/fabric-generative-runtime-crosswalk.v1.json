@@ -1,0 +1,167 @@
+{
+  "schema": "mediflow.ai.fabric-generative-runtime-crosswalk.v1",
+  "release": "0.8.5",
+  "integrationStatus": "local_source_integrated",
+  "applyPolicy": "none",
+  "claimCeiling": "local source runtime crosswalk for four review-only proposals; OCR unavailable; not release-ready, released, deployed, or authorized for clinical apply",
+  "catalogPath": "lib/ai-providers/fabric/generative-catalog.ts",
+  "historicalArtifacts": [
+    {
+      "path": "docs/capability-mapping/fabric-product-crosswalk-receipt.v1.json",
+      "sha256": "f537bccc66f499329c3a4b8fdd884a9ff21633aa59767e064933e96bd4829dc4",
+      "requiredSchema": "mediflow.capability-mapping.product-decision-receipt.v1",
+      "requiredStatus": "candidate_not_integrated",
+      "requiredApplyPolicy": "none"
+    }
+  ],
+  "capabilities": [
+    {
+      "id": "patient_insight",
+      "disposition": "proposal_only",
+      "descriptorEntryPoint": "app/api/ai/patient-insight/preview/route.ts",
+      "productionRoot": "lib/ai-providers/fabric/patient-insight-authenticated-preview-production.ts",
+      "productionRootLiterals": [
+        "acquireAuthenticatedPatientInsightPreview",
+        "createPatientInsightHostCapability",
+        "routeHostResolvedCandidateCapability"
+      ],
+      "requestPath": {
+        "caller": "components/ai-patient-insight.tsx",
+        "routes": [
+          "/api/ai/patient-insight/preview"
+        ]
+      },
+      "wireEvidence": {
+        "path": "lib/ai-providers/fabric/patient-insight-preview-contract.ts",
+        "requiredLiterals": [
+          "mediflow.ai.fabric-resolution.v1",
+          "mediflow.ai.fabric-provenance.v1"
+        ]
+      },
+      "uiEvidence": {
+        "path": "components/ai-patient-insight.tsx",
+        "requestBindingLiteral": "fetch('/api/ai/patient-insight/preview'",
+        "requiredLiterals": [
+          "Receipt, provenance e currentness",
+          "preview.receipt",
+          "preview.provenance"
+        ]
+      }
+    },
+    {
+      "id": "smart_import",
+      "disposition": "proposal_only",
+      "descriptorEntryPoint": "app/api/ai/smart-import/preview/route.ts",
+      "productionRoot": "lib/security/server-session-authenticated-smart-import-preview-production.ts",
+      "productionRootLiterals": [
+        "acquireAuthenticatedSmartImportPreview",
+        "createPatientSmartImportHostCapability",
+        "routeHostResolvedCandidateCapability"
+      ],
+      "requestPath": {
+        "caller": "lib/security/smart-import-browser-orchestrator.ts",
+        "routes": [
+          "/api/ai/smart-import/ingest",
+          "/api/ai/smart-import/preview"
+        ]
+      },
+      "wireEvidence": {
+        "path": "lib/smart-import-fabric-wire.ts",
+        "requiredLiterals": [
+          "mediflow.ai.fabric-resolution.v1",
+          "mediflow.ai.fabric-provenance.v1"
+        ]
+      },
+      "uiEvidence": {
+        "path": "components/patient-smart-import-fabric-preview-card.tsx",
+        "requestBindingLiteral": "createSmartImportReviewBrowserController",
+        "requiredLiterals": [
+          "Receipt",
+          "Provenienza",
+          "preview.receipt",
+          "preview.provenance"
+        ]
+      }
+    },
+    {
+      "id": "document_synthesis",
+      "disposition": "proposal_only",
+      "descriptorEntryPoint": "app/api/ai/document-synthesis/preview/route.ts",
+      "productionRoot": "lib/ai-providers/fabric/document-synthesis-production-operation.ts",
+      "productionRootLiterals": [
+        "acquireDocumentSynthesisProductionOperation",
+        "composeAnyDocCurrentSourceExtraction",
+        "createDocumentSynthesisFabricProductionComposition"
+      ],
+      "requestPath": {
+        "caller": "lib/ai-providers/fabric/document-synthesis-browser-orchestrator.ts",
+        "routes": [
+          "/api/ai/document-synthesis/capture",
+          "/api/ai/document-synthesis/ingest",
+          "/api/ai/document-synthesis/preview"
+        ]
+      },
+      "wireEvidence": {
+        "path": "lib/ai-providers/fabric/document-synthesis-preview-wire.ts",
+        "requiredLiterals": [
+          "mediflow.document-synthesis.publication-receipt.v1",
+          "mediflow.document-synthesis.publication-provenance.v1"
+        ]
+      },
+      "uiEvidence": {
+        "path": "components/document-synthesis-fabric-review-card.tsx",
+        "requestBindingLiteral": "createDocumentSynthesisBrowserOrchestrator",
+        "requiredLiterals": [
+          "Receipt",
+          "Provenienza",
+          "publication.receipt",
+          "publication.provenance"
+        ]
+      }
+    },
+    {
+      "id": "ocr",
+      "disposition": "unavailable",
+      "descriptorEntryPoint": null,
+      "productionRoot": null,
+      "productionRootLiterals": null,
+      "requestPath": null,
+      "wireEvidence": null,
+      "uiEvidence": null
+    },
+    {
+      "id": "treatment_reasoning",
+      "disposition": "proposal_only",
+      "descriptorEntryPoint": "app/api/ai/treatment-reasoning/preview/route.ts",
+      "productionRoot": "lib/ai-providers/fabric/treatment-reasoning-production-root.ts",
+      "productionRootLiterals": [
+        "acquireTreatmentReasoningPreview",
+        "createTreatmentReasoningProductionService",
+        "generateWithAthenaMlx"
+      ],
+      "requestPath": {
+        "caller": "lib/ai-providers/fabric/treatment-reasoning-browser-controller.ts",
+        "routes": [
+          "/api/ai/treatment-reasoning/ingest",
+          "/api/ai/treatment-reasoning/preview"
+        ]
+      },
+      "wireEvidence": {
+        "path": "lib/ai-providers/fabric/treatment-reasoning-browser-controller.ts",
+        "requiredLiterals": [
+          "mediflow.ai.fabric-resolution.v1",
+          "mediflow.ai.fabric-provenance.v1"
+        ]
+      },
+      "uiEvidence": {
+        "path": "components/treatment-reasoning-panel.tsx",
+        "requestBindingLiteral": "createTreatmentReasoningBrowserController",
+        "requiredLiterals": [
+          "Receipt, provenienza e currentness",
+          "publication.fabricReceipt",
+          "publication.provenance"
+        ]
+      }
+    }
+  ]
+}
