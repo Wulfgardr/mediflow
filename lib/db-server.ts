@@ -150,6 +150,41 @@ export class HeadlessSoapActiveRoleAttestationSchemaError extends Error {
     }
 }
 /* @Codex */
+const HEADLESS_SOAP_ENTRY_COMMITS_DDL = `
+    CREATE TABLE headless_soap_entry_commits (
+        idempotency_key TEXT PRIMARY KEY NOT NULL,
+        approval_ref TEXT NOT NULL,
+        authorization_proof_digest TEXT NOT NULL,
+        command_id TEXT NOT NULL,
+        entry_id TEXT NOT NULL REFERENCES entries(id) ON DELETE CASCADE,
+        audit_event_id TEXT NOT NULL REFERENCES audit_events(event_id) ON DELETE RESTRICT,
+        receipt_ref TEXT NOT NULL,
+        binding_snapshot TEXT NOT NULL,
+        binding_digest TEXT NOT NULL,
+        entry_digest TEXT NOT NULL,
+        audit_snapshot TEXT NOT NULL,
+        audit_digest TEXT NOT NULL,
+        receipt_snapshot TEXT NOT NULL,
+        receipt_digest TEXT NOT NULL,
+        committed_at INTEGER NOT NULL
+    )
+`;
+const HEADLESS_SOAP_ENTRY_COMMITS_SCHEMA = normalizeSchemaSql(HEADLESS_SOAP_ENTRY_COMMITS_DDL);
+const HEADLESS_SOAP_ENTRY_COMMITS_UNIQUE_INDEXES = [
+    ['headless_soap_entry_commits_command_id_unique', 'command_id'],
+    ['headless_soap_entry_commits_entry_id_unique', 'entry_id'],
+    ['headless_soap_entry_commits_audit_event_id_unique', 'audit_event_id'],
+    ['headless_soap_entry_commits_receipt_ref_unique', 'receipt_ref'],
+] as const;
+export type HeadlessSoapEntryCommitSchemaErrorCode = 'schema_incompatible' | 'schema_unavailable';
+/* @Codex */
+export class HeadlessSoapEntryCommitSchemaError extends Error {
+    constructor(readonly code: HeadlessSoapEntryCommitSchemaErrorCode) {
+        super(`Headless SOAP entry commit schema ${code === 'schema_incompatible' ? 'is incompatible' : 'is unavailable'}.`);
+        this.name = 'HeadlessSoapEntryCommitSchemaError';
+    }
+}
+/* @Codex */
 const DURABLE_REVIEW_PATIENT_LINKS_DDL = `
     CREATE TABLE IF NOT EXISTS durable_review_patient_links (
         review_id TEXT PRIMARY KEY NOT NULL REFERENCES durable_review_records(review_id),
@@ -207,6 +242,46 @@ function ensureHeadlessSoapActiveRoleAttestationSchema(): void {
     if (!hasCanonicalHeadlessSoapActiveRoleAttestationSchema()) {
         throw new HeadlessSoapActiveRoleAttestationSchemaError('schema_incompatible');
     }
+}
+/* @Codex */
+export function hasCanonicalHeadlessSoapEntryCommitSchema(): boolean {
+    try {
+        const row = sqlite.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?")
+            .get('headless_soap_entry_commits') as { sql?: unknown } | undefined;
+        if (typeof row?.sql !== 'string' || normalizeSchemaSql(row.sql) !== HEADLESS_SOAP_ENTRY_COMMITS_SCHEMA) return false;
+        for (const [name, column] of HEADLESS_SOAP_ENTRY_COMMITS_UNIQUE_INDEXES) {
+            const index = sqlite.prepare("SELECT sql FROM sqlite_master WHERE type = 'index' AND name = ? AND tbl_name = ?")
+                .get(name, 'headless_soap_entry_commits') as { sql?: unknown } | undefined;
+            const expected = normalizeSchemaSql(`CREATE UNIQUE INDEX ${name} ON headless_soap_entry_commits (${column})`);
+            if (typeof index?.sql !== 'string' || normalizeSchemaSql(index.sql) !== expected) return false;
+        }
+        return true;
+    } catch {
+        return false;
+    }
+}
+/* @Codex */
+function ensureHeadlessSoapEntryCommitSchema(): void {
+    try {
+        const exists = Boolean(sqlite.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?")
+            .get('headless_soap_entry_commits'));
+        if (!exists) {
+            sqlite.prepare(HEADLESS_SOAP_ENTRY_COMMITS_DDL.replace('CREATE TABLE', 'CREATE TABLE IF NOT EXISTS')).run();
+        } else {
+            const row = sqlite.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?")
+                .get('headless_soap_entry_commits') as { sql?: unknown } | undefined;
+            if (typeof row?.sql !== 'string' || normalizeSchemaSql(row.sql) !== HEADLESS_SOAP_ENTRY_COMMITS_SCHEMA) {
+                throw new HeadlessSoapEntryCommitSchemaError('schema_incompatible');
+            }
+        }
+        for (const [name, column] of HEADLESS_SOAP_ENTRY_COMMITS_UNIQUE_INDEXES) {
+            sqlite.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS ${name} ON headless_soap_entry_commits (${column})`).run();
+        }
+    } catch (error) {
+        if (error instanceof HeadlessSoapEntryCommitSchemaError) throw error;
+        throw new HeadlessSoapEntryCommitSchemaError('schema_unavailable');
+    }
+    if (!hasCanonicalHeadlessSoapEntryCommitSchema()) throw new HeadlessSoapEntryCommitSchemaError('schema_incompatible');
 }
 /* @Codex */
 export function hasCanonicalDurableReviewPatientLinkSchema(): boolean {
@@ -858,6 +933,8 @@ function applySchemaGuards() {
     } catch (error) {
         console.warn('[MediFlow] Audit schema check skipped:', error);
     }
+    /* @Codex */
+    ensureHeadlessSoapEntryCommitSchema();
 }
 
 /* @Codex */
