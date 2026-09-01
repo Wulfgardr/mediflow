@@ -262,7 +262,7 @@ export function createDeepSeekOcr2FakeAdapter(engineInput: unknown): Readonly<{
                 () => resolve({ kind: 'failure' })]);
         });
         const timeout = new Promise<{ kind: 'timeout' }>((resolve) => { timer = setTimeout(() => {
-            observeCancel(engine.cancel); resolve({ kind: 'timeout' });
+            state = 'terminal'; resolve({ kind: 'timeout' }); setImmediate(() => observeCancel(engine.cancel));
         }, DEEPSEEK_OCR2_FAKE_ADAPTER_TIMEOUT_MS); });
         const settled = await Promise.race([observed, timeout]); if (timer) clearTimeout(timer);
         if (settled.kind === 'timeout') return finish(denied('timeout'));
