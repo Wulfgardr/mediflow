@@ -114,6 +114,23 @@ test('rifiuta input accessor, Proxy e Proxy revocati senza eseguire trap, getter
     assert.equal(envReads, 0);
 });
 
+test('rifiuta proprieta input richieste non-enumerable prima di secret e transport', async () => {
+    let envReads = 0; let transportCalls = 0;
+    const broker = createProviderSecretBrokerV2({ now: () => 1_000, readEnv: () => { envReads += 1; return SECRET; } });
+    const hiddenRequiredInput = Object.defineProperties({}, {
+        lifecycle: { enumerable: false, value: enabled() },
+        evidence: { enumerable: true, value: EVIDENCE }, secretRef: { enumerable: true, value: SECRET_REF },
+        broker: { enumerable: true, value: broker }, input: { enumerable: true, value: 'Synthetic hidden input.' },
+        now: { enumerable: true, value: () => 1_000 },
+        transport: { enumerable: true, value: async () => {
+            transportCalls += 1; return { status: 200, body: JSON.stringify(RESPONSE) };
+        } },
+    });
+    await assert.rejects(executeAnthropicMessagesV2(hiddenRequiredInput as never),
+        (error: unknown) => error instanceof AnthropicMessagesV2Error && error.code === 'input_invalid');
+    assert.deepEqual([envReads, transportCalls], [0, 0]);
+});
+
 test('rifiuta accessor annidati in lifecycle, evidence e secretRef prima del secret', async () => {
     let getterReads = 0; let envReads = 0;
     const broker = createProviderSecretBrokerV2({ now: () => 1_000, readEnv: () => { envReads += 1; return SECRET; } });
@@ -271,7 +288,7 @@ test('rifiuta signal accessor o Proxy revocato senza getter e prima del secret',
     assert.deepEqual([getterReads, envReads], [0, 0]);
 });
 
-test('termina bounded per timeout e cancellation, scarta late completion e ritira header secret', async () => {
+test('termina per timeout e cancellation su Promise pendente, scarta late completion e ritira header secret', async () => {
     const captured = { headers: null as { get(name: string): string | null } | null };
     await assert.rejects(executeAnthropicMessagesV2({ lifecycle: enabled({ ...BINDING, timeoutMs: 1 }), evidence: EVIDENCE,
         secretRef: SECRET_REF, broker: createProviderSecretBrokerV2({ now: () => 1_000, readEnv: () => SECRET }),
