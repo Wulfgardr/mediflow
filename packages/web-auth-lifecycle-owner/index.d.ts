@@ -22,6 +22,12 @@ export type WebUserRetirementCapability = Readonly<{ readonly __webUserRetiremen
 export type WebResourcePort = Readonly<{ readonly __webResourcePort?: never }>;
 export type WebResourceUse = Readonly<{ readonly __webResourceUse?: never }>;
 export type WebResourceRegistration = Readonly<{ readonly __webResourceRegistration?: never }>;
+export type WebAuthenticationGeneration = Readonly<{ readonly __webAuthenticationGeneration?: never }>;
+export type WebResourceBinding = Readonly<{
+    principalRef: string;
+    authenticationGeneration: WebAuthenticationGeneration;
+}>;
+export type WebResourceBindingOperation = (binding: WebResourceBinding) => void;
 export type WebResourceDisposer = (reason: 'lock' | 'dispose' | 'expired' | 'delete' | 'clear') => unknown;
 
 export declare function bootstrapControl(controlId?: unknown): WebControlBootstrap | null;
@@ -42,6 +48,10 @@ export declare function releaseResourcePort(port: unknown): boolean;
 export declare function beginResourceUse(port: unknown): WebResourceUse | null;
 export declare function commitResourceUse(use: unknown): boolean;
 export declare function abortResourceUse(use: unknown): boolean;
+export declare function withCurrentResourceBinding(
+    use: unknown,
+    operation: WebResourceBindingOperation,
+): boolean;
 export declare function registerPrivateResource(
     port: unknown,
     dispose: WebResourceDisposer,
