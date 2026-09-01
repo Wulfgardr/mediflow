@@ -20,7 +20,7 @@ const hashHex = (codec: string, hex: string) => syntheticRecord({ codec, sha256:
 }) });
 const encrypted = (byte: number) => `ENC:${Buffer.alloc(12, byte).toString('base64')}:${Buffer.alloc(16, byte).toString('base64')}`;
 
-export function syntheticBinding(patientVersion = 1) {
+export function syntheticBinding(patientVersion = 1, selectionExpiresAt = 100_000) {
     const ids = { generation: opaque(), grant: opaque(), parent: opaque(), child: opaque(), lease: opaque(),
         scope: opaque(), proposal: opaque(), entry: opaque() };
     const payloadDigest = hash(PAYLOAD_DIGEST_CODEC, 0x2a);
@@ -41,14 +41,14 @@ export function syntheticBinding(patientVersion = 1) {
         childLease: syntheticRecord({
             parent: syntheticRecord({ identity: ids.parent, contractVersion: 1, generation: 1, revocationGeneration: 0 }),
             child: syntheticRecord({ identity: ids.child, contractVersion: 1, generation: 1, revocationGeneration: 0,
-                proposalBudget: 0, expiresAt: 90_000 }),
+                proposalBudget: 0, expiresAt: 110_000 }),
             lease: syntheticRecord({ identity: ids.lease, contractVersion: 1, generation: 1, revocationGeneration: 0 }),
         }),
         selection: syntheticRecord({ scopeIdentity: ids.scope, sessionRef: `ssr_${'b'.repeat(32)}`,
             patientRef: `ptr_${'c'.repeat(32)}`, ambulatoryRef: `abr_${'d'.repeat(32)}`,
-            leaseRef: `lsr_${'e'.repeat(32)}`, selectionEpoch: 1, expiresAt: 80_000 }),
+            leaseRef: `lsr_${'e'.repeat(32)}`, selectionEpoch: 1, expiresAt: selectionExpiresAt }),
         patientVersion, action: 'append', purpose: 'clinician_requested_documentation',
-        proposal: syntheticRecord({ proposalIdentity: ids.proposal, revision: 1, expiresAt: 70_000 }),
+        proposal: syntheticRecord({ proposalIdentity: ids.proposal, revision: 1, expiresAt: 105_000 }),
         entryIdentity: ids.entry, payloadDigest, sealDigest, policyDigest: HEADLESS_SOAP_AUTHORIZATION_POLICY_DIGEST,
     }));
     assert.ok(lineage);

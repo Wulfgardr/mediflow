@@ -420,7 +420,7 @@ function headlessSoapRestoreFixture(): {
         ambulatoryRef: `abr_${'8'.repeat(32)}`,
         leaseRef: `lsr_${'9'.repeat(32)}`,
         selectionEpoch: 1,
-        selectionExpiresAt: committedAtSeconds + 2_000,
+        selectionExpiresAt: committedAtSeconds + 3_600,
         patientVersion: 1,
         action: 'append',
         purpose: 'clinician_requested_documentation',

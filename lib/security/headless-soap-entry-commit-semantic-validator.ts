@@ -140,15 +140,15 @@ function validBinding(binding: Record<string, unknown>, chain: HeadlessSoapEntry
         || binding.parentContractVersion !== 1 || binding.parentGeneration !== 1
         || binding.parentRevocationGeneration !== 0 || binding.childContractVersion !== 1
         || binding.childGeneration !== 1 || binding.childRevocationGeneration !== 0
-        || !safeInteger(binding.childExpiresAt) || binding.childExpiresAt > binding.webSessionExpiresAt
+        || !safeInteger(binding.childExpiresAt)
         || binding.leaseContractVersion !== 1 || binding.leaseGeneration !== 1
         || binding.leaseRevocationGeneration !== 0 || !pattern(binding.sessionRef, SESSION_REF)
         || !pattern(binding.patientRef, PATIENT_REF) || !pattern(binding.ambulatoryRef, AMBULATORY_REF)
         || !pattern(binding.leaseRef, LEASE_REF) || !safeInteger(binding.selectionEpoch, 1)
-        || !safeInteger(binding.selectionExpiresAt) || binding.selectionExpiresAt > binding.childExpiresAt
+        || !safeInteger(binding.selectionExpiresAt) || binding.selectionExpiresAt !== binding.webSessionExpiresAt
         || !safeInteger(binding.patientVersion, 1) || binding.action !== 'append'
         || binding.purpose !== 'clinician_requested_documentation' || binding.proposalRevision !== 1
-        || !safeInteger(binding.proposalExpiresAt) || binding.proposalExpiresAt > binding.selectionExpiresAt
+        || !safeInteger(binding.proposalExpiresAt)
         || !pattern(binding.payloadDigest, HASH) || !pattern(binding.sealDigest, HASH)
         || binding.policyDigest !== POLICY_DIGEST || !pattern(binding.patientIdDigest, HASH)
         || !pattern(binding.ambulatoryIdDigest, HASH)) return false;
