@@ -810,6 +810,13 @@ invoca H7. Prima dell'uscita entrambi sono sempre `spent`, su successo o
 failure. H7 deve contenere nella callback l'intera transazione sincrona; H6
 non conserva receipt e non consente lavoro differito.
 
+Una seconda invocazione top-level che arriva mentre la prima attende ancora
+la continuation H5b e H6 e ancora `bound` perde inerte: non invoca callback,
+non conia authority e non avvelena l'operazione gia acquisita. E reentry
+soltanto una chiamata annidata dopo la transizione H6 a `in_flight`, durante la
+callback host-owned; quella continua a negare e bruciare approval e proof. Il
+lookup durevole H7b resta l'unico race fence per commit e replay.
+
 Una tripla malformed, foreign o non corrispondente resta inerte. Dopo la
 corrispondenza esatta, expiry, currentness loss, drift, callback failure,
 rollback o final fence bruciano approval e proof e drenano H5a-H2b. Restart
