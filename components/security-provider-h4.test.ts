@@ -45,20 +45,32 @@ test('SecurityProvider owns one closure-bound H4 seal service without caller aut
         /const reopenClinicianSoapEntry = \(\s*bundle: ClinicianSoapEntrySealV1,\s*expectedFieldSet: ClinicianSoapEntryFieldSetV1,\s*\) => clinicianSoapEntrySealOwnerRef\.current!\.reopen\(bundle, expectedFieldSet\);/u);
 });
 
-test('the H4 codec internal is imported only by its public seal owner', () => {
+test('the H4 codec internal is restricted to the exact H4-H7 verification owners', () => {
     const importPattern = /(?:from\s+|import\s*\()['"][^'"]*clinician-soap-entry-seal-codec-internal(?:\.ts)?['"]/u;
     const importers = typeScriptSources(repositoryRoot)
         .filter((path) => importPattern.test(readFileSync(path, 'utf8')))
         .map((path) => relative(repositoryRoot, path));
 
-    assert.deepEqual(importers, ['lib/headless/clinician-soap-entry-seal.ts']);
+    /* @Codex Later SOAP gates must parse and verify the H4 seal server-side.
+       Keep that privileged surface explicit instead of reviving the stale H4-only
+       assumption or allowing a broad import pattern. */
+    assert.deepEqual(importers, [
+        'lib/headless/clinician-soap-entry-seal.ts',
+        'lib/security/headless-soap-command-binding-lifecycle.ts',
+        'lib/security/headless-soap-command-binding-test-fixture.ts',
+        'lib/security/headless-soap-entry-commit-owner.ts',
+        'lib/security/headless-soap-entry-commit-semantic-validator.ts',
+        'lib/security/headless-soap-entry-seal-binding.ts',
+    ]);
 });
 
 test('only SecurityProvider composes the H4 seal owner outside tests', () => {
-    const ownerImportPattern = /(?:from\s+|import\s*\()['"][^'"]*clinician-soap-entry-seal(?:\.ts)?['"]/u;
-    const importers = typeScriptSources(repositoryRoot)
-        .filter((path) => ownerImportPattern.test(readFileSync(path, 'utf8')))
+    /* @Codex Type-only consumers carry the public seal contract through H5-H7;
+       authority composition remains a single concrete factory call. */
+    const factoryCallPattern = /createClinicianSoapEntrySealOwner\s*\(\s*\{/u;
+    const composers = typeScriptSources(repositoryRoot)
+        .filter((path) => factoryCallPattern.test(readFileSync(path, 'utf8')))
         .map((path) => relative(repositoryRoot, path));
 
-    assert.deepEqual(importers, ['components/security-provider.tsx']);
+    assert.deepEqual(composers, ['components/security-provider.tsx']);
 });
