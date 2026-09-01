@@ -43,6 +43,7 @@ Approfondimenti utili:
 - Walkthrough operativo end-to-end: [docs/walkthrough.md](./walkthrough.md)
 - Parity localhost/Apple: [docs/parity-matrix.md](./parity-matrix.md), [docs/apple-parity-matrix.json](./apple-parity-matrix.json) e [docs/apple-wide-qa-manifest.json](./apple-wide-qa-manifest.json)
 - Limiti noti del candidato sorgente locale 0.8.5: [docs/known-limitations.md](./known-limitations.md)
+- Verbale finale locale 0.8.5: [docs/analysis/2026-09-01-mediflow-0.8.5-final-verification.md](./analysis/2026-09-01-mediflow-0.8.5-final-verification.md)
 - Run record recovery UI/parity 0.8: [docs/analysis/2026-07-27-parity-0.8-recovery-run.md](./analysis/2026-07-27-parity-0.8-recovery-run.md)
 - Contratto OpenAPI `/api/v1`: [docs/openapi/mediflow-v1.yaml](./openapi/mediflow-v1.yaml), [docs/openapi/README.md](./openapi/README.md), [docs/adr/0010-openapi-spec-first-for-api-v1.md](./adr/0010-openapi-spec-first-for-api-v1.md), [docs/adr/0052-network-patient-profile-write-boundary.md](./adr/0052-network-patient-profile-write-boundary.md), [docs/adr/0053-network-diary-entry-write-boundary.md](./adr/0053-network-diary-entry-write-boundary.md), [docs/adr/0054-network-therapy-write-boundary.md](./adr/0054-network-therapy-write-boundary.md), [docs/adr/0055-network-checkup-write-boundary.md](./adr/0055-network-checkup-write-boundary.md), [docs/adr/0056-network-observation-write-boundary.md](./adr/0056-network-observation-write-boundary.md)
 - Corpus documentale SISS/FSE 2.0: [docs/siss-fse-docs-corpus.md](./siss-fse-docs-corpus.md)

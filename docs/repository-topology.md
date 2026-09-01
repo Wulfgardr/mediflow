@@ -212,11 +212,13 @@ la separazione tra proposta e scrittura.
 
 Il confine ha due lati e il gate controlla entrambi:
 
-1. **Il percorso AI scrive solo proiezioni derivate.** Ogni scrittura in uno dei 75 moduli
-   del percorso AI dev'essere dichiarata, e i campi scritti devono stare nell'allowlist
-   della lane: `documentInsights` per la sintesi documentale, `aiSummary` e i suoi
-   metadati per Patient Insight. L'allowlist è a sua volta verificata: ammettere
-   `diagnoses` fa fallire il gate, quindi non si aggira allargandola.
+1. **Il percorso AI scrive solo proiezioni derivate.** Ogni scrittura in un
+   modulo scansionato del percorso AI dev'essere dichiarata, e i campi scritti
+   devono stare nell'allowlist della lane: `documentInsights` per la sintesi
+   documentale, `aiSummary` e i suoi metadati per Patient Insight. Il guard
+   riporta a ogni esecuzione il conteggio corrente dei file analizzati, senza
+   fissarlo nella documentazione. L'allowlist è a sua volta verificata:
+   ammettere `diagnoses` fa fallire il gate, quindi non si aggira allargandola.
 2. **La lane che può scrivere dati clinici non importa il percorso AI.** È ciò che rende
    la revisione umana una proprietà strutturale invece che una convenzione: proporre e
    applicare restano due percorsi separati, e l'operatore che seleziona i candidati sta

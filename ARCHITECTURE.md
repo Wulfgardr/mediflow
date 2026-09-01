@@ -126,10 +126,12 @@ Ogni endpoint proxy verso servizi locali deve:
 
 ### Application Services, Fabric e Headless 0.8.5
 
-Gli Application Services host-owned sono gli unici owner delle regole di
-dominio, della currentness, dei conflitti, delle transazioni e dell'accesso a
-SQLite. Le route Web, i client e gli adapter Headless non accedono direttamente
-al database e non duplicano la logica applicativa.
+Nel perimetro Fabric/Headless 0.8.5, i production root e gli Application
+Services host-owned possiedono regole di dominio, currentness, conflitti,
+transazioni e accesso a SQLite. Le route sottili e gli adapter Headless di
+questo perimetro non accedono direttamente al database e non duplicano tali
+regole. Alcune route Web storiche importano ancora `dbServer`: non sono prova
+di questo boundary e restano fuori dal claim generale Fabric/Headless.
 
 Il candidato sorgente locale 0.8.5 collega quattro capability generative al
 Fabric end-to-end:
