@@ -216,7 +216,10 @@ export function createHeadlessSoapCommandBindingOwner(sources: HeadlessSoapComma
     });
     const approvalController: HeadlessSoapApprovalControllerV1 = objectFreeze({
         async withSingleUseApproval(candidate: unknown, operation: (command: HeadlessSoapBoundCommandV1) => void): Promise<boolean> {
-            if (currentOperation) { currentOperation.poisoned = true; return false; }
+            if (currentOperation) {
+                if (currentOperation.record.state === 'in_flight') currentOperation.poisoned = true;
+                return false;
+            }
             const parsed = parseHeadlessSoapCommandEnvelope(candidate);
             if (!parsed) return false;
             const { envelope: presented, authorizationProofDigest: proofDigest } = parsed;

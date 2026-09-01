@@ -50,6 +50,39 @@ test('keeps malformed, foreign, and mismatched envelopes inert before exact atta
     assert.equal(calls, 1);
 });
 
+test('keeps a top-level contender inert without poisoning the acquired approval', async () => {
+    let releaseGate!: () => void;
+    const gate = new Promise<void>((resolve) => { releaseGate = resolve; });
+    const current = commandBindingFixture(0x5f, gate), authorizationProof = syntheticProof(15);
+    const bound = await current.owner.service.bind(authorizationProof);
+    const envelope = syntheticRecord({ approvalRef: bound.approvalRef,
+        idempotencyKey: bound.idempotencyKey, authorizationProof });
+    let winnerCalls = 0, contenderCalls = 0;
+    const winner = current.owner.approvalController.withSingleUseApproval(envelope, () => { winnerCalls += 1; });
+    assert.equal(await current.owner.approvalController.withSingleUseApproval(
+        envelope, () => { contenderCalls += 1; }), false);
+    releaseGate();
+    assert.equal(await winner, true);
+    assert.deepEqual({ winnerCalls, contenderCalls }, { winnerCalls: 1, contenderCalls: 0 });
+    assert.equal(await current.owner.approvalController.withSingleUseApproval(envelope, () => undefined), false);
+});
+
+test('burns approval and proof on nested controller reentry during the H7 callback', async () => {
+    const current = commandBindingFixture(0x5e), authorizationProof = syntheticProof(14);
+    const bound = await current.owner.service.bind(authorizationProof);
+    const envelope = syntheticRecord({ approvalRef: bound.approvalRef,
+        idempotencyKey: bound.idempotencyKey, authorizationProof });
+    let outerCalls = 0, nestedCalls = 0, nested: Promise<boolean> | null = null;
+    assert.equal(await current.owner.approvalController.withSingleUseApproval(envelope, () => {
+        outerCalls += 1;
+        nested = current.owner.approvalController.withSingleUseApproval(envelope, () => { nestedCalls += 1; });
+    }), false);
+    assert.ok(nested);
+    assert.equal(await nested, false);
+    assert.deepEqual({ outerCalls, nestedCalls }, { outerCalls: 1, nestedCalls: 0 });
+    assert.equal(current.owner.service.wipe(bound.approvalRef, authorizationProof), false);
+});
+
 test('burns an exact approval without invoking H7 when any lineage field drifts', async () => {
     const current = commandBindingFixture(), authorizationProof = syntheticProof(3);
     const bound = await current.owner.service.bind(authorizationProof);
