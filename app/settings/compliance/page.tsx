@@ -24,15 +24,15 @@ export default function SettingsCompliancePage() {
 
             <div className={`${SETTINGS_CARD_CLASS} space-y-4`}>
                 <div className="flex items-start gap-3">
-                    <div className="rounded-2xl bg-amber-100 p-2 text-amber-800 dark:bg-amber-400/10 dark:text-amber-200">
+                    <div className="rounded-2xl bg-[color:color-mix(in_srgb,var(--lume-signal-warning)_11%,var(--lume-surface-field))] p-2 text-[color:color-mix(in_srgb,var(--lume-signal-warning)_65%,var(--lume-ink))]">
                         <CircleAlert className="h-4 w-4" aria-hidden="true" />
                     </div>
                     <div>
                         <p className="section-kicker">Limite del claim</p>
-                        <h2 className="mt-1 text-base font-semibold text-slate-900 dark:text-white">
+                        <h2 className="mt-1 text-base font-semibold text-[color:var(--lume-ink)]">
                             Nessun verdetto legale
                         </h2>
-                        <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                        <p className="mt-1 text-sm leading-6 text-[color:var(--lume-ink-muted)]">
                             Lo stato legale non è valutato. Le evidenze tecniche possono supportare una verifica,
                             ma non determinano applicabilità, ruoli, adempimenti o certificazioni.
                         </p>
@@ -44,42 +44,42 @@ export default function SettingsCompliancePage() {
                 {COMPLIANCE_EVIDENCE_INVENTORY.records.map((record) => (
                     <article key={record.id} className={`${SETTINGS_CARD_CLASS} space-y-4`} data-testid={`compliance-evidence-${record.id}`}>
                         <div className="flex items-start gap-3">
-                            <div className="rounded-2xl bg-slate-100 p-2 text-slate-700 dark:bg-white/10 dark:text-slate-200">
+                            <div className="rounded-2xl bg-[color:color-mix(in_srgb,var(--lume-ink)_6%,var(--lume-surface-field))] p-2 text-[color:var(--lume-ink-muted)]">
                                 {record.status === 'external_assessment_required'
                                     ? <Scale className="h-4 w-4" aria-hidden="true" />
                                     : <FileCheck2 className="h-4 w-4" aria-hidden="true" />}
                             </div>
                             <div className="min-w-0">
                                 <p className="section-kicker">{STATUS_COPY[record.status]}</p>
-                                <h2 className="mt-1 text-base font-semibold text-slate-900 dark:text-white">{record.label}</h2>
-                                <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">{record.summary}</p>
+                                <h2 className="mt-1 text-base font-semibold text-[color:var(--lume-ink)]">{record.label}</h2>
+                                <p className="mt-2 text-sm leading-6 text-[color:var(--lume-ink-muted)]">{record.summary}</p>
                             </div>
                         </div>
 
-                        <div className="rounded-[22px] border border-slate-200 bg-slate-50/80 p-4 dark:border-white/10 dark:bg-white/5">
-                            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-300">
+                        <div className="rounded-[22px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-ink)_4%,var(--lume-surface-field))] p-4">
+                            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[color:var(--lume-ink-muted)]">
                                 <BookOpenCheck className="h-4 w-4" aria-hidden="true" />
                                 Evidenze consultabili nel repository
                             </div>
-                            <ul className="mt-3 space-y-1 font-mono text-xs text-slate-700 dark:text-slate-200">
+                            <ul className="mt-3 space-y-1 font-mono text-xs text-[color:var(--lume-ink)]">
                                 {record.evidence.map((evidence) => <li key={evidence}>{evidence}</li>)}
                             </ul>
                         </div>
 
                         <dl className="space-y-3 text-sm">
                             <div>
-                                <dt className="font-semibold text-slate-900 dark:text-white">Limite</dt>
-                                <dd className="mt-1 leading-6 text-slate-600 dark:text-slate-300">{record.limitation}</dd>
+                                <dt className="font-semibold text-[color:var(--lume-ink)]">Limite</dt>
+                                <dd className="mt-1 leading-6 text-[color:var(--lume-ink-muted)]">{record.limitation}</dd>
                             </div>
                             <div>
-                                <dt className="font-semibold text-slate-900 dark:text-white">Owner della verifica</dt>
-                                <dd className="mt-1 text-slate-600 dark:text-slate-300">{record.owner}</dd>
+                                <dt className="font-semibold text-[color:var(--lume-ink)]">Owner della verifica</dt>
+                                <dd className="mt-1 text-[color:var(--lume-ink-muted)]">{record.owner}</dd>
                             </div>
                         </dl>
 
                         {record.externalReferences.length > 0 ? (
-                            <div className="border-t border-slate-200 pt-4 dark:border-white/10">
-                                <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-300">
+                            <div className="border-t border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] pt-4">
+                                <p className="text-xs font-bold uppercase tracking-wider text-[color:var(--lume-ink-muted)]">
                                     Fonti ufficiali esterne
                                 </p>
                                 <ul className="mt-2 space-y-2 text-sm">
@@ -89,7 +89,7 @@ export default function SettingsCompliancePage() {
                                                 href={reference.href}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
-                                                className="font-semibold text-slate-700 underline-offset-2 hover:underline dark:text-slate-200"
+                                                className="font-semibold text-[color:var(--lume-accent)] underline-offset-2 hover:underline"
                                             >
                                                 {reference.label}
                                             </a>
