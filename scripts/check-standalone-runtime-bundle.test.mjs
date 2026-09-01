@@ -10,6 +10,7 @@ const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const checker = path.join(root, 'scripts', 'check-standalone-runtime-bundle.mjs');
 const node = process.execPath;
 const detectLibcTracePattern = './node_modules/detect-libc/**/*';
+const pnpmNestedSharpSemverTracePattern = './node_modules/.pnpm/node_modules/semver/**/*';
 const webAuthOwnerPackage = '@mediflow/web-auth-lifecycle-owner';
 const webAuthOwnerTracePattern = './node_modules/@mediflow/web-auth-lifecycle-owner/**/*';
 const webAuthOwnerRoster = [
@@ -74,6 +75,22 @@ test('standalone config traces the complete sharp libc detector', () => {
   const includes = configSource.match(/outputFileTracingIncludes:\s*\{[\s\S]*?["']\/\*["']:\s*\[([\s\S]*?)\]/u)?.[1];
   assert.ok(includes, 'missing global outputFileTracingIncludes roster');
   assert.ok(includes.includes(`"${detectLibcTracePattern}"`), 'detect-libc implementation is not traced for standalone sharp');
+});
+
+/* @Codex */
+test('standalone config traces pnpm semver for the sharp nested under Next', () => {
+  const configSource = fs.readFileSync(path.join(root, 'next.config.ts'), 'utf8');
+  const includes = configSource.match(/outputFileTracingIncludes:\s*\{[\s\S]*?["']\/\*["']:\s*\[([\s\S]*?)\]/u)?.[1];
+  assert.ok(includes, 'missing global outputFileTracingIncludes roster');
+  assert.ok(
+    includes.includes(`"${pnpmNestedSharpSemverTracePattern}"`),
+    'pnpm semver implementation is not traced for standalone nested sharp',
+  );
+  assert.ok(
+    fs.globSync(pnpmNestedSharpSemverTracePattern, { cwd: root })
+      .some((candidate) => candidate.endsWith('/functions/coerce.js')),
+    'installed pnpm semver does not provide functions/coerce.js',
+  );
 });
 
 test('standalone config externalizes and traces the exact web auth owner package roster', () => {

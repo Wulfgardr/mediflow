@@ -70,6 +70,7 @@ const nextConfig: NextConfig = {
       "./scripts/anydoc-local-extraction-worker.mjs",
       "./node_modules/sharp/**/*",
       "./node_modules/detect-libc/**/*",
+      "./node_modules/.pnpm/node_modules/semver/**/*",
       "./node_modules/@img/**/*",
       "./node_modules/@firecrawl/anydoc*/**/*",
       "./node_modules/@mediflow/web-auth-lifecycle-owner/**/*",

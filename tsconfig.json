@@ -58,6 +58,7 @@
     "node_modules",
     "scripts/**/*.ts",
     "scripts/**/*.mts",
+    "lib/security/*-fixture.ts",
     "native/**/Build/**/*",
     "native/**/.build/**/*"
   ]
