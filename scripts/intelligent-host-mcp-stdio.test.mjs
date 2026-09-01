@@ -80,8 +80,12 @@ test('discovers one modern-only non-PHI status tool and calls it over real stdio
         candidateVersion: '0.8.5',
         protocolVersion: MODERN_VERSION,
         dataScope: 'non_phi_system_status',
+        canonicalHeadlessAnchors: 66,
+        generalOperationsGrantable: 0,
+        soapMcpBinding: 'unavailable',
         writes: 0,
         apply: 'none',
+        claim: 'MCP_PROTOCOL_SLICE_ONLY',
     });
     assert.equal(called.result.isError, undefined);
     assert.doesNotMatch(JSON.stringify(called.result), /patient|clinical|secret|token|database|path/iu);

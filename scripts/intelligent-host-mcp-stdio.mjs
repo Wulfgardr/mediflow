@@ -11,16 +11,24 @@ const STATUS = Object.freeze({
     candidateVersion: '0.8.5',
     protocolVersion: PROTOCOL_VERSION,
     dataScope: 'non_phi_system_status',
+    canonicalHeadlessAnchors: 66,
+    generalOperationsGrantable: 0,
+    soapMcpBinding: 'unavailable',
     writes: 0,
     apply: 'none',
+    claim: 'MCP_PROTOCOL_SLICE_ONLY',
 });
 const outputSchema = z.object({
     schemaVersion: z.literal(STATUS.schemaVersion),
     candidateVersion: z.literal(STATUS.candidateVersion),
     protocolVersion: z.literal(STATUS.protocolVersion),
     dataScope: z.literal(STATUS.dataScope),
+    canonicalHeadlessAnchors: z.literal(STATUS.canonicalHeadlessAnchors),
+    generalOperationsGrantable: z.literal(STATUS.generalOperationsGrantable),
+    soapMcpBinding: z.literal(STATUS.soapMcpBinding),
     writes: z.literal(STATUS.writes),
     apply: z.literal(STATUS.apply),
+    claim: z.literal(STATUS.claim),
 }).strict();
 
 function createServer() {
