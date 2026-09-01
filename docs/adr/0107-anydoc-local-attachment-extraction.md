@@ -1,7 +1,7 @@
 # ADR 0107: AnyDoc come estrazione locale unica degli allegati
 
 Date: 2026-08-28
-Status: Proposed
+Status: Accepted
 
 Issue: WUL-522
 Program line: candidato `0.8.5`
@@ -28,6 +28,18 @@ corsia unica.
 MediFlow richiede invece un solo ingresso locale e deterministico per gli
 allegati. Il risultato deve alimentare i consumer review-only esistenti senza
 trasformare un parser in autorita clinica.
+
+## Precedenza e confine
+
+Per l'estrazione automatica degli allegati e per qualunque clausola di runtime
+o fallback OCR, questo ADR prevale sulle formulazioni incompatibili di
+[ADR 0094](./0094-intelligence-fabric-headless-contract-085.md). ADR 0094 resta
+autorevole per il contratto generale del Fabric e per i quattro smart path
+generativi eseguibili.
+
+AnyDoc non e OCR, non e un provider AI e non e una venue Fabric. La conversione
+locale deterministica non soddisfa la capability `ocr` e non ne eredita
+provider, fallback o interruttori.
 
 ## Decisione
 
@@ -60,11 +72,35 @@ AnyDoc estrae e struttura il contenuto. Non assegna codici ICD, non decide
 terapie, ausili o protesi e non scrive note cliniche. Questi restano output
 candidati dei servizi downstream, legati alla fonte e soggetti a revisione.
 
+Le tre fasi restano separate:
+
+1. **Estrazione:** AnyDoc produce Markdown normalizzato, evidenza e provenance.
+2. **Interpretazione:** servizi downstream trasformano l'evidenza in proposte
+   tipizzate e revisionabili. I domini previsti comprendono diagnosi ICD-11,
+   farmaci secondo i cataloghi AIFA, ausili e protesica, esenzioni, codice
+   fiscale, indirizzo, quesito diagnostico, prestazione prescritta e altri
+   campi definiti da un contratto versionato.
+3. **Applicazione:** un servizio applicativo separato puo usare soltanto una
+   proposta confermata con authority, versione attesa, idempotenza, audit e
+   receipt adeguati al rischio. Questo ADR non implementa o autorizza apply.
+
 ## Sostituzione della corsia OCR
 
 DeepSeek/Ollama OCR e Apple Vision vengono rimossi dal flusso automatico degli
 allegati. Non esiste fallback provider, platform-specific o hosted. La route
 OCR legacy viene deprecata e non puo invocare un modello.
+
+La capability `ocr` resta nel catalogo per mantenere classificazione e drift
+verificabili, ma il suo stato e terminale:
+
+- `availabilityDisposition=unavailable`;
+- nessuna venue e nessun provider;
+- nessun fallback e nessun kill switch;
+- nessuna route, configurazione, readiness o transizione di lifecycle puo
+  riattivarla.
+
+Un futuro contratto OCR richiederebbe una nuova decisione e una nuova identita
+versionata. Non puo riattivare la capability `ocr` della 0.8.5.
 
 AnyDoc non esegue OCR locale. Un'immagine o un PDF con pagine scansionate prive
 di text layer fallisce chiuso come
@@ -102,8 +138,8 @@ nuova estrazione.
 
 - Tutti i formati supportati attraversano lo stesso parser locale.
 - I documenti digitali non dipendono da Ollama o da un modello vision.
-- Le scansioni e le immagini richiedono revisione manuale finche un futuro ADR
-  non approva un OCR locale distinto.
+- Le scansioni e le immagini richiedono revisione manuale; non esiste un
+  fallback automatico riservato o implicito.
 - Windows, Linux e macOS condividono lo stesso contratto di estrazione.
 - La processazione downstream resta provenance-bound, review-only e zero-write.
 
@@ -127,9 +163,13 @@ Fermare il packet se:
 - l'output del parser scrive direttamente dati clinici;
 - currentness, provenance o revisione vengono aggirate;
 - il worker espone percorso, contenuto o identificatori clinici nei log;
+- AnyDoc viene classificato come OCR, provider o venue Fabric;
+- `ocr` riceve una venue, un provider, un fallback, un kill switch o una
+  transizione diversa da `availabilityDisposition=unavailable`;
 - la modifica richiede schema, CAS, backup, security condivisa o durable store.
 
 ## Non-obiettivi
 
-Questo ADR non aggiunge OCR locale per immagini, egress, cloud, apply clinico,
-schema, migrazioni, route paired, locator, CAS, backup o nuove authority.
+Questo ADR non aggiunge o riattiva OCR locale per immagini, egress, cloud,
+apply clinico, schema, migrazioni, route paired, locator, CAS, backup o nuove
+authority.
