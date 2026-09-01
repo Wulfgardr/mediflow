@@ -15,7 +15,9 @@ const PATIENT = 'patient.synthetic.treatment';
 const AMBULATORY = 'ambulatory.synthetic.treatment';
 
 function projection() {
-    const patient = { id: PATIENT, firstName: 'Synthetic', lastName: 'Person', version: 7, notes: 'Contesto sintetico.', diagnoses: [], createdAt: NOW, updatedAt: NOW } as Patient;
+    const patient = { id: PATIENT, firstName: 'Synthetic', lastName: 'Person', taxCode: 'SYNTHETIC0000000',
+        address: 'Synthetic address', phone: '0000000000', version: 7, notes: 'Contesto sintetico.',
+        diagnoses: [], createdAt: NOW, updatedAt: NOW } as Patient;
     const therapy = { id: 'therapy.synthetic.treatment', patientId: PATIENT, drugName: 'Farmaco sintetico', dosage: '5 mg', status: 'active', version: 1, startDate: NOW, createdAt: NOW, updatedAt: NOW } as Therapy;
     const entry = { id: 'entry.synthetic.treatment', patientId: PATIENT, type: 'note', title: 'Nota sintetica', content: '<p>Evidenza sintetica.</p>', version: 1, date: NOW, createdAt: NOW, updatedAt: NOW } as ClinicalEntry;
     return buildTreatmentReasoningProjectionAttachment({ patient, therapies: [therapy], entries: [entry], observations: [], attachments: [], now: NOW });

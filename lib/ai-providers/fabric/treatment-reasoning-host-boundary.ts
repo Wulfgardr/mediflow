@@ -45,7 +45,7 @@ type MinimizedTreatmentProjection = Readonly<{
 
 const INPUT_KEYS = ['projection', 'provenanceRef', 'receiptRef'];
 const PROJECTION_KEYS = ['schema', 'capability', 'stage', 'sourceRevision', 'therapyRefs', 'evidenceRefs'];
-const OPAQUE_REF = /^[a-z][a-z0-9._-]{2,127}$/;
+const OPAQUE_REF = /^[A-Za-z][A-Za-z0-9._:-]{2,159}$/;
 const MAX_PROJECTION_REFS_PER_KIND = 32;
 
 function reject(code: TreatmentReasoningHostBoundaryErrorCode): never {

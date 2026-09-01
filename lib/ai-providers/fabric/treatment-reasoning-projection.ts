@@ -144,7 +144,7 @@ function sourceRevision(input: TreatmentReasoningContextInput, patientRevision: 
     let newest = 0;
     for (const record of records) {
         for (const field of ['updatedAt', 'createdAt', 'date', 'observedAt'] as const) {
-            const value = (record as Record<string, unknown>)[field];
+            const value = (record as unknown as Record<string, unknown>)[field];
             const time = value instanceof Date ? value.getTime() : typeof value === 'string' || typeof value === 'number' ? Date.parse(String(value)) : Number.NaN;
             if (Number.isFinite(time) && time > newest) newest = time;
         }

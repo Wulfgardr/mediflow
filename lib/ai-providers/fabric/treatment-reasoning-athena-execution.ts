@@ -37,9 +37,9 @@ type Cancellation = Readonly<{ signal: CancellationSignal; cancel: () => void }>
 type Host = Readonly<{ policy: () => unknown; invoke: (input: Readonly<{ instruction: string; signal: CancellationSignal }>) => unknown }>;
 type Configuration = Readonly<{ host: Host; timeoutMs: number }>;
 const COMMON = freeze({ writesPerformed: 0 as const, applyPolicy: 'none' as const });
-const REF = /^[a-z][a-z0-9._-]{2,127}$/u;
+const REF = /^[A-Za-z][A-Za-z0-9._:-]{2,159}$/u;
 const MAX_REFS = 16;
-const MAX_TIMEOUT_MS = 60_000;
+const MAX_TIMEOUT_MS = 430_000;
 
 export class TreatmentReasoningAthenaExecutionConfigurationError extends Error {
     constructor() { super('Treatment reasoning ATHENA execution configuration rejected'); this.name = 'TreatmentReasoningAthenaExecutionConfigurationError'; }
