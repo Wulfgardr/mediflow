@@ -4,12 +4,14 @@ import { createHash } from 'node:crypto';
 import test from 'node:test';
 import { types } from 'node:util';
 import {
+    CLINICIAN_SOAP_DRAFT_KEYS,
     CLINICIAN_SOAP_DRAFT_SCHEMA,
     CLINICIAN_SOAP_OPERATION_ID,
+    type ClinicianSoapDraftV1,
     validateClinicianSoapWriteDraft,
 } from './clinician-soap-write-contract.ts';
 
-type Draft = Record<'schema' | 'operationId' | 'subjective' | 'objective' | 'assessment' | 'plan', string>;
+type Draft = { -readonly [Key in keyof ClinicianSoapDraftV1]: ClinicianSoapDraftV1[Key] };
 const keys = ['schema', 'operationId', 'subjective', 'objective', 'assessment', 'plan'] as const;
 function draft(overrides: Partial<Draft> = {}): Draft {
     const value = Object.create(null) as Draft;
@@ -28,6 +30,13 @@ function packet(fields: readonly string[]): Buffer {
         return [length, bytes];
     }));
 }
+
+test('exports the six-key draft DTO order without changing the H1 contract', () => {
+    const typed: ClinicianSoapDraftV1 = draft();
+    assert.deepEqual(CLINICIAN_SOAP_DRAFT_KEYS, keys);
+    assert.equal(Object.isFrozen(CLINICIAN_SOAP_DRAFT_KEYS), true);
+    assert.equal(validateClinicianSoapWriteDraft(typed).status, 'accepted');
+});
 
 test('normalizes the four SOAP sections and emits golden digest bytes with the fixed codec order', () => {
     const result = accepted(draft({ subjective: 'A\r\n', objective: 'e\u0301', assessment: 'O', plan: 'P' }));
@@ -61,7 +70,9 @@ test('accepts only a null-prototype record with six ordered enumerable own data 
     const nonEnumerable = draft(); Object.defineProperty(nonEnumerable, 'plan', { enumerable: false, value: 'P' });
     const symbol = draft(); Object.defineProperty(symbol, Symbol('x'), { enumerable: true, value: 'x' });
     const inherited = Object.create({ plan: 'P' }) as Partial<Draft>; Object.assign(inherited, draft()); delete inherited.plan;
-    const reordered = Object.create(null) as Draft; for (const key of [...keys].reverse()) reordered[key] = draft()[key];
+    const reorderedRecord = Object.create(null) as Record<string, string>;
+    for (const key of [...keys].reverse()) reorderedRecord[key] = draft()[key];
+    const reordered = reorderedRecord as Draft;
     for (const value of [null, [], {}, new String('draft'), Promise.resolve(draft()), accessor, nonEnumerable, symbol, inherited, reordered, { ...draft(), extra: true }]) {
         assert.equal(validateClinicianSoapWriteDraft(value).status, 'denied');
     }

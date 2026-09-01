@@ -16,6 +16,15 @@ import {
     entries,
     headlessSoapEntryCommits,
 } from '../schema';
+import {
+    CLINICIAN_SOAP_ENTRY_COMMIT_RECEIPT_DIGEST_DOMAIN as RECEIPT_DIGEST_DOMAIN,
+    CLINICIAN_SOAP_ENTRY_COMMIT_RECEIPT_KEYS as RECEIPT_KEYS,
+    CLINICIAN_SOAP_ENTRY_COMMIT_RECEIPT_OPERATION_ID as OPERATION_ID,
+    CLINICIAN_SOAP_ENTRY_COMMIT_RECEIPT_OUTCOME as RECEIPT_OUTCOME,
+    CLINICIAN_SOAP_ENTRY_COMMIT_RECEIPT_SCHEMA as RECEIPT_SCHEMA,
+    snapshotClinicianSoapEntryCommitReceipt,
+    type ClinicianSoapEntryCommitReceiptV1,
+} from '../headless/clinician-soap-entry-commit-receipt';
 import { parseSeal, type ParsedSeal } from '../headless/clinician-soap-entry-seal-codec-internal';
 import {
     createHeadlessSoapAuthorizationLineage,
@@ -33,16 +42,12 @@ import type { HeadlessSoapBoundCommandV1 } from './headless-soap-command-binding
 import { validateHeadlessSoapEntryCommitSemanticChain } from './headless-soap-entry-commit-semantic-validator';
 import type { ServerSessionSelectionCommitBindingV1 } from './server-session-projection-owner';
 
-const RECEIPT_SCHEMA = 'mediflow.headless.soap-entry-commit-receipt.v1' as const;
-const OPERATION_ID = 'mediflow.clinical_diary.append_soap.v1' as const;
-const RECEIPT_OUTCOME = 'entry_committed' as const;
 const BINDING_SCHEMA = 'mediflow.headless.soap-entry-commit-binding.v1' as const;
 const ENTRY_SNAPSHOT_SCHEMA = 'mediflow.headless.soap-entry-record.v1' as const;
 const AUDIT_METADATA_SCHEMA = 'mediflow.headless.soap-entry-commit-audit-metadata.v1' as const;
 const BINDING_DIGEST_DOMAIN = 'mediflow.headless.soap-entry-commit-binding-digest.v1';
 const ENTRY_DIGEST_DOMAIN = 'mediflow.headless.soap-entry-commit-entry-digest.v1';
 const AUDIT_DIGEST_DOMAIN = 'mediflow.headless.soap-entry-commit-audit-digest.v1';
-const RECEIPT_DIGEST_DOMAIN = 'mediflow.headless.soap-entry-commit-receipt-digest.v1';
 const ENTRY_ID_DOMAIN = 'mediflow.headless.soap-entry-id.v1';
 const AUDIT_ID_DOMAIN = 'mediflow.headless.soap-entry-audit-id.v1';
 const RECEIPT_REF_DOMAIN = 'mediflow.headless.soap-entry-receipt-ref.v1';
@@ -54,8 +59,6 @@ const COMMAND_KEYS = ['schema', 'commandId', 'approvalRef', 'idempotencyKey', 'a
     'lineage', 'sealBundle'] as const;
 const BINDING_KEYS = ['patientId', 'ambulatoryId', 'patientVersion'] as const;
 const REPLAY_KEYS = ['approvalRef', 'idempotencyKey', 'authorizationProofDigest'] as const;
-const RECEIPT_KEYS = ['schema', 'receiptRef', 'operationId', 'outcome', 'commandId', 'entryRef', 'auditEventRef',
-    'patientVersion', 'entryVersion', 'committedAt', 'bindingDigest', 'entryDigest', 'auditDigest'] as const;
 const BINDING_SNAPSHOT_KEYS = ['schema', 'operationId', 'commandId', 'approvalRef', 'idempotencyKey',
     'authorizationProofDigest', 'webSessionId', 'webSessionCreatedAt', 'webSessionExpiresAt', 'principalRef', 'actorRef',
     'attestationRef', 'attestationVersion', 'activeRoleRevocationGeneration', 'activeRolePolicyVersion',
@@ -80,10 +83,8 @@ const APPROVAL_REF = /^hsaa_[0-9a-f]{64}$/u;
 const IDEMPOTENCY_KEY = /^hsai_[0-9a-f]{64}$/u;
 const ENTRY_REF = /^hsei_[0-9a-f]{64}$/u;
 const AUDIT_REF = /^hsea_[0-9a-f]{64}$/u;
-const RECEIPT_REF = /^hser_[0-9a-f]{64}$/u;
 const HASH = /^[0-9a-f]{64}$/u;
 const ACTOR_REF = /^hsa_[0-9a-f]{64}$/u;
-const ISO_SECONDS = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.000Z$/u;
 const isProxy = types.isProxy;
 const client = dbServer.$client;
 const prepare = client.prepare.bind(client);
@@ -91,21 +92,7 @@ const entryTable = getTableName(entries);
 const auditTable = getTableName(auditEvents);
 const ledgerTable = getTableName(headlessSoapEntryCommits);
 
-export type HeadlessSoapEntryCommitReceiptV1 = Readonly<{
-    schema: typeof RECEIPT_SCHEMA;
-    receiptRef: string;
-    operationId: typeof OPERATION_ID;
-    outcome: typeof RECEIPT_OUTCOME;
-    commandId: string;
-    entryRef: string;
-    auditEventRef: string;
-    patientVersion: number;
-    entryVersion: 1;
-    committedAt: string;
-    bindingDigest: string;
-    entryDigest: string;
-    auditDigest: string;
-}>;
+export type HeadlessSoapEntryCommitReceiptV1 = ClinicianSoapEntryCommitReceiptV1;
 
 type ParsedCommand = Readonly<{
     value: HeadlessSoapBoundCommandV1;
@@ -220,34 +207,7 @@ function parseReplayKey(value: unknown): HeadlessSoapEntryReplayKeyV1 | null {
     return value as HeadlessSoapEntryReplayKeyV1;
 }
 
-function snapshotReceipt(value: unknown): HeadlessSoapEntryCommitReceiptV1 | null {
-    const source = exactFrozen(value, RECEIPT_KEYS) ?? exactRow(value, RECEIPT_KEYS);
-    if (!source || source.schema !== RECEIPT_SCHEMA || !matches(source.receiptRef, RECEIPT_REF)
-        || source.operationId !== OPERATION_ID || source.outcome !== RECEIPT_OUTCOME
-        || !matches(source.commandId, COMMAND_ID) || !matches(source.entryRef, ENTRY_REF)
-        || !matches(source.auditEventRef, AUDIT_REF) || !safeInteger(source.patientVersion, 1)
-        || source.entryVersion !== 1 || !matches(source.committedAt, ISO_SECONDS)
-        || !matches(source.bindingDigest, HASH) || !matches(source.entryDigest, HASH)
-        || !matches(source.auditDigest, HASH)) return null;
-    try {
-        if (new Date(source.committedAt).toISOString() !== source.committedAt) return null;
-    } catch { return null; }
-    return record({
-        schema: RECEIPT_SCHEMA,
-        receiptRef: source.receiptRef,
-        operationId: OPERATION_ID,
-        outcome: RECEIPT_OUTCOME,
-        commandId: source.commandId,
-        entryRef: source.entryRef,
-        auditEventRef: source.auditEventRef,
-        patientVersion: source.patientVersion,
-        entryVersion: 1,
-        committedAt: source.committedAt,
-        bindingDigest: source.bindingDigest,
-        entryDigest: source.entryDigest,
-        auditDigest: source.auditDigest,
-    }) as HeadlessSoapEntryCommitReceiptV1;
-}
+const snapshotReceipt = snapshotClinicianSoapEntryCommitReceipt;
 
 function ownerError(code: 'receipt_unavailable' | 'storage_unavailable'): never {
     throw new HeadlessSoapEntryCommitOwnerError(code);
