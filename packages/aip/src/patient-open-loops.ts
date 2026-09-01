@@ -36,7 +36,7 @@ export type PatientOpenLoopsReadResultV1 = Readonly<{
         snapshotRevision: number; itemCount: number; truncated: boolean; timestamp: number;
     }>;
 }>;
-const SOURCE_KEYS = ['now', 'nextRef', 'hashRef', 'acquireLease', 'readSnapshot',
+const SOURCE_KEYS = ['now', 'nextRef', 'hashRef', 'acquireLease', 'reserveLease', 'readSnapshot',
     'readCurrentness', 'writeAudit', 'timeoutMs'] as const;
 const INPUT_KEYS = ['schemaVersion', 'operationId'] as const;
 const LEASE_KEYS = ['status', 'ownerIdentity', 'leaseIdentity', 'ownerRef', 'leaseRef', 'purposeCode',
@@ -109,25 +109,19 @@ function frozenArrayValues(value: unknown): readonly unknown[] | null {
         return output;
     } catch { return null; }
 }
-/** Creates the DB-free, one-lease Application Service for ADR 0114's first clinical read. */
+/** ADR 0114 core: only pending native Promises are preempted; sync ports cooperate and post-call clock fences deny output. */
 export function createPatientOpenLoopsReadServiceV1(sourcesValue: unknown) {
     const sources = exact(sourcesValue, SOURCE_KEYS, false);
     if (!sources || SOURCE_KEYS.slice(0, -1).some((key) => typeof sources[key] !== 'function' || isProxy(sources[key]))
         || !integer(sources.timeoutMs, 1) || (sources.timeoutMs as number) > 2_000) return fail('operation_unavailable');
-    const nowSource = sources.now as () => unknown;
-    const nextRefSource = sources.nextRef as (kind: 'receipt') => unknown;
-    const hashRefSource = sources.hashRef as (value: string) => unknown;
-    const acquireSource = sources.acquireLease as () => unknown;
-    const readSource = sources.readSnapshot as (binding: object, request: object) => unknown;
-    const currentSource = sources.readCurrentness as (binding: object, snapshot: object) => unknown;
-    const auditSource = sources.writeAudit as (record: object) => unknown;
+    const nowSource = sources.now as () => unknown, nextRefSource = sources.nextRef as (kind: 'receipt') => unknown;
+    const hashRefSource = sources.hashRef as (value: string) => unknown, acquireSource = sources.acquireLease as () => unknown;
+    const reserveSource = sources.reserveLease as (leaseIdentity: object) => unknown, readSource = sources.readSnapshot as (binding: object, request: object) => unknown;
+    const currentSource = sources.readCurrentness as (binding: object, snapshot: object) => unknown, auditSource = sources.writeAudit as (record: object) => unknown;
     const timeoutMs = sources.timeoutMs as number;
-    let state: 'available' | 'pending' | 'terminal' = 'available';
-    let terminalCode: PatientOpenLoopsReadV1ErrorCode = 'lease_replay';
-    let lastNow = -1;
-    let controller: AbortController | null = null;
-    let rejectActive: ((error: PatientOpenLoopsReadV1Error) => void) | null = null;
-    let deadlineTimer: ReturnType<typeof setTimer> | null = null;
+    let state: 'available' | 'pending' | 'terminal' = 'available', lastNow = -1;
+    let terminalCode: PatientOpenLoopsReadV1ErrorCode = 'lease_replay', controller: AbortController | null = null;
+    let rejectActive: ((error: PatientOpenLoopsReadV1Error) => void) | null = null, deadlineTimer: ReturnType<typeof setTimer> | null = null;
     const now = (): number => {
         let candidate: unknown; try { candidate = nowSource(); } catch { return fail('operation_unavailable'); }
         if (state !== 'pending') { discardPromise(candidate); return fail(terminalCode); }
@@ -231,10 +225,15 @@ export function createPatientOpenLoopsReadServiceV1(sourcesValue: unknown) {
             if (!integer(timeoutAt, startedAt + 1)) return fail('operation_unavailable');
             const deadline = Math.min(timeoutAt, lease.expiresAt as number);
             const deadlineCode: PatientOpenLoopsReadV1ErrorCode = deadline === lease.expiresAt ? 'expired' : 'timeout';
-            deadlineTimer = setTimer(() => { terminalize(deadlineCode); }, deadline - startedAt);
             const binding = record({ ownerIdentity: lease.ownerIdentity, leaseIdentity: lease.leaseIdentity,
                 generation: lease.generation, revocationGeneration: lease.revocationGeneration,
                 selectionEpoch: lease.selectionEpoch, restartGeneration: lease.restartGeneration });
+            const reservation = sync(() => reserveSource(lease.leaseIdentity as object), 'lease_unavailable');
+            if (reservation === 'replayed') return fail('lease_replay');
+            if (reservation !== 'reserved') return fail('lease_unavailable');
+            const reservedAt = now();
+            if (reservedAt >= deadline) { terminalize(deadlineCode); return fail(deadlineCode); }
+            deadlineTimer = setTimer(() => { terminalize(deadlineCode); }, deadline - reservedAt);
             const request = record({ limit: PATIENT_OPEN_LOOPS_READ_MAX_ITEMS_V1, signal: controller.signal });
             const rawSnapshot = (await bounded(call(() => readSource(binding, request), 'snapshot_unavailable'),
                 'snapshot_unavailable')).value;
@@ -269,6 +268,7 @@ export function createPatientOpenLoopsReadServiceV1(sourcesValue: unknown) {
                 truncated: receipt.truncated, timestamp: receipt.timestamp });
             await bounded(call(() => auditSource(audit), 'audit_unavailable'), 'audit_unavailable');
             if (state !== 'pending') return fail(terminalCode);
+            if (now() >= deadline) { terminalize(deadlineCode); return fail(deadlineCode); }
             const currentValue = sync(() => currentSource(binding, snapshot.snapshotIdentity as object), 'scope_changed');
             const current = exact(currentValue, CURRENT_KEYS);
             if (!current || current.status !== 'current' || current.ownerIdentity !== lease.ownerIdentity

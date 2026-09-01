@@ -51,12 +51,17 @@ function makeCurrent(overrides: Record<string, unknown> = {}) {
 }
 
 function makeSources(overrides: Record<string, unknown> = {}) {
+    const reserved = new WeakSet<object>();
     return canonical({
         now: () => NOW,
         nextRef: () => `aipr_${'c'.repeat(64)}`,
         hashRef: (value: string) => `sha256:${(value.startsWith('owner') ? 'a'
             : value.startsWith('lease') ? 'b' : 'd').repeat(64)}`,
         acquireLease: () => makeLease(),
+        reserveLease: (leaseIdentity: object) => {
+            if (reserved.has(leaseIdentity)) return 'replayed';
+            reserved.add(leaseIdentity); return 'reserved';
+        },
         readSnapshot: () => Promise.resolve(makeSnapshot()),
         readCurrentness: () => makeCurrent(),
         writeAudit: () => Promise.resolve(),
@@ -291,6 +296,24 @@ test('linearizes a one-use lease across concurrent and replayed reads', async ()
     assert.equal(Object.isFrozen(result.receipt), true);
 });
 
+test('consumes the exact lease once across services sharing the broker port', async () => {
+    let reads = 0;
+    let audits = 0;
+    const sources = makeSources({
+        readSnapshot: () => { reads += 1; return Promise.resolve(makeSnapshot()); },
+        writeAudit: () => { audits += 1; return Promise.resolve(); },
+    });
+    const first = createPatientOpenLoopsReadServiceV1(sources);
+    const second = createPatientOpenLoopsReadServiceV1(sources);
+    const firstRead = first.read(validInput());
+    const contender = assert.rejects(second.read(validInput()), isError('lease_replay'));
+
+    assert.equal((await firstRead).outcome, 'read');
+    await contender;
+    assert.equal(reads, 1);
+    assert.equal(audits, 1);
+});
+
 test('times out a pending native Promise and discards its late completion', async () => {
     const pendingSnapshot = deferred<ReturnType<typeof makeSnapshot>>();
     let auditCalls = 0;
@@ -462,4 +485,21 @@ test('applies one real deadline across snapshot and audit even if the host clock
 
     await assert.rejects(service.read(validInput()), isError('timeout'));
     assert.equal(currentnessCalls, 0);
+});
+
+test('post-fences cooperative synchronous callbacks with the broker clock', async () => {
+    let timestamp = NOW;
+    let audits = 0;
+    const service = createPatientOpenLoopsReadServiceV1(makeSources({
+        timeoutMs: 20,
+        now: () => timestamp,
+        readSnapshot: () => {
+            timestamp = NOW + 21;
+            return Promise.resolve(makeSnapshot());
+        },
+        writeAudit: () => { audits += 1; return Promise.resolve(); },
+    }));
+
+    await assert.rejects(service.read(validInput()), isError('timeout'));
+    assert.equal(audits, 0);
 });
