@@ -4,6 +4,8 @@ import { toMarkdownBytes } from '@firecrawl/anydoc/index.js';
 
 const MAX_SOURCE_BYTES = 25 * 1024 * 1024;
 const MAX_MARKDOWN_BYTES = 8 * 1024 * 1024;
+const MAX_PAGE_COUNT = 500;
+const PAGE_ROUTING_SCHEMA_VERSION = 'mediflow.anydoc_page_routing.v1';
 const RESOURCE_LIMIT_EXIT = 24;
 const IO_EXIT = 26;
 const FAILURE_EXIT = new Map([
@@ -29,6 +31,23 @@ function failureCode(error) {
     return IO_EXIT;
 }
 
+/* @Codex */
+function pageRoutingEnvelope(error) {
+    try {
+        if (!(error instanceof Error) || error.code !== 'needsOcr' || !Array.isArray(error.pages)) return null;
+        const pages = error.pages;
+        const pageCount = error.pageCount;
+        if (!Number.isSafeInteger(pageCount) || pageCount < 1 || pageCount > MAX_PAGE_COUNT
+            || pages.length < 1 || pages.length > pageCount) return null;
+        let previous = 0;
+        for (const page of pages) {
+            if (!Number.isSafeInteger(page) || page <= previous || page > pageCount) return null;
+            previous = page;
+        }
+        return `{"schemaVersion":"${PAGE_ROUTING_SCHEMA_VERSION}","pages":[${pages.join(',')}],"pageCount":${pageCount}}`;
+    } catch { return null; }
+}
+
 try {
     const bytes = await readSourceBytes();
     if (bytes === null) {
@@ -40,5 +59,7 @@ try {
         else process.stdout.write(output);
     }
 } catch (error) {
-    process.exitCode = failureCode(error);
+    const routing = pageRoutingEnvelope(error);
+    if (routing !== null) process.stdout.write(routing);
+    process.exitCode = routing !== null ? 21 : failureCode(error);
 }
