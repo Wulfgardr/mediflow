@@ -9,6 +9,7 @@ const hostDateNow = Date.now;
 /** Shared process owner for the public H4 host service and the private H5 lifecycle. */
 export const headlessSoapEntryFieldSetLifecycleProductionOwner = createHeadlessSoapEntryFieldSetLifecycleOwner({
     proposalLifecycle: headlessSoapProposalLifecycleProductionOwner.lifecycleController,
+    proposalBinding: headlessSoapProposalLifecycleProductionOwner.bindingController,
     proposalService: headlessSoapProposalLifecycleProductionOwner.service,
     clock: hostDateNow,
 });

@@ -87,7 +87,7 @@ function twoProposalFixture() {
 
 test('materializes one opaque entry and exposes its exact host field set only through H5 continuation', async () => {
     const current = fixture(); const owner = createHeadlessSoapEntryFieldSetLifecycleOwner(current);
-    assert.equal(Object.isFrozen(owner), true); assert.deepEqual(Reflect.ownKeys(owner).sort(), ['lifecycleController', 'service']);
+    assert.equal(Object.isFrozen(owner), true); assert.deepEqual(Reflect.ownKeys(owner).sort(), ['bindingController', 'lifecycleController', 'service']);
     assert.deepEqual(Reflect.ownKeys(owner.service).sort(), ['materialize', 'wipe']);
     const entryRef = await owner.service.materialize(current.proposalRef);
     assert.equal(Object.getPrototypeOf(entryRef), null); assert.equal(Object.isFrozen(entryRef), true); assert.deepEqual(Reflect.ownKeys(entryRef), []);

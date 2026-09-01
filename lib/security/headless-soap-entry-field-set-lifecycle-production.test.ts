@@ -19,7 +19,7 @@ test('shares one exact H4 host owner while exposing only the public field-set se
     assert.deepEqual(Object.keys(facade).filter((key) => !loaderInteropExports.has(key)), ['headlessSoapEntryFieldSetLifecycleService']);
     const owner = internal.headlessSoapEntryFieldSetLifecycleProductionOwner;
     assert.equal(owner, repeated.headlessSoapEntryFieldSetLifecycleProductionOwner); assert.equal(Object.isFrozen(owner), true);
-    assert.deepEqual(Reflect.ownKeys(owner).sort(), ['lifecycleController', 'service']);
+    assert.deepEqual(Reflect.ownKeys(owner).sort(), ['bindingController', 'lifecycleController', 'service']);
     assert.equal(facade.headlessSoapEntryFieldSetLifecycleService, owner.service); assert.equal(Object.isFrozen(owner.service), true);
     assert.deepEqual(Reflect.ownKeys(owner.service).sort(), ['materialize', 'wipe']);
     assert.deepEqual([owner.service.materialize.length, owner.service.wipe.length], [1, 1]);
@@ -32,6 +32,8 @@ test('shares one exact H4 host owner while exposing only the public field-set se
         owner.lifecycleController.confirmDependent.length, owner.lifecycleController.unregisterDependent.length,
         owner.lifecycleController.withCurrentDependent.length,
     ], [2, 2, 2, 2, 3]);
+    assert.equal(Object.isFrozen(owner.bindingController), true);
+    assert.deepEqual(Reflect.ownKeys(owner.bindingController), ['withCurrentDependentBinding']);
 });
 
 test('keeps foreign H4 identities inert across public and private production surfaces', async () => {
@@ -44,6 +46,8 @@ test('keeps foreign H4 identities inert across public and private production sur
     assert.equal(lifecycle.confirmDependent(foreignRef, foreignRegistration), false);
     assert.equal(lifecycle.unregisterDependent(foreignRef, foreignRegistration), false);
     assert.equal(await lifecycle.withCurrentDependent(foreignRef, foreignRegistration, () => undefined), false);
+    assert.equal(await internal.headlessSoapEntryFieldSetLifecycleProductionOwner.bindingController
+        .withCurrentDependentBinding(foreignRef, foreignRegistration, () => undefined), false);
 });
 
 test('composition root binds the exact H3 owner and captured host clock without route or storage imports', () => {
@@ -57,6 +61,7 @@ test('composition root binds the exact H3 owner and captured host clock without 
     ].sort());
     assert.equal(ownerSource.match(/\bcreateHeadlessSoapEntryFieldSetLifecycleOwner\s*\(/gu)?.length, 1);
     assert.match(ownerSource, /headlessSoapProposalLifecycleProductionOwner\.lifecycleController/u);
+    assert.match(ownerSource, /headlessSoapProposalLifecycleProductionOwner\.bindingController/u);
     assert.match(ownerSource, /headlessSoapProposalLifecycleProductionOwner\.service/u);
     assert.match(ownerSource, /const hostDateNow = Date\.now/u);
     assert.doesNotMatch(ownerSource, /db-server|schema|route|approval|proof|writer|fabric/iu);
