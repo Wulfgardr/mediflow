@@ -65,7 +65,8 @@ function dataRecord(value: unknown, keys: readonly string[], required: readonly 
         const copy: Record<string, unknown> = Object.create(null);
         for (const key of ownKeys) {
             if (typeof key !== 'string') return null;
-            const descriptor = descriptors[key]; if (!descriptor || !('value' in descriptor)) return null;
+            const descriptor = descriptors[key];
+            if (!descriptor || !descriptor.enumerable || !('value' in descriptor)) return null;
             copy[key] = descriptor.value;
         }
         return copy;
