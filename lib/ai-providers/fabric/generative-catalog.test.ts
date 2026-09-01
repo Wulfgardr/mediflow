@@ -16,11 +16,11 @@ test('registra il catalogo generativo congelato', () => {
         ]],
     ));
     assert.deepEqual(compact, {
-        patient_insight: ['synthesis', 'proposal_only', 'aiPatientInsightKillSwitch', 'lib/ai-summary-service.ts'],
+        patient_insight: ['synthesis', 'proposal_only', 'aiPatientInsightKillSwitch', 'app/api/ai/patient-insight/preview/route.ts'],
         smart_import: ['extraction', 'proposal_only', 'aiSmartImportKillSwitch', 'app/api/ai/smart-import/preview/route.ts'],
-        document_synthesis: ['synthesis', 'proposal_only', 'aiDocumentSynthesisKillSwitch', 'lib/domain/documents/document-synthesis-service.ts'],
+        document_synthesis: ['synthesis', 'proposal_only', 'aiDocumentSynthesisKillSwitch', 'app/api/ai/document-synthesis/preview/route.ts'],
         ocr: ['ocr', 'unavailable', null, null],
-        treatment_reasoning: ['reasoning', 'proposal_only', 'aiTreatmentReasoningKillSwitch', 'lib/treatment-reasoning-service.ts'],
+        treatment_reasoning: ['reasoning', 'proposal_only', 'aiTreatmentReasoningKillSwitch', 'app/api/ai/treatment-reasoning/preview/route.ts'],
     });
     for (const [id, descriptor] of Object.entries(GENERATIVE_CAPABILITY_DESCRIPTORS)) {
         assert.equal(descriptor.id, id);

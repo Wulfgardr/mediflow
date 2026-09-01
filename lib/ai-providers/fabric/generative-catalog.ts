@@ -32,11 +32,11 @@ export const GENERATIVE_CAPABILITY_DESCRIPTORS: Readonly<
     Record<GenerativeCapabilityId, FabricCapabilityDescriptor>
 > = Object.freeze({
     patient_insight: descriptor('patient_insight', 'synthesis', 'proposal_only', 'aiPatientInsightKillSwitch',
-        'mediflow.ai.extract.v1', 'lib/ai-summary-service.ts'),
+        'mediflow.ai.extract.v1', 'app/api/ai/patient-insight/preview/route.ts'),
     smart_import: descriptor('smart_import', 'extraction', 'proposal_only', 'aiSmartImportKillSwitch',
         'mediflow.ai.extract.v1', 'app/api/ai/smart-import/preview/route.ts'),
     document_synthesis: descriptor('document_synthesis', 'synthesis', 'proposal_only', 'aiDocumentSynthesisKillSwitch',
-        'mediflow.ai.extract.v1', 'lib/domain/documents/document-synthesis-service.ts'),
+        'mediflow.ai.extract.v1', 'app/api/ai/document-synthesis/preview/route.ts'),
     ocr: Object.freeze({
         id: 'ocr',
         class: 'generative',
@@ -53,5 +53,5 @@ export const GENERATIVE_CAPABILITY_DESCRIPTORS: Readonly<
     }),
     treatment_reasoning: descriptor('treatment_reasoning', 'reasoning', 'proposal_only',
         'aiTreatmentReasoningKillSwitch', 'mediflow.treatment_reasoning.v1',
-        'lib/treatment-reasoning-service.ts'),
+        'app/api/ai/treatment-reasoning/preview/route.ts'),
 });
