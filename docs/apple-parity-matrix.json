@@ -487,7 +487,7 @@
       "area": "ai-runtime",
       "feature": "Configurazione/invocazione runtime AI (Ollama/modelli/kill switch)",
       "web": "selezione modelli per ruolo, connessione Ollama, profilo hardware, kill switch funzioni AI, budget contesto (app/settings/ai/*)",
-      "native": "missing (view-only): pannello runtime mostra stato Ollama/Docker come diagnostica, mai avviato/configurato; nessuna inferenza via boundary",
+      "native": "missing (view-only): pannello runtime mostra stato Ollama/MLX come diagnostica, mai avviato/configurato; nessuna inferenza via boundary",
       "boundary": "partial/host-only: GET /api/v1/network/ai-runtime solo stato; central-runtime 'gated by benchmark/rollout', nessuna route chat/generate paired",
       "gap": "host-only",
       "wave": "W5-ai-avanzate",

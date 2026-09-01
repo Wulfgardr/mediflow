@@ -267,7 +267,7 @@ Documenti/ADR principali:
 | `/api/*` | Runtime web | CRUD, auth, proxy locali, sistema | Session cookie |
 | `/api/v1/*` | Contratto locale/shared | Client native e superfici stabili | Bearer token locale, TLS proxy |
 | `/api/v1/network/*` | First slice home-base | Lista/dettaglio pazienti e write limitati/versionati su profilo/status, diario, terapie, checkup e osservazioni da device paired | Credenziale device + sessione operatore |
-| macOS Apple shell | Operativa | Fronte nativo piu maturo: shell Apple/home-base, workspace paziente condiviso, runtime panel e store locale verificabile; Lume e consegnata nella card clinica opaca, mentre le altre superfici restano in migrazione | Firma/notarizzazione esplicite, Ollama/Docker non app-managed |
+| macOS Apple shell | Operativa | Fronte nativo piu maturo: shell Apple/home-base, workspace paziente condiviso, runtime panel e store locale verificabile; Lume e consegnata nella card clinica opaca, mentre le altre superfici restano in migrazione | Firma/notarizzazione esplicite, Ollama/MLX non app-managed |
 | `MediFlowCore` tri-OS | Verificato tri-OS | Core Swift condiviso per logica clinica, cifratura, contratti, filtri, conflict handling, clinical scales e SQLite locale | CI Linux/macOS/Windows; non equivale a app complete Windows/Linux |
 | iPhone/iPad | Paired | Client paired non-AI, cache cifrata degradabile e workflow online versionati sui moduli core | No SQLite diretto |
 | AnyDoc | Estrazione locale | Conversione deterministica degli allegati supportati in Markdown normalizzato | Processo figlio bounded; nessuna rete; non e OCR o provider Fabric |
@@ -275,7 +275,7 @@ Documenti/ADR principali:
 | ATHENA/MLX | Provider locale capability-specific | Solo Treatment Reasoning review-only | Nessuna prescrizione o apply clinico |
 | OpenAI / Anthropic | Disclosure informativa | Righe read-only nel registro provider | Nessuna configurazione credenziali, esecuzione o egress; un login o abbonamento consumer non e accesso API |
 | OCR | Runtime `unavailable` | Nessuna estrazione automatica di immagini o scansioni | Route legacy `410`; il fallback DeepSeek-OCR 2 non e incluso nella patch |
-| ICD-11 Docker | Opzionale locale | Diagnosi/coding | Solo localhost |
+| ICD-11 WHO | Application Service server-only | Ricerca diagnosi/coding con output MediFlow data-only | Disattivato per default; egress e credenziali host-owned espliciti |
 | OpenMed | Shadow/benchmark | Redaction lane locale non client-facing | Non runtime clinico |
 
 ---

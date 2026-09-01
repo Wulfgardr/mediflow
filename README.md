@@ -316,8 +316,8 @@ Poi usa il launcher della tua piattaforma:
 | Windows | `powershell -ExecutionPolicy Bypass -File .\Start-MediFlow.ps1` |
 | Linux | `./scripts/start-mediflow.sh` |
 
-Apri `http://localhost:3000`. Ollama, ATHENA/MLX, Docker e ICD-11 sono
-opzionali; senza, MediFlow resta usabile con funzionalità ridotte. OpenAI e
+Apri `http://localhost:3000`. Ollama, ATHENA/MLX e l'accesso WHO ICD-11 sono
+opzionali e disattivati quando non configurati. OpenAI e
 Anthropic non sono configurabili o eseguibili nel candidato `0.8.5`.
 
 ## Documentazione

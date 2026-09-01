@@ -181,8 +181,8 @@ graph TB
         MLX["🍏 Apple MLX<br/>:8080"]
     end
 
-    subgraph "🐳 Docker"
-        ICD["🏛️ WHO ICD-11 API<br/>:8888"]
+    subgraph "🌐 WHO opt-in"
+        ICD["🏛️ WHO ICD-11 API v2/MMS<br/>server-only"]
     end
 
     UI --> ENC
@@ -201,8 +201,8 @@ graph TB
 ```
 
 > [!NOTE]
-> **Perché nativo e non tutto Docker?**
-> Su macOS con Apple Silicon, Ollama nativo accede direttamente alla GPU Metal, offrendo inferenza 5-10x più veloce rispetto a un container emulato.
+> **Perché mantenere il runtime AI locale?**
+> Su macOS con Apple Silicon, Ollama e MLX possono usare direttamente Metal. L'accesso ICD-11 e invece un egress server-only separato e opt-in.
 
 ---
 
@@ -217,7 +217,7 @@ graph TB
 | **DB Client** | API Facade (`lib/db.ts`) | Crittografia + REST calls | – |
 | **DB Server** | SQLite + Drizzle ORM | Persistenza tipizzata | – |
 | **AI Engine** | Ollama / Apple MLX | Inferenza LLM locale | 11434 / 8080 |
-| **ICD-11** | WHO Official Docker Image | Codifiche diagnosi | 8888 |
+| **ICD-11** | WHO API v2/MMS via Application Service | Codifiche diagnosi | HTTPS server-only |
 | **Auth** | bcrypt + AES-GCM | Hashing PIN + cifratura dati | – |
 
 ### 3.2 Dipendenze Chiave
@@ -395,13 +395,13 @@ sequenceDiagram
     actor Medico
     participant UI as Autocomplete
     participant Proxy as /api/icd/proxy
-    participant Docker as mediflow-icd:8888
+    participant WHO as WHO API v2/MMS
 
     Medico->>UI: Digita "Diabete mellito"
     UI->>Proxy: GET /api/icd/proxy?q=Diabete%20mellito
-    Proxy->>Docker: GET /icd/release/11/2024-01/mms/search?q=...
-    Docker-->>Proxy: {destinationEntities: [...]}
-    Proxy-->>UI: JSON con codici ICD-11
+    Proxy->>WHO: richiesta bounded sul binding 2026-01/en
+    WHO-->>Proxy: risposta vendor validata
+    Proxy-->>UI: schema MediFlow data-only + receipt PHI-safe
     UI->>UI: Mostra dropdown risultati
     Medico->>UI: Seleziona "5A10 - Diabete mellito tipo 1"
     UI->>UI: Associa codice alla scheda paziente
@@ -421,23 +421,12 @@ sequenceDiagram
 | **Key Storage** | JWK esportato in `sessionStorage` (volatile) |
 | **At-Rest** | Solo ciphertext (`ENC:base64iv:base64data`) |
 
-### 6.2 Configurazione Docker (`docker-compose.yml`)
+### 6.2 Configurazione ICD-11 WHO
 
-```yaml
-services:
-  icd-api:
-    image: whoicd/icd-api
-    container_name: mediflow-icd
-    restart: unless-stopped
-    ports:
-      - "8888:80"
-    environment:
-      - acceptLicense=true
-      - saveAnalytics=false
-      - include=2024-01_en
-    volumes:
-      - icd-data:/app/data
-```
+Il servizio e disattivato per default. L'abilitazione richiede feature flag,
+egress esplicito e credenziali OAuth WHO iniettate soltanto nel processo server.
+La readiness distingue `configured` da `available`; il browser non riceve mai
+credenziali o JSON WHO grezzo. Vedi `docs/icd-who-setup.md`.
 
 ### 6.3 Endpoints API Interni
 
@@ -450,7 +439,7 @@ services:
 | `/api/conversations` | GET, POST | Storico chat AI |
 | `/api/messages` | GET, POST | Messaggi singoli |
 | `/api/proxy/ollama/chat` | POST | Proxy verso Ollama |
-| `/api/icd/proxy` | GET | Proxy verso ICD-11 Docker |
+| `/api/icd/proxy` | GET | Readiness e ricerca ICD-11 WHO autenticate, output MediFlow data-only |
 | `/api/auth/login` | POST | Autenticazione |
 | `/api/auth/setup` | POST | Primo setup profilo |
 
@@ -492,7 +481,7 @@ services:
 ---
 
 > [!TIP]
-> Per avviare lo stack web locale: esegui **`Start_MediFlow.command`**. Lo script verifica Ollama, avvia Docker e prepara la web app; i client Apple usano launcher separati.
+> Per avviare lo stack web locale: esegui **`Start_MediFlow.command`**. Lo script verifica Ollama e prepara la web app; i client Apple usano launcher separati. ICD-11 WHO resta disattivato finche non viene configurato esplicitamente.
 
 ---
 

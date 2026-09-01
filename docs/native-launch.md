@@ -30,9 +30,10 @@ Questo script:
 
 Dentro l'app, il pannello `Runtime` puo avviare/arrestare esplicitamente il
 backend web production standalone e il proxy TLS inclusi nel bundle. I servizi
-opzionali Ollama e Docker/ICD sono mostrati come health diagnostico read-only
-quando gia attivi su `127.0.0.1:11434` e `127.0.0.1:8888`, ma restano fuori
-dalla supervisione app-managed e continuano a richiedere gestione separata.
+opzionali Ollama e MLX sono mostrati come health diagnostico read-only, ma
+restano fuori dalla supervisione app-managed e continuano a richiedere gestione
+separata. ICD-11 WHO e verificato dalla diagnostica web tramite readiness
+autenticata, senza probe nativo o query clinica implicita.
 Gli stop di backend/proxy usano una finestra ordinata breve e poi escalation
 locale, cosi i PID stale non bloccano il ciclo successivo.
 
