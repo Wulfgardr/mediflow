@@ -132,10 +132,17 @@ function buildService(sources: Sources) {
         let began = false;
         try {
             let current: unknown;
-            try { current = sources.current(); } catch { throw new AipTerminologySearchV1Error('authorization_denied'); }
+            fence();
+            try { current = sources.current(); } catch {
+                fence();
+                throw new AipTerminologySearchV1Error('authorization_denied');
+            }
             fence();
             try { execution = sources.beginPermit(permit, current, claim); }
-            catch { throw new AipTerminologySearchV1Error('authorization_denied'); }
+            catch {
+                fence();
+                throw new AipTerminologySearchV1Error('authorization_denied');
+            }
             began = true;
             fence();
             if (!execution || typeof execution !== 'object' || types.isProxy(execution)
@@ -143,21 +150,33 @@ function buildService(sources: Sources) {
                 throw new AipTerminologySearchV1Error('authorization_denied');
             }
             let raw: unknown;
+            fence();
             try { raw = sources.searchCatalog(input, controller.signal); } catch {
+                fence();
                 throw new AipTerminologySearchV1Error('catalog_invalid');
             }
             fence();
             const settled = types.isPromise(raw)
                 ? await wait(raw as Promise<unknown>, controller.signal, 'catalog_invalid') : raw;
+            fence();
             const items = parseCatalogItems(settled, input);
             let receiptRef: unknown;
-            try { receiptRef = sources.nextReceiptRef(); } catch { throw new AipTerminologySearchV1Error('reference_invalid'); }
+            fence();
+            try { receiptRef = sources.nextReceiptRef(); } catch {
+                fence();
+                throw new AipTerminologySearchV1Error('reference_invalid');
+            }
             fence();
             if (typeof receiptRef !== 'string' || !REF.test(receiptRef) || issuedReceiptRefs.has(receiptRef)) {
                 throw new AipTerminologySearchV1Error('reference_invalid');
             }
             issuedReceiptRefs.add(receiptRef);
-            const timestamp = now();
+            fence();
+            let timestamp: number;
+            try { timestamp = now(); } catch (error) {
+                fence();
+                throw error;
+            }
             fence();
             const receipt = record({ schemaVersion: RECEIPT_SCHEMA, receiptRef, operationId: OPERATION_ID,
                 capabilityId: OPERATION_ID, outcome: 'read' as const, system: input.system, resultCount: items.length,
@@ -168,7 +187,11 @@ function buildService(sources: Sources) {
                 system: input.system, resultCount: items.length, maxStage: 'read_only' as const, egress: 'none' as const,
                 writesPerformed: 0 as const, timestamp, denialCode: null });
             let auditResult: unknown;
-            try { auditResult = sources.writeAudit(audit); } catch { throw new AipTerminologySearchV1Error('audit_failed'); }
+            fence();
+            try { auditResult = sources.writeAudit(audit); } catch {
+                fence();
+                throw new AipTerminologySearchV1Error('audit_failed');
+            }
             fence();
             if (auditResult !== undefined && !types.isPromise(auditResult)) throw new AipTerminologySearchV1Error('audit_failed');
             if (types.isPromise(auditResult)) {
@@ -181,13 +204,20 @@ function buildService(sources: Sources) {
             if (encoder.encode(JSON.stringify(output)).byteLength > AIP_TERMINOLOGY_SEARCH_CONTRACT_V1.limitPolicy.outputMaxBytes) {
                 throw new AipTerminologySearchV1Error('catalog_invalid');
             }
-            try { current = sources.current(); } catch { throw new AipTerminologySearchV1Error('authorization_denied'); }
+            fence();
+            try { current = sources.current(); } catch {
+                fence();
+                throw new AipTerminologySearchV1Error('authorization_denied');
+            }
             fence();
             let finalized: unknown;
             try { finalized = sources.finalizePermit(execution, current, claim); }
-            catch { throw new AipTerminologySearchV1Error('authorization_denied'); }
-            if (finalized !== true) throw new AipTerminologySearchV1Error('authorization_denied');
+            catch {
+                fence();
+                throw new AipTerminologySearchV1Error('authorization_denied');
+            }
             fence();
+            if (finalized !== true) throw new AipTerminologySearchV1Error('authorization_denied');
             return output;
         } catch (error) {
             if (began) {

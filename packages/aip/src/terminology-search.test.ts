@@ -338,6 +338,35 @@ test('nega la pubblicazione dopo una callback sincrona oltre il budget senza cla
         'cooperative_pending_promise_and_post_callback_fence');
 });
 
+test('nega una Promise nativa oltre budget prima di receipt e finalize con un solo denial PHI-safe', async () => {
+    let receiptCalls = 0;
+    let finalized = 0;
+    let denied = 0;
+    const audits: Array<Record<string, unknown>> = [];
+    const service = createAipTerminologySearchServiceV1({
+        now: () => 1_000,
+        nextReceiptRef: () => { receiptCalls += 1; return 'receipt.synthetic.microtask-timeout'; },
+        current: () => CURRENT,
+        ...createPermitPorts({ onFinalize: () => { finalized += 1; }, onDeny: () => { denied += 1; } }),
+        searchCatalog: () => Promise.resolve().then(() => {
+            const startedAt = performance.now();
+            while (performance.now() - startedAt < 320) { /* bounded synthetic microtask stall */ }
+            return [];
+        }),
+        writeAudit: async (record: unknown) => { audits.push(record as Record<string, unknown>); },
+    });
+
+    await assert.rejects(service.execute(Object.freeze(Object.create(null)), {
+        schemaVersion: 'mediflow.terminology.search.input.v1', operationId: BINDING.operation,
+        system: 'LOINC', query: 'sodio', limit: 2,
+    }), (error: unknown) => error instanceof AipTerminologySearchV1Error && error.code === 'timeout');
+    assert.equal(receiptCalls, 0);
+    assert.equal(finalized, 0);
+    assert.equal(denied, 1);
+    assert.deepEqual(audits.map((record) => [record.outcome, record.denialCode]), [['denied', 'timeout']]);
+    assert.doesNotMatch(JSON.stringify(audits[0]), /sodio|items|query/ui);
+});
+
 test('una revoca broker durante la lettura nega la pubblicazione del risultato', async () => {
     const refs = ['agent.synthetic.revoke', 'lease.synthetic.revoke'];
     const broker = createAipOwnerBrokerV1({
@@ -456,6 +485,43 @@ test('nega Proxy e accessor dal catalogo senza invocare trap o consumare output 
         }), (error: unknown) => error instanceof AipTerminologySearchV1Error && error.code === 'catalog_invalid');
     }
     assert.equal(reads, 0);
+});
+
+test('nega surrogate Unicode non appaiati nei campi code e display del catalogo', async () => {
+    const invalidItems = [
+        {
+            system: 'UCUM', code: '\uD800', display: 'synthetic unit', displayIt: undefined,
+            defaultUnit: undefined, version: '2.1', source: 'local-pilot-catalog',
+        },
+        {
+            system: 'UCUM', code: 'synthetic-unit', display: '\uDFFF', displayIt: undefined,
+            defaultUnit: undefined, version: '2.1', source: 'local-pilot-catalog',
+        },
+    ];
+    for (const [index, invalidItem] of invalidItems.entries()) {
+        let receiptCalls = 0;
+        let finalized = 0;
+        const audits: Array<Record<string, unknown>> = [];
+        const service = createAipTerminologySearchServiceV1({
+            now: () => 1_000,
+            nextReceiptRef: () => { receiptCalls += 1; return `receipt.synthetic.surrogate${index}`; },
+            current: () => CURRENT,
+            ...createPermitPorts({ onFinalize: () => { finalized += 1; } }),
+            searchCatalog: () => [invalidItem],
+            writeAudit: async (record: unknown) => { audits.push(record as Record<string, unknown>); },
+        });
+
+        await assert.rejects(service.execute(Object.freeze(Object.create(null)), {
+            schemaVersion: 'mediflow.terminology.search.input.v1', operationId: BINDING.operation,
+            system: 'UCUM', query: 'synthetic unit', limit: 2,
+        }), (error: unknown) => error instanceof AipTerminologySearchV1Error
+            && error.code === 'catalog_invalid');
+        assert.equal(receiptCalls, 0);
+        assert.equal(finalized, 0);
+        assert.deepEqual(audits.map((record) => [record.outcome, record.denialCode]),
+            [['denied', 'catalog_invalid']]);
+        assert.doesNotMatch(JSON.stringify(audits[0]), /synthetic unit|items|query/ui);
+    }
 });
 
 test('normalizza deterministicamente la query e pubblica un output profondamente immutabile', async () => {
