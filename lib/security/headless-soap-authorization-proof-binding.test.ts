@@ -297,3 +297,27 @@ test('rejects a truthy non-boolean Web fence before entropy', async () => {
     assert.equal(entropyCalls, 0);
     assert.equal(current.presentationActive(), false);
 });
+
+test('rejects a delayed duplicate Web binding callback before entropy', async () => {
+    const activeRole = syntheticBinding().lineage.activeRole;
+    let entropyCalls = 0;
+    const current = fixture({
+        activeRole,
+        withCurrentWebSessionBinding: (_candidate, operation) => {
+            const binding = Object.freeze(Object.assign(Object.create(null), {
+                principalRef: activeRole.principalRef,
+                authenticationGeneration: activeRole.authenticationGeneration,
+            })) as WebResourceBinding;
+            operation(binding);
+            queueMicrotask(() => { operation(binding); });
+            return true;
+        },
+        entropy: () => { entropyCalls += 1; return Uint8Array.from({ length: 32 }, (_value, index) => index); },
+    });
+    await assert.rejects(
+        current.owner.service.issue(PRESENTATION, '1234'),
+        (error: unknown) => (error as { code?: unknown }).code === 'presentation_unavailable',
+    );
+    assert.equal(entropyCalls, 0);
+    assert.equal(current.presentationActive(), false);
+});

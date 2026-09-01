@@ -188,14 +188,16 @@ export function createHeadlessSoapAuthorizationProofLifecycleOwner(sources: Head
         const withCurrentWebSessionBinding = sources.withCurrentWebSessionBinding;
         if (!presentationBinding && !withCurrentWebSessionBinding) return true;
         if (!presentationBinding || !withCurrentWebSessionBinding) return false;
-        let webInvoked = false, webDuplicated = false, currentWebBinding: WebSessionBinding | null = null;
+        let webInvoked = false, webDuplicated = false, webClosed = false;
+        let currentWebBinding: WebSessionBinding | null = null;
         let webCurrent = false;
         try {
             webCurrent = withCurrentWebSessionBinding(verifiedSession, (webBinding) => {
-                if (webInvoked) { webDuplicated = true; currentWebBinding = null; return; }
+                if (webClosed || webInvoked) { webDuplicated = true; currentWebBinding = null; return; }
                 webInvoked = true; currentWebBinding = webBinding;
             });
         } catch { return false; }
+        finally { webClosed = true; }
         if (webCurrent !== true || !webInvoked || webDuplicated || !currentWebBinding) return false;
         let presentationInvoked = false, presentationDuplicated = false, matched = false;
         let presentationCurrent = false;
@@ -207,7 +209,8 @@ export function createHeadlessSoapAuthorizationProofLifecycleOwner(sources: Head
                     && currentWebBinding.authenticationGeneration === binding.activeRole.authenticationGeneration;
             });
         } catch { return false; }
-        return presentationCurrent === true && presentationInvoked && !presentationDuplicated && matched;
+        return presentationCurrent === true && presentationInvoked && !presentationDuplicated && matched
+            && !webDuplicated && currentWebBinding !== null;
     };
     const issue = async (token: unknown, candidatePin: unknown): Promise<HeadlessSoapAuthorizationProofIssueResultV1> => {
         if (rejectReentry(null)) return fail('lifecycle_unavailable'); let record: ProofRecord | null = null, upstreamGone = false;
