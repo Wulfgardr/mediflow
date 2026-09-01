@@ -5,7 +5,7 @@ import { types } from 'node:util';
 
 import { TREATMENT_REASONING_SCHEMA_VERSION, type TreatmentReasoningEnvelope } from '../../treatment-reasoning-contract';
 
-const REF = /^[a-z][a-z0-9._-]{2,127}$/u;
+const REF = /^[A-Za-z][A-Za-z0-9._:-]{2,159}$/u;
 const MAX = Object.freeze({ summary: 480, recommendation: 900, text: 400, label: 180, rationale: 400, evidence: 10, reasoning: 8, caveats: 8, flags: 8, actions: 8, refs: 12, bindings: 18, tools: 12, limitations: 8 });
 const ACTIONS = new Set(['no_action', 'review_only', 'open_therapy_form_prefill', 'open_monitoring_form_prefill', 'open_diagnosis_review']);
 const POLICIES = new Set(['no_write', 'review_only', 'form_prefill_only']);

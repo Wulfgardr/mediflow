@@ -7,7 +7,7 @@ export const TREATMENT_REASONING_ATHENA_ADMISSION_SCHEMA = 'mediflow.ai.treatmen
 type Binding = Readonly<{ receiptRef: string; provenanceRef: string; evidenceCount: number }>;
 export type TreatmentReasoningAthenaAdmissionResult = Readonly<{ status: 'admitted'; code: null; admission: Readonly<{ schema: typeof TREATMENT_REASONING_ATHENA_ADMISSION_SCHEMA; capability: 'treatment_reasoning'; stage: 'preview'; review: 'required'; uncertainty: Readonly<{ level: 'low'; source: 'degraded_default' }>; evidence: Readonly<{ source: 'host_minimized'; count: number }>; provenanceRef: string; receiptRef: string }>; writesPerformed: 0; applyPolicy: 'none' }> | Readonly<{ status: 'denied'; code: 'input_invalid'; admission: null; writesPerformed: 0; applyPolicy: 'none' }>;
 
-const REF = /^[a-z][a-z0-9._-]{2,127}$/u;
+const REF = /^[A-Za-z][A-Za-z0-9._:-]{2,159}$/u;
 const COMMON = Object.freeze({ writesPerformed: 0 as const, applyPolicy: 'none' as const });
 const UNCERTAINTY = Object.freeze({ level: 'low' as const, source: 'degraded_default' as const });
 

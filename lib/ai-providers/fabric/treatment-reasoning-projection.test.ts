@@ -15,7 +15,7 @@ const patient = (): Patient => ({
     id: 'patient.synthetic.tr.01', firstName: 'Synthetic', lastName: 'Person',
     taxCode: 'SYNTHETIC0000000', address: 'Synthetic address', phone: '0000000000',
     birthDate: new Date('1950-01-01T00:00:00.000Z'), notes: 'Rivalutare la tolleranza della terapia.',
-    diagnoses: [{ system: 'ICD-11', code: 'SYN-1', description: 'Diagnosi sintetica' }],
+    diagnoses: [{ system: 'ICD-11', code: 'SYN-1', description: 'Diagnosi sintetica', date: NOW }],
     version: 7, createdAt: NOW, updatedAt: NOW,
 });
 const therapy = (): Therapy => ({
