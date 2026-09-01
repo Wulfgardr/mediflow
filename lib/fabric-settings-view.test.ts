@@ -13,8 +13,10 @@ import { VENUE_OBSERVATION_REASONS } from './ai-providers/fabric/routing-observa
 import {
     FABRIC_AVAILABILITY_COPY,
     FABRIC_CAPABILITY_LABELS,
+    PROVIDER_DISCLOSURE_LIFECYCLE_LABELS,
     FABRIC_VENUE_COPY,
     VENUE_OBSERVATION_REASON_LABELS,
+    describeProviderDisclosure,
     describeFabricCapabilityAvailability,
     groupFabricCapabilities,
     parseFabricSnapshotPair,
@@ -73,6 +75,33 @@ test('maps every venue and observation reason exhaustively', () => {
     assert.equal(VENUE_OBSERVATION_REASONS.length, 6);
 });
 
+test('descrive provider dichiarati ed effettivi senza trasformare lifecycle o readiness in runtime', () => {
+    const snapshot = buildFabricStatusSnapshot({
+        ollama: () => ({
+            status: 'available',
+            record: { lifecycle: {
+                schemaVersion: 'mediflow.ai.provider-lifecycle.v1',
+                provider: 'ollama',
+                credentialClass: 'local_model',
+                status: 'available_unqualified',
+            } },
+        }),
+        athena: () => ({ status: 'denied', reason: 'missing' }),
+    });
+    const [ollama, athena, openai] = snapshot.providerDisclosure.providers.map(describeProviderDisclosure);
+
+    assert.equal(ollama.lifecycle, PROVIDER_DISCLOSURE_LIFECYCLE_LABELS.available_unqualified);
+    assert.equal(ollama.runtimeObservation, 'Non osservata: serve una receipt dell’operazione corrente.');
+    assert.equal(ollama.executionDisposition, 'Nessuna esecuzione corrente osservata');
+    assert.equal(ollama.effectiveVenue, 'Non osservata');
+    assert.equal(ollama.effectiveEgress, 'Non osservato');
+    assert.equal(athena.lifecycle, 'Lifecycle assente');
+    assert.equal(athena.executionDisposition, 'Negata dal contratto');
+    assert.equal(openai.lifecycle, 'Non applicabile');
+    assert.equal(openai.executionDisposition, 'Esecuzione disabilitata');
+    assert.equal(openai.accessBoundary, 'Un abbonamento consumer non equivale all’accesso API.');
+});
+
 test('groups and orders the complete registry by capability class', () => {
     const capabilities = Object.values(FABRIC_CAPABILITY_DESCRIPTORS).map((descriptor) => ({
         id: descriptor.id,
@@ -108,6 +137,7 @@ test('rejects every non-canonical capability field and unexpected status key', (
     };
     const valid = () => structuredClone(buildFabricStatusSnapshot()) as unknown as Record<string, unknown> & {
         capabilities: Array<Record<string, unknown>>;
+        providerDisclosure: { providers: Array<Record<string, unknown>> };
     };
     assert.equal(parseFabricSnapshotPair(valid(), observability).status.capabilities.length, 16);
 
@@ -199,6 +229,32 @@ test('rejects every non-canonical capability field and unexpected status key', (
         assert.throws(
             () => parseFabricSnapshotPair(status, observability),
             /Snapshot Fabric non conforme/u,
+            label,
+        );
+    }
+
+    for (const [label, mutate] of [
+        ['provider order drift', (status: ReturnType<typeof valid>) => {
+            status.providerDisclosure.providers.reverse();
+        }],
+        ['provider runtime overclaim', (status: ReturnType<typeof valid>) => {
+            (status.providerDisclosure.providers[0].effective as Record<string, unknown>).runtimeObservation = 'observed';
+        }],
+        ['provider venue leak', (status: ReturnType<typeof valid>) => {
+            (status.providerDisclosure.providers[0].effective as Record<string, unknown>).venue = 'local_process';
+        }],
+        ['cloud execution drift', (status: ReturnType<typeof valid>) => {
+            (status.providerDisclosure.providers[2].effective as Record<string, unknown>).executionDisposition = 'not_observed';
+        }],
+        ['provider secret field', (status: ReturnType<typeof valid>) => {
+            status.providerDisclosure.providers[0].endpoint = 'synthetic-local-endpoint';
+        }],
+    ] as const) {
+        const status = valid();
+        mutate(status);
+        assert.throws(
+            () => parseFabricSnapshotPair(status, observability),
+            /Disclosure provider Fabric non conforme/u,
             label,
         );
     }

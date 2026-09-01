@@ -22,6 +22,12 @@ import {
 } from './ai-providers/fabric/routing-observability';
 import type { FabricStatusSnapshot } from './ai-providers/fabric/status';
 import { FABRIC_CAPABILITY_DESCRIPTORS } from './ai-providers/fabric/catalog';
+import {
+    PROVIDER_DISCLOSURE_IDS,
+    buildProviderDisclosureSnapshot,
+    type ProviderDisclosureLifecycle,
+    type ProviderDisclosureRow,
+} from './ai-providers/fabric/provider-disclosure';
 
 export type FabricStatusCapability = FabricStatusSnapshot['capabilities'][number];
 
@@ -64,6 +70,71 @@ export const VENUE_OBSERVATION_STATE_LABELS: Readonly<Record<VenueObservationSta
     offline: 'Non disponibile',
     unknown: 'Stato non verificato',
 });
+
+export const PROVIDER_DISCLOSURE_LIFECYCLE_LABELS: Readonly<
+    Record<ProviderDisclosureLifecycle, string>
+> = Object.freeze({
+    available_unqualified: 'Lifecycle ammesso; readiness non qualificata',
+    degraded: 'Lifecycle degradato',
+    revoked: 'Lifecycle revocato',
+    missing: 'Lifecycle assente',
+    corrupt: 'Lifecycle non leggibile',
+    unavailable: 'Lifecycle non disponibile',
+    invalid: 'Lifecycle non valido',
+    not_applicable: 'Non applicabile',
+});
+
+export type ProviderDisclosurePresentation = Readonly<{
+    declaredLifecycle: string;
+    declaredRuntimeObservation: string;
+    declaredVenue: string;
+    declaredEgress: string;
+    declaredCredentialClass: string;
+    declaredExecutionDisposition: string;
+    lifecycle: string;
+    runtimeObservation: string;
+    effectiveVenue: string;
+    effectiveEgress: string;
+    effectiveCredentialClass: string;
+    executionDisposition: string;
+    accessBoundary: string;
+}>;
+
+export function describeProviderDisclosure(
+    provider: ProviderDisclosureRow,
+): ProviderDisclosurePresentation {
+    return Object.freeze({
+        declaredLifecycle: provider.declared.lifecycle === 'host_managed'
+            ? 'Gestito dall’host'
+            : 'Solo informativo',
+        declaredRuntimeObservation: provider.declared.runtimeObservation === 'operation_receipt_required'
+            ? 'Richiede la receipt dell’operazione corrente'
+            : 'Disabilitata',
+        declaredVenue: FABRIC_VENUE_COPY[provider.declared.venue].title,
+        declaredEgress: provider.declared.egress === 'none' ? 'Nessuna' : 'Disabilitata',
+        declaredCredentialClass: provider.declared.credentialClass === 'local_model'
+            ? 'Modello locale'
+            : 'Accesso API separato',
+        declaredExecutionDisposition: provider.declared.executionDisposition === 'proposal_only_candidate'
+            ? 'Candidato locale, massimo solo proposta'
+            : 'Esecuzione disabilitata',
+        lifecycle: PROVIDER_DISCLOSURE_LIFECYCLE_LABELS[provider.effective.lifecycle],
+        runtimeObservation: 'Non osservata: serve una receipt dell’operazione corrente.',
+        effectiveVenue: 'Non osservata',
+        effectiveEgress: 'Non osservato',
+        effectiveCredentialClass: provider.effective.credentialClass === 'local_model'
+            ? 'Modello locale'
+            : 'Non osservata',
+        executionDisposition: provider.effective.executionDisposition === 'not_observed'
+            ? 'Nessuna esecuzione corrente osservata'
+            : provider.effective.executionDisposition === 'denied_by_contract'
+                ? 'Negata dal contratto'
+                : 'Esecuzione disabilitata',
+        accessBoundary: provider.declared.accessBoundary === 'consumer_subscription_is_not_api_access'
+            ? 'Un abbonamento consumer non equivale all’accesso API.'
+            : 'Non applicabile.',
+    });
+}
 
 export const FABRIC_CAPABILITY_LABELS: Readonly<Record<FabricCapabilityId, string>> = Object.freeze({
     patient_insight: 'Sintesi del quadro paziente',
@@ -247,6 +318,7 @@ const FABRIC_STATUS_KEYS = Object.freeze([
     'capabilities',
     'contractVersion',
     'egressGateOpen',
+    'providerDisclosure',
     'readinessNote',
     'schemaVersion',
 ] as const);
@@ -269,6 +341,30 @@ const FABRIC_STATUS_EGRESS_PROFILE_KEYS = Object.freeze([
     'version',
 ] as const);
 
+const PROVIDER_DISCLOSURE_KEYS = Object.freeze(['providers', 'schemaVersion'] as const);
+const PROVIDER_DISCLOSURE_ROW_KEYS = Object.freeze(['declared', 'effective', 'id', 'label'] as const);
+const PROVIDER_DECLARED_KEYS = Object.freeze([
+    'accessBoundary',
+    'credentialClass',
+    'egress',
+    'executionDisposition',
+    'lifecycle',
+    'runtimeObservation',
+    'venue',
+] as const);
+const PROVIDER_EFFECTIVE_KEYS = Object.freeze([
+    'credentialClass',
+    'egress',
+    'executionDisposition',
+    'lifecycle',
+    'runtimeObservation',
+    'venue',
+] as const);
+const CANONICAL_PROVIDER_DISCLOSURE = buildProviderDisclosureSnapshot({
+    ollama: () => ({ status: 'denied', reason: 'unavailable' }),
+    athena: () => ({ status: 'denied', reason: 'unavailable' }),
+});
+
 function hasExactKeys(value: object, expected: readonly string[]): boolean {
     const keys = Object.keys(value);
     return keys.length === expected.length && keys.every((key) => expected.includes(key));
@@ -278,6 +374,57 @@ function equalsStringArray(value: unknown, expected: readonly string[]): boolean
     return Array.isArray(value)
         && value.length === expected.length
         && value.every((item, index) => item === expected[index]);
+}
+
+function isCanonicalProviderDisclosure(value: unknown): boolean {
+    if (!value || typeof value !== 'object' || Array.isArray(value)
+        || !hasExactKeys(value, PROVIDER_DISCLOSURE_KEYS)) return false;
+    const disclosure = value as Record<string, unknown>;
+    if (disclosure.schemaVersion !== 'mediflow.ai.provider-disclosure.v1'
+        || !Array.isArray(disclosure.providers)
+        || disclosure.providers.length !== PROVIDER_DISCLOSURE_IDS.length) return false;
+
+    return disclosure.providers.every((candidate, index) => {
+        if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)
+            || !hasExactKeys(candidate, PROVIDER_DISCLOSURE_ROW_KEYS)) return false;
+        const row = candidate as Record<string, unknown>;
+        const expected = CANONICAL_PROVIDER_DISCLOSURE.providers[index];
+        const declared = row.declared;
+        const effective = row.effective;
+        if (row.id !== expected.id || row.label !== expected.label
+            || !declared || typeof declared !== 'object' || Array.isArray(declared)
+            || !hasExactKeys(declared, PROVIDER_DECLARED_KEYS)
+            || !effective || typeof effective !== 'object' || Array.isArray(effective)
+            || !hasExactKeys(effective, PROVIDER_EFFECTIVE_KEYS)) return false;
+        const declaredRecord = declared as Record<string, unknown>;
+        const expectedDeclared = expected.declared as Record<string, unknown>;
+        if (PROVIDER_DECLARED_KEYS.some((key) => declaredRecord[key] !== expectedDeclared[key])) return false;
+
+        const effectiveRecord = effective as Record<string, unknown>;
+        if (effectiveRecord.runtimeObservation !== 'not_observed'
+            || effectiveRecord.venue !== null
+            || effectiveRecord.egress !== null) return false;
+        const local = index < 2;
+        if (!local) {
+            return effectiveRecord.lifecycle === 'not_applicable'
+                && effectiveRecord.credentialClass === null
+                && effectiveRecord.executionDisposition === 'execution_disabled';
+        }
+        const lifecycle = effectiveRecord.lifecycle;
+        const lifecycleObserved = lifecycle === 'available_unqualified'
+            || lifecycle === 'degraded'
+            || lifecycle === 'revoked';
+        const denied = lifecycle !== 'available_unqualified';
+        return (
+            lifecycleObserved
+            || lifecycle === 'missing'
+            || lifecycle === 'corrupt'
+            || lifecycle === 'unavailable'
+            || lifecycle === 'invalid'
+        )
+            && effectiveRecord.credentialClass === (lifecycleObserved ? 'local_model' : null)
+            && effectiveRecord.executionDisposition === (denied ? 'denied_by_contract' : 'not_observed');
+    });
 }
 
 export function parseFabricSnapshotPair(
@@ -301,6 +448,7 @@ export function parseFabricSnapshotPair(
         || status.readinessNote !== 'available_unqualified'
         || !('capabilities' in status)
         || !Array.isArray(status.capabilities)
+        || !('providerDisclosure' in status)
         || !observability
         || typeof observability !== 'object'
         || !('schemaVersion' in observability)
@@ -311,6 +459,10 @@ export function parseFabricSnapshotPair(
         || !Array.isArray(observability.observations)
     ) {
         throw new Error('Snapshot Fabric non conforme al contratto atteso.');
+    }
+
+    if (!isCanonicalProviderDisclosure(status.providerDisclosure)) {
+        throw new Error('Disclosure provider Fabric non conforme.');
     }
 
     const capabilityIds = new Set<string>([

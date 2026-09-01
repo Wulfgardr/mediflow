@@ -39,7 +39,7 @@ export default function SettingsAiModelsPage() {
             <SettingsSectionIntro
                 kicker="Intelligenza locale"
                 title="Modelli e hardware"
-                description="Profilo hardware, modelli e Ollama per ciascun ruolo clinico."
+                description="Profilo hardware e modelli Ollama per i ruoli generali. ATHENA mantiene una lane locale separata."
             />
 
             <div className="space-y-6">
@@ -94,7 +94,7 @@ export default function SettingsAiModelsPage() {
                                 {hardwareProfile === 'high' && <CheckCircle className="w-4 h-4" style={{ color: 'var(--lume-ink)' }} />}
                             </div>
                             <p className="text-sm font-semibold" style={{ color: 'var(--lume-ink)' }}>&gt; 32GB RAM</p>
-                            <p className="mt-1 text-[11px] leading-5" style={{ color: 'var(--lume-ink-muted)' }}>Qwen 3.5 35B A3B per tutte le superfici text-only.</p>
+                            <p className="mt-1 text-[11px] leading-5" style={{ color: 'var(--lume-ink-muted)' }}>Qwen 3.5 35B A3B per le superfici text-only generali.</p>
                         </div>
                     </div>
                 </div>
@@ -108,8 +108,8 @@ export default function SettingsAiModelsPage() {
                         </div>
                         <div className="min-w-0">
                             <p className="section-kicker">Ruoli del team AI</p>
-                            <h3 className="mt-1 text-base font-semibold" style={{ color: 'var(--lume-ink)' }}>Modelli per superficie clinica</h3>
-                            <p className="mt-1 text-xs" style={{ color: 'var(--lume-ink-muted)' }}>Ogni ruolo usa un modello dedicato.</p>
+                            <h3 className="mt-1 text-base font-semibold" style={{ color: 'var(--lume-ink)' }}>Modelli Ollama per ruoli generali</h3>
+                            <p className="mt-1 text-xs" style={{ color: 'var(--lume-ink-muted)' }}>Queste selezioni non configurano la lane Treatment Reasoning.</p>
                         </div>
                     </div>
 
@@ -135,7 +135,7 @@ export default function SettingsAiModelsPage() {
                         <ModelSelector
                             selectorId="reasoning"
                             label="Internista (Reasoning)"
-                            description="Per riassunti narrativi, chat complesse e Second Opinion."
+                            description="Per riassunti narrativi e supporto testuale generale; non governa la revisione terapeutica ATHENA."
                             icon={<Cpu className="w-5 h-5" />}
                             value={aiConfig.model_reasoning}
                             onChange={(val) => setAiConfig({ ...aiConfig, model_reasoning: val })}
@@ -176,13 +176,13 @@ export default function SettingsAiModelsPage() {
                         <div className="min-w-0">
                             <p className="section-kicker">Connessione locale</p>
                             <h3 className="mt-1 text-base font-semibold text-slate-900 dark:text-white">Provider</h3>
-                            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Ollama è l&apos;unico provider supportato.</p>
+                            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Ollama per i ruoli generali. Treatment Reasoning usa la lane locale ATHENA separata.</p>
                         </div>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div className="flex items-center rounded-[18px] border border-slate-200/70 bg-white/72 px-3 py-3 text-sm text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
-                            Provider AI: <span className="ml-2 font-semibold text-slate-900 dark:text-white">Ollama</span>
+                            Provider AI per ruoli generali: <span className="ml-2 font-semibold text-slate-900 dark:text-white">Ollama</span>
                         </div>
                         <input
                             type="text"
