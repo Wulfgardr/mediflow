@@ -16,7 +16,7 @@ export const ANYDOC_PDF_PAGE_RENDERER_MAX_PIXELS = 12_000_000;
 export const ANYDOC_PDF_PAGE_RENDERER_MAX_RASTER_BYTES = 16 * 1024 * 1024;
 export const ANYDOC_PDF_PAGE_RENDERER_MAX_TOTAL_RASTER_BYTES = 32 * 1024 * 1024;
 export const ANYDOC_PDF_PAGE_RENDERER_PAGE_TIMEOUT_MS = 10_000;
-export const ANYDOC_PDF_PAGE_RENDERER_CLEANUP_TIMEOUT_MS = 250;
+export const ANYDOC_PDF_PAGE_RENDERER_CLEANUP_OBSERVATION_MS = 250;
 const PDFJS_VERSION = '4.10.38';
 const PDFJS_TARBALL_SHA256 = '1011b38553532d7078c59f26b15a471f8dae00f101b60e2add9b8511737a1ce0';
 const CANVAS_VERSION = '0.1.100';
@@ -29,11 +29,10 @@ export const ANYDOC_PDF_PAGE_RENDERER_ENGINE_DESCRIPTOR = [
     'backend=@napi-rs/canvas@0.1.100;integrity=sha512-xglYA6q3XO5P3BNJYxVZ1IV7DLVjp1Py6nwag88YntrS+3vKHyYcMqXVS4ZztJmwz2uGvz1FWhI/4LgbR5uQDA==;tarballSha256=ec7dc504d4ade7fd36846d16643e50eed5c914335f3a86b6a2a8d632391e5bfa',
     'backendProfile=@napi-rs/canvas-darwin-arm64@0.1.100;integrity=sha512-2PcswRaC7Ly645DGt88///zuFDhJxJYdKAs1uU3mfk1atYkXufgcgLfBpk6Tm12nCQBaNt1wpybuPZ4qOhTo8A==;tarballSha256=c7c8dcb69aae6ddb58fe23e5f20d1c772a8065b077560f5a18336307779add91',
     `profile=${ANYDOC_PDF_PAGE_RENDERER_RUNTIME_PROFILE_ID};platform=darwin;arch=arm64;node=24`,
-    'options=disableWorker:true,isEvalSupported:false,useSystemFonts:false,useWorkerFetch:false,stopAtErrors:true,disableRange:true,disableStream:true,disableAutoFetch:true',
-    `limits=dpi:${ANYDOC_PDF_PAGE_RENDERER_DPI},pages:${ANYDOC_PDF_PAGE_RENDERER_MAX_PAGES},dimension:${ANYDOC_PDF_PAGE_RENDERER_MAX_DIMENSION_PIXELS},pixels:${ANYDOC_PDF_PAGE_RENDERER_MAX_PIXELS},raster:${ANYDOC_PDF_PAGE_RENDERER_MAX_RASTER_BYTES},totalRaster:${ANYDOC_PDF_PAGE_RENDERER_MAX_TOTAL_RASTER_BYTES},pageTimeout:${ANYDOC_PDF_PAGE_RENDERER_PAGE_TIMEOUT_MS},cleanupTimeout:${ANYDOC_PDF_PAGE_RENDERER_CLEANUP_TIMEOUT_MS}`,
+    'options=disableWorker:true,isEvalSupported:false,useSystemFonts:false,useWorkerFetch:false,stopAtErrors:true,disableRange:true,disableStream:true,disableAutoFetch:true,postDeadlineFence:true,durationMode:actual',
+    `limits=dpi:${ANYDOC_PDF_PAGE_RENDERER_DPI},pages:${ANYDOC_PDF_PAGE_RENDERER_MAX_PAGES},dimension:${ANYDOC_PDF_PAGE_RENDERER_MAX_DIMENSION_PIXELS},pixels:${ANYDOC_PDF_PAGE_RENDERER_MAX_PIXELS},raster:${ANYDOC_PDF_PAGE_RENDERER_MAX_RASTER_BYTES},totalRaster:${ANYDOC_PDF_PAGE_RENDERER_MAX_TOTAL_RASTER_BYTES},pageTimeout:${ANYDOC_PDF_PAGE_RENDERER_PAGE_TIMEOUT_MS},cleanupMode:cooperative,cleanupObservation:${ANYDOC_PDF_PAGE_RENDERER_CLEANUP_OBSERVATION_MS}`,
 ].join('\n');
-export const ANYDOC_PDF_PAGE_RENDERER_ENGINE_SHA256 = createHash('sha256')
-    .update(ANYDOC_PDF_PAGE_RENDERER_ENGINE_DESCRIPTOR).digest('hex');
+export const ANYDOC_PDF_PAGE_RENDERER_ENGINE_SHA256 = createHash('sha256').update(ANYDOC_PDF_PAGE_RENDERER_ENGINE_DESCRIPTOR).digest('hex');
 const SHA256 = /^[a-f0-9]{64}$/u;
 const runtimeRequire = createRequire(import.meta.url);
 const sha256 = (value: Uint8Array | string) => createHash('sha256').update(value).digest('hex');
@@ -211,24 +210,25 @@ async function loadEngine(): Promise<RendererEngine | null> {
 function observeCleanup(action: () => unknown): Promise<void> {
     try {
         const value = action();
-        if (!types.isPromise(value) || types.isProxy(value)) return Promise.resolve();
+        if (types.isProxy(value) || !types.isPromise(value)) return Promise.resolve();
         return new Promise((resolve) => { Reflect.apply(Promise.prototype.then, value,
             [() => resolve(), () => resolve()]); });
     } catch { return Promise.resolve(); }
 }
-async function cleanupBounded(page: PdfPage | null, document: PdfDocument | null, loading: LoadingTask | null,
-    timeoutMs: number): Promise<void> {
+/** Cooperative observation only: synchronous engine cleanup hooks cannot be preempted. */
+async function cleanupCooperative(page: PdfPage | null, document: PdfDocument | null, loading: LoadingTask | null, observationMs: number): Promise<void> {
+    let timer: ReturnType<typeof setTimeout> | undefined; const observation = new Promise<void>((resolve) => { timer = setTimeout(resolve, observationMs); });
     try { page?.cleanup(); } catch { /* cleanup is best-effort after denial */ }
     const pending = [document && observeCleanup(() => document.cleanup()), loading && observeCleanup(() => loading.destroy())]
         .filter((value): value is Promise<void> => value !== null);
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    try { await Promise.race([Promise.all(pending), new Promise<void>((resolve) => { timer = setTimeout(resolve, timeoutMs); })]); }
+    try { await Promise.race([Promise.all(pending), observation]); }
     finally { if (timer) clearTimeout(timer); }
 }
 async function renderPage(engine: RendererEngine, bytes: Buffer, timeoutMs = ANYDOC_PDF_PAGE_RENDERER_PAGE_TIMEOUT_MS,
-    cleanupTimeoutMs = ANYDOC_PDF_PAGE_RENDERER_CLEANUP_TIMEOUT_MS): Promise<{ pngBytes: Buffer; width: number; height: number }> {
+    cleanupObservationMs = ANYDOC_PDF_PAGE_RENDERER_CLEANUP_OBSERVATION_MS): Promise<{ pngBytes: Buffer; width: number; height: number }> {
     let loading: LoadingTask | null = null; let document: PdfDocument | null = null; let page: PdfPage | null = null;
     let task: RenderTask | null = null; let canvas: RasterCanvas | null = null; let timer: ReturnType<typeof setTimeout>;
+    const deadlineAt = performance.now() + timeoutMs;
     const timeout = new Promise<never>((_resolve, reject) => { timer = setTimeout(() => {
         try { task?.cancel(); } catch { /* cancellation is host-owned and best-effort */ }
         reject(new PageRenderTimeout());
@@ -249,16 +249,17 @@ async function renderPage(engine: RendererEngine, bytes: Buffer, timeoutMs = ANY
         canvas = engine.createCanvas(width, height); task = page.render({ canvasContext: canvas.getContext('2d'), viewport, background: '#ffffff' });
         await bounded(task.promise);
         const pngBytes = Buffer.from(canvas.toBuffer('image/png'));
+        if (performance.now() >= deadlineAt) throw new PageRenderTimeout();
         if (pngBytes.byteLength < 8 || pngBytes.byteLength > ANYDOC_PDF_PAGE_RENDERER_MAX_RASTER_BYTES) throw new RangeError('resource_limit');
         return { pngBytes, width, height };
     } finally {
-        clearTimeout(timer!); await cleanupBounded(page, document, loading, cleanupTimeoutMs);
+        await cleanupCooperative(page, document, loading, Math.min(cleanupObservationMs, Math.max(0, deadlineAt - performance.now()))); clearTimeout(timer!);
+        if (performance.now() >= deadlineAt) throw new PageRenderTimeout();
         if (canvas) { canvas.width = 0; canvas.height = 0; }
     }
 }
 /** @internal Test-only engine seam; the public renderer remains host-owned and accepts no engine or limits. */
-export const ANYDOC_PDF_PAGE_RENDERER_INTERNAL_TEST_SEAM = Object.freeze({ renderPage: (engine: RendererEngine, bytes: Buffer) =>
-    renderPage(engine, Buffer.from(bytes), 20, 20) });
+export const ANYDOC_PDF_PAGE_RENDERER_INTERNAL_TEST_SEAM = Object.freeze({ renderPage: (engine: RendererEngine, bytes: Buffer) => renderPage(engine, Buffer.from(bytes), 20, 20) });
 async function renderSnapshot(snapshot: Snapshot): Promise<AnyDocPdfPageRendererResult> {
     const engine = await loadEngine(); if (!engine) return denied('engine_unavailable');
     const pages: Array<Readonly<{ page: number; pngBytes: Buffer; receipt: AnyDocPdfPageRenderReceipt }>> = [];
@@ -268,7 +269,7 @@ async function renderSnapshot(snapshot: Snapshot): Promise<AnyDocPdfPageRenderer
         try {
             const raster = await renderPage(engine, input.pdfBytes); totalRasterBytes += raster.pngBytes.byteLength;
             if (totalRasterBytes > ANYDOC_PDF_PAGE_RENDERER_MAX_TOTAL_RASTER_BYTES) return denied('resource_limit');
-            const durationMs = Math.min(ANYDOC_PDF_PAGE_RENDERER_PAGE_TIMEOUT_MS, Math.max(0, Math.ceil(performance.now() - started)));
+            const durationMs = Math.max(0, Math.ceil(performance.now() - started));
             const receipt: AnyDocPdfPageRenderReceipt = Object.freeze({ ...snapshot.sourceBinding, page: input.page,
                 admission: 'needsOcr', pageSha256: input.pageSha256, pageByteLength: input.pageByteLength,
                 routingSha256: snapshot.routingSha256, materializerSha256: ANYDOC_PDF_PAGE_MATERIALIZER_SHA256,
