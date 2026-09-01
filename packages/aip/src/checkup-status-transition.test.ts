@@ -286,23 +286,22 @@ test('nega proof assente, Proxy, callback zero o doppia e risultati asincroni', 
 });
 
 test('linearizza reentry e un solo commit vince', () => {
-    let service: ReturnType<typeof createHeadlessCheckupStatusTransitionServiceV1>;
-    let proposalRef = '';
-    let proof: object;
+    const context: { service?: ReturnType<typeof createHeadlessCheckupStatusTransitionServiceV1>;
+        proposalRef: string; proof?: object } = { proposalRef: '' };
     let nestedCode = '';
     const h = harness({
         commit: ((command: unknown) => {
-            try { service.confirm(proposalRef, proof); } catch (error) {
+            try { context.service!.confirm(context.proposalRef, context.proof!); } catch (error) {
                 nestedCode = (error as HeadlessCheckupStatusTransitionV1Error).code;
             }
             const targetStatus = (command as { targetStatus: 'completed' | 'cancelled' }).targetStatus;
             return record({ status: 'committed', receipt: h.receipt(targetStatus) });
         }) as never,
     });
-    service = h.service;
-    proof = h.proof;
-    proposalRef = service.preview(input()).proposalRef;
-    const receipt = service.confirm(proposalRef, proof);
+    context.service = h.service;
+    context.proof = h.proof;
+    context.proposalRef = h.service.preview(input()).proposalRef;
+    const receipt = h.service.confirm(context.proposalRef, h.proof);
 
     assert.equal(receipt.outcome, 'status_transitioned');
     assert.equal(nestedCode, 'proof_replayed');
@@ -310,24 +309,24 @@ test('linearizza reentry e un solo commit vince', () => {
 });
 
 test('la revoca reentrante durante read o commit impedisce pubblicazione ed esito', () => {
-    let readService: ReturnType<typeof createHeadlessCheckupStatusTransitionServiceV1>;
+    const readContext: { service?: ReturnType<typeof createHeadlessCheckupStatusTransitionServiceV1> } = {};
     const available = record({ status: 'available' as const, ownerIdentity: handle(), resourceIdentity: handle(),
         fromStatus: 'pending' as const, revision: 7, generation: 3, revocationGeneration: 0, selectionEpoch: 9 });
-    const read = harness({ readSnapshot: (() => { readService.dispose(); return available; }) as never });
-    readService = read.service;
-    assert.throws(() => readService.preview(input()), hasCode('operation_unavailable'));
+    const read = harness({ readSnapshot: (() => { readContext.service!.dispose(); return available; }) as never });
+    readContext.service = read.service;
+    assert.throws(() => read.service.preview(input()), hasCode('operation_unavailable'));
 
-    let commitService: ReturnType<typeof createHeadlessCheckupStatusTransitionServiceV1>;
+    const commitContext: { service?: ReturnType<typeof createHeadlessCheckupStatusTransitionServiceV1> } = {};
     const commit = harness({
         commit: ((command: unknown) => {
-            commitService.dispose();
+            commitContext.service!.dispose();
             const targetStatus = (command as { targetStatus: 'completed' | 'cancelled' }).targetStatus;
             return record({ status: 'committed', receipt: commit.receipt(targetStatus) });
         }) as never,
     });
-    commitService = commit.service;
-    const preview = commitService.preview(input());
-    assert.throws(() => commitService.confirm(preview.proposalRef, commit.proof), hasCode('operation_unavailable'));
+    commitContext.service = commit.service;
+    const preview = commit.service.preview(input());
+    assert.throws(() => commit.service.confirm(preview.proposalRef, commit.proof), hasCode('operation_unavailable'));
 });
 
 test('propaga solo denial commit ammessi e respinge receipt o return ostili', async () => {
