@@ -10,13 +10,13 @@ import {
 } from '../../packages/aip/src/checkup-status-transition';
 import { dbServer, runDbServerImmediateTransaction } from '../db-server';
 
-const SOURCE_KEYS = ['readBrokerScope'] as const;
+const SOURCE_KEYS = ['now', 'readHostScopeCandidate'] as const;
 const SCOPE_KEYS = ['status', 'actorRef', 'patientId', 'ambulatoryId', 'checkupId', 'generation',
     'revocationGeneration', 'selectionEpoch'] as const;
 const SCOPE_DENIED_KEYS = ['status', 'code'] as const;
 const COMMAND_KEYS = ['operationId', 'capabilityId', 'idempotencyKey', 'commandDigest', 'ownerIdentity',
     'resourceIdentity', 'fromStatus', 'targetStatus', 'expectedRevision', 'generation', 'revocationGeneration',
-    'selectionEpoch', 'proofRefHash', 'confirmedAt'] as const;
+    'selectionEpoch', 'expiresAt', 'proofRefHash', 'confirmedAt'] as const;
 const RECEIPT_KEYS = ['schemaVersion', 'operationId', 'capabilityId', 'outcome', 'denialCode', 'fromStatus',
     'toStatus', 'previousRevision', 'newRevision', 'ownerRefHash', 'resourceRefHash', 'proofRefHash',
     'receiptRefHash', 'generation', 'revocationGeneration', 'selectionEpoch', 'timestamp'] as const;
@@ -43,7 +43,7 @@ type Command = Record<(typeof COMMAND_KEYS)[number], unknown>;
 
 class CommitAbort extends Error {
     constructor(readonly code: 'scope_changed' | 'revision_conflict' | 'transition_unavailable'
-        | 'idempotency_conflict' | 'audit_unavailable' | 'commit_unavailable') { super(code); }
+        | 'idempotency_conflict' | 'audit_unavailable' | 'commit_unavailable' | 'preview_expired') { super(code); }
 }
 
 function record<T extends object>(value: T): Readonly<T> {
@@ -131,16 +131,30 @@ function parseReceipt(value: unknown, command: Command, resource: Resource,
 /** Owns the synchronous SQLite CAS and persists the receipt inside its append-only audit event. */
 export function createHeadlessCheckupStatusTransitionStorageV1(sourcesValue: unknown) {
     const sources = exact(sourcesValue, SOURCE_KEYS, false);
-    if (!sources || typeof sources.readBrokerScope !== 'function') throw new Error('checkup status storage unavailable');
-    const readBrokerScope = sources.readBrokerScope as () => unknown;
+    if (!sources || typeof sources.now !== 'function' || typeof sources.readHostScopeCandidate !== 'function') {
+        throw new Error('checkup status storage unavailable');
+    }
+    const nowSource = sources.now as () => unknown;
+    const readHostScopeCandidate = sources.readHostScopeCandidate as () => unknown;
     const ownerIdentity = Object.freeze(Object.create(null));
     const ownerSecret = randomBytes(32).toString('hex');
     const resourcesByRef = new Map<string, Resource>(), resourcesByIdentity = new WeakMap<object, Resource>();
     let currentResource: Resource | null = null, restartGeneration = 0, disposed = false;
+    let lastNow = -1;
+
+    const now = (): number => {
+        let candidate: unknown;
+        try { candidate = nowSource(); } catch { throw new CommitAbort('commit_unavailable'); }
+        if (isPromise(candidate) || !integer(candidate) || candidate < lastNow) {
+            throw new CommitAbort('commit_unavailable');
+        }
+        lastNow = candidate;
+        return candidate;
+    };
 
     const readScope = (): Scope | ReturnType<typeof denied> => {
         let candidate: unknown;
-        try { candidate = readBrokerScope(); } catch { return denied('session_unavailable'); }
+        try { candidate = readHostScopeCandidate(); } catch { return denied('session_unavailable'); }
         if (isPromise(candidate)) return denied('session_unavailable');
         const unavailable = exact(candidate, SCOPE_DENIED_KEYS, true);
         if (unavailable?.status === 'denied' && SCOPE_DENIALS.has(String(unavailable.code))) {
@@ -220,7 +234,8 @@ export function createHeadlessCheckupStatusTransitionStorageV1(sourcesValue: unk
             || !integer(command.expectedRevision, 1) || command.expectedRevision >= Number.MAX_SAFE_INTEGER
             || !integer(command.generation, 1)
             || !integer(command.revocationGeneration) || !integer(command.selectionEpoch)
-            || !integer(command.confirmedAt) || typeof command.idempotencyKey !== 'string'
+            || !integer(command.confirmedAt) || !integer(command.expiresAt, (command.confirmedAt as number) + 1)
+            || typeof command.idempotencyKey !== 'string'
             || !IDEMPOTENCY_KEY.test(command.idempotencyKey) || typeof command.commandDigest !== 'string'
             || !DIGEST.test(command.commandDigest) || typeof command.proofRefHash !== 'string'
             || !DIGEST.test(command.proofRefHash)) return denied('commit_unavailable');
@@ -247,6 +262,7 @@ export function createHeadlessCheckupStatusTransitionStorageV1(sourcesValue: unk
                     generation: command.generation as number, revocationGeneration: command.revocationGeneration as number,
                     selectionEpoch: command.selectionEpoch as number, timestamp: command.confirmedAt as number });
                 const seconds = Math.floor((command.confirmedAt as number) / 1_000);
+                if (now() >= (command.expiresAt as number)) throw new CommitAbort('preview_expired');
                 const updated = dbServer.$client.prepare(`UPDATE checkups SET status = ?, version = version + 1, updated_at = ?
                     WHERE id = ? AND patient_id = ? AND status = 'pending' AND version = ? AND deleted_at IS NULL
                     AND EXISTS (SELECT 1 FROM patients_to_ambulatories WHERE patient_id = ? AND ambulatory_id = ?)`)

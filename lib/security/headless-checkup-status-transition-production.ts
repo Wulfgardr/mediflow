@@ -11,7 +11,7 @@ import {
 } from '../../packages/aip/src/checkup-status-transition';
 import { createHeadlessCheckupStatusTransitionStorageV1 } from './headless-checkup-status-transition-storage';
 
-const SOURCE_KEYS = ['now', 'readBrokerScope'] as const;
+const SOURCE_KEYS = ['now', 'readHostScopeCandidate'] as const;
 const BINDING_KEYS = ['operationId', 'proposalRef', 'commandDigest', 'ownerIdentity', 'resourceIdentity',
     'targetStatus', 'expectedRevision', 'generation', 'revocationGeneration', 'selectionEpoch', 'expiresAt'] as const;
 const PROPOSAL_REF = /^hcsp_[0-9a-f]{64}$/u;
@@ -64,15 +64,39 @@ function safeClock(source: () => unknown) {
     };
 }
 
-/** Composes AG-W1 with one broker-scoped SQLite owner and a distinct single-use confirmation proof owner. */
-export function createHeadlessCheckupStatusTransitionProductionV1(sourcesValue: unknown) {
+/** Internal DB-backed candidate only; it does not compose AIP broker or trusted-UI authority. */
+export function createHeadlessCheckupStatusTransitionInternalCandidateV1(sourcesValue: unknown) {
     const sources = exact(sourcesValue, SOURCE_KEYS, false);
-    if (!sources || typeof sources.now !== 'function' || typeof sources.readBrokerScope !== 'function') {
+    if (!sources || typeof sources.now !== 'function' || typeof sources.readHostScopeCandidate !== 'function') {
         throw new HeadlessCheckupStatusTransitionV1Error('operation_unavailable');
     }
-    const now = safeClock(sources.now as () => unknown);
+    let activeCall = false, reentered = false;
+    const unavailable = (): HeadlessCheckupStatusTransitionV1Error =>
+        new HeadlessCheckupStatusTransitionV1Error('operation_unavailable');
+    const guarded = <T>(operation: () => T): T => {
+        if (activeCall) { reentered = true; throw unavailable(); }
+        activeCall = true; reentered = false;
+        try {
+            let result: T;
+            try { result = operation(); } catch (error) {
+                if (reentered) throw unavailable();
+                throw error;
+            }
+            if (reentered) throw unavailable();
+            return result;
+        } finally { activeCall = false; reentered = false; }
+    };
+    const observe = <T>(source: () => T): T => {
+        const result = source();
+        if (reentered) throw unavailable();
+        return result;
+    };
+    const nowSource = sources.now as () => unknown;
+    const scopeSource = sources.readHostScopeCandidate as () => unknown;
+    const now = safeClock(() => observe(nowSource));
     const storage = createHeadlessCheckupStatusTransitionStorageV1(record({
-        readBrokerScope: sources.readBrokerScope as () => unknown,
+        now,
+        readHostScopeCandidate: () => observe(scopeSource),
     }));
     const knownProposals = new Set<string>();
     const proofs = new WeakMap<object, ProofRecord>();
@@ -101,42 +125,54 @@ export function createHeadlessCheckupStatusTransitionProductionV1(sourcesValue: 
     });
     const service = record({
         preview(input: unknown) {
-            const preview = core.preview(input);
-            knownProposals.add(preview.proposalRef);
-            return preview;
+            return guarded(() => {
+                const preview = core.preview(input);
+                knownProposals.add(preview.proposalRef);
+                return preview;
+            });
         },
-        confirm(proposalRef: unknown, proof: unknown) { return core.confirm(proposalRef, proof); },
+        confirm(proposalRef: unknown, proof: unknown) {
+            return guarded(() => core.confirm(proposalRef, proof));
+        },
         dispose() {
-            if (disposed) return;
-            disposed = true; knownProposals.clear(); storage.dispose(); core.dispose();
+            return guarded(() => {
+                if (disposed) return;
+                disposed = true; knownProposals.clear(); storage.dispose(); core.dispose();
+            });
         },
     });
-    const trustedController = record({
+    const candidateController = record({
         issueSelectedCheckupRef(): string {
-            if (disposed) throw new HeadlessCheckupStatusTransitionV1Error('operation_unavailable');
-            try { return storage.issueSelectedCheckupRef(); } catch (error) {
-                const code = error instanceof Error ? error.message : 'operation_unavailable';
-                if (['resource_unavailable', 'session_unavailable', 'role_unavailable', 'restart_changed']
-                    .includes(code)) throw new HeadlessCheckupStatusTransitionV1Error(code as 'resource_unavailable');
-                throw new HeadlessCheckupStatusTransitionV1Error('operation_unavailable');
-            }
+            return guarded(() => {
+                if (disposed) throw new HeadlessCheckupStatusTransitionV1Error('operation_unavailable');
+                try { return storage.issueSelectedCheckupRef(); } catch (error) {
+                    const code = error instanceof Error ? error.message : 'operation_unavailable';
+                    if (['resource_unavailable', 'session_unavailable', 'role_unavailable', 'restart_changed']
+                        .includes(code)) throw new HeadlessCheckupStatusTransitionV1Error(code as 'resource_unavailable');
+                    throw new HeadlessCheckupStatusTransitionV1Error('operation_unavailable');
+                }
+            });
         },
         issueConfirmationProof(proposalRef: unknown): object {
-            if (disposed || typeof proposalRef !== 'string' || !PROPOSAL_REF.test(proposalRef)
-                || !knownProposals.has(proposalRef)) throw new HeadlessCheckupStatusTransitionV1Error('confirmation_required');
-            const issuedAt = now(), expiresAt = issuedAt + PROOF_TTL_MS;
-            if (!Number.isSafeInteger(expiresAt)) throw new HeadlessCheckupStatusTransitionV1Error('operation_unavailable');
-            const secret = randomBytes(32).toString('hex'), proof = Object.freeze(Object.create(null));
-            proofs.set(proof, { proposalRef, proofRefHash: digest(PROOF_DIGEST_DOMAIN, secret), confirmedAt: issuedAt, expiresAt,
-                restartGeneration, state: 'available' });
-            return proof;
+            return guarded(() => {
+                if (disposed || typeof proposalRef !== 'string' || !PROPOSAL_REF.test(proposalRef)
+                    || !knownProposals.has(proposalRef)) throw new HeadlessCheckupStatusTransitionV1Error('confirmation_required');
+                const issuedAt = now(), expiresAt = issuedAt + PROOF_TTL_MS;
+                if (!Number.isSafeInteger(expiresAt)) throw new HeadlessCheckupStatusTransitionV1Error('operation_unavailable');
+                const secret = randomBytes(32).toString('hex'), proof = Object.freeze(Object.create(null));
+                proofs.set(proof, { proposalRef, proofRefHash: digest(PROOF_DIGEST_DOMAIN, secret), confirmedAt: issuedAt, expiresAt,
+                    restartGeneration, state: 'available' });
+                return proof;
+            });
         },
         restart(): void {
-            if (disposed || restartGeneration >= Number.MAX_SAFE_INTEGER) {
-                throw new HeadlessCheckupStatusTransitionV1Error('operation_unavailable');
-            }
-            restartGeneration += 1; knownProposals.clear(); storage.restart();
+            return guarded(() => {
+                if (disposed || restartGeneration >= Number.MAX_SAFE_INTEGER) {
+                    throw new HeadlessCheckupStatusTransitionV1Error('operation_unavailable');
+                }
+                restartGeneration += 1; knownProposals.clear(); storage.restart();
+            });
         },
     });
-    return record({ service, trustedController });
+    return record({ service, candidateController });
 }

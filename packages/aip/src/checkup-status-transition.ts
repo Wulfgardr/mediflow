@@ -60,7 +60,7 @@ const SNAPSHOT_DENIALS = new Set<HeadlessCheckupStatusTransitionV1ErrorCode>([
 ]);
 const COMMIT_DENIALS = new Set<HeadlessCheckupStatusTransitionV1ErrorCode>([
     'idempotency_conflict', 'audit_unavailable', 'commit_unavailable', 'revision_conflict',
-    'transition_unavailable', 'scope_changed',
+    'transition_unavailable', 'scope_changed', 'preview_expired',
 ]);
 const objectAssign = Object.assign, objectCreate = Object.create, objectFreeze = Object.freeze;
 const objectGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
@@ -286,7 +286,8 @@ export function createHeadlessCheckupStatusTransitionServiceV1(sourcesValue: unk
             resourceIdentity: proposal.snapshot.resourceIdentity, fromStatus: 'pending' as const,
             targetStatus: proposal.input.targetStatus, expectedRevision: proposal.input.expectedRevision,
             generation: proposal.snapshot.generation, revocationGeneration: proposal.snapshot.revocationGeneration,
-            selectionEpoch: proposal.snapshot.selectionEpoch, proofRefHash: confirmed.proofRefHash,
+            selectionEpoch: proposal.snapshot.selectionEpoch, expiresAt: proposal.expiresAt,
+            proofRefHash: confirmed.proofRefHash,
             confirmedAt: confirmed.confirmedAt });
         let candidate: unknown;
         try { candidate = commitSource(command); } catch { return reject(proposal, 'commit_unavailable'); }
