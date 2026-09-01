@@ -20,19 +20,32 @@ const INSTANCE_KEYS = ['instanceRef', 'workspaceRef'] as const;
 const AUTH_KEYS = ['schemaVersion', 'credentialClass', 'authRef'] as const;
 const BINDING_KEYS = ['operation', 'groupRef'] as const;
 const LIFECYCLE_BINDING_KEYS = ['schemaVersion', 'providerInstanceRef', 'profile', 'lifecycle'] as const;
+const LIFECYCLE_STATE_KEYS = ['schemaVersion', 'generation', 'status', 'binding'] as const;
+const LIFECYCLE_PROVIDER_BINDING_KEYS = [
+    'schemaVersion', 'operation', 'providerId', 'kind', 'venue', 'model', 'dataClass', 'egressProfileRef',
+    'retentionProfileRef', 'consentRef', 'timeoutMs', 'maxInputBytes', 'maxOutputBytes', 'fallback',
+] as const;
 const OPAQUE_REFS = Object.freeze({
     instance: /^pvi_[0-9a-f]{32}$/,
     workspace: /^pws_[0-9a-f]{32}$/,
     auth: /^par_[0-9a-f]{32}$/,
 });
 const POLICY_REF = /^[a-z][a-z0-9_-]*(?:\.[a-z0-9][a-z0-9_-]*)+$/;
-const MODEL = /^[a-zA-Z0-9][a-zA-Z0-9._:/-]{0,127}$/;
 const MAX_GROUPS = 8;
 
 type ProviderTypeV2 = typeof PROVIDER_TYPES[number];
 type CredentialClassV2 = typeof CREDENTIAL_CLASSES[number];
 type ProviderOperationV2 = typeof OPERATIONS[number];
 type ProviderDataUseV2 = typeof DATA_USES[number];
+
+const HOST_PROFILE_BINDINGS = Object.freeze([
+    Object.freeze({ providerType: 'openai', model: 'gpt-5.4-mini', operation: 'document_synthesis',
+        egressProfileRef: 'egress.synthetic.v1', dataUse: 'synthetic_nonclinical' }),
+    Object.freeze({ providerType: 'anthropic', model: 'claude-sonnet-4-6', operation: 'document_synthesis',
+        egressProfileRef: 'egress.synthetic.v1', dataUse: 'synthetic_nonclinical' }),
+    Object.freeze({ providerType: 'ollama', model: 'qwen3.5:35b-a3b', operation: 'document_synthesis',
+        egressProfileRef: 'egress.local.v1', dataUse: 'clinical_identifiable' }),
+] as const);
 
 export type ProviderInstanceProfileV2 = Readonly<{
     schemaVersion: typeof PROVIDER_INSTANCE_PROFILE_V2_SCHEMA;
@@ -159,6 +172,17 @@ function groups(value: unknown): readonly string[] {
     return Object.freeze(output);
 }
 
+function materializeLifecycle(value: unknown): Record<string, unknown> {
+    const state = exactDataRecord(value, LIFECYCLE_STATE_KEYS);
+    const binding = state.binding === null ? null : exactDataRecord(state.binding, LIFECYCLE_PROVIDER_BINDING_KEYS);
+    return {
+        schemaVersion: state.schemaVersion,
+        generation: state.generation,
+        status: state.status,
+        binding,
+    };
+}
+
 export function snapshotProviderInstanceProfileV2(value: unknown): ProviderInstanceProfileV2 {
     const source = exactDataRecord(value, PROFILE_KEYS);
     const instance = exactDataRecord(source.providerInstance, INSTANCE_KEYS);
@@ -188,9 +212,15 @@ export function snapshotProviderInstanceProfileV2(value: unknown): ProviderInsta
         credentialClass,
         authRef: opaqueRef(auth.authRef, OPAQUE_REFS.auth, true),
     });
-    const model = source.model;
+    const hostProfileBindings = HOST_PROFILE_BINDINGS.filter((candidate) => candidate.providerType === providerType
+        && capabilities.includes(candidate.operation));
+    const matchedHostBinding = hostProfileBindings.length === capabilities.length
+        ? hostProfileBindings.find((candidate) => candidate.model === source.model
+            && candidate.egressProfileRef === source.egressProfileRef && candidate.dataUse === source.dataUse)
+        : undefined;
+    const model = matchedHostBinding?.model;
     if (source.schemaVersion !== PROVIDER_INSTANCE_PROFILE_V2_SCHEMA || auth.schemaVersion !== PROVIDER_AUTH_POLICY_V2_SCHEMA
-        || typeof model !== 'string' || !MODEL.test(model) || model.includes('://')) invalid();
+        || !matchedHostBinding || typeof model !== 'string') invalid();
 
     const venue = enumValue(source.venue, ['local_process', 'home_base', 'cloud'] as const);
     const egress = enumValue(source.egress, ['none', 'official_provider_api'] as const);
@@ -207,7 +237,7 @@ export function snapshotProviderInstanceProfileV2(value: unknown): ProviderInsta
         schemaVersion: source.schemaVersion,
         providerType, providerInstance, auth: authPolicy, model, capabilities,
         groups: declaredGroups, bindings: Object.freeze(bindings), functionAllowlist: Object.freeze([]),
-        venue, egress, egressProfileRef: policyRef(source.egressProfileRef, 'egress.'), residency,
+        venue, egress, egressProfileRef: matchedHostBinding.egressProfileRef, residency,
         residencyProfileRef: policyRef(source.residencyProfileRef, 'residency.'), retention,
         retentionProfileRef: policyRef(source.retentionProfileRef, 'retention.'), dataUse,
         dataUseProfileRef: policyRef(source.dataUseProfileRef, 'data-use.'),
@@ -225,7 +255,8 @@ export function bindProviderLifecycleToInstanceProfileV2(
     }
     const profile = snapshotProviderInstanceProfileV2(hostBinding.profile);
     let lifecycle: ReturnType<typeof snapshotProviderLifecycleV2>;
-    try { lifecycle = snapshotProviderLifecycleV2(hostBinding.lifecycle); } catch { throw new ProviderInstanceProfileV2Error('lifecycle_mismatch'); }
+    try { lifecycle = snapshotProviderLifecycleV2(materializeLifecycle(hostBinding.lifecycle)); }
+    catch { throw new ProviderInstanceProfileV2Error('lifecycle_mismatch'); }
     const binding = lifecycle.binding;
     const operationBinding = binding && profile.bindings.find(({ operation }) => operation === binding.operation);
     const expectedKind = profile.providerType === 'ollama' ? 'local' : 'cloud';
