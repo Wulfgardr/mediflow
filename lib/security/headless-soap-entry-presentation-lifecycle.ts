@@ -4,6 +4,8 @@ import { types } from 'node:util';
 import { createHeadlessSoapEntryPresentationHandoff,
     type HeadlessSoapEntryPresentationHandoffV1 } from './headless-soap-entry-presentation-handoff';
 import type { ClinicianSoapEntryFieldSetV1 } from '../headless/clinician-soap-entry-field-set';
+import type { ClinicianSoapEntrySealV1 } from '../headless/clinician-soap-entry-seal';
+import { verifyHeadlessSoapEntryGestureSealBundle } from './headless-soap-entry-seal-binding';
 declare const presentationDependentRegistrationIdentity: unique symbol;
 export type HeadlessSoapEntryPresentationDependentRegistrationV1 =
     Readonly<{ readonly [presentationDependentRegistrationIdentity]?: never }>;
@@ -37,12 +39,17 @@ export type HeadlessSoapEntryPresentationLifecycleControllerV1 = Readonly<{
     unregisterDependent(correlationToken: unknown, registration: unknown): boolean;
     withCurrentDependent(correlationToken: unknown, registration: unknown, operation: () => void): Promise<boolean>;
 }>;
+export type HeadlessSoapEntryPresentationSealBindingControllerV1 = Readonly<{
+    bindGestureSeal(correlationToken: unknown, sealBundle: unknown): Promise<boolean>;
+}>;
 type PresentationRecord = {
     active: boolean;
+    state: 'presented' | 'gesture_bound';
     entryRef: object;
     entryRegistration: unknown;
     token: string | null;
     handoff: HeadlessSoapEntryPresentationHandoffV1 | null;
+    sealBundle: ClinicianSoapEntrySealV1 | null;
     dependent: PresentationDependentRecord | null;
     dependentClaimed: boolean;
 };
@@ -104,6 +111,7 @@ export function createHeadlessSoapEntryPresentationLifecycleOwner(
 ): Readonly<{
     service: HeadlessSoapEntryPresentationLifecycleServiceV1;
     lifecycleController: HeadlessSoapEntryPresentationLifecycleControllerV1;
+    sealBindingController: HeadlessSoapEntryPresentationSealBindingControllerV1;
 }> {
     const pendingEntries = new WeakSet<object>(), claimedEntries = new WeakSet<object>();
     const presentations = new Map<string, PresentationRecord>(), pendingTokens = new Set<string>(), claimedTokens = new Set<string>();
@@ -142,7 +150,7 @@ export function createHeadlessSoapEntryPresentationLifecycleOwner(
         if (!record.active) return false;
         record.active = false; const dependent = snapshotDependent(record), token = record.token;
         if (token !== null) { if (mapRead(presentations, token) === record) mapRemove(presentations, token); setRemove(pendingTokens, token); }
-        record.token = null; record.handoff = null;
+        record.token = null; record.handoff = null; record.sealBundle = null;
         if (!fromH4) {
             if (record.entryRegistration !== null) {
                 try { sources.entryLifecycle.unregisterDependent(record.entryRef, record.entryRegistration); }
@@ -179,8 +187,8 @@ export function createHeadlessSoapEntryPresentationLifecycleOwner(
                         || mapContains(presentations, handoff.correlationToken)
                         || setContains(pendingTokens, handoff.correlationToken)) { callbackActive = false; return; }
                     setInsert(claimedTokens, handoff.correlationToken); setInsert(pendingTokens, handoff.correlationToken);
-                    recordBox.value = { active: true, entryRef: candidate, entryRegistration: null, token: handoff.correlationToken,
-                        handoff, dependent: null, dependentClaimed: false };
+                    recordBox.value = { active: true, state: 'presented', entryRef: candidate, entryRegistration: null,
+                        token: handoff.correlationToken, handoff, sealBundle: null, dependent: null, dependentClaimed: false };
                     operation.lifecycle = recordBox.value;
                     const attachedRecord = recordBox.value;
                     const registration = sources.entryLifecycle.registerDependent(candidate, () => {
@@ -255,7 +263,7 @@ export function createHeadlessSoapEntryPresentationLifecycleOwner(
         },
         registerDependent(candidate: unknown, dispose: () => void): HeadlessSoapEntryPresentationDependentRegistrationV1 | null {
             if (drainActive) return null; const record = recordFor(candidate);
-            if (!record || record.dependentClaimed || !synchronousCallback(dispose)
+            if (!record || record.state !== 'gesture_bound' || record.dependentClaimed || !synchronousCallback(dispose)
                 || (h4CallInFlight && (!callbackActive || lifecycleOperation?.lifecycle !== record
                     || lifecycleOperation.dependent !== null))) {
                 if (callbackActive && lifecycleOperation) lifecycleOperation.poisoned = true;
@@ -299,5 +307,33 @@ export function createHeadlessSoapEntryPresentationLifecycleOwner(
             return runLifecycleOperation(candidate, registration, operation, true);
         },
     });
-    return objectFreeze({ service, lifecycleController });
+    const sealBindingController: HeadlessSoapEntryPresentationSealBindingControllerV1 = objectFreeze({
+        async bindGestureSeal(candidate: unknown, sealBundleCandidate: unknown): Promise<boolean> {
+            if (poisonReentry()) return false;
+            const record = recordFor(candidate);
+            if (!record) return false;
+            if (record.state !== 'presented' || record.sealBundle !== null || !record.handoff) {
+                terminalize(record, false);
+                return false;
+            }
+            const sealBundle = verifyHeadlessSoapEntryGestureSealBundle(record.handoff.fieldSet, sealBundleCandidate);
+            if (!sealBundle) {
+                terminalize(record, false);
+                return false;
+            }
+            const accepted = await runLifecycleOperation(candidate, null, () => {
+                if (record.state !== 'presented' || record.sealBundle !== null) throw new Error('gesture binding changed');
+                record.sealBundle = sealBundle;
+                record.state = 'gesture_bound';
+            }, false);
+            const boundRecord = recordFor(candidate);
+            if (!accepted || boundRecord !== record || boundRecord?.state !== 'gesture_bound'
+                || boundRecord.sealBundle !== sealBundle) {
+                terminalize(record, false);
+                return false;
+            }
+            return true;
+        },
+    });
+    return objectFreeze({ service, lifecycleController, sealBindingController });
 }

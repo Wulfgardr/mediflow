@@ -2,13 +2,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { createClinicianSoapEntryFieldSet } from '../headless/clinician-soap-entry-field-set.ts';
-import {
-    CLINICIAN_SOAP_DRAFT_SCHEMA, CLINICIAN_SOAP_OPERATION_ID, validateClinicianSoapWriteDraft,
-} from '../headless/clinician-soap-write-contract.ts';
 import {
     createHeadlessSoapEntryPresentationLifecycleOwner,
 } from './headless-soap-entry-presentation-lifecycle.ts';
+import {
+    bindHeadlessSoapEntryPresentationGoldenSeal,
+    createHeadlessSoapEntryPresentationGoldenFieldSet,
+} from './headless-soap-entry-presentation-lifecycle-fixture.test.ts';
 
 const TOKEN = 'AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8';
 type CallbackPhase = 'pre' | 'post' | null;
@@ -17,19 +17,8 @@ function opaque(): Readonly<Record<never, never>> {
     return Object.freeze(Object.create(null)) as Readonly<Record<never, never>>;
 }
 
-function canonicalFieldSet() {
-    const draft = Object.assign(Object.create(null), {
-        schema: CLINICIAN_SOAP_DRAFT_SCHEMA, operationId: CLINICIAN_SOAP_OPERATION_ID,
-        subjective: 'Sintomo sintetico', objective: 'Parametro sintetico',
-        assessment: 'Valutazione sintetica', plan: 'Piano sintetico',
-    });
-    const accepted = validateClinicianSoapWriteDraft(draft); assert.equal(accepted.status, 'accepted');
-    if (accepted.status !== 'accepted') throw new Error('synthetic H1 fixture denied');
-    const fieldSet = createClinicianSoapEntryFieldSet(accepted, 1_704_067_200_987); assert.ok(fieldSet); return fieldSet;
-}
-
 function fixture(count = 1) {
-    const fieldSet = canonicalFieldSet();
+    const fieldSet = createHeadlessSoapEntryPresentationGoldenFieldSet();
     const records = Array.from({ length: count }, () => ({
         ref: opaque(), registration: opaque(), current: true, entryDispose: null as (() => void) | null,
         unregisterCalls: 0, wipeCalls: 0,
@@ -125,6 +114,7 @@ test('contains withCurrentDependent throws on both sides of its callback and dra
     for (const phase of ['pre', 'post'] as const) {
         const current = fixture(); const owner = createHeadlessSoapEntryPresentationLifecycleOwner(current.sources);
         const handoff = await owner.service.present(current.records[0]!.ref);
+        await bindHeadlessSoapEntryPresentationGoldenSeal(owner, handoff.correlationToken);
         let registration: unknown = null; let drains = 0; let callbackCalls = 0;
         assert.equal(await owner.lifecycleController.withCurrentPresentation(handoff.correlationToken, () => {
             registration = owner.lifecycleController.registerDependent(handoff.correlationToken, () => { drains += 1; });
@@ -142,6 +132,7 @@ test('local retirement and drain win when unregister and wipe throw', async () =
     for (const source of ['unregister', 'wipe', 'both'] as const) {
         const current = fixture(); const owner = createHeadlessSoapEntryPresentationLifecycleOwner(current.sources);
         const handoff = await owner.service.present(current.records[0]!.ref);
+        await bindHeadlessSoapEntryPresentationGoldenSeal(owner, handoff.correlationToken);
         let drains = 0; let registration: unknown = null;
         assert.equal(await owner.lifecycleController.withCurrentPresentation(handoff.correlationToken, () => {
             registration = owner.lifecycleController.registerDependent(handoff.correlationToken, () => { drains += 1; });
@@ -182,6 +173,7 @@ test('rejects Proxy, async, and generator disposers without invoking them or the
     for (const kind of ['proxy', 'async', 'generator'] as const) {
         const current = fixture(); const owner = createHeadlessSoapEntryPresentationLifecycleOwner(current.sources);
         const handoff = await owner.service.present(current.records[0]!.ref); let calls = 0; let traps = 0; let registration: unknown;
+        await bindHeadlessSoapEntryPresentationGoldenSeal(owner, handoff.correlationToken);
         const base = () => { calls += 1; };
         const disposer = kind === 'proxy'
             ? new Proxy(base, { apply() { traps += 1; return undefined; } })

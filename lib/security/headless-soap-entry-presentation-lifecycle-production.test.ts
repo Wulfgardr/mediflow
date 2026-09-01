@@ -24,7 +24,7 @@ test('shares one H5a owner while exposing only its frozen presentation service',
     const owner = internal.headlessSoapEntryPresentationLifecycleProductionOwner;
     assert.equal(owner, repeated.headlessSoapEntryPresentationLifecycleProductionOwner);
     assert.equal(Object.isFrozen(owner), true);
-    assert.deepEqual(Reflect.ownKeys(owner).sort(), ['lifecycleController', 'service']);
+    assert.deepEqual(Reflect.ownKeys(owner).sort(), ['lifecycleController', 'sealBindingController', 'service']);
     assert.equal(facade.headlessSoapEntryPresentationLifecycleService, owner.service);
     assert.equal(Object.isFrozen(owner.service), true);
     assert.deepEqual(Reflect.ownKeys(owner.service).sort(), ['cancel', 'present']);
@@ -38,6 +38,9 @@ test('shares one H5a owner while exposing only its frozen presentation service',
         owner.lifecycleController.confirmDependent.length, owner.lifecycleController.unregisterDependent.length,
         owner.lifecycleController.withCurrentDependent.length,
     ], [2, 2, 2, 2, 3]);
+    assert.equal(Object.isFrozen(owner.sealBindingController), true);
+    assert.deepEqual(Reflect.ownKeys(owner.sealBindingController), ['bindGestureSeal']);
+    assert.equal(owner.sealBindingController.bindGestureSeal.length, 2);
 });
 
 test('keeps foreign identities inert without exposing the private H5b controller', async () => {
@@ -51,7 +54,10 @@ test('keeps foreign identities inert without exposing the private H5b controller
     assert.equal(lifecycle.confirmDependent('A'.repeat(43), foreignRegistration), false);
     assert.equal(lifecycle.unregisterDependent('A'.repeat(43), foreignRegistration), false);
     assert.equal(await lifecycle.withCurrentDependent('A'.repeat(43), foreignRegistration, () => undefined), false);
-    assert.equal('lifecycleController' in facade, false); assert.equal('headlessSoapEntryPresentationLifecycleProductionOwner' in facade, false);
+    assert.equal(await internal.headlessSoapEntryPresentationLifecycleProductionOwner.sealBindingController
+        .bindGestureSeal('A'.repeat(43), Object.freeze(Object.create(null))), false);
+    assert.equal('lifecycleController' in facade, false); assert.equal('sealBindingController' in facade, false);
+    assert.equal('headlessSoapEntryPresentationLifecycleProductionOwner' in facade, false);
 });
 
 test('uses one internal composition root with captured and copied 32-byte host entropy', () => {
