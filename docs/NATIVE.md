@@ -48,6 +48,10 @@ La base corrente va letta cosi:
 * **Sicurezza**: i client sigillano i campi sensibili prima del wire/storage;
   pairing device e sessione operatore restano distinti; nessun client mobile
   accede direttamente al database del Mac.
+* **AIP macOS**: ADR 0114 decide un LaunchAgent per-user registrato con
+  `SMAppService`, con broker Node e listener `libxpc` nello stesso processo.
+  Il runtime, la registrazione e le prove cross-process appartengono a #330 e
+  non sono ancora una capability consegnata.
 * **Parity**: la matrice post-Wave 5 e in [docs/parity-matrix.md](./parity-matrix.md).
   `WUL-401`/PR #21 hanno consegnato bundle, fixture, probe AX e runbook P6 di
   base. La candidata v0.8 chiude i gate UI sul candidato con iPhone 2/2, iPad
@@ -166,6 +170,23 @@ WebRuntime incluso, non firmato per default, e puo firmarlo con
 `MEDIFLOW_CODESIGN_IDENTITY` (`-` per ad-hoc, Developer ID per distribuzione).
 La notarizzazione resta un passaggio di distribuzione separato. I servizi
 opzionali sono visibili come health diagnostico, non come processi app-managed.
+
+### Topologia AIP macOS decisa per il packet successivo
+
+ADR 0114 e #329 riservano nel bundle firmato un LaunchAgent
+`com.mediflow.aip-broker`, due launcher nativi, l'addon Node-API/libxpc e il
+runtime JavaScript AIP. Il plist vive in `Contents/Library/LaunchAgents`, usa
+`BundleProgram` e pubblica due Mach service per-user: control e RPC. Il
+launcher MCP sostituisce l'ambiente e mantiene il PID quando esegue il Node 24
+approvato; il broker verifica PID, EUID e ASID dal canale XPC, il requisito di
+firma e una bootstrap reference monouso.
+
+Il `MediFlowMacApp` rimane l'unico owner di registrazione, update, rollback e
+unregister tramite `SMAppService`. Un bundle unsigned, l'approvazione di sistema
+mancante o un mismatch di firma/manifest mantiene AIP disabilitato. Non sono
+ammessi XPCService proxy, secondo IPC, fallback TCP, API private o raw audit
+token. Questa sezione descrive una decisione di packaging, non prova che gli
+artefatti esistano nel tree: l'implementazione e i test reali sono #330.
 
 ### 1. Sessione e privacy
 
