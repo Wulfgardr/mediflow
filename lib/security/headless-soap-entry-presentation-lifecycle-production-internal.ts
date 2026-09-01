@@ -11,6 +11,7 @@ const hostRandomBytes = randomBytes;
 /** Shared process owner for H5a presentation currentness. */
 export const headlessSoapEntryPresentationLifecycleProductionOwner = createHeadlessSoapEntryPresentationLifecycleOwner({
     entryLifecycle: headlessSoapEntryFieldSetLifecycleProductionOwner.lifecycleController,
+    entryBinding: headlessSoapEntryFieldSetLifecycleProductionOwner.bindingController,
     entryService: headlessSoapEntryFieldSetLifecycleProductionOwner.service,
     entropy: () => Uint8Array.from(hostRandomBytes(32)),
 });

@@ -127,7 +127,9 @@ test('binds the exact H4 gesture seal before exposing H5b dependent registration
     const owner = createHeadlessSoapEntryPresentationLifecycleOwner(current.sources);
     const handoff = await owner.service.present(current.entryRef);
 
-    assert.deepEqual(Reflect.ownKeys(owner).sort(), ['lifecycleController', 'sealBindingController', 'service']);
+    assert.deepEqual(Reflect.ownKeys(owner).sort(), [
+        'lifecycleController', 'presentationBindingController', 'sealBindingController', 'service',
+    ]);
     assert.deepEqual(Reflect.ownKeys(owner.sealBindingController), ['bindGestureSeal']);
     assert.equal(owner.lifecycleController.registerDependent(handoff.correlationToken, () => undefined), null);
 
@@ -213,7 +215,9 @@ test('publishes one canonical authority-free handoff only after H4 attach and co
     const owner = createHeadlessSoapEntryPresentationLifecycleOwner(current.sources);
 
     assert.equal(Object.isFrozen(owner), true);
-    assert.deepEqual(Reflect.ownKeys(owner).sort(), ['lifecycleController', 'sealBindingController', 'service']);
+    assert.deepEqual(Reflect.ownKeys(owner).sort(), [
+        'lifecycleController', 'presentationBindingController', 'sealBindingController', 'service',
+    ]);
     assert.deepEqual(Reflect.ownKeys(owner.service).sort(), ['cancel', 'present']);
     assert.deepEqual(Reflect.ownKeys(owner.lifecycleController).sort(), [
         'confirmDependent',

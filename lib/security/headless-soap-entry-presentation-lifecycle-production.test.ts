@@ -24,7 +24,9 @@ test('shares one H5a owner while exposing only its frozen presentation service',
     const owner = internal.headlessSoapEntryPresentationLifecycleProductionOwner;
     assert.equal(owner, repeated.headlessSoapEntryPresentationLifecycleProductionOwner);
     assert.equal(Object.isFrozen(owner), true);
-    assert.deepEqual(Reflect.ownKeys(owner).sort(), ['lifecycleController', 'sealBindingController', 'service']);
+    assert.deepEqual(Reflect.ownKeys(owner).sort(), [
+        'lifecycleController', 'presentationBindingController', 'sealBindingController', 'service',
+    ]);
     assert.equal(facade.headlessSoapEntryPresentationLifecycleService, owner.service);
     assert.equal(Object.isFrozen(owner.service), true);
     assert.deepEqual(Reflect.ownKeys(owner.service).sort(), ['cancel', 'present']);
@@ -41,6 +43,8 @@ test('shares one H5a owner while exposing only its frozen presentation service',
     assert.equal(Object.isFrozen(owner.sealBindingController), true);
     assert.deepEqual(Reflect.ownKeys(owner.sealBindingController), ['bindGestureSeal']);
     assert.equal(owner.sealBindingController.bindGestureSeal.length, 2);
+    assert.equal(Object.isFrozen(owner.presentationBindingController), true);
+    assert.deepEqual(Reflect.ownKeys(owner.presentationBindingController), ['withCurrentDependentBinding']);
 });
 
 test('keeps foreign identities inert without exposing the private H5b controller', async () => {
@@ -56,7 +60,10 @@ test('keeps foreign identities inert without exposing the private H5b controller
     assert.equal(await lifecycle.withCurrentDependent('A'.repeat(43), foreignRegistration, () => undefined), false);
     assert.equal(await internal.headlessSoapEntryPresentationLifecycleProductionOwner.sealBindingController
         .bindGestureSeal('A'.repeat(43), Object.freeze(Object.create(null))), false);
+    assert.equal(await internal.headlessSoapEntryPresentationLifecycleProductionOwner.presentationBindingController
+        .withCurrentDependentBinding('A'.repeat(43), foreignRegistration, () => undefined), false);
     assert.equal('lifecycleController' in facade, false); assert.equal('sealBindingController' in facade, false);
+    assert.equal('presentationBindingController' in facade, false);
     assert.equal('headlessSoapEntryPresentationLifecycleProductionOwner' in facade, false);
 });
 
@@ -75,6 +82,7 @@ test('uses one internal composition root with captured and copied 32-byte host e
     ].sort());
     assert.equal(ownerSource.match(/\bcreateHeadlessSoapEntryPresentationLifecycleOwner\s*\(/gu)?.length, 1);
     assert.match(ownerSource, /entryLifecycle\s*:\s*headlessSoapEntryFieldSetLifecycleProductionOwner\.lifecycleController/u);
+    assert.match(ownerSource, /entryBinding\s*:\s*headlessSoapEntryFieldSetLifecycleProductionOwner\.bindingController/u);
     assert.match(ownerSource, /entryService\s*:\s*headlessSoapEntryFieldSetLifecycleProductionOwner\.service/u);
 
     const capture = ownerSource.match(/\bconst\s+([A-Za-z_$][\w$]*)\s*=\s*randomBytes\s*;/u);
