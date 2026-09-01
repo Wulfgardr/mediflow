@@ -1,12 +1,10 @@
 /* @Codex */
 import { types as nodeUtilTypes } from 'node:util';
 import { snapshotProviderLifecycleV2 } from './provider-lifecycle';
-
 export const PROVIDER_INSTANCE_PROFILE_V2_SCHEMA = 'mediflow.ai.provider-instance-profile.v2' as const;
 export const PROVIDER_AUTH_POLICY_V2_SCHEMA = 'mediflow.ai.provider-auth-policy.v2' as const;
 export const PROVIDER_INSTANCE_LIFECYCLE_BINDING_V2_SCHEMA = 'mediflow.ai.provider-instance-lifecycle-binding.v2' as const;
 export const PROVIDER_INSTANCE_LIFECYCLE_LINK_V2_SCHEMA = 'mediflow.ai.provider-instance-lifecycle-link.v2' as const;
-
 const PROVIDER_TYPES = ['ollama', 'openai', 'anthropic'] as const;
 const CREDENTIAL_CLASSES = ['local_model', 'api_key', 'provider_oauth', 'host_subscription'] as const;
 const OPERATIONS = ['patient_insight', 'smart_import', 'document_synthesis', 'treatment_reasoning'] as const;
@@ -32,21 +30,36 @@ const OPAQUE_REFS = Object.freeze({
 });
 const POLICY_REF = /^[a-z][a-z0-9_-]*(?:\.[a-z0-9][a-z0-9_-]*)+$/;
 const MAX_GROUPS = 8;
-
 type ProviderTypeV2 = typeof PROVIDER_TYPES[number];
 type CredentialClassV2 = typeof CREDENTIAL_CLASSES[number];
 type ProviderOperationV2 = typeof OPERATIONS[number];
 type ProviderDataUseV2 = typeof DATA_USES[number];
-
 const HOST_PROFILE_BINDINGS = Object.freeze([
     Object.freeze({ providerType: 'openai', model: 'gpt-5.4-mini', operation: 'document_synthesis',
-        egressProfileRef: 'egress.synthetic.v1', dataUse: 'synthetic_nonclinical' }),
+        groupRef: 'group.review-only.v1', venue: 'cloud', egress: 'official_provider_api',
+        egressProfileRef: 'egress.synthetic.v1', residency: 'provider_managed',
+        residencyProfileRef: 'residency.provider-managed.v1', retention: 'provider_declared',
+        retentionProfileRef: 'retention.standard.v1', dataUse: 'synthetic_nonclinical',
+        dataUseProfileRef: 'data-use.synthetic-nonclinical.v1' }),
     Object.freeze({ providerType: 'anthropic', model: 'claude-sonnet-4-6', operation: 'document_synthesis',
-        egressProfileRef: 'egress.synthetic.v1', dataUse: 'synthetic_nonclinical' }),
+        groupRef: 'group.review-only.v1', venue: 'cloud', egress: 'official_provider_api',
+        egressProfileRef: 'egress.synthetic.v1', residency: 'provider_managed',
+        residencyProfileRef: 'residency.provider-managed.v1', retention: 'provider_declared',
+        retentionProfileRef: 'retention.standard.v1', dataUse: 'synthetic_nonclinical',
+        dataUseProfileRef: 'data-use.synthetic-nonclinical.v1' }),
     Object.freeze({ providerType: 'ollama', model: 'qwen3.5:35b-a3b', operation: 'document_synthesis',
-        egressProfileRef: 'egress.local.v1', dataUse: 'clinical_identifiable' }),
+        groupRef: 'group.review-only.v1', venue: 'local_process', egress: 'none',
+        egressProfileRef: 'egress.local.v1', residency: 'local_device',
+        residencyProfileRef: 'residency.local-device.v1', retention: 'local_only',
+        retentionProfileRef: 'retention.local-only.v1', dataUse: 'clinical_identifiable',
+        dataUseProfileRef: 'data-use.clinical-identifiable.v1' }),
+    Object.freeze({ providerType: 'ollama', model: 'qwen3.5:35b-a3b', operation: 'document_synthesis',
+        groupRef: 'group.review-only.v1', venue: 'home_base', egress: 'none',
+        egressProfileRef: 'egress.local.v1', residency: 'local_device',
+        residencyProfileRef: 'residency.local-device.v1', retention: 'local_only',
+        retentionProfileRef: 'retention.local-only.v1', dataUse: 'clinical_identifiable',
+        dataUseProfileRef: 'data-use.clinical-identifiable.v1' }),
 ] as const);
-
 export type ProviderInstanceProfileV2 = Readonly<{
     schemaVersion: typeof PROVIDER_INSTANCE_PROFILE_V2_SCHEMA;
     providerType: ProviderTypeV2;
@@ -71,7 +84,6 @@ export type ProviderInstanceProfileV2 = Readonly<{
     dataUse: ProviderDataUseV2;
     dataUseProfileRef: string;
 }>;
-
 export type ProviderInstanceLifecycleLinkV2 = Readonly<{
     schemaVersion: typeof PROVIDER_INSTANCE_LIFECYCLE_LINK_V2_SCHEMA;
     providerInstanceRef: string;
@@ -91,16 +103,13 @@ export type ProviderInstanceLifecycleLinkV2 = Readonly<{
     dataUseProfileRef: string;
     generation: number;
 }>;
-
 export class ProviderInstanceProfileV2Error extends Error {
     constructor(public readonly code: 'profile_invalid' | 'lifecycle_mismatch') {
         super(`Provider instance profile v2 rejected: ${code}`);
         this.name = 'ProviderInstanceProfileV2Error';
     }
 }
-
 function invalid(): never { throw new ProviderInstanceProfileV2Error('profile_invalid'); }
-
 function exactDataRecord(value: unknown, keys: readonly string[]): Record<string, unknown> {
     try {
         if (!value || typeof value !== 'object' || Array.isArray(value) || nodeUtilTypes.isProxy(value)) invalid();
@@ -120,7 +129,6 @@ function exactDataRecord(value: unknown, keys: readonly string[]): Record<string
         return invalid();
     }
 }
-
 function exactDataArray(value: unknown, maximum: number): readonly unknown[] {
     try {
         if (!Array.isArray(value) || nodeUtilTypes.isProxy(value) || Object.getPrototypeOf(value) !== Array.prototype
@@ -140,38 +148,32 @@ function exactDataArray(value: unknown, maximum: number): readonly unknown[] {
         return invalid();
     }
 }
-
 function enumValue<T extends string>(value: unknown, allowed: readonly T[]): T {
     if (typeof value !== 'string' || !allowed.includes(value as T)) invalid();
     return value as T;
 }
-
 function policyRef(value: unknown, prefix?: string): string {
     if (typeof value !== 'string' || value.length > 128 || !POLICY_REF.test(value)
         || (prefix && !value.startsWith(prefix))) invalid();
     return value;
 }
-
 function opaqueRef(value: unknown, pattern: RegExp, nullable = false): string | null {
     if (nullable && value === null) return null;
     if (typeof value !== 'string' || !pattern.test(value)) invalid();
     return value;
 }
-
 function uniqueValues<T extends string>(value: unknown, allowed: readonly T[], maximum: number): readonly T[] {
     const raw = exactDataArray(value, maximum);
     const output = raw.map((item) => enumValue(item, allowed));
     if (output.length === 0 || new Set(output).size !== output.length) invalid();
     return Object.freeze(output);
 }
-
 function groups(value: unknown): readonly string[] {
     const raw = exactDataArray(value, MAX_GROUPS);
     const output = raw.map((item) => policyRef(item, 'group.'));
     if (output.length === 0 || new Set(output).size !== output.length) invalid();
     return Object.freeze(output);
 }
-
 function materializeLifecycle(value: unknown): Record<string, unknown> {
     const state = exactDataRecord(value, LIFECYCLE_STATE_KEYS);
     const binding = state.binding === null ? null : exactDataRecord(state.binding, LIFECYCLE_PROVIDER_BINDING_KEYS);
@@ -212,12 +214,15 @@ export function snapshotProviderInstanceProfileV2(value: unknown): ProviderInsta
         credentialClass,
         authRef: opaqueRef(auth.authRef, OPAQUE_REFS.auth, true),
     });
-    const hostProfileBindings = HOST_PROFILE_BINDINGS.filter((candidate) => candidate.providerType === providerType
-        && capabilities.includes(candidate.operation));
-    const matchedHostBinding = hostProfileBindings.length === capabilities.length
-        ? hostProfileBindings.find((candidate) => candidate.model === source.model
-            && candidate.egressProfileRef === source.egressProfileRef && candidate.dataUse === source.dataUse)
-        : undefined;
+    const matchedHostBindings = HOST_PROFILE_BINDINGS.filter((candidate) => candidate.providerType === providerType
+        && capabilities.includes(candidate.operation) && candidate.model === source.model
+        && bindings.some((binding) => binding.operation === candidate.operation && binding.groupRef === candidate.groupRef)
+        && candidate.venue === source.venue && candidate.egress === source.egress
+        && candidate.egressProfileRef === source.egressProfileRef && candidate.residency === source.residency
+        && candidate.residencyProfileRef === source.residencyProfileRef && candidate.retention === source.retention
+        && candidate.retentionProfileRef === source.retentionProfileRef && candidate.dataUse === source.dataUse
+        && candidate.dataUseProfileRef === source.dataUseProfileRef);
+    const matchedHostBinding = matchedHostBindings.length === capabilities.length ? matchedHostBindings[0] : undefined;
     const model = matchedHostBinding?.model;
     if (source.schemaVersion !== PROVIDER_INSTANCE_PROFILE_V2_SCHEMA || auth.schemaVersion !== PROVIDER_AUTH_POLICY_V2_SCHEMA
         || !matchedHostBinding || typeof model !== 'string') invalid();
@@ -238,9 +243,9 @@ export function snapshotProviderInstanceProfileV2(value: unknown): ProviderInsta
         providerType, providerInstance, auth: authPolicy, model, capabilities,
         groups: declaredGroups, bindings: Object.freeze(bindings), functionAllowlist: Object.freeze([]),
         venue, egress, egressProfileRef: matchedHostBinding.egressProfileRef, residency,
-        residencyProfileRef: policyRef(source.residencyProfileRef, 'residency.'), retention,
-        retentionProfileRef: policyRef(source.retentionProfileRef, 'retention.'), dataUse,
-        dataUseProfileRef: policyRef(source.dataUseProfileRef, 'data-use.'),
+        residencyProfileRef: matchedHostBinding.residencyProfileRef, retention,
+        retentionProfileRef: matchedHostBinding.retentionProfileRef, dataUse,
+        dataUseProfileRef: matchedHostBinding.dataUseProfileRef,
     } as ProviderInstanceProfileV2);
 }
 

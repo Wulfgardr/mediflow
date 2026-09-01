@@ -208,6 +208,22 @@ test('risolve model ed egress da allowlist host-owned per provider e capability'
     });
 });
 
+test('nega riferimenti caller-supplied fuori dalla tupla host-owned exact', () => {
+    for (const profile of [
+        {
+            ...PROFILE,
+            groups: ['group.sk-proj-synthetic-inline-secret'],
+            bindings: [{
+                operation: 'document_synthesis',
+                groupRef: 'group.sk-proj-synthetic-inline-secret',
+            }],
+        },
+        { ...PROFILE, residencyProfileRef: 'residency.sk-proj-synthetic-inline-secret' },
+        { ...PROFILE, retentionProfileRef: 'retention.sk-proj-synthetic-inline-secret' },
+        { ...PROFILE, dataUseProfileRef: 'data-use.sk-proj-synthetic-inline-secret' },
+    ]) rejectsProfile(profile);
+});
+
 test('nega record ostili, duplicati, binding impliciti e function escalation', () => {
     let authReads = 0;
     const authAccessor = Object.defineProperty({ ...PROFILE }, 'auth', {
@@ -252,6 +268,7 @@ test('mantiene le classi auth disgiunte e accetta Ollama solo local-model', () =
     assert.equal(local.providerType, 'ollama');
     assert.equal(local.auth.credentialClass, 'local_model');
     assert.equal(local.auth.authRef, null);
+    assert.equal(snapshotProviderInstanceProfileV2({ ...local, venue: 'home_base' }).venue, 'home_base');
 });
 
 test('nega link su mismatch di provider modello operation e policy', () => {
