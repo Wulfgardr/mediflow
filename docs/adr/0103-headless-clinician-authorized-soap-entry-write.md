@@ -240,6 +240,15 @@ H2b e ricontrolla la stessa selezione nella continuation H2b. Nessun ref H3 e
 pubblicato prima che entrambe le registration e i relativi final fence siano
 correnti. Un attach parziale viene ritirato interamente.
 
+Il controller di binding H3 verifica H2b e selection con due continuation
+host-owned ordinate e non sovrapposte. La prima cattura una sola volta
+`childLease` e `activeRole` e chiude il relativo resource use Web prima che la
+seconda catturi selection e `patientVersion`. Solo dopo entrambi i successi H3
+costruisce la capsule e invoca la callback sincrona; poi ricontrolla attachment
+H2b, attachment selection, identita locali e deadline. Questa sequenza evita
+un resource use Web annidato sullo stesso owner reentry-safe senza trasformare
+gli snapshot intermedi in authority o rinunciare ai final fence.
+
 `preview` transiziona soltanto un `inspectRef` corrente. `proposal` transiziona
 soltanto un `previewRef` corrente e usa
 `withCurrentProposalBudget`: il budget H2b passa da `1` a `0` immediatamente
@@ -667,8 +676,9 @@ entra solo nella continuation di consumo e non viene trattenuto da H6.
 Le identita opache si confrontano soltanto per `===`. Proiezioni, versioni,
 expiry e digest si confrontano per forma chiusa e valore byte-esatto. La
 currentness non e un boolean caller-supplied: e il successo delle continuation
-annidate Web, H2a, H2b, selection, H3, H4, H5a e H5b con i rispettivi final
-fence. H6 conserva la prima capsule senza dati clinici e al consumo ne
+ordinate e closure-bound Web, H2a, H2b, selection, H3, H4, H5a e H5b con i
+rispettivi final fence; i resource use Web condivisi non sono annidati. H6
+conserva la prima capsule senza dati clinici e al consumo ne
 richiede una nuova, completa e corrente; qualunque drift nega.
 
 #### Seal handoff H5a
