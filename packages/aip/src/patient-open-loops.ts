@@ -15,8 +15,8 @@ export {
 export type {
     PatientOpenLoopItemV1, PatientOpenLoopsReadResultV1, PatientOpenLoopsReadV1ErrorCode,
 } from './patient-open-loops-contract.ts';
-const SOURCE_KEYS = ['now', 'nextRef', 'hashRef', 'current', 'beginPermit', 'finalizePermit', 'denyPermit',
-    'acquireLease', 'readSnapshot', 'readCurrentness', 'writeAudit', 'timeoutMs'] as const;
+const SOURCE_KEYS = ['now', 'nextRef', 'hashRef', 'current', 'beginPermit', 'bindPermit', 'finalizeBoundPermit',
+    'denyPermit', 'acquireLease', 'readSnapshot', 'readCurrentness', 'writeAudit', 'timeoutMs'] as const;
 const reflectApply = Reflect.apply;
 const promiseThen = Promise.prototype.then, isProxy = types.isProxy, isPromise = types.isPromise;
 const NativePromise = Promise, setTimer = globalThis.setTimeout, clearTimer = globalThis.clearTimeout;
@@ -34,8 +34,12 @@ export function createPatientOpenLoopsReadServiceV1(sourcesValue: unknown) {
     const nowSource = sources.now as () => unknown, nextRefSource = sources.nextRef as (kind: 'receipt') => unknown;
     const hashRefSource = sources.hashRef as (value: string) => unknown, ownerCurrentSource = sources.current as () => unknown;
     const beginSource = sources.beginPermit as (permit: unknown, current: unknown, claim: object) => unknown;
-    const finalizeSource = sources.finalizePermit as (execution: unknown, current: unknown, claim: object) => unknown;
-    const denySource = sources.denyPermit as (execution: unknown) => unknown, acquireSource = sources.acquireLease as () => unknown;
+    const bindSource = sources.bindPermit as (execution: unknown, binding: object,
+        current: unknown, claim: object) => unknown;
+    const finalizeSource = sources.finalizeBoundPermit as (execution: unknown, binding: object,
+        current: unknown, claim: object) => unknown;
+    const denySource = sources.denyPermit as (execution: unknown) => unknown;
+    const acquireSource = sources.acquireLease as (execution: object) => unknown;
     const readSource = sources.readSnapshot as (binding: object, request: object) => unknown;
     const currentSource = sources.readCurrentness as (binding: object, snapshot: object) => unknown, auditSource = sources.writeAudit as (record: object) => unknown;
     const timeoutMs = sources.timeoutMs as number;
@@ -159,22 +163,26 @@ export function createPatientOpenLoopsReadServiceV1(sourcesValue: unknown) {
             execution = sync(() => beginSource(permitValue, ownerCurrent, claim), 'authorization_denied');
             began = true;
             if (!opaque(execution)) return fail('authorization_denied');
-            const leaseValue = sync(acquireSource, 'lease_unavailable');
+            const leaseValue = sync(() => acquireSource(execution as object), 'lease_unavailable');
             const lease = exact(leaseValue, LEASE_KEYS);
             if (!lease || lease.status !== 'available' || !opaque(lease.ownerIdentity) || !opaque(lease.leaseIdentity)
                 || !matches(REF, lease.ownerRef) || !matches(REF, lease.leaseRef)
                 || lease.purposeCode !== PATIENT_OPEN_LOOPS_READ_PURPOSE_V1
                 || lease.operationId !== PATIENT_OPEN_LOOPS_READ_OPERATION_V1
                 || lease.capabilityId !== PATIENT_OPEN_LOOPS_READ_OPERATION_V1 || lease.maxStage !== 'read_only'
+                || !matches(DIGEST, lease.scopeDigest)
                 || !integer(lease.generation, 1) || !integer(lease.revocationGeneration)
                 || !integer(lease.selectionEpoch) || !integer(lease.restartGeneration, 1)
                 || !integer(lease.expiresAt, startedAt + 1)) return fail('lease_unavailable');
             const deadline = Math.min(timeoutAt, lease.expiresAt as number);
             const deadlineCode: PatientOpenLoopsReadV1ErrorCode = deadline === lease.expiresAt ? 'expired' : 'timeout';
             activeDeadline = deadline; activeDeadlineCode = deadlineCode;
-            const binding = record({ ownerIdentity: lease.ownerIdentity, leaseIdentity: lease.leaseIdentity,
-                generation: lease.generation, revocationGeneration: lease.revocationGeneration,
-                selectionEpoch: lease.selectionEpoch, restartGeneration: lease.restartGeneration });
+            const leaseBinding = record({ scopeDigest: lease.scopeDigest, generation: lease.generation,
+                revocationGeneration: lease.revocationGeneration, selectionEpoch: lease.selectionEpoch });
+            const bindingCurrent = sync(ownerCurrentSource, 'authorization_denied');
+            const binding = sync(() => bindSource(execution, leaseBinding, bindingCurrent, claim),
+                'authorization_denied');
+            if (!opaque(binding)) return fail('authorization_denied');
             const reservedAt = now();
             if (reservedAt >= deadline) { terminalize(deadlineCode); return fail(deadlineCode); }
             deadlineTimer = setTimer(() => { terminalize(deadlineCode); }, deadline - reservedAt);
@@ -187,6 +195,7 @@ export function createPatientOpenLoopsReadServiceV1(sourcesValue: unknown) {
             const snapshot = exact(rawSnapshot, SNAPSHOT_KEYS);
             if (!snapshot || snapshot.status !== 'available' || snapshot.ownerIdentity !== lease.ownerIdentity
                 || snapshot.leaseIdentity !== lease.leaseIdentity || !opaque(snapshot.snapshotIdentity)
+                || snapshot.scopeDigest !== lease.scopeDigest
                 || snapshot.generation !== lease.generation || snapshot.revocationGeneration !== lease.revocationGeneration
                 || snapshot.selectionEpoch !== lease.selectionEpoch || snapshot.restartGeneration !== lease.restartGeneration
                 || !integer(snapshot.revision, 1) || !integer(snapshot.capturedAt, startedAt)
@@ -218,11 +227,15 @@ export function createPatientOpenLoopsReadServiceV1(sourcesValue: unknown) {
             const current = exact(currentValue, CURRENT_KEYS);
             if (!current || current.status !== 'current' || current.ownerIdentity !== lease.ownerIdentity
                 || current.leaseIdentity !== lease.leaseIdentity || current.snapshotIdentity !== snapshot.snapshotIdentity
+                || current.scopeDigest !== lease.scopeDigest
                 || current.generation !== lease.generation || current.revocationGeneration !== lease.revocationGeneration
                 || current.selectionEpoch !== lease.selectionEpoch || current.restartGeneration !== lease.restartGeneration
                 || current.revision !== snapshot.revision) return fail('scope_changed');
             const finalCurrent = sync(ownerCurrentSource, 'authorization_denied');
-            const finalized = sync(() => finalizeSource(execution, finalCurrent, claim), 'authorization_denied');
+            const finalBinding = record({ scopeDigest: current.scopeDigest, generation: current.generation,
+                revocationGeneration: current.revocationGeneration, selectionEpoch: current.selectionEpoch });
+            const finalized = sync(() => finalizeSource(binding, finalBinding, finalCurrent, claim),
+                'authorization_denied');
             if (finalized !== true) return fail('authorization_denied');
             if (now() >= deadline) { terminalize(deadlineCode); return fail(deadlineCode); }
             state = 'terminal'; terminalCode = 'lease_replay';

@@ -42,6 +42,7 @@ function makeLease(overrides: Record<string, unknown> = {}) {
         ownerRef: 'owner.internal-0001', leaseRef: 'lease.internal-0001', purposeCode: 'care_coordination',
         operationId: PATIENT_OPEN_LOOPS_READ_OPERATION_V1,
         capabilityId: PATIENT_OPEN_LOOPS_READ_OPERATION_V1, maxStage: 'read_only',
+        scopeDigest: DIGEST,
         generation: 4, revocationGeneration: 1, selectionEpoch: 9,
         restartGeneration: 2, expiresAt: NOW + 2_000, ...overrides,
     });
@@ -57,6 +58,7 @@ function makeItem(overrides: Record<string, unknown> = {}) {
 function makeSnapshot(overrides: Record<string, unknown> = {}) {
     return canonical({
         status: 'available', ownerIdentity: OWNER, leaseIdentity: LEASE, snapshotIdentity: SNAPSHOT,
+        scopeDigest: DIGEST,
         generation: 4, revocationGeneration: 1, selectionEpoch: 9, restartGeneration: 2,
         revision: 12, capturedAt: NOW, truncated: false, items: Object.freeze([makeItem()]), ...overrides,
     });
@@ -65,6 +67,7 @@ function makeSnapshot(overrides: Record<string, unknown> = {}) {
 function makeCurrent(overrides: Record<string, unknown> = {}) {
     return canonical({
         status: 'current', ownerIdentity: OWNER, leaseIdentity: LEASE, snapshotIdentity: SNAPSHOT,
+        scopeDigest: DIGEST,
         generation: 4, revocationGeneration: 1, selectionEpoch: 9, restartGeneration: 2, revision: 12,
         ...overrides,
     });
@@ -72,7 +75,8 @@ function makeCurrent(overrides: Record<string, unknown> = {}) {
 
 function makeSources(overrides: Record<string, unknown> = {}) {
     const execution = Object.freeze(Object.create(null));
-    let permitState: 'available' | 'active' | 'consumed' | 'denied' = 'available';
+    const boundExecution = Object.freeze(Object.create(null));
+    let permitState: 'available' | 'active' | 'bound' | 'consumed' | 'denied' = 'available';
     return canonical({
         now: () => NOW,
         nextRef: () => `aipr_${'c'.repeat(64)}`,
@@ -83,12 +87,16 @@ function makeSources(overrides: Record<string, unknown> = {}) {
             if (permitState !== 'available') throw new Error('permit unavailable');
             permitState = 'active'; return execution;
         },
-        finalizePermit: (candidate: unknown) => {
+        bindPermit: (candidate: unknown) => {
             if (candidate !== execution || permitState !== 'active') throw new Error('execution unavailable');
+            permitState = 'bound'; return boundExecution;
+        },
+        finalizeBoundPermit: (candidate: unknown) => {
+            if (candidate !== boundExecution || permitState !== 'bound') throw new Error('execution unavailable');
             permitState = 'consumed'; return true;
         },
         denyPermit: (candidate: unknown) => {
-            if (candidate !== execution || permitState !== 'active') return false;
+            if (candidate !== execution || !['active', 'bound'].includes(permitState)) return false;
             permitState = 'denied'; return true;
         },
         acquireLease: () => makeLease(),
@@ -328,6 +336,9 @@ test('linearizes a one-use lease across concurrent and replayed reads', async ()
 
 test('consumes the exact lease once across services sharing the broker port', async () => {
     let reads = 0;
+    let acquisitionBinding: object | null = null;
+    let readBinding: object | null = null;
+    let currentnessBinding: object | null = null;
     const audits: Array<Record<string, unknown>> = [];
     const refs = ['agent.synthetic.open-loops', 'lease.synthetic.open-loops'];
     const broker = createAipOwnerBrokerV1({
@@ -337,9 +348,13 @@ test('consumes the exact lease once across services sharing the broker port', as
     const permit = await broker.authorize(broker.issueLease(broker.issueOwner(BROKER_BINDING)),
         BROKER_CURRENT, BROKER_CLAIM);
     const sources = makeSources({
-        current: () => BROKER_CURRENT, beginPermit: broker.beginPermit,
-        finalizePermit: broker.finalizePermit, denyPermit: broker.denyPermit,
-        readSnapshot: () => { reads += 1; return Promise.resolve(makeSnapshot()); },
+        current: () => BROKER_CURRENT, beginPermit: broker.beginPermit, bindPermit: broker.bindPermit,
+        finalizeBoundPermit: broker.finalizeBoundPermit, denyPermit: broker.denyPermit,
+        acquireLease: (binding: object) => { acquisitionBinding = binding; return makeLease(); },
+        readSnapshot: (binding: object) => {
+            readBinding = binding; reads += 1; return Promise.resolve(makeSnapshot());
+        },
+        readCurrentness: (binding: object) => { currentnessBinding = binding; return makeCurrent(); },
         writeAudit: (record: unknown) => { audits.push(record as Record<string, unknown>); return Promise.resolve(); },
     });
     const first = createPatientOpenLoopsReadServiceV1(sources);
@@ -348,10 +363,80 @@ test('consumes the exact lease once across services sharing the broker port', as
     assert.equal((await first.read(permit, validInput())).outcome, 'read');
     await assert.rejects(second.read(permit, validInput()), isError('authorization_denied'));
     assert.equal(reads, 1);
+    assert.ok(acquisitionBinding && readBinding && currentnessBinding);
+    assert.notEqual(acquisitionBinding, readBinding);
+    assert.equal(readBinding, currentnessBinding);
+    for (const binding of [acquisitionBinding, readBinding]) {
+        assert.equal(Object.getPrototypeOf(binding), null);
+        assert.equal(Object.isFrozen(binding), true);
+        assert.deepEqual(Reflect.ownKeys(binding), []);
+    }
     assert.deepEqual(audits.map((record) => [record.outcome, record.denialCode, record.maxStage]), [
         ['allowed', null, 'read_only'], ['denied', 'authorization_denied', 'read_only'],
     ]);
     assert.doesNotMatch(JSON.stringify(audits), /patientId|owner\.internal|lease\.internal|aipl_|openedAt|dueAt/u);
+});
+
+test('rejects patient scope or selection not bound to the real broker permit before snapshot read', async () => {
+    let reads = 0;
+    const otherDigest = `sha256:${'b'.repeat(64)}`;
+    const cases = [{ selectionEpoch: 77 }, { scopeDigest: otherDigest }];
+    for (const [index, mismatch] of cases.entries()) {
+        const audits: Array<Record<string, unknown>> = [];
+        const refs = [`agent.synthetic.binding-mismatch-${index}`, `lease.synthetic.binding-mismatch-${index}`];
+        const broker = createAipOwnerBrokerV1({
+            now: () => NOW, nextRef: () => refs.shift(), hashRef: () => DIGEST,
+            writeAudit: async () => undefined,
+        });
+        const permit = await broker.authorize(broker.issueLease(broker.issueOwner(BROKER_BINDING)),
+            BROKER_CURRENT, BROKER_CLAIM);
+        const sources = makeSources({
+            current: () => BROKER_CURRENT, beginPermit: broker.beginPermit, bindPermit: broker.bindPermit,
+            finalizeBoundPermit: broker.finalizeBoundPermit, denyPermit: broker.denyPermit,
+            acquireLease: () => makeLease(mismatch),
+            readSnapshot: () => { reads += 1; return Promise.resolve(makeSnapshot(mismatch)); },
+            readCurrentness: () => makeCurrent(mismatch),
+            writeAudit: (record: unknown) => {
+                audits.push(record as Record<string, unknown>); return Promise.resolve();
+            },
+        });
+
+        await assert.rejects(createPatientOpenLoopsReadServiceV1(sources).read(permit, validInput()),
+            isError('authorization_denied'));
+        await assert.rejects(createPatientOpenLoopsReadServiceV1(sources).read(permit, validInput()),
+            isError('authorization_denied'));
+        assert.deepEqual(audits.map((record) => [record.outcome, record.denialCode, record.maxStage]),
+            [['denied', 'authorization_denied', 'read_only'],
+                ['denied', 'authorization_denied', 'read_only']]);
+        assert.doesNotMatch(JSON.stringify(audits), /patientId|owner\.internal|lease\.internal|aipl_/u);
+    }
+    assert.equal(reads, 0);
+});
+
+test('revalidates the real broker owner after lease acquisition and before snapshot read', async () => {
+    let reads = 0;
+    const audits: Array<Record<string, unknown>> = [];
+    const refs = ['agent.synthetic.pre-read-revoke', 'lease.synthetic.pre-read-revoke'];
+    const broker = createAipOwnerBrokerV1({
+        now: () => NOW, nextRef: () => refs.shift(), hashRef: () => DIGEST,
+        writeAudit: async () => undefined,
+    });
+    const owner = broker.issueOwner(BROKER_BINDING);
+    const permit = await broker.authorize(broker.issueLease(owner), BROKER_CURRENT, BROKER_CLAIM);
+    const service = createPatientOpenLoopsReadServiceV1(makeSources({
+        current: () => BROKER_CURRENT, beginPermit: broker.beginPermit, bindPermit: broker.bindPermit,
+        finalizeBoundPermit: broker.finalizeBoundPermit, denyPermit: broker.denyPermit,
+        acquireLease: () => { broker.revokeOwner(owner); return makeLease(); },
+        readSnapshot: () => { reads += 1; return Promise.resolve(makeSnapshot()); },
+        writeAudit: (record: unknown) => {
+            audits.push(record as Record<string, unknown>); return Promise.resolve();
+        },
+    }));
+
+    await assert.rejects(service.read(permit, validInput()), isError('authorization_denied'));
+    assert.equal(reads, 0);
+    assert.deepEqual(audits.map((record) => [record.outcome, record.denialCode]),
+        [['denied', 'authorization_denied']]);
 });
 
 test('times out a pending native Promise and discards its late completion', async () => {
@@ -617,8 +702,8 @@ test('ends broker revocation during allowed audit with a terminal denial', async
     const started = new Promise<void>((resolve) => { auditStarted = resolve; });
     const blocked = new Promise<void>((resolve) => { releaseAudit = resolve; });
     const service = createPatientOpenLoopsReadServiceV1(makeSources({
-        current: () => BROKER_CURRENT, beginPermit: broker.beginPermit,
-        finalizePermit: broker.finalizePermit, denyPermit: broker.denyPermit,
+        current: () => BROKER_CURRENT, beginPermit: broker.beginPermit, bindPermit: broker.bindPermit,
+        finalizeBoundPermit: broker.finalizeBoundPermit, denyPermit: broker.denyPermit,
         writeAudit: (record: unknown) => {
             const typed = record as Record<string, unknown>;
             audits.push(typed);

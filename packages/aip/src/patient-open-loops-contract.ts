@@ -37,11 +37,11 @@ export type PatientOpenLoopsReadResultV1 = Readonly<{
 
 export const INPUT_KEYS = ['schemaVersion', 'operationId'] as const;
 export const LEASE_KEYS = ['status', 'ownerIdentity', 'leaseIdentity', 'ownerRef', 'leaseRef', 'purposeCode',
-    'operationId', 'capabilityId', 'maxStage', 'generation', 'revocationGeneration', 'selectionEpoch',
+    'operationId', 'capabilityId', 'maxStage', 'scopeDigest', 'generation', 'revocationGeneration', 'selectionEpoch',
     'restartGeneration', 'expiresAt'] as const;
-export const SNAPSHOT_KEYS = ['status', 'ownerIdentity', 'leaseIdentity', 'snapshotIdentity', 'generation',
+export const SNAPSHOT_KEYS = ['status', 'ownerIdentity', 'leaseIdentity', 'snapshotIdentity', 'scopeDigest', 'generation',
     'revocationGeneration', 'selectionEpoch', 'restartGeneration', 'revision', 'capturedAt', 'truncated', 'items'] as const;
-export const CURRENT_KEYS = ['status', 'ownerIdentity', 'leaseIdentity', 'snapshotIdentity', 'generation',
+export const CURRENT_KEYS = ['status', 'ownerIdentity', 'leaseIdentity', 'snapshotIdentity', 'scopeDigest', 'generation',
     'revocationGeneration', 'selectionEpoch', 'restartGeneration', 'revision'] as const;
 const ITEM_KEYS = ['loopRef', 'kind', 'temporalState', 'openedAt', 'dueAt', 'revision'] as const;
 export const REF = /^[a-z][a-z0-9._-]{15,127}$/u;

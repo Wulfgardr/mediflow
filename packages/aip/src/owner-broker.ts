@@ -1,12 +1,8 @@
 /* @Codex */
 import { types } from 'node:util';
-import {
-    createAipPermitExecutionOwnerV1,
-    type AipAuthorizationPermitV1,
-    type AipPermitExecutionV1,
-} from './permit-execution-owner.ts';
-
-export type { AipAuthorizationPermitV1, AipPermitExecutionV1 } from './permit-execution-owner.ts';
+import { createAipPermitExecutionOwnerV1, type AipAuthorizationPermitV1,
+    type AipBoundPermitExecutionV1, type AipPermitExecutionV1 } from './permit-execution-owner.ts';
+export type { AipAuthorizationPermitV1, AipBoundPermitExecutionV1, AipPermitExecutionV1 } from './permit-execution-owner.ts';
 export const AIP_AUDIT_SCHEMA_V1 = 'mediflow.aip.audit.v1' as const;
 const SOURCE_KEYS = ['now', 'nextRef', 'hashRef', 'writeAudit'] as const;
 const BINDING_KEYS = ['peerRef', 'runtimeRef', 'parentRef', 'purposeCode', 'operation', 'capabilityId',
@@ -15,6 +11,7 @@ const BINDING_KEYS = ['peerRef', 'runtimeRef', 'parentRef', 'purposeCode', 'oper
 const CURRENT_KEYS = ['peerRef', 'runtimeRef', 'generation', 'revocationGeneration', 'selectionEpoch',
     'parentGeneration', 'policyGeneration'] as const;
 const CLAIM_KEYS = ['operation', 'capabilityId'] as const;
+const EXECUTION_BINDING_KEYS = ['scopeDigest', 'generation', 'revocationGeneration', 'selectionEpoch'] as const;
 const REF = /^[a-z][a-z0-9._-]{15,127}$/u;
 const TOKEN = /^[a-z][a-z0-9._-]{0,127}$/u;
 const DIGEST = /^sha256:[0-9a-f]{64}$/u;
@@ -26,12 +23,9 @@ export type AipOwnerBrokerV1ErrorCode = 'input_invalid' | 'owner_invalid' | 'lea
     | 'permit_replay' | 'permit_revoked' | 'currentness_invalid' | 'claim_invalid' | 'reference_invalid'
     | 'clock_invalid' | 'audit_failed' | 'peer_mismatch' | 'runtime_mismatch' | 'lease_replay' | 'lease_revoked'
     | 'generation_changed' | 'revoked' | 'selection_changed' | 'parent_disposed' | 'policy_changed'
-    | 'claim_mismatch' | 'expired' | 'budget_exhausted' | 'restart_changed';
+    | 'claim_mismatch' | 'scope_changed' | 'expired' | 'budget_exhausted' | 'restart_changed';
 export class AipOwnerBrokerV1Error extends Error {
-    constructor(public readonly code: AipOwnerBrokerV1ErrorCode) {
-        super(`AIP owner broker rejected: ${code}`);
-        this.name = 'AipOwnerBrokerV1Error';
-    }
+    constructor(public readonly code: AipOwnerBrokerV1ErrorCode) { super(`AIP owner broker rejected: ${code}`); this.name = 'AipOwnerBrokerV1Error'; }
 }
 type OwnerRecord = {
     agentRef: string; peerRef: string; runtimeRef: string; parentRef: string; purposeCode: string;
@@ -163,12 +157,23 @@ export function createAipOwnerBrokerV1(sourcesValue: unknown) {
         return null;
     };
     const permitExecutions = createAipPermitExecutionOwnerV1({
-        enter,
-        now,
-        parseCurrent: (value: unknown) => Object.freeze(observe('currentness_invalid',
-            () => exactValues(value, CURRENT_KEYS, 'currentness_invalid'))),
-        parseClaim: (value: unknown) => Object.freeze(observe('claim_invalid',
-            () => exactValues(value, CLAIM_KEYS, 'claim_invalid'))),
+        enter, now,
+        parseCurrent: (value: unknown) => Object.freeze(observe('currentness_invalid', () =>
+            exactValues(value, CURRENT_KEYS, 'currentness_invalid'))),
+        parseClaim: (value: unknown) => Object.freeze(observe('claim_invalid', () =>
+            exactValues(value, CLAIM_KEYS, 'claim_invalid'))),
+        parseBinding: (value: unknown) => Object.freeze(observe('currentness_invalid', () =>
+            exactValues(value, EXECUTION_BINDING_KEYS, 'currentness_invalid'))),
+        validateBinding: (authority: { owner: OwnerRecord }, binding: readonly unknown[]) => {
+            const [scopeDigest, generation, revocationGeneration, selectionEpoch] = binding;
+            if (typeof scopeDigest !== 'string' || !DIGEST.test(scopeDigest) || !integer(generation, 1)
+                || !integer(revocationGeneration) || !integer(selectionEpoch)) return 'currentness_invalid';
+            if (scopeDigest !== authority.owner.scopeDigest) return 'scope_changed';
+            if (generation !== authority.owner.generation) return 'generation_changed';
+            if (revocationGeneration !== authority.owner.revocationGeneration) return 'revoked';
+            if (selectionEpoch !== authority.owner.selectionEpoch) return 'selection_changed';
+            return null;
+        },
         validate: (authority: { owner: OwnerRecord; lease: LeaseRecord }, current: readonly unknown[],
             claim: readonly unknown[], timestamp: number) => authority.lease.state === 'consumed'
             ? ownerDenial(authority.owner, current, claim, timestamp) : 'permit_revoked',
@@ -283,13 +288,13 @@ export function createAipOwnerBrokerV1(sourcesValue: unknown) {
         if (typeof parentRef !== 'string' || !REF.test(parentRef)) throw new AipOwnerBrokerV1Error('input_invalid');
         disposedParents.add(parentRef);
     };
-    const beginPermit = (permit: unknown, current: unknown, claim: unknown): AipPermitExecutionV1 =>
-        permitExecutions.begin(permit, current, claim);
-    const finalizePermit = (execution: unknown, current: unknown, claim: unknown): true =>
-        permitExecutions.finalize(execution, current, claim);
+    const beginPermit = (permit: unknown, current: unknown, claim: unknown): AipPermitExecutionV1 => permitExecutions.begin(permit, current, claim);
+    const bindPermit = (execution: unknown, binding: unknown, current: unknown, claim: unknown): AipBoundPermitExecutionV1 => permitExecutions.bind(execution, binding, current, claim);
+    const finalizePermit = (execution: unknown, current: unknown, claim: unknown): true => permitExecutions.finalize(execution, current, claim);
+    const finalizeBoundPermit = (execution: unknown, binding: unknown, current: unknown, claim: unknown): true =>
+        permitExecutions.finalizeBound(execution, binding, current, claim);
     const denyPermit = (execution: unknown): boolean => permitExecutions.deny(execution);
-    const consumePermit = (permit: unknown, current: unknown, claim: unknown): true =>
-        permitExecutions.consume(permit, current, claim);
-    return Object.freeze({ issueOwner, issueLease, authorize, beginPermit, finalizePermit, denyPermit, consumePermit,
-        revokeOwner, revokeAll, restart, disposeParent });
+    const consumePermit = (permit: unknown, current: unknown, claim: unknown): true => permitExecutions.consume(permit, current, claim);
+    return Object.freeze({ issueOwner, issueLease, authorize, beginPermit, bindPermit, finalizePermit, finalizeBoundPermit,
+        denyPermit, consumePermit, revokeOwner, revokeAll, restart, disposeParent });
 }

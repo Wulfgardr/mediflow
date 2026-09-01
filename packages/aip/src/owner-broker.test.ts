@@ -35,6 +35,8 @@ const CURRENT = Object.freeze({
     policyGeneration: BINDING.policyGeneration,
 });
 const CLAIM = Object.freeze({ operation: BINDING.operation, capabilityId: BINDING.capabilityId });
+const EXECUTION_BINDING = Object.freeze({ scopeDigest: BINDING.scopeDigest, generation: BINDING.generation,
+    revocationGeneration: BINDING.revocationGeneration, selectionEpoch: BINDING.selectionEpoch });
 
 test('emette handle opachi e autorizza solo dopo un audit PHI-safe', async () => {
     const audit: unknown[] = [];
@@ -459,4 +461,96 @@ test('riserva il permit broker-wide e rivalida l execution opaca subito prima de
     assert.equal(broker.denyPermit(deniedExecution), false);
     assert.throws(() => broker.finalizePermit(deniedExecution, CURRENT, CLAIM),
         (error: unknown) => error instanceof Error && 'code' in error && error.code === 'permit_revoked');
+});
+
+test('lega scope e selection al permit e li rivalida nel broker prima del finalize', async () => {
+    let ref = 0;
+    const broker = createAipOwnerBrokerV1({ now: () => 1_000,
+        nextRef: () => `reference.synthetic.bound-${String(ref += 1).padStart(4, '0')}`,
+        hashRef: () => DIGEST, writeAudit: async () => undefined });
+    const begin = async () => {
+        const permit = await broker.authorize(broker.issueLease(broker.issueOwner(BINDING)), CURRENT, CLAIM);
+        return { permit, execution: broker.beginPermit(permit, CURRENT, CLAIM) };
+    };
+    const mismatches: Array<[Record<string, unknown>, string]> = [
+        [{ ...EXECUTION_BINDING, scopeDigest: `sha256:${'b'.repeat(64)}` }, 'scope_changed'],
+        [{ ...EXECUTION_BINDING, generation: 2 }, 'generation_changed'],
+        [{ ...EXECUTION_BINDING, revocationGeneration: 1 }, 'revoked'],
+        [{ ...EXECUTION_BINDING, selectionEpoch: 8 }, 'selection_changed'],
+    ];
+    for (const [binding, expected] of mismatches) {
+        const { permit, execution } = await begin();
+        assert.throws(() => broker.bindPermit(execution, binding, CURRENT, CLAIM),
+            (error: unknown) => error instanceof Error && 'code' in error && error.code === expected);
+        assert.throws(() => broker.beginPermit(permit, CURRENT, CLAIM),
+            (error: unknown) => error instanceof Error && 'code' in error && error.code === 'permit_revoked');
+    }
+    for (const [binding, expected] of mismatches) {
+        const { execution } = await begin();
+        const bound = broker.bindPermit(execution, EXECUTION_BINDING, CURRENT, CLAIM);
+        assert.throws(() => broker.finalizeBoundPermit(bound, binding, CURRENT, CLAIM),
+            (error: unknown) => error instanceof Error && 'code' in error && error.code === expected);
+        assert.throws(() => broker.finalizeBoundPermit(bound, EXECUTION_BINDING, CURRENT, CLAIM),
+            (error: unknown) => error instanceof Error && 'code' in error && error.code === 'permit_revoked');
+    }
+    const { execution: bypassExecution } = await begin();
+    const bypassBound = broker.bindPermit(bypassExecution, EXECUTION_BINDING, CURRENT, CLAIM);
+    assert.throws(() => broker.finalizePermit(bypassExecution, CURRENT, CLAIM),
+        (error: unknown) => error instanceof Error && 'code' in error && error.code === 'permit_revoked');
+    assert.throws(() => broker.finalizeBoundPermit(bypassBound, EXECUTION_BINDING, CURRENT, CLAIM),
+        (error: unknown) => error instanceof Error && 'code' in error && error.code === 'permit_revoked');
+    const { execution } = await begin();
+    const bound = broker.bindPermit(execution, EXECUTION_BINDING, CURRENT, CLAIM);
+    assert.equal(Object.isFrozen(bound), true);
+    assert.equal(Object.getPrototypeOf(bound), null);
+    assert.deepEqual(Reflect.ownKeys(bound), []);
+    assert.equal(broker.finalizeBoundPermit(bound, EXECUTION_BINDING, CURRENT, CLAIM), true);
+});
+
+test('nega binding scoped proxy, extra-key e reentrant senza osservare dati hostile', async () => {
+    let ref = 0;
+    let getterReads = 0;
+    const broker = createAipOwnerBrokerV1({ now: () => 1_000,
+        nextRef: () => `reference.synthetic.hostile-${String(ref += 1).padStart(4, '0')}`,
+        hashRef: () => DIGEST, writeAudit: async () => undefined });
+    const hostile = Object.create(null);
+    Object.defineProperties(hostile, {
+        ...Object.getOwnPropertyDescriptors(EXECUTION_BINDING),
+        selectionEpoch: { enumerable: true, get: () => { getterReads += 1; return 7; } },
+    });
+    let proxyTraps = 0;
+    const proxy = new Proxy(EXECUTION_BINDING, { ownKeys: () => { proxyTraps += 1; return []; } });
+    for (const candidate of [hostile, proxy, { ...EXECUTION_BINDING, patientId: 'synthetic-forbidden' }]) {
+        const permit = await broker.authorize(broker.issueLease(broker.issueOwner(BINDING)), CURRENT, CLAIM);
+        const execution = broker.beginPermit(permit, CURRENT, CLAIM);
+        assert.throws(() => broker.bindPermit(execution, candidate, CURRENT, CLAIM),
+            (error: unknown) => error instanceof Error && 'code' in error && error.code === 'currentness_invalid');
+        assert.throws(() => broker.beginPermit(permit, CURRENT, CLAIM),
+            (error: unknown) => error instanceof Error && 'code' in error && error.code === 'permit_revoked');
+    }
+    assert.equal(getterReads, 0);
+    assert.equal(proxyTraps, 0);
+
+    let calls = 0;
+    let reentrantRef = 0;
+    let swallowed: unknown;
+    const capture: { execution?: ReturnType<typeof broker.beginPermit> } = {};
+    const reentrant = createAipOwnerBrokerV1({
+        now: () => {
+            calls += 1;
+            if (calls === 6) {
+                try { reentrant.bindPermit(capture.execution, EXECUTION_BINDING, CURRENT, CLAIM); } catch (error) { swallowed = error; }
+            }
+            return 1_000;
+        },
+        nextRef: () => `reference.synthetic.reentry-${String(reentrantRef += 1).padStart(4, '0')}`,
+        hashRef: () => DIGEST, writeAudit: async () => undefined,
+    });
+    const permit = await reentrant.authorize(reentrant.issueLease(reentrant.issueOwner(BINDING)), CURRENT, CLAIM);
+    const execution = reentrant.beginPermit(permit, CURRENT, CLAIM);
+    capture.execution = execution;
+    const bound = reentrant.bindPermit(execution, EXECUTION_BINDING, CURRENT, CLAIM);
+    assert.throws(() => reentrant.finalizeBoundPermit(bound, EXECUTION_BINDING, CURRENT, CLAIM),
+        (error: unknown) => error instanceof Error && 'code' in error && error.code === 'clock_invalid');
+    assert.ok(swallowed instanceof Error && 'code' in swallowed && swallowed.code === 'input_invalid');
 });
