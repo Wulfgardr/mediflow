@@ -984,6 +984,147 @@ genera ID, timestamp o receipt e non decodifica riferimenti opachi. La
 composition production lega l'owner H6, il controller selection-currentness
 privato e il solo owner H7b; non pubblica controller, registry o port privati.
 
+#### Contratto H7b della transazione SQLite
+
+H7b implementa il solo owner sincrono iniettato in H7a. `lookup`, `commit` e
+`snapshotReceipt` terminano prima del return e non avviano Promise, timer,
+route, audit asincroni o lavoro differito. H7b importa il database server-side,
+lo schema clinico, il parser H4 e le primitive hash/audit minime; non importa
+H6, projection registry, route, Fabric, provider, venue, egress o UI.
+
+Lo schema aggiunge una sola tabella `headless_soap_entry_commits` con le
+colonne, in ordine canonico:
+
+```text
+idempotency_key PRIMARY KEY
+approval_ref
+authorization_proof_digest
+command_id UNIQUE
+entry_id UNIQUE REFERENCES entries(id) ON DELETE CASCADE
+audit_event_id UNIQUE REFERENCES audit_events(event_id)
+receipt_ref UNIQUE
+binding_snapshot
+binding_digest
+entry_digest
+audit_snapshot
+audit_digest
+receipt_snapshot
+receipt_digest
+committed_at
+```
+
+Tutte le colonne sono `NOT NULL`. Il ledger non contiene SOAP, proof raw, PIN,
+username, ID paziente o ambulatorio raw, provider, venue, prompt o testo in
+chiaro. `command_id` e `entry_id` restano distinti. Il ledger e inserito per
+ultimo: una riga esistente implica entry, audit e receipt integralmente
+materializzati oppure e una corruzione, mai uno stato parziale valido.
+
+Gli identificatori persistiti sono deterministici e non riusano input caller:
+`entry_id = hsei_<sha256>`, `audit_event_id = hsea_<sha256>` e
+`receipt_ref = hser_<sha256>`. Ciascun digest usa un codec domain-separated v1
+distinto e il solo `commandId` H6 canonico come payload. Ogni valore ha 64
+cifre esadecimali lowercase dopo il prefisso. Collisione con una riga non
+field-exact e `idempotency_conflict` o `receipt_unavailable` secondo che
+l'incoerenza preceda o segua un ledger gia accettato.
+
+La receipt H7b e un record null-prototype, frozen e chiuso con le sole key, in
+questo ordine:
+
+```text
+schema
+receiptRef
+operationId
+outcome
+commandId
+entryRef
+auditEventRef
+patientVersion
+entryVersion
+committedAt
+bindingDigest
+entryDigest
+auditDigest
+```
+
+`schema = mediflow.headless.soap-entry-commit-receipt.v1`,
+`operationId = mediflow.clinical_diary.append_soap.v1`,
+`outcome = entry_committed`, `entryVersion = 1` e `committedAt` e un ISO 8601
+UTC canonico a precisione di secondo. `receipt_snapshot` e il JSON canonico
+byte-esatto di questo record; `receipt_digest` usa il codec
+`mediflow.headless.soap-entry-commit-receipt-digest.v1`. Fresh commit, replay
+nello stesso processo, replay dopo restart e replay dopo restore restituiscono
+la stessa receipt senza flag di percorso.
+
+`binding_snapshot` e un JSON canonico chiuso che conserva soltanto i campi
+serializzabili necessari a dimostrare il binding H6: schema e ID operazione,
+command/approval/idempotency e proof digest, Web session ID, principal/actor e
+attestation ref con versioni, policy, versioni/generazioni della child lease,
+selection refs/epoch/expiry, patient version, action/purpose, proposal
+revision/expiry e i digest payload, seal e policy. Le identity JavaScript
+opache non sono serializzate. Gli ID clinici raw ricevuti dal commit binding
+sono usati soltanto nella transazione e vi compaiono come digest
+domain-separated `patientIdDigest` e `ambulatoryIdDigest`.
+`binding_digest` e il digest del JSON canonico completo.
+
+Il lookup usa `idempotency_key` come indice. Una riga assente produce
+`missing`. Una riga con `approval_ref` o `authorization_proof_digest` diverso
+produce `conflict`. Una riga candidata a replay viene riletta insieme alla sua
+entry e al suo audit; H7b ricostruisce e confronta snapshot, receipt e tutti i
+digest. Solo una catena integralmente coerente produce `exact`. Righe mancanti,
+JSON non canonico, digest drift, riferimenti incrociati incoerenti o entry/audit
+tampered causano il solo `HeadlessSoapEntryCommitOwnerError` tipizzato
+`receipt_unavailable`; failure SQLite non classificabili restano
+`storage_unavailable`.
+
+Il fresh commit usa `runDbServerImmediateTransaction` e, sotto lo stesso
+writer lock, esegue esattamente:
+
+1. un secondo lookup del ledger come race fence; `exact` restituisce la receipt
+   gia durevole e `conflict` nega senza write;
+2. parsing esatto del bound command, della lineage e del seal H4, con confronto
+   di proof, command, approval, idempotency, operation, payload, seal e policy
+   digest;
+3. un solo read-CAS su `patients`, `patients_to_ambulatories` e
+   `ambulatories`: patient ID e ambulatory ID devono essere quelli del commit
+   binding, il paziente deve essere non archiviato e non tombstoned, la
+   membership deve esistere e `patients.version` deve uguagliare la version H6;
+4. insert dell'entry `visit` usando byte-per-byte il seal H4 per `date`,
+   `title`, `content`, `setting` e `metadata`, con `attachments`, `deleted_at`
+   e `deletion_reason` null, version 1 e timestamp espliciti; il normalizzatore
+   generico delle route non viene usato e la patient version non viene
+   incrementata;
+5. insert sincrono dello stesso audit `entry.created`, outcome `success`, actor
+   `user` con ref hashato, subject `entry`, source `web`, request null e
+   metadata PHI-safe contenenti soltanto operation/command ref e digest;
+6. costruzione della receipt e insert del ledger per ultimo;
+7. rilettura e verifica field-exact di ledger, entry e audit prima del return.
+
+Ogni throw o denial prima del completamento del punto 7 rollbacka entry, audit
+e ledger insieme. Failure di currentness produce `binding_unavailable`; race
+su chiave produce `idempotency_conflict`; corruzione o incoerenza durevole
+produce `receipt_unavailable`; errori SQLite restano `storage_unavailable` e
+shape o lifecycle inattesi `lifecycle_unavailable`. Nessun messaggio raw
+attraversa il port.
+
+Il backup artifact v1 aggiunge la collection additiva
+`headlessSoapEntryCommits`; artifact legacy che la omettono vengono
+normalizzati a `[]`. Non viene esportato globalmente `audit_events`. Ogni riga
+H7b esporta le colonne del ledger, inclusi `binding_snapshot`,
+`audit_snapshot`, `receipt_snapshot` e i digest; l'entry correlata continua a
+viaggiare nella collection `entries`. Il restore effettua prima un preflight
+integrale, poi nella transazione target usa l'ordine `entries -> audit H7b ->
+ledger`: inserisce un audit H7b assente, riusa quello presente soltanto se
+field-exact e rollbacka su ogni collisione diversa prima di cancellare dati.
+Audit non correlati restano append-only. Un re-export dopo restore deve essere
+byte-equivalente e il replay H7b deve restare `exact`.
+
+La composition production vive in un root server-only interno che crea una
+sola istanza H7a legando l'`approvalController` H6, il
+`selectionCommitBindingController` del process owner e il solo owner SQLite
+H7b. Il facade production esporta esclusivamente
+`headlessSoapEntryCommitService`; owner, controller, registry e port DB restano
+privati.
+
 L'approval artifact, audit e receipt sono PHI-safe. Contengono solo riferimenti
 opachi, esito, timestamp, digest e versioni necessari. Non contengono SOAP,
 PIN, proof, projection, identita dirette, provider, venue, egress o testo di
