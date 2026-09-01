@@ -54,9 +54,10 @@ test('sanitizeAuditMetadata keeps only the PHI-safe whitelist', () => {
     });
 });
 
-test('audit catalog includes the PHI-safe application lock vocabulary', () => {
+test('audit catalog includes the PHI-safe application lock and reference-data vocabulary', () => {
     assert.equal(AUDIT_EVENT_TYPES.includes('auth.lock'), true);
     assert.equal(AUDIT_EVENT_TYPES.includes('auth.soap_active_role.enrolled'), true);
+    assert.equal(AUDIT_EVENT_TYPES.includes('reference_data.icd11.search'), true);
 });
 
 test('audit schema blocks update and delete to preserve append-only semantics', () => {
@@ -362,6 +363,7 @@ test('summarizeAuditEvents groups PHI-safe operational KPIs', () => {
         siss_handoff: 0,
         settings: 0,
         ai_review: 0,
+        reference_data: 0,
     });
     assert.deepEqual(summary.topEventTypes, [
         { eventType: 'patient.updated', count: 2 },
