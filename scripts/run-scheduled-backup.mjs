@@ -40,6 +40,7 @@ const BACKUP_TABLES = {
   patients: 'patients',
   physicianReviewAttestations: 'physician_review_attestations',
   headlessSoapActiveRoleAttestations: 'headless_soap_active_role_attestations',
+  headlessSoapEntryCommits: 'headless_soap_entry_commits',
   prostheticPrescriptions: 'prosthetic_prescriptions',
   serviceCatalogEntries: 'service_catalog_entries',
   servicePrescriptionItems: 'service_prescription_items',
@@ -135,6 +136,8 @@ export function canonicalizeHeadlessSoapActiveRoleAttestations(payload) {
       const primary = String(left.attestationRef).localeCompare(String(right.attestationRef));
       return primary === 0 ? String(left.actorRef).localeCompare(String(right.actorRef)) : primary;
     }),
+    headlessSoapEntryCommits: [...(payload.headlessSoapEntryCommits || [])].sort((left, right) =>
+      String(left.idempotencyKey).localeCompare(String(right.idempotencyKey))),
   };
 }
 

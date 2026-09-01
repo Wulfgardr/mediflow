@@ -9,6 +9,8 @@ import test from 'node:test';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import Database from 'better-sqlite3';
 import { BACKUP_COLLECTIONS, createEmptyDataset, parseBackupArtifact, serializeBackupArtifact, stableStringify } from './backup-artifact';
+import { ATTACHMENTS_ABSENT, frame, PAYLOAD_DIGEST_CODEC, SEAL_DIGEST_CODEC,
+    SEAL_SCHEMA } from './headless/clinician-soap-entry-seal-codec-internal';
 import { decryptData, encryptData, generateMasterKey } from './security/security';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -35,6 +37,7 @@ const BACKUP_TABLES = {
     patients: 'patients',
     physicianReviewAttestations: 'physician_review_attestations',
     headlessSoapActiveRoleAttestations: 'headless_soap_active_role_attestations',
+    headlessSoapEntryCommits: 'headless_soap_entry_commits',
     prostheticPrescriptions: 'prosthetic_prescriptions',
     serviceCatalogEntries: 'service_catalog_entries',
     servicePrescriptionItems: 'service_prescription_items',
@@ -128,6 +131,11 @@ async function populateSyntheticClinicalFixture(db: Database.Database, actorRef:
     });
     insertRow(db, MEMBERSHIP_TABLE, { patient_id: 'w7-patient', ambulatory_id: 'w7-amb-primary', assigned_at: now + 24 });
     insertRow(db, MEMBERSHIP_TABLE, { patient_id: 'w7-patient', ambulatory_id: 'w7-amb-secondary', assigned_at: now + 25 });
+    insertRow(db, 'patients', {
+        id: 'w7-h7b-patient', first_name: 'Synthetic', last_name: 'H7b', tax_code: 'SYNTHETIC-H7B-RT',
+        ambulatory_id: 'w7-amb-primary', is_archived: 0, version: 7, created_at: now, updated_at: now,
+    });
+    insertRow(db, MEMBERSHIP_TABLE, { patient_id: 'w7-h7b-patient', ambulatory_id: 'w7-amb-primary', assigned_at: now + 25 });
     insertRow(db, 'entries', {
         id: 'w7-entry', patient_id: 'w7-patient', type: 'note', date: now + 3,
         ...(await sealed('entries', ['title', 'content', 'metadata', 'attachments', 'deletion_reason'])),
@@ -274,6 +282,59 @@ async function populateSyntheticClinicalFixture(db: Database.Database, actorRef:
     return durableReviewCommand;
 }
 
+type HeadlessSoapReplayFixture = {
+    key: { approvalRef: string; idempotencyKey: string; authorizationProofDigest: string };
+    receipt: Record<string, unknown>;
+};
+
+/* @Codex The roundtrip source uses the real H7b owner so replay integrity, not a handcrafted ledger, is preserved. */
+function seedHeadlessSoapCommit(dataDir: string): HeadlessSoapReplayFixture {
+    const fixtureUrl = pathToFileURL(path.join(ROOT, 'lib/security/headless-soap-command-binding-test-fixture.ts')).href;
+    const ownerUrl = pathToFileURL(path.join(ROOT, 'lib/security/headless-soap-entry-commit-owner.ts')).href;
+    const source = `
+        const { commandBindingFixture, syntheticBinding, syntheticProof, syntheticRecord } = await import(${JSON.stringify(fixtureUrl)});
+        const { createHeadlessSoapEntryCommitOwner } = await import(${JSON.stringify(ownerUrl)});
+        const fixture = commandBindingFixture(0x6e);
+        fixture.setCurrent(syntheticBinding(7));
+        const proof = syntheticProof(0x6e);
+        const bound = await fixture.owner.service.bind(proof);
+        let command = null;
+        const accepted = await fixture.owner.approvalController.withSingleUseApproval(syntheticRecord({
+            approvalRef: bound.approvalRef, idempotencyKey: bound.idempotencyKey, authorizationProof: proof,
+        }), (candidate) => { command = candidate; });
+        if (!accepted || !command) throw new Error('synthetic H7b command unavailable');
+        const result = createHeadlessSoapEntryCommitOwner().commit(command, syntheticRecord({
+            patientId: 'w7-h7b-patient', ambulatoryId: 'w7-amb-primary', patientVersion: 7,
+        }));
+        if (result.status !== 'committed') throw new Error('synthetic H7b commit denied: ' + JSON.stringify(result));
+        process.stdout.write(JSON.stringify({
+            key: { approvalRef: command.approvalRef, idempotencyKey: command.idempotencyKey,
+                authorizationProofDigest: command.authorizationProofDigest },
+            receipt: result.receipt,
+        }));
+    `;
+    return JSON.parse(runNode(
+        ['--experimental-strip-types', '--import', LOADER, '--input-type=module', '--eval', source],
+        { MEDIFLOW_DATA_DIR: dataDir },
+    )) as HeadlessSoapReplayFixture;
+}
+
+/* @Codex */
+function replayHeadlessSoapCommit(dataDir: string, fixture: HeadlessSoapReplayFixture): Record<string, unknown> {
+    const fixtureUrl = pathToFileURL(path.join(ROOT, 'lib/security/headless-soap-command-binding-test-fixture.ts')).href;
+    const ownerUrl = pathToFileURL(path.join(ROOT, 'lib/security/headless-soap-entry-commit-owner.ts')).href;
+    const source = `
+        const { syntheticRecord } = await import(${JSON.stringify(fixtureUrl)});
+        const { createHeadlessSoapEntryCommitOwner } = await import(${JSON.stringify(ownerUrl)});
+        const key = JSON.parse(process.env.W7_HEADLESS_REPLAY_KEY);
+        process.stdout.write(JSON.stringify(createHeadlessSoapEntryCommitOwner().lookup(syntheticRecord(key))));
+    `;
+    return JSON.parse(runNode(
+        ['--experimental-strip-types', '--import', LOADER, '--input-type=module', '--eval', source],
+        { MEDIFLOW_DATA_DIR: dataDir, W7_HEADLESS_REPLAY_KEY: JSON.stringify(fixture.key) },
+    )) as Record<string, unknown>;
+}
+
 function primaryKeyColumns(db: Database.Database, table: string): string[] {
     return (db.prepare(`PRAGMA table_info(${quoteIdentifier(table)})`).all() as Array<{ name: string; pk: number }>)
         .filter((column) => column.pk > 0)
@@ -304,6 +365,178 @@ function restoreArtifact(targetDataDir: string, artifactPath: string): void {
         { MEDIFLOW_DATA_DIR: targetDataDir, W7_ARTIFACT_PATH: artifactPath },
     );
 }
+
+/* @Codex */
+function headlessSoapRestoreFixture(): {
+    payload: ReturnType<typeof createEmptyDataset>;
+    audit: Record<string, unknown>;
+} {
+    const commandId = `hsac_${'1'.repeat(64)}`;
+    const approvalRef = `hsaa_${'2'.repeat(64)}`;
+    const idempotencyKey = `hsai_${'3'.repeat(64)}`;
+    const digest = (domain: string, snapshot: string) => createHash('sha256')
+        .update(domain, 'utf8').update('\0', 'utf8').update(snapshot, 'utf8').digest('hex');
+    const entryId = `hsei_${digest('mediflow.headless.soap-entry-id.v1', commandId)}`;
+    const auditEventId = `hsea_${digest('mediflow.headless.soap-entry-audit-id.v1', commandId)}`;
+    const receiptRef = `hser_${digest('mediflow.headless.soap-entry-receipt-ref.v1', commandId)}`;
+    const committedAt = '2026-03-17T08:10:00.000Z'; const committedAtSeconds = 1_773_735_000;
+    const authorizationProofDigest = 'a'.repeat(64), payloadDigest = 'b'.repeat(64);
+    const encrypted = (byte: number) =>
+        `ENC:${Buffer.alloc(12, byte).toString('base64')}:${Buffer.alloc(16, byte).toString('base64')}`;
+    const title = encrypted(1), content = encrypted(2), metadata = encrypted(3);
+    const sealPacket = frame([SEAL_DIGEST_CODEC, SEAL_SCHEMA, PAYLOAD_DIGEST_CODEC, payloadDigest,
+        'visit', committedAt, 'ambulatory', title, content, metadata, ATTACHMENTS_ABSENT]);
+    assert.ok(sealPacket);
+    const sealDigest = createHash('sha256').update(sealPacket).digest('hex');
+    const patientIdDigest = digest('mediflow.headless.soap-entry-commit-patient-id-digest.v1', 'h7b-patient');
+    const bindingSnapshot = JSON.stringify({
+        schema: 'mediflow.headless.soap-entry-commit-binding.v1',
+        operationId: 'mediflow.clinical_diary.append_soap.v1',
+        commandId,
+        approvalRef,
+        idempotencyKey,
+        authorizationProofDigest,
+        webSessionId: '4'.repeat(64),
+        webSessionCreatedAt: committedAtSeconds - 300,
+        webSessionExpiresAt: committedAtSeconds + 3_600,
+        principalRef: 'synthetic-clinician',
+        actorRef: 'synthetic-clinician',
+        attestationRef: `hsar_${'5'.repeat(32)}`,
+        attestationVersion: 1,
+        activeRoleRevocationGeneration: 0,
+        activeRolePolicyVersion: 'clinician_confirmed_single_use.v1',
+        parentContractVersion: 1,
+        parentGeneration: 1,
+        parentRevocationGeneration: 0,
+        childContractVersion: 1,
+        childGeneration: 1,
+        childRevocationGeneration: 0,
+        childExpiresAt: committedAtSeconds + 3_000,
+        leaseContractVersion: 1,
+        leaseGeneration: 1,
+        leaseRevocationGeneration: 0,
+        sessionRef: `ssr_${'6'.repeat(32)}`,
+        patientRef: `ptr_${'7'.repeat(32)}`,
+        ambulatoryRef: `abr_${'8'.repeat(32)}`,
+        leaseRef: `lsr_${'9'.repeat(32)}`,
+        selectionEpoch: 1,
+        selectionExpiresAt: committedAtSeconds + 2_000,
+        patientVersion: 1,
+        action: 'append',
+        purpose: 'clinician_requested_documentation',
+        proposalRevision: 1,
+        proposalExpiresAt: committedAtSeconds + 1_000,
+        payloadDigest,
+        sealDigest,
+        policyDigest: '1175ad0f063ac03d73f71afce252a7922e359882c9c1f7313a5cbc445e3a5f17',
+        patientIdDigest,
+        ambulatoryIdDigest: digest('mediflow.headless.soap-entry-commit-ambulatory-id-digest.v1', 'h7b-amb'),
+    });
+    const bindingDigest = digest('mediflow.headless.soap-entry-commit-binding-digest.v1', bindingSnapshot);
+    const entry = {
+        id: entryId, patientId: 'h7b-patient', type: 'visit', title, date: committedAt,
+        content, setting: 'ambulatory', metadata,
+        attachments: null, deletedAt: null, deletionReason: null, version: 1,
+        createdAt: committedAt, updatedAt: committedAt,
+    };
+    const entrySnapshot = JSON.stringify({
+        schema: 'mediflow.headless.soap-entry-record.v1', entryId,
+        patientIdDigest,
+        type: entry.type, title: entry.title, date: committedAtSeconds, content: entry.content,
+        setting: entry.setting, metadata: entry.metadata, attachments: null, deletedAt: null,
+        deletionReason: null, version: 1, createdAt: committedAtSeconds, updatedAt: committedAtSeconds,
+    });
+    const entryDigest = digest('mediflow.headless.soap-entry-commit-entry-digest.v1', entrySnapshot);
+    const audit = {
+        eventId: auditEventId, schemaVersion: 1, eventType: 'entry.created', occurredAt: committedAtSeconds,
+        outcome: 'success', actorType: 'user',
+        actorRef: `hsa_${digest('mediflow.headless.soap-entry-commit-actor-ref.v1', 'synthetic-clinician')}`,
+        subjectType: 'entry', subjectRef: entryId, sourceSurface: 'web', requestId: null,
+        redactedMetadata: JSON.stringify({
+            schema: 'mediflow.headless.soap-entry-commit-audit-metadata.v1',
+            operationId: 'mediflow.clinical_diary.append_soap.v1', commandRef: commandId, bindingDigest, entryDigest,
+        }),
+        createdAt: committedAtSeconds,
+    };
+    const auditSnapshot = JSON.stringify(audit);
+    const auditDigest = digest('mediflow.headless.soap-entry-commit-audit-digest.v1', auditSnapshot);
+    const receipt = {
+        schema: 'mediflow.headless.soap-entry-commit-receipt.v1', receiptRef,
+        operationId: 'mediflow.clinical_diary.append_soap.v1', outcome: 'entry_committed', commandId,
+        entryRef: entryId, auditEventRef: auditEventId, patientVersion: 1, entryVersion: 1, committedAt,
+        bindingDigest, entryDigest, auditDigest,
+    };
+    const receiptSnapshot = JSON.stringify(receipt);
+    const receiptDigest = digest('mediflow.headless.soap-entry-commit-receipt-digest.v1', receiptSnapshot);
+    const payload = createEmptyDataset();
+    payload.ambulatories = [{ id: 'h7b-amb', name: 'Ambulatorio sintetico H7b', createdAt: committedAt }];
+    payload.patients = [{
+        id: 'h7b-patient', firstName: 'Synthetic', lastName: 'H7b', taxCode: 'SYNTHETIC-H7B',
+        ambulatoryId: 'h7b-amb', assignedAmbulatoryIds: ['h7b-amb'], version: 1,
+        createdAt: committedAt, updatedAt: committedAt,
+    }];
+    payload.entries = [entry];
+    payload.headlessSoapEntryCommits = [{
+        idempotencyKey, approvalRef, authorizationProofDigest, commandId,
+        entryId, auditEventId, receiptRef,
+        bindingSnapshot, bindingDigest, entryDigest, auditSnapshot, auditDigest, receiptSnapshot, receiptDigest, committedAt,
+    }];
+    return { payload, audit };
+}
+
+/* @Codex */
+function insertAuditSnapshot(db: Database.Database, audit: Record<string, unknown>): void {
+    insertRow(db, 'audit_events', {
+        event_id: audit.eventId, schema_version: audit.schemaVersion, event_type: audit.eventType,
+        occurred_at: audit.occurredAt, outcome: audit.outcome, actor_type: audit.actorType, actor_ref: audit.actorRef,
+        subject_type: audit.subjectType, subject_ref: audit.subjectRef, source_surface: audit.sourceSurface,
+        request_id: audit.requestId, redacted_metadata: audit.redactedMetadata, created_at: audit.createdAt,
+    });
+}
+
+/* @Codex */
+function countRows(db: Database.Database, table: string, where = ''): number {
+    return (db.prepare(`SELECT COUNT(*) AS count FROM ${quoteIdentifier(table)} ${where}`).get() as { count: number }).count;
+}
+
+test('preflights H7b audit collisions before deleting target data', async () => {
+    const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-backup-h7b-collision-'));
+    const targetDataDir = path.join(workDir, 'target'); const artifactPath = path.join(workDir, 'h7b.mediflow');
+    try {
+        prepareDatabase(targetDataDir);
+        const fixture = headlessSoapRestoreFixture();
+        fs.writeFileSync(artifactPath, await serializeBackupArtifact(fixture.payload));
+        const target = new Database(path.join(targetDataDir, 'medical.db'));
+        try {
+            insertRow(target, 'ambulatories', { id: 'h7b-preserved', name: 'Sentinella sintetica', created_at: 1_773_735_000 });
+            insertAuditSnapshot(target, { ...fixture.audit, outcome: 'failure' });
+            assert.throws(() => restoreArtifact(targetDataDir, artifactPath), /audit.*collision|collision.*audit/iu);
+            assert.equal(countRows(target, 'ambulatories', "WHERE id = 'h7b-preserved'"), 1);
+            assert.equal(countRows(target, 'headless_soap_entry_commits'), 0);
+        } finally { target.close(); }
+    } finally { fs.rmSync(workDir, { recursive: true, force: true }); }
+});
+
+test('restores entries then exact H7b audits then ledger while preserving unrelated audit rows', async () => {
+    const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-backup-h7b-exact-'));
+    const targetDataDir = path.join(workDir, 'target'); const artifactPath = path.join(workDir, 'h7b.mediflow');
+    try {
+        prepareDatabase(targetDataDir);
+        const fixture = headlessSoapRestoreFixture();
+        fs.writeFileSync(artifactPath, await serializeBackupArtifact(fixture.payload));
+        const target = new Database(path.join(targetDataDir, 'medical.db'));
+        try {
+            insertAuditSnapshot(target, fixture.audit);
+            insertAuditSnapshot(target, { ...fixture.audit, eventId: `event_${'c'.repeat(32)}`, eventType: 'patient.updated', subjectRef: null });
+            restoreArtifact(targetDataDir, artifactPath);
+            assert.equal(countRows(target, 'entries'), 1);
+            assert.equal(countRows(target, 'headless_soap_entry_commits'), 1);
+            assert.equal(countRows(target, 'audit_events'), 2);
+            const restored = target.prepare('SELECT audit_snapshot AS auditSnapshot FROM headless_soap_entry_commits').get() as { auditSnapshot: string };
+            assert.equal(restored.auditSnapshot, JSON.stringify(fixture.audit));
+        } finally { target.close(); }
+    } finally { fs.rmSync(workDir, { recursive: true, force: true }); }
+});
 
 /* @Codex */
 function countCommandLedger(db: Database.Database): [number, number, number] {
@@ -424,6 +657,7 @@ test('scheduled backup restores every clinical table and preserves ciphertext by
             clearBackupTables(sourceDb, clinicalTables);
             clearBackupTables(targetDb, clinicalTables);
             const durableReviewCommand = await populateSyntheticClinicalFixture(sourceDb, sourceActorRef);
+            const headlessSoapReplay = seedHeadlessSoapCommit(sourceDataDir);
 
             for (const table of clinicalTables) {
                 assert.equal(readOrderedRows(targetDb, table).length, 0, `target ${table} must be virgin before restore`);
@@ -457,6 +691,9 @@ test('scheduled backup restores every clinical table and preserves ciphertext by
                 { MEDIFLOW_DATA_DIR: targetDataDir, MEDIFLOW_DURABLE_REVIEW_RECORD: JSON.stringify(durableReviewCommand) },
             ));
             assert.deepEqual(replayed, { recordId: durableReviewCommand.record.reviewId, ...durableReviewCommand.record });
+            assert.deepEqual(replayHeadlessSoapCommit(targetDataDir, headlessSoapReplay), {
+                status: 'exact', receipt: headlessSoapReplay.receipt,
+            });
 
             let encryptedFieldCount = 0;
             for (const table of clinicalTables) {
@@ -484,6 +721,7 @@ test('scheduled backup restores every clinical table and preserves ciphertext by
             })) as { ok: boolean; artifactPath?: string; message?: string };
             assert.equal(reexport.ok, true, reexport.message); assert.ok(reexport.artifactPath);
             const restoredArtifact = await parseBackupArtifact(JSON.parse(fs.readFileSync(reexport.artifactPath, 'utf8')));
+            assert.deepEqual(restoredArtifact.payload.headlessSoapEntryCommits, artifact.payload.headlessSoapEntryCommits);
             assert.deepEqual(restoredArtifact.payload.attachments.map(({ documentSourceRef, documentRevision, documentFreshnessEpoch }) => ({ documentSourceRef, documentRevision, documentFreshnessEpoch })),
                 artifact.payload.attachments.map(({ documentSourceRef, documentRevision, documentFreshnessEpoch }) => ({ documentSourceRef, documentRevision, documentFreshnessEpoch })));
             assert.ok(encryptedFieldCount >= 50, 'fixture must exercise the complete encrypted clinical surface');

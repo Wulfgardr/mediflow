@@ -14,6 +14,7 @@ import {
     entries,
     exemptions,
     headlessSoapActiveRoleAttestations,
+    headlessSoapEntryCommits,
     messages,
     observations,
     patients,
@@ -49,8 +50,8 @@ export const dynamic = 'force-dynamic';
 /* @Codex */
 function sortBackupRows<T extends Record<string, unknown>>(rows: T[]): T[] {
     return [...rows].sort((left, right) => {
-        const leftKey = String(left.attestationRef ?? left.actorRef ?? left.id ?? left.key ?? left.code ?? left.aic ?? left.patientId ?? left.conversationId ?? '');
-        const rightKey = String(right.attestationRef ?? right.actorRef ?? right.id ?? right.key ?? right.code ?? right.aic ?? right.patientId ?? right.conversationId ?? '');
+        const leftKey = String(left.idempotencyKey ?? left.attestationRef ?? left.actorRef ?? left.id ?? left.key ?? left.code ?? left.aic ?? left.patientId ?? left.conversationId ?? '');
+        const rightKey = String(right.idempotencyKey ?? right.attestationRef ?? right.actorRef ?? right.id ?? right.key ?? right.code ?? right.aic ?? right.patientId ?? right.conversationId ?? '');
         const primary = leftKey.localeCompare(rightKey);
         return primary === 0 ? String(left.actorRef ?? '').localeCompare(String(right.actorRef ?? '')) : primary;
     });
@@ -86,6 +87,7 @@ function buildBackupDataset(): BackupDataset {
         const patientsRows = tx.select().from(patients).all();
         const physicianReviewAttestationRows = tx.select().from(physicianReviewAttestations).all();
         const headlessSoapActiveRoleAttestationRows = tx.select().from(headlessSoapActiveRoleAttestations).all();
+        const headlessSoapEntryCommitRows = tx.select().from(headlessSoapEntryCommits).all();
         const prostheticPrescriptionRows = tx.select().from(prostheticPrescriptions).all();
         const serviceCatalogRows = tx.select().from(serviceCatalogEntries).all();
         const servicePrescriptionItemRows = tx.select().from(servicePrescriptionItems).all();
@@ -132,6 +134,7 @@ function buildBackupDataset(): BackupDataset {
             patients: sortBackupRows(enrichedPatients),
             physicianReviewAttestations: sortBackupRows(physicianReviewAttestationRows),
             headlessSoapActiveRoleAttestations: sortBackupRows(headlessSoapActiveRoleAttestationRows),
+            headlessSoapEntryCommits: sortBackupRows(headlessSoapEntryCommitRows),
             prostheticPrescriptions: sortBackupRows(filterRowsByReference(prostheticPrescriptionRows, 'patientId', patientIds)),
             serviceCatalogEntries: sortBackupRows(serviceCatalogRows),
             servicePrescriptionItems: sortBackupRows(filterRowsByReference(servicePrescriptionItemRows, 'patientId', patientIds)),

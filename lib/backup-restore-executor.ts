@@ -1,7 +1,9 @@
 /* @Codex */
-import { dbServer } from './db-server';
+import { eq } from 'drizzle-orm';
+import { dbServer, runDbServerImmediateTransaction } from './db-server';
 import {
     ambulatories,
+    auditEvents,
     attachments,
     checkups,
     conversations,
@@ -15,6 +17,7 @@ import {
     entries,
     exemptions,
     headlessSoapActiveRoleAttestations,
+    headlessSoapEntryCommits,
     messages,
     observations,
     patients,
@@ -32,6 +35,7 @@ import { derivePatientAmbulatoryLinks } from './backup-patient-ambulatory-links'
 import { revokeAttachmentExtractionLocatorGeneration } from './domain/documents/attachment-extraction-locator-revocation';
 
 const CLEAR_ORDER: BackupCollectionName[] = [
+    'headlessSoapEntryCommits',
     'messages',
     'attachments',
     'documentDiagnosisProposals',
@@ -87,6 +91,7 @@ const INSERT_ORDER: BackupCollectionName[] = [
 
 const TABLE_LOOKUP = {
     ambulatories,
+    headlessSoapEntryCommits,
     attachments,
     checkups,
     conversations,
@@ -150,6 +155,7 @@ export const DATE_FIELDS = new Set([
     'startDate',
     'startedAt',
     'completedAt',
+    'committedAt',
     'expiresAt',
     'activatedAt',
     'revokedAt',
@@ -197,19 +203,106 @@ function insertRows<T extends Record<string, unknown>>(
     }
 }
 
+const HEADLESS_SOAP_AUDIT_KEYS = [
+    'eventId', 'schemaVersion', 'eventType', 'occurredAt', 'outcome', 'actorType', 'actorRef',
+    'subjectType', 'subjectRef', 'sourceSurface', 'requestId', 'redactedMetadata', 'createdAt',
+] as const;
+
+/* @Codex */
+function parseHeadlessSoapAuditSnapshot(value: unknown): Record<string, unknown> {
+    if (typeof value !== 'string') throw new Error('Restore blocked: invalid H7b audit snapshot.');
+    try {
+        const parsed = JSON.parse(value) as unknown;
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)
+            || JSON.stringify(parsed) !== value
+            || Object.keys(parsed).length !== HEADLESS_SOAP_AUDIT_KEYS.length
+            || HEADLESS_SOAP_AUDIT_KEYS.some((key, index) => Object.keys(parsed)[index] !== key)) {
+            throw new Error('invalid');
+        }
+        return parsed as Record<string, unknown>;
+    } catch {
+        throw new Error('Restore blocked: invalid H7b audit snapshot.');
+    }
+}
+
+/* @Codex */
+function dateSeconds(value: Date | null): number | null {
+    return value instanceof Date && Number.isFinite(value.getTime()) && value.getTime() % 1000 === 0
+        ? value.getTime() / 1000
+        : null;
+}
+
+/* @Codex */
+function snapshotStoredAudit(row: typeof auditEvents.$inferSelect): Record<string, unknown> {
+    return {
+        eventId: row.eventId, schemaVersion: row.schemaVersion, eventType: row.eventType,
+        occurredAt: dateSeconds(row.occurredAt), outcome: row.outcome, actorType: row.actorType,
+        actorRef: row.actorRef, subjectType: row.subjectType, subjectRef: row.subjectRef,
+        sourceSurface: row.sourceSurface, requestId: row.requestId, redactedMetadata: row.redactedMetadata,
+        createdAt: dateSeconds(row.createdAt),
+    };
+}
+
+/* @Codex Audit collision checks run under the writer lock and before any target collection is cleared. */
+function preflightHeadlessSoapAuditCollisions(rows: Record<string, unknown>[]): void {
+    for (const row of rows) {
+        const audit = parseHeadlessSoapAuditSnapshot(row.auditSnapshot);
+        const eventId = audit.eventId;
+        if (typeof eventId !== 'string') throw new Error('Restore blocked: invalid H7b audit snapshot.');
+        const existing = dbServer.select().from(auditEvents).where(eq(auditEvents.eventId, eventId)).get();
+        if (existing && JSON.stringify(snapshotStoredAudit(existing)) !== row.auditSnapshot) {
+            throw new Error('Restore blocked: H7b audit collision.');
+        }
+    }
+}
+
+/* @Codex Entries already exist at this point; audits are inserted/reused field-exactly before the ledger. */
+function restoreHeadlessSoapEntryCommits(rows: Record<string, unknown>[]): void {
+    for (const row of rows) {
+        const audit = parseHeadlessSoapAuditSnapshot(row.auditSnapshot);
+        const eventId = audit.eventId as string;
+        const existing = dbServer.select().from(auditEvents).where(eq(auditEvents.eventId, eventId)).get();
+        if (existing) {
+            if (JSON.stringify(snapshotStoredAudit(existing)) !== row.auditSnapshot) {
+                throw new Error('Restore blocked: H7b audit collision.');
+            }
+        } else {
+            dbServer.insert(auditEvents).values({
+                eventId,
+                schemaVersion: audit.schemaVersion as number,
+                eventType: audit.eventType as string,
+                occurredAt: new Date((audit.occurredAt as number) * 1000),
+                outcome: audit.outcome as string,
+                actorType: audit.actorType as string,
+                actorRef: audit.actorRef as string,
+                subjectType: audit.subjectType as string,
+                subjectRef: audit.subjectRef as string | null,
+                sourceSurface: audit.sourceSurface as string,
+                requestId: audit.requestId as string | null,
+                redactedMetadata: audit.redactedMetadata as string | null,
+                createdAt: new Date((audit.createdAt as number) * 1000),
+            }).run();
+        }
+    }
+    insertRows(dbServer, headlessSoapEntryCommits, rows);
+}
+
 export function restoreBackupArtifact(artifact: BackupArtifact): void {
     revokeAttachmentExtractionLocatorGeneration();
-    dbServer.transaction((tx) => {
+    runDbServerImmediateTransaction(() => {
         assertCommandRecoveryIsRepresentable();
+        const headlessSoapRows = artifact.payload.headlessSoapEntryCommits ?? [];
+        preflightHeadlessSoapAuditCollisions(headlessSoapRows);
         for (const collection of CLEAR_ORDER) {
-            tx.delete(TABLE_LOOKUP[collection]).run();
+            dbServer.delete(TABLE_LOOKUP[collection]).run();
         }
-        tx.delete(patientsToAmbulatories).run();
+        dbServer.delete(patientsToAmbulatories).run();
 
         for (const collection of INSERT_ORDER) {
-            insertRows(tx, TABLE_LOOKUP[collection], artifact.payload[collection] ?? []);
+            insertRows(dbServer, TABLE_LOOKUP[collection], artifact.payload[collection] ?? []);
         }
 
-        insertRows(tx, patientsToAmbulatories, derivePatientAmbulatoryLinks(artifact.payload.patients));
+        insertRows(dbServer, patientsToAmbulatories, derivePatientAmbulatoryLinks(artifact.payload.patients));
+        restoreHeadlessSoapEntryCommits(headlessSoapRows);
     });
 }
