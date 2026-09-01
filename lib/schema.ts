@@ -476,6 +476,30 @@ export const auditEvents = sqliteTable('audit_events', {
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
 });
 
+/* @Codex */
+export const headlessSoapEntryCommits = sqliteTable('headless_soap_entry_commits', {
+    idempotencyKey: text('idempotency_key').primaryKey().notNull(),
+    approvalRef: text('approval_ref').notNull(),
+    authorizationProofDigest: text('authorization_proof_digest').notNull(),
+    commandId: text('command_id').notNull(),
+    entryId: text('entry_id').references(() => entries.id, { onDelete: 'cascade' }).notNull(),
+    auditEventId: text('audit_event_id').references(() => auditEvents.eventId, { onDelete: 'restrict' }).notNull(),
+    receiptRef: text('receipt_ref').notNull(),
+    bindingSnapshot: text('binding_snapshot').notNull(),
+    bindingDigest: text('binding_digest').notNull(),
+    entryDigest: text('entry_digest').notNull(),
+    auditSnapshot: text('audit_snapshot').notNull(),
+    auditDigest: text('audit_digest').notNull(),
+    receiptSnapshot: text('receipt_snapshot').notNull(),
+    receiptDigest: text('receipt_digest').notNull(),
+    committedAt: integer('committed_at', { mode: 'timestamp' }).notNull(),
+}, (table) => ({
+    commandIdUnique: uniqueIndex('headless_soap_entry_commits_command_id_unique').on(table.commandId),
+    entryIdUnique: uniqueIndex('headless_soap_entry_commits_entry_id_unique').on(table.entryId),
+    auditEventIdUnique: uniqueIndex('headless_soap_entry_commits_audit_event_id_unique').on(table.auditEventId),
+    receiptRefUnique: uniqueIndex('headless_soap_entry_commits_receipt_ref_unique').on(table.receiptRef),
+}));
+
 // --- Attachments ---
 export const attachments = sqliteTable('attachments', {
     id: text('id').primaryKey(),
