@@ -1,10 +1,13 @@
 /* @Codex */
 import 'server-only';
 
+import { types } from 'node:util';
+
 import { parseSeal, type ParsedSeal } from '../headless/clinician-soap-entry-seal-codec-internal';
 import { digestHeadlessSoapAuthorizationProof } from './headless-soap-authorization-proof-token';
 import {
     createHeadlessSoapAuthorizationLineage,
+    sameHeadlessSoapAuthorizationLineage,
     type HeadlessSoapAuthorizationLineageV1,
 } from './headless-soap-authorization-lineage';
 import {
@@ -24,6 +27,20 @@ export type HeadlessSoapCommandBindingResultV1 = Readonly<{
     approvalRef: string;
     idempotencyKey: string;
 }>;
+export type HeadlessSoapCommandEnvelopeV1 = Readonly<{
+    approvalRef: string;
+    idempotencyKey: string;
+    authorizationProof: string;
+}>;
+export type HeadlessSoapBoundCommandV1 = Readonly<{
+    schema: 'mediflow.headless.soap-bound-command.v1';
+    commandId: string;
+    approvalRef: string;
+    idempotencyKey: string;
+    authorizationProofDigest: string;
+    lineage: HeadlessSoapAuthorizationLineageV1;
+    sealBundle: ParsedSeal;
+}>;
 type ProofLifecyclePort = Readonly<{
     registerDependent(candidate: unknown, dispose: () => void): unknown | null;
     confirmDependent(candidate: unknown, registration: unknown): boolean;
@@ -31,6 +48,8 @@ type ProofLifecyclePort = Readonly<{
 }>;
 type ProofBindingPort = Readonly<{
     withCurrentDependentBinding(candidate: unknown, registration: unknown,
+        operation: (lineage: unknown, sealBundle: unknown) => void): Promise<boolean>;
+    withSingleUseDependentBinding(candidate: unknown, registration: unknown,
         operation: (lineage: unknown, sealBundle: unknown) => void): Promise<boolean>;
 }>;
 export type HeadlessSoapCommandBindingSources = Readonly<{
@@ -43,9 +62,12 @@ export type HeadlessSoapCommandBindingServiceV1 = Readonly<{
     bind(authorizationProof: unknown): Promise<HeadlessSoapCommandBindingResultV1>;
     wipe(approvalRef: unknown, authorizationProof: unknown): boolean;
 }>;
+export type HeadlessSoapApprovalControllerV1 = Readonly<{
+    withSingleUseApproval(envelope: unknown, operation: (command: HeadlessSoapBoundCommandV1) => void): Promise<boolean>;
+}>;
 type BindingRecord = {
     active: boolean;
-    state: 'bound' | 'spent';
+    state: 'bound' | 'in_flight' | 'spent';
     proofDigest: string;
     registration: unknown;
     commandId: string;
@@ -56,11 +78,23 @@ type BindingRecord = {
 };
 
 const APPROVAL_REF = /^hsaa_[0-9a-f]{64}$/u;
+const IDEMPOTENCY_KEY = /^hsai_[0-9a-f]{64}$/u;
+const ENVELOPE_KEYS = ['approvalRef', 'idempotencyKey', 'authorizationProof'] as const;
 const objectAssign = Object.assign;
 const objectCreate = Object.create;
 const objectFreeze = Object.freeze;
+const objectGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
+const objectGetPrototypeOf = Object.getPrototypeOf;
+const objectIsFrozen = Object.isFrozen;
+const reflectOwnKeys = Reflect.ownKeys;
 const regexpTest = RegExp.prototype.test;
 const reflectApply = Reflect.apply;
+const functionPrototype = Function.prototype;
+const promiseThen = Promise.prototype.then;
+const isAsyncFunction = types.isAsyncFunction;
+const isGeneratorFunction = types.isGeneratorFunction;
+const isPromise = types.isPromise;
+const isProxy = types.isProxy;
 const mapGet = Map.prototype.get;
 const mapSet = Map.prototype.set;
 const mapDelete = Map.prototype.delete;
@@ -73,6 +107,40 @@ function fail(code: HeadlessSoapCommandBindingErrorCode): never {
 function result(approvalRef: string, idempotencyKey: string): HeadlessSoapCommandBindingResultV1 {
     return objectFreeze(objectAssign(objectCreate(null), { status: 'approval_bound' as const, approvalRef, idempotencyKey }));
 }
+function envelope(value: unknown): HeadlessSoapCommandEnvelopeV1 | null {
+    try {
+        if (typeof value !== 'object' || value === null || isProxy(value) || objectGetPrototypeOf(value) !== null
+            || !objectIsFrozen(value)) return null;
+        const keys = reflectOwnKeys(value);
+        if (keys.length !== ENVELOPE_KEYS.length) return null;
+        const output = objectCreate(null) as Record<string, unknown>;
+        for (let index = 0; index < ENVELOPE_KEYS.length; index += 1) {
+            const key = ENVELOPE_KEYS[index]!;
+            if (keys[index] !== key) return null;
+            const descriptor = objectGetOwnPropertyDescriptor(value, key);
+            if (!descriptor || !descriptor.enumerable || !('value' in descriptor)
+                || descriptor.configurable || descriptor.writable) return null;
+            output[key] = descriptor.value;
+        }
+        const digest = digestHeadlessSoapAuthorizationProof(output.authorizationProof);
+        if (typeof output.approvalRef !== 'string' || !reflectApply(regexpTest, APPROVAL_REF, [output.approvalRef])
+            || typeof output.idempotencyKey !== 'string' || !reflectApply(regexpTest, IDEMPOTENCY_KEY, [output.idempotencyKey])
+            || !digest) return null;
+        return output as HeadlessSoapCommandEnvelopeV1;
+    } catch { return null; }
+}
+function synchronous(value: unknown): value is (command: HeadlessSoapBoundCommandV1) => void {
+    return typeof value === 'function' && !isProxy(value) && !isAsyncFunction(value) && !isGeneratorFunction(value)
+        && objectGetPrototypeOf(value) === functionPrototype;
+}
+function invoke(operation: (command: HeadlessSoapBoundCommandV1) => void, command: HeadlessSoapBoundCommandV1): boolean {
+    try {
+        const value = reflectApply(operation, undefined, [command]);
+        if (value === undefined) return true;
+        if (isPromise(value)) try { reflectApply(promiseThen, value, [undefined, () => undefined]); } catch { /* denial */ }
+    } catch { /* fixed false below */ }
+    return false;
+}
 function sameBinding(lineage: HeadlessSoapAuthorizationLineageV1, seal: ParsedSeal): boolean {
     return lineage.payloadDigest.sha256.hex === seal.payloadDigest.sha256.hex
         && lineage.sealDigest.sha256.hex === seal.sealDigest.sha256.hex;
@@ -81,9 +149,11 @@ function sameBinding(lineage: HeadlessSoapAuthorizationLineageV1, seal: ParsedSe
 /** Owns the process-local H6 command binding without write authority. */
 export function createHeadlessSoapCommandBindingOwner(sources: HeadlessSoapCommandBindingSources): Readonly<{
     service: HeadlessSoapCommandBindingServiceV1;
+    approvalController: HeadlessSoapApprovalControllerV1;
 }> {
     const approvals = new Map<string, BindingRecord>();
     const identifierTombstones = new Set<string>();
+    let currentOperation: { record: BindingRecord; poisoned: boolean } | null = null;
     const recordFor = (candidate: unknown): BindingRecord | null => {
         if (typeof candidate !== 'string' || !reflectApply(regexpTest, APPROVAL_REF, [candidate])) return null;
         const record = reflectApply(mapGet, approvals, [candidate]) as BindingRecord | undefined;
@@ -103,6 +173,7 @@ export function createHeadlessSoapCommandBindingOwner(sources: HeadlessSoapComma
         return fail(code);
     };
     const bind = async (proof: unknown): Promise<HeadlessSoapCommandBindingResultV1> => {
+        if (currentOperation) { currentOperation.poisoned = true; return fail('lifecycle_unavailable'); }
         const proofDigest = digestHeadlessSoapAuthorizationProof(proof);
         if (!proofDigest) return fail('proof_unavailable');
         let record: BindingRecord | null = null, upstreamGone = false;
@@ -152,6 +223,7 @@ export function createHeadlessSoapCommandBindingOwner(sources: HeadlessSoapComma
     };
     const service: HeadlessSoapCommandBindingServiceV1 = objectFreeze({ bind,
         wipe(approvalRef: unknown, proof: unknown): boolean {
+            if (currentOperation) { currentOperation.poisoned = true; return false; }
             const record = recordFor(approvalRef), digest = digestHeadlessSoapAuthorizationProof(proof);
             if (!record || !digest || digest !== record.proofDigest || record.state !== 'bound') return false;
             remove(record, false);
@@ -160,5 +232,60 @@ export function createHeadlessSoapCommandBindingOwner(sources: HeadlessSoapComma
             record.registration = null; return true;
         },
     });
-    return objectFreeze({ service });
+    const approvalController: HeadlessSoapApprovalControllerV1 = objectFreeze({
+        async withSingleUseApproval(candidate: unknown, operation: (command: HeadlessSoapBoundCommandV1) => void): Promise<boolean> {
+            if (currentOperation) { currentOperation.poisoned = true; return false; }
+            const presented = envelope(candidate);
+            if (!presented) return false;
+            const record = recordFor(presented.approvalRef);
+            const proofDigest = digestHeadlessSoapAuthorizationProof(presented.authorizationProof);
+            if (!record || record.state !== 'bound' || !proofDigest || proofDigest !== record.proofDigest
+                || presented.idempotencyKey !== record.idempotencyKey) return false;
+            const retire = (): void => {
+                if (!remove(record, false)) return;
+                try { sources.proofLifecycle.unregisterDependent(presented.authorizationProof, record.registration); }
+                catch { /* proof wipe remains */ }
+                try { sources.proofService.wipe(presented.authorizationProof); } catch { /* local spent state won */ }
+                record.registration = null;
+            };
+            if (!synchronous(operation)) { retire(); return false; }
+            const activeOperation = { record, poisoned: false };
+            currentOperation = activeOperation;
+            let invoked = false, accepted = false, changed = false, singleUse = false;
+            try {
+                singleUse = await sources.proofBinding.withSingleUseDependentBinding(
+                    presented.authorizationProof,
+                    record.registration,
+                    (lineageCandidate, sealCandidate) => {
+                        if (invoked || activeOperation.poisoned || record.state !== 'bound') {
+                            activeOperation.poisoned = true; return;
+                        }
+                        invoked = true;
+                        const lineage = createHeadlessSoapAuthorizationLineage(lineageCandidate);
+                        const seal = parseSeal(sealCandidate);
+                        if (!lineage || !seal || !record.lineage || !sameBinding(lineage, seal)
+                            || !sameHeadlessSoapAuthorizationLineage(record.lineage, lineage)) {
+                            changed = true; return;
+                        }
+                        record.state = 'in_flight';
+                        const command = objectFreeze(objectAssign(objectCreate(null), {
+                            schema: 'mediflow.headless.soap-bound-command.v1' as const,
+                            commandId: record.commandId,
+                            approvalRef: record.approvalRef,
+                            idempotencyKey: record.idempotencyKey,
+                            authorizationProofDigest: record.proofDigest,
+                            lineage,
+                            sealBundle: seal,
+                        })) as HeadlessSoapBoundCommandV1;
+                        accepted = invoke(operation, command);
+                    },
+                );
+            } catch { singleUse = false; }
+            finally { if (currentOperation === activeOperation) currentOperation = null; }
+            const outcome = singleUse && invoked && accepted && !changed && !activeOperation.poisoned;
+            if (record.active) retire();
+            return outcome;
+        },
+    });
+    return objectFreeze({ service, approvalController });
 }
