@@ -6,7 +6,11 @@ import { spawnSync } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
 
-import { extractAnyDocLocalBytes } from './anydoc-local-extraction-runner';
+import {
+    extractAnyDocLocalBytes,
+    extractAnyDocPageRoutingBytes,
+    parseAnyDocPageRoutingEnvelope,
+} from './anydoc-local-extraction-runner';
 import { ANYDOC_LOCAL_EXTRACTION_MAX_MARKDOWN_BYTES, ANYDOC_LOCAL_EXTRACTION_MAX_SOURCE_BYTES } from './anydoc-local-extraction-contract';
 
 const SYNTHETIC_RTF = Buffer.from('{\\rtf1\\ansi Synthetic discharge note.}', 'utf8');
@@ -14,6 +18,102 @@ const RUNNER_SOURCE = readFileSync(new URL('./anydoc-local-extraction-runner.ts'
 const NEXT_CONFIG_SOURCE = readFileSync(new URL('../../../next.config.ts', import.meta.url), 'utf8');
 const WORKER_PATH = path.resolve(path.dirname(new URL('./anydoc-local-extraction-runner.ts', import.meta.url).pathname), '../../../scripts/anydoc-local-extraction-worker.mjs');
 const CHECKER_PATH = path.resolve(path.dirname(WORKER_PATH), 'check-standalone-runtime-bundle.mjs');
+
+/* @Codex */
+function syntheticPdf(pageKinds: readonly ('text' | 'scan')[]): Buffer {
+    const pageIds = pageKinds.map((_, index) => 5 + index * 2);
+    const objects: Buffer[] = [
+        Buffer.from('<< /Type /Catalog /Pages 2 0 R >>'),
+        Buffer.from(`<< /Type /Pages /Kids [${pageIds.map((id) => `${id} 0 R`).join(' ')}] /Count ${pageKinds.length} >>`),
+        Buffer.from('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>'),
+        Buffer.concat([Buffer.from('<< /Type /XObject /Subtype /Image /Width 1 /Height 1 /ColorSpace /DeviceGray /BitsPerComponent 8 /Length 1 >>\nstream\n'), Buffer.from([0x80]), Buffer.from('\nendstream')]),
+    ];
+    pageKinds.forEach((kind, index) => {
+        const contentId = pageIds[index]! + 1;
+        const stream = kind === 'text'
+            ? `BT /F1 24 Tf 72 700 Td (Synthetic page ${index + 1}) Tj ET`
+            : 'q 468 0 0 648 72 72 cm /Im1 Do Q';
+        objects.push(Buffer.from(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> /XObject << /Im1 4 0 R >> >> /Contents ${contentId} 0 R >>`));
+        objects.push(Buffer.from(`<< /Length ${Buffer.byteLength(stream)} >>\nstream\n${stream}\nendstream`));
+    });
+    const parts: Buffer[] = [Buffer.from('%PDF-1.4\n')];
+    const offsets = [0];
+    objects.forEach((object, index) => {
+        offsets.push(parts.reduce((sum, part) => sum + part.byteLength, 0));
+        parts.push(Buffer.from(`${index + 1} 0 obj\n`), object, Buffer.from('\nendobj\n'));
+    });
+    const xrefOffset = parts.reduce((sum, part) => sum + part.byteLength, 0);
+    const xref = offsets.slice(1).map((offset) => `${String(offset).padStart(10, '0')} 00000 n \n`).join('');
+    parts.push(Buffer.from(`xref\n0 ${objects.length + 1}\n0000000000 65535 f \n${xref}trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`));
+    return Buffer.concat(parts);
+}
+
+test('preserves the exact AnyDoc page-routing evidence for a mixed synthetic PDF', async () => {
+    const result = await extractAnyDocPageRoutingBytes(syntheticPdf(['text', 'scan']));
+
+    assert.deepEqual(result, {
+        schemaVersion: 'mediflow.anydoc_page_routing.v1',
+        pages: [2],
+        pageCount: 2,
+    });
+    assert.equal(Object.isFrozen(result), true);
+    assert.equal(Object.isFrozen(result?.pages), true);
+});
+
+test('returns no routing for native text and all pages for a scanned synthetic PDF', async () => {
+    assert.equal(await extractAnyDocPageRoutingBytes(syntheticPdf(['text', 'text'])), null);
+    assert.deepEqual(await extractAnyDocPageRoutingBytes(syntheticPdf(['scan', 'scan'])), {
+        schemaVersion: 'mediflow.anydoc_page_routing.v1',
+        pages: [1, 2],
+        pageCount: 2,
+    });
+});
+
+test('keeps mixed-document public extraction fail-closed without exposing routing', async () => {
+    const result = await extractAnyDocLocalBytes('synthetic-attachment-mixed', syntheticPdf(['text', 'scan']));
+
+    assert.equal(result.status, 'review_required');
+    if (result.status !== 'review_required') return;
+    assert.equal(result.detail, 'image_or_scan');
+    assert.equal(result.markdown, '');
+    assert.equal(result.candidateUse, 'blocked');
+    assert.equal(Object.hasOwn(result, 'pageRouting'), false);
+});
+
+test('emits exact PHI-free structured stdout only for needsOcr', () => {
+    const result = spawnSync(process.execPath, [WORKER_PATH], {
+        input: syntheticPdf(['text', 'scan']),
+        encoding: 'utf8',
+        env: { NODE_ENV: 'production', NAPI_RS_ENFORCE_VERSION_CHECK: '1' },
+    });
+    const envelope = JSON.parse(result.stdout);
+
+    assert.equal(result.status, 21);
+    assert.equal(result.stderr, '');
+    assert.deepEqual(Object.keys(envelope), ['schemaVersion', 'pages', 'pageCount']);
+    assert.deepEqual(envelope, {
+        schemaVersion: 'mediflow.anydoc_page_routing.v1',
+        pages: [2],
+        pageCount: 2,
+    });
+    assert.doesNotMatch(result.stdout, /Synthetic/u);
+});
+
+test('rejects malformed, duplicate, out-of-range and oversized routing envelopes', () => {
+    const invalid = [
+        '',
+        '{',
+        '{}',
+        JSON.stringify({ schemaVersion: 'mediflow.anydoc_page_routing.v1', pages: [1, 1], pageCount: 2 }),
+        JSON.stringify({ schemaVersion: 'mediflow.anydoc_page_routing.v1', pages: [2, 1], pageCount: 2 }),
+        JSON.stringify({ schemaVersion: 'mediflow.anydoc_page_routing.v1', pages: [3], pageCount: 2 }),
+        JSON.stringify({ schemaVersion: 'mediflow.anydoc_page_routing.v1', pages: [1], pageCount: 501 }),
+        JSON.stringify({ schemaVersion: 'mediflow.anydoc_page_routing.v1', pages: [1], pageCount: 1, extra: true }),
+        ' '.repeat(4097),
+    ];
+
+    for (const envelope of invalid) assert.equal(parseAnyDocPageRoutingEnvelope(envelope), null);
+});
 
 function assertIoFailure(result: Awaited<ReturnType<typeof extractAnyDocLocalBytes>>) {
     assert.equal(result.status, 'review_required');
@@ -71,7 +171,7 @@ test('does not inherit provider, native override or Node option variables', asyn
 
 test('derives the exact digest-bound worker from the physical module directory', () => {
     assert.match(RUNNER_SOURCE, /anydoc-local-extraction-worker\.mjs/u);
-    assert.match(RUNNER_SOURCE, /34f2db3d788585dab175b284bc8f1f39395fb66a21780e1782a5d5067073e370/u);
+    assert.match(RUNNER_SOURCE, /5d6e2e60f1d71f3fd45065961258a7debe8a96e017abdcee92823986c8f08c67/u);
     assert.match(RUNNER_SOURCE, /medical-record-app/u);
     assert.match(RUNNER_SOURCE, /cwd: worker\.directory,/u);
     assert.doesNotMatch(RUNNER_SOURCE, /new URL\([^\n]*scripts\//u);

@@ -18,14 +18,57 @@ import {
 const MODULE_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
 const MEDIFLOW_PACKAGE_NAME = 'medical-record-app';
 const WORKER_FILE = 'anydoc-local-extraction-worker.mjs';
-const WORKER_SHA256 = '34f2db3d788585dab175b284bc8f1f39395fb66a21780e1782a5d5067073e370';
+const WORKER_SHA256 = '5d6e2e60f1d71f3fd45065961258a7debe8a96e017abdcee92823986c8f08c67';
 const MAX_ROOT_STEPS = 8;
 const WORKER_TIMEOUT_MS = 15_000;
 const MAX_DIAGNOSTIC_BYTES = 16 * 1024;
+const MAX_PAGE_ROUTING_ENVELOPE_BYTES = 4 * 1024;
 const EXIT_SIGNAL = new Map<number, AnyDocLocalFailureSignal>([
     [20, 'unsupported'], [21, 'needsOcr'], [22, 'malformed'], [23, 'encrypted'],
     [24, 'resourceLimit'], [25, 'missingPart'], [26, 'io'],
 ]);
+
+/* @Codex */
+export const ANYDOC_PAGE_ROUTING_SCHEMA_VERSION = 'mediflow.anydoc_page_routing.v1' as const;
+export const ANYDOC_PAGE_ROUTING_MAX_PAGE_COUNT = 500;
+
+export interface AnyDocPageRoutingEvidence {
+    readonly schemaVersion: typeof ANYDOC_PAGE_ROUTING_SCHEMA_VERSION;
+    readonly pages: readonly number[];
+    readonly pageCount: number;
+}
+
+type WorkerResult = {
+    signal?: AnyDocLocalFailureSignal;
+    markdown?: string;
+    pageRouting?: AnyDocPageRoutingEvidence;
+};
+
+/** Accepts only the bounded, exact-key worker envelope; all malformed evidence is discarded. */
+export function parseAnyDocPageRoutingEnvelope(input: unknown): AnyDocPageRoutingEvidence | null {
+    if (typeof input !== 'string' || input.length < 1
+        || Buffer.byteLength(input, 'utf8') > MAX_PAGE_ROUTING_ENVELOPE_BYTES) return null;
+    let value: unknown;
+    try { value = JSON.parse(input); } catch { return null; }
+    if (typeof value !== 'object' || value === null || Array.isArray(value)
+        || Object.getPrototypeOf(value) !== Object.prototype) return null;
+    const keys = Reflect.ownKeys(value);
+    if (keys.length !== 3 || !['schemaVersion', 'pages', 'pageCount'].every((key) => keys.includes(key))) return null;
+    const candidate = value as { schemaVersion?: unknown; pages?: unknown; pageCount?: unknown };
+    if (candidate.schemaVersion !== ANYDOC_PAGE_ROUTING_SCHEMA_VERSION || !Array.isArray(candidate.pages)
+        || typeof candidate.pageCount !== 'number') return null;
+    const pages = candidate.pages;
+    const pageCount = candidate.pageCount;
+    if (!Number.isSafeInteger(pageCount) || pageCount < 1 || pageCount > ANYDOC_PAGE_ROUTING_MAX_PAGE_COUNT
+        || pages.length < 1 || pages.length > pageCount
+        || pages.some((page, index) => !Number.isSafeInteger(page) || page < 1
+            || page > pageCount || (index > 0 && page <= pages[index - 1]))) return null;
+    return Object.freeze({
+        schemaVersion: ANYDOC_PAGE_ROUTING_SCHEMA_VERSION,
+        pages: Object.freeze([...pages]) as readonly number[],
+        pageCount,
+    });
+}
 
 function deniedSource(): LocalExtractionResult {
     return buildAnyDocLocalExtraction(null, '');
@@ -80,7 +123,7 @@ function resolveOwnedWorker(): { path: string; directory: string } | null {
     return null;
 }
 
-async function runWorker(bytes: Buffer): Promise<{ signal?: AnyDocLocalFailureSignal; markdown?: string }> {
+async function runWorker(bytes: Buffer): Promise<WorkerResult> {
     return await new Promise((resolve) => {
         const worker = resolveOwnedWorker();
         if (!worker) return resolve({ signal: 'io' });
@@ -95,7 +138,7 @@ async function runWorker(bytes: Buffer): Promise<{ signal?: AnyDocLocalFailureSi
         let diagnosticBytes = 0;
         let forcedSignal: AnyDocLocalFailureSignal | undefined;
         let settled = false;
-        const finish = (value: { signal?: AnyDocLocalFailureSignal; markdown?: string }) => {
+        const finish = (value: WorkerResult) => {
             if (settled) return;
             settled = true;
             clearTimeout(timer);
@@ -120,12 +163,28 @@ async function runWorker(bytes: Buffer): Promise<{ signal?: AnyDocLocalFailureSi
         child.once('error', () => finish({ signal: 'io' }));
         child.once('close', (code) => {
             if (forcedSignal) return finish({ signal: forcedSignal });
+            if (code === 21) {
+                const pageRouting = parseAnyDocPageRoutingEnvelope(Buffer.concat(output, outputBytes).toString('utf8'));
+                return finish(pageRouting ? { signal: 'needsOcr', pageRouting } : { signal: 'io' });
+            }
             if (code !== 0) return finish({ signal: EXIT_SIGNAL.get(code ?? -1) ?? 'io' });
             return finish({ markdown: Buffer.concat(output, outputBytes).toString('utf8') });
         });
         child.stdin.on('error', () => undefined);
         child.stdin.end(bytes);
     });
+}
+
+/** Returns only validated page-routing evidence and never exposes native or partial document text. */
+export async function extractAnyDocPageRoutingBytes(input: unknown): Promise<AnyDocPageRoutingEvidence | null> {
+    if (types.isProxy(input) || !(input instanceof Uint8Array)) return null;
+    let bytes: Buffer;
+    try { bytes = Buffer.from(input); } catch { return null; }
+    if (bytes.byteLength < 1 || bytes.byteLength > ANYDOC_LOCAL_EXTRACTION_MAX_SOURCE_BYTES) return null;
+    try {
+        const result = await runWorker(bytes);
+        return result.signal === 'needsOcr' ? result.pageRouting ?? null : null;
+    } catch { return null; }
 }
 
 /** Converts one host-resolved byte snapshot without accepting caller-supplied digest, path, version, or parser options. */

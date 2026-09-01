@@ -8,7 +8,7 @@ import { spawnSync } from 'node:child_process';
 import { assertNodeRuntime, readNodeContract, standaloneDirectory } from './node-runtime-contract.mjs';
 
 const ANYDOC_WORKER_FILE = 'anydoc-local-extraction-worker.mjs';
-const ANYDOC_WORKER_SHA256 = '34f2db3d788585dab175b284bc8f1f39395fb66a21780e1782a5d5067073e370';
+const ANYDOC_WORKER_SHA256 = '5d6e2e60f1d71f3fd45065961258a7debe8a96e017abdcee92823986c8f08c67';
 const PDF_INSPECTOR_WORKER_FILE = 'pdf-inspector-worker.mjs';
 const PDF_ROUTE_DIRECTORY = path.join('server', 'app', 'api', 'pdf-extract');
 const PDF_RUNTIME_REFERENCE = /(?:pdf-inspector-worker\.mjs|pdf-inspector-router|(?:node_modules[\\/])?@firecrawl[\\/]pdf-inspector(?:[-/]|$))/i;
