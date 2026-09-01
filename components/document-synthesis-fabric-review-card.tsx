@@ -106,7 +106,7 @@ function DocumentSynthesisFabricReviewCardSession({
                     </button>
                 ) : phase === 'running' ? (
                     <span className="inline-flex items-center gap-1.5 text-[color:var(--lume-accent)]" role="status">
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        <Loader2 className="h-3.5 w-3.5" aria-hidden="true" />
                         Generazione locale…
                     </span>
                 ) : (
