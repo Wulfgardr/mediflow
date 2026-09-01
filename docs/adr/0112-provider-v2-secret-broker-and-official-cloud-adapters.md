@@ -198,18 +198,19 @@ clinico. Nessun errore attiva un secondo provider o un modello diverso.
 
 ## Split di implementazione
 
-1. **#279**: tipi v2, lifecycle, secret reference/broker, policy egress e
-   transport injectable, tutti TDD e senza rete.
-2. **#284**: adapter Responses OpenAI, parser, error mapping e optional smoke
+1. **#289**: tipi v2 e lifecycle chiuso, tutti TDD e senza rete.
+2. **#290**: secret reference allowlisted e broker a lease effimero.
+3. **#288**: policy egress/retention/consent e receipt operation-derived.
+4. **#284**: adapter Responses OpenAI, parser, error mapping e optional smoke
    sintetico esplicito.
-3. **#282**: adapter Messages Anthropic, parser, error mapping e optional smoke
+5. **#282**: adapter Messages Anthropic, parser, error mapping e optional smoke
    sintetico esplicito.
-4. Migrazione di una sola operazione Fabric review-only dopo le tre receipt di
+6. Migrazione di una sola operazione Fabric review-only dopo le tre receipt di
    contratto; nessun allargamento laterale dei quattro production root.
 
-Ogni packet resta sotto un solo issue/branch/worktree. Le modifiche condivise
-al registry v2 si chiudono in #279 prima di far partire #282 e #284 in
-parallelo.
+Ogni packet resta sotto un solo issue/branch/worktree. #279 coordina i tre
+packet comuni; #289, #290 e #288 si chiudono in quest'ordine prima di far
+partire #282 e #284 in parallelo.
 
 ## Matrice di verifica
 
