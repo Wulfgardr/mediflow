@@ -50,7 +50,7 @@ function exact(value: unknown, keys: readonly string[]): Exact | null {
     return result;
 }
 function arrayValues(value: unknown, maximum: number): readonly unknown[] | null {
-    if (!Array.isArray(value) || types.isProxy(value) || Object.getPrototypeOf(value) !== Array.prototype) return null;
+    if (types.isProxy(value) || !Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) return null;
     const descriptors = Object.getOwnPropertyDescriptors(value) as unknown as Record<string, PropertyDescriptor>;
     const length = descriptors.length?.value;
     if (!Number.isSafeInteger(length) || length < 0 || length > maximum

@@ -6,6 +6,7 @@ import test from 'node:test';
 
 import { createCanvas } from '@napi-rs/canvas';
 import { PDFDocument, StandardFonts } from 'pdf-lib';
+import { ANYDOC_LOCAL_EXTRACTION_MAX_MARKDOWN_BYTES } from './anydoc-local-extraction-contract';
 import { buildAnyDocPageManifest } from './anydoc-page-manifest';
 import { materializeAnyDocPdfPages } from './anydoc-pdf-page-materializer';
 import {
@@ -142,6 +143,25 @@ test('rejects global review, alternate spelling, routing, order, digest and bind
         const result = await renderAnyDocNeedsOcrPages(manifest, materialization);
         assert.deepEqual(result, { schemaVersion: 'mediflow.anydoc_pdf_page_renderer.v1', status: 'review_required',
             reason, review: 'required', writes: 0, apply: 'none' });
+    }
+});
+
+test('rejects reconstructed native evidence with invalid exact receipt fields', async () => {
+    const fixture = await acceptedFixture(); const native = fixture.manifest.pages[1]!.nativeEvidence!;
+    const cases = [
+        { ...native, receiptId: 'not-a-digest' },
+        { ...native, markdownSha256: '0'.repeat(63) },
+        { ...native, markdownByteLength: 0 },
+        { ...native, markdownByteLength: 1.5 },
+        { ...native, markdownByteLength: ANYDOC_LOCAL_EXTRACTION_MAX_MARKDOWN_BYTES + 1 },
+        { ...native, extra: true },
+    ];
+    for (const nativeEvidence of cases) {
+        const manifest = { ...fixture.manifest, pages: fixture.manifest.pages.map((page, index) =>
+            index === 1 ? { ...page, nativeEvidence } : page) };
+        const result = await renderAnyDocNeedsOcrPages(manifest, fixture.materialization);
+        assert.equal(result.status, 'review_required');
+        if (result.status === 'review_required') assert.equal(result.reason, 'invalid_manifest');
     }
 });
 
