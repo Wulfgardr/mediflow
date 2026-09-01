@@ -1,21 +1,11 @@
 /* @Codex */
 import { expect, test, type Page } from '@playwright/test';
-import { bootstrapUnlockedSession, setAiLaneKillSwitch } from './utils';
 
-type PatientInsightPreviewRequest = {
-  schemaVersion: 'mediflow.patient-insight.preview-request.v1';
-  requestId: string;
-  patientId: string;
-  ambulatoryId: string;
-  patientRevision: number;
-  capturedAt: string;
-  sources: {
-    focus: { summary: string };
-    conditions: Array<{ label: string }>;
-    activeTherapies: Array<{ label: string }>;
-    recentEvents: Array<{ summary: string }>;
-  };
-};
+import {
+  parsePatientInsightPreviewRequest,
+  type PatientInsightPreviewRequest,
+} from '../lib/ai-providers/fabric/patient-insight-preview-contract';
+import { bootstrapUnlockedSession, setAiLaneKillSwitch } from './utils';
 
 const MODEL = 'synthetic-patient-insight:latest';
 const REVIEW_REF = `review_${'b'.repeat(32)}`;
@@ -89,19 +79,17 @@ function availablePreview(request: PatientInsightPreviewRequest) {
 
 test.describe.configure({ retries: 0 });
 
-test('Patient Insight Fabric mostra una proposta review-only senza authority del chiamante', async ({ page }) => {
+test('Patient Insight UI invia un payload strict e mostra una proposta review-only', async ({ page }) => {
   const pin = process.env.E2E_PIN || '1234';
   let previewCalls = 0;
   let capturedRequest: PatientInsightPreviewRequest | null = null;
   let generationStarted = false;
-  const forbiddenClinicalWrites: string[] = [];
+  const postGestureMutations: string[] = [];
 
   page.on('request', (request) => {
     if (!generationStarted || !['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method())) return;
     const pathname = new URL(request.url()).pathname;
-    if (/^\/api\/(?:patients|entries|therapies|observations|attachments|checkups)(?:\/|$)/u.test(pathname)) {
-      forbiddenClinicalWrites.push(`${request.method()} ${pathname}`);
-    }
+    postGestureMutations.push(`${request.method()} ${pathname}`);
   });
 
   await bootstrapUnlockedSession(page, pin);
@@ -110,7 +98,8 @@ test('Patient Insight Fabric mostra una proposta review-only senza authority del
 
   await page.route('**/api/ai/patient-insight/preview', async (route) => {
     previewCalls += 1;
-    capturedRequest = route.request().postDataJSON() as PatientInsightPreviewRequest;
+    capturedRequest = parsePatientInsightPreviewRequest(route.request().postDataJSON());
+    if (!capturedRequest) throw new Error('La UI Patient Insight ha inviato un payload preview non conforme.');
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -156,6 +145,12 @@ test('Patient Insight Fabric mostra una proposta review-only senza authority del
   expect(capturedRequest!.requestId).toMatch(/^pi_[0-9a-f-]{36}$/u);
   expect(capturedRequest!.ambulatoryId).toMatch(/^[A-Za-z0-9][A-Za-z0-9._:-]*$/u);
   expect(new Date(capturedRequest!.capturedAt).toISOString()).toBe(capturedRequest!.capturedAt);
-  expect(JSON.stringify(capturedRequest)).not.toMatch(/"(?:provider|model|endpoint|apply)"\s*:/u);
-  expect(forbiddenClinicalWrites).toEqual([]);
+  expect(Object.keys(capturedRequest!.sources)).toEqual([
+    'focus', 'conditions', 'activeTherapies', 'recentEvents',
+  ]);
+  expect(Object.keys(capturedRequest!.sources.focus)).toEqual(['summary']);
+  expect(JSON.stringify(capturedRequest)).not.toMatch(
+    /"(?:provider|model|endpoint|venue|prompt|fallback|egress|apply)"\s*:/u,
+  );
+  expect(postGestureMutations).toEqual(['POST /api/ai/patient-insight/preview']);
 });
