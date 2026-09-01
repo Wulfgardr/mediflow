@@ -13,6 +13,7 @@ const SNAPSHOT_KEYS = [
     'schemaVersion',
 ];
 const CAPABILITY_KEYS = [
+    'availabilityDisposition',
     'class',
     'contractSchema',
     'egressProfile',
@@ -47,6 +48,24 @@ test('espone uno snapshot minimo, ordinato e congelato', () => {
         assert.equal(Object.isFrozen(capability.venues), true);
         assert.equal(Object.isFrozen(capability.egressProfile), true);
         assert.equal(capability.killSwitch === null || typeof capability.killSwitch === 'string', true);
+    }
+});
+
+test('espone disposition truthful senza trasformarla in readiness provider', () => {
+    const snapshot = buildFabricStatusSnapshot();
+    const byId = Object.fromEntries(snapshot.capabilities.map((capability) => [capability.id, capability]));
+
+    for (const id of ['patient_insight', 'smart_import', 'document_synthesis', 'treatment_reasoning']) {
+        assert.equal(byId[id]?.availabilityDisposition, 'proposal_only', id);
+    }
+    assert.equal(byId.ocr?.availabilityDisposition, 'unavailable');
+    assert.deepEqual(byId.ocr?.venues, []);
+    assert.equal(byId.ocr?.killSwitch, null);
+    assert.equal('provider' in byId.ocr, false);
+    assert.equal('fallback' in byId.ocr, false);
+
+    for (const capability of snapshot.capabilities.filter((item) => item.class === 'deterministic')) {
+        assert.equal(capability.availabilityDisposition, 'available', capability.id);
     }
 });
 

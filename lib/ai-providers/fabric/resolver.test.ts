@@ -246,15 +246,44 @@ test('respinge ogni descriptor non canonico, anche a valori identici', () => {
         policyFor(forgedProfile), { descriptor: forgedProfile, venue: 'local_process' }));
 });
 
-test('propaga ProviderRegistryError senza conversione', () => {
+test('nega OCR terminale prima di consultare il provider registry', () => {
     const descriptor = GENERATIVE_CAPABILITY_DESCRIPTORS.ocr;
-    assert.throws(() => resolveFabricCapability(policyFor(descriptor), {
+    const policy = Object.freeze({
+        ...policyFor(descriptor),
+        allowedVenues: Object.freeze(['local_process'] as const),
+    });
+    let bindingReads = 0;
+    const hostileRequest = {
         descriptor,
-        venue: 'local_process',
-        // Fixture negativa costruita a pezzi per non attivare il guard
-        // never-regress sulle URL non locali, come in registry.test.ts.
-        generative: { ...binding, endpoint: ['https:', '//example.test'].join('') },
-    }), (error) => error instanceof ProviderRegistryError && error.code === 'endpoint_not_local');
+        venue: 'local_process' as const,
+        get generative(): never {
+            bindingReads += 1;
+            throw new Error('provider binding materialized');
+        },
+    };
+
+    expectCode('venue_not_allowed', () => resolveFabricCapability(policy, hostileRequest));
+    assert.equal(bindingReads, 0);
+});
+
+test('nega OCR terminale prima di materializzare una resolution host', () => {
+    const descriptor = GENERATIVE_CAPABILITY_DESCRIPTORS.ocr;
+    const policy = Object.freeze({
+        ...policyFor(descriptor),
+        allowedVenues: Object.freeze(['local_process'] as const),
+    });
+    let resolutionReads = 0;
+    const hostileRequest = {
+        descriptor,
+        venue: 'local_process' as const,
+        get generative(): never {
+            resolutionReads += 1;
+            throw new Error('host resolution materialized');
+        },
+    };
+
+    expectCode('venue_not_allowed', () => resolveFabricCapabilityWithHostResolution(policy, hostileRequest));
+    assert.equal(resolutionReads, 0);
 });
 
 test('costruisce provenienza congelata con sole etichette', () => {

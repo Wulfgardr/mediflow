@@ -197,6 +197,9 @@ export function resolveFabricCapability(
     if (FABRIC_CAPABILITY_DESCRIPTORS[descriptor.id] !== descriptor) {
         throw new FabricPolicyError('capability_unknown');
     }
+    if (descriptor.availabilityDisposition === 'unavailable') {
+        throw new FabricPolicyError('venue_not_allowed');
+    }
 
     const selfManagedProvider = generativeCapability
         ? SELF_MANAGED_GENERATIVE[descriptor.id as GenerativeCapabilityId] ?? null
@@ -269,7 +272,6 @@ export function resolveFabricCapabilityWithHostResolution(
     request: HostResolvedFabricRequest,
 ): FabricResolution {
     const descriptor = request.descriptor;
-    const rawGenerative = request.generative;
     const allowedVenues = Array.isArray(policy.allowedVenues)
         ? Array.from(policy.allowedVenues)
         : null;
@@ -295,6 +297,10 @@ export function resolveFabricCapabilityWithHostResolution(
     ) {
         throw new FabricPolicyError('capability_unknown');
     }
+    if (descriptor.availabilityDisposition === 'unavailable') {
+        throw new FabricPolicyError('venue_not_allowed');
+    }
+    const rawGenerative = request.generative;
     const expectedTask = GENERATIVE_TASKS[
         descriptor.id as Exclude<GenerativeCapabilityId, 'treatment_reasoning'>
     ];

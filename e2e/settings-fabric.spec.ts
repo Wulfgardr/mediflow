@@ -27,6 +27,19 @@ test('Fabric settings renders the read-only venue and capability registry', asyn
   await expect(page.getByTestId('fabric-group-deterministic')).toBeVisible();
   await expect(page.getByTestId('fabric-egress-section')).toContainText('Uscita esterna chiusa');
 
+  for (const capability of ['patient_insight', 'smart_import', 'document_synthesis', 'treatment_reasoning']) {
+    await expect(page.getByTestId(`fabric-availability-${capability}`)).toContainText('Solo proposta');
+  }
+  await expect(page.getByTestId('fabric-availability-icd_lookup')).toContainText('Disponibile nell’app');
+  await expect(page.getByTestId('fabric-availability-ocr')).toContainText('Non disponibile');
+  await expect(page.getByTestId('fabric-capability-ocr')).toContainText('Nessuna sede: funzione non eseguibile');
+  await expect(page.getByTestId('fabric-capability-ocr')).toContainText('Stato terminale: nessun interruttore può riattivarla');
+
+  const registry = page.getByTestId('fabric-capability-registry');
+  await expect(registry).not.toContainText('consumer_login');
+  await expect(registry).not.toContainText('API key');
+  await expect(registry).not.toContainText('OAuth');
+
   await expect(surface.locator('form')).toHaveCount(0);
   await expect(surface.locator('input, select, textarea, button, [role="switch"], [contenteditable="true"]')).toHaveCount(0);
 

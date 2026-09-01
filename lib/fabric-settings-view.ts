@@ -2,10 +2,12 @@
 import {
     DETERMINISTIC_CAPABILITY_IDS,
     EGRESS_PROFILES,
+    FABRIC_SCHEMA_VERSION,
     FABRIC_VENUES,
     GENERATIVE_CAPABILITY_IDS,
     type CapabilityClass,
     type EgressProfileId,
+    type FabricAvailabilityDisposition,
     type FabricCapabilityId,
     type FabricOperation,
     type FabricReviewPolicy,
@@ -19,6 +21,7 @@ import {
     type VenueObservationState,
 } from './ai-providers/fabric/routing-observability';
 import type { FabricStatusSnapshot } from './ai-providers/fabric/status';
+import { FABRIC_CAPABILITY_DESCRIPTORS } from './ai-providers/fabric/catalog';
 
 export type FabricStatusCapability = FabricStatusSnapshot['capabilities'][number];
 
@@ -100,6 +103,33 @@ export const FABRIC_REVIEW_LABELS: Readonly<Record<FabricReviewPolicy, string>> 
     informational: 'Solo lettura',
 });
 
+/* @Codex */
+export type FabricAvailabilityCopy = Readonly<{
+    title: string;
+    description: string;
+}>;
+
+export const FABRIC_AVAILABILITY_COPY: Readonly<
+    Record<FabricAvailabilityDisposition, FabricAvailabilityCopy>
+> = Object.freeze({
+    available: Object.freeze({
+        title: 'Disponibile nell’app',
+        description: 'Funzione applicativa disponibile; non attesta provider, modello o stato runtime.',
+    }),
+    proposal_only: Object.freeze({
+        title: 'Solo proposta',
+        description: 'Prepara una proposta da rivedere; non applica dati clinici.',
+    }),
+    manual_only: Object.freeze({
+        title: 'Solo manuale',
+        description: 'Il registro non espone un’esecuzione automatica.',
+    }),
+    unavailable: Object.freeze({
+        title: 'Non disponibile',
+        description: 'Classificata per trasparenza, ma non eseguibile.',
+    }),
+});
+
 export const EGRESS_PROFILE_LABELS: Readonly<Record<EgressProfileId, Readonly<{
     title: string;
     description: string;
@@ -113,6 +143,29 @@ export const EGRESS_PROFILE_LABELS: Readonly<Record<EgressProfileId, Readonly<{
         description: 'Chiuso per costruzione: rende esplicito il percorso, ma non lo apre.',
     }),
 });
+
+export type FabricCapabilityAvailabilityPresentation = Readonly<{
+    status: FabricAvailabilityCopy;
+    venues: string;
+    egress: string;
+    terminalUnavailable: boolean;
+}>;
+
+export function describeFabricCapabilityAvailability(
+    capability: FabricStatusCapability,
+): FabricCapabilityAvailabilityPresentation {
+    const terminalUnavailable = capability.availabilityDisposition === 'unavailable';
+    return Object.freeze({
+        status: FABRIC_AVAILABILITY_COPY[capability.availabilityDisposition],
+        venues: terminalUnavailable
+            ? 'Nessuna sede: funzione non eseguibile'
+            : capability.venues.map((venue) => FABRIC_VENUE_COPY[venue].title).join(' · '),
+        egress: terminalUnavailable
+            ? 'Non applicabile'
+            : EGRESS_PROFILE_LABELS[capability.egressProfile.id].title,
+        terminalUnavailable,
+    });
+}
 
 export type FabricCapabilityGroup = Readonly<{
     id: CapabilityClass;
@@ -190,6 +243,43 @@ export function venueReasonLabel(reason: VenueObservationReason | null): string 
     return reason === null ? 'Nessun limite rilevato dalla verifica corrente.' : VENUE_OBSERVATION_REASON_LABELS[reason];
 }
 
+const FABRIC_STATUS_KEYS = Object.freeze([
+    'capabilities',
+    'contractVersion',
+    'egressGateOpen',
+    'readinessNote',
+    'schemaVersion',
+] as const);
+
+const FABRIC_STATUS_CAPABILITY_KEYS = Object.freeze([
+    'availabilityDisposition',
+    'class',
+    'contractSchema',
+    'egressProfile',
+    'id',
+    'killSwitch',
+    'operation',
+    'review',
+    'venues',
+] as const);
+
+const FABRIC_STATUS_EGRESS_PROFILE_KEYS = Object.freeze([
+    'egress',
+    'id',
+    'version',
+] as const);
+
+function hasExactKeys(value: object, expected: readonly string[]): boolean {
+    const keys = Object.keys(value);
+    return keys.length === expected.length && keys.every((key) => expected.includes(key));
+}
+
+function equalsStringArray(value: unknown, expected: readonly string[]): boolean {
+    return Array.isArray(value)
+        && value.length === expected.length
+        && value.every((item, index) => item === expected[index]);
+}
+
 export function parseFabricSnapshotPair(
     status: unknown,
     observability: unknown,
@@ -200,10 +290,15 @@ export function parseFabricSnapshotPair(
     if (
         !status
         || typeof status !== 'object'
+        || !hasExactKeys(status, FABRIC_STATUS_KEYS)
         || !('schemaVersion' in status)
         || status.schemaVersion !== 'mediflow.ai.fabric-status.v1'
+        || !('contractVersion' in status)
+        || status.contractVersion !== FABRIC_SCHEMA_VERSION
         || !('egressGateOpen' in status)
         || typeof status.egressGateOpen !== 'boolean'
+        || !('readinessNote' in status)
+        || status.readinessNote !== 'available_unqualified'
         || !('capabilities' in status)
         || !Array.isArray(status.capabilities)
         || !observability
@@ -225,13 +320,38 @@ export function parseFabricSnapshotPair(
     const venueIds = new Set<string>(FABRIC_VENUES);
     const reasons = new Set<string>(VENUE_OBSERVATION_REASONS);
 
-    if (status.capabilities.some((capability) => (
-        !capability
-        || typeof capability !== 'object'
-        || !('id' in capability)
-        || typeof capability.id !== 'string'
-        || !capabilityIds.has(capability.id)
-    ))) {
+    if (status.capabilities.some((capability) => {
+        if (
+            !capability
+            || typeof capability !== 'object'
+            || !('id' in capability)
+            || typeof capability.id !== 'string'
+            || !capabilityIds.has(capability.id)
+            || !hasExactKeys(capability, FABRIC_STATUS_CAPABILITY_KEYS)
+        ) return true;
+
+        const expected = FABRIC_CAPABILITY_DESCRIPTORS[capability.id as FabricCapabilityId];
+        const record = capability as Record<string, unknown>;
+        const expectedProfile = EGRESS_PROFILES[expected.egressProfileId];
+        const profile = record.egressProfile;
+        return record.class !== expected.class
+            || record.operation !== expected.operation
+            || record.review !== expected.review
+            || record.availabilityDisposition !== expected.availabilityDisposition
+            || !equalsStringArray(record.venues, expected.venues)
+            || record.killSwitch !== expected.killSwitch
+            || record.contractSchema !== expected.contractSchema
+            || !profile
+            || typeof profile !== 'object'
+            || Array.isArray(profile)
+            || !hasExactKeys(profile, FABRIC_STATUS_EGRESS_PROFILE_KEYS)
+            || !('id' in profile)
+            || profile.id !== expectedProfile.id
+            || !('version' in profile)
+            || profile.version !== expectedProfile.version
+            || !('egress' in profile)
+            || profile.egress !== expectedProfile.egress;
+    })) {
         throw new Error('Registro capability Fabric non conforme.');
     }
     const observedCapabilityIds = status.capabilities.map((capability) => capability.id as string);
