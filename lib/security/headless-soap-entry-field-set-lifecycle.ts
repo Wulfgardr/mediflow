@@ -9,6 +9,7 @@ import {
 import type {
     ClinicianSoapWriteAccepted,
 } from '../headless/clinician-soap-write-contract';
+import type { HeadlessSoapProposalBindingV1 } from './headless-soap-proposal-lifecycle';
 
 declare const entryRefIdentity: unique symbol;
 declare const entryDependentRegistrationIdentity: unique symbol;
@@ -31,6 +32,10 @@ export type HeadlessSoapProposalLifecyclePortForEntryV1 = Readonly<{
 }>;
 export type HeadlessSoapEntryFieldSetLifecycleSources = Readonly<{
     proposalLifecycle: HeadlessSoapProposalLifecyclePortForEntryV1;
+    proposalBinding?: Readonly<{
+        withCurrentDependentBinding(candidate: unknown, registration: unknown,
+            operation: (binding: HeadlessSoapProposalBindingV1) => void): Promise<boolean>;
+    }>;
     proposalService: Readonly<{ wipe(candidate: unknown): boolean }>;
     clock(): number;
     createFieldSet?(snapshot: unknown, epochMilliseconds: unknown): ClinicianSoapEntryFieldSetV1 | null;
@@ -46,6 +51,19 @@ export type HeadlessSoapEntryFieldSetLifecycleControllerV1 = Readonly<{
     unregisterDependent(candidate: unknown, registration: unknown): boolean;
     withCurrentDependent(candidate: unknown, registration: unknown,
         operation: (fieldSet: ClinicianSoapEntryFieldSetV1) => void): Promise<boolean>;
+}>;
+export type HeadlessSoapEntryFieldSetBindingV1 = Readonly<{
+    activeRole: HeadlessSoapProposalBindingV1['activeRole'];
+    childLease: HeadlessSoapProposalBindingV1['childLease'];
+    selection: HeadlessSoapProposalBindingV1['selection'];
+    patientVersion: HeadlessSoapProposalBindingV1['patientVersion'];
+    proposal: HeadlessSoapProposalBindingV1['proposal'];
+    entryIdentity: HeadlessSoapEntryRefV1;
+    payloadDigest: ClinicianSoapEntryFieldSetV1['payloadDigest'];
+}>;
+export type HeadlessSoapEntryFieldSetBindingControllerV1 = Readonly<{
+    withCurrentDependentBinding(candidate: unknown, registration: unknown,
+        operation: (binding: HeadlessSoapEntryFieldSetBindingV1) => void): Promise<boolean>;
 }>;
 
 type EntryRecord = {
@@ -84,6 +102,7 @@ function callbackSucceeded(operation: (...args: never[]) => void, args: unknown[
 export function createHeadlessSoapEntryFieldSetLifecycleOwner(sources: HeadlessSoapEntryFieldSetLifecycleSources): Readonly<{
     service: HeadlessSoapEntryFieldSetLifecycleServiceV1;
     lifecycleController: HeadlessSoapEntryFieldSetLifecycleControllerV1;
+    bindingController: HeadlessSoapEntryFieldSetBindingControllerV1;
 }> {
     const entries = new WeakMap<object, EntryRecord>(), pending = new WeakSet<object>(), claimed = new WeakSet<object>();
     const dependentRegistrations = new WeakMap<object, EntryDependentRecord>();
@@ -252,5 +271,57 @@ export function createHeadlessSoapEntryFieldSetLifecycleOwner(sources: HeadlessS
             return runLifecycleOperation(candidate, registration, operation, true);
         },
     });
-    return objectFreeze({ service, lifecycleController });
+    const bindingController: HeadlessSoapEntryFieldSetBindingControllerV1 = objectFreeze({
+        async withCurrentDependentBinding(candidate: unknown, registration: unknown,
+            operation: (binding: HeadlessSoapEntryFieldSetBindingV1) => void): Promise<boolean> {
+            const record = recordFor(candidate); if (!record) return false;
+            const dependent = dependentFor(record, registration); if (!dependent) return false;
+            if (h3CallInFlight) { poisonReentry(); return false; }
+            if (!synchronousCallback(operation) || !sources.proposalBinding) { terminalize(record, false); return false; }
+            const activeOperation: LifecycleOperation = { lifecycle: record, dependent, created: [], poisoned: false };
+            h3CallInFlight = true; lifecycleOperation = activeOperation;
+            const locallyCurrent = (): boolean => recordFor(candidate) === record
+                && dependentFor(record, registration) === dependent;
+            let invoked = false, callbackAccepted = false, h3Current = false;
+            try {
+                h3Current = await sources.proposalBinding.withCurrentDependentBinding(
+                    record.proposalRef,
+                    record.proposalRegistration,
+                    (upstream) => {
+                        if (callbackActive || invoked || !locallyCurrent()) { activeOperation.poisoned = true; return; }
+                        const fieldSet = record.fieldSet; if (!fieldSet) { activeOperation.poisoned = true; return; }
+                        callbackActive = true; invoked = true;
+                        const binding = objectCreate(null) as Record<string, unknown>;
+                        binding.activeRole = upstream.activeRole;
+                        binding.childLease = upstream.childLease;
+                        binding.selection = upstream.selection;
+                        binding.patientVersion = upstream.patientVersion;
+                        binding.proposal = upstream.proposal;
+                        binding.entryIdentity = record.entryRef;
+                        binding.payloadDigest = fieldSet.payloadDigest;
+                        callbackAccepted = callbackSucceeded(
+                            operation as (...args: never[]) => void,
+                            [objectFreeze(binding)],
+                        );
+                        callbackActive = false;
+                    },
+                );
+            } catch { h3Current = false; }
+            finally {
+                callbackActive = false; h3CallInFlight = false;
+                if (lifecycleOperation === activeOperation) lifecycleOperation = null;
+            }
+            let attached = false;
+            if (!activeOperation.poisoned && invoked && callbackAccepted && h3Current
+                && locallyCurrent() && createdCurrent(activeOperation)) {
+                try { attached = sources.proposalLifecycle.confirmDependent(record.proposalRef, record.proposalRegistration); }
+                catch { attached = false; }
+            }
+            const accepted = !activeOperation.poisoned && invoked && callbackAccepted && h3Current && attached
+                && locallyCurrent() && createdCurrent(activeOperation);
+            if (!accepted) terminalize(record, false);
+            return accepted;
+        },
+    });
+    return objectFreeze({ service, lifecycleController, bindingController });
 }
