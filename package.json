@@ -227,11 +227,11 @@
     "jspdf": "4.2.1",
     "jspdf-autotable": "^5.0.2",
     "lucide-react": "^0.562.0",
-    "next": "16.2.11",
+    "next": "16.3.4",
     "openai": "^6.16.0",
     "pdf-lib": "1.17.1",
     "pdfjs-dist": "4.10.38",
-    "pm2": "^7.0.3",
+    "pm2": "7.0.4",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-dropzone": "^14.3.8",
@@ -243,12 +243,14 @@
   },
   "overrides": {
     "jspdf": {
-      "dompurify": "3.4.12"
+      "dompurify": "3.4.14"
     },
     "next": {
-      "postcss": "8.5.22",
-      "sharp": "0.35.3"
-    }
+      "postcss": "8.5.23",
+      "sharp": "0.35.4"
+    },
+    "ip-address": "10.7.0",
+    "nanoid": "3.3.18"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",
@@ -260,8 +262,8 @@
     "@types/react-dom": "^19",
     "drizzle-kit": "^0.31.8",
     "eslint": "^9",
-    "eslint-config-next": "16.1.1",
-    "js-yaml": "^4.3.0",
+    "eslint-config-next": "16.3.4",
+    "js-yaml": "4.3.1",
     "tailwindcss": "^4",
     "typescript": "5.9.3"
   }
