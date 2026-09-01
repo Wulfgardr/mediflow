@@ -104,6 +104,15 @@ const setHas = Set.prototype.has;
 function fail(code: HeadlessSoapCommandBindingErrorCode): never {
     throw new HeadlessSoapCommandBindingError(code);
 }
+function bindingDenial(error: unknown): HeadlessSoapCommandBindingErrorCode {
+    try {
+        if (typeof error !== 'object' || error === null || isProxy(error)) return 'binding_unavailable';
+        const descriptor = objectGetOwnPropertyDescriptor(error, 'code');
+        if (!descriptor || !('value' in descriptor)) return 'binding_unavailable';
+        if (descriptor.value === 'proof_expired' || descriptor.value === 'lifecycle_unavailable') return descriptor.value;
+    } catch { /* fixed fallback below */ }
+    return 'binding_unavailable';
+}
 function result(approvalRef: string, idempotencyKey: string): HeadlessSoapCommandBindingResultV1 {
     return objectFreeze(objectAssign(objectCreate(null), { status: 'approval_bound' as const, approvalRef, idempotencyKey }));
 }
@@ -189,7 +198,7 @@ export function createHeadlessSoapCommandBindingOwner(sources: HeadlessSoapComma
         try { attached = sources.proofLifecycle.confirmDependent(proof, registration) === true; } catch { attached = false; }
         if (!attached || upstreamGone) return abortAttached(proof, registration, 'proof_unavailable');
         let captured: HeadlessSoapAuthorizationLineageV1 | null = null, invoked = false, poisoned = false;
-        let current = false;
+        let current = false, upstreamDenial: HeadlessSoapCommandBindingErrorCode | null = null;
         try {
             current = await sources.proofBinding.withCurrentDependentBinding(proof, registration, (candidate, sealCandidate) => {
                 if (invoked || upstreamGone) { poisoned = true; return; }
@@ -199,7 +208,8 @@ export function createHeadlessSoapCommandBindingOwner(sources: HeadlessSoapComma
                 if (!lineage || !seal || !sameBinding(lineage, seal)) { poisoned = true; return; }
                 captured = lineage;
             });
-        } catch { current = false; }
+        } catch (error) { current = false; upstreamDenial = bindingDenial(error); }
+        if (upstreamDenial) return abortAttached(proof, registration, upstreamDenial);
         if (!current || !invoked || poisoned || !captured || upstreamGone) {
             return abortAttached(proof, registration, 'binding_unavailable');
         }

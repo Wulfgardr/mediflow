@@ -54,7 +54,7 @@ export function syntheticProof(byte: number): string {
 
 export function commandBindingFixture(entropyByte = 0x44) {
     const trace: string[] = [], registrations = new Map<string, { registration: object; dispose: () => void }>();
-    let current = syntheticBinding(), entropyCalls = 0, wipes = 0;
+    let current = syntheticBinding(), entropyCalls = 0, wipes = 0, currentFailure: unknown = null;
     const owner = createHeadlessSoapCommandBindingOwner({
         proofLifecycle: {
             registerDependent(proof: unknown, dispose: () => void) { trace.push('register'); const registration = opaque();
@@ -68,6 +68,7 @@ export function commandBindingFixture(entropyByte = 0x44) {
             async withCurrentDependentBinding(proof: unknown, registration: unknown,
                 operation: (lineage: unknown, sealBundle: unknown) => void) {
                 trace.push('current'); if (registrations.get(String(proof))?.registration !== registration) return false;
+                if (currentFailure) throw currentFailure;
                 operation(current.lineage, current.sealBundle); return true;
             },
             async withSingleUseDependentBinding(proof: unknown, registration: unknown,
@@ -81,5 +82,6 @@ export function commandBindingFixture(entropyByte = 0x44) {
         entropy() { trace.push(`entropy-${++entropyCalls}`); return new Uint8Array(32).fill(entropyByte); },
     });
     return { owner, trace, current: () => current, setCurrent(next: ReturnType<typeof syntheticBinding>) { current = next; },
+        failCurrent(error: unknown) { currentFailure = error; },
         wipes: () => wipes, drain(proof: string) { registrations.get(proof)?.dispose(); registrations.delete(proof); } };
 }

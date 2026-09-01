@@ -40,3 +40,13 @@ test('retires a published binding once when H5b drains it upstream', async () =>
     assert.equal(current.owner.service.wipe(result.approvalRef, authorizationProof), false);
     assert.equal(current.wipes(), 0);
 });
+
+test('preserves exact H5b expiry and lifecycle denials while burning the attached proof', async () => {
+    for (const code of ['proof_expired', 'lifecycle_unavailable'] as const) {
+        const current = fixture(), authorizationProof = proof(code === 'proof_expired' ? 6 : 7);
+        current.failCurrent(Object.assign(new Error('synthetic upstream denial'), { code }));
+        await assert.rejects(current.owner.service.bind(authorizationProof),
+            (error) => error instanceof HeadlessSoapCommandBindingError && error.code === code);
+        assert.equal(current.wipes(), 1);
+    }
+});
