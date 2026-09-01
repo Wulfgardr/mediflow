@@ -28,7 +28,7 @@ function prepare(dataDir: string, seed = true): string {
     return dbPath;
 }
 
-function bootstrap(dataDir: string, env: NodeJS.ProcessEnv = {}) {
+function bootstrap(dataDir: string, env: Partial<NodeJS.ProcessEnv> = {}) {
     return spawnSync(process.execPath, [RUNNER, WORKER], {
         cwd: ROOT, env: { ...process.env, ...env, MEDIFLOW_DATA_DIR: dataDir }, encoding: 'utf8',
     });
