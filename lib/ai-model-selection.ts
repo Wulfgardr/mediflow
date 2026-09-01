@@ -1,6 +1,5 @@
 /* @Codex */
 export const DEFAULT_TEXT_MODEL = 'qwen3.5:35b-a3b';
-export const DEFAULT_OCR_MODEL = 'deepseek-ocr';
 export const LEGACY_QWEN_TEXT_MODEL = 'qwen2.5:32b';
 export const LEGACY_MEDGEMMA_TEXT_MODEL = 'hf.co/unsloth/medgemma-1.5-4b-it-GGUF';
 

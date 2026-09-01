@@ -11,13 +11,12 @@ const BASE_BINDING = {
     models: {
         clinical: 'qwen3.5:35b-a3b',
         reasoning: 'reasoning-model',
-        ocr: 'ocr-model',
     },
     endpoint: 'http://localhost:11434',
     chatTimeoutMs: 1_000,
 };
 
-for (const task of ['clinical', 'reasoning', 'ocr']) {
+for (const task of ['clinical', 'reasoning']) {
     test(`associa ${task} al provider Ollama locale`, () => {
         const resolved = localProviderRegistry.resolve({ ...BASE_BINDING, task });
 
@@ -43,6 +42,7 @@ for (const task of ['clinical', 'reasoning', 'ocr']) {
 
 for (const [binding, code] of [
     [{ ...BASE_BINDING, task: 'unknown' }, 'invalid_task'],
+    [{ ...BASE_BINDING, task: 'ocr' }, 'invalid_task'],
     [{ ...BASE_BINDING, provider: 'openai' }, 'provider_not_registered'],
     [{ ...BASE_BINDING, provider: '' }, 'provider_not_registered'],
     [{ ...BASE_BINDING, provider: '   ' }, 'provider_not_registered'],

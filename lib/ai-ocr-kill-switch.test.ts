@@ -9,21 +9,17 @@ import {
     serializeAiOcrKillSwitchState,
 } from './ai-ocr-kill-switch';
 
-test('OCR kill switch stays active when unset and fails closed for explicit disabled or malformed values', () => {
-    assert.equal(resolveAiOcrKillSwitchState(undefined), 'enabled');
-    assert.equal(resolveAiOcrKillSwitchState('enabled'), 'enabled');
-    assert.equal(resolveAiOcrKillSwitchState('disabled'), 'disabled');
-    assert.equal(resolveAiOcrKillSwitchState('unexpected'), 'disabled');
-    assert.equal(isAiOcrEnabledValue(undefined), true);
-    assert.equal(serializeAiOcrKillSwitchState(true), 'enabled');
+test('historical OCR kill-switch compatibility is terminally disabled for every value', () => {
+    for (const value of [undefined, 'enabled', true, 1, 'disabled', 'unexpected']) {
+        assert.equal(resolveAiOcrKillSwitchState(value), 'disabled');
+        assert.equal(isAiOcrEnabledValue(value), false);
+    }
+    assert.equal(serializeAiOcrKillSwitchState(true), 'disabled');
     assert.equal(serializeAiOcrKillSwitchState(false), 'disabled');
 });
 
-test('OCR assert throws the lane-specific disabled error', () => {
-    assert.throws(
-        () => assertAiOcrEnabledValue('disabled'),
-        AiOcrDisabledError,
-    );
-    assert.doesNotThrow(() => assertAiOcrEnabledValue(undefined));
-    assert.doesNotThrow(() => assertAiOcrEnabledValue('enabled'));
+test('historical OCR assert always throws the lane-specific disabled error', () => {
+    for (const value of [undefined, 'enabled', 'disabled']) {
+        assert.throws(() => assertAiOcrEnabledValue(value), AiOcrDisabledError);
+    }
 });

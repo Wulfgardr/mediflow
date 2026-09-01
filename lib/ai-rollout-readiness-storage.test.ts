@@ -14,7 +14,6 @@ import { AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY } from './ai-document-synthesis-k
 import { AI_PATIENT_INSIGHT_KILL_SWITCH_KEY } from './ai-patient-insight-kill-switch.ts';
 import { AI_SMART_IMPORT_KILL_SWITCH_KEY } from './ai-smart-import-kill-switch.ts';
 import { AI_TREATMENT_REASONING_KILL_SWITCH_KEY } from './ai-treatment-reasoning-kill-switch.ts';
-import { AI_OCR_KILL_SWITCH_KEY } from './ai-ocr-kill-switch.ts';
 
 test('rollout readiness contract helper keeps all known lanes visible and marks missing artifacts explicitly', () => {
     const previousDataDir = process.env.MEDIFLOW_DATA_DIR;
@@ -48,7 +47,7 @@ test('rollout readiness contract helper keeps all known lanes visible and marks 
         });
 
         assert.equal(payload.lanes.length, AI_ROLLOUT_READINESS_LANES.length);
-        assert.equal(payload.localControls.length, 5);
+        assert.equal(payload.localControls.length, 4);
 
         const patientInsight = payload.lanes.find((lane) => lane.lane === 'patient_insight');
         assert.equal(patientInsight?.available, true);
@@ -70,9 +69,7 @@ test('rollout readiness contract helper keeps all known lanes visible and marks 
         const treatmentReasoningControl = payload.localControls.find((control) => control.lane === 'treatment_reasoning');
         assert.equal(treatmentReasoningControl?.state, 'enabled');
 
-        const ocrControl = payload.localControls.find((control) => control.lane === 'ocr');
-        assert.equal(ocrControl?.state, 'enabled');
-        assert.equal(ocrControl?.key, AI_OCR_KILL_SWITCH_KEY);
+        assert.equal(payload.localControls.some((control) => (control.lane as string) === 'ocr'), false);
 
         const redaction = payload.lanes.find((lane) => lane.lane === 'redaction');
         assert.equal(redaction?.available, false);
@@ -135,16 +132,15 @@ test('corrupt rollout readiness JSON degrades only the affected lane', () => {
 
 test('rollout readiness local controls fail closed when settings are absent or malformed', () => {
     const absentControls = buildAiRolloutLocalControlsPayload({});
-    assert.deepEqual(absentControls.map((control) => control.state), ['disabled', 'disabled', 'disabled', 'disabled', 'enabled']);
+    assert.deepEqual(absentControls.map((control) => control.state), ['disabled', 'disabled', 'disabled', 'disabled']);
 
     const malformedControls = buildAiRolloutLocalControlsPayload({
         patient_insight: 'unexpected',
         smart_import: null,
         document_synthesis: 'true-ish',
         treatment_reasoning: 'unexpected',
-        ocr: 'unexpected',
     });
-    assert.deepEqual(malformedControls.map((control) => control.state), ['disabled', 'disabled', 'disabled', 'disabled', 'disabled']);
+    assert.deepEqual(malformedControls.map((control) => control.state), ['disabled', 'disabled', 'disabled', 'disabled']);
 });
 
 test('rollout readiness local controls also accept canonical setting keys', () => {
@@ -153,9 +149,8 @@ test('rollout readiness local controls also accept canonical setting keys', () =
         [AI_SMART_IMPORT_KILL_SWITCH_KEY]: true,
         [AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY]: '1',
         [AI_TREATMENT_REASONING_KILL_SWITCH_KEY]: 'enabled',
-        [AI_OCR_KILL_SWITCH_KEY]: 'disabled',
     });
-    assert.deepEqual(controls.map((control) => control.state), ['enabled', 'enabled', 'enabled', 'enabled', 'disabled']);
+    assert.deepEqual(controls.map((control) => control.state), ['enabled', 'enabled', 'enabled', 'enabled']);
 
     const canonicalNullWinsOverLaneFallback = buildAiRolloutLocalControlsPayload({
         [AI_PATIENT_INSIGHT_KILL_SWITCH_KEY]: null,

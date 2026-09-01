@@ -88,11 +88,6 @@ test('settings shows rollout readiness lanes, missing artifacts and markdown pre
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ key: 'aiTreatmentReasoningKillSwitch', value: 'enabled' }),
     });
-    await fetch('/api/settings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key: 'aiOcrKillSwitch', value: 'disabled' }),
-    });
   });
 
   // Wave 0.8.1: governance/readiness has its own AI sub-route.
@@ -106,12 +101,12 @@ test('settings shows rollout readiness lanes, missing artifacts and markdown pre
   await expect(page.getByTestId('ai-rollout-metric-ready')).toContainText('1');
   await expect(page.getByTestId('ai-rollout-metric-hold')).toContainText('1');
   await expect(page.getByTestId('ai-rollout-metric-missing')).toContainText('3');
-  await expect(page.getByTestId('ai-rollout-local-control-summary')).toContainText('3 disattivati su 5');
+  await expect(page.getByTestId('ai-rollout-local-control-summary')).toContainText('2 disattivati su 4');
   await expect(page.getByTestId('ai-rollout-local-control-patient_insight')).toContainText('disabled');
   await expect(page.getByTestId('ai-rollout-local-control-smart_import')).toContainText('enabled');
   await expect(page.getByTestId('ai-rollout-local-control-document_synthesis')).toContainText('disabled');
   await expect(page.getByTestId('ai-rollout-local-control-treatment_reasoning')).toContainText('enabled');
-  await expect(page.getByTestId('ai-rollout-local-control-ocr')).toContainText('disabled');
+  await expect(page.getByTestId('ai-rollout-local-control-ocr')).toHaveCount(0);
 
   const missingRedactionLane = page.getByTestId('ai-rollout-lane-redaction');
   await expect(missingRedactionLane).toContainText('Redaction');

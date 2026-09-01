@@ -18,10 +18,6 @@ import {
     AI_TREATMENT_REASONING_KILL_SWITCH_KEY,
     isAiTreatmentReasoningEnabledValue,
 } from './ai-treatment-reasoning-kill-switch';
-import {
-    AI_OCR_KILL_SWITCH_KEY,
-    isAiOcrEnabledValue,
-} from './ai-ocr-kill-switch';
 
 export type RolloutReadinessArtifactLane =
     | 'patient_insight'
@@ -42,15 +38,13 @@ export type RolloutReadinessLocalControlLane =
     | 'patient_insight'
     | 'smart_import'
     | 'document_synthesis'
-    | 'treatment_reasoning'
-    | 'ocr';
+    | 'treatment_reasoning';
 
 export const AI_ROLLOUT_LOCAL_CONTROL_LANES: RolloutReadinessLocalControlLane[] = [
     'patient_insight',
     'smart_import',
     'document_synthesis',
     'treatment_reasoning',
-    'ocr',
 ];
 
 const AI_ROLLOUT_LOCAL_CONTROL_META: Record<RolloutReadinessLocalControlLane, {
@@ -77,11 +71,6 @@ const AI_ROLLOUT_LOCAL_CONTROL_META: Record<RolloutReadinessLocalControlLane, {
         label: 'Treatment Reasoning',
         key: AI_TREATMENT_REASONING_KILL_SWITCH_KEY,
         resolveEnabled: isAiTreatmentReasoningEnabledValue,
-    },
-    ocr: {
-        label: 'OCR documentale',
-        key: AI_OCR_KILL_SWITCH_KEY,
-        resolveEnabled: isAiOcrEnabledValue,
     },
 };
 
