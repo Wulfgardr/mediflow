@@ -95,7 +95,7 @@ export function parseInput(value: unknown): ParsedInput {
 }
 
 function safeText(value: unknown, maxBytes: number): value is string {
-    return typeof value === 'string' && value.length > 0 && !CONTROL.test(value)
+    return typeof value === 'string' && value.length > 0 && !CONTROL.test(value) && !UNPAIRED_SURROGATE.test(value)
         && encoder.encode(value).byteLength <= maxBytes;
 }
 
