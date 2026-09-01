@@ -260,11 +260,17 @@ test('patient purge revokes old locators and operations before deleting attachme
             (id, patient_id, name, type, size, path, data, document_source_ref, document_revision, document_freshness_epoch)
             VALUES (?, ?, 'replacement.rtf', 'application/rtf', 4, 'replacement.rtf', ?, ?, 1, 1)`)
             .run(`at-${patientId}`, patientId, 'data:text/rtf;base64,VGVzdA==', 'b'.repeat(64));
-        const freshLocator = authority.issue({ attachmentId: `at-${patientId}` });
+        /* @Codex Purge removes the ambulatory membership that authorizes the
+           selected patient. The prior source authority must remain unusable;
+           re-establish membership and a new selected session before minting. */
+        assert.equal(authority.issue({ attachmentId: `at-${patientId}` }), null);
+        sqlite.prepare("INSERT INTO patients_to_ambulatories (patient_id, ambulatory_id) VALUES (?, 'amb-test')").run(patientId);
+        const replacementAuthority = await createSelectedAuthority(patientId);
+        const freshLocator = replacementAuthority.issue({ attachmentId: `at-${patientId}` });
         assert.ok(freshLocator);
-        const fresh = authority.consume(freshLocator);
+        const fresh = replacementAuthority.consume(freshLocator);
         assert.equal(fresh.status, 'begun');
-        if (fresh.status === 'begun') assert.equal(authority.finalize(fresh.operation).status, 'spent');
+        if (fresh.status === 'begun') assert.equal(replacementAuthority.finalize(fresh.operation).status, 'spent');
     } finally {
         sqlite.close();
     }

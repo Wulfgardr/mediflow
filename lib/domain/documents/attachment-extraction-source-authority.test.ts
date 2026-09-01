@@ -216,5 +216,5 @@ test('keeps callbacks, AnyDoc, routes, logging, and persistence outside the auth
     const revocation = fs.readFileSync(new URL('./attachment-extraction-locator-revocation.ts', import.meta.url), 'utf8');
     assert.doesNotMatch(revocation, /Promise|async|await|callback|dbServer|schema|transaction|\.then|Symbol\.iterator/iu);
     const restore = fs.readFileSync(new URL('../../backup-restore-executor.ts', import.meta.url), 'utf8');
-    assert.match(restore, /revokeAttachmentExtractionLocatorGeneration\(\);\s*dbServer\.transaction/iu);
+    assert.match(restore, /revokeAttachmentExtractionLocatorGeneration\(\);\s*runDbServerImmediateTransaction/iu);
 });

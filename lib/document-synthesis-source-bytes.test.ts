@@ -7,11 +7,7 @@ import ts from 'typescript';
 
 const ROOT = process.cwd();
 const SERVICE_PATH = 'lib/domain/documents/document-synthesis-service.ts';
-const EXPECTED_COUNTS: Record<string, number> = {
-    'components/document-upload.tsx': 1,
-    'components/pdf-importer.tsx': 1,
-    'app/patients/[id]/entries/new/page.tsx': 1,
-};
+const EXPECTED_COUNTS: Record<string, number> = {};
 
 type CallSite = { path: string; source: ts.SourceFile; call: ts.CallExpression };
 
@@ -129,21 +125,6 @@ function assertReadHasGate(site: CallSite, fragment: string): void {
     assert.ok(hasIfAncestor(sourceBytesInput(site).read, site.source, fragment), `${site.path} readSourceBytes must be gated by ${fragment}.`);
 }
 
-function assertFallibleReader(source: ts.SourceFile): void {
-    const reader = source.statements.find((statement): statement is ts.FunctionDeclaration =>
-        ts.isFunctionDeclaration(statement) && statement.name?.text === 'readSourceBytes');
-    assert.ok(reader?.body, `${source.fileName} must define a local readSourceBytes helper.`);
-    let arrayBuffer = false;
-    let undefinedCatch = false;
-    visit(reader.body, (node) => {
-        if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === 'arrayBuffer') arrayBuffer = true;
-        if (ts.isCatchClause(node)) visit(node.block, (child) => {
-            if (ts.isReturnStatement(child) && child.expression && ts.isIdentifier(child.expression) && child.expression.text === 'undefined') undefinedCatch = true;
-        });
-    });
-    assert.ok(arrayBuffer && undefinedCatch, `${source.fileName} readSourceBytes must fail closed to undefined.`);
-}
-
 function hasIfAncestor(node: ts.Node, source: ts.SourceFile, fragment: string): boolean {
     for (let current: ts.Node | undefined = node.parent; current; current = current.parent) {
         if (ts.isIfStatement(current) && current.expression.getText(source).includes(fragment)) return true;
@@ -180,21 +161,14 @@ function assertNoComputedSourceBytesAccess(source: ts.SourceFile): void {
     assert.equal(accesses.length, 0, 'sourceBytes must not use computed access in the synthesis service.');
 }
 
-test('source bytes stay local, gated, and binding-checked across all productive callers', () => {
+test('the retired direct synthesis service has no productive caller or source-byte escape', () => {
     const calls = collectProductionCalls();
     assertExpectedCalls(calls);
-    const byPath = (filePath: string) => calls.filter((site) => site.path === filePath);
-    const upload = byPath('components/document-upload.tsx');
-    assert.deepEqual(upload.map((site) => sourceBytesInput(site).name), ['file']);
-    assert.equal(sourceBytesInput(byPath('components/pdf-importer.tsx')[0]).name, 'file');
-    const entry = byPath('app/patients/[id]/entries/new/page.tsx')[0];
-    assert.equal(sourceBytesInput(entry).name, 'file');
-    for (const site of [...upload, byPath('components/pdf-importer.tsx')[0], entry]) assertFallibleReader(site.source);
-
-    for (const site of [...upload, byPath('components/pdf-importer.tsx')[0], entry]) assertReadHasGate(site, 'documentSynthesisEnabled');
-    const entryGate = initializerBefore(entry.source, 'documentSynthesisEnabled', entry.call.getStart(entry.source));
-    const entryGateCall = entryGate ? unwrap(entryGate) : undefined;
-    assert.ok(entryGateCall && ts.isCallExpression(entryGateCall) && ts.isIdentifier(entryGateCall.expression) && entryGateCall.expression.text === 'isAiDocumentSynthesisEnabledValue', 'NewEntryPage must resolve the document-synthesis kill switch before reading bytes.');
+    assert.deepEqual(calls, []);
+    /* @Codex Upload now mounts the authenticated Fabric review card; pre-record
+       PDF intake remains fail-closed until the source is host-owned. */
+    assert.match(fs.readFileSync(path.join(ROOT, 'components/document-upload.tsx'), 'utf8'), /DocumentSynthesisFabricReviewCard/u);
+    assert.match(fs.readFileSync(path.join(ROOT, 'components/pdf-importer.tsx'), 'utf8'), /unsupported_local_extraction/u);
 
     const service = parseSource(SERVICE_PATH);
     assertNoComputedSourceBytesAccess(service);
