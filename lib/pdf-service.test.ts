@@ -4,18 +4,35 @@ process.env.TZ = 'Europe/Rome';
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import {
-    buildOcrFallbackResult,
+    DocumentTextUnavailableError,
     extractPdfTextLayer,
     extractDocumentTextForSummary,
+    extractPatientDataSmart,
     extractTextFromPdf,
-    extractUsableOcrText,
-    mergePdfPageText,
     mergeExtractedPatientDataWithTextFallback,
     parsePatientData,
 } from './pdf-service';
 
-test('extractPdfTextLayer preserves the 1-indexed selective OCR contract', async () => {
+test('pdf-service has no retired OCR execution or rendering fallback', () => {
+    const source = fs.readFileSync(new URL('./pdf-service.ts', import.meta.url), 'utf8');
+    assert.doesNotMatch(source, /\/api\/ocr\/extract|\bcallOcr\b|\brenderPdfToImages\b|\bfileToBase64\b|DeepSeek|Apple Vision/u);
+});
+
+/* @Codex */
+function assertUnsupportedLocalExtraction(
+    error: unknown,
+    detail: 'image_or_scan' | 'resource_limit' | 'malformed_document' | 'encrypted_document',
+): boolean {
+    assert.ok(error instanceof DocumentTextUnavailableError);
+    assert.equal(error.status, 'review_required');
+    assert.equal(error.reason, 'unsupported_local_extraction');
+    assert.equal(error.detail, detail);
+    return true;
+}
+
+test('extractPdfTextLayer preserves historical 1-indexed review metadata compatibility', async () => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = async () => new Response(JSON.stringify({
         text: '<!-- Page 1 -->\nTesto nativo',
@@ -40,51 +57,6 @@ test('extractPdfTextLayer preserves the 1-indexed selective OCR contract', async
     }
 });
 
-test('mergePdfPageText restores mixed PDF source order', () => {
-    const text = mergePdfPageText({
-        text: 'Pagina uno\n\nPagina tre',
-        state: 'mixed',
-        pageCount: 3,
-        pagesNeedingOcr: [2],
-        pages: [
-            { page: 1, text: 'Pagina uno', needsOcr: false },
-            { page: 2, text: '', needsOcr: true },
-            { page: 3, text: 'Pagina tre', needsOcr: false },
-        ],
-    }, new Map([[2, 'Pagina due OCR con contenuto clinico sufficientemente informativo.']]));
-    assert.equal(
-        text,
-        'Pagina uno\n\nPagina due OCR con contenuto clinico sufficientemente informativo.\n\nPagina tre',
-    );
-});
-
-test('mergePdfPageText fails closed when a selected OCR page is missing', () => {
-    assert.throws(() => mergePdfPageText({
-        text: 'Pagina uno',
-        state: 'mixed',
-        pageCount: 2,
-        pagesNeedingOcr: [2],
-        pages: [
-            { page: 1, text: 'Pagina uno', needsOcr: false },
-            { page: 2, text: '', needsOcr: true },
-        ],
-    }, new Map()), /OCR selettivo incompleto/);
-});
-
-test('mergePdfPageText accepts short but non-degenerate OCR text', () => {
-    const text = mergePdfPageText({
-        text: 'Pagina uno',
-        state: 'mixed',
-        pageCount: 2,
-        pagesNeedingOcr: [2],
-        pages: [
-            { page: 1, text: 'Pagina uno', needsOcr: false },
-            { page: 2, text: '', needsOcr: true },
-        ],
-    }, new Map([[2, 'Firma']]));
-    assert.equal(text, 'Pagina uno\n\nFirma');
-});
-
 test('extractTextFromPdf does not expose partial mixed-document text', async () => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = async () => new Response(JSON.stringify({
@@ -100,7 +72,63 @@ test('extractTextFromPdf does not expose partial mixed-document text', async () 
         },
     }), { status: 200, headers: { 'content-type': 'application/json' } });
     try {
-        await assert.rejects(extractTextFromPdf(new Blob(['synthetic'])), /richiede OCR selettivo/);
+        await assert.rejects(
+            extractTextFromPdf(new Blob(['synthetic'])),
+            (error) => assertUnsupportedLocalExtraction(error, 'image_or_scan'),
+        );
+    } finally {
+        globalThis.fetch = originalFetch;
+    }
+});
+
+/* @Codex */
+test('image inputs require review without invoking the retired OCR route', async () => {
+    const originalFetch = globalThis.fetch;
+    const calls: string[] = [];
+    globalThis.fetch = (async (input) => {
+        calls.push(String(input));
+        throw new Error('no extraction endpoint may be called for an image');
+    }) as typeof fetch;
+
+    try {
+        const image = new File(['synthetic-image'], 'scan.png', { type: 'image/png' });
+        await assert.rejects(
+            extractDocumentTextForSummary(image),
+            (error) => assertUnsupportedLocalExtraction(error, 'image_or_scan'),
+        );
+        await assert.rejects(
+            extractPatientDataSmart(image),
+            (error) => assertUnsupportedLocalExtraction(error, 'image_or_scan'),
+        );
+        assert.deepEqual(calls, []);
+    } finally {
+        globalThis.fetch = originalFetch;
+    }
+});
+
+/* @Codex */
+test('scanned PDF fails closed after text-layer inspection without OCR fallback', async () => {
+    const originalFetch = globalThis.fetch;
+    const calls: string[] = [];
+    globalThis.fetch = (async (input) => {
+        calls.push(String(input));
+        return new Response(JSON.stringify({
+            text: '',
+            textLayer: {
+                state: 'ocr_required',
+                pageCount: 1,
+                pagesNeedingOcr: [1],
+                pages: [{ page: 1, text: '', needsOcr: true }],
+            },
+        }), { status: 200, headers: { 'content-type': 'application/json' } });
+    }) as typeof fetch;
+
+    try {
+        await assert.rejects(
+            extractDocumentTextForSummary(new File(['%PDF-scan'], 'scan.pdf', { type: 'application/pdf' })),
+            (error) => assertUnsupportedLocalExtraction(error, 'image_or_scan'),
+        );
+        assert.deepEqual(calls, ['/api/pdf-extract']);
     } finally {
         globalThis.fetch = originalFetch;
     }
@@ -154,54 +182,6 @@ test('extractPdfTextLayer rejects inconsistent routing metadata', async () => {
     } finally {
         globalThis.fetch = originalFetch;
     }
-});
-
-test('extractUsableOcrText keeps markdown-like OCR text and ignores structured JSON payloads', () => {
-    assert.equal(
-        extractUsableOcrText({ rawMarkdown: 'Referto:\nPaziente con follow-up cardiologico.' }),
-        'Referto:\nPaziente con follow-up cardiologico.'
-    );
-    assert.equal(
-        extractUsableOcrText({ rawMarkdown: '{"paziente":{"nome":"Giulia"}}', notes: 'Nota sintetica utile' }),
-        'Nota sintetica utile'
-    );
-});
-
-test('extractUsableOcrText normalizes noisy OCR-like headings before downstream parsing', () => {
-    assert.equal(
-        extractUsableOcrText({
-            rawMarkdown: 'ANAMNESI remota: ipertensione arteriosa.  TERAPIA domiciliare: Paracetamolo 1000 mg al bisogno.',
-        }),
-        'ANAMNESI remota:\nipertensione arteriosa.\n\nTERAPIA domiciliare:\nParacetamolo 1000 mg al bisogno.'
-    );
-});
-
-test('extractUsableOcrText rejects degenerate OCR loops', () => {
-    assert.equal(
-        extractUsableOcrText({ rawMarkdown: '1.1.1.1.1.1.1.1.1.1.1.1.1.1.1.1.1.1.1.1.' }),
-        ''
-    );
-});
-
-test('buildOcrFallbackResult promotes low-confidence OCR when usable local text exists', () => {
-    const result = buildOcrFallbackResult({
-        confidence: 0.2,
-        notes: 'Dimissione con rivalutazione ortopedica consigliata.',
-    }, 'ai');
-
-    assert.ok(result);
-    assert.equal(result?.rawText, 'Dimissione con rivalutazione ortopedica consigliata.');
-    assert.equal(result?.notes, 'Dimissione con rivalutazione ortopedica consigliata.');
-    assert.equal(result?.source, 'ai');
-});
-
-test('buildOcrFallbackResult ignores pure OCR failure notes', () => {
-    const result = buildOcrFallbackResult({
-        confidence: 0,
-        notes: 'OCR extraction failed: model unavailable',
-    }, 'ai');
-
-    assert.equal(result, null);
 });
 
 test('parsePatientData extracts name and birth date from signature-style discharge text', () => {

@@ -6,18 +6,6 @@ import type {
     SmartImportTherapyExtraction,
     TherapySuggestionState,
 } from './ai-task-contracts';
-/* @Codex */
-import { normalizeDocumentInput } from './domain/documents/document-input-normalization';
-import {
-    looksLikeLowSignalOcrText,
-} from './domain/documents/document-ocr-queue';
-/* @Codex */
-import {
-    normalizePdfDocumentMetadata,
-    rememberPdfDocumentMetadata,
-    type PdfDocumentMetadata,
-} from './pdf-document-metadata';
-
 // Client-side text parsing only - Extraction happens on server via API
 
 export interface ExtractedPatientData {
@@ -72,15 +60,6 @@ export interface ExtractedPatientReviewTherapy {
     sourceType?: 'document_explicit' | 'reviewable_local_match';
 }
 
-function isOcrFailureNote(value: string): boolean {
-    return /^OCR extraction failed:/i.test(value.trim());
-}
-
-function looksLikeStructuredPayload(value: string): boolean {
-    const trimmed = value.trim();
-    return trimmed.startsWith('{') || trimmed.startsWith('[') || trimmed.startsWith('```');
-}
-
 export type PdfTextLayerFailureReason =
     | 'corrupted_pdf'
     | 'password_protected'
@@ -97,13 +76,38 @@ export class PdfTextLayerUnreadableError extends Error {
     }
 }
 
+/* @Codex */
 export class DocumentTextUnavailableError extends Error {
+    readonly status = 'review_required' as const;
+    readonly reason = 'unsupported_local_extraction' as const;
+    readonly detail:
+        | 'unsupported_format'
+        | 'image_or_scan'
+        | 'malformed_document'
+        | 'encrypted_document'
+        | 'resource_limit'
+        | 'incomplete_document'
+        | 'io_failure'
+        | 'empty_extraction';
     readonly textLayerFailure?: PdfTextLayerFailureReason;
 
-    constructor(message: string, textLayerFailure?: PdfTextLayerFailureReason) {
+    constructor(
+        message: string,
+        textLayerFailure?: PdfTextLayerFailureReason,
+        detail?: DocumentTextUnavailableError['detail'],
+    ) {
         super(message);
         this.name = 'DocumentTextUnavailableError';
         this.textLayerFailure = textLayerFailure;
+        this.detail = detail ?? (
+            textLayerFailure === 'password_protected'
+                ? 'encrypted_document'
+                : textLayerFailure === 'resource_limit'
+                    ? 'resource_limit'
+                    : textLayerFailure
+                        ? 'malformed_document'
+                        : 'image_or_scan'
+        );
     }
 }
 
@@ -125,29 +129,6 @@ export interface PdfTextLayerResult {
     pages: Array<{ page: number; text: string; needsOcr: boolean }>;
 }
 
-/* @Codex */
-export function extractUsableOcrText(data: { rawMarkdown?: unknown; notes?: unknown } | null | undefined): string {
-    const rawMarkdown = typeof data?.rawMarkdown === 'string' ? data.rawMarkdown.trim() : '';
-    if (rawMarkdown && !looksLikeStructuredPayload(rawMarkdown) && !looksLikeLowSignalOcrText(rawMarkdown)) {
-        return normalizeDocumentInput(rawMarkdown).normalizedText;
-    }
-
-    const notes = typeof data?.notes === 'string' ? data.notes.trim() : '';
-    if (notes && !isOcrFailureNote(notes) && !looksLikeLowSignalOcrText(notes)) {
-        return normalizeDocumentInput(notes).normalizedText;
-    }
-
-    return '';
-}
-
-/* @Codex */
-const OCR_PAGE_LIMIT = 6;
-/* @Codex */
-type RenderedPdfForOcr = {
-    images: string[];
-    pageNumbers: number[];
-    metadata?: PdfDocumentMetadata;
-};
 /* @Codex */
 const IMAGE_EXTENSION_REGEX = /\.(apng|avif|bmp|gif|heic|heif|jpe?g|png|tiff?|webp)$/i;
 /* @Codex */
@@ -380,237 +361,24 @@ export async function extractPdfTextLayer(file: Blob): Promise<PdfTextLayerResul
     };
 }
 
+/* @Codex */
 export async function extractTextFromPdf(file: Blob): Promise<string> {
     const layer = await extractPdfTextLayer(file);
     if (layer.state !== 'native') {
         throw new DocumentTextUnavailableError(
-            'Il PDF richiede OCR selettivo prima di restituire testo completo.',
+            'Il PDF contiene pagine senza testo nativo e richiede revisione manuale.',
+            undefined,
+            'image_or_scan',
+        );
+    }
+    if (!layer.text.trim()) {
+        throw new DocumentTextUnavailableError(
+            'Il PDF non contiene testo nativo utile.',
+            undefined,
+            'empty_extraction',
         );
     }
     return layer.text;
-}
-
-/**
- * Convert file to base64 for AI-OCR processing
- */
-async function fileToBase64(file: Blob): Promise<string> {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-    });
-}
-
-/* @Codex */
-async function callOcr(imageBase64: string, mode: 'full' | 'patient' | 'labs' = 'patient') {
-    const response = await fetch('/api/ocr/extract', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: imageBase64, mode })
-    });
-
-    if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        throw new Error(err?.error || "OCR extraction failed");
-    }
-
-    const payload = await response.json();
-    return payload?.data || null;
-}
-
-/* @Codex */
-async function readPdfDocumentMetadata(pdf: any): Promise<PdfDocumentMetadata | undefined> {
-    try {
-        if (typeof pdf?.getMetadata !== 'function') return undefined;
-        const metadata = await pdf.getMetadata();
-        return normalizePdfDocumentMetadata(metadata?.info);
-    } catch {
-        return undefined;
-    }
-}
-
-/* @Codex */
-async function renderPdfToImages(
-    file: Blob,
-    maxPages = OCR_PAGE_LIMIT,
-    preferredPages?: readonly number[],
-): Promise<RenderedPdfForOcr> {
-    const buffer = await file.arrayBuffer();
-    try {
-        if (!(globalThis as any).pdfjsWorker) {
-            await import('pdfjs-dist/legacy/build/pdf.worker.mjs');
-        }
-    } catch {
-        // Fall back to the legacy fake-worker path if the side-effect import is unavailable.
-    }
-
-    const pdfjsLib: any = await import('pdfjs-dist/legacy/build/pdf.mjs');
-
-    try {
-        if (pdfjsLib?.GlobalWorkerOptions) {
-            pdfjsLib.GlobalWorkerOptions.workerSrc = "";
-        }
-    } catch {
-        // No-op: worker disabled below
-    }
-
-    const loadingTask = pdfjsLib.getDocument({
-        data: buffer,
-        disableWorker: true
-    });
-    const pdf = await loadingTask.promise;
-    const metadata = await readPdfDocumentMetadata(pdf);
-    const pagesToRender = maxPages === 0
-        ? []
-        : preferredPages?.length
-        ? Array.from(new Set(preferredPages))
-            .filter((page) => Number.isInteger(page) && page >= 1 && page <= pdf.numPages)
-            .slice(0, maxPages)
-        : await selectPdfPagesForOcr(pdf, maxPages);
-
-    const images: string[] = [];
-    for (const pageNumber of pagesToRender) {
-        const page = await pdf.getPage(pageNumber);
-        const viewport = page.getViewport({ scale: 1.6 });
-
-        const canvas = document.createElement('canvas');
-        const context = canvas.getContext('2d');
-        if (!context) continue;
-
-        canvas.width = Math.floor(viewport.width);
-        canvas.height = Math.floor(viewport.height);
-
-        const renderTask = page.render({ canvasContext: context, viewport });
-        await renderTask.promise;
-
-        images.push(canvas.toDataURL('image/png'));
-    }
-
-    return { images, pageNumbers: pagesToRender, metadata };
-}
-
-/* @Codex */
-async function selectPdfPagesForOcr(pdf: any, maxPages: number): Promise<number[]> {
-    const total = pdf.numPages || 1;
-    const analysisPages = Math.min(total, Math.max(maxPages + 3, 9));
-    const keywords = [
-        'diagnosi', 'terapia', 'farmac', 'prescr', 'anamnesi', 'esami', 'referto',
-        'dimission', 'valutazione', 'conclusioni', 'paziente', 'medico'
-    ];
-
-    const scores: { page: number; score: number }[] = [];
-
-    for (let i = 1; i <= analysisPages; i++) {
-        const page = await pdf.getPage(i);
-        const textContent = await page.getTextContent();
-        const text = (textContent.items as any[]).map((item) => item.str).join(' ');
-        const lower = text.toLowerCase();
-
-        let score = text.length;
-        for (const keyword of keywords) {
-            if (lower.includes(keyword)) score += 500;
-        }
-        if (/\d{1,3}[,\.]\d+/.test(lower)) score += 200;
-
-        scores.push({ page: i, score });
-    }
-
-    const selected = new Set<number>();
-    selected.add(1);
-    if (total > 1) selected.add(total);
-
-    scores
-        .sort((a, b) => b.score - a.score)
-        .forEach(({ page }) => {
-            if (selected.size >= maxPages) return;
-            selected.add(page);
-        });
-
-    return Array.from(selected).sort((a, b) => a - b).slice(0, maxPages);
-}
-
-/* @Codex */
-async function extractOcrTextByPage(rendered: RenderedPdfForOcr): Promise<Map<number, string>> {
-    const chunks = new Map<number, string>();
-    for (let index = 0; index < rendered.images.length; index += 1) {
-        try {
-            const result = await callOcr(rendered.images[index], 'full');
-            const raw = result?.rawMarkdown || "";
-            if (raw) chunks.set(rendered.pageNumbers[index], raw);
-        } catch (e) {
-            console.warn('[PDF Service] OCR full failed for page', e);
-        }
-    }
-    return chunks;
-}
-
-/* @Codex */
-export function mergePdfPageText(layer: PdfTextLayerResult, ocrByPage: Map<number, string>): string {
-    if (layer.pagesNeedingOcr.some((page) => {
-        const text = ocrByPage.get(page)?.trim() || '';
-        return !text || looksLikeLowSignalOcrText(text);
-    })) {
-        throw new DocumentTextUnavailableError(
-            'OCR selettivo incompleto: almeno una pagina non ha prodotto testo utile.',
-        );
-    }
-    return layer.pages
-        .map((page) => page.needsOcr ? ocrByPage.get(page.page) || '' : page.text)
-        .filter((text) => text.trim())
-        .join('\n\n');
-}
-
-/* @Codex */
-function mapOcrToPatientData(
-    data: any,
-    rawText: string,
-    source: 'ai' | 'hybrid' | 'regex'
-): ExtractedPatientData {
-    const fallbackText = rawText || extractUsableOcrText(data);
-    const notes = typeof data?.notes === 'string' && !isOcrFailureNote(data.notes)
-        ? data.notes.trim() || undefined
-        : undefined;
-
-    return {
-        firstName: data?.firstName,
-        lastName: data?.lastName,
-        taxCode: data?.taxCode,
-        birthDate: data?.birthDate ? new Date(data.birthDate) : undefined,
-        address: data?.address,
-        phone: data?.phone,
-        diagnosis: data?.diagnosis,
-        medications: data?.medications,
-        notes: notes || (fallbackText ? fallbackText.slice(0, 500) : undefined),
-        rawText: fallbackText,
-        source,
-        confidence: data?.confidence || 0.6
-    };
-}
-
-/* @Codex */
-export function buildOcrFallbackResult(
-    data: any,
-    source: 'ai' | 'hybrid' | 'regex',
-    rawText = ''
-): ExtractedPatientData | null {
-    if (!data || typeof data !== 'object') return null;
-
-    const result = mapOcrToPatientData(data, rawText, source);
-    const hasMeaningfulContent = Boolean(
-        result.firstName ||
-        result.lastName ||
-        result.taxCode ||
-        result.birthDate ||
-        result.address ||
-        result.phone ||
-        result.diagnosis ||
-        result.notes ||
-        result.rawText ||
-        result.medications?.length
-    );
-
-    return hasMeaningfulContent ? result : null;
 }
 
 /* @Codex */
@@ -619,168 +387,85 @@ export async function extractDocumentTextForSummary(file: File): Promise<string>
     const isImage = isImageDocumentInput(file);
 
     if (!isPdf && !isImage) {
-        return "";
+        return '';
+    }
+    if (isImage) {
+        throw new DocumentTextUnavailableError(
+            'Le immagini e le scansioni richiedono revisione manuale.',
+            undefined,
+            'image_or_scan',
+        );
     }
 
-    if (isPdf) {
-        let layer: PdfTextLayerResult | undefined;
-        try {
-            layer = await extractPdfTextLayer(file);
-            if (layer.state === 'native' && layer.text.trim()) {
-                const metadata = (await renderPdfToImages(file, 0)).metadata;
-                rememberPdfDocumentMetadata(file.name, layer.text, metadata);
-                return layer.text;
-            }
-        } catch (error) {
-            throw inspectionFailure(error);
-        }
-        if (layer && layer.pagesNeedingOcr.length > OCR_PAGE_LIMIT) {
+    try {
+        const layer = await extractPdfTextLayer(file);
+        if (layer.state !== 'native') {
             throw new DocumentTextUnavailableError(
-                'Il PDF supera il limite locale di pagine OCR selettive.',
-                'resource_limit',
+                'Il PDF contiene pagine senza testo nativo: estrazione locale non supportata.',
+                undefined,
+                'image_or_scan',
             );
         }
-        const rendered = await renderPdfToImages(
-            file,
-            OCR_PAGE_LIMIT,
-            layer?.pagesNeedingOcr,
-        );
-        const ocrByPage = rendered.images.length
-            ? await extractOcrTextByPage(rendered)
-            : new Map<number, string>();
-        const normalizedText = normalizeDocumentInput(
-            layer ? mergePdfPageText(layer, ocrByPage) : Array.from(ocrByPage.values()).join('\n\n'),
-            { sourceKind: 'ocr' },
-        ).normalizedText;
-        rememberPdfDocumentMetadata(file.name, normalizedText, rendered.metadata);
-        return normalizedText;
+        if (!layer.text.trim()) {
+            throw new DocumentTextUnavailableError(
+                'Il PDF non contiene testo nativo utile.',
+                undefined,
+                'empty_extraction',
+            );
+        }
+        return layer.text;
+    } catch (error) {
+        throw inspectionFailure(error);
     }
-
-    const base64 = await fileToBase64(file);
-    const result = await callOcr(base64, 'full');
-    return extractUsableOcrText(result);
 }
 
 /**
- * Smart extraction: AI-OCR first, regex validation/fallback
- * Supports PDF and locally processable image inputs.
+ * Parse patient fields deterministically from a PDF with a complete native
+ * text layer. Images, scans, and mixed PDFs stop at the typed review boundary.
  */
+/* @Codex */
 export async function extractPatientDataSmart(file: File): Promise<ExtractedPatientData> {
     const isImage = isImageDocumentInput(file);
     const isPdf = isPdfDocumentInput(file);
 
     if (!isImage && !isPdf) {
-        throw new Error("Formato non supportato. Usa un PDF o un'immagine comune elaborabile localmente.");
-    }
-
-    let pdfLayer: PdfTextLayerResult | undefined;
-    if (isPdf) {
-        try {
-            pdfLayer = await extractPdfTextLayer(file);
-        } catch (error) {
-            throw inspectionFailure(error);
-        }
-    }
-    if (pdfLayer && pdfLayer.pagesNeedingOcr.length > OCR_PAGE_LIMIT) {
         throw new DocumentTextUnavailableError(
-            'Il PDF supera il limite locale di pagine OCR selettive.',
-            'resource_limit',
+            'Formato non supportato dall\'estrazione locale.',
+            undefined,
+            'unsupported_format',
+        );
+    }
+    if (isImage) {
+        throw new DocumentTextUnavailableError(
+            'Le immagini e le scansioni richiedono revisione manuale.',
+            undefined,
+            'image_or_scan',
         );
     }
 
-    /* @Codex */
-    // Try AI-OCR first (PDF: render to images, Image: direct)
-    let aiResult: ExtractedPatientData | null = null;
-    let ocrText = '';
-    let ocrByPage = new Map<number, string>();
-
+    let layer: PdfTextLayerResult;
     try {
-        if (isPdf) {
-            const rendered = pdfLayer?.state === 'native'
-                ? { images: [], pageNumbers: [] }
-                : await renderPdfToImages(file, OCR_PAGE_LIMIT, pdfLayer?.pagesNeedingOcr);
-            const { images } = rendered;
-            if (images.length) {
-                let patientData: any = null;
-                try {
-                    patientData = await callOcr(images[0], 'patient');
-                    if (patientData && patientData.confidence > 0.5) {
-                        aiResult = mapOcrToPatientData(patientData, '', 'ai');
-                    }
-                } catch (e) {
-                    console.warn('[PDF Service] OCR patient extraction failed', e);
-                }
-
-                ocrByPage = await extractOcrTextByPage(rendered);
-                ocrText = Array.from(ocrByPage.values()).join('\n\n');
-                if (ocrText) {
-                    ocrText = normalizeDocumentInput(ocrText, { sourceKind: 'ocr' }).normalizedText;
-                }
-                if (aiResult && ocrText) {
-                    aiResult.rawText = ocrText;
-                }
-                if (!aiResult && patientData) {
-                    aiResult = buildOcrFallbackResult(patientData, 'ai', ocrText);
-                }
-            }
-        } else if (isImage) {
-            const base64 = await fileToBase64(file);
-            const patientData = await callOcr(base64, 'patient');
-            if (patientData && patientData.confidence > 0.5) {
-                aiResult = mapOcrToPatientData(patientData, patientData.rawMarkdown || '', 'ai');
-            }
-            try {
-                const fullResult = await callOcr(base64, 'full');
-                ocrText = extractUsableOcrText(fullResult);
-                if (aiResult && ocrText) {
-                    aiResult.rawText = ocrText;
-                }
-            } catch (e) {
-                console.warn('[PDF Service] OCR full extraction failed for image', e);
-            }
-            if (!aiResult && patientData) {
-                aiResult = buildOcrFallbackResult(patientData, 'ai', ocrText);
-            }
-        }
-    } catch (e) {
-        console.warn('[PDF Service] AI-OCR failed, falling back to regex', e);
+        layer = await extractPdfTextLayer(file);
+    } catch (error) {
+        throw inspectionFailure(error);
     }
 
-    // For PDFs, also extract text with pdfjs for regex validation
-    const pdfText = pdfLayer?.text || '';
-
-    const combinedText = pdfLayer
-        ? mergePdfPageText(pdfLayer, ocrByPage)
-        : [pdfText, ocrText].filter(Boolean).join('\n\n');
-
-    // If AI gave good results, validate with regex
-    if (aiResult && aiResult.confidence > 0.7) {
-        return mergeExtractedPatientDataWithTextFallback(aiResult, combinedText);
+    if (layer.state !== 'native') {
+        throw new DocumentTextUnavailableError(
+            'Il PDF contiene pagine senza testo nativo: estrazione locale non supportata.',
+            undefined,
+            'image_or_scan',
+        );
+    }
+    if (!layer.text.trim()) {
+        throw new DocumentTextUnavailableError(
+            'Il PDF non contiene testo nativo utile.',
+            undefined,
+            'empty_extraction',
+        );
     }
 
-    // Fallback: regex parsing (for PDF text)
-    if (combinedText) {
-        const regexResult = parsePatientData(combinedText);
-
-        // Merge AI and regex results (prefer AI where available)
-        if (aiResult) {
-            return mergeExtractedPatientDataWithTextFallback({
-                ...aiResult,
-                rawText: combinedText,
-                source: 'hybrid',
-                confidence: Math.max(aiResult.confidence, 0.5)
-            }, combinedText);
-        }
-
-        return { ...regexResult, source: 'regex', confidence: 0.6, rawText: combinedText };
-    }
-
-    // Last resort: return AI result even with low confidence
-    if (aiResult) return aiResult;
-
-    throw new DocumentTextUnavailableError(
-        'Nessun testo utile estratto localmente dal documento. Verifica OCR locale o prova un PDF/immagine piu leggibile.',
-    );
+    return parsePatientData(layer.text);
 }
 
 /**
