@@ -7,6 +7,10 @@ import {
     createHeadlessSoapFreshPinVerifier,
     type HeadlessSoapFreshPinVerificationSources,
 } from './headless-soap-fresh-pin-verification.ts';
+import {
+    issueSyntheticWebSession,
+    retireSyntheticWebSession,
+} from './web-auth-lifecycle-owner-test-fixture.ts';
 
 const PIN = '2468';
 const USER_ID = 'synthetic-fresh-pin-user';
@@ -74,6 +78,21 @@ test('verifies the fresh PIN only for the same current Web admin session', async
     assert.equal(Object.getPrototypeOf(verifier), null);
     assert.equal(Object.isFrozen(verifier), true);
     assert.equal(verifier.verify.length, 1);
+});
+
+test('preserves the exact owner projection needed for an out-of-band Web generation fence', async () => {
+    const projection = issueSyntheticWebSession({ id: USER_ID, username: USERNAME, role: 'admin' }, 'fresh-pin-exact-cell');
+    try {
+        const verifier = createHeadlessSoapFreshPinVerifier({
+            resolveCurrentWebAdmin: async () => projection,
+            verifyCredentials: async () => ({
+                kind: 'verified', account: { id: USER_ID, username: USERNAME, role: 'admin' },
+            }),
+        });
+        assert.equal(await verifier.verify(PIN), projection);
+    } finally {
+        retireSyntheticWebSession(projection);
+    }
 });
 
 test('preserves a valid PIN byte-for-byte and rejects values outside the exact 4..8 string boundary', async () => {

@@ -43,9 +43,12 @@ type PresentationBindingPort = Readonly<{
         operation: (binding: HeadlessSoapEntryPresentationBindingV1,
             sealBundle: ClinicianSoapEntrySealV1) => void): Promise<boolean>;
 }>;
-export type HeadlessSoapAuthorizationProofLifecycleSources = Readonly<{
+type WebSessionBinding = Pick<HeadlessSoapAuthorizationLineageV1['activeRole'],
+    'principalRef' | 'authenticationGeneration'>;
+type WebSessionBindingPort = (candidate: unknown,
+    operation: (binding: WebSessionBinding) => void) => boolean;
+type HeadlessSoapAuthorizationProofLifecycleBaseSources = Readonly<{
     presentationLifecycle: PresentationLifecyclePort;
-    presentationBinding?: PresentationBindingPort;
     presentationService: Readonly<{ cancel(candidate: unknown): boolean }>;
     verifyFreshPin(candidate: unknown): Promise<unknown>;
     entropy(): unknown;
@@ -53,6 +56,11 @@ export type HeadlessSoapAuthorizationProofLifecycleSources = Readonly<{
     schedule(dispose: () => void, delayMs: number): unknown;
     cancelSchedule(handle: unknown): void;
 }>;
+export type HeadlessSoapAuthorizationProofLifecycleSources = HeadlessSoapAuthorizationProofLifecycleBaseSources & (
+    | Readonly<{ presentationBinding: PresentationBindingPort;
+        withCurrentWebSessionBinding: WebSessionBindingPort }>
+    | Readonly<{ presentationBinding?: undefined; withCurrentWebSessionBinding?: undefined }>
+);
 export type HeadlessSoapAuthorizationProofIssueResultV1 = Readonly<{
     status: 'proof_issued'; authorizationProof: string;
 }>;
@@ -174,6 +182,33 @@ export function createHeadlessSoapAuthorizationProofLifecycleOwner(sources: Head
         candidate.policyDigest = HEADLESS_SOAP_AUTHORIZATION_POLICY_DIGEST;
         return createHeadlessSoapAuthorizationLineage(objectFreeze(candidate));
     };
+    const exactWebCellCurrent = async (token: unknown, registration: unknown,
+        verifiedSession: HeadlessSoapFreshPinVerificationV1): Promise<boolean> => {
+        const presentationBinding = sources.presentationBinding;
+        const withCurrentWebSessionBinding = sources.withCurrentWebSessionBinding;
+        if (!presentationBinding && !withCurrentWebSessionBinding) return true;
+        if (!presentationBinding || !withCurrentWebSessionBinding) return false;
+        let webInvoked = false, webDuplicated = false, currentWebBinding: WebSessionBinding | null = null;
+        let webCurrent = false;
+        try {
+            webCurrent = withCurrentWebSessionBinding(verifiedSession, (webBinding) => {
+                if (webInvoked) { webDuplicated = true; currentWebBinding = null; return; }
+                webInvoked = true; currentWebBinding = webBinding;
+            });
+        } catch { return false; }
+        if (webCurrent !== true || !webInvoked || webDuplicated || !currentWebBinding) return false;
+        let presentationInvoked = false, presentationDuplicated = false, matched = false;
+        let presentationCurrent = false;
+        try {
+            presentationCurrent = await presentationBinding.withCurrentDependentBinding(token, registration, (binding) => {
+                if (presentationInvoked) { presentationDuplicated = true; matched = false; return; }
+                presentationInvoked = true;
+                matched = currentWebBinding?.principalRef === binding.activeRole.principalRef
+                    && currentWebBinding.authenticationGeneration === binding.activeRole.authenticationGeneration;
+            });
+        } catch { return false; }
+        return presentationCurrent === true && presentationInvoked && !presentationDuplicated && matched;
+    };
     const issue = async (token: unknown, candidatePin: unknown): Promise<HeadlessSoapAuthorizationProofIssueResultV1> => {
         if (rejectReentry(null)) return fail('lifecycle_unavailable'); let record: ProofRecord | null = null, upstreamGone = false;
         let registration: unknown = null; try { registration = sources.presentationLifecycle.registerDependent(token, () => {
@@ -185,6 +220,10 @@ export function createHeadlessSoapAuthorizationProofLifecycleOwner(sources: Head
         let pinVerification: unknown = null; try { pinVerification = await sources.verifyFreshPin(candidatePin); } catch { pinVerification = null; }
         if (upstreamGone) return fail('presentation_unavailable');
         if (!isHeadlessSoapFreshPinVerificationV1(pinVerification)) return abortIssue(token, registration, 'pin_unavailable');
+        if (!await exactWebCellCurrent(token, registration, pinVerification)
+            || upstreamGone || !presentationCurrent(token, registration)) {
+            return abortIssue(token, registration, 'presentation_unavailable');
+        }
         let minted: ReturnType<typeof createHeadlessSoapAuthorizationProofToken> = null;
         try { minted = createHeadlessSoapAuthorizationProofToken(sources.entropy()); } catch { minted = null; }
         if (!minted) return abortIssue(token, registration, 'proof_unavailable');
