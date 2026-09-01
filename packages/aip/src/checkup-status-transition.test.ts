@@ -212,7 +212,7 @@ test('conferma una sola volta con proof privato e restituisce la stessa receipt 
     assert.deepEqual(Reflect.ownKeys(h.lastCommand() as object), [
         'operationId', 'capabilityId', 'idempotencyKey', 'commandDigest', 'ownerIdentity',
         'resourceIdentity', 'fromStatus', 'targetStatus', 'expectedRevision', 'generation',
-        'revocationGeneration', 'selectionEpoch', 'proofRefHash', 'confirmedAt',
+        'revocationGeneration', 'selectionEpoch', 'expiresAt', 'proofRefHash', 'confirmedAt',
     ]);
 });
 
