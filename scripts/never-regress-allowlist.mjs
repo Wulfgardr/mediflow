@@ -214,6 +214,11 @@ export const NEVER_REGRESS_ALLOWLIST = {
             reason: 'The provider-v2 transport pins the sole OpenAI Responses egress target; it is server-only, opt-in, policy-gated and cannot be replaced by caller input.',
         },
         {
+            path: 'lib/ai-providers/v2/anthropic-messages-official-transport.ts',
+            pattern: 'https://api\\.anthropic\\.com/v1/messages',
+            reason: 'The provider-v2 transport pins the sole Anthropic Messages egress target; it is server-only, opt-in, workspace-bound and cannot be replaced by caller input.',
+        },
+        {
             path: 'lib/ai-providers/v2/provider-lifecycle.test.ts',
             pattern: 'https://api\\.openai\\.com(?=["\\x27`])',
             reason: 'The lifecycle test supplies an endpoint-shaped forbidden field to prove that the strict provider binding rejects caller-selected destinations without network access.',
