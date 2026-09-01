@@ -1,20 +1,17 @@
 /* @Codex */
 import { expect, test, type Page } from '@playwright/test';
 
+import {
+  snapshotTreatmentReasoningProjectionAttachment,
+  type TreatmentReasoningProjectionAttachment,
+} from '../lib/ai-providers/fabric/treatment-reasoning-projection';
 import { bootstrapUnlockedSession, setAiLaneKillSwitch } from './utils';
 
 const HANDLE = `trp_${'a'.repeat(32)}`;
 const RECEIPT_REF = 'receipt_synthetic_01';
 const PROVENANCE_REF = 'provenance_synthetic_01';
 
-type Projection = Readonly<{
-  schemaVersion: string;
-  capability: string;
-  sourceRevision: string;
-  capturedAt: string;
-  therapyRefs: readonly string[];
-  evidenceRefs: readonly string[];
-}>;
+type Projection = TreatmentReasoningProjectionAttachment;
 
 type RecordedBodies = {
   selection?: unknown;
@@ -172,19 +169,17 @@ async function createFixture(page: Page): Promise<{ patientId: string; therapyId
 
 test.describe.configure({ retries: 0 });
 
-test('Treatment Reasoning Fabric pubblica soltanto una proposta source-bound dopo conferma esplicita', async ({ page }) => {
+test('Treatment Reasoning UI invia payload strict e mostra una proposta source-bound', async ({ page }) => {
   const calls: string[] = [];
   const bodies: RecordedBodies = {};
-  const forbiddenClinicalWrites: string[] = [];
+  const postGestureMutations: string[] = [];
   let projection: Projection | null = null;
   let generationStarted = false;
 
   page.on('request', (request) => {
     if (!generationStarted || !['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method())) return;
     const pathname = new URL(request.url()).pathname;
-    if (/^\/api\/(?:patients|entries|therapies|observations|attachments|checkups)(?:\/|$)/u.test(pathname)) {
-      forbiddenClinicalWrites.push(`${request.method()} ${pathname}`);
-    }
+    postGestureMutations.push(`${request.method()} ${pathname}`);
   });
 
   await page.route('**/api/context', async (route) => {
@@ -221,13 +216,27 @@ test('Treatment Reasoning Fabric pubblica soltanto una proposta source-bound dop
   await page.route('**/api/ai/treatment-reasoning/ingest', async (route) => {
     calls.push(`${route.request().method()}:/api/ai/treatment-reasoning/ingest`);
     bodies.ingest = route.request().postDataJSON();
-    projection = (bodies.ingest as { projection: Projection }).projection;
+    if (!bodies.ingest || typeof bodies.ingest !== 'object' || Array.isArray(bodies.ingest)) {
+      throw new Error('La UI Treatment Reasoning ha inviato un payload ingest non conforme.');
+    }
+    expect(Object.keys(bodies.ingest)).toEqual(['projection', 'requestId']);
+    const ingest = bodies.ingest as { projection?: unknown; requestId?: unknown };
+    expect(ingest.requestId).toMatch(/^req_[0-9a-f]{32}$/u);
+    projection = snapshotTreatmentReasoningProjectionAttachment(ingest.projection, new Date().toISOString());
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ handle: HANDLE }) });
   });
   await page.route('**/api/ai/treatment-reasoning/preview', async (route) => {
     calls.push(`${route.request().method()}:/api/ai/treatment-reasoning/preview`);
     bodies.preview = route.request().postDataJSON();
     if (!projection) throw new Error('Preview richiesta prima della projection sintetica.');
+    if (!bodies.preview || typeof bodies.preview !== 'object' || Array.isArray(bodies.preview)) {
+      throw new Error('La UI Treatment Reasoning ha inviato un payload preview non conforme.');
+    }
+    expect(Object.keys(bodies.preview)).toEqual(['handle', 'requestId']);
+    const preview = bodies.preview as { handle?: unknown; requestId?: unknown };
+    expect(preview.handle).toBe(HANDLE);
+    expect(preview.requestId).toMatch(/^req_[0-9a-f]{32}$/u);
+    expect(preview.requestId).not.toBe((bodies.ingest as { requestId?: unknown }).requestId);
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(publicationFor(projection)) });
   });
 
@@ -295,8 +304,12 @@ test('Treatment Reasoning Fabric pubblica soltanto una proposta source-bound dop
   expect((bodies.ingest as { projection: Projection }).projection.therapyRefs).toContain(`therapy:${fixture.therapyId}`);
 
   const callerKeys = collectKeys([bodies.selection, bodies.ingest, bodies.preview]);
-  for (const forbidden of ['provider', 'model', 'endpoint', 'prompt', 'apply']) {
+  for (const forbidden of ['provider', 'model', 'endpoint', 'venue', 'prompt', 'fallback', 'egress', 'apply']) {
     expect(callerKeys.has(forbidden), `Il caller non deve fornire ${forbidden}`).toBe(false);
   }
-  expect(forbiddenClinicalWrites).toEqual([]);
+  expect(postGestureMutations).toEqual([
+    'POST /api/ai/smart-import/selection',
+    'POST /api/ai/treatment-reasoning/ingest',
+    'POST /api/ai/treatment-reasoning/preview',
+  ]);
 });
