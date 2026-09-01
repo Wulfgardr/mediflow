@@ -27,6 +27,7 @@ const BINDING = Object.freeze({
 });
 const CURRENT = Object.freeze({
     peerRef: BINDING.peerRef,
+    runtimeRef: BINDING.runtimeRef,
     generation: BINDING.generation,
     revocationGeneration: BINDING.revocationGeneration,
     selectionEpoch: BINDING.selectionEpoch,
@@ -105,6 +106,7 @@ test('nega il replay della stessa lease e ne registra il denial', async () => {
 test('nega ogni drift di generazione, selezione, parent, policy o capability', async () => {
     const cases: Array<[Record<string, unknown>, Record<string, unknown>, string]> = [
         [{ ...CURRENT, generation: 2 }, { ...CLAIM }, 'generation_changed'],
+        [{ ...CURRENT, runtimeRef: 'runtime.local.synthetic.other' }, { ...CLAIM }, 'runtime_mismatch'],
         [{ ...CURRENT, revocationGeneration: 1 }, { ...CLAIM }, 'revoked'],
         [{ ...CURRENT, selectionEpoch: 8 }, { ...CLAIM }, 'selection_changed'],
         [{ ...CURRENT, parentGeneration: 4 }, { ...CLAIM }, 'parent_disposed'],
@@ -246,4 +248,182 @@ test('non richiede nuova entropy dopo avere registrato una authorization allowed
     const permit = await broker.authorize(lease, CURRENT, CLAIM);
     assert.deepEqual(Reflect.ownKeys(permit), []);
     assert.equal((audit[0] as Record<string, unknown>)?.outcome, 'allowed');
+});
+
+test('serializza per owner il budget mentre la porta audit e sospesa', async () => {
+    const audit: Array<Record<string, unknown>> = [];
+    const refs = ['agent.synthetic.linear', 'lease.synthetic.linear1', 'lease.synthetic.linear2'];
+    let auditStarted!: () => void;
+    let releaseAudit!: () => void;
+    const started = new Promise<void>((resolve) => { auditStarted = resolve; });
+    const blocked = new Promise<void>((resolve) => { releaseAudit = resolve; });
+    let firstAllowed = true;
+    const broker = createAipOwnerBrokerV1({
+        now: () => 1_000,
+        nextRef: () => refs.shift(),
+        hashRef: () => DIGEST,
+        writeAudit: async (record: unknown) => {
+            const typed = record as Record<string, unknown>;
+            audit.push(typed);
+            if (typed.outcome === 'allowed' && firstAllowed) {
+                firstAllowed = false;
+                auditStarted();
+                await blocked;
+            }
+        },
+    });
+    const owner = broker.issueOwner({ ...BINDING, budget: 1 });
+    const first = broker.authorize(broker.issueLease(owner), CURRENT, CLAIM);
+    await started;
+    const second = broker.authorize(broker.issueLease(owner), CURRENT, CLAIM);
+    releaseAudit();
+
+    const permit = await first;
+    await assert.rejects(second,
+        (error: unknown) => error instanceof Error && 'code' in error && error.code === 'budget_exhausted');
+    assert.equal(broker.consumePermit(permit, CURRENT, CLAIM), true);
+    assert.deepEqual(audit.map((record) => [record.outcome, record.denialCode, record.budgetUsed]),
+        [['allowed', null, 1], ['denied', 'budget_exhausted', 1]]);
+});
+
+test('rivalida al commit revoca, restart, disposal ed expiry durante audit', async () => {
+    let currentTime = 1_000;
+    const cases: Array<[string, (broker: ReturnType<typeof createAipOwnerBrokerV1>, owner: unknown) => void]> = [
+        ['revoked', (broker, owner) => { broker.revokeOwner(owner); }],
+        ['revoked', (broker) => { broker.revokeAll(); }],
+        ['restart_changed', (broker) => { broker.restart(); }],
+        ['parent_disposed', (broker) => { broker.disposeParent(BINDING.parentRef); }],
+        ['expired', () => { currentTime = BINDING.expiresAt; }],
+    ];
+    for (const [expected, invalidate] of cases) {
+        currentTime = 1_000;
+        const audit: Array<Record<string, unknown>> = [];
+        const refs = ['agent.synthetic.commit-race', 'lease.synthetic.commit-race'];
+        let auditStarted!: () => void;
+        let releaseAudit!: () => void;
+        const started = new Promise<void>((resolve) => { auditStarted = resolve; });
+        const blocked = new Promise<void>((resolve) => { releaseAudit = resolve; });
+        let firstAllowed = true;
+        const broker = createAipOwnerBrokerV1({ now: () => currentTime, nextRef: () => refs.shift(), hashRef: () => DIGEST,
+            writeAudit: async (record: unknown) => {
+                const typed = record as Record<string, unknown>;
+                audit.push(typed);
+                if (typed.outcome === 'allowed' && firstAllowed) {
+                    firstAllowed = false;
+                    auditStarted();
+                    await blocked;
+                }
+            } });
+        const owner = broker.issueOwner(BINDING);
+        const pending = broker.authorize(broker.issueLease(owner), CURRENT, CLAIM);
+        await started;
+        invalidate(broker, owner);
+        releaseAudit();
+        await assert.rejects(pending,
+            (error: unknown) => error instanceof Error && 'code' in error && error.code === expected);
+        assert.deepEqual(audit.map((record) => record.denialCode), [null, expected]);
+    }
+});
+
+test('rifiuta accessor senza invocarli e fallisce chiuso sulla reentrancy host', async () => {
+    let accessorObserved = false;
+    const hostileSources = Object.create(null) as Record<string, unknown>;
+    Object.defineProperties(hostileSources, {
+        now: { enumerable: true, get: () => { accessorObserved = true; return () => 1_000; } },
+        nextRef: { enumerable: true, value: () => 'reference.synthetic.source' },
+        hashRef: { enumerable: true, value: () => DIGEST },
+        writeAudit: { enumerable: true, value: async () => undefined },
+    });
+    assert.throws(() => createAipOwnerBrokerV1(hostileSources),
+        (error: unknown) => error instanceof Error && 'code' in error && error.code === 'input_invalid');
+    assert.equal(accessorObserved, false);
+
+    const hostileBinding = Object.create(null) as Record<string, unknown>;
+    Object.defineProperties(hostileBinding, {
+        ...Object.getOwnPropertyDescriptors(BINDING),
+        runtimeRef: { enumerable: true, configurable: true, get: () => { accessorObserved = true; return BINDING.runtimeRef; } },
+    });
+    const safeRefs = ['agent.synthetic.accessor', 'lease.synthetic.accessor'];
+    const safe = createAipOwnerBrokerV1({ now: () => 1_000, nextRef: () => safeRefs.shift(), hashRef: () => DIGEST,
+        writeAudit: async () => undefined });
+    assert.throws(() => safe.issueOwner(hostileBinding),
+        (error: unknown) => error instanceof Error && 'code' in error && error.code === 'input_invalid');
+    assert.equal(accessorObserved, false);
+
+    const owner = safe.issueOwner(BINDING);
+    const hostileCurrent = Object.create(null) as Record<string, unknown>;
+    Object.defineProperties(hostileCurrent, {
+        ...Object.getOwnPropertyDescriptors(CURRENT),
+        runtimeRef: { enumerable: true, configurable: true, get: () => { accessorObserved = true; return CURRENT.runtimeRef; } },
+    });
+    await assert.rejects(safe.authorize(safe.issueLease(owner), hostileCurrent, CLAIM),
+        (error: unknown) => error instanceof Error && 'code' in error && error.code === 'currentness_invalid');
+    assert.equal(accessorObserved, false);
+
+    let clockCalls = 0;
+    let swallowed: unknown;
+    const refs = ['agent.synthetic.reentrant', 'lease.synthetic.reentrant'];
+    const broker = createAipOwnerBrokerV1({
+        now: () => {
+            clockCalls += 1;
+            if (clockCalls === 2) {
+                try { broker.restart(); } catch (error) { swallowed = error; }
+            }
+            return 1_000;
+        },
+        nextRef: () => refs.shift(), hashRef: () => DIGEST, writeAudit: async () => undefined,
+    });
+    const reentrantLease = broker.issueLease(broker.issueOwner(BINDING));
+    await assert.rejects(broker.authorize(reentrantLease, CURRENT, CLAIM),
+        (error: unknown) => error instanceof Error && 'code' in error && error.code === 'clock_invalid');
+    assert.ok(swallowed instanceof Error && 'code' in swallowed && swallowed.code === 'input_invalid');
+
+    let auditSwallowed: unknown;
+    const auditRefs = ['agent.synthetic.thenable', 'lease.synthetic.thenable'];
+    const auditBroker = createAipOwnerBrokerV1({
+        now: () => 1_000, nextRef: () => auditRefs.shift(), hashRef: () => DIGEST,
+        writeAudit: () => Object.defineProperty({}, 'then', { get: () => {
+            try { auditBroker.restart(); } catch (error) { auditSwallowed = error; }
+            return undefined;
+        } }),
+    });
+    const auditLease = auditBroker.issueLease(auditBroker.issueOwner(BINDING));
+    await assert.rejects(auditBroker.authorize(auditLease, CURRENT, CLAIM),
+        (error: unknown) => error instanceof Error && 'code' in error && error.code === 'audit_failed');
+    assert.ok(auditSwallowed instanceof Error && 'code' in auditSwallowed && auditSwallowed.code === 'input_invalid');
+});
+
+test('autentica e consuma il permit una sola volta sul runtime e currentness esatti', async () => {
+    const refs = ['agent.synthetic.permit1', 'lease.synthetic.permit1',
+        'agent.synthetic.permit2', 'lease.synthetic.permit2',
+        'agent.synthetic.permit3', 'lease.synthetic.permit3',
+        'agent.synthetic.permit4', 'lease.synthetic.permit4'];
+    const broker = createAipOwnerBrokerV1({ now: () => 1_000, nextRef: () => refs.shift(), hashRef: () => DIGEST,
+        writeAudit: async () => undefined });
+    const permit = await broker.authorize(broker.issueLease(broker.issueOwner(BINDING)), CURRENT, CLAIM);
+    assert.throws(() => broker.consumePermit(Object.freeze(Object.create(null)), CURRENT, CLAIM),
+        (error: unknown) => error instanceof Error && 'code' in error && error.code === 'permit_invalid');
+    assert.equal(broker.consumePermit(permit, CURRENT, CLAIM), true);
+    assert.throws(() => broker.consumePermit(permit, CURRENT, CLAIM),
+        (error: unknown) => error instanceof Error && 'code' in error && error.code === 'permit_replay');
+
+    const runtimePermit = await broker.authorize(broker.issueLease(broker.issueOwner(BINDING)), CURRENT, CLAIM);
+    assert.throws(() => broker.consumePermit(runtimePermit,
+        { ...CURRENT, runtimeRef: 'runtime.local.synthetic.other' }, CLAIM),
+    (error: unknown) => error instanceof Error && 'code' in error && error.code === 'runtime_mismatch');
+
+    const policyPermit = await broker.authorize(broker.issueLease(broker.issueOwner(BINDING)), CURRENT, CLAIM);
+    assert.throws(() => broker.consumePermit(policyPermit, { ...CURRENT, policyGeneration: 6 }, CLAIM),
+        (error: unknown) => error instanceof Error && 'code' in error && error.code === 'policy_changed');
+
+    const revokedOwner = broker.issueOwner(BINDING);
+    const revokedPermit = await broker.authorize(broker.issueLease(revokedOwner), CURRENT, CLAIM);
+    broker.revokeOwner(revokedOwner);
+    assert.throws(() => broker.consumePermit(revokedPermit, CURRENT, CLAIM),
+        (error: unknown) => error instanceof Error && 'code' in error && error.code === 'revoked');
+
+    const foreign = createAipOwnerBrokerV1({ now: () => 1_000, nextRef: () => 'reference.synthetic.foreign',
+        hashRef: () => DIGEST, writeAudit: async () => undefined });
+    assert.throws(() => foreign.consumePermit(revokedPermit, CURRENT, CLAIM),
+        (error: unknown) => error instanceof Error && 'code' in error && error.code === 'permit_invalid');
 });
