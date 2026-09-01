@@ -279,11 +279,15 @@ Documentazione tecnica:
 ## 🗄️ Modifiche database (Drizzle / SQLite)
 
 Le schema guard additive di `lib/db-server.ts` sono serializzate con una
-transazione SQLite `IMMEDIATE`. Questo vincolo vale anche durante `next build`,
-che valuta i moduli server con piu processi: non introdurre guard che aprono una
-seconda connessione o aggirano la transazione. La regressione dedicata e
-`npm run test:db-bootstrap-concurrency` e usa solo un database temporaneo
-sintetico.
+transazione SQLite `IMMEDIATE` nel runtime dev/server. Durante la sola fase
+`NEXT_PHASE=phase-production-build`, la raccolta dei metadati Next usa invece
+SQLite in-memory e non apre, copia, recupera o migra il database clinico
+persistente. Non introdurre side effect persistenti durante la build, né guard
+runtime che aprono una seconda connessione o aggirano la transazione. Le
+regressioni dedicate sono
+`lib/db-server-attachment-currentness-bootstrap.test.ts` e
+`npm run test:db-bootstrap-concurrency`; usano soltanto database temporanei
+sintetici.
 
 Fonti autorevoli:
 - Schema: `lib/schema.ts`

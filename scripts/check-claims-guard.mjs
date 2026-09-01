@@ -11,6 +11,7 @@ const roots = [
   'docs/README.md', 'docs/markdown-index.md', 'docs/FAQ.md', 'docs/ROADMAP.md',
   'docs/STATE_OF_THE_SYSTEM.md', 'docs/walkthrough.md', 'docs/system_architecture.md',
   'docs/ARCHITETTURA.md', 'docs/COMPLIANCE.md', 'docs/MANUALE.md', 'docs/NATIVE.md',
+  'docs/analysis/2026-09-01-mediflow-0.8.5-final-verification.md',
   'docs/FSE2-terminology-roadmap.md', 'docs/product_roadmap.md',
   'docs/topologia-dati-flussi.md', 'docs/design',
   'docs/adr/0006-terminology-plugin-and-fse-profiles.md',

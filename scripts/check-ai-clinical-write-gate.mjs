@@ -9,9 +9,9 @@
 // diagnosi, terapie o altri record clinici strutturati (0086 §3). ADR 0086 chiude con una
 // regola generale: diagnosi, prescrizioni e identità paziente non sono auto-applicabili.
 //
-// MediFlow è local-first: i servizi AI sono invocati direttamente dai componenti, non
-// dietro una route. Il punto di enforcement quindi NON è la route ma il writer del
-// servizio. Un gate route-based passerebbe a vuoto.
+// MediFlow è local-first: nel candidato 0.8.5 i quattro smart path attraversano route
+// autenticate, ma la route resta un adapter. Il punto di enforcement è il production
+// root e il writer del servizio; un gate limitato ai nomi delle route passerebbe a vuoto.
 //
 // Il confine reale ha due lati, e il gate controlla entrambi:
 //

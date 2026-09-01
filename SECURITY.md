@@ -238,9 +238,11 @@ al target.
 
 ### Application Services e Headless
 
-Le route e gli adapter non accedono direttamente al database. Gli Application
-Services host-owned risolvono currentness, authority, conflitti, transazioni e
-audit. Una receipt Fabric descrive un'esecuzione e non è un grant.
+Le route sottili e gli adapter Fabric/Headless del perimetro 0.8.5 non accedono
+direttamente al database. I relativi production root e Application Services
+host-owned risolvono currentness, authority, conflitti, transazioni e audit.
+Alcune route Web storiche importano ancora `dbServer` e non ereditano questo
+claim per analogia. Una receipt Fabric descrive un'esecuzione e non è un grant.
 
 La foundation Headless 0.8.5 non espone un runtime agentico generale esterno.
 L'unica eccezione di scrittura è `mediflow.clinical_diary.append_soap.v1` con
@@ -311,10 +313,10 @@ ADR 0092 non definisce il contratto Intelligence Fabric. ADR 0094 governa le
 capability 0.8.5, le venue, i production root e l'assenza di authority caller.
 
 > [!IMPORTANT]
-> I flussi AI clinici sono dietro safety gate con kill-switch (patient-insight,
-> smart-import, document-synthesis) e model governance delle decisioni
-> documentali. Restano AI locale review-first: nessuna scrittura clinica
-> autonoma.
+> I quattro flussi AI clinici sono dietro safety gate con kill-switch
+> (patient-insight, smart-import, document-synthesis e treatment-reasoning) e
+> model governance delle decisioni documentali. Restano AI locale
+> review-first: nessuna scrittura clinica autonoma.
 
 ## ⚠️ Provider cloud disabilitati
 
