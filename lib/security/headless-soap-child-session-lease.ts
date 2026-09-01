@@ -12,6 +12,29 @@ declare const leaseIdentity: unique symbol;
 declare const dependentRegistrationIdentity: unique symbol;
 export type HeadlessSoapChildSessionLeaseV1 = Readonly<{ readonly [leaseIdentity]?: never }>;
 export type HeadlessSoapChildSessionDependentRegistrationV1 = Readonly<{ readonly [dependentRegistrationIdentity]?: never }>;
+export type HeadlessSoapChildSessionBindingIdentityV1 = Readonly<Record<never, never>>;
+export type HeadlessSoapChildSessionLeaseBindingV1 = Readonly<{
+    parent: Readonly<{
+        identity: HeadlessSoapChildSessionBindingIdentityV1;
+        contractVersion: 1;
+        generation: 1;
+        revocationGeneration: 0;
+    }>;
+    child: Readonly<{
+        identity: HeadlessSoapChildSessionBindingIdentityV1;
+        contractVersion: 1;
+        generation: 1;
+        revocationGeneration: 0;
+        proposalBudget: 0;
+        expiresAt: number;
+    }>;
+    lease: Readonly<{
+        identity: HeadlessSoapChildSessionLeaseV1;
+        contractVersion: 1;
+        generation: 1;
+        revocationGeneration: 0;
+    }>;
+}>;
 export type HeadlessSoapChildSessionLeaseErrorCode = 'active_role_unavailable' | 'child_unavailable' | 'lease_unavailable' | 'lease_expired' | 'proposal_budget_exhausted' | 'lifecycle_unavailable';
 export class HeadlessSoapChildSessionLeaseError extends Error {
     constructor(readonly code: HeadlessSoapChildSessionLeaseErrorCode) { super(`Headless SOAP child session lease rejected: ${code}`); this.name = 'HeadlessSoapChildSessionLeaseError'; }
@@ -38,8 +61,12 @@ export type HeadlessSoapChildSessionLeaseLifecycleControllerV1 = Readonly<{
     withCurrentDependent(candidate: unknown, registration: unknown, operation: () => void): Promise<boolean>;
     withCurrentProposalBudget(candidate: unknown, registration: unknown, operation: () => void): Promise<boolean>;
 }>;
-type ParentRecord = { grant: HeadlessSoapActiveRoleSessionGrantV1; registration: HeadlessSoapActiveRoleDependentRegistrationV1 | null; active: boolean; contractVersion: 1; generation: 1; revocationGeneration: 0 | 1; children: ChildRecord | null };
-type ChildRecord = { parent: ParentRecord; leaseRecord: LeaseRecord; active: boolean; contractVersion: 1; generation: 1; revocationGeneration: 0 | 1; budget: 0 | 1; expiresAt: number; lastObservedAt: number; next: ChildRecord | null; drainNext: ChildRecord | null; dependents: DependentRecord | null };
+export type HeadlessSoapChildSessionLeaseBindingControllerV1 = Readonly<{
+    withCurrentDependentBinding(candidate: unknown, registration: unknown,
+        operation: (binding: HeadlessSoapChildSessionLeaseBindingV1) => void): Promise<boolean>;
+}>;
+type ParentRecord = { identity: HeadlessSoapChildSessionBindingIdentityV1; grant: HeadlessSoapActiveRoleSessionGrantV1; registration: HeadlessSoapActiveRoleDependentRegistrationV1 | null; active: boolean; contractVersion: 1; generation: 1; revocationGeneration: 0 | 1; children: ChildRecord | null };
+type ChildRecord = { identity: HeadlessSoapChildSessionBindingIdentityV1; parent: ParentRecord; leaseRecord: LeaseRecord; active: boolean; contractVersion: 1; generation: 1; revocationGeneration: 0 | 1; budget: 0 | 1; proposalRegistration: HeadlessSoapChildSessionDependentRegistrationV1 | null; expiresAt: number; lastObservedAt: number; next: ChildRecord | null; drainNext: ChildRecord | null; dependents: DependentRecord | null };
 type LeaseRecord = { lease: HeadlessSoapChildSessionLeaseV1; child: ChildRecord; active: boolean; contractVersion: 1; generation: 1; revocationGeneration: 0 | 1 };
 type DependentRecord = { registration: HeadlessSoapChildSessionDependentRegistrationV1; child: ChildRecord; dispose: () => void; active: boolean; next: DependentRecord | null };
 type TimeOutcome = Readonly<{ status: 'current'; observedAt: number }> | Readonly<{ status: 'child_unavailable' | 'lease_expired' | 'lifecycle_unavailable' }>;
@@ -55,11 +82,31 @@ function synchronousCallback(value: unknown): boolean { return typeof value === 
 function weakGet<T>(registry: WeakMap<object, T>, key: object): T | undefined { return reflectApply(weakMapGet, registry, [key]) as T | undefined; }
 function weakSet<T>(registry: WeakMap<object, T>, key: object, value: T): void { reflectApply(weakMapSet, registry, [key, value]); }
 function weakDelete<T>(registry: WeakMap<object, T>, key: object): void { reflectApply(weakMapDelete, registry, [key]); }
+function fieldlessIdentity(): HeadlessSoapChildSessionBindingIdentityV1 { return objectFreeze(objectCreate(null)) as HeadlessSoapChildSessionBindingIdentityV1; }
+function childLeaseBinding(child: ChildRecord): HeadlessSoapChildSessionLeaseBindingV1 {
+    const parentRecord = child.parent, leaseRecord = child.leaseRecord;
+    if (!parentRecord.active || !child.active || !leaseRecord.active || parentRecord.revocationGeneration !== 0
+        || child.revocationGeneration !== 0 || leaseRecord.revocationGeneration !== 0 || child.budget !== 0) throw dependentOperationFailure;
+    const parent = objectCreate(null) as Record<string, unknown>;
+    parent.identity = parentRecord.identity; parent.contractVersion = parentRecord.contractVersion;
+    parent.generation = parentRecord.generation; parent.revocationGeneration = parentRecord.revocationGeneration;
+    const childBinding = objectCreate(null) as Record<string, unknown>;
+    childBinding.identity = child.identity; childBinding.contractVersion = child.contractVersion; childBinding.generation = child.generation;
+    childBinding.revocationGeneration = child.revocationGeneration; childBinding.proposalBudget = child.budget;
+    childBinding.expiresAt = child.expiresAt;
+    const lease = objectCreate(null) as Record<string, unknown>;
+    lease.identity = leaseRecord.lease; lease.contractVersion = leaseRecord.contractVersion; lease.generation = leaseRecord.generation;
+    lease.revocationGeneration = leaseRecord.revocationGeneration;
+    const binding = objectCreate(null) as Record<string, unknown>;
+    binding.parent = objectFreeze(parent); binding.child = objectFreeze(childBinding); binding.lease = objectFreeze(lease);
+    return objectFreeze(binding) as HeadlessSoapChildSessionLeaseBindingV1;
+}
 
 /** Owns the public child service and its closure-bound dependent lifecycle controller. */
 export function createHeadlessSoapChildSessionLeaseOwner(sources: HeadlessSoapChildSessionLeaseSources): Readonly<{
     service: HeadlessSoapChildSessionLeaseServiceV1;
     lifecycleController: HeadlessSoapChildSessionLeaseLifecycleControllerV1;
+    bindingController: HeadlessSoapChildSessionLeaseBindingControllerV1;
 }> {
     const parents = new WeakMapConstructor<object, ParentRecord>(), leases = new WeakMapConstructor<object, LeaseRecord>();
     const dependentRegistrations = new WeakMapConstructor<object, DependentRecord>(), clock = sources.clock ?? defaultClock;
@@ -77,7 +124,7 @@ export function createHeadlessSoapChildSessionLeaseOwner(sources: HeadlessSoapCh
         if (parent.children === child) parent.children = child.next;
         else { let previous = parent.children; while (previous && previous.next !== child) previous = previous.next; if (previous) previous.next = child.next; }
         child.next = null; };
-    const terminalizeChild = (child: ChildRecord): void => { if (!child.active) return; child.active = false; child.revocationGeneration = 1;
+    const terminalizeChild = (child: ChildRecord): void => { if (!child.active) return; child.active = false; child.revocationGeneration = 1; child.proposalRegistration = null;
         child.leaseRecord.active = false; child.leaseRecord.revocationGeneration = 1; weakDelete(leases, child.leaseRecord.lease);
         drainDependents(child); unlinkChild(child); };
     const drainParent = (parent: ParentRecord): void => { if (!parent.active) return; parent.active = false; parent.revocationGeneration = 1;
@@ -103,21 +150,22 @@ export function createHeadlessSoapChildSessionLeaseOwner(sources: HeadlessSoapCh
         let published: HeadlessSoapChildSessionLeaseV1 | null = null, touched: ParentRecord | null = null, entered = false, attached = false;
         try { attached = await sources.withCurrentGrant((grant) => { entered = true; const observedAt = readClock();
                 if (observedAt === null || observedAt > maxSafeInteger - TTL_MS) throw new Error('child_lifecycle_unavailable'); const expiresAt = observedAt + TTL_MS;
-                let parent = weakGet(parents, grant); if (!parent) { const created: ParentRecord = { grant, registration: null, active: true, contractVersion: 1, generation: 1, revocationGeneration: 0, children: null }; touched = created;
+                let parent = weakGet(parents, grant); if (!parent) { const created: ParentRecord = { identity: fieldlessIdentity(), grant, registration: null, active: true, contractVersion: 1, generation: 1, revocationGeneration: 0, children: null }; touched = created;
                     const registration = sources.registerDependent(grant, () => { drainParent(created); }); if (!registration) throw new Error('child_attach_unavailable');
                     created.registration = registration; weakSet(parents, grant, created); parent = created; }
                 touched = parent; const registration = parent.registration;
                 if (!parent.active || !registration || !sources.confirmDependent(grant, registration)) throw new Error('child_parent_unavailable');
                 const lease = objectFreeze(objectCreate(null)) as HeadlessSoapChildSessionLeaseV1;
                 const leaseRecord = { lease, child: null as unknown as ChildRecord, active: true, contractVersion: 1, generation: 1, revocationGeneration: 0 } satisfies LeaseRecord;
-                const child: ChildRecord = { parent, leaseRecord, active: true, contractVersion: 1, generation: 1, revocationGeneration: 0, budget: 1, expiresAt, lastObservedAt: observedAt, next: parent.children, drainNext: null, dependents: null };
+                const child: ChildRecord = { identity: fieldlessIdentity(), parent, leaseRecord, active: true, contractVersion: 1, generation: 1, revocationGeneration: 0, budget: 1, proposalRegistration: null, expiresAt, lastObservedAt: observedAt, next: parent.children, drainNext: null, dependents: null };
                 leaseRecord.child = child; parent.children = child; weakSet(leases, lease, leaseRecord);
                 if (!parent.active || !sources.confirmDependent(grant, registration) || weakGet(leases, lease) !== leaseRecord) throw new Error('child_publication_unavailable'); published = lease;
             });
         } catch { if (entered) { if (touched) detachParent(touched); return fail('lifecycle_unavailable'); } return fail('active_role_unavailable'); }
         if (!attached || !published) { if (touched) detachParent(touched); return fail('lifecycle_unavailable'); } return published; };
     const runLeaseOperation = async (candidate: unknown, consumeBudget: boolean, registration?: unknown,
-        operation?: (lease?: HeadlessSoapChildSessionLeaseV1) => unknown, passLease = false, requiresRegistration = false): Promise<HeadlessSoapChildSessionLeaseV1> => {
+        operation?: (lease?: HeadlessSoapChildSessionLeaseV1) => unknown, passLease = false, requiresRegistration = false,
+        anchorProposalRegistration = false): Promise<HeadlessSoapChildSessionLeaseV1> => {
         if (dependentOperationActive) { dependentOperationPoisoned = true; return fail('lifecycle_unavailable'); }
         const record = typeof candidate === 'object' && candidate !== null ? weakGet(leases, candidate) : undefined;
         if (!record || !record.active || !record.child.active) return fail('lease_unavailable'); const child = record.child, parent = child.parent;
@@ -131,7 +179,8 @@ export function createHeadlessSoapChildSessionLeaseOwner(sources: HeadlessSoapCh
                 child.lastObservedAt = outcome.observedAt;
                 if (requiresRegistration && !registrationWasCurrent) { dependentRejected = true; return; }
                 if (requiresRegistration && !dependentCurrent(child, registration)) { terminalizeChild(child); dependentFailed = true; outcome = { status: 'child_unavailable' }; return; }
-                if (consumeBudget) { if (child.budget === 0) { outcome = { status: 'proposal_budget_exhausted' }; return; } child.budget = 0; }
+                if (consumeBudget) { if (child.budget === 0) { outcome = { status: 'proposal_budget_exhausted' }; return; } child.budget = 0;
+                    if (anchorProposalRegistration) child.proposalRegistration = registration as HeadlessSoapChildSessionDependentRegistrationV1; }
                 if (!operation) return;
                 if (!beginDependentOperation(child)) { dependentFailed = true; outcome = { status: 'child_unavailable' }; return; }
                 let failed = false; try { requireVoidResult(reflectApply(operation, undefined, passLease ? [record.lease] : [])); } catch { failed = true; }
@@ -184,7 +233,8 @@ export function createHeadlessSoapChildSessionLeaseOwner(sources: HeadlessSoapCh
         unregisterDependent(candidate: unknown, registration: unknown): boolean { if (typeof candidate !== 'object' || candidate === null || typeof registration !== 'object' || registration === null) return false;
             const leaseRecord = weakGet(leases, candidate), dependent = weakGet(dependentRegistrations, registration);
             if (!leaseRecord || !dependent || !dependent.active || dependent.child !== leaseRecord.child || dependent.registration !== registration) return false;
-            dependent.active = false; weakDelete(dependentRegistrations, registration); unlinkDependent(dependent); return true; },
+            dependent.active = false; if (dependent.child.proposalRegistration === registration) dependent.child.proposalRegistration = null;
+            weakDelete(dependentRegistrations, registration); unlinkDependent(dependent); return true; },
         async withCurrentDependent(candidate: unknown, registration: unknown, operation: () => void): Promise<boolean> {
             if (dependentOperationActive) { dependentOperationPoisoned = true; return false; } if (!synchronousCallback(operation)) return false;
             const leaseRecord = typeof candidate === 'object' && candidate !== null ? weakGet(leases, candidate) : undefined;
@@ -195,10 +245,30 @@ export function createHeadlessSoapChildSessionLeaseOwner(sources: HeadlessSoapCh
             if (dependentOperationActive) { dependentOperationPoisoned = true; return false; } if (!synchronousCallback(operation)) return false;
             const leaseRecord = typeof candidate === 'object' && candidate !== null ? weakGet(leases, candidate) : undefined;
             if (!leaseRecord || !leaseRecord.active || !leaseRecord.child.active) return false;
-            try { await runLeaseOperation(candidate, true, registration, operation, false, true); return true; } catch (error) { if (error === dependentOperationFailure) return false; throw error; }
+            try { await runLeaseOperation(candidate, true, registration, operation, false, true, true); return true; } catch (error) { if (error === dependentOperationFailure) return false; throw error; }
         },
     });
-    return objectFreeze({ service, lifecycleController });
+    const bindingController: HeadlessSoapChildSessionLeaseBindingControllerV1 = objectFreeze({
+        async withCurrentDependentBinding(candidate: unknown, registration: unknown,
+            operation: (binding: HeadlessSoapChildSessionLeaseBindingV1) => void): Promise<boolean> {
+            if (dependentOperationActive) { dependentOperationPoisoned = true; return false; }
+            if (!synchronousCallback(operation)) return false;
+            const leaseRecord = typeof candidate === 'object' && candidate !== null ? weakGet(leases, candidate) : undefined;
+            if (!leaseRecord || !leaseRecord.active || !leaseRecord.child.active) return false;
+            let budgetConsumed = false;
+            const invoke = (): void => {
+                const child = leaseRecord.child;
+                if (child.budget !== 0 || child.proposalRegistration !== registration) return;
+                budgetConsumed = true;
+                requireVoidResult(reflectApply(operation, undefined, [childLeaseBinding(child)]));
+            };
+            try {
+                await runLeaseOperation(candidate, false, registration, invoke, false, true);
+                return budgetConsumed && leaseRecord.child.proposalRegistration === registration;
+            } catch (error) { if (error === dependentOperationFailure) return false; throw error; }
+        },
+    });
+    return objectFreeze({ service, lifecycleController, bindingController });
 }
 
 /** Owns one opaque, process-local child prerequisite; it contains no clinical write authority. */

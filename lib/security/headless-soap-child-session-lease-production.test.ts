@@ -21,7 +21,7 @@ test('keeps one process owner internal while the public facade shares only its s
 
     const owner = internal.headlessSoapChildSessionLeaseProductionOwner;
     assert.equal(Object.isFrozen(owner), true);
-    assert.deepEqual(Reflect.ownKeys(owner).sort(), ['lifecycleController', 'service']);
+    assert.deepEqual(Reflect.ownKeys(owner).sort(), ['bindingController', 'lifecycleController', 'service']);
     assert.equal(production.headlessSoapChildSessionLeaseService, owner.service);
     assert.equal(Object.isFrozen(owner.lifecycleController), true);
     assert.deepEqual(Reflect.ownKeys(owner.lifecycleController).sort(), [
@@ -32,6 +32,8 @@ test('keeps one process owner internal while the public facade shares only its s
         'withCurrentLease',
         'withCurrentProposalBudget',
     ]);
+    assert.equal(Object.isFrozen(owner.bindingController), true);
+    assert.deepEqual(Reflect.ownKeys(owner.bindingController), ['withCurrentDependentBinding']);
 });
 
 test('exposes one frozen child-session singleton and denies open without a current clinician session', async () => {
@@ -68,6 +70,8 @@ test('denies foreign identities through both the public service and private life
     assert.equal(await lifecycle.withCurrentLease(foreignLease, () => undefined), false);
     assert.equal(await lifecycle.withCurrentDependent(foreignLease, foreignRegistration, () => undefined), false);
     assert.equal(await lifecycle.withCurrentProposalBudget(foreignLease, foreignRegistration, () => undefined), false);
+    assert.equal(await internal.headlessSoapChildSessionLeaseProductionOwner.bindingController
+        .withCurrentDependentBinding(foreignLease, foreignRegistration, () => undefined), false);
 });
 
 test('composes one private H2b owner without exposing lifecycle authority from either facade', () => {

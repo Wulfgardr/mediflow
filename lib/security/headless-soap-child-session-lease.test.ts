@@ -28,7 +28,7 @@ test('opens one zero-field process-local child lease and rechecks the same ident
 });
 test('private owner attaches, fences, unregisters, and synchronously drains child dependents', async () => {
     const current = fixture(); const owner = createHeadlessSoapChildSessionLeaseOwner({ ...current.lifecycle, clock: current.clock });
-    assert.deepEqual(Reflect.ownKeys(owner).sort(), ['lifecycleController', 'service']);
+    assert.deepEqual(Reflect.ownKeys(owner).sort(), ['bindingController', 'lifecycleController', 'service']);
     assert.deepEqual(Reflect.ownKeys(owner.lifecycleController).sort(), ['confirmDependent', 'registerDependent', 'unregisterDependent', 'withCurrentDependent', 'withCurrentLease', 'withCurrentProposalBudget']);
     const lease = await owner.service.open(); let registration: unknown = null, removed: unknown = null, disposals = 0, removedDisposals = 0;
     assert.equal(await owner.lifecycleController.withCurrentLease(lease, (candidate) => {
