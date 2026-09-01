@@ -1,7 +1,7 @@
 # ADR 0113: recording visita e trascrizione locale nella 0.8.5
 
 Date: 2026-09-01
-Status: Proposed
+Status: Accepted
 
 Issue: [GitHub #280](https://github.com/Wulfgardr/mediflow/issues/280)
 
@@ -59,13 +59,12 @@ legame univoco tra registrazione, paziente corrente e bozza revisionata.
 
 ## Decisione
 
-Adottiamo l'opzione 3 come contratto proposto per la `0.8.5`.
+Adottiamo l'opzione 3 come contratto accettato per la `0.8.5`.
 
 Questo ADR rende implementabile la decisione generale di ADR 0072 e ne
 sostituisce soltanto il rinvio del runtime. Restano validi local-first,
 review-first, assenza di raw audio persistito, divieto di cloud implicito e
-separazione dalla scrittura clinica. L'implementazione non parte finche questo
-ADR non viene accettato.
+separazione dalla scrittura clinica.
 
 La pipeline ammessa e:
 
@@ -92,9 +91,11 @@ provider testuali.
 - La capability e costruita dietro `if #available(macOS 26.0, *)`; sulle
   versioni precedenti la UI mostra `non disponibile su questo Mac` e non
   richiede permessi ne asset.
-- Il target dichiara `NSMicrophoneUsageDescription` e l'entitlement sandbox
-  `com.apple.security.device.audio-input`. La loro assenza e un errore di
-  build o di contract test, non una degradazione silenziosa.
+- Il target dichiara `NSMicrophoneUsageDescription`; la sua assenza e un errore
+  di build o di contract test, non una degradazione silenziosa. Il target
+  corrente non abilita App Sandbox e quindi non dichiara
+  `com.apple.security.device.audio-input`. Un'eventuale sandbox futura richiede
+  una decisione separata, l'entitlement audio-input e una nuova verifica.
 - Non viene richiesta l'autorizzazione di `SFSpeechRecognizer` e non viene
   introdotto un entitlement di rete per la trascrizione.
 
@@ -104,6 +105,8 @@ La UI presenta prima un'informativa MediFlow che spiega acquisizione locale,
 assenza di salvataggio audio, uso della trascrizione e modalita di annullamento.
 Solo il gesto esplicito `Consenti microfono e continua` puo invocare il prompt
 del sistema. Aprire la pagina o mostrare il controllo non richiede permessi.
+La callback di `AVAudioApplication.requestRecordPermission` puo arrivare fuori
+dal main thread; ogni transizione UI viene riportata sul `MainActor`.
 
 La macchina a stati minima e:
 
@@ -123,23 +126,35 @@ buffer.
 
 ## Asset speech locali
 
-Prima del primo avvio la capability verifica supporto e installazione degli
-asset Apple per `it-IT`. Se mancano, il download e un'azione separata ed
-esplicita che mostra stato e dimensione quando disponibile. Il download
-contiene soltanto asset vendor e non payload clinici; non avviene mentre una
-sessione visita e attiva.
+Prima del primo avvio la capability risolve `it-IT` tramite
+`SpeechTranscriber.supportedLocale(equivalentTo:)`, costruisce il transcriber
+con la locale restituita e interroga `AssetInventory.status(forModules:)`.
+Se necessario, crea `assetInstallationRequest`, mostra il `Progress` esposto
+dal framework e avvia `downloadAndInstall()` soltanto dopo un'azione separata
+ed esplicita. Completata l'installazione, riserva la locale con
+`AssetInventory.reserve(locale:)`. Il download contiene soltanto asset vendor
+e non payload clinici; non avviene mentre una sessione visita e attiva.
 
-Asset assente, locale non supportata, installazione fallita o digest/runtime
-non coerente lasciano la capability disabilitata. Non esiste fallback cloud o
-verso un'altra lingua.
+`AssetInventory` non espone digest, versione o byte-size degli asset. La
+receipt registra quindi build del sistema, locale risolta, `isAvailable`,
+`installedLocales`, stato e risultato della reservation, senza inventare una
+provenienza per-artifact. Asset assente, locale non supportata, installazione o
+reservation fallita, richiesta `nil`, limite `maximumReservedLocales`
+raggiunto o ritorno `false` lasciano la capability disabilitata. La reservation
+ha lifetime esplicito nel controller e viene rilasciata quando la capability
+viene dismessa. Non esiste fallback cloud o verso un'altra lingua.
 
 ## Memoria, backpressure e cancellazione
 
-L'input tap produce buffer PCM inviati in streaming all'analyzer. MediFlow
-mantiene una coda propria limitata al minore tra quattro secondi di audio e
-8 MiB. Non conserva l'intera sessione. Se il consumer non tiene il passo, la
-registrazione termina con `bufferExceeded`; non vengono scartati frame per
-produrre una trascrizione apparentemente completa.
+L'input tap produce buffer PCM. Il controller sceglie prima
+`SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith:considering:)`, prepara
+l'analyzer con `prepareToAnalyze(in:)` e converte in RAM i buffer hardware
+quando il formato non coincide; nessun buffer convertito viene persistito. Il
+callback del tap copia immediatamente i frame in memoria owned e non blocca il
+thread audio. MediFlow mantiene una coda propria limitata al minore tra quattro
+secondi di audio e 8 MiB. Non conserva l'intera sessione. Se il consumer non
+tiene il passo, la registrazione termina con `bufferExceeded`; non vengono
+scartati frame per produrre una trascrizione apparentemente completa.
 
 La sessione ha durata massima proposta di 90 minuti e transcript massimo di
 256 KiB UTF-8. Questi limiti sono costanti host-owned e vengono mostrati prima
@@ -147,10 +162,11 @@ della cattura. L'eventuale memoria interna dei framework Apple resta opaca e
 deve essere misurata nel benchmark; non viene inclusa nel claim sul buffer
 MediFlow.
 
-In ogni uscita terminale l'ordine e: rimuovere il tap, fermare l'engine,
-finalizzare o cancellare l'analyzer, azzerare la coda PCM e ritirare la session
-reference. Non si usano `AVAudioFile`, file temporanei, cache audio o
-serializzazione dei buffer.
+Su Stop il controller rimuove il tap, ferma l'engine, chiude l'input sequence,
+chiama `finalizeAndFinishThroughEndOfInput()`, drena i risultati e accetta solo
+quelli con `isFinal`. Su Cancel usa `cancelAndFinishNow()`. In entrambi i casi
+azzera la coda PCM e ritira la session reference. Non si usano `AVAudioFile`,
+file temporanei, cache audio o serializzazione dei buffer.
 
 ## Finalita, currentness e review
 
@@ -239,8 +255,8 @@ fallback cloud, `SFSpeech`, dipendenza Fluid, avvio senza consenso, risultato
 non-final, binding paziente ricostruito dal caller, frame drop silenzioso,
 riuso della review dopo un edit o scrittura clinica senza nuovo proof.
 
-Fino ad ADR accettato, runtime integrato e gate superati, il claim massimo e:
-**contratto proposto per recording e trascrizione locale Apple nella 0.8.5;
+Fino a runtime integrato e gate superati, il claim massimo e: **contratto
+accettato per recording e trascrizione locale Apple nella 0.8.5;
 nessuna capability runtime consegnata o release-ready**.
 
 ## Fonti primarie
