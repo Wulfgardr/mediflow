@@ -107,6 +107,15 @@ token OAuth vive in RAM, e legato alla generation credenziale e scade prima
 del tempo vendor dichiarato. `revoked_local` invalida token e lease locali ma
 non dichiara revoca WHO.
 
+Il packet credenziali fissa un solo reference logico host-owned:
+`host_secret/mediflow.who.icd-api.oauth-client.v1`. Il resolver e l'issuer
+ricevono target opachi e operano entro limiti e cancellazione host-owned; la lease bearer e
+monouso, dura al massimo 30 secondi e riusa tramite single-flight soltanto un
+token RAM della stessa generation. Il token viene ritirato almeno 60 secondi
+prima della scadenza vendor e viene invalidato su disable, revoca locale,
+restart o dispose. Questo packet usa soltanto resolver e issuer fake: non
+introduce URL, HTTP, fetch, rete o smoke live.
+
 La query in uscita contiene soltanto i termini necessari alla ricerca ICD-11:
 nessun patient ID, nome, codice fiscale, documento, nota, prompt o contesto
 clinico. Il servizio non dichiara anonimizzazione: una query diagnostica puo
@@ -162,6 +171,7 @@ HTTP, redirect, retry/fallback, query o risultato nei log, cache stale o di
 release diversa, DB diretto, authority agentica, write clinico, PHI/PII reale
 nei test o migrazione caller nello stesso packet del core.
 
-Fino ai packet successivi, il claim massimo e: **contratto e core ICD-11 WHO
-verificati con transport fake; nessun live transport, OAuth, caller migrato,
-Docker rimosso dal runtime o smoke WHO consegnato**.
+Fino ai packet successivi, il claim massimo e: **contratto, core e lease
+secret/token generation-bound ICD-11 WHO verificati con transport e issuer
+fake; nessun live transport HTTP, OAuth end-to-end, caller migrato, Docker
+rimosso dal runtime o smoke WHO consegnato**.
