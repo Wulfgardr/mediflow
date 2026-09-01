@@ -27,6 +27,8 @@ const FORBIDDEN_REQUEST_HEADERS = ['anthropic-beta', 'anthropic-workspace-id', '
 const ENCODER = new TextEncoder();
 const DECODER = new TextDecoder('utf-8', { fatal: true });
 const SIGNAL_ABORTED = Object.getOwnPropertyDescriptor(AbortSignal.prototype, 'aborted')?.get;
+const ADD_EVENT_LISTENER = EventTarget.prototype.addEventListener;
+const REMOVE_EVENT_LISTENER = EventTarget.prototype.removeEventListener;
 const HEADERS_GET = Headers.prototype.get;
 const HEADERS_DELETE = Headers.prototype.delete;
 const RESPONSE_STATUS = Object.getOwnPropertyDescriptor(Response.prototype, 'status')?.get;
@@ -253,11 +255,15 @@ export function createAnthropicMessagesOfficialHttpsTransport(factoryValue: unkn
     const factory = checkedFactory(factoryValue);
     return async (requestValue) => {
         const request = checkedRequest(requestValue, factory.authority);
-        if (aborted(request.signal)) {
-            clearHeaders(request.headers);
-            throw new AnthropicMessagesOfficialHttpsTransportError('request_cancelled');
+        let retired = false;
+        const retire = () => { if (!retired) { retired = true; clearHeaders(request.headers); } };
+        try { Reflect.apply(ADD_EVENT_LISTENER, request.signal, ['abort', retire, { once: true }]); }
+        catch {
+            retire();
+            throw new AnthropicMessagesOfficialHttpsTransportError('input_invalid');
         }
         try {
+            if (aborted(request.signal)) throw new AnthropicMessagesOfficialHttpsTransportError('request_cancelled');
             let returned: unknown;
             try {
                 returned = Reflect.apply(factory.fetch, undefined, [ANTHROPIC_MESSAGES_OFFICIAL_URL, Object.freeze({
@@ -277,6 +283,9 @@ export function createAnthropicMessagesOfficialHttpsTransport(factoryValue: unkn
             const response = checkedResponse(responseValue, factory.authority);
             const body = await boundedBody(response.body, request.maxResponseBytes);
             return Object.freeze({ status: response.status, body });
-        } finally { clearHeaders(request.headers); }
+        } finally {
+            try { Reflect.apply(REMOVE_EVENT_LISTENER, request.signal, ['abort', retire]); } catch { /* native signal validated */ }
+            retire();
+        }
     };
 }
