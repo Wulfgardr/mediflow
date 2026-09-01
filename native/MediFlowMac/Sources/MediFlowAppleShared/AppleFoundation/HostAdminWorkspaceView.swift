@@ -309,7 +309,7 @@ struct HostAdminWorkspaceView: View {
                     if let value = local.hardwareProfile { InfoRow("Profilo hardware", value) }
                     InfoRow("Modello clinico", local.clinicalModel ?? "Non impostato")
                     InfoRow("Modello ragionamento", local.reasoningModel ?? "Non impostato")
-                    InfoRow("Modello OCR", local.ocrModel ?? "Non impostato")
+                    InfoRow("OCR", "Non disponibile nella 0.8.5")
                 }
             }
         }

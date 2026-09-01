@@ -3,7 +3,7 @@
 // WUL-297 Modelli e Hardware: moved from the monolithic settings page.
 
 import { useState } from 'react';
-import { AlertTriangle, Bot, CheckCircle, Cpu, RefreshCw, Save, Server, Stethoscope, Upload } from 'lucide-react';
+import { AlertTriangle, Bot, CheckCircle, Cpu, RefreshCw, Save, Server, Stethoscope } from 'lucide-react';
 import { cn } from '@/lib/utils';
 /* @Codex */
 import { useAiSettingsController } from '@/lib/hooks/use-ai-settings-controller';
@@ -117,7 +117,7 @@ export default function SettingsAiModelsPage() {
                         <ModelSelector
                             selectorId="clinical"
                             label="Radiologo & Clinico"
-                            description="Per sintesi cliniche, insight e strutturazione testuale dopo OCR."
+                            description="Per sintesi cliniche, insight e strutturazione testuale dopo l'estrazione locale."
                             icon={<Bot className="w-5 h-5" />}
                             value={aiConfig.model_clinical}
                             onChange={(val) => setAiConfig({ ...aiConfig, model_clinical: val })}
@@ -150,22 +150,6 @@ export default function SettingsAiModelsPage() {
                             targetUrl={aiConfig.url}
                         />
 
-                        <ModelSelector
-                            selectorId="ocr"
-                            label="Segreteria (OCR)"
-                            description="Per importare documenti cartacei, referti scannerizzati e note."
-                            icon={<Upload className="w-5 h-5" />}
-                            value={aiConfig.model_ocr}
-                            onChange={(val) => setAiConfig({ ...aiConfig, model_ocr: val })}
-                            recommended={[
-                                { name: "deepseek-ocr", desc: "DeepSeek OCR 2 (Consigliato)" },
-                                { name: "minicpm-v:8b-2.6", desc: "MiniCPM-V 8B (Alternativo)" },
-                                { name: "llava:13b", desc: "LLaVA 13B (Vision Generalista)" }
-                            ]}
-                            provider={aiConfig.provider}
-                            targetUrl={aiConfig.url}
-                        />
-
                         <AiRolloutGuardNotice
                             selections={[
                                 {
@@ -177,11 +161,6 @@ export default function SettingsAiModelsPage() {
                                     roleId: 'reasoning',
                                     roleLabel: 'Internista (Reasoning)',
                                     model: aiConfig.model_reasoning,
-                                },
-                                {
-                                    roleId: 'ocr',
-                                    roleLabel: 'Segreteria (OCR)',
-                                    model: aiConfig.model_ocr,
                                 },
                             ]}
                         />

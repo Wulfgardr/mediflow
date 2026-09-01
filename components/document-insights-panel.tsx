@@ -151,7 +151,7 @@ export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanel
                     )}
                     <div className="flex items-center gap-1 rounded-full bg-[color:color-mix(in_srgb,var(--lume-ink)_6%,var(--lume-surface-field))] px-2 py-1 text-xs font-medium text-[color:var(--lume-ink-muted)]">
                         <Sparkles className="w-3 h-3" />
-                        OCR + AI
+                        Estrazione locale + AI
                     </div>
                     <button
                         type="button"
@@ -289,7 +289,7 @@ export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanel
 
             <div className="mt-4 flex items-center gap-2 border-t border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] pt-3 text-[10px] text-[color:var(--lume-ink-muted)]">
                 <AlertTriangle className="w-3 h-3 text-[color:color-mix(in_srgb,var(--lume-signal-warning)_60%,var(--lume-ink))]" />
-                <span>{modelLabels ? `Sintesi generata da IA locale (${modelLabels.ocr} + ${modelLabels.clinical}). Verificare sempre.` : 'Sintesi generata da IA locale. Verificare sempre.'}</span>
+                <span>{modelLabels ? `Sintesi generata da IA locale (${modelLabels.clinical}). Verificare sempre.` : 'Sintesi generata da IA locale. Verificare sempre.'}</span>
             </div>
         </div>
     );
