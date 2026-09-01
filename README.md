@@ -17,12 +17,13 @@ _by Ordito & Concilio_
 
 **Porta l'informazione giusta nel momento giusto.**
 
-[![Versione](https://img.shields.io/badge/versione-0.8.2-1f6feb)](./CHANGELOG.md)
+[![Candidato sorgente](https://img.shields.io/badge/candidato%20locale-0.8.5-1f6feb)](#candidato-sorgente-locale-085)
+[![Ultima release](https://img.shields.io/badge/ultima%20release-0.8.2-6e7681)](./CHANGELOG.md)
 [![Licenza](https://img.shields.io/badge/licenza-MIT-2ea043)](./LICENSE)
 [![Local-first](https://img.shields.io/badge/dati-local--first-8957e5)](#confini-dichiarati)
-[![Core Swift](https://img.shields.io/badge/core%20Swift-macOS%20%7C%20Linux%20%7C%20Windows-6e7681)](#release-sorgente-082)
+[![Core Swift](https://img.shields.io/badge/core%20Swift-macOS%20%7C%20Linux%20%7C%20Windows-6e7681)](#candidato-sorgente-locale-085)
 
-[In breve](#mediflow-in-breve) · [Uso attuale](#come-si-usa-oggi) · [Architettura](#come-collaborano-le-app) · [Schermate](#come-si-presenta) · [Stato](#release-sorgente-082) · [Avvio](#avvio-rapido) · [Sviluppo](#sviluppo-assistito)
+[In breve](#mediflow-in-breve) · [Uso attuale](#come-si-usa-oggi) · [Architettura](#come-collaborano-le-app) · [Schermate](#come-si-presenta) · [Stato](#candidato-sorgente-locale-085) · [Avvio](#avvio-rapido) · [Sviluppo](#sviluppo-assistito)
 
 </div>
 
@@ -40,10 +41,10 @@ AI-first. Dati clinici, terminologie, reference data, ricerca, navigazione e
 workflow deterministici restano funzioni di prima classe anche quando ogni
 provider AI è disabilitato.
 
-Il cloud non è un requisito per lavorare. Quando Ollama è configurato, alcune
-funzioni locali possono preparare materiale da rivedere. Nessun output AI
-aggiunge diagnosi, terapie o altri dati clinici strutturati senza un'azione
-esplicita del medico.
+Il cloud non è un requisito per lavorare. Nel candidato locale `0.8.5`, Ollama
+e ATHENA/MLX servono solo le capability locali assegnate. Quattro percorsi
+Fabric preparano proposte con receipt e provenienza visibili. Nessuna preview
+aggiunge diagnosi, terapie o altri dati clinici strutturati.
 
 Nel contesto territoriale italiano, MediFlow aiuta ad aprire la scheda giusta,
 ritrovare la fonte, distinguere una terapia da una prestazione prescritta e
@@ -103,27 +104,34 @@ Le app condividono capacità e significato clinico, non la stessa disposizione
 pixel per pixel. Trasporto, pairing e limiti del data plane sono documentati in
 [`docs/topologia-dati-flussi.md`](./docs/topologia-dati-flussi.md).
 
-### Uno sguardo oltre la 0.8: Intelligence Fabric
+### Intelligence Fabric nel candidato locale 0.8.5
 
-> **Direzione futura, non presente come funzione completa nella 0.8.**
+> **Candidato sorgente locale. Non è una release e non prova CI remota o
+> disponibilità su un altro host.**
 
-L'Intelligence Fabric potrà collegare una domanda o attività alla sede di
-esecuzione consentita dalla policy. Il routing dovrà essere esplicito,
-osservabile e `fail-closed`.
+L'Intelligence Fabric collega quattro attività nominate alla sede di esecuzione
+consentita dalla policy: `AI Patient Insight`, Smart Import, Document Synthesis
+e Treatment Reasoning. Ogni percorso ha un ingresso applicativo distinto,
+routing host-owned e disposition `proposal_only`.
 
 ```mermaid
 flowchart LR
-    task["Domanda o attività"] --> policy["Routing esplicito<br/>vincolato da policy"]
-    policy --> deterministic["Logica deterministica"]
-    policy -.-> device["Modello on-device"]
-    policy -.-> paired["Home-base paired"]
-    policy -.-> local["Modello locale"]
-    policy -. "solo se approvato" .-> cloud["Provider cloud"]
+    ui["UI MediFlow"] --> services["Application Service Layer"]
+    services --> fabric["Fabric host-owned"]
+    fabric --> ollama["Ollama<br/>capability-specific"]
+    fabric --> athena["ATHENA/MLX<br/>Treatment Reasoning"]
+    fabric --> review["Proposta + receipt + provenienza<br/>revisione del medico"]
+    fabric -. "chiuso" .-> cloud["Cloud / egress"]
 ```
 
-Non esiste fallback silenzioso verso il cloud. MediFlow resta utile quando tutti
-i provider AI sono disabilitati. Provenienza, identità del paziente, sede di
-esecuzione, incertezza e revisione del medico dovranno restare visibili.
+Non esiste fallback silenzioso verso il cloud. Receipt, provenienza e
+currentness restano visibili, ma non sono grant e non autorizzano apply.
+MediFlow resta utile quando tutti i provider AI sono disabilitati.
+
+AnyDoc è una corsia separata e deterministica per l'estrazione locale degli
+allegati supportati. Non è OCR né un provider Fabric. Immagini e PDF
+scansionati senza text layer falliscono chiusi e richiedono revisione manuale;
+le route OCR legacy rispondono `410`.
 
 ## Come si presenta
 
@@ -164,7 +172,61 @@ a dimensioni telefono o tablet restano evidenze di test e non fanno parte
 della galleria. Il [manifest media 0.8](./screenshots/0.8/manifest.json)
 registra dispositivo, runtime, scena, commit sorgente e hash._
 
-## Release sorgente 0.8.2
+## Candidato sorgente locale 0.8.5
+
+Il tree usa la versione `0.8.5`. È un candidato locale: non dichiara CI remota
+sulla stessa SHA, tag, GitHub Release, distribuzione, App Store o release
+readiness.
+
+Quattro percorsi Fabric sono collegati end-to-end alla UI come
+`proposal_only`: Patient Insight, Smart Import, Document Synthesis e Treatment
+Reasoning. Le preview espongono receipt, provenienza e currentness. Nessuna
+preview applica dati clinici. Il
+[crosswalk runtime](./docs/capability-mapping/fabric-generative-runtime-crosswalk.v1.json)
+lega ogni percorso al proprio entrypoint, production root, route ed evidenza
+UI. La receipt storica `candidate_not_integrated` resta distinta e immutata.
+
+AnyDoc è l'unica estrazione automatica locale degli allegati supportati. La
+capability `ocr` è `unavailable` nel runtime corrente e le route OCR legacy
+rispondono `410`. Immagini e scansioni restano in revisione manuale.
+
+I gate F6/F7 chiudono la patch escludendo le parti non pronte:
+
+| Gate | Incluso nel candidato | Escluso dalla 0.8.5 | Esito |
+| :-- | :-- | :-- | :-- |
+| F6 | AnyDoc per testo estraibile; fail-closed per immagini/scansioni | DeepSeek-OCR 2, pipeline selettiva `needsOcr`, provenienza/hash/qualità per pagina, benchmark italiano con soglie ed E2E | `RELEASE_SCOPE_EXCLUDED` |
+| F7 | Ollama locale e ATHENA/MLX per le capability assegnate; disclosure OpenAI/Anthropic read-only | Esecuzione cloud, configurazione credenziali e contratto provider completo | `RELEASE_SCOPE_EXCLUDED` |
+
+OpenAI e Anthropic sono solo righe informative: esecuzione ed egress restano
+disabilitati. Un login o abbonamento consumer non costituisce accesso API. Il
+contratto completo che distingue type, instance, auth, model, capabilities,
+groups, bindings, allowlist e credential classes non è incluso nella patch.
+
+ATHENA richiede un runner MLX offline pre-provisioned, indicato con un percorso
+eseguibile assoluto host-owned in `MEDIFLOW_ATHENA_MLX_GENERATE_BIN`, e il
+modello locale. Il commit `2574cf5fc`
+ha superato TDD 6/6, typecheck ed ESLint. Uno smoke sintetico sul percorso di
+produzione con modello BF16 locale ha completato in 10,6 secondi con 64 token e
+211 caratteri, senza registrare il raw output. È una prova locale singola, non
+readiness universale o validazione clinica.
+
+Il candidato registra i percorsi, i contratti e questa osservazione ATHENA, non
+un benchmark di release per accuratezza OCR, qualità generativa, latenza o
+throughput. La suite finale del tree esatto resta un gate separato prima di ogni
+claim di readiness.
+
+Il piano Headless generale conserva 66 esiti terminali e zero operazioni
+eseguibili. I 32 `GET` network osservati restano evidence candidate. La sola
+eccezione stretta è la append SOAP locale server-side H1-H10, vincolata a
+sessione physician active-role, currentness, revisione clinica, gesto e step-up
+monouso, CAS, audit e receipt. Non abilita Mini, apply generale, authority
+Fabric o un trasporto agentico.
+
+Cloud, egress, MCP, visita registrabile, semantic query planner, SQL diretto e
+invocazione AI dai client paired restano fuori scope. I limiti completi sono in
+[`docs/known-limitations.md`](./docs/known-limitations.md).
+
+### Ultima release pubblicata: 0.8.2
 
 La release `0.8.2` distribuisce il codice sorgente verificato. Non costituisce
 una pubblicazione App Store, una certificazione o una dichiarazione di
@@ -181,7 +243,7 @@ Queste prove non dichiarano parity completa o conformità accessibilità. Il
 limite VoiceOver mobile resta registrato in
 [`docs/known-limitations.md`](./docs/known-limitations.md).
 
-### Aggiornamenti integrati
+#### Contenuti della 0.8.2
 
 La tranche integrata richiede una revisione umana prima di ogni scrittura
 clinica proposta dall'AI. Le API non espongono messaggi grezzi delle eccezioni.
@@ -198,55 +260,28 @@ Il dettaglio è nel [CHANGELOG](./CHANGELOG.md). La fotografia completa vive in
 [`docs/STATE_OF_THE_SYSTEM.md`](./docs/STATE_OF_THE_SYSTEM.md); la matrice
 parity canonica vive in [`docs/parity-matrix.md`](./docs/parity-matrix.md).
 
-### Modelli e servizi opzionali
-
-Le funzioni deterministiche restano disponibili senza un modello. Il percorso
-AI locale usa Ollama ed è disponibile quando Ollama è configurato.
-L'architettura separa il servizio applicativo dal connettore del modello. Oggi
-è operativo soltanto il connettore Ollama.
-
-Una futura modifica può aggiungere plug-in opzionali per modelli locali, LAN o
-cloud. Le regole dell'organizzazione e la scelta esplicita dell'utente devono
-consentire ogni attivazione.
-
-La direzione post-0.8 prende il nome di **Intelligence Fabric**: una capability
-potrà usare logica deterministica, un modello on-device, un home-base paired, un
-modello locale o un provider cloud approvato. Il routing dovrà essere esplicito,
-osservabile, vincolato da policy e fail-closed. Questa direzione non è una
-funzione completa della 0.8.
-
-Un fornitore esterno può offrire più capacità o ridurre alcuni tempi di
-elaborazione. Non è un requisito e non implica una promessa clinica.
-
-Prima di ogni invio servono minimizzazione, controlli verificati, registrazione
-locale e abilitazione esplicita. La redazione o pseudonimizzazione deve essere
-dimostrata per il flusso specifico. MediFlow non dichiara anonimizzazione
-garantita.
-
-Il controllo dell'invio esterno resta oggi chiuso. Nessun plug-in esterno accede
-direttamente al database. Il flusso separa proposta, chiarimento e scrittura
-autorizzata; la scrittura diretta tramite modello non è consegnata.
-
-L'[ADR 0086](./docs/adr/0086-intelligent-scaffold-and-graded-automation-boundary.md)
-definisce il contratto comune post-0.8 per Document Ops, riconciliazione
-anagrafica, sunto clinico, Atena e provider. Distingue le funzioni presenti
-dalla roadmap e non modifica il candidato 0.8. La futura inbox conversazionale
-e l'automazione graduata non sono funzioni live della 0.8.
-
 ## Confini dichiarati
 
 MediFlow non racconta più di quanto possa dimostrare.
 
 - **Il default è locale.** Nessun cloud obbligatorio, nessuna telemetria o
   uscita dati attiva per impostazione iniziale.
-- **I fornitori esterni non sono operativi.** L'estensione a plug-in richiede
-  attivazione esplicita, registrazione locale e controlli sull'invio esterno.
+- **I fornitori esterni non sono operativi.** OpenAI e Anthropic compaiono solo
+  come disclosure informative; non esistono configurazione credenziali,
+  esecuzione cloud o egress nella patch.
+- **I quattro percorsi Fabric sono proposal-only.** Receipt e provenienza sono
+  visibili, ma nessuna preview applica dati clinici.
+- **OCR non è disponibile nel runtime corrente.** AnyDoc estrae solo documenti
+  locali supportati; immagini e scansioni senza text layer falliscono chiuse.
+  DeepSeek-OCR 2 non è implementato, benchmarkato o incluso nella `0.8.5`.
+- **Headless generale resta a zero operazioni.** La sola eccezione è la append
+  SOAP H1-H10 confermata dal medico, senza trasporto agentico generale.
 - **iPhone e iPad non sono app complete.** Il perimetro operativo è
   `home-base + client paired`; cache offline e alcune superfici derivate dai
   documenti restano parziali o disponibili solo sull'host.
-- **Windows e Linux non hanno ancora parity applicativa.** La release verifica il
-  core Swift condiviso e il runtime di base, non applicazioni complete su ogni
-  piattaforma.
+- **Windows e Linux non hanno ancora parity applicativa.** La baseline verifica
+  il core Swift condiviso e il runtime di base, non applicazioni complete su
+  ogni piattaforma.
 - **SISS e FSE restano un handoff assistito.** MediFlow apre il contesto giusto,
   ma non dichiara sincronizzazione FSE, writeback regionale o invio
   prescrittivo diretto.
@@ -254,6 +289,8 @@ MediFlow non racconta più di quanto possa dimostrare.
   sostituisce revisione, giudizio clinico o responsabilità professionale.
 - **La inbox intelligente non è consegnata.** Le route conversazionali di base
   non costituiscono un flusso di chiarimento o conversione in record clinici.
+- **MCP, visita registrabile e semantic query non sono consegnati.** Non
+  esistono server/onboarding MCP, registrazione visita o planner SQL.
 
 Delle 43 capability per cui la parity è un obiettivo, 30 sono complete e 13
 parziali; altre 21 restano intenzionalmente host-only. La matrice fa fede sui
@@ -279,8 +316,9 @@ Poi usa il launcher della tua piattaforma:
 | Windows | `powershell -ExecutionPolicy Bypass -File .\Start-MediFlow.ps1` |
 | Linux | `./scripts/start-mediflow.sh` |
 
-Apri `http://localhost:3000`. Ollama, Docker e ICD-11 sono opzionali; senza,
-MediFlow resta usabile con funzionalità ridotte.
+Apri `http://localhost:3000`. Ollama, ATHENA/MLX, Docker e ICD-11 sono
+opzionali; senza, MediFlow resta usabile con funzionalità ridotte. OpenAI e
+Anthropic non sono configurabili o eseguibili nel candidato `0.8.5`.
 
 ## Documentazione
 
@@ -300,7 +338,7 @@ La prima lingua visiva del cockpit è derivata da
 originale. Il ragionamento terapeutico review-only usa
 [ATHENA](https://github.com/mims-harvard/ATHENA) di mims-harvard, con licenza
 MIT. Il lavoro sulla visita registrabile prende a riferimento l'ecosistema
-Fluid.
+Fluid, ma la visita registrabile resta fuori scope nel candidato `0.8.5`.
 
 Modelli, runtime, librerie e ispirazioni, con URL, ruolo e licenza, sono in
 **[CREDITS.md](./CREDITS.md)**.
