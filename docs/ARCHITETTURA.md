@@ -43,7 +43,7 @@ flowchart TD
 
     subgraph "Servizi locali"
         Ollama["Ollama :11434"]
-        ICD["ICD-11 Docker :8888"]
+        ICD["ICD-11 WHO<br/>server-only"]
         OpenMed["OpenMed redaction :18080"]
     end
 

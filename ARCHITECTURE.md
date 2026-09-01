@@ -46,7 +46,7 @@ MediFlow è un **sistema ibrido locale**:
   - ATHENA-R1-Qwen3-8B su MLX per Treatment Reasoning
   - AnyDoc come unica estrazione automatica locale e deterministica degli
     allegati
-  - ICD-11 Docker API per ricerca diagnosi (localhost)
+  - Application Service ICD-11 WHO server-only, egress opt-in
   - sidecar locale OpenMed per redaction shadow/benchmark (localhost, non client-facing)
 - Strategia client Apple:
   - la web app sul Mac resta la superficie primaria di oggi
@@ -72,7 +72,7 @@ create documentale manuale per client trusted su LAN.
 | Ollama (AI generativa generale) | `http://127.0.0.1:11434` | opzionale; non esegue OCR nel percorso allegati 0.8.5 |
 | ATHENA su MLX | processo locale bounded | opzionale; solo Treatment Reasoning, con runner e modello locali configurati |
 | AnyDoc | processo figlio locale bounded | unica estrazione automatica degli allegati; nessuna rete e nessun OCR |
-| ICD-11 (Docker) | `http://127.0.0.1:8888` | opzionale |
+| ICD-11 WHO | HTTPS ufficiale, solo dal server | opzionale, egress opt-in |
 | OpenMed redaction (shadow) | `http://127.0.0.1:18080` | opzionale, non client-facing |
 
 ---
@@ -226,7 +226,7 @@ flowchart TB
     Ollama["Ollama :11434"]
     Athena["ATHENA / MLX<br/>Treatment Reasoning"]
     AnyDoc["AnyDoc<br/>estrazione locale"]
-    ICD["ICD-11 Docker :8888"]
+    ICD["ICD-11 WHO<br/>server-only"]
   end
 
   Web -->|HTTP| Next

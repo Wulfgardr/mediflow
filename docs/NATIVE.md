@@ -37,7 +37,7 @@ La base corrente va letta cosi:
 
 * **macOS**: `MediFlowMacApp` e il fronte nativo piu maturo. Il bundle packaged
   include il WebRuntime Next standalone e puo osservare o gestire esplicitamente
-  backend locale e proxy TLS senza diventare supervisore di Ollama o Docker.
+  backend locale e proxy TLS senza diventare supervisore dei provider AI opzionali.
 * **iPhone/iPad**: `MediFlowMobileApp` usa la stessa libreria SwiftUI e il
   boundary `/api/v1/network/*`. I workflow paired online coprono lifecycle
   paziente, moduli clinici non-AI, cataloghi, prestazioni/protesica e create
@@ -160,10 +160,9 @@ la family architecture. In questa slice il bundle **osserva** il runtime locale:
   script `local-api-tls-proxy.mjs` incluso nel bundle;
 * arresta backend/proxy con timeout esplicito e escalation locale quando il
   processo non termina in modo ordinato;
-* mostra lo stato diagnostico read-only di Ollama (`127.0.0.1:11434`) e
-  Docker/ICD (`127.0.0.1:8888`) quando sono gia attivi;
+* mostra lo stato diagnostico read-only di Ollama (`127.0.0.1:11434`) e MLX;
 * non mostra mai token, certificati, chiavi o dati paziente;
-* non installa, avvia, arresta o supervisiona Ollama o container Docker.
+* non installa, avvia, arresta o supervisiona i provider AI opzionali.
 
 `scripts/build-apple-macos-app.sh` produce il bundle universale macOS con il
 WebRuntime incluso, non firmato per default, e puo firmarlo con

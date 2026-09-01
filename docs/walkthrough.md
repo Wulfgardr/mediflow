@@ -86,7 +86,7 @@ graph TB
         OLLAMA["Ollama :11434"]
         ATHENA["ATHENA su MLX (processo locale)"]
         ANYDOC["AnyDoc (worker locale)"]
-        ICD["ICD-11 Docker :8888"]
+        ICD["ICD-11 WHO<br/>server-only"]
         OPENMED["OpenMed redaction :18080 (shadow)"]
     end
 
@@ -121,7 +121,7 @@ graph TB
 | Ollama | `11434` | Provider locale per Patient Insight, Smart Import e Document Synthesis |
 | ATHENA su MLX | n/a | Provider locale dedicato a Treatment Reasoning, se configurato |
 | AnyDoc | n/a | Worker locale senza porta di rete per allegati con testo estraibile |
-| ICD-11 (Docker) | `8888` | Diagnosi ICD-11 |
+| ICD-11 WHO | HTTPS ufficiale | Diagnosi ICD-11, egress opt-in server-only |
 | OpenMed redaction (shadow) | `18080` | Sidecar locale benchmark/shadow per `redaction.v1` |
 
 ---
@@ -575,9 +575,10 @@ bundle compilato e ora la shell Apple/home-base: il pannello `Runtime` legge
 `native-config.json` e `runtime-status.json` per mostrare readiness locale senza
 esporre token, certificati, chiavi o dati paziente. Il pannello puo avviare e
 arrestare esplicitamente il backend web production standalone e il proxy TLS
-inclusi nel bundle con stop bounded/escalation locale. Ollama e Docker/ICD
-compaiono solo come health diagnostico read-only se gia attivi su localhost; non
-vengono installati, avviati o arrestati dalla app.
+inclusi nel bundle con stop bounded/escalation locale. Ollama e MLX compaiono
+solo come health diagnostico read-only; non vengono installati, avviati o
+arrestati dalla app. ICD-11 WHO usa invece la readiness autenticata della web
+app e non viene sondato dalla shell nativa.
 
 La scheda `Impostazioni -> Cataloghi` della shell macOS espone la minima
 operabilita amministrativa dei dataset condivisi: count/stato, import JSON
@@ -671,7 +672,7 @@ sequenceDiagram
 ## 🧪 Checklist operativa
 
 1) Avvia `npm run dev` (o `Start_MediFlow.command`)  
-2) Avvia ICD-11 Docker (`docker compose up -d icd-api`)  
+2) Configura ICD-11 WHO solo se autorizzato, seguendo `docs/icd-who-setup.md`
 3) Avvia TLS proxy (`scripts/native-setup.sh` o `Launch_MediFlowMac.command`)  
 4) Apri web app e completa il setup PIN  
 5) Avvia app macOS e fai login con PIN  

@@ -32,7 +32,6 @@ destinazione di export. Dati e artifact sensibili restano fuori da Git secondo
 
 - Node.js **24.x**, come fissato da `.nvmrc` e `package.json`
 - npm (incluso con Node)
-- Docker Desktop (opzionale, per API ICD-11)
 - Ollama (opzionale, per Patient Insight, Smart Import e Document Synthesis)
 - Apple Silicon, artifact locale ATHENA e toolchain MLX (opzionali, solo per
   Treatment Reasoning)

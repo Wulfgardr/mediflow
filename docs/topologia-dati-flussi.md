@@ -54,7 +54,7 @@ flowchart TB
     Ollama["Ollama :11434"]
     Athena["ATHENA su MLX (processo locale)"]
     AnyDoc["AnyDoc (worker locale)"]
-    ICD["ICD-11 Docker :8888"]
+    ICD["ICD-11 WHO<br/>server-only"]
     OpenMed["OpenMed redaction :18080 (shadow)"]
   end
   subgraph "Local Filesystem"

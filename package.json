@@ -130,7 +130,6 @@
     "seed:performance-baseline": "node scripts/run-strip-types.mjs scripts/seed-performance-baseline.mjs",
     "benchmark:list-routes": "node scripts/benchmark-list-routes.mjs",
     "benchmark:clinical-facts:observations": "node scripts/run-strip-types.mjs scripts/benchmark-observation-facts.mjs",
-    "benchmark:icd-resolver": "node scripts/run-strip-types.mjs scripts/benchmark-icd-resolver.ts",
     "benchmark:aifa-resolver": "node scripts/run-strip-types.mjs scripts/benchmark-aifa-resolver.ts",
     "benchmark:ai-task-contracts": "node scripts/run-strip-types.mjs scripts/benchmark-ai-task-contracts.ts",
     "benchmark:document-decision": "node scripts/run-strip-types.mjs scripts/benchmark-document-decision.ts",

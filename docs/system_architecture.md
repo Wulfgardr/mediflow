@@ -59,7 +59,7 @@ Per la mappa documentale completa usa [docs/README.md](./README.md) e [docs/mark
 | ATHENA/MLX | Runtime locale configurabile | Serve Treatment Reasoning solo con modello e runner `mlx_lm.generate` pre-provisionati; assenza o configurazione incompleta falliscono in modo chiuso |
 | AnyDoc | Estrazione documentale locale | Unica estrazione automatica inclusa per formati con testo estraibile, con provenienza e currentness |
 | OCR automatico | Non disponibile nella 0.8.5 | Immagini, scansioni e documenti senza testo utile richiedono review manuale; DeepSeek-OCR 2 e Apple Vision restano fuori dal perimetro di rilascio |
-| ICD-11 Docker | Servizio locale opzionale | Resolver diagnostico OMS |
+| ICD-11 WHO | Application Service server-only opzionale | Output MediFlow data-only, egress e credenziali espliciti |
 | OpenMed redaction | Sidecar shadow opzionale | Lane `redaction.v1` benchmark/shadow, non client-facing |
 | TLS proxy `:3443` | Trasporto locale fidato | Base di `/api/v1` per native e `home-base` |
 
