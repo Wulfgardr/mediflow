@@ -22,11 +22,14 @@ export function useLiveQuery<T, TDefault = undefined>(
     const [revision, setRevision] = useState(0);
     /* @Codex */
     const tablesRef = useRef(tables);
-    tablesRef.current = tables;
 
     useEffect(() => {
         querierRef.current = querier;
     }, [querier]);
+
+    useEffect(() => {
+        tablesRef.current = tables;
+    }, [tables]);
 
     useEffect(() => dbChangeBus.subscribeWithScopeResolver(() => {
         setRevision((previous) => previous + 1);
@@ -82,11 +85,14 @@ export function useLiveQueryState<T, TDefault = undefined>(
     const refresh = useCallback(() => setRevision((previous) => previous + 1), []);
     /* @Codex */
     const tablesRef = useRef(tables);
-    tablesRef.current = tables;
 
     useEffect(() => {
         querierRef.current = querier;
     }, [querier]);
+
+    useEffect(() => {
+        tablesRef.current = tables;
+    }, [tables]);
 
     useEffect(() => dbChangeBus.subscribeWithScopeResolver(() => {
         setRevision((previous) => previous + 1);

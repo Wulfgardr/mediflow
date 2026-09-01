@@ -2,7 +2,7 @@
 
 // WUL-297 Repertori (AIFA + esenzioni): moved from the monolithic settings page.
 
-import { useState, useEffect, useRef } from 'react';
+import { useCallback, useState, useEffect, useRef } from 'react';
 import { AlertTriangle, Database, Server, Upload } from 'lucide-react';
 import {
     importAifaCsv,
@@ -30,18 +30,19 @@ export default function SettingsRepertoriPage() {
     const [downloadedAt, setDownloadedAt] = useState(() => new Date().toISOString().slice(0, 10));
     const [datasetVersion, setDatasetVersion] = useState('');
 
-    // Load initial data
-    useEffect(() => {
-        loadStatus();
-    }, []);
-
-    const loadStatus = async () => {
+    /* @Codex Stable loader shared by initial hydration and explicit refresh. */
+    const loadStatus = useCallback(async () => {
         try {
             setDrugCatalog(await getDrugCatalogStatus());
         } catch (e) {
             console.error(e);
         }
-    };
+    }, []);
+
+    // Load initial data
+    useEffect(() => {
+        void loadStatus();
+    }, [loadStatus]);
 
     // --- AIFA Handlers ---
     const handleAifaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {

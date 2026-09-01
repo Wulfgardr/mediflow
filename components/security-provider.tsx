@@ -236,15 +236,6 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         };
     }, []);
 
-    // Initial check
-    useEffect(() => {
-        const init = async () => {
-            const restored = await restoreSession();
-            checkAuthStatus(restored);
-        };
-        init();
-    }, []);
-
     const checkAuthStatus = async (isSessionRestored?: boolean) => {
         try {
             const { response: res, payload: data, controlState } = await checkAuthHealthRequest();
@@ -358,6 +349,15 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             return false;
         }
     };
+
+    // Initial check
+    useEffect(() => {
+        const init = async () => {
+            const restored = await restoreSession();
+            await checkAuthStatus(restored);
+        };
+        void init();
+    }, []);
 
     const login = async (pin: string): Promise<boolean> => {
         const attemptGeneration = ++authorityAttemptGenerationRef.current;
