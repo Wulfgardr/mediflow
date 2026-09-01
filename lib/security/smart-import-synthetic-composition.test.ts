@@ -41,19 +41,25 @@ function resolution(chat: LocalProviderResolution['adapter']['chat']): LocalProv
 function request(path: string, init?: RequestInit): Request { return new Request(new URL(path, 'http://localhost'), { method: init?.method, headers: init?.headers, body: init?.body }); }
 
 function harness(tamper = false) {
-    const now = new Date().toISOString(); const noStore: string[] = []; let entropy = 0; let selectionCalls = 0; let ingestCalls = 0; let previewCalls = 0; let killSwitchReads = 0; let consumes = 0; let chats = 0; let routers = 0;
+    const now = new Date().toISOString(); const noStore: string[] = []; let entropy = 0; let selectionAcquisitions = 0; let ingestAcquisitions = 0; let previewAcquisitions = 0; let selectionCalls = 0; let ingestCalls = 0; let previewCalls = 0; let killSwitchReads = 0; let consumes = 0; let chats = 0; let routers = 0;
     const session = issueSyntheticWebSession(USER, `smart-import-composition-${sessionSequence += 1}`);
     sessions.push(session);
     const registry = createFullPortProjectionOwnerFactory({ resolve: (_session, pair) => Object.freeze({ ...pair, patientVersion: 1 }), clock: () => Date.parse(now), entropy: () => bytes(++entropy), brokerFactory: (config) => createTypedProjectionBroker(config, { clock: () => now, entropy: () => bytes(++entropy) }) });
-    const acquireContext = async () => Object.freeze({ session, owner: registry.acquire(session) });
-    const selection = createAuthenticatedWebSessionSelectionService({ acquireOwner: async () => registry.acquire(session) });
-    const selectionHttp = createSmartImportSelectionHttpHandler({ issueSelection: async (input) => { selectionCalls += 1; return selection.issue(input); } });
+    const context = () => Object.freeze({ session, owner: registry.acquire(session) });
+    const selection = createAuthenticatedWebSessionSelectionService({ acquireOwner: async () => { selectionAcquisitions += 1; return registry.acquire(session); } });
+    const selectionHttp = createSmartImportSelectionHttpHandler({ acquireSelection: async () => {
+        const operation = await selection.acquire();
+        return Object.freeze({ issueSelection: async (input: unknown) => { selectionCalls += 1; return operation.issueSelection(input); } });
+    } });
     const epochHttp = createSmartImportSelectionEpochHttpHandler({ readEpoch: async () => registry.snapshotSelectionEpoch(session) });
-    const ingest = createAuthenticatedSmartImportAttachmentIngestService({ acquireContext, ingestWithOwner: (current, owner, input) => { ingestCalls += 1; return ingestServerSessionSmartImportAttachmentWithOwner(current, owner, input); } });
-    const ingestHttp = createSmartImportIngestHttpHandler({ ingest: ingest.ingest });
+    const ingest = createAuthenticatedSmartImportAttachmentIngestService({ acquireContext: async () => { ingestAcquisitions += 1; return context(); }, ingestWithOwner: (current, owner, input) => { ingestCalls += 1; return ingestServerSessionSmartImportAttachmentWithOwner(current, owner, input); } });
+    const ingestHttp = createSmartImportIngestHttpHandler({ acquireIngest: ingest.acquire });
     const binding = resolution(async () => { chats += 1; return { content: JSON.stringify({ schemaVersion: 'mediflow.ai.extract.v1', task: 'smart_import', summary: 'Synthetic review', data: { diagnoses: [{ label: 'Synthetic diagnosis', icdQuery: 'SYN', confidence: 'high', evidence: 'Synthetic evidence', sourceId: 'source.local.00000000001.01', explicitCode: undefined }], therapies: [], servicePrescriptions: [] } }), stats: { latency: 1, tokensIn: 1, tokensOut: 1 } }; });
-    const preview = createAuthenticatedSmartImportPreviewService({ acquireContext, createCapability: (broker) => createPatientSmartImportHostCapability({ killSwitch: createPatientSmartImportHostKillSwitch({ readSetting: async () => { killSwitchReads += 1; return 'enabled'; } }), broker: { consume: (input) => { consumes += 1; return broker.consume(input); } }, lifecycle: { read: () => ({ status: 'available', record: { schemaVersion: 'mediflow.ai.provider-lifecycle-record.v1', lifecycle: { schemaVersion: 'mediflow.ai.provider-lifecycle.v1', provider: 'ollama', credentialClass: 'local_model', status: 'available_unqualified' }, actorClass: 'host_service', actorRef: `actor_${'a'.repeat(32)}`, version: 1, hostTimestamp: now, receiptRef: `receipt_${'b'.repeat(32)}` } }) }, binding: { readClinical: async () => ({ status: 'available', resolution: binding }) }, readiness: { observeClinical: async () => ({ status: 'available', code: null, observation: { venue: 'local_process', state: 'available', reason: null } }) }, route: (input, lifecycle) => { routers += 1; return routeHostResolvedCandidateCapability(input, lifecycle); }, sources: { clock: () => now, entropy: () => bytes(7) } }) });
-    const previewHttp = createSmartImportPreviewHttpHandler({ preview: async (input) => { previewCalls += 1; return preview.preview(input); } });
+    const preview = createAuthenticatedSmartImportPreviewService({ acquireContext: async () => { previewAcquisitions += 1; return context(); }, createCapability: (broker) => createPatientSmartImportHostCapability({ killSwitch: createPatientSmartImportHostKillSwitch({ readSetting: async () => { killSwitchReads += 1; return 'enabled'; } }), broker: { consume: (input) => { consumes += 1; return broker.consume(input); } }, lifecycle: { read: () => ({ status: 'available', record: { schemaVersion: 'mediflow.ai.provider-lifecycle-record.v1', lifecycle: { schemaVersion: 'mediflow.ai.provider-lifecycle.v1', provider: 'ollama', credentialClass: 'local_model', status: 'available_unqualified' }, actorClass: 'host_service', actorRef: `actor_${'a'.repeat(32)}`, version: 1, hostTimestamp: now, receiptRef: `receipt_${'b'.repeat(32)}` } }) }, binding: { readClinical: async () => ({ status: 'available', resolution: binding }) }, readiness: { observeClinical: async () => ({ status: 'available', code: null, observation: { venue: 'local_process', state: 'available', reason: null } }) }, route: (input, lifecycle) => { routers += 1; return routeHostResolvedCandidateCapability(input, lifecycle); }, sources: { clock: () => now, entropy: () => bytes(7) } }) });
+    const previewHttp = createSmartImportPreviewHttpHandler({ acquirePreview: async () => {
+        const operation = await preview.acquire();
+        return Object.freeze({ preview: async (input: unknown) => { previewCalls += 1; return operation.preview(input); } });
+    } });
     const fetch: typeof globalThis.fetch = async (path, init) => {
         const pathname = String(path); const response = pathname.endsWith('/selection') ? init?.method === 'GET' ? await epochHttp() : await selectionHttp(request(pathname, init)) : pathname.endsWith('/ingest') ? await ingestHttp(request(pathname, init)) : await previewHttp(request(pathname, init));
         noStore.push(response.headers.get('Cache-Control') ?? ''); if (!pathname.endsWith('/ingest') || !response.ok) return response;
@@ -62,18 +68,18 @@ function harness(tamper = false) {
     };
     const browserSelection = createSmartImportSelectionBrowserAdapter({ fetch }); const normalizer = createSmartImportProjectionAttachmentBrowserNormalizer({ clock: () => new Date(now) });
     const browser = createSmartImportBrowserOrchestrator({ fetch, isCurrent: browserSelection.isCurrent, requestId: (() => { let id = 0; return () => `req_${(++id).toString(16).padStart(32, 'a')}`; })() });
-    return { browserSelection, normalizer, browser, counts: () => ({ selectionCalls, ingestCalls, previewCalls, killSwitchReads, consumes, chats, routers }), noStore };
+    return { browserSelection, normalizer, browser, counts: () => ({ selectionAcquisitions, ingestAcquisitions, previewAcquisitions, selectionCalls, ingestCalls, previewCalls, killSwitchReads, consumes, chats, routers }), noStore };
 }
 test('runs the synthetic browser-to-wire contract through real HTTP JSON boundaries', async () => {
     const current = harness(); await current.browserSelection.initialize(); const lease = await current.browserSelection.select({ patientId: 'patient.synthetic.1', ambulatoryId: 'ambulatory.synthetic.1' }, true);
     const bound = current.normalizer.captureForCurrentSelection(attachmentInput(), true, lease, current.browserSelection.isCurrent); const root = await current.browser.run(lease, bound);
     assert.deepEqual(parseSmartImportPreviewWireRoot(root), root); assert.equal(root.preview.status, 'available', JSON.stringify(root.preview)); assert.equal(root.preview.writesPerformed, 0); assert.equal(root.preview.apply, 'denied');
     if (root.preview.status === 'available') { assert.equal(root.preview.receipt.provider, 'ollama'); assert.equal(root.preview.provenance.receipt.model, 'synthetic-local-model'); assert.equal('explicitCode' in root.preview.proposal.diagnoses[0], false); }
-    assert.deepEqual(current.counts(), { selectionCalls: 1, ingestCalls: 1, previewCalls: 1, killSwitchReads: 1, consumes: 1, chats: 1, routers: 1 }); assert.deepEqual(current.noStore, ['no-store', 'no-store', 'no-store', 'no-store']);
+    assert.deepEqual(current.counts(), { selectionAcquisitions: 1, ingestAcquisitions: 1, previewAcquisitions: 1, selectionCalls: 1, ingestCalls: 1, previewCalls: 1, killSwitchReads: 1, consumes: 1, chats: 1, routers: 1 }); assert.deepEqual(current.noStore, ['no-store', 'no-store', 'no-store', 'no-store']);
 });
 
 test('denies a tampered ingest handle after capability entry and before routing or chat', async () => {
     const current = harness(true); await current.browserSelection.initialize(); const lease = await current.browserSelection.select({ patientId: 'patient.synthetic.1', ambulatoryId: 'ambulatory.synthetic.1' }, true);
     const bound = current.normalizer.captureForCurrentSelection(attachmentInput(), true, lease, current.browserSelection.isCurrent); const root = await current.browser.run(lease, bound);
-    assert.equal(root.preview.status, 'denied'); assert.equal(root.preview.code, 'projection_unavailable'); assert.deepEqual(current.counts(), { selectionCalls: 1, ingestCalls: 1, previewCalls: 1, killSwitchReads: 1, consumes: 1, chats: 0, routers: 0 });
+    assert.equal(root.preview.status, 'denied'); assert.equal(root.preview.code, 'projection_unavailable'); assert.deepEqual(current.counts(), { selectionAcquisitions: 1, ingestAcquisitions: 1, previewAcquisitions: 1, selectionCalls: 1, ingestCalls: 1, previewCalls: 1, killSwitchReads: 1, consumes: 1, chats: 0, routers: 0 });
 });

@@ -25,7 +25,6 @@ import {
 } from '@/lib/ai-smart-import-kill-switch';
 import {
     applyPatientSmartImportSelection,
-    buildPatientSmartImportProjectionCaptureInput,
     generatePatientSmartImportAnalysis,
     type DiagnosisSmartImportSuggestion,
     type PatientSmartImportAnalysis,
@@ -33,6 +32,10 @@ import {
     type TherapySmartImportSuggestion,
     type TherapySuggestionState,
 } from '@/lib/domain/documents/patient-smart-import-service';
+import {
+    buildPatientSmartImportProjectionCaptureInput,
+    countUsableSources,
+} from '@/lib/domain/documents/patient-smart-import-projection-capture';
 import type { SmartImportReviewSnapshot } from '@/lib/domain/documents/patient-review-queue-summary';
 import { semanticSignalSurfaceClass } from '@/components/ui/semantic-signal';
 import {
@@ -47,21 +50,6 @@ interface PatientSmartImportPanelProps {
     /* WUL-262: lets patient detail mirror reviewable/blocked/ready counts in the
        review-queue summary without duplicating panel state or behavior. */
     onReviewSnapshotChange?: (snapshot: SmartImportReviewSnapshot) => void;
-}
-
-export function countUsableSources(
-    patient: Patient,
-    entries: ClinicalEntry[] | undefined,
-    attachmentSummaryCount: number
-): number {
-    const documentInsightCount = Array.isArray(patient.documentInsights) ? patient.documentInsights.length : 0;
-
-    return [
-        patient.notes?.trim() ? 1 : 0,
-        entries?.filter((entry) => !entry.deletedAt && entry.content?.trim()).length || 0,
-        documentInsightCount,
-        attachmentSummaryCount,
-    ].reduce((total, count) => total + count, 0);
 }
 
 function therapyStateLabel(state: TherapySuggestionState): string {

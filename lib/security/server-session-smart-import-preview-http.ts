@@ -4,15 +4,15 @@ import 'server-only';
 import { NextResponse } from 'next/server';
 
 import { apiFailure, apiInternalError } from '../api-error-response';
-import type { PatientSmartImportHostCapabilityResult } from '../domain/documents/patient-smart-import-host-capability';
 import { serializeSmartImportPreviewWireRoot } from '../smart-import-preview-wire';
 import {
     AuthenticatedSmartImportPreviewError,
     type AuthenticatedSmartImportPreviewErrorCode,
+    type AuthenticatedSmartImportPreviewOperation,
 } from './server-session-authenticated-smart-import-preview';
 
 type PreviewInput = Readonly<{ handle: string; requestId: string }>;
-type Sources = Readonly<{ preview(input: PreviewInput): Promise<PatientSmartImportHostCapabilityResult> }>;
+type Sources = Readonly<{ acquirePreview(): Promise<AuthenticatedSmartImportPreviewOperation> }>;
 
 const MESSAGE = 'Preview Smart Import non disponibile.';
 
@@ -51,12 +51,17 @@ function typedFailure(code: AuthenticatedSmartImportPreviewErrorCode): NextRespo
 
 export function createSmartImportPreviewHttpHandler(sources: Sources) {
     return async (request: Request): Promise<NextResponse> => {
+        let operation: AuthenticatedSmartImportPreviewOperation;
+        try { operation = await sources.acquirePreview(); } catch (error) {
+            if (error instanceof AuthenticatedSmartImportPreviewError) return typedFailure(error.code) ?? apiInternalError('POST Smart Import preview', error);
+            return apiInternalError('POST Smart Import preview', error);
+        }
         let value: unknown;
         try { value = await request.json(); } catch { return failure('input_invalid', 400); }
         const parsed = input(value);
         if (!parsed) return failure('input_invalid', 400);
         try {
-            const result = await sources.preview(parsed);
+            const result = await operation.preview(parsed);
             const snapshot = serializeSmartImportPreviewWireRoot({ preview: result });
             if (!snapshot) return apiInternalError('POST Smart Import preview', result);
             const response = NextResponse.json(snapshot); response.headers.set('Cache-Control', 'no-store');

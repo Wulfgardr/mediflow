@@ -9,13 +9,7 @@ import {
     type SmartImportTherapyExtraction as ParsedAiTherapy,
     type TherapySuggestionState,
 } from '../../ai-task-contracts';
-import { db, type AifaDrug, type ClinicalEntry, type Diagnosis, type DocumentInsight, type Patient, type Therapy } from '../../db';
-/* @Codex */
-import { clinicalRichTextToPlainText } from '../../clinical-rich-text';
-/* @Codex */
-import { dedupeDocumentInsightsForContext } from './document-insight-context';
-/* @Codex */
-import { renderDocumentEvidencePackContext } from './document-evidence-pack';
+import { db, type AifaDrug, type ClinicalEntry, type Diagnosis, type Patient, type Therapy } from '../../db';
 import { searchICDHybrid, type ICDSearchResult } from '../../icd-service';
 import {
     buildDiagnosisSearchQueries,
@@ -44,11 +38,23 @@ import {
     executePatientSmartImportFabricPreview,
     PATIENT_SMART_IMPORT_FABRIC_METADATA,
 } from './patient-smart-import-fabric';
+/* @Codex */
+import {
+    buildPatientSmartImportSourceRecords as buildSourceRecords,
+    buildPatientSmartImportTherapyCandidateHints as buildTherapyCandidateHints,
+    parsePatientSmartImportDiagnoses as parseDiagnoses,
+    trimPatientSmartImportSnippet as trimSnippet,
+    type PatientSmartImportEvidenceSourceKind,
+    type PatientSmartImportSourceRecord as SmartImportSourceRecord,
+} from './patient-smart-import-projection-capture';
+
+export { buildPatientSmartImportProjectionCaptureInput } from './patient-smart-import-projection-capture';
+export type { PatientSmartImportProjectionCaptureInput } from './patient-smart-import-projection-capture';
 
 export type { SmartImportConfidence, TherapySuggestionState, SmartImportReview, SmartImportReviewState };
 
 export interface SmartImportEvidence {
-    sourceKind: 'patient-notes' | 'clinical-entry' | 'document-insight' | 'attachment-summary';
+    sourceKind: PatientSmartImportEvidenceSourceKind;
     sourceId: string;
     label: string;
     excerpt: string;
@@ -151,14 +157,6 @@ export interface PatientSmartImportAnalysis {
     therapies: TherapySmartImportSuggestion[];
 }
 
-interface SmartImportSourceRecord {
-    id: string;
-    kind: SmartImportEvidence['sourceKind'];
-    label: string;
-    date?: string;
-    content: string;
-}
-
 type DiagnosisSearchLoader = (query: string) => Promise<ICDSearchResult[]>;
 type DrugCatalogSearchLoader = (query: string) => Promise<AifaDrug[]>;
 
@@ -169,25 +167,7 @@ export interface ApplySmartImportResult {
     appliedTherapyIds: string[];
 }
 
-const THERAPY_HINT_LIMIT = 14;
 const SMART_IMPORT_OUTPUT_MAX_TOKENS = 1100;
-const DOSAGE_TOKEN_REGEX = /\b\d+(?:[.,]\d+)?\s*(?:mg|mcg|g|ml|ui|u|cp|cps|cpr|caps(?:ule)?|compress(?:a|e)|gtt|fial(?:a|e)|spruzzi?)\b/i;
-const THERAPY_SECTION_HINTS = [
-    'terapia',
-    'terapia domiciliare',
-    'farmaco',
-    'farmaci',
-    'posologia',
-    'prescr',
-    'assume',
-    'medicazione',
-    'schema terapeutico',
-];
-const DRUG_QUERY_STOPWORDS = new Set([
-    'al', 'alla', 'alle', 'con', 'da', 'del', 'della', 'dopo', 'fare', 'giorno', 'giorni',
-    'mattino', 'mezza', 'ogni', 'per', 'poi', 'pranzo', 'prima', 'sera', 'volta', 'volte',
-    'verificare', 'confermare', 'dose', 'dosi', 'ore', 'uno', 'una', 'due', 'tre', 'quattro',
-]);
 
 function buildDrugCandidateKey(candidate: Pick<AifaDrug, 'aic' | 'name' | 'activePrinciple' | 'packaging'>): string {
     return [
@@ -200,275 +180,6 @@ function buildDrugCandidateKey(candidate: Pick<AifaDrug, 'aic' | 'name' | 'activ
 
 function formatDiagnosisComparison(diagnosis: Pick<Diagnosis, 'system' | 'code' | 'description'>): string {
     return `${diagnosis.system} ${diagnosis.code} · ${diagnosis.description}`;
-}
-
-function tokenize(value: string): string[] {
-    return normalizeText(value)
-        .split(/\s+/)
-        .filter((token) => token.length > 1);
-}
-
-function trimSnippet(value: string, maxLength = 260): string {
-    const normalized = value.replace(/\s+/g, ' ').trim();
-    if (normalized.length <= maxLength) return normalized;
-    return `${normalized.slice(0, maxLength - 1).trim()}...`;
-}
-
-function splitSourceClauses(content: string): string[] {
-    return content
-        .replace(/\r/g, '\n')
-        .split(/[\n;•\u2022|]+/)
-        .flatMap((part) => part.split(/(?<=[.!?])\s+/))
-        .map((part) => part.replace(/\s+/g, ' ').trim())
-        .filter(Boolean);
-}
-
-function isTherapyLikeClause(clause: string): boolean {
-    const normalized = normalizeText(clause);
-    if (!normalized) return false;
-    if (THERAPY_SECTION_HINTS.some((hint) => normalized.includes(hint))) {
-        return true;
-    }
-
-    return DOSAGE_TOKEN_REGEX.test(clause)
-        && tokenize(clause).some((token) => token.length >= 4 && !DRUG_QUERY_STOPWORDS.has(token));
-}
-
-function splitTherapyCandidateClause(clause: string): string[] {
-    const compact = clause.replace(/\s+/g, ' ').trim();
-    const transitionParts = compact
-        .split(/\b(?:poi|quindi|successivamente)\b/i)
-        .map((part) => part.trim())
-        .filter(Boolean);
-    const baseParts = transitionParts.length > 1 ? transitionParts : [compact];
-
-    return baseParts.flatMap((part) => {
-        const commaParts = part
-            .split(/,(?!\d)/)
-            .map((item) => item.trim())
-            .filter(Boolean);
-
-        if (commaParts.length > 1 && commaParts.filter(isTherapyLikeClause).length >= 2) {
-            return commaParts;
-        }
-
-        return [part];
-    });
-}
-
-/* @Codex */
-function splitPromptSourceSegments(content: string, maxSegments = 4): string[] {
-    const segments = content
-        .replace(/\r/g, '\n')
-        .split(/[\n;•\u2022]+/)
-        .map((part) => part.replace(/\s+/g, ' ').trim())
-        .filter(Boolean);
-
-    if (segments.length <= 1) {
-        return [content.replace(/\s+/g, ' ').trim()];
-    }
-
-    return segments.slice(0, maxSegments);
-}
-
-function buildTherapyCandidateHints(sources: SmartImportSourceRecord[]): Array<{ sourceId: string; label: string; excerpt: string }> {
-    const seen = new Set<string>();
-    const hints: Array<{ sourceId: string; label: string; excerpt: string }> = [];
-
-    for (const source of sources) {
-        const clauses = splitSourceClauses(source.content);
-        for (const clause of clauses) {
-            if (!isTherapyLikeClause(clause)) continue;
-
-            for (const candidate of splitTherapyCandidateClause(clause)) {
-                const excerpt = trimSnippet(candidate, 180);
-                if (!excerpt) continue;
-
-                const key = `${source.id}:${normalizeText(excerpt)}`;
-                if (seen.has(key)) continue;
-
-                seen.add(key);
-                hints.push({
-                    sourceId: source.id,
-                    label: source.label,
-                    excerpt,
-                });
-
-                if (hints.length >= THERAPY_HINT_LIMIT) {
-                    return hints;
-                }
-            }
-        }
-    }
-
-    return hints;
-}
-
-function parseDocumentInsights(raw: Patient['documentInsights']): DocumentInsight[] {
-    if (!raw) return [];
-    if (Array.isArray(raw)) return raw;
-
-    if (typeof raw === 'string') {
-        try {
-            const parsed = JSON.parse(raw);
-            return Array.isArray(parsed) ? parsed as DocumentInsight[] : [];
-        } catch {
-            return [];
-        }
-    }
-
-    return [];
-}
-
-function parseDiagnoses(raw: Patient['diagnoses']): Diagnosis[] {
-    if (!raw) return [];
-    if (Array.isArray(raw)) return raw;
-
-    if (typeof raw === 'string') {
-        try {
-            const parsed = JSON.parse(raw);
-            return Array.isArray(parsed) ? parsed as Diagnosis[] : [];
-        } catch {
-            return [];
-        }
-    }
-
-    return [];
-}
-
-function normalizeDate(value: unknown): string | undefined {
-    if (!value) return undefined;
-    const date = new Date(value as string | number | Date);
-    return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
-}
-
-function buildSourceRecords(
-    patient: Patient,
-    entries: ClinicalEntry[],
-    attachments: Array<{ id: string; name: string; summarySnapshot?: string; createdAt: Date }>
-): SmartImportSourceRecord[] {
-    const records: SmartImportSourceRecord[] = [];
-
-    if (patient.notes?.trim()) {
-        /* @Codex */
-        splitPromptSourceSegments(patient.notes, 6).forEach((segment, index) => {
-            records.push({
-                id: `patient-notes:${index + 1}`,
-                kind: 'patient-notes',
-                label: index === 0 ? 'Note paziente' : `Note paziente · segmento ${index + 1}`,
-                content: trimSnippet(segment, 900),
-            });
-        });
-    }
-
-    entries
-        .filter((entry) => !entry.deletedAt && entry.content?.trim())
-        .sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime())
-        .slice(0, 6)
-        .forEach((entry) => {
-            /* @Codex */
-            splitPromptSourceSegments(clinicalRichTextToPlainText(entry.content), 4).forEach((segment, index) => {
-                records.push({
-                    id: `entry:${entry.id}:${index + 1}`,
-                    kind: 'clinical-entry',
-                    label: index === 0
-                        ? `${entry.type.toUpperCase()} ${new Date(entry.date).toLocaleDateString('it-IT')}`
-                        : `${entry.type.toUpperCase()} ${new Date(entry.date).toLocaleDateString('it-IT')} · segmento ${index + 1}`,
-                    date: normalizeDate(entry.date),
-                    content: trimSnippet(segment, 650),
-                });
-            });
-        });
-
-    const insightFileNames = new Set<string>();
-    dedupeDocumentInsightsForContext(
-        [...parseDocumentInsights(patient.documentInsights)]
-            .sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime())
-    )
-        .insights
-        .slice(0, 4)
-        .forEach((insight) => {
-            const fileName = typeof insight.fileName === 'string' ? insight.fileName.trim() : '';
-            if (fileName) insightFileNames.add(fileName.toLowerCase());
-
-            const evidencePackContext = insight.evidencePack
-                ? renderDocumentEvidencePackContext(insight.evidencePack, 420)
-                : '';
-            const extractedDiagnoses = !evidencePackContext && Array.isArray(insight.extractedData?.diagnoses)
-                ? insight.extractedData.diagnoses
-                    .map((item) => `${item.system} ${item.code} ${item.description}`)
-                    .join(' | ')
-                : '';
-            /* @Codex */
-            const extractedMedications = !evidencePackContext && Array.isArray(insight.extractedData?.medications)
-                ? insight.extractedData.medications.join(' | ')
-                : '';
-
-            records.push({
-                id: `insight:${insight.id}`,
-                kind: 'document-insight',
-                label: `Documento ${fileName || 'analizzato'}`,
-                date: normalizeDate(insight.date),
-                content: trimSnippet(
-                    [evidencePackContext, insight.summary, extractedDiagnoses, extractedMedications].filter(Boolean).join('\n'),
-                    900,
-                ),
-            });
-        });
-
-    attachments
-        .filter((attachment) => attachment.summarySnapshot?.trim())
-        .filter((attachment) => !insightFileNames.has(attachment.name.trim().toLowerCase()))
-        .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
-        .slice(0, 3)
-        .forEach((attachment) => {
-            records.push({
-                id: `attachment:${attachment.id}`,
-                kind: 'attachment-summary',
-                label: `Allegato ${attachment.name}`,
-                date: normalizeDate(attachment.createdAt),
-                content: trimSnippet(attachment.summarySnapshot || '', 500),
-            });
-        });
-
-    return records;
-}
-
-export type PatientSmartImportProjectionCaptureInput = Readonly<{
-    patient: Readonly<{ version: Patient['version'] }>;
-    currentDiagnoses: ReadonlyArray<Readonly<{ system: string; code: string; description: string }>>;
-    currentActiveTherapies: ReadonlyArray<Readonly<{ drugName: string; activePrinciple: string | null; dosage: string | null; aic: string | null; atc: string | null }>>;
-    sources: ReadonlyArray<Readonly<{ kind: SmartImportEvidence['sourceKind']; originKey: string; label: string; date: string | null; content: string }>>;
-    therapyCandidateHints: ReadonlyArray<Readonly<{ kind: SmartImportEvidence['sourceKind']; originKey: string; label: string; excerpt: string }>>;
-}>;
-
-/** Preserves every legacy source record; the browser normalizer owns its 32-source rejection. */
-/* @Codex */
-export function buildPatientSmartImportProjectionCaptureInput(
-    patient: Patient,
-    entries: ClinicalEntry[],
-    attachments: Array<{ id: string; name: string; summarySnapshot?: string; createdAt: Date }>,
-    therapies: Therapy[],
-): PatientSmartImportProjectionCaptureInput {
-    const sourceRecords = buildSourceRecords(patient, entries, attachments);
-    const sources = sourceRecords.map((source) => Object.freeze({ kind: source.kind, originKey: source.id, label: source.label,
-        date: source.date ?? null, content: source.content }));
-    const byId = new Map(sourceRecords.map((source) => [source.id, source]));
-    const therapyCandidateHints = buildTherapyCandidateHints(sourceRecords).map((hint) => {
-        const source = byId.get(hint.sourceId)!;
-        return Object.freeze({ kind: source.kind, originKey: source.id, label: hint.label, excerpt: hint.excerpt });
-    });
-    return Object.freeze({
-        patient: Object.freeze({ version: patient.version }),
-        currentDiagnoses: Object.freeze(parseDiagnoses(patient.diagnoses).map((diagnosis) => Object.freeze({ system: diagnosis.system,
-            code: diagnosis.code, description: diagnosis.description }))),
-        currentActiveTherapies: Object.freeze(therapies.filter((therapy) => therapy.status === 'active').map((therapy) => Object.freeze({
-            drugName: therapy.drugName, activePrinciple: therapy.activePrinciple ?? null, dosage: therapy.dosage ?? null,
-            aic: therapy.aic ?? null, atc: therapy.atc ?? null,
-        }))),
-        sources: Object.freeze(sources),
-        therapyCandidateHints: Object.freeze(therapyCandidateHints),
-    });
 }
 
 function buildStructuredPrompt(

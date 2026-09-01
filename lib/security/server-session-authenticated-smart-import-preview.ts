@@ -10,6 +10,9 @@ type Broker = Readonly<{ consume(input: Readonly<{ handle: string; capability: '
 type Context = Readonly<{ session: ServerSession; owner: ServerSessionProjectionOwner }>;
 type Capability = Readonly<{ preview(input: unknown): Promise<PatientSmartImportHostCapabilityResult> }>;
 type Sources = Readonly<{ acquireContext(): Promise<Context | null>; createCapability(broker: Broker): Capability }>;
+export type AuthenticatedSmartImportPreviewOperation = Readonly<{
+    preview(input: unknown): Promise<PatientSmartImportHostCapabilityResult>;
+}>;
 
 export type AuthenticatedSmartImportPreviewErrorCode = 'preview_unavailable' | 'session_unavailable';
 export class AuthenticatedSmartImportPreviewError extends Error {
@@ -36,18 +39,27 @@ function hasSafeInputBoundary(value: unknown): boolean {
 }
 
 export function createAuthenticatedSmartImportPreviewService(sources: Sources) {
+    const acquire = async (): Promise<AuthenticatedSmartImportPreviewOperation> => {
+        let context: Context | null;
+        try { context = await sources.acquireContext(); } catch { return fail('session_unavailable'); }
+        if (!context) return fail('session_unavailable');
+        const broker: Broker = Object.freeze({
+            consume(value) { return context.owner.resolveProjectionService(context.session).consume(value); },
+        });
+        return Object.freeze({
+            async preview(input: unknown): Promise<PatientSmartImportHostCapabilityResult> {
+                if (!hasSafeInputBoundary(input)) return inputInvalid;
+                let capability: Capability;
+                try { capability = sources.createCapability(broker); } catch { return fail('preview_unavailable'); }
+                try { return await capability.preview(input); } catch { return fail('preview_unavailable'); }
+            },
+        });
+    };
+
     return Object.freeze({
+        acquire,
         async preview(input: unknown): Promise<PatientSmartImportHostCapabilityResult> {
-            let context: Context | null;
-            try { context = await sources.acquireContext(); } catch { return fail('session_unavailable'); }
-            if (!context) return fail('session_unavailable');
-            if (!hasSafeInputBoundary(input)) return inputInvalid;
-            const broker: Broker = Object.freeze({
-                consume(value) { return context.owner.resolveProjectionService(context.session).consume(value); },
-            });
-            let capability: Capability;
-            try { capability = sources.createCapability(broker); } catch { return fail('preview_unavailable'); }
-            try { return await capability.preview(input); } catch { return fail('preview_unavailable'); }
+            return (await acquire()).preview(input);
         },
     });
 }

@@ -25,12 +25,17 @@ function rejects(status: number, code: string) {
         assert.deepEqual(await response.json(), { error: 'Selezione Smart Import non disponibile.', code });
     };
 }
+function postHandler(issueSelection: (input: unknown) => Promise<typeof LEASE>) {
+    return createSmartImportSelectionHttpHandler({
+        acquireSelection: async () => Object.freeze({ issueSelection }),
+    });
+}
 
 test('emits the complete opaque selection lease with no-store through one composition call', async () => {
     let calls = 0; let received: unknown;
-    const handle = createSmartImportSelectionHttpHandler({ issueSelection: async (input) => {
+    const handle = postHandler(async (input) => {
         calls += 1; received = input; return LEASE;
-    } });
+    });
 
     const response = await handle(request()); const body = await response.json();
 
@@ -42,7 +47,7 @@ test('emits the complete opaque selection lease with no-store through one compos
 
 test('fails closed for malformed, extra, prototype, and accessor JSON bodies without calling composition', async () => {
     let calls = 0;
-    const handle = createSmartImportSelectionHttpHandler({ issueSelection: async () => { calls += 1; return LEASE; } });
+    const handle = postHandler(async () => { calls += 1; return LEASE; });
     const accessor = { expectedEpoch: 0, patientId: REQUEST.patientId };
     Object.defineProperty(accessor, 'ambulatoryId', { enumerable: true, get() { return REQUEST.ambulatoryId; } });
     const prototype = Object.assign(Object.create({ inherited: true }), REQUEST);
@@ -54,6 +59,24 @@ test('fails closed for malformed, extra, prototype, and accessor JSON bodies wit
     assert.equal(calls, 0);
 });
 
+test('authenticates before observing a hostile selection request', async () => {
+    let reads = 0;
+    const hostile = new Proxy({}, {
+        get() {
+            reads += 1;
+            throw new Error('hostile request observed');
+        },
+    }) as Request;
+    const handle = createSmartImportSelectionHttpHandler({
+        acquireSelection: async () => {
+            throw new AuthenticatedWebSessionSelectionError('session_unavailable');
+        },
+    });
+
+    await rejects(401, 'session_unavailable')(await handle(hostile));
+    assert.equal(reads, 0);
+});
+
 test('maps every specified typed selection error to its stable HTTP status', async () => {
     const cases: readonly [string, number][] = [
         ['input_invalid', 400], ['session_unavailable', 401], ['session_ineligible', 401], ['epoch_conflict', 409],
@@ -61,10 +84,10 @@ test('maps every specified typed selection error to its stable HTTP status', asy
         ['owner_acquiring', 409], ['owner_exists', 409], ['lease_expired', 410], ['reference_unavailable', 503],
     ];
     for (const [code, status] of cases) {
-        const handle = createSmartImportSelectionHttpHandler({ issueSelection: async () => {
+        const handle = postHandler(async () => {
             throw code === 'session_unavailable' ? new AuthenticatedWebSessionSelectionError('session_unavailable')
                 : new ServerSessionProjectionOwnerError(code as never);
-        } });
+        });
         await rejects(status, code)(await handle(request()));
     }
 });
@@ -74,7 +97,7 @@ test('sanitizes unexpected and impossible owner errors without input or raw deta
     console.error = () => undefined;
     try {
         for (const error of [new ServerSessionProjectionOwnerError('broker_factory_failed'), new Error('synthetic raw database path')]) {
-            const handle = createSmartImportSelectionHttpHandler({ issueSelection: async () => { throw error; } });
+            const handle = postHandler(async () => { throw error; });
             const response = await handle(request()); const body = await response.json();
             assert.equal(response.status, 500); assert.equal(response.headers.get('Cache-Control'), 'no-store');
             assert.deepEqual(body, { error: 'Errore interno del server.', code: 'internal_error' });
@@ -116,7 +139,7 @@ test('route keeps POST unchanged and wires GET only to the epoch composition wit
     const epochProduction = readFileSync(new URL('./server-session-authenticated-selection-epoch-production.ts', import.meta.url), 'utf8');
     assert.match(source, /runtime\s*=\s*'nodejs'|runtime\s*=\s*"nodejs"/u);
     assert.match(source, /dynamic\s*=\s*'force-dynamic'|dynamic\s*=\s*"force-dynamic"/u);
-    assert.match(source, /issueAuthenticatedWebSessionSelection/u);
+    assert.match(source, /acquireAuthenticatedWebSessionSelection/u);
     assert.match(source, /readAuthenticatedWebSessionSelectionEpoch/u);
     assert.match(source, /export const GET = createSmartImportSelectionEpochHttpHandler/u);
     assert.match(epochProduction, /readAuthenticatedWebSession()[\s\S]*snapshotSelectionEpoch\(session\)/u);

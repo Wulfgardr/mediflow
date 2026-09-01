@@ -5,7 +5,7 @@ import test from 'node:test';
 
 import type { ClinicalEntry, DocumentInsight, Patient, Therapy } from '../../db.ts';
 import { SmartImportProjectionAttachmentBrowserNormalizerError, createSmartImportProjectionAttachmentBrowserNormalizer } from '../../security/smart-import-projection-attachment-browser-normalizer.ts';
-import { buildPatientSmartImportProjectionCaptureInput } from './patient-smart-import-service.ts';
+import { buildPatientSmartImportProjectionCaptureInput } from './patient-smart-import-projection-capture.ts';
 
 const NOW = new Date('2026-08-23T12:00:00.000Z');
 const rejects = (error: unknown) => error instanceof SmartImportProjectionAttachmentBrowserNormalizerError && error.code === 'capture_invalid';
@@ -63,8 +63,11 @@ test('does not synthesize a patient version when the legacy record lacks one', (
 });
 
 test('keeps the builder pure and outside selection, context, and apply boundaries', () => {
-    const source = readFileSync(new URL('./patient-smart-import-service.ts', import.meta.url), 'utf8');
+    const source = readFileSync(new URL('./patient-smart-import-projection-capture.ts', import.meta.url), 'utf8');
     const start = source.indexOf('export function buildPatientSmartImportProjectionCaptureInput');
-    const builder = source.slice(start, source.indexOf('function buildStructuredPrompt', start));
+    assert.ok(start >= 0);
+    const builder = source.slice(start);
     assert.doesNotMatch(builder, /db\.|fetch\(|localStorage|sessionStorage|ambulatoryId|\/api\/context|selection|apply/u);
+    assert.match(source, /import type \{[^\n]+\} from ['"]\.\.\/\.\.\/db['"]/u);
+    assert.doesNotMatch(source, /AIService|patient-smart-import-service|import \{[^\n]+\} from ['"]\.\.\/\.\.\/db['"]/u);
 });
