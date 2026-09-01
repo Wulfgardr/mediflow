@@ -77,7 +77,7 @@ test('composes H5a, fresh host PIN verification and captured process primitives 
         'node:crypto', 'server-only', './headless-soap-authorization-proof-lifecycle',
         './headless-soap-entry-presentation-lifecycle-production-internal',
         './headless-soap-fresh-pin-verification', './host-credential-verification',
-        './server-auth', './server-auth-policy',
+        './server-auth', './server-auth-policy', './web-auth-lifecycle-owner-adapter',
     ].sort());
     assert.equal(ownerSource.match(/\bcreateHeadlessSoapAuthorizationProofLifecycleOwner\s*\(/gu)?.length, 1);
     assert.equal(ownerSource.match(/\bcreateHeadlessSoapFreshPinVerifier\s*\(/gu)?.length, 1);
@@ -88,6 +88,11 @@ test('composes H5a, fresh host PIN verification and captured process primitives 
     assert.match(ownerSource, /resolveCurrentWebAdmin/u);
     assert.match(ownerSource, /verifyCredentials\s*:\s*verifyHostCredentials/u);
     assert.match(ownerSource, /isWebAdminSession/u);
+    assert.match(ownerSource, /withCurrentWebSessionBinding\s*:\s*withCurrentVerifiedWebSessionBinding/u);
+    for (const method of [
+        'mintResourcePort', 'beginResourceUse', 'withCurrentResourceBinding',
+        'commitResourceUse', 'abortResourceUse', 'releaseResourcePort',
+    ]) assert.match(ownerSource, new RegExp(`\\b${method}\\b`, 'u'));
     assert.match(ownerSource, /hostUint8ArrayFrom/u);
     assert.match(ownerSource, /reflectApply\s*\(\s*hostUint8ArrayFrom\s*,\s*hostUint8Array/u);
     assert.doesNotMatch(ownerSource, /\bUint8Array\.from\s*\(/u);

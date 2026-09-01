@@ -632,6 +632,17 @@ dal chiamante. `activeRole` lega questa identity, l'identita process-local del
 grant H2a, la stessa sessione Web, actor, attestation
 ref/version/revocation generation e policy version.
 
+Prima di invocare CSPRNG o pubblicare la proof, H5b conserva l'identita della
+proiezione Web owner-issued restituita dal secondo fence del PIN fresco. Entra
+e chiude un resource use Web dedicato, cattura privatamente principal ref e
+authentication generation e soltanto dopo entra nella continuation H5a. La
+continuation deve esporre una volta sola lo stesso principal ref e la stessa
+generation per identita; i due resource use non sono annidati. Mismatch,
+callback assente o duplicata, risultato diverso dal booleano `true`, throw o
+perdita del final fence terminalizzano la presentazione come
+`presentation_unavailable`, prima di entropy. Il final fence H5a post-entropy
+resta obbligatorio.
+
 `childLease` lega tre identity fieldless distinte per parent, child e lease
 H2b e conserva separatamente le tre terne contract version, generation e
 revocation generation; il child aggiunge `proposalBudget = 0`, gia consumato

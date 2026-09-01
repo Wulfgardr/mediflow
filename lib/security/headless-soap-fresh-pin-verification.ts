@@ -159,18 +159,6 @@ function sameSession(before: Record<string, unknown>, after: Record<string, unkn
     return true;
 }
 
-function snapshot(record: Record<string, unknown>): HeadlessSoapFreshPinVerificationV1 {
-    return objectFreeze(objectAssign(objectCreate(null), {
-        id: record.id,
-        userId: record.userId,
-        username: record.username,
-        role: 'admin' as const,
-        authChannel: 'web' as const,
-        createdAt: record.createdAt,
-        expiresAt: record.expiresAt,
-    })) as HeadlessSoapFreshPinVerificationV1;
-}
-
 export function isHeadlessSoapFreshPinVerificationV1(
     value: unknown,
 ): value is HeadlessSoapFreshPinVerificationV1 {
@@ -204,7 +192,9 @@ export function createHeadlessSoapFreshPinVerifier(
             }
             const after = currentWebAdmin(await afterPending, dateNow());
             if (!ambientThenSafe()) return null;
-            return after && sameSession(before, after) ? snapshot(after) : null;
+            return after && sameSession(before, after)
+                ? after as unknown as HeadlessSoapFreshPinVerificationV1
+                : null;
         } catch {
             return null;
         }
