@@ -34,8 +34,10 @@ function scheduleProposalExpiry(delayMs: number, operation: () => void): () => v
 /** Shared process owner for the public H3 service and the private H4 lifecycle. */
 export const headlessSoapProposalLifecycleProductionOwner = createHeadlessSoapProposalLifecycleOwner({
     leaseLifecycle: headlessSoapChildSessionLeaseProductionOwner.lifecycleController,
+    leaseBinding: headlessSoapChildSessionLeaseProductionOwner.bindingController,
     leaseService: headlessSoapChildSessionLeaseProductionOwner.service,
     selectionLifecycle: selectionPort,
+    selectionBinding: serverSessionProjectionOwnerProductionOwner.selectionBindingController,
     readCurrentSelectionSession: readAuthenticatedWebSession,
     clock: hostDateNow,
     scheduler: scheduleProposalExpiry,

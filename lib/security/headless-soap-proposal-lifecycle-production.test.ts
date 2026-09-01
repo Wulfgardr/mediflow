@@ -19,7 +19,7 @@ test('shares one exact H3 process owner while exposing only the public service',
     assert.deepEqual(Object.keys(facade).filter((key) => !loaderInteropExports.has(key)), ['headlessSoapProposalLifecycleService']);
     const owner = internal.headlessSoapProposalLifecycleProductionOwner;
     assert.equal(owner, repeated.headlessSoapProposalLifecycleProductionOwner); assert.equal(Object.isFrozen(owner), true);
-    assert.deepEqual(Reflect.ownKeys(owner).sort(), ['lifecycleController', 'service']);
+    assert.deepEqual(Reflect.ownKeys(owner).sort(), ['bindingController', 'lifecycleController', 'service']);
     assert.equal(facade.headlessSoapProposalLifecycleService, owner.service); assert.equal(Object.isFrozen(owner.service), true);
     assert.deepEqual(Reflect.ownKeys(owner.service).sort(), ['inspect', 'preview', 'proposal', 'wipe']);
     assert.deepEqual([owner.service.inspect.length, owner.service.preview.length, owner.service.proposal.length, owner.service.wipe.length], [2, 1, 1, 1]);
@@ -27,6 +27,8 @@ test('shares one exact H3 process owner while exposing only the public service',
     assert.deepEqual(Reflect.ownKeys(owner.lifecycleController).sort(), [
         'confirmDependent', 'registerDependent', 'unregisterDependent', 'withCurrentDependent', 'withCurrentProposal',
     ]);
+    assert.equal(Object.isFrozen(owner.bindingController), true);
+    assert.deepEqual(Reflect.ownKeys(owner.bindingController), ['withCurrentDependentBinding']);
 });
 
 test('keeps foreign H3 identities inert across public and private production surfaces', async () => {
@@ -41,6 +43,8 @@ test('keeps foreign H3 identities inert across public and private production sur
     assert.equal(lifecycle.unregisterDependent(foreignRef, foreignRegistration), false);
     assert.equal(await lifecycle.withCurrentProposal(foreignRef, () => undefined), false);
     assert.equal(await lifecycle.withCurrentDependent(foreignRef, foreignRegistration, () => undefined), false);
+    assert.equal(await internal.headlessSoapProposalLifecycleProductionOwner.bindingController
+        .withCurrentDependentBinding(foreignRef, foreignRegistration, () => undefined), false);
 });
 
 test('composition root binds request session, existing owners, and cancellable host intrinsics only', () => {
@@ -56,7 +60,9 @@ test('composition root binds request session, existing owners, and cancellable h
     assert.equal(ownerSource.match(/\bcreateHeadlessSoapProposalLifecycleOwner\s*\(/gu)?.length, 1);
     assert.match(ownerSource, /readCurrentSelectionSession:\s*readAuthenticatedWebSession/u);
     assert.match(ownerSource, /headlessSoapChildSessionLeaseProductionOwner\.lifecycleController/u);
+    assert.match(ownerSource, /headlessSoapChildSessionLeaseProductionOwner\.bindingController/u);
     assert.match(ownerSource, /serverSessionProjectionOwnerProductionOwner\.selectionLifecycleController/u);
+    assert.match(ownerSource, /serverSessionProjectionOwnerProductionOwner\.selectionBindingController/u);
     assert.match(ownerSource, /const hostDateNow = Date\.now/u); assert.match(ownerSource, /const hostSetTimeout = setTimeout/u);
     assert.match(ownerSource, /const hostClearTimeout = clearTimeout/u);
     assert.doesNotMatch(ownerSource, /db-server|schema|route|approval|proof|writer|fabric/iu);
