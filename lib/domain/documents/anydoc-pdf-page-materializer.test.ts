@@ -100,6 +100,15 @@ test('fails closed for malformed, encrypted, page-count mismatch and invalid rou
     assert.equal(hostile.status, 'review_required'); assert.equal(reads, 0);
 });
 
+test('denies a revoked routing page array without throwing or materializing', async () => {
+    const source = syntheticPdf([612]); const pages = Proxy.revocable([1], {}); pages.revoke();
+    const result = await materializeAnyDocPdfPages(source, sha256(source), {
+        schemaVersion: 'mediflow.anydoc_page_routing.v1', pages: pages.proxy, pageCount: 1,
+    });
+    assert.deepEqual(result, { schemaVersion: 'mediflow.anydoc_pdf_page_materializer.v1', status: 'review_required',
+        reason: 'invalid_routing', review: 'required', writes: 0, apply: 'none' });
+});
+
 test('enforces source, page-count and cumulative output byte limits without partial pages', async () => {
     const oversized = Buffer.alloc(ANYDOC_LOCAL_EXTRACTION_MAX_SOURCE_BYTES + 1);
     let result = await materializeAnyDocPdfPages(oversized, sha256(oversized), routing(1));

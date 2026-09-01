@@ -68,8 +68,8 @@ function validatedRouting(input: unknown): AnyDocPageRoutingEvidence | null {
     const schemaVersion = descriptors.schemaVersion!.value;
     const pagesInput = descriptors.pages!.value;
     const pageCount = descriptors.pageCount!.value;
-    if (schemaVersion !== ANYDOC_PAGE_ROUTING_SCHEMA_VERSION || !Array.isArray(pagesInput)
-        || types.isProxy(pagesInput) || Object.getPrototypeOf(pagesInput) !== Array.prototype
+    if (schemaVersion !== ANYDOC_PAGE_ROUTING_SCHEMA_VERSION || types.isProxy(pagesInput)
+        || !Array.isArray(pagesInput) || Object.getPrototypeOf(pagesInput) !== Array.prototype
         || !Number.isSafeInteger(pageCount) || pageCount < 1 || pageCount > ANYDOC_PAGE_ROUTING_MAX_PAGE_COUNT) return null;
     const pageDescriptors = Object.getOwnPropertyDescriptors(pagesInput) as unknown as Record<string, PropertyDescriptor>;
     const pageLength = pageDescriptors.length?.value;

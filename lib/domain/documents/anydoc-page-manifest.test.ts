@@ -82,6 +82,15 @@ test('fails closed on source, routing, page-count, order and digest mismatches',
         assert.deepEqual(result.pages, []);
     }
 });
+test('denies revoked routing and materialization page arrays without throwing', async () => {
+    const fixture = await materialized(['text', 'scan'], [2]); const binding = sourceBinding(fixture.source);
+    const routingPages = Proxy.revocable([...fixture.evidence.pages], {}); routingPages.revoke();
+    let result = await buildAnyDocPageManifest(binding, { ...fixture.evidence, pages: routingPages.proxy }, fixture.pages);
+    assert.equal(result.status, 'review_required'); assert.equal(result.reason, 'invalid_routing');
+    const materializedPages = Proxy.revocable([...fixture.pages.pages], {}); materializedPages.revoke();
+    result = await buildAnyDocPageManifest(binding, fixture.evidence, { ...fixture.pages, pages: materializedPages.proxy });
+    assert.equal(result.status, 'review_required'); assert.equal(result.reason, 'page_evidence_mismatch');
+});
 test('rejects cumulative materialized output beyond the reviewed bound before parsing', async () => {
     const fixture = await materialized(['scan'], [1]);
     const bytes = Buffer.alloc(ANYDOC_PDF_PAGE_MATERIALIZER_MAX_OUTPUT_BYTES + 1);

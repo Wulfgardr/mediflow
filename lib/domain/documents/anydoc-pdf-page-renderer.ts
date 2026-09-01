@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { performance } from 'node:perf_hooks';
 import { types } from 'node:util';
-import { ANYDOC_LOCAL_EXTRACTION_MAX_SOURCE_BYTES } from './anydoc-local-extraction-contract';
+import { ANYDOC_LOCAL_EXTRACTION_MAX_MARKDOWN_BYTES, ANYDOC_LOCAL_EXTRACTION_MAX_SOURCE_BYTES } from './anydoc-local-extraction-contract';
 import { ANYDOC_PAGE_ROUTING_MAX_PAGE_COUNT, ANYDOC_PAGE_ROUTING_SCHEMA_VERSION } from './anydoc-local-extraction-runner';
 import { ANYDOC_PAGE_MANIFEST_SCHEMA_VERSION, type AnyDocPageManifestSourceBinding } from './anydoc-page-manifest';
 import { ANYDOC_PDF_PAGE_MATERIALIZER_MAX_OUTPUT_BYTES, ANYDOC_PDF_PAGE_MATERIALIZER_SCHEMA_VERSION,
@@ -135,7 +135,7 @@ function manifestSnapshot(value: unknown): { source: AnyDocPageManifestSourceBin
         if (page.status === 'needsOcr') {
             if (page.nativeEvidence !== null) return 'invalid_manifest';
             needsOcr.push(index + 1);
-        } else if (!exact(page.nativeEvidence, ['receiptId', 'markdownSha256', 'markdownByteLength'])) return 'invalid_manifest';
+        } else { const native = exact(page.nativeEvidence, ['receiptId', 'markdownSha256', 'markdownByteLength']); if (!native || typeof native.receiptId !== 'string' || !SHA256.test(native.receiptId) || typeof native.markdownSha256 !== 'string' || !SHA256.test(native.markdownSha256) || !Number.isSafeInteger(native.markdownByteLength) || (native.markdownByteLength as number) < 1 || (native.markdownByteLength as number) > ANYDOC_LOCAL_EXTRACTION_MAX_MARKDOWN_BYTES) return 'invalid_manifest'; }
         pages.push(Object.freeze({ page: index + 1, status: page.status, pageSha256: page.pageSha256,
             pageByteLength: page.pageByteLength as number }));
     }
