@@ -20,7 +20,7 @@ function authenticatedContext<T extends object, U extends object>(session: T, ow
     return Object.freeze(value);
 }
 function fixture() {
-    const session = createSession(USER, 'web'); const registry = createServerSessionProjectionOwnerRegistry({ resolve: (_session, pair) => Object.freeze(pair) }); const owner = registry.acquire(session);
+    const session = createSession(USER, 'web'); const registry = createServerSessionProjectionOwnerRegistry({ resolve: (_session, pair) => Object.freeze({ ...pair, patientVersion: 1 }) }); const owner = registry.acquire(session);
     owner.issueSelection({ expectedEpoch: 0, patientId: 'patient.synthetic.active-review', ambulatoryId: 'ambulatory.synthetic.active-review' });
     const state = { currentAuthority: authority(session.id), currentReview: review(), locatorError: null as Error | null, locatorCalls: 0, recheckCalls: 0, registrations: 0, session: session as typeof session | null };
     const service = createActiveReviewBindingService({

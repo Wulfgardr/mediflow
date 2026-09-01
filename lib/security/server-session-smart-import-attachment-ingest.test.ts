@@ -33,7 +33,9 @@ function attachment() {
             label: 'Fonte sintetica', date: null, content: 'Contenuto sintetico.' }] };
 }
 function setup() {
-    const registry = createFullPortProjectionOwnerFactory({ resolve: (_session, pair) => pair });
+    const registry = createFullPortProjectionOwnerFactory({
+        resolve: (_session, pair) => Object.freeze({ ...pair, patientVersion: 1 }),
+    });
     const session = issueSyntheticWebSession(USER, `smart-import-ingest-${sequence += 1}`);
     sessions.push(session);
     const owner = registry.create(session);

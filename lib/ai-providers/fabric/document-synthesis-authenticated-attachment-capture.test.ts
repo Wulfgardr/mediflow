@@ -39,7 +39,7 @@ test('uses the fixed server boundary with an isolated database, session, and sel
         writeFileSync(mockAuth, `
 const { createSession, deleteSession } = require(${JSON.stringify(path.join(ROOT, 'lib/security/server-session.ts'))});
 const { createServerSessionProjectionOwnerRegistry } = require(${JSON.stringify(path.join(ROOT, 'lib/security/server-session-projection-owner.ts'))});
-const registry = createServerSessionProjectionOwnerRegistry({ resolve: (_session, pair) => Object.freeze({ ...pair }) });
+const registry = createServerSessionProjectionOwnerRegistry({ resolve: (_session, pair) => Object.freeze({ ...pair, patientVersion: 1 }) });
 const makeContext = (patientId) => {
   const session = createSession({ id: 'user.synthetic.capture', username: ['cap', 'ture'].join(''), role: 'admin' }, 'web');
   const owner = registry.acquire(session);

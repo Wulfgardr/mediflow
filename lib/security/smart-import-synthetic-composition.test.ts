@@ -44,7 +44,7 @@ function harness(tamper = false) {
     const now = new Date().toISOString(); const noStore: string[] = []; let entropy = 0; let selectionCalls = 0; let ingestCalls = 0; let previewCalls = 0; let killSwitchReads = 0; let consumes = 0; let chats = 0; let routers = 0;
     const session = issueSyntheticWebSession(USER, `smart-import-composition-${sessionSequence += 1}`);
     sessions.push(session);
-    const registry = createFullPortProjectionOwnerFactory({ resolve: (_session, pair) => Object.freeze(pair), clock: () => Date.parse(now), entropy: () => bytes(++entropy), brokerFactory: (config) => createTypedProjectionBroker(config, { clock: () => now, entropy: () => bytes(++entropy) }) });
+    const registry = createFullPortProjectionOwnerFactory({ resolve: (_session, pair) => Object.freeze({ ...pair, patientVersion: 1 }), clock: () => Date.parse(now), entropy: () => bytes(++entropy), brokerFactory: (config) => createTypedProjectionBroker(config, { clock: () => now, entropy: () => bytes(++entropy) }) });
     const acquireContext = async () => Object.freeze({ session, owner: registry.acquire(session) });
     const selection = createAuthenticatedWebSessionSelectionService({ acquireOwner: async () => registry.acquire(session) });
     const selectionHttp = createSmartImportSelectionHttpHandler({ issueSelection: async (input) => { selectionCalls += 1; return selection.issue(input); } });
