@@ -249,9 +249,8 @@ export function createHeadlessSoapEntryFieldSetLifecycleOwner(sources: HeadlessS
         },
         confirmDependent(candidate: unknown, registration: unknown): boolean {
             if (lifecycleDrainActive) return false; const record = recordFor(candidate); if (!record || !dependentFor(record, registration)) return false;
-            if (h3CallInFlight && (!callbackActive || lifecycleOperation?.lifecycle !== record)) {
-                if (callbackActive && lifecycleOperation) lifecycleOperation.poisoned = true; return false;
-            }
+            if (callbackActive) { if (lifecycleOperation) lifecycleOperation.poisoned = true; return false; }
+            if (h3CallInFlight) return false;
             let attached = false; try { attached = sources.proposalLifecycle.confirmDependent(record.proposalRef, record.proposalRegistration); }
             catch { attached = false; }
             if (!attached || recordFor(candidate) !== record || !dependentFor(record, registration)) { terminalize(record, false); return false; }
@@ -260,9 +259,8 @@ export function createHeadlessSoapEntryFieldSetLifecycleOwner(sources: HeadlessS
         unregisterDependent(candidate: unknown, registration: unknown): boolean {
             if (lifecycleDrainActive) return false; const record = recordFor(candidate); if (!record) return false;
             const dependent = dependentFor(record, registration); if (!dependent) return false;
-            if (h3CallInFlight && (!callbackActive || lifecycleOperation?.lifecycle !== record)) {
-                if (callbackActive && lifecycleOperation) lifecycleOperation.poisoned = true; return false;
-            }
+            if (callbackActive) { if (lifecycleOperation) lifecycleOperation.poisoned = true; return false; }
+            if (h3CallInFlight) return false;
             dependent.active = false;
             weakDelete(dependentRegistrations, dependent.registration); unlinkDependent(dependent); return true;
         },
