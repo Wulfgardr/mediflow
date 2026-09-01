@@ -1,7 +1,7 @@
 # ADR 0110: riapertura governata del programma intelligente 0.8.5
 
 Date: 2026-09-01
-Status: Proposed
+Status: Accepted
 
 Issue: [GitHub #276](https://github.com/Wulfgardr/mediflow/issues/276) come
 programma di integrazione; WUL-564 resta il verificatore finale. Ogni lane
