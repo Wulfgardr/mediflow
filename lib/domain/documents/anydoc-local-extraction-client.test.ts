@@ -70,7 +70,7 @@ test('accepts only canonical bounded raw JSON and leaves no object parser expose
 test('connects only the existing attachment retry control to the read-only local preview boundary', () => {
     const source = readFileSync(new URL('../../../components/document-upload.tsx', import.meta.url), 'utf8');
     assert.match(source, /requestAnyDocLocalExtractionPreview/u);
-    assert.match(source, /Anteprima estrazione locale \(sola lettura\)/u);
+    assert.match(source, /Anteprima AnyDoc locale · sola lettura/u);
     assert.doesNotMatch(source, /\/ocr-replay|documentSha256|Replay OCR/u);
     assert.doesNotMatch(source, /body:\s*JSON\.stringify/u);
 });
