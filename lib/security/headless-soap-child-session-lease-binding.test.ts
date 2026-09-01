@@ -3,11 +3,14 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createHeadlessSoapChildSessionLeaseOwner, HeadlessSoapChildSessionLeaseError } from './headless-soap-child-session-lease.ts';
 import type { HeadlessSoapActiveRoleDependentRegistrationV1, HeadlessSoapActiveRoleSessionGrantV1 } from './headless-soap-active-role-session-grant.ts';
+import type { HeadlessSoapAuthorizationLineageV1 } from './headless-soap-authorization-lineage.ts';
 
 function fixture() {
     const grant = Object.freeze(Object.create(null)) as HeadlessSoapActiveRoleSessionGrantV1;
+    const activeRole = Object.freeze(Object.assign(Object.create(null), { grantIdentity: grant })) as HeadlessSoapAuthorizationLineageV1['activeRole'];
     const registrations = new Map<HeadlessSoapActiveRoleDependentRegistrationV1, () => void>();
     let active = true, beforeUse: (() => void) | null = null, afterUse: (() => void) | null = null, denyNextUse = false, now = 1_000;
+    let bindingUses = 0, zeroArgumentUses = 0;
     const retire = () => { if (!active) return; active = false; const disposers = [...registrations.values()]; registrations.clear(); for (const dispose of disposers) dispose(); };
     const lifecycle = Object.freeze({
         async withCurrentGrant(operation: (candidate: HeadlessSoapActiveRoleSessionGrantV1) => void) {
@@ -22,11 +25,22 @@ function fixture() {
         async withCurrentDependent(candidate: unknown, registration: unknown, operation: () => void) {
             if (denyNextUse) { denyNextUse = false; retire(); throw new Error('synthetic active role denial'); }
             if (!active || candidate !== grant || !registrations.has(registration as HeadlessSoapActiveRoleDependentRegistrationV1)) return false;
+            zeroArgumentUses += 1;
             const before = beforeUse; beforeUse = null; before?.(); operation(); const after = afterUse; afterUse = null; after?.(); return active;
         },
+        activeRoleBindingController: Object.freeze({
+            async withCurrentDependentBinding(candidate: unknown, registration: unknown,
+                operation: (binding: HeadlessSoapAuthorizationLineageV1['activeRole']) => void) {
+                if (denyNextUse) { denyNextUse = false; retire(); throw new Error('synthetic active role denial'); }
+                if (!active || candidate !== grant || !registrations.has(registration as HeadlessSoapActiveRoleDependentRegistrationV1)) return false;
+                bindingUses += 1; const before = beforeUse; beforeUse = null; before?.(); operation(activeRole);
+                const after = afterUse; afterUse = null; after?.(); return active;
+            },
+        }),
     });
     return { afterUse: (operation: () => void) => { afterUse = operation; }, beforeUse: (operation: () => void) => { beforeUse = operation; },
-        clock: () => now, denyUse: () => { denyNextUse = true; }, lifecycle, retire, setNow: (value: number) => { now = value; } };
+        activeRole, clock: () => now, denyUse: () => { denyNextUse = true; }, lifecycle, resetUseCounts: () => { bindingUses = 0; zeroArgumentUses = 0; }, retire,
+        setNow: (value: number) => { now = value; }, useCounts: () => ({ bindingUses, zeroArgumentUses }) };
 }
 const denied = (code: string) => (error: unknown) => error instanceof HeadlessSoapChildSessionLeaseError
     && error.code === code && !/synthetic|sqlite|database|patient/iu.test(error.message);
@@ -45,6 +59,25 @@ test('adds one private H6 binding controller without changing H2b service or lif
     assert.deepEqual(Reflect.ownKeys(owner.lifecycleController).sort(), ['confirmDependent', 'registerDependent', 'unregisterDependent', 'withCurrentDependent', 'withCurrentLease', 'withCurrentProposalBudget']);
     assert.equal(Object.isFrozen(owner.bindingController), true); assert.deepEqual(Reflect.ownKeys(owner.bindingController), ['withCurrentDependentBinding']);
     assert.equal(owner.bindingController.withCurrentDependentBinding.length, 3);
+});
+
+test('propagates activeRole through the H2a binding continuation without a zero-argument reentry', async () => {
+    const current = fixture(), owner = createHeadlessSoapChildSessionLeaseOwner({ ...current.lifecycle, clock: current.clock });
+    const lease = await owner.service.open(); let registration: unknown = null;
+    assert.equal(await owner.lifecycleController.withCurrentLease(lease, candidate => {
+        registration = owner.lifecycleController.registerDependent(candidate, () => undefined);
+    }), true); assert.ok(registration);
+    assert.equal(await owner.lifecycleController.withCurrentProposalBudget(lease, registration, () => undefined), true);
+    current.resetUseCounts(); let observedActiveRole: unknown = null;
+    const bindingController = owner.bindingController as unknown as Readonly<{
+        withCurrentDependentBinding(candidate: unknown, dependentRegistration: unknown,
+            operation: (childLease: unknown, activeRole: unknown) => void): Promise<boolean>;
+    }>;
+    assert.equal(await bindingController.withCurrentDependentBinding(lease, registration, (_childLease, activeRole) => {
+        observedActiveRole = activeRole;
+    }), true);
+    assert.equal(observedActiveRole, current.activeRole);
+    assert.deepEqual(current.useCounts(), { bindingUses: 1, zeroArgumentUses: 0 });
 });
 
 test('emits the exact stable child-lease capsule only after H3 consumes its proposal budget', async () => {

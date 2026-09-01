@@ -4,9 +4,11 @@ import fs from 'node:fs';
 import { test } from 'node:test';
 import { createHeadlessSoapChildSessionLeaseOwner, createHeadlessSoapChildSessionLeaseService, HeadlessSoapChildSessionLeaseError } from './headless-soap-child-session-lease.ts';
 import type { HeadlessSoapActiveRoleDependentRegistrationV1, HeadlessSoapActiveRoleSessionGrantV1 } from './headless-soap-active-role-session-grant.ts';
+import type { HeadlessSoapAuthorizationLineageV1 } from './headless-soap-authorization-lineage.ts';
 
 function fixture() {
     const grant = Object.freeze(Object.create(null)) as HeadlessSoapActiveRoleSessionGrantV1;
+    const activeRole = Object.freeze(Object.assign(Object.create(null), { grantIdentity: grant })) as HeadlessSoapAuthorizationLineageV1['activeRole'];
     const registrations = new Map<HeadlessSoapActiveRoleDependentRegistrationV1, () => void>(); let active = true, beforeUse: (() => void) | null = null, denyNextUse = false, failAttach = false, failFence = false, now = 1_000;
     const retire = () => { if (!active) return; active = false; const disposers = [...registrations.values()]; registrations.clear(); for (const dispose of disposers) dispose(); };
     const lifecycle = Object.freeze({
@@ -15,6 +17,13 @@ function fixture() {
         confirmDependent(candidate: unknown, registration: unknown) { return active && candidate === grant && registrations.has(registration as HeadlessSoapActiveRoleDependentRegistrationV1); },
         unregisterDependent(candidate: unknown, registration: unknown) { return candidate === grant && registrations.delete(registration as HeadlessSoapActiveRoleDependentRegistrationV1); },
         async withCurrentDependent(candidate: unknown, registration: unknown, operation: () => void) { if (denyNextUse) { denyNextUse = false; retire(); throw new Error('synthetic active role denial'); } if (!active || candidate !== grant || !registrations.has(registration as HeadlessSoapActiveRoleDependentRegistrationV1)) return false; const before = beforeUse; beforeUse = null; before?.(); operation(); return active; },
+        activeRoleBindingController: Object.freeze({
+            async withCurrentDependentBinding(candidate: unknown, registration: unknown,
+                operation: (binding: HeadlessSoapAuthorizationLineageV1['activeRole']) => void) {
+                if (!active || candidate !== grant || !registrations.has(registration as HeadlessSoapActiveRoleDependentRegistrationV1)) return false;
+                const before = beforeUse; beforeUse = null; before?.(); operation(activeRole); return active;
+            },
+        }),
     });
     return { beforeUse: (operation: () => void) => { beforeUse = operation; }, clock: () => now, denyUse: () => { denyNextUse = true; }, failAttach: () => { failAttach = true; }, failFence: () => { failFence = true; }, lifecycle, registrationCount: () => registrations.size, setNow: (value: number) => { now = value; }, retire };
 }

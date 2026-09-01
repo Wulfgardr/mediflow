@@ -110,6 +110,7 @@ test('composes one private H2b owner without exposing lifecycle authority from e
     for (const method of ['withCurrentGrant', 'registerDependent', 'confirmDependent', 'unregisterDependent', 'withCurrentDependent']) {
         assert.match(childOwnerSource, new RegExp(`\\b${method}: activeRoleLifecycle\\.${method}\\b`, 'u'));
     }
+    assert.match(childOwnerSource, /activeRoleBindingController:\s*activeRoleBindingController/u);
     for (const source of [childSource, grantSource]) {
         assert.equal(source.match(/^export\s+(?:const|function|class)\s/gmu)?.length, 1);
         assert.doesNotMatch(source, /^export\s+(?:const|function|class)\s+\w*(?:Owner|Controller)\b/gmu);

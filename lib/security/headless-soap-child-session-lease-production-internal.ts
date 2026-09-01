@@ -5,6 +5,7 @@ import { headlessSoapActiveRoleSessionGrantProductionOwner } from './headless-so
 import { createHeadlessSoapChildSessionLeaseOwner } from './headless-soap-child-session-lease';
 
 const activeRoleLifecycle = headlessSoapActiveRoleSessionGrantProductionOwner.lifecycleController;
+const activeRoleBindingController = headlessSoapActiveRoleSessionGrantProductionOwner.bindingController;
 
 /** Internal process owner shared by the H2b facade and future host lifecycle controllers. */
 export const headlessSoapChildSessionLeaseProductionOwner = createHeadlessSoapChildSessionLeaseOwner({
@@ -13,4 +14,5 @@ export const headlessSoapChildSessionLeaseProductionOwner = createHeadlessSoapCh
     confirmDependent: activeRoleLifecycle.confirmDependent,
     unregisterDependent: activeRoleLifecycle.unregisterDependent,
     withCurrentDependent: activeRoleLifecycle.withCurrentDependent,
+    activeRoleBindingController: activeRoleBindingController,
 });
