@@ -1077,9 +1077,11 @@ domain-separated `patientIdDigest` e `ambulatoryIdDigest`.
 `binding_digest` e il digest del JSON canonico completo.
 
 `selectionExpiresAt` eredita byte-esattamente `webSessionExpiresAt`, come la
-selection production da cui proviene. La deadline child H2b e la deadline
-selection restano lifecycle distinti: H7b non deduce un ordinamento tra le
-due e non usa una delle due per estendere l'altra.
+selection production da cui proviene. Le deadline child H2b, selection/Web e
+proposal H3 restano lifecycle distinti: H7b ne richiede forma e valore
+canonici ma non deduce un ordinamento tra loro e non usa una deadline per
+estenderne un'altra. La currentness congiunta e gia provata dalle continuation
+H6/H7 prima del commit; il reread durevole non la ricostruisce dai timestamp.
 
 Il lookup usa `idempotency_key` come indice. Una riga assente produce
 `missing`. Una riga con `approval_ref` o `authorization_proof_digest` diverso
