@@ -1,7 +1,7 @@
 # ADR 0112: provider v2, secret broker e adapter cloud ufficiali
 
 Date: 2026-09-01
-Status: Proposed
+Status: Accepted
 
 Issues: [GitHub #279](https://github.com/Wulfgardr/mediflow/issues/279),
 [GitHub #282](https://github.com/Wulfgardr/mediflow/issues/282) e
