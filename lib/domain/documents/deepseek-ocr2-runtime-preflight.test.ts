@@ -166,13 +166,29 @@ test('times out, observes cancel, discards late completion and exposes no runtim
     const adapter = createDeepSeekOcr2FakeAdapter({ kind: 'test_fake', run: () => pending,
         cancel: () => { cancelled += 1; return Promise.reject(new Error('private')); } });
     const started = performance.now(); const result = await adapter.execute(request());
-    assert.equal(result.reason, 'timeout'); assert.equal(cancelled, 1);
+    assert.equal(result.reason, 'timeout'); assert.equal(cancelled, 0);
     const elapsed = performance.now() - started;
     assert.ok(elapsed >= DEEPSEEK_OCR2_FAKE_ADAPTER_TIMEOUT_MS - 5 && elapsed < 500);
-    release(output()); await new Promise((resolve) => setImmediate(resolve));
+    release(output()); await new Promise((resolve) => setImmediate(resolve)); assert.equal(cancelled, 1);
     assert.equal((await adapter.execute(request())).reason, 'restart_forbidden');
     const source = readFileSync(new URL('./deepseek-ocr2-runtime-preflight.ts', import.meta.url), 'utf8');
     assert.doesNotMatch(source, /fetch\(|https?:|child_process|spawn\(|exec\(|readFile|writeFile|trust_remote_code|Apple Vision|Ollama|app\/api|dbServer|lib\/schema/iu);
     assert.doesNotMatch(source, /AbortSignal|process\.env|modelPath|endpoint|markdown/iu);
     assert.equal(createDeepSeekOcr2FakeAdapter.length, 1);
+});
+
+test('terminalizes timeout before observing a synchronous blocking fake cancel', async () => {
+    let cancelStarted = false; let cancelFinished = false;
+    const pending = new Promise<unknown>(() => undefined);
+    const adapter = createDeepSeekOcr2FakeAdapter({ kind: 'test_fake', run: () => pending, cancel: () => {
+        cancelStarted = true; const until = performance.now() + 80;
+        while (performance.now() < until) { /* cooperative fake stall */ }
+        cancelFinished = true; return Promise.reject(new Error('private'));
+    } });
+    const started = performance.now(); const result = await adapter.execute(request());
+    const elapsed = performance.now() - started;
+    assert.equal(result.reason, 'timeout'); assert.equal(cancelStarted, false);
+    assert.ok(elapsed < DEEPSEEK_OCR2_FAKE_ADAPTER_TIMEOUT_MS + 45);
+    await new Promise((resolve) => setImmediate(resolve)); assert.equal(cancelFinished, true);
+    assert.equal((await adapter.execute(request())).reason, 'restart_forbidden');
 });
