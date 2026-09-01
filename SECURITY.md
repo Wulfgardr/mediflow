@@ -108,7 +108,7 @@ Regole minime:
   solo il token locale.
 - Le eccezioni token-aware fuori da `/api/v1/*` restano superfici locali di
   supporto/bootstrap, non privilegi admin generali: cataloghi locali,
-  settings/native bootstrap, proxy AI/OCR locale, health/redaction locali,
+  settings/native bootstrap, proxy AI locale, health/redaction locali,
   network overview e stato MLX read-only. Ogni nuova eccezione deve documentare
   perche non richiede una sessione admin web.
 
@@ -188,23 +188,96 @@ Regole minime:
 - Permettere solo porte previste.
 - Trattare ogni risposta come input non fidato.
 
-## 🤖 AI locale e import clinico guidato
+## 🤖 Fabric locale e import clinico guidato
 
-I flussi AI locali che leggono note paziente, diario clinico o documenti analizzati
-devono rispettare queste regole aggiuntive:
+I quattro smart path 0.8.5 sono Patient Insight, Smart Import, Document
+Synthesis e Treatment Reasoning. Quando leggono note paziente, diario clinico o
+documenti analizzati, devono rispettare queste regole aggiuntive:
 
-- usare solo servizi locali allowlisted (`localhost`, `127.0.0.1`)
+- usare solo i provider locali risolti dal production root host-owned
 - trattare l'output del modello come **non fidato** finché un operatore non lo conferma
 - non eseguire import silenziosi da testo libero verso diagnosi o terapie
 - mantenere review esplicita prima di scrivere nuovi dati strutturati in scheda
 - trattare `summarySnapshot` e `parseEvidenceArtifactSnapshot` degli allegati
   come artifact clinici locali, non come payload innocui di debug
+- esporre receipt, provenienza e currentness senza prompt, output grezzo,
+  credenziali o testo clinico
+- rifiutare provider, modello, endpoint, venue, prompt, fallback o apply forniti
+  dal caller
 
 Le diagnosi estratte da documenti restano review-only, anche quando il codice
 ICD e esplicito. Il payload automatico della sintesi non include
 `patients.diagnoses` (vedi ADR 0084).
 
-### Readiness dei modelli Ollama
+Quando configurati, Ollama serve Patient Insight, Smart Import e Document
+Synthesis e ATHENA su MLX serve soltanto Treatment Reasoning. I due lifecycle
+sono host-owned e separati: stato, revoca, grant o fallback di un provider non
+valgono per l'altro. I provider cloud restano disabilitati.
+
+ATHENA richiede runner e artifact del modello locali. L'override host-owned
+`MEDIFLOW_ATHENA_MLX_GENERATE_BIN` accetta soltanto un percorso assoluto a
+`mlx_lm.generate`, senza argomenti, shell o risoluzione di pacchetti. Il
+launcher `uvx` predefinito forza la modalità offline e fallisce chiuso se la
+cache richiesta non è disponibile. La presenza del runner non è una prova di
+readiness universale.
+
+AnyDoc è l'unica corsia automatica di estrazione locale degli allegati. Gira in
+un processo figlio bounded senza rete. La capability `ocr` resta `unavailable`
+nel runtime corrente. Immagini e PDF scansionati senza text layer falliscono
+chiusi come contenuto da revisionare.
+
+Nel perimetro 0.8.5, immagini e scansioni vanno a review manuale e le route OCR
+legacy, dopo l'autenticazione, rispondono `410`. DeepSeek-OCR 2 è
+`RELEASE_SCOPE_EXCLUDED`: non esistono adapter, E2E o benchmark che ne
+autorizzino l'uso. Un workstream post-0.8.5 può
+ricevere soltanto pagine `needsOcr` da AnyDoc e deve conservare ordine,
+provenienza, hash e qualità per pagina. Prima dell'abilitazione servono
+benchmark sintetico italiano, soglie dichiarate, ricomposizione fail-closed e
+prova che nessun dato lascia il processo locale. Apple Vision non appartiene
+al target.
+
+### Application Services e Headless
+
+Le route e gli adapter non accedono direttamente al database. Gli Application
+Services host-owned risolvono currentness, authority, conflitti, transazioni e
+audit. Una receipt Fabric descrive un'esecuzione e non è un grant.
+
+La foundation Headless 0.8.5 non espone un runtime agentico generale esterno.
+L'unica eccezione di scrittura è `mediflow.clinical_diary.append_soap.v1` con
+`clinician_confirmed_single_use.v1`. La conferma richiede UI dedicata, PIN
+fresco e proof monouso. Il caller non può fornire authority, sessione, binding
+clinici o idempotenza. L'Application Service ricontrolla la currentness e usa
+il solo owner transazionale SQLite. L'eccezione non trasferisce authority al
+Fabric o ad altre capability.
+
+Esistono due modalità architetturali distinte. Nel modello
+provider-in-MediFlow, il Fabric governa un provider per una capability
+applicativa. Nel modello MediFlow-in-intelligent-host, un host futuro invoca
+Application Services governati tramite un adapter MCP, App o Headless. La
+seconda modalità è `RELEASE_SCOPE_EXCLUDED`: non autorizza server MCP,
+installer, onboarding, sessioni agentiche, un runtime Headless generale
+esterno o accesso diretto a SQLite.
+
+### Modello provider F7
+
+La disclosure implementata mostra Ollama e ATHENA come provider locali e
+OpenAI/Anthropic come righe informative con esecuzione disabilitata. Non prova
+il modello provider completo.
+
+Il modello F7 completo non è implementato ed è `RELEASE_SCOPE_EXCLUDED`. Un
+contratto post-0.8.5 dovrà separare provider type, istanza, autenticazione,
+modello, capability, gruppi, binding e function allowlist. Le classi di
+credenziale restano distinte: `local_model`, `api_key`, `provider_oauth`
+ufficiale e `host_subscription`. Nessuna classe implica un'altra.
+
+Un login consumer o un abbonamento non è una credenziale di inferenza. Un
+flusso `provider_oauth` deve essere ufficiale, documentato dal provider e
+separato dalle sessioni consumer; non sono ammessi token estratti, OAuth
+privati o protocolli ricostruiti. Configurazione credenziali, egress ed
+esecuzione OpenAI/Anthropic sono `RELEASE_SCOPE_EXCLUDED`; il candidato include
+solo le righe informative disabilitate.
+
+### Readiness dei provider locali
 
 [ADR 0092](./docs/adr/0092-limite-digest-bound-readiness-ai-locale.md) definisce
 l'annotazione `available_unqualified` per i percorsi Ollama correnti.
@@ -218,7 +291,9 @@ Il digest pre/post è detection best-effort. Non impedisce lo swap ABA del
 modello durante l'inferenza.
 
 Nessuna receipt o dichiarazione di tipo autorizza un consumer. La qualified
-readiness resta bloccata.
+readiness resta bloccata. La lane ATHENA mantiene attestazione, kill switch e
+lifecycle propri; il runtime MLX generico di amministrazione e benchmark non è
+una prova di readiness ATHENA.
 
 `clinical_application` e `engineering_operator` non condividono grant.
 
@@ -232,8 +307,8 @@ verificare modello locale, cloud disabilitato, strumenti, rete e processo.
 Le nuove API manterranno timeout e abort interni. Non accetteranno
 `AbortSignal` dal chiamante e scarteranno i completamenti tardivi.
 
-ADR 0092 non definisce il contratto Intelligence Fabric. Un ADR separato deve
-governare capability, venue, home-base, provider cloud e authority.
+ADR 0092 non definisce il contratto Intelligence Fabric. ADR 0094 governa le
+capability 0.8.5, le venue, i production root e l'assenza di authority caller.
 
 > [!IMPORTANT]
 > I flussi AI clinici sono dietro safety gate con kill-switch (patient-insight,
@@ -241,9 +316,12 @@ governare capability, venue, home-base, provider cloud e authority.
 > documentali. Restano AI locale review-first: nessuna scrittura clinica
 > autonoma.
 
-## ⚠️ Comparator cloud opt-in
+## ⚠️ Provider cloud disabilitati
 
-non cambia il default `local-first`.
+Nessun provider cloud appartiene al runtime 0.8.5. OpenAI e Anthropic sono
+soltanto record informativi: non esistono login, token, probe, routing o egress
+cloud nel prodotto. Un comparator remoto resta, al più, una lane interna di
+engineering separata e non cambia il default `local-first`.
 
 Regole minime:
 
@@ -270,7 +348,7 @@ La taxonomy audit canonica e definita in [docs/adr/0015-audit-taxonomy-minimum-c
 
 ### Non loggare
 - campi paziente decifrati
-- testo OCR grezzo
+- testo estratto dai documenti o contenuto OCR storico
 - testo note/diario usato nei prompt AI
 - suggerimenti clinici grezzi prima della conferma utente
 - allegati caricati (base64)

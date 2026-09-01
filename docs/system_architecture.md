@@ -55,8 +55,10 @@ Per la mappa documentale completa usa [docs/README.md](./README.md) e [docs/mark
 | --- | --- | --- |
 | Web app Next.js | Superficie primaria | Root Kree8 live, UI clinica locale, `/api/*`, `/api/v1/*`, overview `home-base`, coordinamento AI locale |
 | SQLite + Drizzle | Storage autorevole | `medical.db`, schema in `lib/schema.ts` |
-| Ollama | Runtime AI/OCR locale | Default text-only `qwen3.5:35b-a3b`, OCR primario locale separato |
-| Apple Vision OCR | Fallback macOS-only | Seconda lettura locale quando l'OCR primario restituisce output vuoto/degenerato; nessun equivalente certificato Windows/Linux (ADR 0059) |
+| Ollama | Runtime generativo locale configurabile | Serve Patient Insight, Smart Import e Document Synthesis quando host e modello locali superano la readiness; non e un runtime OCR della 0.8.5 |
+| ATHENA/MLX | Runtime locale configurabile | Serve Treatment Reasoning solo con modello e runner `mlx_lm.generate` pre-provisionati; assenza o configurazione incompleta falliscono in modo chiuso |
+| AnyDoc | Estrazione documentale locale | Unica estrazione automatica inclusa per formati con testo estraibile, con provenienza e currentness |
+| OCR automatico | Non disponibile nella 0.8.5 | Immagini, scansioni e documenti senza testo utile richiedono review manuale; DeepSeek-OCR 2 e Apple Vision restano fuori dal perimetro di rilascio |
 | ICD-11 Docker | Servizio locale opzionale | Resolver diagnostico OMS |
 | OpenMed redaction | Sidecar shadow opzionale | Lane `redaction.v1` benchmark/shadow, non client-facing |
 | TLS proxy `:3443` | Trasporto locale fidato | Base di `/api/v1` per native e `home-base` |
@@ -125,18 +127,15 @@ Boundary importanti:
 
 Pipeline corrente:
 
-1. upload documento
-2. normalizzazione input locale
-3. OCR locale primario via Ollama/DeepSeek OCR; i documenti senza testo finiscono
-   in una `Coda OCR` con riprocesso idempotente e nessuna proposta clinica finche
-   il testo non basta (WUL-237)
-4. fallback Apple Vision solo su macOS se il primario produce testo low-signal;
-   su Windows/Linux non esiste oggi un fallback platform-specific certificato
-5. estrazione/sintesi con runtime generativo locale
+1. upload e validazione locale del documento
+2. estrazione AnyDoc per i formati con testo estraibile
+3. registrazione di provenienza, hash e currentness della fonte estratta
+4. invio a review manuale di immagini, scansioni e documenti senza testo utile;
+   la capability OCR automatica resta `unavailable` e non produce proposte
+5. estrazione/sintesi review-first con runtime generativo locale configurato
 6. persistenza di:
    - `summarySnapshot`
-   - artifact `parse/evidence` cifrato, section-aware (`sectionMap`, ancore
-     page/section/snippet)
+   - artifact `parse/evidence` cifrato e tracciabile
    - `documentInsights` come projection compatibile
 7. refresh dei consumer reviewable (`AI Patient Insight`, smart import, create
    flow document-driven)
@@ -144,14 +143,13 @@ Pipeline corrente:
 `Smart Import` resta reviewable e filtra il rumore da fonti senza novita clinica
 quando diagnosi/terapie sono gia presenti. L'estrazione identita e prudente
 (niente data di nascita da data arbitraria, codice fiscale con omocodie) e gli
-errori AI sono visibili, con timeout sull'OCR (WUL-324, WUL-325).
+errori AI sono visibili e non attivano fallback impliciti.
 
-L'AI locale e il default review-first. Le lane comparator cloud (`gpt-5.4`) e
-OpenMed `redaction.v1` sono opt-in / shadow / benchmark-only, separate dal runtime
-clinico e non sono claim di prodotto. Il benchmark di assorbimento evidenza misura
-questa direzione su corpus sintetico multi-fonte: recall delle fonti, disciplina
-di citazione, recupero di fonti superate e contenimento del leakage da fonti
-stale.
+L'AI locale e il default review-first. OpenAI e Anthropic sono disclosure
+informative con esecuzione disabilitata nella 0.8.5: non esistono configurazione,
+credenziali, login o fallback cloud inclusi nel candidato. Le lane comparator e
+OpenMed `redaction.v1` restano benchmark-only, separate dal runtime clinico e non
+sono claim di prodotto.
 
 > [!NOTE]
 > Il safety gate AI (WUL-358) espone un kill-switch per `patient-insight`,
@@ -193,4 +191,4 @@ stale.
 
 ---
 
-*Ultimo aggiornamento: 2026-06-16 - v0.7.0 mainline*
+*Ultimo aggiornamento: 2026-09-01 - candidato sorgente locale v0.8.5*
