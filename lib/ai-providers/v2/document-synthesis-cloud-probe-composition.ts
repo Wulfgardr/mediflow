@@ -169,7 +169,10 @@ function create(configurationValue: unknown, dependenciesValue: unknown): Docume
     let transport;
     try {
         transport = configuration.provider === 'openai'
-            ? createOpenAIResponsesOfficialHttpsTransport(Object.freeze({ fetch: sources.fetch }))
+            ? createOpenAIResponsesOfficialHttpsTransport(Object.freeze({
+                instanceBinding: configuration.instanceBinding,
+                fetch: sources.fetch,
+            }))
             : createAnthropicMessagesOfficialHttpsTransport(Object.freeze({
                 instanceBinding: configuration.instanceBinding,
                 workspaceAuthority: configuration.workspaceAuthority,
