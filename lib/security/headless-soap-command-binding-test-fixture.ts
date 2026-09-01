@@ -1,6 +1,9 @@
 /* @Codex */
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 
+import { ATTACHMENTS_ABSENT, frame, PAYLOAD_DIGEST_CODEC, SEAL_DIGEST_CODEC,
+    SEAL_SCHEMA } from '../headless/clinician-soap-entry-seal-codec-internal';
 import { createHeadlessSoapAuthorizationProofToken } from './headless-soap-authorization-proof-token';
 import { createHeadlessSoapAuthorizationLineage,
     HEADLESS_SOAP_AUTHORIZATION_POLICY_DIGEST } from './headless-soap-authorization-lineage';
@@ -12,13 +15,21 @@ const opaque = () => Object.freeze(Object.create(null)) as Readonly<Record<never
 const hash = (codec: string, byte: number) => syntheticRecord({ codec, sha256: syntheticRecord({
     bytes: Object.freeze(Array(32).fill(byte)), hex: byte.toString(16).padStart(2, '0').repeat(32),
 }) });
+const hashHex = (codec: string, hex: string) => syntheticRecord({ codec, sha256: syntheticRecord({
+    bytes: Object.freeze(Array.from({ length: 32 }, (_, index) => Number.parseInt(hex.slice(index * 2, index * 2 + 2), 16))), hex,
+}) });
 const encrypted = (byte: number) => `ENC:${Buffer.alloc(12, byte).toString('base64')}:${Buffer.alloc(16, byte).toString('base64')}`;
 
 export function syntheticBinding(patientVersion = 1) {
     const ids = { generation: opaque(), grant: opaque(), parent: opaque(), child: opaque(), lease: opaque(),
         scope: opaque(), proposal: opaque(), entry: opaque() };
-    const payloadDigest = hash('mediflow.headless.soap-entry-payload-digest.v1', 0x2a);
-    const sealDigest = hash('mediflow.headless.soap-entry-seal-digest.v1', 0x3b);
+    const payloadDigest = hash(PAYLOAD_DIGEST_CODEC, 0x2a);
+    const title = encrypted(1), content = encrypted(2), metadata = encrypted(3);
+    const date = '2026-09-01T10:00:00.000Z';
+    const sealPacket = frame([SEAL_DIGEST_CODEC, SEAL_SCHEMA, PAYLOAD_DIGEST_CODEC,
+        payloadDigest.sha256.hex, 'visit', date, 'ambulatory', title, content, metadata, ATTACHMENTS_ABSENT]);
+    assert.ok(sealPacket);
+    const sealDigest = hashHex(SEAL_DIGEST_CODEC, createHash('sha256').update(sealPacket).digest('hex'));
     const lineage = createHeadlessSoapAuthorizationLineage(syntheticRecord({
         schema: 'mediflow.headless.soap-authorization-lineage.v1', operationId: 'mediflow.clinical_diary.append_soap.v1',
         webSession: syntheticRecord({ id: '1'.repeat(64), userId: 'synthetic-clinician', username: 'synthetic.clinician',
@@ -41,9 +52,8 @@ export function syntheticBinding(patientVersion = 1) {
         entryIdentity: ids.entry, payloadDigest, sealDigest, policyDigest: HEADLESS_SOAP_AUTHORIZATION_POLICY_DIGEST,
     }));
     assert.ok(lineage);
-    const sealBundle = syntheticRecord({ schema: 'mediflow.headless.soap-entry-seal.v1', type: 'visit',
-        date: '2026-09-01T10:00:00.000Z', setting: 'ambulatory', title: encrypted(1), content: encrypted(2),
-        metadata: encrypted(3), payloadDigest, sealDigest });
+    const sealBundle = syntheticRecord({ schema: SEAL_SCHEMA, type: 'visit',
+        date, setting: 'ambulatory', title, content, metadata, payloadDigest, sealDigest });
     return { lineage, sealBundle };
 }
 
