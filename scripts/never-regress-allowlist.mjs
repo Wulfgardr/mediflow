@@ -215,8 +215,68 @@ export const NEVER_REGRESS_ALLOWLIST = {
         },
         {
             path: 'lib/ai-providers/v2/provider-lifecycle.test.ts',
-            pattern: 'https://api\\.openai\\.com',
+            pattern: 'https://api\\.openai\\.com(?=["\\x27`])',
             reason: 'The lifecycle test supplies an endpoint-shaped forbidden field to prove that the strict provider binding rejects caller-selected destinations without network access.',
+        },
+        {
+            path: 'lib/reference-data/icd11-who-host-composition.test.ts',
+            pattern: 'https://icdaccessmanagement\\.who\\.int/connect/token(?=["\\x27`])',
+            reason: 'WHO host-composition tests assert the exact token binding through injected fake clients without network access.',
+        },
+        {
+            path: 'lib/reference-data/icd11-who-host-composition.test.ts',
+            pattern: 'https://id\\.who\\.int/icd/release/11/2026-01/mms/search(?=\\?)',
+            reason: 'WHO host-composition tests assert the immutable Search binding through injected fake clients without network access.',
+        },
+        {
+            path: 'lib/reference-data/icd11-who-host-composition.test.ts',
+            pattern: 'https://caller\\.invalid(?=["\\x27`])',
+            reason: 'WHO host-composition tests use a reserved invalid caller endpoint to prove caller-supplied URLs are rejected.',
+        },
+        {
+            path: 'lib/reference-data/icd11-who-http-route.test.ts',
+            pattern: 'https://mediflow\\.local/api/icd/proxy(?=\\?|["\\x27`])',
+            reason: 'The WHO HTTP route test uses one synthetic origin only to construct Request objects for the exact route under test.',
+        },
+        {
+            path: 'lib/reference-data/icd11-who-node-https-client.test.ts',
+            pattern: 'https://icdaccessmanagement\\.who\\.int/connect/token(?=["\\x27`])',
+            reason: 'The Node HTTPS client test observes the exact token request through a fake HTTPS seam and performs no network access.',
+        },
+        {
+            path: 'lib/reference-data/icd11-who-node-https-client.test.ts',
+            pattern: 'https://id\\.who\\.int/icd/release/11/2026-01/mms/search(?=\\?)',
+            reason: 'The Node HTTPS client test observes the exact Search request through a fake HTTPS seam and performs no network access.',
+        },
+        {
+            path: 'lib/reference-data/icd11-who-node-https-client.ts',
+            pattern: 'https://icdaccessmanagement\\.who\\.int/connect/token(?=["\\x27`])',
+            reason: 'The server-only WHO HTTPS client permits only the immutable official OAuth endpoint selected by the host composition.',
+        },
+        {
+            path: 'lib/reference-data/icd11-who-node-https-client.ts',
+            pattern: 'https://id\\.who\\.int\\$\\{path\\}(?=["\\x27`])',
+            reason: 'The server-only WHO HTTPS client combines the fixed official ICD host with a path already validated by its transport contract.',
+        },
+        {
+            path: 'lib/reference-data/icd11-who-official-token-issuer.test.ts',
+            pattern: 'https://id\\.who\\.int/connect/token(?=["\\x27`])',
+            reason: 'The token issuer test uses the wrong WHO host as an inert hostile fixture to prove exact-host rejection.',
+        },
+        {
+            path: 'lib/reference-data/icd11-who-official-token-issuer.test.ts',
+            pattern: 'http://icdaccessmanagement\\.who\\.int/connect/token(?=["\\x27`])',
+            reason: 'The token issuer test uses plaintext HTTP as an inert hostile fixture to prove HTTPS-only rejection.',
+        },
+        {
+            path: 'lib/reference-data/icd11-who-official-token-issuer.ts',
+            pattern: 'https://icdaccessmanagement\\.who\\.int/connect/token(?=["\\x27`])',
+            reason: 'The server-only token issuer binds to the immutable official WHO OAuth endpoint and accepts no caller URL.',
+        },
+        {
+            path: 'lib/reference-data/icd11-who-server-owner.test.ts',
+            pattern: 'https://caller\\.invalid(?=["\\x27`])',
+            reason: 'The WHO owner test uses a reserved invalid endpoint to prove caller-supplied URL fields are denied.',
         },
         {
             path: 'lib/aifa-catalog.ts',

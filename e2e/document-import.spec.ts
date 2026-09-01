@@ -44,18 +44,30 @@ test('document import review proposes extracted data and creates the scheda with
     });
   });
 
-  // Local ICD-11 resolution used by the review enrichment for problemStatements.
+  // Governed ICD-11 resolution used by the review enrichment for problemStatements.
   await page.route('**/api/icd/proxy**', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
-        destinationEntities: [
+        schemaVersion: 'mediflow.reference-data.icd11-search-response.v1',
+        entries: [
           {
-            theCode: '5A11',
-            title: diagnosisLabel,
+            code: '5A11',
+            description: diagnosisLabel,
+            system: 'ICD-11',
           },
         ],
+        receipt: {
+          schemaVersion: 'mediflow.reference-data.icd11-search-receipt.v1',
+          operation: 'mediflow.reference_data.icd11.search.v1',
+          releaseId: '2026-01',
+          language: 'en',
+          source: 'live',
+          resultCount: 1,
+          latencyMs: 1,
+          completedAt: '2027-01-15T08:00:00.000Z',
+        },
       }),
     });
   });
