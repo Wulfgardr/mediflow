@@ -1076,6 +1076,11 @@ sono usati soltanto nella transazione e vi compaiono come digest
 domain-separated `patientIdDigest` e `ambulatoryIdDigest`.
 `binding_digest` e il digest del JSON canonico completo.
 
+`selectionExpiresAt` eredita byte-esattamente `webSessionExpiresAt`, come la
+selection production da cui proviene. La deadline child H2b e la deadline
+selection restano lifecycle distinti: H7b non deduce un ordinamento tra le
+due e non usa una delle due per estendere l'altra.
+
 Il lookup usa `idempotency_key` come indice. Una riga assente produce
 `missing`. Una riga con `approval_ref` o `authorization_proof_digest` diverso
 produce `conflict`. Una riga candidata a replay viene riletta insieme alla sua
