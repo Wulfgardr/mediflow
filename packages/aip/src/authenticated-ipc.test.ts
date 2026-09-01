@@ -280,3 +280,23 @@ test('nega Proxy/accessor e reentrancy delle porte trusted senza osservare autho
     host.stageLaunch(ACTIVATION);
     await assert.rejects(host.handleBootstrap(Object.freeze(Object.create(null)), frame()), code('peer_denied'));
 });
+
+test('nega Proxy revocati senza propagare eccezioni native', async () => {
+    const revokedActivation = Proxy.revocable({ ...ACTIVATION }, {});
+    revokedActivation.revoke();
+    const activationHost = fixture().host;
+    assert.throws(() => activationHost.stageLaunch(revokedActivation.proxy), code('input_invalid'));
+
+    const revokedPeer = Proxy.revocable({ ...XPC_PEER }, {});
+    revokedPeer.revoke();
+    const peerHost = fixture(revokedPeer.proxy).host;
+    peerHost.stageLaunch(ACTIVATION);
+    await assert.rejects(peerHost.handleBootstrap(Object.freeze(Object.create(null)), frame()), code('peer_denied'));
+
+    const revokedFrame = Proxy.revocable(frame(), {});
+    revokedFrame.revoke();
+    const frameHost = fixture().host;
+    frameHost.stageLaunch(ACTIVATION);
+    await assert.rejects(frameHost.handleBootstrap(Object.freeze(Object.create(null)), revokedFrame.proxy),
+        code('frame_invalid'));
+});
