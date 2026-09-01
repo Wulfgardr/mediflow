@@ -49,9 +49,10 @@ function database(): Database.Database { return new Database(path.join(dataDir, 
 
 after(() => { fs.rmSync(dataDir, { recursive: true, force: true }); });
 
-async function command(entropyByte: number): Promise<HeadlessSoapBoundCommandV1> {
+async function command(entropyByte: number, source = syntheticBinding(PATIENT_VERSION)):
+Promise<HeadlessSoapBoundCommandV1> {
     const fixture = commandBindingFixture(entropyByte);
-    fixture.setCurrent(syntheticBinding(PATIENT_VERSION));
+    fixture.setCurrent(source);
     const proof = syntheticProof(entropyByte);
     const bound = await fixture.owner.service.bind(proof);
     let captured: HeadlessSoapBoundCommandV1 | null = null;
@@ -183,6 +184,22 @@ test('denies stale patient CAS without partial entry, audit or ledger', async ()
             audits: (db.prepare('SELECT count(*) AS count FROM audit_events').get() as { count: number }).count,
             ledger: (db.prepare('SELECT count(*) AS count FROM headless_soap_entry_commits').get() as { count: number }).count,
         }, countsBefore);
+    } finally { db.close(); }
+});
+
+test('rejects a selection expiry not inherited from Web without partial durable state', async () => {
+    const bound = await command(0x6b, syntheticBinding(PATIENT_VERSION, 99_999));
+    const ids = deterministicIds(bound);
+    assert.deepEqual(createHeadlessSoapEntryCommitOwner().commit(bound, binding()),
+        syntheticRecord({ status: 'denied', code: 'receipt_unavailable' }));
+    const db = database();
+    try {
+        assert.deepEqual({
+            entry: (db.prepare('SELECT count(*) AS count FROM entries WHERE id = ?').get(ids.entryId) as { count: number }).count,
+            audit: (db.prepare('SELECT count(*) AS count FROM audit_events WHERE event_id = ?').get(ids.auditEventId) as { count: number }).count,
+            ledger: (db.prepare('SELECT count(*) AS count FROM headless_soap_entry_commits WHERE idempotency_key = ?')
+                .get(bound.idempotencyKey) as { count: number }).count,
+        }, { entry: 0, audit: 0, ledger: 0 });
     } finally { db.close(); }
 });
 
