@@ -162,7 +162,7 @@ test('archive row flags attachments without extracted text as "serve testo"', ()
     const archive = buildPatientReviewQueueSummary(input).rows[3];
     assert.equal(archive.state, 'serve-testo');
     assert.match(archive.detail, /2 allegati su 5/);
-    assert.match(archive.detail, /OCR o sintesi/);
+    assert.match(archive.detail, /estrazione locale o revisione manuale/);
 
     const complete = baseInput();
     complete.archive = { attachmentsCount: 3, missingTextCount: 0 };
