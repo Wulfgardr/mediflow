@@ -23,8 +23,9 @@ type ActiveBinding = {
     ingest: TypedBroker['ingest']; service: TypedBroker['service'];
 };
 type CanonicalPair = Readonly<{ patientId: string; ambulatoryId: string }>;
+type CanonicalClinicalContext = CanonicalPair & Readonly<{ patientVersion: number }>;
 type SelectionSources = Readonly<{
-    resolve(session: ServerSession, input: CanonicalPair): CanonicalPair;
+    resolve(session: ServerSession, input: CanonicalPair): unknown;
     clock(): number;
     entropy(): Uint8Array;
     brokerFactory(config: TypedProjectionBrokerConfig): TypedBroker;
@@ -33,7 +34,7 @@ type SelectionLease = Readonly<{
     sessionRef: string; selectionEpoch: number; patientRef: string; ambulatoryRef: string;
     leaseRef: string; expiresAt: number;
 }>;
-type SelectionState = CanonicalPair & SelectionLease;
+type SelectionState = CanonicalClinicalContext & SelectionLease;
 
 declare const selectionScopeIdentity: unique symbol;
 declare const selectionRegistrationIdentity: unique symbol;
@@ -45,6 +46,23 @@ export type ServerSessionSelectionLifecycleControllerV1 = Readonly<{
     confirmDependent(scope: unknown, registration: unknown): boolean;
     unregisterDependent(scope: unknown, registration: unknown): boolean;
     withCurrentDependent(scope: unknown, registration: unknown, operation: () => void): boolean;
+}>;
+export type ServerSessionSelectionBindingV1 = Readonly<{
+    scopeIdentity: ServerSessionSelectionScopeV1;
+    sessionRef: string;
+    patientRef: string;
+    ambulatoryRef: string;
+    leaseRef: string;
+    selectionEpoch: number;
+    expiresAt: number;
+}>;
+export type ServerSessionSelectionBindingSnapshotV1 = Readonly<{
+    selection: ServerSessionSelectionBindingV1;
+    patientVersion: number;
+}>;
+export type ServerSessionSelectionBindingControllerV1 = Readonly<{
+    withCurrentDependentBinding(scope: unknown, registration: unknown,
+        operation: (binding: ServerSessionSelectionBindingSnapshotV1) => void): boolean;
 }>;
 type SelectionScopeRecord = { scope: ServerSessionSelectionScopeV1; session: ServerSession; selection: SelectionState;
     active: boolean; dependents: SelectionDependentRecord | null; current(): boolean };
@@ -130,6 +148,14 @@ function selectionCallbackSucceeded(operation: (...args: never[]) => void, args:
         }
     } catch { /* fixed false below */ }
     return false;
+}
+
+function closedFrozenRecord(entries: ReadonlyArray<readonly [string, unknown]>): Readonly<Record<string, unknown>> {
+    const record = ObjectCreate(null) as Record<string, unknown>;
+    for (const [key, value] of entries) {
+        ObjectDefineProperty(record, key, { value, enumerable: true, writable: false, configurable: false });
+    }
+    return ObjectFreeze(record);
 }
 
 function hasMapValue<K, V>(registry: Map<K, V>, key: K): boolean {
@@ -321,11 +347,21 @@ function frozenExact(input: unknown, keys: readonly string[]): Record<string, un
     } catch { return null; }
 }
 
+function canonicalClinicalContext(input: unknown, requested: CanonicalPair): CanonicalClinicalContext | null {
+    const value = frozenExact(input, ['patientId', 'ambulatoryId', 'patientVersion']);
+    if (!value || value.patientId !== requested.patientId || value.ambulatoryId !== requested.ambulatoryId
+        || !NumberIsSafeInteger(value.patientVersion) || (value.patientVersion as number) < 1) return null;
+    return ObjectFreeze({ patientId: value.patientId as string, ambulatoryId: value.ambulatoryId as string,
+        patientVersion: value.patientVersion as number });
+}
+
 type ProjectionOwnerAuthorityKind = 'legacy' | 'port' | 'port-full';
 
 function createProjectionOwnerProcessOwner<Owner extends ProjectionOwnerSurface>(authorityKind: ProjectionOwnerAuthorityKind,
     sourceOverrides: Partial<SelectionSources> = {}): Readonly<{
-        registry: ProjectionOwnerRegistry<Owner>; selectionLifecycleController: ServerSessionSelectionLifecycleControllerV1;
+        registry: ProjectionOwnerRegistry<Owner>;
+        selectionLifecycleController: ServerSessionSelectionLifecycleControllerV1;
+        selectionBindingController: ServerSessionSelectionBindingControllerV1;
     }> {
     const sources = ObjectFreeze({ ...defaultSources, ...sourceOverrides });
     const owners = new MapConstructor<string, ProjectionOwnerSurface>();
@@ -444,6 +480,29 @@ function createProjectionOwnerProcessOwner<Owner extends ProjectionOwnerSurface>
                 || record.registration !== registration || !scope.current()) return false;
             const activeOperation = beginSelectionOperation(scope, record); if (!activeOperation) return false;
             const succeeded = selectionCallbackSucceeded(operation, []) && scope.active && record.active
+                && dependentRecord(registration) === record && scope.current();
+            return endSelectionOperation(activeOperation, succeeded);
+        },
+    });
+    const selectionBindingController: ServerSessionSelectionBindingControllerV1 = ObjectFreeze({
+        withCurrentDependentBinding(candidate: unknown, registration: unknown,
+            operation: (binding: ServerSessionSelectionBindingSnapshotV1) => void): boolean {
+            if (selectionOperation) { selectionOperation.poisoned = true; return false; }
+            if (!supportedSelectionCallback(operation)) return false;
+            const scope = scopeRecord(candidate); const record = dependentRecord(registration);
+            if (!scope || !record || !scope.active || !record.active || record.scope !== scope
+                || record.registration !== registration || !scope.current()) return false;
+            const activeOperation = beginSelectionOperation(scope, record); if (!activeOperation) return false;
+            const current = scope.selection;
+            const selection = closedFrozenRecord([
+                ['scopeIdentity', scope.scope], ['sessionRef', current.sessionRef], ['patientRef', current.patientRef],
+                ['ambulatoryRef', current.ambulatoryRef], ['leaseRef', current.leaseRef],
+                ['selectionEpoch', current.selectionEpoch], ['expiresAt', current.expiresAt],
+            ]) as ServerSessionSelectionBindingV1;
+            const binding = closedFrozenRecord([
+                ['selection', selection], ['patientVersion', current.patientVersion],
+            ]) as ServerSessionSelectionBindingSnapshotV1;
+            const succeeded = selectionCallbackSucceeded(operation, [binding]) && scope.active && record.active
                 && dependentRecord(registration) === record && scope.current();
             return endSelectionOperation(activeOperation, succeeded);
         },
@@ -630,6 +689,12 @@ function createProjectionOwnerProcessOwner<Owner extends ProjectionOwnerSurface>
                 if (portBacked) finish(true);
                 return fail('selection_unavailable');
             };
+            const resolveClinicalContext = (pair: CanonicalPair): CanonicalClinicalContext => {
+                let candidate: unknown;
+                try { candidate = sources.resolve(session, ObjectFreeze({ patientId: pair.patientId, ambulatoryId: pair.ambulatoryId })); }
+                catch { return fail('selection_unavailable'); }
+                return canonicalClinicalContext(candidate, pair) ?? fail('selection_unavailable');
+            };
             const requireCurrentSession = (presented: ServerSession) => {
                 if (terminal || !presentedProjectionIsCurrent(presented)) fail('session_unavailable');
             };
@@ -638,14 +703,28 @@ function createProjectionOwnerProcessOwner<Owner extends ProjectionOwnerSurface>
                 value.sessionRef === sessionRef && value.selectionEpoch === current.selectionEpoch
                 && value.patientRef === current.patientRef && value.ambulatoryRef === current.ambulatoryRef
                 && value.leaseRef === current.leaseRef;
-            const expire = () => {
-                if (portBacked) { finish(true); return; }
+            const invalidateSelection = () => {
                 const previousSelectionScope = selectionLifecycleScope; selectionLifecycleScope = null;
                 if (previousSelectionScope) drainSelectionScope(previousSelectionScope);
                 const previous = active; const hadSelection = selection !== null;
                 active = null; selection = null;
                 if (hadSelection) reviewContextEpoch += 1;
                 revoke(previous);
+            };
+            const expire = () => {
+                if (portBacked) { finish(true); return; }
+                invalidateSelection();
+            };
+            const selectionSourceCurrent = (expected: SelectionState) => {
+                if (terminal || selection !== expected || epoch !== expected.selectionEpoch) return false;
+                let observed: CanonicalClinicalContext;
+                try { observed = resolveClinicalContext(expected); }
+                catch { invalidateSelection(); return false; }
+                if (observed.patientId !== expected.patientId || observed.ambulatoryId !== expected.ambulatoryId
+                    || observed.patientVersion !== expected.patientVersion) {
+                    invalidateSelection(); return false;
+                }
+                return !terminal && selection === expected && epoch === expected.selectionEpoch;
             };
             const rejectLeaseCriticalSectionReentry = () => {
                 if (leaseCriticalSectionActive) fail('selection_busy');
@@ -675,6 +754,11 @@ function createProjectionOwnerProcessOwner<Owner extends ProjectionOwnerSurface>
                 if (selection !== boundSelection || epoch !== boundSelectionEpoch || reviewContextEpoch !== boundReviewContextEpoch) {
                     return fail('stale_selection');
                 }
+                if (!selectionSourceCurrent(boundSelection)) return fail('stale_selection');
+                requireCurrentSession(presentedSession);
+                if (selection !== boundSelection || epoch !== boundSelectionEpoch || reviewContextEpoch !== boundReviewContextEpoch) {
+                    return fail('stale_selection');
+                }
                 const mintRef = (): Ref => {
                     const ref = ObjectFreeze(ObjectCreate(null));
                     addOwnerIdentity(refs, ref);
@@ -691,6 +775,7 @@ function createProjectionOwnerProcessOwner<Owner extends ProjectionOwnerSurface>
                         now = sources.clock();
                     } catch { if (portBacked) finish(true); return false; }
                     if (!NumberIsFinite(now) || now >= boundSelection.expiresAt) { expire(); return false; }
+                    if (!selectionSourceCurrent(boundSelection)) return false;
                     return NumberIsFinite(now) && now < boundSelection.expiresAt && !terminal
                         && presentedProjectionIsCurrent(presentedSession)
                         && selection === boundSelection && epoch === boundSelectionEpoch && reviewContextEpoch === boundReviewContextEpoch;
@@ -795,6 +880,10 @@ function createProjectionOwnerProcessOwner<Owner extends ProjectionOwnerSurface>
                     requireCurrentSession(presentedSession);
                     if (leasePortOperationPoisoned || durableReviewOperationPoisoned || selection !== boundSelection || epoch !== boundSelectionEpoch
                         || reviewContextEpoch !== boundReviewContextEpoch || durableReviewCommitInFlight !== null) return fail('stale_selection');
+                    if (!selectionSourceCurrent(boundSelection)) return fail('stale_selection');
+                    requireCurrentSession(presentedSession);
+                    if (leasePortOperationPoisoned || durableReviewOperationPoisoned || selection !== boundSelection || epoch !== boundSelectionEpoch
+                        || reviewContextEpoch !== boundReviewContextEpoch || durableReviewCommitInFlight !== null) return fail('stale_selection');
                     const token = ObjectFreeze(ObjectCreate(null));
                     let spent = false;
                     let disposed = false;
@@ -805,6 +894,7 @@ function createProjectionOwnerProcessOwner<Owner extends ProjectionOwnerSurface>
                         let now: number;
                         try { now = sources.clock(); } catch { if (portBacked) finish(true); return false; }
                         if (!NumberIsFinite(now) || now >= boundSelection.expiresAt) { expire(); return false; }
+                        if (!selectionSourceCurrent(boundSelection)) return false;
                         return !leasePortOperationPoisoned && !durableReviewOperationPoisoned && NumberIsFinite(now) && now < boundSelection.expiresAt
                             && !terminal && presentedProjectionIsCurrent(presentedSession)
                             && selection === boundSelection && epoch === boundSelectionEpoch
@@ -853,10 +943,18 @@ function createProjectionOwnerProcessOwner<Owner extends ProjectionOwnerSurface>
             const owner: Omit<ServerSessionProjectionOwner, 'mintPatientInsightLeaseCommitPort' | 'mintOcrLeaseCommitPort' | 'mintDocumentSynthesisLeaseCommitPort' | 'mintTreatmentReasoningLeaseCommitPort' | 'mintDurableReviewCommitPort'> = {
                 snapshotSelectionEpoch(presentedSession) {
                     requireCurrentSession(presentedSession);
+                    const current = selection;
+                    if (current && !selectionSourceCurrent(current)) return fail('stale_selection');
+                    requireCurrentSession(presentedSession);
+                    if (current && selection !== current) return fail('stale_selection');
                     return epoch;
                 },
                 snapshotReviewContextEpoch(presentedSession) {
                     requireCurrentSession(presentedSession);
+                    const current = selection;
+                    if (current && !selectionSourceCurrent(current)) return fail('stale_selection');
+                    requireCurrentSession(presentedSession);
+                    if (current && selection !== current) return fail('stale_selection');
                     return reviewContextEpoch;
                 },
                 acquireProjectionIngest(presentedSession, input) {
@@ -866,6 +964,9 @@ function createProjectionOwnerProcessOwner<Owner extends ProjectionOwnerSurface>
                     const value = readTuple(input); const current = selection;
                     if (!current || !tupleMatches(value, current)) return fail('stale_selection');
                     if (readClock() >= current.expiresAt) { expire(); return fail('lease_expired'); }
+                    if (!selectionSourceCurrent(current)) return fail('stale_selection');
+                    requireCurrentSession(presentedSession);
+                    if (selection !== current || !tupleMatches(value, current)) return fail('stale_selection');
                     if (active?.selection === current && active.active) return active.ingest;
                     if (creating === current) return fail('broker_unavailable');
                     creating = current;
@@ -885,6 +986,9 @@ function createProjectionOwnerProcessOwner<Owner extends ProjectionOwnerSurface>
                         requireCurrentSession(presentedSession);
                         if (selection !== current || !tupleMatches(value, current)) fail('stale_selection');
                         if (readClock() >= current.expiresAt) { expire(); fail('lease_expired'); }
+                        if (!selectionSourceCurrent(current)) fail('stale_selection');
+                        requireCurrentSession(presentedSession);
+                        if (selection !== current || !tupleMatches(value, current)) fail('stale_selection');
                     } catch (error) {
                         try { candidate.control.revoke(); } catch { /* Opaque cleanup failure. */ }
                         throw error;
@@ -892,12 +996,22 @@ function createProjectionOwnerProcessOwner<Owner extends ProjectionOwnerSurface>
                     const binding = { selection: current, active: false, control: candidate.control,
                         unregister: null } as ActiveBinding;
                     const assertActive = () => {
-                        if (!binding.active || active !== binding || selection !== current) {
+                        if (!binding.active || active !== binding || selection !== current
+                            || !selectionSourceCurrent(current) || !binding.active || active !== binding || selection !== current) {
                             throw new ProjectionBrokerError('broker_revoked');
                         }
                     };
-                    binding.ingest = ObjectFreeze({ ingest(value) { assertActive(); return candidate.ingest.ingest(value); } });
-                    binding.service = ObjectFreeze({ consume(value) { assertActive(); return candidate.service.consume(value); } });
+                    const withActiveBinding = <Result>(operation: () => Result): Result => {
+                        assertActive();
+                        try { const result = operation(); assertActive(); return result; }
+                        catch (error) { assertActive(); throw error; }
+                    };
+                    binding.ingest = ObjectFreeze({ ingest(value) {
+                        return withActiveBinding(() => candidate.ingest.ingest(value));
+                    } });
+                    binding.service = ObjectFreeze({ consume(value) {
+                        return withActiveBinding(() => candidate.service.consume(value));
+                    } });
                     try {
                         if (portBacked) {
                             const brokerPort = mintResourcePort(presentedSession);
@@ -914,9 +1028,13 @@ function createProjectionOwnerProcessOwner<Owner extends ProjectionOwnerSurface>
                 resolveProjectionService(presentedSession) {
                     rejectLeaseCriticalSectionReentry();
                     requireCurrentSession(presentedSession);
-                    if (!selection) return fail('stale_selection');
-                    if (readClock() >= selection.expiresAt) { expire(); return fail('lease_expired'); }
-                    if (!active?.active || active.selection !== selection) return fail('broker_unavailable');
+                    const current = selection;
+                    if (!current) return fail('stale_selection');
+                    if (readClock() >= current.expiresAt) { expire(); return fail('lease_expired'); }
+                    if (!selectionSourceCurrent(current)) return fail('stale_selection');
+                    requireCurrentSession(presentedSession);
+                    if (selection !== current) return fail('stale_selection');
+                    if (!active?.active || active.selection !== current) return fail('broker_unavailable');
                     return active.service;
                 },
                 issueSelection(input) {
@@ -930,9 +1048,7 @@ function createProjectionOwnerProcessOwner<Owner extends ProjectionOwnerSurface>
                             || typeof value.patientId !== 'string' || typeof value.ambulatoryId !== 'string') fail('input_invalid');
                         const live = currentSession(true);
                         if (session.authChannel !== 'web' || live !== session) fail('session_unavailable');
-                        let pair: CanonicalPair;
-                        try { pair = sources.resolve(session, { patientId: value.patientId, ambulatoryId: value.ambulatoryId }); }
-                        catch { return fail('selection_unavailable'); }
+                        const pair = resolveClinicalContext({ patientId: value.patientId, ambulatoryId: value.ambulatoryId });
                         const assertCurrent = () => {
                             const current = currentSession(true);
                             if (terminal || current !== session || session.authChannel !== 'web'
@@ -946,6 +1062,8 @@ function createProjectionOwnerProcessOwner<Owner extends ProjectionOwnerSurface>
                         const patientRef = reference('ptr'); const ambulatoryRef = reference('abr'); const leaseRef = reference('lsr');
                         const now = readClock(); const finalSession = assertCurrent(); const expiresAt = finalSession.expiresAt;
                         if (now >= expiresAt) { if (portBacked) expire(); fail('lease_expired'); }
+                        const finalContext = resolveClinicalContext(pair); assertCurrent();
+                        if (finalContext.patientVersion !== pair.patientVersion) fail('selection_unavailable');
                         const next: SelectionState = ObjectFreeze({ ...pair, sessionRef, selectionEpoch: epoch + 1,
                             patientRef, ambulatoryRef, leaseRef,
                             expiresAt });
@@ -962,6 +1080,7 @@ function createProjectionOwnerProcessOwner<Owner extends ProjectionOwnerSurface>
                                 try {
                                     const observedAt = readClock();
                                     if (observedAt >= next.expiresAt) { expire(); return false; }
+                                    if (!selectionSourceCurrent(next)) return false;
                                     return scope.active && !terminal && currentSession(true) === session
                                         && selectionLifecycleScope === scope && selection === next && epoch === next.selectionEpoch;
                                 } catch { return false; }
@@ -978,15 +1097,19 @@ function createProjectionOwnerProcessOwner<Owner extends ProjectionOwnerSurface>
                     rejectLeaseCriticalSectionReentry();
                     const value = exact(input, ['sessionRef', 'selectionEpoch', 'patientRef', 'ambulatoryRef', 'leaseRef']);
                     if (terminal) return fail('session_unavailable');
-                    if (!selection) return fail('stale_selection');
-                    if (readClock() >= selection.expiresAt) {
+                    const current = selection;
+                    if (!current) return fail('stale_selection');
+                    if (readClock() >= current.expiresAt) {
                         expire(); return fail('lease_expired');
                     }
                     requireCurrentSession(presentedSession);
-                    if (value.sessionRef !== sessionRef || value.selectionEpoch !== selection.selectionEpoch
-                        || value.patientRef !== selection.patientRef || value.ambulatoryRef !== selection.ambulatoryRef
-                        || value.leaseRef !== selection.leaseRef) fail('stale_selection');
-                    return ObjectFreeze({ patientId: selection.patientId, ambulatoryId: selection.ambulatoryId });
+                    if (value.sessionRef !== sessionRef || value.selectionEpoch !== current.selectionEpoch
+                        || value.patientRef !== current.patientRef || value.ambulatoryRef !== current.ambulatoryRef
+                        || value.leaseRef !== current.leaseRef) fail('stale_selection');
+                    if (!selectionSourceCurrent(current)) return fail('stale_selection');
+                    requireCurrentSession(presentedSession);
+                    if (selection !== current || epoch !== current.selectionEpoch) return fail('stale_selection');
+                    return ObjectFreeze({ patientId: current.patientId, ambulatoryId: current.ambulatoryId });
                 },
                 withLeaseCriticalSection(presentedSession, callback) {
                     if (leaseCriticalSectionActive) return fail('selection_busy');
@@ -995,6 +1118,9 @@ function createProjectionOwnerProcessOwner<Owner extends ProjectionOwnerSurface>
                     const current = selection;
                     if (!current) return fail('stale_selection');
                     if (readClock() >= current.expiresAt) { expire(); return fail('lease_expired'); }
+                    if (!selectionSourceCurrent(current)) return fail('stale_selection');
+                    requireCurrentSession(presentedSession);
+                    if (selection !== current || epoch !== current.selectionEpoch) return fail('stale_selection');
                     const expectedSelectionEpoch = epoch;
                     const expectedReviewContextEpoch = reviewContextEpoch;
                     const assertUnchanged = () => {
@@ -1004,6 +1130,10 @@ function createProjectionOwnerProcessOwner<Owner extends ProjectionOwnerSurface>
                             return fail('stale_selection');
                         }
                         if (now >= current.expiresAt) { expire(); return fail('lease_expired'); }
+                        if (!selectionSourceCurrent(current)) return fail('stale_selection');
+                        requireCurrentSession(presentedSession);
+                        if (selection !== current || epoch !== expectedSelectionEpoch
+                            || reviewContextEpoch !== expectedReviewContextEpoch) return fail('stale_selection');
                     };
                     leaseCriticalSectionActive = true;
                     try {
@@ -1144,7 +1274,7 @@ function createProjectionOwnerProcessOwner<Owner extends ProjectionOwnerSurface>
             }
         },
     };
-    return ObjectFreeze({ registry: ObjectFreeze(registry), selectionLifecycleController });
+    return ObjectFreeze({ registry: ObjectFreeze(registry), selectionLifecycleController, selectionBindingController });
 }
 
 export function createLegacyProjectionOwnerFactory(sourceOverrides: Partial<SelectionSources> = {}) {
@@ -1161,7 +1291,7 @@ export function createFullPortProjectionOwnerFactory(sourceOverrides: Partial<Se
     return createFullPortProjectionOwnerProcessOwner(sourceOverrides).registry;
 }
 
-/** Shares one final-owner registry with its private selection lifecycle controller. */
+/** Shares one final-owner registry with its private selection lifecycle and binding controllers. */
 /* @Codex */
 export function createFullPortProjectionOwnerProcessOwner(sourceOverrides: Partial<SelectionSources> = {}) {
     return createProjectionOwnerProcessOwner<ServerSessionProjectionOwner>('port-full', sourceOverrides);

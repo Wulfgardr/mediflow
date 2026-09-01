@@ -17,12 +17,16 @@ test('production facade and private lifecycle share one exact process owner', as
     const owner = internal.serverSessionProjectionOwnerProductionOwner;
     assert.equal(owner, repeated.serverSessionProjectionOwnerProductionOwner);
     assert.equal(Object.isFrozen(owner), true);
-    assert.deepEqual(Reflect.ownKeys(owner).sort(), ['registry', 'selectionLifecycleController']);
+    assert.deepEqual(Reflect.ownKeys(owner).sort(), [
+        'registry', 'selectionBindingController', 'selectionLifecycleController',
+    ]);
     assert.equal(facade.serverSessionProjectionOwnerRegistry, owner.registry);
     assert.deepEqual(Reflect.ownKeys(owner.selectionLifecycleController).sort(), [
         'confirmDependent', 'registerDependent', 'unregisterDependent', 'withCurrentDependent', 'withCurrentSelection',
     ]);
+    assert.deepEqual(Reflect.ownKeys(owner.selectionBindingController), ['withCurrentDependentBinding']);
     assert.equal(Reflect.get(owner.registry, 'selectionLifecycleController'), undefined);
+    assert.equal(Reflect.get(owner.registry, 'selectionBindingController'), undefined);
 });
 
 test('production facade imports only the internal singleton and exports no lifecycle authority', () => {
@@ -30,7 +34,7 @@ test('production facade imports only the internal singleton and exports no lifec
     const facadeSource = fs.readFileSync(new URL('./server-session-projection-owner-production.ts', import.meta.url), 'utf8');
     assert.match(internalSource, /serverSessionProjectionOwnerProductionOwner = createFullPortProjectionOwnerProcessOwner/u);
     assert.match(facadeSource, /serverSessionProjectionOwnerRegistry = serverSessionProjectionOwnerProductionOwner\.registry/u);
-    assert.doesNotMatch(facadeSource, /selectionLifecycleController|createFullPortProjectionOwner/u);
+    assert.doesNotMatch(facadeSource, /selection(?:Lifecycle|Binding)Controller|createFullPortProjectionOwner/u);
     assert.equal(facadeSource.match(/^export\s+(?:const|function|class)\s/gmu)?.length, 1);
     assert.doesNotMatch(facadeSource, /^export\s+(?:const|function|class)\s+\w*(?:Owner|Controller)\b/gmu);
 });
