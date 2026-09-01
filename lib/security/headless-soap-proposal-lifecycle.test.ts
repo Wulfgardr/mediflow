@@ -340,7 +340,7 @@ test('foreign and restarted refs stay inert without damaging the authentic owner
 
 test('H4 lifecycle surface exposes only a closure-owned H1 copy from the current proposal', async () => {
     const { owner, proposalRef, source } = await h4Fixture(); let captured: ReturnType<typeof h1Snapshot> | null = null;
-    assert.deepEqual(Reflect.ownKeys(owner), ['service', 'lifecycleController']);
+    assert.deepEqual(Reflect.ownKeys(owner), ['service', 'lifecycleController', 'bindingController']);
     assert.deepEqual(Reflect.ownKeys(owner.lifecycleController), [
         'withCurrentProposal', 'registerDependent', 'confirmDependent', 'unregisterDependent', 'withCurrentDependent',
     ]);

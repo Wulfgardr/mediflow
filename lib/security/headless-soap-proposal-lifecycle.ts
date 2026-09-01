@@ -4,6 +4,7 @@ import { types } from 'node:util';
 import {
     validateClinicianSoapWriteDraft, type ClinicianSoapWriteAccepted,
 } from '../headless/clinician-soap-write-contract';
+import type { HeadlessSoapAuthorizationLineageV1 } from './headless-soap-authorization-lineage';
 
 export const HEADLESS_SOAP_PROPOSAL_TTL_MS = 120_000;
 declare const inspectRefIdentity: unique symbol;
@@ -37,10 +38,33 @@ export type HeadlessSoapSelectionLifecyclePortV1 = Readonly<{
     unregisterDependent(scope: unknown, registration: unknown): boolean;
     withCurrentDependent(scope: unknown, registration: unknown, operation: () => void): boolean;
 }>;
+export type HeadlessSoapProposalBindingV1 = Readonly<{
+    activeRole: HeadlessSoapAuthorizationLineageV1['activeRole'];
+    childLease: HeadlessSoapAuthorizationLineageV1['childLease'];
+    selection: HeadlessSoapAuthorizationLineageV1['selection'];
+    patientVersion: HeadlessSoapAuthorizationLineageV1['patientVersion'];
+    proposal: HeadlessSoapAuthorizationLineageV1['proposal'];
+}>;
+export type HeadlessSoapProposalBindingControllerV1 = Readonly<{
+    withCurrentDependentBinding(candidate: unknown, registration: unknown,
+        operation: (binding: HeadlessSoapProposalBindingV1) => void): Promise<boolean>;
+}>;
 export type HeadlessSoapProposalLifecycleSources = Readonly<{
     leaseLifecycle: HeadlessSoapLeaseLifecyclePortV1;
+    leaseBinding?: Readonly<{
+        withCurrentDependentBinding(candidate: unknown, registration: unknown,
+            operation: (childLease: HeadlessSoapProposalBindingV1['childLease'],
+                activeRole: HeadlessSoapProposalBindingV1['activeRole']) => void): Promise<boolean>;
+    }>;
     leaseService: Readonly<{ terminate(candidate: unknown): boolean }>;
     selectionLifecycle: HeadlessSoapSelectionLifecyclePortV1;
+    selectionBinding?: Readonly<{
+        withCurrentDependentBinding(candidate: unknown, registration: unknown,
+            operation: (binding: Readonly<{
+                selection: HeadlessSoapProposalBindingV1['selection'];
+                patientVersion: HeadlessSoapProposalBindingV1['patientVersion'];
+            }>) => void): boolean;
+    }>;
     readCurrentSelectionSession(): Promise<unknown | null>;
     clock(): number;
     scheduler(delayMs: number, operation: () => void): () => void;
@@ -63,7 +87,7 @@ type Stage = 'inspect' | 'preview' | 'proposal';
 type LifecycleRecord = {
     active: boolean; lease: object; leaseRegistration: unknown; scope: unknown; selectionRegistration: unknown;
     snapshot: ClinicianSoapWriteAccepted | null; stage: Stage; stageRef: object; refs: object[]; expiresAt: number; lastObservedAt: number;
-    cancel: (() => void) | null; dependents: ProposalDependentRecord | null;
+    proposalRevision: 1 | null; cancel: (() => void) | null; dependents: ProposalDependentRecord | null;
 };
 type ProposalDependentRecord = {
     registration: HeadlessSoapProposalDependentRegistrationV1; lifecycle: LifecycleRecord; dispose: () => void;
@@ -130,6 +154,7 @@ function acceptedSnapshot(value: unknown): ClinicianSoapWriteAccepted | null {
 export function createHeadlessSoapProposalLifecycleOwner(sources: HeadlessSoapProposalLifecycleSources): Readonly<{
     service: HeadlessSoapProposalLifecycleServiceV1;
     lifecycleController: HeadlessSoapProposalLifecycleControllerV1;
+    bindingController: HeadlessSoapProposalBindingControllerV1;
 }> {
     const stages = new WeakMap<object, LifecycleRecord>(), leases = new WeakMap<object, LifecycleRecord>(), pending = new WeakSet<object>();
     const dependentRegistrations = new WeakMap<object, ProposalDependentRecord>(); let lifecycleOperation: LifecycleOperation | null = null;
@@ -137,7 +162,7 @@ export function createHeadlessSoapProposalLifecycleOwner(sources: HeadlessSoapPr
     const proposalRecord = (candidate: unknown): LifecycleRecord | null => {
         if (typeof candidate !== 'object' || candidate === null || isProxy(candidate)) return null;
         const record = weakGet(stages, candidate); return record?.active && record.stage === 'proposal'
-            && record.stageRef === candidate && record.snapshot !== null ? record : null;
+            && record.stageRef === candidate && record.snapshot !== null && record.proposalRevision === 1 ? record : null;
     };
     const dependentRecord = (record: LifecycleRecord, registration: unknown): ProposalDependentRecord | null => {
         if (typeof registration !== 'object' || registration === null || isProxy(registration)) return null;
@@ -163,7 +188,8 @@ export function createHeadlessSoapProposalLifecycleOwner(sources: HeadlessSoapPr
     const terminalize = (record: LifecycleRecord): boolean => {
         if (!record.active) return false; record.active = false; const dependents = snapshotDependents(record);
         const cancel = record.cancel; record.cancel = null; try { cancel?.(); } catch { /* logical retirement already won */ }
-        for (let index = 0; index < record.refs.length; index += 1) weakDelete(stages, record.refs[index]!); weakDelete(leases, record.lease); record.snapshot = null;
+        for (let index = 0; index < record.refs.length; index += 1) weakDelete(stages, record.refs[index]!); weakDelete(leases, record.lease);
+        record.snapshot = null; record.proposalRevision = null;
         try { sources.leaseLifecycle.unregisterDependent(record.lease, record.leaseRegistration); } catch { /* local state is terminal */ }
         try { sources.selectionLifecycle.unregisterDependent(record.scope, record.selectionRegistration); } catch { /* local state is terminal */ }
         try { sources.leaseService.terminate(record.lease); } catch { /* local state is terminal */ } invokeDependentDrain(dependents); return true;
@@ -223,7 +249,9 @@ export function createHeadlessSoapProposalLifecycleOwner(sources: HeadlessSoapPr
             if (!leaseAttached) return fail('lease_unavailable');
             const observedAt = sources.clock(); if (!numberIsSafeInteger(observedAt) || observedAt < 0 || observedAt > maxSafeInteger - HEADLESS_SOAP_PROPOSAL_TTL_MS) return fail('lifecycle_unavailable');
             const inspectRef = opaque() as HeadlessSoapInspectRefV1;
-            record = { active: true, lease, leaseRegistration, scope, selectionRegistration, snapshot, stage: 'inspect', stageRef: inspectRef, refs: [inspectRef], expiresAt: observedAt + HEADLESS_SOAP_PROPOSAL_TTL_MS, lastObservedAt: observedAt, cancel: null, dependents: null };
+            record = { active: true, lease, leaseRegistration, scope, selectionRegistration, snapshot, stage: 'inspect', stageRef: inspectRef,
+                refs: [inspectRef], expiresAt: observedAt + HEADLESS_SOAP_PROPOSAL_TTL_MS, lastObservedAt: observedAt,
+                proposalRevision: null, cancel: null, dependents: null };
             if (!arm(record, HEADLESS_SOAP_PROPOSAL_TTL_MS)) return fail('lifecycle_unavailable');
             const finalLeaseAttached = sources.leaseLifecycle.confirmDependent(lease, leaseRegistration);
             const finalSelectionAttached = sources.selectionLifecycle.confirmDependent(scope, selectionRegistration);
@@ -240,6 +268,7 @@ export function createHeadlessSoapProposalLifecycleOwner(sources: HeadlessSoapPr
     };
     const transition = async (candidate: unknown, expected: 'inspect' | 'preview', next: 'preview' | 'proposal'): Promise<HeadlessSoapPreviewRefV1 | HeadlessSoapProposalRefV1> => {
         if (lifecycleReentry()) return fail('lifecycle_unavailable');
+        const publishesProposal = next === 'proposal';
         if (typeof candidate !== 'object' || candidate === null || isProxy(candidate)) return fail('stage_unavailable');
         const record = weakGet(stages, candidate); if (!record || !record.active) return fail('stage_unavailable');
         let leaseCurrent = false, selectionCurrent = false;
@@ -257,11 +286,12 @@ export function createHeadlessSoapProposalLifecycleOwner(sources: HeadlessSoapPr
             try { if (!sources.selectionLifecycle.confirmDependent(record.scope, record.selectionRegistration)) { lostSelection = true; return; } }
             catch { lostSelection = true; return; }
             callbackTimeFailure = observe(record); if (callbackTimeFailure) return;
-            published = opaque(); record.stage = next; record.stageRef = published; record.refs.push(published); weakSet(stages, published, record); transitioned = true;
+            published = opaque(); record.stage = next; record.stageRef = published;
+            record.refs.push(published); weakSet(stages, published, record); transitioned = true;
         };
         let current = false;
         try {
-            current = next === 'proposal'
+            current = publishesProposal
                 ? await sources.leaseLifecycle.withCurrentProposalBudget(record.lease, record.leaseRegistration, publish)
                 : await sources.leaseLifecycle.withCurrentDependent(record.lease, record.leaseRegistration, publish);
         } catch (error) {
@@ -283,6 +313,7 @@ export function createHeadlessSoapProposalLifecycleOwner(sources: HeadlessSoapPr
         if (!transitioned || !published || !leaseAttached || !selectionAttached || !record.active || record.stage !== next
             || record.stageRef !== published || weakGet(stages, published) !== record) { terminalize(record); return fail('lifecycle_unavailable'); }
         const finalTimeFailure = observe(record); if (finalTimeFailure) return fail(finalTimeFailure);
+        if (publishesProposal) record.proposalRevision = 1;
         return published as HeadlessSoapPreviewRefV1 | HeadlessSoapProposalRefV1;
     };
     const createdCurrent = (operation: LifecycleOperation): boolean => { for (let index = 0; index < operation.created.length; index += 1) {
@@ -369,5 +400,70 @@ export function createHeadlessSoapProposalLifecycleOwner(sources: HeadlessSoapPr
             return runLifecycleOperation(candidate, registration, operation, true);
         },
     });
-    return objectFreeze({ service, lifecycleController });
+    const bindingController: HeadlessSoapProposalBindingControllerV1 = objectFreeze({
+        async withCurrentDependentBinding(candidate: unknown, registration: unknown,
+            operation: (binding: HeadlessSoapProposalBindingV1) => void): Promise<boolean> {
+            if (lifecycleReentry()) return false;
+            const record = proposalRecord(candidate); if (!record) return false;
+            const dependent = dependentRecord(record, registration); if (!dependent) return false;
+            if (!synchronousCallback(operation) || !sources.leaseBinding || !sources.selectionBinding) {
+                terminalize(record); return false;
+            }
+            if (observe(record) || proposalRecord(candidate) !== record
+                || dependentRecord(record, registration) !== dependent) return false;
+            const activeOperation: LifecycleOperation = { lifecycle: record, dependent, created: [], poisoned: false };
+            lifecycleOperation = activeOperation;
+            const locallyCurrent = (): boolean => proposalRecord(candidate) === record
+                && dependentRecord(record, registration) === dependent;
+            let leaseInvoked = false, selectionInvoked = false, invoked = false, callbackAccepted = false;
+            let leaseCurrent = false, selectionCurrent = false;
+            try {
+                leaseCurrent = await sources.leaseBinding.withCurrentDependentBinding(
+                    record.lease,
+                    record.leaseRegistration,
+                    (childLease, activeRole) => {
+                        if (leaseInvoked || !locallyCurrent()) { activeOperation.poisoned = true; return; }
+                        leaseInvoked = true;
+                        try {
+                            selectionCurrent = sources.selectionBinding!.withCurrentDependentBinding(
+                                record.scope,
+                                record.selectionRegistration,
+                                (selectionSnapshot) => {
+                                    if (selectionInvoked || !locallyCurrent()) { activeOperation.poisoned = true; return; }
+                                    selectionInvoked = true; invoked = true;
+                                    const proposal = objectCreate(null) as Record<string, unknown>;
+                                    proposal.proposalIdentity = candidate; proposal.revision = record.proposalRevision;
+                                    proposal.expiresAt = record.expiresAt;
+                                    const binding = objectCreate(null) as Record<string, unknown>;
+                                    binding.activeRole = activeRole; binding.childLease = childLease;
+                                    binding.selection = selectionSnapshot.selection;
+                                    binding.patientVersion = selectionSnapshot.patientVersion;
+                                    binding.proposal = objectFreeze(proposal);
+                                    callbackAccepted = callbackSucceeded(
+                                        operation as (...args: never[]) => void,
+                                        [objectFreeze(binding)],
+                                    );
+                                },
+                            );
+                        } catch { selectionCurrent = false; }
+                    },
+                );
+            } catch { leaseCurrent = false; }
+            let leaseAttached = false, selectionAttached = false, timeCurrent = false;
+            if (!activeOperation.poisoned && leaseInvoked && selectionInvoked && invoked && callbackAccepted
+                && leaseCurrent && selectionCurrent && locallyCurrent() && createdCurrent(activeOperation)) {
+                try { leaseAttached = sources.leaseLifecycle.confirmDependent(record.lease, record.leaseRegistration); }
+                catch { leaseAttached = false; }
+                try { selectionAttached = sources.selectionLifecycle.confirmDependent(record.scope, record.selectionRegistration); }
+                catch { selectionAttached = false; }
+                if (leaseAttached && selectionAttached && locallyCurrent()
+                    && createdCurrent(activeOperation)) timeCurrent = observe(record) === null;
+            }
+            const accepted = !activeOperation.poisoned && leaseInvoked && selectionInvoked && invoked && callbackAccepted
+                && leaseCurrent && selectionCurrent && leaseAttached && selectionAttached && timeCurrent
+                && locallyCurrent() && createdCurrent(activeOperation);
+            lifecycleOperation = null; if (!accepted) terminalize(record); return accepted;
+        },
+    });
+    return objectFreeze({ service, lifecycleController, bindingController });
 }
