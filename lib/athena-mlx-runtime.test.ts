@@ -11,6 +11,7 @@ import {
 import {
     describeAthenaMlxModelArtifact,
     isAthenaMlxModelAvailable,
+    resolveAthenaMlxLauncher,
     resolveAthenaMlxMaxTokens,
 } from './athena-mlx-runtime';
 
@@ -78,5 +79,30 @@ test('athena mlx token limit keeps a fast default and hard upper bound', () => {
         } else {
             process.env.MEDIFLOW_ATHENA_MAX_TOKENS = previous;
         }
+    }
+});
+
+test('athena mlx accepts only an explicit executable local runner override', () => {
+    const fixtureDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-athena-runner-'));
+    const runner = path.join(fixtureDir, 'mlx_lm.generate');
+    fs.writeFileSync(runner, '#!/bin/sh\nexit 0\n', { encoding: 'utf8', mode: 0o700 });
+    const previous = process.env.MEDIFLOW_ATHENA_MLX_GENERATE_BIN;
+
+    try {
+        process.env.MEDIFLOW_ATHENA_MLX_GENERATE_BIN = runner;
+        assert.deepEqual(resolveAthenaMlxLauncher(), {
+            mode: 'direct',
+            command: runner,
+            prefixArgs: [],
+        });
+
+        process.env.MEDIFLOW_ATHENA_MLX_GENERATE_BIN = './mlx_lm.generate';
+        assert.throws(() => resolveAthenaMlxLauncher(), /direct runner/u);
+
+        process.env.MEDIFLOW_ATHENA_MLX_GENERATE_BIN = path.join(fixtureDir, 'other-command');
+        assert.throws(() => resolveAthenaMlxLauncher(), /direct runner/u);
+    } finally {
+        if (previous === undefined) delete process.env.MEDIFLOW_ATHENA_MLX_GENERATE_BIN;
+        else process.env.MEDIFLOW_ATHENA_MLX_GENERATE_BIN = previous;
     }
 });
