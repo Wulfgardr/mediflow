@@ -864,6 +864,119 @@ idempotenza/receipt durevole. Un failure fa rollback di tutto e consuma la
 proof. Un replay esatto restituisce la stessa receipt; stessa chiave con un
 campo o binding diverso e conflitto.
 
+#### Contratto H7a dell'Application Service
+
+H7a espone un solo metodo server-only:
+
+```text
+execute(envelope: unknown): Promise<HeadlessSoapEntryCommitResultV1>
+```
+
+Il risultato di successo e un record null-prototype, frozen e chiuso con le
+sole key `status,receipt`, dove `status = entry_committed`. Fresh commit e
+replay esatto hanno la stessa shape e la stessa snapshot di receipt: non
+espongono un flag `fresh`, `replay` o altra informazione sul percorso. La
+receipt e il record canonico H7b; H7a non la estende e non la ricostruisce.
+
+L'envelope conserva l'ordine e le regole H6: record null-prototype e frozen,
+non Proxy, con le sole own data property `approvalRef`, `idempotencyKey`,
+`authorizationProof`, enumerabili, non writable e non configurable. H6 e H7a
+usano un solo parser server-only condiviso. Il parser produce una copia
+canonica dell'envelope e il digest domain-separated della proof; la proof raw
+resta effimera, non raggiunge alcun port durevole e non viene mai persistita.
+
+H7a orchestra soltanto quattro authority private:
+
+1. l'`approvalController` H6 con `withSingleUseApproval`;
+2. il selection-currentness controller dell'owner production che risolve una
+   selection scope identity autentica senza esporre registry o projection;
+3. un lookup H7b sincrono che riceve soltanto
+   `approvalRef,idempotencyKey,authorizationProofDigest` e restituisce
+   `missing`, `exact` con receipt canonica oppure `conflict`;
+4. un commit H7b sincrono che riceve soltanto il `boundCommand` owner-issued
+   da H6 e il commit binding canonico prodotto dal controller selection; la
+   transazione termina interamente prima del return.
+
+Il selection-currentness controller resta una property non pubblica dello
+stesso process owner che contiene registry e controller H3. Espone soltanto:
+
+```text
+withCurrentCommitBinding(scopeIdentity, expected, operation): boolean
+```
+
+`expected` e il record chiuso
+`webSessionId,sessionRef,patientRef,ambulatoryRef,leaseRef,selectionEpoch,patientVersion`.
+`scopeIdentity` e l'identita opaca owner-issued conservata nella lineage H6.
+Il controller la risolve nel WeakMap dell'owner, confronta byte-esattamente
+session locator e tuple opaca, ricontrolla expiry, Web resource cell,
+selection e source currentness prima e dopo la callback e passa a `operation`
+soltanto `patientId,ambulatoryId,patientVersion` canonici. Questi ID raw restano
+nella callback privata e raggiungono soltanto il commit port H7b. `peekSession`
+e `registry.lookup` non sono authority H7 e non vengono usati per ricostruire
+una projection da una copia della sessione.
+
+Il commit port non accetta l'envelope caller-supplied. Il lookup e il commit
+port non ricevono la proof raw. Entrambi sono sincroni perche l'intera H7b
+deve restare contenuta nella callback `void` H6; Promise, thenable, callback
+duplicata, throw non tipizzato o risultato non canonico sono failure
+fail-closed.
+
+Lookup e commit restituiscono solo union null-prototype, frozen e chiuse. Il
+lookup usa `{status: missing}`, `{status: exact,receipt}` o
+`{status: conflict}`. Il commit usa `{status: committed,receipt}` oppure un
+denial `{status: denied,code}`, dove `code` e soltanto
+`binding_unavailable`, `idempotency_conflict`, `receipt_unavailable`,
+`storage_unavailable` o `lifecycle_unavailable`; non restituisce boolean,
+`undefined`, errori raw o union estendibili. H7a espone
+`HeadlessSoapEntryCommitError`, che contiene
+soltanto uno dei codici H7a fissati sotto. Rejection, throw arbitrario, union o
+receipt malformata vengono normalizzati a `lifecycle_unavailable` o
+`storage_unavailable` secondo il boundary che ha fallito; nessun messaggio
+dependency-supplied attraversa il service.
+
+L'ordine H7a e vincolante:
+
+1. validare e copiare l'envelope, quindi calcolare il proof digest;
+2. eseguire il lookup durevole prima di H6;
+3. su `exact`, restituire la receipt senza currentness, consumo H6 o write;
+4. su `conflict`, negare senza currentness, consumo H6 o write;
+5. su `missing`, entrare una volta in `withSingleUseApproval`;
+6. dentro la callback sincrona, entrare nel selection-currentness controller;
+   dentro la sua callback lasciare a H7b il secondo lookup come race fence e,
+   soltanto su miss, il CAS SQLite e il commit atomico;
+7. se H6 conferma e la callback ha prodotto una receipt canonica, restituirla;
+8. dopo ogni esito dubbio -- H6 `false`, selection final fence perso, receipt
+   mancante o failure dopo un possibile commit -- ripetere una sola volta il
+   lookup esatto dopo H6; il post-lookup non riattiva H6 e non riscrive;
+9. applicare la precedenza finale `exact > conflict > receipt/storage error >
+   denial catturato > approval_unavailable`; rejection o shape H6 invalida e
+   `lifecycle_unavailable`;
+10. senza receipt durevole, non restituire mai la receipt catturata da un
+    commit il cui selection o H6 final fence non e confermato.
+
+La chiave di replay e la tripla esatta caller-held
+`approvalRef,idempotencyKey,authorizationProof`, verificata durevolmente come
+`approvalRef,idempotencyKey,authorizationProofDigest`. La proof raw non entra
+nel database. Un replay e `exact` soltanto se H7b verifica anche integrita e
+coerenza della receipt, dell'entry, dell'audit e dei digest di binding
+persistiti. Qualunque stessa idempotency key con approval, proof digest o
+binding diverso e `idempotency_conflict`; uno stato parziale, incoerente o
+tampered e `receipt_unavailable`, mai un replay.
+
+I codici H7a PHI-safe sono esattamente `envelope_unavailable`,
+`approval_unavailable`, `binding_unavailable`, `idempotency_conflict`,
+`receipt_unavailable`, `storage_unavailable` e `lifecycle_unavailable`.
+Malformed envelope precede ogni lookup; replay exact e conflict precedono H6;
+un denial H7b catturato precede `approval_unavailable`; una receipt durevole
+exact post-commit precede il final denial H6. Errori arbitrari non attraversano
+il boundary.
+
+H7a non importa session store, registry, projection facade, schema clinico,
+Drizzle, SQLite, route, audit writer, Fabric, provider, venue o egress. Non
+genera ID, timestamp o receipt e non decodifica riferimenti opachi. La
+composition production lega l'owner H6, il controller selection-currentness
+privato e il solo owner H7b; non pubblica controller, registry o port privati.
+
 L'approval artifact, audit e receipt sono PHI-safe. Contengono solo riferimenti
 opachi, esito, timestamp, digest e versioni necessari. Non contengono SOAP,
 PIN, proof, projection, identita dirette, provider, venue, egress o testo di
