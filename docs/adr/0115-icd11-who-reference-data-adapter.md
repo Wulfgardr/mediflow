@@ -115,9 +115,18 @@ sincrono dentro resolver, presenter o issuer resta cooperativo e non e
 preemptable nello stesso processo. La lease bearer e monouso, dura al massimo
 30 secondi e riusa tramite single-flight soltanto un token RAM della stessa
 generation. Il token viene ritirato almeno 60 secondi prima della scadenza
-vendor e viene invalidato su disable, revoca locale, restart o dispose. Questo
-packet usa soltanto resolver e issuer fake: non introduce URL, HTTP, fetch,
-rete o smoke live.
+vendor e viene invalidato su disable, revoca locale, restart o dispose. Il
+packet lease usa soltanto resolver e issuer fake: non introduce URL, HTTP,
+fetch, rete o smoke live.
+
+Il packet issuer ufficiale #322 aggiunge un adapter separato con binding
+immutabile `POST https://icdaccessmanagement.who.int/connect/token`, HTTP Basic
+per client ID e secret, form esatta `grant_type=client_credentials` e
+`scope=icdapi_access`. Request e response hanno entrambe cap 8 KiB; la risposta
+accettata contiene soltanto `access_token`, `expires_in`, `token_type=Bearer` e
+`scope=icdapi_access`. Header e form sono facciate effimere ritirate su settle o
+abort. Il client HTTP resta obbligatoriamente iniettato e fake nei test: il
+packet non aggiunge `fetch`, rete live, composition root o smoke OAuth.
 
 La query in uscita contiene soltanto i termini necessari alla ricerca ICD-11:
 nessun patient ID, nome, codice fiscale, documento, nota, prompt o contesto
@@ -160,8 +169,8 @@ payload non attraversano il boundary.
 
 ## Packet successivi
 
-1. Secret broker e live transport WHO ufficiale con test HTTP fake e smoke
-   sintetico opt-in.
+1. Issuer OAuth ufficiale #322 e transport Search #323, separati e verificati
+   con client HTTP fake.
 2. Composition root host-owned e cache/reference snapshot governata.
 3. Migrazione atomica di route, UI e Application Services, poi rimozione del
    percorso Docker e aggiornamento di launcher, docs e guard.
@@ -174,7 +183,8 @@ HTTP, redirect, retry/fallback, query o risultato nei log, cache stale o di
 release diversa, DB diretto, authority agentica, write clinico, PHI/PII reale
 nei test o migrazione caller nello stesso packet del core.
 
-Fino ai packet successivi, il claim massimo e: **contratto, core e lease
-secret/token generation-bound ICD-11 WHO verificati con transport e issuer
-fake; nessun live transport HTTP, OAuth end-to-end, caller migrato, Docker
-rimosso dal runtime o smoke WHO consegnato**.
+Fino ai packet successivi, il claim massimo e: **contratto, core, lease
+secret/token generation-bound e issuer OAuth ufficiale ICD-11 WHO verificati
+con transport e client HTTP fake; nessun transport Search ufficiale, client
+HTTP live, OAuth end-to-end, caller migrato, Docker rimosso dal runtime o smoke
+WHO consegnato**.
