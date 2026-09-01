@@ -36,14 +36,14 @@ function webSession(): ServerSession {
 function fixture() {
     const sqlite = new Database(':memory:');
     sqlite.exec(`
-        CREATE TABLE patients (id TEXT PRIMARY KEY NOT NULL);
+        CREATE TABLE patients (id TEXT PRIMARY KEY NOT NULL, version INTEGER NOT NULL);
         CREATE TABLE ambulatories (id TEXT PRIMARY KEY NOT NULL);
         CREATE TABLE patients_to_ambulatories (
             patient_id TEXT NOT NULL,
             ambulatory_id TEXT NOT NULL,
             PRIMARY KEY (patient_id, ambulatory_id)
         );
-        INSERT INTO patients (id) VALUES ('patient.synthetic.01'), ('patient.synthetic.02');
+        INSERT INTO patients (id, version) VALUES ('patient.synthetic.01', 3), ('patient.synthetic.02', 5);
         INSERT INTO ambulatories (id) VALUES ('ambulatory.synthetic.01'), ('ambulatory.synthetic.02');
         INSERT INTO patients_to_ambulatories (patient_id, ambulatory_id) VALUES
             ('patient.synthetic.01', 'ambulatory.synthetic.01'),
@@ -65,15 +65,31 @@ test('resolves only the requested canonical M2M pair across multiple memberships
     assert.deepEqual(resolve(session, {
         patientId: 'patient.synthetic.01',
         ambulatoryId: 'ambulatory.synthetic.01',
-    }), { patientId: 'patient.synthetic.01', ambulatoryId: 'ambulatory.synthetic.01' });
+    }), { patientId: 'patient.synthetic.01', ambulatoryId: 'ambulatory.synthetic.01', patientVersion: 3 });
     assert.deepEqual(resolve(session, {
         patientId: 'patient.synthetic.01',
         ambulatoryId: 'ambulatory.synthetic.02',
-    }), { patientId: 'patient.synthetic.01', ambulatoryId: 'ambulatory.synthetic.02' });
+    }), { patientId: 'patient.synthetic.01', ambulatoryId: 'ambulatory.synthetic.02', patientVersion: 3 });
     assert.throws(() => resolve(session, {
         patientId: 'patient.synthetic.02',
         ambulatoryId: 'ambulatory.synthetic.01',
     }), rejects('membership_missing'));
+});
+
+test('rereads the canonical patient version and rejects non-positive or unsafe values', (context) => {
+    const { sqlite, resolve } = fixture();
+    context.after(() => sqlite.close());
+    const session = webSession();
+    const request = { patientId: 'patient.synthetic.01', ambulatoryId: 'ambulatory.synthetic.01' };
+
+    assert.equal(resolve(session, request).patientVersion, 3);
+    sqlite.prepare('UPDATE patients SET version = ? WHERE id = ?').run(4, request.patientId);
+    assert.equal(resolve(session, request).patientVersion, 4);
+
+    for (const version of [0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
+        sqlite.prepare('UPDATE patients SET version = ? WHERE id = ?').run(version, request.patientId);
+        assert.throws(() => resolve(session, request), rejects('patient_version_invalid'));
+    }
 });
 
 test('rejects missing canonical patient and ambulatory rows distinctly', (context) => {
