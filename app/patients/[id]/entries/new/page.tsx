@@ -13,7 +13,6 @@ import workspaceStyles from '@/components/kree8/kree8-workspace-shell.module.css
 import { db, type Attachment, type ClinicalEntry } from '@/lib/db';
 /* @Codex */
 import { isClinicalRichTextBlank, sanitizeClinicalRichTextHtml } from '@/lib/clinical-rich-text';
-import { refreshPatientSummaryIfEnabled } from '@/lib/ai-summary-service';
 import { useLiveQuery } from '@/lib/live-query';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/components/ui/toast-provider';
@@ -273,17 +272,6 @@ export default function NewEntryPage() {
                 createdAt: new Date(),
                 updatedAt: new Date(),
             });
-
-            setUploadProgress('Aggiornamento riepilogo paziente...');
-            // @Codex: la voce e gia salvata; un refresh fallito non deve bloccare la navigazione
-            try {
-                const summaryRefresh = await refreshPatientSummaryIfEnabled(id);
-                if (summaryRefresh.status === 'skipped' && summaryRefresh.reason === 'disabled') {
-                    console.info('[NewEntryPage] AI Patient Insight refresh skipped: kill switch disabled');
-                }
-            } catch (refreshError) {
-                console.error('[NewEntryPage] AI Patient Insight refresh failed:', refreshError);
-            }
 
             router.push(`/patients/${id}/modules`);
         } catch (error) {
