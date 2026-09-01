@@ -934,6 +934,13 @@ receipt malformata vengono normalizzati a `lifecycle_unavailable` o
 `storage_unavailable` secondo il boundary che ha fallito; nessun messaggio
 dependency-supplied attraversa il service.
 
+Il lookup H7b segnala una corruzione durevole gia classificata soltanto con
+`HeadlessSoapEntryCommitOwnerError`, limitato ai codici
+`receipt_unavailable` e `storage_unavailable`. H7a preserva esclusivamente
+questi due codici nominali; ogni throw arbitrario o lookalike resta
+`storage_unavailable`. La failure tipizzata non aggiunge una quarta shape alla
+union del lookup e non trasporta dettagli storage.
+
 L'ordine H7a e vincolante:
 
 1. validare e copiare l'envelope, quindi calcolare il proof digest;
