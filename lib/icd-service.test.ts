@@ -7,6 +7,7 @@ import {
     checkApiStatus,
     createICDReferenceDataClient,
     icdClientErrorMessage,
+    icdReadinessMessage,
 } from './icd-service.ts';
 
 const RECEIPT = Object.freeze({
@@ -121,4 +122,14 @@ test('rejects unsafe and oversized queries before issuing a request', async () =
             (error: unknown) => error instanceof ICDClientError && error.code === 'request_invalid');
     }
     assert.equal(calls, 0);
+});
+
+test('renders every governed readiness state without turning configuration into availability', () => {
+    assert.equal(icdReadinessMessage('disabled'), 'Servizio WHO ICD-11 disattivato.');
+    assert.equal(icdReadinessMessage('credentials_absent'), 'Credenziali WHO ICD-11 non configurate.');
+    assert.equal(icdReadinessMessage('offline'), 'Accesso di rete WHO ICD-11 disattivato.');
+    assert.equal(icdReadinessMessage('configured'),
+        'WHO ICD-11 configurato; disponibilità non ancora verificata.');
+    assert.equal(icdReadinessMessage('available'), 'WHO ICD-11 disponibile e verificato.');
+    assert.equal(icdReadinessMessage('unavailable'), 'Servizio WHO ICD-11 non disponibile.');
 });

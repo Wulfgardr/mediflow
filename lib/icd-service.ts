@@ -207,3 +207,18 @@ export function icdClientErrorMessage(error: unknown): string {
         default: return 'Il servizio WHO ICD-11 non è disponibile.';
     }
 }
+
+export function icdReadinessMessage(status: ICDReadinessStatus): string {
+    switch (status) {
+        case 'disabled': return 'Servizio WHO ICD-11 disattivato.';
+        case 'credentials_absent': return 'Credenziali WHO ICD-11 non configurate.';
+        case 'offline': return 'Accesso di rete WHO ICD-11 disattivato.';
+        case 'configured': return 'WHO ICD-11 configurato; disponibilità non ancora verificata.';
+        case 'available': return 'WHO ICD-11 disponibile e verificato.';
+        case 'unavailable': return 'Servizio WHO ICD-11 non disponibile.';
+        default: {
+            const exhaustive: never = status;
+            return exhaustive;
+        }
+    }
+}

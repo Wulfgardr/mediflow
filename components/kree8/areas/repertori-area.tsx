@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import {
   ArrowUpRight,
@@ -19,6 +19,8 @@ import type {
 } from '../cockpit-shared';
 import type { PillVariant } from '@/lib/patient-workspace';
 import { catalogFreshnessSignal } from '@/lib/ui-semantic-signal';
+import { getICDReadiness, icdReadinessMessage } from '@/lib/icd-service';
+import type { ICDReadiness } from '@/lib/icd-service';
 import styles from '../kree8-clinical-cockpit-foundation.module.css';
 import patientStyles from '../kree8-clinical-cockpit-patient-inbox.module.css';
 import repertoriStyles from '../kree8-clinical-cockpit-repertori.module.css';
@@ -48,8 +50,8 @@ const REVIEW_CATALOGS: Kree8CatalogRow[] = [
   },
   {
     id: 'icd',
-    name: 'ICD-11 IT',
-    sub: 'release ministeriale 2026',
+    name: 'ICD-11 WHO',
+    sub: 'readiness governata · release 2026-01',
     freshness: 'fresh',
     age: '7 g fa',
   },
@@ -96,7 +98,11 @@ function catalogFreshnessFromCount(count: number): Kree8CatalogFreshness {
 }
 
 /* @Codex */
-function buildLiveCatalogState(drugCount: number, exemptionCount: number): Kree8CatalogClientState {
+function buildLiveCatalogState(
+  drugCount: number,
+  exemptionCount: number,
+  icdReadiness: ICDReadiness | null,
+): Kree8CatalogClientState {
   const rows: Kree8CatalogRow[] = [
     {
       id: 'aic',
@@ -122,10 +128,16 @@ function buildLiveCatalogState(drugCount: number, exemptionCount: number): Kree8
     },
     {
       id: 'icd',
-      name: 'ICD-11 locale',
-      sub: 'Servizio locale gestito dal launcher; nessun servizio remoto richiesto.',
-      freshness: 'ok',
-      age: 'porta 8888',
+      name: 'ICD-11 WHO',
+      sub: icdReadiness
+        ? `Readiness governata: ${icdReadinessMessage(icdReadiness.status)}`
+        : 'Readiness governata non verificabile.',
+      freshness: icdReadiness?.status === 'available'
+        ? 'fresh'
+        : icdReadiness?.status === 'configured'
+          ? 'stale'
+          : 'off',
+      age: icdReadiness ? `release ${icdReadiness.releaseId}` : 'non verificato',
       href: '/settings/diagnostica',
       actionLabel: 'Diagnostica',
     },
@@ -147,11 +159,12 @@ function RepertoriArea({ isReview }: { isReview: boolean }) {
     async () => {
       if (isReview) return REVIEW_CATALOG_STATE;
       try {
-        const [drugCount, exemptionCount] = await Promise.all([
+        const [drugCount, exemptionCount, icdReadiness] = await Promise.all([
           fetchCatalogCount('/api/drugs?count=1'),
           fetchCatalogCount('/api/exemptions?count=1'),
+          getICDReadiness().catch(() => null),
         ]);
-        return buildLiveCatalogState(drugCount, exemptionCount);
+        return buildLiveCatalogState(drugCount, exemptionCount, icdReadiness);
       } catch (error) {
         console.error('[MediFlow] Kree8 catalog status failed:', error);
         return {
@@ -196,13 +209,6 @@ function RepertoriArea({ isReview }: { isReview: boolean }) {
     freshnessTier === 'stale' && repertoriStyles.freshnessStale,
     freshnessTier === 'broken' && repertoriStyles.freshnessBroken,
   );
-
-  useEffect(() => {
-    if (!catalogs.length) return;
-    if (!catalogs.some((catalog) => catalog.id === selectedCatalogId)) {
-      setSelectedCatalogId(catalogs[0].id);
-    }
-  }, [catalogs, selectedCatalogId]);
 
   return (
     <div className={styles.areaShell}>
