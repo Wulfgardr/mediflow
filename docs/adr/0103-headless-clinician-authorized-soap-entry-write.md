@@ -1125,6 +1125,45 @@ H7b. Il facade production esporta esclusivamente
 `headlessSoapEntryCommitService`; owner, controller, registry e port DB restano
 privati.
 
+### Costanti H8 per 0.8.5
+
+H8 aggiunge soltanto due nomi server-only per il facade production H7:
+`headlessSoapEntryCommitWebAdapter` e
+`headlessSoapEntryCommitChatAdapter`. Entrambi sono alias 1:1 della stessa
+identita frozen `headlessSoapEntryCommitService`, espongono quindi il solo
+metodo `execute(envelope)` gia definito da H7a e non introducono wrapper,
+branching o semantica dipendente dalla superficie. Web e chat non diventano
+authority e un esito conversazionale non viene interpretato come gesto,
+approval o proof.
+
+Il modulo H8 importa soltanto il facade production e `server-only`. Non crea
+route, transport, listener, request parser, draft, proof, controller, owner,
+registry, provider, venue, egress o accesso storage. In particolare non
+aggiunge endpoint HTTP, handler Next, socket, IPC, listener CLI o un secondo
+parser dell'envelope: ogni validazione e currentness restano quelle di H7.
+
+Mini non viene collegato a H7. Il comando sorgente storico `draft preview`
+conserva nel manifest la disposition di provenienza `proposal_only` con motivo
+`SYNTHETIC_PREVIEW_ONLY`; H8 non riscrive quella evidenza. La proiezione
+operativa locale e invece deny-only: per `draft preview`, come per il roster
+Mini referenziale chiuso della 0.8.5, il DTO
+`mediflow.mini.headless-referential-status.v1` conserva esattamente
+`manualDisposition=manual_only`, `grantability=not_grantable`,
+`operationId=null`, `applicationServiceRef=null`, `applyPolicy=none` e
+`writesPerformed=0`. La disposition sorgente descrive il candidato storico;
+il DTO operativo descrive cio che H8 permette e prevale per l'esecuzione.
+
+La CLI Mini espone soltanto la consultazione pipe-only di questi stati
+referenziali. Ogni comando ben formato diverso da `capabilities`, incluso
+`draft preview`, termina senza chiamare H7 con errore
+`TRANSPORT_UNBOUND` e process exit code `69`. Questo codice non e una denial
+clinica, non conia receipt e non prova che esista un transport non raggiungibile:
+attesta che H8 non ne seleziona alcuno.
+
+Claim ceiling H8: **due alias server-only locali dello stesso facade H7 e una
+proiezione Mini referenziale deny-only; nessuna route, chat runtime, operazione
+Mini, authority, transport, parity, integrazione remota o release.**
+
 L'approval artifact, audit e receipt sono PHI-safe. Contengono solo riferimenti
 opachi, esito, timestamp, digest e versioni necessari. Non contengono SOAP,
 PIN, proof, projection, identita dirette, provider, venue, egress o testo di
