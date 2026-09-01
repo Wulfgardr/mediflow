@@ -1,7 +1,7 @@
 # ADR 0111: routing OCR selettivo per pagina con DeepSeek-OCR 2
 
 Date: 2026-09-01
-Status: Proposed
+Status: Accepted
 
 Issue: [GitHub #278](https://github.com/Wulfgardr/mediflow/issues/278)
 
@@ -40,8 +40,8 @@ Questo ADR dettaglia soltanto il packet `F6` riaperto da ADR 0110.
   storici. Introduce la nuova identità versionata
   `mediflow.ocr.deepseek_ocr2.page.v1`.
 
-Lo stato `Proposed` non consegna adapter, modello, supporto hardware, benchmark
-o runtime. Fino ai gate di questo ADR, scansioni e immagini continuano a
+L'accettazione non consegna adapter, modello, supporto hardware, benchmark o
+runtime. Fino ai gate di questo ADR, scansioni e immagini continuano a
 richiedere revisione manuale.
 
 ## Decisione
@@ -66,8 +66,36 @@ allegato corrente host-owned
 
 ### Routing governato da AnyDoc
 
-Per ogni pagina, l'adapter AnyDoc produce un indice 1-based e uno dei soli tre
-esiti:
+Nel pacchetto `@firecrawl/anydoc@0.2.4` fissato dal tree, la conversione di un
+PDF misto non restituisce Markdown parziale: rigetta con un `NeedsOcrError` che
+espone soltanto `pages` 1-based e `pageCount`. Questi due campi sono l'autorita
+del routing, ma non contengono il testo delle altre pagine. L'adapter non deve
+quindi inventare un risultato page-level da un output che AnyDoc non produce.
+
+Quando `pages` non e vuoto, un materializzatore deterministico e
+dependency-pinned separa il PDF in pagine singole senza estrarne testo e senza
+decidere il routing. Per ogni indice non presente in `pages`, AnyDoc viene
+eseguito sul PDF di una sola pagina per ottenere il testo nativo; per gli
+indici presenti in `pages`, soltanto il renderer produce l'input ammesso al
+modello. Numero, ordine e corrispondenza con `pageCount` vengono riconfermati.
+Un disaccordo tra il segnale sul documento e l'esito della pagina isolata
+termina in `review_required` per l'intero documento.
+
+Il materializzatore e un boundary proprio: libreria, versione, lock, limiti e
+digest devono essere revisionati nel packet che lo introduce. Non puo
+estrarre testo, correggere pagine, rasterizzare silenziosamente o diventare un
+router alternativo. Il worker corrente, che riduce `needsOcr` al solo exit code
+`21`, non soddisfa il contratto perche perde `pages` e `pageCount`; deve essere
+esteso o affiancato da un envelope bounded prima dell'integrazione runtime.
+
+Il primo segnale sul PDF assegna gli indici presenti in `pages` a `needsOcr` e
+il complemento a `native_unmaterialized`: quest'ultimo nome registra soltanto
+che AnyDoc non ha segnalato OCR, non che esista gia testo nativo. Dopo la
+materializzazione e la conversione AnyDoc della singola pagina, il solo esito
+positivo diventa `native`.
+
+Al termine della materializzazione, ogni pagina PDF ha un indice 1-based e uno
+dei soli tre esiti pubblicabili:
 
 - `native`: il testo utile viene conservato e la pagina non viene renderizzata
   per il modello;
@@ -79,8 +107,10 @@ Solo un esito positivo `needsOcr` autorizza l'ammissione tecnica della pagina.
 Errore del parser, documento cifrato o malformato, limite di risorsa, pagina
 mancante e risultato ambiguo non vengono convertiti in `needsOcr`.
 
-Il contratto v1 copre PDF con ordine pagina stabile e immagini singole trattate
-come pagina 1. I formati senza una mappa di pagina stabile restano sul percorso
+Il contratto v1 copre soltanto PDF con ordine pagina stabile. Le immagini
+singole non sono un formato ammesso da AnyDoc 0.2.4 e restano a revisione
+manuale finche un ADR successivo non definisce un'autorita di routing distinta.
+Gli altri formati senza una mappa di pagina stabile restano sul percorso
 AnyDoc nativo o a revisione manuale; non vengono rasterizzati in modo
 implicito.
 
@@ -252,7 +282,8 @@ Ogni eventuale codice ripreso richiede una nuova review sul contratto presente.
 La prima slice usa fixture sintetiche e un solo runtime profile:
 
 1. introdurre i contratti pagina, manifest, profilo e receipt;
-2. ottenere da AnyDoc decisioni page-level senza riusare il router storico;
+2. conservare `NeedsOcrError.pages/pageCount`, introdurre il materializzatore
+   PDF revisionato e rieseguire AnyDoc soltanto sulle pagine native isolate;
 3. integrare renderer e runner ufficiale pin-by-digest, offline e bounded;
 4. ricomporre un PDF misto con pagine native e `needsOcr`;
 5. eseguire unit test di admissione e denial, E2E di ricomposizione e benchmark
@@ -270,6 +301,8 @@ completamento tardivo.
 Fermare il packet se:
 
 - una pagina non `needsOcr` raggiunge il modello;
+- il complemento di `NeedsOcrError.pages` viene trattato come testo parziale o
+  promosso da `native_unmaterialized` senza una conversione AnyDoc isolata;
 - DeepSeek-OCR 2 o il caller decide il routing;
 - compare download runtime, egress, endpoint remoto o custom code non fissato;
 - un tag o nome sostituisce un digest verificato;
@@ -287,6 +320,6 @@ Questo ADR non implementa runtime, provisioning, route, UI, schema, backup,
 provider cloud, apply clinico o supporto hardware universale. Non autorizza
 Apple Vision, Ollama OCR, le route legacy o un consumer paired diretto.
 
-Il claim massimo fino al completamento dei gate è: **contratto proposto per OCR
+Il claim massimo fino al completamento dei gate è: **contratto accettato per OCR
 locale selettivo per pagina con AnyDoc come router e DeepSeek-OCR 2 ufficiale
 pin-by-digest; nessun nuovo runtime o profilo hardware è ancora consegnato**.
