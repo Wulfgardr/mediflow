@@ -1,7 +1,7 @@
 # ADR 0114: isolamento AIP e MCP per Intelligent Host
 
 Date: 2026-09-01
-Status: Proposed
+Status: Accepted
 
 Issue: [GitHub #285](https://github.com/Wulfgardr/mediflow/issues/285)
 Program line: candidata `0.8.5`
@@ -134,9 +134,10 @@ solo dati non clinici: versione del contratto, versione applicativa, 66 anchor
 canonici, zero operazioni Headless generali grantable, binding SOAP MCP
 `unavailable` e claim `MCP_PROTOCOL_SLICE_ONLY`.
 
-Il risultato usa `resultType: "complete"`, `structuredContent` validato dallo
-schema di output e una rappresentazione testuale equivalente per i client che
-la richiedono. Le annotazioni dichiarano read-only, non distruttivo,
+Il risultato usa `structuredContent` validato dallo schema di output e una
+rappresentazione testuale equivalente per i client che la richiedono. La
+revisione finale `2026-07-28` non espone `resultType`. Le annotazioni
+dichiarano read-only, non distruttivo,
 idempotente e closed-world; restano hint e non autorizzazione.
 
 Discovery, catalogo e stato non creano una sessione AIP o un grant. La slice
@@ -274,7 +275,7 @@ revoca, audit con contenuto clinico, SQL diretto, provider selection, fallback,
 write non deciso o un secondo boundary nello stesso diff.
 
 Fino alla matrice completa della sola thin slice, il claim massimo è:
-**ADR proposto per isolamento MCP/AIP; nessun server o tool è consegnato**.
+**ADR accettato per isolamento MCP/AIP; nessun server o tool è consegnato**.
 
 Dopo una thin slice verificata il claim massimo diventa:
 **MCP `stdio` locale modern-only con un tool di stato non-PHI; nessuna sessione
