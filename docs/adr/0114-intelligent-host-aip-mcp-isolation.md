@@ -4,8 +4,12 @@ Date: 2026-09-01
 Status: Accepted
 
 Issue: [GitHub #285](https://github.com/Wulfgardr/mediflow/issues/285)
+Decisione packaging macOS:
+[GitHub #329](https://github.com/Wulfgardr/mediflow/issues/329)
 Program line: candidata `0.8.5`
 Evidence base: `1452603ab6f3f53f25bc0788f7c09a8b024a4b59`
+Evidence packaging macOS: `7f4cc6da6be9951f36db4ae274f0813215638619`,
+Xcode `26.6` (`17F113`), SDK macOS `26.5`
 
 Related: [ADR 0094](./0094-intelligence-fabric-headless-contract-085.md),
 [ADR 0095](./0095-broker-projection-e-servizi-host-per-capability.md),
@@ -101,10 +105,118 @@ Il processo MCP non importa né riceve:
 - production root Fabric legati alla sessione Web;
 - production root, approval, proof o identità SOAP H2-H7.
 
-Su macOS il target del broker è un servizio per-user con XPC. Un porting può
-usare Unix domain socket con permessi `0600` e peer credentials oppure named
-pipe con access control list equivalenti. Ogni alternativa deve autenticare il
-peer e conservare gli stessi denial; un listener TCP non è equivalente.
+Su macOS il target del broker è il Mach service per-user definito sotto. Un
+porting può usare Unix domain socket con permessi `0600` e peer credentials
+oppure named pipe con access control list equivalenti. Ogni alternativa deve
+autenticare il peer e conservare gli stessi denial; un listener TCP non è
+equivalente.
+
+### Packaging macOS e identità pubblica del peer
+
+Il broker Node.js deve essere lo stesso processo che possiede i listener
+`libxpc`. L'addon Node-API chiama il core AIP TypeScript in-process. Non è
+ammesso un XPCService Swift che inoltra frame al broker tramite pipe, socket,
+HTTP o un altro canale: sarebbe un secondo IPC non attestato e un secondo
+composition root. Non è ammessa neppure una replica Swift delle decisioni di
+owner, lease o revoca.
+
+Il bundle firmato `MediFlow.app` contiene questi artefatti:
+
+- `Contents/Library/LaunchAgents/com.mediflow.aip-broker.plist`;
+- `Contents/Library/LaunchServices/com.mediflow.aip-broker`, launcher nativo
+  che sostituisce il processo con il broker Node.js;
+- `Contents/Library/LaunchServices/com.mediflow.mcp-launcher`, launcher nativo
+  usato come comando MCP dall'host intelligente;
+- `Contents/Frameworks/mediflow-aip-xpc.node`, addon Node-API firmato;
+- `Contents/Resources/AIPRuntime/`, con broker, adapter MCP e manifest di
+  versione, architettura, ABI Node e digest.
+
+Il plist usa `BundleProgram`, non un path assoluto, ed è registrato dal
+`MediFlowMacApp` con `SMAppService.agent(plistName:)`. Ha label
+`com.mediflow.aip-broker`, `RunAtLoad=false`, `KeepAlive=false`, umask `077` e
+due `MachServices` on-demand:
+
+- `com.mediflow.aip.control.v1`, accessibile soltanto al parent host-owned già
+  attestato, per staging e health del lancio;
+- `com.mediflow.aip.rpc.v1`, accessibile al processo Node approvato che esegue
+  l'adapter MCP.
+
+Il plist non contiene bootstrap reference, token, path clinici, `NODE_OPTIONS`,
+`NODE_PATH`, variabili `DYLD_*`, credenziali o endpoint di rete. I launcher
+risolvono path solo dentro il bundle verificato e usano `execve` con un ambiente
+nuovo e allowlisted. Il launcher MCP conserva soltanto home e directory
+temporanea canoniche, locale, marker di runtime, nomi dei Mach service e una
+bootstrap reference opaca. Non eredita l'ambiente dell'host intelligente.
+
+Il parent host-owned usa il servizio control per creare lo stage già governato
+da questa ADR e avvia il launcher MCP con la bootstrap reference casuale e
+monouso nell'ambiente sostitutivo. Il launcher non può creare uno stage, un
+owner o una capability e fallisce se la reference non è presente. Esegue subito
+`execve` del Node approvato mantenendo il PID. La prima connessione RPC deve
+presentarsi sul canale con PID, effective UID e audit session ID (ASID) attesi,
+soddisfare il requisito di firma del Node e consumare la reference entro il
+timeout. Il frame non può dichiarare o sovrascrivere questi attributi. PID e
+reference, presi singolarmente, non sono authority.
+
+L'addon usa soltanto API pubbliche disponibili dal deployment target macOS 14:
+`xpc_connection_get_pid`, `xpc_connection_get_euid`,
+`xpc_connection_get_asid` e
+`xpc_connection_set_peer_code_signing_requirement`. Il requisito viene
+applicato prima di accettare messaggi. Il servizio control richiede il
+designated requirement esatto dell'app firmata e il binding della current host
+generation. Il servizio RPC richiede il code directory hash esatto del binario
+Node selezionato; un requisito generico sul nome `node`, sul solo team o sul
+solo UID non è sufficiente, perché lo stesso eseguibile può avviare script
+diversi. Il binding PID/EUID/ASID e la bootstrap reference monouso restano
+obbligatori anche quando il requisito di firma è soddisfatto.
+
+La build Developer ID usa identifier e Team ID attesi per i launcher, verifica
+la firma dell'intero bundle e registra nel manifest il requisito esatto del
+Node. Una build di sviluppo deve essere almeno firmata ad hoc e usa i code
+directory hash esatti del candidato. Un bundle unsigned, un Node senza firma
+verificabile, `SMAppService.Status.requiresApproval`, un requisito non valido o
+un mismatch di manifest negano AIP. Non esiste un profilo permissivo per
+aggirare il gate.
+
+Il SDK pubblico Xcode 26.6 non espone un raw audit token da
+`xpc_connection_t`. Sono vietati simboli privati, KVC, SPI, introspezione di
+layout e serializzazione di `audit_token_t`. ASID indica la sessione audit, non
+è il raw audit token. Se un SDK futuro aggiunge una API pubblica, il suo uso
+richiede un nuovo ADR e non cambia retroattivamente questo contratto.
+
+`MediFlowMacApp` è l'unico owner del lifecycle:
+
+1. **Installazione.** Dopo un'azione locale esplicita verifica bundle,
+   manifest, architettura, ABI e firme; registra il LaunchAgent con
+   `SMAppService`; tratta l'approvazione di sistema come gate e completa un
+   handshake di versione sui due Mach service.
+2. **Aggiornamento.** Un bundle nuovo non modifica file dentro un bundle già
+   registrato. L'app attende il completamento di `unregister`, registra il
+   plist del nuovo bundle e accetta il cambio soltanto dopo l'handshake con il
+   digest atteso. La disconnessione revoca prima owner, handle e bootstrap.
+3. **Rollback.** Se registrazione o handshake falliscono, l'app disabilita il
+   nuovo servizio. La candidata 0.8.5 non introduce un updater automatico: il
+   rollback operativo ripristina il precedente bundle firmato conservato dal
+   processo di distribuzione, poi ripete registrazione e handshake. Non combina
+   launcher, addon, JavaScript o manifest di versioni diverse. Se il bundle
+   precedente non è disponibile o il suo handshake fallisce, lo stato resta
+   disabilitato.
+4. **Disinstallazione.** L'azione locale di rimozione chiama `unregister`,
+   attende la terminazione del job e verifica `notRegistered` prima di
+   rimuovere il solo stato tecnico non sensibile. Trascinare l'app nel Cestino
+   senza questa azione non prova una disinstallazione completa.
+
+Il broker conserva bootstrap, connection binding, lease e generation soltanto
+in memoria. Invalidazione XPC, cancel, timeout, uscita del peer, update,
+unregister e restart revocano la connection generation prima di altre call. Un
+restart non ricarica reference, owner o handle precedenti. Log e receipt di
+lifecycle contengono soltanto versione, digest abbreviato, stato
+`SMAppService`, outcome e denial code; non contengono raw identity, PID, EUID,
+ASID, requirement, reference, frame o dati clinici.
+
+Questa decisione autorizza il solo packet runtime
+[GitHub #330](https://github.com/Wulfgardr/mediflow/issues/330). Non consegna
+addon, plist, launcher, registrazione, test cross-process o disponibilità AIP.
 
 Il processo Web può chiedere al broker di attivare un owner figlio soltanto
 dopo un gesto esplicito e una verifica Web riuscita. Il bridge passa un comando
@@ -242,6 +354,11 @@ Owner, lease, revoca, audit e IPC appartengono a un packet successivo in
 `packages/aip/`. Il read terminologico, il read clinico e ogni proposal o write
 restano packet separati con test e owner dei file distinti.
 
+La porta macOS è ulteriormente separata in #329, decisione di packaging e
+identità, e #330, implementazione Node-API/libxpc e prove cross-process. #330
+non può introdurre un proxy Swift, un secondo IPC o un requisito di firma più
+debole di quello deciso qui.
+
 ## Matrice di prova
 
 | Gate | Prova positiva richiesta | Falsificatore bloccante |
@@ -253,6 +370,7 @@ restano packet separati con test e owner dei file distinti.
 | Input | schema strict, unknown tool e JSON malformato negati | campi inattesi ignorati o caller authority accettata |
 | Risorse | timeout, cancellation, rate e frame bound provati | flood o completamento tardivo produce lavoro osservabile |
 | Owner AIP | peer e owner figlio distinti verificati a ogni call | `clientInfo`, cookie, token locale o handle usato come identità |
+| IPC macOS | Mach service per-user; PID/EUID/ASID dal canale, firma e bootstrap monouso verificati | identità dal frame, raw audit token, API private, TCP o secondo IPC |
 | Lease | capability, purpose, scope, budget, expiry ed epoch esatti | lease condiviso, esteso dal figlio, ricostruito o cross-session |
 | Revoca | lock, logout, expiry, epoch change e restart negano la call successiva | handle consumabile dopo revoca o restart |
 | Application Service | un solo servizio nominato esegue regole e currentness | adapter, route o planner accede a SQLite o duplica business logic |
@@ -284,6 +402,10 @@ write non deciso o un secondo boundary nello stesso diff.
 
 Fino alla matrice completa della sola thin slice, il claim massimo è:
 **ADR accettato per isolamento MCP/AIP; nessun server o tool è consegnato**.
+
+Per la porta macOS, dopo #329 e prima della prova runtime #330, il claim massimo
+è: **topologia LaunchAgent/XPC e identità peer pubblica decise; nessun addon,
+servizio installato o flusso cross-process consegnato**.
 
 Dopo una thin slice verificata il claim massimo diventa:
 **MCP `stdio` locale modern-only con un tool di stato non-PHI; nessuna sessione
