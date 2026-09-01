@@ -56,7 +56,8 @@ function envelope(sourceText: string) {
 
 function ownerWithSelection(clock: () => number = () => 1_000) {
     let entropy = 0;
-    const registry = createServerSessionProjectionOwnerRegistry({ clock, entropy: () => Uint8Array.from({ length: 16 }, (_, index) => (entropy += 1) + index), resolve: (_session, pair) => Object.freeze({ ...pair }) });
+    const clinicalContext = Object.freeze({ ...PAIR, patientVersion: 1 });
+    const registry = createServerSessionProjectionOwnerRegistry({ clock, entropy: () => Uint8Array.from({ length: 16 }, (_, index) => (entropy += 1) + index), resolve: () => clinicalContext });
     const session = createSession(USER, 'web'); const owner = registry.acquire(session);
     owner.issueSelection({ expectedEpoch: 0, ...PAIR });
     return { session, owner };

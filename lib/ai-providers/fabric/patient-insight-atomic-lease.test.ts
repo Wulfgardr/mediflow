@@ -45,7 +45,7 @@ function fixture() {
     const registry = createServerSessionProjectionOwnerRegistry({
         clock: () => clock,
         entropy: () => Uint8Array.from({ length: 16 }, (_, index) => (ownerEntropy += 1) + index),
-        resolve: (_session, pair) => Object.freeze({ ...pair }),
+        resolve: (_session, pair) => Object.freeze({ ...pair, patientVersion: 1 }),
     });
     const session = createSession({ id: 'synthetic-user', username: ['synthetic', 'clinician'].join('-'), role: 'clinician' });
     const owner = registry.acquire(session);
