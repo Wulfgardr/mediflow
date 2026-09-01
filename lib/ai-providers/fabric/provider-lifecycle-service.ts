@@ -21,7 +21,8 @@ export class ProviderLifecycleServiceError extends Error {
 }
 
 type HostSources = Readonly<{ entropy: () => unknown; now: () => unknown }>;
-type FactoryOptions = Readonly<{ appDataDir?: string; sources?: unknown }>;
+type FactoryOptions = Readonly<{ appDataDir?: string; provider?: string; sources?: unknown }>;
+const PROVIDER_REF = /^[a-z][a-z0-9_-]{0,63}$/u;
 const PRODUCTION_SOURCES: HostSources = Object.freeze({
     entropy: () => randomBytes(32).toString('hex'),
     now: () => new Date().toISOString(),
@@ -87,16 +88,20 @@ function snapshotOnboarding(value: unknown): ProviderOnboardingState {
 }
 
 export function createHostProviderLifecycleService(options: FactoryOptions = {}) {
-    const config = dataRecord(options, [], ['appDataDir', 'sources']);
+    const config = dataRecord(options, [], ['appDataDir', 'provider', 'sources']);
     if (config.appDataDir !== undefined
         && (typeof config.appDataDir !== 'string' || !path.isAbsolute(config.appDataDir))) {
         throw new ProviderLifecycleServiceError('input_invalid');
     }
     const appDataDir = config.appDataDir as string | undefined;
+    const provider = config.provider === undefined ? 'ollama' : config.provider;
+    if (typeof provider !== 'string' || !PROVIDER_REF.test(provider)) {
+        throw new ProviderLifecycleServiceError('input_invalid');
+    }
     const sources = snapshotSources(config.sources);
     const read = (): ProviderLifecycleRead => {
         try {
-            return Object.freeze({ status: 'available', record: createProviderLifecycleStore(appDataDir).load() });
+            return Object.freeze({ status: 'available', record: createProviderLifecycleStore(appDataDir, undefined, provider).load() });
         } catch (error) {
             const reason = error instanceof ProviderLifecycleStoreError && error.code === 'missing'
                 ? 'missing' : error instanceof ProviderLifecycleStoreError && error.code === 'corrupt'
@@ -106,7 +111,7 @@ export function createHostProviderLifecycleService(options: FactoryOptions = {})
     };
     const save = (expected: number, lifecycle: ProviderLifecycleState | ProviderLifecycleEvent) => {
         const metadata = operationMetadata(sources);
-        const store = createProviderLifecycleStore(appDataDir, () => new Date(metadata.timestamp));
+        const store = createProviderLifecycleStore(appDataDir, () => new Date(metadata.timestamp), provider);
         return typeof lifecycle === 'string'
             ? store.save({ kind: 'transition', expectedVersion: expected, event: lifecycle,
                 actorClass: 'host_service', actorRef: metadata.actorRef, receiptRef: metadata.receiptRef })
@@ -115,7 +120,9 @@ export function createHostProviderLifecycleService(options: FactoryOptions = {})
     };
     const admit = (value: unknown) => {
         const input = expectedVersion(value, 'onboarding');
-        return save(input.expectedVersion as number, admitProvider(snapshotOnboarding(input.onboarding)));
+        const lifecycle = admitProvider(snapshotOnboarding(input.onboarding));
+        if (lifecycle.provider !== provider) throw new ProviderLifecycleServiceError('input_invalid');
+        return save(input.expectedVersion as number, lifecycle);
     };
     const transition = (event: ProviderLifecycleEvent) => (value: unknown) => {
         const input = expectedVersion(value);

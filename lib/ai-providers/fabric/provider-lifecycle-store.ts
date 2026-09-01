@@ -38,6 +38,7 @@ export class ProviderLifecycleStoreError extends Error {
 const ACTOR_CLASSES = new Set<unknown>(['physician', 'host_service']);
 const ACTOR_REF = /^actor_[0-9a-f]{32,64}$/;
 const RECEIPT_REF = /^receipt_[0-9a-f]{32,64}$/;
+const PROVIDER_REF = /^[a-z][a-z0-9_-]{0,63}$/;
 function hasExactKeys(value: object, expected: readonly string[]): boolean {
     const keys = Reflect.ownKeys(value);
     return keys.length === expected.length && expected.every((key) => keys.includes(key));
@@ -45,7 +46,7 @@ function hasExactKeys(value: object, expected: readonly string[]): boolean {
 function freezeRecord(value: Omit<ProviderLifecycleRecord, 'schemaVersion'>): ProviderLifecycleRecord {
     return Object.freeze({ schemaVersion: PROVIDER_LIFECYCLE_STORE_SCHEMA_VERSION, ...value });
 }
-function snapshotRecord(value: unknown): ProviderLifecycleRecord {
+function snapshotRecord(value: unknown, provider: string): ProviderLifecycleRecord {
     if (!value || typeof value !== 'object' || Array.isArray(value) || !hasExactKeys(value, [
         'schemaVersion', 'lifecycle', 'actorClass', 'actorRef', 'version', 'hostTimestamp', 'receiptRef',
     ])) throw new ProviderLifecycleStoreError('corrupt');
@@ -59,6 +60,7 @@ function snapshotRecord(value: unknown): ProviderLifecycleRecord {
     const receiptRef = input.receiptRef;
     if (
         schemaVersion !== PROVIDER_LIFECYCLE_STORE_SCHEMA_VERSION
+        || (lifecycle as { provider?: unknown } | null)?.provider !== provider
         || !ACTOR_CLASSES.has(actorClass) || typeof actorRef !== 'string' || !ACTOR_REF.test(actorRef)
         || !Number.isSafeInteger(version) || (version as number) < 1
         || typeof hostTimestamp !== 'string' || new Date(hostTimestamp).toISOString() !== hostTimestamp
@@ -74,7 +76,7 @@ function snapshotRecord(value: unknown): ProviderLifecycleRecord {
         throw new ProviderLifecycleStoreError('corrupt');
     }
 }
-function snapshotCommand(value: unknown): ProviderLifecycleStoreCommand {
+function snapshotCommand(value: unknown, provider: string): ProviderLifecycleStoreCommand {
     if (!value || typeof value !== 'object' || Array.isArray(value)) {
         throw new ProviderLifecycleStoreError('command_invalid');
     }
@@ -96,7 +98,7 @@ function snapshotCommand(value: unknown): ProviderLifecycleStoreCommand {
     if (kind === 'admit') {
         try {
             const lifecycle = snapshotProviderLifecycle(input.lifecycle);
-            if (lifecycle.status !== 'available_unqualified') throw new Error();
+            if (lifecycle.status !== 'available_unqualified' || lifecycle.provider !== provider) throw new Error();
             return Object.freeze({ kind, expectedVersion: expectedVersion as number, lifecycle,
                 actorClass: actorClass as ProviderLifecycleActorClass, actorRef, receiptRef });
         } catch { throw new ProviderLifecycleStoreError('command_invalid'); }
@@ -108,16 +110,26 @@ function snapshotCommand(value: unknown): ProviderLifecycleStoreCommand {
     return Object.freeze({ kind, expectedVersion: expectedVersion as number, event,
         actorClass: actorClass as ProviderLifecycleActorClass, actorRef, receiptRef });
 }
-export function getProviderLifecycleStorePaths(appDataDir = getDataDir()) {
+function providerRef(value: unknown): string {
+    if (typeof value !== 'string' || !PROVIDER_REF.test(value)) throw new ProviderLifecycleStoreError('command_invalid');
+    return value;
+}
+
+export function getProviderLifecycleStorePaths(appDataDir = getDataDir(), provider = 'ollama') {
+    const canonicalProvider = providerRef(provider);
     const directory = path.join(appDataDir, 'ai', 'fabric');
+    const basename = canonicalProvider === 'ollama'
+        ? 'provider-lifecycle.v1'
+        : `provider-lifecycle.${canonicalProvider}.v1`;
     return {
         directory,
-        recordPath: path.join(directory, 'provider-lifecycle.v1.json'),
-        lockPath: path.join(directory, 'provider-lifecycle.v1.lock'),
+        recordPath: path.join(directory, `${basename}.json`),
+        lockPath: path.join(directory, `${basename}.lock`),
     } as const;
 }
-export function createProviderLifecycleStore(appDataDir = getDataDir(), hostClock: () => Date = () => new Date()) {
-    const paths = getProviderLifecycleStorePaths(appDataDir);
+export function createProviderLifecycleStore(appDataDir = getDataDir(), hostClock: () => Date = () => new Date(), provider = 'ollama') {
+    const canonicalProvider = providerRef(provider);
+    const paths = getProviderLifecycleStorePaths(appDataDir, canonicalProvider);
     function readNullable(): ProviderLifecycleRecord | null {
         let raw: string;
         try { raw = fs.readFileSync(paths.recordPath, 'utf8'); }
@@ -125,7 +137,7 @@ export function createProviderLifecycleStore(appDataDir = getDataDir(), hostCloc
             if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
             throw new ProviderLifecycleStoreError('unreadable');
         }
-        try { return snapshotRecord(JSON.parse(raw)); }
+        try { return snapshotRecord(JSON.parse(raw), canonicalProvider); }
         catch { throw new ProviderLifecycleStoreError('corrupt'); }
     }
     function load(): ProviderLifecycleRecord {
@@ -134,7 +146,7 @@ export function createProviderLifecycleStore(appDataDir = getDataDir(), hostCloc
         return record;
     }
     function save(value: unknown): ProviderLifecycleRecord {
-        const command = snapshotCommand(value);
+        const command = snapshotCommand(value, canonicalProvider);
         fs.mkdirSync(paths.directory, { recursive: true, mode: 0o700 });
         if (process.platform !== 'win32') fs.chmodSync(paths.directory, 0o700);
         let lock: number;
@@ -180,7 +192,7 @@ export function createProviderLifecycleStore(appDataDir = getDataDir(), hostCloc
                 const directory = fs.openSync(paths.directory, 'r');
                 try { fs.fsyncSync(directory); } finally { fs.closeSync(directory); }
             }
-            return snapshotRecord(record);
+            return snapshotRecord(record, canonicalProvider);
         } finally {
             if (temporaryPath) fs.rmSync(temporaryPath, { force: true });
             fs.closeSync(lock!);
