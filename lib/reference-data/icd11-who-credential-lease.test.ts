@@ -434,6 +434,65 @@ test('consume e injector sono one-shot, reentrancy e completamenti tardivi negan
     ));
 });
 
+test('nega la reentrancy sincrona del presenter credenziali', async () => {
+    let writes = 0; let nestedError: unknown;
+    const manager = createIcd11WhoCredentialLeaseManager({
+        now: () => 1_000,
+        resolveSecretReference: async () => Object.freeze({
+            schemaVersion: 'mediflow.reference-data.icd11-who-resolved-secret.v1',
+            presentCredentials: (sink: { set(clientId: string, clientSecret: string): unknown }) => {
+                sink.set(CLIENT_ID, CLIENT_SECRET);
+            },
+        }),
+        issueToken: async (request: { presentCredentials: CredentialPresenter }) => {
+            request.presentCredentials({ set() {
+                writes += 1;
+                try { request.presentCredentials({ set() { writes += 1; } }); }
+                catch (error) { nestedError = error; }
+            } });
+            return Object.freeze({ schemaVersion: 'mediflow.reference-data.icd11-who-token-result.v1',
+                tokenType: 'Bearer', accessToken: ACCESS_TOKEN, expiresInMs: 3_600_000 });
+        },
+    });
+    configure(manager);
+
+    await manager.acquire();
+    assert.equal(writes, 1);
+    assert.ok(nestedError instanceof Icd11WhoCredentialLeaseError);
+    assert.equal(nestedError.code, 'token_unavailable');
+});
+
+test('nega la reentrancy sincrona dell injector bearer', async () => {
+    let writes = 0; let nestedError: unknown;
+    const manager = createIcd11WhoCredentialLeaseManager({
+        now: () => 1_000,
+        resolveSecretReference: async () => Object.freeze({
+            schemaVersion: 'mediflow.reference-data.icd11-who-resolved-secret.v1',
+            presentCredentials: (sink: { set(clientId: string, clientSecret: string): unknown }) => {
+                sink.set(CLIENT_ID, CLIENT_SECRET);
+            },
+        }),
+        issueToken: async (request: { presentCredentials: CredentialPresenter }) => {
+            request.presentCredentials({ set() {} });
+            return Object.freeze({ schemaVersion: 'mediflow.reference-data.icd11-who-token-result.v1',
+                tokenType: 'Bearer', accessToken: ACCESS_TOKEN, expiresInMs: 3_600_000 });
+        },
+    });
+    configure(manager);
+    const lease = await manager.acquire();
+
+    await manager.consume(lease, (inject) => {
+        inject({ set() {
+            writes += 1;
+            try { inject({ set() { writes += 1; } }); }
+            catch (error) { nestedError = error; }
+        } });
+    });
+    assert.equal(writes, 1);
+    assert.ok(nestedError instanceof Icd11WhoCredentialLeaseError);
+    assert.equal(nestedError.code, 'lease_consumed');
+});
+
 test('non assimila thenable ostili restituiti dal consumer', async () => {
     let thenReads = 0;
     const manager = createIcd11WhoCredentialLeaseManager({
