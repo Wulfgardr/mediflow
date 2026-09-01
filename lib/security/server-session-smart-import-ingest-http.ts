@@ -10,13 +10,14 @@ import {
     type SmartImportProjectionAttachmentHostErrorCode,
 } from '../smart-import-projection-attachment-host';
 import { SmartImportProjectionError, type SmartImportProjectionErrorCode } from '../smart-import-projection';
+import type { AuthenticatedSmartImportAttachmentIngestOperation } from './server-session-authenticated-smart-import-attachment-ingest';
 import {
     ServerSessionSmartImportAttachmentIngestError,
     type ServerSessionSmartImportAttachmentIngestErrorCode,
 } from './server-session-smart-import-attachment-ingest';
 import { ServerSessionProjectionOwnerError, type ServerSessionProjectionOwnerErrorCode } from './server-session-projection-owner';
 
-type Sources = Readonly<{ ingest(input: unknown): Promise<string> }>;
+type Sources = Readonly<{ acquireIngest(): Promise<AuthenticatedSmartImportAttachmentIngestOperation> }>;
 
 const MESSAGE = 'Ingest Smart Import non disponibile.';
 
@@ -95,11 +96,15 @@ function transportObject(value: unknown): boolean {
 
 export function createSmartImportIngestHttpHandler(sources: Sources) {
     return async (request: Request): Promise<NextResponse> => {
+        let operation: AuthenticatedSmartImportAttachmentIngestOperation;
+        try { operation = await sources.acquireIngest(); } catch (error) {
+            return typedFailure(error) ?? apiInternalError('POST Smart Import ingest', error);
+        }
         let input: unknown;
         try { input = await request.json(); } catch { return failure('input_invalid', 400); }
         if (!transportObject(input)) return failure('input_invalid', 400);
         try {
-            const handle = await sources.ingest(input);
+            const handle = await operation.ingest(input);
             const response = NextResponse.json({ handle });
             response.headers.set('Cache-Control', 'no-store');
             return response;

@@ -37,10 +37,13 @@ function failed(code: typeof FAILED_CODES[number] = FAILED_CODES[0]) {
         code, proposal: null, receipt: RECEIPT, provenance: PROVENANCE, reviewRef: null });
 }
 function subject(result: unknown = AVAILABLE) {
-    let calls = 0; let received: unknown;
-    return Object.freeze({ calls: () => calls, received: () => received,
-        preview: createSmartImportPreviewHttpHandler({ preview: async (input) => {
-            calls += 1; received = input; if (result instanceof Error) throw result; return result as never;
+    let acquisitions = 0; let calls = 0; let received: unknown;
+    return Object.freeze({ acquisitions: () => acquisitions, calls: () => calls, received: () => received,
+        preview: createSmartImportPreviewHttpHandler({ acquirePreview: async () => {
+            acquisitions += 1;
+            return Object.freeze({ preview: async (input: unknown) => {
+                calls += 1; received = input; if (result instanceof Error) throw result; return result as never;
+            } });
         } }),
     });
 }
@@ -51,7 +54,7 @@ async function rejects(response: Response, status: number, code: string) {
 
 test('serializes one available review-only capability result without echoing input', async () => {
     const current = subject(); const response = await current.preview(request()); const body = await response.json();
-    assert.equal(response.status, 200); assert.equal(response.headers.get('Cache-Control'), 'no-store');
+    assert.equal(response.status, 200); assert.equal(response.headers.get('Cache-Control'), 'no-store'); assert.equal(current.acquisitions(), 1);
     const parsedBody = parseSmartImportPreviewWireRoot(body); assert.deepEqual(body, AVAILABLE_WIRE); assert.deepEqual(parsedBody, body); assert.equal(current.calls(), 1); assert.deepEqual(current.received(), INPUT);
     assert.equal(AVAILABLE.provenance.receipt, AVAILABLE.receipt);
     assert.ok(parsedBody && parsedBody.preview.status === 'available'); assert.equal('explicitCode' in parsedBody.preview.proposal.diagnoses[0], false);
@@ -84,6 +87,24 @@ test('maps controlled authentication preview errors', async () => {
     }
 });
 
+test('authenticates before observing a hostile request', async () => {
+    let reads = 0;
+    const hostile = new Proxy({}, {
+        get() {
+            reads += 1;
+            throw new Error('hostile request observed');
+        },
+    }) as Request;
+    const preview = createSmartImportPreviewHttpHandler({
+        acquirePreview: async () => {
+            throw new AuthenticatedSmartImportPreviewError('session_unavailable');
+        },
+    });
+
+    await rejects(await preview(hostile), 401, 'session_unavailable');
+    assert.equal(reads, 0);
+});
+
 test('rejects malformed or authority-expanding runtime results without exposing them', async () => {
     const originalError = console.error; const entries: unknown[][] = []; console.error = (...values: unknown[]) => { entries.push(values); };
     const cycle: { self?: unknown } = {}; cycle.self = cycle;
@@ -114,7 +135,7 @@ test('route stays a thin dynamic Node adapter and the handler uses the shared ex
     const route = readFileSync(new URL('../../app/api/ai/smart-import/preview/route.ts', import.meta.url), 'utf8');
     const handlerSource = readFileSync(new URL('./server-session-smart-import-preview-http.ts', import.meta.url), 'utf8');
     assert.match(route, /runtime\s*=\s*'nodejs'|runtime\s*=\s*"nodejs"/u); assert.match(route, /dynamic\s*=\s*'force-dynamic'|dynamic\s*=\s*"force-dynamic"/u);
-    assert.match(route, /previewAuthenticatedSmartImport/u); assert.match(handlerSource, /function exhaustiveCode\(code: never\): null/u); assert.match(handlerSource, /serializeSmartImportPreviewWireRoot/u);
+    assert.match(route, /acquireAuthenticatedSmartImportPreview/u); assert.match(handlerSource, /function exhaustiveCode\(code: never\): null/u); assert.match(handlerSource, /serializeSmartImportPreviewWireRoot/u);
     assert.doesNotMatch(handlerSource, /function plainData|function capabilityResult/u);
     assert.doesNotMatch(`${route}\n${handlerSource}`, /requireSession|createServerSessionProjectionOwnerRegistry|resolveProjectionService|createPatientSmartImportHostCapability|createTypedProjectionBroker|\.apply\(|proxy/u);
 });

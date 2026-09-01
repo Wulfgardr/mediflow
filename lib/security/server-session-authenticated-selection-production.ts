@@ -4,6 +4,9 @@ import 'server-only';
 import { acquireAuthenticatedWebSessionProjectionOwner } from './server-auth';
 import { createAuthenticatedWebSessionSelectionService } from './server-session-authenticated-selection';
 
-export const issueAuthenticatedWebSessionSelection = createAuthenticatedWebSessionSelectionService({
+const authenticatedWebSessionSelection = createAuthenticatedWebSessionSelectionService({
     acquireOwner: acquireAuthenticatedWebSessionProjectionOwner,
-}).issue;
+});
+
+export const acquireAuthenticatedWebSessionSelection = authenticatedWebSessionSelection.acquire;
+export const issueAuthenticatedWebSessionSelection = authenticatedWebSessionSelection.issue;

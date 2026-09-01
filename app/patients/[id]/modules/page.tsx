@@ -19,7 +19,7 @@ import PatientActionModal from '@/components/patient-action-modal';
 import { PatientIdentityLens } from '@/components/patient-identity-lens';
 import { PatientSheetActionsMenu } from '@/components/patient-sheet-actions-menu';
 import PatientReviewQueueSummaryPanel from '@/components/patient-review-queue-summary';
-import PatientSmartImportPanel, { countUsableSources } from '@/components/patient-smart-import-panel';
+import { PatientSmartImportFabricPreviewCard } from '@/components/patient-smart-import-fabric-preview-card';
 import ProstheticPrescriptionManager from '@/components/prosthetic-prescription-manager';
 import ServicePrescriptionManager from '@/components/service-prescription-manager';
 import SissHandoffDiary from '@/components/siss-handoff-diary';
@@ -38,7 +38,11 @@ import { useLiveQuery, useLiveQueryState } from '@/lib/live-query';
 import { buildPatientWorkspaceFromRecords } from '@/lib/patient-workspace';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { useToast } from '@/components/ui/toast-provider';
-import { buildPatientReviewQueueSummary, type SmartImportReviewSnapshot } from '@/lib/domain/documents/patient-review-queue-summary';
+import { buildPatientReviewQueueSummary } from '@/lib/domain/documents/patient-review-queue-summary';
+import {
+    buildPatientSmartImportProjectionCaptureInput,
+    countUsableSources,
+} from '@/lib/domain/documents/patient-smart-import-projection-capture';
 import { classifyInsightReadability } from '@/lib/patient-insight-view-model';
 import { classifyObservationRange, toNumericValue } from '@/lib/observation-range';
 import { resolveStaticTerminology } from '@/lib/terminology';
@@ -65,8 +69,6 @@ export default function PatientDetailPage() {
     }, []);
     const [isDocumentUploadOpen, setIsDocumentUploadOpen] = useState(false);
     const [observationPrefill, setObservationPrefill] = useState<ObservationPrefill | undefined>();
-    /* WUL-262: mirror of the Smart Import review counts reported by the panel. */
-    const [smartImportReview, setSmartImportReview] = useState<SmartImportReviewSnapshot | null>(null);
     const confirm = useConfirm();
     const { showToast } = useToast();
 
@@ -307,6 +309,14 @@ export default function PatientDetailPage() {
         () => new Map((linkedServiceCatalogEntries ?? []).map((entry) => [entry.id, entry])),
         [linkedServiceCatalogEntries],
     );
+    /* @Codex Smart Import production receives one pure host projection. The
+       legacy generator/apply service is deliberately absent from this page. */
+    const smartImportFabricCaptureInput = useMemo(
+        () => patient && entries && attachments && activeTherapies
+            ? buildPatientSmartImportProjectionCaptureInput(patient, entries, attachments, activeTherapies)
+            : null,
+        [patient, entries, attachments, activeTherapies],
+    );
 
     if (!patient) {
         return (
@@ -443,7 +453,6 @@ export default function PatientDetailPage() {
         smartImport: {
             enabled: isAiSmartImportEnabledValue(smartImportKillSwitch?.value),
             sourceCount: smartImportSourceCount,
-            analysis: smartImportReview ?? undefined,
         },
         archive: {
             attachmentsCount: attachmentItems.length,
@@ -451,7 +460,7 @@ export default function PatientDetailPage() {
         },
     });
     const reviewQueueAttentionRows = reviewQueueSummary.rows.filter((row) =>
-        ['da-rivedere', 'bloccato', 'serve-testo', 'pronto-da-applicare'].includes(row.state),
+        ['da-rivedere', 'bloccato', 'serve-testo'].includes(row.state),
     );
     /* @Codex WUL-UIUX: i numeri che contano subito, soprattutto su pazienti
        complessi. Nessun "fuori range": senza range di riferimento clinici non si
@@ -852,12 +861,11 @@ export default function PatientDetailPage() {
                             <p className={workspaceStyles.emptyState}>Nessuna evidenza documentale in primo piano.</p>
                         )}
                         </div>
-                        {smartImportSourceCount > 0 ? (
-                            <PatientSmartImportPanel
-                                patient={patient}
-                                entries={entries}
-                                activeTherapies={activeTherapies}
-                                onReviewSnapshotChange={setSmartImportReview}
+                        {smartImportSourceCount > 0 && smartImportFabricCaptureInput ? (
+                            <PatientSmartImportFabricPreviewCard
+                                patientId={patient.id}
+                                captureInput={smartImportFabricCaptureInput}
+                                enabled={isAiSmartImportEnabledValue(smartImportKillSwitch?.value)}
                             />
                         ) : null}
                         <DocumentInsightsPanel patient={patient} />

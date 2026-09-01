@@ -28,10 +28,10 @@ const killSwitch = createPatientSmartImportHostKillSwitch({
     },
 });
 
-export const previewAuthenticatedSmartImport = createAuthenticatedSmartImportPreviewService({
+export const acquireAuthenticatedSmartImportPreview = createAuthenticatedSmartImportPreviewService({
     acquireContext: acquireAuthenticatedWebSessionProjectionOwnerContext,
     createCapability: (broker) => createPatientSmartImportHostCapability({
         killSwitch, broker, lifecycle,
         binding: createHostLocalProviderBindingService(), readiness, route: routeHostResolvedCandidateCapability,
     }),
-}).preview;
+}).acquire;

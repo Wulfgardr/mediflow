@@ -7,6 +7,9 @@ import {
 } from './server-session-projection-owner';
 
 type SelectionLease = ReturnType<ServerSessionProjectionOwner['issueSelection']>;
+export type AuthenticatedWebSessionSelectionOperation = Readonly<{
+    issueSelection(input: unknown): Promise<SelectionLease>;
+}>;
 export type AuthenticatedWebSessionSelectionErrorCode = 'input_invalid' | 'session_unavailable';
 
 export class AuthenticatedWebSessionSelectionError extends Error {
@@ -23,22 +26,31 @@ function fail(code: AuthenticatedWebSessionSelectionErrorCode): never {
 }
 
 export function createAuthenticatedWebSessionSelectionService(sources: Sources) {
+    const acquire = async (): Promise<AuthenticatedWebSessionSelectionOperation> => {
+        let owner: ServerSessionProjectionOwner | null;
+        try {
+            owner = await sources.acquireOwner();
+        } catch (error) {
+            if (error instanceof ServerSessionProjectionOwnerError) throw error;
+            return fail('session_unavailable');
+        }
+        if (!owner) return fail('session_unavailable');
+        return Object.freeze({
+            async issueSelection(input: unknown): Promise<SelectionLease> {
+                try {
+                    return owner.issueSelection(input as never);
+                } catch (error) {
+                    if (error instanceof ServerSessionProjectionOwnerError) throw error;
+                    return fail('input_invalid');
+                }
+            },
+        });
+    };
+
     return Object.freeze({
+        acquire,
         async issue(input: unknown): Promise<SelectionLease> {
-            let owner: ServerSessionProjectionOwner | null;
-            try {
-                owner = await sources.acquireOwner();
-            } catch (error) {
-                if (error instanceof ServerSessionProjectionOwnerError) throw error;
-                return fail('session_unavailable');
-            }
-            if (!owner) return fail('session_unavailable');
-            try {
-                return owner.issueSelection(input as never);
-            } catch (error) {
-                if (error instanceof ServerSessionProjectionOwnerError) throw error;
-                return fail('input_invalid');
-            }
+            return (await acquire()).issueSelection(input);
         },
     });
 }

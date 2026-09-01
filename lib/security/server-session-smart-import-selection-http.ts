@@ -3,13 +3,14 @@ import 'server-only';
 
 import { NextResponse } from 'next/server';
 import { apiFailure, apiInternalError } from '../api-error-response';
-import { AuthenticatedWebSessionSelectionError } from './server-session-authenticated-selection';
+import {
+    AuthenticatedWebSessionSelectionError,
+    type AuthenticatedWebSessionSelectionOperation,
+} from './server-session-authenticated-selection';
 import { ServerSessionProjectionOwnerError } from './server-session-projection-owner';
 
 type SelectionInput = Readonly<{ expectedEpoch: number; patientId: string; ambulatoryId: string }>;
-type SelectionLease = Readonly<{ sessionRef: string; selectionEpoch: number; patientRef: string;
-    ambulatoryRef: string; leaseRef: string; expiresAt: number }>;
-type Sources = Readonly<{ issueSelection(input: SelectionInput): Promise<SelectionLease> }>;
+type Sources = Readonly<{ acquireSelection(): Promise<AuthenticatedWebSessionSelectionOperation> }>;
 type EpochSources = Readonly<{ readEpoch(): Promise<number> }>;
 
 const MESSAGE = 'Selezione Smart Import non disponibile.';
@@ -47,12 +48,16 @@ function typedFailure(error: unknown): NextResponse | null {
 
 export function createSmartImportSelectionHttpHandler(sources: Sources) {
     return async (request: Request): Promise<NextResponse> => {
+        let operation: AuthenticatedWebSessionSelectionOperation;
+        try { operation = await sources.acquireSelection(); } catch (error) {
+            return typedFailure(error) ?? apiInternalError('POST Smart Import selection', error);
+        }
         let value: unknown;
         try { value = await request.json(); } catch { return failure('input_invalid', 400); }
         const parsed = input(value);
         if (!parsed) return failure('input_invalid', 400);
         try {
-            const lease = await sources.issueSelection(parsed);
+            const lease = await operation.issueSelection(parsed);
             const response = NextResponse.json({ selection: {
                 sessionRef: lease.sessionRef, selectionEpoch: lease.selectionEpoch, patientRef: lease.patientRef,
                 ambulatoryRef: lease.ambulatoryRef, leaseRef: lease.leaseRef, expiresAt: lease.expiresAt,

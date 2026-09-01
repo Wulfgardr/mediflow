@@ -25,10 +25,13 @@ function request(body: unknown = INPUT): Request {
         headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
 }
 function handler(error?: unknown) {
-    let calls = 0; let received: unknown;
-    return Object.freeze({ calls: () => calls, received: () => received,
-        handle: createSmartImportIngestHttpHandler({ ingest: async (input) => {
-            calls += 1; received = input; if (error) throw error; return HANDLE;
+    let acquisitions = 0; let calls = 0; let received: unknown;
+    return Object.freeze({ acquisitions: () => acquisitions, calls: () => calls, received: () => received,
+        handle: createSmartImportIngestHttpHandler({ acquireIngest: async () => {
+            acquisitions += 1;
+            return Object.freeze({ ingest: async (input: unknown) => {
+                calls += 1; received = input; if (error) throw error; return HANDLE;
+            } });
         } }),
     });
 }
@@ -40,7 +43,7 @@ async function rejects(response: Response, status: number, code: string) {
 test('emits only an opaque handle with no-store through one composition call', async () => {
     const subject = handler(); const response = await subject.handle(request()); const body = await response.json();
 
-    assert.equal(response.status, 200); assert.equal(response.headers.get('Cache-Control'), 'no-store');
+    assert.equal(response.status, 200); assert.equal(response.headers.get('Cache-Control'), 'no-store'); assert.equal(subject.acquisitions(), 1);
     assert.deepEqual(body, { handle: HANDLE }); assert.equal(subject.calls(), 1); assert.deepEqual(subject.received(), INPUT);
     for (const marker of [INPUT.tuple.sessionRef, INPUT.tuple.patientRef, INPUT.tuple.ambulatoryRef,
         INPUT.tuple.leaseRef, INPUT.requestId]) assert.equal(JSON.stringify(body).includes(marker), false);
@@ -54,6 +57,24 @@ test('rejects malformed and plainly non-object JSON before invoking composition'
         await rejects(await subject.handle(value), 400, 'input_invalid');
     }
     assert.equal(subject.calls(), 0);
+});
+
+test('authenticates before observing a hostile request', async () => {
+    let reads = 0;
+    const hostile = new Proxy({}, {
+        get() {
+            reads += 1;
+            throw new Error('hostile request observed');
+        },
+    }) as Request;
+    const handle = createSmartImportIngestHttpHandler({
+        acquireIngest: async () => {
+            throw new ServerSessionSmartImportAttachmentIngestError('session_unavailable');
+        },
+    });
+
+    await rejects(await handle(hostile), 401, 'session_unavailable');
+    assert.equal(reads, 0);
 });
 
 test('maps every typed ingest error to its stable HTTP status', async () => {
@@ -132,6 +153,6 @@ test('route remains a thin dynamic Node adapter over production ingest compositi
     const source = readFileSync(new URL('../../app/api/ai/smart-import/ingest/route.ts', import.meta.url), 'utf8');
     assert.match(source, /runtime\s*=\s*'nodejs'|runtime\s*=\s*"nodejs"/u);
     assert.match(source, /dynamic\s*=\s*'force-dynamic'|dynamic\s*=\s*"force-dynamic"/u);
-    assert.match(source, /ingestAuthenticatedSmartImportAttachment/u);
+    assert.match(source, /acquireAuthenticatedSmartImportAttachmentIngest/u);
     assert.doesNotMatch(source, /requireSession|createServerSessionProjectionOwnerRegistry|issueSelection|createTypedProjectionBroker|preview|apply/u);
 });

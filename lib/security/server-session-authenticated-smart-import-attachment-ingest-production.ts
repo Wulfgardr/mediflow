@@ -5,7 +5,7 @@ import { acquireAuthenticatedWebSessionProjectionOwnerContext } from './server-a
 import { createAuthenticatedSmartImportAttachmentIngestService } from './server-session-authenticated-smart-import-attachment-ingest';
 import { ingestServerSessionSmartImportAttachmentWithOwner } from './server-session-smart-import-attachment-ingest';
 
-export const ingestAuthenticatedSmartImportAttachment = createAuthenticatedSmartImportAttachmentIngestService({
+export const acquireAuthenticatedSmartImportAttachmentIngest = createAuthenticatedSmartImportAttachmentIngestService({
     acquireContext: acquireAuthenticatedWebSessionProjectionOwnerContext,
     ingestWithOwner: ingestServerSessionSmartImportAttachmentWithOwner,
-}).ingest;
+}).acquire;
