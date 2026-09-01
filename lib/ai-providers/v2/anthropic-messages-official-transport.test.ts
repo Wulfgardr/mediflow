@@ -1,7 +1,7 @@
 /* @Codex */
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { executeAnthropicMessagesV2 } from './anthropic-messages-adapter.ts';
+import { AnthropicMessagesV2Error, executeAnthropicMessagesV2 } from './anthropic-messages-adapter.ts';
 import {
     ANTHROPIC_MESSAGES_OFFICIAL_MAX_REQUEST_BYTES,
     ANTHROPIC_MESSAGES_OFFICIAL_URL,
@@ -206,4 +206,35 @@ test('mantiene lo stream bounded e non richiede workspace header sui denial HTTP
         new Response('{"type":"error"}', { status: 401 })
     )));
     assert.deepEqual(await denied(transportRequest() as never), { status: 401, body: '{"type":"error"}' });
+});
+
+test('ritira x-api-key su timeout e cancel anche se fetch ignora abort e resta pending', async () => {
+    for (const mode of ['timeout', 'cancel'] as const) {
+        const timedBinding = Object.freeze({ ...BINDING, timeoutMs: 10 });
+        const timedLifecycle = enabled(timedBinding);
+        let retainedHeaders: Headers | undefined;
+        let markStarted: (() => void) | undefined;
+        const started = new Promise<void>((resolve) => { markStarted = resolve; });
+        const transport = createAnthropicMessagesOfficialHttpsTransport(factory(async (_url, init) => {
+            retainedHeaders = init.headers as Headers;
+            markStarted?.();
+            return new Promise<Response>(() => { /* intentionally ignores abort */ });
+        }, { instanceBinding: instanceBinding(PROFILE, timedLifecycle) }));
+        const controller = new AbortController();
+        let tick = 1_000;
+        const pending = executeAnthropicMessagesV2({
+            lifecycle: timedLifecycle, evidence: EVIDENCE,
+            secretRef: Object.freeze({ scheme: 'env', name: 'ANTHROPIC_API_KEY' }),
+            broker: createProviderSecretBrokerV2({ now: () => { tick += 1; return tick; }, readEnv: () => SECRET }),
+            input: 'Synthetic non-clinical timeout request.', now: () => { tick += 1; return tick; }, transport,
+            signal: controller.signal,
+        });
+        await started;
+        assert.equal(retainedHeaders?.get('x-api-key'), SECRET);
+        if (mode === 'cancel') controller.abort();
+        await assert.rejects(pending, (error: unknown) => error instanceof AnthropicMessagesV2Error
+            && error.code === (mode === 'timeout' ? 'request_timeout' : 'request_cancelled'));
+        assert.equal(retainedHeaders?.get('x-api-key'), null);
+        assert.equal(retainedHeaders?.get('anthropic-workspace-id'), null);
+    }
 });
