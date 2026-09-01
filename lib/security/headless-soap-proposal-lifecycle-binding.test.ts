@@ -49,6 +49,7 @@ function fixture() {
         selectionEpoch: 4, expiresAt: 310_000,
     })) as HeadlessSoapProposalBindingV1['selection'];
     let leaseDispose: (() => void) | null = null, selectionDispose: (() => void) | null = null;
+    let leaseBindingActive = false;
     let loseLeaseFenceAfterBinding = false;
     const sources = {
         leaseLifecycle: {
@@ -64,7 +65,8 @@ function fixture() {
                 operation: (child: HeadlessSoapProposalBindingV1['childLease'],
                     role: HeadlessSoapProposalBindingV1['activeRole']) => void) {
                 if (candidate !== lease || registration !== leaseRegistration || !leaseDispose) return false;
-                operation(childLease, activeRole);
+                leaseBindingActive = true;
+                try { operation(childLease, activeRole); } finally { leaseBindingActive = false; }
                 if (loseLeaseFenceAfterBinding) leaseDispose = null;
                 return true;
             },
@@ -84,6 +86,7 @@ function fixture() {
                     patientVersion: HeadlessSoapProposalBindingV1['patientVersion'];
                 }>) => void) {
                 if (candidate !== scope || registration !== selectionRegistration || !selectionDispose) return false;
+                if (leaseBindingActive) return false;
                 operation(Object.freeze(Object.assign(Object.create(null), { selection, patientVersion: 7 }))); return true;
             },
         },
@@ -108,7 +111,7 @@ async function prepared() {
     return { current, owner, proposalRef, registration };
 }
 
-test('emits the exact H3 binding capsule from nested H2b and selection currentness', async () => {
+test('emits the exact H3 capsule from ordered non-overlapping H2b and selection bindings', async () => {
     const { current, owner, proposalRef, registration } = await prepared();
     let observed: unknown = null;
     assert.equal(await owner.bindingController.withCurrentDependentBinding(

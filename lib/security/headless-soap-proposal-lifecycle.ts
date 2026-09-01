@@ -417,6 +417,14 @@ export function createHeadlessSoapProposalLifecycleOwner(sources: HeadlessSoapPr
                 && dependentRecord(record, registration) === dependent;
             let leaseInvoked = false, selectionInvoked = false, invoked = false, callbackAccepted = false;
             let leaseCurrent = false, selectionCurrent = false;
+            const leaseSnapshot: {
+                childLease: HeadlessSoapProposalBindingV1['childLease'] | null;
+                activeRole: HeadlessSoapProposalBindingV1['activeRole'] | null;
+            } = { childLease: null, activeRole: null };
+            const selectionSnapshot: { value: Readonly<{
+                selection: HeadlessSoapProposalBindingV1['selection'];
+                patientVersion: HeadlessSoapProposalBindingV1['patientVersion'];
+            }> | null } = { value: null };
             try {
                 leaseCurrent = await sources.leaseBinding.withCurrentDependentBinding(
                     record.lease,
@@ -424,31 +432,41 @@ export function createHeadlessSoapProposalLifecycleOwner(sources: HeadlessSoapPr
                     (childLease, activeRole) => {
                         if (leaseInvoked || !locallyCurrent()) { activeOperation.poisoned = true; return; }
                         leaseInvoked = true;
-                        try {
-                            selectionCurrent = sources.selectionBinding!.withCurrentDependentBinding(
-                                record.scope,
-                                record.selectionRegistration,
-                                (selectionSnapshot) => {
-                                    if (selectionInvoked || !locallyCurrent()) { activeOperation.poisoned = true; return; }
-                                    selectionInvoked = true; invoked = true;
-                                    const proposal = objectCreate(null) as Record<string, unknown>;
-                                    proposal.proposalIdentity = candidate; proposal.revision = record.proposalRevision;
-                                    proposal.expiresAt = record.expiresAt;
-                                    const binding = objectCreate(null) as Record<string, unknown>;
-                                    binding.activeRole = activeRole; binding.childLease = childLease;
-                                    binding.selection = selectionSnapshot.selection;
-                                    binding.patientVersion = selectionSnapshot.patientVersion;
-                                    binding.proposal = objectFreeze(proposal);
-                                    callbackAccepted = callbackSucceeded(
-                                        operation as (...args: never[]) => void,
-                                        [objectFreeze(binding)],
-                                    );
-                                },
-                            );
-                        } catch { selectionCurrent = false; }
+                        leaseSnapshot.childLease = childLease; leaseSnapshot.activeRole = activeRole;
                     },
                 );
             } catch { leaseCurrent = false; }
+            if (!activeOperation.poisoned && leaseInvoked && leaseCurrent && locallyCurrent()
+                && createdCurrent(activeOperation)) {
+                try {
+                    selectionCurrent = sources.selectionBinding.withCurrentDependentBinding(
+                        record.scope,
+                        record.selectionRegistration,
+                        (binding) => {
+                            if (selectionInvoked || !locallyCurrent()) { activeOperation.poisoned = true; return; }
+                            selectionInvoked = true; selectionSnapshot.value = binding;
+                        },
+                    );
+                } catch { selectionCurrent = false; }
+            }
+            const childLease = leaseSnapshot.childLease, activeRole = leaseSnapshot.activeRole;
+            const selectionBinding = selectionSnapshot.value;
+            if (!activeOperation.poisoned && leaseInvoked && selectionInvoked && leaseCurrent && selectionCurrent
+                && childLease && activeRole && selectionBinding && locallyCurrent() && createdCurrent(activeOperation)) {
+                invoked = true;
+                const proposal = objectCreate(null) as Record<string, unknown>;
+                proposal.proposalIdentity = candidate; proposal.revision = record.proposalRevision;
+                proposal.expiresAt = record.expiresAt;
+                const binding = objectCreate(null) as Record<string, unknown>;
+                binding.activeRole = activeRole; binding.childLease = childLease;
+                binding.selection = selectionBinding.selection;
+                binding.patientVersion = selectionBinding.patientVersion;
+                binding.proposal = objectFreeze(proposal);
+                callbackAccepted = callbackSucceeded(
+                    operation as (...args: never[]) => void,
+                    [objectFreeze(binding)],
+                );
+            }
             let leaseAttached = false, selectionAttached = false, timeCurrent = false;
             if (!activeOperation.poisoned && leaseInvoked && selectionInvoked && invoked && callbackAccepted
                 && leaseCurrent && selectionCurrent && locallyCurrent() && createdCurrent(activeOperation)) {
