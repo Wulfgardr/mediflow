@@ -158,3 +158,142 @@ test('rifiuta accessor transport e clock fuori range senza eseguire getter', asy
     await assert.rejects(run(async () => ({ status: 200, body: JSON.stringify(RESPONSE) }), () => ticks.shift()!),
         (error: unknown) => error instanceof OpenAIResponsesV2Error && error.code === 'response_invalid');
 });
+
+test('nega il commit tardivo se transport o clock mutano lifecycle o policy evidence', async () => {
+    const mutableLifecycle = structuredClone(enabled()) as unknown as { status: string };
+    const mutableEvidence = structuredClone(EVIDENCE) as unknown as { retentionProfileRef: string };
+    await assert.rejects(executeOpenAIResponsesV2({ lifecycle: mutableLifecycle, evidence: mutableEvidence,
+        secretRef: SECRET_REF, broker: createProviderSecretBrokerV2({ now: () => 1_000, readEnv: () => SECRET }),
+        input: 'Synthetic mutable-state request.', now: () => 1_000, transport: async () => {
+            mutableLifecycle.status = 'disabled'; mutableEvidence.retentionProfileRef = 'retention.changed.v1';
+            return { status: 200, body: JSON.stringify(RESPONSE) };
+        } }), (error: unknown) => error instanceof OpenAIResponsesV2Error && error.code === 'provider_disabled');
+
+    const clockLifecycle = structuredClone(enabled()) as unknown as { status: string };
+    const ticks = [1_000, 1_025];
+    await assert.rejects(executeOpenAIResponsesV2({ lifecycle: clockLifecycle, evidence: EVIDENCE,
+        secretRef: SECRET_REF, broker: createProviderSecretBrokerV2({ now: () => 1_000, readEnv: () => SECRET }),
+        input: 'Synthetic clock-mutation request.', now: () => {
+            const value = ticks.shift()!; if (ticks.length === 0) clockLifecycle.status = 'disabled'; return value;
+        }, transport: async () => ({ status: 200, body: JSON.stringify(RESPONSE) }) }),
+    (error: unknown) => error instanceof OpenAIResponsesV2Error && error.code === 'provider_disabled');
+});
+
+test('ritira Authorization su timeout anche se il transport resta pending', async () => {
+    let retainedHeaders: Headers | undefined;
+    await assert.rejects(executeOpenAIResponsesV2({ lifecycle: enabled({ ...BINDING, timeoutMs: 1 }), evidence: EVIDENCE,
+        secretRef: SECRET_REF, broker: createProviderSecretBrokerV2({ now: () => 1_000, readEnv: () => SECRET }),
+        input: 'Synthetic timeout request.', now: () => 1_000, transport: async (request) => {
+            retainedHeaders = request.headers;
+            return new Promise<never>(() => { /* intentionally ignores abort */ });
+        } }), (error: unknown) => error instanceof OpenAIResponsesV2Error && error.code === 'request_timeout');
+    assert.equal(retainedHeaders?.get('authorization'), null);
+});
+
+test('materializza input, lifecycle, evidence, secretRef e broker senza accessor o Proxy', async () => {
+    let getterReads = 0; let envReads = 0; let transportCalls = 0;
+    const state = enabled();
+    const lifecycleAccessor = Object.defineProperties({}, {
+        schemaVersion: { enumerable: true, value: state.schemaVersion },
+        generation: { enumerable: true, value: state.generation }, status: { enumerable: true, value: state.status },
+        binding: { enumerable: true, get() { getterReads += 1; return state.binding; } },
+    });
+    const evidenceAccessor = Object.defineProperties({}, Object.fromEntries(Object.entries(EVIDENCE).map(([key, value]) => [key,
+        key === 'retentionProfileRef' ? { enumerable: true, get() { getterReads += 1; return value; } }
+            : { enumerable: true, value }]))) as unknown;
+    const secretAccessor = Object.defineProperties({}, {
+        scheme: { enumerable: true, value: 'env' },
+        name: { enumerable: true, get() { getterReads += 1; return 'OPENAI_API_KEY'; } },
+    });
+    const realBroker = createProviderSecretBrokerV2({ now: () => 1_000,
+        readEnv: () => { envReads += 1; return SECRET; } });
+    const brokerAccessor = Object.defineProperties({}, {
+        issue: { enumerable: true, get() { getterReads += 1; return realBroker.issue; } },
+        snapshot: { enumerable: true, value: realBroker.snapshot }, revoke: { enumerable: true, value: realBroker.revoke },
+        consume: { enumerable: true, value: realBroker.consume },
+    });
+    const transport = async () => { transportCalls += 1; return { status: 200, body: JSON.stringify(RESPONSE) }; };
+    const run = (lifecycle: unknown, evidence: unknown, secretRef: unknown, broker: unknown = realBroker) => (
+        executeOpenAIResponsesV2({ lifecycle, evidence, secretRef, broker: broker as never,
+            input: 'Synthetic hostile input.', now: () => 1_000, transport })
+    );
+    const revoked = Proxy.revocable(state, {}); revoked.revoke();
+    for (const values of [
+        [lifecycleAccessor, EVIDENCE, SECRET_REF], [state, evidenceAccessor, SECRET_REF],
+        [state, EVIDENCE, secretAccessor], [state, EVIDENCE, SECRET_REF, brokerAccessor],
+        [revoked.proxy, EVIDENCE, SECRET_REF],
+    ]) await assert.rejects(run(...values as [unknown, unknown, unknown, unknown]),
+        (error: unknown) => error instanceof OpenAIResponsesV2Error && error.code === 'input_invalid');
+    assert.deepEqual([getterReads, envReads, transportCalls], [0, 0, 0]);
+});
+
+test('rifiuta input root e signal ostili senza eseguire trap, getter o secret', async () => {
+    let hostileReads = 0; let envReads = 0;
+    const base = { lifecycle: enabled(), evidence: EVIDENCE, secretRef: SECRET_REF,
+        broker: createProviderSecretBrokerV2({ now: () => 1_000, readEnv: () => { envReads += 1; return SECRET; } }),
+        input: 'Synthetic root-boundary request.', now: () => 1_000,
+        transport: async () => ({ status: 200, body: JSON.stringify(RESPONSE) }) };
+    const proxy = new Proxy(base, {
+        get() { hostileReads += 1; throw new Error('get'); },
+        ownKeys() { hostileReads += 1; throw new Error('keys'); },
+        getPrototypeOf() { hostileReads += 1; throw new Error('prototype'); },
+    });
+    const accessor = Object.defineProperty({ ...base }, 'input', {
+        enumerable: true, get() { hostileReads += 1; return 'Synthetic accessor request.'; },
+    });
+    const hidden = Object.defineProperty({ ...base }, 'lifecycle', {
+        enumerable: false, value: base.lifecycle,
+    });
+    const signalAccessor = Object.defineProperty({}, 'aborted', {
+        enumerable: true, get() { hostileReads += 1; return false; },
+    });
+    const revoked = Proxy.revocable(new AbortController().signal, {}); revoked.revoke();
+    for (const value of [proxy, accessor, hidden, { ...base, signal: signalAccessor }, { ...base, signal: revoked.proxy }]) {
+        await assert.rejects(executeOpenAIResponsesV2(value as never),
+            (error: unknown) => error instanceof OpenAIResponsesV2Error && error.code === 'input_invalid');
+    }
+    assert.deepEqual([hostileReads, envReads], [0, 0]);
+});
+
+test('nega mutazioni da clock iniziale o callback broker prima del transport', async () => {
+    let envReads = 0; let transportCalls = 0;
+    const clockLifecycle = structuredClone(enabled()) as unknown as { status: string };
+    await assert.rejects(executeOpenAIResponsesV2({ lifecycle: clockLifecycle, evidence: EVIDENCE,
+        secretRef: SECRET_REF, broker: createProviderSecretBrokerV2({ now: () => 1_000,
+            readEnv: () => { envReads += 1; return SECRET; } }), input: 'Synthetic initial-clock request.',
+        now: () => { clockLifecycle.status = 'disabled'; return 1_000; },
+        transport: async () => { transportCalls += 1; return { status: 200, body: JSON.stringify(RESPONSE) }; } }),
+    (error: unknown) => error instanceof OpenAIResponsesV2Error && error.code === 'provider_disabled');
+    assert.deepEqual([envReads, transportCalls], [0, 0]);
+
+    const brokerLifecycle = structuredClone(enabled()) as unknown as { status: string };
+    await assert.rejects(executeOpenAIResponsesV2({ lifecycle: brokerLifecycle, evidence: EVIDENCE,
+        secretRef: SECRET_REF, broker: createProviderSecretBrokerV2({ now: () => 1_000,
+            readEnv: () => { envReads += 1; brokerLifecycle.status = 'disabled'; return SECRET; } }),
+        input: 'Synthetic broker-callback request.', now: () => 1_000,
+        transport: async () => { transportCalls += 1; return { status: 200, body: JSON.stringify(RESPONSE) }; } }),
+    (error: unknown) => error instanceof OpenAIResponsesV2Error && error.code === 'provider_disabled');
+    assert.deepEqual([envReads, transportCalls], [1, 0]);
+});
+
+test('nega reentrancy e thenable transport ostili senza invocarli', async () => {
+    const nestedInput = { lifecycle: enabled(), evidence: EVIDENCE, secretRef: SECRET_REF,
+        broker: createProviderSecretBrokerV2({ now: () => 1_000, readEnv: () => SECRET }),
+        input: 'Synthetic nested request.', now: () => 1_000,
+        transport: async () => ({ status: 200, body: JSON.stringify(RESPONSE) }) };
+    let nested: Promise<unknown> | null = null; let ticks = 0;
+    const result = await executeOpenAIResponsesV2({ ...nestedInput, input: 'Synthetic outer request.',
+        now: () => { ticks += 1; if (!nested) { nested = executeOpenAIResponsesV2(nestedInput); void nested.catch(() => undefined); }
+            return 1_000 + ticks; } });
+    assert.equal(result.outputText, 'Synthetic response.');
+    await assert.rejects(nested!,
+        (error: unknown) => error instanceof OpenAIResponsesV2Error && error.code === 'input_invalid');
+
+    let thenCalls = 0;
+    const thenable = Object.freeze({ then(resolve: (value: unknown) => void) {
+        thenCalls += 1; resolve({ status: 200, body: JSON.stringify(RESPONSE) });
+    } });
+    await assert.rejects(executeOpenAIResponsesV2({ ...nestedInput, transport: (() => thenable) as never }),
+        (error: unknown) => error instanceof OpenAIResponsesV2Error && error.code === 'response_invalid');
+    assert.equal(thenCalls, 0);
+});
