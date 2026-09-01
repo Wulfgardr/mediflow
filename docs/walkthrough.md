@@ -1,5 +1,5 @@
 ---
-summary: "Canonical end-to-end MediFlow walkthrough for web, native clients, local services, data flow, OCR, home-base, and security."
+summary: "Canonical end-to-end MediFlow walkthrough for web, native clients, local services, AnyDoc, Intelligence Fabric, home-base, and security."
 read_when:
   - "Needing an operational walkthrough of MediFlow before implementation or verification."
   - "Changing flows across web, native, local services, document intelligence, home-base, or security/session boundaries."
@@ -11,7 +11,9 @@ read_when:
 > **Stato documento: CANONICAL (walkthrough operativo end-to-end).**
 > Se altri documenti tecnici secondari divergono su dettagli di flusso, prevale questo file.
 
-Questo documento offre la vista end-to-end del progetto: web app Next.js, backend locale SQLite, servizi AI/OCR e client nativo macOS.
+Questo documento offre la vista end-to-end del progetto: web app Next.js,
+backend locale SQLite, estrazione documentale AnyDoc, Intelligence Fabric e
+client nativo macOS.
 Serve per onboarding tecnico, manutenzione e verifica rapida dei flussi principali.
 
 > [!IMPORTANT]
@@ -26,6 +28,12 @@ Serve per onboarding tecnico, manutenzione e verifica rapida dei flussi principa
 > limitati su profilo/status, diario, terapie, checkup e osservazioni, il bundle
 > macOS home-base packaged, client iPhone/iPad paired non-AI, e il primo artifact
 > `parse/evidence` per documento allegato, consumato in priorita da `AI Patient Insight`.
+
+> [!IMPORTANT]
+> Nel candidato sorgente locale `0.8.5`, il percorso documentale corrente e
+> `attachment host-owned -> AnyDoc -> provenienza -> proposta/review`. Le route
+> OCR storiche sono ritirate con risposta auth-first `410`. I quattro percorsi
+> generativi attraversano il Fabric e non espongono apply o scritture.
 
 ---
 
@@ -76,6 +84,8 @@ graph TB
 
     subgraph "Local Services"
         OLLAMA["Ollama :11434"]
+        ATHENA["ATHENA su MLX (processo locale)"]
+        ANYDOC["AnyDoc (worker locale)"]
         ICD["ICD-11 Docker :8888"]
         OPENMED["OpenMed redaction :18080 (shadow)"]
     end
@@ -94,6 +104,8 @@ graph TB
     NET --> DB
     AUTH --> DB
     WEBAPI --> OLLAMA
+    WEBAPI --> ATHENA
+    WEBAPI --> ANYDOC
     WEBAPI --> ICD
     WEBAPI --> OPENMED
 ```
@@ -106,8 +118,9 @@ graph TB
 | --- | --- | --- |
 | Next.js | `3000` | UI web + API locali |
 | TLS Proxy | `3443` | HTTPS locale per il client macOS |
-| Ollama | `11434` | AI clinica + OCR primario |
-| Apple Vision OCR | n/a | Fallback OCR locale solo su macOS quando l'OCR primario produce output low-signal |
+| Ollama | `11434` | Provider locale per Patient Insight, Smart Import e Document Synthesis |
+| ATHENA su MLX | n/a | Provider locale dedicato a Treatment Reasoning, se configurato |
+| AnyDoc | n/a | Worker locale senza porta di rete per allegati con testo estraibile |
 | ICD-11 (Docker) | `8888` | Diagnosi ICD-11 |
 | OpenMed redaction (shadow) | `18080` | Sidecar locale benchmark/shadow per `redaction.v1` |
 
@@ -126,7 +139,7 @@ graph TB
 | --- | --- |
 | `app/` | pagine Next.js e route API |
 | `components/` | componenti UI e logica client |
-| `lib/` | servizi, DB, cifratura, AI/OCR |
+| `lib/` | servizi, DB, cifratura, Intelligence Fabric ed estrazione documentale |
 | `drizzle/` | migrazioni DB |
 | `native/` | app macOS SwiftUI |
 | `scripts/` | avvio, TLS proxy, build native |
@@ -176,29 +189,32 @@ in sidebar (Generale, Sicurezza e Dati, Intelligenza Artificiale, Avanzate), con
 `/settings` come dashboard Stato sistema, ricerca CMD+K, toggle Privacy Mode in
 header e conferme digitate (`RIPRISTINA` / `RESET`).
 
-### Filiera OCR locale e boundary piattaforma
+### Estrazione AnyDoc e confine OCR
 
-La lettura documentale usa una catena locale e review-first:
+La lettura automatica corrente parte sempre da un allegato gia salvato e
+selezionato dal nodo autorevole:
 
-1. input normalizzato localmente;
-2. OCR primario via Ollama/DeepSeek OCR quando disponibile;
-3. rilevamento di output vuoto o degenerato;
-4. fallback Apple Vision **solo su macOS**;
-5. parsing/sintesi locale e review operatore prima di qualunque scrittura
-   clinica strutturata.
+1. la sessione web autenticata seleziona l'allegato corrente;
+2. `POST /api/attachments/{id}/local-extraction` acquisisce byte e currentness
+   dal boundary host-owned;
+3. il worker AnyDoc locale produce Markdown normalizzato;
+4. il contratto lega risultato, hash della sorgente, hash del Markdown e
+   provenienza all'allegato corrente;
+5. Document Synthesis puo usare l'evidenza soltanto per una proposta Fabric da
+   rivedere.
 
-I documenti che non producono testo sufficiente finiscono nella `Coda OCR`
-(pannello dedicato con stati e motivi in italiano, riprocesso idempotente): nessuna
-proposta clinica viene generata finche il testo estratto non basta.
+AnyDoc non esegue OCR. Immagini, scansioni, documenti cifrati, malformati o
+privi di testo utile falliscono chiusi verso revisione manuale. Le route
+storiche `/api/ocr/extract` e `/api/pdf-extract` verificano prima la sessione e
+poi restituiscono `410`; non invocano Apple Vision, DeepSeek-OCR o altri
+fallback.
 
-Windows e Linux non hanno oggi un fallback OCR platform-specific equivalente
-certificato in MediFlow. Su quelle piattaforme il flusso supportato resta OCR
-primario locale via Ollama/DeepSeek OCR, testo gia presente nel documento, o
-failure esplicito se non viene estratto testo utile.
-
-Questo boundary e formalizzato in
-[ADR 0059](./adr/0059-macos-apple-vision-ocr-fallback.md). Non introduce cloud
-OCR, non cambia i vincoli PHI-safe e non rende Smart Import automatico.
+Il fallback selettivo DeepSeek-OCR 2 e un requisito deciso ma
+`RELEASE_SCOPE_EXCLUDED` dalla 0.8.5. Un packet futuro potra inviarvi soltanto
+le pagine `needsOcr` e dovra ricomporre provenienza, hash e qualita per pagina.
+Prima dell'abilitazione richiedera benchmark sintetico italiano, soglie fissate,
+E2E e misure prestazionali. Dovra restare locale, fail-closed, proposal-only e
+zero-write. Vedi [ADR 0109](./adr/0109-confini-programma-intelligence-fabric-headless-085.md).
 
 ### Diario protesico da documenti Assistente RL
 
@@ -440,105 +456,90 @@ restano follow-up. Vedi anche [docs/adr/0016-backup-artifact-v1-manifest-preflig
 
 ---
 
-## 🤖 AI e OCR
+## 🤖 Intelligence Fabric ed estrazione documentale
 
-### Servizi
+### Componenti correnti
 
-- `lib/ai-service.ts`: facciata LLM con adapter Ollama; ATHENA/MLX resta una lane separata per treatment reasoning
-- `lib/ocr-service.ts`: OCR multimodale
-- `lib/pdf-service.ts`: estrazione testo PDF (fallback regex)
-- `lib/document-synthesis-service.ts`: sintesi clinica + salvataggio
-- `lib/document-parse-evidence-artifact.ts`: artifact canonico `parse/evidence`
-  per allegato, con `sectionMap` opzionale per sezioni classificate, ancore
-  fact `page/section/snippet` e conflitti reviewable
-- `lib/openmed-redaction.ts` + `app/api/system/redaction/route.ts`: adapter
-  locale shadow-only per la lane `redaction.v1`
-- `lib/ai-providers/fabric/candidate-router.ts`: admissione locale fail-closed
-  per snapshot provider e venue osservate, senza fallback
-- `lib/ai-providers/fabric/local-candidate-harness.ts`: prova sintetica che
-  collega receipt, provenance, proposta e review del medico senza persistenza
+- `lib/domain/documents/anydoc-current-source-composition.ts`: acquisisce
+  l'allegato corrente dal boundary host-owned e compone l'estrazione AnyDoc.
+- `lib/domain/documents/anydoc-local-extraction-runner.ts`: esegue il worker
+  locale con limiti di input, output, tempo e risorse.
+- `lib/ai-providers/fabric/generative-catalog.ts`: catalogo delle capability e
+  dello stadio massimo.
+- `lib/ai-providers/fabric/*production*`: production root e operazioni
+  host-owned dei quattro percorsi generativi.
+- `lib/ai-providers/fabric/provider-disclosure.ts`: disclosure read-only dei
+  provider, distinta dall'osservazione di una singola operazione.
+- `docs/capability-mapping/fabric-generative-runtime-crosswalk.v1.json`:
+  crosswalk verificabile tra UI, route, production root e publication.
 
-> [!NOTE]
-> L'AI resta locale di default e review-first. I safety gate (WUL-358)
-> espongono un kill-switch per `patient-insight`, `smart-import` e
-> `document-synthesis`, piu model governance delle decisioni documentali. La
-> lane comparator cloud (`gpt-5.4`) e OpenMed `redaction.v1` restano opt-in /
-> shadow / benchmark-only, separate dal runtime clinico.
+OpenAI e Anthropic compaiono soltanto come righe informative disabilitate.
+Configurazione credenziali, OAuth, esecuzione cloud ed egress sono
+`RELEASE_SCOPE_EXCLUDED` dalla 0.8.5. Un abbonamento consumer o host non concede
+accesso API o inference. I runtime inclusi sono Ollama locale e ATHENA su MLX
+dove configurati; il chiamante non sceglie provider, modello o fallback.
 
-### Flusso OCR + Sintesi
+### Quattro percorsi generativi Fabric
 
-1) Utente carica PDF/immagine
-2) Normalizzazione input locale (PDF/immagine/CDA/CCD quando presente)
-3) OCR via DeepSeek-OCR (Ollama)
-4) Analisi testuale e sintesi via Qwen (`qwen3.5:35b-a3b` di default)
-5) Costruzione di:
-   - `summarySnapshot` leggibile
-   - `parse/evidence artifact` canonico per l'allegato, incluse le ancore
-     sezionali quando disponibili
-   - `documentInsights` come projection/compat layer iniziale
-6) Estrazione prudente di eventuali diagnosi con codice ICD esplicito
-7) Persistenza cifrata sugli allegati + refresh di `AI Patient Insight`
+| Capability | Percorso autenticato | Provider locale | Risultato massimo |
+| --- | --- | --- | --- |
+| Patient Insight | UI -> `/api/ai/patient-insight/preview` -> production root host-owned | Ollama | Preview con receipt, provenienza e currentness |
+| Smart Import | controller -> `/api/ai/smart-import/ingest` -> `/api/ai/smart-import/preview` | Ollama | Proposta review-only legata alla selezione corrente |
+| Document Synthesis | controller -> `capture` -> AnyDoc -> `ingest` -> `preview` sotto `/api/ai/document-synthesis/*` | Ollama | Publication da allegato corrente con source binding |
+| Treatment Reasoning | controller -> `/api/ai/treatment-reasoning/ingest` -> `/api/ai/treatment-reasoning/preview` | ATHENA su MLX | Anteprima review-only con source binding |
+
+Ogni route acquisisce la sessione prima del payload clinico. Il nodo costruisce
+projection, selezione e currentness; il provider non accede a SQLite. Le
+publication includono receipt e provenienza PHI-safe, dichiarano
+`writesPerformed=0` e `applyPolicy=none` e non espongono prompt o risposta grezza.
+Una receipt descrive la risoluzione eseguita; non concede authority.
+
+I quattro percorsi non eseguono apply. Una successiva modifica clinica, se
+prevista da un Application Service distinto, richiede selezione esplicita,
+authority, currentness, idempotenza e audit propri. Non eredita permessi dalla
+proposta Fabric.
+
+### Allegato -> AnyDoc -> proposta Document Synthesis
+
+```text
+allegato persistito e corrente
+  -> capture autenticata host-owned
+  -> AnyDoc locale
+  -> Markdown + hash + provenienza
+  -> ingest con handle opaco
+  -> preview Fabric Document Synthesis
+  -> proposta da rivedere, senza persistenza clinica
+```
+
+Il percorso accetta soltanto l'allegato risolto dal nodo. L'estrazione non
+applica dati e la sintesi non aggiorna `patients.diagnoses`, terapie,
+`summarySnapshot`, `parseEvidenceArtifactSnapshot` o `documentInsights`.
+Immagini e scansioni tornano a revisione manuale senza fallback invisibile.
 
 ### Import documento nella nuova anagrafica
 
-Nel create-flow `Nuova Anagrafica`, `components/pdf-importer.tsx` usa lo stesso
-OCR locale ma aggiunge una review intermedia esplicita prima del salvataggio.
-La decisione operativa e fissata in [ADR 0042](./adr/0042-document-driven-new-patient-review-and-prudent-therapy-persistence.md)
-e viene ora resa esplicita dal contratto `patient import decision` di
-[ADR 0051](./adr/0051-patient-import-decision-contract-between-review-and-persistence.md).
+Il vecchio percorso diretto `file -> OCR -> compilazione anagrafica` non e un
+percorso automatico corrente della 0.8.5. Un documento deve prima diventare un
+allegato host-owned; soltanto allora AnyDoc puo estrarre il testo e Document
+Synthesis puo produrre una proposta.
 
-Il flusso:
+Le decisioni storiche di [ADR 0042](./adr/0042-document-driven-new-patient-review-and-prudent-therapy-persistence.md)
+e [ADR 0051](./adr/0051-patient-import-decision-contract-between-review-and-persistence.md)
+restano registrate, ma non autorizzano un bridge dalla proposal al writer. La
+creazione o modifica dell'anagrafica resta un'azione applicativa distinta e
+confermata dall'operatore.
 
-1) OCR + analisi clinica del documento su un excerpt piu ampio del testo utile
-2) estrazione di:
-   - diagnosi con codice ICD esplicito
-   - problemi clinici reviewable senza codice esplicito
-   - terapie candidate reviewable
-3) riconciliazione locale reviewable:
-   - match ICD-11 per i problemi candidati
-   - match AIFA/ATC o fallback manuale per le terapie candidate
-4) costruzione di un `patient import decision` esplicito:
-   - target dell import (`create_new_patient`, `merge_existing_patient`,
-     `review_identity`)
-   - field decisions
-   - diagnosi `apply_structured|review_only|ignore`
-   - terapie `persist_structured|append_note|ignore`
-5) review operatore su anagrafica, diagnosi e terapie prima di applicare i
-   default al form
-6) alla creazione della scheda, le terapie confermate e attive con posologia
-   sufficiente vengono persistite come record strutturati in `therapies`; i casi
-   incompleti o non attivi possono restare come nota documentale di supporto
+### Smart Import review-only nel profilo paziente
 
-Vincoli:
+Il controller lega la richiesta alla selezione paziente e alle fonti correnti,
+poi esegue ingest e preview tramite handle opaco. La publication contiene
+suggerimenti con evidenze, receipt e provenienza. Replay, selezione cambiata,
+lease scaduta o projection stantia negano prima dell'uso del provider.
 
-- anche in questo flusso non esiste import silenzioso da free-text a ICD o
-  terapia
-- la riconciliazione resta sempre locale e reviewable
-- una terapia manual-only o senza posologia sufficiente non viene promossa a
-  record strutturato solo perche compare nel documento
-
-### Smart Import reviewable nel profilo paziente
-
-Nel profilo paziente il web client espone anche una CTA persistente di smart import
-quando esistono fonti utili (`patient.notes`, diario clinico, `documentInsights`,
-summary di allegati).
-
-Il flusso:
-
-1) raccoglie le fonti cliniche locali gia presenti  
-2) le invia al modello clinico locale piu capace configurato  
-3) produce suggerimenti reviewable per:
-   - diagnosi candidate con match ICD-11 locale
-   - terapie candidate con match catalogo AIFA/ATC o fallback manuale
-4) applica solo gli elementi confermati dall'operatore su `patients.diagnoses`
-   e `therapies`, con dedupe esplicito
-5) se la fonte e solo referral/follow-up senza novita clinica e la diagnosi o
-   terapia e gia presente, il suggerimento viene soppresso invece di essere
-   riproposto come rumore operativo
-
-Vincolo: le diagnosi estratte dai documenti restano proposte review-only. La
-sintesi non aggiorna automaticamente `patients.diagnoses`; patologie free-text,
-codici ICD e terapie richiedono sempre review umana in questa slice (ADR 0084).
+La preview Smart Import non modifica diagnosi o terapie. Un eventuale apply
+successivo non fa parte del percorso Fabric e deve restare una operazione
+applicativa separata, esplicita e auditabile. ADR 0084 continua a vietare la
+scrittura diagnostica dalla sintesi documentale.
 
 ### Guard revisione shell web
 
@@ -659,7 +660,8 @@ sequenceDiagram
 | API auth | `app/api/auth/*` |
 | API web | `app/api/*` |
 | API v1 | `app/api/v1/*` |
-| AI/OCR | `lib/ai-service.ts`, `lib/ocr-service.ts`, `lib/pdf-service.ts` |
+| Intelligence Fabric | `lib/ai-providers/fabric/generative-catalog.ts`, `lib/ai-providers/fabric/*production*` |
+| AnyDoc | `lib/domain/documents/anydoc-current-source-composition.ts`, `lib/domain/documents/anydoc-local-extraction-runner.ts` |
 | ICD | `app/api/icd/proxy/route.ts` |
 | Native app | `native/MediFlowMac/Sources/MediFlowMac/*` |
 | TLS proxy | `scripts/local-api-tls-proxy.mjs` |
@@ -698,10 +700,17 @@ sequenceDiagram
   consegnato il tooling P6 di base, mentre `WUL-481` governa prerequisiti
   operativi e verbale manuale residuo sul Mac sbloccato. Offline degradato
   (`WUL-403`) e decisione documentale condizionata da ADR 0076 restano separati.
-- Il candidato Intelligence Fabric post-0.8 non governa ancora tutti i call
-  path AI reali. Il core Swift decodifica la proiezione `status_only`, ma il
-  client paired non esegue AI. Cloud, on-device, persistenza del lifecycle
-  provider e scrittura clinica dal Fabric restano fuori.
+- Il candidato sorgente locale 0.8.5 collega i quattro percorsi generativi al
+  Fabric, ma il client paired resta `status_only` e non esegue AI. Nessun
+  percorso Fabric applica o scrive dati clinici.
+- Il fallback selettivo DeepSeek-OCR 2 e l'esecuzione OpenAI/Anthropic sono
+  requisiti futuri `RELEASE_SCOPE_EXCLUDED`: non hanno adapter, E2E o authority
+  nel candidato. Cloud, egress, credenziali provider e fallback invisibile
+  restano fuori.
+
+Claim ceiling per i flussi descritti: candidato sorgente locale 0.8.5. Il
+walkthrough non prova release, pubblicazione, certificazione, deployment cloud,
+AI paired, MCP operativo o authority agentica generale.
 
 ---
 
