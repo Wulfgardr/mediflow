@@ -7,7 +7,7 @@ Questa cartella contiene le decisioni di MediFlow (web + native).
 ## ADR piu recente
 
 - [0108-piano-canonico-headless-read-only-085.md](./0108-piano-canonico-headless-read-only-085.md): accetta il significato fail-closed di `66/66` come 66 esiti terminali, con i GET network solo evidence candidate e zero operation grant.
-- [0107-anydoc-local-attachment-extraction.md](./0107-anydoc-local-attachment-extraction.md): propone AnyDoc come unica corsia automatica locale per gli allegati, con DeepSeek/Ollama e Apple Vision fuori dal flusso e scansioni bloccate per review.
+- [0107-anydoc-local-attachment-extraction.md](./0107-anydoc-local-attachment-extraction.md): accetta AnyDoc come unica corsia automatica locale per gli allegati; `ocr` resta classificata ma terminalmente `unavailable`, senza DeepSeek/Ollama, Apple Vision o fallback.
 - [0106-web-auth-logout-pin-setup-lifecycle.md](./0106-web-auth-logout-pin-setup-lifecycle.md): completa il lifecycle Web P3 per logout esatto, retirement dopo CAS PIN e setup commit-last; non prova runtime o reset PIN.
 - [0105-web-auth-process-integrity-assumption.md](./0105-web-auth-process-integrity-assumption.md): accetta per H1a l'assunzione di integrita process-global e registra il residuo di disponibilita e i gate H1b/security.
 - [0104-web-lock-revocation-fence-and-credential-transport.md](./0104-web-lock-revocation-fence-and-credential-transport.md): accetta fence process-local per lock Web e binding control/session; runtime e native restano non implementati.

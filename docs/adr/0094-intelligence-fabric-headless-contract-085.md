@@ -1,6 +1,7 @@
 # ADR 0094: Intelligence Fabric e controllo headless 0.8.5
 
 Date: 2026-08-22
+Amended: 2026-09-01
 Status: Accepted
 
 Issue: WUL-522
@@ -10,7 +11,8 @@ Program line: candidato `0.8.5`
 Related: [ADR 0089](./0089-contratto-intelligence-fabric-e-venue-esecutive.md),
 [ADR 0090](./0090-giunture-fabric-trust-onboarding-routing-interazione.md),
 [ADR 0091](./0091-candidato-locale-fabric-admissione-continuita-status.md),
-[ADR 0092](./0092-limite-digest-bound-readiness-ai-locale.md), ADR 0093
+[ADR 0092](./0092-limite-digest-bound-readiness-ai-locale.md),
+[ADR 0107](./0107-anydoc-local-attachment-extraction.md), ADR 0093
 in [PR #185](https://github.com/Wulfgardr/mediflow/pull/185) e WUL-282.
 
 ## Problema
@@ -22,8 +24,9 @@ creerebbe due percorsi business, oppure farebbe dipendere la completezza
 headless dai soli percorsi intelligenti.
 
 La PR #159 ha portato su `main` il nucleo Fabric. Patient Insight e Document
-Synthesis producono gia metadati Fabric; Smart Import, OCR e Treatment
-Reasoning non attraversano ancora lo stesso resolver host-owned. Le PR
+Synthesis producono gia metadati Fabric; Smart Import e Treatment Reasoning non
+attraversano ancora lo stesso resolver host-owned. ADR 0107 mantiene invece
+`ocr` classificata ma terminalmente non disponibile. Le PR
 #180-#190 contengono evidenza utile per AIP e Mini, ma dipendono da uno stack
 ampio e non diventano la nuova base per effetto di questa ADR.
 
@@ -36,7 +39,7 @@ capability, senza confondere installazione, discovery, sessione e autorita.
 | Area | Stato su `main` | Conseguenza |
 | --- | --- | --- |
 | Fabric | PR #159 merged; resolver, cataloghi, lifecycle candidato, receipt e provenance presenti | Il nuovo lavoro estende il nucleo. |
-| Smart paths | Due path adottano Fabric; tre hanno ancora chiamate locali dirette o lane separate | Tutti e cinque richiedono governance Fabric end-to-end. |
+| Smart paths | Due path adottano Fabric; Smart Import e Treatment Reasoning hanno ancora chiamate locali dirette o lane separate; `ocr` e classificata ma non eseguibile | I quattro path generativi richiedono governance Fabric end-to-end; `ocr` resta terminalmente `unavailable`. |
 | AIP e Mini | PR #180-#190 aperte e draft | Restano evidenza; i replacement packet partono da `main` o da uno stack accettato. |
 | Step-up | WUL-282 e Backlog e blocca WUL-522 per apply | Nessun apply viene implementato da questo packet. |
 
@@ -100,8 +103,9 @@ La completezza architetturale richiede insieme:
 
 - 66/66 righe canoniche classificate e machine-readable;
 - nessuna duplicazione della logica business;
-- tutte le funzioni intelligenti governate dal Fabric;
-- venue ed egress espliciti;
+- tutte le funzioni intelligenti eseguibili governate dal Fabric;
+- venue ed egress espliciti per le capability eseguibili, assenza esplicita per
+  quelle terminalmente non disponibili;
 - lease, optimistic concurrency, idempotenza, job, cancellazione, revoca e
   rate limit;
 - receipt e provenance PHI-safe, degrado fail-closed ed E2E sintetico.
@@ -172,22 +176,26 @@ macOS o desktop ospita l'agent service. Il web usa un bridge esplicito verso
 quel servizio. iOS e iPadOS consentono consultazione, approvazione e revoca,
 ma non ospitano l'agent service.
 
-### D9. Cinque smart path governati dal Fabric
+### D9. Quattro smart path generativi e OCR non eseguibile
 
-Patient Insight, Document Synthesis, Smart Import, OCR e Treatment Reasoning
-passano dal Fabric end-to-end per l'uso UI e applicativo. Ogni path dichiara
-capability nominata, `inputProjectionSchema`, `outputProposalSchema`,
-`availabilityDisposition`, provenance e receipt. Non sono ammessi generic
-invoke, prompt o testo libero del chiamante.
+Patient Insight, Document Synthesis, Smart Import e Treatment Reasoning passano
+dal Fabric end-to-end per l'uso UI e applicativo. Sono i soli smart path
+generativi candidati all'esecuzione. Ogni path dichiara capability nominata,
+`inputProjectionSchema`, `outputProposalSchema`, `availabilityDisposition`,
+provenance e receipt. Quando l'esecuzione e disponibile, il massimo stadio
+clinico resta `proposal_only`: nessun output applica dati clinici. Non sono
+ammessi generic invoke, prompt o testo libero del chiamante.
 
-Le projection paziente sono versionate e broker-owned. Document Synthesis e
-OCR richiedono anche un handle documento opaco selezionato dal medico, mai un
-upload o testo caller-supplied.
+Le projection paziente sono versionate e broker-owned. Document Synthesis
+richiede anche un handle documento opaco selezionato dal medico, mai un upload
+o testo caller-supplied.
 
-Un OCR primario low-signal puo richiedere una seconda risoluzione Fabric
-host-owned per Apple Vision, con receipt e provenance distinte. Una denial non
-innesca fallback. Senza seconda autorizzazione l'esito e fallback negato o
-`ocr_pending`.
+La capability `ocr` resta classificata per completezza e anti-drift, ma non e
+eseguibile. Dichiara `availabilityDisposition=unavailable` e non dichiara
+venue, provider, fallback o kill switch. Nessuna route, configurazione,
+readiness o transizione di lifecycle puo renderla disponibile. AnyDoc segue
+ADR 0107 come estrazione locale deterministica degli allegati: non e OCR, non e
+un provider e non soddisfa la capability `ocr`.
 
 Il record Fabric durabile conserva stato, attore, riferimento, versione e
 receipt. Una proposta sanitizzata vive in un record applicativo domain-owned
@@ -228,14 +236,14 @@ P0 ADR 0094 (questo packet)
  +--> F1 contratto Fabric host-owned
  |     +--> F2 Patient Insight + Document Synthesis gate
  |     +--> F3 Smart Import
- |     +--> F4 OCR + fallback esplicito
- |     +--> F5 Treatment Reasoning
- |     +--> F6 lifecycle provider + review durabili
+ |     +--> F4 Treatment Reasoning
+ |     +--> F5 lifecycle provider + review durabili
+ |     +--> X1 OCR classificata `unavailable`, senza runtime
  |
  +--> T1 CLI pipe + local service + bridge host
 
 S1 + C1 + A1 + J1 + T1 --> M1 Mini/AIP con disposition progressive
-F2..F6 + S1           --> B1 binding smart application capabilities
+F2..F5 + S1           --> B1 binding smart application capabilities
 M1 + B1               --> I1 E2E sintetico fail-closed
 I1                    --> V1 verifica indipendente WUL-564
 WUL-282               --> A2 apply amministrativo futuro, fuori dal packet
@@ -244,8 +252,9 @@ WUL-282               --> A2 apply amministrativo futuro, fuori dal packet
 | Packet logico | Confine |
 | --- | --- |
 | Smart Import | Resolver Fabric e receipt prima dell'invocazione. |
-| OCR/fallback | Resolver primario e seconda decisione esplicita. |
 | Treatment Reasoning | Risoluzione Fabric prima della lane locale. |
+| OCR | Solo classificazione terminale `unavailable`; nessun packet runtime, venue, provider, fallback o kill switch. |
+| AnyDoc | Estrazione locale deterministica governata da ADR 0107, fuori dai path generativi e dalla capability `ocr`. |
 | Lifecycle/review durabili | Stato provider, job, review e riferimenti domain-owned. |
 | Bridge/manifest | Catalogo AIP-Fabric-Mini, UI surfaces e drift. |
 | Integrazione sintetica | Autorita, servizio, Fabric, job, proposta, revoca e receipt. |
@@ -262,7 +271,9 @@ Riaprire l'ADR e fermare la promozione se:
 - discovery o sessione espongono dati senza lease e authority;
 - il chiamante influenza provider, modello, venue o fallback;
 - una delle 66 righe non ha classificazione o campi D4;
-- uno smart path evita il Fabric o usa generic invoke;
+- uno dei quattro smart path generativi evita il Fabric o usa generic invoke;
+- `ocr` diventa invocabile, riceve venue, provider, fallback o kill switch, o
+  AnyDoc viene trattato come OCR;
 - apply precede WUL-282, conferma, idempotenza o expected revision;
 - conflitti, revoca, cancellazione o rate limit non falliscono chiusi;
 - un listener LAN, egress, cloud, SQLite diretto o fallback silenzioso compare;
@@ -271,7 +282,7 @@ Riaprire l'ADR e fermare la promozione se:
 ## Non-obiettivi e gate
 
 - Nessun runtime, route, UI o client Apple in questo packet.
-- Nessun provider, credenziale, dato paziente reale o migrazione.
+- Nessun provider, credenziale, dato paziente reale, migrazione o runtime OCR.
 - Nessun apply, MCP, REST agentico, listener LAN o cloud.
 - Nessun merge, promotion, tag, release, cleanup o security review.
 - Le PR #180-#183 restano evidence e non vengono riscritte.
