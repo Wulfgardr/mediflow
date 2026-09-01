@@ -3,7 +3,7 @@ import type {
     DeterministicCapabilityId,
     FabricCapabilityDescriptor,
     FabricVenue,
-} from './contract.ts';
+} from './contract';
 
 const LOCAL_DETERMINISTIC_VENUES: readonly FabricVenue[] = Object.freeze([
     'local_process',
