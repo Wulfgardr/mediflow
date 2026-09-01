@@ -66,6 +66,8 @@ test('scheduled backup table map covers the canonical backup artifact collection
   const runnerTableKeys = extractObjectKeys(runnerSource, 'BACKUP_TABLES');
 
   assert.deepEqual([...runnerTableKeys].sort(), [...canonicalCollections].sort());
+  assert.ok(canonicalCollections.includes('headlessSoapEntryCommits'));
+  assert.ok(runnerTableKeys.includes('headlessSoapEntryCommits'));
 });
 
 test('scheduled backup runner does not keep a duplicated local collection list', () => {
@@ -90,6 +92,19 @@ test('scheduled backup canonicalizes SOAP attestations before artifact checksum'
   const reverse = JSON.parse(await serializeBackupArtifact({ headlessSoapActiveRoleAttestations: [second, first] }, createdAt));
 
   assert.deepEqual(forward.payload.headlessSoapActiveRoleAttestations.map((row) => row.attestationRef), [secondRef, firstRef]);
+  assert.deepEqual(forward.payload, reverse.payload);
+  assert.equal(forward.manifest.checksum, reverse.manifest.checksum);
+});
+
+test('scheduled backup canonicalizes the H7b ledger without exporting audit_events', async () => {
+  const later = { idempotencyKey: `hsai_${'f'.repeat(64)}`, auditSnapshot: '{"eventId":"synthetic-later"}' };
+  const earlier = { idempotencyKey: `hsai_${'a'.repeat(64)}`, auditSnapshot: '{"eventId":"synthetic-earlier"}' };
+  const createdAt = new Date('2026-08-26T08:00:00.000Z');
+  const forward = JSON.parse(await serializeBackupArtifact({ headlessSoapEntryCommits: [later, earlier] }, createdAt));
+  const reverse = JSON.parse(await serializeBackupArtifact({ headlessSoapEntryCommits: [earlier, later] }, createdAt));
+
+  assert.deepEqual(forward.payload.headlessSoapEntryCommits.map((row) => row.idempotencyKey), [earlier.idempotencyKey, later.idempotencyKey]);
+  assert.equal('auditEvents' in forward.payload, false);
   assert.deepEqual(forward.payload, reverse.payload);
   assert.equal(forward.manifest.checksum, reverse.manifest.checksum);
 });
