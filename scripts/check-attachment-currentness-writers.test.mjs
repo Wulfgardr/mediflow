@@ -51,8 +51,10 @@ test('keeps every retired OCR replay fingerprint absent from the live contract a
 
 test('exact repository inventory is classified with no currentness gaps', () => {
     const findings = compareInventory(inventory(), CONTRACT);
-    assert.equal(CONTRACT.length, 22);
-    assert.equal(inventory().length, 22);
+    /* @Codex The retired OCR replay update is intentionally absent; the exact
+       live inventory now contains 21 current or delegated writers. */
+    assert.equal(CONTRACT.length, 21);
+    assert.equal(inventory().length, 21);
     assert.deepEqual(findings.filter((item) => ['DUPLICATE_CONTRACT', 'MISSING_OR_DRIFTED_WRITER', 'WRITER_COUNT_DRIFT', 'UNDECLARED_WRITER'].includes(item.code)), []);
     assert.deepEqual([...new Set(findings.map((item) => item.code))].sort(), []);
     assert.equal(CONTRACT.find((item) => item.path === 'lib/seeder.ts' && item.kind === 'facade-add')?.disposition, 'delegated');
