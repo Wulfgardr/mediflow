@@ -427,3 +427,36 @@ test('autentica e consuma il permit una sola volta sul runtime e currentness esa
     assert.throws(() => foreign.consumePermit(revokedPermit, CURRENT, CLAIM),
         (error: unknown) => error instanceof Error && 'code' in error && error.code === 'permit_invalid');
 });
+
+test('riserva il permit broker-wide e rivalida l execution opaca subito prima della pubblicazione', async () => {
+    const refs = ['agent.synthetic.execution1', 'lease.synthetic.execution1',
+        'agent.synthetic.execution2', 'lease.synthetic.execution2',
+        'agent.synthetic.execution3', 'lease.synthetic.execution3'];
+    const broker = createAipOwnerBrokerV1({ now: () => 1_000, nextRef: () => refs.shift(), hashRef: () => DIGEST,
+        writeAudit: async () => undefined });
+
+    const owner = broker.issueOwner(BINDING);
+    const permit = await broker.authorize(broker.issueLease(owner), CURRENT, CLAIM);
+    const execution = broker.beginPermit(permit, CURRENT, CLAIM);
+    assert.equal(Object.isFrozen(execution), true);
+    assert.equal(Object.getPrototypeOf(execution), null);
+    assert.deepEqual(Reflect.ownKeys(execution), []);
+    assert.throws(() => broker.beginPermit(permit, CURRENT, CLAIM),
+        (error: unknown) => error instanceof Error && 'code' in error && error.code === 'permit_replay');
+    broker.revokeOwner(owner);
+    assert.throws(() => broker.finalizePermit(execution, CURRENT, CLAIM),
+        (error: unknown) => error instanceof Error && 'code' in error && error.code === 'revoked');
+
+    const restartPermit = await broker.authorize(broker.issueLease(broker.issueOwner(BINDING)), CURRENT, CLAIM);
+    const restartExecution = broker.beginPermit(restartPermit, CURRENT, CLAIM);
+    broker.restart();
+    assert.throws(() => broker.finalizePermit(restartExecution, CURRENT, CLAIM),
+        (error: unknown) => error instanceof Error && 'code' in error && error.code === 'restart_changed');
+
+    const deniedPermit = await broker.authorize(broker.issueLease(broker.issueOwner(BINDING)), CURRENT, CLAIM);
+    const deniedExecution = broker.beginPermit(deniedPermit, CURRENT, CLAIM);
+    assert.equal(broker.denyPermit(deniedExecution), true);
+    assert.equal(broker.denyPermit(deniedExecution), false);
+    assert.throws(() => broker.finalizePermit(deniedExecution, CURRENT, CLAIM),
+        (error: unknown) => error instanceof Error && 'code' in error && error.code === 'permit_revoked');
+});
