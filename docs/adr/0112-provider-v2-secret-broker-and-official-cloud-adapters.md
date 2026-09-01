@@ -4,6 +4,7 @@ Date: 2026-09-01
 Status: Accepted
 
 Issues: [GitHub #279](https://github.com/Wulfgardr/mediflow/issues/279),
+[GitHub #324](https://github.com/Wulfgardr/mediflow/issues/324),
 [GitHub #282](https://github.com/Wulfgardr/mediflow/issues/282) e
 [GitHub #284](https://github.com/Wulfgardr/mediflow/issues/284).
 
@@ -67,6 +68,34 @@ Il resolver riceve solo un operation handle emesso dall'host. Provider,
 modello, endpoint, venue, data class e profili non sono autorita
 caller-supplied. Oggetti con campi extra o getter non materializzabili una sola
 volta falliscono chiusi.
+
+Il packet #324 completa questo livello con il profilo
+`mediflow.ai.provider-instance-profile.v2`. Il profilo separa:
+
+- `providerType` dall'istanza configurata, identificata da un riferimento
+  opaco `pvi_*`;
+- il riferimento workspace `pws_*` e la policy auth con riferimento `par_*`;
+- modello, capability dichiarate, gruppi e binding operation-to-group;
+- function allowlist, che resta vuota nella prima slice text-only;
+- venue, egress, residency, retention e data use, ciascuno dichiarato insieme
+  al proprio riferimento di policy quando previsto.
+
+I riferimenti instance, workspace e auth hanno forma opaca e bounded. Il
+profilo non contiene endpoint, chiavi, token, cookie o altri valori di
+credenziale. OpenAI e Anthropic accettano soltanto `api_key`; Ollama accetta
+soltanto `local_model`. Le classi `provider_oauth` e `host_subscription`
+restano distinte ma non sono una credenziale eseguibile per questi provider
+nella prima slice.
+
+Il link host-owned
+`mediflow.ai.provider-instance-lifecycle-binding.v2` conserva invariata la
+forma byte-exact del lifecycle per-operation. Riceve un solo profilo e un solo
+lifecycle, entrambi strict, insieme all'`instanceRef` atteso dall'host. Pubblica
+un link immutabile soltanto se instance, provider, modello, operation, venue,
+data use, egress e retention coincidono.
+L'output nomina una sola instance, il gruppo dell'operation e la function
+allowlist vuota. Il link non e una receipt di esecuzione, non abilita egress e
+non autorizza una capability non dichiarata.
 
 ### 2. Secret reference e broker
 
@@ -201,11 +230,13 @@ clinico. Nessun errore attiva un secondo provider o un modello diverso.
 1. **#289**: tipi v2 e lifecycle chiuso, tutti TDD e senza rete.
 2. **#290**: secret reference allowlisted e broker a lease effimero.
 3. **#288**: policy egress/retention/consent e receipt operation-derived.
-4. **#284**: adapter Responses OpenAI, parser, error mapping e optional smoke
+4. **#324**: profilo instance/auth completo e link lifecycle host-owned,
+   senza modificare il registry v1 o comporre un transport.
+5. **#284**: adapter Responses OpenAI, parser, error mapping e optional smoke
    sintetico esplicito.
-5. **#282**: adapter Messages Anthropic, parser, error mapping e optional smoke
+6. **#282**: adapter Messages Anthropic, parser, error mapping e optional smoke
    sintetico esplicito.
-6. Migrazione di una sola operazione Fabric review-only dopo le tre receipt di
+7. Migrazione di una sola operazione Fabric review-only dopo le tre receipt di
    contratto; nessun allargamento laterale dei quattro production root.
 
 Ogni packet resta sotto un solo issue/branch/worktree. #279 coordina i tre
@@ -218,6 +249,8 @@ partire #282 e #284 in parallelo.
 | --- | --- |
 | Secret broker | allowlist, absent, lease one-shot, expiry, revoke, mismatch, nessun leak |
 | Lifecycle | tutte le transizioni lecite e denial delle transizioni inverse |
+| Profilo instance | record exact-key, riferimenti opachi, duplicati e mismatch negati, auth disgiunta, function allowlist vuota |
+| Link lifecycle | una sola instance e match esatto di provider, modello, operation e policy, senza cambiare il lifecycle byte-exact |
 | Policy | synthetic PASS; clinical/redacted senza gate, consenso o retention DENY |
 | OpenAI | URL/header/body/parser/errori con transport fake; header mai in snapshot |
 | Anthropic | URL/header/version/body/parser/errori con transport fake; header mai in snapshot |
@@ -237,5 +270,7 @@ logging di header/body, PHI nelle fixture, un claim zero-retention non provato,
 una receipt prima della validazione della risposta o un allargamento del
 registry locale senza migrazione esplicita.
 
-Fino al completamento dei packet #279, #282 e #284 il claim massimo e
-`PROVIDER_V2_CONTRACT_PROPOSED__CLOUD_RUNTIME_NOT_DELIVERED`.
+Il completamento del solo packet #324 autorizza al massimo il claim
+`PROVIDER_V2_INSTANCE_PROFILE_AND_STRICT_LIFECYCLE_LINK_VERIFIED__CLOUD_COMPOSITION_NOT_DELIVERED`.
+Non prova trasporto live, egress clinico, smoke con credenziali, composition
+Fabric o release readiness.
