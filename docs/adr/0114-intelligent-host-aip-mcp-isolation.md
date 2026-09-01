@@ -185,6 +185,14 @@ di PHI. Il primo read clinico candidato è
 `mediflow.patient.open_loops.read.v1`: usa la selezione broker-owned, non
 accetta `patientId` e restituisce riferimenti opachi e dati minimizzati.
 
+Il read terminologico riserva il permit nel broker condiviso prima della
+lettura e riceve un execution handle opaco. Dopo l'audit, il broker rivalida
+revoca, restart, currentness e binding subito prima della pubblicazione; un
+denial successivo al begin tenta sempre un audit terminale PHI-safe senza query
+o item. Il budget di `250 ms` limita Promise pendenti e aggiunge un fence
+cooperativo dopo callback sincrone. Non interrompe in modo hard una callback
+sincrona ostile o bloccante, che resta dentro il boundary host trusted.
+
 Patient Insight, Smart Import, Document Synthesis e Treatment Reasoning possono
 diventare tool `proposal_only` soltanto tramite nuovi Application Services AIP
 che riusano factory puri. L'adapter non importa i production root Web e non
