@@ -41,6 +41,8 @@ Fonti primarie:
 [API v2](https://icd.who.int/docs/icd-api/APIDoc-Version2/),
 [autenticazione](https://icd.who.int/docs/icd-api/API-Authentication/) e
 [release supportate](https://icd.who.int/docs/icd-api/SupportedClassifications/).
+Lo [Swagger v2](https://id.who.int/swagger/v2/swagger.json) definisce il path
+Search e gli schemi `ISearchResult` e `ISimpleEntity` osservati dal parser.
 
 Questi sono fatti upstream osservati, non una prova live MediFlow. Release,
 lingue e compatibilita devono essere ricontrollate prima di cambiare binding.
@@ -128,6 +130,29 @@ accettata contiene soltanto `access_token`, `expires_in`, `token_type=Bearer` e
 abort. Il client HTTP resta obbligatoriamente iniettato e fake nei test: il
 packet non aggiunge `fetch`, rete live, composition root o smoke OAuth.
 
+Il packet Search ufficiale #323 aggiunge un adapter separato con binding
+immutabile `GET https://id.who.int/icd/release/11/2026-01/mms/search`. La query
+contiene soltanto `q`, `flatResults=true`, `highlightingEnabled=false`,
+`medicalCodingMode=true` e `includeKeywordResult=false`. Gli header sono
+`API-Version: v2`, `Accept: application/json`, `Accept-Language: en` e il
+bearer fornito da una lease monouso. Lo Swagger WHO non espone un parametro
+per il limite dei risultati: MediFlow applica il limite locale di 25 elementi
+dopo il limite raw di 64 KiB e fallisce chiuso se il risultato lo supera.
+
+L'adapter accetta soltanto un envelope HTTP data-only e i campi opzionali
+documentati di `ISearchResult`, `ISimpleEntity` e `ISimplePropertyValue`.
+Richiede `theCode` e `title`, rifiuta highlighting, duplicati, discendenti
+nidificati, campi aggiuntivi e valori non conformi, e pubblica soltanto lo
+schema transport esistente. Il client HTTP resta iniettato e fake. Il packet
+non aggiunge `fetch`, rete live, route, migrazione caller o smoke Search.
+
+Il timeout di 5 secondi appartiene al servizio e abortisce il transport
+pending. Cancellazione e restart impediscono la pubblicazione e ritirano la
+lease. Come per le altre porte nello stesso processo, il lavoro JavaScript
+sincrono dentro il client HTTP iniettato resta cooperativo e non e preemptable;
+il limite interrompe soltanto una `Promise` nativa ancora pendente dopo il
+ritorno della callback.
+
 La query in uscita contiene soltanto i termini necessari alla ricerca ICD-11:
 nessun patient ID, nome, codice fiscale, documento, nota, prompt o contesto
 clinico. Il servizio non dichiara anonimizzazione: una query diagnostica puo
@@ -169,12 +194,10 @@ payload non attraversano il boundary.
 
 ## Packet successivi
 
-1. Issuer OAuth ufficiale #322 e transport Search #323, separati e verificati
-   con client HTTP fake.
-2. Composition root host-owned e cache/reference snapshot governata.
-3. Migrazione atomica di route, UI e Application Services, poi rimozione del
+1. Composition root host-owned e cache/reference snapshot governata.
+2. Migrazione atomica di route, UI e Application Services, poi rimozione del
    percorso Docker e aggiornamento di launcher, docs e guard.
-4. Smoke live con credenziali fuori Git e verifica exact-candidate.
+3. Smoke live con credenziali fuori Git e verifica exact-candidate.
 
 ## Stop rule e claim ceiling
 
@@ -184,7 +207,7 @@ release diversa, DB diretto, authority agentica, write clinico, PHI/PII reale
 nei test o migrazione caller nello stesso packet del core.
 
 Fino ai packet successivi, il claim massimo e: **contratto, core, lease
-secret/token generation-bound e issuer OAuth ufficiale ICD-11 WHO verificati
-con transport e client HTTP fake; nessun transport Search ufficiale, client
-HTTP live, OAuth end-to-end, caller migrato, Docker rimosso dal runtime o smoke
-WHO consegnato**.
+secret/token generation-bound, issuer OAuth e transport Search ufficiali
+ICD-11 WHO verificati con client HTTP fake; nessun client HTTP live, OAuth o
+Search end-to-end, caller migrato, Docker rimosso dal runtime o smoke WHO
+consegnato**.

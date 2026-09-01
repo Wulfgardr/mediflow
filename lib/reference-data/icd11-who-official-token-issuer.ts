@@ -9,10 +9,10 @@ import type {
     Icd11WhoOfficialForm,
     Icd11WhoOfficialHeaders,
     Icd11WhoOfficialHttpsClient,
-    Icd11WhoOfficialHttpsClientRequest,
+    Icd11WhoOfficialTokenHttpsClientRequest,
 } from './icd11-who-official-https-client.ts';
 
-export type { Icd11WhoOfficialHttpsClientRequest } from './icd11-who-official-https-client.ts';
+export type Icd11WhoOfficialHttpsClientRequest = Icd11WhoOfficialTokenHttpsClientRequest;
 
 export const ICD11_WHO_OFFICIAL_TOKEN_FINAL_URL =
     'https://icdaccessmanagement.who.int/connect/token' as const;
@@ -222,7 +222,7 @@ export function createIcd11WhoOfficialTokenIssuer(factoryValue: unknown) {
             signal,
             maxRequestBytes: ICD11_WHO_OFFICIAL_TOKEN_MAX_REQUEST_BYTES,
             maxResponseBytes: ICD11_WHO_OFFICIAL_TOKEN_MAX_RESPONSE_BYTES,
-        }) satisfies Icd11WhoOfficialHttpsClientRequest;
+        }) satisfies Icd11WhoOfficialTokenHttpsClientRequest;
         let aborted = false;
         let rejectCancelled!: (error: Icd11WhoOfficialTokenIssuerError) => void;
         const cancelled = new Promise<never>((_resolve, reject) => { rejectCancelled = reject; });
