@@ -764,6 +764,16 @@ function createOwner() {
         finally { leave(); }
     }
 
+    function withCurrentResourceBinding(use, operation) {
+        if (!enter()) return false;
+        try {
+            return resources.withCurrentResourceBinding(resourceState, use, operation)
+                && !operationPoisoned;
+        }
+        catch { return false; }
+        finally { leave(); }
+    }
+
     function registerPrivateResource(port, dispose) {
         if (!enter()) return null;
         try {
@@ -786,7 +796,7 @@ function createOwner() {
         prepareUserRetirement, commitUserRetirement, abortUserRetirement,
         prepareAdminReset, commitAdminReset, abortAdminReset,
         mintResourcePort, releaseResourcePort, beginResourceUse, commitResourceUse, abortResourceUse,
-        registerPrivateResource, unregisterPrivateResource,
+        withCurrentResourceBinding, registerPrivateResource, unregisterPrivateResource,
     });
 }
 

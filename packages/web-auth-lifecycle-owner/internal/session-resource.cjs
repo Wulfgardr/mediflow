@@ -2,7 +2,7 @@
 'use strict';
 
 /* Private resources are attached to P3 cells and never constitute authority. */
-const { types: { isProxy } } = require('node:util');
+const { types: { isAsyncFunction, isGeneratorFunction, isPromise, isProxy } } = require('node:util');
 const cells = require('./session-cell.cjs');
 
 const objectCreate = Object.create;
@@ -90,11 +90,55 @@ function createSessionResourceState() {
     state.ports = new WeakMap();
     state.uses = new WeakMap();
     state.registrations = new WeakMap();
+    state.authenticationGenerations = new WeakMap();
     state.portHead = null;
     state.useHead = null;
     state.registrationHead = null;
     state.cleanupComplete = new WeakMap();
     return state;
+}
+
+function authenticationGenerationFor(state, cell) {
+    let generation = weakGet(state.authenticationGenerations, cell);
+    if (generation) return generation;
+    generation = opaque();
+    return weakSet(state.authenticationGenerations, cell, generation) ? generation : null;
+}
+
+function synchronousOperation(value) {
+    return supportedDisposer(value) && !isAsyncFunction(value) && !isGeneratorFunction(value);
+}
+
+function observeRejectedResult(value) {
+    if (!isPromise(value)) return;
+    try { reflectApply(promiseThen, value, [undefined, ignoredRejection]); } catch { /* denial remains */ }
+}
+
+/** Emits the exact active-cell identity only while one resource use remains current. */
+function withCurrentResourceBinding(state, use, operation) {
+    if (!trustedState(state) || !isObjectLike(use) || isProxy(use) || !synchronousOperation(operation)) return false;
+    const before = currentTime();
+    const record = resourceUseFor(state, use);
+    if (before === null || !record || !record.active || !liveResource(record.owner, before)
+        || record.cell !== record.owner.cell || record.session !== record.owner.session) return false;
+    const generation = authenticationGenerationFor(state, record.cell);
+    if (!generation) return false;
+    const binding = objectCreate(null);
+    binding.principalRef = record.session.userId;
+    binding.authenticationGeneration = generation;
+    objectFreeze(binding);
+    let result;
+    try { result = reflectApply(operation, undefined, [binding]); }
+    catch { return false; }
+    if (result !== undefined) {
+        observeRejectedResult(result);
+        return false;
+    }
+    const after = currentTime();
+    const finalRecord = resourceUseFor(state, use);
+    return after !== null && finalRecord === record && record.active
+        && liveResource(record.owner, after) && record.cell === record.owner.cell
+        && weakGet(state.authenticationGenerations, record.cell) === generation;
 }
 
 /** Creates a private resource port bound to one exact active cell. */
@@ -287,6 +331,7 @@ module.exports = objectFreeze({
     prepareResourceUse,
     consumeResourceUse,
     isCurrentResourceUse,
+    withCurrentResourceBinding,
     registerResource,
     releaseResourcePort,
     unregisterResource,

@@ -4,8 +4,10 @@ import { types } from 'node:util';
 import {
     abortResourceUse, beginResourceUse, commitResourceUse, mintResourcePort,
     registerPrivateResource, releaseResourcePort, unregisterPrivateResource,
-    type WebResourcePort, type WebResourceRegistration, type WebResourceUse,
+    withCurrentResourceBinding, type WebResourceBinding, type WebResourcePort,
+    type WebResourceRegistration, type WebResourceUse,
 } from './web-auth-lifecycle-owner-adapter';
+import type { HeadlessSoapAuthorizationLineageV1 } from './headless-soap-authorization-lineage';
 const SESSION_KEYS = ['id', 'userId', 'username', 'role', 'authChannel', 'createdAt', 'expiresAt'] as const;
 const ATTESTATION_KEYS = ['attestationRef', 'actorRef', 'schemaVersion', 'role', 'operationId', 'policyVersion', 'status', 'attestationVersion', 'issuerRef', 'expiresAt', 'activatedAt', 'revocationGeneration', 'revokedAt', 'createdAt', 'updatedAt'] as const;
 const ATTESTATION_SCHEMA = 'mediflow.headless-soap-active-role-attestation.v1', OPERATION = 'mediflow.clinical_diary.append_soap.v1', POLICY = 'clinician_confirmed_single_use.v1';
@@ -35,6 +37,7 @@ type Session = Readonly<{ id: string; userId: string; username: string; role: 'a
 type Snapshot = Readonly<{ session: Session; attestationRef: string; issuerRef: string; activatedAt: number; attestationExpiresAt: number; updatedAt: number; expiresAt: number }>;
 type DependentRecord = { registration: HeadlessSoapActiveRoleDependentRegistrationV1; owner: GrantRecord; dispose: () => void; active: boolean; next: DependentRecord | null };
 type GrantRecord = { grant: HeadlessSoapActiveRoleSessionGrantV1; snapshot: Snapshot; active: boolean; port: WebResourcePort | null; registration: WebResourceRegistration | null; dependents: DependentRecord | null };
+type ActiveRoleBinding = HeadlessSoapAuthorizationLineageV1['activeRole'];
 const dependentOperationFailure = objectFreeze(objectCreate(null));
 const ignorePromiseRejection = () => undefined;
 function requireVoidResult(value: unknown): void { if (value === undefined) return;
@@ -42,6 +45,8 @@ function requireVoidResult(value: unknown): void { if (value === undefined) retu
     throw dependentOperationFailure; }
 function synchronousCallback(value: unknown): boolean { return typeof value === 'function' && !isProxy(value) && !isAsyncFunction(value)
     && !isGeneratorFunction(value) && objectGetPrototypeOf(value) === functionPrototype; }
+function fieldlessIdentity(value: unknown): boolean { try { return typeof value === 'object' && value !== null && !isProxy(value)
+    && objectGetPrototypeOf(value) === null && objectIsFrozen(value) && reflectOwnKeys(value).length === 0; } catch { return false; } }
 function fail(code: HeadlessSoapActiveRoleSessionGrantErrorCode): never { throw new HeadlessSoapActiveRoleSessionGrantError(code); }
 function exact(value: unknown, keys: readonly string[]): Record<string, unknown> | null {
     try {
@@ -117,6 +122,36 @@ export function createHeadlessSoapActiveRoleSessionGrantOwner(sources: HeadlessS
     const confirmResource = (record: GrantRecord): boolean => { const port = record.port; if (!record.active || !port) return false; let resourceUse: WebResourceUse | null = null, committed = false;
         try { resourceUse = beginResourceUse(port); committed = !!resourceUse && commitResourceUse(resourceUse); return committed; }
         catch { return false; } finally { if (resourceUse && !committed) abortResourceUse(resourceUse); } };
+    const activeRoleBinding = (record: GrantRecord, value: WebResourceBinding): ActiveRoleBinding | null => {
+        const binding = exact(value, ['principalRef', 'authenticationGeneration']);
+        if (!binding || binding.principalRef !== record.snapshot.session.userId
+            || !fieldlessIdentity(binding.authenticationGeneration)) return null;
+        return objectFreeze(objectAssign(objectCreate(null), {
+            grantIdentity: record.grant,
+            principalRef: binding.principalRef,
+            authenticationGeneration: binding.authenticationGeneration,
+            actorRef: record.snapshot.session.userId,
+            attestationRef: record.snapshot.attestationRef,
+            attestationVersion: 1 as const,
+            revocationGeneration: 0 as const,
+            policyVersion: POLICY,
+        })) as ActiveRoleBinding;
+    };
+    const withResourceBinding = (record: GrantRecord, operation: (binding: ActiveRoleBinding) => void): boolean => {
+        const port = record.port; if (!record.active || !port) return false;
+        let resourceUse: WebResourceUse | null = null, committed = false, invoked = false;
+        try {
+            resourceUse = beginResourceUse(port); if (!resourceUse) return false;
+            const current = withCurrentResourceBinding(resourceUse, (webBinding) => {
+                const binding = activeRoleBinding(record, webBinding); if (!binding) throw dependentOperationFailure;
+                requireVoidResult(reflectApply(operation, undefined, [binding])); invoked = true;
+            });
+            if (!current || !invoked || !record.active) return false;
+            committed = commitResourceUse(resourceUse);
+            return committed && record.active;
+        } catch { return false; }
+        finally { if (resourceUse && !committed) abortResourceUse(resourceUse); }
+    };
     const finishCurrent = (record: GrantRecord, operation?: (record: GrantRecord) => void): GrantRecord => {
         if (!record.active || currentGet(current, record.snapshot.session.id) !== record || weakGet(issued, record.grant) !== record) { discard(record); return fail('lifecycle_unavailable'); }
         if (operation) { if (dependentOperationActive) { dependentOperationPoisoned = true; discard(record); throw dependentOperationFailure; }
@@ -201,7 +236,41 @@ export function createHeadlessSoapActiveRoleSessionGrantOwner(sources: HeadlessS
             } catch (error) { if (error === dependentOperationFailure) return false; throw error; }
         },
     });
-    return objectFreeze({ service, lifecycleController });
+    const bindingController = objectFreeze({
+        async withCurrentGrantBinding(operation: (
+            grant: HeadlessSoapActiveRoleSessionGrantV1,
+            activeRole: ActiveRoleBinding,
+        ) => void): Promise<boolean> {
+            if (!synchronousCallback(operation)) return false;
+            try {
+                await issueCurrent((owner) => {
+                    if (!withResourceBinding(owner, (binding) => {
+                        requireVoidResult(reflectApply(operation, undefined, [owner.grant, binding]));
+                    })) throw dependentOperationFailure;
+                });
+                return true;
+            } catch (error) { if (error === dependentOperationFailure) return false; throw error; }
+        },
+        async withCurrentDependentBinding(
+            candidate: unknown,
+            registration: unknown,
+            operation: (activeRole: ActiveRoleBinding) => void,
+        ): Promise<boolean> {
+            if (typeof candidate !== 'object' || candidate === null || !synchronousCallback(operation)) return false;
+            const owner = weakGet(issued, candidate);
+            if (!owner || !dependentCurrent(owner, registration)) return false;
+            try {
+                await recheckCurrent(candidate, (currentOwner) => {
+                    if (currentOwner !== owner || !dependentCurrent(owner, registration)
+                        || !withResourceBinding(owner, (binding) => {
+                            requireVoidResult(reflectApply(operation, undefined, [binding]));
+                        }) || !dependentCurrent(owner, registration)) throw dependentOperationFailure;
+                });
+                return true;
+            } catch (error) { if (error === dependentOperationFailure) return false; throw error; }
+        },
+    });
+    return objectFreeze({ service, lifecycleController, bindingController });
 }
 
 /** Owns one opaque, process-local prerequisite; it contains no downstream authority. */

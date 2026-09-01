@@ -16,6 +16,12 @@ export type WebResourcePort = owner.WebResourcePort;
 export type WebResourceUse = owner.WebResourceUse;
 export type WebResourceRegistration = owner.WebResourceRegistration;
 export type WebResourceDisposer = owner.WebResourceDisposer;
+export type WebAuthenticationGeneration = Readonly<{ readonly __webAuthenticationGeneration?: never }>;
+export type WebResourceBinding = Readonly<{
+    principalRef: string;
+    authenticationGeneration: WebAuthenticationGeneration;
+}>;
+export type WebResourceBindingOperation = (binding: WebResourceBinding) => void;
 export type WebRetirementReceipt = owner.WebRetirementReceipt;
 export type WebUserRetirementCapability = owner.WebUserRetirementCapability;
 export type WebRetirementReason = 'lock' | 'dispose' | 'expired' | 'delete' | 'clear';
@@ -94,6 +100,18 @@ export function commitResourceUse(use: unknown): boolean {
 
 export function abortResourceUse(use: unknown): boolean {
     return owner.abortResourceUse(use);
+}
+
+export function withCurrentResourceBinding(
+    use: unknown,
+    operation: WebResourceBindingOperation,
+): boolean {
+    return (owner as typeof owner & {
+        withCurrentResourceBinding(
+            candidate: unknown,
+            callback: WebResourceBindingOperation,
+        ): boolean;
+    }).withCurrentResourceBinding(use, operation);
 }
 
 export function registerPrivateResource(
