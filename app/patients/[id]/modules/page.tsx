@@ -52,6 +52,18 @@ import { buildPatientModuleRailGroups } from '@/lib/patient-module-rail-mapping'
 import FollowupSuggestions from '@/components/followup-suggestions';
 import { calculateAge, estimateBirthYearFromTaxCode } from '@/lib/utils';
 
+/* @Codex These helpers are invoked only from explicit UI events. Keeping their
+   time and navigation side effects outside render makes that boundary visible
+   to React's purity checks. */
+function buildObservationRequestId(loop: OpenLoop): string {
+    return `${loop.kind}:${loop.sourceRef.id ?? loop.sourceRef.code ?? 'unknown'}:${Date.now()}`;
+}
+
+function navigateToObservationForm(): void {
+    window.location.assign('#parametri');
+    requestAnimationFrame(() => document.getElementById('parametri')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+}
+
 export default function PatientDetailPage() {
     const params = useParams();
     const id = params.id as string;
@@ -69,6 +81,9 @@ export default function PatientDetailPage() {
     }, []);
     const [isDocumentUploadOpen, setIsDocumentUploadOpen] = useState(false);
     const [observationPrefill, setObservationPrefill] = useState<ObservationPrefill | undefined>();
+    /* @Codex One stable clock sample is sufficient for this read-only staleness
+       projection; it must not change as a side effect of an unrelated render. */
+    const [currentTimestampMs] = useState(() => Date.now());
     const confirm = useConfirm();
     const { showToast } = useToast();
 
@@ -356,7 +371,7 @@ export default function PatientDetailPage() {
     // Proiezione read-only dei follow-up suggeriti dai documenti (nessun auto-write).
     const followupSuggestions = projectFollowupSuggestions(documentInsights);
     const openObservationForm = (loop: OpenLoop) => {
-        const requestId = `${loop.kind}:${loop.sourceRef.id ?? loop.sourceRef.code ?? 'unknown'}:${Date.now()}`;
+        const requestId = buildObservationRequestId(loop);
         let prefill: ObservationPrefill = { requestId };
 
         if (loop.kind === 'results_pending' && loop.sourceRef.id) {
@@ -400,8 +415,7 @@ export default function PatientDetailPage() {
         }
 
         setObservationPrefill(prefill);
-        window.location.hash = 'parametri';
-        requestAnimationFrame(() => document.getElementById('parametri')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+        navigateToObservationForm();
     };
     const summaryText = leadDiagnosis
         ? `${leadDiagnosis.code} · ${leadDiagnosis.description}${patient.isAdi ? ' con continuita territoriale attiva.' : '.'}`
@@ -469,7 +483,7 @@ export default function PatientDetailPage() {
     // percorso e ancora aperto (rilevante soprattutto per l'ADI).
     const lastEntryDate = activeEntries[0]?.date ? new Date(activeEntries[0].date) : null;
     const daysSinceContact = lastEntryDate
-        ? Math.floor((Date.now() - lastEntryDate.getTime()) / (1000 * 60 * 60 * 24))
+        ? Math.floor((currentTimestampMs - lastEntryDate.getTime()) / (1000 * 60 * 60 * 24))
         : null;
     const contactStale = daysSinceContact !== null && daysSinceContact > 90 && !patient.isArchived;
     // Documenti caricati senza sintesi: azionabile, a differenza del conteggio referti.

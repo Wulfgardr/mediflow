@@ -86,7 +86,12 @@ test('both React hooks retain dynamic scope resolver wiring', () => {
         sourceBetween(source, 'export function useLiveQueryState<', '    return { data, error, loading, refresh };'),
     ];
     for (const hookBlock of hookBlocks) {
-        assert.match(hookBlock, /const tablesRef = useRef\(tables\);\s*tablesRef\.current = tables;/);
+        /* @Codex Keep the resolver current after commit without mutating a ref
+           during render, which React's purity contract forbids. */
+        assert.match(
+            hookBlock,
+            /const tablesRef = useRef\(tables\);[\s\S]*?useEffect\(\(\) => \{\s*tablesRef\.current = tables;\s*\}, \[tables\]\);/,
+        );
         assert.match(hookBlock, /dbChangeBus\.subscribeWithScopeResolver\(\(\) => \{[\s\S]*?\}, \(\) => tablesRef\.current\), \[\]\)/);
     }
 });
