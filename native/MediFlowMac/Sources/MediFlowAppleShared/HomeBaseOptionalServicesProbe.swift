@@ -25,8 +25,7 @@ public struct HomeBaseOptionalServicesSnapshot: Equatable, Sendable {
 
     public static let initial = HomeBaseOptionalServicesProbe.buildSnapshot(
         ollamaReachable: nil,
-        mlxReachable: nil,
-        icdReachable: nil
+        mlxReachable: nil
     )
 }
 
@@ -49,21 +48,13 @@ public enum HomeBaseOptionalServicesProbe {
             session: session,
             acceptedStatusCodes: 200..<300
         )
-        async let icdReachable = isReachable(
-            URL(string: "http://127.0.0.1:8888"),
-            session: session,
-            // Some container frontends can answer 401/403 while still proving that ICD is up.
-            acceptedStatusCodes: 200..<500
-        )
-
         return await buildSnapshot(
             ollamaReachable: ollamaReachable,
-            mlxReachable: mlxReachable,
-            icdReachable: icdReachable
+            mlxReachable: mlxReachable
         )
     }
 
-    static func buildSnapshot(ollamaReachable: Bool?, mlxReachable: Bool?, icdReachable: Bool?) -> HomeBaseOptionalServicesSnapshot {
+    static func buildSnapshot(ollamaReachable: Bool?, mlxReachable: Bool?) -> HomeBaseOptionalServicesSnapshot {
         HomeBaseOptionalServicesSnapshot(services: [
             HomeBaseOptionalServiceStatus(
                 id: "optional-ollama",
@@ -86,17 +77,6 @@ public enum HomeBaseOptionalServicesProbe {
                     unknown: "Endpoint 127.0.0.1:8080 non ancora verificato"
                 ),
                 state: state(for: mlxReachable)
-            ),
-            HomeBaseOptionalServiceStatus(
-                id: "optional-docker-icd",
-                title: "Docker / ICD (container)",
-                detail: detail(
-                    reachable: icdReachable,
-                    ready: "Endpoint 127.0.0.1:8888 raggiungibile",
-                    notReady: "Endpoint 127.0.0.1:8888 non rilevato",
-                    unknown: "Endpoint 127.0.0.1:8888 non ancora verificato"
-                ),
-                state: state(for: icdReachable)
             )
         ])
     }

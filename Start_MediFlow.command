@@ -136,7 +136,7 @@ echo "   🪪 Sorgente: ${CURRENT_APP_SOURCE_FINGERPRINT}"
 echo ""
 
 # --- 1. Start Ollama (AI Engine) ---
-echo "🤖 [1/3] Controllo AI Engine (Ollama)..."
+echo "🤖 [1/2] Controllo AI Engine (Ollama)..."
 if ! pgrep -x "ollama" > /dev/null; then
     echo "   ⚠️  Ollama non attivo. Avvio in corso..."
     if command -v ollama &> /dev/null; then
@@ -163,27 +163,6 @@ else
     echo "   ✅ Ollama già attivo."
 fi
 
-# --- 2. Start ICD-11 API (Docker) ---
-echo ""
-echo "🩺 [2/3] Controllo ICD-11 API (Docker)..."
-if command -v docker &> /dev/null; then
-    # Check if container is running
-    if docker ps --format '{{.Names}}' | grep -q 'mediflow-icd'; then
-        echo "   ✅ ICD-11 API già attivo (porta 8888)."
-    else
-        echo "   ⚠️  ICD-11 non attivo. Avvio container..."
-        docker compose up -d icd-api 2>/dev/null || docker-compose up -d icd-api 2>/dev/null
-        if [ $? -eq 0 ]; then
-            echo "   ✅ ICD-11 API avviato (porta 8888)."
-        else
-            echo "   ⚠️  Impossibile avviare ICD-11. Le diagnosi non funzioneranno."
-        fi
-    fi
-else
-    echo "   ⚠️  Docker non installato. Le diagnosi ICD-11 non saranno disponibili."
-    echo "      Per abilitarle: installa Docker Desktop e rilancia."
-fi
-
 inspect_mediflow_port
 if [ "$PORT_STATUS" = "occupied_other" ]; then
     echo ""
@@ -199,9 +178,9 @@ if [ "$PORT_STATUS" = "occupied_other" ]; then
     exit 1
 fi
 
-# --- 3. Start Next.js App ---
+# --- 2. Start Next.js App ---
 echo ""
-echo "🚀 [3/3] Avvio Applicazione Next.js..."
+echo "🚀 [2/2] Avvio Applicazione Next.js..."
 echo ""
 
 # Cleanup function
@@ -211,8 +190,6 @@ cleanup() {
     fi
     echo ""
     echo "🛑 Arresto in corso..."
-    # Optional: stop ICD container on exit to save resources
-    # docker compose stop icd-api 2>/dev/null
     echo "👋 MediFlow arrestato. A presto!"
     exit
 }
