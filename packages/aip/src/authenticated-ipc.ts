@@ -36,7 +36,7 @@ type Stage = { activation: readonly unknown[]; generation: number; state: 'avail
 type Pending = { controller: AbortController; reason: AipAuthenticatedIpcV1ErrorCode };
 type Peer = { transport: 'xpc' | 'uds' | 'named_pipe'; peerRef: string; runtimeRef: string };
 function exactValues(value: unknown, keys: readonly string[]): unknown[] {
-    if (!value || typeof value !== 'object' || Array.isArray(value) || types.isProxy(value)) {
+    if (!value || typeof value !== 'object' || types.isProxy(value) || Array.isArray(value)) {
         throw new AipAuthenticatedIpcV1Error('input_invalid');
     }
     let prototype: object | null;
@@ -70,7 +70,7 @@ function brokerPort(value: unknown): BrokerPort {
     return value as BrokerPort;
 }
 function inputBytes(value: unknown): Uint8Array {
-    if (!(value instanceof Uint8Array) || types.isProxy(value) || !BYTE_LENGTH_GETTER) {
+    if (types.isProxy(value) || !(value instanceof Uint8Array) || !BYTE_LENGTH_GETTER) {
         throw new AipAuthenticatedIpcV1Error('frame_invalid');
     }
     let length: number;
