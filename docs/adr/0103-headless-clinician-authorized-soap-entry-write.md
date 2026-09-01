@@ -576,6 +576,241 @@ Chat, voce/audio trascritti, planner text, Mini e utterance dell'agente possono
 solo raccogliere la bozza o richiedere preview. Non possono mai approvare,
 coniare un gesto, confermare un PIN o consumare una proof.
 
+### Costanti H6 per 0.8.5
+
+La base H5b vincolante per H6 e `c5ebd50da`. Questa sezione completa il
+binding H6 e autorizza soltanto i seam privati necessari a costruirlo. I
+service e i facade pubblici H2a-H5b restano invariati. I controller lifecycle
+gia fissati restano invariati; eventuali callback con dati di binding vivono
+in controller privati distinti, usano gli stessi registry e non creano un
+secondo owner.
+
+#### Lineage host-owned
+
+H6 riceve la currentness upstream soltanto in una continuation sincrona
+host-owned. La continuation porta una capsule memory-only, null-prototype e
+frozen con esattamente queste own data key enumerabili, nell'ordine indicato:
+
+```text
+schema, operationId, webSession, activeRole, childLease, selection,
+patientVersion, action, purpose, proposal, entryIdentity, payloadDigest,
+sealDigest, policyDigest
+```
+
+I literal sono:
+
+```text
+schema      = mediflow.headless.soap-authorization-lineage.v1
+operationId = mediflow.clinical_diary.append_soap.v1
+action      = append
+purpose     = clinician_requested_documentation
+```
+
+Le forme annidate sono chiuse, null-prototype e frozen:
+
+```text
+webSession = id, userId, username, role, authChannel, createdAt, expiresAt
+activeRole = grantIdentity, principalRef, authenticationGeneration, actorRef,
+             attestationRef, attestationVersion, revocationGeneration,
+             policyVersion
+childLease = parent, child, lease
+parent     = identity, contractVersion, generation, revocationGeneration
+child      = identity, contractVersion, generation, revocationGeneration,
+             proposalBudget, expiresAt
+lease      = identity, contractVersion, generation, revocationGeneration
+selection  = scopeIdentity, sessionRef, patientRef, ambulatoryRef, leaseRef,
+             selectionEpoch, expiresAt
+proposal   = proposalIdentity, revision, expiresAt
+```
+
+`webSession` e l'esatta proiezione a sette campi gia verificata da H5b.
+L'owner Web aggiunge una porta privata closure-bound che, dentro un resource
+use corrente, espone il principal ref e una identity opaca, fieldless e
+process-local della exact active cell come `authenticationGeneration`. La
+porta non cambia la proiezione o il facade Web e non accetta una generation
+dal chiamante. `activeRole` lega questa identity, l'identita process-local del
+grant H2a, la stessa sessione Web, actor, attestation
+ref/version/revocation generation e policy version.
+
+`childLease` lega tre identity fieldless distinte per parent, child e lease
+H2b e conserva separatamente le tre terne contract version, generation e
+revocation generation; il child aggiunge `proposalBudget = 0`, gia consumato
+dalla transizione H3, ed expiry. `selection` lega
+scope identity, session ref, patient ref, ambulatory ref, lease ref, selection
+epoch ed expiry. La source selection canonica risolve insieme
+`patientId,ambulatoryId,patientVersion`; l'owner conserva `patientVersion`, la
+rilegge dalla stessa source a ogni currentness e richiede uguaglianza. La
+versione e un safe integer almeno `1`, non deriva dal selection epoch e non e
+letta direttamente da H6. Il registry e il lease pubblico selection restano
+invariati.
+
+H3 assegna e conserva `proposal.revision = 1` soltanto nella transizione
+riuscita `preview_current -> proposal_current`; il controller di binding la
+emette con proposal identity ed expiry. Non esiste una seconda revisione nella
+0.8.5. `entryIdentity` e l'identita opaca H4;
+`payloadDigest` e la copia canonica H4. `sealDigest` e la copia canonica H4
+confermata dal gesto H5a. La capsule non contiene SOAP plaintext, PIN, proof
+raw, ciphertext, ID clinici raw, receipt o write authority. Il bundle H4
+entra solo nella continuation di consumo e non viene trattenuto da H6.
+
+Le identita opache si confrontano soltanto per `===`. Proiezioni, versioni,
+expiry e digest si confrontano per forma chiusa e valore byte-esatto. La
+currentness non e un boolean caller-supplied: e il successo delle continuation
+annidate Web, H2a, H2b, selection, H3, H4, H5a e H5b con i rispettivi final
+fence. H6 conserva la prima capsule senza dati clinici e al consumo ne
+richiede una nuova, completa e corrente; qualunque drift nega.
+
+#### Seal handoff H5a
+
+Il lifecycle H5a aggiunge un controller server-only distinto con il solo
+metodo `bindGestureSeal(correlationToken, sealBundle)`. Non entra nel facade
+production H5a prima dell'adapter H8. Il client gesture owner invoca la porta
+di binding soltanto dopo il reopen byte-esatto riuscito e prima di restituire
+il gia fissato `{ status: 'pin_required' }`; il risultato pubblico non cambia.
+
+Il controller accetta soltanto il token H5a corrente e l'esatto bundle
+`mediflow.headless.soap-entry-seal.v1`. Verifica forma chiusa, assenza di
+attachments, uguaglianza di type/date/setting/payload digest con il field set
+H4 corrente e ricalcola il seal digest dai tre `ENC:` con il codec H4. Non
+dichiara di decryptare server-side: quella prova resta nel client owner H4.
+Conserva memory-only una copia canonica del bundle verificato per il solo
+handoff H7 e ne proietta nella capsule soltanto `sealDigest`; bundle e
+ciphertext non sono conservati da H6. Il primo binding valido porta la
+presentazione da `presented` a `gesture_bound`; duplicato, mismatch, perdita
+di currentness o failure terminalizzano H5a e upstream. H5b puo emettere una
+proof soltanto da una presentazione `gesture_bound`. Cancel, drain, expiry o
+proof spent rilasciano bundle e digest.
+
+#### Policy digest
+
+`policyDigest` usa il codec
+`mediflow.headless.soap-authorization-policy-digest.v1`, SHA-256 e il framing
+UTF-8 length-prefixed unsigned 32-bit big-endian H1/H4. L'ordine esatto e:
+
+```text
+mediflow.headless.soap-authorization-policy-digest.v1
+mediflow.clinical_diary.append_soap.v1
+clinician_confirmed_single_use.v1
+physician
+append
+clinician_requested_documentation
+1
+300000
+120000
+30000
+mediflow.headless.soap-entry-field-set.v1
+mediflow.headless.soap-entry-payload-digest.v1
+mediflow.headless.soap-entry-seal.v1
+mediflow.headless.soap-entry-seal-digest.v1
+mediflow.headless.attachments.absent.v1
+```
+
+Il golden hex e
+`1175ad0f063ac03d73f71afce252a7922e359882c9c1f7313a5cbc445e3a5f17`.
+Il digest ha la forma chiusa `codec,sha256`, quindi `bytes,hex`; e una
+costante H6, non una source configurabile. Una policy diversa richiede
+amendment.
+
+#### Identita e API H6
+
+H6 genera con tre draw CSPRNG indipendenti, in quest'ordine:
+
+```text
+commandId      = hsac_<64 hex lowercase>
+approvalRef    = hsaa_<64 hex lowercase>
+idempotencyKey = hsai_<64 hex lowercase>
+```
+
+Ogni suffix usa esattamente 32 byte host-owned. Non esistono retry: entropia
+malformata, throw o collisione live/tombstoned negano e bruciano una proof gia
+reclamata. Le tombstone durano quanto il processo. H6 conserva soltanto il
+digest domain-separated della authorization proof, mai la stringa raw.
+
+L'owner H6 espone `{ service, approvalController }`; soltanto `service` entra
+nel facade H6. Il service espone esattamente:
+
+```text
+bind(authorizationProof)
+wipe(approvalRef, authorizationProof)
+```
+
+`bind` restituisce un record null-prototype e frozen con le sole key
+`status,approvalRef,idempotencyKey`, dove `status = approval_bound`.
+`commandId`, capsule e digest non attraversano il facade. `wipe` richiede la
+coppia esatta ref/proof, restituisce `true` soltanto alla prima
+terminalizzazione e usa la proof caller-held solo per unregister e cleanup;
+non la conserva.
+
+L'`approvalController` privato H7 espone soltanto
+`withSingleUseApproval(envelope, operation)`. `envelope` e il record chiuso
+H7 null-prototype e frozen, non Proxy, con le sole own data property
+enumerabili, non writable e non configurable, nell'ordine `approvalRef`,
+`idempotencyKey`, `authorizationProof`; symbol, accessor o chiavi ulteriori
+negano. `operation` riceve un `boundCommand` null-prototype e frozen con
+esattamente:
+
+```text
+schema, commandId, approvalRef, idempotencyKey,
+authorizationProofDigest, lineage, sealBundle
+```
+
+`schema = mediflow.headless.soap-bound-command.v1`. `lineage` e la capsule
+appena ri-risolta; `sealBundle` e la copia canonica H5a appena ri-risolta
+nella stessa continuation e contiene i tre ciphertext da consegnare a H7.
+La callback e sincrona, host-owned e void. Async,
+generator, Proxy, thenable/Promise, throw, risultato non-void o reentry negano
+e bruciano approval e proof.
+
+#### Lifecycle e handoff H6 verso H7
+
+Lo stesso proof owner H5b espone alla sola composition H6 un controller di
+binding distinto con esattamente
+`withCurrentDependentBinding(authorizationProof, registration, operation)` e
+`withSingleUseDependentBinding(authorizationProof, registration, operation)`.
+Entrambi restituiscono `Promise<boolean>` e invocano la callback sincrona
+host-owned come `operation(lineage, sealBundle)`. La registration viene creata,
+confermata o ritirata soltanto dai tre metodi gia fissati sul lifecycle
+controller H5b; i due controller riusano record e registry. Il controller di
+binding non entra nel facade H5b e non cambia le callback zero-arg. Un proof
+H5b puo avere un solo dipendente H6.
+
+H6 usa soltanto `bound -> in_flight -> spent`. Non introduce timer o TTL: la
+sua validita e l'intersezione della proof H5b residua, al massimo `30000 ms`,
+e di tutta la lineage upstream. `bind` registra e conferma il dipendente H5b,
+acquisisce e valida la prima capsule, genera le tre identita e pubblica solo
+dopo il final fence. Non chiama il consumo monouso: la proof resta `minted`.
+
+`withSingleUseApproval` controlla prima la tripla envelope e il proof digest,
+poi entra nel consumo atomico H5b con l'esatta registration H6. H5b
+ri-risolve internamente lineage e bundle mentre la proof e ancora `minted`,
+applica tempo e final fence, porta la proof a `in_flight` e soltanto allora
+invoca la callback H6. H6 confronta la capsule, passa `bound -> in_flight` e
+invoca H7. Prima dell'uscita entrambi sono sempre `spent`, su successo o
+failure. H7 deve contenere nella callback l'intera transazione sincrona; H6
+non conserva receipt e non consente lavoro differito.
+
+Una tripla malformed, foreign o non corrispondente resta inerte. Dopo la
+corrispondenza esatta, expiry, currentness loss, drift, callback failure,
+rollback o final fence bruciano approval e proof e drenano H5a-H2b. Restart
+prima del commit nega; replay durevole, conflict e risposta persa dopo commit
+sono esclusivamente H7b e non riattivano H6.
+
+I denial PHI-safe H6 sono esattamente `proof_unavailable`, `proof_expired`,
+`binding_unavailable`, `approval_unavailable`, `binding_changed` e
+`lifecycle_unavailable`. La precedenza di bind e proof, registration H5b,
+currentness/capsule, policy, entropia/collisioni e final fence. La precedenza
+del consumo e envelope, lookup/stato, idempotency e proof digest,
+currentness/tempo H5b, ri-risoluzione e confronto capsule, transizione monouso
+e callback H7.
+
+H6 non importa route, adapter, cookie, `SecurityProvider`, schema clinico,
+Drizzle, SQLite, writer, audit, log o persistenza. Non accetta SOAP, patient
+ID, ambulatory ID, field set, seal digest, version, epoch, policy, command o
+idempotency dal chiamante. Fermare se compare un secondo proof owner, un TTL
+H6, capsule caller-supplied o serializzata, patient version derivata
+dall'epoch, proposal revision diversa da `1`, proof raw trattenuta, callback
+asincrona, accesso DB/route o qualunque writer, replay o receipt H7.
+
 ### Presentazione e approval clinica
 
 Il client riceve l'entry risultante dall'host. Sigilla title, contenuto e
