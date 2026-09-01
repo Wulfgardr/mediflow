@@ -500,6 +500,78 @@ Click concorrenti o ripetuti, cancel, close e denial terminalizzano l'owner.
 I denial restano quelli H4 piu `gesture_unavailable`, tutti PHI-safe. Mount,
 trasporto e adapter applicativi restano H8; H5a non apre route o fetch.
 
+### Costanti H5b per 0.8.5
+
+H5b e un owner process-local separato e non ha authority di scrittura
+autonoma. Espone pubblicamente soltanto
+`issue(correlationToken, candidatePin)` e `wipe(authorizationProof)`. `issue`
+accetta il token canonico H5a, che resta non-authorizing, e il PIN grezzo come
+stringa di 4..8 caratteri, senza trim o normalizzazione. Actor, sessione,
+ruolo, paziente, ambulatorio, field set, digest, command, idempotenza, approval
+e policy non sono mai input caller-supplied.
+
+`issue` reclama una presentazione una sola volta e registra il dipendente H5b
+prima della prima operazione asincrona sul PIN. Risolve la sessione Web admin
+corrente prima e dopo `verifyHostCredentials` e richiede uguaglianza esatta di
+`id`, `userId`, `username`, `role`, `authChannel`, `createdAt` ed `expiresAt`,
+oltre alla corrispondenza dell'account verificato. H5b adotta la semantica
+canonica di audit e lockout di `verifyHostCredentials`: non duplica bcrypt,
+CAS o conteggio dei tentativi. Il ruolo Web non prova il ruolo clinico; il
+prerequisito physician deriva soltanto dalla currentness transitiva
+H5a/H4/H3/H2b/H2a. PIN invalido, credenziale negata o session drift
+terminalizzano la presentazione; un nuovo tentativo richiede nuova
+presentazione, seal e gesto.
+
+Il risultato positivo ha esattamente le own data key enumerabili `status` e
+`authorizationProof`, in questo ordine, su record null-prototype e frozen.
+`status` e `proof_issued`. `authorizationProof` e `hsap_` seguito da 64
+caratteri hex lowercase, ottenuti da esattamente 32 byte CSPRNG host-owned. Il
+dominio e `mediflow.headless.soap-authorization-proof.v1`. L'owner conserva
+soltanto il digest SHA-256 domain-separated della proof, mai il valore raw.
+PIN e proof raw non entrano in cookie, URL, storage browser, persistenza, log,
+audit, backup o receipt; il loro rilascio e logico e non dichiara zeroization
+delle stringhe.
+
+Il record H5b lega privatamente presentazione/dipendente H5a, proiezione Web
+esatta verificata, digest della proof, stato e tempo. La currentness H5a porta
+transitivamente revoca, selezione, proposta, field set e sessione figlia, ma
+H5b non enumera questi binding, non ne dichiara la convergenza completa e non
+li espone. H6 deve risolvere e confrontare tutti i binding host completi al
+primo consumo; fino ad allora la proof non e un `approvalRef`, un command o
+authority eseguibile.
+
+La TTL e esattamente `30000 ms` dal campione clock finale preso dopo PIN
+valido, sessione Web invariata e final fence H5a, immediatamente prima della
+pubblicazione. L'intervallo e half-open: corrente per `now < expiresAt` e
+scaduto per `now >= expiresAt`. Clock e somma devono essere safe integer non
+negativi; overflow, valore invalido o rollback terminalizzano. Uno scheduler
+host-owned e cancellabile effettua cleanup; una callback anticipata
+rischedula il residuo. Il timer non e authority e ogni uso ricontrolla tempo e
+currentness.
+
+La proof segue soltanto `minted -> in_flight -> spent`, senza ritorni. Il
+controller privato espone esattamente `withCurrentProof`,
+`registerDependent`, `confirmDependent`, `unregisterDependent`,
+`withCurrentDependent` e `withSingleUseProof`. Tutte le callback sono
+sincrone, host-owned e senza argomenti. `withSingleUseProof` porta
+atomicamente `minted` a `in_flight` immediatamente prima della callback e
+porta sempre a `spent` prima dell'uscita, su successo, throw, risultato
+asincrono, reentry, rollback o final fence fallito. Expiry, `wipe`, lock,
+logout o drain upstream portano direttamente a `spent`; `wipe` e idempotente
+come esito booleano.
+
+I denial PHI-safe H5b sono esattamente `presentation_unavailable`,
+`pin_unavailable`, `proof_unavailable`, `proof_expired` e
+`lifecycle_unavailable`. Una proof malformed, foreign, restarted, in-flight o
+spent e `proof_unavailable`; soltanto una proof nota e minted che raggiunge il
+boundary temporale e `proof_expired`. La precedenza e identita/formato,
+currentness H5a e sessione Web, tempo, final fence e stato monouso. Dopo il
+primo attach H5a ogni denial terminalizza il lifecycle; prima dell'attach gli
+input foreign restano inerti.
+
+H5b non importa o riusa `physician_terminal_review`, non crea route, fetch,
+`approvalRef`, command, idempotency key, writer, schema clinico o transazione.
+
 Chat, voce/audio trascritti, planner text, Mini e utterance dell'agente possono
 solo raccogliere la bozza o richiedere preview. Non possono mai approvare,
 coniare un gesto, confermare un PIN o consumare una proof.
