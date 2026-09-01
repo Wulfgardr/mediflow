@@ -136,3 +136,20 @@ test('keeps foreign H5a binding inert and terminalizes loss of the H4 binding fe
     ), false);
     assert.equal(owner.service.cancel(handoff.correlationToken), false);
 });
+
+test('poisons H5a when a binding callback reenters dependent confirmation', async () => {
+    const current = fixture();
+    const owner = createHeadlessSoapEntryPresentationLifecycleOwner(current.sources);
+    const handoff = await owner.service.present(current.entryRef);
+    await bindHeadlessSoapEntryPresentationGoldenSeal(owner, handoff.correlationToken);
+    const registration = owner.lifecycleController.registerDependent(handoff.correlationToken, () => undefined);
+    assert.ok(registration);
+    let inner = true;
+    const outer = await owner.presentationBindingController.withCurrentDependentBinding(
+        handoff.correlationToken,
+        registration,
+        () => { inner = owner.lifecycleController.confirmDependent(handoff.correlationToken, registration); },
+    );
+    assert.deepEqual({ inner, outer }, { inner: false, outer: false });
+    assert.equal(owner.service.cancel(handoff.correlationToken), false);
+});

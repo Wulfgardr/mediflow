@@ -306,9 +306,8 @@ export function createHeadlessSoapEntryPresentationLifecycleOwner(
         confirmDependent(candidate: unknown, registration: unknown): boolean {
             if (drainActive) return false; const record = recordFor(candidate);
             if (!record || !dependentFor(record, registration)) return false;
-            if (h4CallInFlight && (!callbackActive || lifecycleOperation?.lifecycle !== record)) {
-                if (callbackActive && lifecycleOperation) lifecycleOperation.poisoned = true; return false;
-            }
+            if (callbackActive) { if (lifecycleOperation) lifecycleOperation.poisoned = true; return false; }
+            if (h4CallInFlight) return false;
             let attached = false;
             try { attached = sources.entryLifecycle.confirmDependent(record.entryRef, record.entryRegistration); } catch { attached = false; }
             if (!attached || recordFor(candidate) !== record || !dependentFor(record, registration)) {
@@ -319,9 +318,8 @@ export function createHeadlessSoapEntryPresentationLifecycleOwner(
         unregisterDependent(candidate: unknown, registration: unknown): boolean {
             if (drainActive) return false; const record = recordFor(candidate); if (!record) return false;
             const dependent = dependentFor(record, registration); if (!dependent) return false;
-            if (h4CallInFlight && (!callbackActive || lifecycleOperation?.lifecycle !== record)) {
-                if (callbackActive && lifecycleOperation) lifecycleOperation.poisoned = true; return false;
-            }
+            if (callbackActive) { if (lifecycleOperation) lifecycleOperation.poisoned = true; return false; }
+            if (h4CallInFlight) return false;
             dependent.active = false; record.dependent = null; weakMapRemove(dependentRegistrations, dependent.registration); return true;
         },
         withCurrentDependent(candidate: unknown, registration: unknown, operation: () => void): Promise<boolean> {

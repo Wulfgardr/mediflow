@@ -135,3 +135,17 @@ test('keeps foreign H4 binding identities inert and terminalizes a failed upstre
     assert.equal(await owner.bindingController.withCurrentDependentBinding(entryRef, registration, () => undefined), false);
     assert.equal(owner.service.wipe(entryRef), false);
 });
+
+test('poisons H4 when a binding callback reenters dependent confirmation', async () => {
+    const current = fixture();
+    const owner = createHeadlessSoapEntryFieldSetLifecycleOwner(current.sources);
+    const entryRef = await owner.service.materialize(current.proposalRef);
+    const registration = owner.lifecycleController.registerDependent(entryRef, () => undefined);
+    assert.ok(registration);
+    let inner = true;
+    const outer = await owner.bindingController.withCurrentDependentBinding(entryRef, registration, () => {
+        inner = owner.lifecycleController.confirmDependent(entryRef, registration);
+    });
+    assert.deepEqual({ inner, outer }, { inner: false, outer: false });
+    assert.equal(owner.service.wipe(entryRef), false);
+});
