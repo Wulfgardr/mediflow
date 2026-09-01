@@ -1,5 +1,5 @@
 import { db } from '@/lib/db';
-import { DEFAULT_OCR_MODEL, ensureTextModelDefaultsUpgraded, resolveTextModel } from '@/lib/ai-models';
+import { ensureTextModelDefaultsUpgraded, resolveTextModel } from '@/lib/ai-models';
 import {
     DEFAULT_OLLAMA_BASE_URL,
     resolveOllamaBaseUrl,
@@ -29,7 +29,6 @@ export type {
 } from '@/lib/ai-providers/provider';
 
 const TEXT_CHAT_TIMEOUT_MS = 300_000;
-const OCR_CHAT_TIMEOUT_MS = 180_000;
 
 /* @Codex */
 export class AIService {
@@ -86,24 +85,20 @@ export class AIService {
 
         const modelClinical = await db.settings.get('aiModel_clinical');
         const modelReasoning = await db.settings.get('aiModel_reasoning');
-        const modelOcr = await db.settings.get('aiModel_ocr');
         const modelLegacy = await db.settings.get('aiModel');
 
         const models: Record<AIServiceTask, string> = {
             clinical: resolveTextModel(modelClinical?.value, modelLegacy?.value),
             reasoning: resolveTextModel(modelReasoning?.value, modelLegacy?.value),
-            ocr: modelOcr?.value || DEFAULT_OCR_MODEL,
         };
 
-        const disableThinking = task !== 'ocr';
-        const chatTimeoutMs = task === 'ocr' ? OCR_CHAT_TIMEOUT_MS : TEXT_CHAT_TIMEOUT_MS;
         return AIService.fromLocalTaskConfig(
             task,
             baseUrl,
             models,
             providerSetting?.value,
-            disableThinking,
-            chatTimeoutMs,
+            true,
+            TEXT_CHAT_TIMEOUT_MS,
         );
     }
 

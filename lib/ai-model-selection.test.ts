@@ -2,7 +2,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
-    DEFAULT_OCR_MODEL,
     DEFAULT_TEXT_MODEL,
     LEGACY_MEDGEMMA_TEXT_MODEL,
     LEGACY_QWEN_TEXT_MODEL,
@@ -11,7 +10,6 @@ import {
 
 test('espone i default e i modelli testuali legacy canonici', () => {
     assert.equal(DEFAULT_TEXT_MODEL, 'qwen3.5:35b-a3b');
-    assert.equal(DEFAULT_OCR_MODEL, 'deepseek-ocr');
     assert.equal(LEGACY_QWEN_TEXT_MODEL, 'qwen2.5:32b');
     assert.equal(LEGACY_MEDGEMMA_TEXT_MODEL, 'hf.co/unsloth/medgemma-1.5-4b-it-GGUF');
 });

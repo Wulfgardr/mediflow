@@ -2,7 +2,6 @@
 import { db } from '@/lib/db';
 import { DEFAULT_TEXT_MODEL, isStaleTextModel } from './ai-model-selection';
 export {
-    DEFAULT_OCR_MODEL,
     DEFAULT_TEXT_MODEL,
     LEGACY_MEDGEMMA_TEXT_MODEL,
     LEGACY_QWEN_TEXT_MODEL,

@@ -17,14 +17,14 @@ export type AiRolloutGuardPayload = {
         } | null;
     }>;
     localControls?: Array<{
-        lane: 'patient_insight' | 'smart_import' | 'document_synthesis' | 'treatment_reasoning' | 'ocr';
+        lane: 'patient_insight' | 'smart_import' | 'document_synthesis' | 'treatment_reasoning';
         label: string;
         state: 'enabled' | 'disabled';
     }>;
 };
 
 export type AiRolloutGuardSelection = {
-    roleId: 'clinical' | 'reasoning' | 'ocr';
+    roleId: 'clinical' | 'reasoning';
     roleLabel: string;
     model: string;
 };
@@ -38,7 +38,7 @@ export type AiRolloutModelGuard = {
 };
 
 export type AiRolloutLocalControlGuard = {
-    lane: 'patient_insight' | 'smart_import' | 'document_synthesis' | 'treatment_reasoning' | 'ocr';
+    lane: 'patient_insight' | 'smart_import' | 'document_synthesis' | 'treatment_reasoning';
     label: string;
     roles: string[];
     state: 'disabled';
@@ -60,7 +60,6 @@ function normalizeModelName(value?: string | null) {
 const LOCAL_CONTROL_LANES_BY_ROLE: Record<AiRolloutGuardSelection['roleId'], AiRolloutLocalControlGuard['lane'][]> = {
     clinical: ['patient_insight', 'smart_import', 'document_synthesis'],
     reasoning: [],
-    ocr: ['ocr'],
 };
 
 function pickHigherSeverity(
