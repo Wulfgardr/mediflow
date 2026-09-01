@@ -47,6 +47,12 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npm run check:never-regress
 
+      - name: Fabric generative runtime crosswalk
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: |
+          npm run check:fabric-generative-runtime-crosswalk
+          npm run test:fabric-generative-runtime-crosswalk
+
       # Puro fs.readFileSync su cinque file: nessuna rete, nessun DB, nessuna
       # toolchain, ~150 ms. È a contatori espliciti, quindi si romperà a ogni
       # aggiunta legittima di una capability — è il comportamento voluto, come

@@ -1,6 +1,6 @@
 {
   "name": "medical-record-app",
-  "version": "0.8.2",
+  "version": "0.8.5",
   "private": false,
   "engines": {
     "node": ">=24 <25"
@@ -31,6 +31,8 @@
     "check:schema-drift": "node scripts/check-schema-drift.mjs",
     "check:schema-writers": "node scripts/check-schema-writers.mjs",
     "check:ai-clinical-writes": "node scripts/check-ai-clinical-write-gate.mjs",
+    "check:fabric-generative-runtime-crosswalk": "node scripts/check-fabric-generative-runtime-crosswalk.mjs",
+    "test:fabric-generative-runtime-crosswalk": "node --test scripts/check-fabric-generative-runtime-crosswalk.test.mjs",
     "check:attachment-currentness-writers": "node scripts/check-attachment-currentness-writers.mjs",
     "test:attachment-currentness-writers": "node --test scripts/check-attachment-currentness-writers.test.mjs",
     "check:node-runtime": "node scripts/node-runtime-contract.mjs verify",
