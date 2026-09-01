@@ -31,8 +31,6 @@ export default function SettingsAiFunctionsPage() {
         setSmartImportEnabled,
         treatmentReasoningEnabled,
         setTreatmentReasoningEnabled,
-        ocrEnabled,
-        setOcrEnabled,
         documentRouterControlFlowMode,
         setDocumentRouterControlFlowMode,
         selectedInsightMode,
@@ -177,44 +175,19 @@ export default function SettingsAiFunctionsPage() {
                     <div className="space-y-3">
                         <div
                             className="rounded-[18px] border p-4"
-                            style={ocrEnabled
-                                ? { borderColor: 'color-mix(in srgb, var(--lume-ink) 18%, transparent)', background: 'var(--lume-surface-field)' }
-                                : { borderColor: 'color-mix(in srgb, var(--lume-signal-critical) 28%, transparent)', background: 'var(--lume-surface-field)' }}
-                            data-testid="ocr-kill-switch-card"
+                            style={{ borderColor: 'color-mix(in srgb, var(--lume-signal-critical) 28%, transparent)', background: 'var(--lume-surface-field)' }}
+                            data-testid="ocr-unavailable-card"
                         >
                             <div className="flex items-start justify-between gap-3">
                                 <div>
-                                    <p className="text-sm font-semibold" style={{ color: 'var(--lume-ink)' }}>OCR documentale (modello locale)</p>
+                                    <p className="text-sm font-semibold" style={{ color: 'var(--lume-ink)' }}>OCR non disponibile</p>
                                     <p className="mt-1 text-[11px] leading-5" style={{ color: 'var(--lume-ink-muted)' }}>
-                                        Se spento, l&apos;estrazione testo da scansioni si ferma e i documenti restano in coda revisione.
+                                        Immagini e scansioni richiedono revisione. AnyDoc resta l&apos;unica estrazione automatica locale e non viene usato come fallback invisibile.
                                     </p>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <label
-                                        htmlFor="ocrKillSwitch"
-                                        className="rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em]"
-                                        style={ocrEnabled
-                                            ? { borderColor: 'color-mix(in srgb, var(--lume-ink) 18%, transparent)', background: 'var(--lume-surface-focal)', color: 'var(--lume-ink)' }
-                                            : { borderColor: 'color-mix(in srgb, var(--lume-signal-critical) 32%, transparent)', background: 'var(--lume-surface-focal)', color: 'var(--lume-signal-critical)' }}
-                                    >
-                                        {ocrEnabled ? 'Attivo' : 'Spento'}
-                                    </label>
-                                    <button
-                                        id="ocrKillSwitch"
-                                        type="button"
-                                        role="switch"
-                                        aria-checked={ocrEnabled}
-                                        aria-label="OCR documentale locale"
-                                        onClick={() => setOcrEnabled(!ocrEnabled)}
-                                        className="relative h-7 w-12 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[color:var(--lume-accent)]"
-                                        style={{ background: ocrEnabled ? 'var(--lume-ink)' : 'color-mix(in srgb, var(--lume-ink) 20%, transparent)' }}
-                                    >
-                                        <span
-                                            className="absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform"
-                                            style={{ transform: ocrEnabled ? 'translateX(20px)' : 'translateX(0)' }}
-                                        />
-                                    </button>
-                                </div>
+                                <span className="rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em]" style={{ borderColor: 'color-mix(in srgb, var(--lume-signal-critical) 32%, transparent)', background: 'var(--lume-surface-focal)', color: 'var(--lume-signal-critical)' }}>
+                                    Revisione richiesta
+                                </span>
                             </div>
                         </div>
 
@@ -307,7 +280,7 @@ export default function SettingsAiFunctionsPage() {
                                 <div>
                                     <p className="text-sm font-semibold" style={{ color: 'var(--lume-ink)' }}>Document Synthesis</p>
                                     <p className="mt-1 text-[11px] leading-5" style={{ color: 'var(--lume-ink-muted)' }}>
-                                        Se spento, OCR e import base restano disponibili, ma non vengono prodotte sintesi cliniche automatiche.
+                                        Se spento, estrazione locale e import base restano disponibili, ma non vengono prodotte sintesi cliniche automatiche.
                                     </p>
                                 </div>
                                 <div className="flex items-center gap-2">

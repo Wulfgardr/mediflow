@@ -13,14 +13,7 @@ import workspaceStyles from '@/components/kree8/kree8-workspace-shell.module.css
 import { db, type Attachment, type ClinicalEntry } from '@/lib/db';
 /* @Codex */
 import { isClinicalRichTextBlank, sanitizeClinicalRichTextHtml } from '@/lib/clinical-rich-text';
-import { serializeDocumentParseEvidenceArtifact } from '@/lib/domain/documents/document-parse-evidence-artifact';
-import { synthesizeDocument } from '@/lib/domain/documents/document-synthesis-service';
-import {
-    AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY,
-    isAiDocumentSynthesisEnabledValue,
-} from '@/lib/ai-document-synthesis-kill-switch';
-import { extractPatientDataSmart, extractDocumentTextForSummary, isImageDocumentInput, isPdfDocumentInput } from '@/lib/pdf-service';
-import { refreshPatientSummaryIfEnabled, getAiModelLabels } from '@/lib/ai-summary-service';
+import { refreshPatientSummaryIfEnabled } from '@/lib/ai-summary-service';
 import { useLiveQuery } from '@/lib/live-query';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/components/ui/toast-provider';
@@ -63,15 +56,6 @@ function formatEntryDate(value: Date | string | number | null | undefined): stri
         month: 'short',
         year: 'numeric',
     }).format(date);
-}
-
-/* @Codex */
-async function readSourceBytes(source: Blob): Promise<ArrayBuffer | undefined> {
-    try {
-        return await source.arrayBuffer();
-    } catch {
-        return undefined;
-    }
 }
 
 /* @Codex WUL-421 */
@@ -243,42 +227,10 @@ export default function NewEntryPage() {
 
         try {
             const attachmentIds: string[] = [];
-            const aiModels = await getAiModelLabels();
-            const documentSynthesisKillSwitch = await db.settings.get(AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY);
-            const documentSynthesisEnabled = isAiDocumentSynthesisEnabledValue(documentSynthesisKillSwitch?.value);
 
             for (const file of files) {
-                let summary = 'Allegato alla voce clinica';
-                let parseEvidenceArtifactSnapshot: string | undefined;
+                const summary = 'Allegato alla voce clinica · revisione documentale richiesta';
                 const attachmentId = uuidv4();
-
-                const isPdf = isPdfDocumentInput(file);
-                const isImage = isImageDocumentInput(file);
-
-                if (isPdf || isImage) {
-                    try {
-                        setUploadProgress(`AI OCR (${aiModels.ocr})...`);
-                        const extracted = await extractPatientDataSmart(file);
-                        let rawText = extracted.rawText;
-                        if (!rawText || rawText.length < 200) {
-                            rawText = await extractDocumentTextForSummary(file);
-                        }
-
-                        if (rawText && documentSynthesisEnabled) {
-                            setUploadProgress(`Sintesi documento (${aiModels.clinical})...`);
-                            const sourceBytes = await readSourceBytes(file);
-                            const result = await synthesizeDocument(rawText, file.name, id, { attachmentId, sourceBytes });
-                            summary = result.insight.summary;
-                            parseEvidenceArtifactSnapshot = serializeDocumentParseEvidenceArtifact(result.parseEvidenceArtifact);
-                        } else if (extracted.notes && extracted.notes.length > 5) {
-                            summary = extracted.notes;
-                        } else {
-                            summary = 'Documento allegato (analizzato)';
-                        }
-                    } catch (error) {
-                        console.warn('Documento OCR/Sintesi fallita', error);
-                    }
-                }
 
                 const base64Data = await new Promise<string>((resolve, reject) => {
                     const reader = new FileReader();
@@ -296,7 +248,6 @@ export default function NewEntryPage() {
                     path: `uploads/${file.name}`,
                     data: base64Data,
                     summarySnapshot: summary,
-                    parseEvidenceArtifactSnapshot,
                     createdAt: new Date(),
                 });
                 attachmentIds.push(attachmentId);

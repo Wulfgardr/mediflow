@@ -89,20 +89,6 @@ export default function DiagnosticHub() {
                 if (!res.ok) throw new Error("API Error");
                 return { status: 'ok', latency: Math.round(performance.now() - start) };
             }
-        },
-        {
-            id: 'ocr',
-            name: 'OCR Service (DeepSeek OCR 2)',
-            icon: <Database className="w-4 h-4" />,
-            description: 'Segreteria virtuale: lettura documenti',
-            checkFn: async () => {
-                const start = performance.now();
-                const res = await fetch('/api/ocr/extract');
-                if (!res.ok) throw new Error("OCR non disponibile");
-                const data = await res.json();
-                if (!data.available) throw new Error(data.message || "Modello non installato");
-                return { status: 'ok', latency: Math.round(performance.now() - start) };
-            }
         }
     ];
 
