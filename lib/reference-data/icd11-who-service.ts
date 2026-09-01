@@ -6,7 +6,7 @@ export const ICD11_WHO_TRANSPORT_TARGET = 'who.icd-api.v2.official' as const;
 export const ICD11_WHO_BINDING = Object.freeze({
     apiVersion: 'v2' as const, releaseId: '2026-01' as const, linearization: 'mms' as const,
     language: 'en' as const, queryMaxBytes: 160, resultLimit: 25, maxResponseBytes: 65_536,
-    timeoutMs: 5_000, cacheTtlMs: 86_400_000,
+    timeoutMs: 5_000, auditTimeoutMs: 1_000, cacheTtlMs: 86_400_000,
 });
 
 const RUNTIME_KEYS = ['schemaVersion', 'network', 'egress', 'credential'] as const;
@@ -118,6 +118,13 @@ function arrayValues(value: unknown, maximum: number): unknown[] | null {
     } catch { return null; }
 }
 
+function nativePromise(value: unknown): value is Promise<unknown> {
+    try {
+        return !nodeUtilTypes.isProxy(value) && nodeUtilTypes.isPromise(value)
+            && Object.getPrototypeOf(value) === Promise.prototype;
+    } catch { return false; }
+}
+
 function transportResult(value: unknown) {
     const result = record(value, RESULT_KEYS);
     if (!result || result.schemaVersion !== 'mediflow.reference-data.icd11-who-transport-result.v1'
@@ -151,6 +158,7 @@ export function createIcd11WhoReferenceDataService(dependencies: Dependencies) {
     const sources = dependencyRecord as unknown as Dependencies;
     const cache = new Map<string, Readonly<{ entries: Icd11WhoSearchResult['entries']; expiresAt: number }>>();
     const active = new Map<AbortController, { code: 'request_timeout' | 'request_cancelled' }>(); let disposed = false;
+    const auditWaiters = new Set<() => void>();
     const requireActive = (): void => {
         if (disposed) throw new Icd11WhoServiceError('service_disposed');
     };
@@ -161,11 +169,31 @@ export function createIcd11WhoReferenceDataService(dependencies: Dependencies) {
             operation: ICD11_WHO_SEARCH_OPERATION, releaseId: ICD11_WHO_BINDING.releaseId,
             language: ICD11_WHO_BINDING.language, source, resultCount: entries.length,
             latencyMs: completedAtMs - startedAt, completedAt: new Date(completedAtMs).toISOString() });
-        try {
-            const audited = sources.audit(receipt); requireActive();
-            await audited; requireActive();
-        } catch {
-            requireActive(); throw new Icd11WhoServiceError('audit_unavailable');
+        let audited: unknown;
+        try { audited = sources.audit(receipt); requireActive(); }
+        catch { requireActive(); throw new Icd11WhoServiceError('audit_unavailable'); }
+        if (audited !== undefined) {
+            if (!nativePromise(audited)) throw new Icd11WhoServiceError('audit_unavailable');
+            let rejectDisposed!: () => void;
+            const disposedDuringAudit = new Promise<never>((_resolve, reject) => {
+                rejectDisposed = () => reject(new Icd11WhoServiceError('service_disposed'));
+                auditWaiters.add(rejectDisposed);
+            });
+            let timer: ReturnType<typeof setTimeout> | undefined;
+            const timedOut = new Promise<never>((_resolve, reject) => {
+                timer = setTimeout(() => reject(new Icd11WhoServiceError('audit_unavailable')),
+                    ICD11_WHO_BINDING.auditTimeoutMs);
+            });
+            try {
+                const outcome = await Promise.race([audited, disposedDuringAudit, timedOut]);
+                requireActive();
+                if (outcome !== undefined) throw new Icd11WhoServiceError('audit_unavailable');
+            } catch {
+                requireActive(); throw new Icd11WhoServiceError('audit_unavailable');
+            } finally {
+                if (timer) clearTimeout(timer);
+                auditWaiters.delete(rejectDisposed);
+            }
         }
         return Object.freeze({ entries, receipt });
     };
@@ -217,7 +245,9 @@ export function createIcd11WhoReferenceDataService(dependencies: Dependencies) {
         if (disposed) return false;
         disposed = true; cache.clear();
         for (const [controller, cancellation] of active) { cancellation.code = 'request_cancelled'; controller.abort(); }
-        active.clear(); return true;
+        active.clear();
+        for (const rejectDisposed of auditWaiters) rejectDisposed();
+        auditWaiters.clear(); return true;
     };
     return Object.freeze({ search, dispose });
 }
