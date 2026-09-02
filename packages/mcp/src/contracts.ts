@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 export const TERMINOLOGY_OPERATION_ID = 'mediflow.terminology.search.v1' as const;
 export const OPEN_LOOPS_OPERATION_ID = 'mediflow.patient.open_loops.read.v1' as const;
+export const FOLLOW_UP_PROPOSAL_OPERATION_ID = 'mediflow.patient.open_loops.follow_up.propose.v1' as const;
 export const HEADLESS_STATUS_TOOL_ID = 'mediflow.system.headless_status.v1' as const;
 export const CAPABILITIES_TOOL_ID = 'mediflow.system.capabilities.v1' as const;
 export const RPC_REQUEST_SCHEMA = 'mediflow.aip.operation.request.v1' as const;
@@ -29,6 +30,13 @@ export const OPERATION_DESCRIPTORS = Object.freeze([Object.freeze({
   maximumStage: 'read_only' as const,
   inputSchema: 'mediflow.patient.open_loops.read.input.v1',
   outputSchema: 'mediflow.patient.open_loops.read.result.v1',
+}), Object.freeze({
+  operationId: FOLLOW_UP_PROPOSAL_OPERATION_ID,
+  capabilityId: FOLLOW_UP_PROPOSAL_OPERATION_ID,
+  serviceRef: 'PatientOpenLoopsFollowUpProposalServiceV1',
+  maximumStage: 'proposal_only' as const,
+  inputSchema: 'mediflow.patient.open_loops.follow_up.propose.input.v1',
+  outputSchema: 'mediflow.patient.open_loops.follow_up.proposal.v1',
 })]);
 export type OperationDescriptor = (typeof OPERATION_DESCRIPTORS)[number];
 
@@ -100,6 +108,7 @@ export const terminologyOutputSchema = z.object({
 });
 
 export const openLoopsArgumentsSchema = z.object({}).strict();
+export const followUpProposalArgumentsSchema = z.object({}).strict();
 const openLoopItemSchema = z.object({
   loopRef: z.string().regex(/^aipl_[0-9a-f]{64}$/u),
   kind: z.enum(['results_pending', 'series_stalled', 'registered_expectation']),
@@ -131,6 +140,41 @@ export const openLoopsOutputSchema = z.object({
       || value.truncated !== value.receipt.truncated
       || value.snapshotRevision !== value.receipt.snapshotRevision) {
     context.addIssue({ code: 'custom', message: 'receipt_mismatch' });
+  }
+});
+
+const followUpProposalItemSchema = z.object({
+  loopRef: z.string().regex(/^aipl_[0-9a-f]{64}$/u),
+  action: z.enum(['review_result', 'review_measurement_series', 'review_expected_follow_up']),
+}).strict();
+const followUpProposalReceiptSchema = z.object({
+  schemaVersion: z.literal('mediflow.patient.open_loops.follow_up.proposal.receipt.v1'),
+  receiptRef: z.string().regex(/^aipfr_[0-9a-f]{64}$/u),
+  operationId: z.literal(FOLLOW_UP_PROPOSAL_OPERATION_ID),
+  capabilityId: z.literal(FOLLOW_UP_PROPOSAL_OPERATION_ID),
+  applicationServiceRef: z.literal('PatientOpenLoopsFollowUpProposalServiceV1'),
+  outcome: z.literal('proposed'), proposalRefHash: digest, receiptRefHash: digest, sourceReceiptRefHash: digest,
+  basedOnSnapshotRevision: z.number().int().safe().min(1), itemCount: safeInteger.max(32), truncated: z.boolean(),
+  maximumStage: z.literal('proposal_only'), reviewRequired: z.literal(true), writesPerformed: z.literal(0),
+  apply: z.literal('none'), egress: z.literal('none'), timestamp: safeInteger,
+}).strict();
+export const followUpProposalOutputSchema = z.object({
+  schemaVersion: z.literal('mediflow.patient.open_loops.follow_up.proposal.v1'),
+  operationId: z.literal(FOLLOW_UP_PROPOSAL_OPERATION_ID),
+  capabilityId: z.literal(FOLLOW_UP_PROPOSAL_OPERATION_ID),
+  applicationServiceRef: z.literal('PatientOpenLoopsFollowUpProposalServiceV1'), outcome: z.literal('proposed'),
+  maximumStage: z.literal('proposal_only'), reviewRequired: z.literal(true), writesPerformed: z.literal(0),
+  apply: z.literal('none'), proposalRef: z.string().regex(/^aipfp_[0-9a-f]{64}$/u),
+  basedOnSnapshotRevision: z.number().int().safe().min(1), items: z.array(followUpProposalItemSchema).max(32),
+  receipt: followUpProposalReceiptSchema,
+}).strict().superRefine((value, context) => {
+  const references = new Set(value.items.map((item) => item.loopRef));
+  if (references.size !== value.items.length || value.items.length !== value.receipt.itemCount
+      || value.basedOnSnapshotRevision !== value.receipt.basedOnSnapshotRevision) {
+    context.addIssue({ code: 'custom', message: 'receipt_mismatch' });
+  }
+  if (encoder.encode(JSON.stringify(value)).byteLength > 16 * 1024) {
+    context.addIssue({ code: 'custom', message: 'output_oversized' });
   }
 });
 

@@ -6,7 +6,10 @@ import { fileURLToPath } from 'node:url';
 import { createAipOperationRpcChildEnvironmentV1, createAipOperationRpcHostV1 } from '../../aip/src/operation-rpc.ts';
 
 const CLI = fileURLToPath(new URL('./cli.ts', import.meta.url));
-const LOADER = fileURLToPath(new URL('../../../scripts/register-strip-types-loader.mjs', import.meta.url));
+const LOADER = process.env.MEDIFLOW_TEST_STRIP_TYPES_LOADER
+  ?? fileURLToPath(new URL('../../../scripts/register-strip-types-loader.mjs', import.meta.url));
+const TEST_MODULE_ENV = process.env.MEDIFLOW_TEST_NODE_PATH
+  ? { NODE_PATH: process.env.MEDIFLOW_TEST_NODE_PATH } : {};
 const ROOT = fileURLToPath(new URL('../../..', import.meta.url));
 const SCHEMA = 'mediflow.mini.transport.v1';
 const capabilities = [{ operationId: 'mediflow.terminology.search.v1', capabilityId: 'mediflow.terminology.search.v1',
@@ -15,6 +18,11 @@ const capabilities = [{ operationId: 'mediflow.terminology.search.v1', capabilit
   operationId: 'mediflow.patient.open_loops.read.v1', capabilityId: 'mediflow.patient.open_loops.read.v1',
   maximumStage: 'read_only', inputSchema: 'mediflow.patient.open_loops.read.input.v1',
   outputSchema: 'mediflow.patient.open_loops.read.result.v1',
+}, {
+  operationId: 'mediflow.patient.open_loops.follow_up.propose.v1',
+  capabilityId: 'mediflow.patient.open_loops.follow_up.propose.v1', maximumStage: 'proposal_only',
+  inputSchema: 'mediflow.patient.open_loops.follow_up.propose.input.v1',
+  outputSchema: 'mediflow.patient.open_loops.follow_up.proposal.v1',
 }];
 const capabilityCatalog = { schemaVersion: 'mediflow.system.capabilities.v1', operations: capabilities };
 const status = { schemaVersion: 'mediflow.system.headless-status.v1', candidateVersion: '0.8.5',
@@ -36,24 +44,41 @@ const loops = { schemaVersion: 'mediflow.patient.open_loops.read.result.v1',
     ownerRefHash: `sha256:${'3'.repeat(64)}`, leaseRefHash: `sha256:${'4'.repeat(64)}`,
     receiptRefHash: `sha256:${'5'.repeat(64)}`, generation: 1, revocationGeneration: 0, selectionEpoch: 2,
     snapshotRevision: 7, itemCount: 1, truncated: false, timestamp: 1_000 } };
+const proposal = { schemaVersion: 'mediflow.patient.open_loops.follow_up.proposal.v1',
+  operationId: 'mediflow.patient.open_loops.follow_up.propose.v1',
+  capabilityId: 'mediflow.patient.open_loops.follow_up.propose.v1',
+  applicationServiceRef: 'PatientOpenLoopsFollowUpProposalServiceV1', outcome: 'proposed',
+  maximumStage: 'proposal_only', reviewRequired: true, writesPerformed: 0, apply: 'none',
+  proposalRef: `aipfp_${'6'.repeat(64)}`, basedOnSnapshotRevision: 7,
+  items: [{ loopRef: `aipl_${'1'.repeat(64)}`, action: 'review_result' }],
+  receipt: { schemaVersion: 'mediflow.patient.open_loops.follow_up.proposal.receipt.v1',
+    receiptRef: `aipfr_${'7'.repeat(64)}`,
+    operationId: 'mediflow.patient.open_loops.follow_up.propose.v1',
+    capabilityId: 'mediflow.patient.open_loops.follow_up.propose.v1',
+    applicationServiceRef: 'PatientOpenLoopsFollowUpProposalServiceV1', outcome: 'proposed',
+    proposalRefHash: `sha256:${'8'.repeat(64)}`, receiptRefHash: `sha256:${'9'.repeat(64)}`,
+    sourceReceiptRefHash: `sha256:${'a'.repeat(64)}`, basedOnSnapshotRevision: 7,
+    itemCount: 1, truncated: false, maximumStage: 'proposal_only', reviewRequired: true,
+    writesPerformed: 0, apply: 'none', egress: 'none', timestamp: 1_001 } };
 const success = (result: unknown) => `${JSON.stringify({ schemaVersion: SCHEMA, ok: true, result })}\n`;
 const failure = (code: string) => `${JSON.stringify({ schemaVersion: SCHEMA, ok: false, error: { code } })}\n`;
 
 function runUnbound(input: string | Buffer, args: string[] = []) {
   return spawnSync(process.execPath, ['--experimental-strip-types', '--import', LOADER, CLI, ...args], {
-    input, encoding: 'utf8', timeout: 5_000,
+    input, encoding: 'utf8', timeout: 5_000, env: { ...process.env, ...TEST_MODULE_ENV },
   });
 }
 
 type BoundOptions = { args?: string[]; timeoutMs?: number;
   trustedEnvironment?: boolean;
   terminology?: (input: unknown, signal: AbortSignal) => unknown;
-  openLoops?: (input: unknown, signal: AbortSignal) => unknown };
+  openLoops?: (input: unknown, signal: AbortSignal) => unknown;
+  proposal?: (input: unknown, signal: AbortSignal) => unknown };
 async function runBound(input: string | Buffer, options: BoundOptions = {}) {
   const environment = createAipOperationRpcChildEnvironmentV1(`aipb_${'1'.repeat(32)}`);
   const child: ChildProcess = spawn(process.execPath,
     ['--experimental-strip-types', '--import', LOADER, CLI, ...(options.args ?? [])], {
-      env: (options.trustedEnvironment === false ? {} : environment) as NodeJS.ProcessEnv,
+      env: { ...(options.trustedEnvironment === false ? {} : environment), ...TEST_MODULE_ENV } as NodeJS.ProcessEnv,
       stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
   });
   const observed: unknown[] = [];
@@ -65,6 +90,12 @@ async function runBound(input: string | Buffer, options: BoundOptions = {}) {
     operationId: 'mediflow.patient.open_loops.read.v1', capabilityId: 'mediflow.patient.open_loops.read.v1',
     serviceRef: 'PatientOpenLoopsReadServiceV1', maximumStage: 'read_only', timeoutMs: options.timeoutMs ?? 250,
     execute: options.openLoops ?? ((value: unknown) => { observed.push(value); return loops; }),
+  }, {
+    operationId: 'mediflow.patient.open_loops.follow_up.propose.v1',
+    capabilityId: 'mediflow.patient.open_loops.follow_up.propose.v1',
+    serviceRef: 'PatientOpenLoopsFollowUpProposalServiceV1', maximumStage: 'proposal_only',
+    timeoutMs: options.timeoutMs ?? 250,
+    execute: options.proposal ?? ((value: unknown) => { observed.push(value); return proposal; }),
   }] });
   host.attach({ subscribe: (listener: (frame: unknown) => void) => {
     child.on('message', listener); return () => child.off('message', listener);
@@ -106,9 +137,20 @@ test('executes the two explicit read commands without caller-supplied patient sc
   assert.doesNotMatch(`${search.stdout}${openLoops.stdout}`, /patientId|patientName|birth|authority|provider/i);
 });
 
+test('requests one review-only follow-up proposal with an exact empty caller input', async () => {
+  const result = await runBound('{"command":"follow-up-proposal","args":{}}');
+  assert.equal(result.code, 0); assert.equal(result.stderr, ''); assert.equal(result.stdout, success(proposal));
+  assert.deepEqual(result.observed.map((value) => ({ ...(value as object) })), [{
+    schemaVersion: 'mediflow.patient.open_loops.follow_up.propose.input.v1',
+    operationId: 'mediflow.patient.open_loops.follow_up.propose.v1',
+  }]);
+  assert.doesNotMatch(result.stdout, /patientId|patientName|birth|diagnosis|reasoning|prompt|authority|provider/iu);
+});
+
 test('fails all valid commands closed when inherited host IPC is absent', () => {
   const requests = [{ command: 'status', args: {} }, { command: 'capabilities', args: {} }, { command: 'terminology search',
-    args: { system: 'LOINC', query: 'synthetic', limit: 1 } }, { command: 'open-loops', args: {} }];
+    args: { system: 'LOINC', query: 'synthetic', limit: 1 } }, { command: 'open-loops', args: {} },
+  { command: 'follow-up-proposal', args: {} }];
   for (const request of requests) {
     const result = runUnbound(JSON.stringify(request));
     assert.equal(result.status, 69); assert.equal(result.stderr, '');
@@ -118,7 +160,7 @@ test('fails all valid commands closed when inherited host IPC is absent', () => 
 
 test('rejects oversized open stdin without waiting for EOF', async () => {
   const child = spawn(process.execPath, ['--experimental-strip-types', '--import', LOADER, CLI], {
-    cwd: ROOT, env: {} as NodeJS.ProcessEnv, stdio: ['pipe', 'pipe', 'pipe'],
+    cwd: ROOT, env: TEST_MODULE_ENV as NodeJS.ProcessEnv, stdio: ['pipe', 'pipe', 'pipe'],
   });
   let stdout = ''; let stderr = '';
   child.stdout!.setEncoding('utf8'); child.stderr!.setEncoding('utf8');
@@ -141,6 +183,7 @@ test('rejects a spoofable IPC parent when the launcher binding is absent', async
 
 test('rejects extra, duplicate and unknown caller fields before host service entry', async () => {
   const invalid = ['{"command":"open-loops","args":{"patientId":"sensitive-value"}}',
+    '{"command":"follow-up-proposal","args":{"text":"forbidden"}}',
     '{"command":"terminology search","args":{"system":"LOINC","query":"x","limit":1,"authority":"caller"}}',
     '{"command":"open-loops","command":"capabilities","args":{}}',
     '{"command":"patient show","args":{}}', 'not-secret-json'];
@@ -162,7 +205,9 @@ test('maps host timeout to a typed PHI-safe denial and drops late completion', a
 });
 
 test('keeps help, format and input budgets deterministic', async () => {
-  const help = spawnSync('npm', ['run', '--silent', 'mini', '--', '--help'], { cwd: ROOT, encoding: 'utf8', timeout: 5_000 });
+  const help = spawnSync(process.execPath, ['--experimental-strip-types', '--import', LOADER, CLI, '--help'], {
+    cwd: ROOT, encoding: 'utf8', timeout: 5_000, env: TEST_MODULE_ENV,
+  });
   assert.equal(help.status, 0); assert.equal(help.stderr, '');
   assert.equal(help.stdout, 'Usage: mediflow-mini [--format json|ndjson] < request.json\n');
   const formatted = await runBound('{ "args": {}, "command": "capabilities" }', { args: ['--format', 'ndjson'] });

@@ -5,8 +5,9 @@ import {
   AIP_OPERATION_RPC_AUTHENTICATED_ENV_V1, AIP_OPERATION_RPC_ENV_KEY_V1,
 } from '../../aip/src/child-ipc-contract.ts';
 import {
-  HEADLESS_STATUS, OPEN_LOOPS_OPERATION_ID, OPERATION_DESCRIPTORS, RPC_REQUEST_SCHEMA, RPC_RESULT_SCHEMA,
-  TERMINOLOGY_OPERATION_ID, openLoopsOutputSchema, publicCatalog, rpcOperationSchema,
+  FOLLOW_UP_PROPOSAL_OPERATION_ID, HEADLESS_STATUS, OPEN_LOOPS_OPERATION_ID, OPERATION_DESCRIPTORS,
+  RPC_REQUEST_SCHEMA, RPC_RESULT_SCHEMA, TERMINOLOGY_OPERATION_ID, followUpProposalArgumentsSchema,
+  followUpProposalOutputSchema, openLoopsOutputSchema, publicCatalog, rpcOperationSchema,
   selectBoundOperations, terminologyArgumentsSchema, terminologyOutputSchema,
   type OperationDescriptor,
 } from './contracts.ts';
@@ -193,6 +194,13 @@ export function createOperationClient() {
     readOpenLoops: async (signal?: AbortSignal) => {
       const descriptor = OPERATION_DESCRIPTORS.find((item) => item.operationId === OPEN_LOOPS_OPERATION_ID)!;
       const output = openLoopsOutputSchema.safeParse(await run(descriptor,
+        { schemaVersion: descriptor.inputSchema, operationId: descriptor.operationId }, signal));
+      return output.success ? output.data : invalid();
+    },
+    proposeOpenLoopsFollowUp: async (argumentsValue: unknown, signal?: AbortSignal) => {
+      followUpProposalArgumentsSchema.parse(argumentsValue);
+      const descriptor = OPERATION_DESCRIPTORS.find((item) => item.operationId === FOLLOW_UP_PROPOSAL_OPERATION_ID)!;
+      const output = followUpProposalOutputSchema.safeParse(await run(descriptor,
         { schemaVersion: descriptor.inputSchema, operationId: descriptor.operationId }, signal));
       return output.success ? output.data : invalid();
     },
