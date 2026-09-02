@@ -16,6 +16,7 @@ import { EvidenceStackTile } from '@/components/evidence-stack-tile';
 import ObservationManager from '@/components/observation-manager';
 import type { ObservationPrefill } from '@/lib/observation-prefill';
 import PatientActionModal from '@/components/patient-action-modal';
+import { IntelligentHostPatientAction } from '@/components/intelligent-host-patient-action';
 import { PatientIdentityLens } from '@/components/patient-identity-lens';
 import { PatientSheetActionsMenu } from '@/components/patient-sheet-actions-menu';
 import PatientReviewQueueSummaryPanel from '@/components/patient-review-queue-summary';
@@ -650,13 +651,19 @@ export default function PatientDetailPage() {
             navGroups={workspaceNavGroups}
             primaryAction={{ href: `/patients/${id}/entries/new`, label: 'Nuova voce', icon: Plus }}
             headerActions={(
-                <PatientSheetActionsMenu
-                    editHref={`/patients/${id}/edit`}
-                    canShareFhirFile={canShareFhirFile}
-                    onExportFhir={() => setIsExportModalOpen(true)}
-                    onShareFhir={handleShareFhir}
-                    onReportPdf={handleReportPdf}
-                />
+                <>
+                    <IntelligentHostPatientAction
+                        patientId={patient.id}
+                        ambulatoryId={patient.ambulatoryId ?? null}
+                    />
+                    <PatientSheetActionsMenu
+                        editHref={`/patients/${id}/edit`}
+                        canShareFhirFile={canShareFhirFile}
+                        onExportFhir={() => setIsExportModalOpen(true)}
+                        onShareFhir={handleShareFhir}
+                        onReportPdf={handleReportPdf}
+                    />
+                </>
             )}
         >
             <div className={workspaceStyles.clinicalStack}>
