@@ -74,7 +74,7 @@ test('maps the governed Open Loops read into one bounded review-first proposal',
         },
         finalizePermit: (execution: unknown) => { assert.equal(execution, EXECUTION); calls.push('finalize'); return true; },
         denyPermit: () => false,
-        readOpenLoops: async (_signal: AbortSignal) => { calls.push('read'); return sourceResult(); },
+        readOpenLoops: async () => { calls.push('read'); return sourceResult(); },
         writeAudit: async (audit: unknown) => { calls.push('audit'); audits.push(audit); },
         timeoutMs: 250,
     });
