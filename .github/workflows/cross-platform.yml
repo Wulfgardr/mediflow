@@ -11,6 +11,26 @@ on:
       - main
 
 jobs:
+  headless-contracts:
+    name: Headless contracts (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install (npm ci)
+        run: npm ci
+      - name: Deny DB, Web, native and network imports in portable surfaces
+        run: npm run check:headless-portable-imports
+      - name: Run the shared AIP, Mini and MCP contracts
+        run: npm run test:headless-portable
+
   build-start:
     name: build + start (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
