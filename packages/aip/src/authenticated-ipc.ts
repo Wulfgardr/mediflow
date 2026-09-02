@@ -1,5 +1,6 @@
 /* @Codex */
 import { types } from 'node:util';
+import type { AipOwnerHandleV1 } from './owner-broker.ts';
 export const AIP_BOOTSTRAP_ENV_KEY_V1 = 'MEDIFLOW_AIP_BOOTSTRAP_REF' as const;
 export const AIP_IPC_MAX_INPUT_BYTES_V1 = 64 * 1024;
 export const AIP_IPC_MAX_OUTPUT_BYTES_V1 = 4 * 1024;
@@ -30,11 +31,13 @@ export class AipAuthenticatedIpcV1Error extends Error {
         this.name = 'AipAuthenticatedIpcV1Error';
     }
 }
-type BrokerPort = { issueOwner: (binding: unknown) => unknown; revokeOwner: (owner: unknown) => boolean; restart: () => void };
+type BrokerPort = { issueOwner: (binding: unknown) => AipOwnerHandleV1;
+    revokeOwner: (owner: unknown) => boolean; restart: () => void };
 type Stage = { activation: readonly unknown[]; generation: number; state: 'available' | 'pending' | 'consumed'
     | 'revoked'; denialCode: AipAuthenticatedIpcV1ErrorCode | null };
 type Pending = { controller: AbortController; reason: AipAuthenticatedIpcV1ErrorCode };
 type Peer = { transport: 'xpc' | 'uds' | 'named_pipe'; peerRef: string; runtimeRef: string };
+type Session = { owner: AipOwnerHandleV1; claimed: boolean };
 function exactValues(value: unknown, keys: readonly string[]): unknown[] {
     if (!value || typeof value !== 'object' || types.isProxy(value) || Array.isArray(value)) {
         throw new AipAuthenticatedIpcV1Error('input_invalid');
@@ -68,6 +71,12 @@ function brokerPort(value: unknown): BrokerPort {
         throw new AipAuthenticatedIpcV1Error('input_invalid');
     }
     return value as BrokerPort;
+}
+function opaqueOwner(value: unknown): value is AipOwnerHandleV1 {
+    if (!value || typeof value !== 'object' || types.isProxy(value) || Array.isArray(value)) return false;
+    try {
+        return Object.getPrototypeOf(value) === null && Reflect.ownKeys(value).length === 0 && Object.isFrozen(value);
+    } catch { return false; }
 }
 function inputBytes(value: unknown): Uint8Array {
     if (types.isProxy(value) || !(value instanceof Uint8Array) || !BYTE_LENGTH_GETTER) {
@@ -129,7 +138,7 @@ export function createAipAuthenticatedIpcHostV1(sourcesValue: unknown) {
     const auditSource = auditValue as (record: unknown) => unknown;
     const authenticateTrustedPortPeer = authenticateValue as (connection: object, signal: AbortSignal) => unknown;
     const stages = new Map<string, Stage>();
-    const sessions = new Map<object, unknown>();
+    const sessions = new Map<object, Session>();
     const pending = new Map<object, Pending>();
     const closed = new WeakSet<object>();
     let lastNow = -1;
@@ -251,9 +260,10 @@ export function createAipAuthenticatedIpcHostV1(sourcesValue: unknown) {
             parentGeneration: stage.activation[14], policyGeneration: stage.activation[15], venue: stage.activation[16],
             egressAllowed: stage.activation[17],
         }));
-        let owner: unknown;
+        let owner: AipOwnerHandleV1;
         try { owner = observe('broker_failed', () => broker.issueOwner(ownerBinding)); }
         catch { return finishDenied('broker_failed', peer); }
+        if (!opaqueOwner(owner)) return finishDenied('broker_failed', peer);
         try { await writeAudit('allowed', peer, null); }
         catch { broker.revokeOwner(owner); stage.state = 'revoked'; stage.denialCode = 'audit_failed';
             pending.delete(connection); throw new AipAuthenticatedIpcV1Error('audit_failed'); }
@@ -264,19 +274,28 @@ export function createAipAuthenticatedIpcHostV1(sourcesValue: unknown) {
         if (RESPONSE.byteLength > AIP_IPC_MAX_OUTPUT_BYTES_V1) {
             broker.revokeOwner(owner); return finishDenied('output_oversized', peer);
         }
-        stage.state = 'consumed'; pending.delete(connection); sessions.set(connection, owner);
+        stage.state = 'consumed'; pending.delete(connection); sessions.set(connection, { owner, claimed: false });
         return RESPONSE.slice();
+    };
+    const claimAuthenticatedOwner = (connectionValue: unknown): AipOwnerHandleV1 => {
+        enter();
+        if (!connectionValue || typeof connectionValue !== 'object' || types.isProxy(connectionValue)
+            || closed.has(connectionValue as object)) throw new AipAuthenticatedIpcV1Error('connection_invalid');
+        const session = sessions.get(connectionValue as object);
+        if (!session || session.claimed) throw new AipAuthenticatedIpcV1Error('connection_invalid');
+        session.claimed = true;
+        return session.owner;
     };
     const cancel = (connectionValue: unknown): boolean => {
         enter();
         if (!connectionValue || typeof connectionValue !== 'object' || types.isProxy(connectionValue)) return false;
         const connection = connectionValue as object;
         const active = pending.get(connection);
-        const owner = sessions.get(connection);
-        if (!active && !owner) return false;
+        const session = sessions.get(connection);
+        if (!active && !session) return false;
         closed.add(connection);
         if (active) { active.reason = 'cancelled'; active.controller.abort(); }
-        if (owner) { broker.revokeOwner(owner); sessions.delete(connection); }
+        if (session) { broker.revokeOwner(session.owner); sessions.delete(connection); }
         return true;
     };
     const close = (connectionValue: unknown): boolean => cancel(connectionValue);
@@ -288,11 +307,11 @@ export function createAipAuthenticatedIpcHostV1(sourcesValue: unknown) {
         for (const [connection, active] of pending) {
             closed.add(connection); active.reason = 'restart_changed'; active.controller.abort();
         }
-        for (const [connection, owner] of sessions) {
-            closed.add(connection); broker.revokeOwner(owner);
+        for (const [connection, session] of sessions) {
+            closed.add(connection); broker.revokeOwner(session.owner);
         }
         sessions.clear();
         observe('broker_failed', () => broker.restart());
     };
-    return Object.freeze({ stageLaunch, handleBootstrap, cancel, close, restart });
+    return Object.freeze({ stageLaunch, handleBootstrap, claimAuthenticatedOwner, cancel, close, restart });
 }
