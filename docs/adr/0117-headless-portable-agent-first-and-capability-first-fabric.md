@@ -172,6 +172,100 @@ credenziali ufficiali, egress esplicito, policy dati applicabile e consenso
 quando richiesto. I provider cloud restano `default OFF`; non sono un fallback
 implicito del percorso Headless.
 
+### Addendum: Supervisor portabile e late binding production
+
+Il percorso production portabile usa un unico comando pubblico, avviato
+dall'host MCP, con questa topologia:
+
+```text
+host MCP non fidato
+  -> Supervisor Node trusted
+       -> Web production child
+       -> MCP stdio child
+```
+
+Il Supervisor e il parent trusted. Possiede broker AIP, mirror autoritativo del
+contesto, launcher, audit e lifecycle dei figli. Il processo Web conserva
+soltanto H1a, selezione e gesto esplicito; il processo MCP conserva soltanto
+parser MCP e client RPC AIP. Il Web non importa launcher, broker, MCP o port di
+audit e non avvia processi agentici. Il Supervisor non acquisisce cookie e non
+ricostruisce una sessione Web.
+
+Il comando production avvia direttamente il `server.js` standalone prodotto
+da `next build`, senza shell o passaggio intermedio da `npm run`. Il child Web
+eredita un canale IPC privato dal Supervisor; stdout e stderr del Web vengono
+inoltrati soltanto a stderr del Supervisor. Un server Web preesistente, non
+figlio dell'esatto Supervisor, non e adottabile. In sviluppo, o quando il
+canale parentale manca, il bridge Intelligent Host resta indisponibile e
+fallisce chiuso.
+
+Il processo MCP parte prima dell'attivazione, eredita stdin/stdout dall'host e
+riserva stdout esclusivamente a JSON-RPC. Registra la superficie statica ma,
+finche il late binding AIP non e completato, ogni operazione che richiede il
+catalogo host restituisce `host_unbound`. Il bootstrap AIP viene consegnato una
+sola volta sul canale IPC gia ereditato; non passa da ambiente mutabile, file,
+stdin, stdout o listener. Il processo non accetta un secondo binding: dopo
+revoca, lock, logout, reselection o expiry, un nuovo contesto richiede un nuovo
+avvio del comando MCP.
+
+#### Comando Web minimizzato
+
+L'attivazione nasce da un controllo patient-scoped nella UI Web. Il click e un
+intent, non authority. Prima di inviare il comando, il Web:
+
+1. acquisisce H1a canonico;
+2. registra il dependent sulla selezione corrente;
+3. rilegge binding clinico e versione paziente;
+4. ottiene dal Supervisor una challenge casuale monouso;
+5. invia il comando e attende l'ACK production entro il timeout.
+
+Il protocollo ammette soltanto `prepare`, `activate`, `revoke_all` e `ack`, con
+record chiusi, frame UTF-8 non superiori a 4 KiB, request reference casuale,
+challenge con TTL massimo di 5 secondi e consumo atomico. Il Supervisor accetta
+frame esclusivamente dall'esatto `ChildProcess` Web creato da lui e nega
+replay, campi extra, challenge errata, frame oversized o messaggi successivi a
+disconnect.
+
+Il payload `activate` contiene soltanto:
+
+- riferimenti Web gia hashati a utente e parent;
+- identificativi interni esatti di paziente e ambulatorio selezionati;
+- selection epoch e versione paziente attesa;
+- scadenza massima della cattura.
+
+Gli identificativi sono necessari agli Application Services patient-scoped,
+restano sul solo IPC locale ereditato e non entrano in log, stderr, audit o
+receipt. Cookie, oggetto sessione, username, PIN, testo clinico, owner, closure,
+proof, permit e grant non sono serializzabili nel protocollo. Generazioni,
+lease, parent authority, capability e scadenza effettiva sono mintate e
+possedute dal Supervisor, non copiate dal comando Web.
+
+L'ACK di attivazione viene emesso soltanto dopo autenticazione del child MCP e
+binding del catalogo corrente. Per la sessione `read_only`/`proposal_only` il
+gesto patient-scoped e sufficiente; F10 resta separato e richiede conferma
+trusted-UI, step-up e proof specifici dell'operazione.
+
+#### Revoca e stop rule
+
+Logout, application lock e reselection revocano prima la risorsa Web e poi
+inviano `revoke_all`. La risposta finale attende un ACK per al massimo un
+secondo. Se l'ACK non arriva, il Web disconnette il canale parentale e risponde
+`503`; il Supervisor tratta il disconnect come revoca terminale. Expiry del
+mirror, uscita Web, uscita MCP, restart e mismatch di currentness revocano
+immediatamente broker, owner, bootstrap e operazioni pendenti. Il Supervisor
+mantiene inoltre un timer indipendente e non prolunga mai la scadenza ricevuta.
+
+Il mirror Supervisor espone a broker e launcher una lettura sincrona, ma nasce
+soltanto da un comando autenticato sul canale ereditato. Riassegna generazioni
+proprie, verifica la versione paziente tramite una porta host separata e
+terminalizza su qualunque drift. Nessun polling, listener TCP, UDS, named pipe,
+broker residente o adozione di processi esistenti appartiene a questo baseline.
+
+Queste scelte chiudono il contratto late binding; non costituiscono da sole una
+prova di implementazione. Il gate production richiede test cross-process
+sintetici che dimostrino processi distinti, pre-attivazione `host_unbound`,
+attivazione utile, revoca, replay denial, stdout pulito e assenza di listener.
+
 ## Import e packaging guard
 
 Il grafo del core Headless e del Web localhost non può avere import obbligatori
