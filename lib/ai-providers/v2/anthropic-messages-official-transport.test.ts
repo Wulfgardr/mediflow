@@ -166,6 +166,23 @@ test('nega mismatch profile, workspace, key scope e vendor ID prima di creare il
     }
 });
 
+test('nega lifecycle configured, disabled e degraded prima di qualsiasi egress', () => {
+    let calls = 0;
+    const fetch = async () => { calls += 1; return response(); };
+    const configured = transitionProviderLifecycleV2(createAbsentProviderLifecycleV2(), {
+        type: 'configure', binding: BINDING,
+    });
+    const active = enabled();
+    const inactive = [configured, transitionProviderLifecycleV2(active, { type: 'disable' }),
+        transitionProviderLifecycleV2(active, { type: 'degrade' })];
+    for (const lifecycle of inactive) {
+        assert.throws(() => createAnthropicMessagesOfficialHttpsTransport(factory(fetch, {
+            instanceBinding: instanceBinding(PROFILE, lifecycle),
+        })), /Anthropic official HTTPS transport rejected/u);
+    }
+    assert.equal(calls, 0);
+});
+
 test('nega request ostili e workspace response mismatch senza propagare dettagli', async () => {
     let calls = 0;
     const transport = createAnthropicMessagesOfficialHttpsTransport(factory(async () => {
