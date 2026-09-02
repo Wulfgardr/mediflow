@@ -85,12 +85,12 @@ const scope = closed({
     status: 'available' as const,
     patientId: PATIENT_ID,
     ambulatoryId: AMBULATORY_ID,
-    scopeDigest: SCOPE_DIGEST,
     generation: current.generation,
     revocationGeneration: current.revocationGeneration,
     selectionEpoch: current.selectionEpoch,
     restartGeneration: 2,
     expiresAt: NOW + 10_000,
+    scopeDigest: SCOPE_DIGEST,
 });
 const READ_INPUT = closed({ schemaVersion: 'mediflow.patient.open_loops.read.input.v1',
     operationId: 'mediflow.patient.open_loops.read.v1' });
@@ -188,6 +188,10 @@ after(() => fs.rmSync(dataDir, { recursive: true, force: true }));
 test('reads the host-owned selection through the Application Service and publishes opaque minimized loops', async () => {
     const value = harness();
     try {
+        assert.deepEqual(Reflect.ownKeys(scope), [
+            'status', 'patientId', 'ambulatoryId', 'generation', 'revocationGeneration',
+            'selectionEpoch', 'restartGeneration', 'expiresAt', 'scopeDigest',
+        ]);
         const result = await value.candidate.service.read(await value.permit(), READ_INPUT);
 
         assert.equal(result.outcome, 'read');

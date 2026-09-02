@@ -59,7 +59,8 @@ function exactValues(value: unknown, keys: readonly string[], code: AipOperation
     });
 }
 function arrayValues(value: unknown, code: AipOperationRpcV1ErrorCode): unknown[] {
-    if (types.isProxy(value) || !Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
+    if (types.isProxy(value) || !Array.isArray(value)
+        || (Object.getPrototypeOf(value) !== Array.prototype && Object.getPrototypeOf(value) !== null)) {
         throw new AipOperationRpcV1Error(code);
     }
     let descriptors: Record<string, PropertyDescriptor>;

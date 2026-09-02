@@ -22,8 +22,8 @@ import { observations, patientsToAmbulatories, servicePrescriptionItems } from '
 
 const SOURCE_KEYS = ['now', 'current', 'beginPermit', 'bindPermit', 'finalizeBoundPermit', 'denyPermit',
     'resolveHostScope', 'writeAudit'] as const;
-const SCOPE_KEYS = ['status', 'patientId', 'ambulatoryId', 'scopeDigest', 'generation', 'revocationGeneration',
-    'selectionEpoch', 'restartGeneration', 'expiresAt'] as const;
+const SCOPE_KEYS = ['status', 'patientId', 'ambulatoryId', 'generation', 'revocationGeneration',
+    'selectionEpoch', 'restartGeneration', 'expiresAt', 'scopeDigest'] as const;
 const REQUEST_KEYS = ['limit', 'signal'] as const;
 const DIGEST = /^sha256:[0-9a-f]{64}$/u;
 const DAY_MS = 86_400_000;
