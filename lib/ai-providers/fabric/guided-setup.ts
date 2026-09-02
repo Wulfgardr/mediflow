@@ -27,7 +27,7 @@ type Candidate = Readonly<{
     candidateRef: string; capability: GuidedFabricCapability; profileId: string; profileTier: FabricSetupProfileTier;
     optionalAdapter: boolean; installation: 'ready' | 'download_required'; compatibility: 'compatible' | 'incompatible';
     provider: string; engine: string; runtimeRef: string; model: string; modelVersion: string; modelDigest: string;
-    venue: 'local_process'; credentialRef: string | null; egressProfileId: 'local_only';
+    venue: 'local_process'; credentialRef: null; egressProfileId: 'local_only';
     dataPolicy: 'clinical_local_only'; recipeId: string; fallback: 'none'; downloadBytes: number;
 }>;
 type Store = Readonly<{
@@ -38,7 +38,7 @@ type Sources = Readonly<{
     detectHostCandidates: () => unknown; installProfile: (candidate: Candidate, signal: AbortSignal) => unknown;
     runSyntheticSmoke: (request: unknown, signal: AbortSignal) => unknown; bindingStore: Store;
 }>;
-type Prepared = { binding: FabricBindingCandidateV1; used: boolean };
+type Prepared = { binding: FabricBindingCandidateV1; generation: number; used: boolean };
 const SOURCE_KEYS = ['detectHostCandidates', 'installProfile', 'runSyntheticSmoke', 'bindingStore'] as const;
 const INVENTORY_KEYS = ['schemaVersion', 'platform', 'architecture', 'memoryMiB', 'freeDiskMiB', 'accelerators',
     'candidates'] as const;
@@ -101,7 +101,7 @@ function candidate(value: unknown): Candidate {
         || (input.compatibility !== 'compatible' && input.compatibility !== 'incompatible')
         || ![input.provider, input.engine, input.runtimeRef, input.model, input.modelVersion, input.recipeId].every(token)
         || typeof input.modelDigest !== 'string' || !DIGEST.test(input.modelDigest) || input.venue !== 'local_process'
-        || (input.credentialRef !== null && (typeof input.credentialRef !== 'string' || !REF.test(input.credentialRef)))
+        || input.credentialRef !== null
         || input.egressProfileId !== 'local_only' || input.dataPolicy !== 'clinical_local_only'
         || input.fallback !== 'none' || !Number.isSafeInteger(input.downloadBytes) || (input.downloadBytes as number) < 0
         || (input.installation === 'ready' ? input.downloadBytes !== 0 : input.downloadBytes === 0)) {
@@ -139,7 +139,7 @@ async function nativeCall(source: () => unknown, signal: AbortSignal, timeoutMs:
 
 export function createFabricGuidedSetupService(sourceValue: unknown) {
     const host = sources(sourceValue); let generation = 0;
-    const choices = new Map<string, Candidate>(); const recommended = new Map<GuidedFabricCapability, string>();
+    let choices = new Map<string, Candidate>(); let recommended = new Map<GuidedFabricCapability, string>();
     const prepared = new WeakMap<object, Prepared>();
     const discover = () => {
         let raw: unknown;
@@ -161,17 +161,21 @@ export function createFabricGuidedSetupService(sourceValue: unknown) {
             });
             detected = boundedArray(input.candidates, MAX_CANDIDATES).map(candidate);
         } catch { throw new FabricGuidedSetupError('inventory_unavailable'); }
-        generation += 1; choices.clear(); recommended.clear();
+        const nextGeneration = generation + 1;
+        if (!Number.isSafeInteger(nextGeneration)) throw new FabricGuidedSetupError('inventory_unavailable');
+        const nextChoices = new Map<string, Candidate>();
+        const nextRecommended = new Map<GuidedFabricCapability, string>();
         const compatible = detected.filter((item) => item.compatibility === 'compatible');
         for (const item of compatible) {
             const key = `${item.capability}\0${item.profileId}`;
-            if (choices.has(key)) throw new FabricGuidedSetupError('inventory_unavailable'); choices.set(key, item);
+            if (nextChoices.has(key)) throw new FabricGuidedSetupError('inventory_unavailable');
+            nextChoices.set(key, item);
         }
         const capabilities = GUIDED_FABRIC_CAPABILITIES.map((id) => {
             const options = compatible.filter((item) => item.capability === id).sort((left, right) =>
                 Number(left.installation !== 'ready') - Number(right.installation !== 'ready')
                 || TIER_RANK[left.profileTier] - TIER_RANK[right.profileTier] || left.profileId.localeCompare(right.profileId));
-            const selected = options[0] ?? null; if (selected) recommended.set(id, selected.profileId);
+            const selected = options[0] ?? null; if (selected) nextRecommended.set(id, selected.profileId);
             return Object.freeze({ capability: id, status: selected?.installation ?? 'unavailable',
                 recommendedProfileId: selected?.profileId ?? null, options: Object.freeze(options.map((item) => Object.freeze({
                     profileId: item.profileId, profileTier: item.profileTier, provider: item.provider, engine: item.engine,
@@ -180,10 +184,13 @@ export function createFabricGuidedSetupService(sourceValue: unknown) {
                     advancedOnly: selected !== item, optionalAdapter: item.optionalAdapter,
                 }))) });
         });
-        return Object.freeze({ schemaVersion: 'mediflow.ai.fabric-guided-discovery.v1', generation,
+        const discovery = Object.freeze({ schemaVersion: 'mediflow.ai.fabric-guided-discovery.v1',
+            generation: nextGeneration,
             host: Object.freeze({ platform: input.platform, architecture: input.architecture, memoryMiB: input.memoryMiB,
                 freeDiskMiB: input.freeDiskMiB, accelerators: Object.freeze(accelerators) }),
             ocrRouting: FABRIC_DOCUMENT_OCR_ROUTING_V1, capabilities: Object.freeze(capabilities) });
+        generation = nextGeneration; choices = nextChoices; recommended = nextRecommended;
+        return discovery;
     };
     const prepare = async (value: unknown) => {
         const input = exact(value, ['generation', 'capability', 'profileId', 'mode', 'download']);
@@ -240,7 +247,8 @@ export function createFabricGuidedSetupService(sourceValue: unknown) {
         finally { clearTimeout(timer); }
         if (generation !== selectedGeneration) throw new FabricGuidedSetupError('selection_unavailable');
         const handle = Object.freeze(Object.create(null));
-        prepared.set(handle, { used: false, binding: Object.freeze({ schemaVersion: FABRIC_BINDING_CANDIDATE_SCHEMA_V1,
+        prepared.set(handle, { used: false, generation: selectedGeneration,
+            binding: Object.freeze({ schemaVersion: FABRIC_BINDING_CANDIDATE_SCHEMA_V1,
             capability: ready.capability, profileId: ready.profileId, provider: ready.provider, engine: ready.engine,
             runtimeRef: ready.runtimeRef, model: ready.model, modelVersion: ready.modelVersion,
             modelDigest: ready.modelDigest, venue: ready.venue, credentialRef: ready.credentialRef,
@@ -265,6 +273,7 @@ export function createFabricGuidedSetupService(sourceValue: unknown) {
         if (!Number.isSafeInteger(input.expectedVersion) || (input.expectedVersion as number) < 0) {
             throw new FabricGuidedSetupError('input_invalid');
         }
+        if (staged.generation !== generation) throw new FabricGuidedSetupError('selection_unavailable');
         const result = host.bindingStore.activate({ expectedVersion: input.expectedVersion, binding: staged.binding });
         staged.used = true; return result;
     };

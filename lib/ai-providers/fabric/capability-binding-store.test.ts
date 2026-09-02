@@ -1,5 +1,6 @@
 /* @Codex */
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -68,6 +69,73 @@ test('attiva atomicamente un binding locale smoke-tested senza persistere segret
     assert.equal(store.paths.recordPath.startsWith(root), true);
 });
 
+test('riconcilia con read-back un errore di durability successivo al rename', (t) => {
+    const { store, cleanup } = fixture(); t.after(cleanup);
+    const originalFsync = fs.fsyncSync;
+    fs.fsyncSync = (descriptor) => {
+        if (fs.fstatSync(descriptor).isDirectory()) {
+            throw Object.assign(new Error('synthetic directory fsync failure'), { code: 'EIO' });
+        }
+        return originalFsync(descriptor);
+    };
+    t.after(() => { fs.fsyncSync = originalFsync; });
+    const receipt = store.activate({ expectedVersion: 0, binding: candidate('patient_insight') });
+    assert.equal(receipt.outcome, 'activated');
+    assert.equal(receipt.toVersion, 1);
+    assert.equal(store.read().bindings.patient_insight?.profileId, 'profile.synthetic.balanced.v1');
+});
+
+test('dichiara commit_unknown se il read-back post-rename non e determinabile', (t) => {
+    const { store, cleanup } = fixture(); t.after(cleanup);
+    const originalFsync = fs.fsyncSync; const originalRead = fs.readSync;
+    let denyNextRead = false;
+    fs.fsyncSync = (descriptor) => {
+        if (fs.fstatSync(descriptor).isDirectory()) {
+            denyNextRead = true;
+            throw Object.assign(new Error('synthetic directory fsync failure'), { code: 'EIO' });
+        }
+        return originalFsync(descriptor);
+    };
+    fs.readSync = ((...args: unknown[]) => {
+        if (denyNextRead) {
+            denyNextRead = false;
+            throw Object.assign(new Error('synthetic read-back failure'), { code: 'EIO' });
+        }
+        return Reflect.apply(originalRead, fs, args) as number;
+    }) as typeof fs.readSync;
+    t.after(() => { fs.fsyncSync = originalFsync; fs.readSync = originalRead; });
+    try {
+        expectCode('commit_unknown', () => store.activate({ expectedVersion: 0,
+            binding: candidate('patient_insight') }));
+    } finally {
+        fs.fsyncSync = originalFsync; fs.readSync = originalRead;
+    }
+    assert.equal(store.read().version, 1);
+});
+
+test('nega ogni credentialRef nel binding locale prima della persistenza', (t) => {
+    const { store, cleanup } = fixture(); t.after(cleanup);
+    expectCode('input_invalid', () => store.activate({ expectedVersion: 0, binding: {
+        ...candidate('patient_insight'), credentialRef: `credential_ref_${REF_SUFFIX}`,
+    } }));
+    assert.equal(store.read().version, 0);
+    assert.equal(fs.existsSync(store.paths.recordPath), false);
+});
+
+test('nega un record persistente oltre il budget anche se il JSON resta valido', (t) => {
+    const { store, cleanup } = fixture(); t.after(cleanup);
+    store.activate({ expectedVersion: 0, binding: candidate('patient_insight') });
+    fs.appendFileSync(store.paths.recordPath, ' '.repeat(128 * 1024));
+    expectCode('corrupt', () => store.read());
+});
+
+test('nega un record persistente che non sia un file regolare', (t) => {
+    const { store, cleanup } = fixture(); t.after(cleanup);
+    fs.mkdirSync(store.paths.directory, { recursive: true });
+    fs.mkdirSync(store.paths.recordPath);
+    expectCode('corrupt', () => store.read());
+});
+
 test('ripristina soltanto l ultimo binding attivato e brucia il rollback', (t) => {
     const { store, cleanup } = fixture(); t.after(cleanup);
     const first = store.activate({ expectedVersion: 0, binding: candidate('ocr', 'profile.synthetic.light.v1') });
@@ -98,6 +166,27 @@ test('mantiene versioni CAS e un binding indipendente per tutte le cinque capabi
     }
     expectCode('version_conflict', () => store.activate({ expectedVersion: 4, binding: candidate('ocr', 'profile.new.v1') }));
     assert.equal(store.read().version, 5);
+});
+
+test('recupera il lock di un owner terminato senza usurpare quello vivo', (t) => {
+    const stale = fixture(); t.after(stale.cleanup);
+    const exited = spawnSync(process.execPath, ['-e', 'process.exit(0)']);
+    assert.equal(exited.status, 0); assert.equal(typeof exited.pid, 'number');
+    fs.mkdirSync(stale.store.paths.directory, { recursive: true });
+    fs.writeFileSync(stale.store.paths.lockPath, `${JSON.stringify({
+        schemaVersion: 'mediflow.ai.fabric-binding-lock.v1', ownerPid: exited.pid,
+        ownerRef: `fabric_lock_${'a'.repeat(32)}`,
+    })}\n`);
+    assert.equal(stale.store.activate({ expectedVersion: 0, binding: candidate('patient_insight') }).outcome, 'activated');
+    assert.equal(fs.existsSync(stale.store.paths.lockPath), false);
+
+    const live = fixture(); t.after(live.cleanup);
+    fs.mkdirSync(live.store.paths.directory, { recursive: true });
+    const liveRecord = `${JSON.stringify({ schemaVersion: 'mediflow.ai.fabric-binding-lock.v1', ownerPid: process.pid,
+        ownerRef: `fabric_lock_${'b'.repeat(32)}` })}\n`;
+    fs.writeFileSync(live.store.paths.lockPath, liveRecord);
+    expectCode('busy', () => live.store.activate({ expectedVersion: 0, binding: candidate('smart_import') }));
+    assert.equal(fs.readFileSync(live.store.paths.lockPath, 'utf8'), liveRecord);
 });
 
 test('nega replay, input ostili, clock rollback, record corrotti e lock concorrenti', (t) => {
