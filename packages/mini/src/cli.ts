@@ -1,7 +1,9 @@
 /* @Codex */
 import { argv, exit, stdin, stdout } from 'node:process';
 import { z } from 'zod';
-import { openLoopsArgumentsSchema, terminologyArgumentsSchema } from '../../mcp/src/contracts.ts';
+import {
+  followUpProposalArgumentsSchema, openLoopsArgumentsSchema, terminologyArgumentsSchema,
+} from '../../mcp/src/contracts.ts';
 import { OperationClientError, createOperationClient } from '../../mcp/src/operation-client.ts';
 
 const SCHEMA_VERSION = 'mediflow.mini.transport.v1';
@@ -19,6 +21,7 @@ const requestSchema = z.discriminatedUnion('command', [
   z.object({ command: z.literal('capabilities'), args: z.object({}).strict() }).strict(),
   z.object({ command: z.literal('terminology search'), args: terminologyArgumentsSchema }).strict(),
   z.object({ command: z.literal('open-loops'), args: openLoopsArgumentsSchema }).strict(),
+  z.object({ command: z.literal('follow-up-proposal'), args: followUpProposalArgumentsSchema }).strict(),
 ]);
 
 function hasDuplicateKeys(source: string): boolean {
@@ -114,7 +117,9 @@ if (argv.length === 3 && argv[2] === '--help') {
           ? await client.publicCatalog()
           : request.command === 'terminology search'
             ? await client.searchTerminology(request.args)
-            : await client.readOpenLoops();
+            : request.command === 'open-loops'
+              ? await client.readOpenLoops()
+              : await client.proposeOpenLoopsFollowUp(request.args);
         client.close(); succeed(result);
       } catch (error) {
         client?.close();

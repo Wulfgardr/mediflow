@@ -1,8 +1,9 @@
 /* @Codex */
 import { McpServer } from '@modelcontextprotocol/server';
 import {
-  CAPABILITIES_TOOL_ID, HEADLESS_STATUS_TOOL_ID, OPEN_LOOPS_OPERATION_ID, TERMINOLOGY_OPERATION_ID,
-  capabilitiesOutputSchema, headlessStatusOutputSchema, openLoopsArgumentsSchema, openLoopsOutputSchema,
+  CAPABILITIES_TOOL_ID, FOLLOW_UP_PROPOSAL_OPERATION_ID, HEADLESS_STATUS_TOOL_ID, OPEN_LOOPS_OPERATION_ID,
+  TERMINOLOGY_OPERATION_ID, capabilitiesOutputSchema, followUpProposalArgumentsSchema,
+  followUpProposalOutputSchema, headlessStatusOutputSchema, openLoopsArgumentsSchema, openLoopsOutputSchema,
   systemArgumentsSchema, terminologyArgumentsSchema, terminologyOutputSchema,
 } from './contracts.ts';
 import { OperationClientError, createOperationClient } from './operation-client.ts';
@@ -10,6 +11,7 @@ import { OperationClientError, createOperationClient } from './operation-client.
 const annotations = Object.freeze({
   readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false,
 });
+const proposalAnnotations = Object.freeze({ ...annotations, idempotentHint: false });
 const toolError = (error: unknown) => {
   const code = error instanceof OperationClientError ? error.denialCode ?? error.code : 'operation_unavailable';
   const safe = /^(?:host_unbound|protocol_invalid|operation_denied|cancelled|timeout|service_failed)$/u.test(code)
@@ -40,7 +42,7 @@ export async function createUsefulMcpServer() {
     });
     server.registerTool(CAPABILITIES_TOOL_ID, {
       title: 'List governed capabilities',
-      description: 'Lists the exact read-only operations bound by the trusted host RPC catalog.',
+      description: 'Lists the exact bounded operations bound by the trusted host RPC catalog.',
       inputSchema: systemArgumentsSchema, outputSchema: capabilitiesOutputSchema, annotations,
       _meta: { 'mediflow/maximumStage': 'read_only', 'mediflow/surfaceKind': 'rpc_catalog' },
     }, async (_args, context) => {
@@ -78,6 +80,24 @@ export async function createUsefulMcpServer() {
         const output = await bound.readOpenLoops(context.mcpReq.signal);
         return { content: [{ type: 'text', text: `Open-loops read returned ${output.items.length} item(s).` }],
           structuredContent: output };
+      } catch (error) { return toolError(error); }
+    });
+  }
+  if (client && has(FOLLOW_UP_PROPOSAL_OPERATION_ID)) {
+    const bound = client;
+    server.registerTool(FOLLOW_UP_PROPOSAL_OPERATION_ID, {
+      title: 'Propose selected patient follow-up reviews',
+      description: 'Maps trusted-host Open Loops to bounded review actions. Proposal only; no apply or clinical writes.',
+      inputSchema: followUpProposalArgumentsSchema, outputSchema: followUpProposalOutputSchema,
+      annotations: proposalAnnotations,
+      _meta: { 'mediflow/capabilityId': FOLLOW_UP_PROPOSAL_OPERATION_ID,
+        'mediflow/maximumStage': 'proposal_only' },
+    }, async (args, context) => {
+      try {
+        const output = await bound.proposeOpenLoopsFollowUp(args, context.mcpReq.signal);
+        return { content: [{ type: 'text',
+          text: `Follow-up proposal returned ${output.items.length} review item(s); apply none.` }],
+        structuredContent: output };
       } catch (error) { return toolError(error); }
     });
   }
