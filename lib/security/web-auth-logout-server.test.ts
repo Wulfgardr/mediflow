@@ -189,7 +189,7 @@ test('route reads both cookies once and denies a rejected cookie Promise', () =>
     assert.equal(route.match(/cookies\(\)/gu)?.length, 1);
     assert.match(route, /bearerCookie = cookieStore\.get\(SESSION_COOKIE_NAME\)/u);
     assert.match(route, /controlCookie = cookieStore\.get\(CONTROL_COOKIE_NAME\)/u);
-    assert.match(route, /return completeExactWebP3Logout\(bearerCookie, controlCookie, request\);/u);
+    assert.match(route, /completeExactWebP3Logout\(bearerCookie, controlCookie, request\)/u);
     const forbidden = ['requireSession', 'server-session', 'deleteSession', 'clearAllSessions',
         'cookies.set', 'cookies.delete', 'maxAge', 'Set-Cookie'];
     for (const token of forbidden) assert.equal(route.includes(token), false, token);
@@ -202,6 +202,7 @@ test('route reads both cookies once and denies a rejected cookie Promise', () =>
         const modules = new Map([
             ['next/headers', ${JSON.stringify(toDataModule("export const cookies = () => { globalThis.cookieCalls = (globalThis.cookieCalls ?? 0) + 1; return Promise.reject(new Error('synthetic rejection')); }"))}],
             ['@/lib/security/web-auth-logout-server', ${JSON.stringify(toDataModule("export async function completeExactWebP3Logout(bearer, control) { globalThis.serviceCalls = (globalThis.serviceCalls ?? 0) + 1; globalThis.observed = [bearer, control]; return new Response(null, { status: 401, headers: { 'Cache-Control': 'no-store' } }); }"))}],
+            ['@/lib/security/portable-supervisor-web-lifecycle', ${JSON.stringify(toDataModule("export async function completePortableSupervisorWebLifecycleMutationV1(mutation) { return mutation; }"))}],
         ]);
         registerHooks({ resolve(specifier, context, nextResolve) {
             if (context.parentURL === routeUrl && modules.has(specifier)) return { shortCircuit: true, url: modules.get(specifier), format: 'module' };
