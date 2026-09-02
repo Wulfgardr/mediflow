@@ -1,8 +1,8 @@
 /* @Codex */
 import { types } from 'node:util';
 
-export const SOURCE_KEYS = ['now', 'nextRef', 'hashRef', 'writeAudit', 'readHostContext', 'spawnChild',
-  'createOpenLoopsRead'] as const;
+export const SOURCE_KEYS = ['now', 'nextRef', 'hashRef', 'writeAudit', 'commitTerminalAudit', 'readHostContext',
+  'spawnChild', 'createOpenLoopsRead'] as const;
 export const CONTEXT_KEYS = ['status', 'userRef', 'parentRef', 'purposeCode', 'patientId', 'ambulatoryId',
   'generation', 'revocationGeneration', 'selectionEpoch', 'restartGeneration', 'parentGeneration',
   'policyGeneration', 'expiresAt', 'bootstrapExpiresAt'] as const;
@@ -35,7 +35,7 @@ export type Child = Readonly<{
 }>;
 export type OperationState = Readonly<{ operationId: string; capabilityId: string;
   maximumStage: 'read_only' | 'proposal_only'; owner: object; scopeSession: object;
-  peerRef: string; runtimeRef: string; context: Context }>;
+  peerRef: string; runtimeRef: string; scopeDigest: string; context: Context }>;
 
 export function exact(value: unknown, keys: readonly string[]): Record<string, unknown> | null {
   try {
