@@ -171,6 +171,7 @@ test('accetta solo attestazioni locali con permesso equivalente esplicito', asyn
         XPC_PEER,
         { ...XPC_PEER, transport: 'uds', permission: 'mode_0600_peer_credentials' },
         { ...XPC_PEER, transport: 'named_pipe', permission: 'owner_only_acl' },
+        { ...XPC_PEER, transport: 'inherited_child_ipc', permission: 'spawn_bound_private_channel' },
     ];
     for (const peer of accepted) {
         const { host } = fixture(peer);
@@ -183,6 +184,7 @@ test('accetta solo attestazioni locali con permesso equivalente esplicito', asyn
         { ...XPC_PEER, transport: 'uds', permission: 'mode_0600' },
         { ...XPC_PEER, transport: 'named_pipe', permission: 'authenticated_users_acl' },
         { ...XPC_PEER, transport: 'xpc', permission: 'system_wide' },
+        { ...XPC_PEER, transport: 'inherited_child_ipc', permission: 'inherited_environment_only' },
     ];
     for (const peer of denied) {
         const { host } = fixture(peer);
