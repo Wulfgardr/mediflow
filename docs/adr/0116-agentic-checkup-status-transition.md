@@ -134,6 +134,33 @@ Assenso in chat, risposta del modello, voce trascritta, annotation del tool,
 click del client MCP o presenza di una preview non costituiscono conferma. Il
 proof non entra in output, log, audit, provider o processo MCP.
 
+### Addendum: binding multiprocesso operation-specific
+
+Nella topologia production di ADR 0117, broker AIP e Web trusted sono processi
+distinti. La separazione non trasferisce F10 al Supervisor: ruolo, step-up,
+PIN, gesto, proof e commit restano nel processo Web che possiede la sessione
+autenticata e il writer clinico.
+
+Il Supervisor puo inoltrare al Web una sola richiesta di preview tramite un
+sottoprotocollo IPC privato, chiuso e distinto dal bootstrap H1a. Prima
+dell'inoltro apre un permit AIP con maximum stage `proposal_only`; lo finalizza
+soltanto dopo un esito Web corrente e terminalizza richiesta e permit su
+revoca, timeout, protocol error o uscita di uno dei figli. Il processo MCP non
+parla mai direttamente con il Web.
+
+La richiesta contiene soltanto input canonico, `requestRef` casuale e costanti
+di schema/operazione. La risposta espone soltanto esito PHI-safe,
+`proposalRef` opaco e scadenza. `requestRef` e `proposalRef` sono correlazione,
+non authority. Actor, ruolo, cookie, PIN, gesto, proof, idempotency key e ID
+database non attraversano il canale; la conferma usa una route trusted separata
+e risolve nuovamente sessione, selezione e risorsa nel Web.
+
+Il Web accetta il sottoprotocollo soltanto dall'esatto parent Supervisor gia
+ereditato, mantiene `checkupRef` e preview memory-only e li revoca insieme a
+sessione, selezione o canale. Un ACK di preview non autorizza il commit e un
+riavvio non ricostruisce riferimenti o proposte. Questa estensione non aggiunge
+altre operazioni write e non amplia i quattro frame di bootstrap H1a.
+
 ### Concorrenza, idempotenza e commit
 
 L'host genera una chiave di idempotenza opaca e la lega al digest completo del

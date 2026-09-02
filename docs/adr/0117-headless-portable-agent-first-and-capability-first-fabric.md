@@ -219,12 +219,12 @@ intent, non authority. Prima di inviare il comando, il Web:
 4. ottiene dal Supervisor una challenge casuale monouso;
 5. invia il comando e attende l'ACK production entro il timeout.
 
-Il protocollo ammette soltanto `prepare`, `activate`, `revoke_all` e `ack`, con
-record chiusi, frame UTF-8 non superiori a 4 KiB, request reference casuale,
-challenge con TTL massimo di 5 secondi e consumo atomico. Il Supervisor accetta
-frame esclusivamente dall'esatto `ChildProcess` Web creato da lui e nega
-replay, campi extra, challenge errata, frame oversized o messaggi successivi a
-disconnect.
+Il protocollo di bootstrap H1a ammette soltanto `prepare`, `activate`,
+`revoke_all` e `ack`, con record chiusi, frame UTF-8 non superiori a 4 KiB,
+request reference casuale, challenge con TTL massimo di 5 secondi e consumo
+atomico. Il Supervisor accetta frame esclusivamente dall'esatto `ChildProcess`
+Web creato da lui e nega replay, campi extra, challenge errata, frame oversized
+o messaggi successivi a disconnect.
 
 Il payload `activate` contiene soltanto:
 
@@ -244,6 +244,25 @@ L'ACK di attivazione viene emesso soltanto dopo autenticazione del child MCP e
 binding del catalogo corrente. Per la sessione `read_only`/`proposal_only` il
 gesto patient-scoped e sufficiente; F10 resta separato e richiede conferma
 trusted-UI, step-up e proof specifici dell'operazione.
+
+#### Sottoprotocollo F10 separato
+
+La sola eccezione operation-specific ammessa nella `0.8.5` e la preview della
+transizione checkup definita da ADR 0116. Usa un decoder e uno schema distinti
+dal bootstrap H1a: non aggiunge metodi a `prepare|activate|revoke_all|ack` e non
+puo produrre una seconda attivazione o estendere il lease.
+
+Il Supervisor apre un permit `proposal_only`, inoltra al Web exact-child una
+richiesta `preview` chiusa e correla una sola risposta `preview_result`. Il Web
+mantiene proposta e riferimenti opachi in memoria. La successiva conferma e il
+commit sono Web-local e richiedono nuovamente sessione, ruolo medico, selezione,
+step-up fresco, gesto e proof privata. Nessuna di queste authority attraversa
+IPC o MCP.
+
+Uscita Web/MCP, revoca, reselection, lock, logout, timeout, frame inatteso o
+risposta duplicata terminalizzano permit e richiesta. Il sottoprotocollo non
+trasporta testo libero, actor, cookie, PIN, proof, ID database, audit payload o
+receipt clinica e non autorizza altre operazioni.
 
 #### Revoca e stop rule
 
