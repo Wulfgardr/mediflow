@@ -3,7 +3,8 @@ import type { ValidatedSemanticQueryPlanV1 } from './semantic-query-plan';
 
 /* @Codex */
 export type SemanticQueryExecutionV1ErrorCode = 'plan_denied' | 'policy_unavailable' | 'currentness_denied'
-  | 'service_denied' | 'output_denied' | 'audit_failed' | 'timeout' | 'cancelled' | 'restart_forbidden';
+  | 'service_denied' | 'output_denied' | 'authorization_denied' | 'audit_failed' | 'timeout' | 'cancelled'
+  | 'restart_forbidden';
 export class SemanticQueryExecutionV1Error extends Error {
   constructor(public readonly code: SemanticQueryExecutionV1ErrorCode) {
     super(`Semantic query execution rejected: ${code}`); this.name = 'SemanticQueryExecutionV1Error';
@@ -31,7 +32,8 @@ export type SemanticQueryExecutionAuditV1 = Readonly<{
 type SemanticQueryExecutionAuditIntentV1 = Readonly<Omit<SemanticQueryExecutionAuditV1,
   'durationMs' | 'timestamp'>>;
 
-const SOURCE_KEYS = ['inspectPlan', 'current', 'now', 'nextRef', 'resolveApplicationService', 'writeAudit'] as const;
+const SOURCE_KEYS = ['inspectPlan', 'current', 'now', 'nextRef', 'resolveApplicationService', 'canonicalizeOutput',
+  'beforeCommit', 'writeAudit'] as const;
 const SNAPSHOT_KEYS = ['purposeCode', 'scope', 'generation', 'revocationGeneration', 'selectionEpoch',
   'maxSteps', 'maxDurationMs', 'maxOutputBytes'] as const;
 const SERVICE_KEYS = ['operationId', 'applicationServiceRef', 'maximumStage', 'execute'] as const;
@@ -113,7 +115,8 @@ function discardPromise(value: unknown): boolean {
 export function createSemanticQueryExecutorV1(sourcesValue: unknown) {
   const sources = exact(sourcesValue, SOURCE_KEYS);
   if (!sources || SOURCE_KEYS.slice(0, -1).some((key) => typeof sources[key] !== 'function'
-    || isProxy(sources[key]))) return fail('policy_unavailable');
+    || isProxy(sources[key])) || isAsyncFunction(sources.canonicalizeOutput)
+    || isAsyncFunction(sources.beforeCommit)) return fail('policy_unavailable');
   const auditPort = exact(sources.writeAudit, AUDIT_PORT_KEYS, true);
   // The host port calls `decide` at its commit point and may persist only the returned terminal audit.
   if (!auditPort || auditPort.mode !== 'synchronous_terminal.v1' || typeof auditPort.commit !== 'function'
@@ -122,12 +125,15 @@ export function createSemanticQueryExecutorV1(sourcesValue: unknown) {
   const currentSource = sources.current as () => unknown, nowSource = sources.now as () => unknown;
   const nextRefSource = sources.nextRef as (kind: 'request' | 'action') => unknown;
   const resolveSource = sources.resolveApplicationService as (ref: unknown) => unknown;
+  const canonicalizeOutputSource = sources.canonicalizeOutput as (operationId: unknown, output: unknown) => unknown;
+  const beforeCommitSource = sources.beforeCommit as () => unknown;
   const auditSource = auditPort.commit as (intent: SemanticQueryExecutionAuditIntentV1,
     decide: (current: unknown, committedAt: unknown) => SemanticQueryExecutionAuditV1) => unknown;
   let state: 'idle' | 'running' | 'committing' | 'terminal' = 'idle';
   let terminalCode: SemanticQueryExecutionV1ErrorCode | null = null, auditActive = false;
   let controller: AbortController | null = null, terminalResolve: ((value: 'timeout' | 'cancelled') => void) | null = null;
-  let lastNow = -1;
+  let lastNow = -1, nativeDeadlineAt = -1;
+  const nativeDeadlineExceeded = (): boolean => nativeDeadlineAt >= 0 && performance.now() >= nativeDeadlineAt;
 
   const now = (): number => {
     let value: unknown; try { value = nowSource(); } catch { return fail('policy_unavailable'); }
@@ -199,7 +205,7 @@ export function createSemanticQueryExecutorV1(sourcesValue: unknown) {
       if (outcome === 'allowed') {
         if (state !== 'committing') return terminalError();
         if (!plan || startedAt === null || deadlineAt === null) return fail('audit_failed');
-        if (timestampValue >= deadlineAt) { terminalize('timeout'); return fail('timeout'); }
+        if (timestampValue >= deadlineAt || nativeDeadlineExceeded()) { terminalize('timeout'); return fail('timeout'); }
         assertCurrent(current, plan);
         state = 'terminal'; terminalCode = null;
       }
@@ -243,6 +249,7 @@ export function createSemanticQueryExecutorV1(sourcesValue: unknown) {
         || !Array.isArray(validated.steps) || !validated.steps.length) return fail('plan_denied');
       if (consumedPlanHandles.has(handle)) return fail('restart_forbidden');
       consumedPlanHandles.add(handle); plan = validated;
+      nativeDeadlineAt = performance.now() + plan.budget.maxDurationMs;
       startedAt = now(); deadlineAt = startedAt + plan.budget.maxDurationMs;
       if (!integer(deadlineAt, startedAt + 1)) return fail('policy_unavailable');
       timer = setTimeout(() => terminalize('timeout'), plan.budget.maxDurationMs);
@@ -262,8 +269,17 @@ export function createSemanticQueryExecutorV1(sourcesValue: unknown) {
         try { returned = reflectApply(service.execute as (...args: unknown[]) => unknown, undefined,
           [step.input, controller.signal]); }
         catch { if (state !== 'running') return terminalError(); return fail('service_denied'); }
-        const output = await bounded(returned, 'service_denied', terminal);
-        if (now() - startedAt >= plan.budget.maxDurationMs) { terminalize('timeout'); return fail('timeout'); }
+        const rawOutput = await bounded(returned, 'service_denied', terminal);
+        readCurrent(plan);
+        if (nativeDeadlineExceeded()) { terminalize('timeout'); return fail('timeout'); }
+        let output: unknown;
+        try { output = reflectApply(canonicalizeOutputSource, undefined, [step.operationId, rawOutput]); }
+        catch { if (state !== 'running') return terminalError(); return fail('output_denied'); }
+        if (state !== 'running') return terminalError();
+        if (discardPromise(output)) return fail('output_denied');
+        if (nativeDeadlineExceeded() || now() - startedAt >= plan.budget.maxDurationMs) {
+          terminalize('timeout'); return fail('timeout');
+        }
         const envelope = requiredFields(output, RESULT_KEYS);
         if (!envelope || typeof envelope.schemaVersion !== 'string' || !envelope.schemaVersion
           || envelope.schemaVersion.length > 128 || envelope.operationId !== step.operationId
@@ -273,7 +289,27 @@ export function createSemanticQueryExecutorV1(sourcesValue: unknown) {
         readCurrent(plan); outputs.push(record({ stepRef: step.stepRef, operationId: step.operationId, output }));
       }
       const requestRef = nextRef('request'), actionRef = nextRef('action'), createdAt = now();
-      if (createdAt - startedAt >= plan.budget.maxDurationMs) { terminalize('timeout'); return fail('timeout'); }
+      if (nativeDeadlineExceeded() || createdAt - startedAt >= plan.budget.maxDurationMs) {
+        terminalize('timeout'); return fail('timeout');
+      }
+      readCurrent(plan);
+      let fence: unknown;
+      try { fence = reflectApply(beforeCommitSource, undefined, []); }
+      catch (error) {
+        if (error instanceof SemanticQueryExecutionV1Error) throw error;
+        return fail('authorization_denied');
+      }
+      if (state !== 'running') return terminalError();
+      if (discardPromise(fence)) return fail('authorization_denied');
+      if (fence !== true) {
+        if (fence === 'currentness_denied' || fence === 'authorization_denied' || fence === 'timeout') {
+          return fail(fence);
+        }
+        return fail('authorization_denied');
+      }
+      if (nativeDeadlineExceeded() || now() - startedAt >= plan.budget.maxDurationMs) {
+        terminalize('timeout'); return fail('timeout');
+      }
       readCurrent(plan);
       state = 'committing';
       const committedAt = commitAudit('allowed', null, plan, outputs.length, startedAt, deadlineAt);
