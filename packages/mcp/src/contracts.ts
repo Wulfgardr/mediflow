@@ -5,6 +5,7 @@ export const TERMINOLOGY_OPERATION_ID = 'mediflow.terminology.search.v1' as cons
 export const OPEN_LOOPS_OPERATION_ID = 'mediflow.patient.open_loops.read.v1' as const;
 export const FOLLOW_UP_PROPOSAL_OPERATION_ID = 'mediflow.patient.open_loops.follow_up.propose.v1' as const;
 export const SEMANTIC_QUERY_OPERATION_ID = 'mediflow.semantic_query_plan.execute.v1' as const;
+export const CHECKUP_STATUS_TRANSITION_OPERATION_ID = 'mediflow.patient.checkup.status.transition.v1' as const;
 export const HEADLESS_STATUS_TOOL_ID = 'mediflow.system.headless_status.v1' as const;
 export const CAPABILITIES_TOOL_ID = 'mediflow.system.capabilities.v1' as const;
 export const RPC_REQUEST_SCHEMA = 'mediflow.aip.operation.request.v1' as const;
@@ -38,6 +39,13 @@ export const OPERATION_DESCRIPTORS = Object.freeze([Object.freeze({
   maximumStage: 'proposal_only' as const,
   inputSchema: 'mediflow.patient.open_loops.follow_up.propose.input.v1',
   outputSchema: 'mediflow.patient.open_loops.follow_up.proposal.v1',
+}), Object.freeze({
+  operationId: CHECKUP_STATUS_TRANSITION_OPERATION_ID,
+  capabilityId: CHECKUP_STATUS_TRANSITION_OPERATION_ID,
+  serviceRef: 'HeadlessCheckupStatusTransitionServiceV1',
+  maximumStage: 'proposal_only' as const,
+  inputSchema: 'mediflow.patient.checkup.status.transition.input.v1',
+  outputSchema: 'mediflow.patient.checkup.status.transition.preview-result.v1',
 }), Object.freeze({
   operationId: SEMANTIC_QUERY_OPERATION_ID,
   capabilityId: SEMANTIC_QUERY_OPERATION_ID,
@@ -117,6 +125,25 @@ export const terminologyOutputSchema = z.object({
 
 export const openLoopsArgumentsSchema = z.object({}).strict();
 export const followUpProposalArgumentsSchema = z.object({}).strict();
+export const checkupStatusTransitionArgumentsSchema = z.object({
+  checkupRef: z.string().regex(/^hcsr_[0-9a-f]{64}$/u),
+  targetStatus: z.enum(['completed', 'cancelled']),
+  expectedRevision: z.number().int().safe().min(1).max(Number.MAX_SAFE_INTEGER - 1),
+}).strict();
+const checkupStatusTransitionDenialSchema = z.enum(['invalid_input', 'operation_unavailable',
+  'resource_unavailable', 'scope_changed', 'session_unavailable', 'role_unavailable', 'preview_expired',
+  'confirmation_required', 'proof_unavailable', 'proof_replayed', 'revision_conflict',
+  'transition_unavailable', 'idempotency_conflict', 'audit_unavailable', 'commit_unavailable',
+  'restart_changed']);
+export const checkupStatusTransitionOutputSchema = z.discriminatedUnion('outcome', [z.object({
+  schemaVersion: z.literal('mediflow.patient.checkup.status.transition.preview-result.v1'),
+  operationId: z.literal(CHECKUP_STATUS_TRANSITION_OPERATION_ID), outcome: z.literal('proposed'),
+  proposalRef: z.string().regex(/^hcsp_[0-9a-f]{64}$/u), expiresAt: safeInteger.min(1),
+}).strict(), z.object({
+  schemaVersion: z.literal('mediflow.patient.checkup.status.transition.preview-result.v1'),
+  operationId: z.literal(CHECKUP_STATUS_TRANSITION_OPERATION_ID), outcome: z.literal('denied'),
+  denialCode: checkupStatusTransitionDenialSchema,
+}).strict()]);
 const openLoopItemSchema = z.object({
   loopRef: z.string().regex(/^aipl_[0-9a-f]{64}$/u),
   kind: z.enum(['results_pending', 'series_stalled', 'registered_expectation']),

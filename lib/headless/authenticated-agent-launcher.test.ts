@@ -134,6 +134,7 @@ async function runRealMini(command: 'open-loops' | 'follow-up-proposal') {
       };
     },
     createOpenLoopsRead: createSyntheticOpenLoopsRead(scopes),
+    previewCheckupStatus: async () => { throw new Error('not exercised'); },
   });
 
   const session = await launcher.launch();
@@ -199,6 +200,7 @@ type SyntheticRpcOptions = Readonly<{
   operationId?: string; input?: unknown;
   onAudit?: (audit: unknown, context: ReturnType<typeof mutableHostContext>) => void;
   commitTerminalAudit?: (intent: unknown, decideAtCommit: () => unknown) => unknown;
+  previewCheckupStatus?: (input: unknown, signal: AbortSignal) => Promise<unknown>;
 }>;
 
 async function runSyntheticRpc(options: SyntheticRpcOptions = {}) {
@@ -257,6 +259,7 @@ async function runSyntheticRpc(options: SyntheticRpcOptions = {}) {
       };
     },
     createOpenLoopsRead: createSyntheticOpenLoopsRead(scopes),
+    previewCheckupStatus: options.previewCheckupStatus ?? (async () => { throw new Error('not exercised'); }),
   });
 
   const session = await launcher.launch();
@@ -307,6 +310,28 @@ test('composes the bounded semantic planner through the authenticated launcher',
   assert.equal(current.scopes.length, 1);
   assert.equal(current.session.close(), true);
   assert.equal(current.terminated(), true);
+});
+
+test('opens and finalizes the checkup permit only at proposal_only after a current Web result', async () => {
+  let forwarded: unknown;
+  const input = { schemaVersion: 'mediflow.patient.checkup.status.transition.input.v1',
+    operationId: 'mediflow.patient.checkup.status.transition.v1', checkupRef: `hcsr_${'a'.repeat(64)}`,
+    targetStatus: 'completed', expectedRevision: 1 };
+  const current = await runSyntheticRpc({ operationId: 'mediflow.patient.checkup.status.transition.v1', input,
+    previewCheckupStatus: async (value) => { forwarded = value; return {
+      schemaVersion: 'mediflow.checkup-status.ipc.v1', type: 'preview_result',
+      requestRef: `hcqr_${'b'.repeat(32)}`, operationId: 'mediflow.patient.checkup.status.transition.v1',
+      outcome: 'proposed', proposalRef: `hcsp_${'c'.repeat(64)}`, expiresAt: 2_000 } } });
+  assert.deepEqual({ ...(forwarded as Record<string, unknown>) }, input);
+  const result = current.response.result as { operation?: Record<string, unknown>; value?: Record<string, unknown> };
+  assert.equal(current.response.outcome, 'completed', JSON.stringify(current.response));
+  assert.deepEqual(result.operation, { operationId: 'mediflow.patient.checkup.status.transition.v1',
+    capabilityId: 'mediflow.patient.checkup.status.transition.v1',
+    serviceRef: 'HeadlessCheckupStatusTransitionServiceV1', maximumStage: 'proposal_only' });
+  assert.deepEqual(result.value, { schemaVersion: 'mediflow.patient.checkup.status.transition.preview-result.v1',
+    operationId: 'mediflow.patient.checkup.status.transition.v1', outcome: 'proposed',
+    proposalRef: `hcsp_${'c'.repeat(64)}`, expiresAt: 2_000 });
+  assert.equal(current.session.close(), true);
 });
 
 test('denies patient or ambulatory identity drift with an unchanged numeric tuple', async () => {
@@ -397,6 +422,7 @@ test('propagates restart to RPC, scope, broker and the authenticated child', asy
     },
     createOpenLoopsRead: () => ({ service: { read: async () => result(), cancel: () => undefined,
       dispose: () => undefined } }),
+    previewCheckupStatus: async () => { throw new Error('not exercised'); },
   });
   const session = await launcher.launch();
   assert.equal(session.restart(), true);

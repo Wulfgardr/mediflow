@@ -6,11 +6,13 @@ import {
   AIP_OPERATION_RPC_AUTHENTICATED_ENV_V1, AIP_OPERATION_RPC_ENV_KEY_V1, AIP_OPERATION_RPC_LATE_BIND_ENV_V1,
 } from '../../aip/src/child-ipc-contract.ts';
 import {
-  FOLLOW_UP_PROPOSAL_OPERATION_ID, HEADLESS_STATUS, OPEN_LOOPS_OPERATION_ID, OPERATION_DESCRIPTORS,
+  CHECKUP_STATUS_TRANSITION_OPERATION_ID, FOLLOW_UP_PROPOSAL_OPERATION_ID, HEADLESS_STATUS,
+  OPEN_LOOPS_OPERATION_ID, OPERATION_DESCRIPTORS,
   RPC_REQUEST_SCHEMA, RPC_RESULT_SCHEMA, TERMINOLOGY_OPERATION_ID, followUpProposalArgumentsSchema,
   followUpProposalOutputSchema, openLoopsOutputSchema, publicCatalog, rpcOperationSchema,
   SEMANTIC_QUERY_OPERATION_ID, selectBoundOperations, semanticQueryArgumentsSchema, semanticQueryOutputSchema,
   terminologyArgumentsSchema, terminologyOutputSchema,
+  checkupStatusTransitionArgumentsSchema, checkupStatusTransitionOutputSchema,
   type OperationDescriptor,
 } from './contracts.ts';
 
@@ -233,6 +235,16 @@ export function createOperationClient() {
       const descriptor = OPERATION_DESCRIPTORS.find((item) => item.operationId === FOLLOW_UP_PROPOSAL_OPERATION_ID)!;
       const output = followUpProposalOutputSchema.safeParse(await run(descriptor,
         { schemaVersion: descriptor.inputSchema, operationId: descriptor.operationId }, signal));
+      return output.success ? output.data : invalid();
+    },
+    previewCheckupStatusTransition: async (argumentsValue: unknown, signal?: AbortSignal) => {
+      const args = checkupStatusTransitionArgumentsSchema.parse(argumentsValue);
+      const descriptor = OPERATION_DESCRIPTORS.find(
+        (item) => item.operationId === CHECKUP_STATUS_TRANSITION_OPERATION_ID)!;
+      const output = checkupStatusTransitionOutputSchema.safeParse(await run(descriptor, {
+        schemaVersion: descriptor.inputSchema, operationId: descriptor.operationId,
+        checkupRef: args.checkupRef, targetStatus: args.targetStatus, expectedRevision: args.expectedRevision,
+      }, signal));
       return output.success ? output.data : invalid();
     },
     executeSemanticQuery: async (argumentsValue: unknown, signal?: AbortSignal) => {

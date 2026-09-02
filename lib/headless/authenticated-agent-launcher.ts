@@ -9,6 +9,10 @@ import {
   createAipOperationRpcHostV1,
 } from '../../packages/aip/src/operation-rpc.ts';
 import { createAipOwnerBrokerV1 } from '../../packages/aip/src/owner-broker.ts';
+import { HEADLESS_CHECKUP_STATUS_OPERATION_V1 } from
+  '../../packages/aip/src/checkup-status-transition.ts';
+import { decodeCheckupStatusTransitionIpcFrameV1, encodeCheckupStatusTransitionIpcFrameV1 } from
+  '../../packages/aip/src/checkup-status-transition-ipc.ts';
 import {
   PATIENT_OPEN_LOOPS_FOLLOW_UP_PROPOSAL_APPLICATION_SERVICE_V1,
   PATIENT_OPEN_LOOPS_FOLLOW_UP_PROPOSAL_OPERATION_V1,
@@ -58,6 +62,8 @@ export function createAuthenticatedAgentLauncherV1(sourcesValue: unknown) {
   const readHostContext = sources.readHostContext as () => unknown;
   const spawnChild = sources.spawnChild as (environment: Readonly<Record<string, string>>) => unknown;
   const createOpenLoopsRead = sources.createOpenLoopsRead as (value: unknown) => unknown;
+  const previewCheckupStatus = sources.previewCheckupStatus as
+    (value: unknown, signal: AbortSignal) => Promise<unknown>;
   if (types.isAsyncFunction(commitTerminalAudit)) throw new AuthenticatedAgentLauncherV1Error('input_invalid');
   const issued = new Set<string>();
   let lastNow = -1;
@@ -224,8 +230,11 @@ export function createAuthenticatedAgentLauncherV1(sourcesValue: unknown) {
     };
     const authorize = async (state: OperationState) => broker.authorize(broker.issueLease(state.owner),
       current(state), record({ operation: state.operationId, capabilityId: state.capabilityId }));
-    const beginScopedPermit = (state: OperationState, permit: unknown, currentValue: unknown, claim: unknown) => {
-      const execution = broker.beginPermit(permit, currentValue, claim);
+    const beginScopedPermit = (state: OperationState, permit: unknown, currentValue: unknown, claim: unknown,
+      requiredStage?: 'read_only' | 'proposal_only') => {
+      const execution = requiredStage
+        ? broker.beginPermitAtStage(permit, currentValue, claim, requiredStage)
+        : broker.beginPermit(permit, currentValue, claim);
       if (!registry.bindExecution(state.scopeSession, state.owner, execution)) {
         broker.denyPermit(execution); throw new AuthenticatedAgentLauncherV1Error('operation_unavailable');
       }
@@ -280,11 +289,52 @@ export function createAuthenticatedAgentLauncherV1(sourcesValue: unknown) {
         try { return await service.execute(permit, input); } finally { service.dispose(); }
       });
     };
+    const executeCheckupPreview = async (state: OperationState, input: unknown, signal: AbortSignal) => {
+      const permit = await authorize(state), claim = record({ operation: state.operationId,
+        capabilityId: state.capabilityId });
+      let execution: object | null = null;
+      const cancel = () => { if (execution) { try { broker.denyPermit(execution); } catch { /* terminal */ } } };
+      return withAbort(signal, cancel, async () => {
+        try {
+          execution = beginScopedPermit(state, permit, current(state), claim, 'proposal_only');
+          const sourceValue = await previewCheckupStatus(input, signal);
+          const raw = decodeCheckupStatusTransitionIpcFrameV1(
+            encodeCheckupStatusTransitionIpcFrameV1(sourceValue));
+          const proposed = exact(raw, ['schemaVersion', 'type', 'requestRef', 'operationId', 'outcome',
+            'proposalRef', 'expiresAt']);
+          const denied = proposed ? null : exact(raw, ['schemaVersion', 'type', 'requestRef', 'operationId',
+            'outcome', 'denialCode']);
+          const currentValue = resolveScopedCurrent(state, execution);
+          if (proposed?.schemaVersion === 'mediflow.checkup-status.ipc.v1'
+            && proposed.type === 'preview_result' && proposed.operationId === state.operationId
+            && proposed.outcome === 'proposed' && typeof proposed.proposalRef === 'string'
+            && integer(proposed.expiresAt, now() + 1)) {
+            broker.finalizePermit(execution, currentValue, claim); execution = null;
+            return record({ schemaVersion: 'mediflow.patient.checkup.status.transition.preview-result.v1',
+              operationId: state.operationId, outcome: 'proposed', proposalRef: proposed.proposalRef,
+              expiresAt: proposed.expiresAt });
+          }
+          if (denied?.schemaVersion === 'mediflow.checkup-status.ipc.v1'
+            && denied.type === 'preview_result' && denied.operationId === state.operationId
+            && denied.outcome === 'denied' && typeof denied.denialCode === 'string') {
+            broker.denyPermit(execution); execution = null;
+            return record({ schemaVersion: 'mediflow.patient.checkup.status.transition.preview-result.v1',
+              operationId: state.operationId, outcome: 'denied', denialCode: denied.denialCode });
+          }
+          throw new AuthenticatedAgentLauncherV1Error('operation_unavailable');
+        } catch (error) {
+          cancel(); execution = null;
+          if (error instanceof AuthenticatedAgentLauncherV1Error) throw error;
+          throw new AuthenticatedAgentLauncherV1Error('operation_unavailable');
+        }
+      });
+    };
     const prepareRpc = (): void => {
       const terminologyState = createOperation(AIP_TERMINOLOGY_SEARCH_CONTRACT_V1.operationId, 'read_only');
       const openLoopsState = createOperation(PATIENT_OPEN_LOOPS_READ_OPERATION_V1, 'read_only');
       const proposalState = createOperation(PATIENT_OPEN_LOOPS_FOLLOW_UP_PROPOSAL_OPERATION_V1, 'proposal_only');
       const semanticState = createOperation(SEMANTIC_QUERY_OPERATION_CONTRACT_V1.operationId, 'read_only');
+      const checkupState = createOperation(HEADLESS_CHECKUP_STATUS_OPERATION_V1, 'proposal_only');
       rpcHost = createAipOperationRpcHostV1({ operations: [{
         operationId: terminologyState.operationId, capabilityId: terminologyState.capabilityId,
         serviceRef: AIP_TERMINOLOGY_SEARCH_CONTRACT_V1.applicationServiceRef, maximumStage: 'read_only', timeoutMs: 500,
@@ -314,6 +364,10 @@ export function createAuthenticatedAgentLauncherV1(sourcesValue: unknown) {
             try { return await service.propose(permit, input); } finally { service.dispose(); }
           });
         },
+      }, {
+        operationId: checkupState.operationId, capabilityId: checkupState.capabilityId,
+        serviceRef: 'HeadlessCheckupStatusTransitionServiceV1', maximumStage: 'proposal_only', timeoutMs: 5_000,
+        execute: (input: unknown, signal: AbortSignal) => executeCheckupPreview(checkupState, input, signal),
       }, {
         operationId: semanticState.operationId, capabilityId: semanticState.capabilityId,
         serviceRef: SEMANTIC_QUERY_OPERATION_CONTRACT_V1.applicationServiceRef,

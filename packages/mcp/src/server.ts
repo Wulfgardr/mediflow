@@ -1,11 +1,13 @@
 /* @Codex */
 import { McpServer } from '@modelcontextprotocol/server';
 import {
-  CAPABILITIES_TOOL_ID, FOLLOW_UP_PROPOSAL_OPERATION_ID, HEADLESS_STATUS_TOOL_ID, OPEN_LOOPS_OPERATION_ID,
+  CAPABILITIES_TOOL_ID, CHECKUP_STATUS_TRANSITION_OPERATION_ID, FOLLOW_UP_PROPOSAL_OPERATION_ID,
+  HEADLESS_STATUS_TOOL_ID, OPEN_LOOPS_OPERATION_ID,
   SEMANTIC_QUERY_OPERATION_ID, TERMINOLOGY_OPERATION_ID, capabilitiesOutputSchema, followUpProposalArgumentsSchema,
   followUpProposalOutputSchema, headlessStatusOutputSchema, openLoopsArgumentsSchema, openLoopsOutputSchema,
   semanticQueryArgumentsSchema, semanticQueryOutputSchema, systemArgumentsSchema, terminologyArgumentsSchema,
   terminologyOutputSchema,
+  checkupStatusTransitionArgumentsSchema, checkupStatusTransitionOutputSchema,
 } from './contracts.ts';
 import { OperationClientError, createOperationClient } from './operation-client.ts';
 
@@ -103,6 +105,22 @@ export async function createUsefulMcpServer() {
       return { content: [{ type: 'text',
         text: `Semantic query completed ${output.steps.length} read step(s); writes 0, apply none.` }],
       structuredContent: output };
+    } catch (error) { return toolError(error); }
+  });
+  server.registerTool(CHECKUP_STATUS_TRANSITION_OPERATION_ID, {
+    title: 'Preview a selected checkup status transition',
+    description: 'Creates a bounded preview only. A physician must confirm separately in trusted MediFlow UI.',
+    inputSchema: checkupStatusTransitionArgumentsSchema, outputSchema: checkupStatusTransitionOutputSchema,
+    annotations: proposalAnnotations,
+    _meta: { 'mediflow/capabilityId': CHECKUP_STATUS_TRANSITION_OPERATION_ID,
+      'mediflow/maximumStage': 'proposal_only', 'mediflow/surfaceKind': 'trusted_ui_confirmation_required' },
+  }, async (args, context) => {
+    try {
+      const output = await bound().previewCheckupStatusTransition(args, context.mcpReq.signal);
+      const text = output.outcome === 'proposed'
+        ? 'Checkup transition preview created; trusted MediFlow UI confirmation is required.'
+        : `Checkup transition preview denied: ${output.denialCode}.`;
+      return { content: [{ type: 'text', text }], structuredContent: output };
     } catch (error) { return toolError(error); }
   });
   return Object.freeze({ server, close: () => client?.close() });

@@ -2,7 +2,7 @@
 import { types } from 'node:util';
 
 export const SOURCE_KEYS = ['now', 'nextRef', 'hashRef', 'writeAudit', 'commitTerminalAudit', 'readHostContext',
-  'spawnChild', 'createOpenLoopsRead'] as const;
+  'spawnChild', 'createOpenLoopsRead', 'previewCheckupStatus'] as const;
 export const CONTEXT_KEYS = ['status', 'userRef', 'parentRef', 'purposeCode', 'patientId', 'ambulatoryId',
   'generation', 'revocationGeneration', 'selectionEpoch', 'restartGeneration', 'parentGeneration',
   'policyGeneration', 'expiresAt', 'bootstrapExpiresAt'] as const;

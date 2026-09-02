@@ -104,6 +104,7 @@ function fixture() {
       events.push('web.drain.scheduled'); return () => { timer.active = false; };
     },
     mirror, children,
+    checkup: Object.freeze({ acceptWebFrame: () => false, close: () => true }),
     launchMcp: () => { events.push('mcp.launch'); return launch.promise; },
   });
   return {
