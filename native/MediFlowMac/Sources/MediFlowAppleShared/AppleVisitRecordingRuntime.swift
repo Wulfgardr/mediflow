@@ -209,6 +209,16 @@ final class VisitRecordingPCMConverter {
 @available(macOS 26.0, *)
 @MainActor
 final class AppleVisitRecordingRuntime: VisitRecordingRuntimePort {
+    private enum Lifecycle: Equatable {
+        case idle
+        case preparing(UInt64)
+        case prepared(UInt64)
+        case capturing(UInt64)
+        case stopped(UInt64)
+        case finalizing(UInt64)
+        case terminal
+    }
+
     private let engine = AVAudioEngine()
     private let transcriber: SpeechTranscriber
     private let analyzer: SpeechAnalyzer
@@ -220,6 +230,7 @@ final class AppleVisitRecordingRuntime: VisitRecordingRuntimePort {
     private var onFrame: (@Sendable (VisitRecordingPCMFrame) -> Void)?
     private var onInterruption: (@Sendable () -> Void)?
     private var onFailure: (@Sendable (VisitRecordingDenial) -> Void)?
+    private var lifecycle = Lifecycle.idle
 
     init(locale: Locale) {
         transcriber = SpeechTranscriber(locale: locale, preset: .transcription)
@@ -233,6 +244,9 @@ final class AppleVisitRecordingRuntime: VisitRecordingRuntimePort {
         onInterruption: @escaping @Sendable () -> Void,
         onFailure: @escaping @Sendable (VisitRecordingDenial) -> Void
     ) async throws {
+        guard lifecycle == .idle else { throw CocoaError(.coderInvalidValue) }
+        let generation: UInt64 = 1
+        lifecycle = .preparing(generation)
         self.audioBudget = audioBudget
         self.onFrame = onFrame
         self.onInterruption = onInterruption
@@ -242,12 +256,14 @@ final class AppleVisitRecordingRuntime: VisitRecordingRuntimePort {
               let target = await SpeechAnalyzer.bestAvailableAudioFormat(
                   compatibleWith: [transcriber], considering: natural
               ) else { throw CocoaError(.featureUnsupported) }
+        try require(.preparing(generation))
         pcmConverter = try VisitRecordingPCMConverter(
             sourceFormat: natural,
             targetFormat: target,
             audioBudget: audioBudget
         )
         try await analyzer.prepareToAnalyze(in: target)
+        try require(.preparing(generation))
         resultTask = Task {
             do {
                 for try await result in transcriber.results {
@@ -258,9 +274,13 @@ final class AppleVisitRecordingRuntime: VisitRecordingRuntimePort {
                 throw error
             }
         }
+        lifecycle = .prepared(generation)
     }
 
     func startCapture() throws {
+        guard case let .prepared(generation) = lifecycle else {
+            throw CocoaError(.coderInvalidValue)
+        }
         guard let audioBudget else { throw CocoaError(.coderInvalidValue) }
         let input = engine.inputNode
         let format = input.inputFormat(forBus: 0)
@@ -302,11 +322,20 @@ final class AppleVisitRecordingRuntime: VisitRecordingRuntimePort {
             queue: nil
         ) { _ in interruption?() }
         engine.prepare()
-        do { try engine.start() }
+        do {
+            try engine.start()
+            lifecycle = .capturing(generation)
+        }
         catch { stopCapture(); throw error }
     }
 
     func consume(_ frame: VisitRecordingPCMFrame) async throws {
+        switch lifecycle {
+        case .capturing, .stopped:
+            break
+        default:
+            throw CancellationError()
+        }
         guard let pcmConverter else { throw CocoaError(.coderInvalidValue) }
         let outputs: [VisitRecordingConvertedPCM]
         do {
@@ -330,9 +359,16 @@ final class AppleVisitRecordingRuntime: VisitRecordingRuntimePort {
             tapInstalled = false
         }
         engine.stop()
+        if case let .capturing(generation) = lifecycle {
+            lifecycle = .stopped(generation)
+        }
     }
 
     func finishAndFinalize() async throws {
+        guard case let .stopped(generation) = lifecycle else {
+            throw CocoaError(.coderInvalidValue)
+        }
+        lifecycle = .finalizing(generation)
         guard let pcmConverter else { throw CocoaError(.coderInvalidValue) }
         let outputs: [VisitRecordingConvertedPCM]
         do {
@@ -342,17 +378,42 @@ final class AppleVisitRecordingRuntime: VisitRecordingRuntimePort {
         }
         defer { outputs.forEach { $0.releaseReservation() } }
         for output in outputs {
+            try require(.finalizing(generation))
             try await analyze(output.buffer)
         }
+        try require(.finalizing(generation))
         try await analyzer.finalizeAndFinishThroughEndOfInput()
+        try require(.finalizing(generation))
         try await resultTask?.value
+        try require(.finalizing(generation))
+        lifecycle = .terminal
+        clearRetainedState()
     }
 
     func cancelAndFinishNow() async {
-        pcmConverter?.cancel()
+        guard lifecycle != .terminal else { return }
+        lifecycle = .terminal
+        stopCapture()
+        let converter = pcmConverter
+        let results = resultTask
+        converter?.cancel()
         await analyzer.cancelAndFinishNow()
-        resultTask?.cancel()
-        _ = try? await resultTask?.value
+        results?.cancel()
+        _ = try? await results?.value
+        clearRetainedState()
+    }
+
+    private func require(_ expected: Lifecycle) throws {
+        guard lifecycle == expected else { throw CancellationError() }
+    }
+
+    private func clearRetainedState() {
+        pcmConverter = nil
+        resultTask = nil
+        audioBudget = nil
+        onFrame = nil
+        onInterruption = nil
+        onFailure = nil
     }
 
     private func analyze(_ buffer: AVAudioPCMBuffer) async throws {

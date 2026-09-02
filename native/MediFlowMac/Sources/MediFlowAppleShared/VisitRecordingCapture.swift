@@ -280,13 +280,47 @@ final class VisitRecordingPCMQueue: @unchecked Sendable {
     }
 }
 
-@MainActor
-private final class VisitRecordingFailureLatch {
-    private(set) var value: VisitRecordingDenial?
-
-    func record(_ denial: VisitRecordingDenial) {
-        if value == nil { value = denial }
+private final class VisitRecordingFailureLatch: @unchecked Sendable {
+    enum PublicationClaim {
+        case granted
+        case denied(VisitRecordingDenial)
+        case unavailable
     }
+
+    private let lock = NSLock()
+    private var denial: VisitRecordingDenial?
+    private var publicationClaimed = false
+
+    @discardableResult
+    func record(_ denial: VisitRecordingDenial) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !publicationClaimed, self.denial == nil else { return false }
+        self.denial = denial
+        return true
+    }
+
+    var value: VisitRecordingDenial? {
+        lock.lock()
+        defer { lock.unlock() }
+        return denial
+    }
+
+    func claimPublication() -> PublicationClaim {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !publicationClaimed else { return .unavailable }
+        if let denial { return .denied(denial) }
+        publicationClaimed = true
+        return .granted
+    }
+}
+
+private enum VisitRecordingCaptureGenerationState: Equatable {
+    case idle
+    case preparing(UInt64)
+    case active(UInt64)
+    case terminal
 }
 
 private enum VisitRecordingDeadlineOutcome {
@@ -385,6 +419,7 @@ public final class VisitRecordingCaptureController {
     private var consumerFailed = false
     private var closed = false
     private var captureStopped = false
+    private var captureGenerationState = VisitRecordingCaptureGenerationState.idle
     private var retainedPreflight: VisitRecordingPreflight?
 
     init(
@@ -467,6 +502,7 @@ public final class VisitRecordingCaptureController {
             await releaseReservationIfNeeded()
             return
         }
+        guard let generation = claimCaptureGeneration() else { return }
         let budget = VisitRecordingAudioBudget(limits: limits)
         let queue = VisitRecordingPCMQueue()
         let failures = VisitRecordingFailureLatch()
@@ -484,17 +520,21 @@ public final class VisitRecordingCaptureController {
                         frame.releaseReservationOffAudioThread()
                     case .busy:
                         frame.releaseReservationOffAudioThread()
-                        self?.requestFailure(.bufferExceeded)
+                        self?.recordFailure(.bufferExceeded, in: failures)
                     case .invalid:
                         frame.releaseReservationOffAudioThread()
-                        self?.requestFailure(.invalidUsage)
+                        self?.recordFailure(.invalidUsage, in: failures)
                     }
                 },
                 onResult: { [weak self] result in self?.accept(result) },
-                onInterruption: { [weak self] in self?.requestFailure(.interrupted) },
-                onFailure: { [weak self] denial in self?.requestFailure(denial) }
+                onInterruption: { [weak self] in self?.recordFailure(.interrupted, in: failures) },
+                onFailure: { [weak self] denial in self?.recordFailure(denial, in: failures) }
             )
-            guard !closed else { return }
+            guard isPreparing(generation), !closed else {
+                await runtime.cancelAndFinishNow()
+                return
+            }
+            if let denial = failures.value { await fail(denial); return }
             guard isCurrentSelection else { await fail(.staleBinding); return }
             try session.apply(.start)
             consumerTask = Task { @MainActor [weak self] in
@@ -515,20 +555,23 @@ public final class VisitRecordingCaptureController {
                         return
                     case let .denied(denial):
                         self.consumerFailed = true
-                        self.failureLatch?.record(denial)
-                        self.requestFailure(denial)
+                        self.recordFailure(denial, in: failures)
                         return
                     case .timedOut, .cancelled:
                         self.consumerFailed = true
-                        self.failureLatch?.record(.failed)
-                        self.requestFailure(.failed)
+                        self.recordFailure(.failed, in: failures)
                         return
                     }
                 }
             }
             try runtime.startCapture()
-            guard !closed else { return }
+            guard isPreparing(generation), !closed else {
+                await runtime.cancelAndFinishNow()
+                return
+            }
+            if let denial = failures.value { await fail(denial); return }
             guard isCurrentSelection else { await fail(.staleBinding); return }
+            captureGenerationState = .active(generation)
             let durationNanoseconds = self.durationNanoseconds
             durationTask = Task { @MainActor [weak self] in
                 do { try await Task.sleep(nanoseconds: durationNanoseconds) }
@@ -553,6 +596,8 @@ public final class VisitRecordingCaptureController {
                     }
                 }
             }
+        } catch where !isPreparing(generation) || closed {
+            await runtime.cancelAndFinishNow()
         } catch {
             await fail(.failed)
         }
@@ -564,7 +609,8 @@ public final class VisitRecordingCaptureController {
     }
 
     public func stop() async {
-        guard session.phase == .recording, !closed, let queue else { return }
+        guard case .active = captureGenerationState,
+              session.phase == .recording, !closed, let queue else { return }
         guard isCurrentSelection else { await fail(.staleBinding); return }
         do { try session.apply(.stop) }
         catch { await fail(.failed); return }
@@ -604,6 +650,17 @@ public final class VisitRecordingCaptureController {
         guard !transcriptOverflowed else { await fail(.transcriptExceeded); return }
         guard !finalTranscript.isEmpty else { await fail(.failed); return }
         guard isCurrentSelection else { await fail(.staleBinding); return }
+        guard let failureLatch else { await fail(.failed); return }
+        switch failureLatch.claimPublication() {
+        case .granted:
+            break
+        case let .denied(denial):
+            await fail(denial)
+            return
+        case .unavailable:
+            await fail(.failed)
+            return
+        }
         do {
             try session.apply(
                 .publishTranscript(
@@ -617,6 +674,7 @@ public final class VisitRecordingCaptureController {
             return
         }
         closed = true
+        retireCaptureGeneration()
         currentnessTask?.cancel()
         finalizationDeadlineTask?.cancel()
         queue.cancel()
@@ -652,7 +710,11 @@ public final class VisitRecordingCaptureController {
     }
 
     private func accept(_ result: VisitRecordingTranscriptResult) {
-        guard isCurrentSelection else { requestFailure(.staleBinding); return }
+        guard let failureLatch else { return }
+        guard isCurrentSelection else {
+            recordFailure(.staleBinding, in: failureLatch)
+            return
+        }
         guard result.isFinal, !closed, !transcriptOverflowed else { return }
         let segment = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !segment.isEmpty else { return }
@@ -661,7 +723,7 @@ public final class VisitRecordingCaptureController {
         guard separator <= limits.maxTranscriptUTF8Bytes - finalTranscriptBytes,
               bytes <= limits.maxTranscriptUTF8Bytes - finalTranscriptBytes - separator else {
             transcriptOverflowed = true
-            requestFailure(.transcriptExceeded)
+            recordFailure(.transcriptExceeded, in: failureLatch)
             return
         }
         if separator == 1 { finalTranscript.append(" ") }
@@ -686,7 +748,11 @@ public final class VisitRecordingCaptureController {
         }
     }
 
-    private nonisolated func requestFailure(_ denial: VisitRecordingDenial) {
+    private nonisolated func recordFailure(
+        _ denial: VisitRecordingDenial,
+        in latch: VisitRecordingFailureLatch
+    ) {
+        guard latch.record(denial) else { return }
         Task { @MainActor [weak self] in await self?.fail(denial) }
     }
 
@@ -698,6 +764,7 @@ public final class VisitRecordingCaptureController {
         guard !closed else { return }
         failureLatch?.record(denial)
         closed = true
+        retireCaptureGeneration()
         durationTask?.cancel()
         currentnessTask?.cancel()
         finalizationDeadlineTask?.cancel()
@@ -718,6 +785,7 @@ public final class VisitRecordingCaptureController {
 
     private func finishDenied(_ denial: VisitRecordingDenial) {
         closed = true
+        retireCaptureGeneration()
         durationTask?.cancel()
         currentnessTask?.cancel()
         finalizationDeadlineTask?.cancel()
@@ -733,6 +801,21 @@ public final class VisitRecordingCaptureController {
     private func clearTranscriptAccumulator() {
         finalTranscript.removeAll(keepingCapacity: false)
         finalTranscriptBytes = 0
+    }
+
+    private func claimCaptureGeneration() -> UInt64? {
+        guard captureGenerationState == .idle else { return nil }
+        let generation: UInt64 = 1
+        captureGenerationState = .preparing(generation)
+        return generation
+    }
+
+    private func isPreparing(_ generation: UInt64) -> Bool {
+        captureGenerationState == .preparing(generation)
+    }
+
+    private func retireCaptureGeneration() {
+        captureGenerationState = .terminal
     }
 
     private func stopRuntimeCaptureIfNeeded() {
