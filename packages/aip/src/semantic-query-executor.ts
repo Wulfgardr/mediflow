@@ -20,16 +20,27 @@ export type SemanticQueryExecutionResultV1 = Readonly<{
   steps: readonly Readonly<{ stepRef: string; operationId: string; output: unknown }>[];
   receipt: SemanticQueryExecutionReceiptV1;
 }>;
+export type SemanticQueryExecutionAuditV1 = Readonly<{
+  schemaVersion: 'mediflow.aip.audit.v1'; eventType: 'semantic_query_plan_execution';
+  outcome: 'allowed' | 'denied'; operation: 'mediflow.semantic_query_plan.execute.v1';
+  capabilityId: 'mediflow.semantic_query_plan.execute.v1'; policyDecision: 'allowed' | 'denied';
+  revisionBinding: Readonly<{ generation: number; revocationGeneration: number; selectionEpoch: number }> | null;
+  operationCount: number; durationMs: number; timestamp: number; writesPerformed: 0; applyPolicy: 'none';
+  denialCode: SemanticQueryExecutionV1ErrorCode | null;
+}>;
 
 const SOURCE_KEYS = ['inspectPlan', 'current', 'now', 'nextRef', 'resolveApplicationService', 'writeAudit'] as const;
 const SNAPSHOT_KEYS = ['purposeCode', 'scope', 'generation', 'revocationGeneration', 'selectionEpoch',
   'maxSteps', 'maxDurationMs', 'maxOutputBytes'] as const;
 const SERVICE_KEYS = ['operationId', 'applicationServiceRef', 'maximumStage', 'execute'] as const;
 const RESULT_KEYS = ['schemaVersion', 'operationId', 'capabilityId', 'outcome'] as const;
+const AUDIT_PORT_KEYS = ['mode', 'commit'] as const;
+const AUDIT_ACK_KEYS = ['status', 'generation', 'revocationGeneration', 'selectionEpoch'] as const;
 const REQUEST_REF = /^sqrq_[0-9a-f]{64}$/u, ACTION_REF = /^sqra_[0-9a-f]{64}$/u;
-const { isProxy, isPromise } = types;
+const { isAsyncFunction, isProxy, isPromise } = types;
 const promiseThen = Promise.prototype.then, reflectApply = Reflect.apply;
 const encoder = new TextEncoder();
+const consumedPlanHandles = new WeakSet<object>();
 
 function fail(code: SemanticQueryExecutionV1ErrorCode): never { throw new SemanticQueryExecutionV1Error(code); }
 function record<T extends object>(value: T): Readonly<T> { return Object.freeze(Object.assign(Object.create(null), value)); }
@@ -100,13 +111,19 @@ function discardPromise(value: unknown): boolean {
 /** Executes one process-local validated plan through host-owned read Application Services. */
 export function createSemanticQueryExecutorV1(sourcesValue: unknown) {
   const sources = exact(sourcesValue, SOURCE_KEYS);
-  if (!sources || SOURCE_KEYS.some((key) => typeof sources[key] !== 'function')) return fail('policy_unavailable');
+  if (!sources || SOURCE_KEYS.slice(0, -1).some((key) => typeof sources[key] !== 'function'
+    || isProxy(sources[key]))) return fail('policy_unavailable');
+  const auditPort = exact(sources.writeAudit, AUDIT_PORT_KEYS, true);
+  // The host port is the terminal linearization point: it atomically checks the binding and commits synchronously.
+  if (!auditPort || auditPort.mode !== 'synchronous_terminal.v1' || typeof auditPort.commit !== 'function'
+    || isProxy(auditPort.commit) || isAsyncFunction(auditPort.commit)) return fail('policy_unavailable');
   const inspectSource = sources.inspectPlan as (handle: unknown) => unknown;
   const currentSource = sources.current as () => unknown, nowSource = sources.now as () => unknown;
   const nextRefSource = sources.nextRef as (kind: 'request' | 'action') => unknown;
   const resolveSource = sources.resolveApplicationService as (ref: unknown) => unknown;
-  const auditSource = sources.writeAudit as (receipt: unknown) => unknown;
-  let state: 'idle' | 'running' | 'terminal' = 'idle', terminalCode: 'timeout' | 'cancelled' | null = null;
+  const auditSource = auditPort.commit as (audit: SemanticQueryExecutionAuditV1) => unknown;
+  let state: 'idle' | 'running' | 'committing' | 'terminal' = 'idle';
+  let terminalCode: SemanticQueryExecutionV1ErrorCode | null = null, auditActive = false;
   let controller: AbortController | null = null, terminalResolve: ((value: 'timeout' | 'cancelled') => void) | null = null;
   let lastNow = -1;
 
@@ -130,7 +147,9 @@ export function createSemanticQueryExecutorV1(sourcesValue: unknown) {
   };
   const terminalize = (code: 'timeout' | 'cancelled'): boolean => {
     if (state !== 'running') return false;
-    state = 'terminal'; terminalCode = code; controller?.abort(code); terminalResolve?.(code); return true;
+    state = 'terminal'; terminalCode = code; terminalResolve?.(code);
+    try { controller?.abort(code); } catch { /* terminal */ }
+    return true;
   };
   const terminalError = (): never => fail(terminalCode ?? 'service_denied');
   const bounded = async (value: unknown, failure: 'service_denied' | 'audit_failed', terminal: Promise<'timeout' | 'cancelled'>) => {
@@ -156,21 +175,62 @@ export function createSemanticQueryExecutorV1(sourcesValue: unknown) {
       || !(kind === 'request' ? REQUEST_REF : ACTION_REF).test(value)) return fail('audit_failed');
     return value;
   };
+  const commitAudit = (outcome: 'allowed' | 'denied', code: SemanticQueryExecutionV1ErrorCode | null,
+    plan: ValidatedSemanticQueryPlanV1 | null, operationCount: number, startedAt: number | null): void => {
+    if (auditActive) return fail('audit_failed');
+    const timestamp = lastNow < 0 ? 0 : lastNow;
+    const durationMs = startedAt === null ? 0 : Math.max(0, timestamp - startedAt);
+    const audit = record({ schemaVersion: 'mediflow.aip.audit.v1' as const,
+      eventType: 'semantic_query_plan_execution' as const, outcome,
+      operation: 'mediflow.semantic_query_plan.execute.v1' as const,
+      capabilityId: 'mediflow.semantic_query_plan.execute.v1' as const, policyDecision: outcome,
+      revisionBinding: plan ? record(plan.currentness) : null, operationCount, durationMs, timestamp,
+      writesPerformed: 0 as const, applyPolicy: 'none' as const, denialCode: outcome === 'denied' ? code : null });
+    let committed: unknown;
+    auditActive = true;
+    try { committed = reflectApply(auditSource, undefined, [audit]); }
+    catch { return fail('audit_failed'); }
+    finally { auditActive = false; }
+    if (discardPromise(committed)) return fail('audit_failed');
+    const acknowledgement = exact(committed, AUDIT_ACK_KEYS, true);
+    if (!acknowledgement) return fail('audit_failed');
+    if (outcome === 'denied') {
+      if (acknowledgement.status !== 'committed'
+        || acknowledgement.generation !== (plan?.currentness.generation ?? null)
+        || acknowledgement.revocationGeneration !== (plan?.currentness.revocationGeneration ?? null)
+        || acknowledgement.selectionEpoch !== (plan?.currentness.selectionEpoch ?? null)) return fail('audit_failed');
+      return;
+    }
+    if (acknowledgement.status === 'currentness_denied') return fail('currentness_denied');
+    if (acknowledgement.status !== 'committed' || !plan
+      || acknowledgement.generation !== plan.currentness.generation
+      || acknowledgement.revocationGeneration !== plan.currentness.revocationGeneration
+      || acknowledgement.selectionEpoch !== plan.currentness.selectionEpoch) return fail('audit_failed');
+  };
 
   const execute = async (handle: unknown): Promise<SemanticQueryExecutionResultV1> => {
-    if (state !== 'idle') return fail('restart_forbidden');
-    let inspected: unknown;
-    try { inspected = inspectSource(handle); } catch { return fail('plan_denied'); }
-    if (discardPromise(inspected) || !canonical(inspected)) return fail('plan_denied');
-    const plan = inspected as ValidatedSemanticQueryPlanV1;
-    if (plan.schemaVersion !== 'mediflow.semantic-query-plan.validated.v1' || !plan.steps.length) return fail('plan_denied');
-    if (state !== 'idle') return fail('restart_forbidden');
+    if (state !== 'idle') {
+      if (!auditActive) { try { commitAudit('denied', 'restart_forbidden', null, 0, null); } catch { /* terminal */ } }
+      return fail('restart_forbidden');
+    }
     state = 'running'; controller = new AbortController();
     const terminal = new Promise<'timeout' | 'cancelled'>((resolve) => { terminalResolve = resolve; });
     const outputs: Readonly<{ stepRef: string; operationId: string; output: unknown }>[] = [];
-    let outputBytes = 0, timer: ReturnType<typeof setTimeout> | null = null;
+    let plan: ValidatedSemanticQueryPlanV1 | null = null, outputBytes = 0;
+    let startedAt: number | null = null, timer: ReturnType<typeof setTimeout> | null = null;
     try {
-      const startedAt = now(); timer = setTimeout(() => terminalize('timeout'), plan.budget.maxDurationMs);
+      if (typeof handle !== 'object' || handle === null || isProxy(handle)) return fail('plan_denied');
+      if (consumedPlanHandles.has(handle)) return fail('restart_forbidden');
+      let inspected: unknown;
+      try { inspected = inspectSource(handle); } catch { return fail('plan_denied'); }
+      if (discardPromise(inspected) || !canonical(inspected)) return fail('plan_denied');
+      if (state !== 'running') return terminalError();
+      const validated = inspected as ValidatedSemanticQueryPlanV1;
+      if (validated.schemaVersion !== 'mediflow.semantic-query-plan.validated.v1'
+        || !Array.isArray(validated.steps) || !validated.steps.length) return fail('plan_denied');
+      if (consumedPlanHandles.has(handle)) return fail('restart_forbidden');
+      consumedPlanHandles.add(handle); plan = validated;
+      startedAt = now(); timer = setTimeout(() => terminalize('timeout'), plan.budget.maxDurationMs);
       for (let index = 0; index < plan.steps.length; index += 1) {
         const step = plan.steps[index]!;
         readCurrent(plan);
@@ -199,18 +259,31 @@ export function createSemanticQueryExecutorV1(sourcesValue: unknown) {
       }
       const requestRef = nextRef('request'), actionRef = nextRef('action'), createdAt = now();
       if (createdAt - startedAt >= plan.budget.maxDurationMs) { terminalize('timeout'); return fail('timeout'); }
+      readCurrent(plan);
       const receipt = record({ schemaVersion: 'mediflow.headless.receipt.v1' as const, requestRef, actionRef,
         capabilityId: 'mediflow.semantic_query_plan.execute.v1' as const, outcome: 'orchestration' as const,
         policyDecision: 'allowed' as const, revisionBinding: record(plan.currentness), operationCount: outputs.length,
         durationMs: createdAt - startedAt, createdAt, writesPerformed: 0 as const, applyPolicy: 'none' as const });
-      readCurrent(plan);
-      let audited: unknown; try { audited = auditSource(receipt); } catch { return fail('audit_failed'); }
-      await bounded(audited, 'audit_failed', terminal); readCurrent(plan);
-      if (now() - startedAt >= plan.budget.maxDurationMs) { terminalize('timeout'); return fail('timeout'); }
-      state = 'terminal'; return record({ schemaVersion: 'mediflow.semantic-query-execution.result.v1' as const,
+      const result = record({ schemaVersion: 'mediflow.semantic-query-execution.result.v1' as const,
         outcome: 'read_completed' as const, steps: list(outputs), receipt });
+      if (timer) { clearTimeout(timer); timer = null; }
+      state = 'committing'; commitAudit('allowed', null, plan, outputs.length, startedAt);
+      state = 'terminal'; terminalCode = null; return result;
+    } catch (error) {
+      const inferred = error instanceof SemanticQueryExecutionV1Error ? error.code : 'service_denied';
+      const code = terminalCode ?? inferred;
+      const publicError = new SemanticQueryExecutionV1Error(code);
+      if (state !== 'terminal') { state = 'terminal'; terminalCode = code; }
+      try { if (controller && !controller.signal.aborted) controller.abort(code); } catch { /* terminal */ }
+      if (!auditActive) {
+        try { commitAudit('denied', code, plan, outputs.length, startedAt); }
+        catch { if (code !== 'timeout' && code !== 'cancelled') terminalCode = 'audit_failed'; }
+      }
+      throw publicError;
     } finally {
-      if (timer) clearTimeout(timer); if (state === 'running') state = 'terminal'; controller = null; terminalResolve = null;
+      if (timer) clearTimeout(timer);
+      if (state === 'running' || state === 'committing') { state = 'terminal'; terminalCode ??= 'service_denied'; }
+      controller = null; terminalResolve = null;
     }
   };
   return record({ execute, cancel: () => terminalize('cancelled') });
