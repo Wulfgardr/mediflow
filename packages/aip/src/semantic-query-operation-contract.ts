@@ -131,11 +131,41 @@ export function semanticQueryOperationDiscardPromise(value: unknown): boolean {
   try { void Promise.prototype.then.call(value, undefined, () => undefined); } catch { /* denied */ }
   return true;
 }
-export function canonicalSemanticQueryOperationJson(value: unknown, budget = { nodes: 0 }, depth = 0): unknown {
+type SemanticQueryOperationJsonBudget = { nodes: number; bytes: number; maxBytes: number };
+function spendSemanticQueryOperationJsonBytes(budget: SemanticQueryOperationJsonBudget, bytes: number): void {
+  if (bytes > budget.maxBytes - budget.bytes) return semanticQueryOperationFail('operation_unavailable');
+  budget.bytes += bytes;
+}
+function spendSemanticQueryOperationJsonString(value: string, budget: SemanticQueryOperationJsonBudget): void {
+  if (value.length > budget.maxBytes - budget.bytes) return semanticQueryOperationFail('operation_unavailable');
+  spendSemanticQueryOperationJsonBytes(budget, 2);
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    if (code === 0x22 || code === 0x5c || code === 0x08 || code === 0x09 || code === 0x0a
+      || code === 0x0c || code === 0x0d) spendSemanticQueryOperationJsonBytes(budget, 2);
+    else if (code <= 0x1f) spendSemanticQueryOperationJsonBytes(budget, 6);
+    else if (code <= 0x7f) spendSemanticQueryOperationJsonBytes(budget, 1);
+    else if (code <= 0x7ff) spendSemanticQueryOperationJsonBytes(budget, 2);
+    else if (code >= 0xd800 && code <= 0xdbff && value.charCodeAt(index + 1) >= 0xdc00
+      && value.charCodeAt(index + 1) <= 0xdfff) {
+      spendSemanticQueryOperationJsonBytes(budget, 4); index += 1;
+    } else if (code >= 0xd800 && code <= 0xdfff) spendSemanticQueryOperationJsonBytes(budget, 6);
+    else spendSemanticQueryOperationJsonBytes(budget, 3);
+  }
+}
+export function canonicalSemanticQueryOperationJson(value: unknown,
+  budget: SemanticQueryOperationJsonBudget = { nodes: 0, bytes: 0,
+    maxBytes: SEMANTIC_QUERY_OPERATION_MAX_OUTPUT_BYTES_V1 }, depth = 0): unknown {
   budget.nodes += 1;
   if (budget.nodes > 2_048 || depth > 16) return semanticQueryOperationFail('operation_unavailable');
-  if (value === null || typeof value === 'boolean' || typeof value === 'string') return value;
-  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (value === null) { spendSemanticQueryOperationJsonBytes(budget, 4); return value; }
+  if (typeof value === 'boolean') {
+    spendSemanticQueryOperationJsonBytes(budget, value ? 4 : 5); return value;
+  }
+  if (typeof value === 'string') { spendSemanticQueryOperationJsonString(value, budget); return value; }
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    spendSemanticQueryOperationJsonBytes(budget, String(value).length); return value;
+  }
   if (typeof value !== 'object' || types.isProxy(value) || types.isPromise(value)) {
     return semanticQueryOperationFail('operation_unavailable');
   }
@@ -144,6 +174,7 @@ export function canonicalSemanticQueryOperationJson(value: unknown, budget = { n
       if (![Array.prototype, null].includes(Object.getPrototypeOf(value)) || value.length > 128) {
         return semanticQueryOperationFail('operation_unavailable');
       }
+      spendSemanticQueryOperationJsonBytes(budget, 2 + Math.max(0, value.length - 1));
       const keys = Reflect.ownKeys(value);
       if (keys.length !== value.length + 1) return semanticQueryOperationFail('operation_unavailable');
       const output: unknown[] = [];
@@ -162,12 +193,15 @@ export function canonicalSemanticQueryOperationJson(value: unknown, budget = { n
     if (keys.length > 256 || keys.some((key) => typeof key !== 'string')) {
       return semanticQueryOperationFail('operation_unavailable');
     }
+    spendSemanticQueryOperationJsonBytes(budget, 2 + Math.max(0, keys.length - 1));
     const output = Object.create(null) as Record<string, unknown>;
     for (const key of keys as string[]) {
       const descriptor = Object.getOwnPropertyDescriptor(value, key);
       if (!descriptor?.enumerable || !('value' in descriptor)) {
         return semanticQueryOperationFail('operation_unavailable');
       }
+      spendSemanticQueryOperationJsonString(key, budget);
+      spendSemanticQueryOperationJsonBytes(budget, 1);
       output[key] = canonicalSemanticQueryOperationJson(descriptor.value, budget, depth + 1);
     }
     return Object.freeze(output);

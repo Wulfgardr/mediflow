@@ -29,11 +29,13 @@ const output = (operationId: string, marker: string) => record({ schemaVersion: 
   operationId, capabilityId: operationId, outcome: 'read', items: Object.freeze(Object.setPrototypeOf([marker], null)) });
 function setup(overrides: { current?: () => unknown; execute?: (index: number, signal: AbortSignal) => unknown;
   now?: () => unknown; serviceStage?: unknown;
+  canonicalizeOutput?: (operationId: unknown, value: unknown) => unknown;
+  beforeCommit?: () => unknown;
   writeAudit?: (audit: unknown, decide: (current: unknown, committedAt: unknown) => unknown) => unknown;
 } = {}, maxDurationMs = 80) {
   const candidate = plan(maxDurationMs); let now = 1_000; let ref = 0; const events: string[] = [], audits: unknown[] = [];
   const current = overrides.current ?? policy, clock = overrides.now ?? (() => now++);
-  const sources = { inspectPlan: candidate.validator.inspect,
+    const sources = { inspectPlan: candidate.validator.inspect,
     current, now: clock, nextRef: (kind: unknown) => {
       ref += 1; return `${kind === 'request' ? 'sqrq' : 'sqra'}_${String(ref).padStart(64, 'a')}`;
     }, resolveApplicationService: (serviceRef: unknown) => {
@@ -43,7 +45,9 @@ function setup(overrides: { current?: () => unknown; execute?: (index: number, s
         execute: (_input: unknown, signal: AbortSignal) => {
           events.push(operations[index]!); return overrides.execute?.(index, signal) ?? output(operations[index]!, `item-${index}`);
         } });
-    }, writeAudit: record({ mode: 'synchronous_terminal.v1', commit: (audit: unknown,
+    }, canonicalizeOutput: overrides.canonicalizeOutput ?? ((_operationId: unknown, value: unknown) => value),
+    beforeCommit: overrides.beforeCommit ?? (() => true),
+    writeAudit: record({ mode: 'synchronous_terminal.v1', commit: (audit: unknown,
       decide: (current: unknown, committedAt: unknown) => unknown) => {
       const overridden = overrides.writeAudit?.(audit, decide);
       const terminal = overridden ?? decide((audit as { outcome: unknown }).outcome === 'allowed' ? current() : null, clock());
@@ -116,6 +120,28 @@ test('revalidates currentness after the final host callback before publication',
   } });
   await assert.rejects(duringAudit.executor.execute(duringAudit.handle), /currentness_denied/);
   assert.deepEqual(duringAudit.audits.map((value) => (value as { outcome: unknown }).outcome), ['denied']);
+});
+
+test('post-fences currentness before canonicalizing a raw service output', async () => {
+  let snapshot = policy();
+  let canonicalCalls = 0;
+  let traps = 0;
+  const raw = new Proxy({}, { ownKeys: () => { traps += 1; return []; },
+    getPrototypeOf: () => { traps += 1; return Object.prototype; } });
+  const candidate = setup({ current: () => snapshot, execute: () => {
+    snapshot = record({ ...policy(), selectionEpoch: 12 });
+    return raw;
+  }, canonicalizeOutput: (_operationId, value) => {
+    canonicalCalls += 1;
+    Reflect.ownKeys(value as object);
+    return value;
+  } });
+
+  await assert.rejects(candidate.executor.execute(candidate.handle),
+    (error) => error instanceof SemanticQueryExecutionV1Error && error.code === 'currentness_denied');
+  assert.equal(canonicalCalls, 0);
+  assert.equal(traps, 0);
+  assert.deepEqual(candidate.audits.map((audit) => (audit as { outcome: unknown }).outcome), ['denied']);
 });
 
 test('consumes each genuine plan handle globally and terminalizes every executor attempt', async () => {

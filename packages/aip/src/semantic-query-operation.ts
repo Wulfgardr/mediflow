@@ -50,15 +50,11 @@ export {
 } from './semantic-query-operation-contract.ts';
 export type { SemanticQueryOperationV1ErrorCode } from './semantic-query-operation-contract.ts';
 
-const { isProxy, isPromise } = types;
-const encoder = new TextEncoder();
+const { isProxy, isPromise } = types, encoder = new TextEncoder();
 
-const record = semanticQueryOperationRecord;
-const list = semanticQueryOperationList;
-const exact = semanticQueryOperationExact;
-const integer = semanticQueryOperationInteger;
-const discardPromise = semanticQueryOperationDiscardPromise;
-const fail = semanticQueryOperationFail;
+const record = semanticQueryOperationRecord, list = semanticQueryOperationList;
+const exact = semanticQueryOperationExact, integer = semanticQueryOperationInteger;
+const discardPromise = semanticQueryOperationDiscardPromise, fail = semanticQueryOperationFail;
 type Policy = SemanticQueryOperationPolicyV1;
 
 function mapError(error: unknown): SemanticQueryOperationV1Error {
@@ -77,6 +73,7 @@ function mapError(error: unknown): SemanticQueryOperationV1Error {
     if (error.code === 'timeout') return new SemanticQueryOperationV1Error('timeout');
     if (error.code === 'cancelled') return new SemanticQueryOperationV1Error('cancelled');
     if (error.code === 'currentness_denied') return new SemanticQueryOperationV1Error('currentness_denied');
+    if (error.code === 'authorization_denied') return new SemanticQueryOperationV1Error('authorization_denied');
     if (error.code === 'audit_failed') return new SemanticQueryOperationV1Error('audit_failed');
     if (error.code === 'plan_denied') return new SemanticQueryOperationV1Error('plan_denied');
     return new SemanticQueryOperationV1Error('operation_unavailable');
@@ -232,8 +229,17 @@ export function createSemanticQueryOperationServiceV1(sourcesValue: unknown) {
       for (let index = 0; index < sourceRefs.length; index += 1) {
         if (finalSourceRefs[index] !== sourceRefs[index]) return fail('currentness_denied');
       }
+      const executionCurrent = (): Policy | null => {
+        try {
+          const snapshot = currentPolicy(), refs = currentSourceRefs(snapshot);
+          if (refs.length !== sourceRefs.length) return null;
+          for (let index = 0; index < sourceRefs.length; index += 1)
+            if (refs[index] !== sourceRefs[index]) return null;
+          return snapshot;
+        } catch { return null; }
+      };
       const executor = createSemanticQueryExecutorV1({ inspectPlan: validator.inspect,
-        current: currentPolicy, now: nowSource, nextRef: nextRefSource,
+        current: executionCurrent, now: nowSource, nextRef: nextRefSource,
         resolveApplicationService: (serviceRef: unknown) => {
           const allowed = findSemanticQueryAllowedOperation(serviceRef, true);
           if (!allowed) return null;
@@ -241,25 +247,28 @@ export function createSemanticQueryOperationServiceV1(sourcesValue: unknown) {
             ? openLoopsSource : terminologySource;
           return record({ operationId: allowed.operationId,
             applicationServiceRef: allowed.applicationServiceRef, maximumStage: 'read_only' as const,
-            execute: async (readInput: unknown, signal: AbortSignal) => {
-              const output = await executeRead(readInput, signal);
-              const canonical = canonicalSemanticQueryOperationJson(output);
-              let bytes: number;
-              try { bytes = encoder.encode(JSON.stringify(canonical)).byteLength; }
-              catch { return fail('operation_unavailable'); }
-              if (bytes > SEMANTIC_QUERY_OPERATION_MAX_OUTPUT_BYTES_V1) return fail('operation_unavailable');
-              return canonical;
-            } });
+            execute: (readInput: unknown, signal: AbortSignal) => executeRead(readInput, signal) });
+        }, canonicalizeOutput: (_operationId: unknown, output: unknown) => {
+          const canonical = canonicalSemanticQueryOperationJson(output);
+          let bytes: number; try { bytes = encoder.encode(JSON.stringify(canonical)).byteLength; }
+          catch { return fail('operation_unavailable'); }
+          if (bytes > SEMANTIC_QUERY_OPERATION_MAX_OUTPUT_BYTES_V1) return fail('operation_unavailable');
+          return canonical;
+        }, beforeCommit: () => {
+          if (!executionCurrent()) return 'currentness_denied' as const;
+          let finalized: unknown; try { finalized = finalizeSource(permitExecution, currentOwner(), claim); }
+          catch { return 'authorization_denied' as const; }
+          if (discardPromise(finalized) || finalized !== true) return 'authorization_denied' as const;
+          return true;
         }, writeAudit: record({ mode: 'synchronous_terminal.v1' as const,
-          commit: (_intent: unknown, decide: (current: unknown, committedAt: unknown) => unknown) => {
-            const terminal = decide(currentPolicy(), nowSource());
+          commit: (intent: unknown, decide: (current: unknown, committedAt: unknown) => unknown) => {
+            const allowed = (intent as { outcome?: unknown }).outcome === 'allowed';
+            const terminal = decide(allowed ? executionCurrent() : null, nowSource());
             writeAudit(terminal);
             return terminal;
           } }) });
       activeExecutor = executor;
       const result = await executor.execute(handle);
-      const finalized = finalizeSource(permitExecution, currentOwner(), claim);
-      if (finalized !== true || isPromise(finalized)) return fail('authorization_denied');
       state = 'terminal';
       return result;
     } catch (error) {

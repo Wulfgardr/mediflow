@@ -53,6 +53,7 @@ type SetupOverrides = Readonly<{
   executeTerminology?: (value: unknown, signal: AbortSignal) => unknown;
   executeOpenLoops?: (value: unknown, signal: AbortSignal) => unknown;
   commitTerminalAudit?: (value: unknown) => unknown;
+  finalizePermit?: () => unknown;
 }>;
 
 function setup(overrides: SetupOverrides = {}) {
@@ -81,7 +82,7 @@ function setup(overrides: SetupOverrides = {}) {
     },
     finalizePermit: () => {
       finalized += 1;
-      return true;
+      return overrides.finalizePermit?.() ?? true;
     },
     denyPermit: () => true,
     executeTerminology: overrides.executeTerminology ?? (async (_value: unknown, signal: AbortSignal) => {
@@ -179,6 +180,35 @@ test('denies trusted provenance drift before executing the first read', async ()
   assert.doesNotMatch(JSON.stringify(audits), /src_c|src_d|patientId|ambulatoryId/iu);
 });
 
+test('revalidates trusted provenance after the first and final read callbacks', async () => {
+  for (const driftAt of ['first', 'final'] as const) {
+    let source = 'c';
+    let terminologyCalls = 0;
+    const { service, permit, calls, audits } = setup({
+      currentSourceRefs: () => record({ generation: 7, revocationGeneration: 2, selectionEpoch: 11,
+        sourceRefs: Object.freeze([`src_${source.repeat(64)}`]) }),
+      executeOpenLoops: async () => {
+        if (driftAt === 'first') source = 'd';
+        return { schemaVersion: 'mediflow.patient.open_loops.read.result.v1',
+          operationId: 'mediflow.patient.open_loops.read.v1', capabilityId: 'mediflow.patient.open_loops.read.v1',
+          outcome: 'read', items: [] };
+      },
+      executeTerminology: async () => {
+        terminologyCalls += 1;
+        source = 'd';
+        return { schemaVersion: 'mediflow.terminology.search.output.v1',
+          operationId: 'mediflow.terminology.search.v1', capabilityId: 'mediflow.terminology.search.v1',
+          outcome: 'read', items: [] };
+      },
+    });
+    await assert.rejects(service.execute(permit, input()),
+      (error: unknown) => (error as { code?: string }).code === 'currentness_denied');
+    assert.equal(terminologyCalls, driftAt === 'first' ? 0 : 1);
+    assert.deepEqual(calls, []);
+    assert.deepEqual(audits.map((audit) => (audit as { outcome: unknown }).outcome), ['denied']);
+  }
+});
+
 test('revalidates host currentness after a read and withholds later results', async () => {
   let selectionEpoch = 11;
   let readCalls = 0;
@@ -222,8 +252,13 @@ test('cancels an active read and discards its late completion', async () => {
     (error: unknown) => (error as { code?: string }).code === 'cancelled');
   assert.equal(observedSignals[0]?.aborted, true);
   assert.equal(service.cancel(), false);
-  release({ schemaVersion: 'synthetic.late.v1', operationId: 'late', capabilityId: 'late', outcome: 'read' });
+  let traps = 0;
+  const late = new Proxy({ schemaVersion: 'synthetic.late.v1', operationId: 'late', capabilityId: 'late',
+    outcome: 'read' }, { getPrototypeOf: () => { traps += 1; return Object.prototype; },
+    ownKeys: () => { traps += 1; return []; } });
+  release(late);
   await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(traps, 0);
   assert.equal(audits.length, 1);
   assert.deepEqual([(audits[0] as { outcome: unknown }).outcome,
     (audits[0] as { denialCode: unknown }).denialCode], ['denied', 'cancelled']);
@@ -257,4 +292,78 @@ test('requires an exact synchronous terminal audit commit port', async () => {
   await assert.rejects(service.execute(permit, input()),
     (error: unknown) => (error as { code?: string }).code === 'audit_failed');
   assert.ok(commits >= 1);
+});
+
+test('finalizes the outer permit before allowed audit and denies false or throwing finalizers', async () => {
+  for (const finalizePermit of [() => false, () => { throw new Error('synthetic finalizer failure'); }]) {
+    const { service, permit, audits, counters } = setup({ finalizePermit });
+    await assert.rejects(service.execute(permit, input()),
+      (error: unknown) => (error as { code?: string }).code === 'authorization_denied');
+    assert.deepEqual(counters(), { began: 1, finalized: 1 });
+    assert.deepEqual(audits.map((audit) => (audit as { outcome: unknown }).outcome), ['denied']);
+  }
+  const events: string[] = [];
+  const ordered = setup({ finalizePermit: () => { events.push('finalize'); return true; },
+    commitTerminalAudit: (audit) => { events.push((audit as { outcome: string }).outcome); } });
+  await ordered.service.execute(ordered.permit, input());
+  assert.deepEqual(events, ['finalize', 'allowed']);
+});
+
+test('post-fences deadline and provenance drift caused by the synchronous finalizer', async () => {
+  let clock = 1_000;
+  const timed = setup({ now: () => clock, finalizePermit: () => { clock = 1_020; return true; } });
+  const timedInput = input();
+  timedInput.budget.maxDurationMs = 15;
+  await assert.rejects(timed.service.execute(timed.permit, timedInput),
+    (error: unknown) => (error as { code?: string }).code === 'timeout');
+  assert.deepEqual(timed.audits.map((audit) => [(audit as { outcome: unknown }).outcome,
+    (audit as { denialCode: unknown }).denialCode]), [['denied', 'timeout']]);
+
+  const stalledClock = setup({ now: () => 1_000, finalizePermit: () => {
+    const deadline = performance.now() + 25;
+    while (performance.now() < deadline) { /* bounded synthetic synchronous stall */ }
+    return true;
+  } });
+  const stalledInput = input();
+  stalledInput.budget.maxDurationMs = 15;
+  await assert.rejects(stalledClock.service.execute(stalledClock.permit, stalledInput),
+    (error: unknown) => (error as { code?: string }).code === 'timeout');
+  assert.deepEqual(stalledClock.audits.map((audit) => [(audit as { outcome: unknown }).outcome,
+    (audit as { denialCode: unknown }).denialCode]), [['denied', 'timeout']]);
+
+  let source = 'c';
+  const drifted = setup({ currentSourceRefs: () => record({ generation: 7, revocationGeneration: 2,
+    selectionEpoch: 11, sourceRefs: Object.freeze([`src_${source.repeat(64)}`]) }),
+  finalizePermit: () => { source = 'd'; return true; } });
+  await assert.rejects(drifted.service.execute(drifted.permit, input()),
+    (error: unknown) => (error as { code?: string }).code === 'currentness_denied');
+  assert.deepEqual(drifted.audits.map((audit) => (audit as { outcome: unknown }).outcome), ['denied']);
+
+  let selectionEpoch = 11;
+  const revoked = setup({ currentPolicy: () => record({ ...policy(), selectionEpoch }),
+    currentSourceRefs: () => record({ generation: 7, revocationGeneration: 2, selectionEpoch,
+      sourceRefs: Object.freeze([`src_${'c'.repeat(64)}`]) }),
+    finalizePermit: () => { selectionEpoch = 12; return true; } });
+  await assert.rejects(revoked.service.execute(revoked.permit, input()),
+    (error: unknown) => (error as { code?: string }).code === 'currentness_denied');
+  assert.deepEqual(revoked.audits.map((audit) => (audit as { outcome: unknown }).outcome), ['denied']);
+});
+
+test('bounds output strings, keys and cumulative JSON bytes before materialization', async () => {
+  const oversizedValues = [
+    [{ value: 'é'.repeat(20_000) }],
+    [{ [`key_${'x'.repeat(33_000)}`]: true }],
+    Array.from({ length: 128 }, () => ({ value: 'x'.repeat(300) })),
+    Array.from({ length: 128 }, (_unused, index) => ({ [`key_${index}_${'x'.repeat(300)}`]: true })),
+  ];
+  for (const items of oversizedValues) {
+    const { service, permit, audits } = setup({ executeOpenLoops: async () => ({
+      schemaVersion: 'mediflow.patient.open_loops.read.result.v1',
+      operationId: 'mediflow.patient.open_loops.read.v1', capabilityId: 'mediflow.patient.open_loops.read.v1',
+      outcome: 'read', items,
+    }) });
+    await assert.rejects(service.execute(permit, input()),
+      (error: unknown) => (error as { code?: string }).code === 'operation_unavailable');
+    assert.deepEqual(audits.map((audit) => (audit as { outcome: unknown }).outcome), ['denied']);
+  }
 });
