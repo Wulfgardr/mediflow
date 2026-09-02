@@ -20,6 +20,7 @@ for (const fileName of fs.readdirSync(path.join(root, 'drizzle')).filter((name) 
 
 const NOW = 1_800_000_000_000;
 const DAY_SECONDS = 86_400;
+const DB_SOURCE_ROW_LIMIT = 1_024;
 const PATIENT_ID = 'patient.synthetic.open-loops';
 const OTHER_PATIENT_ID = 'patient.synthetic.other-open-loops';
 const AMBULATORY_ID = 'ambulatory.synthetic.open-loops';
@@ -91,11 +92,19 @@ const scope = closed({
     restartGeneration: 2,
     expiresAt: NOW + 10_000,
 });
+const READ_INPUT = closed({ schemaVersion: 'mediflow.patient.open_loops.read.input.v1',
+    operationId: 'mediflow.patient.open_loops.read.v1' });
 
-function harness(options: { scope?: Readonly<Record<string, unknown>>; mutateOnAllowed?: boolean } = {}) {
+function harness(options: { scope?: Readonly<Record<string, unknown>>; ownerScopeDigest?: string;
+    mutateOnAllowed?: boolean; mutateOnFinalize?: boolean;
+    onResolveHostScope?: () => void } = {}) {
     const brokerAudits: unknown[] = [];
     const operationAudits: unknown[] = [];
     const refs = ['agent.synthetic.open-loops', 'lease.synthetic.open-loops'];
+    const scopesByExecution = new WeakMap<object, Readonly<Record<string, unknown>>>();
+    const begunExecutions: object[] = [];
+    const resolvedExecutions: object[] = [];
+    const registeredScope = options.scope ?? scope;
     const broker = createAipOwnerBrokerV1({
         now: () => NOW,
         nextRef: () => refs.shift(),
@@ -109,7 +118,7 @@ function harness(options: { scope?: Readonly<Record<string, unknown>>; mutateOnA
         purposeCode: 'care_coordination',
         operation: claim.operation,
         capabilityId: claim.capabilityId,
-        scopeDigest: SCOPE_DIGEST,
+        scopeDigest: options.ownerScopeDigest ?? SCOPE_DIGEST,
         maxStage: 'read_only',
         budget: 2,
         expiresAt: NOW + 10_000,
@@ -121,14 +130,35 @@ function harness(options: { scope?: Readonly<Record<string, unknown>>; mutateOnA
         venue: 'local_intelligent_host',
         egressAllowed: false,
     }));
+    const resolveHostScope = (execution: unknown) => {
+        if (!execution || typeof execution !== 'object') return null;
+        resolvedExecutions.push(execution);
+        options.onResolveHostScope?.();
+        return scopesByExecution.get(execution) ?? null;
+    };
     const candidate = createPatientOpenLoopsReadInternalCandidateV1(closed({
         now: () => NOW,
         current: () => current,
-        beginPermit: broker.beginPermit,
+        beginPermit: (permit: unknown, currentValue: unknown, claimValue: unknown) => {
+            const execution = broker.beginPermit(permit, currentValue, claimValue);
+            scopesByExecution.set(execution, registeredScope);
+            begunExecutions.push(execution);
+            return execution;
+        },
         bindPermit: broker.bindPermit,
-        finalizeBoundPermit: broker.finalizeBoundPermit,
+        finalizeBoundPermit: (execution: unknown, binding: unknown, currentValue: unknown, claimValue: unknown) => {
+            const finalized = broker.finalizeBoundPermit(execution, binding, currentValue, claimValue);
+            if (options.mutateOnFinalize) {
+                const database = new Database(databasePath);
+                try {
+                    database.prepare('DELETE FROM patients_to_ambulatories WHERE patient_id = ? AND ambulatory_id = ?')
+                        .run(PATIENT_ID, AMBULATORY_ID);
+                } finally { database.close(); }
+            }
+            return finalized;
+        },
         denyPermit: broker.denyPermit,
-        readHostScopeCandidate: () => options.scope ?? scope,
+        resolveHostScope,
         writeAudit: (audit: unknown) => {
             operationAudits.push(audit);
             if (options.mutateOnAllowed && (audit as { outcome?: unknown }).outcome === 'allowed') {
@@ -146,6 +176,9 @@ function harness(options: { scope?: Readonly<Record<string, unknown>>; mutateOnA
         owner,
         candidate,
         operationAudits,
+        begunExecutions,
+        resolvedExecutions,
+        resolveHostScope,
         permit: () => broker.authorize(broker.issueLease(owner), current, claim),
     };
 }
@@ -155,10 +188,7 @@ after(() => fs.rmSync(dataDir, { recursive: true, force: true }));
 test('reads the host-owned selection through the Application Service and publishes opaque minimized loops', async () => {
     const value = harness();
     try {
-        const result = await value.candidate.service.read(await value.permit(), closed({
-            schemaVersion: 'mediflow.patient.open_loops.read.input.v1',
-            operationId: 'mediflow.patient.open_loops.read.v1',
-        }));
+        const result = await value.candidate.service.read(await value.permit(), READ_INPUT);
 
         assert.equal(result.outcome, 'read');
         assert.equal(result.items.length, 2);
@@ -177,10 +207,8 @@ test('reads the host-owned selection through the Application Service and publish
 test('fails closed before publication when the selected patient projection changes during the audit fence', async () => {
     const value = harness({ mutateOnAllowed: true });
     try {
-        await assert.rejects(value.candidate.service.read(await value.permit(), closed({
-            schemaVersion: 'mediflow.patient.open_loops.read.input.v1',
-            operationId: 'mediflow.patient.open_loops.read.v1',
-        })), (error: unknown) => (error as { code?: unknown }).code === 'scope_changed');
+        await assert.rejects(value.candidate.service.read(await value.permit(), READ_INPUT),
+            (error: unknown) => (error as { code?: unknown }).code === 'scope_changed');
         assert.deepEqual(value.operationAudits.map((audit) => [
             (audit as { outcome: string }).outcome,
             (audit as { denialCode: string | null }).denialCode,
@@ -189,13 +217,187 @@ test('fails closed before publication when the selected patient projection chang
     } finally { value.candidate.service.dispose(); }
 });
 
-test('denies an unavailable ambulatory membership without returning another patient data', async () => {
-    const value = harness({ scope: closed({ ...scope, patientId: OTHER_PATIENT_ID }) });
+test('keeps different patient scopes bound to their own opaque permit execution', async () => {
+    const otherDigest = `sha256:${'b'.repeat(64)}`;
+    const first = harness();
+    const second = harness({ ownerScopeDigest: otherDigest,
+        scope: closed({ ...scope, patientId: OTHER_PATIENT_ID, scopeDigest: otherDigest }) });
     try {
-        await assert.rejects(value.candidate.service.read(await value.permit(), closed({
-            schemaVersion: 'mediflow.patient.open_loops.read.input.v1',
-            operationId: 'mediflow.patient.open_loops.read.v1',
-        })), (error: unknown) => (error as { code?: unknown }).code === 'snapshot_unavailable');
-        assert.deepEqual(value.operationAudits.map((audit) => (audit as { outcome: string }).outcome), ['denied']);
-    } finally { value.candidate.service.dispose(); }
+        assert.equal((await first.candidate.service.read(await first.permit(), READ_INPUT)).items.length, 2);
+        await assert.rejects(second.candidate.service.read(await second.permit(), READ_INPUT),
+            (error: unknown) => (error as { code?: unknown }).code === 'snapshot_unavailable');
+        assert.notEqual(first.begunExecutions[0], second.begunExecutions[0]);
+        assert.ok(first.resolvedExecutions.every((execution) => execution === first.begunExecutions[0]));
+        assert.ok(second.resolvedExecutions.every((execution) => execution === second.begunExecutions[0]));
+        assert.equal(first.resolveHostScope(second.begunExecutions[0]), null);
+        assert.equal(second.resolveHostScope(first.begunExecutions[0]), null);
+    } finally {
+        first.candidate.service.dispose();
+        second.candidate.service.dispose();
+    }
+});
+
+test('rejects the legacy zero-argument scope source instead of accepting caller-selected IDs', () => {
+    const legacy = {
+        now: () => NOW,
+        current: () => current,
+        beginPermit: () => Object.freeze(Object.create(null)),
+        bindPermit: () => Object.freeze(Object.create(null)),
+        finalizeBoundPermit: () => true,
+        denyPermit: () => true,
+        readHostScopeCandidate: () => scope,
+        writeAudit: () => Promise.resolve(),
+    };
+    const rejected = (sources: Record<string, unknown>) => assert.throws(
+        () => createPatientOpenLoopsReadInternalCandidateV1(closed(sources)),
+        (error: unknown) => (error as { code?: unknown }).code === 'operation_unavailable');
+    rejected(legacy);
+    rejected({ now: legacy.now, current: legacy.current, beginPermit: legacy.beginPermit,
+        bindPermit: legacy.bindPermit, finalizeBoundPermit: legacy.finalizeBoundPermit,
+        denyPermit: legacy.denyPermit, resolveHostScope: () => scope, writeAudit: legacy.writeAudit });
+});
+
+test('fails closed on execution scope mismatch, broker revocation and broker restart', async () => {
+    const mismatch = harness({ scope: closed({ ...scope, scopeDigest: `sha256:${'c'.repeat(64)}` }) });
+    try {
+        await assert.rejects(mismatch.candidate.service.read(await mismatch.permit(), READ_INPUT),
+            (error: unknown) => (error as { code?: unknown }).code === 'authorization_denied');
+    } finally { mismatch.candidate.service.dispose(); }
+
+    for (const invalidate of [
+        (value: ReturnType<typeof harness>) => value.broker.revokeOwner(value.owner),
+        (value: ReturnType<typeof harness>) => value.broker.restart(),
+    ]) {
+        const value = harness();
+        try {
+            const permit = await value.permit();
+            invalidate(value);
+            await assert.rejects(value.candidate.service.read(permit, READ_INPUT),
+                (error: unknown) => (error as { code?: unknown }).code === 'authorization_denied');
+            assert.equal(value.resolvedExecutions.length, 0);
+        } finally { value.candidate.service.dispose(); }
+    }
+});
+
+test('rejects oversized host patient and ambulatory identifiers before any DB projection', async () => {
+    const oversized = 'x'.repeat(257);
+    for (const candidateScope of [
+        closed({ ...scope, patientId: oversized }),
+        closed({ ...scope, ambulatoryId: oversized }),
+    ]) {
+        const value = harness({ scope: candidateScope });
+        try {
+            await assert.rejects(value.candidate.service.read(await value.permit(), READ_INPUT),
+                (error: unknown) => (error as { code?: unknown }).code === 'lease_unavailable');
+            assert.deepEqual(value.operationAudits.map((audit) => (audit as { outcome: string }).outcome), ['denied']);
+        } finally { value.candidate.service.dispose(); }
+    }
+});
+
+test('namespaces every opaque loop reference to the broker-bound host scope digest', async () => {
+    const otherDigest = `sha256:${'b'.repeat(64)}`;
+    const first = harness();
+    const second = harness({ ownerScopeDigest: otherDigest, scope: closed({ ...scope, scopeDigest: otherDigest }) });
+    try {
+        const left = await first.candidate.service.read(await first.permit(), READ_INPUT);
+        const right = await second.candidate.service.read(await second.permit(), READ_INPUT);
+        assert.deepEqual(left.items.map((item) => item.kind), right.items.map((item) => item.kind));
+        assert.equal(new Set([
+            ...left.items.map((item) => item.loopRef),
+            ...right.items.map((item) => item.loopRef),
+        ]).size, left.items.length + right.items.length);
+    } finally {
+        first.candidate.service.dispose();
+        second.candidate.service.dispose();
+    }
+});
+
+test('fails closed when either patient-scoped source query exceeds its explicit DB row cap', async () => {
+    const database = new Database(databasePath);
+    const expectOverflowDenial = async () => {
+        const value = harness();
+        try {
+            await assert.rejects(value.candidate.service.read(await value.permit(), READ_INPUT),
+                (error: unknown) => (error as { code?: unknown }).code === 'snapshot_unavailable');
+            assert.deepEqual(value.operationAudits.map((audit) => (audit as { outcome: string }).outcome), ['denied']);
+        } finally { value.candidate.service.dispose(); }
+    };
+    try {
+        const insertObservation = database.prepare(`INSERT INTO observations
+            (id, patient_id, code_system, code, display, unit_system, unit_code, value, observed_at,
+                source, version, created_at, updated_at)
+            VALUES (?, ?, 'LOINC', ?, 'Serie sintetica overflow', 'UCUM', '1', '1', ?,
+                'manual', 1, ?, ?)`);
+        database.transaction(() => {
+            for (let index = 0; index <= DB_SOURCE_ROW_LIMIT; index += 1) {
+                const timestamp = Math.floor(NOW / 1_000) - (index + 100) * DAY_SECONDS;
+                insertObservation.run(`observation.synthetic.overflow.${index}`, PATIENT_ID,
+                    `SYN-OVERFLOW-${index}`, timestamp, timestamp, timestamp);
+            }
+        })();
+        await expectOverflowDenial();
+        database.prepare("DELETE FROM observations WHERE id LIKE 'observation.synthetic.overflow.%'").run();
+
+        const insertItem = database.prepare(`INSERT INTO service_prescription_items
+            (id, patient_id, prescription_id, ordinal, status, category, service_name, match_status,
+                version, created_at, updated_at)
+            VALUES (?, ?, 'prescription.synthetic.open-loops', ?, 'prescribed', 'lab',
+                'Esame sintetico overflow', 'unmatched', 1, ?, ?)`);
+        database.transaction(() => {
+            for (let index = 0; index <= DB_SOURCE_ROW_LIMIT; index += 1) {
+                const timestamp = Math.floor(NOW / 1_000) - 20 * DAY_SECONDS;
+                insertItem.run(`item.synthetic.overflow.${index}`, PATIENT_ID, index + 1, timestamp, timestamp);
+            }
+        })();
+        await expectOverflowDenial();
+    } finally {
+        database.prepare("DELETE FROM observations WHERE id LIKE 'observation.synthetic.overflow.%'").run();
+        database.prepare("DELETE FROM service_prescription_items WHERE id LIKE 'item.synthetic.overflow.%'").run();
+        database.close();
+    }
+});
+
+test('revalidates membership after the final scope and broker callbacks before publication', async () => {
+    const restoreMembership = () => {
+        const database = new Database(databasePath);
+        try {
+            database.prepare('INSERT OR IGNORE INTO patients_to_ambulatories (patient_id, ambulatory_id) VALUES (?, ?)')
+                .run(PATIENT_ID, AMBULATORY_ID);
+        } finally { database.close(); }
+    };
+    let reads = 0;
+    const afterFingerprint = harness({
+        onResolveHostScope: () => {
+            reads += 1;
+            if (reads === 5) {
+                const database = new Database(databasePath);
+                try {
+                    database.prepare('DELETE FROM patients_to_ambulatories WHERE patient_id = ? AND ambulatory_id = ?')
+                        .run(PATIENT_ID, AMBULATORY_ID);
+                } finally { database.close(); }
+            }
+        },
+    });
+    try {
+        await assert.rejects(afterFingerprint.candidate.service.read(await afterFingerprint.permit(), READ_INPUT),
+            (error: unknown) => (error as { code?: unknown }).code === 'scope_changed');
+        assert.equal(reads, 5);
+        assert.deepEqual(afterFingerprint.operationAudits.map((audit) => (audit as { outcome: string }).outcome),
+            ['allowed', 'denied']);
+    } finally {
+        afterFingerprint.candidate.service.dispose();
+        restoreMembership();
+    }
+
+    const afterFinalize = harness({ mutateOnFinalize: true });
+    try {
+        await assert.rejects(afterFinalize.candidate.service.read(await afterFinalize.permit(), READ_INPUT),
+            (error: unknown) => (error as { code?: unknown }).code === 'operation_unavailable');
+        assert.deepEqual(afterFinalize.operationAudits.map((audit) => (audit as { outcome: string }).outcome),
+            ['allowed', 'denied']);
+        assert.doesNotMatch(JSON.stringify(afterFinalize.operationAudits), /patient\.synthetic|ambulatory\.synthetic/u);
+    } finally {
+        afterFinalize.candidate.service.dispose();
+        restoreMembership();
+    }
 });

@@ -1,6 +1,7 @@
 /* @Codex */
 import 'server-only';
 
+import { Buffer } from 'node:buffer';
 import { createHash, randomBytes } from 'node:crypto';
 import { types } from 'node:util';
 import { and, asc, eq } from 'drizzle-orm';
@@ -20,12 +21,14 @@ import {
 import { observations, patientsToAmbulatories, servicePrescriptionItems } from '../schema';
 
 const SOURCE_KEYS = ['now', 'current', 'beginPermit', 'bindPermit', 'finalizeBoundPermit', 'denyPermit',
-    'readHostScopeCandidate', 'writeAudit'] as const;
+    'resolveHostScope', 'writeAudit'] as const;
 const SCOPE_KEYS = ['status', 'patientId', 'ambulatoryId', 'scopeDigest', 'generation', 'revocationGeneration',
     'selectionEpoch', 'restartGeneration', 'expiresAt'] as const;
 const REQUEST_KEYS = ['limit', 'signal'] as const;
 const DIGEST = /^sha256:[0-9a-f]{64}$/u;
 const DAY_MS = 86_400_000;
+const HOST_ID_MAX_BYTES = 256;
+const DB_SOURCE_ROW_LIMIT = 1_024;
 const isProxy = types.isProxy;
 
 type Scope = Readonly<{
@@ -65,6 +68,18 @@ function integer(value: unknown, minimum = 0): value is number {
     return Number.isSafeInteger(value) && (value as number) >= minimum;
 }
 
+function hostId(value: unknown): value is string {
+    return typeof value === 'string' && value.length > 0 && value.trim() === value
+        && Buffer.byteLength(value, 'utf8') <= HOST_ID_MAX_BYTES;
+}
+
+function opaque(value: unknown): value is object {
+    try {
+        return !!value && typeof value === 'object' && !isProxy(value) && Object.getPrototypeOf(value) === null
+            && Object.isFrozen(value) && Reflect.ownKeys(value).length === 0;
+    } catch { return false; }
+}
+
 function digest(domain: string, value: string): string {
     return `sha256:${createHash('sha256').update(domain).update('\0').update(value).digest('hex')}`;
 }
@@ -72,8 +87,7 @@ function digest(domain: string, value: string): string {
 function scope(value: unknown): Scope | null {
     const candidate = exact(value, SCOPE_KEYS, true);
     if (!candidate || candidate.status !== 'available'
-        || typeof candidate.patientId !== 'string' || candidate.patientId.length < 1
-        || typeof candidate.ambulatoryId !== 'string' || candidate.ambulatoryId.length < 1
+        || !hostId(candidate.patientId) || !hostId(candidate.ambulatoryId)
         || typeof candidate.scopeDigest !== 'string' || !DIGEST.test(candidate.scopeDigest)
         || !integer(candidate.generation, 1) || !integer(candidate.revocationGeneration)
         || !integer(candidate.selectionEpoch) || !integer(candidate.restartGeneration, 1)
@@ -115,14 +129,20 @@ function readProjection(selected: Scope, capturedAt: number, limit: number): Pro
             createdAt: servicePrescriptionItems.createdAt, serviceName: servicePrescriptionItems.serviceName,
             version: servicePrescriptionItems.version,
         }).from(servicePrescriptionItems).where(eq(servicePrescriptionItems.patientId, selected.patientId))
-            .orderBy(asc(servicePrescriptionItems.id)).all();
+            .orderBy(asc(servicePrescriptionItems.id)).limit(DB_SOURCE_ROW_LIMIT + 1).all();
+        if (itemRows.length > DB_SOURCE_ROW_LIMIT) {
+            throw new PatientOpenLoopsReadV1Error('snapshot_unavailable');
+        }
         const observationRows = tx.select({
             id: observations.id, patientId: observations.patientId, codeSystem: observations.codeSystem,
             code: observations.code, display: observations.display, observedAt: observations.observedAt,
             deletedAt: observations.deletedAt, servicePrescriptionItemId: observations.servicePrescriptionItemId,
             version: observations.version,
         }).from(observations).where(eq(observations.patientId, selected.patientId))
-            .orderBy(asc(observations.id)).all();
+            .orderBy(asc(observations.id)).limit(DB_SOURCE_ROW_LIMIT + 1).all();
+        if (observationRows.length > DB_SOURCE_ROW_LIMIT) {
+            throw new PatientOpenLoopsReadV1Error('snapshot_unavailable');
+        }
         return { itemRows, observationRows };
     });
     const inputItems: OpenLoopServicePrescriptionItem[] = rows.itemRows.map((item) => ({
@@ -148,7 +168,7 @@ function readProjection(selected: Scope, capturedAt: number, limit: number): Pro
             if (loop.kind === 'results_pending') {
                 return record({
                     loopRef: `aipl_${digest('mediflow.patient.open-loops.loop-ref.v1',
-                        `service_item\0${loop.sourceRef.id}`).slice(7)}`,
+                        `${selected.scopeDigest}\0service_item\0${loop.sourceRef.id}`).slice(7)}`,
                     kind: loop.kind,
                     temporalState: 'overdue' as const,
                     openedAt,
@@ -158,7 +178,8 @@ function readProjection(selected: Scope, capturedAt: number, limit: number): Pro
             }
             const key = `${loop.sourceRef.codeSystem}\0${loop.sourceRef.code}`;
             return record({
-                loopRef: `aipl_${digest('mediflow.patient.open-loops.loop-ref.v1', `series\0${key}`).slice(7)}`,
+                loopRef: `aipl_${digest('mediflow.patient.open-loops.loop-ref.v1',
+                    `${selected.scopeDigest}\0series\0${key}`).slice(7)}`,
                 kind: loop.kind,
                 temporalState: 'overdue' as const,
                 openedAt,
@@ -178,25 +199,28 @@ function readProjection(selected: Scope, capturedAt: number, limit: number): Pro
         items: limited, truncated: projected.length > limit });
 }
 
-/** DB-backed Application Service candidate; AIP authority and Web selection remain host-owned ports. */
+/** DB-backed candidate; only a future host registry may resolve an exact scope from the opaque permit execution. */
 export function createPatientOpenLoopsReadInternalCandidateV1(sourcesValue: unknown) {
     const sources = exact(sourcesValue, SOURCE_KEYS, false);
-    if (!sources || SOURCE_KEYS.some((key) => typeof sources[key] !== 'function' || isProxy(sources[key]))) {
+    if (!sources || SOURCE_KEYS.some((key) => typeof sources[key] !== 'function' || isProxy(sources[key]))
+        || (sources.resolveHostScope as (execution: object) => unknown).length !== 1) {
         throw new PatientOpenLoopsReadV1Error('operation_unavailable');
     }
     const nowSource = sources.now as () => unknown;
-    const scopeSource = sources.readHostScopeCandidate as () => unknown;
+    const resolveScopeSource = sources.resolveHostScope as (execution: object) => unknown;
     let lastNow = -1;
-    const now = (): number => {
+    let activeExecution: object | null = null;
+    const resolveScope = (execution: unknown): Scope => {
+        if (!opaque(execution)) throw new PatientOpenLoopsReadV1Error('lease_unavailable');
         let value: unknown;
-        try { value = nowSource(); } catch { throw new PatientOpenLoopsReadV1Error('operation_unavailable'); }
-        if (!integer(value) || value < lastNow || types.isPromise(value)) {
-            throw new PatientOpenLoopsReadV1Error('operation_unavailable');
+        try { value = resolveScopeSource(execution); } catch {
+            throw new PatientOpenLoopsReadV1Error('lease_unavailable');
         }
-        lastNow = value;
-        return value;
+        if (types.isPromise(value)) throw new PatientOpenLoopsReadV1Error('lease_unavailable');
+        return scope(value) ?? (() => { throw new PatientOpenLoopsReadV1Error('lease_unavailable'); })();
     };
-    const readScope = (): Scope => scope(scopeSource()) ?? (() => { throw new PatientOpenLoopsReadV1Error('lease_unavailable'); })();
+    const readActiveScope = (): Scope => activeExecution
+        ? resolveScope(activeExecution) : (() => { throw new PatientOpenLoopsReadV1Error('lease_unavailable'); })();
     const ownerIdentity = Object.freeze(Object.create(null));
     const leaseIdentity = Object.freeze(Object.create(null));
     const ownerRef = `aipo_${randomBytes(32).toString('hex')}`;
@@ -204,7 +228,30 @@ export function createPatientOpenLoopsReadInternalCandidateV1(sourcesValue: unkn
     const snapshots = new WeakMap<object, SnapshotRecord>();
     let activeScope: Scope | null = null;
     let activeBinding: object | null = null;
+    let activeSnapshot: SnapshotRecord | null = null;
+    let publicationFenceArmed = false;
     let revision = 0;
+    const assertPublicationCurrent = (capturedAt: number): void => {
+        if (!publicationFenceArmed || !activeScope || !activeSnapshot) return;
+        const selected = readActiveScope();
+        if (!sameScope(activeScope, selected) || !sameScope(activeSnapshot.scope, selected)) {
+            throw new PatientOpenLoopsReadV1Error('scope_changed');
+        }
+        const projection = readProjection(selected, capturedAt, 32);
+        if (projection.fingerprint !== activeSnapshot.fingerprint) {
+            throw new PatientOpenLoopsReadV1Error('scope_changed');
+        }
+    };
+    const now = (): number => {
+        let value: unknown;
+        try { value = nowSource(); } catch { throw new PatientOpenLoopsReadV1Error('operation_unavailable'); }
+        if (!integer(value) || value < lastNow || types.isPromise(value)) {
+            throw new PatientOpenLoopsReadV1Error('operation_unavailable');
+        }
+        lastNow = value;
+        assertPublicationCurrent(value);
+        return value;
+    };
     const core = createPatientOpenLoopsReadServiceV1(record({
         now,
         nextRef: () => `aipr_${randomBytes(32).toString('hex')}`,
@@ -214,9 +261,10 @@ export function createPatientOpenLoopsReadInternalCandidateV1(sourcesValue: unkn
         bindPermit: sources.bindPermit,
         finalizeBoundPermit: sources.finalizeBoundPermit,
         denyPermit: sources.denyPermit,
-        acquireLease: () => {
-            const selected = readScope();
+        acquireLease: (execution: object) => {
+            const selected = resolveScope(execution);
             if (now() >= selected.expiresAt) throw new PatientOpenLoopsReadV1Error('expired');
+            activeExecution = execution;
             activeScope = selected;
             return record({ status: 'available' as const, ownerIdentity, leaseIdentity, ownerRef, leaseRef,
                 purposeCode: 'care_coordination' as const, operationId: 'mediflow.patient.open_loops.read.v1' as const,
@@ -228,7 +276,7 @@ export function createPatientOpenLoopsReadInternalCandidateV1(sourcesValue: unkn
         readSnapshot: (binding: object, requestValue: unknown) => new Promise((resolve, reject) => {
             try {
                 const request = exact(requestValue, REQUEST_KEYS, true);
-                const selected = readScope();
+                const selected = readActiveScope();
                 if (!request || !integer(request.limit, 1) || request.limit > 32
                     || !(request.signal instanceof AbortSignal) || request.signal.aborted
                     || !activeScope || !sameScope(activeScope, selected)) {
@@ -236,7 +284,7 @@ export function createPatientOpenLoopsReadInternalCandidateV1(sourcesValue: unkn
                 }
                 const capturedAt = now();
                 const projection = readProjection(selected, capturedAt, request.limit);
-                if (request.signal.aborted || !sameScope(selected, readScope())) {
+                if (request.signal.aborted || !sameScope(selected, readActiveScope())) {
                     throw new PatientOpenLoopsReadV1Error('snapshot_unavailable');
                 }
                 activeBinding = binding;
@@ -252,13 +300,17 @@ export function createPatientOpenLoopsReadInternalCandidateV1(sourcesValue: unkn
         }),
         readCurrentness: (binding: object, snapshotIdentity: object) => {
             const snapshot = snapshots.get(snapshotIdentity);
-            const selected = readScope();
+            const selected = readActiveScope();
             if (!snapshot || binding !== activeBinding || !activeScope || !sameScope(activeScope, selected)
                 || !sameScope(snapshot.scope, selected)) throw new PatientOpenLoopsReadV1Error('scope_changed');
-            const projection = readProjection(selected, now(), 32);
-            if (projection.fingerprint !== snapshot.fingerprint || !sameScope(selected, readScope())) {
+            const finalSelected = readActiveScope();
+            if (!sameScope(selected, finalSelected)) throw new PatientOpenLoopsReadV1Error('scope_changed');
+            const projection = readProjection(finalSelected, now(), 32);
+            if (projection.fingerprint !== snapshot.fingerprint) {
                 throw new PatientOpenLoopsReadV1Error('scope_changed');
             }
+            activeSnapshot = snapshot;
+            publicationFenceArmed = true;
             return record({ status: 'current' as const, ownerIdentity, leaseIdentity, snapshotIdentity,
                 scopeDigest: selected.scopeDigest, generation: selected.generation,
                 revocationGeneration: selected.revocationGeneration, selectionEpoch: selected.selectionEpoch,
