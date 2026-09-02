@@ -10,7 +10,7 @@ import {
     bindProviderLifecycleToInstanceProfileV2,
     snapshotProviderInstanceProfileV2,
 } from './provider-instance-profile';
-import { PROVIDER_BINDING_V2_LIMITS } from './provider-lifecycle';
+import { PROVIDER_BINDING_V2_LIMITS, snapshotProviderLifecycleV2 } from './provider-lifecycle';
 
 export const ANTHROPIC_MESSAGES_OFFICIAL_URL = 'https://api.anthropic.com/v1/messages' as const;
 export const ANTHROPIC_MESSAGES_OFFICIAL_MAX_REQUEST_BYTES = 1_048_576 as const;
@@ -116,15 +116,17 @@ function checkedFactory(value: unknown) {
     if (!factory || !binding || !safeFunction(factory.fetch)) {
         throw new AnthropicMessagesOfficialHttpsTransportError('input_invalid');
     }
-    let profile; let link;
+    let profile; let link; let lifecycle;
     try {
         profile = snapshotProviderInstanceProfileV2(binding.profile);
         link = bindProviderLifecycleToInstanceProfileV2(factory.instanceBinding);
+        lifecycle = snapshotProviderLifecycleV2(binding.lifecycle);
     } catch { throw new AnthropicMessagesOfficialHttpsTransportError('input_invalid'); }
     const expectedWorkspace = profile.providerInstance.workspaceRef;
     const authority = typeof expectedWorkspace === 'string'
         ? workspaceAuthority(factory.workspaceAuthority, expectedWorkspace) : null;
-    if (!authority || profile.providerType !== 'anthropic' || profile.model !== 'claude-sonnet-4-6'
+    if (!authority || lifecycle.status !== 'enabled'
+        || profile.providerType !== 'anthropic' || profile.model !== 'claude-sonnet-4-6'
         || profile.auth.credentialClass !== 'api_key' || profile.auth.authRef === null
         || link.providerType !== 'anthropic' || link.providerInstanceRef !== profile.providerInstance.instanceRef
         || link.operation !== 'document_synthesis' || link.model !== profile.model
