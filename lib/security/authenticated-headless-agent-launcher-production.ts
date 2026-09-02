@@ -4,6 +4,8 @@ import { createHash, randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { types } from 'node:util';
 
+import type { SemanticQueryOperationTerminalAuditCommitV1 } from
+  '../../packages/aip/src/semantic-query-operation-contract.ts';
 import { createAuthenticatedAgentLauncherV1 } from '../headless/authenticated-agent-launcher.ts';
 import { createPatientOpenLoopsReadInternalCandidateV1 } from './patient-open-loops-read-production.ts';
 
@@ -16,7 +18,7 @@ const TARGETS = Object.freeze({
 });
 
 type Sources = Readonly<{ readHostContext: () => unknown; writeAudit: (value: unknown) => unknown;
-  commitTerminalAudit: (value: unknown) => unknown }>;
+  commitTerminalAudit: SemanticQueryOperationTerminalAuditCommitV1 }>;
 
 function sources(value: unknown): Sources {
   if (!value || typeof value !== 'object' || types.isProxy(value) || Array.isArray(value)) throw new Error('input_invalid');

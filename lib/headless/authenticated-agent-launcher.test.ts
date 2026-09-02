@@ -75,6 +75,14 @@ function createSyntheticOpenLoopsRead(scopes: unknown[]) {
   };
 }
 
+function terminalAuditSink(audits: unknown[]) {
+  return (_intent: unknown, decideAtCommit: () => unknown) => {
+    const audit = decideAtCommit();
+    audits.push(audit);
+    return audit;
+  };
+}
+
 async function runRealMini(command: 'open-loops' | 'follow-up-proposal') {
   let sequence = 0;
   let stdout = '', stderr = '';
@@ -94,7 +102,7 @@ async function runRealMini(command: 'open-loops' | 'follow-up-proposal') {
     },
     hashRef: (value: string) => `sha256:${createHash('sha256').update(value).digest('hex')}`,
     writeAudit: async (value: unknown) => { audits.push(value); },
-    commitTerminalAudit: (value: unknown) => { terminalAudits.push(value); },
+    commitTerminalAudit: terminalAuditSink(terminalAudits),
     readHostContext: () => ({ status: 'available', userRef: 'user.synthetic.local.0001',
       parentRef: 'parent.synthetic.web.0001', purposeCode: 'care_coordination', patientId: PATIENT_ID,
       ambulatoryId: AMBULATORY_ID, generation: 1, revocationGeneration: 0, selectionEpoch: 2,
@@ -158,33 +166,53 @@ test('serves a real Mini follow-up proposal without writes or apply authority', 
   assert.equal(session.close(), false);
 });
 
-test('composes the bounded semantic planner through the authenticated launcher', async () => {
+function semanticInput(terminologyOnly = false) {
+  const terminology = {
+    stepRef: 'step_terminology',
+    operationId: 'mediflow.terminology.search.v1',
+    input: { schemaVersion: 'mediflow.terminology.search.input.v1',
+      operationId: 'mediflow.terminology.search.v1', system: 'LOINC', query: 'blood pressure', limit: 1 },
+  };
+  return {
+    schemaVersion: 'mediflow.semantic-query-operation.input.v1',
+    operationId: 'mediflow.semantic_query_plan.execute.v1',
+    budget: { maxSteps: terminologyOnly ? 1 : 2, maxDurationMs: 200, maxOutputBytes: 24 * 1024 },
+    explanation: 'Read synthetic host-owned sources.',
+    steps: terminologyOnly ? [terminology] : [{
+      stepRef: 'step_open_loops',
+      operationId: 'mediflow.patient.open_loops.read.v1',
+      input: { schemaVersion: 'mediflow.patient.open_loops.read.input.v1',
+        operationId: 'mediflow.patient.open_loops.read.v1' },
+    }, terminology],
+  };
+}
+
+function mutableHostContext() {
+  return { status: 'available', userRef: 'user.synthetic.local.0001',
+    parentRef: 'parent.synthetic.web.0001', purposeCode: 'care_coordination', patientId: PATIENT_ID,
+    ambulatoryId: AMBULATORY_ID, generation: 1, revocationGeneration: 0, selectionEpoch: 2,
+    restartGeneration: 1, parentGeneration: 1, policyGeneration: 1,
+    expiresAt: 5_000, bootstrapExpiresAt: 2_000 };
+}
+
+type SyntheticRpcOptions = Readonly<{
+  operationId?: string; input?: unknown;
+  onAudit?: (audit: unknown, context: ReturnType<typeof mutableHostContext>) => void;
+  commitTerminalAudit?: (intent: unknown, decideAtCommit: () => unknown) => unknown;
+}>;
+
+async function runSyntheticRpc(options: SyntheticRpcOptions = {}) {
   let sequence = 0;
   let publishCount = 0;
   let terminated = false;
   const audits: unknown[] = [];
   const terminalAudits: unknown[] = [];
   const scopes: unknown[] = [];
+  const hashInputs: string[] = [];
+  const hostContext = mutableHostContext();
   const messageListeners = new Set<(frame: unknown) => void>();
   let resolveRpc!: (frame: unknown) => void;
   const rpcResponse = new Promise<unknown>((resolve) => { resolveRpc = resolve; });
-  const semanticInput = {
-    schemaVersion: 'mediflow.semantic-query-operation.input.v1',
-    operationId: 'mediflow.semantic_query_plan.execute.v1',
-    budget: { maxSteps: 2, maxDurationMs: 200, maxOutputBytes: 24 * 1024 },
-    explanation: 'Read synthetic open loops and resolve one local terminology term.',
-    steps: [{
-      stepRef: 'step_open_loops',
-      operationId: 'mediflow.patient.open_loops.read.v1',
-      input: { schemaVersion: 'mediflow.patient.open_loops.read.input.v1',
-        operationId: 'mediflow.patient.open_loops.read.v1' },
-    }, {
-      stepRef: 'step_terminology',
-      operationId: 'mediflow.terminology.search.v1',
-      input: { schemaVersion: 'mediflow.terminology.search.input.v1',
-        operationId: 'mediflow.terminology.search.v1', system: 'LOINC', query: 'blood pressure', limit: 1 },
-    }],
-  };
   const launcher = createAuthenticatedAgentLauncherV1({
     now: () => 1_000,
     nextRef: (kind: string) => {
@@ -192,14 +220,13 @@ test('composes the bounded semantic planner through the authenticated launcher',
       return kind === 'bootstrap' ? `aipb_${sequence.toString(16).padStart(32, '0')}`
         : `${kind.replaceAll('_', '.')}.synthetic.${String(sequence).padStart(8, '0')}`;
     },
-    hashRef: (value: string) => `sha256:${createHash('sha256').update(value).digest('hex')}`,
-    writeAudit: async (value: unknown) => { audits.push(value); },
-    commitTerminalAudit: (value: unknown) => { terminalAudits.push(value); },
-    readHostContext: () => ({ status: 'available', userRef: 'user.synthetic.local.0001',
-      parentRef: 'parent.synthetic.web.0001', purposeCode: 'care_coordination', patientId: PATIENT_ID,
-      ambulatoryId: AMBULATORY_ID, generation: 1, revocationGeneration: 0, selectionEpoch: 2,
-      restartGeneration: 1, parentGeneration: 1, policyGeneration: 1,
-      expiresAt: 5_000, bootstrapExpiresAt: 2_000 }),
+    hashRef: (value: string) => {
+      hashInputs.push(value);
+      return `sha256:${createHash('sha256').update(value).digest('hex')}`;
+    },
+    writeAudit: async (value: unknown) => { audits.push(value); options.onAudit?.(value, hostContext); },
+    commitTerminalAudit: options.commitTerminalAudit ?? terminalAuditSink(terminalAudits),
+    readHostContext: () => ({ ...hostContext }),
     spawnChild: (environment: Readonly<Record<string, string>>) => {
       const bootstrapRef = environment.MEDIFLOW_AIP_BOOTSTRAP_REF!;
       const connection = Object.freeze(Object.create(null)) as object;
@@ -219,7 +246,8 @@ test('composes the bounded semantic planner through the authenticated launcher',
             queueMicrotask(() => {
               for (const listener of messageListeners) listener(JSON.stringify({
                 schemaVersion: 'mediflow.aip.operation.request.v1', method: 'call', requestId: 'rpc_semantic_1',
-                operationId: 'mediflow.semantic_query_plan.execute.v1', input: semanticInput,
+                operationId: options.operationId ?? 'mediflow.semantic_query_plan.execute.v1',
+                input: options.input ?? semanticInput(),
               }));
             });
           } else resolveRpc(JSON.parse(frame) as unknown);
@@ -232,9 +260,18 @@ test('composes the bounded semantic planner through the authenticated launcher',
   });
 
   const session = await launcher.launch();
-  const response = await rpcResponse as { outcome: unknown; result?: { operation?: Record<string, unknown>;
-    value?: { steps?: Array<{ operationId?: unknown }>; receipt?: Record<string, unknown> } } };
-  assert.equal(response.outcome, 'completed', JSON.stringify({ response, audits, terminalAudits, scopes }));
+  const response = await rpcResponse as Record<string, unknown>;
+  return { response, audits, terminalAudits, scopes, hashInputs, hostContext, session,
+    terminated: () => terminated };
+}
+
+test('composes the bounded semantic planner through the authenticated launcher', async () => {
+  const current = await runSyntheticRpc();
+  const response = current.response as { outcome: unknown; result?: { operation?: Record<string, unknown>;
+    value?: { steps?: Array<{ operationId?: unknown; output?: Record<string, unknown> }>;
+      receipt?: Record<string, unknown> } } };
+  assert.equal(response.outcome, 'completed', JSON.stringify({ response, audits: current.audits,
+    terminalAudits: current.terminalAudits, scopes: current.scopes }));
   assert.deepEqual(response.result?.operation, {
     operationId: 'mediflow.semantic_query_plan.execute.v1',
     capabilityId: 'mediflow.semantic_query_plan.execute.v1',
@@ -242,15 +279,81 @@ test('composes the bounded semantic planner through the authenticated launcher',
   });
   assert.deepEqual(response.result?.value?.steps?.map((step) => step.operationId),
     ['mediflow.patient.open_loops.read.v1', 'mediflow.terminology.search.v1']);
+  const childReceipt = response.result?.value?.steps?.[0]?.output?.receipt as Record<string, unknown> | undefined;
+  assert.deepEqual([response.result?.value?.steps?.[0]?.output?.snapshotRevision, childReceipt?.snapshotRevision,
+    childReceipt?.receiptRef], [7, 7, `aipr_${'2'.repeat(64)}`]);
   assert.deepEqual([response.result?.value?.receipt?.outcome, response.result?.value?.receipt?.writesPerformed,
     response.result?.value?.receipt?.applyPolicy], ['orchestration', 0, 'none']);
-  assert.equal(terminalAudits.length, 1);
-  assert.doesNotMatch(JSON.stringify(terminalAudits),
+  const lineage = Array.from(new Set(current.hashInputs.filter((value) =>
+    value.startsWith('mediflow.semantic-query-source-lineage.v1\0'))));
+  assert.equal(lineage.length, 2);
+  const parts = lineage.map((value) => value.split('\0'));
+  assert.equal(parts[0]?.[1], parts[1]?.[1]);
+  assert.match(parts[0]?.[1] ?? '', /^sha256:[0-9a-f]{64}$/u);
+  assert.notEqual(parts[0]?.[1], (current.scopes[0] as { scopeDigest?: unknown })?.scopeDigest);
+  assert.deepEqual(parts.map((value) => value.slice(2)), [[
+    '1', '0', '2', 'mediflow.terminology.search.v1', 'mediflow.terminology.search.v1',
+    'AipTerminologySearchServiceV1', 'mediflow.terminology.search.input.v1',
+    'mediflow.terminology.search.output.v1', 'read_only',
+  ], [
+    '1', '0', '2', 'mediflow.patient.open_loops.read.v1', 'mediflow.patient.open_loops.read.v1',
+    'PatientOpenLoopsReadServiceV1', 'mediflow.patient.open_loops.read.input.v1',
+    'mediflow.patient.open_loops.read.result.v1', 'read_only',
+  ]]);
+  assert.equal(current.terminalAudits.length, 1);
+  assert.doesNotMatch(JSON.stringify(current.terminalAudits),
     new RegExp(`${PATIENT_ID}|${AMBULATORY_ID}|sourceRefs|blood pressure`, 'u'));
-  assert.doesNotMatch(JSON.stringify(audits), new RegExp(`${PATIENT_ID}|${AMBULATORY_ID}`, 'u'));
-  assert.equal(scopes.length, 1);
-  assert.equal(session.close(), true);
-  assert.equal(terminated, true);
+  assert.doesNotMatch(JSON.stringify(current.audits), new RegExp(`${PATIENT_ID}|${AMBULATORY_ID}`, 'u'));
+  assert.equal(current.scopes.length, 1);
+  assert.equal(current.session.close(), true);
+  assert.equal(current.terminated(), true);
+});
+
+test('denies patient or ambulatory identity drift with an unchanged numeric tuple', async () => {
+  for (const field of ['patientId', 'ambulatoryId'] as const) {
+    let mutated = false;
+    const current = await runSyntheticRpc({ operationId: 'mediflow.terminology.search.v1',
+      input: { schemaVersion: 'mediflow.terminology.search.input.v1',
+        operationId: 'mediflow.terminology.search.v1', system: 'LOINC', query: 'blood pressure', limit: 1 },
+      onAudit: (audit, context) => {
+        const value = audit as { eventType?: unknown; outcome?: unknown; operation?: unknown };
+        if (!mutated && value.eventType === 'authorization' && value.outcome === 'allowed'
+          && value.operation === 'mediflow.terminology.search.v1') {
+          context[field] = `changed-${field}`; mutated = true;
+        }
+      } });
+    assert.equal(mutated, true);
+    assert.deepEqual([current.response.outcome, current.response.denialCode], ['denied', 'service_failed']);
+    assert.equal(current.audits.some((audit) => {
+      const value = audit as { eventType?: unknown; outcome?: unknown };
+      return value.eventType === 'terminology_search' && value.outcome === 'allowed';
+    }), false);
+    assert.doesNotMatch(JSON.stringify(current.audits), /synthetic-patient-id|synthetic-ambulatory-id/u);
+    assert.equal(current.session.close(), true);
+  }
+});
+
+test('denies a semantic outer permit when the bound scope registry restarts', async () => {
+  let mutated = false;
+  const current = await runSyntheticRpc({ input: semanticInput(true), onAudit: (audit, context) => {
+    const value = audit as { eventType?: unknown; outcome?: unknown; operation?: unknown };
+    if (!mutated && value.eventType === 'authorization' && value.outcome === 'allowed'
+      && value.operation === 'mediflow.semantic_query_plan.execute.v1') {
+      context.restartGeneration += 1; mutated = true;
+    }
+  } });
+  assert.equal(mutated, true);
+  assert.deepEqual([current.response.outcome, current.response.denialCode], ['denied', 'service_failed']);
+  assert.deepEqual(current.terminalAudits.map((audit) => [(audit as { outcome?: unknown }).outcome,
+    (audit as { denialCode?: unknown }).denialCode]), [['denied', 'currentness_denied']]);
+  assert.equal(current.scopes.length, 0);
+  assert.equal(current.session.close(), true);
+});
+
+test('does not accept a no-op terminal audit port as a successful semantic commit', async () => {
+  const current = await runSyntheticRpc({ input: semanticInput(true), commitTerminalAudit: () => undefined });
+  assert.deepEqual([current.response.outcome, current.response.denialCode], ['denied', 'service_failed']);
+  assert.equal(current.session.close(), true);
 });
 
 test('propagates restart to RPC, scope, broker and the authenticated child', async () => {
@@ -266,7 +369,7 @@ test('propagates restart to RPC, scope, broker and the authenticated child', asy
     },
     hashRef: (value: string) => `sha256:${createHash('sha256').update(value).digest('hex')}`,
     writeAudit: async () => undefined,
-    commitTerminalAudit: () => undefined,
+    commitTerminalAudit: terminalAuditSink([]),
     readHostContext: () => ({ status: 'available', userRef: 'user.synthetic.local.0001',
       parentRef: 'parent.synthetic.web.0001', purposeCode: 'care_coordination', patientId: PATIENT_ID,
       ambulatoryId: AMBULATORY_ID, generation: 1, revocationGeneration: 0, selectionEpoch: 2,
