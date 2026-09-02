@@ -194,7 +194,8 @@ I quattro smart path 0.8.5 sono Patient Insight, Smart Import, Document
 Synthesis e Treatment Reasoning. Quando leggono note paziente, diario clinico o
 documenti analizzati, devono rispettare queste regole aggiuntive:
 
-- usare solo i provider locali risolti dal production root host-owned
+- usare solo provider risolti dal production root host-owned; i provider
+  remoti richiedono lifecycle attivo e opt-in esplicito
 - trattare l'output del modello come **non fidato** finché un operatore non lo conferma
 - non eseguire import silenziosi da testo libero verso diagnosi o terapie
 - mantenere review esplicita prima di scrivere nuovi dati strutturati in scheda
@@ -212,7 +213,8 @@ ICD e esplicito. Il payload automatico della sintesi non include
 Quando configurati, Ollama serve Patient Insight, Smart Import e Document
 Synthesis e ATHENA su MLX serve soltanto Treatment Reasoning. I due lifecycle
 sono host-owned e separati: stato, revoca, grant o fallback di un provider non
-valgono per l'altro. I provider cloud restano disabilitati.
+valgono per l'altro. OpenAI e Anthropic restano `default OFF` e non sono
+fallback.
 
 ATHENA richiede runner e artifact del modello locali. L'override host-owned
 `MEDIFLOW_ATHENA_MLX_GENERATE_BIN` accetta soltanto un percorso assoluto a
@@ -221,20 +223,16 @@ launcher `uvx` predefinito forza la modalità offline e fallisce chiuso se la
 cache richiesta non è disponibile. La presenza del runner non è una prova di
 readiness universale.
 
-AnyDoc è l'unica corsia automatica di estrazione locale degli allegati. Gira in
-un processo figlio bounded senza rete. La capability `ocr` resta `unavailable`
-nel runtime corrente. Immagini e PDF scansionati senza text layer falliscono
-chiusi come contenuto da revisionare.
+AnyDoc resta il primo passaggio automatico locale degli allegati. Gira in un
+processo figlio bounded senza rete. Il tree classifica e materializza le sole
+pagine `needsOcr`, poi le renderizza per il preflight con fake seam. Errori,
+formati ambigui e documenti cifrati non vengono promossi a `needsOcr`.
 
-Nel perimetro 0.8.5, immagini e scansioni vanno a review manuale e le route OCR
-legacy, dopo l'autenticazione, rispondono `410`. DeepSeek-OCR 2 è
-`RELEASE_SCOPE_EXCLUDED`: non esistono adapter, E2E o benchmark che ne
-autorizzino l'uso. Un workstream post-0.8.5 può
-ricevere soltanto pagine `needsOcr` da AnyDoc e deve conservare ordine,
-provenienza, hash e qualità per pagina. Prima dell'abilitazione servono
-benchmark sintetico italiano, soglie dichiarate, ricomposizione fail-closed e
-prova che nessun dato lascia il processo locale. Apple Vision non appartiene
-al target.
+Il preflight DeepSeek-OCR 2 è integrato con manifest e limiti fissati. Il
+runtime adapter non è integrato e il test usa un engine fake. Il tree non prova
+un runtime live, un benchmark E2E o runtime readiness. La ricomposizione deve
+restare fail-closed e conservare ordine, provenienza, hash e qualità per pagina.
+Le route OCR legacy, dopo l'autenticazione, rispondono `410`.
 
 ### Application Services e Headless
 
@@ -244,40 +242,59 @@ host-owned risolvono currentness, authority, conflitti, transazioni e audit.
 Alcune route Web storiche importano ancora `dbServer` e non ereditano questo
 claim per analogia. Una receipt Fabric descrive un'esecuzione e non è un grant.
 
-La foundation Headless 0.8.5 non espone un runtime agentico generale esterno.
-L'unica eccezione di scrittura è `mediflow.clinical_diary.append_soap.v1` con
-`clinician_confirmed_single_use.v1`. La conferma richiede UI dedicata, PIN
-fresco e proof monouso. Il caller non può fornire authority, sessione, binding
-clinici o idempotenza. L'Application Service ricontrolla la currentness e usa
-il solo owner transazionale SQLite. L'eccezione non trasferisce authority al
-Fabric o ad altre capability.
+La foundation Headless 0.8.5 avvia un processo figlio autenticato con ambiente
+allowlisted e canale RPC AIP ereditato. MCP `stdio` e Mini espongono soltanto
+catalogo, ricerca terminologica locale, lettura delle Open Loops del paziente
+selezionato, proposta follow-up `proposal_only` e query semantica bounded
+read-only. Nessun adapter importa il database, accetta authority dal caller o
+apre un listener.
+
+Il launcher e il quickstart production restano
+`PRODUCTION_BRIDGE_BLOCKER`. La topologia Supervisor portabile come trusted
+parent su IPC ereditato è `DECIDED`; l'implementazione è `SPLIT_REQUIRED`. La
+factory esaminata non chiude il late-bind trusted-UI, l'owner sincrono di
+`readHostContext`, lifecycle e revoca production o l'audit terminale sincrono.
+La superficie non è un entrypoint supportato e non autorizza sessioni agentiche
+generali. Broker residente e UDS sono esclusi dalla `0.8.5`.
+
+F10 contiene una transizione stato checkup con core e composizione SQLite
+verificati. È soltanto un candidato interno: non è registrata nel launcher, in
+MCP, in Mini o nella UI. Nessun caller può sostituire il gesto di conferma del
+medico. Il binding trusted-UI resta un blocker di autorità collegato alla
+implementazione mancante del production bridge selezionato:
+`INTERNAL_CANDIDATE_VERIFIED / AUTHORITY_UI_BINDING_BLOCKER`.
+
+Il core, l'operazione read-only e la superficie statica MCP/Mini del planner
+semantico sono integrati:
+`STATIC_SURFACE_INTEGRATED / PRODUCTION_BRIDGE_BLOCKER`. La superficie accetta
+solo piani bounded e closed-world su terminology search e Open Loops
+patient-scoped. Il production bridge selezionato non ha callsite o test. Il
+planner non può produrre SQL libero, importare il database o superare purpose,
+scope, budget e currentness host-owned. La registrazione visita è
+`DEFER_NEXT_PATCH`; nessun audio o transcript appartiene al candidato corrente.
 
 Esistono due modalità architetturali distinte. Nel modello
 provider-in-MediFlow, il Fabric governa un provider per una capability
-applicativa. Nel modello MediFlow-in-intelligent-host, un host futuro invoca
-Application Services governati tramite un adapter MCP, App o Headless. La
-seconda modalità è `RELEASE_SCOPE_EXCLUDED`: non autorizza server MCP,
-installer, onboarding, sessioni agentiche, un runtime Headless generale
-esterno o accesso diretto a SQLite.
+applicativa. Nel modello MediFlow-in-intelligent-host, MCP/Mini raggiungono
+Application Services governati tramite RPC AIP ereditato. Questa seconda
+modalità resta candidata: non autorizza installer, onboarding, sessioni
+agentiche generali, listener o accesso diretto a SQLite.
 
 ### Modello provider F7
 
-La disclosure implementata mostra Ollama e ATHENA come provider locali e
-OpenAI/Anthropic come righe informative con esecuzione disabilitata. Non prova
-il modello provider completo.
-
-Il modello F7 completo non è implementato ed è `RELEASE_SCOPE_EXCLUDED`. Un
-contratto post-0.8.5 dovrà separare provider type, istanza, autenticazione,
-modello, capability, gruppi, binding e function allowlist. Le classi di
-credenziale restano distinte: `local_model`, `api_key`, `provider_oauth`
-ufficiale e `host_subscription`. Nessuna classe implica un'altra.
+Il modello provider v2 separa provider type, istanza, autenticazione, modello,
+capability, gruppi, binding e function allowlist. Le classi di credenziale
+restano distinte: `local_model`, `api_key`, `provider_oauth` ufficiale e
+`host_subscription`. Nessuna classe implica un'altra.
 
 Un login consumer o un abbonamento non è una credenziale di inferenza. Un
 flusso `provider_oauth` deve essere ufficiale, documentato dal provider e
 separato dalle sessioni consumer; non sono ammessi token estratti, OAuth
-privati o protocolli ricostruiti. Configurazione credenziali, egress ed
-esecuzione OpenAI/Anthropic sono `RELEASE_SCOPE_EXCLUDED`; il candidato include
-solo le righe informative disabilitate.
+privati o protocolli ricostruiti. Gli adapter HTTPS ufficiali e i probe
+Document Synthesis review-only sono integrati ma `default OFF`. Ogni uso
+richiede secret reference, lifecycle attivo e policy egress/retention
+host-owned. I test usano transport fake: nessuna credenziale o rete live è
+provata dal candidato.
 
 ### Readiness dei provider locali
 
@@ -318,20 +335,20 @@ capability 0.8.5, le venue, i production root e l'assenza di authority caller.
 > model governance delle decisioni documentali. Restano AI locale
 > review-first: nessuna scrittura clinica autonoma.
 
-## ⚠️ Provider cloud disabilitati
+## ⚠️ Provider remoti con opt-in obbligatorio
 
-Nessun provider cloud appartiene al runtime 0.8.5. OpenAI e Anthropic sono
-soltanto record informativi: non esistono login, token, probe, routing o egress
-cloud nel prodotto. Un comparator remoto resta, al più, una lane interna di
-engineering separata e non cambia il default `local-first`.
+OpenAI e Anthropic hanno adapter ufficiali e probe review-only. La factory
+production resta OFF senza i due opt-in host e non osserva credenziali quando
+è disabilitata. Il tree non prova rete live, account, retention o idoneità a
+dati clinici e non cambia il default `local-first`.
 
 Regole minime:
 
-- e ammesso solo come lane interna di engineering, mai come runtime clinico
-- usa solo case pack privati, redatti/minimizzati e fuori Git
-- richiede approvazione umana esplicita prima di qualunque export
-- non puo scrivere dati paziente, generare apply automatici o essere committato
-  nel repository
+- resta OFF senza opt-in provider ed egress espliciti
+- usa soltanto la data class ammessa dalla policy host-owned
+- non riceve authority clinica e non può generare apply automatici
+- non espone segreti, prompt, output clinico o raw response in receipt e log
+- non autorizza claim di zero retention senza prova dell'account
 
 ---
 

@@ -18,7 +18,7 @@ read_when:
 > prevalgono [AGENTS.md](../AGENTS.md) e
 > [docs/repository-topology.md](./repository-topology.md).
 
-Ultimo aggiornamento: 2026-09-01 (candidato sorgente locale v0.8.5)
+Ultimo aggiornamento: 2026-09-02 (candidato sorgente locale v0.8.5)
 
 > [!NOTE]
 > Questo documento descrive il tree del candidato sorgente locale `0.8.5`.
@@ -72,9 +72,10 @@ La fotografia corrente e questa:
   clinical scales e store SQLite locale; Linux e Windows oggi verificano la
   portabilita del core in CI, non una parity applicativa completa.
 - **Parity UI 0.8**: iPhone 2/2, iPad 7/7, build/probe macOS e localhost 82/82
-  sono verdi sul tree verificato. La parity resta clinico-semantica, non pixel.
-  VoiceOver reale mobile non è provato per il limite esterno della beta Xcode
-  27; la deroga vale solo per la release sorgente e non autorizza claim di
+  sono PASS della baseline storica `0843726fe`, non del candidato exact-tree
+  `0.8.5`. Il volume Xcode non è montato e non esiste una nuova prova nativa
+  sullo SHA corrente. La parity resta clinico-semantica, non pixel. VoiceOver
+  reale mobile non è provato e la deroga storica non autorizza claim di
   conformità.
 - **Checkpoint pubblicato 0.8.2**: le PR 163-176 sono su `main`. I commit finali hanno
   review DeepSeek e Sol pulite. Sul push a `main`, Apple Native ha superato
@@ -82,12 +83,11 @@ La fotografia corrente e questa:
 - **Candidato sorgente locale 0.8.5**: il tree integra i contratti e i percorsi
   locali della patch. Non e una release, non e release-ready e non dispone di
   una prova CI remota sulla stessa SHA.
-- **Document intelligence**: AnyDoc e l'unica estrazione automatica locale
-  degli allegati supportati con testo estraibile. Non e OCR e non usa servizi
-  hosted. Nel tree corrente `ocr` e `unavailable`, le route OCR legacy
-  rispondono `410` e immagini o PDF scansionati senza text layer falliscono
-  chiusi come `review_required/unsupported_local_extraction`, con revisione
-  manuale e senza sintesi o proposta.
+- **Document intelligence**: AnyDoc resta il primo passaggio automatico locale
+  e non usa servizi hosted. Il tree include routing, manifest,
+  materializzazione e rendering delle pagine `needsOcr`, oltre al preflight
+  DeepSeek-OCR 2 con fake seam. Runtime adapter, prova live, benchmark E2E e
+  readiness OCR restano assenti; le route legacy rispondono `410`.
 - **Evidence absorption**: il layer locale di assorbimento evidenza e ora
   misurato con corpus sintetico multi-fonte, recall di fonte, disciplina di
   citazione, recupero di fonti superate e leakage da fonti stale.
@@ -106,18 +106,35 @@ La fotografia corrente e questa:
   sul percorso di produzione ha completato in
   10,6 secondi con 64 token e 211 caratteri, senza registrare il raw output.
   Questa singola osservazione non prova readiness universale o qualità clinica.
-- **Gate di perimetro F6/F7**: il fallback locale DeepSeek-OCR 2 e il runtime
-  cloud OpenAI/Anthropic non sono implementati, verificati o inclusi nella
-  patch. Il loro esito e `RELEASE_SCOPE_EXCLUDED`, non un claim di feature o
-  readiness. OpenAI e Anthropic compaiono soltanto nella disclosure informativa
-  con esecuzione, credenziali ed egress disabilitati.
-- **Headless**: il piano generale contiene 66 esiti terminali e zero operazioni
-  eseguibili. I 32 `GET` network osservati restano evidence candidate. La sola
-  eccezione stretta e la append SOAP server-side H1-H10, vincolata a medico,
-  conferma clinica monouso, currentness, CAS, audit e receipt; non abilita
-  apply generale, Mini, Fabric authority o trasporto agentico.
-- **Fuori perimetro 0.8.5**: cloud, egress, MCP, visita registrabile e semantic
-  query planner non sono funzioni del candidato locale.
+- **Gate F6/F7**: F6 integra il core selettivo e il preflight con fake seam, ma
+  non un runtime adapter DeepSeek. F7 integra provider v2, secret broker,
+  adapter ufficiali e probe OpenAI/Anthropic `default OFF`. Non esistono
+  credenziali, rete live o runtime readiness cloud nel candidato.
+- **Fabric capability-first**: il selector guidato copre cinque capability,
+  filtra profili compatibili, esegue smoke sintetici e attiva binding host-owned
+  in modo atomico con CAS e rollback. Non persiste segreti e non qualifica il
+  runtime.
+- **Headless**: MCP `stdio` e Mini raggiungono catalogo, terminology search,
+  Open Loops patient-scoped, proposta follow-up e query semantica bounded
+  read-only tramite un processo figlio autenticato e RPC AIP ereditato.
+  Launcher e quickstart production restano
+  `PRODUCTION_BRIDGE_BLOCKER`. La topologia Supervisor portabile come trusted
+  parent su IPC ereditato è `DECIDED`; l'implementazione è `SPLIT_REQUIRED`.
+  Restano aperti late-bind trusted-UI, owner sincrono di `readHostContext`,
+  lifecycle e revoca production e audit terminale sincrono. Broker residente e
+  UDS sono esclusi dalla `0.8.5`.
+- **Write F10**: la transizione stato checkup ha core e composizione SQLite
+  verificati come candidato interno. Non è collegata a launcher, MCP, Mini o
+  UI; il binding trusted-UI resta
+  `AUTHORITY_UI_BINDING_BLOCKER` per il production bridge.
+- **Planner candidato**: core, operazione read-only e superficie statica
+  MCP/Mini sono integrati:
+  `STATIC_SURFACE_INTEGRATED / PRODUCTION_BRIDGE_BLOCKER`. Il production bridge
+  selezionato non ha callsite o test e SQL diretto resta vietato.
+- **Recording differito**: la visita registrabile è `DEFER_NEXT_PATCH`. Il
+  packet è solo foundation: nessuna integrazione runtime, callsite, UI o prova
+  Xcode exact-tree appartiene al candidato. Cloud default-on e AI dai client
+  paired restano fuori scope.
 - **Attese locali**: la prima slice web collega prestazioni attese e risultati;
   il salvataggio resta esplicito e il workflow non e esteso ai client paired.
 - **SISS/FSE**: handoff contestuale e flussi `webapp-assisted`; nessuna
@@ -210,10 +227,11 @@ La document intelligence e `artifact-first`:
   AnyDoc in un processo locale bounded;
 - AnyDoc produce Markdown normalizzato, evidenza e provenienza senza usare rete
   o servizi hosted;
-- nel candidato corrente la capability `ocr` e `unavailable` e le route OCR
-  legacy rispondono `410`; non esiste un percorso OCR eseguibile incluso;
-- immagini, documenti cifrati e PDF scansionati senza text layer falliscono
-  chiusi e richiedono revisione manuale;
+- il candidato classifica le sole pagine `needsOcr`, le materializza e le
+  renderizza con limiti bounded; il preflight DeepSeek usa un fake seam e non è
+  un runtime adapter;
+- immagini, documenti cifrati e input ambigui falliscono chiusi; le route OCR
+  legacy rispondono `410`;
 - il risultato va trattato come evidenza reviewable;
 - `summarySnapshot` e `parseEvidenceArtifactSnapshot` sono dati clinici e
   persistono cifrati;
@@ -271,10 +289,14 @@ Documenti/ADR principali:
 | `MediFlowCore` tri-OS | Verificato tri-OS | Core Swift condiviso per logica clinica, cifratura, contratti, filtri, conflict handling, clinical scales e SQLite locale | CI Linux/macOS/Windows; non equivale a app complete Windows/Linux |
 | iPhone/iPad | Paired | Client paired non-AI, cache cifrata degradabile e workflow online versionati sui moduli core | No SQLite diretto |
 | AnyDoc | Estrazione locale | Conversione deterministica degli allegati supportati in Markdown normalizzato | Processo figlio bounded; nessuna rete; non e OCR o provider Fabric |
+| Pipeline `needsOcr` | Core selettivo integrato | Routing, manifest, materializzazione, rendering e preflight DeepSeek con fake seam | Nessun runtime adapter, prova live o benchmark E2E |
+| Selector Fabric | Integrato | Discovery compatibile, smoke sintetico e binding atomico per cinque capability | Nessun segreto persistito; discovery non equivale a readiness |
 | Ollama | Provider locale capability-specific | Percorsi generativi Fabric ammessi dalla capability | Solo loopback; nessun OCR o fallback implicito |
 | ATHENA/MLX | Provider locale capability-specific | Solo Treatment Reasoning review-only | Nessuna prescrizione o apply clinico |
-| OpenAI / Anthropic | Disclosure informativa | Righe read-only nel registro provider | Nessuna configurazione credenziali, esecuzione o egress; un login o abbonamento consumer non e accesso API |
-| OCR | Runtime `unavailable` | Nessuna estrazione automatica di immagini o scansioni | Route legacy `410`; il fallback DeepSeek-OCR 2 non e incluso nella patch |
+| OpenAI / Anthropic | Adapter ufficiali `default OFF` | Probe Document Synthesis review-only con policy e secret reference host-owned | Solo transport fake nel tree; nessuna credenziale, rete live o runtime readiness |
+| MCP / Mini | Superficie figlia candidata | Catalogo, terminology search, Open Loops patient-scoped, proposta follow-up e query semantica bounded read-only | RPC AIP ereditato; entrypoint production `PRODUCTION_BRIDGE_BLOCKER` |
+| Write checkup F10 | `INTERNAL_CANDIDATE_VERIFIED / AUTHORITY_UI_BINDING_BLOCKER` | Core e composizione SQLite verificati | Nessun binding launcher, MCP, Mini o UI; conferma trusted-UI richiesta |
+| Semantic planner | `STATIC_SURFACE_INTEGRATED / PRODUCTION_BRIDGE_BLOCKER` | Core, validazione, esecutore, operazione read-only e superficie statica MCP/Mini integrati | Production bridge senza callsite o test; nessun SQL libero |
 | ICD-11 WHO | Application Service server-only | Ricerca diagnosi/coding con output MediFlow data-only | Disattivato per default; egress e credenziali host-owned espliciti |
 | OpenMed | Shadow/benchmark | Redaction lane locale non client-facing | Non runtime clinico |
 
@@ -369,8 +391,9 @@ come baseline finche benchmark e governance non giustificano un cambio.
 L'Application Service Layer resta host-owned. Il Fabric risolve provider,
 modello e venue per capability e restituisce receipt e provenienza PHI-safe.
 Il chiamante non sceglie provider, modello, venue o fallback. Il gate egress
-resta `closed_pending_redaction_lane`: non esistono provider cloud o consenso
-egress consegnati.
+resta chiuso per default. Gli adapter cloud esistono, ma non sono attivi senza
+opt-in host, lifecycle, policy e secret reference; il tree non include
+credenziali o prove di rete live.
 
 Le superfici operative includono:
 
@@ -410,7 +433,8 @@ receipt storica `candidate_not_integrated`.
 - `smart_import`: `proposal_only`.
 - `document_synthesis`: `proposal_only`.
 - `treatment_reasoning`: `proposal_only`.
-- `ocr`: `unavailable`, senza entrypoint o production root.
+- `ocr`: core selettivo e preflight integrati, senza runtime adapter o
+  production root qualificato.
 
 Questo stato e locale al tree. Non prova CI remota, release readiness, tag,
 pubblicazione, installazione o disponibilita operativa su un altro host. Lo
@@ -426,29 +450,41 @@ implicite della patch.
 
 | Gate | Implementato | Verificato nel tree locale | Residuo escluso | Esito |
 | --- | --- | --- | --- | --- |
-| F6 — OCR selettivo | AnyDoc per testo estraibile; `ocr=unavailable`; route OCR legacy `410`; immagini e scansioni fail-closed a revisione manuale | Guard AnyDoc local-only, crosswalk `4 proposal_only + 1 unavailable` e contratti delle route legacy | DeepSeek-OCR 2 per pagine `needsOcr`, provenienza/hash/qualita per pagina, benchmark sintetico italiano con soglie ed E2E non sono implementati ne verificati | `RELEASE_SCOPE_EXCLUDED` |
-| F7 — provider esterni | Ollama locale e ATHENA/MLX dove configurati; OpenAI e Anthropic solo come disclosure read-only con esecuzione ed egress disabilitati | Contratti provider disclosure, stato Fabric e proiezione UI read-only con fixture sintetiche | Non esistono configurazione credenziali o runtime cloud, ne il contratto completo per type, instance, auth, model, capabilities, groups, bindings, allowlist e credential classes | `RELEASE_SCOPE_EXCLUDED` |
+| F6 — OCR selettivo | AnyDoc first-pass; routing, manifest, materializzazione e rendering `needsOcr`; preflight DeepSeek con fake seam | Test bounded e fail-closed del core selettivo | Runtime adapter, prova live, benchmark italiano E2E e qualifica hardware | `INTEGRATED CORE / NO_RUNTIME_READINESS` |
+| F7 — provider esterni | Provider v2, secret broker, adapter HTTPS ufficiali e probe review-only OpenAI/Anthropic | Test con transport fake e default OFF | Credenziali, rete live, retention account e runtime readiness remota | `INTEGRATED / DEFAULT_OFF` |
 
 Una sottoscrizione o un login consumer OpenAI/Anthropic non costituiscono
-accesso API. Nessuna riga informativa autorizza onboarding, probe, invio di PHI
+accesso API. Registry, probe e adapter non autorizzano onboarding, invio di PHI
 o esecuzione remota.
 
-### 5.1.3 Headless generale e unica eccezione SOAP
+### 5.1.3 Headless, MCP e Mini candidati
 
-Il piano Headless 0.8.5 classifica tutti i 66 anchor canonici con un esito
-terminale. Le 32 route `GET` network osservate sono evidence candidate, non
-operation ID o grant. Il numero di operazioni Headless generali eseguibili
-resta zero.
+Un launcher trusted avvia un processo figlio autenticato con ambiente
+allowlisted e RPC AIP ereditato. MCP `stdio` e Mini pubblicano catalogo,
+terminology search, Open Loops patient-scoped, proposta follow-up
+`proposal_only` e query semantica bounded read-only. Ogni call passa dal broker
+e dagli Application Services host-owned; gli adapter non importano SQLite e non
+aprono listener.
 
-La sola eccezione e una append SOAP locale e server-side. La catena H1-H10 lega
-bozza chiusa, sessione physician active-role, paziente e revisione correnti,
-seal client, gesto e step-up monouso, approval, CAS, audit, ledger e receipt.
-Non apre un trasporto Headless generale, non accetta conferme sintetizzate da
-un agente e non conferisce authority Fabric.
+Questa superficie resta un candidato integrato. Launcher production,
+quickstart, onboarding e lifecycle operativo supportato restano
+`PRODUCTION_BRIDGE_BLOCKER`. La topologia Supervisor portabile come trusted
+parent su IPC ereditato è `DECIDED`; l'implementazione è `SPLIT_REQUIRED`. La
+factory esaminata non chiude late-bind trusted-UI, owner sincrono di
+`readHostContext`, lifecycle e revoca production o audit terminale sincrono. Un
+broker residente o UDS non rientra nella `0.8.5`.
 
-MCP, CLI agentica, listener, onboarding di agenti, visita registrabile e
-semantic query planner restano fuori scope. Cloud, egress e invocazione AI dai
-client paired restano chiusi.
+La transizione stato checkup F10 è verificata soltanto come candidato interno
+nel core e nella composizione SQLite. Non ha binding launcher, MCP, Mini o UI.
+La conferma trusted-UI resta `AUTHORITY_UI_BINDING_BLOCKER` e blocca la chiusura
+del production bridge.
+
+Il core, l'operazione read-only e la superficie statica MCP/Mini del semantic
+query planner sono integrati:
+`STATIC_SURFACE_INTEGRATED / PRODUCTION_BRIDGE_BLOCKER`. Il production bridge
+selezionato non ha callsite o test. La visita registrabile è
+`DEFER_NEXT_PATCH` e non è integrata nel runtime. Egress implicito, SQL diretto
+ed esecuzione AI dai client paired restano chiusi.
 
 ### 5.2 Lane benchmark-only
 
@@ -469,9 +505,9 @@ solo dalla capability Treatment Reasoning. Ollama resta capability-specific e
 non esegue OCR. Ogni altra lane MLX resta benchmark, shadow o hold secondo la
 matrice di serving.
 
-OpenAI e Anthropic restano righe informative nel registro e nella UI di stato.
-Non sono provider effettivi del candidato, non accettano credenziali e non
-abilitano esecuzione o egress.
+OpenAI e Anthropic hanno adapter ufficiali e probe review-only. Restano
+`default OFF`; il tree usa transport fake e non contiene credenziali o prove di
+rete live. Registry e probe non autorizzano esecuzione o egress.
 
 Per promuovere una lane servono:
 
@@ -604,6 +640,8 @@ Da preservare:
 Disponibile:
 
 - estrazione automatica locale con AnyDoc per i formati supportati;
+- routing, manifest, materializzazione e rendering bounded delle pagine
+  `needsOcr`, con preflight DeepSeek e fake seam;
 - review di suggerimenti;
 - soppressione rumore quando una fonte non introduce novita clinica;
 - create-flow document-driven con persistenza prudente delle terapie;
@@ -617,7 +655,7 @@ Disponibile:
 Fuori scope:
 
 - auto-promozione di diagnosi/terapie da testo libero ambiguo;
-- fallback DeepSeek-OCR 2, benchmark OCR e relativa esecuzione E2E;
+- runtime adapter DeepSeek-OCR 2, benchmark OCR e relativa esecuzione E2E;
 - import silenzioso di documenti reali senza review;
 - uso di documenti reali come fixture Git.
 

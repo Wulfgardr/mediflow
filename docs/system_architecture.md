@@ -1,8 +1,8 @@
 ---
-summary: "Compact operational architecture overview for the current MediFlow mainline shell, home-base, AI/document lanes, SISS/FSE boundaries, and local guardrails."
+summary: "Compact operational architecture overview for the current MediFlow 0.8.5 candidate shell, home-base, AI/document lanes, SISS/FSE boundaries, and local guardrails."
 read_when:
   - "Needing a fast technical architecture overview without reading the full walkthrough."
-  - "Checking current mainline runtime boundaries before implementation or review."
+  - "Checking current 0.8.5 candidate boundaries before implementation or review."
 ---
 
 # Architettura di MediFlow (sintesi operativa)
@@ -12,7 +12,8 @@ read_when:
 > La visione architetturale stabile resta [ARCHITECTURE.md](../ARCHITECTURE.md).
 > Il walkthrough operativo canonico resta [docs/walkthrough.md](./walkthrough.md).
 
-Panoramica tecnica rapida aggiornata allo stato reale di `main`.
+Panoramica tecnica rapida del candidato sorgente locale `0.8.5`. Non prova CI
+remota, release readiness, tag o release.
 Per la lettura completa e trasversale usa [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md).
 Per il dettaglio completo usa [docs/walkthrough.md](./walkthrough.md).
 Per la mappa documentale completa usa [docs/README.md](./README.md) e [docs/markdown-index.md](./markdown-index.md).
@@ -57,8 +58,13 @@ Per la mappa documentale completa usa [docs/README.md](./README.md) e [docs/mark
 | SQLite + Drizzle | Storage autorevole | `medical.db`, schema in `lib/schema.ts` |
 | Ollama | Runtime generativo locale configurabile | Serve Patient Insight, Smart Import e Document Synthesis quando host e modello locali superano la readiness; non e un runtime OCR della 0.8.5 |
 | ATHENA/MLX | Runtime locale configurabile | Serve Treatment Reasoning solo con modello e runner `mlx_lm.generate` pre-provisionati; assenza o configurazione incompleta falliscono in modo chiuso |
-| AnyDoc | Estrazione documentale locale | Unica estrazione automatica inclusa per formati con testo estraibile, con provenienza e currentness |
-| OCR automatico | Non disponibile nella 0.8.5 | Immagini, scansioni e documenti senza testo utile richiedono review manuale; DeepSeek-OCR 2 e Apple Vision restano fuori dal perimetro di rilascio |
+| AnyDoc | Estrazione documentale locale | Primo passaggio per formati con testo estraibile, con provenienza e currentness |
+| Core OCR selettivo | Integrato senza runtime adapter | Routing, manifest, materializzazione e rendering `needsOcr`; preflight DeepSeek con fake seam, senza prova live o benchmark E2E |
+| Selector Fabric | Integrato | Discovery compatibile, smoke sintetico e binding atomico per cinque capability; nessuna qualifica runtime implicita |
+| OpenAI / Anthropic | Adapter ufficiali `default OFF` | Probe review-only con transport fake; nessuna credenziale o rete live nel tree |
+| MCP / Mini | Superficie figlia candidata | Terminology, Open Loops, follow-up proposal e query semantica bounded tramite RPC AIP ereditato; entrypoint production bloccato |
+| Write checkup F10 | Candidato interno verificato | Core e composizione SQLite presenti; nessun binding launcher/MCP/Mini/UI, `AUTHORITY_UI_BINDING_BLOCKER` |
+| Semantic planner | `STATIC_SURFACE_INTEGRATED / PRODUCTION_BRIDGE_BLOCKER` | Core, operazione read-only e superficie statica MCP/Mini integrati; production bridge senza callsite o test; nessun SQL libero |
 | ICD-11 WHO | Application Service server-only opzionale | Output MediFlow data-only, egress e credenziali espliciti |
 | OpenMed redaction | Sidecar shadow opzionale | Lane `redaction.v1` benchmark/shadow, non client-facing |
 | TLS proxy `:3443` | Trasporto locale fidato | Base di `/api/v1` per native e `home-base` |
@@ -130,8 +136,9 @@ Pipeline corrente:
 1. upload e validazione locale del documento
 2. estrazione AnyDoc per i formati con testo estraibile
 3. registrazione di provenienza, hash e currentness della fonte estratta
-4. invio a review manuale di immagini, scansioni e documenti senza testo utile;
-   la capability OCR automatica resta `unavailable` e non produce proposte
+4. classificazione delle sole pagine `needsOcr`, materializzazione e rendering
+   bounded, poi preflight DeepSeek con fake seam; il runtime adapter non è
+   integrato e gli altri esiti vanno a review manuale
 5. estrazione/sintesi review-first con runtime generativo locale configurato
 6. persistenza di:
    - `summarySnapshot`
@@ -145,11 +152,32 @@ quando diagnosi/terapie sono gia presenti. L'estrazione identita e prudente
 (niente data di nascita da data arbitraria, codice fiscale con omocodie) e gli
 errori AI sono visibili e non attivano fallback impliciti.
 
-L'AI locale e il default review-first. OpenAI e Anthropic sono disclosure
-informative con esecuzione disabilitata nella 0.8.5: non esistono configurazione,
-credenziali, login o fallback cloud inclusi nel candidato. Le lane comparator e
-OpenMed `redaction.v1` restano benchmark-only, separate dal runtime clinico e non
-sono claim di prodotto.
+L'AI locale è il default review-first. OpenAI e Anthropic hanno adapter HTTPS
+ufficiali e probe review-only, ma restano `default OFF`. Ogni composizione
+richiede lifecycle, secret reference e policy egress/retention host-owned. I
+test usano transport fake: il tree non contiene credenziali o prove di rete
+live. Le lane comparator e OpenMed `redaction.v1` restano benchmark-only.
+
+Il launcher trusted avvia un processo figlio autenticato con RPC AIP ereditato.
+MCP `stdio` e Mini espongono terminology search, Open Loops patient-scoped e
+follow-up proposal, oltre alla query semantica bounded read-only, senza accesso
+diretto a SQLite. Launcher production e quickstart restano
+`PRODUCTION_BRIDGE_BLOCKER`. La topologia Supervisor
+portabile come trusted parent su IPC ereditato è `DECIDED`; l'implementazione è
+`SPLIT_REQUIRED`. La factory esaminata non chiude late-bind trusted-UI, owner
+sincrono di `readHostContext`, lifecycle e revoca production o audit terminale
+sincrono. Broker residente e UDS sono esclusi dalla `0.8.5`.
+
+La transizione stato checkup F10 è verificata come candidato interno nel core e
+nella composizione SQLite. Non è collegata a launcher, MCP, Mini o UI. La
+conferma trusted-UI resta `AUTHORITY_UI_BINDING_BLOCKER` per il production
+bridge.
+
+Il core, l'operazione read-only e la superficie statica MCP/Mini del planner
+semantico sono integrati:
+`STATIC_SURFACE_INTEGRATED / PRODUCTION_BRIDGE_BLOCKER`. Il production bridge
+selezionato non ha callsite o test. La registrazione visita è
+`DEFER_NEXT_PATCH` e non è integrata nel runtime.
 
 > [!NOTE]
 > Il safety gate AI (WUL-358) espone un kill-switch per `patient-insight`,
@@ -167,6 +195,8 @@ sono claim di prodotto.
   della sorgente locale.
 - Il cockpit Kree8 e la root web live su `main`; nuove sperimentazioni non
   vivono come selector persistito in Settings.
+- Il selector Fabric sceglie binding di capability, non shell web. Discovery e
+  smoke sintetico non dimostrano readiness.
 - I benchmark/shadow lane (`OpenMed`, comparator cloud, NER benchmark-only)
   restano separati dal runtime clinico.
 - SISS/FSE resta `portal-handoff` / webapp-assisted: niente integrazione
@@ -191,4 +221,4 @@ sono claim di prodotto.
 
 ---
 
-*Ultimo aggiornamento: 2026-09-01 - candidato sorgente locale v0.8.5*
+*Ultimo aggiornamento: 2026-09-02 - candidato sorgente locale v0.8.5*

@@ -314,21 +314,28 @@ sequenceDiagram
         Fabric->>Ollama: Invocazione locale senza fallback
         Ollama-->>Fabric: Output candidato
         Fabric-->>UI: Publication + receipt PHI-safe + provenienza
-    else immagine, scansione o sorgente non corrente
-        DocAPI-->>UI: Denial fail-closed e revisione manuale
+    else pagine needsOcr e sorgente corrente
+        AnyDoc-->>DocAPI: Segnale needsOcr + routing per pagina
+        Note over AnyDoc,DocAPI: Core candidato separato: manifest, materializzazione, rendering e preflight fake
+        DocAPI-->>UI: Review required, nessuna publication automatica
+    else sorgente non corrente o input non ammesso
+        DocAPI-->>UI: Denial fail-closed
     end
 ```
 
-AnyDoc e l'unica estrazione automatica locale inclusa nella 0.8.5. Non esegue
-OCR e non persiste il risultato nel record clinico. La publication Document
-Synthesis dichiara `writesPerformed=0` e `applyPolicy=none`.
+AnyDoc resta il primo passaggio automatico locale. Non esegue OCR e non
+persiste il risultato nel record clinico. Il tree include routing, manifest,
+materializzazione e rendering delle sole pagine `needsOcr`, oltre al preflight
+DeepSeek con fake seam. Questi componenti non sono composti in un production
+root OCR. La publication Document Synthesis dichiara `writesPerformed=0` e
+`applyPolicy=none`.
 
 Le route legacy `/api/ocr/extract` e `/api/pdf-extract` acquisiscono prima la
-sessione e poi restituiscono `410`. Il fallback selettivo DeepSeek-OCR 2 e un
-requisito deciso ma `RELEASE_SCOPE_EXCLUDED`: non ha adapter, E2E o benchmark
-di promozione. Un packet futuro dovra inviare soltanto pagine `needsOcr`,
-ricomporre provenienza, hash e qualita per pagina e superare un benchmark
-sintetico italiano con soglie fissate. Resta vietato cloud egress o write.
+sessione e poi restituiscono `410`. Il runtime adapter DeepSeek-OCR 2 non è
+integrato: il tree non contiene un'esecuzione live, una prova E2E o un benchmark
+di promozione. Una futura promozione deve conservare provenienza, hash e qualità
+per pagina e superare un benchmark sintetico italiano con soglie fissate.
+Restano vietati cloud egress implicito e write.
 
 ### 4.5 Patient Insight -> preview Fabric
 
@@ -419,9 +426,50 @@ fallback Ollama e non applica terapie o diagnosi.
 | `treatment_reasoning` | ATHENA / processo MLX locale | preview | host | nessuno; `writesPerformed=0` |
 
 Tutte le receipt sono PHI-safe e descrittive. Non sono grant. Il client paired
-espone solo stato e non invoca queste capability. OpenAI e Anthropic restano
-registry/disclosure informativa: runtime, credenziali ed egress sono
-`RELEASE_SCOPE_EXCLUDED` dalla 0.8.5.
+espone solo stato e non invoca queste capability. OpenAI e Anthropic hanno
+adapter HTTPS ufficiali e probe review-only `default OFF`. I test usano
+transport fake; il tree non contiene credenziali o prove di rete live.
+
+#### Selector Fabric guidato
+
+Il selector opera sui binding di capability, non sulla shell web. Rileva
+profili compatibili, esegue uno smoke sintetico e attiva il nuovo binding con
+CAS e persistenza atomica. Un fallimento mantiene o ripristina il binding
+precedente. Discovery e smoke non qualificano hardware, modello o runtime e il
+record persistito non contiene segreti.
+
+#### Intelligent Host candidato
+
+```text
+launcher trusted
+  -> processo figlio autenticato
+  -> RPC AIP ereditato e revocabile
+  -> MCP stdio oppure Mini
+  -> Application Service nominato
+  -> risultato read_only o proposal_only
+```
+
+Le operazioni candidate sono terminology search, lettura patient-scoped delle
+Open Loops, proposta follow-up e query semantica bounded read-only. Il processo
+figlio non apre listener, non importa SQLite e non accetta authority dal caller.
+Launcher production e
+quickstart restano `PRODUCTION_BRIDGE_BLOCKER`. La topologia Supervisor
+portabile come trusted parent su IPC ereditato è `DECIDED`; l'implementazione è
+`SPLIT_REQUIRED`. La factory esaminata non chiude late-bind trusted-UI, owner
+sincrono di `readHostContext`, lifecycle e revoca production o audit terminale
+sincrono. Broker residente e UDS sono esclusi dalla `0.8.5`.
+
+La transizione stato checkup F10 non appartiene a quel catalogo. Core e
+composizione SQLite sono verificati come candidato interno, ma non esiste un
+binding launcher, MCP, Mini o UI. La conferma trusted-UI resta
+`AUTHORITY_UI_BINDING_BLOCKER` per il production bridge.
+
+Il core, l'operazione read-only e la superficie statica MCP/Mini del planner
+semantico sono integrati:
+`STATIC_SURFACE_INTEGRATED / PRODUCTION_BRIDGE_BLOCKER`. La superficie compone
+solo terminology search e Open Loops patient-scoped. Il production bridge
+selezionato non ha callsite o test e il planner non produce SQL libero. La
+registrazione visita è `DEFER_NEXT_PATCH`.
 
 ### 4.9 File AIFA locale -> catalogo indicizzato con provenienza
 
@@ -500,6 +548,9 @@ completo, attachment remoti, cataloghi remoti, campi AI/documentali.
 | `/api/ai/treatment-reasoning/{ingest,preview}` | Web UI | Sessione web e selezione corrente | HTTP localhost | Ingest e preview Treatment Reasoning tramite Fabric e ATHENA locale |
 | `/api/ocr/extract`, `/api/pdf-extract` | Consumer legacy | Auth prima del body | HTTP localhost | Boundary terminale `410`; nessuna estrazione o invocazione OCR |
 | `/api/icd/proxy` | Web UI | Sessione + allowlist localhost | HTTP localhost | Lookup ICD-11 |
+| AIP child RPC | Processo figlio trusted | Bootstrap secret e contesto host-owned | IPC ereditato | Catalogo e operazioni nominate; nessun listener o DB diretto |
+| MCP Intelligent Host | Harness locale | Binding RPC ereditato dal launcher | `stdio` | Terminology, Open Loops, proposta follow-up e query semantica bounded; superficie candidata |
+| Mini | CLI locale | Binding RPC ereditato dal launcher | stdin/stdout JSON | Stesso catalogo MCP; entrypoint production ancora bloccato |
 
 Nota auth: il token locale non porta privilegi admin web. Le route di sistema
 ad alto impatto richiedono una sessione admin web; le eccezioni token-aware fuori
@@ -519,7 +570,11 @@ read-only esplicitamente documentati in [SECURITY.md](../SECURITY.md).
 - Controllo token locale: `lib/local-api-auth.ts`, `lib/local-api-token.ts`
 - Proxy TLS locale: `scripts/local-api-tls-proxy.mjs`
 - AnyDoc e source authority: `lib/domain/documents/anydoc-current-source-composition.ts`, `lib/domain/documents/anydoc-local-extraction-runner.ts`
+- Core OCR selettivo: `lib/domain/documents/anydoc-page-manifest.ts`, `lib/domain/documents/anydoc-pdf-page-materializer.ts`, `lib/domain/documents/anydoc-pdf-page-renderer.ts`, `lib/domain/documents/deepseek-ocr2-runtime-preflight.ts`
 - Catalogo e production root Fabric: `lib/ai-providers/fabric/generative-catalog.ts`, `lib/ai-providers/fabric/*production*`
+- Selector Fabric: `lib/ai-providers/fabric/guided-setup.ts`, `lib/ai-providers/fabric/capability-binding-store.ts`
+- Provider ufficiali default OFF: `lib/ai-providers/v2/*official-transport.ts`, `lib/ai-providers/v2/document-synthesis-cloud-probe-composition.ts`
+- Headless/AIP/MCP/Mini: `packages/aip/`, `packages/mcp/`, `packages/mini/`, `scripts/intelligent-host-mcp-stdio.mjs`
 - Crosswalk dei quattro percorsi: `docs/capability-mapping/fabric-generative-runtime-crosswalk.v1.json`
 - Disclosure provider: `lib/ai-providers/fabric/provider-disclosure.ts`
 
@@ -538,11 +593,14 @@ read-only esplicitamente documentati in [SECURITY.md](../SECURITY.md).
 - Proxy verso servizi locali sempre allowlist localhost.
 - I quattro percorsi Fabric restano preview/proposal-only, host-owned e
   `writesPerformed=0`; receipt e provenienza non concedono authority.
-- AnyDoc legge soltanto l'allegato corrente. Immagini e scansioni falliscono
-  chiuse verso review manuale; le route OCR legacy restano terminali `410`.
-- DeepSeek-OCR 2 selettivo e runtime OpenAI/Anthropic sono
-  `RELEASE_SCOPE_EXCLUDED` dalla 0.8.5. Non devono apparire come fallback,
-  credenziale o egress abilitati.
+- AnyDoc legge soltanto l'allegato corrente. Solo le pagine `needsOcr`
+  raggiungono la pipeline bounded; le route OCR legacy restano terminali `410`.
+- Il preflight DeepSeek usa un fake seam. Non deve apparire come runtime
+  adapter, fallback pronto o prova di qualifica.
+- Gli adapter OpenAI/Anthropic restano `default OFF`. Registry e probe non sono
+  credenziali, consenso egress o readiness cloud.
+- MCP/Mini raggiungono soltanto Application Services nominati tramite RPC AIP
+  ereditato; nessun accesso SQLite o authority caller-supplied.
 - `summarySnapshot` e `parseEvidenceArtifactSnapshot` restano dati clinici
   cifrati, non log di debug.
 - Il placeholder `[LOCKED DATA]` resta solo di presentazione (WUL-323): non deve
@@ -551,6 +609,7 @@ read-only esplicitamente documentati in [SECURITY.md](../SECURITY.md).
   (ADR 0066, WUL-306, WUL-308); la hard delete resta una erasure GDPR admin
   esplicita.
 
-Claim ceiling dei percorsi Fabric e AnyDoc: candidato sorgente locale 0.8.5.
-Questa topologia non prova release, pubblicazione, certificazione, deployment
-cloud, AI paired, MCP operativo o authority agentica generale.
+Claim ceiling dei percorsi Fabric, AnyDoc e Headless: candidato sorgente locale
+0.8.5. Questa topologia non prova release, pubblicazione, certificazione,
+deployment cloud, AI paired, entrypoint MCP production o authority agentica
+generale.

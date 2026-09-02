@@ -133,6 +133,11 @@ allegati supportati. Non è OCR né un provider Fabric. Immagini e PDF
 scansionati senza text layer falliscono chiusi e richiedono revisione manuale;
 le route OCR legacy rispondono `410`.
 
+Il candidato include anche la pipeline selettiva per pagina: AnyDoc classifica
+le sole pagine `needsOcr` e prepara input bounded per un adapter OCR opzionale.
+Il tree si ferma al preflight con fake seam e non rende disponibile un runtime
+OCR qualificato.
+
 ## Come si presenta
 
 ### Workspace operativo su localhost
@@ -186,21 +191,30 @@ preview applica dati clinici. Il
 lega ogni percorso al proprio entrypoint, production root, route ed evidenza
 UI. La receipt storica `candidate_not_integrated` resta distinta e immutata.
 
-AnyDoc è l'unica estrazione automatica locale degli allegati supportati. La
-capability `ocr` è `unavailable` nel runtime corrente e le route OCR legacy
-rispondono `410`. Immagini e scansioni restano in revisione manuale.
+AnyDoc resta il primo passaggio automatico locale per gli allegati supportati.
+Il candidato include manifest, materializzazione e rendering selettivi delle
+sole pagine `needsOcr`, oltre al preflight DeepSeek-OCR 2 con fake seam. Il
+runtime adapter non è integrato. Il tree non contiene prove live, benchmark E2E
+di promozione o una qualifica di runtime su questo host.
+Le route OCR legacy continuano a rispondere `410`.
 
-I gate F6/F7 chiudono la patch escludendo le parti non pronte:
+I gate F6/F7 distinguono il core integrato dai residui non pronti:
 
 | Gate | Incluso nel candidato | Escluso dalla 0.8.5 | Esito |
 | :-- | :-- | :-- | :-- |
-| F6 | AnyDoc per testo estraibile; fail-closed per immagini/scansioni | DeepSeek-OCR 2, pipeline selettiva `needsOcr`, provenienza/hash/qualità per pagina, benchmark italiano con soglie ed E2E | `RELEASE_SCOPE_EXCLUDED` |
-| F7 | Ollama locale e ATHENA/MLX per le capability assegnate; disclosure OpenAI/Anthropic read-only | Esecuzione cloud, configurazione credenziali e contratto provider completo | `RELEASE_SCOPE_EXCLUDED` |
+| F6 | AnyDoc come primo passaggio; pipeline selettiva `needsOcr` e preflight DeepSeek-OCR 2 con fake seam | Runtime adapter, esecuzione live e benchmark italiano E2E con soglie | `INTEGRATED CORE / NO_RUNTIME_READINESS` |
+| F7 | Contratto provider v2, secret broker, adapter HTTPS ufficiali e probe review-only OpenAI/Anthropic | Credenziali o rete live, invio di PHI e runtime readiness remota | `INTEGRATED / DEFAULT_OFF` |
 
-OpenAI e Anthropic sono solo righe informative: esecuzione ed egress restano
-disabilitati. Un login o abbonamento consumer non costituisce accesso API. Il
-contratto completo che distingue type, instance, auth, model, capabilities,
-groups, bindings, allowlist e credential classes non è incluso nella patch.
+OpenAI e Anthropic hanno adapter HTTPS ufficiali e probe Document Synthesis
+review-only. Restano `default OFF` e richiedono opt-in host, lifecycle attivo,
+policy egress/retention e un secret broker. I test usano transport fake: il
+tree non contiene credenziali live e non prova rete, account, retention o
+readiness cloud. Un login o abbonamento consumer non costituisce accesso API.
+
+Il selector guidato Fabric rileva profili compatibili per cinque capability,
+esegue uno smoke sintetico e attiva il binding host-owned in modo atomico con
+CAS e rollback. Non persiste segreti e non qualifica hardware, modello o
+runtime per effetto della sola discovery.
 
 ATHENA richiede un runner MLX offline pre-provisioned, indicato con un percorso
 eseguibile assoluto host-owned in `MEDIFLOW_ATHENA_MLX_GENERATE_BIN`, e il
@@ -215,16 +229,36 @@ un benchmark di release per accuratezza OCR, qualità generativa, latenza o
 throughput. La suite finale del tree esatto resta un gate separato prima di ogni
 claim di readiness.
 
-Il piano Headless generale conserva 66 esiti terminali e zero operazioni
-eseguibili. I 32 `GET` network osservati restano evidence candidate. La sola
-eccezione stretta è la append SOAP locale server-side H1-H10, vincolata a
-sessione physician active-role, currentness, revisione clinica, gesto e step-up
-monouso, CAS, audit e receipt. Non abilita Mini, apply generale, authority
-Fabric o un trasporto agentico.
+Il candidato Headless avvia un processo figlio autenticato con RPC AIP
+ereditato. MCP `stdio` e Mini espongono catalogo, ricerca terminologica locale,
+lettura patient-scoped delle Open Loops, proposta follow-up `proposal_only` e
+query semantica bounded read-only. Gli adapter non accedono direttamente a
+SQLite e non ricevono authority dal caller. Il launcher e il quickstart
+production restano
+`PRODUCTION_BRIDGE_BLOCKER`: questa superficie non è ancora un entrypoint di
+prodotto supportato. La topologia Supervisor portabile, trusted parent del
+processo figlio su IPC ereditato, è `DECIDED`; l'implementazione è
+`SPLIT_REQUIRED`. Il packet esaminato si ferma alla factory e non chiude il
+late-bind trusted-UI, l'owner sincrono di `readHostContext`, lifecycle e revoca
+production o l'audit terminale sincrono. Un broker residente o UDS è escluso
+dalla `0.8.5`.
 
-Cloud, egress, MCP, visita registrabile, semantic query planner, SQL diretto e
-invocazione AI dai client paired restano fuori scope. I limiti completi sono in
-[`docs/known-limitations.md`](./docs/known-limitations.md).
+F10 include anche una transizione dello stato checkup come candidato interno:
+core e composizione SQLite sono verificati, ma non esiste un binding in
+launcher, MCP, Mini o UI. Lo stato è
+`INTERNAL_CANDIDATE_VERIFIED / AUTHORITY_UI_BINDING_BLOCKER`. La conferma
+trusted-UI resta parte dell'implementazione mancante del production bridge
+selezionato.
+
+Il core, l'operazione read-only e la superficie statica MCP/Mini del semantic
+query planner sono integrati:
+`STATIC_SURFACE_INTEGRATED / PRODUCTION_BRIDGE_BLOCKER`. La superficie compone
+solo ricerca terminologica e Open Loops patient-scoped, con piano bounded e
+schema closed-world. SQL diretto resta vietato e il production bridge
+selezionato non è ancora implementato o testato. La visita registrabile è
+`DEFER_NEXT_PATCH`.
+Ogni egress richiede opt-in host esplicito e i client paired non invocano AI. I
+limiti sono in [`docs/known-limitations.md`](./docs/known-limitations.md).
 
 ### Ultima release pubblicata: 0.8.2
 
@@ -266,16 +300,18 @@ MediFlow non racconta più di quanto possa dimostrare.
 
 - **Il default è locale.** Nessun cloud obbligatorio, nessuna telemetria o
   uscita dati attiva per impostazione iniziale.
-- **I fornitori esterni non sono operativi.** OpenAI e Anthropic compaiono solo
-  come disclosure informative; non esistono configurazione credenziali,
-  esecuzione cloud o egress nella patch.
+- **I provider esterni restano spenti per default.** OpenAI e Anthropic hanno
+  adapter ufficiali e probe review-only, ma il tree non include credenziali o
+  prove di rete live e non dichiara readiness cloud.
 - **I quattro percorsi Fabric sono proposal-only.** Receipt e provenienza sono
   visibili, ma nessuna preview applica dati clinici.
-- **OCR non è disponibile nel runtime corrente.** AnyDoc estrae solo documenti
-  locali supportati; immagini e scansioni senza text layer falliscono chiuse.
-  DeepSeek-OCR 2 non è implementato, benchmarkato o incluso nella `0.8.5`.
-- **Headless generale resta a zero operazioni.** La sola eccezione è la append
-  SOAP H1-H10 confermata dal medico, senza trasporto agentico generale.
+- **OCR non ha runtime readiness.** AnyDoc resta il primo passaggio; la pipeline
+  `needsOcr` e il preflight DeepSeek-OCR 2 con fake seam sono integrati, ma
+  runtime adapter, prova live, benchmark E2E e qualifica dell'host mancano.
+- **Headless è un candidato integrato, non un entrypoint supportato.** MCP e
+  Mini espongono due letture nominate e una proposta bounded tramite RPC
+  host-owned. La write checkup F10 resta un candidato interno senza binding di
+  autorità UI. Launcher production e quickstart restano bloccanti.
 - **iPhone e iPad non sono app complete.** Il perimetro operativo è
   `home-base + client paired`; cache offline e alcune superfici derivate dai
   documenti restano parziali o disponibili solo sull'host.
@@ -289,8 +325,12 @@ MediFlow non racconta più di quanto possa dimostrare.
   sostituisce revisione, giudizio clinico o responsabilità professionale.
 - **La inbox intelligente non è consegnata.** Le route conversazionali di base
   non costituiscono un flusso di chiarimento o conversione in record clinici.
-- **MCP, visita registrabile e semantic query non sono consegnati.** Non
-  esistono server/onboarding MCP, registrazione visita o planner SQL.
+- **Le nuove lane hanno stati distinti.** MCP/Mini sono integrati come
+  superficie figlia candidata ma non hanno ancora un entrypoint production. Il
+  planner ha core e operazione read-only integrati, ma non è ancora esposto
+  dalla superficie statica MCP/Mini. La registrazione visita è
+  `DEFER_NEXT_PATCH`: il packet è solo foundation e non ha integrazione runtime,
+  callsite o UI nel candidato.
 
 Delle 43 capability per cui la parity è un obiettivo, 30 sono complete e 13
 parziali; altre 21 restano intenzionalmente host-only. La matrice fa fede sui
@@ -317,8 +357,9 @@ Poi usa il launcher della tua piattaforma:
 | Linux | `./scripts/start-mediflow.sh` |
 
 Apri `http://localhost:3000`. Ollama, ATHENA/MLX e l'accesso WHO ICD-11 sono
-opzionali e disattivati quando non configurati. OpenAI e
-Anthropic non sono configurabili o eseguibili nel candidato `0.8.5`.
+opzionali e disattivati quando non configurati. Gli adapter OpenAI e Anthropic
+restano `default OFF`; non sono un fallback e richiedono configurazione
+host-owned esplicita. Il tree non contiene credenziali o prove di rete live.
 
 ## Documentazione
 
@@ -338,7 +379,8 @@ La prima lingua visiva del cockpit è derivata da
 originale. Il ragionamento terapeutico review-only usa
 [ATHENA](https://github.com/mims-harvard/ATHENA) di mims-harvard, con licenza
 MIT. Il lavoro sulla visita registrabile prende a riferimento l'ecosistema
-Fluid, ma la visita registrabile resta fuori scope nel candidato `0.8.5`.
+Fluid, ma la visita registrabile è `DEFER_NEXT_PATCH` e non fa parte del
+candidato `0.8.5`.
 
 Modelli, runtime, librerie e ispirazioni, con URL, ruolo e licenza, sono in
 **[CREDITS.md](./CREDITS.md)**.

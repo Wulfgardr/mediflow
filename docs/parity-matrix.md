@@ -96,16 +96,21 @@ conteggio delle prove correnti e non autorizzano il claim “parity completa”.
 La chiave `reconciliation` del JSON collega il contratto alle prove 0.8.
 Il manifest Apple-wide verifica 24 acceptance record tecnici separati.
 
-## Evidenza corrente
+## Evidenza registrata
+
+Le prove Apple basate su Xcode nella tabella seguente appartengono alla baseline
+storica `0843726fe`. Restano valide soltanto per quel tree e non costituiscono
+evidenza exact-tree del candidato `0.8.5`, sul quale il volume Xcode non è
+montato.
 
 | Classe | Superficie | Prova | Stato |
 | --- | --- | --- | --- |
 | `verified-automatic` | Web | Evidence Stack 2/2 con PIN sintetico `0000`; build 104 pagine e standalone | PASS |
 | `verified-real-interaction` | Web | Chromium produzione a 320/390/768/1440 e zoom esatto 200%/400%; focus visibile e nessun overflow orizzontale | PASS |
-| `verified-automatic` | iPhone | XCUITest 2/2, tab identifier atomici e apertura delle sei superfici | PASS, non equivale a VoiceOver |
-| `verified-automatic` | iPad | XCUITest 7/7, list-detail, AX5, rotazione, geometria e audit AX | PASS, non equivale a VoiceOver |
-| `verified-real-interaction` | macOS | Build Xcode 27, click-map, focus, Cmd-R contestuale, resize e VoiceOver manuale | PASS |
-| `verified-automatic` | macOS probe | `typecheck` e 6/6 test del probe AX corretto e process-safe | PASS |
+| `verified-automatic` | iPhone | XCUITest 2/2, tab identifier atomici e apertura delle sei superfici | PASS storico su `0843726fe`; non equivale a VoiceOver |
+| `verified-automatic` | iPad | XCUITest 7/7, list-detail, AX5, rotazione, geometria e audit AX | PASS storico su `0843726fe`; non equivale a VoiceOver |
+| `verified-real-interaction` | macOS | Build Xcode 27, click-map, focus, Cmd-R contestuale, resize e VoiceOver manuale | PASS storico su `0843726fe` |
+| `verified-automatic` | macOS probe | `typecheck` e 6/6 test del probe AX corretto e process-safe | PASS storico su `0843726fe` |
 | `accepted-external-limitation` | iPhone/iPad | VoiceOver reale | Non provato; Xcode 27 beta, issue Apple `173507341` |
 
 ## Stato per area
@@ -146,9 +151,11 @@ Wave 5 è una tranche consegnata, non la chiusura della parity complessiva.
 
 ### W6-A — convergenza UI macOS e click-map P6
 
-Il codice clipping e il probe AX corretto sono integrati. Il bundle Xcode 27
-ha superato build, resize, click-map, focus e Cmd-R contestuale. Il precedente
-blocco del volume Xcode è superato e non descrive più lo stato corrente.
+Il codice clipping e il probe AX corretto sono integrati. Le prove Xcode sul
+commit storico `0843726fe` restano valide soltanto per quel tree. Sul candidato
+exact-tree il volume Xcode non è disponibile, `xcode-select` punta a
+CommandLineTools e `xcodebuild` non è utilizzabile. W6-A non ha quindi una
+nuova prova nativa sullo SHA corrente.
 
 ### W6-B — offline degradato onesto
 
