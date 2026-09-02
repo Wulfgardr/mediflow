@@ -131,6 +131,44 @@ test('esegue smoke sintetico e attiva il profilo raccomandato senza download o f
     expectCode('replay', () => value.service.activate({ candidate: prepared.candidate, expectedVersion: 1 }));
 });
 
+test('brucia l handle prima di un commit_unknown e nega il replay dopo un cambio interveniente', async (t) => {
+    const value = fixture(); t.after(value.cleanup);
+    const discovery = value.service.discover();
+    const first = await value.service.prepare({ generation: discovery.generation, capability: 'patient_insight',
+        profileId: 'profile.synthetic.balanced.v1', mode: 'recommended', download: 'not_required' });
+    const intervening = await value.service.prepare({ generation: discovery.generation, capability: 'patient_insight',
+        profileId: 'profile.synthetic.quality.v1', mode: 'advanced', download: 'not_required' });
+    const originalFsync = fs.fsyncSync; const originalRead = fs.readSync;
+    let denyNextRead = false;
+    fs.fsyncSync = (descriptor) => {
+        if (fs.fstatSync(descriptor).isDirectory()) {
+            denyNextRead = true;
+            throw Object.assign(new Error('synthetic directory fsync failure'), { code: 'EIO' });
+        }
+        return originalFsync(descriptor);
+    };
+    fs.readSync = ((...args: unknown[]) => {
+        if (denyNextRead) {
+            denyNextRead = false;
+            throw Object.assign(new Error('synthetic read-back failure'), { code: 'EIO' });
+        }
+        return Reflect.apply(originalRead, fs, args) as number;
+    }) as typeof fs.readSync;
+    try {
+        assert.throws(() => value.service.activate({ candidate: first.candidate, expectedVersion: 0 }),
+            (error) => error instanceof Error && 'code' in error && error.code === 'commit_unknown');
+    } finally {
+        fs.fsyncSync = originalFsync; fs.readSync = originalRead;
+    }
+    assert.equal(value.store.read().version, 1);
+    assert.equal(value.store.read().bindings.patient_insight?.profileId, 'profile.synthetic.balanced.v1');
+    value.service.activate({ candidate: intervening.candidate, expectedVersion: 1 });
+    assert.equal(value.store.read().bindings.patient_insight?.profileId, 'profile.synthetic.quality.v1');
+    expectCode('replay', () => value.service.activate({ candidate: first.candidate, expectedVersion: 2 }));
+    assert.equal(value.store.read().version, 2);
+    assert.equal(value.store.read().bindings.patient_insight?.profileId, 'profile.synthetic.quality.v1');
+});
+
 test('nega in activate un handle preparato su una generation ormai stale', async (t) => {
     const value = fixture(); t.after(value.cleanup);
     const discovery = value.service.discover();

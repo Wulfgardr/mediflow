@@ -274,8 +274,8 @@ export function createFabricGuidedSetupService(sourceValue: unknown) {
             throw new FabricGuidedSetupError('input_invalid');
         }
         if (staged.generation !== generation) throw new FabricGuidedSetupError('selection_unavailable');
-        const result = host.bindingStore.activate({ expectedVersion: input.expectedVersion, binding: staged.binding });
-        staged.used = true; return result;
+        staged.used = true;
+        return host.bindingStore.activate({ expectedVersion: input.expectedVersion, binding: staged.binding });
     };
     const rollback = (value: unknown) => host.bindingStore.rollback(exact(value, ['expectedVersion', 'transitionRef']));
     return Object.freeze({ discover, prepare, activate, rollback });
