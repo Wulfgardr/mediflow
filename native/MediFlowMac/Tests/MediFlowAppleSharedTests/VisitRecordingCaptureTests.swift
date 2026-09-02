@@ -67,6 +67,18 @@ final class VisitRecordingCaptureTests: XCTestCase {
         XCTAssertNil(controller.session.transcript)
     }
 
+    func testRuntimeDenialConcurrentWithStopCannotPublishTranscript() async throws {
+        try await assertConcurrentStopSignalFailsClosed(.denial, expected: .failed)
+    }
+
+    func testOverflowConcurrentWithStopCannotPublishTranscript() async throws {
+        try await assertConcurrentStopSignalFailsClosed(.overflow, expected: .bufferExceeded)
+    }
+
+    func testInterruptionConcurrentWithStopCannotPublishTranscript() async throws {
+        try await assertConcurrentStopSignalFailsClosed(.interruption, expected: .interrupted)
+    }
+
     func testCancelIsIdempotentClearsWorkAndNeverFinalizes() async throws {
         let runtime = FakeVisitRecordingRuntime()
         runtime.suspendConsumption = true
@@ -84,6 +96,50 @@ final class VisitRecordingCaptureTests: XCTestCase {
         XCTAssertEqual(runtime.cancelCount, 1)
         XCTAssertEqual(runtime.activeConsumptionCount, 0)
         XCTAssertEqual(runtime.finishCount, 0)
+        XCTAssertNil(controller.session.transcript)
+    }
+
+    func testConcurrentStartsOpenOnlyOneCaptureGeneration() async throws {
+        let runtime = FakeVisitRecordingRuntime()
+        runtime.suspendPreparation = true
+        let controller = try makeController(runtime: runtime)
+        let firstStart = Task { @MainActor in await controller.start() }
+        await waitUntil { runtime.prepareCount == 1 }
+        var secondStartEntered = false
+        let secondStart = Task { @MainActor in
+            secondStartEntered = true
+            await controller.start()
+        }
+
+        await waitUntil { secondStartEntered }
+        XCTAssertEqual(runtime.prepareCount, 1)
+        if runtime.prepareCount == 1 {
+            runtime.resumePreparations()
+        } else {
+            runtime.failPreparations(SyntheticCaptureError.failure)
+        }
+        await firstStart.value
+        await secondStart.value
+
+        guard runtime.prepareCount == 1 else { return }
+        XCTAssertEqual(runtime.startCount, 1)
+        XCTAssertEqual(controller.session.phase, .recording)
+        await controller.cancel()
+    }
+
+    func testCancelDuringPrepareLeavesNoLateRuntimeAndCannotActivate() async throws {
+        let runtime = FakeVisitRecordingRuntime()
+        runtime.suspendPreparation = true
+        let controller = try makeController(runtime: runtime)
+        let start = Task { @MainActor in await controller.start() }
+        await waitUntil { runtime.prepareCount == 1 }
+
+        await controller.cancel()
+        await start.value
+
+        XCTAssertEqual(controller.session.phase, .denied(.cancelled))
+        XCTAssertEqual(runtime.startCount, 0)
+        XCTAssertEqual(runtime.activePreparedResourceCount, 0)
         XCTAssertNil(controller.session.transcript)
     }
 
@@ -404,9 +460,40 @@ final class VisitRecordingCaptureTests: XCTestCase {
                 encoding: .utf8
             )
         }.joined(separator: "\n")
-        for forbidden in ["AVAudioFile", "FileManager", "URLSession", "SFSpeech", "Fluid", "MediaRecorder"] {
+        for forbidden in [
+            "AVAudioFile", "FileManager", "URLSession", "SFSpeech", "Fluid", "MediaRecorder",
+            "Logger(", "NSLog(", "os_log(", "print(", "debugPrint(",
+        ] {
             XCTAssertFalse(source.contains(forbidden), "forbidden recording boundary: \(forbidden)")
         }
+    }
+
+    private func assertConcurrentStopSignalFailsClosed(
+        _ signal: SyntheticConcurrentStopSignal,
+        expected denial: VisitRecordingDenial
+    ) async throws {
+        let runtime = FakeVisitRecordingRuntime()
+        runtime.finishResults = [.init(text: "Trascrizione sintetica da scartare.", isFinal: true)]
+        let reference = VisitRecordingSelectionReference(binding: binding, generation: 1)
+        var readsAfterFinishStarted = 0
+        let controller = try makeController(
+            runtime: runtime,
+            selectionReference: reference,
+            currentSelectionReference: {
+                if runtime.finishCount > 0 {
+                    readsAfterFinishStarted += 1
+                    if readsAfterFinishStarted == 2 { signal.trigger(runtime) }
+                }
+                return reference
+            }
+        )
+
+        await controller.start()
+        await controller.stop()
+        await Task.yield()
+
+        XCTAssertEqual(controller.session.phase, .denied(denial))
+        XCTAssertNil(controller.session.transcript)
     }
 
     private func makeController(
@@ -518,6 +605,7 @@ final class VisitRecordingCaptureTests: XCTestCase {
 @MainActor
 private final class FakeVisitRecordingRuntime: VisitRecordingRuntimePort {
     var finishResults: [VisitRecordingTranscriptResult] = []
+    var suspendPreparation = false
     var suspendConsumption = false
     var suspendFinalization = false
     var conversionReservationBytes = 0
@@ -531,12 +619,14 @@ private final class FakeVisitRecordingRuntime: VisitRecordingRuntimePort {
     private(set) var finishCount = 0
     private(set) var cancelCount = 0
     private(set) var activeConsumptionCount = 0
+    private(set) var activePreparedResourceCount = 0
 
     private var frameHandler: (@Sendable (VisitRecordingPCMFrame) -> Void)?
     private var resultHandler: (@MainActor @Sendable (VisitRecordingTranscriptResult) -> Void)?
     private var interruptionHandler: (@Sendable () -> Void)?
     private var failureHandler: (@Sendable (VisitRecordingDenial) -> Void)?
     private var audioBudget: VisitRecordingAudioBudget?
+    private var preparationContinuations: [CheckedContinuation<Void, Error>] = []
     private var consumptionContinuations: [CheckedContinuation<Void, Never>] = []
     private var finalizationContinuations: [CheckedContinuation<Void, Never>] = []
 
@@ -556,6 +646,10 @@ private final class FakeVisitRecordingRuntime: VisitRecordingRuntimePort {
         resultHandler = onResult
         interruptionHandler = onInterruption
         failureHandler = onFailure
+        if suspendPreparation {
+            try await withCheckedThrowingContinuation { preparationContinuations.append($0) }
+        }
+        activePreparedResourceCount += 1
     }
 
     func startCapture() throws {
@@ -591,16 +685,35 @@ private final class FakeVisitRecordingRuntime: VisitRecordingRuntimePort {
         }
         finishResults.forEach { resultHandler?($0) }
         if let finishError { throw finishError }
+        activePreparedResourceCount = 0
     }
 
     func cancelAndFinishNow() async {
         cancelCount += 1
+        activePreparedResourceCount = 0
+        let preparations = preparationContinuations
+        preparationContinuations.removeAll()
+        preparations.forEach { $0.resume() }
         let continuations = consumptionContinuations
         consumptionContinuations.removeAll()
         continuations.forEach { $0.resume() }
         let finalizations = finalizationContinuations
         finalizationContinuations.removeAll()
         finalizations.forEach { $0.resume() }
+    }
+
+    func resumePreparations() {
+        suspendPreparation = false
+        let continuations = preparationContinuations
+        preparationContinuations.removeAll()
+        continuations.forEach { $0.resume() }
+    }
+
+    func failPreparations(_ error: Error) {
+        suspendPreparation = false
+        let continuations = preparationContinuations
+        preparationContinuations.removeAll()
+        continuations.forEach { $0.resume(throwing: error) }
     }
 
     func emit(_ frame: VisitRecordingPCMFrame) {
@@ -620,6 +733,25 @@ private final class FakeVisitRecordingRuntime: VisitRecordingRuntimePort {
     }
     func emitResult(_ result: VisitRecordingTranscriptResult) { resultHandler?(result) }
     func triggerInterruption() { interruptionHandler?() }
+    func triggerFailure(_ denial: VisitRecordingDenial) { failureHandler?(denial) }
+}
+
+private enum SyntheticConcurrentStopSignal {
+    case denial
+    case overflow
+    case interruption
+
+    @MainActor
+    func trigger(_ runtime: FakeVisitRecordingRuntime) {
+        switch self {
+        case .denial:
+            runtime.triggerFailure(.failed)
+        case .overflow:
+            runtime.triggerFailure(.bufferExceeded)
+        case .interruption:
+            runtime.triggerInterruption()
+        }
+    }
 }
 
 private enum SyntheticCaptureError: Error { case failure }
