@@ -1,8 +1,9 @@
 /* @Codex */
 import { z } from 'zod';
 import {
-  AIP_BOOTSTRAP_ENV_KEY_V1, AIP_BOOTSTRAP_REQUEST_SCHEMA_V1, AIP_BOOTSTRAP_RESULT_SCHEMA_V1,
-  AIP_OPERATION_RPC_AUTHENTICATED_ENV_V1, AIP_OPERATION_RPC_ENV_KEY_V1,
+  AIP_BOOTSTRAP_BIND_MAX_FRAME_BYTES_V1, AIP_BOOTSTRAP_BIND_SCHEMA_V1, AIP_BOOTSTRAP_ENV_KEY_V1,
+  AIP_BOOTSTRAP_REQUEST_SCHEMA_V1, AIP_BOOTSTRAP_RESULT_SCHEMA_V1,
+  AIP_OPERATION_RPC_AUTHENTICATED_ENV_V1, AIP_OPERATION_RPC_ENV_KEY_V1, AIP_OPERATION_RPC_LATE_BIND_ENV_V1,
 } from '../../aip/src/child-ipc-contract.ts';
 import {
   FOLLOW_UP_PROPOSAL_OPERATION_ID, HEADLESS_STATUS, OPEN_LOOPS_OPERATION_ID, OPERATION_DESCRIPTORS,
@@ -36,21 +37,22 @@ export function createOperationClient() {
   const channel = process;
   const bootstrapRef = channel.env[AIP_BOOTSTRAP_ENV_KEY_V1];
   const rpcMode = channel.env[AIP_OPERATION_RPC_ENV_KEY_V1];
+  const validBootstrap = typeof bootstrapRef === 'string' && /^aipb_[0-9a-f]{32}$/u.test(bootstrapRef);
+  const lateBindable = rpcMode === AIP_OPERATION_RPC_LATE_BIND_ENV_V1 && bootstrapRef === undefined;
   if (typeof channel.send !== 'function' || channel.connected !== true
-      || (rpcMode !== 'inherited_child_ipc_v1' && rpcMode !== AIP_OPERATION_RPC_AUTHENTICATED_ENV_V1)
-      || typeof bootstrapRef !== 'string' || !/^aipb_[0-9a-f]{32}$/u.test(bootstrapRef)) {
+      || (!validBootstrap && !lateBindable)
+      || (validBootstrap && rpcMode !== 'inherited_child_ipc_v1'
+        && rpcMode !== AIP_OPERATION_RPC_AUTHENTICATED_ENV_V1)) {
     throw new OperationClientError('host_unbound');
   }
   const pending = new Map<string, Pending>();
   let sequence = 0;
   let closed = false;
-  let authenticated = rpcMode === 'inherited_child_ipc_v1';
+  let state: 'unbound' | 'bootstrapping' | 'authenticated' = rpcMode === 'inherited_child_ipc_v1'
+    ? 'authenticated' : validBootstrap ? 'bootstrapping' : 'unbound';
   let resolveBootstrap = (): void => undefined;
   let rejectBootstrap: (error: OperationClientError) => void = () => undefined;
-  const bootstrapReady = authenticated ? Promise.resolve() : new Promise<void>((resolve, reject) => {
-    resolveBootstrap = resolve; rejectBootstrap = reject;
-  });
-  void bootstrapReady.catch(() => undefined);
+  let bootstrapReady: Promise<void> | null = state === 'authenticated' ? Promise.resolve() : null;
   let bootstrapTimer: ReturnType<typeof setTimeout> | null = null;
   const failPending = (error: OperationClientError) => {
     for (const entry of pending.values()) { clearTimeout(entry.timer); entry.abort?.(); entry.reject(error); }
@@ -72,16 +74,28 @@ export function createOperationClient() {
     const error = new OperationClientError('protocol_invalid'); terminal(error); throw error;
   };
   const onMessage = (frame: unknown) => {
+    if (state === 'unbound') {
+      if (typeof frame !== 'string' || Buffer.byteLength(frame, 'utf8') > AIP_BOOTSTRAP_BIND_MAX_FRAME_BYTES_V1) {
+        terminal(new OperationClientError('protocol_invalid')); return;
+      }
+      let decoded: unknown;
+      try { decoded = JSON.parse(frame); } catch { terminal(new OperationClientError('protocol_invalid')); return; }
+      const bind = z.object({ schemaVersion: z.literal(AIP_BOOTSTRAP_BIND_SCHEMA_V1), operation: z.literal('bind'),
+        bootstrapRef: z.string().regex(/^aipb_[0-9a-f]{32}$/u) }).strict().safeParse(decoded);
+      if (!bind.success) { terminal(new OperationClientError('protocol_invalid')); return; }
+      beginBootstrap(bind.data.bootstrapRef);
+      return;
+    }
     if (typeof frame !== 'string' || Buffer.byteLength(frame, 'utf8') > MAX_FRAME_BYTES) {
       terminal(new OperationClientError('protocol_invalid')); return;
     }
     let decoded: unknown;
     try { decoded = JSON.parse(frame); } catch { terminal(new OperationClientError('protocol_invalid')); return; }
-    if (!authenticated) {
+    if (state === 'bootstrapping') {
       const connected = z.object({ schemaVersion: z.literal(AIP_BOOTSTRAP_RESULT_SCHEMA_V1),
         outcome: z.literal('connected') }).strict().safeParse(decoded);
       if (!connected.success) { terminal(new OperationClientError('protocol_invalid')); return; }
-      authenticated = true;
+      state = 'authenticated';
       if (bootstrapTimer) { clearTimeout(bootstrapTimer); bootstrapTimer = null; }
       resolveBootstrap();
       return;
@@ -137,8 +151,12 @@ export function createOperationClient() {
     });
   };
   const exchange = (frame: Record<string, unknown>, label: string, signal?: AbortSignal,
-    cancelOnTimeout = false): Promise<unknown> => bootstrapReady.then(() =>
-      exchangeBound(frame, label, signal, cancelOnTimeout));
+    cancelOnTimeout = false): Promise<unknown> => {
+    if (state === 'unbound' || (lateBindable && state !== 'authenticated') || !bootstrapReady) {
+      return Promise.reject(new OperationClientError('host_unbound'));
+    }
+    return bootstrapReady.then(() => exchangeBound(frame, label, signal, cancelOnTimeout));
+  };
   const parseCompleted = (value: unknown, expected: OperationDescriptor): unknown => {
     const completed = z.object({
       schemaVersion: z.literal(RPC_RESULT_SCHEMA), requestId: requestIdSchema, outcome: z.literal('completed'),
@@ -165,17 +183,28 @@ export function createOperationClient() {
     if (!completed.success) return invalid();
     return selectBoundOperations(completed.data.result.operations);
   };
-  const run = async (descriptor: OperationDescriptor, input: object, signal?: AbortSignal) =>
-    parseCompleted(await exchange({ method: 'call', operationId: descriptor.operationId, input },
+  const run = async (descriptor: OperationDescriptor, input: object, signal?: AbortSignal) => {
+    const bound = await catalog(signal);
+    if (!bound.some((item) => item.operationId === descriptor.operationId
+      && item.capabilityId === descriptor.capabilityId && item.serviceRef === descriptor.serviceRef
+      && item.maximumStage === descriptor.maximumStage)) throw new OperationClientError('operation_denied');
+    return parseCompleted(await exchange({ method: 'call', operationId: descriptor.operationId, input },
       'call', signal, true), descriptor);
+  };
 
-  if (!authenticated) {
+  function beginBootstrap(reference: string): void {
+    state = 'bootstrapping';
+    bootstrapReady = new Promise<void>((resolve, reject) => {
+      resolveBootstrap = resolve; rejectBootstrap = reject;
+    });
+    void bootstrapReady.catch(() => undefined);
     bootstrapTimer = setTimeout(() => terminal(new OperationClientError('host_unbound')), REQUEST_TIMEOUT_MS);
     bootstrapTimer.unref();
     try {
-      publish({ schemaVersion: AIP_BOOTSTRAP_REQUEST_SCHEMA_V1, operation: 'bootstrap', bootstrapRef });
+      publish({ schemaVersion: AIP_BOOTSTRAP_REQUEST_SCHEMA_V1, operation: 'bootstrap', bootstrapRef: reference });
     } catch { terminal(new OperationClientError('host_unbound')); }
   }
+  if (state === 'bootstrapping') beginBootstrap(bootstrapRef as string);
 
   return Object.freeze({
     catalog,
