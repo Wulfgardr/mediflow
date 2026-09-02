@@ -2,10 +2,8 @@
 import { z } from 'zod';
 import {
   AIP_BOOTSTRAP_ENV_KEY_V1, AIP_BOOTSTRAP_REQUEST_SCHEMA_V1, AIP_BOOTSTRAP_RESULT_SCHEMA_V1,
-} from '../../aip/src/authenticated-ipc.ts';
-import {
   AIP_OPERATION_RPC_AUTHENTICATED_ENV_V1, AIP_OPERATION_RPC_ENV_KEY_V1,
-} from '../../aip/src/operation-rpc.ts';
+} from '../../aip/src/child-ipc-contract.ts';
 import {
   HEADLESS_STATUS, OPEN_LOOPS_OPERATION_ID, OPERATION_DESCRIPTORS, RPC_REQUEST_SCHEMA, RPC_RESULT_SCHEMA,
   TERMINOLOGY_OPERATION_ID, openLoopsOutputSchema, publicCatalog, rpcOperationSchema,
@@ -45,7 +43,7 @@ export function createOperationClient() {
   let closed = false;
   let authenticated = rpcMode === 'inherited_child_ipc_v1';
   let resolveBootstrap = (): void => undefined;
-  let rejectBootstrap = (_error: OperationClientError): void => undefined;
+  let rejectBootstrap: (error: OperationClientError) => void = () => undefined;
   const bootstrapReady = authenticated ? Promise.resolve() : new Promise<void>((resolve, reject) => {
     resolveBootstrap = resolve; rejectBootstrap = reject;
   });

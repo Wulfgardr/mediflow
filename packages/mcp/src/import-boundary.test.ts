@@ -12,8 +12,7 @@ const roots = [
 ];
 const allowedExternal = new Set(['zod', '@modelcontextprotocol/server', '@modelcontextprotocol/server/stdio',
   'node:process', 'node:util']);
-const allowedAip = new Set([resolve(root, 'packages/aip/src/operation-rpc.ts'),
-  resolve(root, 'packages/aip/src/authenticated-ipc.ts')]);
+const allowedAip = new Set([resolve(root, 'packages/aip/src/child-ipc-contract.ts')]);
 
 test('keeps the exact MCP and Mini runtime graph on portable Application Service RPC only', async () => {
   const pending = [...roots]; const visited = new Set<string>(); let combined = '';
@@ -40,7 +39,7 @@ test('keeps the exact MCP and Mini runtime graph on portable Application Service
     /(?:better-sqlite3|lib\/db|lib\/schema|web-auth|next\/|node:(?:net|http|https|tls)|\.swift|AppKit|Foundation)/iu);
   assert.doesNotMatch(combined, /(?:\bfetch\s*\(|WebSocket|XMLHttpRequest|generic[._ -]?invoke)/iu);
   assert.deepEqual([...visited].sort(), [
-    resolve(root, 'packages/aip/src/authenticated-ipc.ts'), resolve(root, 'packages/aip/src/operation-rpc.ts'),
+    resolve(root, 'packages/aip/src/child-ipc-contract.ts'),
     resolve(root, 'packages/mcp/src/contracts.ts'), resolve(root, 'packages/mcp/src/operation-client.ts'),
     resolve(root, 'packages/mcp/src/server.ts'), resolve(root, 'packages/mini/src/cli.ts'),
     resolve(root, 'scripts/intelligent-host-mcp-stdio.mjs'),

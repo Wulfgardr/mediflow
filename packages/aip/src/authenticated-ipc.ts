@@ -1,9 +1,12 @@
 /* @Codex */
 import { types } from 'node:util';
 import type { AipOwnerHandleV1 } from './owner-broker.ts';
-export const AIP_BOOTSTRAP_ENV_KEY_V1 = 'MEDIFLOW_AIP_BOOTSTRAP_REF' as const;
-export const AIP_BOOTSTRAP_REQUEST_SCHEMA_V1 = 'mediflow.aip.bootstrap.v1' as const;
-export const AIP_BOOTSTRAP_RESULT_SCHEMA_V1 = 'mediflow.aip.bootstrap.result.v1' as const;
+import {
+    AIP_BOOTSTRAP_ENV_KEY_V1, AIP_BOOTSTRAP_REQUEST_SCHEMA_V1, AIP_BOOTSTRAP_RESULT_SCHEMA_V1,
+} from './child-ipc-contract.ts';
+export {
+    AIP_BOOTSTRAP_ENV_KEY_V1, AIP_BOOTSTRAP_REQUEST_SCHEMA_V1, AIP_BOOTSTRAP_RESULT_SCHEMA_V1,
+} from './child-ipc-contract.ts';
 export const AIP_IPC_MAX_INPUT_BYTES_V1 = 64 * 1024;
 export const AIP_IPC_MAX_OUTPUT_BYTES_V1 = 4 * 1024;
 export const AIP_IPC_TIMEOUT_MS_V1 = 1_000;
