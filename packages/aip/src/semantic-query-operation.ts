@@ -16,7 +16,6 @@ import {
   createSemanticQueryPlanValidatorV1,
 } from './semantic-query-plan.ts';
 import {
-  SEMANTIC_QUERY_ALLOWED_READS_V1,
   SEMANTIC_QUERY_OPERATION_ID_V1,
   SEMANTIC_QUERY_OPERATION_INPUT_KEYS_V1,
   SEMANTIC_QUERY_OPERATION_INPUT_SCHEMA_V1,
