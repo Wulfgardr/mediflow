@@ -27,6 +27,9 @@ export const SEMANTIC_QUERY_OPERATION_SOURCE_REF_KEYS_V1 = ['generation', 'revoc
 export const SEMANTIC_QUERY_OPERATION_OPEN_LOOPS_INPUT_KEYS_V1 = ['schemaVersion', 'operationId'] as const;
 export const SEMANTIC_QUERY_OPERATION_SOURCE_REF_V1 = /^src_[0-9a-f]{64}$/u;
 
+export type SemanticQueryOperationTerminalAuditCommitV1 = (intent: unknown,
+  decideAtCommit: () => unknown) => unknown;
+
 export function semanticQueryOperationRecord<T extends object>(value: T): Readonly<T> {
   return Object.freeze(Object.assign(Object.create(null) as T, value));
 }

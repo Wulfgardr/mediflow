@@ -52,7 +52,7 @@ type SetupOverrides = Readonly<{
   currentSourceRefs?: () => unknown;
   executeTerminology?: (value: unknown, signal: AbortSignal) => unknown;
   executeOpenLoops?: (value: unknown, signal: AbortSignal) => unknown;
-  commitTerminalAudit?: (value: unknown) => unknown;
+  commitTerminalAudit?: (intent: unknown, decideAtCommit?: () => unknown) => unknown;
   finalizePermit?: () => unknown;
 }>;
 
@@ -107,8 +107,10 @@ function setup(overrides: SetupOverrides = {}) {
         items: [{ loopRef: `aipl_${'1'.repeat(64)}`, temporalState: 'overdue' }],
       };
     }),
-    commitTerminalAudit: overrides.commitTerminalAudit ?? ((value: unknown) => {
+    commitTerminalAudit: overrides.commitTerminalAudit ?? ((intent: unknown, decideAtCommit?: () => unknown) => {
+      const value = decideAtCommit ? decideAtCommit() : intent;
       audits.push(value);
+      return decideAtCommit ? value : undefined;
     }),
   });
   return { service, permit, calls, audits, counters: () => ({ began, finalized }) };
@@ -294,6 +296,29 @@ test('requires an exact synchronous terminal audit commit port', async () => {
   assert.ok(commits >= 1);
 });
 
+test('decides at the real terminal audit commit point after synchronous prework', async () => {
+  let clock = 1_000;
+  const audits: unknown[] = [];
+  const current = setup({ now: () => clock,
+    commitTerminalAudit: (intent, decideAtCommit) => {
+      if ((intent as { outcome?: unknown }).outcome === 'allowed') {
+        const deadline = performance.now() + 25;
+        while (performance.now() < deadline) { /* bounded synthetic synchronous prework */ }
+        clock += 25;
+      }
+      const audit = decideAtCommit ? decideAtCommit() : intent;
+      audits.push(audit);
+      return decideAtCommit ? audit : undefined;
+    } });
+  const candidate = input();
+  candidate.budget.maxDurationMs = 15;
+
+  await assert.rejects(current.service.execute(current.permit, candidate),
+    (error: unknown) => (error as { code?: string }).code === 'timeout');
+  assert.deepEqual(audits.map((audit) => [(audit as { outcome: unknown }).outcome,
+    (audit as { denialCode: unknown }).denialCode]), [['denied', 'timeout']]);
+});
+
 test('finalizes the outer permit before allowed audit and denies false or throwing finalizers', async () => {
   for (const finalizePermit of [() => false, () => { throw new Error('synthetic finalizer failure'); }]) {
     const { service, permit, audits, counters } = setup({ finalizePermit });
@@ -304,7 +329,11 @@ test('finalizes the outer permit before allowed audit and denies false or throwi
   }
   const events: string[] = [];
   const ordered = setup({ finalizePermit: () => { events.push('finalize'); return true; },
-    commitTerminalAudit: (audit) => { events.push((audit as { outcome: string }).outcome); } });
+    commitTerminalAudit: (_intent, decideAtCommit) => {
+      const audit = decideAtCommit!();
+      events.push((audit as { outcome: string }).outcome);
+      return audit;
+    } });
   await ordered.service.execute(ordered.permit, input());
   assert.deepEqual(events, ['finalize', 'allowed']);
 });
