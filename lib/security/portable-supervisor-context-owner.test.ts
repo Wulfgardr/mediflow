@@ -29,7 +29,7 @@ const PAIR = Object.freeze({
 const sessions = new Set<ServerSession>();
 let sequence = 0;
 
-type AcquisitionOutcome = 'current' | 'null' | 'reject';
+type AcquisitionOutcome = 'current' | 'null' | 'reject' | 'deferred';
 
 function fixture(acquisitionOutcome: AcquisitionOutcome = 'current') {
     const session = issueSyntheticWebSession(USER, `portable-supervisor-${sequence += 1}`);
@@ -44,7 +44,28 @@ function fixture(acquisitionOutcome: AcquisitionOutcome = 'current') {
     const lease = owner.issueSelection({ expectedEpoch: 0, ...PAIR });
     const authenticatedContext = Object.freeze(Object.assign(Object.create(null), { session, owner }));
     let acquisitions = 0;
+    let resolveDeferred: (() => void) | null = null;
+    let registrations = 0, confirmations = 0, unregistrations = 0;
     let failBindingRead = false;
+    const selectionLifecycle = {
+        withCurrentSelection: selectionOwner.selectionLifecycleController.withCurrentSelection,
+        registerDependent(scope: unknown, dispose: () => void) {
+            const registration = selectionOwner.selectionLifecycleController.registerDependent(scope, dispose);
+            if (registration) registrations += 1;
+            return registration;
+        },
+        confirmDependent(scope: unknown, registration: unknown) {
+            const confirmed = selectionOwner.selectionLifecycleController.confirmDependent(scope, registration);
+            if (confirmed) confirmations += 1;
+            return confirmed;
+        },
+        unregisterDependent(scope: unknown, registration: unknown) {
+            const unregistered = selectionOwner.selectionLifecycleController.unregisterDependent(scope, registration);
+            if (unregistered) unregistrations += 1;
+            return unregistered;
+        },
+        withCurrentDependent: selectionOwner.selectionLifecycleController.withCurrentDependent,
+    };
     const selectionBinding = {
         withCurrentDependentBinding(scope: unknown, registration: unknown,
             operation: (binding: ServerSessionSelectionBindingSnapshotV1) => void) {
@@ -58,9 +79,12 @@ function fixture(acquisitionOutcome: AcquisitionOutcome = 'current') {
         acquireAuthenticatedContext: () => {
             acquisitions += 1;
             if (acquisitionOutcome === 'reject') return Promise.reject(new Error('synthetic H1a rejection'));
+            if (acquisitionOutcome === 'deferred') return new Promise((resolve) => {
+                resolveDeferred = () => resolve(authenticatedContext);
+            });
             return Promise.resolve(acquisitionOutcome === 'null' ? null : authenticatedContext);
         },
-        selectionLifecycle: selectionOwner.selectionLifecycleController,
+        selectionLifecycle,
         selectionBinding,
         selectionCommitBinding: selectionOwner.selectionCommitBindingController,
         clock: () => now,
@@ -73,6 +97,8 @@ function fixture(acquisitionOutcome: AcquisitionOutcome = 'current') {
     return {
         session, selectionOwner, owner, lease, supervisor, timers,
         acquisitionCount() { return acquisitions; },
+        registrationCounts() { return { registrations, confirmations, unregistrations }; },
+        resolveAcquisition() { assert.ok(resolveDeferred); resolveDeferred(); resolveDeferred = null; },
         setNow(value: number) { now = value; },
         setPatientVersion(value: number) { patientVersion = value; },
         failBindingRead() { failBindingRead = true; },
@@ -184,6 +210,26 @@ test('stop, restart, and dispose are terminal and idempotent; process generation
     assert.ok(thirdContext.restartGeneration > secondContext.restartGeneration);
     assert.equal(third.dispose(), true); assert.equal(third.dispose(), false); assert.equal(third.restart(), false);
     assert.equal(unavailable(() => third.readHostContext()), true);
+});
+
+test('double and concurrent acquisition cannot publish sibling owners or leave loser resources', async () => {
+    const pending = fixture('deferred');
+    const firstPending = pending.supervisor.acquire();
+    assert.equal(await pending.supervisor.acquire(), null);
+    assert.equal(pending.acquisitionCount(), 1);
+    assert.deepEqual(pending.registrationCounts(), { registrations: 0, confirmations: 0, unregistrations: 0 });
+    assert.equal(pending.timers.length, 0);
+
+    pending.resolveAcquisition();
+    const first = await firstPending; assert.ok(first);
+    assert.equal(await pending.supervisor.acquire(), null);
+    assert.equal(pending.acquisitionCount(), 1);
+    assert.deepEqual(pending.registrationCounts(), { registrations: 1, confirmations: 1, unregistrations: 0 });
+    assert.equal(pending.timers.filter((timer) => timer.active).length, 1);
+
+    assert.equal(first.stop(), true);
+    assert.deepEqual(pending.registrationCounts(), { registrations: 1, confirmations: 1, unregistrations: 1 });
+    assert.equal(pending.timers.filter((timer) => timer.active).length, 0);
 });
 
 test('missing selection fails closed without registering or activating authority', async () => {
