@@ -13,7 +13,7 @@ const PORT_KEYS = ['subscribe', 'publish'] as const;
 const CATALOG_KEYS = ['schemaVersion', 'method', 'requestId'] as const;
 const CALL_KEYS = ['schemaVersion', 'method', 'requestId', 'operationId', 'input'] as const;
 const CANCEL_KEYS = ['schemaVersion', 'method', 'requestId', 'targetRequestId'] as const;
-const TOKEN = /^[a-z][a-z0-9._-]{0,127}$/u;
+const TOKEN = /^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,159}$/u;
 const REQUEST = /^rpc_[a-z0-9][a-z0-9_-]{0,63}$/u;
 const BOOTSTRAP = /^aipb_[0-9a-f]{32}$/u;
 const MAX_OPERATIONS = 32, MAX_JSON_DEPTH = 16, MAX_JSON_VALUES = 2_048;
@@ -162,22 +162,31 @@ export function createAipOperationRpcHostV1(sourcesValue: unknown) {
         session.unsubscribe = null;
         try { ignoreNativePromise(unsubscribe?.()); } catch { /* trusted adapter cleanup is best-effort */ }
     };
-    const send = (handle: object, session: Session, payload: unknown, overflowRequestId?: string): void => {
-        if (!session.active || session.generation !== generation || sessions.get(handle) !== session) return;
+    const encode = (payload: unknown, overflowRequestId?: string): string | null => {
         let frame: string;
         try {
             frame = JSON.stringify(copyJson(payload));
             if (Buffer.byteLength(frame, 'utf8') > AIP_OPERATION_RPC_MAX_FRAME_BYTES_V1) throw new Error('oversized');
         } catch {
-            if (!overflowRequestId) { revokeSession(handle, session); return; }
+            if (!overflowRequestId) return null;
             frame = JSON.stringify({ schemaVersion: AIP_OPERATION_RPC_RESULT_SCHEMA_V1,
                 requestId: overflowRequestId, outcome: 'denied', denialCode: 'output_oversized' });
         }
+        return frame;
+    };
+    const publish = (handle: object, session: Session, frame: string): void => {
+        if (!session.active || session.generation !== generation || sessions.get(handle) !== session) return;
         try {
             const result = session.port.publish(frame);
             ignoreNativePromise(result);
             if (result !== undefined) throw new Error('invalid_publish');
         } catch { revokeSession(handle, session); }
+    };
+    const send = (handle: object, session: Session, payload: unknown, overflowRequestId?: string): void => {
+        if (!session.active || session.generation !== generation || sessions.get(handle) !== session) return;
+        const frame = encode(payload, overflowRequestId);
+        if (frame === null) { revokeSession(handle, session); return; }
+        publish(handle, session, frame);
     };
     const deny = (handle: object, session: Session, requestId: string | null, denialCode: string): void => send(handle,
         session, { schemaVersion: AIP_OPERATION_RPC_RESULT_SCHEMA_V1, requestId, outcome: 'denied', denialCode });
@@ -199,10 +208,13 @@ export function createAipOperationRpcHostV1(sourcesValue: unknown) {
                 : result;
             if (performance.now() >= deadline) { pending.reason = 'timeout'; controller.abort(); throw new Error('terminal'); }
             const output = copyJson(value);
+            const frame = encode({ schemaVersion: AIP_OPERATION_RPC_RESULT_SCHEMA_V1, requestId, outcome: 'completed',
+                result: { operation: definition.metadata, value: output } }, requestId);
+            if (frame === null) throw new Error('terminal');
+            if (performance.now() >= deadline) { pending.reason = 'timeout'; controller.abort(); throw new Error('terminal'); }
             if (session.pending.get(requestId) !== pending || !session.active || session.generation !== generation) return;
             session.pending.delete(requestId); clearTimeout(pending.timer);
-            send(handle, session, { schemaVersion: AIP_OPERATION_RPC_RESULT_SCHEMA_V1, requestId, outcome: 'completed',
-                result: { operation: definition.metadata, value: output } }, requestId);
+            publish(handle, session, frame);
         } catch {
             if (session.pending.get(requestId) !== pending || !session.active || session.generation !== generation) return;
             session.pending.delete(requestId); clearTimeout(pending.timer);

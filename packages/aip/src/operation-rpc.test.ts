@@ -40,7 +40,7 @@ function memoryPort() {
 const fakeDefinition = (execute: (input: unknown, signal: AbortSignal) => unknown, timeoutMs = 100) => ({
     operationId: 'fake.system.status.v1',
     capabilityId: 'fake.system.status.read.v1',
-    serviceRef: 'fake_application_services.system_status.v1',
+    serviceRef: 'FakeApplicationServicesSystemStatusV1',
     maximumStage: 'read_only' as const,
     timeoutMs,
     execute,
@@ -63,11 +63,11 @@ test('publishes only the host allowlisted catalog and binds calls to its named f
     assert.deepEqual(port.sent.map((frame) => JSON.parse(frame)), [{
         schemaVersion: 'mediflow.aip.operation.result.v1', requestId: 'rpc_catalog_1', outcome: 'completed',
         result: { operations: [{ operationId: 'fake.system.status.v1', capabilityId: 'fake.system.status.read.v1',
-            serviceRef: 'fake_application_services.system_status.v1', maximumStage: 'read_only' }] },
+            serviceRef: 'FakeApplicationServicesSystemStatusV1', maximumStage: 'read_only' }] },
     }, {
         schemaVersion: 'mediflow.aip.operation.result.v1', requestId: 'rpc_call_1', outcome: 'completed',
         result: { operation: { operationId: 'fake.system.status.v1', capabilityId: 'fake.system.status.read.v1',
-            serviceRef: 'fake_application_services.system_status.v1', maximumStage: 'read_only' },
+            serviceRef: 'FakeApplicationServicesSystemStatusV1', maximumStage: 'read_only' },
         value: { status: 'ready' } },
     }]);
     assert.equal((observed[0] as { detail: boolean }).detail, false);
@@ -198,6 +198,26 @@ test('post-fences a cooperative synchronous service that returns after its deadl
         operationId: 'fake.system.status.v1', input: {} }));
     await new Promise((resolve) => setImmediate(resolve));
     assert.equal(JSON.parse(port.sent[0] ?? '{}').denialCode, 'timeout');
+});
+
+test('post-fences response encoding before publishing a completed result', () => {
+    const originalNow = Object.getOwnPropertyDescriptor(performance, 'now');
+    const moments = [0, 5, 10];
+    Object.defineProperty(performance, 'now', { configurable: true, value: () => moments.shift() ?? 10 });
+    try {
+        const host = createAipOperationRpcHostV1({ operations: [fakeDefinition(() => ({ status: 'ready' }), 10)] });
+        const port = memoryPort();
+        host.attach(port.adapter);
+        port.receive(request({ method: 'call', requestId: 'rpc_encode_deadline_1',
+            operationId: 'fake.system.status.v1', input: {} }));
+        assert.deepEqual(JSON.parse(port.sent[0] ?? '{}'), {
+            schemaVersion: 'mediflow.aip.operation.result.v1', requestId: 'rpc_encode_deadline_1', outcome: 'denied',
+            denialCode: 'timeout',
+        });
+    } finally {
+        if (originalNow) Object.defineProperty(performance, 'now', originalNow);
+        else delete (performance as unknown as { now?: unknown }).now;
+    }
 });
 
 test('bounds in-flight work and the replay ledger per opaque session', async () => {
