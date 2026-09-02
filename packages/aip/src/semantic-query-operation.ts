@@ -37,7 +37,9 @@ import {
   semanticQueryOperationList,
   semanticQueryOperationRecord,
   type SemanticQueryOperationPolicyV1,
+  type SemanticQueryOperationTerminalAuditCommitV1,
 } from './semantic-query-operation-contract.ts';
+import { commitSemanticQueryTerminalAuditV1 } from './semantic-query-terminal-audit.ts';
 
 export {
   SEMANTIC_QUERY_ALLOWED_READS_V1,
@@ -99,7 +101,7 @@ export function createSemanticQueryOperationServiceV1(sourcesValue: unknown) {
   const denySource = sources.denyPermit as (execution: unknown) => unknown;
   const terminologySource = sources.executeTerminology as (input: unknown, signal: AbortSignal) => unknown;
   const openLoopsSource = sources.executeOpenLoops as (input: unknown, signal: AbortSignal) => unknown;
-  const auditSource = sources.commitTerminalAudit as (audit: unknown) => unknown;
+  const auditSource = sources.commitTerminalAudit as SemanticQueryOperationTerminalAuditCommitV1;
   const claim = record({ operation: SEMANTIC_QUERY_OPERATION_ID_V1,
     capabilityId: SEMANTIC_QUERY_OPERATION_ID_V1 });
   let state: 'available' | 'pending' | 'terminal' = 'available';
@@ -153,27 +155,26 @@ export function createSemanticQueryOperationServiceV1(sourcesValue: unknown) {
       || new Set(refs).size !== refs.length) return fail('currentness_denied');
     return list(refs as string[]);
   };
-  const writeAudit = (audit: unknown): void => {
-    let result: unknown;
-    try { result = auditSource(audit); } catch { return fail('audit_failed'); }
-    if (result !== undefined) {
-      discardPromise(result);
-      return fail('audit_failed');
-    }
+  const commitAudit = (intent: unknown, decideAtCommit: () => unknown): unknown => {
+    const committed = commitSemanticQueryTerminalAuditV1(auditSource, intent, decideAtCommit);
     auditWritten = true;
+    return committed;
   };
   const denialAudit = (policy: Policy | null, code: 'plan_denied' | 'currentness_denied'): void => {
-    let timestamp: unknown;
-    try { timestamp = nowSource(); } catch { return fail('audit_failed'); }
-    if (!integer(timestamp)) return fail('audit_failed');
-    writeAudit(record({ schemaVersion: 'mediflow.aip.audit.v1' as const,
+    const intent = record({ schemaVersion: 'mediflow.aip.audit.v1' as const,
       eventType: 'semantic_query_plan_execution' as const, outcome: 'denied' as const,
       operation: SEMANTIC_QUERY_OPERATION_ID_V1, capabilityId: SEMANTIC_QUERY_OPERATION_ID_V1,
       policyDecision: 'denied' as const,
       revisionBinding: policy ? record({ generation: policy.generation,
         revocationGeneration: policy.revocationGeneration, selectionEpoch: policy.selectionEpoch }) : null,
-      operationCount: 0 as const, durationMs: 0 as const, timestamp, writesPerformed: 0 as const,
-      applyPolicy: 'none' as const, denialCode: code }));
+      operationCount: 0 as const, durationMs: 0 as const, writesPerformed: 0 as const,
+      applyPolicy: 'none' as const, denialCode: code });
+    commitAudit(intent, () => {
+      let timestamp: unknown;
+      try { timestamp = nowSource(); } catch { return fail('audit_failed'); }
+      if (!integer(timestamp)) return fail('audit_failed');
+      return record({ ...intent, timestamp });
+    });
   };
   const canonicalInput = (operationId: unknown, inputValue: unknown): unknown => {
     if (operationId === AIP_TERMINOLOGY_SEARCH_CONTRACT_V1.operationId) {
@@ -263,9 +264,7 @@ export function createSemanticQueryOperationServiceV1(sourcesValue: unknown) {
         }, writeAudit: record({ mode: 'synchronous_terminal.v1' as const,
           commit: (intent: unknown, decide: (current: unknown, committedAt: unknown) => unknown) => {
             const allowed = (intent as { outcome?: unknown }).outcome === 'allowed';
-            const terminal = decide(allowed ? executionCurrent() : null, nowSource());
-            writeAudit(terminal);
-            return terminal;
+            return commitAudit(intent, () => decide(allowed ? executionCurrent() : null, nowSource()));
           } }) });
       activeExecutor = executor;
       const result = await executor.execute(handle);
