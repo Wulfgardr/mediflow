@@ -1,0 +1,149 @@
+/* @Codex */
+import { z } from 'zod';
+
+export const TERMINOLOGY_OPERATION_ID = 'mediflow.terminology.search.v1' as const;
+export const OPEN_LOOPS_OPERATION_ID = 'mediflow.patient.open_loops.read.v1' as const;
+export const HEADLESS_STATUS_TOOL_ID = 'mediflow.system.headless_status.v1' as const;
+export const CAPABILITIES_TOOL_ID = 'mediflow.system.capabilities.v1' as const;
+export const RPC_REQUEST_SCHEMA = 'mediflow.aip.operation.request.v1' as const;
+export const RPC_RESULT_SCHEMA = 'mediflow.aip.operation.result.v1' as const;
+
+const encoder = new TextEncoder();
+const safeText = (maximumBytes: number) => z.string().refine((value) => value.length > 0
+  && !/[\u0000-\u001f\u007f-\u009f\uD800-\uDFFF]/u.test(value)
+  && encoder.encode(value).byteLength <= maximumBytes);
+const safeInteger = z.number().int().safe().nonnegative();
+const digest = z.string().regex(/^sha256:[0-9a-f]{64}$/u);
+
+export const OPERATION_DESCRIPTORS = Object.freeze([Object.freeze({
+  operationId: TERMINOLOGY_OPERATION_ID,
+  capabilityId: TERMINOLOGY_OPERATION_ID,
+  serviceRef: 'AipTerminologySearchServiceV1',
+  maximumStage: 'read_only' as const,
+  inputSchema: 'mediflow.terminology.search.input.v1',
+  outputSchema: 'mediflow.terminology.search.output.v1',
+}), Object.freeze({
+  operationId: OPEN_LOOPS_OPERATION_ID,
+  capabilityId: OPEN_LOOPS_OPERATION_ID,
+  serviceRef: 'PatientOpenLoopsReadServiceV1',
+  maximumStage: 'read_only' as const,
+  inputSchema: 'mediflow.patient.open_loops.read.input.v1',
+  outputSchema: 'mediflow.patient.open_loops.read.result.v1',
+})]);
+export type OperationDescriptor = (typeof OPERATION_DESCRIPTORS)[number];
+
+export const systemArgumentsSchema = z.object({}).strict();
+export const HEADLESS_STATUS = Object.freeze({
+  schemaVersion: 'mediflow.system.headless-status.v1' as const,
+  candidateVersion: '0.8.5' as const,
+  protocolVersion: '2026-07-28' as const,
+  dataScope: 'non_phi_system_status' as const,
+  writes: 0 as const,
+  apply: 'none' as const,
+});
+export const headlessStatusOutputSchema = z.object({
+  schemaVersion: z.literal(HEADLESS_STATUS.schemaVersion),
+  candidateVersion: z.literal(HEADLESS_STATUS.candidateVersion),
+  protocolVersion: z.literal(HEADLESS_STATUS.protocolVersion),
+  dataScope: z.literal(HEADLESS_STATUS.dataScope), writes: z.literal(0), apply: z.literal('none'),
+}).strict();
+
+export const rpcOperationSchema = z.object({
+  operationId: z.string(), capabilityId: z.string(), serviceRef: z.string(),
+  maximumStage: z.enum(['read_only', 'proposal_only']),
+}).strict();
+const publicOperationSchema = z.object({
+  operationId: z.string(), capabilityId: z.string(), maximumStage: z.enum(['read_only', 'proposal_only']),
+  inputSchema: z.string(), outputSchema: z.string(),
+}).strict();
+export const capabilitiesOutputSchema = z.object({
+  schemaVersion: z.literal('mediflow.system.capabilities.v1'),
+  operations: z.array(publicOperationSchema).max(32),
+}).strict();
+
+export const terminologyArgumentsSchema = z.object({
+  system: z.enum(['LOINC', 'UCUM']),
+  query: safeText(512).refine((value) => {
+    const bytes = encoder.encode(value.trim().replace(/\s+/gu, ' ')).byteLength;
+    return bytes >= 1 && bytes <= 96;
+  }),
+  limit: z.number().int().min(1).max(10),
+}).strict();
+
+const terminologyItemSchema = z.object({
+  system: z.enum(['LOINC', 'UCUM']), code: safeText(64), display: safeText(256),
+  displayIt: safeText(256).optional(), defaultUnit: safeText(64).optional(),
+  version: safeText(32).nullable(),
+}).strict();
+const terminologyReceiptSchema = z.object({
+  schemaVersion: z.literal('mediflow.terminology.search.receipt.v1'),
+  receiptRef: z.string().regex(/^[a-z][a-z0-9._-]{15,127}$/u),
+  operationId: z.literal(TERMINOLOGY_OPERATION_ID), capabilityId: z.literal(TERMINOLOGY_OPERATION_ID),
+  outcome: z.literal('read'), system: z.enum(['LOINC', 'UCUM']), resultCount: safeInteger.max(10),
+  catalogSource: z.literal('local-pilot-catalog'), egress: z.literal('none'),
+  writesPerformed: z.literal(0), fabricDependency: z.literal('none'), timestamp: safeInteger,
+}).strict();
+export const terminologyOutputSchema = z.object({
+  schemaVersion: z.literal('mediflow.terminology.search.output.v1'),
+  operationId: z.literal(TERMINOLOGY_OPERATION_ID), capabilityId: z.literal(TERMINOLOGY_OPERATION_ID),
+  applicationServiceRef: z.literal('AipTerminologySearchServiceV1'), outcome: z.literal('read'),
+  items: z.array(terminologyItemSchema).max(10), receipt: terminologyReceiptSchema,
+}).strict().superRefine((value, context) => {
+  const codes = new Set(value.items.map((item) => item.code));
+  if (value.items.length !== value.receipt.resultCount || codes.size !== value.items.length
+      || value.items.some((item) => item.system !== value.receipt.system)) {
+    context.addIssue({ code: 'custom', message: 'receipt_mismatch' });
+  }
+  if (encoder.encode(JSON.stringify(value)).byteLength > 16 * 1024) {
+    context.addIssue({ code: 'custom', message: 'output_oversized' });
+  }
+});
+
+export const openLoopsArgumentsSchema = z.object({}).strict();
+const openLoopItemSchema = z.object({
+  loopRef: z.string().regex(/^aipl_[0-9a-f]{64}$/u),
+  kind: z.enum(['results_pending', 'series_stalled', 'registered_expectation']),
+  temporalState: z.enum(['open', 'overdue', 'unscheduled']), openedAt: safeInteger,
+  dueAt: safeInteger.nullable(), revision: z.number().int().safe().min(1),
+}).strict();
+const openLoopsReceiptSchema = z.object({
+  schemaVersion: z.literal('mediflow.patient.open_loops.read.receipt.v1'),
+  receiptRef: z.string().regex(/^aipr_[0-9a-f]{64}$/u), operationId: z.literal(OPEN_LOOPS_OPERATION_ID),
+  capabilityId: z.literal(OPEN_LOOPS_OPERATION_ID), outcome: z.literal('read'),
+  ownerRefHash: digest, leaseRefHash: digest, receiptRefHash: digest,
+  generation: z.number().int().safe().min(1), revocationGeneration: safeInteger,
+  selectionEpoch: safeInteger, snapshotRevision: z.number().int().safe().min(1),
+  itemCount: safeInteger.max(32), truncated: z.boolean(), timestamp: safeInteger,
+}).strict();
+export const openLoopsOutputSchema = z.object({
+  schemaVersion: z.literal('mediflow.patient.open_loops.read.result.v1'),
+  operationId: z.literal(OPEN_LOOPS_OPERATION_ID), capabilityId: z.literal(OPEN_LOOPS_OPERATION_ID),
+  outcome: z.literal('read'), items: z.array(openLoopItemSchema).max(32), truncated: z.boolean(),
+  snapshotRevision: z.number().int().safe().min(1), receipt: openLoopsReceiptSchema,
+}).strict().superRefine((value, context) => {
+  const references = new Set(value.items.map((item) => item.loopRef));
+  const temporalInvalid = value.items.some((item) => item.openedAt > value.receipt.timestamp
+    || (item.temporalState === 'unscheduled' && item.dueAt !== null)
+    || (item.temporalState === 'overdue' && (item.dueAt === null || item.dueAt < item.openedAt
+      || item.dueAt >= value.receipt.timestamp))
+    || (item.temporalState === 'open' && (item.dueAt === null || item.dueAt < item.openedAt)));
+  if (value.items.length !== value.receipt.itemCount || references.size !== value.items.length || temporalInvalid
+      || value.truncated !== value.receipt.truncated
+      || value.snapshotRevision !== value.receipt.snapshotRevision) {
+    context.addIssue({ code: 'custom', message: 'receipt_mismatch' });
+  }
+});
+
+export function selectBoundOperations(value: unknown): readonly OperationDescriptor[] {
+  const parsed = z.array(rpcOperationSchema).max(32).safeParse(value);
+  if (!parsed.success) return Object.freeze([]);
+  return Object.freeze(OPERATION_DESCRIPTORS.filter((expected) => parsed.data.some((actual) =>
+    actual.operationId === expected.operationId && actual.capabilityId === expected.capabilityId
+    && actual.serviceRef === expected.serviceRef && actual.maximumStage === expected.maximumStage)));
+}
+
+export function publicCatalog(operations: readonly OperationDescriptor[]) {
+  return Object.freeze({ schemaVersion: 'mediflow.system.capabilities.v1' as const,
+    operations: Object.freeze(operations.map(({ operationId, capabilityId, maximumStage, inputSchema, outputSchema }) =>
+      Object.freeze({ operationId, capabilityId, maximumStage, inputSchema, outputSchema }))) });
+}

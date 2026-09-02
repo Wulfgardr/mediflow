@@ -4,8 +4,13 @@ import { spawn } from 'node:child_process';
 import { access, readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import {
+    createAipOperationRpcChildEnvironmentV1,
+    createAipOperationRpcHostV1,
+} from '../packages/aip/src/operation-rpc.ts';
 
 const SERVER = fileURLToPath(new URL('./intelligent-host-mcp-stdio.mjs', import.meta.url));
+const STRIP_TYPES_LOADER = fileURLToPath(new URL('./register-strip-types-loader.mjs', import.meta.url));
 const MODERN_VERSION = '2026-07-28';
 const META = Object.freeze({
     'io.modelcontextprotocol/protocolVersion': MODERN_VERSION,
@@ -23,8 +28,36 @@ function withTimeout(promise, label) {
     ]);
 }
 
-function startServer() {
-    const child = spawn(process.execPath, [SERVER], { env: {}, stdio: ['pipe', 'pipe', 'pipe'] });
+async function waitFor(predicate, label) {
+    for (let index = 0; index < 100; index += 1) {
+        if (predicate()) return;
+        await new Promise((resolve) => setTimeout(resolve, 5));
+    }
+    throw new Error(`Timed out: ${label}`);
+}
+
+function startServer(bound = false, options = {}) {
+    const environment = bound ? createAipOperationRpcChildEnvironmentV1(`aipb_${'1'.repeat(32)}`) : {};
+    const child = spawn(process.execPath, ['--experimental-strip-types', '--import', STRIP_TYPES_LOADER, SERVER], {
+        env: environment, stdio: bound ? ['pipe', 'pipe', 'pipe', 'ipc'] : ['pipe', 'pipe', 'pipe'],
+    });
+    if (bound) {
+        const host = createAipOperationRpcHostV1({ operations: [{
+            operationId: 'mediflow.terminology.search.v1', capabilityId: 'mediflow.terminology.search.v1',
+            serviceRef: options.terminologyServiceRef ?? 'AipTerminologySearchServiceV1',
+            maximumStage: 'read_only', timeoutMs: options.timeoutMs ?? 250,
+            execute: options.terminology ?? (async () => ({ status: 'synthetic' })),
+        }, {
+            operationId: 'mediflow.patient.open_loops.read.v1',
+            capabilityId: 'mediflow.patient.open_loops.read.v1', serviceRef: 'PatientOpenLoopsReadServiceV1',
+            maximumStage: 'read_only', timeoutMs: options.timeoutMs ?? 250,
+            execute: options.openLoops ?? (async () => ({ status: 'synthetic' })),
+        }] });
+        host.attach({
+            subscribe: (listener) => { child.on('message', listener); return () => child.off('message', listener); },
+            publish: (frame) => { child.send(frame); },
+        });
+    }
     const pending = new Map();
     const protocolMessages = [];
     let stdout = '';
@@ -46,51 +79,197 @@ function startServer() {
     });
     child.stderr.on('data', (chunk) => { stderr += chunk; });
     let nextId = 1;
-    const send = (method, params = {}, modern = true) => {
+    const begin = (method, params = {}, modern = true) => {
         const id = nextId++;
         const message = { jsonrpc: '2.0', id, method, params: modern ? { ...params, _meta: META } : params };
         const response = new Promise((resolve) => pending.set(id, resolve));
         child.stdin.write(`${JSON.stringify(message)}\n`);
-        return withTimeout(response, method);
+        return { id, response: withTimeout(response, method) };
     };
+    const send = (method, params = {}, modern = true) => begin(method, params, modern).response;
+    const notify = (method, params = {}) => child.stdin.write(`${JSON.stringify({
+        jsonrpc: '2.0', method, params: { ...params, _meta: META },
+    })}\n`);
     const stop = async () => {
         if (child.exitCode === null && !child.killed) child.stdin.end();
         await withTimeout(new Promise((resolve) => child.once('exit', resolve)), 'server exit');
     };
-    return { child, protocolMessages, send, stop, stderr: () => stderr };
+    return { begin, child, notify, protocolMessages, send, stop, stderr: () => stderr };
 }
 
-test('discovers one modern-only non-PHI status tool and calls it over real stdio', async () => {
+const terminologyOutput = Object.freeze({
+    schemaVersion: 'mediflow.terminology.search.output.v1', operationId: 'mediflow.terminology.search.v1',
+    capabilityId: 'mediflow.terminology.search.v1', applicationServiceRef: 'AipTerminologySearchServiceV1',
+    outcome: 'read', items: [{ system: 'LOINC', code: 'synthetic-code', display: 'Synthetic display', version: null }],
+    receipt: { schemaVersion: 'mediflow.terminology.search.receipt.v1', receiptRef: 'aiptr_synthetic_0001',
+        operationId: 'mediflow.terminology.search.v1', capabilityId: 'mediflow.terminology.search.v1',
+        outcome: 'read', system: 'LOINC', resultCount: 1, catalogSource: 'local-pilot-catalog', egress: 'none',
+        writesPerformed: 0, fabricDependency: 'none', timestamp: 1_000 },
+});
+const openLoopsOutput = Object.freeze({
+    schemaVersion: 'mediflow.patient.open_loops.read.result.v1',
+    operationId: 'mediflow.patient.open_loops.read.v1', capabilityId: 'mediflow.patient.open_loops.read.v1',
+    outcome: 'read', items: [{ loopRef: `aipl_${'1'.repeat(64)}`, kind: 'results_pending',
+        temporalState: 'open', openedAt: 900, dueAt: 1_100, revision: 1 }], truncated: false, snapshotRevision: 7,
+    receipt: { schemaVersion: 'mediflow.patient.open_loops.read.receipt.v1', receiptRef: `aipr_${'2'.repeat(64)}`,
+        operationId: 'mediflow.patient.open_loops.read.v1', capabilityId: 'mediflow.patient.open_loops.read.v1',
+        outcome: 'read', ownerRefHash: `sha256:${'3'.repeat(64)}`, leaseRefHash: `sha256:${'4'.repeat(64)}`,
+        receiptRefHash: `sha256:${'5'.repeat(64)}`, generation: 1, revocationGeneration: 0, selectionEpoch: 2,
+        snapshotRevision: 7, itemCount: 1, truncated: false, timestamp: 1_000 },
+});
+
+test('discovers status, capabilities and two host-bound reads over stdio and child IPC', async (context) => {
     await access(SERVER);
-    const server = startServer();
+    const server = startServer(true);
+    context.after(() => { if (server.child.exitCode === null) server.child.kill(); });
     const discovered = await server.send('server/discover');
     assert.deepEqual(discovered.result.supportedVersions, [MODERN_VERSION]);
     assert.ok(discovered.result.capabilities.tools);
 
     const listed = await server.send('tools/list');
-    assert.equal(listed.result.tools.length, 1);
-    const [tool] = listed.result.tools;
-    assert.equal(tool.name, 'mediflow.system.headless_status.v1');
-    assert.equal(tool.inputSchema.type, 'object');
-    assert.equal('resultType' in tool, false);
-
-    const called = await server.send('tools/call', { name: tool.name, arguments: {} });
-    assert.deepEqual(called.result.structuredContent, {
-        schemaVersion: 'mediflow.system.headless-status.v1',
-        candidateVersion: '0.8.5',
-        protocolVersion: MODERN_VERSION,
-        dataScope: 'non_phi_system_status',
-        canonicalHeadlessAnchors: 66,
-        generalOperationsGrantable: 0,
-        soapMcpBinding: 'unavailable',
-        writes: 0,
-        apply: 'none',
-        claim: 'MCP_PROTOCOL_SLICE_ONLY',
-    });
-    assert.equal(called.result.isError, undefined);
-    assert.doesNotMatch(JSON.stringify(called.result), /patient|clinical|secret|token|database|path/iu);
+    assert.deepEqual(listed.result.tools.map((tool) => tool.name), [
+        'mediflow.system.headless_status.v1', 'mediflow.system.capabilities.v1',
+        'mediflow.terminology.search.v1', 'mediflow.patient.open_loops.read.v1',
+    ]);
+    assert.equal(listed.result.tools.every((tool) => tool.annotations.readOnlyHint === true
+        && tool.annotations.destructiveHint === false && tool.annotations.openWorldHint === false
+        && tool._meta['mediflow/maximumStage'] === 'read_only'), true);
+    const status = await server.send('tools/call', { name: 'mediflow.system.headless_status.v1', arguments: {} });
+    assert.equal(status.result.structuredContent.dataScope, 'non_phi_system_status');
+    const capabilities = await server.send('tools/call', { name: 'mediflow.system.capabilities.v1', arguments: {} });
+    assert.deepEqual(capabilities.result.structuredContent.operations.map((item) => item.operationId), [
+        'mediflow.terminology.search.v1', 'mediflow.patient.open_loops.read.v1',
+    ]);
+    assert.doesNotMatch(JSON.stringify({ status, capabilities }), /patientId|patientName|secret|token|database|path/iu);
     await server.stop();
     assert.equal(server.stderr(), '');
+});
+
+test('does not expose an operation whose host service binding is not exact', async (context) => {
+    const server = startServer(true, { terminologyServiceRef: 'AipTerminologySearchServiceV2' });
+    context.after(() => { if (server.child.exitCode === null) server.child.kill(); });
+    await server.send('server/discover');
+    const listed = await server.send('tools/list');
+    assert.deepEqual(listed.result.tools.map((tool) => tool.name), [
+        'mediflow.system.headless_status.v1', 'mediflow.system.capabilities.v1',
+        'mediflow.patient.open_loops.read.v1',
+    ]);
+    await server.stop();
+});
+
+test('calls only the two canonical read inputs and returns minimized validated outputs', async (context) => {
+    const observed = [];
+    const server = startServer(true, {
+        terminology: async (input) => { observed.push(input); return terminologyOutput; },
+        openLoops: async (input) => { observed.push(input); return openLoopsOutput; },
+    });
+    context.after(() => { if (server.child.exitCode === null) server.child.kill(); });
+    const terminology = await server.send('tools/call', { name: 'mediflow.terminology.search.v1',
+        arguments: { system: 'LOINC', query: '  synthetic   query ', limit: 3 } });
+    assert.deepEqual(terminology.result.structuredContent, terminologyOutput);
+    assert.equal(terminology.result.content[0].text, 'Terminology search returned 1 item(s).');
+    const loops = await server.send('tools/call', {
+        name: 'mediflow.patient.open_loops.read.v1', arguments: {},
+    });
+    assert.deepEqual(loops.result.structuredContent, openLoopsOutput);
+    assert.equal(loops.result.content[0].text, 'Open-loops read returned 1 item(s).');
+    assert.equal(observed.every((input) => Object.getPrototypeOf(input) === null && Object.isFrozen(input)), true);
+    assert.deepEqual(observed.map((input) => ({ ...input })), [{ schemaVersion: 'mediflow.terminology.search.input.v1',
+        operationId: 'mediflow.terminology.search.v1', system: 'LOINC', query: 'synthetic query', limit: 3 }, {
+        schemaVersion: 'mediflow.patient.open_loops.read.input.v1',
+        operationId: 'mediflow.patient.open_loops.read.v1',
+    }]);
+    assert.doesNotMatch(JSON.stringify({ terminology, loops }), /patientId|patientName|birth|authority|provider/i);
+    await server.stop();
+    assert.equal(server.stderr(), '');
+});
+
+test('rejects caller-supplied patient scope and authority before either host service', async (context) => {
+    let calls = 0;
+    const server = startServer(true, { terminology: () => { calls += 1; return terminologyOutput; },
+        openLoops: () => { calls += 1; return openLoopsOutput; } });
+    context.after(() => { if (server.child.exitCode === null) server.child.kill(); });
+    const forgedLoops = await server.send('tools/call', { name: 'mediflow.patient.open_loops.read.v1',
+        arguments: { patientId: 'caller-selected' } });
+    const forgedTerminology = await server.send('tools/call', { name: 'mediflow.terminology.search.v1',
+        arguments: { system: 'LOINC', query: 'synthetic', limit: 1, authority: 'caller' } });
+    assert.equal(forgedLoops.error?.code === -32602 || forgedLoops.result?.isError === true, true);
+    assert.equal(forgedTerminology.error?.code === -32602 || forgedTerminology.result?.isError === true, true);
+    assert.doesNotMatch(JSON.stringify({ forgedLoops, forgedTerminology }), /caller-selected|"caller"/u);
+    assert.equal(calls, 0);
+    await server.stop();
+});
+
+test('propagates MCP cancellation to child RPC and discards the late service completion', async (context) => {
+    let entered = false; let signal; let finish;
+    const server = startServer(true, { terminology: (_input, serviceSignal) => {
+        entered = true; signal = serviceSignal;
+        return new Promise((resolve) => { finish = resolve; });
+    } });
+    context.after(() => { if (server.child.exitCode === null) server.child.kill(); });
+    const call = server.begin('tools/call', { name: 'mediflow.terminology.search.v1',
+        arguments: { system: 'LOINC', query: 'synthetic', limit: 1 } });
+    void call.response.catch(() => undefined);
+    await waitFor(() => entered, 'service entry');
+    server.notify('notifications/cancelled', { requestId: call.id, reason: 'synthetic cancellation' });
+    await waitFor(() => signal?.aborted === true, 'RPC abort propagation');
+    finish(terminologyOutput);
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    assert.equal(server.protocolMessages.filter((message) => message.id === call.id).length, 0);
+    await server.stop();
+});
+
+test('maps the host budget denial without publishing a later service result', async (context) => {
+    let finish;
+    const server = startServer(true, { timeoutMs: 15, terminology: () => new Promise((resolve) => { finish = resolve; }) });
+    context.after(() => { if (server.child.exitCode === null) server.child.kill(); });
+    const call = server.begin('tools/call', { name: 'mediflow.terminology.search.v1',
+        arguments: { system: 'LOINC', query: 'synthetic', limit: 1 } });
+    const response = await call.response;
+    assert.equal(response.result.isError, true);
+    assert.equal(response.result.content[0].text, 'MediFlow operation denied: timeout.');
+    finish(terminologyOutput);
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    assert.equal(server.protocolMessages.filter((message) => message.id === call.id).length, 1);
+    await server.stop();
+});
+
+test('cancels the host when the client budget expires and drops the late result', async (context) => {
+    let entered = false; let signal; let finish;
+    const server = startServer(true, { timeoutMs: 1_500, terminology: (_input, serviceSignal) => {
+        entered = true; signal = serviceSignal;
+        return new Promise((resolve) => { finish = resolve; });
+    } });
+    context.after(() => { if (server.child.exitCode === null) server.child.kill(); });
+    const call = server.begin('tools/call', { name: 'mediflow.terminology.search.v1',
+        arguments: { system: 'LOINC', query: 'synthetic', limit: 1 } });
+    await waitFor(() => entered, 'service entry');
+    const response = await call.response;
+    assert.equal(response.result.isError, true);
+    assert.equal(response.result.content[0].text, 'MediFlow operation denied: timeout.');
+    await waitFor(() => signal?.aborted === true, 'client-budget RPC abort propagation');
+    finish(terminologyOutput);
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    assert.equal(server.protocolMessages.filter((message) => message.id === call.id).length, 1);
+    await server.stop();
+});
+
+test('rejects hostile service output without reflecting it to the MCP caller', async (context) => {
+    let calls = 0;
+    const server = startServer(true, { terminology: () => {
+        calls += 1; return calls === 1 ? { ...terminologyOutput, patientName: 'sensitive-value' } : terminologyOutput;
+    } });
+    context.after(() => { if (server.child.exitCode === null) server.child.kill(); });
+    const response = await server.send('tools/call', { name: 'mediflow.terminology.search.v1',
+        arguments: { system: 'LOINC', query: 'synthetic', limit: 1 } });
+    assert.equal(response.result.isError, true);
+    assert.equal(response.result.content[0].text, 'MediFlow operation denied: protocol_invalid.');
+    assert.doesNotMatch(JSON.stringify(response), /sensitive-value|patientName/u);
+    const retry = await server.send('tools/call', { name: 'mediflow.terminology.search.v1',
+        arguments: { system: 'LOINC', query: 'synthetic', limit: 1 } });
+    assert.equal(retry.result.content[0].text, 'MediFlow operation denied: host_unbound.');
+    assert.equal(calls, 1);
+    await server.stop();
 });
 
 test('rejects a legacy initialize and remains usable for a modern opening', async () => {
@@ -111,7 +290,7 @@ test('fails unknown tools in-band and survives malformed JSON without stdout noi
     const response = await server.send('tools/call', { name: 'unknown.tool', arguments: {} });
     assert.ok(response.error || response.result?.isError === true);
     const valid = await server.send('tools/list');
-    assert.equal(valid.result.tools.length, 1);
+    assert.equal(valid.error.code, -32601);
     await server.stop();
     assert.equal(server.protocolMessages.every((message) => message.jsonrpc === '2.0'), true);
 });
