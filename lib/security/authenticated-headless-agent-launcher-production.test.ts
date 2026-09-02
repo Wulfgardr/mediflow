@@ -167,3 +167,34 @@ test('late-bound MCP port denies a publish queued reentrantly before failed bind
   assert.equal(publishCalls, 1);
   assert.equal(terminateCalls, 1);
 });
+
+test('late-bound MCP port rolls back bind listeners when publish terminates reentrantly', () => {
+  const environment = createAipAuthenticatedOperationRpcChildEnvironmentV1(`aipb_${'0'.repeat(32)}`);
+  const listeners = new Set<(frame: unknown) => void>();
+  const closeListeners = new Set<() => void>();
+  let publishCalls = 0, terminateCalls = 0;
+  const child = record({
+    connection: record({}),
+    subscribe(listener: (frame: unknown) => void) {
+      listeners.add(listener);
+      return () => { listeners.delete(listener); };
+    },
+    publish() {
+      publishCalls += 1;
+      for (const listener of listeners) listener('synthetic-bootstrap-request');
+    },
+    onClose(listener: () => void) {
+      closeListeners.add(listener);
+      return () => { closeListeners.delete(listener); };
+    },
+    terminate() { terminateCalls += 1; },
+  });
+  const port = createLateBoundMcpChildPortV1(child, environment);
+
+  assert.throws(() => port.subscribe(() => port.terminate()), /child_unavailable/u);
+  assert.throws(() => port.onClose(() => undefined), /child_unavailable/u);
+  assert.equal(publishCalls, 1);
+  assert.equal(terminateCalls, 1);
+  assert.equal(listeners.size, 0);
+  assert.equal(closeListeners.size, 0);
+});

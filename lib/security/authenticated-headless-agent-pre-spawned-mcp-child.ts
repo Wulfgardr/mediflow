@@ -93,7 +93,8 @@ export function createLateBoundMcpChildPortV1(
       try { terminate(); } catch { /* original denial remains */ }
       return unavailable();
     }
-    if (discardPromise(result) || result !== undefined) {
+    const invalidResult = discardPromise(result) || result !== undefined;
+    if (terminated || invalidResult) {
       try { terminate(); } catch { /* original denial remains */ }
       unavailable();
     }
@@ -101,7 +102,7 @@ export function createLateBoundMcpChildPortV1(
   return record({
     connection: child.connection,
     subscribe: (listener: (frame: unknown) => void) => {
-      if (!synchronousFunction(listener)) unavailable();
+      if (terminated || !synchronousFunction(listener)) unavailable();
       let subscription: unknown;
       try { subscription = child.subscribe(listener); }
       catch {
@@ -109,6 +110,10 @@ export function createLateBoundMcpChildPortV1(
         return unavailable();
       }
       const unsubscribe = checkedUnsubscribe(subscription);
+      if (terminated) {
+        try { unsubscribe(); } catch { /* terminal denial remains */ }
+        unavailable();
+      }
       if (!bindPublished) {
         bindPublished = true;
         try { publish(bindFrame); }
@@ -122,14 +127,19 @@ export function createLateBoundMcpChildPortV1(
     },
     publish,
     onClose: (listener: () => void) => {
-      if (!synchronousFunction(listener)) unavailable();
+      if (terminated || !synchronousFunction(listener)) unavailable();
       let subscription: unknown;
       try { subscription = child.onClose(listener); }
       catch {
         try { terminate(); } catch { /* original denial remains */ }
         return unavailable();
       }
-      return checkedUnsubscribe(subscription);
+      const unsubscribe = checkedUnsubscribe(subscription);
+      if (terminated) {
+        try { unsubscribe(); } catch { /* terminal denial remains */ }
+        unavailable();
+      }
+      return unsubscribe;
     },
     terminate,
   });
