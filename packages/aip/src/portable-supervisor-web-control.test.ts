@@ -141,7 +141,62 @@ test('revoke_all terminalizes once and reports cleanup failure without reviving'
   const failed = fixture({ revoke: () => Promise.reject(new Error('synthetic revoke')) });
   const denial = await parsed(failed.control.handle(request({ method: 'revoke_all', reason: 'reselection' })));
   assert.equal(denial.outcome, 'denied'); assert.equal(denial.denialCode, 'revoke_failed');
-  assert.equal(await failed.control.terminate('explicit'), false);
+  await assert.rejects(failed.control.terminate('explicit'), /revoke_failed/u);
+});
+
+test('concurrent revocations share one cleanup and ACK only after its success', async () => {
+  const pending = deferred<void>();
+  let calls = 0, firstSettled = false, secondSettled = false;
+  const current = fixture({ revoke: () => { calls += 1; return pending.promise; } });
+  const first = current.control.handle(request({ method: 'revoke_all', reason: 'application_lock',
+    requestRef: `pswr_${'5'.repeat(32)}` })).then((value) => { firstSettled = true; return value; });
+  const second = current.control.handle(request({ method: 'revoke_all', reason: 'reselection',
+    requestRef: `pswr_${'6'.repeat(32)}` })).then((value) => { secondSettled = true; return value; });
+  await new Promise<void>((resolve) => { setImmediate(resolve); });
+  assert.equal(calls, 1); assert.equal(firstSettled, false); assert.equal(secondSettled, false);
+  pending.resolve();
+  for (const result of await Promise.all([first, second])) {
+    assert.equal(decodePortableSupervisorWebIpcFrameV1(result).outcome, 'revoked');
+  }
+});
+
+test('concurrent revoke failure is shared and remains sticky for later replay', async () => {
+  const pending = deferred<void>();
+  let calls = 0;
+  const current = fixture({ revoke: () => { calls += 1; return pending.promise; } });
+  const first = current.control.handle(request({ method: 'revoke_all', reason: 'application_lock',
+    requestRef: `pswr_${'7'.repeat(32)}` }));
+  const second = current.control.handle(request({ method: 'revoke_all', reason: 'reselection',
+    requestRef: `pswr_${'8'.repeat(32)}` }));
+  pending.reject(new Error('synthetic concurrent revoke'));
+  for (const result of await Promise.all([first, second])) {
+    const denial = decodePortableSupervisorWebIpcFrameV1(result);
+    assert.equal(denial.outcome, 'denied'); assert.equal(denial.denialCode, 'revoke_failed');
+  }
+  const replay = await parsed(current.control.handle(request({ method: 'revoke_all', reason: 'explicit',
+    requestRef: `pswr_${'9'.repeat(32)}` })));
+  assert.equal(replay.outcome, 'denied'); assert.equal(replay.denialCode, 'revoke_failed');
+  assert.equal(calls, 1);
+});
+
+test('installs the revoke flight before a reentrant callback starts a sibling request', async () => {
+  const holder: { control?: ReturnType<typeof createPortableSupervisorWebControlV1> } = {};
+  const pending = deferred<void>();
+  let calls = 0, nested: Promise<string> | null = null, nestedSettled = false;
+  const current = fixture({ revoke: () => {
+    calls += 1;
+    nested = holder.control?.handle(request({ method: 'revoke_all', reason: 'explicit',
+      requestRef: `pswr_${'a'.repeat(32)}` })).then((value) => { nestedSettled = true; return value; }) ?? null;
+    return pending.promise;
+  } });
+  holder.control = current.control;
+  const outerResult = current.control.handle(request({ method: 'revoke_all', reason: 'web_disconnect' }));
+  await new Promise<void>((resolve) => { setImmediate(resolve); });
+  assert.ok(nested); assert.equal(nestedSettled, false); assert.equal(calls, 1);
+  pending.resolve();
+  const outer = await parsed(outerResult); assert.equal(outer.outcome, 'revoked');
+  const sibling = decodePortableSupervisorWebIpcFrameV1(await nested);
+  assert.equal(sibling.outcome, 'revoked'); assert.equal(calls, 1);
 });
 
 test('malformed or noncanonical input throws protocol_invalid and terminalizes once', async () => {

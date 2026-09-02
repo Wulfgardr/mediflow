@@ -72,7 +72,7 @@ export function createPortableSupervisorWebControlV1(sourcesValue: unknown) {
   const source = exact(sourcesValue, SOURCE_KEYS);
   if (SOURCE_KEYS.some((key) => typeof source[key] !== 'function' || types.isProxy(source[key]))) return fail();
   const sources = source as unknown as Sources;
-  let phase: Phase = 'idle', pending: Pending | null = null, lastNow = -1;
+  let phase: Phase = 'idle', pending: Pending | null = null, termination: Promise<void> | null = null, lastNow = -1;
   const now = (): number => {
     let value: unknown;
     try { value = sources.now(); } catch { return fail(); }
@@ -85,15 +85,23 @@ export function createPortableSupervisorWebControlV1(sourcesValue: unknown) {
   const denied = (requestRef: string, denialCode: string): string =>
     ack(requestRef, { outcome: 'denied', denialCode });
   const terminate = async (reason: TerminalReason): Promise<boolean> => {
-    if (phase === 'terminal') return false;
-    phase = 'terminal'; pending = null;
-    let result: unknown;
-    try { result = sources.revoke(TERMINAL_REASONS.has(reason) ? reason : 'explicit'); }
-    catch { throw new Error('revoke_failed'); }
-    if (types.isPromise(result)) {
-      try { await result; } catch { throw new Error('revoke_failed'); }
-    } else if (result !== undefined) throw new Error('revoke_failed');
-    return true;
+    const first = termination === null;
+    if (first) {
+      phase = 'terminal'; pending = null;
+      let complete!: () => void, reject!: () => void;
+      termination = new Promise<void>((resolve, rejectPromise) => {
+        complete = resolve;
+        reject = () => rejectPromise(new Error('revoke_failed'));
+      });
+      try {
+        const result = sources.revoke(TERMINAL_REASONS.has(reason) ? reason : 'explicit');
+        if (types.isPromise(result)) void Promise.prototype.then.call(result, complete, reject);
+        else if (result === undefined) complete();
+        else reject();
+      } catch { reject(); }
+    }
+    try { await termination; } catch { throw new Error('revoke_failed'); }
+    return first;
   };
   const protocolFailure = async (): Promise<never> => {
     try { await terminate('explicit'); } catch { /* protocol failure remains terminal */ }
