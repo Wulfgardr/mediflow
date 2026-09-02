@@ -27,17 +27,14 @@ function plan(maxDurationMs = 80) {
 }
 const output = (operationId: string, marker: string) => record({ schemaVersion: 'synthetic.read.result.v1',
   operationId, capabilityId: operationId, outcome: 'read', items: Object.freeze(Object.setPrototypeOf([marker], null)) });
-const auditAcknowledgement = (audit: unknown, status: 'committed' | 'currentness_denied' = 'committed') => {
-  const binding = (audit as { revisionBinding: { generation: number; revocationGeneration: number;
-    selectionEpoch: number } | null }).revisionBinding;
-  return record({ status, generation: binding?.generation ?? null,
-    revocationGeneration: binding?.revocationGeneration ?? null, selectionEpoch: binding?.selectionEpoch ?? null });
-};
 function setup(overrides: { current?: () => unknown; execute?: (index: number, signal: AbortSignal) => unknown;
-  now?: () => unknown; serviceStage?: unknown; writeAudit?: (audit: unknown) => unknown } = {}, maxDurationMs = 80) {
+  now?: () => unknown; serviceStage?: unknown;
+  writeAudit?: (audit: unknown, decide: (current: unknown, committedAt: unknown) => unknown) => unknown;
+} = {}, maxDurationMs = 80) {
   const candidate = plan(maxDurationMs); let now = 1_000; let ref = 0; const events: string[] = [], audits: unknown[] = [];
+  const current = overrides.current ?? policy, clock = overrides.now ?? (() => now++);
   const sources = { inspectPlan: candidate.validator.inspect,
-    current: overrides.current ?? policy, now: overrides.now ?? (() => now++), nextRef: (kind: unknown) => {
+    current, now: clock, nextRef: (kind: unknown) => {
       ref += 1; return `${kind === 'request' ? 'sqrq' : 'sqra'}_${String(ref).padStart(64, 'a')}`;
     }, resolveApplicationService: (serviceRef: unknown) => {
       const index = refs.indexOf(serviceRef as never); if (index < 0) return null;
@@ -46,20 +43,20 @@ function setup(overrides: { current?: () => unknown; execute?: (index: number, s
         execute: (_input: unknown, signal: AbortSignal) => {
           events.push(operations[index]!); return overrides.execute?.(index, signal) ?? output(operations[index]!, `item-${index}`);
         } });
-    }, writeAudit: record({ mode: 'synchronous_terminal.v1', commit: (audit: unknown) => {
-      const acknowledgement = overrides.writeAudit?.(audit) ?? auditAcknowledgement(audit);
-      if ((acknowledgement as { status?: unknown })?.status === 'committed') { audits.push(audit); events.push('audit'); }
-      return acknowledgement;
+    }, writeAudit: record({ mode: 'synchronous_terminal.v1', commit: (audit: unknown,
+      decide: (current: unknown, committedAt: unknown) => unknown) => {
+      const overridden = overrides.writeAudit?.(audit, decide);
+      const terminal = overridden ?? decide((audit as { outcome: unknown }).outcome === 'allowed' ? current() : null, clock());
+      audits.push(terminal); events.push('audit'); return terminal;
     } }) };
   const createExecutor = () => createSemanticQueryExecutorV1(sources);
   return { ...candidate, executor: createExecutor(), createExecutor, events, audits, sources };
 }
 
 test('executes validated read steps in order and publishes only a PHI-safe orchestration receipt', async () => {
-  let audit: unknown; const { executor, handle, events } = setup({ writeAudit: (value) => {
-    audit = value; return auditAcknowledgement(value);
-  } });
+  const { executor, handle, events, audits } = setup();
   const result = await executor.execute(handle);
+  const audit = audits[0];
   assert.deepEqual(events, [...operations, 'audit']);
   assert.deepEqual(Array.from(result.steps, (step) => step.operationId), [...operations]);
   assert.notEqual(result.receipt, audit);
@@ -108,16 +105,14 @@ test('revalidates currentness after the final host callback before publication',
     return 1_000 + clockCalls;
   } });
   await assert.rejects(currentness.executor.execute(currentness.handle), /currentness_denied/);
-  assert.equal(clockCalls, 4);
   assert.equal((currentness.audits[0] as { outcome: unknown }).outcome, 'denied');
 
   snapshot = policy();
   const duringAudit = setup({ current: () => snapshot, writeAudit: (audit) => {
     if ((audit as { outcome: unknown }).outcome === 'allowed') {
       snapshot = record({ ...policy(), selectionEpoch: 12 });
-      return record({ status: 'currentness_denied', generation: 7, revocationGeneration: 2, selectionEpoch: 12 });
     }
-    return auditAcknowledgement(audit);
+    return undefined;
   } });
   await assert.rejects(duringAudit.executor.execute(duringAudit.handle), /currentness_denied/);
   assert.deepEqual(duringAudit.audits.map((value) => (value as { outcome: unknown }).outcome), ['denied']);
@@ -153,4 +148,64 @@ test('records one terminal denial and never materializes a late allowed audit', 
     writeAudit: record({ mode: 'synchronous_terminal.v1', commit: async () => { asyncAuditCalls += 1; } }) }),
   /policy_unavailable/);
   assert.equal(asyncAuditCalls, 0);
+
+  let retainedDecision!: (current: unknown, committedAt: unknown) => unknown;
+  const oneShot = setup({ writeAudit: (_audit, decide) => { retainedDecision = decide; return undefined; } });
+  await oneShot.executor.execute(oneShot.handle);
+  assert.throws(() => retainedDecision(policy(), 1_010), /audit_failed/);
+  assert.deepEqual(oneShot.audits.map((value) => (value as { outcome: unknown }).outcome), ['allowed']);
+
+  let promiseAuditCalls = 0;
+  const promisePort = setup();
+  const promiseExecutor = createSemanticQueryExecutorV1({ ...promisePort.sources,
+    writeAudit: record({ mode: 'synchronous_terminal.v1', commit: () => {
+      promiseAuditCalls += 1; return Promise.resolve(null);
+    } }) });
+  await assert.rejects(promiseExecutor.execute(promisePort.handle), /audit_failed/);
+  assert.equal(promiseAuditCalls, 2);
+});
+
+test('lets the terminal audit enforce the deadline at the actual commit point', async () => {
+  const slow = setup({ now: () => Date.now(), writeAudit: (audit) => {
+    if ((audit as { outcome: unknown }).outcome === 'allowed') {
+      const startedAt = performance.now();
+      while (performance.now() - startedAt < 40) { /* bounded synthetic synchronous stall */ }
+    }
+    return undefined;
+  } }, 15);
+
+  await assert.rejects(slow.executor.execute(slow.handle),
+    (error) => error instanceof SemanticQueryExecutionV1Error && error.code === 'timeout');
+  assert.deepEqual(slow.audits.map((value) => [
+    (value as { outcome: unknown }).outcome, (value as { denialCode: unknown }).denialCode,
+  ]), [['denied', 'timeout']]);
+});
+
+test('linearizes cancellation on either side of the terminal audit decision', async () => {
+  let cancelBefore = () => false, acceptedBefore = false;
+  const before = setup({ writeAudit: (audit) => {
+    if ((audit as { outcome: unknown }).outcome === 'allowed') acceptedBefore = cancelBefore();
+    return undefined;
+  } });
+  cancelBefore = before.executor.cancel;
+
+  await assert.rejects(before.executor.execute(before.handle),
+    (error) => error instanceof SemanticQueryExecutionV1Error && error.code === 'cancelled');
+  assert.equal(acceptedBefore, true);
+  assert.deepEqual(before.audits.map((value) => [
+    (value as { outcome: unknown }).outcome, (value as { denialCode: unknown }).denialCode,
+  ]), [['denied', 'cancelled']]);
+
+  let cancelAfter = () => true, acceptedAfter = true;
+  const after = setup({ writeAudit: (audit, decide) => {
+    if ((audit as { outcome: unknown }).outcome !== 'allowed') return undefined;
+    const terminal = decide(policy(), 1_010);
+    acceptedAfter = cancelAfter();
+    return terminal;
+  } });
+  cancelAfter = after.executor.cancel;
+
+  assert.equal((await after.executor.execute(after.handle)).outcome, 'read_completed');
+  assert.equal(acceptedAfter, false);
+  assert.deepEqual(after.audits.map((value) => (value as { outcome: unknown }).outcome), ['allowed']);
 });
