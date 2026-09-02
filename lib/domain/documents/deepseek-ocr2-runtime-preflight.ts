@@ -30,12 +30,15 @@ const backendProfile = Object.freeze({ id: 'mediflow.deepseek_ocr2.transformers_
     pytorchVersion: '2.6.0', transformersVersion: '4.46.3', tokenizersVersion: '0.20.3', flashAttentionVersion: '2.7.3',
     minimumHostMemoryBytes: 32 * GIB, minimumAcceleratorMemoryBytes: 16 * GIB, minimumTemporaryStorageBytes: 16 * GIB,
     maximumRasterBytes: ANYDOC_PDF_PAGE_RENDERER_MAX_RASTER_BYTES, maximumDimensionPixels: ANYDOC_PDF_PAGE_RENDERER_MAX_DIMENSION_PIXELS,
-    maximumPixels: ANYDOC_PDF_PAGE_RENDERER_MAX_PIXELS, maximumOutputBytes: DEEPSEEK_OCR2_MAX_OUTPUT_BYTES, concurrency: 1 });
+    maximumPixels: ANYDOC_PDF_PAGE_RENDERER_MAX_PIXELS, maximumOutputBytes: DEEPSEEK_OCR2_MAX_OUTPUT_BYTES,
+    maximumOutputTokens: 8_192, maximumResidentMemoryBytes: 30 * GIB, pageTimeoutMs: 120_000,
+    terminationGraceMs: 1_000, qualityValidatorVersion: 'mediflow.deepseek_ocr2.text_quality.v1',
+    minimumMeaningfulCharacters: 8, minimumQualityPermille: 750, concurrency: 1 });
 export const DEEPSEEK_OCR2_ARTIFACT_MANIFEST = Object.freeze({ schemaVersion: DEEPSEEK_OCR2_ARTIFACT_MANIFEST_SCHEMA_VERSION,
     artifactId: 'mediflow.ocr.deepseek_ocr2.page.v1', provenance: 'official_deepseek_github_and_huggingface',
     license: 'Apache-2.0', source, model, backendProfile });
 const MANIFEST_CANONICAL = JSON.stringify(DEEPSEEK_OCR2_ARTIFACT_MANIFEST);
-export const DEEPSEEK_OCR2_ARTIFACT_MANIFEST_SHA256 = '6e9cb4e2e627440cefa50e0b70050872368a93e6256e3cd62f65ecdaa3113e80';
+export const DEEPSEEK_OCR2_ARTIFACT_MANIFEST_SHA256 = '6af7ca3acfb43c11770e564ec8f9b59973fac172bd1ecb6999be0659f7b286ee';
 
 type Exact = Record<string, unknown>;
 export type DeepSeekOcr2PreflightStatus = 'test_adapter_eligible' | 'HOLD_HARDWARE_UPSTREAM_RUNTIME'
@@ -80,7 +83,9 @@ function manifestSnapshot(value: unknown): typeof DEEPSEEK_OCR2_ARTIFACT_MANIFES
         'acceleratorVendor', 'computeBackend', 'pythonVersion', 'cudaVersion', 'pytorchVersion', 'transformersVersion',
         'tokenizersVersion', 'flashAttentionVersion', 'minimumHostMemoryBytes', 'minimumAcceleratorMemoryBytes',
         'minimumTemporaryStorageBytes', 'maximumRasterBytes', 'maximumDimensionPixels', 'maximumPixels',
-        'maximumOutputBytes', 'concurrency']);
+        'maximumOutputBytes', 'maximumOutputTokens', 'maximumResidentMemoryBytes', 'pageTimeoutMs',
+        'terminationGraceMs', 'qualityValidatorVersion', 'minimumMeaningfulCharacters', 'minimumQualityPermille',
+        'concurrency']);
     if (!root || !sourceValue || !modelValue || !profileValue) return null;
     const canonical = JSON.stringify({ schemaVersion: root.schemaVersion, artifactId: root.artifactId,
         provenance: root.provenance, license: root.license, source: sourceValue, model: modelValue, backendProfile: profileValue });

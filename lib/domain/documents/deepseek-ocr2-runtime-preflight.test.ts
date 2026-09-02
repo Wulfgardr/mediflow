@@ -56,7 +56,7 @@ test('pins the official artifact and keeps the current M4 on the upstream hardwa
     assert.equal(DEEPSEEK_OCR2_ARTIFACT_MANIFEST.model.digestSha256, 'd8ff67a424ba6f4dd077885eb9d6a05d2537e76fe5491f0e2a9b712f8c8870fa');
     assert.equal(DEEPSEEK_OCR2_ARTIFACT_MANIFEST.license, 'Apache-2.0');
     assert.equal(DEEPSEEK_OCR2_ARTIFACT_MANIFEST.backendProfile.policyOrigin, 'mediflow_unbenchmarked_v1');
-    assert.equal(DEEPSEEK_OCR2_ARTIFACT_MANIFEST_SHA256, '6e9cb4e2e627440cefa50e0b70050872368a93e6256e3cd62f65ecdaa3113e80');
+    assert.equal(DEEPSEEK_OCR2_ARTIFACT_MANIFEST_SHA256, '6af7ca3acfb43c11770e564ec8f9b59973fac172bd1ecb6999be0659f7b286ee');
     const m4 = { ...compatibleEvidence('local_probe'), operatingSystem: 'darwin', architecture: 'arm64',
         acceleratorVendor: 'apple', computeBackend: 'metal', acceleratorMemoryBytes: null,
         pythonVersion: null, cudaVersion: null, pytorchVersion: null, transformersVersion: null,
