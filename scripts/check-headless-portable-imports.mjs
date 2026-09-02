@@ -15,7 +15,8 @@ const FILE_SURFACES = [{ relative: 'scripts/intelligent-host-mcp-stdio.mjs', req
 const FORBIDDEN_EXTERNAL = new Set([
     'better-sqlite3', 'drizzle-orm', 'server-only', 'next/headers', 'next/server',
     'node:http', 'node:https', 'node:http2', 'node:net', 'node:tls', 'node:dgram',
-    'http', 'https', 'net', 'tls', 'dgram', 'ffi-napi', 'onnxruntime-node', 'node-gyp-build',
+    'http', 'https', 'net', 'tls', 'dgram', 'node:module', 'module',
+    'ffi-napi', 'onnxruntime-node', 'node-gyp-build',
 ]);
 const NATIVE_SEGMENT = /(?:^|[-_/@.])(xpc|swift|vision|metal|mlx|cuda|cudnn)(?:$|[-_/@.])/iu;
 const ALLOWED_PURE_LIB_MODULES = new Set([
@@ -61,6 +62,14 @@ function forbiddenSpecifier(specifier, file) {
     return null;
 }
 
+function calledName(node) {
+    if (ts.isIdentifier(node)) return node.text;
+    if (ts.isPropertyAccessExpression(node)) return node.name.text;
+    if (ts.isElementAccessExpression(node) && node.argumentExpression
+        && ts.isStringLiteralLike(node.argumentExpression)) return node.argumentExpression.text;
+    return null;
+}
+
 export function validateHeadlessPortableSource(sourceText, file = 'packages/aip/src/input.ts') {
     const parsed = sourceFile(sourceText, file);
     const issues = parsed.parseDiagnostics.map((diagnostic) => `${file}:${line(parsed, diagnostic.start ?? 0)}: syntax error`);
@@ -85,6 +94,19 @@ export function validateHeadlessPortableSource(sourceText, file = 'packages/aip/
                 const argument = node.arguments[0];
                 if (argument && ts.isStringLiteralLike(argument)) inspectSpecifier(node, argument.text);
                 else issues.push(`${file}:${line(parsed, node.getStart(parsed))}: computed module loading is forbidden`);
+            }
+            const name = calledName(node.expression);
+            if (name && ['eval', 'Function', 'createRequire', 'getBuiltinModule'].includes(name)) {
+                issues.push(`${file}:${line(parsed, node.getStart(parsed))}: executable module indirection is forbidden: ${name}`);
+            }
+            if (name && ['fetch', 'sendBeacon'].includes(name)) {
+                issues.push(`${file}:${line(parsed, node.getStart(parsed))}: network runtime call is forbidden: ${name}`);
+            }
+        }
+        if (ts.isNewExpression(node)) {
+            const name = calledName(node.expression);
+            if (name && ['Function', 'WebSocket', 'EventSource', 'XMLHttpRequest'].includes(name)) {
+                issues.push(`${file}:${line(parsed, node.getStart(parsed))}: network or executable runtime constructor is forbidden: ${name}`);
             }
         }
         ts.forEachChild(node, visit);
