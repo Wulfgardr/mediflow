@@ -4,7 +4,10 @@ import 'server-only';
 import { createHash } from 'node:crypto';
 import { types } from 'node:util';
 
-import type { Context } from '../headless/authenticated-agent-launcher-contract.ts';
+import {
+    PORTABLE_SUPERVISOR_WEB_CAPTURE_SCHEMA_V1,
+    type PortableSupervisorWebCaptureV1,
+} from '../../packages/aip/src/portable-supervisor-web-ipc-contract.ts';
 import {
     acquireAuthenticatedWebSessionProjectionOwnerContext,
     type AuthenticatedWebSessionProjectionOwnerContext,
@@ -20,56 +23,57 @@ import type {
 } from './server-session-projection-owner.ts';
 import { serverSessionProjectionOwnerProductionOwner } from './server-session-projection-owner-production-internal';
 
-export const PORTABLE_SUPERVISOR_CONTEXT_TTL_MS = 15 * 60_000;
-export const PORTABLE_SUPERVISOR_BOOTSTRAP_TTL_MS = 5_000;
+export const PORTABLE_SUPERVISOR_WEB_CAPTURE_TTL_MS = 15 * 60_000;
 const DIGEST = /^sha256:[0-9a-f]{64}$/u;
 const REF = /^[a-z][a-z0-9._-]{15,127}$/u;
+const HOST_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
+const REVOKE_REASONS = new Set(['logout', 'application_lock', 'reselection', 'explicit']);
 
-type Scheduler = (delayMs: number, operation: () => void) => () => void;
+export type PortableSupervisorWebCaptureTerminalReasonV1 =
+    'logout' | 'application_lock' | 'reselection' | 'expiry' | 'web_disconnect' | 'explicit';
+export type PortableSupervisorWebCaptureRevokeReasonV1 =
+    'logout' | 'application_lock' | 'reselection' | 'explicit';
+type Scheduler = (delayMs: number, operation: () => void) => unknown;
+type TerminalObserver = (reason: PortableSupervisorWebCaptureTerminalReasonV1) => unknown;
 type Sources = Readonly<{
     acquireAuthenticatedContext(): Promise<AuthenticatedWebSessionProjectionOwnerContext | null>;
     selectionLifecycle: ServerSessionSelectionLifecycleControllerV1;
     selectionBinding: ServerSessionSelectionBindingControllerV1;
     selectionCommitBinding: ServerSessionSelectionCommitBindingControllerV1;
-    clock(): number;
-    hashRef(value: string): string;
+    clock(): unknown;
+    hashRef(value: string): unknown;
     scheduler: Scheduler;
 }>;
 type RecordState = {
-    active: boolean; scope: ServerSessionSelectionScopeV1;
+    active: boolean; published: boolean; scope: ServerSessionSelectionScopeV1;
     registration: ServerSessionSelectionDependentRegistrationV1;
     binding: ServerSessionSelectionBindingSnapshotV1;
-    expected: Readonly<Record<string, unknown>>; userRef: string; parentRef: string;
-    generation: number; revocationGeneration: number; restartGeneration: number;
-    parentGeneration: number; policyGeneration: number; expiresAt: number;
+    expected: Readonly<Record<string, unknown>>;
+    capture: PortableSupervisorWebCaptureV1;
+    observeTerminal: TerminalObserver;
     cancel: (() => void) | null;
 };
 
-export type PortableSupervisorContextOwnerV1 = Readonly<{
-    readHostContext(): Context;
-    stop(): boolean;
-    restart(): boolean;
+export type PortableSupervisorWebCaptureOwnerV1 = Readonly<{
+    readCapture(): PortableSupervisorWebCaptureV1;
+    revoke(reason: PortableSupervisorWebCaptureRevokeReasonV1): boolean;
     dispose(): boolean;
 }>;
 
-export class PortableSupervisorContextOwnerError extends Error {
-    readonly code = 'context_unavailable' as const;
+export class PortableSupervisorWebCaptureOwnerError extends Error {
+    readonly code = 'capture_unavailable' as const;
     constructor() {
-        super('Portable supervisor context unavailable');
-        this.name = 'PortableSupervisorContextOwnerError';
+        super('Portable supervisor Web capture unavailable');
+        this.name = 'PortableSupervisorWebCaptureOwnerError';
     }
 }
 
-function unavailable(): never { throw new PortableSupervisorContextOwnerError(); }
+function unavailable(): never { throw new PortableSupervisorWebCaptureOwnerError(); }
 function record<T extends object>(value: T): Readonly<T> {
     return Object.freeze(Object.assign(Object.create(null) as T, value));
 }
 function safeInteger(value: unknown, minimum = 0): value is number {
     return Number.isSafeInteger(value) && (value as number) >= minimum;
-}
-function hostId(value: unknown): value is string {
-    return typeof value === 'string' && value.length > 0 && value.trim() === value
-        && Buffer.byteLength(value, 'utf8') <= 256;
 }
 function currentBinding(value: unknown, scope: unknown): value is ServerSessionSelectionBindingSnapshotV1 {
     if (!value || typeof value !== 'object' || types.isProxy(value)) return false;
@@ -78,7 +82,7 @@ function currentBinding(value: unknown, scope: unknown): value is ServerSessionS
         const selection = candidate.selection;
         return !!selection && selection.scopeIdentity === scope && REF.test(selection.sessionRef)
             && REF.test(selection.patientRef) && REF.test(selection.ambulatoryRef) && REF.test(selection.leaseRef)
-            && safeInteger(selection.selectionEpoch) && safeInteger(selection.expiresAt, 1)
+            && safeInteger(selection.selectionEpoch, 1) && safeInteger(selection.expiresAt, 1)
             && safeInteger(candidate.patientVersion, 1);
     } catch { return false; }
 }
@@ -96,91 +100,93 @@ function clinicalBinding(value: unknown, version: number): value is ServerSessio
     if (!value || typeof value !== 'object' || types.isProxy(value)) return false;
     try {
         const candidate = value as ServerSessionSelectionCommitBindingV1;
-        return hostId(candidate.patientId) && hostId(candidate.ambulatoryId) && candidate.patientVersion === version;
+        return typeof candidate.patientId === 'string' && HOST_ID.test(candidate.patientId)
+            && typeof candidate.ambulatoryId === 'string' && HOST_ID.test(candidate.ambulatoryId)
+            && candidate.patientVersion === version;
     } catch { return false; }
 }
+function discardPromise(value: unknown): boolean {
+    if (!types.isPromise(value)) return false;
+    try { void Promise.prototype.then.call(value, undefined, () => undefined); } catch { /* terminal observer */ }
+    return true;
+}
 
-/** Process owner composed below with authenticated Web and production selection lifecycle only. */
-export function createPortableSupervisorContextOwnerProcessV1(sources: Sources): Readonly<{
-    acquire(): Promise<PortableSupervisorContextOwnerV1 | null>;
+/** Web-only capture owner; the trusted Supervisor mints all downstream authority. */
+export function createPortableSupervisorWebCaptureOwnerProcessV1(sources: Sources): Readonly<{
+    acquire(observeTerminal: TerminalObserver): Promise<PortableSupervisorWebCaptureOwnerV1 | null>;
 }> {
-    let generation = 0, revocationGeneration = 0, restartGeneration = 1;
-    let parentGeneration = 0, lastProcessNow = -1;
+    let lastProcessNow = -1, spent = false;
     let ownerSlot: symbol | RecordState | null = null;
-    const policyGeneration = 1;
-    const increment = (value: number): number => value < Number.MAX_SAFE_INTEGER ? value + 1 : unavailable();
     const clock = (): number => {
         let value: unknown;
         try { value = sources.clock(); } catch { return unavailable(); }
-        if (!safeInteger(value) || value < lastProcessNow) return unavailable();
+        if (discardPromise(value) || !safeInteger(value) || value < lastProcessNow) return unavailable();
         lastProcessNow = value; return value;
     };
     const hash = (domain: 'user' | 'parent', value: string): string => {
         let digest: unknown;
-        try { digest = sources.hashRef(`mediflow.portable-supervisor.${domain}.v1\0${value}`); }
+        try { digest = sources.hashRef(`mediflow.portable-supervisor.web-capture.${domain}.v1\0${value}`); }
         catch { return unavailable(); }
-        if (typeof digest !== 'string' || !DIGEST.test(digest)) return unavailable();
+        if (discardPromise(digest) || typeof digest !== 'string' || !DIGEST.test(digest)) return unavailable();
         return `${domain}.${digest.slice(7)}`;
     };
-    const terminal = (state: RecordState, detached: boolean, restart: boolean): boolean => {
+    const notify = (state: RecordState, reason: PortableSupervisorWebCaptureTerminalReasonV1): void => {
+        if (!state.published) return;
+        let result: unknown;
+        try { result = state.observeTerminal(reason); } catch { return; }
+        discardPromise(result);
+    };
+    const terminal = (state: RecordState, detached: boolean,
+        reason: PortableSupervisorWebCaptureTerminalReasonV1): boolean => {
         if (!state.active) return false;
         state.active = false;
         if (ownerSlot === state) ownerSlot = null;
         const cancel = state.cancel; state.cancel = null;
-        try { cancel?.(); } catch { /* Logical authority is already terminal. */ }
+        try { cancel?.(); } catch { /* logical authority is already terminal */ }
         if (!detached) {
             try { sources.selectionLifecycle.unregisterDependent(state.scope, state.registration); }
-            catch { /* Logical authority remains terminal. */ }
+            catch { /* logical authority remains terminal */ }
         }
-        revocationGeneration = increment(revocationGeneration);
-        if (restart) restartGeneration = increment(restartGeneration);
+        notify(state, reason);
         return true;
     };
-    const read = (state: RecordState): Context => {
+    const invalidate = (state: RecordState, reason: PortableSupervisorWebCaptureTerminalReasonV1): never => {
+        terminal(state, false, reason); return unavailable();
+    };
+    const read = (state: RecordState): PortableSupervisorWebCaptureV1 => {
         if (!state.active) return unavailable();
-        let now: number;
-        try { now = clock(); } catch { terminal(state, false, false); return unavailable(); }
-        if (now > state.expiresAt - 2) { terminal(state, false, false); return unavailable(); }
+        let before: number;
+        try { before = clock(); } catch { return invalidate(state, 'reselection'); }
+        if (before > state.capture.expiresAt - 2) return invalidate(state, 'expiry');
         let observed: unknown = null;
-        let selectionCurrent = false;
         try {
-            selectionCurrent = sources.selectionBinding.withCurrentDependentBinding(
+            if (!sources.selectionBinding.withCurrentDependentBinding(
                 state.scope, state.registration, (candidate) => { observed = candidate; },
-            );
-        } catch { terminal(state, false, false); return unavailable(); }
-        if (!selectionCurrent || !sameBinding(state.binding, observed)) {
-            terminal(state, false, false); return unavailable();
-        }
+            ) || !sameBinding(state.binding, observed)) return invalidate(state, 'reselection');
+        } catch { return invalidate(state, 'reselection'); }
         let clinical: unknown = null;
-        let clinicalCurrent = false;
         try {
-            clinicalCurrent = sources.selectionCommitBinding.withCurrentCommitBinding(
+            if (!sources.selectionCommitBinding.withCurrentCommitBinding(
                 state.scope, state.expected as never, (candidate) => { clinical = candidate; },
-            );
-        } catch { terminal(state, false, false); return unavailable(); }
-        if (!clinicalCurrent || !clinicalBinding(clinical, state.binding.patientVersion)) {
-            terminal(state, false, false); return unavailable();
-        }
+            ) || !clinicalBinding(clinical, state.binding.patientVersion)
+                || clinical.patientId !== state.capture.patientId
+                || clinical.ambulatoryId !== state.capture.ambulatoryId) return invalidate(state, 'reselection');
+        } catch { return invalidate(state, 'reselection'); }
         observed = null;
         try {
-            selectionCurrent = sources.selectionBinding.withCurrentDependentBinding(
+            if (!sources.selectionBinding.withCurrentDependentBinding(
                 state.scope, state.registration, (candidate) => { observed = candidate; },
-            );
-        } catch { terminal(state, false, false); return unavailable(); }
-        if (!selectionCurrent || !sameBinding(state.binding, observed)) {
-            terminal(state, false, false); return unavailable();
-        }
-        const bootstrapExpiresAt = Math.min(now + PORTABLE_SUPERVISOR_BOOTSTRAP_TTL_MS, state.expiresAt - 1);
-        return record({ status: 'available' as const, userRef: state.userRef, parentRef: state.parentRef,
-            purposeCode: 'care_coordination', patientId: clinical.patientId, ambulatoryId: clinical.ambulatoryId,
-            generation: state.generation, revocationGeneration: state.revocationGeneration,
-            selectionEpoch: state.binding.selection.selectionEpoch, restartGeneration: state.restartGeneration,
-            parentGeneration: state.parentGeneration, policyGeneration: state.policyGeneration,
-            expiresAt: state.expiresAt, bootstrapExpiresAt });
+            ) || !sameBinding(state.binding, observed)) return invalidate(state, 'reselection');
+        } catch { return invalidate(state, 'reselection'); }
+        let after: number;
+        try { after = clock(); } catch { return invalidate(state, 'reselection'); }
+        if (after > state.capture.expiresAt - 2) return invalidate(state, 'expiry');
+        return state.capture;
     };
-    const acquire = async (): Promise<PortableSupervisorContextOwnerV1 | null> => {
-        if (ownerSlot !== null) return null;
-        const acquisition = Symbol('portable-supervisor-acquisition');
+    const acquire = async (observeTerminal: TerminalObserver): Promise<PortableSupervisorWebCaptureOwnerV1 | null> => {
+        if (spent || ownerSlot !== null || typeof observeTerminal !== 'function'
+            || types.isProxy(observeTerminal) || types.isAsyncFunction(observeTerminal)) return null;
+        const acquisition = Symbol('portable-supervisor-web-capture-acquisition');
         ownerSlot = acquisition;
         let authenticatedContext: AuthenticatedWebSessionProjectionOwnerContext | null;
         try { authenticatedContext = await sources.acquireAuthenticatedContext(); }
@@ -194,7 +200,7 @@ export function createPortableSupervisorContextOwnerProcessV1(sources: Sources):
             const attached = sources.selectionLifecycle.withCurrentSelection(authenticated, (candidate) => {
                 scope = candidate;
                 registration = sources.selectionLifecycle.registerDependent(candidate, () => {
-                    if (state) terminal(state, true, false); else drained = true;
+                    if (state) terminal(state, true, 'reselection'); else drained = true;
                 });
             });
             if (!attached || !scope || !registration || drained) return null;
@@ -213,40 +219,46 @@ export function createPortableSupervisorContextOwnerProcessV1(sources: Sources):
             ) || !clinicalBinding(clinical, selected.patientVersion)) return null;
             const now = clock();
             const expiresAt = Math.min(authenticated.expiresAt, selected.selection.expiresAt,
-                now + PORTABLE_SUPERVISOR_CONTEXT_TTL_MS);
-            if (!safeInteger(expiresAt) || now > expiresAt - 2) return null;
-            generation = increment(generation); parentGeneration = increment(parentGeneration);
-            state = { active: true, scope, registration, binding: selected, expected,
+                now + PORTABLE_SUPERVISOR_WEB_CAPTURE_TTL_MS);
+            if (!safeInteger(expiresAt, 1) || now > expiresAt - 2) return null;
+            const capture = record({ schemaVersion: PORTABLE_SUPERVISOR_WEB_CAPTURE_SCHEMA_V1,
                 userRef: hash('user', authenticated.userId),
                 parentRef: hash('parent', `${selected.selection.sessionRef}\0${selected.selection.leaseRef}`),
-                generation, revocationGeneration, restartGeneration, parentGeneration, policyGeneration,
-                expiresAt, cancel: null };
+                patientId: clinical.patientId, ambulatoryId: clinical.ambulatoryId,
+                selectionEpoch: selected.selection.selectionEpoch,
+                expectedPatientVersion: selected.patientVersion, expiresAt });
+            state = { active: true, published: false, scope, registration, binding: selected,
+                expected, capture, observeTerminal, cancel: null };
             let scheduling = true, firedSynchronously = false, cancel: unknown;
             try {
                 cancel = sources.scheduler(expiresAt - now, () => {
                     if (scheduling) { firedSynchronously = true; return; }
-                    if (state) terminal(state, false, false);
+                    if (state) terminal(state, false, 'expiry');
                 });
-            } catch { terminal(state, false, false); return null; }
+            } catch { terminal(state, false, 'expiry'); return null; }
             scheduling = false;
-            if (firedSynchronously || typeof cancel !== 'function') {
+            const cancelIsPromise = discardPromise(cancel);
+            if (firedSynchronously || cancelIsPromise || typeof cancel !== 'function'
+                || types.isProxy(cancel) || types.isAsyncFunction(cancel)) {
                 try { if (typeof cancel === 'function') cancel(); } catch { /* unpublished timer denied */ }
-                terminal(state, false, false); return null;
+                terminal(state, false, 'expiry'); return null;
             }
             state.cancel = cancel as () => void;
             if (!sources.selectionLifecycle.confirmDependent(scope, registration)) {
-                terminal(state, false, false); return null;
+                terminal(state, false, 'reselection'); return null;
             }
-            ownerSlot = state;
             read(state);
+            ownerSlot = state; spent = true; state.published = true;
             const published = state;
-            return record({ readHostContext: () => read(published), stop: () => terminal(published, false, false),
-                restart: () => terminal(published, false, true), dispose: () => terminal(published, false, false) });
-        } catch { if (state) terminal(state, false, false); return null; }
+            return record({ readCapture: () => read(published),
+                revoke: (reason: PortableSupervisorWebCaptureRevokeReasonV1) =>
+                    REVOKE_REASONS.has(reason) && terminal(published, false, reason),
+                dispose: () => terminal(published, false, 'web_disconnect') });
+        } catch { if (state) terminal(state, false, 'reselection'); return null; }
         finally {
             if (ownerSlot === acquisition) ownerSlot = null;
             if (!state?.active && scope && registration) {
-                try { sources.selectionLifecycle.unregisterDependent(scope, registration); } catch { /* partial attach denied */ }
+                try { sources.selectionLifecycle.unregisterDependent(scope, registration); } catch { /* partial attach */ }
             }
         }
     };
@@ -267,7 +279,7 @@ function hashRef(value: string): string {
 }
 
 const productionSelectionOwner = serverSessionProjectionOwnerProductionOwner;
-const productionProcessOwner = createPortableSupervisorContextOwnerProcessV1({
+const productionProcessOwner = createPortableSupervisorWebCaptureOwnerProcessV1({
     acquireAuthenticatedContext: acquireAuthenticatedWebSessionProjectionOwnerContext,
     selectionLifecycle: productionSelectionOwner.selectionLifecycleController,
     selectionBinding: productionSelectionOwner.selectionBindingController,
@@ -275,4 +287,4 @@ const productionProcessOwner = createPortableSupervisorContextOwnerProcessV1({
     clock: hostDateNow, hashRef, scheduler: schedule,
 });
 
-export const acquirePortableSupervisorContextOwnerV1 = productionProcessOwner.acquire;
+export const acquirePortableSupervisorWebCaptureOwnerV1 = productionProcessOwner.acquire;
