@@ -31,7 +31,7 @@ function inventory(candidates: readonly unknown[]) {
         candidates: Object.freeze([...candidates]) });
 }
 function fixture(options: { candidates?: readonly unknown[]; smokeOutcome?: string;
-    installOverrides?: Readonly<Record<string, unknown>> } = {}) {
+    installOverrides?: Readonly<Record<string, unknown>>; detectHostCandidates?: () => unknown } = {}) {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-guided-setup-'));
     const entropies = ['a'.repeat(32), 'b'.repeat(32), 'c'.repeat(32)];
     const timestamps = ['2026-09-02T11:00:00.000Z', '2026-09-02T11:01:00.000Z', '2026-09-02T11:02:00.000Z'];
@@ -48,7 +48,7 @@ function fixture(options: { candidates?: readonly unknown[]; smokeOutcome?: stri
     }), option({ candidateRef: `candidate.hidden.${SUFFIX}`, capability: 'treatment_reasoning',
         profileId: 'profile.hidden.v1', compatibility: 'incompatible', recipeId: 'recipe.treatment.v1' })];
     const service = createFabricGuidedSetupService({
-        detectHostCandidates: () => inventory(candidates),
+        detectHostCandidates: options.detectHostCandidates ?? (() => inventory(candidates)),
         installProfile: async (candidate: Record<string, unknown>) => {
             installs.push(candidate);
             return Object.freeze({ ...candidate, installation: 'ready', downloadBytes: 0,
@@ -92,6 +92,28 @@ test('scopre solo profili compatibili per cinque capability senza dedurre dal no
     } finally { fixtureValue.cleanup(); }
 });
 
+test('nega credentialRef non nulli nell inventario locale', (t) => {
+    const value = fixture({ candidates: [option({ credentialRef: `credential_ref_${SUFFIX}` })] });
+    t.after(value.cleanup);
+    expectCode('inventory_unavailable', () => value.service.discover());
+});
+
+test('mantiene transazionale la discovery se il nuovo inventario e invalido', async (t) => {
+    let detected: readonly unknown[] = [option()];
+    const value = fixture({ detectHostCandidates: () => inventory(detected) });
+    t.after(value.cleanup);
+    const first = value.service.discover();
+    detected = [option(), option({ candidateRef: `candidate.duplicate.${SUFFIX}` })];
+    expectCode('inventory_unavailable', () => value.service.discover());
+    await expectReject('selection_unavailable', () => value.service.prepare({ generation: first.generation + 1,
+        capability: 'patient_insight', profileId: 'profile.synthetic.balanced.v1', mode: 'advanced',
+        download: 'not_required' }));
+    assert.equal(value.smokes.length, 0);
+    const retained = await value.service.prepare({ generation: first.generation, capability: 'patient_insight',
+        profileId: 'profile.synthetic.balanced.v1', mode: 'recommended', download: 'not_required' });
+    assert.equal(retained.receipt.profileId, 'profile.synthetic.balanced.v1');
+});
+
 test('esegue smoke sintetico e attiva il profilo raccomandato senza download o fallback', async (t) => {
     const value = fixture(); t.after(value.cleanup);
     const discovery = value.service.discover();
@@ -107,6 +129,17 @@ test('esegue smoke sintetico e attiva il profilo raccomandato senza download o f
     assert.equal(activation.outcome, 'activated');
     assert.equal(value.store.read().bindings.patient_insight?.profileId, 'profile.synthetic.balanced.v1');
     expectCode('replay', () => value.service.activate({ candidate: prepared.candidate, expectedVersion: 1 }));
+});
+
+test('nega in activate un handle preparato su una generation ormai stale', async (t) => {
+    const value = fixture(); t.after(value.cleanup);
+    const discovery = value.service.discover();
+    const prepared = await value.service.prepare({ generation: discovery.generation, capability: 'patient_insight',
+        profileId: 'profile.synthetic.balanced.v1', mode: 'recommended', download: 'not_required' });
+    value.service.discover();
+    expectCode('selection_unavailable', () => value.service.activate({ candidate: prepared.candidate,
+        expectedVersion: 0 }));
+    assert.equal(value.store.read().version, 0);
 });
 
 test('non scarica OCR senza conferma e mantiene il binding precedente se lo smoke fallisce', async (t) => {

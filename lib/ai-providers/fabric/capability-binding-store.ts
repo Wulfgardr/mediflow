@@ -1,4 +1,5 @@
 /* @Codex */
+import { Buffer } from 'node:buffer';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -17,7 +18,7 @@ export type FabricBindingCandidateV1 = Readonly<{
     schemaVersion: typeof FABRIC_BINDING_CANDIDATE_SCHEMA_V1;
     capability: GuidedFabricCapability; profileId: string; provider: string; engine: string; runtimeRef: string;
     model: string; modelVersion: string; modelDigest: string; venue: 'local_process';
-    credentialRef: string | null; egressProfileId: 'local_only'; dataPolicy: 'clinical_local_only';
+    credentialRef: null; egressProfileId: 'local_only'; dataPolicy: 'clinical_local_only';
     recipeId: string; readiness: 'synthetic_smoke_passed'; smokeReceiptRef: string;
     provenanceRef: string; fallback: 'none';
 }>;
@@ -39,7 +40,7 @@ export type FabricBindingTransitionReceiptV1 = Readonly<{
     previousBindingDigest: string | null; currentBindingDigest: string | null; timestamp: string;
 }>;
 export type FabricBindingStoreErrorCode = 'input_invalid' | 'corrupt' | 'unavailable' | 'busy'
-    | 'version_conflict' | 'transition_conflict' | 'clock_invalid' | 'source_invalid';
+    | 'version_conflict' | 'transition_conflict' | 'clock_invalid' | 'source_invalid' | 'commit_unknown';
 export class FabricBindingStoreError extends Error {
     constructor(public readonly code: FabricBindingStoreErrorCode) {
         super(`Fabric binding store rejected: ${code}`); this.name = 'FabricBindingStoreError';
@@ -53,10 +54,13 @@ const BINDING_KEYS = [...CANDIDATE_KEYS, 'activatedAt'] as const;
 const STATE_KEYS = ['schemaVersion', 'version', 'bindings', 'lastTransition'] as const;
 const TRANSITION_KEYS = ['schemaVersion', 'kind', 'transitionRef', 'sourceTransitionRef', 'capability',
     'previousBinding', 'currentBinding', 'timestamp'] as const;
+const LOCK_KEYS = ['schemaVersion', 'ownerPid', 'ownerRef'] as const;
 const TOKEN = /^[a-zA-Z0-9][a-zA-Z0-9._:/+-]{0,127}$/u;
 const REF = /^[a-z][a-z0-9._-]{15,127}$/u;
 const TRANSITION_REF = /^fabric_transition_[0-9a-f]{32}$/u;
+const LOCK_REF = /^fabric_lock_[0-9a-f]{32}$/u;
 const DIGEST = /^sha256:[0-9a-f]{64}$/u;
+const MAX_STORE_BYTES = 64 * 1024, MAX_LOCK_BYTES = 512;
 type Sources = Readonly<{ now: () => unknown; entropy: () => unknown }>;
 
 function exact(value: unknown, keys: readonly string[]): Record<string, unknown> {
@@ -91,8 +95,7 @@ function snapshotCandidate(value: unknown): FabricBindingCandidateV1 {
         || ![input.profileId, input.provider, input.engine, input.runtimeRef, input.model, input.modelVersion, input.recipeId]
             .every((item) => typeof item === 'string' && TOKEN.test(item))
         || typeof input.modelDigest !== 'string' || !DIGEST.test(input.modelDigest)
-        || input.venue !== 'local_process' || (input.credentialRef !== null
-            && (typeof input.credentialRef !== 'string' || !REF.test(input.credentialRef)))
+        || input.venue !== 'local_process' || input.credentialRef !== null
         || input.egressProfileId !== 'local_only' || input.dataPolicy !== 'clinical_local_only'
         || input.readiness !== 'synthetic_smoke_passed'
         || typeof input.smokeReceiptRef !== 'string' || !REF.test(input.smokeReceiptRef)
@@ -159,6 +162,20 @@ function sources(value: unknown): Sources {
         || types.isProxy(input.now) || types.isProxy(input.entropy)) throw new FabricBindingStoreError('source_invalid');
     return Object.freeze({ now: input.now as () => unknown, entropy: input.entropy as () => unknown });
 }
+function readBoundedRegular(filePath: string, maximum: number): string {
+    let file: number | null = null;
+    try {
+        const pathStatus = fs.lstatSync(filePath);
+        if (!pathStatus.isFile()) throw new FabricBindingStoreError('corrupt');
+        file = fs.openSync(filePath, 'r'); const status = fs.fstatSync(file);
+        if (!status.isFile() || status.dev !== pathStatus.dev || status.ino !== pathStatus.ino || status.size > maximum) {
+            throw new FabricBindingStoreError('corrupt');
+        }
+        const bytes = Buffer.alloc(status.size + 1); const length = fs.readSync(file, bytes, 0, bytes.length, 0);
+        if (length !== status.size) throw new FabricBindingStoreError('corrupt');
+        return bytes.subarray(0, length).toString('utf8');
+    } finally { if (file !== null) fs.closeSync(file); }
+}
 
 export function getFabricBindingStorePaths(appDataDir = getDataDir()) {
     const directory = path.join(appDataDir, 'ai', 'fabric');
@@ -170,13 +187,60 @@ export function createFabricCapabilityBindingStore(appDataDir = getDataDir(), so
     const host = sources(sourceValue); const paths = getFabricBindingStorePaths(appDataDir);
     const read = (): FabricBindingStoreStateV1 => {
         let raw: string;
-        try { raw = fs.readFileSync(paths.recordPath, 'utf8'); }
+        try { raw = readBoundedRegular(paths.recordPath, MAX_STORE_BYTES); }
         catch (error) {
             if ((error as NodeJS.ErrnoException).code === 'ENOENT') return snapshotState({
                 schemaVersion: FABRIC_BINDING_STORE_SCHEMA_V1, version: 0, bindings: emptyBindings(), lastTransition: null });
+            if (error instanceof FabricBindingStoreError) throw error;
             throw new FabricBindingStoreError('unavailable');
         }
         try { return snapshotState(JSON.parse(raw)); } catch { throw new FabricBindingStoreError('corrupt'); }
+    };
+    const readLock = (): { ownerPid: number; ownerRef: string } | null => {
+        try {
+            const input = exact(JSON.parse(readBoundedRegular(paths.lockPath, MAX_LOCK_BYTES)), LOCK_KEYS);
+            if (input.schemaVersion !== 'mediflow.ai.fabric-binding-lock.v1' || !Number.isSafeInteger(input.ownerPid)
+                || (input.ownerPid as number) < 1 || typeof input.ownerRef !== 'string' || !LOCK_REF.test(input.ownerRef)) return null;
+            return { ownerPid: input.ownerPid as number, ownerRef: input.ownerRef };
+        } catch { return null; }
+    };
+    const ownerAlive = (ownerPid: number): boolean => {
+        if (ownerPid === process.pid) return true;
+        try { process.kill(ownerPid, 0); return true; }
+        catch (error) { return (error as NodeJS.ErrnoException).code !== 'ESRCH'; }
+    };
+    const recoverLock = (): boolean => {
+        const observed = readLock(); if (!observed || ownerAlive(observed.ownerPid)) return false;
+        const current = readLock();
+        if (!current || current.ownerPid !== observed.ownerPid || current.ownerRef !== observed.ownerRef) return false;
+        try { fs.rmSync(paths.lockPath); return true; } catch { return false; }
+    };
+    const acquireLock = (): string => {
+        const ownerRef = `fabric_lock_${randomBytes(16).toString('hex')}`;
+        const candidatePath = `${paths.lockPath}.${process.pid}.${randomUUID()}.owner`;
+        let file: number | null = null;
+        try {
+            file = fs.openSync(candidatePath, 'wx', 0o600);
+            fs.writeFileSync(file, `${JSON.stringify({ schemaVersion: 'mediflow.ai.fabric-binding-lock.v1',
+                ownerPid: process.pid, ownerRef })}\n`, 'utf8'); fs.fsyncSync(file); fs.closeSync(file); file = null;
+            for (let attempt = 0; attempt < 2; attempt += 1) {
+                try { fs.linkSync(candidatePath, paths.lockPath); return ownerRef; }
+                catch (error) {
+                    if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw new FabricBindingStoreError('unavailable');
+                    if (attempt === 0 && recoverLock()) continue;
+                    throw new FabricBindingStoreError('busy');
+                }
+            }
+            throw new FabricBindingStoreError('busy');
+        } finally {
+            if (file !== null) fs.closeSync(file);
+            try { fs.rmSync(candidatePath, { force: true }); } catch { /* best-effort non-authoritative candidate cleanup */ }
+        }
+    };
+    const releaseLock = (ownerRef: string): boolean => {
+        const current = readLock();
+        if (!current || current.ownerPid !== process.pid || current.ownerRef !== ownerRef) return false;
+        try { fs.rmSync(paths.lockPath); return true; } catch { return false; }
     };
     const metadata = (current: FabricBindingStoreStateV1): { transitionRef: string; timestamp: string } => {
         let entropy: unknown; let timestamp: unknown;
@@ -194,23 +258,31 @@ export function createFabricCapabilityBindingStore(appDataDir = getDataDir(), so
         meta: ReturnType<typeof metadata>) => FabricBindingStoreStateV1): FabricBindingStoreStateV1 => {
         fs.mkdirSync(paths.directory, { recursive: true, mode: 0o700 });
         if (process.platform !== 'win32') fs.chmodSync(paths.directory, 0o700);
-        let lock: number;
-        try { lock = fs.openSync(paths.lockPath, 'wx', 0o600); } catch { throw new FabricBindingStoreError('busy'); }
-        let temporaryPath: string | null = null;
+        const lockRef = acquireLock();
+        let temporaryPath: string | null = null; let committed = false;
         try {
             const current = read(); if (current.version !== expectedVersion) throw new FabricBindingStoreError('version_conflict');
             const next = build(current, metadata(current));
             temporaryPath = `${paths.recordPath}.${process.pid}.${randomUUID()}.tmp`;
             const file = fs.openSync(temporaryPath, 'wx', 0o600);
             try { fs.writeFileSync(file, `${JSON.stringify(next)}\n`, 'utf8'); fs.fsyncSync(file); } finally { fs.closeSync(file); }
-            fs.renameSync(temporaryPath, paths.recordPath); temporaryPath = null;
-            if (process.platform !== 'win32') {
-                fs.chmodSync(paths.recordPath, 0o600); const directory = fs.openSync(paths.directory, 'r');
-                try { fs.fsyncSync(directory); } finally { fs.closeSync(directory); }
+            fs.renameSync(temporaryPath, paths.recordPath); temporaryPath = null; committed = true;
+            try {
+                if (process.platform !== 'win32') {
+                    fs.chmodSync(paths.recordPath, 0o600); const directory = fs.openSync(paths.directory, 'r');
+                    try { fs.fsyncSync(directory); } finally { fs.closeSync(directory); }
+                }
+            } catch {
+                try { const observed = read();
+                    if (JSON.stringify(observed) === JSON.stringify(next)) return observed; } catch { /* reconcile below */ }
+                throw new FabricBindingStoreError('commit_unknown');
             }
             return snapshotState(next);
         } finally {
-            if (temporaryPath) fs.rmSync(temporaryPath, { force: true }); fs.closeSync(lock!); fs.rmSync(paths.lockPath, { force: true });
+            let cleanupFailed = false;
+            try { if (temporaryPath) fs.rmSync(temporaryPath, { force: true }); } catch { cleanupFailed = true; }
+            if (!releaseLock(lockRef)) cleanupFailed = true;
+            if (cleanupFailed) throw new FabricBindingStoreError(committed ? 'commit_unknown' : 'unavailable');
         }
     };
     const receipt = (state: FabricBindingStoreStateV1): FabricBindingTransitionReceiptV1 => {
