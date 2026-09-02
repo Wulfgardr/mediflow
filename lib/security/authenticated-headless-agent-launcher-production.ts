@@ -6,8 +6,13 @@ import { types } from 'node:util';
 
 import type { SemanticQueryOperationTerminalAuditCommitV1 } from
   '../../packages/aip/src/semantic-query-operation-contract.ts';
-import { createAuthenticatedAgentLauncherV1 } from '../headless/authenticated-agent-launcher.ts';
+import {
+  AuthenticatedAgentLauncherV1Error, createAuthenticatedAgentLauncherV1,
+} from '../headless/authenticated-agent-launcher.ts';
+import { createLateBoundMcpChildPortV1 } from './authenticated-headless-agent-pre-spawned-mcp-child.ts';
 import { createPatientOpenLoopsReadInternalCandidateV1 } from './patient-open-loops-read-production.ts';
+
+export { createLateBoundMcpChildPortV1 } from './authenticated-headless-agent-pre-spawned-mcp-child.ts';
 
 const SOURCE_KEYS = ['readHostContext', 'writeAudit', 'commitTerminalAudit'] as const;
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
@@ -19,6 +24,7 @@ const TARGETS = Object.freeze({
 
 type Sources = Readonly<{ readHostContext: () => unknown; writeAudit: (value: unknown) => unknown;
   commitTerminalAudit: SemanticQueryOperationTerminalAuditCommitV1 }>;
+type SpawnChild = (environment: Readonly<Record<string, string>>) => unknown;
 
 function sources(value: unknown): Sources {
   if (!value || typeof value !== 'object' || types.isProxy(value) || Array.isArray(value)) throw new Error('input_invalid');
@@ -56,7 +62,9 @@ function childPort(target: string, environment: Readonly<Record<string, string>>
   };
 }
 
-function createProductionLauncher(kind: keyof typeof TARGETS, sourcesValue: unknown) {
+function createProductionLauncher(
+  kind: keyof typeof TARGETS, sourcesValue: unknown, spawnChildOverride?: SpawnChild,
+) {
   const ports = sources(sourcesValue);
   return createAuthenticatedAgentLauncherV1({
     now: () => Date.now(),
@@ -72,7 +80,8 @@ function createProductionLauncher(kind: keyof typeof TARGETS, sourcesValue: unkn
     writeAudit: ports.writeAudit,
     commitTerminalAudit: ports.commitTerminalAudit,
     readHostContext: ports.readHostContext,
-    spawnChild: (environment: Readonly<Record<string, string>>) => childPort(TARGETS[kind], environment),
+    spawnChild: spawnChildOverride
+      ?? ((environment: Readonly<Record<string, string>>) => childPort(TARGETS[kind], environment)),
     createOpenLoopsRead: createPatientOpenLoopsReadInternalCandidateV1,
   });
 }
@@ -83,4 +92,15 @@ export function createProductionMcpAgentLauncherV1(sourcesValue: unknown) {
 
 export function createProductionMiniAgentLauncherV1(sourcesValue: unknown) {
   return createProductionLauncher('mini', sourcesValue);
+}
+
+export function createProductionMcpAgentLauncherWithPreSpawnedChildV1(
+  sourcesValue: unknown, childPortValue: unknown,
+) {
+  let claimed = false;
+  return createProductionLauncher('mcp', sourcesValue, (environment) => {
+    if (claimed) throw new AuthenticatedAgentLauncherV1Error('child_unavailable');
+    claimed = true;
+    return createLateBoundMcpChildPortV1(childPortValue, environment);
+  });
 }
