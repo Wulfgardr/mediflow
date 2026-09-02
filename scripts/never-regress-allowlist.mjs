@@ -177,6 +177,11 @@ export const NEVER_REGRESS_ALLOWLIST = {
             reason: 'PIN-change tests derive a unique synthetic username per isolated database fixture.',
         },
         {
+            path: 'lib/security/portable-supervisor-context-owner.test.ts',
+            pattern: "username:\\s*'synthetic-clinician'",
+            reason: 'Portable Supervisor owner tests use an explicit synthetic clinician session against an isolated database fixture.',
+        },
+        {
             path: 'lib/security/server-auth.test.ts',
             pattern: "username:\\s*'(?:synthetic-auth-operator|username|different-synthetic-user)'",
             reason: 'Server-auth tests use explicit synthetic identities to cover accepted and mismatched sessions.',
