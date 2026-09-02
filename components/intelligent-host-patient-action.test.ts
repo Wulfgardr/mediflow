@@ -74,8 +74,7 @@ test('requires an explicit resync after 409 and never retries activation automat
         fetch: async (url, init = {}) => {
             calls.push({ url: String(url), method: init.method });
             if (calls.length === 1) return response({ selectionEpoch: 0 });
-            if (calls.length === 2) return response({ selection: LEASE });
-            if (calls.length === 3) return response({}, 409);
+            if (calls.length === 2) return response({}, 409);
             return response({ selectionEpoch: 1 });
         },
     });
@@ -83,25 +82,29 @@ test('requires an explicit resync after 409 and never retries activation automat
     await client.initialize();
     await assert.rejects(() => client.activate(SCOPE, true), rejects('selection_resync_required'));
     assert.equal(calls.length, 3);
+    assert.deepEqual(calls[2], { url: '/api/ai/smart-import/selection', method: 'GET' });
     await client.resync();
     assert.deepEqual(calls[3], { url: '/api/ai/smart-import/selection', method: 'GET' });
 });
 
-test('maps a 503 without retry and fences a completion after reset', async () => {
+test('terminalizes host-side 409 and 503 without retry and fences a completion after reset', async () => {
     let calls = 0;
-    const unavailable = createIntelligentHostBrowserAdapter({
-        fetch: async (_url, init = {}) => {
-            calls += 1;
-            if (init.method === 'GET') return response({ selectionEpoch: 0 });
-            if (calls === 2) return response({ selection: LEASE });
-            return response({}, 503);
-        },
-    });
-    await unavailable.initialize();
-    await assert.rejects(() => unavailable.activate(SCOPE, true), rejects('host_unavailable'));
-    assert.equal(calls, 3);
-    await assert.rejects(() => unavailable.activate(SCOPE, true), rejects('operation_terminal'));
-    assert.equal(calls, 3);
+    for (const status of [409, 503]) {
+        calls = 0;
+        const unavailable = createIntelligentHostBrowserAdapter({
+            fetch: async (_url, init = {}) => {
+                calls += 1;
+                if (init.method === 'GET') return response({ selectionEpoch: 0 });
+                if (calls === 2) return response({ selection: LEASE });
+                return response({}, status);
+            },
+        });
+        await unavailable.initialize();
+        await assert.rejects(() => unavailable.activate(SCOPE, true), rejects('host_unavailable'));
+        assert.equal(calls, 3);
+        await assert.rejects(() => unavailable.activate(SCOPE, true), rejects('operation_terminal'));
+        assert.equal(calls, 3);
+    }
 
     const delayed = deferred<Response>();
     const activationStarted = deferred<void>();

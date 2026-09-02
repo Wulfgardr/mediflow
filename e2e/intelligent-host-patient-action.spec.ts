@@ -30,14 +30,15 @@ async function createFixture(page: Page, suffix: string): Promise<Fixture> {
     }, suffix);
 }
 
-test('patient header activates once, resyncs explicitly on 409, and terminalizes 503', async ({ page }) => {
+test('patient header resyncs a selection conflict and terminalizes an unavailable host', async ({ page }) => {
     await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
     const marker = `${Date.now()}`.slice(-7);
     const first = await createFixture(page, `${marker}A`);
     const second = await createFixture(page, `${marker}B`);
     await page.setViewportSize({ width: 390, height: 844 });
     let epoch = 0;
-    let activation: 'active' | 'conflict' | 'unavailable' = 'active';
+    let selectionConflict = false;
+    let activation: 'active' | 'unavailable' = 'active';
     const selectionBodies: unknown[] = [];
     const activationBodies: unknown[] = [];
 
@@ -48,6 +49,11 @@ test('patient header activates once, resyncs explicitly on 409, and terminalizes
         }
         const body = route.request().postDataJSON() as { expectedEpoch: number };
         selectionBodies.push(body);
+        if (selectionConflict) {
+            selectionConflict = false;
+            await route.fulfill({ status: 409, contentType: 'application/json', body: '{}' });
+            return;
+        }
         epoch = body.expectedEpoch + 1;
         await route.fulfill({
             status: 200,
@@ -66,9 +72,7 @@ test('patient header activates once, resyncs explicitly on 409, and terminalizes
     });
     await page.route('**/api/patients/*/intelligent-host/activate', async (route) => {
         activationBodies.push(route.request().postDataJSON());
-        if (activation === 'conflict') {
-            await route.fulfill({ status: 409, contentType: 'application/json', body: '{}' });
-        } else if (activation === 'unavailable') {
+        if (activation === 'unavailable') {
             await route.fulfill({ status: 503, contentType: 'application/json', body: '{}' });
         } else {
             await route.fulfill({
@@ -95,7 +99,7 @@ test('patient header activates once, resyncs explicitly on 409, and terminalizes
     expect(selectionBodies[0]).toEqual({ expectedEpoch: 0, ...first });
     expect(activationBodies[0]).toEqual({ selectionEpoch: 1 });
 
-    activation = 'conflict';
+    selectionConflict = true;
     await page.goto(`/patients/${second.patientId}/modules`);
     action = page.getByTestId('intelligent-host-patient-action');
     activate = action.getByRole('button', { name: 'Attiva Intelligent Host per questa scheda' });
@@ -103,7 +107,7 @@ test('patient header activates once, resyncs explicitly on 409, and terminalizes
     await activate.click();
     await expect(action.getByRole('status')).toContainText('Selezione non più corrente');
     await expect(activate).toBeDisabled();
-    expect(activationBodies).toHaveLength(2);
+    expect(activationBodies).toHaveLength(1);
 
     await action.getByRole('button', { name: 'Riallinea selezione' }).click();
     await expect(action.getByRole('status')).toContainText('Selezione riallineata');
@@ -115,6 +119,6 @@ test('patient header activates once, resyncs explicitly on 409, and terminalizes
     await expect(action.getByRole('status')).toContainText('Riavvia la sessione');
     await expect(action.getByRole('button', { name: 'Intelligent Host non disponibile per questa scheda' })).toBeDisabled();
     await expect(action.getByRole('button', { name: 'Riallinea selezione' })).toHaveCount(0);
-    expect(activationBodies).toHaveLength(3);
-    expect(activationBodies[2]).toEqual({ selectionEpoch: 3 });
+    expect(activationBodies).toHaveLength(2);
+    expect(activationBodies[1]).toEqual({ selectionEpoch: 2 });
 });

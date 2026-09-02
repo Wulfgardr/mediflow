@@ -141,10 +141,9 @@ export function createIntelligentHostBrowserAdapter(sources: Sources = {}) {
                 return fail('activation_outcome_unknown');
             }
             guard(token, currentOperation);
-            if (response.status === 409) {
-                terminal = false;
-                return fail('selection_resync_required');
-            }
+            // A host-side 409 is terminal for this one-shot Supervisor command.
+            // Only the Smart Import selection step above can request a recoverable resync.
+            if (response.status === 409) return fail('host_unavailable');
             if (response.status === 503) return fail('host_unavailable');
             if (response.status === 401) {
                 selection.reset();
