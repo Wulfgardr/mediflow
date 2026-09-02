@@ -58,8 +58,8 @@ function allowedIntent() {
   });
 }
 
-function allowedAudit() {
-  return record({ ...allowedIntent(), durationMs: 17, timestamp: TIMESTAMP });
+function allowedAudit(overrides: Record<string, unknown> = {}) {
+  return record({ ...allowedIntent(), durationMs: 17, timestamp: TIMESTAMP, ...overrides });
 }
 
 function deniedIntent() {
@@ -72,8 +72,16 @@ function deniedIntent() {
   });
 }
 
-function deniedAudit() {
-  return record({ ...deniedIntent(), timestamp: TIMESTAMP + 1 });
+function deniedAudit(overrides: Record<string, unknown> = {}) {
+  return record({ ...deniedIntent(), timestamp: TIMESTAMP + 1, ...overrides });
+}
+
+function port(overrides: { now?: () => unknown; readHostContext?: () => unknown } = {}) {
+  let clockReads = 0;
+  return createPortableSupervisorSemanticAuditPortV1({
+    now: overrides.now ?? (() => TIMESTAMP + Math.min(clockReads++, 1)),
+    readHostContext: overrides.readHostContext ?? (() => context()),
+  });
 }
 
 function database(): Database.Database {
@@ -91,12 +99,12 @@ function auditCount(): number {
 after(() => { fs.rmSync(dataDir, { recursive: true, force: true }); });
 
 test('persists one canonical allowed terminal audit and returns the same object', async () => {
-  const port = createPortableSupervisorSemanticAuditPortV1({ readHostContext: () => context() });
+  const commit = port();
   const intent = allowedIntent();
   const terminal = allowedAudit();
   let decisions = 0;
 
-  const committed = port(intent, () => { decisions += 1; return terminal; });
+  const committed = commit(intent, () => { decisions += 1; return terminal; });
 
   assert.equal(decisions, 1);
   assert.equal(committed, terminal);
@@ -140,10 +148,10 @@ test('persists one canonical allowed terminal audit and returns the same object'
 });
 
 test('persists a denied terminal audit without binding or clinical identifiers', () => {
-  const port = createPortableSupervisorSemanticAuditPortV1({ readHostContext: () => context() });
+  const commit = port();
   const terminal = deniedAudit();
 
-  assert.equal(port(deniedIntent(), () => terminal), terminal);
+  assert.equal(commit(deniedIntent(), () => terminal), terminal);
 
   const sqlite = database();
   try {
@@ -170,12 +178,12 @@ test('persists a denied terminal audit without binding or clinical identifiers',
 
 test('calls the decision once then rolls back when its binding is stale', () => {
   const before = auditCount();
-  const port = createPortableSupervisorSemanticAuditPortV1({
+  const commit = port({
     readHostContext: () => context({ selectionEpoch: 12 }),
   });
   let decisions = 0;
 
-  assert.throws(() => port(allowedIntent(), () => { decisions += 1; return allowedAudit(); }), (error) => {
+  assert.throws(() => commit(allowedIntent(), () => { decisions += 1; return allowedAudit(); }), (error) => {
     assert.equal((error as { code?: unknown }).code, 'context_unavailable');
     return true;
   });
@@ -187,9 +195,9 @@ test('rejects an invalid host context before calling the decision', () => {
   const before = auditCount();
   const invalidContext = Object.freeze({ ...context() });
   let decisions = 0;
-  const port = createPortableSupervisorSemanticAuditPortV1({ readHostContext: () => invalidContext });
+  const commit = port({ readHostContext: () => invalidContext });
 
-  assert.throws(() => port(allowedIntent(), () => { decisions += 1; return allowedAudit(); }), (error) => {
+  assert.throws(() => commit(allowedIntent(), () => { decisions += 1; return allowedAudit(); }), (error) => {
     assert.equal((error as { code?: unknown }).code, 'context_unavailable');
     return true;
   });
@@ -199,15 +207,15 @@ test('rejects an invalid host context before calling the decision', () => {
 
 test('rejects non-canonical or extended terminal audit shapes', () => {
   const before = auditCount();
-  const port = createPortableSupervisorSemanticAuditPortV1({ readHostContext: () => context() });
+  const commit = port();
   let decisions = 0;
   const mutable = { ...allowedAudit() };
 
-  assert.throws(() => port(allowedIntent(), () => { decisions += 1; return mutable; }), (error) => {
+  assert.throws(() => commit(allowedIntent(), () => { decisions += 1; return mutable; }), (error) => {
     assert.equal((error as { code?: unknown }).code, 'audit_unavailable');
     return true;
   });
-  assert.throws(() => port(allowedIntent(), () => {
+  assert.throws(() => commit(allowedIntent(), () => {
     decisions += 1;
     return record({ ...allowedAudit(), patientId: PATIENT_ID });
   }), (error) => {
@@ -221,10 +229,10 @@ test('rejects non-canonical or extended terminal audit shapes', () => {
 test('preserves a decision failure and never retries the callback', () => {
   const before = auditCount();
   const failure = new Error('synthetic terminal decision failure');
-  const port = createPortableSupervisorSemanticAuditPortV1({ readHostContext: () => context() });
+  const commit = port();
   let decisions = 0;
 
-  assert.throws(() => port(allowedIntent(), () => { decisions += 1; throw failure; }),
+  assert.throws(() => commit(allowedIntent(), () => { decisions += 1; throw failure; }),
     (error) => error === failure);
   assert.equal(decisions, 1);
   assert.equal(auditCount(), before);
@@ -233,28 +241,267 @@ test('preserves a decision failure and never retries the callback', () => {
 test('is synchronous and rejects async or Promise-returning sources fail closed', () => {
   const before = auditCount();
   const terminal = allowedAudit();
-  const port = createPortableSupervisorSemanticAuditPortV1({ readHostContext: () => context() });
+  const commit = port();
   let decisions = 0;
 
-  assert.throws(() => port(allowedIntent(), async () => terminal), (error) => {
+  assert.throws(() => commit(allowedIntent(), async () => terminal), (error) => {
     assert.equal((error as { code?: unknown }).code, 'audit_unavailable');
     return true;
   });
   assert.equal(decisions, 0);
-  assert.throws(() => port(allowedIntent(), () => { decisions += 1; return Promise.resolve(terminal); }), (error) => {
+  assert.throws(() => commit(allowedIntent(), () => { decisions += 1; return Promise.resolve(terminal); }), (error) => {
     assert.equal((error as { code?: unknown }).code, 'audit_unavailable');
     return true;
   });
   assert.equal(decisions, 1);
   assert.equal(auditCount(), before);
 
-  const promiseContextPort = createPortableSupervisorSemanticAuditPortV1({
+  const promiseContextPort = port({
     readHostContext: () => Promise.resolve(context()),
   });
   assert.throws(() => promiseContextPort(allowedIntent(), () => terminal), (error) => {
     assert.equal((error as { code?: unknown }).code, 'context_unavailable');
     return true;
   });
+  assert.equal(auditCount(), before);
+});
+
+test('requires exact synchronous host clock and context sources', () => {
+  const before = auditCount();
+  const readHostContext = () => context();
+  for (const sources of [null, {}, { readHostContext }, { now: () => TIMESTAMP },
+    { now: () => TIMESTAMP, readHostContext, extra: true },
+    { now: async () => TIMESTAMP, readHostContext },
+    { now: new Proxy(() => TIMESTAMP, {}), readHostContext },
+    { now: () => TIMESTAMP, readHostContext: async () => context() }]) {
+    assert.throws(() => createPortableSupervisorSemanticAuditPortV1(sources), (error) => {
+      assert.equal((error as { code?: unknown }).code, 'audit_unavailable');
+      return true;
+    });
+  }
+  assert.equal(auditCount(), before);
+});
+
+test('samples context and host clock on both sides of the single decision', () => {
+  const events: string[] = [];
+  let contextReads = 0;
+  let clockReads = 0;
+  const commit = createPortableSupervisorSemanticAuditPortV1({
+    now: () => { events.push(`clock:${clockReads}`); return TIMESTAMP + Math.min(clockReads++, 1); },
+    readHostContext: () => { events.push(`context:${contextReads}`); contextReads += 1; return context(); },
+  });
+  const terminal = allowedAudit();
+
+  assert.equal(commit(allowedIntent(), () => { events.push('decision'); return terminal; }), terminal);
+  assert.deepEqual(events, ['context:0', 'clock:0', 'decision', 'context:1', 'clock:1']);
+  assert.deepEqual([contextReads, clockReads], [2, 2]);
+});
+
+test('rolls back when callback reentry revokes the host authority', () => {
+  const before = auditCount();
+  let current = context();
+  let decisions = 0;
+  const commit = port({ readHostContext: () => current });
+
+  assert.throws(() => commit(allowedIntent(), () => {
+    decisions += 1;
+    current = context({ revocationGeneration: 3 });
+    return allowedAudit();
+  }), (error) => (error as { code?: unknown }).code === 'context_unavailable');
+  assert.equal(decisions, 1);
+  assert.equal(auditCount(), before);
+});
+
+test('rolls back when callback reentry advances the selection epoch', () => {
+  const before = auditCount();
+  let current = context();
+  let decisions = 0;
+  const commit = port({ readHostContext: () => current });
+
+  assert.throws(() => commit(allowedIntent(), () => {
+    decisions += 1;
+    current = context({ selectionEpoch: 12 });
+    return allowedAudit();
+  }), (error) => (error as { code?: unknown }).code === 'context_unavailable');
+  assert.equal(decisions, 1);
+  assert.equal(auditCount(), before);
+});
+
+test('rejects every stable authority field changing across the decision', () => {
+  const before = auditCount();
+  const changes: Record<string, unknown>[] = [
+    { userRef: `user.${'c'.repeat(64)}` }, { parentRef: `parent.${'d'.repeat(64)}` },
+    { purposeCode: 'other' }, { patientId: 'synthetic-patient-other' },
+    { ambulatoryId: 'synthetic-ambulatory-other' }, { generation: 8 },
+    { restartGeneration: 2 }, { parentGeneration: 4 }, { policyGeneration: 6 },
+    { expiresAt: TIMESTAMP + 61_000 },
+  ];
+  for (const change of changes) {
+    let reads = 0;
+    const commit = port({ readHostContext: () => reads++ === 0 ? context() : context(change) });
+    let decisions = 0;
+    assert.throws(() => commit(allowedIntent(), () => { decisions += 1; return allowedAudit(); }), (error) =>
+      (error as { code?: unknown }).code === 'context_unavailable');
+    assert.equal(decisions, 1);
+  }
+  assert.equal(auditCount(), before);
+});
+
+test('accepts a fresh monotonic bootstrap window from the same authority', () => {
+  let reads = 0;
+  const commit = port({ readHostContext: () => context({
+    bootstrapExpiresAt: TIMESTAMP + 30_000 + Math.min(reads++, 1),
+  }) });
+  const terminal = allowedAudit();
+  assert.equal(commit(allowedIntent(), () => terminal), terminal);
+});
+
+test('rejects a regressed bootstrap window after the decision', () => {
+  const before = auditCount();
+  let reads = 0;
+  const commit = port({ readHostContext: () => context({
+    bootstrapExpiresAt: TIMESTAMP + (reads++ === 0 ? 30_000 : 29_999),
+  }) });
+  let decisions = 0;
+
+  assert.throws(() => commit(allowedIntent(), () => { decisions += 1; return allowedAudit(); }), (error) =>
+    (error as { code?: unknown }).code === 'context_unavailable');
+  assert.equal(decisions, 1);
+  assert.equal(auditCount(), before);
+});
+
+test('rejects a terminal timestamp before the pre-commit host clock', () => {
+  const before = auditCount();
+  const commit = port({ now: (() => { const samples = [TIMESTAMP, TIMESTAMP + 10];
+    return () => samples.shift() ?? TIMESTAMP + 10; })() });
+  let decisions = 0;
+
+  assert.throws(() => commit(allowedIntent(), () => {
+    decisions += 1; return allowedAudit({ timestamp: TIMESTAMP - 1 });
+  }), (error) => (error as { code?: unknown }).code === 'context_unavailable');
+  assert.equal(decisions, 1);
+  assert.equal(auditCount(), before);
+});
+
+test('rejects a terminal timestamp after the post-commit host clock', () => {
+  const before = auditCount();
+  const commit = port({ now: (() => { const samples = [TIMESTAMP, TIMESTAMP + 10];
+    return () => samples.shift() ?? TIMESTAMP + 10; })() });
+  let decisions = 0;
+
+  assert.throws(() => commit(allowedIntent(), () => {
+    decisions += 1; return allowedAudit({ timestamp: TIMESTAMP + 11 });
+  }), (error) => (error as { code?: unknown }).code === 'context_unavailable');
+  assert.equal(decisions, 1);
+  assert.equal(auditCount(), before);
+});
+
+test('rejects a terminal timestamp at the half-open authority expiry', () => {
+  const before = auditCount();
+  const commit = port({
+    now: (() => { const samples = [TIMESTAMP, TIMESTAMP + 10];
+      return () => samples.shift() ?? TIMESTAMP + 10; })(),
+    readHostContext: () => context({ expiresAt: TIMESTAMP + 10, bootstrapExpiresAt: TIMESTAMP + 9 }),
+  });
+  let decisions = 0;
+
+  assert.throws(() => commit(allowedIntent(), () => {
+    decisions += 1; return allowedAudit({ timestamp: TIMESTAMP + 10 });
+  }), (error) => (error as { code?: unknown }).code === 'context_unavailable');
+  assert.equal(decisions, 1);
+  assert.equal(auditCount(), before);
+});
+
+test('rejects an expired bootstrap context before invoking the decision', () => {
+  const before = auditCount();
+  const commit = port({ readHostContext: () => context({ bootstrapExpiresAt: TIMESTAMP }) });
+  let decisions = 0;
+
+  assert.throws(() => commit(allowedIntent(), () => { decisions += 1; return allowedAudit(); }), (error) =>
+    (error as { code?: unknown }).code === 'context_unavailable');
+  assert.equal(decisions, 0);
+  assert.equal(auditCount(), before);
+});
+
+test('rejects host clock rollback after invoking the decision once', () => {
+  const before = auditCount();
+  const samples = [TIMESTAMP + 1, TIMESTAMP];
+  const commit = port({ now: () => samples.shift() ?? TIMESTAMP });
+  let decisions = 0;
+
+  assert.throws(() => commit(allowedIntent(), () => {
+    decisions += 1; return allowedAudit({ timestamp: TIMESTAMP + 1 });
+  }), (error) => (error as { code?: unknown }).code === 'audit_unavailable');
+  assert.equal(decisions, 1);
+  assert.equal(auditCount(), before);
+});
+
+test('rejects a throwing host clock before invoking the decision', () => {
+  const before = auditCount();
+  const failure = new Error('synthetic host clock failure');
+  const commit = port({ now: () => { throw failure; } });
+  let decisions = 0;
+
+  assert.throws(() => commit(allowedIntent(), () => { decisions += 1; return allowedAudit(); }), (error) =>
+    (error as { code?: unknown }).code === 'audit_unavailable');
+  assert.equal(decisions, 0);
+  assert.equal(auditCount(), before);
+});
+
+test('rejects a throwing host clock after invoking the decision once', () => {
+  const before = auditCount();
+  let reads = 0;
+  const failure = new Error('synthetic post-decision host clock failure');
+  const commit = port({ now: () => { if (reads++ === 0) return TIMESTAMP; throw failure; } });
+  let decisions = 0;
+
+  assert.throws(() => commit(allowedIntent(), () => { decisions += 1; return allowedAudit(); }), (error) =>
+    (error as { code?: unknown }).code === 'audit_unavailable');
+  assert.equal(decisions, 1);
+  assert.equal(auditCount(), before);
+});
+
+test('rejects Promise clocks before and after the single decision', () => {
+  const before = auditCount();
+  let decisions = 0;
+  const beforeCommit = port({ now: () => Promise.resolve(TIMESTAMP) });
+  assert.throws(() => beforeCommit(allowedIntent(), () => { decisions += 1; return allowedAudit(); }), (error) =>
+    (error as { code?: unknown }).code === 'audit_unavailable');
+  assert.equal(decisions, 0);
+
+  let reads = 0;
+  const afterCommit = port({ now: () => reads++ === 0 ? TIMESTAMP : Promise.resolve(TIMESTAMP + 1) });
+  assert.throws(() => afterCommit(allowedIntent(), () => { decisions += 1; return allowedAudit(); }), (error) =>
+    (error as { code?: unknown }).code === 'audit_unavailable');
+  assert.equal(decisions, 1);
+  assert.equal(auditCount(), before);
+});
+
+test('rolls back when the post-decision context rejects or returns a Promise', () => {
+  const before = auditCount();
+  for (const post of [() => { throw new Error('synthetic post-context failure'); },
+    () => Promise.resolve(context())]) {
+    let reads = 0;
+    let decisions = 0;
+    const commit = port({ readHostContext: () => reads++ === 0 ? context() : post() });
+    assert.throws(() => commit(allowedIntent(), () => { decisions += 1; return allowedAudit(); }));
+    assert.equal(decisions, 1);
+  }
+  assert.equal(auditCount(), before);
+});
+
+test('does not let a denied null binding bypass authority revocation', () => {
+  const before = auditCount();
+  let current = context();
+  let decisions = 0;
+  const commit = port({ readHostContext: () => current });
+
+  assert.throws(() => commit(deniedIntent(), () => {
+    decisions += 1;
+    current = context({ revocationGeneration: 3 });
+    return deniedAudit();
+  }), (error) => (error as { code?: unknown }).code === 'context_unavailable');
+  assert.equal(decisions, 1);
   assert.equal(auditCount(), before);
 });
 
@@ -267,10 +514,10 @@ test('rolls back callback-side writes when the audit insert trigger fails', () =
       WHEN NEW.event_type = 'agent.semantic_query.executed'
       BEGIN SELECT RAISE(ABORT, 'synthetic semantic audit insert failure'); END;`);
   } finally { sqlite.close(); }
-  const port = createPortableSupervisorSemanticAuditPortV1({ readHostContext: () => context() });
+  const commit = port();
   let decisions = 0;
   try {
-    assert.throws(() => port(allowedIntent(), () => {
+    assert.throws(() => commit(allowedIntent(), () => {
       decisions += 1;
       dbServer.insert(settings).values({ key: marker, value: 'pending' }).run();
       return allowedAudit();
@@ -297,10 +544,10 @@ test('rolls back when an inserted audit row disappears before reread', () => {
       WHEN NEW.event_type = 'agent.semantic_query.executed'
       BEGIN DELETE FROM audit_events WHERE event_id = NEW.event_id; END;`);
   } finally { sqlite.close(); }
-  const port = createPortableSupervisorSemanticAuditPortV1({ readHostContext: () => context() });
+  const commit = port();
   let decisions = 0;
   try {
-    assert.throws(() => port(allowedIntent(), () => {
+    assert.throws(() => commit(allowedIntent(), () => {
       decisions += 1;
       dbServer.insert(settings).values({ key: marker, value: 'pending' }).run();
       return allowedAudit();

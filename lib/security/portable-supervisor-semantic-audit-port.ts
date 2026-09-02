@@ -10,10 +10,11 @@ import { dbServer, runDbServerImmediateTransaction } from '../db-server';
 import { auditEvents } from '../schema';
 import { AUDIT_SCHEMA_VERSION, hashAuditRef } from './audit';
 
-const SOURCE_KEYS = ['readHostContext'] as const;
+const SOURCE_KEYS = ['now', 'readHostContext'] as const;
 const CONTEXT_KEYS = ['status', 'userRef', 'parentRef', 'purposeCode', 'patientId', 'ambulatoryId',
     'generation', 'revocationGeneration', 'selectionEpoch', 'restartGeneration', 'parentGeneration',
     'policyGeneration', 'expiresAt', 'bootstrapExpiresAt'] as const;
+const STABLE_CONTEXT_KEYS = CONTEXT_KEYS.filter((key) => key !== 'bootstrapExpiresAt');
 const INTENT_KEYS = ['schemaVersion', 'eventType', 'outcome', 'operation', 'capabilityId',
     'policyDecision', 'revisionBinding', 'operationCount', 'writesPerformed', 'applyPolicy',
     'denialCode'] as const;
@@ -94,6 +95,11 @@ function hostContext(value: unknown): CanonicalRecord {
     return parsed;
 }
 
+function sameContext(left: CanonicalRecord, right: CanonicalRecord): boolean {
+    return STABLE_CONTEXT_KEYS.every((key) => left[key] === right[key])
+        && (right.bootstrapExpiresAt as number) >= (left.bootstrapExpiresAt as number);
+}
+
 function auditShape(value: unknown, terminal: boolean): CanonicalRecord {
     const keys = terminal ? TERMINAL_KEYS : INTENT_KEYS;
     const parsed = exact(value, keys, true)
@@ -164,29 +170,53 @@ function metadata(terminal: CanonicalRecord): string {
 /** Persists one synchronous terminal semantic-query audit under the SQLite writer lock. */
 export function createPortableSupervisorSemanticAuditPortV1(sourcesValue: unknown) {
     const sources = exact(sourcesValue, SOURCE_KEYS, false);
-    if (!sources || typeof sources.readHostContext !== 'function' || isProxy(sources.readHostContext)
+    if (!sources || typeof sources.now !== 'function' || isProxy(sources.now) || isAsyncFunction(sources.now)
+        || typeof sources.readHostContext !== 'function' || isProxy(sources.readHostContext)
         || isAsyncFunction(sources.readHostContext)) return fail();
+    const nowSource = sources.now as () => unknown;
     const readHostContext = sources.readHostContext as () => unknown;
+    let lastNow = -1;
+    const now = (): number => {
+        let value: unknown;
+        try { value = nowSource(); } catch { return fail(); }
+        if (discardPromise(value) || !integer(value) || value < lastNow) return fail();
+        lastNow = value;
+        return value;
+    };
+    const readContext = (): CanonicalRecord => {
+        let value: unknown;
+        try { value = readHostContext(); } catch (error) { throw error; }
+        if (discardPromise(value)) return fail('context_unavailable');
+        return hostContext(value);
+    };
     return function commitTerminalAudit(intentValue: unknown, decideAtCommit: () => unknown): unknown {
         const intent = auditShape(intentValue, false);
         if (typeof decideAtCommit !== 'function' || isProxy(decideAtCommit)
             || isAsyncFunction(decideAtCommit)) return fail();
         return runDbServerImmediateTransaction(() => {
-            let contextValue: unknown;
-            try { contextValue = readHostContext(); } catch (error) { throw error; }
-            if (discardPromise(contextValue)) return fail('context_unavailable');
-            const current = hostContext(contextValue);
+            const beforeContext = readContext();
+            const beforeNow = now();
+            if (beforeNow >= (beforeContext.bootstrapExpiresAt as number)
+                || beforeNow >= (beforeContext.expiresAt as number)) return fail('context_unavailable');
             let terminalValue: unknown;
             try { terminalValue = decideAtCommit(); } catch (error) { throw error; }
             if (discardPromise(terminalValue)) return fail();
             const terminal = auditShape(terminalValue, true);
-            if (!coherent(intent, terminal) || !sameBinding(terminal.revisionBinding, current)
-                || (terminal.timestamp as number) >= (current.expiresAt as number)) return fail('context_unavailable');
+            const afterContext = readContext();
+            const afterNow = now();
+            if (!sameContext(beforeContext, afterContext)
+                || afterNow >= (afterContext.bootstrapExpiresAt as number)
+                || afterNow >= (afterContext.expiresAt as number)
+                || !coherent(intent, terminal) || !sameBinding(terminal.revisionBinding, afterContext)
+                || (terminal.timestamp as number) < beforeNow || (terminal.timestamp as number) > afterNow
+                || (terminal.timestamp as number) >= (afterContext.expiresAt as number)) {
+                return fail('context_unavailable');
+            }
             const eventId = randomUUID(), occurredAt = new Date(terminal.timestamp as number);
             const redactedMetadata = metadata(terminal);
             // Re-hash opaque context refs: audit linkage stays stable without exposing operational refs.
-            const actorRef = hashAuditRef(current.userRef as string);
-            const subjectRef = hashAuditRef(current.parentRef as string);
+            const actorRef = hashAuditRef(afterContext.userRef as string);
+            const subjectRef = hashAuditRef(afterContext.parentRef as string);
             dbServer.insert(auditEvents).values({ eventId, schemaVersion: AUDIT_SCHEMA_VERSION,
                 eventType: 'agent.semantic_query.executed', occurredAt,
                 outcome: terminal.outcome === 'allowed' ? 'success' : 'denied', actorType: 'user', actorRef,
