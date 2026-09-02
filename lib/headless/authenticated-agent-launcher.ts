@@ -23,6 +23,10 @@ import {
   createLocalAipTerminologySearchServiceV1,
 } from '../../packages/aip/src/terminology-search.ts';
 import {
+  SEMANTIC_QUERY_OPERATION_CONTRACT_V1,
+  createSemanticQueryOperationServiceV1,
+} from '../../packages/aip/src/semantic-query-operation.ts';
+import {
   BOOTSTRAP, CHILD_KEYS, CONTEXT_KEYS, DIGEST, REF, SOURCE_KEYS, TOKEN,
   AuthenticatedAgentLauncherV1Error, exact, hostId, integer, record,
   type AuthenticatedAgentLauncherV1ErrorCode, type Child, type Context, type OperationState,
@@ -44,9 +48,11 @@ export function createAuthenticatedAgentLauncherV1(sourcesValue: unknown) {
   const nextRefSource = sources.nextRef as (kind: string) => unknown;
   const hashRefSource = sources.hashRef as (value: string) => unknown;
   const writeAudit = sources.writeAudit as (value: unknown) => unknown;
+  const commitTerminalAudit = sources.commitTerminalAudit as (value: unknown) => unknown;
   const readHostContext = sources.readHostContext as () => unknown;
   const spawnChild = sources.spawnChild as (environment: Readonly<Record<string, string>>) => unknown;
   const createOpenLoopsRead = sources.createOpenLoopsRead as (value: unknown) => unknown;
+  if (types.isAsyncFunction(commitTerminalAudit)) throw new AuthenticatedAgentLauncherV1Error('input_invalid');
   const issued = new Set<string>();
   let lastNow = -1;
   let started = false;
@@ -205,7 +211,7 @@ export function createAuthenticatedAgentLauncherV1(sourcesValue: unknown) {
         egressAllowed: false }));
       const scopeSession = registry.bindOwner(ticket, owner);
       const state = record({ operationId, capabilityId: operationId, maximumStage, owner, scopeSession,
-        peerRef, runtimeRef, context: launchContext });
+        peerRef, runtimeRef, scopeDigest: scope.scopeDigest, context: launchContext });
       operationStates.push(state);
       return state;
     };
@@ -238,23 +244,25 @@ export function createAuthenticatedAgentLauncherV1(sourcesValue: unknown) {
         finally { (service.dispose as () => void)(); }
       });
     };
+    const executeTerminology = async (state: OperationState, input: unknown, signal: AbortSignal) => {
+      const permit = await authorize(state);
+      const service = createLocalAipTerminologySearchServiceV1({ now,
+        nextReceiptRef: () => nextRef('terminology_receipt'), current: () => current(state),
+        beginPermit: broker.beginPermit, finalizePermit: broker.finalizePermit,
+        denyPermit: broker.denyPermit, writeAudit });
+      return withAbort(signal, service.cancel, async () => {
+        try { return await service.execute(permit, input); } finally { service.dispose(); }
+      });
+    };
     const prepareRpc = (): void => {
       const terminologyState = createOperation(AIP_TERMINOLOGY_SEARCH_CONTRACT_V1.operationId, 'read_only');
       const openLoopsState = createOperation(PATIENT_OPEN_LOOPS_READ_OPERATION_V1, 'read_only');
       const proposalState = createOperation(PATIENT_OPEN_LOOPS_FOLLOW_UP_PROPOSAL_OPERATION_V1, 'proposal_only');
+      const semanticState = createOperation(SEMANTIC_QUERY_OPERATION_CONTRACT_V1.operationId, 'read_only');
       rpcHost = createAipOperationRpcHostV1({ operations: [{
         operationId: terminologyState.operationId, capabilityId: terminologyState.capabilityId,
         serviceRef: AIP_TERMINOLOGY_SEARCH_CONTRACT_V1.applicationServiceRef, maximumStage: 'read_only', timeoutMs: 500,
-        execute: async (input: unknown, signal: AbortSignal) => {
-          const permit = await authorize(terminologyState);
-          const service = createLocalAipTerminologySearchServiceV1({ now,
-            nextReceiptRef: () => nextRef('terminology_receipt'), current: () => current(terminologyState),
-            beginPermit: broker.beginPermit, finalizePermit: broker.finalizePermit,
-            denyPermit: broker.denyPermit, writeAudit });
-          return withAbort(signal, service.cancel, async () => {
-            try { return await service.execute(permit, input); } finally { service.dispose(); }
-          });
-        },
+        execute: (input: unknown, signal: AbortSignal) => executeTerminology(terminologyState, input, signal),
       }, {
         operationId: openLoopsState.operationId, capabilityId: openLoopsState.capabilityId,
         serviceRef: PATIENT_OPEN_LOOPS_READ_APPLICATION_SERVICE_V1, maximumStage: 'read_only', timeoutMs: 1_000,
@@ -278,6 +286,49 @@ export function createAuthenticatedAgentLauncherV1(sourcesValue: unknown) {
             }), readSignal), writeAudit, timeoutMs: 250 as const }));
           return withAbort(signal, service.cancel, async () => {
             try { return await service.propose(permit, input); } finally { service.dispose(); }
+          });
+        },
+      }, {
+        operationId: semanticState.operationId, capabilityId: semanticState.capabilityId,
+        serviceRef: SEMANTIC_QUERY_OPERATION_CONTRACT_V1.applicationServiceRef,
+        maximumStage: 'read_only', timeoutMs: 500,
+        execute: async (input: unknown, signal: AbortSignal) => {
+          const permit = await authorize(semanticState);
+          const currentPolicy = () => {
+            const snapshot = current(semanticState);
+            return record({ purposeCode: semanticState.context.purposeCode, scope: 'selected_patient' as const,
+              generation: snapshot.generation, revocationGeneration: snapshot.revocationGeneration,
+              selectionEpoch: snapshot.selectionEpoch,
+              maxSteps: SEMANTIC_QUERY_OPERATION_CONTRACT_V1.limitPolicy.maxSteps,
+              maxDurationMs: SEMANTIC_QUERY_OPERATION_CONTRACT_V1.limitPolicy.maxDurationMs,
+              maxOutputBytes: SEMANTIC_QUERY_OPERATION_CONTRACT_V1.limitPolicy.maxOutputBytes });
+          };
+          const currentSourceRefs = () => {
+            const snapshot = current(semanticState);
+            const sourceRefs = [terminologyState.operationId, openLoopsState.operationId].map((operationId) => {
+              const digest = hashRef(['semantic_query_source_v1', semanticState.scopeDigest, operationId,
+                snapshot.generation, snapshot.revocationGeneration, snapshot.selectionEpoch].join('\0'));
+              return `src_${digest.slice('sha256:'.length)}`;
+            });
+            return record({ generation: snapshot.generation, revocationGeneration: snapshot.revocationGeneration,
+              selectionEpoch: snapshot.selectionEpoch, sourceRefs: Object.freeze(sourceRefs) });
+          };
+          const service = createSemanticQueryOperationServiceV1(record({ now,
+            nextRef: (kind: 'request' | 'action') => {
+              const digest = hashRef(nextRef(`semantic_query_${kind}`));
+              return `${kind === 'request' ? 'sqrq' : 'sqra'}_${digest.slice('sha256:'.length)}`;
+            }, currentPolicy, currentSourceRefs, currentOwner: () => current(semanticState),
+            beginPermit: broker.beginPermit, finalizePermit: broker.finalizePermit, denyPermit: broker.denyPermit,
+            executeTerminology: (readInput: unknown, readSignal: AbortSignal) =>
+              executeTerminology(terminologyState, readInput, readSignal),
+            executeOpenLoops: (readInput: unknown, readSignal: AbortSignal) =>
+              executeOpenLoops(openLoopsState, readInput, readSignal),
+            commitTerminalAudit }));
+          return withAbort(signal, service.cancel, async () => {
+            try {
+              const result = await service.execute(permit, input);
+              return JSON.parse(JSON.stringify(result)) as unknown;
+            } finally { service.dispose(); }
           });
         },
       }] });

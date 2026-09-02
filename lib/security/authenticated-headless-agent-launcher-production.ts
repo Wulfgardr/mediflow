@@ -7,7 +7,7 @@ import { types } from 'node:util';
 import { createAuthenticatedAgentLauncherV1 } from '../headless/authenticated-agent-launcher.ts';
 import { createPatientOpenLoopsReadInternalCandidateV1 } from './patient-open-loops-read-production.ts';
 
-const SOURCE_KEYS = ['readHostContext', 'writeAudit'] as const;
+const SOURCE_KEYS = ['readHostContext', 'writeAudit', 'commitTerminalAudit'] as const;
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 const LOADER = `${ROOT}/scripts/register-strip-types-loader.mjs`;
 const TARGETS = Object.freeze({
@@ -15,14 +15,16 @@ const TARGETS = Object.freeze({
   mini: `${ROOT}/packages/mini/src/cli.ts`,
 });
 
-type Sources = Readonly<{ readHostContext: () => unknown; writeAudit: (value: unknown) => unknown }>;
+type Sources = Readonly<{ readHostContext: () => unknown; writeAudit: (value: unknown) => unknown;
+  commitTerminalAudit: (value: unknown) => unknown }>;
 
 function sources(value: unknown): Sources {
   if (!value || typeof value !== 'object' || types.isProxy(value) || Array.isArray(value)) throw new Error('input_invalid');
   const descriptors = Object.getOwnPropertyDescriptors(value) as Record<string, PropertyDescriptor>;
   if (Reflect.ownKeys(value).length !== SOURCE_KEYS.length || SOURCE_KEYS.some((key) =>
     !descriptors[key]?.enumerable || !('value' in descriptors[key]) || typeof descriptors[key].value !== 'function'
-    || types.isProxy(descriptors[key].value))) throw new Error('input_invalid');
+    || types.isProxy(descriptors[key].value)
+    || (key === 'commitTerminalAudit' && types.isAsyncFunction(descriptors[key].value)))) throw new Error('input_invalid');
   return value as Sources;
 }
 
@@ -66,6 +68,7 @@ function createProductionLauncher(kind: keyof typeof TARGETS, sourcesValue: unkn
     hashRef: (value: string) => `sha256:${createHash('sha256')
       .update('mediflow.headless.authenticated-launcher.v1').update('\0').update(value).digest('hex')}`,
     writeAudit: ports.writeAudit,
+    commitTerminalAudit: ports.commitTerminalAudit,
     readHostContext: ports.readHostContext,
     spawnChild: (environment: Readonly<Record<string, string>>) => childPort(TARGETS[kind], environment),
     createOpenLoopsRead: createPatientOpenLoopsReadInternalCandidateV1,
