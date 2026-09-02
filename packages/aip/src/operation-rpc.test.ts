@@ -77,6 +77,28 @@ test('publishes only the host allowlisted catalog and binds calls to its named f
     assert.equal(Object.isFrozen(observed[0]), true);
 });
 
+test('serializes hardened null-prototype arrays returned by trusted services', async () => {
+    const items = [{ status: 'ready' }];
+    Object.setPrototypeOf(items, null);
+    Object.freeze(items);
+    const host = createAipOperationRpcHostV1({
+        operations: [fakeDefinition(() => ({ items }))],
+    });
+    const port = memoryPort();
+    host.attach(port.adapter);
+
+    port.receive(request({ method: 'call', requestId: 'rpc_hardened_array_1',
+        operationId: 'fake.system.status.v1', input: {} }));
+    await new Promise((resolve) => setImmediate(resolve));
+
+    assert.deepEqual(JSON.parse(port.sent[0] ?? '{}'), {
+        schemaVersion: 'mediflow.aip.operation.result.v1', requestId: 'rpc_hardened_array_1', outcome: 'completed',
+        result: { operation: { operationId: 'fake.system.status.v1', capabilityId: 'fake.system.status.read.v1',
+            serviceRef: 'FakeApplicationServicesSystemStatusV1', maximumStage: 'read_only' },
+        value: { items: [{ status: 'ready' }] } },
+    });
+});
+
 test('rejects caller-supplied authority, unknown operations and strict or oversized frames before service entry', async () => {
     let calls = 0;
     const host = createAipOperationRpcHostV1({ operations: [fakeDefinition(() => { calls += 1; return null; })] });
