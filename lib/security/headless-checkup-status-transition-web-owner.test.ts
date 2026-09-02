@@ -79,6 +79,11 @@ after(() => fs.rmSync(dataDir, { recursive: true, force: true }));
 test('retains the preview in Web and commits only through Web-local physician PIN and gesture', async () => {
   const current = fixture(SUCCESS), preview = await current.preview();
   assert.equal(preview.outcome, 'proposed');
+  assert.deepEqual(await current.owner.hostUi.readCurrentProposal(preview.proposalRef), closed({
+    schemaVersion: 'mediflow.patient.checkup.status.transition.proposal-view.v1',
+    proposalRef: preview.proposalRef, targetStatus: 'completed', expectedRevision: 1,
+    expiresAt: preview.expiresAt,
+  }));
   const gesture = await current.owner.hostUi.issueExactGesture(closed({ proposalRef: preview.proposalRef,
     targetStatus: 'completed', expectedRevision: 1 }));
   const input = command(preview.proposalRef, gesture);

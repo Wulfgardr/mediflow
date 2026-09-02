@@ -157,6 +157,17 @@ export function createHeadlessCheckupStatusTransitionWebOwnerV1(sourcesValue: un
     gestures.set(gesture, { proposal, binding: record(binding), ui: current, generation });
     return gesture;
   };
+  const readCurrentProposal = async (proposalRef: unknown): Promise<Readonly<Canonical>> => {
+    if (disposed || typeof proposalRef !== 'string' || !PROPOSAL_REF.test(proposalRef)) return fail('invalid_input');
+    const proposal = proposals.get(proposalRef);
+    if (!proposal || proposal.state !== 'current') return fail('proof_replayed');
+    const timestamp = now();
+    if (!integer(timestamp, 1) || timestamp >= proposal.expiresAt) return fail('preview_expired');
+    await ui();
+    return record({ schemaVersion: 'mediflow.patient.checkup.status.transition.proposal-view.v1', proposalRef,
+      targetStatus: proposal.input.targetStatus, expectedRevision: proposal.input.expectedRevision,
+      expiresAt: proposal.expiresAt });
+  };
   const confirm = async (value: unknown): Promise<HeadlessCheckupStatusReceiptV1> => {
     const input = exact(value, CONFIRM);
     if (!input || input.schemaVersion !== 'mediflow.patient.checkup.status.transition.confirmation.v1'
@@ -207,5 +218,5 @@ export function createHeadlessCheckupStatusTransitionWebOwnerV1(sourcesValue: un
   };
   return record({ parent: record({ handlePreview }), hostUi: record({
     issueSelectedCheckupRef: candidate.candidateController.issueSelectedCheckupRef,
-    issueExactGesture, confirm }), revoke, dispose });
+    readCurrentProposal, issueExactGesture, confirm }), revoke, dispose });
 }
