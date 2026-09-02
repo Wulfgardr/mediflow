@@ -126,7 +126,7 @@ export function createPortableSupervisorWebSessionControllerV1(sources: Sources)
     let owner: PortableSupervisorWebCaptureOwnerV1 | null = null;
     let activationPromise: Promise<PortableSupervisorWebSessionActivationV1> | null = null;
     let revocationPromise: Promise<boolean> | null = null;
-    let earlyRetirement: Deferred | null = null;
+    let acquisitionCut = false;
     let requestedRetirement: PortableSupervisorWebSessionRetirementReasonV1 | null = null;
     let terminalWithoutRevocation: Promise<boolean> | null = null;
 
@@ -139,7 +139,7 @@ export function createPortableSupervisorWebSessionControllerV1(sources: Sources)
     const revokeRemote = (reason: PortableSupervisorWebCaptureTerminalReasonV1): Promise<boolean> => {
         if (revocationPromise) return revocationPromise;
         phase = 'revoking';
-        const pending = earlyRetirement ?? deferred();
+        const pending = deferred();
         revocationPromise = pending.promise;
         // The Promise is observed even when the synchronous terminal observer has no caller.
         void Promise.prototype.then.call(pending.promise, undefined, () => undefined);
@@ -162,12 +162,18 @@ export function createPortableSupervisorWebSessionControllerV1(sources: Sources)
         return pending.promise;
     };
     const observeTerminal = (reason: PortableSupervisorWebCaptureTerminalReasonV1): void => {
-        revokeRemote(reason);
+        if (!acquisitionCut) revokeRemote(reason);
     };
     const terminalNoOwner = (): void => {
         phase = 'terminal'; disconnect();
-        terminalWithoutRevocation ??= earlyRetirement?.promise ?? Promise.resolve(false);
-        earlyRetirement?.resolve(false);
+        terminalWithoutRevocation ??= Promise.resolve(false);
+    };
+    const revokeLateOwner = (lateOwner: PortableSupervisorWebCaptureOwnerV1,
+        reason: PortableSupervisorWebSessionRetirementReasonV1): void => {
+        try { lateOwner.revoke(reason); }
+        catch {
+            try { lateOwner.dispose(); } catch { /* transport is already cut */ }
+        }
     };
     const constrainCapture = (currentOwner: PortableSupervisorWebCaptureOwnerV1,
         constraint: PortableSupervisorWebSessionActivationInputV1) => {
@@ -180,8 +186,9 @@ export function createPortableSupervisorWebSessionControllerV1(sources: Sources)
         const currentOwner = owner;
         if (!currentOwner) {
             requestedRetirement ??= reason;
-            earlyRetirement ??= deferred();
-            return earlyRetirement.promise;
+            acquisitionCut = true;
+            terminalNoOwner();
+            return terminalWithoutRevocation as Promise<boolean>;
         }
         try { currentOwner.revoke(reason); }
         catch {
@@ -204,13 +211,12 @@ export function createPortableSupervisorWebSessionControllerV1(sources: Sources)
     const runActivation = async (constraint: PortableSupervisorWebSessionActivationInputV1) => {
         try {
             const acquired = await sources.acquireCaptureOwner(observeTerminal);
-            if (!acquired) throw fail('selection_unavailable');
-            owner = acquired;
-            if (requestedRetirement) {
-                const retirement = revokeLocal(requestedRetirement);
-                try { await retirement; } catch (error) { throw activationError(error); }
+            if (acquisitionCut || phase !== 'activating') {
+                if (acquired) revokeLateOwner(acquired, requestedRetirement ?? 'explicit');
                 throw fail('session_terminal');
             }
+            if (!acquired) throw fail('selection_unavailable');
+            owner = acquired;
             const activated = await sources.activateBridge(() => constrainCapture(acquired, constraint));
             if (phase !== 'activating' || owner !== acquired) throw fail('session_terminal');
             const currentCapture = constrainCapture(acquired, constraint);
@@ -219,7 +225,10 @@ export function createPortableSupervisorWebSessionControllerV1(sources: Sources)
             const result = record({ state: 'active' as const, expiresAt });
             phase = 'active';
             return result;
-        } catch (error) { return cleanupActivation(error); }
+        } catch (error) {
+            if (acquisitionCut) throw fail('session_terminal');
+            return cleanupActivation(error);
+        }
     };
     const activateCurrentSelection = (value: unknown): Promise<PortableSupervisorWebSessionActivationV1> => {
         const constraint = input(value);
