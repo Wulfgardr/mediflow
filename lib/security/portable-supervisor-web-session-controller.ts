@@ -85,10 +85,6 @@ function input(value: unknown): PortableSupervisorWebSessionActivationInputV1 | 
         return record({ expectedPatientId: patient.value, selectionEpoch: epoch.value });
     } catch { return null; }
 }
-function sameInput(left: PortableSupervisorWebSessionActivationInputV1,
-    right: PortableSupervisorWebSessionActivationInputV1): boolean {
-    return left.expectedPatientId === right.expectedPatientId && left.selectionEpoch === right.selectionEpoch;
-}
 function bridgeExpiry(value: unknown, maximum: number): number | null {
     try {
         if (!value || typeof value !== 'object' || Array.isArray(value) || types.isProxy(value)
@@ -127,7 +123,6 @@ export function createPortableSupervisorWebSessionControllerV1(sources: Sources)
     retire(reason: PortableSupervisorWebSessionRetirementReasonV1): Promise<boolean>;
 }> {
     let phase: Phase = 'idle';
-    let expected: PortableSupervisorWebSessionActivationInputV1 | null = null;
     let owner: PortableSupervisorWebCaptureOwnerV1 | null = null;
     let activationPromise: Promise<PortableSupervisorWebSessionActivationV1> | null = null;
     let revocationPromise: Promise<boolean> | null = null;
@@ -230,11 +225,12 @@ export function createPortableSupervisorWebSessionControllerV1(sources: Sources)
         const constraint = input(value);
         if (!constraint) return Promise.reject(fail('input_invalid'));
         if (phase === 'activating' || phase === 'active') {
-            return expected && sameInput(expected, constraint) && activationPromise
-                ? activationPromise : Promise.reject(fail('selection_conflict'));
+            // A second HTTP request has its own request-local H1a context. Input
+            // equality cannot prove it belongs to the session that won the slot.
+            return Promise.reject(fail('selection_conflict'));
         }
         if (phase !== 'idle') return Promise.reject(fail('session_terminal'));
-        phase = 'activating'; expected = constraint;
+        phase = 'activating';
         let accept!: (value: PortableSupervisorWebSessionActivationV1) => void;
         let deny!: (error: unknown) => void;
         activationPromise = new Promise((resolve, reject) => { accept = resolve; deny = reject; });

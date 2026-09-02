@@ -71,8 +71,10 @@ export function IntelligentHostPatientAction({
             if (token === generation.current) setState({ phase: 'ready' });
         }).catch((error: unknown) => {
             if (token !== generation.current) return;
-            setState({ phase: error instanceof IntelligentHostBrowserAdapterError
-                && error.code === 'session_unavailable' ? 'session_unavailable' : 'resync_required' });
+            const code = error instanceof IntelligentHostBrowserAdapterError ? error.code : null;
+            setState({ phase: code === 'session_unavailable' ? 'session_unavailable'
+                : code === 'operation_terminal' || code === 'host_unavailable'
+                    ? 'host_unavailable' : 'resync_required' });
         });
         return () => {
             generation.current += 1;
@@ -111,8 +113,10 @@ export function IntelligentHostPatientAction({
             if (token === generation.current) setState({ phase: 'ready_resynced' });
         } catch (error) {
             if (token !== generation.current) return;
-            setState({ phase: error instanceof IntelligentHostBrowserAdapterError
-                && error.code === 'session_unavailable' ? 'session_unavailable' : 'resync_required' });
+            const code = error instanceof IntelligentHostBrowserAdapterError ? error.code : null;
+            setState({ phase: code === 'session_unavailable' ? 'session_unavailable'
+                : code === 'operation_terminal' || code === 'host_unavailable'
+                    ? 'host_unavailable' : 'resync_required' });
         } finally {
             if (token === generation.current) pending.current = false;
         }

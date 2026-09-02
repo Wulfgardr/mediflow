@@ -104,6 +104,9 @@ test('terminalizes host-side 409 and 503 without retry and fences a completion a
         assert.equal(calls, 3);
         await assert.rejects(() => unavailable.activate(SCOPE, true), rejects('operation_terminal'));
         assert.equal(calls, 3);
+        unavailable.reset();
+        await assert.rejects(() => unavailable.initialize(), rejects('operation_terminal'));
+        assert.equal(calls, 3);
     }
 
     const delayed = deferred<Response>();
@@ -141,6 +144,7 @@ test('declares an accessible quiet action and wires only authoritative patient f
     assert.doesNotMatch(component, /canActivate[\s\S]{0,180}host_unavailable/u);
     assert.match(component, /generation\.current/u);
     assert.match(component, /client\.reset\(\)/u);
+    assert.match(component, /code === 'operation_terminal'[\s\S]{0,100}'host_unavailable'/u);
     assert.doesNotMatch(component, /setInterval|setTimeout|console\.|framer-motion|animate-/u);
     assert.match(page, /<IntelligentHostPatientAction\s+patientId=\{patient\.id\}\s+ambulatoryId=\{patient\.ambulatoryId \?\? null\}\s+\/>\s+<PatientSheetActionsMenu/u);
 });
