@@ -106,6 +106,7 @@ export function createPortableSupervisorContextOwnerProcessV1(sources: Sources):
 }> {
     let generation = 0, revocationGeneration = 0, restartGeneration = 1;
     let parentGeneration = 0, lastProcessNow = -1;
+    let ownerSlot: symbol | RecordState | null = null;
     const policyGeneration = 1;
     const increment = (value: number): number => value < Number.MAX_SAFE_INTEGER ? value + 1 : unavailable();
     const clock = (): number => {
@@ -124,6 +125,7 @@ export function createPortableSupervisorContextOwnerProcessV1(sources: Sources):
     const terminal = (state: RecordState, detached: boolean, restart: boolean): boolean => {
         if (!state.active) return false;
         state.active = false;
+        if (ownerSlot === state) ownerSlot = null;
         const cancel = state.cancel; state.cancel = null;
         try { cancel?.(); } catch { /* Logical authority is already terminal. */ }
         if (!detached) {
@@ -177,9 +179,13 @@ export function createPortableSupervisorContextOwnerProcessV1(sources: Sources):
             expiresAt: state.expiresAt, bootstrapExpiresAt });
     };
     const acquire = async (): Promise<PortableSupervisorContextOwnerV1 | null> => {
+        if (ownerSlot !== null) return null;
+        const acquisition = Symbol('portable-supervisor-acquisition');
+        ownerSlot = acquisition;
         let authenticatedContext: AuthenticatedWebSessionProjectionOwnerContext | null;
-        try { authenticatedContext = await sources.acquireAuthenticatedContext(); } catch { return null; }
-        if (!authenticatedContext) return null;
+        try { authenticatedContext = await sources.acquireAuthenticatedContext(); }
+        catch { if (ownerSlot === acquisition) ownerSlot = null; return null; }
+        if (!authenticatedContext) { if (ownerSlot === acquisition) ownerSlot = null; return null; }
         const authenticated = authenticatedContext.session;
         let scope: ServerSessionSelectionScopeV1 | null = null;
         let registration: ServerSessionSelectionDependentRegistrationV1 | null = null;
@@ -231,12 +237,14 @@ export function createPortableSupervisorContextOwnerProcessV1(sources: Sources):
             if (!sources.selectionLifecycle.confirmDependent(scope, registration)) {
                 terminal(state, false, false); return null;
             }
+            ownerSlot = state;
             read(state);
             const published = state;
             return record({ readHostContext: () => read(published), stop: () => terminal(published, false, false),
                 restart: () => terminal(published, false, true), dispose: () => terminal(published, false, false) });
         } catch { if (state) terminal(state, false, false); return null; }
         finally {
+            if (ownerSlot === acquisition) ownerSlot = null;
             if (!state?.active && scope && registration) {
                 try { sources.selectionLifecycle.unregisterDependent(scope, registration); } catch { /* partial attach denied */ }
             }
