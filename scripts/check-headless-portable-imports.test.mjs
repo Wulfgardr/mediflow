@@ -31,6 +31,12 @@ test('denies database, Web, native and network imports across static and dynamic
         "await import('node:https');",
         "require('node:tls');",
         "const target = 'node:http'; await import(target);",
+        "process.getBuiltinModule('node:net');",
+        "const require = createRequire(import.meta.url); require('node:https');",
+        "eval(\"import('node:net')\");",
+        "new Function(\"return fetch('https://example.invalid')\");",
+        "await fetch('https://example.invalid');",
+        "new WebSocket('wss://example.invalid');",
     ];
     for (const source of forbidden) {
         assert.notDeepEqual(validateHeadlessPortableSource(source, 'packages/mcp/src/server.ts'), [], source);
