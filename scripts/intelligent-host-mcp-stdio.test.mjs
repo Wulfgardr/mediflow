@@ -291,6 +291,40 @@ test('calls the named semantic query tool with only strict allowlisted steps', a
     assert.equal(server.stderr(), '');
 });
 
+test('rejects a semantic result beyond the caller duration budget', async (context) => {
+    const server = startServer(true, { semantic: async () => semanticOutput });
+    context.after(() => { if (server.child.exitCode === null) server.child.kill(); });
+    const response = await server.send('tools/call', {
+        name: 'mediflow.semantic_query_plan.execute.v1',
+        arguments: { ...semanticArguments,
+            budget: { ...semanticArguments.budget, maxDurationMs: semanticOutput.receipt.durationMs - 1 } },
+    });
+    assert.equal(response.result.isError, true);
+    assert.equal(response.result.content[0].text, 'MediFlow operation denied: protocol_invalid.');
+    await server.stop();
+});
+
+test('rejects a semantic result beyond the caller UTF-8 output budget', async (context) => {
+    const utf8Terminology = { ...terminologyOutput,
+        items: [{ ...terminologyOutput.items[0], display: 'é'.repeat(100) }] };
+    const oversized = { ...semanticOutput, steps: [
+        { ...semanticOutput.steps[0], output: utf8Terminology }, semanticOutput.steps[1],
+    ] };
+    const json = JSON.stringify(oversized);
+    const utf8Bytes = Buffer.byteLength(json, 'utf8');
+    assert.ok(utf8Bytes > json.length);
+    const server = startServer(true, { semantic: async () => oversized });
+    context.after(() => { if (server.child.exitCode === null) server.child.kill(); });
+    const response = await server.send('tools/call', {
+        name: 'mediflow.semantic_query_plan.execute.v1',
+        arguments: { ...semanticArguments,
+            budget: { ...semanticArguments.budget, maxOutputBytes: json.length } },
+    });
+    assert.equal(response.result.isError, true);
+    assert.equal(response.result.content[0].text, 'MediFlow operation denied: protocol_invalid.');
+    await server.stop();
+});
+
 test('rejects caller-supplied patient scope and authority before every host service', async (context) => {
     let calls = 0;
     const server = startServer(true, { terminology: () => { calls += 1; return terminologyOutput; },

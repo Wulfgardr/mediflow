@@ -226,7 +226,12 @@ export const semanticQueryOutputSchema = z.object({
   steps: z.array(semanticOutputStepSchema).min(1).max(2), receipt: semanticReceiptSchema,
 }).strict().superRefine((value, context) => {
   if (value.steps.length !== value.receipt.operationCount
-      || new Set(value.steps.map((step) => step.stepRef)).size !== value.steps.length) {
+      || new Set(value.steps.map((step) => step.stepRef)).size !== value.steps.length
+      || value.steps.some((step) => step.operationId === OPEN_LOOPS_OPERATION_ID
+        && (step.output.receipt.generation !== value.receipt.revisionBinding.generation
+          || step.output.receipt.revocationGeneration !== value.receipt.revisionBinding.revocationGeneration
+          || step.output.receipt.selectionEpoch !== value.receipt.revisionBinding.selectionEpoch
+          || step.output.receipt.timestamp > value.receipt.createdAt))) {
     context.addIssue({ code: 'custom', message: 'receipt_mismatch' });
   }
   if (encoder.encode(JSON.stringify(value)).byteLength > 32 * 1024) {
