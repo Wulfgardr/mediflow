@@ -21,7 +21,8 @@ const capture = () => Object.freeze(Object.assign(Object.create(null), {
     selectionEpoch: 7, expectedPatientVersion: 3, expiresAt: 20_000,
 }));
 
-function fixture(responder?: (frame: Record<string, unknown>, emit: (value: unknown) => void) => void) {
+function fixture(responder?: (frame: Record<string, unknown>, emit: (value: unknown) => void) => void,
+    afterDetach?: () => void) {
     let now = 1_000, connected = true, disconnected = 0;
     const frames: string[] = [], listeners = new Set<(message: unknown) => void>();
     const timers: Array<{ delay: number; callback: () => void; active: boolean }> = [];
@@ -35,7 +36,9 @@ function fixture(responder?: (frame: Record<string, unknown>, emit: (value: unkn
             responder?.(decoded, (message) => { for (const listener of [...listeners]) listener(message); });
         },
         onMessage: (listener: (message: unknown) => void) => { listeners.add(listener); },
-        offMessage: (listener: (message: unknown) => void) => { listeners.delete(listener); },
+        offMessage: (listener: (message: unknown) => void) => {
+            listeners.delete(listener); afterDetach?.();
+        },
         disconnect: () => { connected = false; disconnected += 1; },
         schedule: (delay: number, callback: () => void) => {
             const timer = { delay, callback, active: true }; timers.push(timer);
@@ -151,6 +154,55 @@ test('timeout and disconnected transport fail closed and remove per-call resourc
 
     const absent = fixture(); absent.bridge.disconnect();
     await assert.rejects(absent.bridge.activate(capture), rejects('host_unavailable'));
+});
+
+test('disconnect cancels a pending activation before a queued exact ACK can settle it', async () => {
+    const activation: { request: unknown; emit: ((value: unknown) => void) | null } = {
+        request: null, emit: null,
+    };
+    const current = fixture((frame, emit) => {
+        if (frame.method === 'prepare') emit(ack(frame.requestRef, 'prepared', 5_000));
+        else { activation.request = frame.requestRef; activation.emit = emit; }
+    });
+    const pending = current.bridge.activate(capture);
+    for (let turn = 0; turn < 4 && activation.emit === null; turn += 1) await Promise.resolve();
+    const emitActivation = activation.emit;
+    assert.ok(emitActivation);
+    assert.equal(current.listeners.size, 1);
+    const rejected = assert.rejects(pending, rejects('host_unavailable'));
+    current.bridge.disconnect();
+    assert.equal(current.connected(), false);
+    assert.equal(current.listeners.size, 0);
+    assert.equal(current.timers.every((timer) => !timer.active), true);
+    emitActivation(ack(activation.request, 'activated', 20_000));
+    await rejected;
+});
+
+test('disconnect cancels every active exchange and disconnects the transport once', async () => {
+    const current = fixture();
+    const first = assert.rejects(current.bridge.revokeAll('logout'), rejects('host_unavailable'));
+    const second = assert.rejects(current.bridge.revokeAll('restart'), rejects('host_unavailable'));
+    assert.equal(current.listeners.size, 2);
+    current.bridge.disconnect();
+    current.bridge.disconnect();
+    assert.equal(current.disconnected(), 1);
+    assert.equal(current.listeners.size, 0);
+    assert.equal(current.timers.every((timer) => !timer.active), true);
+    await Promise.all([first, second]);
+});
+
+test('disconnect reentered during listener cleanup wins over an activation ACK', async () => {
+    let detachments = 0;
+    const current = fixture((frame, emit) => emit(ack(frame.requestRef,
+        frame.method === 'prepare' ? 'prepared' : 'activated',
+        frame.method === 'prepare' ? 5_000 : 20_000)), () => {
+        detachments += 1;
+        if (detachments === 2) current.bridge.disconnect();
+    });
+    await assert.rejects(current.bridge.activate(capture), rejects('host_unavailable'));
+    assert.equal(current.disconnected(), 1);
+    assert.equal(current.listeners.size, 0);
+    assert.equal(current.timers.every((timer) => !timer.active), true);
 });
 
 test('revoke_all requires its exact ACK within one second and disconnects on failure', async () => {

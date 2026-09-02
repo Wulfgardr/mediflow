@@ -59,10 +59,19 @@ export function createPortableSupervisorWebIpcBridgeV1(sources: Sources): Readon
     revokeAll(reason: RevokeReason): Promise<boolean>;
     disconnect(): void;
 }> {
+    let terminal = false, transportDisconnectAttempted = false;
+    const activeExchanges = new Set<() => void>();
     const disconnect = (): void => {
+        if (!terminal) {
+            terminal = true;
+            const exchanges = [...activeExchanges]; activeExchanges.clear();
+            for (const cancel of exchanges) cancel();
+        }
+        if (transportDisconnectAttempted) return;
         let isConnected: unknown = true;
         try { isConnected = sources.connected(); } catch { /* still attempt disconnect */ }
         discardPromise(isConnected);
+        transportDisconnectAttempted = true;
         if (isConnected === false) return;
         try { discardPromise(sources.disconnect()); } catch { /* logical channel is already unavailable */ }
     };
@@ -73,6 +82,7 @@ export function createPortableSupervisorWebIpcBridgeV1(sources: Sources): Readon
         return value;
     };
     const connected = (): boolean => {
+        if (terminal) return false;
         let value: unknown;
         try { value = sources.connected(); } catch { return false; }
         return !discardPromise(value) && value === true;
@@ -91,20 +101,31 @@ export function createPortableSupervisorWebIpcBridgeV1(sources: Sources): Readon
         if (!connected()) return Promise.reject(new PortableSupervisorWebIpcBridgeV1Error('host_unavailable'));
         return new Promise((resolve, reject) => {
             let settled = false, cancelTimer: (() => void) | null = null;
+            let cancelExchange: (() => void) | null = null;
             const finish = (error: PortableSupervisorWebIpcBridgeV1Error | null,
                 value: PortableSupervisorWebIpcFrameV1 | null, sever = false): void => {
                 if (settled) return;
                 settled = true;
-                try { sources.offMessage(listener); } catch { sever = true; }
+                if (cancelExchange) activeExchanges.delete(cancelExchange);
+                try { if (discardPromise(sources.offMessage(listener))) sever = true; }
+                catch { sever = true; }
                 const cancel = cancelTimer; cancelTimer = null;
-                try { cancel?.(); } catch { sever = true; }
+                try { if (cancel && discardPromise(cancel())) sever = true; }
+                catch { sever = true; }
                 if (sever) {
                     disconnect();
                     if (!error) error = new PortableSupervisorWebIpcBridgeV1Error('host_unavailable');
                 }
+                if (!error && terminal) error = new PortableSupervisorWebIpcBridgeV1Error('host_unavailable');
                 if (error) reject(error); else resolve(value as PortableSupervisorWebIpcFrameV1);
             };
+            cancelExchange = () => finish(
+                new PortableSupervisorWebIpcBridgeV1Error('host_unavailable'), null);
+            activeExchanges.add(cancelExchange);
             const listener: MessageListener = (message) => {
+                if (!connected()) {
+                    finish(new PortableSupervisorWebIpcBridgeV1Error('host_unavailable'), null, true); return;
+                }
                 let response: PortableSupervisorWebIpcFrameV1;
                 try { response = decodePortableSupervisorWebIpcFrameV1(message); }
                 catch { finish(new PortableSupervisorWebIpcBridgeV1Error('protocol_invalid'), null, true); return; }
@@ -117,6 +138,9 @@ export function createPortableSupervisorWebIpcBridgeV1(sources: Sources): Readon
                 }
                 if (response.outcome !== expectedOutcome) {
                     finish(new PortableSupervisorWebIpcBridgeV1Error('protocol_invalid'), null, true); return;
+                }
+                if (!connected()) {
+                    finish(new PortableSupervisorWebIpcBridgeV1Error('host_unavailable'), null, true); return;
                 }
                 finish(null, response);
             };
@@ -137,6 +161,14 @@ export function createPortableSupervisorWebIpcBridgeV1(sources: Sources): Readon
             } catch { finish(new PortableSupervisorWebIpcBridgeV1Error('host_unavailable'), null, true); return; }
             scheduling = false;
             const timerIsPromise = discardPromise(timer);
+            if (settled) {
+                if (!timerIsPromise && typeof timer === 'function' && !types.isProxy(timer)
+                    && !types.isAsyncFunction(timer)) {
+                    try { if (discardPromise((timer as () => unknown)())) disconnect(); }
+                    catch { disconnect(); }
+                }
+                return;
+            }
             if (fired || timerIsPromise || typeof timer !== 'function' || types.isProxy(timer)
                 || types.isAsyncFunction(timer)) {
                 try { if (typeof timer === 'function') timer(); } catch { /* denied timer */ }
