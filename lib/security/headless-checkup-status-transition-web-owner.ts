@@ -26,7 +26,7 @@ const DENIALS = new Set(['invalid_input', 'operation_unavailable', 'resource_una
 
 type Canonical = Record<string, unknown>;
 type Proposal = { input: Readonly<Canonical>; state: 'current' | 'pending' | 'committed' | 'terminal';
-  receipt: HeadlessCheckupStatusReceiptV1 | null };
+  expiresAt: number; receipt: HeadlessCheckupStatusReceiptV1 | null };
 type Gesture = { proposal: Proposal; binding: Readonly<Canonical>; ui: Readonly<Canonical>; generation: number };
 
 function record<T extends object>(value: T): Readonly<T> {
@@ -102,9 +102,11 @@ export function createHeadlessCheckupStatusTransitionWebOwnerV1(sourcesValue: un
     return record(parsed);
   };
   const auditDenied = async (code: string): Promise<void> => {
+    const timestamp = now();
+    if (!integer(timestamp, 1)) return fail('audit_unavailable');
     const audit = record({ schemaVersion: 'mediflow.aip.audit.v1', eventType: 'checkup_status_transition',
       outcome: 'denied', operation: OPERATION, capabilityId: OPERATION, maxStage: 'proposal_only',
-      egress: 'none', writesPerformed: 0, timestamp: 0, denialCode: code });
+      egress: 'none', writesPerformed: 0, timestamp, denialCode: code });
     try { await Promise.resolve(writeAudit(audit)); } catch { return fail('audit_unavailable'); }
   };
   const revoke = (): boolean => {
@@ -130,7 +132,7 @@ export function createHeadlessCheckupStatusTransitionWebOwnerV1(sourcesValue: un
     try {
       scope();
       const input = frame.input as Readonly<Canonical>, preview = candidate.service.preview(input);
-      proposals.set(preview.proposalRef, { input, state: 'current', receipt: null });
+      proposals.set(preview.proposalRef, { input, state: 'current', expiresAt: preview.expiresAt, receipt: null });
       return encodeCheckupStatusTransitionIpcFrameV1({ schemaVersion: CHECKUP_STATUS_TRANSITION_IPC_SCHEMA_V1,
         type: 'preview_result', requestRef, operationId: OPERATION, outcome: 'proposed',
         proposalRef: preview.proposalRef, expiresAt: preview.expiresAt });
@@ -149,6 +151,8 @@ export function createHeadlessCheckupStatusTransitionWebOwnerV1(sourcesValue: un
     const proposal = proposals.get(binding.proposalRef);
     if (!proposal || proposal.state !== 'current' || proposal.input.targetStatus !== binding.targetStatus
       || proposal.input.expectedRevision !== binding.expectedRevision) return fail('proof_replayed');
+    const timestamp = now();
+    if (!integer(timestamp, 1) || timestamp >= proposal.expiresAt) return fail('preview_expired');
     const current = await ui(), gesture = Object.freeze(Object.create(null));
     gestures.set(gesture, { proposal, binding: record(binding), ui: current, generation });
     return gesture;
@@ -158,13 +162,21 @@ export function createHeadlessCheckupStatusTransitionWebOwnerV1(sourcesValue: un
     if (!input || input.schemaVersion !== 'mediflow.patient.checkup.status.transition.confirmation.v1'
       || input.operationId !== OPERATION || typeof input.proposalRef !== 'string'
       || !PROPOSAL_REF.test(input.proposalRef) || typeof input.candidatePin !== 'string'
-      || !input.gesture || typeof input.gesture !== 'object') return fail('invalid_input');
+      || (input.targetStatus !== 'completed' && input.targetStatus !== 'cancelled')
+      || !integer(input.expectedRevision, 1) || !input.gesture || typeof input.gesture !== 'object') {
+      return fail('invalid_input');
+    }
     const proposal = proposals.get(input.proposalRef);
-    if (proposal?.state === 'committed' && proposal.receipt) return proposal.receipt;
+    if (proposal?.state === 'committed' && proposal.receipt) {
+      if (proposal.input.targetStatus === input.targetStatus
+        && proposal.input.expectedRevision === input.expectedRevision) return proposal.receipt;
+      return fail('idempotency_conflict');
+    }
     if (!proposal || proposal.state !== 'current' || proposal.input.targetStatus !== input.targetStatus
       || proposal.input.expectedRevision !== input.expectedRevision) return fail('proof_replayed');
     proposal.state = 'pending';
     try {
+      const confirmationGeneration = generation;
       const gesture = gestures.get(input.gesture as object), before = await ui();
       if (!gesture || gesture.proposal !== proposal || gesture.generation !== generation
         || !sameCurrent(gesture.ui, before) || GESTURE.some((key) => gesture.binding[key] !== input[key])) {
@@ -172,6 +184,9 @@ export function createHeadlessCheckupStatusTransitionWebOwnerV1(sourcesValue: un
       }
       let pin: unknown;
       try { pin = await verifyPin(input.candidatePin as string); } catch { return fail('confirmation_required'); }
+      if (generation !== confirmationGeneration || proposals.get(input.proposalRef as string) !== proposal) {
+        return fail('session_unavailable');
+      }
       const proof = exact(pin, ['actorRef', 'sessionRef']);
       if (!proof || proof.actorRef !== before.actorRef || proof.sessionRef !== before.sessionRef) {
         return fail('confirmation_required');

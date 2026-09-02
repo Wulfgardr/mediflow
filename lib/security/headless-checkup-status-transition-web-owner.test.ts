@@ -19,13 +19,15 @@ for (const name of fs.readdirSync(path.join(root, 'drizzle')).filter((item) => i
 const ACTOR = 'synthetic-physician-web-owner', PATIENT = 'synthetic-patient-web-owner';
 const AMBULATORY = 'synthetic-ambulatory-web-owner', SUCCESS = 'synthetic-checkup-web-success';
 const DENIED = 'synthetic-checkup-web-denied', STALE = 'synthetic-checkup-web-stale';
+const EXPIRED = 'synthetic-checkup-web-expired', CUT = 'synthetic-checkup-web-cut';
 bootstrap.prepare('INSERT INTO ambulatories (id, name, type, version) VALUES (?, ?, ?, 1)')
   .run(AMBULATORY, 'Ambulatorio sintetico', 'test');
 bootstrap.prepare(`INSERT INTO patients (id, first_name, last_name, tax_code, ambulatory_id, is_archived, version)
   VALUES (?, 'Persona', 'Sintetica', 'SYNTHETICWEB01', ?, 0, 1)`).run(PATIENT, AMBULATORY);
 bootstrap.prepare('INSERT INTO patients_to_ambulatories (patient_id, ambulatory_id) VALUES (?, ?)')
   .run(PATIENT, AMBULATORY);
-for (const [id, date] of [[SUCCESS, 1_800_000_000], [DENIED, 1_800_000_100], [STALE, 1_800_000_200]] as const) {
+for (const [id, date] of [[SUCCESS, 1_800_000_000], [DENIED, 1_800_000_100], [STALE, 1_800_000_200],
+  [EXPIRED, 1_800_000_300], [CUT, 1_800_000_400]] as const) {
   bootstrap.prepare(`INSERT INTO checkups (id, patient_id, date, title, status, version)
     VALUES (?, ?, ?, 'Checkup sintetico', 'pending', 1)`).run(id, PATIENT, date);
 }
@@ -39,6 +41,8 @@ function closed<T extends Record<string, unknown>>(value: T): Readonly<T> {
 }
 function fixture(checkupId: string) {
   let now = 1_802_000_000_000, active = true, role = 'physician', version = 1;
+  let pinVerifier = async (pin: string): Promise<unknown> => pin === '2468'
+    ? closed({ actorRef: ACTOR, sessionRef: 'session.synthetic.web' }) : null;
   const scope = () => active ? closed({ status: 'available' as const, actorRef: ACTOR, patientId: PATIENT,
     ambulatoryId: AMBULATORY, checkupId, generation: 5, revocationGeneration: 2, selectionEpoch: 9 })
     : closed({ status: 'denied' as const, code: 'session_unavailable' as const });
@@ -48,8 +52,7 @@ function fixture(checkupId: string) {
   const audits: unknown[] = [];
   const owner = createHeadlessCheckupStatusTransitionWebOwnerV1(closed({
     now: () => now, readHostScopeCandidate: scope, readCurrentUiContext: async () => ui(),
-    verifyFreshPin: async (pin: string) => pin === '2468'
-      ? closed({ actorRef: ACTOR, sessionRef: 'session.synthetic.web' }) : null,
+    verifyFreshPin: async (pin: string) => pinVerifier(pin),
     writeDenialAudit: async (record: unknown) => { audits.push(record); },
   }));
   const select = () => owner.hostUi.issueSelectedCheckupRef();
@@ -63,11 +66,13 @@ function fixture(checkupId: string) {
   };
   return { owner, preview, audits, setActive: (value: boolean) => { active = value; },
     setRole: (value: string) => { role = value; }, setVersion: (value: number) => { version = value; },
-    setNow: (value: number) => { now = value; } };
+    setNow: (value: number) => { now = value; },
+    setPinVerifier: (value: (pin: string) => Promise<unknown>) => { pinVerifier = value; } };
 }
-function command(proposalRef: unknown, gesture: object, candidatePin = '2468') {
+function command(proposalRef: unknown, gesture: object, candidatePin = '2468',
+  targetStatus: 'completed' | 'cancelled' = 'completed', expectedRevision = 1) {
   return closed({ schemaVersion: 'mediflow.patient.checkup.status.transition.confirmation.v1',
-    operationId: OPERATION, proposalRef, targetStatus: 'completed', expectedRevision: 1, candidatePin, gesture });
+    operationId: OPERATION, proposalRef, targetStatus, expectedRevision, candidatePin, gesture });
 }
 after(() => fs.rmSync(dataDir, { recursive: true, force: true }));
 
@@ -80,11 +85,40 @@ test('retains the preview in Web and commits only through Web-local physician PI
   const receipt = await current.owner.hostUi.confirm(input);
   assert.equal(receipt.outcome, 'status_transitioned');
   assert.equal(await current.owner.hostUi.confirm(input), receipt, 'duplicate confirm is receipt-only');
+  await assert.rejects(current.owner.hostUi.confirm(command(preview.proposalRef, gesture, '2468', 'cancelled')),
+    (error: unknown) => (error as { code?: unknown }).code === 'idempotency_conflict');
+  await assert.rejects(current.owner.hostUi.confirm(command(preview.proposalRef, gesture, '2468', 'completed', 2)),
+    (error: unknown) => (error as { code?: unknown }).code === 'idempotency_conflict');
   assert.deepEqual(Reflect.ownKeys(current.owner.parent), ['handlePreview']);
   assert.equal('confirm' in current.owner.parent, false);
   const check = new Database(databasePath, { readonly: true });
   try { assert.deepEqual(check.prepare('SELECT status, version FROM checkups WHERE id = ?').get(SUCCESS),
     { status: 'completed', version: 2 }); } finally { check.close(); current.owner.dispose(); }
+});
+
+test('expires retained proposals and revokes a confirmation while PIN verification is pending', async () => {
+  const expired = fixture(EXPIRED), expiredPreview = await expired.preview();
+  expired.setNow((expiredPreview.expiresAt as number) + 1);
+  await assert.rejects(expired.owner.hostUi.issueExactGesture(closed({ proposalRef: expiredPreview.proposalRef,
+    targetStatus: 'completed', expectedRevision: 1 })),
+  (error: unknown) => (error as { code?: unknown }).code === 'preview_expired');
+
+  const cut = fixture(CUT), cutPreview = await cut.preview();
+  const cutGesture = await cut.owner.hostUi.issueExactGesture(closed({ proposalRef: cutPreview.proposalRef,
+    targetStatus: 'completed', expectedRevision: 1 }));
+  let release!: () => void;
+  const waiting = new Promise<void>((resolve) => { release = resolve; });
+  cut.setPinVerifier(async () => { await waiting; return closed({ actorRef: ACTOR,
+    sessionRef: 'session.synthetic.web' }); });
+  const confirmation = cut.owner.hostUi.confirm(command(cutPreview.proposalRef, cutGesture));
+  await new Promise((resolve) => setImmediate(resolve));
+  cut.owner.revoke(); release();
+  await assert.rejects(confirmation,
+    (error: unknown) => (error as { code?: unknown }).code === 'session_unavailable');
+  const check = new Database(databasePath, { readonly: true });
+  try { for (const id of [EXPIRED, CUT]) assert.deepEqual(
+    check.prepare('SELECT status, version FROM checkups WHERE id = ?').get(id), { status: 'pending', version: 1 }); }
+  finally { check.close(); expired.owner.dispose(); cut.owner.dispose(); }
 });
 
 test('denies wrong role, session cut, stale revision and duplicate preview with zero write', async () => {
