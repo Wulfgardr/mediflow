@@ -6,12 +6,14 @@ import { once } from 'node:events';
 import test from 'node:test';
 
 import {
+    AIP_OPERATION_RPC_AUTHENTICATED_ENV_V1,
     AIP_OPERATION_RPC_ENV_KEY_V1,
     AIP_OPERATION_RPC_MAX_FRAME_BYTES_V1,
     AIP_OPERATION_RPC_MAX_IN_FLIGHT_V1,
     AIP_OPERATION_RPC_MAX_REQUESTS_V1,
     AIP_OPERATION_RPC_REQUEST_SCHEMA_V1,
     AipOperationRpcV1Error,
+    createAipAuthenticatedOperationRpcChildEnvironmentV1,
     createAipOperationRpcChildEnvironmentV1,
     createAipOperationRpcHostV1,
 } from './operation-rpc.ts';
@@ -297,6 +299,11 @@ test('uses a replacement environment and carries call, replay and cancel over in
     assert.equal(environment[AIP_OPERATION_RPC_ENV_KEY_V1], 'inherited_child_ipc_v1');
     assert.equal('PATH' in environment, false);
     assert.equal('HOME' in environment, false);
+    const authenticated = createAipAuthenticatedOperationRpcChildEnvironmentV1(`aipb_${'2'.repeat(32)}`);
+    assert.equal(Object.getPrototypeOf(authenticated), null);
+    assert.deepEqual(Reflect.ownKeys(authenticated), ['MEDIFLOW_AIP_BOOTSTRAP_REF', AIP_OPERATION_RPC_ENV_KEY_V1]);
+    assert.equal(authenticated[AIP_OPERATION_RPC_ENV_KEY_V1], AIP_OPERATION_RPC_AUTHENTICATED_ENV_V1);
+    assert.equal(Object.isFrozen(authenticated), true);
 
     const childSource = `
         process.on('message', (message) => {

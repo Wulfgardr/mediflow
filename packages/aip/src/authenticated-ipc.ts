@@ -2,6 +2,8 @@
 import { types } from 'node:util';
 import type { AipOwnerHandleV1 } from './owner-broker.ts';
 export const AIP_BOOTSTRAP_ENV_KEY_V1 = 'MEDIFLOW_AIP_BOOTSTRAP_REF' as const;
+export const AIP_BOOTSTRAP_REQUEST_SCHEMA_V1 = 'mediflow.aip.bootstrap.v1' as const;
+export const AIP_BOOTSTRAP_RESULT_SCHEMA_V1 = 'mediflow.aip.bootstrap.result.v1' as const;
 export const AIP_IPC_MAX_INPUT_BYTES_V1 = 64 * 1024;
 export const AIP_IPC_MAX_OUTPUT_BYTES_V1 = 4 * 1024;
 export const AIP_IPC_TIMEOUT_MS_V1 = 1_000;
@@ -19,7 +21,7 @@ const BOOTSTRAP = /^aipb_[0-9a-f]{32}$/u;
 const BYTE_LENGTH_GETTER = Object.getOwnPropertyDescriptor(
     Object.getPrototypeOf(Uint8Array.prototype) as object, 'byteLength')?.get;
 const RESPONSE = new TextEncoder().encode(JSON.stringify({
-    schemaVersion: 'mediflow.aip.bootstrap.result.v1', outcome: 'connected',
+    schemaVersion: AIP_BOOTSTRAP_RESULT_SCHEMA_V1, outcome: 'connected',
 }));
 export type AipAuthenticatedIpcV1ErrorCode = 'input_invalid' | 'connection_invalid' | 'frame_invalid'
     | 'frame_oversized' | 'peer_denied' | 'permission_denied' | 'identity_mismatch' | 'bootstrap_invalid'
@@ -206,7 +208,7 @@ export function createAipAuthenticatedIpcHostV1(sourcesValue: unknown) {
             frameValues = exactValues(parsed, FRAME_KEYS);
         } catch { return deny('frame_invalid'); }
         const [schemaVersion, operation, bootstrapRef] = frameValues;
-        if (schemaVersion !== 'mediflow.aip.bootstrap.v1' || operation !== 'bootstrap'
+        if (schemaVersion !== AIP_BOOTSTRAP_REQUEST_SCHEMA_V1 || operation !== 'bootstrap'
             || typeof bootstrapRef !== 'string' || !BOOTSTRAP.test(bootstrapRef)) return deny('frame_invalid');
         const stage = stages.get(bootstrapRef);
         if (!stage) return deny('bootstrap_invalid');

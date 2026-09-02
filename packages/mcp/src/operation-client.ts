@@ -1,7 +1,11 @@
 /* @Codex */
 import { z } from 'zod';
-import { AIP_BOOTSTRAP_ENV_KEY_V1 } from '../../aip/src/authenticated-ipc.ts';
-import { AIP_OPERATION_RPC_ENV_KEY_V1 } from '../../aip/src/operation-rpc.ts';
+import {
+  AIP_BOOTSTRAP_ENV_KEY_V1, AIP_BOOTSTRAP_REQUEST_SCHEMA_V1, AIP_BOOTSTRAP_RESULT_SCHEMA_V1,
+} from '../../aip/src/authenticated-ipc.ts';
+import {
+  AIP_OPERATION_RPC_AUTHENTICATED_ENV_V1, AIP_OPERATION_RPC_ENV_KEY_V1,
+} from '../../aip/src/operation-rpc.ts';
 import {
   HEADLESS_STATUS, OPEN_LOOPS_OPERATION_ID, OPERATION_DESCRIPTORS, RPC_REQUEST_SCHEMA, RPC_RESULT_SCHEMA,
   TERMINOLOGY_OPERATION_ID, openLoopsOutputSchema, publicCatalog, rpcOperationSchema,
@@ -30,25 +34,37 @@ export class OperationClientError extends Error {
 export function createOperationClient() {
   const channel = process;
   const bootstrapRef = channel.env[AIP_BOOTSTRAP_ENV_KEY_V1];
+  const rpcMode = channel.env[AIP_OPERATION_RPC_ENV_KEY_V1];
   if (typeof channel.send !== 'function' || channel.connected !== true
-      || channel.env[AIP_OPERATION_RPC_ENV_KEY_V1] !== 'inherited_child_ipc_v1'
+      || (rpcMode !== 'inherited_child_ipc_v1' && rpcMode !== AIP_OPERATION_RPC_AUTHENTICATED_ENV_V1)
       || typeof bootstrapRef !== 'string' || !/^aipb_[0-9a-f]{32}$/u.test(bootstrapRef)) {
     throw new OperationClientError('host_unbound');
   }
   const pending = new Map<string, Pending>();
   let sequence = 0;
   let closed = false;
+  let authenticated = rpcMode === 'inherited_child_ipc_v1';
+  let resolveBootstrap = (): void => undefined;
+  let rejectBootstrap = (_error: OperationClientError): void => undefined;
+  const bootstrapReady = authenticated ? Promise.resolve() : new Promise<void>((resolve, reject) => {
+    resolveBootstrap = resolve; rejectBootstrap = reject;
+  });
+  void bootstrapReady.catch(() => undefined);
+  let bootstrapTimer: ReturnType<typeof setTimeout> | null = null;
   const failPending = (error: OperationClientError) => {
     for (const entry of pending.values()) { clearTimeout(entry.timer); entry.abort?.(); entry.reject(error); }
     pending.clear();
   };
   const onDisconnect = () => {
     if (closed) return;
-    closed = true; channel.off('message', onMessage); failPending(new OperationClientError('host_unbound'));
+    const error = new OperationClientError('host_unbound');
+    closed = true; channel.off('message', onMessage); failPending(error); rejectBootstrap(error);
   };
   const terminal = (error: OperationClientError) => {
     if (closed) return;
     closed = true; channel.off('message', onMessage); channel.off('disconnect', onDisconnect); failPending(error);
+    rejectBootstrap(error);
+    if (bootstrapTimer) { clearTimeout(bootstrapTimer); bootstrapTimer = null; }
     if (channel.connected && typeof channel.disconnect === 'function') channel.disconnect();
   };
   const invalid = (): never => {
@@ -60,6 +76,15 @@ export function createOperationClient() {
     }
     let decoded: unknown;
     try { decoded = JSON.parse(frame); } catch { terminal(new OperationClientError('protocol_invalid')); return; }
+    if (!authenticated) {
+      const connected = z.object({ schemaVersion: z.literal(AIP_BOOTSTRAP_RESULT_SCHEMA_V1),
+        outcome: z.literal('connected') }).strict().safeParse(decoded);
+      if (!connected.success) { terminal(new OperationClientError('protocol_invalid')); return; }
+      authenticated = true;
+      if (bootstrapTimer) { clearTimeout(bootstrapTimer); bootstrapTimer = null; }
+      resolveBootstrap();
+      return;
+    }
     const parsed = baseResultSchema.safeParse(decoded);
     if (!parsed.success) { terminal(new OperationClientError('protocol_invalid')); return; }
     const entry = pending.get(parsed.data.requestId);
@@ -81,7 +106,7 @@ export function createOperationClient() {
     if (Buffer.byteLength(encoded, 'utf8') > MAX_FRAME_BYTES) throw new OperationClientError('protocol_invalid');
     try { channel.send(encoded); } catch { throw new OperationClientError('host_unbound'); }
   };
-  const exchange = (frame: Record<string, unknown>, label: string, signal?: AbortSignal,
+  const exchangeBound = (frame: Record<string, unknown>, label: string, signal?: AbortSignal,
     cancelOnTimeout = false): Promise<unknown> => {
     const requestId = nextId(label);
     if (signal?.aborted) return Promise.reject(new OperationClientError('cancelled'));
@@ -110,6 +135,9 @@ export function createOperationClient() {
       catch (error) { pending.delete(requestId); clearTimeout(timer); abort?.(); reject(error as OperationClientError); }
     });
   };
+  const exchange = (frame: Record<string, unknown>, label: string, signal?: AbortSignal,
+    cancelOnTimeout = false): Promise<unknown> => bootstrapReady.then(() =>
+      exchangeBound(frame, label, signal, cancelOnTimeout));
   const parseCompleted = (value: unknown, expected: OperationDescriptor): unknown => {
     const completed = z.object({
       schemaVersion: z.literal(RPC_RESULT_SCHEMA), requestId: requestIdSchema, outcome: z.literal('completed'),
@@ -139,6 +167,14 @@ export function createOperationClient() {
   const run = async (descriptor: OperationDescriptor, input: object, signal?: AbortSignal) =>
     parseCompleted(await exchange({ method: 'call', operationId: descriptor.operationId, input },
       'call', signal, true), descriptor);
+
+  if (!authenticated) {
+    bootstrapTimer = setTimeout(() => terminal(new OperationClientError('host_unbound')), REQUEST_TIMEOUT_MS);
+    bootstrapTimer.unref();
+    try {
+      publish({ schemaVersion: AIP_BOOTSTRAP_REQUEST_SCHEMA_V1, operation: 'bootstrap', bootstrapRef });
+    } catch { terminal(new OperationClientError('host_unbound')); }
+  }
 
   return Object.freeze({
     catalog,

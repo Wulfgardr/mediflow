@@ -7,6 +7,7 @@ export const AIP_OPERATION_RPC_MAX_FRAME_BYTES_V1 = 64 * 1024;
 export const AIP_OPERATION_RPC_MAX_IN_FLIGHT_V1 = 8;
 export const AIP_OPERATION_RPC_MAX_REQUESTS_V1 = 256;
 export const AIP_OPERATION_RPC_ENV_KEY_V1 = 'MEDIFLOW_AIP_OPERATION_RPC' as const;
+export const AIP_OPERATION_RPC_AUTHENTICATED_ENV_V1 = 'authenticated_inherited_child_ipc_v1' as const;
 const SOURCE_KEYS = ['operations'] as const;
 const DEFINITION_KEYS = ['operationId', 'capabilityId', 'serviceRef', 'maximumStage', 'timeoutMs', 'execute'] as const;
 const PORT_KEYS = ['subscribe', 'publish'] as const;
@@ -127,6 +128,17 @@ export function createAipOperationRpcChildEnvironmentV1(bootstrapRef: unknown): 
     const environment = Object.create(null) as Record<string, string>;
     environment[AIP_BOOTSTRAP_ENV_KEY_V1] = bootstrapRef;
     environment[AIP_OPERATION_RPC_ENV_KEY_V1] = 'inherited_child_ipc_v1';
+    return Object.freeze(environment);
+}
+export function createAipAuthenticatedOperationRpcChildEnvironmentV1(
+    bootstrapRef: unknown,
+): Readonly<Record<string, string>> {
+    if (typeof bootstrapRef !== 'string' || !BOOTSTRAP.test(bootstrapRef)) {
+        throw new AipOperationRpcV1Error('input_invalid');
+    }
+    const environment = Object.create(null) as Record<string, string>;
+    environment[AIP_BOOTSTRAP_ENV_KEY_V1] = bootstrapRef;
+    environment[AIP_OPERATION_RPC_ENV_KEY_V1] = AIP_OPERATION_RPC_AUTHENTICATED_ENV_V1;
     return Object.freeze(environment);
 }
 export function createAipOperationRpcHostV1(sourcesValue: unknown) {
