@@ -304,6 +304,9 @@ struct VisitDraftComposerView: View {
             Text("Detta col microfono della tastiera di sistema nel campo qui sotto, poi elabora la bozza. Nessun salvataggio automatico: la bozza va rivista prima di essere inserita nella voce.")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
+#if os(macOS)
+            VisitRecordingLumeShell(model: model)
+#endif
             TextEditor(text: $model.newEntryVisitTranscript)
                 .scrollContentBackground(.hidden)
                 .frame(minHeight: 70)
