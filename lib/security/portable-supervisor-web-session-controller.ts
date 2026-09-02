@@ -20,6 +20,7 @@ const INPUT_KEYS = ['expectedPatientId', 'selectionEpoch'] as const;
 const HOST_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
 const RETIRE_REASONS = new Set(['logout', 'application_lock', 'reselection', 'explicit']);
 const CONTEXT_DENIALS = new Set(['context_invalid', 'context_stale']);
+const ACQUISITION_CUT = Symbol('portable-supervisor-web-acquisition-cut');
 
 type Phase = 'idle' | 'activating' | 'active' | 'revoking' | 'terminal';
 export type PortableSupervisorWebSessionRetirementReasonV1 =
@@ -129,6 +130,10 @@ export function createPortableSupervisorWebSessionControllerV1(sources: Sources)
     let acquisitionCut = false;
     let requestedRetirement: PortableSupervisorWebSessionRetirementReasonV1 | null = null;
     let terminalWithoutRevocation: Promise<boolean> | null = null;
+    let signalAcquisitionCut!: () => void;
+    const acquisitionCutSignal = new Promise<typeof ACQUISITION_CUT>((resolve) => {
+        signalAcquisitionCut = () => resolve(ACQUISITION_CUT);
+    });
 
     const disconnect = (): void => {
         try {
@@ -187,6 +192,7 @@ export function createPortableSupervisorWebSessionControllerV1(sources: Sources)
         if (!currentOwner) {
             requestedRetirement ??= reason;
             acquisitionCut = true;
+            signalAcquisitionCut();
             terminalNoOwner();
             return terminalWithoutRevocation as Promise<boolean>;
         }
@@ -210,9 +216,20 @@ export function createPortableSupervisorWebSessionControllerV1(sources: Sources)
     };
     const runActivation = async (constraint: PortableSupervisorWebSessionActivationInputV1) => {
         try {
-            const acquired = await sources.acquireCaptureOwner(observeTerminal);
-            if (acquisitionCut || phase !== 'activating') {
-                if (acquired) revokeLateOwner(acquired, requestedRetirement ?? 'explicit');
+            const acquisition = sources.acquireCaptureOwner(observeTerminal);
+            let lateOwnerRevoked = false;
+            const revokeAcquired = (candidate: PortableSupervisorWebCaptureOwnerV1 | null): void => {
+                if (!candidate || lateOwnerRevoked) return;
+                lateOwnerRevoked = true;
+                revokeLateOwner(candidate, requestedRetirement ?? 'explicit');
+            };
+            void Promise.prototype.then.call(acquisition,
+                (candidate: PortableSupervisorWebCaptureOwnerV1 | null) => {
+                    if (acquisitionCut) revokeAcquired(candidate);
+                }, () => undefined);
+            const acquired = await Promise.race([acquisition, acquisitionCutSignal]);
+            if (acquired === ACQUISITION_CUT || acquisitionCut || phase !== 'activating') {
+                if (acquired !== ACQUISITION_CUT) revokeAcquired(acquired);
                 throw fail('session_terminal');
             }
             if (!acquired) throw fail('selection_unavailable');

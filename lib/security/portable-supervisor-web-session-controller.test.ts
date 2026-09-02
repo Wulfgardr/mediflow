@@ -221,10 +221,15 @@ test('cuts retirement during owner acquisition and revokes a late owner only loc
         new Promise<'still_pending'>((resolve) => setImmediate(() => resolve('still_pending'))),
     ]);
     assert.equal(outcome, false);
+    const activationOutcome = await Promise.race([
+        activationRejection.then(() => 'rejected' as const),
+        new Promise<'still_pending'>((resolve) => setImmediate(() => resolve('still_pending'))),
+    ]);
+    assert.equal(activationOutcome, 'rejected');
     assert.equal(current.revocations(), 0);
     assert.equal(current.disconnects(), 1);
     current.acquisition.resolve();
-    await activationRejection;
+    await new Promise<void>((resolve) => setImmediate(resolve));
     assert.equal(current.activations(), 0);
     assert.equal(current.events.includes('local:logout'), true);
     assert.equal(current.revocations(), 0);

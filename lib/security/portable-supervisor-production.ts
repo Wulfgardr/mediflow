@@ -47,6 +47,7 @@ type RuntimeSources = Readonly<{
 
 // The ACK send callback proves queueing, so keep the authority-free Web child alive to drain its HTTP response.
 export const PORTABLE_SUPERVISOR_WEB_ACK_DRAIN_MS_V1 = 250;
+export const PORTABLE_SUPERVISOR_WEB_ACK_QUEUE_TIMEOUT_MS_V1 = 250;
 
 export type PortableSupervisorProductionRuntimeV1 = Readonly<{
   closed: Promise<void>;
@@ -66,6 +67,7 @@ export function createPortableSupervisorProductionRuntimeV1(
   const { children, mirror } = sources;
   let session: AuthenticatedSession | null = null;
   let authorityRevoked = false, terminal = false, ackPending = false, cleaned = false;
+  let cancelAckQueue: (() => void) | null = null;
   let cancelAckDrain: (() => void) | null = null;
   let unsubscribeWeb: () => void = () => undefined;
   let unsubscribeChild: () => void = () => undefined;
@@ -85,7 +87,9 @@ export function createPortableSupervisorProductionRuntimeV1(
   const cleanup = (): void => {
     if (cleaned) return;
     cleaned = true;
+    const cancelQueue = cancelAckQueue; cancelAckQueue = null;
     const cancel = cancelAckDrain; cancelAckDrain = null;
+    try { cancelQueue?.(); } catch { /* terminal */ }
     try { cancel?.(); } catch { /* terminal */ }
     try { unsubscribeWeb(); } catch { /* terminal */ }
     try { unsubscribeChild(); } catch { /* terminal */ }
@@ -138,6 +142,20 @@ export function createPortableSupervisorProductionRuntimeV1(
       if (typeof cancelAckDrain !== 'function') throw new Error('drain_unavailable');
     } catch { terminate('explicit'); }
   };
+  const beginAckQueueTimeout = (): void => {
+    if (terminal) return;
+    try {
+      cancelAckQueue = sources.schedule(PORTABLE_SUPERVISOR_WEB_ACK_QUEUE_TIMEOUT_MS_V1,
+        finishAfterAckDrain);
+      if (typeof cancelAckQueue !== 'function') throw new Error('queue_timeout_unavailable');
+    } catch { terminate('explicit'); }
+  };
+  const completeAckQueue = (): void => {
+    if (terminal || !cancelAckQueue) return;
+    const cancel = cancelAckQueue; cancelAckQueue = null;
+    try { cancel(); } catch { terminate('explicit'); return; }
+    beginAckDrain();
+  };
   const handleWeb = async (frame: unknown): Promise<void> => {
     if (terminal || ackPending) return;
     let revoke = false;
@@ -148,10 +166,15 @@ export function createPortableSupervisorProductionRuntimeV1(
     try { response = await control.handle(frame); }
     catch { terminate('explicit'); return; }
     if (terminal) return;
-    children.sendWeb(response, (error) => {
-      if (error) terminate('web_disconnect');
-      else if (revoke || authorityRevoked) beginAckDrain();
-    });
+    const terminalAck = revoke || authorityRevoked;
+    if (terminalAck) beginAckQueueTimeout();
+    if (terminal) return;
+    try {
+      children.sendWeb(response, (error) => {
+        if (error) terminate('web_disconnect');
+        else if (terminalAck) completeAckQueue();
+      });
+    } catch { terminate('web_disconnect'); }
   };
   unsubscribeWeb = children.subscribeWeb((frame) => { void handleWeb(frame); });
   unsubscribeChild = children.onTerminal((reason) => { terminate(reason); });
