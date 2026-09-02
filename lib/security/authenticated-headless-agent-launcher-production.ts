@@ -58,7 +58,11 @@ function createProductionLauncher(kind: keyof typeof TARGETS, sourcesValue: unkn
     now: () => Date.now(),
     nextRef: (referenceKind: string) => referenceKind === 'bootstrap'
       ? `aipb_${randomBytes(16).toString('hex')}`
-      : `${referenceKind.replaceAll('_', '.')}.${randomBytes(24).toString('hex')}`,
+      : referenceKind === 'follow_up_proposal'
+        ? `aipfp_${randomBytes(32).toString('hex')}`
+        : referenceKind === 'follow_up_proposal_receipt'
+          ? `aipfr_${randomBytes(32).toString('hex')}`
+          : `${referenceKind.replaceAll('_', '.')}.${randomBytes(24).toString('hex')}`,
     hashRef: (value: string) => `sha256:${createHash('sha256')
       .update('mediflow.headless.authenticated-launcher.v1').update('\0').update(value).digest('hex')}`,
     writeAudit: ports.writeAudit,
