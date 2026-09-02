@@ -4,10 +4,15 @@ import test from 'node:test';
 
 import { createAipOwnerBrokerV1 } from './owner-broker.ts';
 import {
+    PATIENT_OPEN_LOOPS_READ_APPLICATION_SERVICE_V1,
     PATIENT_OPEN_LOOPS_READ_OPERATION_V1,
     PATIENT_OPEN_LOOPS_READ_TIMEOUT_MODE_V1,
     createPatientOpenLoopsReadServiceV1,
 } from './patient-open-loops';
+
+test('pubblica il service ref canonico per i transport host-owned', () => {
+    assert.equal(PATIENT_OPEN_LOOPS_READ_APPLICATION_SERVICE_V1, 'PatientOpenLoopsReadServiceV1');
+});
 
 const NOW = 1_800_000_000_000;
 const DIGEST = `sha256:${'a'.repeat(64)}`;
