@@ -23,9 +23,12 @@ import {
   createLocalAipTerminologySearchServiceV1,
 } from '../../packages/aip/src/terminology-search.ts';
 import {
+  SEMANTIC_QUERY_ALLOWED_READS_V1,
   SEMANTIC_QUERY_OPERATION_CONTRACT_V1,
   createSemanticQueryOperationServiceV1,
 } from '../../packages/aip/src/semantic-query-operation.ts';
+import type { SemanticQueryOperationTerminalAuditCommitV1 } from
+  '../../packages/aip/src/semantic-query-operation-contract.ts';
 import {
   BOOTSTRAP, CHILD_KEYS, CONTEXT_KEYS, DIGEST, REF, SOURCE_KEYS, TOKEN,
   AuthenticatedAgentLauncherV1Error, exact, hostId, integer, record,
@@ -35,6 +38,9 @@ import { createAuthenticatedSessionScopeRegistryV1 } from './authenticated-sessi
 
 const BOOTSTRAP_TIMEOUT_MS = 1_500;
 const SESSION_OPERATION = 'mediflow.system.agent_session.v1';
+const SEMANTIC_SOURCE_LINEAGE = 'mediflow.semantic-query-source-lineage.v1';
+const RESOLVED_SCOPE_KEYS = ['status', 'patientId', 'ambulatoryId', 'generation', 'revocationGeneration',
+  'selectionEpoch', 'restartGeneration', 'expiresAt', 'scopeDigest'] as const;
 
 export { AuthenticatedAgentLauncherV1Error } from './authenticated-agent-launcher-contract.ts';
 export type { AuthenticatedAgentLauncherV1ErrorCode } from './authenticated-agent-launcher-contract.ts';
@@ -48,7 +54,7 @@ export function createAuthenticatedAgentLauncherV1(sourcesValue: unknown) {
   const nextRefSource = sources.nextRef as (kind: string) => unknown;
   const hashRefSource = sources.hashRef as (value: string) => unknown;
   const writeAudit = sources.writeAudit as (value: unknown) => unknown;
-  const commitTerminalAudit = sources.commitTerminalAudit as (value: unknown) => unknown;
+  const commitTerminalAudit = sources.commitTerminalAudit as SemanticQueryOperationTerminalAuditCommitV1;
   const readHostContext = sources.readHostContext as () => unknown;
   const spawnChild = sources.spawnChild as (environment: Readonly<Record<string, string>>) => unknown;
   const createOpenLoopsRead = sources.createOpenLoopsRead as (value: unknown) => unknown;
@@ -192,7 +198,8 @@ export function createAuthenticatedAgentLauncherV1(sourcesValue: unknown) {
     const current = (state: OperationState) => {
       const value = context();
       if (value.userRef !== state.context.userRef || value.parentRef !== state.context.parentRef
-        || value.purposeCode !== state.context.purposeCode) {
+        || value.purposeCode !== state.context.purposeCode || value.patientId !== state.context.patientId
+        || value.ambulatoryId !== state.context.ambulatoryId) {
         throw new AuthenticatedAgentLauncherV1Error('context_unavailable');
       }
       return record({ peerRef: state.peerRef, runtimeRef: state.runtimeRef, generation: value.generation,
@@ -217,6 +224,29 @@ export function createAuthenticatedAgentLauncherV1(sourcesValue: unknown) {
     };
     const authorize = async (state: OperationState) => broker.authorize(broker.issueLease(state.owner),
       current(state), record({ operation: state.operationId, capabilityId: state.capabilityId }));
+    const beginScopedPermit = (state: OperationState, permit: unknown, currentValue: unknown, claim: unknown) => {
+      const execution = broker.beginPermit(permit, currentValue, claim);
+      if (!registry.bindExecution(state.scopeSession, state.owner, execution)) {
+        broker.denyPermit(execution); throw new AuthenticatedAgentLauncherV1Error('operation_unavailable');
+      }
+      return execution;
+    };
+    const resolveScopedCurrent = (state: OperationState, execution: object) => {
+      let resolved: unknown;
+      try { resolved = registry.resolveExecution(execution); } catch {
+        throw new AuthenticatedAgentLauncherV1Error('context_unavailable');
+      }
+      const scope = exact(resolved, RESOLVED_SCOPE_KEYS);
+      const snapshot = current(state);
+      if (!scope || scope.status !== 'available' || scope.scopeDigest !== state.scopeDigest
+        || scope.patientId !== state.context.patientId || scope.ambulatoryId !== state.context.ambulatoryId
+        || scope.generation !== snapshot.generation || scope.revocationGeneration !== snapshot.revocationGeneration
+        || scope.selectionEpoch !== snapshot.selectionEpoch
+        || scope.restartGeneration !== state.context.restartGeneration || scope.expiresAt !== state.context.expiresAt) {
+        throw new AuthenticatedAgentLauncherV1Error('context_unavailable');
+      }
+      return snapshot;
+    };
     const withAbort = async <T>(signal: AbortSignal, cancel: () => void, action: () => Promise<T>): Promise<T> => {
       if (signal.aborted) throw new AuthenticatedAgentLauncherV1Error('operation_unavailable');
       const onAbort = () => cancel();
@@ -227,13 +257,9 @@ export function createAuthenticatedAgentLauncherV1(sourcesValue: unknown) {
     const executeOpenLoops = async (state: OperationState, input: unknown, signal: AbortSignal) => {
       const permit = await authorize(state);
       const candidate = createOpenLoopsRead(record({ now, current: () => current(state),
-        beginPermit: (value: unknown, currentValue: unknown, claim: unknown) => {
-          const execution = broker.beginPermit(value, currentValue, claim);
-          if (!registry.bindExecution(state.scopeSession, state.owner, execution)) {
-            broker.denyPermit(execution); throw new AuthenticatedAgentLauncherV1Error('operation_unavailable');
-          }
-          return execution;
-        }, bindPermit: broker.bindPermit, finalizeBoundPermit: broker.finalizeBoundPermit,
+        beginPermit: (value: unknown, currentValue: unknown, claim: unknown) =>
+          beginScopedPermit(state, value, currentValue, claim),
+        bindPermit: broker.bindPermit, finalizeBoundPermit: broker.finalizeBoundPermit,
         denyPermit: broker.denyPermit, resolveHostScope: registry.resolveExecution, writeAudit }));
       const outer = exact(candidate, ['service']);
       const service = outer?.service as { read?: unknown; cancel?: unknown; dispose?: unknown } | undefined;
@@ -294,8 +320,13 @@ export function createAuthenticatedAgentLauncherV1(sourcesValue: unknown) {
         maximumStage: 'read_only', timeoutMs: 500,
         execute: async (input: unknown, signal: AbortSignal) => {
           const permit = await authorize(semanticState);
+          let semanticExecution: object | null = null;
+          const scopedCurrent = () => {
+            if (!semanticExecution) throw new AuthenticatedAgentLauncherV1Error('operation_unavailable');
+            return resolveScopedCurrent(semanticState, semanticExecution);
+          };
           const currentPolicy = () => {
-            const snapshot = current(semanticState);
+            const snapshot = scopedCurrent();
             return record({ purposeCode: semanticState.context.purposeCode, scope: 'selected_patient' as const,
               generation: snapshot.generation, revocationGeneration: snapshot.revocationGeneration,
               selectionEpoch: snapshot.selectionEpoch,
@@ -304,10 +335,12 @@ export function createAuthenticatedAgentLauncherV1(sourcesValue: unknown) {
               maxOutputBytes: SEMANTIC_QUERY_OPERATION_CONTRACT_V1.limitPolicy.maxOutputBytes });
           };
           const currentSourceRefs = () => {
-            const snapshot = current(semanticState);
-            const sourceRefs = [terminologyState.operationId, openLoopsState.operationId].map((operationId) => {
-              const digest = hashRef(['semantic_query_source_v1', semanticState.scopeDigest, operationId,
-                snapshot.generation, snapshot.revocationGeneration, snapshot.selectionEpoch].join('\0'));
+            const snapshot = scopedCurrent();
+            const sourceRefs = Array.from(SEMANTIC_QUERY_ALLOWED_READS_V1, (source) => {
+              const digest = hashRef([SEMANTIC_SOURCE_LINEAGE, semanticState.scopeDigest, snapshot.generation,
+                snapshot.revocationGeneration, snapshot.selectionEpoch, source.operationId, source.capabilityId,
+                source.applicationServiceRef, source.inputSchema, source.outputSchema,
+                source.maximumStage].join('\0'));
               return `src_${digest.slice('sha256:'.length)}`;
             });
             return record({ generation: snapshot.generation, revocationGeneration: snapshot.revocationGeneration,
@@ -317,8 +350,12 @@ export function createAuthenticatedAgentLauncherV1(sourcesValue: unknown) {
             nextRef: (kind: 'request' | 'action') => {
               const digest = hashRef(nextRef(`semantic_query_${kind}`));
               return `${kind === 'request' ? 'sqrq' : 'sqra'}_${digest.slice('sha256:'.length)}`;
-            }, currentPolicy, currentSourceRefs, currentOwner: () => current(semanticState),
-            beginPermit: broker.beginPermit, finalizePermit: broker.finalizePermit, denyPermit: broker.denyPermit,
+            }, currentPolicy, currentSourceRefs,
+            currentOwner: () => semanticExecution ? scopedCurrent() : current(semanticState),
+            beginPermit: (value: unknown, currentValue: unknown, claim: unknown) => {
+              const execution = beginScopedPermit(semanticState, value, currentValue, claim);
+              semanticExecution = execution; return execution;
+            }, finalizePermit: broker.finalizePermit, denyPermit: broker.denyPermit,
             executeTerminology: (readInput: unknown, readSignal: AbortSignal) =>
               executeTerminology(terminologyState, readInput, readSignal),
             executeOpenLoops: (readInput: unknown, readSignal: AbortSignal) =>
