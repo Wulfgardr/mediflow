@@ -110,7 +110,11 @@ function fixture() {
     runtime, events, sent, sendCallbacks, launch,
     send(frame: unknown) { assert.ok(webListener); webListener(frame); },
     childExit(reason: 'web_disconnect' | 'mcp_disconnect') { assert.ok(terminalListener); terminalListener(reason); },
-    drainAck() { const timer = scheduled.shift(); assert.ok(timer?.active); timer.active = false; timer.callback(); },
+    drainAck() {
+      let timer = scheduled.shift();
+      while (timer && !timer.active) timer = scheduled.shift();
+      assert.ok(timer?.active); timer.active = false; timer.callback();
+    },
     setNow(value: number) { now = value; },
   };
 }
@@ -156,8 +160,9 @@ test('revokes authority and MCP before waiting for the revoke ACK send callback'
   await waitFor(() => current.sent.length === 3);
   const revoked = decodePortableSupervisorWebIpcFrameV1(current.sent[2]);
   assert.equal(revoked.outcome, 'revoked');
-  assert.deepEqual(current.events.slice(-4), [
-    'session.close', 'mirror.revoke', 'mcp.terminate', 'web.send.revoked',
+  assert.deepEqual(current.events.slice(-5), [
+    'session.close', 'mirror.revoke', 'mcp.terminate',
+    'web.drain.scheduled', 'web.send.revoked',
   ]);
   assert.equal(current.events.includes('web.terminate'), false);
   current.send(request({ method: 'revoke_all', reason: 'explicit',
@@ -182,6 +187,24 @@ test('drains an activation denial after a terminal launcher failure, then stops 
   current.sendCallbacks.shift()?.(null); current.drainAck(); await current.runtime.closed;
   assert.equal(current.events.filter((event) => event === 'web.terminate').length, 1);
   assert.equal(current.events.filter((event) => event === 'mirror.revoke').length, 1);
+});
+
+test('bounds a terminal ACK whose Web send callback never settles', async () => {
+  const current = fixture();
+  const challenge = await prepare(current);
+  current.send(request({ method: 'activate', challenge, capture }));
+  current.launch.resolve(Object.freeze({
+    schemaVersion: 'mediflow.headless.authenticated-launch.v1', status: 'authenticated',
+    close: () => { current.events.push('session.close'); return true; },
+  }));
+  await waitFor(() => current.sent.length === 2); current.sendCallbacks.shift()?.(null);
+
+  current.send(request({ method: 'revoke_all', reason: 'logout' }));
+  await waitFor(() => current.sent.length === 3);
+  assert.equal(current.events.includes('mirror.revoke'), true);
+  current.drainAck();
+  await current.runtime.closed;
+  assert.equal(current.events.filter((event) => event === 'web.terminate').length, 1);
 });
 
 test('child loss or malformed Web IPC terminalizes the complete topology once', async () => {
