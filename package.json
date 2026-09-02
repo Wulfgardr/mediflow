@@ -20,6 +20,7 @@
     "mini": "node scripts/run-strip-types.mjs packages/mini/src/cli.ts",
     "test:mini-cli": "node scripts/run-strip-types.mjs --test packages/mini/src/cli.test.ts",
     "mcp:intelligent-host": "node scripts/run-strip-types.mjs scripts/intelligent-host-mcp-stdio.mjs",
+    "mcp:intelligent-host:production": "node scripts/run-strip-types.mjs scripts/mediflow-headless-supervisor.mjs",
     "test:mcp:intelligent-host": "node scripts/run-strip-types.mjs --test packages/mcp/src/contracts.test.ts packages/mcp/src/import-boundary.test.ts scripts/intelligent-host-mcp-stdio.test.mjs",
     "check:headless-portable-imports": "node scripts/check-headless-portable-imports.mjs",
     "test:headless-portable": "node scripts/run-headless-portable-tests.mjs",
