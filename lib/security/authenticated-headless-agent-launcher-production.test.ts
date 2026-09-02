@@ -133,3 +133,37 @@ test('late-bound MCP port observes every rejected lifecycle Promise before denia
     await new Promise<void>((resolve) => setImmediate(resolve));
   }
 });
+
+test('late-bound MCP port denies a publish queued reentrantly before failed bind termination', async () => {
+  const environment = createAipAuthenticatedOperationRpcChildEnvironmentV1(`aipb_${'f'.repeat(32)}`);
+  const listeners = new Set<(frame: unknown) => void>();
+  let publishCalls = 0, terminateCalls = 0;
+  const child = record({
+    connection: record({}),
+    subscribe(listener: (frame: unknown) => void) {
+      listeners.add(listener);
+      return () => { listeners.delete(listener); };
+    },
+    publish() {
+      publishCalls += 1;
+      for (const listener of listeners) listener('synthetic-bootstrap-request');
+      return Promise.reject(new Error('synthetic bind failure'));
+    },
+    onClose() { return () => undefined; },
+    terminate() { terminateCalls += 1; },
+  });
+  const port = createLateBoundMcpChildPortV1(child, environment);
+  let lateOutcome = 'pending';
+
+  assert.throws(() => port.subscribe(() => {
+    void Promise.resolve().then(() => {
+      try { port.publish('synthetic-late-frame'); lateOutcome = 'published'; }
+      catch { lateOutcome = 'denied'; }
+    });
+  }), /child_unavailable/u);
+  await new Promise<void>((resolve) => setImmediate(resolve));
+
+  assert.equal(lateOutcome, 'denied');
+  assert.equal(publishCalls, 1);
+  assert.equal(terminateCalls, 1);
+});

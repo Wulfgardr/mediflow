@@ -86,6 +86,7 @@ export function createLateBoundMcpChildPortV1(
     };
   };
   const publish = (frame: string): void => {
+    if (terminated) unavailable();
     let result: unknown;
     try { result = typeof frame === 'string' ? child.publish(frame) : null; }
     catch {
