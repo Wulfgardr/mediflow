@@ -57,6 +57,8 @@ export const AUDIT_EVENT_TYPES = [
     'ai.review.rejected',
     /* @Codex: terminal PHI-safe audit for the bounded semantic-query operation. */
     'agent.semantic_query.executed',
+    /* @Codex: non-terminal PHI-safe attempt emitted by generic AIP ports. */
+    'agent.operation.attempted',
     /* @Codex: PHI-safe receipt for the host-owned WHO reference-data boundary. */
     'reference_data.icd11.search',
 ] as const;
