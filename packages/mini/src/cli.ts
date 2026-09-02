@@ -2,7 +2,8 @@
 import { argv, exit, stdin, stdout } from 'node:process';
 import { z } from 'zod';
 import {
-  followUpProposalArgumentsSchema, openLoopsArgumentsSchema, terminologyArgumentsSchema,
+  followUpProposalArgumentsSchema, openLoopsArgumentsSchema, semanticQueryArgumentsSchema,
+  terminologyArgumentsSchema,
 } from '../../mcp/src/contracts.ts';
 import { OperationClientError, createOperationClient } from '../../mcp/src/operation-client.ts';
 
@@ -22,6 +23,7 @@ const requestSchema = z.discriminatedUnion('command', [
   z.object({ command: z.literal('terminology search'), args: terminologyArgumentsSchema }).strict(),
   z.object({ command: z.literal('open-loops'), args: openLoopsArgumentsSchema }).strict(),
   z.object({ command: z.literal('follow-up-proposal'), args: followUpProposalArgumentsSchema }).strict(),
+  z.object({ command: z.literal('semantic-query'), args: semanticQueryArgumentsSchema }).strict(),
 ]);
 
 function hasDuplicateKeys(source: string): boolean {
@@ -119,7 +121,9 @@ if (argv.length === 3 && argv[2] === '--help') {
             ? await client.searchTerminology(request.args)
             : request.command === 'open-loops'
               ? await client.readOpenLoops()
-              : await client.proposeOpenLoopsFollowUp(request.args);
+              : request.command === 'follow-up-proposal'
+                ? await client.proposeOpenLoopsFollowUp(request.args)
+                : await client.executeSemanticQuery(request.args);
         client.close(); succeed(result);
       } catch (error) {
         client?.close();

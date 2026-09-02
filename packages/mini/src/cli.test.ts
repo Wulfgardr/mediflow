@@ -23,6 +23,11 @@ const capabilities = [{ operationId: 'mediflow.terminology.search.v1', capabilit
   capabilityId: 'mediflow.patient.open_loops.follow_up.propose.v1', maximumStage: 'proposal_only',
   inputSchema: 'mediflow.patient.open_loops.follow_up.propose.input.v1',
   outputSchema: 'mediflow.patient.open_loops.follow_up.proposal.v1',
+}, {
+  operationId: 'mediflow.semantic_query_plan.execute.v1',
+  capabilityId: 'mediflow.semantic_query_plan.execute.v1', maximumStage: 'read_only',
+  inputSchema: 'mediflow.semantic-query-operation.input.v1',
+  outputSchema: 'mediflow.semantic-query-execution.result.v1',
 }];
 const capabilityCatalog = { schemaVersion: 'mediflow.system.capabilities.v1', operations: capabilities };
 const status = { schemaVersion: 'mediflow.system.headless-status.v1', candidateVersion: '0.8.5',
@@ -60,6 +65,28 @@ const proposal = { schemaVersion: 'mediflow.patient.open_loops.follow_up.proposa
     sourceReceiptRefHash: `sha256:${'a'.repeat(64)}`, basedOnSnapshotRevision: 7,
     itemCount: 1, truncated: false, maximumStage: 'proposal_only', reviewRequired: true,
     writesPerformed: 0, apply: 'none', egress: 'none', timestamp: 1_001 } };
+const semanticArgs = { budget: { maxSteps: 2, maxDurationMs: 250, maxOutputBytes: 32_768 },
+  explanation: 'Search local terminology and read selected open loops.',
+  steps: [{ stepRef: 'step_terminology', operationId: 'mediflow.terminology.search.v1',
+    input: { system: 'LOINC', query: '  synthetic   query ', limit: 3 } },
+  { stepRef: 'step_open_loops', operationId: 'mediflow.patient.open_loops.read.v1', input: {} }] };
+const semanticInput = { schemaVersion: 'mediflow.semantic-query-operation.input.v1',
+  operationId: 'mediflow.semantic_query_plan.execute.v1', budget: semanticArgs.budget,
+  explanation: semanticArgs.explanation,
+  steps: [{ stepRef: 'step_terminology', operationId: 'mediflow.terminology.search.v1',
+    input: { schemaVersion: 'mediflow.terminology.search.input.v1',
+      operationId: 'mediflow.terminology.search.v1', system: 'LOINC', query: 'synthetic query', limit: 3 } },
+  { stepRef: 'step_open_loops', operationId: 'mediflow.patient.open_loops.read.v1',
+    input: { schemaVersion: 'mediflow.patient.open_loops.read.input.v1',
+      operationId: 'mediflow.patient.open_loops.read.v1' } }] };
+const semantic = { schemaVersion: 'mediflow.semantic-query-execution.result.v1', outcome: 'read_completed',
+  steps: [{ stepRef: 'step_terminology', operationId: 'mediflow.terminology.search.v1', output: terminology },
+    { stepRef: 'step_open_loops', operationId: 'mediflow.patient.open_loops.read.v1', output: loops }],
+  receipt: { schemaVersion: 'mediflow.headless.receipt.v1', requestRef: `sqrq_${'b'.repeat(64)}`,
+    actionRef: `sqra_${'c'.repeat(64)}`, capabilityId: 'mediflow.semantic_query_plan.execute.v1',
+    outcome: 'orchestration', policyDecision: 'allowed',
+    revisionBinding: { generation: 1, revocationGeneration: 0, selectionEpoch: 2 },
+    operationCount: 2, durationMs: 4, createdAt: 1_002, writesPerformed: 0, applyPolicy: 'none' } };
 const success = (result: unknown) => `${JSON.stringify({ schemaVersion: SCHEMA, ok: true, result })}\n`;
 const failure = (code: string) => `${JSON.stringify({ schemaVersion: SCHEMA, ok: false, error: { code } })}\n`;
 
@@ -73,7 +100,8 @@ type BoundOptions = { args?: string[]; timeoutMs?: number;
   trustedEnvironment?: boolean;
   terminology?: (input: unknown, signal: AbortSignal) => unknown;
   openLoops?: (input: unknown, signal: AbortSignal) => unknown;
-  proposal?: (input: unknown, signal: AbortSignal) => unknown };
+  proposal?: (input: unknown, signal: AbortSignal) => unknown;
+  semantic?: (input: unknown, signal: AbortSignal) => unknown };
 async function runBound(input: string | Buffer, options: BoundOptions = {}) {
   const environment = createAipOperationRpcChildEnvironmentV1(`aipb_${'1'.repeat(32)}`);
   const child: ChildProcess = spawn(process.execPath,
@@ -96,6 +124,11 @@ async function runBound(input: string | Buffer, options: BoundOptions = {}) {
     serviceRef: 'PatientOpenLoopsFollowUpProposalServiceV1', maximumStage: 'proposal_only',
     timeoutMs: options.timeoutMs ?? 250,
     execute: options.proposal ?? ((value: unknown) => { observed.push(value); return proposal; }),
+  }, {
+    operationId: 'mediflow.semantic_query_plan.execute.v1',
+    capabilityId: 'mediflow.semantic_query_plan.execute.v1', serviceRef: 'SemanticQueryOperationServiceV1',
+    maximumStage: 'read_only', timeoutMs: options.timeoutMs ?? 250,
+    execute: options.semantic ?? ((value: unknown) => { observed.push(value); return semantic; }),
   }] });
   host.attach({ subscribe: (listener: (frame: unknown) => void) => {
     child.on('message', listener); return () => child.off('message', listener);
@@ -147,10 +180,18 @@ test('requests one review-only follow-up proposal with an exact empty caller inp
   assert.doesNotMatch(result.stdout, /patientId|patientName|birth|diagnosis|reasoning|prompt|authority|provider/iu);
 });
 
+test('executes one strict semantic-query command with canonical allowlisted steps', async () => {
+  const result = await runBound(JSON.stringify({ command: 'semantic-query', args: semanticArgs }));
+  assert.equal(result.code, 0); assert.equal(result.stderr, ''); assert.equal(result.stdout, success(semantic));
+  assert.deepEqual(JSON.parse(JSON.stringify(result.observed)), [semanticInput]);
+  assert.equal(semantic.receipt.writesPerformed, 0); assert.equal(semantic.receipt.applyPolicy, 'none');
+  assert.doesNotMatch(result.stdout, /patientId|ambulatoryId|authority|provider|venue|sql/iu);
+});
+
 test('fails all valid commands closed when inherited host IPC is absent', () => {
   const requests = [{ command: 'status', args: {} }, { command: 'capabilities', args: {} }, { command: 'terminology search',
     args: { system: 'LOINC', query: 'synthetic', limit: 1 } }, { command: 'open-loops', args: {} },
-  { command: 'follow-up-proposal', args: {} }];
+  { command: 'follow-up-proposal', args: {} }, { command: 'semantic-query', args: semanticArgs }];
   for (const request of requests) {
     const result = runUnbound(JSON.stringify(request));
     assert.equal(result.status, 69); assert.equal(result.stderr, '');
@@ -185,6 +226,10 @@ test('rejects extra, duplicate and unknown caller fields before host service ent
   const invalid = ['{"command":"open-loops","args":{"patientId":"sensitive-value"}}',
     '{"command":"follow-up-proposal","args":{"text":"forbidden"}}',
     '{"command":"terminology search","args":{"system":"LOINC","query":"x","limit":1,"authority":"caller"}}',
+    JSON.stringify({ command: 'semantic-query', args: { ...semanticArgs, authority: 'caller' } }),
+    JSON.stringify({ command: 'semantic-query', args: { ...semanticArgs,
+      steps: [{ stepRef: 'step_generic', operationId: 'generic.invoke', input: { sql: 'SELECT *' } },
+        semanticArgs.steps[1]] } }),
     '{"command":"open-loops","command":"capabilities","args":{}}',
     '{"command":"patient show","args":{}}', 'not-secret-json'];
   for (const input of invalid) {

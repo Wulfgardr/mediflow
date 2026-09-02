@@ -4,6 +4,7 @@ import { z } from 'zod';
 export const TERMINOLOGY_OPERATION_ID = 'mediflow.terminology.search.v1' as const;
 export const OPEN_LOOPS_OPERATION_ID = 'mediflow.patient.open_loops.read.v1' as const;
 export const FOLLOW_UP_PROPOSAL_OPERATION_ID = 'mediflow.patient.open_loops.follow_up.propose.v1' as const;
+export const SEMANTIC_QUERY_OPERATION_ID = 'mediflow.semantic_query_plan.execute.v1' as const;
 export const HEADLESS_STATUS_TOOL_ID = 'mediflow.system.headless_status.v1' as const;
 export const CAPABILITIES_TOOL_ID = 'mediflow.system.capabilities.v1' as const;
 export const RPC_REQUEST_SCHEMA = 'mediflow.aip.operation.request.v1' as const;
@@ -37,6 +38,13 @@ export const OPERATION_DESCRIPTORS = Object.freeze([Object.freeze({
   maximumStage: 'proposal_only' as const,
   inputSchema: 'mediflow.patient.open_loops.follow_up.propose.input.v1',
   outputSchema: 'mediflow.patient.open_loops.follow_up.proposal.v1',
+}), Object.freeze({
+  operationId: SEMANTIC_QUERY_OPERATION_ID,
+  capabilityId: SEMANTIC_QUERY_OPERATION_ID,
+  serviceRef: 'SemanticQueryOperationServiceV1',
+  maximumStage: 'read_only' as const,
+  inputSchema: 'mediflow.semantic-query-operation.input.v1',
+  outputSchema: 'mediflow.semantic-query-execution.result.v1',
 })]);
 export type OperationDescriptor = (typeof OPERATION_DESCRIPTORS)[number];
 
@@ -174,6 +182,54 @@ export const followUpProposalOutputSchema = z.object({
     context.addIssue({ code: 'custom', message: 'receipt_mismatch' });
   }
   if (encoder.encode(JSON.stringify(value)).byteLength > 16 * 1024) {
+    context.addIssue({ code: 'custom', message: 'output_oversized' });
+  }
+});
+
+const semanticStepRef = z.string().regex(/^step_[a-z0-9_]{1,48}$/u);
+const semanticBudgetSchema = z.object({
+  maxSteps: z.number().int().min(1).max(2), maxDurationMs: z.number().int().min(1).max(250),
+  maxOutputBytes: z.number().int().min(1).max(32 * 1024),
+}).strict();
+const semanticQueryStepSchema = z.discriminatedUnion('operationId', [z.object({
+  stepRef: semanticStepRef, operationId: z.literal(TERMINOLOGY_OPERATION_ID), input: terminologyArgumentsSchema,
+}).strict(), z.object({
+  stepRef: semanticStepRef, operationId: z.literal(OPEN_LOOPS_OPERATION_ID), input: openLoopsArgumentsSchema,
+}).strict()]);
+export const semanticQueryArgumentsSchema = z.object({
+  budget: semanticBudgetSchema,
+  explanation: safeText(512).refine((value) => value.length >= 8 && value.trim() === value),
+  steps: z.array(semanticQueryStepSchema).min(1).max(2),
+}).strict().superRefine((value, context) => {
+  if (value.steps.length !== value.budget.maxSteps
+      || new Set(value.steps.map((step) => step.stepRef)).size !== value.steps.length) {
+    context.addIssue({ code: 'custom', message: 'plan_mismatch' });
+  }
+});
+
+const semanticOutputStepSchema = z.discriminatedUnion('operationId', [z.object({
+  stepRef: semanticStepRef, operationId: z.literal(TERMINOLOGY_OPERATION_ID), output: terminologyOutputSchema,
+}).strict(), z.object({
+  stepRef: semanticStepRef, operationId: z.literal(OPEN_LOOPS_OPERATION_ID), output: openLoopsOutputSchema,
+}).strict()]);
+const semanticReceiptSchema = z.object({
+  schemaVersion: z.literal('mediflow.headless.receipt.v1'),
+  requestRef: z.string().regex(/^sqrq_[0-9a-f]{64}$/u), actionRef: z.string().regex(/^sqra_[0-9a-f]{64}$/u),
+  capabilityId: z.literal(SEMANTIC_QUERY_OPERATION_ID), outcome: z.literal('orchestration'),
+  policyDecision: z.literal('allowed'), revisionBinding: z.object({
+    generation: z.number().int().safe().min(1), revocationGeneration: safeInteger, selectionEpoch: safeInteger,
+  }).strict(), operationCount: z.number().int().min(1).max(2), durationMs: safeInteger, createdAt: safeInteger,
+  writesPerformed: z.literal(0), applyPolicy: z.literal('none'),
+}).strict();
+export const semanticQueryOutputSchema = z.object({
+  schemaVersion: z.literal('mediflow.semantic-query-execution.result.v1'), outcome: z.literal('read_completed'),
+  steps: z.array(semanticOutputStepSchema).min(1).max(2), receipt: semanticReceiptSchema,
+}).strict().superRefine((value, context) => {
+  if (value.steps.length !== value.receipt.operationCount
+      || new Set(value.steps.map((step) => step.stepRef)).size !== value.steps.length) {
+    context.addIssue({ code: 'custom', message: 'receipt_mismatch' });
+  }
+  if (encoder.encode(JSON.stringify(value)).byteLength > 32 * 1024) {
     context.addIssue({ code: 'custom', message: 'output_oversized' });
   }
 });

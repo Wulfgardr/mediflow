@@ -2,9 +2,10 @@
 import { McpServer } from '@modelcontextprotocol/server';
 import {
   CAPABILITIES_TOOL_ID, FOLLOW_UP_PROPOSAL_OPERATION_ID, HEADLESS_STATUS_TOOL_ID, OPEN_LOOPS_OPERATION_ID,
-  TERMINOLOGY_OPERATION_ID, capabilitiesOutputSchema, followUpProposalArgumentsSchema,
+  SEMANTIC_QUERY_OPERATION_ID, TERMINOLOGY_OPERATION_ID, capabilitiesOutputSchema, followUpProposalArgumentsSchema,
   followUpProposalOutputSchema, headlessStatusOutputSchema, openLoopsArgumentsSchema, openLoopsOutputSchema,
-  systemArgumentsSchema, terminologyArgumentsSchema, terminologyOutputSchema,
+  semanticQueryArgumentsSchema, semanticQueryOutputSchema, systemArgumentsSchema, terminologyArgumentsSchema,
+  terminologyOutputSchema,
 } from './contracts.ts';
 import { OperationClientError, createOperationClient } from './operation-client.ts';
 
@@ -97,6 +98,23 @@ export async function createUsefulMcpServer() {
         const output = await bound.proposeOpenLoopsFollowUp(args, context.mcpReq.signal);
         return { content: [{ type: 'text',
           text: `Follow-up proposal returned ${output.items.length} review item(s); apply none.` }],
+        structuredContent: output };
+      } catch (error) { return toolError(error); }
+    });
+  }
+  if (client && has(SEMANTIC_QUERY_OPERATION_ID)) {
+    const bound = client;
+    server.registerTool(SEMANTIC_QUERY_OPERATION_ID, {
+      title: 'Execute bounded semantic query',
+      description: 'Runs one strict read-only plan over two allowlisted local operations. No writes.',
+      inputSchema: semanticQueryArgumentsSchema, outputSchema: semanticQueryOutputSchema, annotations,
+      _meta: { 'mediflow/capabilityId': SEMANTIC_QUERY_OPERATION_ID,
+        'mediflow/maximumStage': 'read_only', 'mediflow/surfaceKind': 'bounded_orchestration' },
+    }, async (args, context) => {
+      try {
+        const output = await bound.executeSemanticQuery(args, context.mcpReq.signal);
+        return { content: [{ type: 'text',
+          text: `Semantic query completed ${output.steps.length} read step(s); writes 0, apply none.` }],
         structuredContent: output };
       } catch (error) { return toolError(error); }
     });
