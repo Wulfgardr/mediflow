@@ -2,6 +2,7 @@
 import { types } from 'node:util';
 
 export const PATIENT_OPEN_LOOPS_READ_OPERATION_V1 = 'mediflow.patient.open_loops.read.v1' as const;
+export const PATIENT_OPEN_LOOPS_READ_APPLICATION_SERVICE_V1 = 'PatientOpenLoopsReadServiceV1' as const;
 export const PATIENT_OPEN_LOOPS_READ_MAX_ITEMS_V1 = 32 as const;
 export const PATIENT_OPEN_LOOPS_READ_PURPOSE_V1 = 'care_coordination' as const;
 export const PATIENT_OPEN_LOOPS_READ_TIMEOUT_MODE_V1 = 'cooperative_pending_promise_and_post_callback_fence' as const;
