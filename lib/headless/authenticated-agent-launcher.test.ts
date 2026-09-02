@@ -1,6 +1,6 @@
 /* @Codex */
 import assert from 'node:assert/strict';
-import { spawn, type ChildProcess } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -32,7 +32,6 @@ function result() {
 
 test('launches a real Mini child and serves host-scoped open loops over authenticated inherited IPC', async () => {
   let sequence = 0;
-  let child: ChildProcess | null = null;
   let stdout = '', stderr = '';
   let resolveExit!: (code: number | null) => void;
   const exited = new Promise<number | null>((resolve) => { resolveExit = resolve; });
@@ -58,7 +57,6 @@ test('launches a real Mini child and serves host-scoped open loops over authenti
           cwd: DEPENDENCY_ROOT, env: { ...environment } as NodeJS.ProcessEnv,
           stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
         });
-      child = process;
       process.stdout!.setEncoding('utf8'); process.stderr!.setEncoding('utf8');
       process.stdout!.on('data', (chunk: string) => { stdout += chunk; });
       process.stderr!.on('data', (chunk: string) => { stderr += chunk; });
@@ -124,7 +122,6 @@ test('launches a real Mini child and serves host-scoped open loops over authenti
   assert.equal(scopes.length, 1);
   assert.equal(JSON.stringify(audits).includes(PATIENT_ID), false);
   assert.equal(JSON.stringify(audits).includes(AMBULATORY_ID), false);
-  assert.equal(child?.exitCode, 0);
   assert.equal(session.close(), false);
 });
 
