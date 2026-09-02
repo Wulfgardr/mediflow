@@ -321,7 +321,11 @@ test('accepts the final package-owner delegated terminal logout', () => {
 });
 
 test('rejects route cookie, delegation, and terminal-response drift', () => {
-    const delegate = 'return completeExactWebP3Logout(bearerCookie, controlCookie, request);';
+    const serviceCall = 'completeExactWebP3Logout(bearerCookie, controlCookie, request)';
+    const delegate = `return completePortableSupervisorWebLifecycleMutationV1(
+        ${serviceCall},
+        'logout',
+    );`;
     const mutations = [
         ['wrong service module', replaceOnce(
             logoutRoute,
@@ -356,22 +360,27 @@ test('rejects route cookie, delegation, and terminal-response drift', () => {
         ['wrapped delegated response', replaceOnce(
             logoutRoute,
             delegate,
-            'const response = await completeExactWebP3Logout(bearerCookie, controlCookie, request); void response; return new Response(null, { status: 204 });',
+            `const response = await ${serviceCall}; void response; return new Response(null, { status: 204 });`,
         ), logoutService],
         ['optional delegated call', replaceOnce(
             logoutRoute,
-            delegate,
-            'return completeExactWebP3Logout?.(bearerCookie, controlCookie, request);',
+            serviceCall,
+            'completeExactWebP3Logout?.(bearerCookie, controlCookie, request)',
         ), logoutService],
         ['duplicate delegated call', replaceOnce(
             logoutRoute,
             delegate,
-            'void completeExactWebP3Logout(bearerCookie, controlCookie, request); ' + delegate,
+            `void ${serviceCall}; ${delegate}`,
         ), logoutService],
         ['dynamic delegated call', replaceOnce(
             logoutRoute,
-            delegate,
-            "return (await import('./logout')).completeExactWebP3Logout(bearerCookie, controlCookie, request);",
+            serviceCall,
+            "(await import('./logout')).completeExactWebP3Logout(bearerCookie, controlCookie, request)",
+        ), logoutService],
+        ['wrong lifecycle reason', replaceOnce(
+            logoutRoute,
+            "        'logout',",
+            "        'application_lock',",
         ), logoutService],
     ];
     assertLogoutMutationsRejected(mutations);

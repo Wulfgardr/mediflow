@@ -653,7 +653,7 @@ function isUnconditionalOwnerCall(owner, call) {
 }
 
 const EXACT_LOGOUT_RECORD_VALIDATOR_BODY = `{ if (!value || typeof value !== 'object' || isProxy(value)) return null; try { if (ObjectGetPrototypeOf(value) !== prototype || (frozen && !ObjectIsFrozen(value)) || ObjectGetOwnPropertySymbols(value).length !== 0) return null; const names = ObjectGetOwnPropertyNames(value); if (names.length !== keys.length) return null; for (const key of keys) { if (!names.includes(key)) return null; const descriptor = ObjectGetOwnPropertyDescriptor(value, key); if (!descriptor || !('value' in descriptor) || !descriptor.enumerable) return null; if (frozen && (descriptor.configurable || descriptor.writable)) return null; } return value as ExactRecord; } catch { return null; } }`;
-const EXACT_LOGOUT_COOKIE_VALIDATOR_BODY = `{ const record = exactRecord(value, ['name', 'value'], Object.prototype, false); return record?.name === name && typeof record.value === 'string' && pattern.test(record.value) ? record.value : null; }`;
+const EXACT_LOGOUT_COOKIE_VALIDATOR_BODY = `{ const plain = exactRecord(value, ['name', 'value'], Object.prototype, false); const framework = plain ? null : exactRecord(value, ['name', 'value', 'path'], Object.prototype, false); const record = plain ?? (framework?.path === '/' ? framework : null); return record?.name === name && typeof record.value === 'string' && pattern.test(record.value) ? record.value : null; }`;
 const EXACT_LOGOUT_PROJECTION_VALIDATOR_BODY = `{ const resolution = exactRecord(value, ['status', 'projection'], null, true); if (!resolution || resolution.status !== 'active') return null; const projection = exactRecord(resolution.projection, SESSION_KEYS, null, true); if (!projection || projection.id !== sessionId || projection.authChannel !== 'web' || typeof projection.userId !== 'string' || !projection.userId || typeof projection.username !== 'string' || !projection.username || typeof projection.role !== 'string' || !projection.role || typeof projection.createdAt !== 'number' || !Number.isSafeInteger(projection.createdAt) || typeof projection.expiresAt !== 'number' || !Number.isSafeInteger(projection.expiresAt) || projection.expiresAt <= DateNow()) return null; return resolution.projection as WebSessionProjection; }`;
 const EXACT_LOGOUT_RECEIPT_VALIDATOR_BODY = `{ const oneField = exactRecord(value, ['outcome'], null, true); const twoFields = oneField ? null : exactRecord(value, ['outcome', 'etag'], null, true); const record = oneField ?? twoFields; if (!record || (record.outcome !== 'completed' && record.outcome !== 'denied' && record.outcome !== 'failed')) return null; if (!twoFields) return { outcome: record.outcome, etag: null }; const etag = strongWebAuthControlEtag(twoFields.etag); return etag ? { outcome: record.outcome, etag } : null; }`;
 
@@ -765,9 +765,15 @@ function exactCookieLookup(expression, checker, cookieStore, sessionCookieName) 
 
 function validateExactServiceOwnedLogoutRoute(sourceFile, checker, spec) {
     const delegated = spec.modes.delegated;
-    const [cookiesImport, serviceImport, sessionConstant, controlConstant, handler] = sourceFile.statements;
+    const lifecycleModule = '@/lib/security/portable-supervisor-web-lifecycle';
+    const lifecycleExport = 'completePortableSupervisorWebLifecycleMutationV1';
+    const [cookiesImport, serviceImport, lifecycleImport, sessionConstant, controlConstant, handler] = sourceFile.statements;
     const problems = [];
     const cookiesBinding = importedBinding(sourceFile, checker, 'next/headers', 'cookies')?.symbol;
+    const serviceBinding = importedBinding(
+        sourceFile, checker, delegated.serviceModule, delegated.serviceExport,
+    )?.symbol;
+    const lifecycleBinding = importedBinding(sourceFile, checker, lifecycleModule, lifecycleExport)?.symbol;
     const exactStringConstant = (statement, name, value) => {
         if (!ts.isVariableStatement(statement) || !(statement.declarationList.flags & ts.NodeFlags.Const)
             || statement.declarationList.declarations.length !== 1) return null;
@@ -778,9 +784,10 @@ function validateExactServiceOwnedLogoutRoute(sourceFile, checker, spec) {
     };
     const sessionCookieBinding = exactStringConstant(sessionConstant, 'SESSION_COOKIE_NAME', 'mediflow_session');
     const controlCookieBinding = exactStringConstant(controlConstant, 'CONTROL_COOKIE_NAME', 'mediflow_auth_control');
-    if (sourceFile.statements.length !== 5
+    if (sourceFile.statements.length !== 6
         || !exactNamedImport(cookiesImport, 'next/headers', 'cookies')
         || !exactNamedImport(serviceImport, delegated.serviceModule, delegated.serviceExport)
+        || !exactNamedImport(lifecycleImport, lifecycleModule, lifecycleExport)
         || !sessionCookieBinding || !controlCookieBinding
         || !handler || !ts.isFunctionDeclaration(handler) || !handler.name || handler.name.text !== delegated.handler
         || !ts.getModifiers(handler)?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)) {
@@ -815,9 +822,16 @@ function validateExactServiceOwnedLogoutRoute(sourceFile, checker, spec) {
     const controlRead = acquisitionStatements[2] && ts.isExpressionStatement(acquisitionStatements[2])
         ? unwrap(acquisitionStatements[2].expression) : null;
     const returnStatement = statements[3] && ts.isReturnStatement(statements[3]) ? statements[3] : null;
-    const delegateCall = returnStatement?.expression && unwrap(returnStatement.expression);
-    const exactDelegate = Boolean(delegateCall && ts.isCallExpression(delegateCall) && !delegateCall.questionDotToken
-        && ts.isIdentifier(delegateCall.expression) && delegateCall.expression.text === delegated.serviceExport
+    const lifecycleCall = returnStatement?.expression && unwrap(returnStatement.expression);
+    const delegateCall = lifecycleCall && ts.isCallExpression(lifecycleCall)
+        ? unwrap(lifecycleCall.arguments[0]) : null;
+    const lifecycleReason = lifecycleCall && ts.isCallExpression(lifecycleCall)
+        ? unwrap(lifecycleCall.arguments[1]) : null;
+    const exactDelegate = Boolean(lifecycleCall && ts.isCallExpression(lifecycleCall)
+        && !lifecycleCall.questionDotToken && exactIdentifierBinding(checker, lifecycleCall.expression, lifecycleBinding)
+        && lifecycleCall.arguments.length === 2 && ts.isStringLiteral(lifecycleReason) && lifecycleReason.text === 'logout'
+        && delegateCall && ts.isCallExpression(delegateCall) && !delegateCall.questionDotToken
+        && exactIdentifierBinding(checker, delegateCall.expression, serviceBinding)
         && exactArguments(delegateCall, [
             { identifier: bearer?.name ?? '' }, { identifier: control?.name ?? '' },
             { identifier: request?.name && ts.isIdentifier(request.name) ? request.name.text : '' },
@@ -1032,7 +1046,8 @@ export function validateLogoutAuditModes({ spec, routeSource, serviceSource = nu
     const routeCall = routeCalls[0];
     const directDelegate = routeCall && ts.isIdentifier(unwrap(routeCall.expression))
         && unwrap(routeCall.expression).text === importedName(route.sourceFile, delegated.serviceModule, delegated.serviceExport);
-    const serviceReturn = routeCall?.parent && ts.isReturnStatement(routeCall.parent) ? routeCall.parent : null;
+    const serviceStatement = routeCall ? directStatement(handler, routeCall) : null;
+    const serviceReturn = serviceStatement && ts.isReturnStatement(serviceStatement) ? serviceStatement : null;
     const routeReturns = handler ? directReturnStatements(handler) : [];
     if (routeCalls.length !== 1 || !directDelegate || !serviceReturn
         || routeReturns.length !== 1 || routeReturns[0] !== serviceReturn) {
