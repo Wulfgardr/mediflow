@@ -206,7 +206,7 @@ test('maps host timeout to a typed PHI-safe denial and drops late completion', a
 
 test('keeps help, format and input budgets deterministic', async () => {
   const help = spawnSync(process.execPath, ['--experimental-strip-types', '--import', LOADER, CLI, '--help'], {
-    cwd: ROOT, encoding: 'utf8', timeout: 5_000, env: TEST_MODULE_ENV,
+    cwd: ROOT, encoding: 'utf8', timeout: 5_000, env: TEST_MODULE_ENV as NodeJS.ProcessEnv,
   });
   assert.equal(help.status, 0); assert.equal(help.stderr, '');
   assert.equal(help.stdout, 'Usage: mediflow-mini [--format json|ndjson] < request.json\n');
