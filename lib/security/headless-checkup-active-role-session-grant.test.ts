@@ -1,22 +1,26 @@
 /* @Codex */
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { test } from 'node:test';
+import { afterEach, test } from 'node:test';
 
 import { createHeadlessCheckupActiveRoleSessionGrantOwner,
   HeadlessCheckupActiveRoleSessionGrantError } from './headless-checkup-active-role-session-grant.ts';
+import { issueSyntheticWebSession, retireSyntheticWebSession } from
+  './web-auth-lifecycle-owner-test-fixture.ts';
 
-const ACTOR = 'synthetic-checkup-grant-actor', NOW = 1_900_000_000_000;
+const ACTOR = 'synthetic-checkup-grant-actor', NOW = Date.now() + 1_000;
 const TTL = 8 * 60 * 60 * 1_000;
+const sessions: Array<ReturnType<typeof issueSyntheticWebSession>> = [];
+let sequence = 0;
 function record<T extends object>(value: T): Readonly<T> {
   return Object.freeze(Object.assign(Object.create(null), value));
 }
 function fixture() {
   const state = { now: NOW, patientId: 'synthetic-patient-a', ambulatoryId: 'synthetic-ambulatory-a',
-    epoch: 4, terminal: 0, unregister: 0, cancel: 0, registrationDispose: null as (() => void) | null,
-    expiryDispose: null as (() => void) | null, attestationReads: 0 };
-  const session = record({ id: 'a'.repeat(64), userId: ACTOR, username: 'synthetic-checkup-admin',
-    role: 'admin', authChannel: 'web', createdAt: NOW - 2_000, expiresAt: NOW + TTL + 10_000 });
+    epoch: 4, terminal: 0, cancel: 0, expiryDispose: null as (() => void) | null, attestationReads: 0 };
+  const session = issueSyntheticWebSession({ id: ACTOR, username: 'synthetic-checkup-admin', role: 'admin' },
+    `checkup-grant-${sequence += 1}`);
+  sessions.push(session);
   let currentSession: unknown = session;
   let currentAttestation: unknown = activeAttestation();
   const owner = Object.freeze({
@@ -32,11 +36,7 @@ function fixture() {
   const context = record({ session, owner });
   const grantOwner = createHeadlessCheckupActiveRoleSessionGrantOwner({
     now: () => state.now,
-    readSession: () => currentSession,
     readAttestation: () => { state.attestationReads++; return currentAttestation; },
-    registerSessionResource: (_sessionRef, dispose) => {
-      state.registrationDispose = dispose; return () => { state.unregister++; state.registrationDispose = null; };
-    },
     schedule: (_delay, dispose) => {
       state.expiryDispose = dispose; return () => { state.cancel++; state.expiryDispose = null; };
     },
@@ -45,6 +45,10 @@ function fixture() {
     setSession(value: unknown) { currentSession = value; },
     setAttestation(value: unknown) { currentAttestation = value; } };
 }
+
+afterEach(() => {
+  while (sessions.length > 0) retireSyntheticWebSession(sessions.pop()!);
+});
 function activeAttestation(change: Record<string, unknown> = {}): unknown {
   return record({ attestationRef: `hcar_${'b'.repeat(32)}`, actorRef: ACTOR,
     schemaVersion: 'mediflow.headless-checkup-active-role-attestation.v1', role: 'physician',
@@ -89,7 +93,7 @@ test('rejects inactive, revoked, expired, wrong-operation, or ineligible session
 
 test('terminalizes grant on logout, attestation revocation, reselection, expiry, and replay', () => {
   const cases: Array<(current: ReturnType<typeof fixture>) => void> = [
-    (current) => current.state.registrationDispose?.(),
+    (current) => { retireSyntheticWebSession(current.session); },
     (current) => current.setAttestation(activeAttestation({ status: 'revoked', revocationGeneration: 1,
       revokedAt: new Date(NOW) })),
     (current) => { current.state.epoch += 1; },
@@ -108,9 +112,9 @@ test('terminalizes grant on logout, attestation revocation, reselection, expiry,
 test('double-read drift and wrong request context publish no usable grant', () => {
   const drift = fixture(); let read = 0;
   const driftOwner = createHeadlessCheckupActiveRoleSessionGrantOwner({
-    now: () => NOW, readSession: () => drift.session,
+    now: () => NOW,
     readAttestation: () => ++read === 1 ? activeAttestation() : activeAttestation({ issuerRef: `hcari_${'d'.repeat(32)}` }),
-    registerSessionResource: () => () => undefined, schedule: () => () => undefined,
+    schedule: () => () => undefined,
   });
   assert.throws(() => driftOwner.issue(drift.context, () => undefined), hasCode('projection_stale'));
 
@@ -122,17 +126,12 @@ test('double-read drift and wrong request context publish no usable grant', () =
   assert.equal(current.state.terminal, 1);
 });
 
-test('synchronous registration retirement and async callbacks fail closed', () => {
-  const current = fixture(); let calls = 0;
-  const raced = createHeadlessCheckupActiveRoleSessionGrantOwner({
-    now: () => NOW, readSession: () => current.session, readAttestation: () => activeAttestation(),
-    registerSessionResource: (_session, dispose) => { dispose(); return () => { calls++; }; },
-    schedule: () => () => undefined,
-  });
-  assert.throws(() => raced.issue(current.context, () => { calls++; }), hasCode('lifecycle_unavailable'));
-  assert.equal(calls, 2);
+test('external P3 retirement and async callbacks fail closed', () => {
+  const current = fixture();
   const grant = current.grantOwner.issue(current.context, () => { current.state.terminal++; });
   assert.throws(() => current.grantOwner.withCurrent(grant, async () => 'forbidden'), hasCode('lifecycle_unavailable'));
+  assert.equal(current.state.terminal, 0);
+  assert.equal(current.grantOwner.withCurrent(grant, () => 'current'), 'current');
 });
 
 test('imports no request ambient, review authority, PIN, proof, writer, or IPC boundary', () => {

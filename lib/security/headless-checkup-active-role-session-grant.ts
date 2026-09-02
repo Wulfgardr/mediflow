@@ -3,6 +3,11 @@ import 'server-only';
 
 import { types } from 'node:util';
 
+import { abortResourceUse, beginResourceUse, commitResourceUse, mintResourcePort,
+  registerPrivateResource, releaseResourcePort, unregisterPrivateResource, withCurrentResourceBinding,
+  type WebResourceBinding, type WebResourcePort, type WebResourceRegistration,
+  type WebResourceUse } from './web-auth-lifecycle-owner-adapter';
+
 const ATTESTATION_SCHEMA = 'mediflow.headless-checkup-active-role-attestation.v1';
 const OPERATION = 'mediflow.patient.checkup.status.transition.v1';
 const POLICY = 'physician_confirmed_single_use.v1';
@@ -13,21 +18,21 @@ const ATTESTATION_KEYS = ['attestationRef', 'actorRef', 'schemaVersion', 'role',
   'revokedAt', 'createdAt', 'updatedAt'] as const;
 const SESSION_REF = /^[0-9a-f]{64}$/u, ATTESTATION_REF = /^hcar_[0-9a-f]{32}$/u;
 const ISSUER_REF = /^hcari_[0-9a-f]{32}$/u;
+const CALLBACK_FAILED = Object.freeze(Object.create(null));
 
 type Canonical = Record<string, unknown>;
 type Context = Readonly<{ session: Canonical; owner: Canonical }>;
 type Snapshot = Readonly<{ session: Canonical; owner: Canonical; actorRef: string; sessionRef: string;
   attestationRef: string; issuerRef: string; activatedAt: number; updatedAt: number; expiresAt: number;
   patientId: string; ambulatoryId: string; selectionEpoch: number }>;
-type RecordState = { active: boolean; grant: HeadlessCheckupActiveRoleSessionGrantV1; snapshot: Snapshot;
-  unregister: (() => void) | null; cancel: (() => void) | null; onTerminal: () => void };
+type RecordState = { active: boolean; published: boolean; grant: HeadlessCheckupActiveRoleSessionGrantV1;
+  snapshot: Snapshot; port: WebResourcePort | null; registration: WebResourceRegistration | null;
+  cancel: (() => void) | null; onTerminal: () => void };
 declare const grantIdentity: unique symbol;
 export type HeadlessCheckupActiveRoleSessionGrantV1 = Readonly<{ readonly [grantIdentity]?: never }>;
 export type HeadlessCheckupActiveRoleSessionGrantSources = Readonly<{
   now(): unknown;
-  readSession(sessionRef: string): unknown;
   readAttestation(actorRef: string): unknown;
-  registerSessionResource(sessionRef: string, dispose: () => void): unknown;
   schedule(delayMs: number, dispose: () => void): unknown;
 }>;
 export class HeadlessCheckupActiveRoleSessionGrantError extends Error {
@@ -78,9 +83,7 @@ function session(value: unknown, observedAt: number): Canonical {
     || (item.expiresAt as number) <= observedAt) return fail('session_unavailable');
   return value as Canonical;
 }
-function attestation(value: unknown, actorRef: string, observedAt: number): Readonly<{
-  attestationRef: string; issuerRef: string; activatedAt: number; updatedAt: number; expiresAt: number;
-}> {
+function attestation(value: unknown, actorRef: string, observedAt: number) {
   const item = exact(value, ATTESTATION_KEYS);
   if (!item || item.actorRef !== actorRef || item.schemaVersion !== ATTESTATION_SCHEMA || item.role !== 'physician'
     || item.operationId !== OPERATION || item.policyVersion !== POLICY || item.attestationVersion !== 1
@@ -97,7 +100,7 @@ function attestation(value: unknown, actorRef: string, observedAt: number): Read
     || activatedAt > updatedAt || updatedAt > observedAt || activatedAt > observedAt
     || expiresAt - activatedAt !== TTL_MS) return fail('attestation_unavailable');
   if (expiresAt <= observedAt) return fail('attestation_expired');
-  return Object.freeze({ attestationRef: item.attestationRef, issuerRef: item.issuerRef,
+  return Object.freeze({ attestationRef: item.attestationRef as string, issuerRef: item.issuerRef,
     activatedAt, updatedAt, expiresAt });
 }
 function context(value: unknown): Context {
@@ -120,24 +123,30 @@ function callback(value: unknown): value is (...args: unknown[]) => unknown {
   return typeof value === 'function' && !types.isProxy(value) && !types.isAsyncFunction(value)
     && !types.isGeneratorFunction(value);
 }
+function validBinding(value: WebResourceBinding, actorRef: string): boolean {
+  const item = exact(value, ['principalRef', 'authenticationGeneration']);
+  return !!item && item.principalRef === actorRef && !!item.authenticationGeneration
+    && typeof item.authenticationGeneration === 'object' && exact(item.authenticationGeneration, []) !== null;
+}
 
-/** Process owner for a checkup-only role grant captured in an authenticated Web request. */
+/** Process owner for a checkup-only grant captured from the external P3 Web owner in a request. */
 export function createHeadlessCheckupActiveRoleSessionGrantOwner(sources: HeadlessCheckupActiveRoleSessionGrantSources) {
-  const grants = new WeakMap<object, RecordState>(); let operationActive = false;
-  const terminate = (record: RecordState, notify = true): void => {
+  const grants = new WeakMap<object, RecordState>(); let operationActive = false, operationPoisoned = false;
+  const terminate = (record: RecordState, notify = true, ownerCleanup = false): void => {
     if (!record.active) return;
     record.active = false; grants.delete(record.grant);
-    const unregister = record.unregister, cancel = record.cancel; record.unregister = null; record.cancel = null;
-    try { unregister?.(); } catch { /* terminal */ }
+    const port = record.port, registration = record.registration, cancel = record.cancel;
+    record.port = null; record.registration = null; record.cancel = null;
     try { cancel?.(); } catch { /* terminal */ }
-    if (notify) { try { record.onTerminal(); } catch { /* terminal */ } }
+    if (!ownerCleanup) {
+      try { if (port && registration) unregisterPrivateResource(port, registration); } catch { /* terminal */ }
+      try { if (port) releaseResourcePort(port); } catch { /* terminal */ }
+    }
+    if (notify && record.published) { try { record.onTerminal(); } catch { /* terminal */ } }
   };
   const snapshot = (captured: Context): Snapshot => {
-    const observedAt = now(sources.now); let sessionValue: unknown, attestationValue: unknown;
-    try { sessionValue = sources.readSession(captured.session.id as string); }
-    catch { return fail('session_unavailable'); }
-    const currentSession = session(sessionValue, observedAt);
-    if (currentSession !== captured.session) return fail('session_unavailable');
+    const observedAt = now(sources.now), currentSession = session(captured.session, observedAt);
+    let attestationValue: unknown;
     try { attestationValue = sources.readAttestation(currentSession.userId as string); }
     catch { return fail('attestation_unavailable'); }
     const role = attestation(attestationValue, currentSession.userId as string, observedAt);
@@ -145,23 +154,38 @@ export function createHeadlessCheckupActiveRoleSessionGrantOwner(sources: Headle
     try { selected = Reflect.apply(captured.owner.withLeaseCriticalSection as (...args: unknown[]) => unknown,
       captured.owner, [captured.session, (selection: unknown) => {
         const pair = selection && typeof selection === 'object' ? selection as Canonical : null;
-        const selectionEpoch = Reflect.apply(captured.owner.snapshotSelectionEpoch as (...args: unknown[]) => unknown,
+        const epoch = Reflect.apply(captured.owner.snapshotSelectionEpoch as (...args: unknown[]) => unknown,
           captured.owner, [captured.session]);
         if (!pair || typeof pair.patientId !== 'string' || typeof pair.ambulatoryId !== 'string'
-          || !Number.isSafeInteger(selectionEpoch) || (selectionEpoch as number) < 0) return fail('session_unavailable');
-        return { patientId: pair.patientId, ambulatoryId: pair.ambulatoryId, selectionEpoch };
+          || !Number.isSafeInteger(epoch) || (epoch as number) < 0) return fail('session_unavailable');
+        return { patientId: pair.patientId, ambulatoryId: pair.ambulatoryId, selectionEpoch: epoch as number };
       }]); } catch (error) { if (error instanceof HeadlessCheckupActiveRoleSessionGrantError) throw error;
       return fail('session_unavailable'); }
     if (!selected || typeof selected !== 'object') return fail('session_unavailable');
-    const scope = selected as { patientId: string; ambulatoryId: string; selectionEpoch: number };
     return Object.freeze(Object.assign(Object.create(null), { session: captured.session, owner: captured.owner,
       actorRef: currentSession.userId as string, sessionRef: currentSession.id as string, ...role,
-      expiresAt: Math.min(role.expiresAt, currentSession.expiresAt as number), ...scope }));
+      expiresAt: Math.min(role.expiresAt, currentSession.expiresAt as number), ...selected })) as Snapshot;
   };
   const stable = (captured: Context): Snapshot => {
     const before = snapshot(captured), after = snapshot(captured);
     if (!same(before, after)) return fail('projection_stale');
     return after;
+  };
+  const resource = <T>(record: Pick<RecordState, 'active' | 'port' | 'snapshot'>,
+    operation: () => T): T => {
+    const port = record.port; if (!record.active || !port) return fail('grant_unavailable');
+    let use: WebResourceUse | null = null, committed = false, invoked = false, output: T;
+    try {
+      use = beginResourceUse(port); if (!use) return fail('grant_unavailable');
+      const current = withCurrentResourceBinding(use, (binding) => {
+        if (!validBinding(binding, record.snapshot.actorRef)) throw CALLBACK_FAILED;
+        output = operation(); invoked = true;
+      });
+      if (!current || !invoked || !record.active) return fail('grant_unavailable');
+      committed = commitResourceUse(use);
+      if (!committed || !record.active) return fail('grant_unavailable');
+      return output!;
+    } finally { if (use && !committed) abortResourceUse(use); }
   };
   const current = (candidate: unknown, presented?: Context): RecordState => {
     if (!candidate || typeof candidate !== 'object' || types.isProxy(candidate)) return fail('grant_unavailable');
@@ -172,57 +196,48 @@ export function createHeadlessCheckupActiveRoleSessionGrantOwner(sources: Headle
     if (presented && (presented.session !== record.snapshot.session || presented.owner !== record.snapshot.owner)) {
       terminate(record); return fail('projection_stale');
     }
-    let observed: Snapshot;
-    try { observed = stable({ session: record.snapshot.session, owner: record.snapshot.owner }); }
-    catch (error) { terminate(record); throw error; }
-    if (!same(observed, record.snapshot)) { terminate(record); return fail('projection_stale'); }
     return record;
   };
   const invoke = <T>(candidate: unknown, operation: () => T, presented?: unknown): T => {
-    if (!callback(operation) || operationActive) return fail('lifecycle_unavailable');
-    const requestContext = presented === undefined ? undefined : context(presented), record = current(candidate, requestContext);
-    operationActive = true;
+    if (!callback(operation)) return fail('lifecycle_unavailable');
+    if (operationActive) { operationPoisoned = true; return fail('lifecycle_unavailable'); }
+    const request = presented === undefined ? undefined : context(presented), record = current(candidate, request);
+    operationPoisoned = false; operationActive = true;
     try {
-      const result = operation();
-      if (types.isPromise(result) || !record.active) { terminate(record); return fail('lifecycle_unavailable'); }
-      current(candidate, requestContext);
-      return result;
-    } catch (error) { terminate(record); throw error; }
+      return resource(record, () => {
+        const before = stable({ session: record.snapshot.session, owner: record.snapshot.owner });
+        if (!same(before, record.snapshot)) return fail('projection_stale');
+        const result = operation();
+        if (operationPoisoned || types.isPromise(result) || !record.active) return fail('lifecycle_unavailable');
+        const after = stable({ session: record.snapshot.session, owner: record.snapshot.owner });
+        if (!same(after, record.snapshot)) return fail('projection_stale');
+        return result;
+      });
+    } catch (error) { terminate(record); throw error === CALLBACK_FAILED ? fail('grant_unavailable') : error; }
     finally { operationActive = false; }
   };
   return Object.freeze({
     issue(value: unknown, onTerminalValue: unknown): HeadlessCheckupActiveRoleSessionGrantV1 {
-      const captured = context(value);
-      if (!callback(onTerminalValue)) return fail('input_invalid');
+      const captured = context(value); if (!callback(onTerminalValue)) return fail('input_invalid');
       const initial = stable(captured), grant = Object.freeze(Object.create(null)) as HeadlessCheckupActiveRoleSessionGrantV1;
-      const record: RecordState = { active: true, grant, snapshot: initial, unregister: null, cancel: null,
-        onTerminal: onTerminalValue as () => void };
-      let unregister: unknown, cancel: unknown;
+      const port = mintResourcePort(initial.session); if (!port) return fail('lifecycle_unavailable');
+      const record: RecordState = { active: true, published: false, grant, snapshot: initial, port,
+        registration: null, cancel: null, onTerminal: onTerminalValue as () => void };
       try {
-        unregister = sources.registerSessionResource(initial.sessionRef, () => terminate(record, true));
-        if (!record.active) return fail('lifecycle_unavailable');
-        cancel = sources.schedule(initial.expiresAt - now(sources.now), () => terminate(record, true));
-      } catch {
-        try { if (typeof unregister === 'function') unregister(); } catch { /* unpublished */ }
-        try { if (typeof cancel === 'function') cancel(); } catch { /* unpublished */ }
-        record.active = false; return fail('lifecycle_unavailable');
-      }
-      if (typeof unregister !== 'function' || types.isProxy(unregister) || types.isAsyncFunction(unregister)
-        || typeof cancel !== 'function' || types.isProxy(cancel) || types.isAsyncFunction(cancel)) {
-        try { if (typeof unregister === 'function') unregister(); } catch { /* unpublished */ }
-        try { if (typeof cancel === 'function') cancel(); } catch { /* unpublished */ }
-        record.active = false; return fail('lifecycle_unavailable');
-      }
-      if (!record.active) {
-        try { unregister(); } catch { /* unpublished */ }
-        try { cancel(); } catch { /* unpublished */ }
+        resource(record, () => undefined);
+        const registration = registerPrivateResource(port, () => terminate(record, true, true));
+        if (!registration || !record.active) return fail('lifecycle_unavailable');
+        record.registration = registration;
+        const cancel = sources.schedule(initial.expiresAt - now(sources.now), () => terminate(record));
+        if (!callback(cancel) || !record.active) return fail('lifecycle_unavailable');
+        record.cancel = cancel as () => void;
+        const final = resource(record, () => stable(captured));
+        if (!same(initial, final) || !record.active) return fail('projection_stale');
+        grants.set(grant, record); record.published = true; return grant;
+      } catch (error) {
+        terminate(record, false); if (error instanceof HeadlessCheckupActiveRoleSessionGrantError) throw error;
         return fail('lifecycle_unavailable');
       }
-      record.unregister = unregister as () => void; record.cancel = cancel as () => void;
-      const final = stable(captured);
-      if (!same(initial, final)) { terminate(record); return fail('projection_stale'); }
-      if (!record.active) { terminate(record); return fail('lifecycle_unavailable'); }
-      grants.set(grant, record); return grant;
     },
     withCurrent<T>(candidate: unknown, operation: () => T): T { return invoke(candidate, operation); },
     withCurrentRequest<T>(candidate: unknown, presented: unknown, operation: () => T): T {
