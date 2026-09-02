@@ -62,6 +62,12 @@ function startServer(bound = false, options = {}) {
             serviceRef: options.proposalServiceRef ?? 'PatientOpenLoopsFollowUpProposalServiceV1',
             maximumStage: 'proposal_only', timeoutMs: options.timeoutMs ?? 250,
             execute: options.proposal ?? (async () => ({ status: 'synthetic' })),
+        }, {
+            operationId: 'mediflow.semantic_query_plan.execute.v1',
+            capabilityId: 'mediflow.semantic_query_plan.execute.v1',
+            serviceRef: options.semanticServiceRef ?? 'SemanticQueryOperationServiceV1',
+            maximumStage: 'read_only', timeoutMs: options.timeoutMs ?? 250,
+            execute: options.semantic ?? (async () => ({ status: 'synthetic' })),
         }] });
         host.attach({
             subscribe: (listener) => { child.on('message', listener); return () => child.off('message', listener); },
@@ -145,8 +151,37 @@ const proposalOutput = Object.freeze({
         itemCount: 1, truncated: false, maximumStage: 'proposal_only', reviewRequired: true,
         writesPerformed: 0, apply: 'none', egress: 'none', timestamp: 1_001 },
 });
+const semanticArguments = Object.freeze({
+    budget: { maxSteps: 2, maxDurationMs: 250, maxOutputBytes: 32_768 },
+    explanation: 'Search local terminology and read selected open loops.',
+    steps: [{ stepRef: 'step_terminology', operationId: 'mediflow.terminology.search.v1',
+        input: { system: 'LOINC', query: '  synthetic   query ', limit: 3 } },
+    { stepRef: 'step_open_loops', operationId: 'mediflow.patient.open_loops.read.v1', input: {} }],
+});
+const semanticInput = Object.freeze({
+    schemaVersion: 'mediflow.semantic-query-operation.input.v1',
+    operationId: 'mediflow.semantic_query_plan.execute.v1', budget: semanticArguments.budget,
+    explanation: semanticArguments.explanation,
+    steps: [{ stepRef: 'step_terminology', operationId: 'mediflow.terminology.search.v1',
+        input: { schemaVersion: 'mediflow.terminology.search.input.v1',
+            operationId: 'mediflow.terminology.search.v1', system: 'LOINC', query: 'synthetic query', limit: 3 } },
+    { stepRef: 'step_open_loops', operationId: 'mediflow.patient.open_loops.read.v1',
+        input: { schemaVersion: 'mediflow.patient.open_loops.read.input.v1',
+            operationId: 'mediflow.patient.open_loops.read.v1' } }],
+});
+const semanticOutput = Object.freeze({
+    schemaVersion: 'mediflow.semantic-query-execution.result.v1', outcome: 'read_completed',
+    steps: [{ stepRef: 'step_terminology', operationId: 'mediflow.terminology.search.v1',
+        output: terminologyOutput },
+    { stepRef: 'step_open_loops', operationId: 'mediflow.patient.open_loops.read.v1', output: openLoopsOutput }],
+    receipt: { schemaVersion: 'mediflow.headless.receipt.v1', requestRef: `sqrq_${'b'.repeat(64)}`,
+        actionRef: `sqra_${'c'.repeat(64)}`, capabilityId: 'mediflow.semantic_query_plan.execute.v1',
+        outcome: 'orchestration', policyDecision: 'allowed',
+        revisionBinding: { generation: 1, revocationGeneration: 0, selectionEpoch: 2 },
+        operationCount: 2, durationMs: 4, createdAt: 1_002, writesPerformed: 0, applyPolicy: 'none' },
+});
 
-test('discovers status, capabilities, two reads and one proposal over stdio and child IPC', async (context) => {
+test('discovers status, capabilities, two reads, one proposal and semantic orchestration', async (context) => {
     await access(SERVER);
     const server = startServer(true);
     context.after(() => { if (server.child.exitCode === null) server.child.kill(); });
@@ -158,18 +193,18 @@ test('discovers status, capabilities, two reads and one proposal over stdio and 
     assert.deepEqual(listed.result.tools.map((tool) => tool.name), [
         'mediflow.system.headless_status.v1', 'mediflow.system.capabilities.v1',
         'mediflow.terminology.search.v1', 'mediflow.patient.open_loops.read.v1',
-        'mediflow.patient.open_loops.follow_up.propose.v1',
+        'mediflow.patient.open_loops.follow_up.propose.v1', 'mediflow.semantic_query_plan.execute.v1',
     ]);
     assert.equal(listed.result.tools.every((tool) => tool.annotations.readOnlyHint === true
         && tool.annotations.destructiveHint === false && tool.annotations.openWorldHint === false), true);
     assert.deepEqual(listed.result.tools.map((tool) => tool._meta['mediflow/maximumStage']),
-        ['read_only', 'read_only', 'read_only', 'read_only', 'proposal_only']);
+        ['read_only', 'read_only', 'read_only', 'read_only', 'proposal_only', 'read_only']);
     const status = await server.send('tools/call', { name: 'mediflow.system.headless_status.v1', arguments: {} });
     assert.equal(status.result.structuredContent.dataScope, 'non_phi_system_status');
     const capabilities = await server.send('tools/call', { name: 'mediflow.system.capabilities.v1', arguments: {} });
     assert.deepEqual(capabilities.result.structuredContent.operations.map((item) => item.operationId), [
         'mediflow.terminology.search.v1', 'mediflow.patient.open_loops.read.v1',
-        'mediflow.patient.open_loops.follow_up.propose.v1',
+        'mediflow.patient.open_loops.follow_up.propose.v1', 'mediflow.semantic_query_plan.execute.v1',
     ]);
     assert.equal(capabilities.result.structuredContent.operations.every((item) => !('serviceRef' in item)), true);
     assert.doesNotMatch(JSON.stringify({ status, capabilities }), /patientId|patientName|secret|token|database|path/iu);
@@ -185,7 +220,7 @@ test('does not expose an operation whose host service binding is not exact', asy
     assert.deepEqual(listed.result.tools.map((tool) => tool.name), [
         'mediflow.system.headless_status.v1', 'mediflow.system.capabilities.v1',
         'mediflow.patient.open_loops.read.v1',
-        'mediflow.patient.open_loops.follow_up.propose.v1',
+        'mediflow.patient.open_loops.follow_up.propose.v1', 'mediflow.semantic_query_plan.execute.v1',
     ]);
     await server.stop();
 });
@@ -237,11 +272,31 @@ test('calls the named follow-up proposal tool with an exact empty caller input',
     assert.equal(server.stderr(), '');
 });
 
+test('calls the named semantic query tool with only strict allowlisted steps', async (context) => {
+    const observed = [];
+    const server = startServer(true, {
+        semantic: async (input) => { observed.push(input); return semanticOutput; },
+    });
+    context.after(() => { if (server.child.exitCode === null) server.child.kill(); });
+    const semantic = await server.send('tools/call', {
+        name: 'mediflow.semantic_query_plan.execute.v1', arguments: semanticArguments,
+    });
+    assert.deepEqual(semantic.result.structuredContent, semanticOutput);
+    assert.equal(semantic.result.content[0].text, 'Semantic query completed 2 read step(s); writes 0, apply none.');
+    assert.deepEqual(JSON.parse(JSON.stringify(observed)), [semanticInput]);
+    assert.equal(semantic.result.structuredContent.receipt.writesPerformed, 0);
+    assert.equal(semantic.result.structuredContent.receipt.applyPolicy, 'none');
+    assert.doesNotMatch(JSON.stringify(semantic), /patientId|ambulatoryId|authority|provider|venue|sql/iu);
+    await server.stop();
+    assert.equal(server.stderr(), '');
+});
+
 test('rejects caller-supplied patient scope and authority before every host service', async (context) => {
     let calls = 0;
     const server = startServer(true, { terminology: () => { calls += 1; return terminologyOutput; },
         openLoops: () => { calls += 1; return openLoopsOutput; },
-        proposal: () => { calls += 1; return proposalOutput; } });
+        proposal: () => { calls += 1; return proposalOutput; },
+        semantic: () => { calls += 1; return semanticOutput; } });
     context.after(() => { if (server.child.exitCode === null) server.child.kill(); });
     const forgedLoops = await server.send('tools/call', { name: 'mediflow.patient.open_loops.read.v1',
         arguments: { patientId: 'caller-selected' } });
@@ -251,10 +306,15 @@ test('rejects caller-supplied patient scope and authority before every host serv
         name: 'mediflow.patient.open_loops.follow_up.propose.v1',
         arguments: { text: 'forbidden freeform', authority: 'caller' },
     });
+    const forgedSemantic = await server.send('tools/call', {
+        name: 'mediflow.semantic_query_plan.execute.v1',
+        arguments: { ...semanticArguments, sourceRefs: ['caller'], provider: 'caller' },
+    });
     assert.equal(forgedLoops.error?.code === -32602 || forgedLoops.result?.isError === true, true);
     assert.equal(forgedTerminology.error?.code === -32602 || forgedTerminology.result?.isError === true, true);
     assert.equal(forgedProposal.error?.code === -32602 || forgedProposal.result?.isError === true, true);
-    assert.doesNotMatch(JSON.stringify({ forgedLoops, forgedTerminology, forgedProposal }),
+    assert.equal(forgedSemantic.error?.code === -32602 || forgedSemantic.result?.isError === true, true);
+    assert.doesNotMatch(JSON.stringify({ forgedLoops, forgedTerminology, forgedProposal, forgedSemantic }),
         /caller-selected|forbidden freeform|"caller"/u);
     assert.equal(calls, 0);
     await server.stop();
@@ -346,6 +406,26 @@ test('rejects a non-closed-world follow-up proposal without reflecting clinical 
     assert.doesNotMatch(JSON.stringify(response), /sensitive-value|diagnosis/u);
     const retry = await server.send('tools/call', {
         name: 'mediflow.patient.open_loops.follow_up.propose.v1', arguments: {},
+    });
+    assert.equal(retry.result.content[0].text, 'MediFlow operation denied: host_unbound.');
+    assert.equal(calls, 1);
+    await server.stop();
+});
+
+test('rejects a non-closed-world semantic result without reflecting clinical text', async (context) => {
+    let calls = 0;
+    const server = startServer(true, { semantic: () => {
+        calls += 1; return { ...semanticOutput, diagnosis: 'sensitive-value' };
+    } });
+    context.after(() => { if (server.child.exitCode === null) server.child.kill(); });
+    const response = await server.send('tools/call', {
+        name: 'mediflow.semantic_query_plan.execute.v1', arguments: semanticArguments,
+    });
+    assert.equal(response.result.isError, true);
+    assert.equal(response.result.content[0].text, 'MediFlow operation denied: protocol_invalid.');
+    assert.doesNotMatch(JSON.stringify(response), /sensitive-value|diagnosis/u);
+    const retry = await server.send('tools/call', {
+        name: 'mediflow.semantic_query_plan.execute.v1', arguments: semanticArguments,
     });
     assert.equal(retry.result.content[0].text, 'MediFlow operation denied: host_unbound.');
     assert.equal(calls, 1);

@@ -8,7 +8,8 @@ import {
   FOLLOW_UP_PROPOSAL_OPERATION_ID, HEADLESS_STATUS, OPEN_LOOPS_OPERATION_ID, OPERATION_DESCRIPTORS,
   RPC_REQUEST_SCHEMA, RPC_RESULT_SCHEMA, TERMINOLOGY_OPERATION_ID, followUpProposalArgumentsSchema,
   followUpProposalOutputSchema, openLoopsOutputSchema, publicCatalog, rpcOperationSchema,
-  selectBoundOperations, terminologyArgumentsSchema, terminologyOutputSchema,
+  SEMANTIC_QUERY_OPERATION_ID, selectBoundOperations, semanticQueryArgumentsSchema, semanticQueryOutputSchema,
+  terminologyArgumentsSchema, terminologyOutputSchema,
   type OperationDescriptor,
 } from './contracts.ts';
 
@@ -203,6 +204,25 @@ export function createOperationClient() {
       const output = followUpProposalOutputSchema.safeParse(await run(descriptor,
         { schemaVersion: descriptor.inputSchema, operationId: descriptor.operationId }, signal));
       return output.success ? output.data : invalid();
+    },
+    executeSemanticQuery: async (argumentsValue: unknown, signal?: AbortSignal) => {
+      const args = semanticQueryArgumentsSchema.parse(argumentsValue);
+      const descriptor = OPERATION_DESCRIPTORS.find((item) => item.operationId === SEMANTIC_QUERY_OPERATION_ID)!;
+      const steps = args.steps.map((step) => step.operationId === TERMINOLOGY_OPERATION_ID
+        ? { stepRef: step.stepRef, operationId: step.operationId, input: {
+          schemaVersion: 'mediflow.terminology.search.input.v1' as const, operationId: step.operationId,
+          system: step.input.system, query: step.input.query.trim().replace(/\s+/gu, ' '), limit: step.input.limit,
+        } } : { stepRef: step.stepRef, operationId: step.operationId, input: {
+          schemaVersion: 'mediflow.patient.open_loops.read.input.v1' as const, operationId: step.operationId,
+        } });
+      const output = semanticQueryOutputSchema.safeParse(await run(descriptor, {
+        schemaVersion: descriptor.inputSchema, operationId: descriptor.operationId,
+        budget: args.budget, explanation: args.explanation, steps,
+      }, signal));
+      if (!output.success || output.data.steps.length !== args.steps.length
+        || output.data.steps.some((step, index) => step.stepRef !== args.steps[index]?.stepRef
+          || step.operationId !== args.steps[index]?.operationId)) return invalid();
+      return output.data;
     },
     close: () => {
       terminal(new OperationClientError('host_unbound'));

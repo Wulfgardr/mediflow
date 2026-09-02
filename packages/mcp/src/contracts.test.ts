@@ -2,10 +2,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
-  FOLLOW_UP_PROPOSAL_OPERATION_ID, OPEN_LOOPS_OPERATION_ID, OPERATION_DESCRIPTORS, TERMINOLOGY_OPERATION_ID,
+  FOLLOW_UP_PROPOSAL_OPERATION_ID, OPEN_LOOPS_OPERATION_ID, OPERATION_DESCRIPTORS, SEMANTIC_QUERY_OPERATION_ID,
+  TERMINOLOGY_OPERATION_ID,
   capabilitiesOutputSchema, followUpProposalArgumentsSchema, followUpProposalOutputSchema,
   headlessStatusOutputSchema, openLoopsOutputSchema, publicCatalog, selectBoundOperations,
-  terminologyArgumentsSchema, terminologyOutputSchema,
+  semanticQueryArgumentsSchema, semanticQueryOutputSchema, terminologyArgumentsSchema, terminologyOutputSchema,
 } from './contracts.ts';
 
 const terminology = (items: unknown[]) => ({
@@ -19,6 +20,13 @@ const terminology = (items: unknown[]) => ({
 const item = (code: string, display = 'Synthetic display') => ({
   system: 'LOINC', code, display, version: null,
 });
+const semanticArguments = {
+  budget: { maxSteps: 2, maxDurationMs: 250, maxOutputBytes: 32_768 },
+  explanation: 'Search local terminology and read selected open loops.',
+  steps: [{ stepRef: 'step_terminology', operationId: TERMINOLOGY_OPERATION_ID,
+    input: { system: 'LOINC', query: 'synthetic query', limit: 2 } },
+  { stepRef: 'step_open_loops', operationId: OPEN_LOOPS_OPERATION_ID, input: {} }],
+};
 
 test('bounds normalized terminology inputs and service outputs in UTF-8 bytes', () => {
   assert.equal(terminologyArgumentsSchema.safeParse({ system: 'LOINC', query: '   ', limit: 1 }).success, false);
@@ -102,4 +110,40 @@ test('binds one closed-world proposal-only follow-up contract without publishing
   assert.deepEqual(selected, OPERATION_DESCRIPTORS);
   assert.equal(capabilitiesOutputSchema.safeParse(published).success, true);
   assert.doesNotMatch(JSON.stringify(published), /serviceRef/u);
+});
+
+test('binds one operation-specific read-only semantic query contract', () => {
+  assert.deepEqual(OPERATION_DESCRIPTORS[3], {
+    operationId: SEMANTIC_QUERY_OPERATION_ID, capabilityId: SEMANTIC_QUERY_OPERATION_ID,
+    serviceRef: 'SemanticQueryOperationServiceV1', maximumStage: 'read_only',
+    inputSchema: 'mediflow.semantic-query-operation.input.v1',
+    outputSchema: 'mediflow.semantic-query-execution.result.v1',
+  });
+  assert.equal(semanticQueryArgumentsSchema.safeParse(semanticArguments).success, true);
+  assert.equal(semanticQueryArgumentsSchema.safeParse({ ...semanticArguments, sourceRefs: ['caller'] }).success, false);
+  assert.equal(semanticQueryArgumentsSchema.safeParse({ ...semanticArguments, purposeCode: 'caller' }).success, false);
+  assert.equal(semanticQueryArgumentsSchema.safeParse({ ...semanticArguments,
+    budget: { ...semanticArguments.budget, maxSteps: 1 } }).success, false);
+  assert.equal(semanticQueryArgumentsSchema.safeParse({ ...semanticArguments,
+    steps: [{ stepRef: 'step_generic', operationId: 'generic.invoke', input: { sql: 'SELECT *' } },
+      semanticArguments.steps[1]] }).success, false);
+});
+
+test('validates semantic query output as closed-world orchestration with zero writes', () => {
+  const output = {
+    schemaVersion: 'mediflow.semantic-query-execution.result.v1', outcome: 'read_completed',
+    steps: [{ stepRef: 'step_terminology', operationId: TERMINOLOGY_OPERATION_ID,
+      output: terminology([item('synthetic-code')]) }],
+    receipt: { schemaVersion: 'mediflow.headless.receipt.v1', requestRef: `sqrq_${'1'.repeat(64)}`,
+      actionRef: `sqra_${'2'.repeat(64)}`, capabilityId: SEMANTIC_QUERY_OPERATION_ID,
+      outcome: 'orchestration', policyDecision: 'allowed',
+      revisionBinding: { generation: 1, revocationGeneration: 0, selectionEpoch: 2 },
+      operationCount: 1, durationMs: 4, createdAt: 1_000, writesPerformed: 0, applyPolicy: 'none' },
+  };
+  assert.equal(semanticQueryOutputSchema.safeParse(output).success, true);
+  assert.equal(semanticQueryOutputSchema.safeParse({ ...output, patientId: 'forbidden' }).success, false);
+  assert.equal(semanticQueryOutputSchema.safeParse({ ...output,
+    receipt: { ...output.receipt, operationCount: 2 } }).success, false);
+  assert.equal(semanticQueryOutputSchema.safeParse({ ...output,
+    steps: [{ ...output.steps[0], output: { ...output.steps[0].output, diagnosis: 'forbidden' } }] }).success, false);
 });
