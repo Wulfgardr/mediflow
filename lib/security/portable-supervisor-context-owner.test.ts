@@ -29,7 +29,9 @@ const PAIR = Object.freeze({
 const sessions = new Set<ServerSession>();
 let sequence = 0;
 
-function fixture() {
+type AcquisitionOutcome = 'current' | 'null' | 'reject';
+
+function fixture(acquisitionOutcome: AcquisitionOutcome = 'current') {
     const session = issueSyntheticWebSession(USER, `portable-supervisor-${sequence += 1}`);
     sessions.add(session);
     let now = session.createdAt;
@@ -40,6 +42,8 @@ function fixture() {
     });
     const owner = selectionOwner.registry.acquire(session);
     const lease = owner.issueSelection({ expectedEpoch: 0, ...PAIR });
+    const authenticatedContext = Object.freeze(Object.assign(Object.create(null), { session, owner }));
+    let acquisitions = 0;
     let failBindingRead = false;
     const selectionBinding = {
         withCurrentDependentBinding(scope: unknown, registration: unknown,
@@ -51,7 +55,11 @@ function fixture() {
         },
     };
     const supervisor = createPortableSupervisorContextOwnerProcessV1({
-        readCurrentSelectionSession: async () => session,
+        acquireAuthenticatedContext: () => {
+            acquisitions += 1;
+            if (acquisitionOutcome === 'reject') return Promise.reject(new Error('synthetic H1a rejection'));
+            return Promise.resolve(acquisitionOutcome === 'null' ? null : authenticatedContext);
+        },
         selectionLifecycle: selectionOwner.selectionLifecycleController,
         selectionBinding,
         selectionCommitBinding: selectionOwner.selectionCommitBindingController,
@@ -64,6 +72,7 @@ function fixture() {
     });
     return {
         session, selectionOwner, owner, lease, supervisor, timers,
+        acquisitionCount() { return acquisitions; },
         setNow(value: number) { now = value; },
         setPatientVersion(value: number) { patientVersion = value; },
         failBindingRead() { failBindingRead = true; },
@@ -184,6 +193,15 @@ test('missing selection fails closed without registering or activating authority
     assert.equal(current.timers.length, 0);
 });
 
+test('H1a denial or rejection fails closed before selection authority or timers are reached', async () => {
+    for (const outcome of ['null', 'reject'] as const) {
+        const current = fixture(outcome);
+        assert.equal(await current.supervisor.acquire(), null, outcome);
+        assert.equal(current.acquisitionCount(), 1, outcome);
+        assert.equal(current.timers.length, 0, outcome);
+    }
+});
+
 test('a host currentness failure is redacted and terminal before it reaches the launcher', async () => {
     const current = fixture();
     const supervisor = await current.supervisor.acquire(); assert.ok(supervisor);
@@ -192,13 +210,15 @@ test('a host currentness failure is redacted and terminal before it reaches the 
     assert.equal(supervisor.dispose(), false);
 });
 
-test('production composition owns auth, purpose, hashing, and selection lifecycle without caller context input', () => {
+test('production composition consumes only canonical H1a context and production selection controllers', () => {
     const source = readFileSync(new URL('./portable-supervisor-context-owner.ts', import.meta.url), 'utf8');
-    assert.match(source, /readCurrentSelectionSession:\s*readAuthenticatedWebSession/u);
+    assert.match(source, /acquireAuthenticatedWebSessionProjectionOwnerContext/u);
+    assert.match(source, /acquireAuthenticatedContext:\s*acquireAuthenticatedWebSessionProjectionOwnerContext/u);
+    assert.match(source, /const authenticated = authenticatedContext\.session/u);
     assert.match(source, /purposeCode:\s*'care_coordination'/u);
     assert.match(source, /selectionLifecycleController/u);
     assert.match(source, /selectionBindingController/u);
     assert.match(source, /selectionCommitBindingController/u);
     assert.match(source, /createHash\('sha256'\)/u);
-    assert.doesNotMatch(source, /NextRequest|NextResponse|request\.json|request\.body|frame|cookieStore|patientId:\s*input|ambulatoryId:\s*input/iu);
+    assert.doesNotMatch(source, /readAuthenticatedWebSession|requireSession|NextRequest|NextResponse|request\.json|request\.body|frame|cookieStore|patientId:\s*input|ambulatoryId:\s*input/iu);
 });
