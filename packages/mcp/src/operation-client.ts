@@ -16,6 +16,7 @@ import {
 const MAX_FRAME_BYTES = 64 * 1024;
 const MAX_REQUESTS = 256;
 const REQUEST_TIMEOUT_MS = 1_000;
+const encoder = new TextEncoder();
 const requestIdSchema = z.string().regex(/^rpc_[a-z0-9][a-z0-9_-]{0,63}$/u);
 const baseResultSchema = z.object({
   schemaVersion: z.literal(RPC_RESULT_SCHEMA), requestId: requestIdSchema,
@@ -220,6 +221,8 @@ export function createOperationClient() {
         budget: args.budget, explanation: args.explanation, steps,
       }, signal));
       if (!output.success || output.data.steps.length !== args.steps.length
+        || output.data.receipt.durationMs > args.budget.maxDurationMs
+        || encoder.encode(JSON.stringify(output.data)).byteLength > args.budget.maxOutputBytes
         || output.data.steps.some((step, index) => step.stepRef !== args.steps[index]?.stepRef
           || step.operationId !== args.steps[index]?.operationId)) return invalid();
       return output.data;
