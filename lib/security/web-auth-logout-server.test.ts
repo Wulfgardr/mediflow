@@ -21,6 +21,8 @@ const CONTROL_ID = 'c'.repeat(64);
 const ETAG = 'e'.repeat(64);
 const bearerCookie = (value: unknown) => ({ name: 'mediflow_session', value });
 const controlCookie = (value: unknown) => ({ name: 'mediflow_auth_control', value });
+const frameworkBearerCookie = (value: unknown) => ({ name: 'mediflow_session', value, path: '/' });
+const frameworkControlCookie = (value: unknown) => ({ name: 'mediflow_auth_control', value, path: '/' });
 
 function sealed<Value extends Record<string, unknown>>(values: Value): Readonly<Value> {
     return Object.freeze(Object.assign(Object.create(null), values)) as Readonly<Value>;
@@ -74,8 +76,8 @@ test('retires the exact projection bound to bearer and control before audit', as
     const exact = projection();
     const order: string[] = [];
     const response = await completeExactWebP3Logout(
-        bearerCookie(SESSION_ID),
-        controlCookie(CONTROL_ID),
+        frameworkBearerCookie(SESSION_ID),
+        frameworkControlCookie(CONTROL_ID),
         request,
         Object.freeze({
             resolve: (sessionId, controlId) => {
@@ -116,11 +118,13 @@ test('denies hostile or missing cookies before owner resolution', async () => {
     Object.defineProperty(accessor, 'value', { enumerable: true, get() { getters += 1; return SESSION_ID; } });
     const exactSources = sources({ resolve: () => { resolves += 1; return sealed({ status: 'absent' as const }); } });
     const invalidBearers = [undefined, null, {}, proxy, accessor, Promise.resolve(),
+        { ...bearerCookie(SESSION_ID), path: '/other' }, { ...bearerCookie(SESSION_ID), path: '/', extra: true },
         { ...bearerCookie(SESSION_ID), extra: true }, bearerCookie('A'.repeat(64)), bearerCookie('a'.repeat(63))];
     for (const value of invalidBearers) {
         assert.equal((await completeExactWebP3Logout(value, controlCookie(CONTROL_ID), request, exactSources)).status, 401);
     }
     for (const value of [undefined, controlCookie('short'), bearerCookie(CONTROL_ID),
+        { ...controlCookie(CONTROL_ID), path: '/other' },
         { ...controlCookie(CONTROL_ID), extra: true }]) {
         assert.equal((await completeExactWebP3Logout(bearerCookie(SESSION_ID), value, request, exactSources)).status, 401);
     }

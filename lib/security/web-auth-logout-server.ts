@@ -58,7 +58,9 @@ function exactRecord(value: unknown, keys: readonly string[], prototype: object 
 }
 
 function exactCookie(value: unknown, name: string, pattern: RegExp): string | null {
-    const record = exactRecord(value, ['name', 'value'], Object.prototype, false);
+    const plain = exactRecord(value, ['name', 'value'], Object.prototype, false);
+    const framework = plain ? null : exactRecord(value, ['name', 'value', 'path'], Object.prototype, false);
+    const record = plain ?? (framework?.path === '/' ? framework : null);
     return record?.name === name && typeof record.value === 'string' && pattern.test(record.value)
         ? record.value
         : null;
