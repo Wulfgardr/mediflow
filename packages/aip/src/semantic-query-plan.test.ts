@@ -106,3 +106,23 @@ test('rejects malformed host policy and empty provenance without returning a gra
   assert.throws(() => setup().validate(noSources), /invalid_plan/);
   assert.equal(Object.getPrototypeOf(setup()), null);
 });
+
+test('rejects aliases and cumulative copy amplification before invoking the host canonicalizer', () => {
+  let shared: Record<string, unknown> = { leaf: false };
+  for (let depth = 0; depth < 6; depth += 1) {
+    shared = Object.fromEntries(Array.from({ length: 8 }, (_value, index) => [`branch${index}`, shared]));
+  }
+  const value = candidate(); (value.steps[0] as { input: unknown }).input = shared;
+  let calls = 0;
+  const validator = createSemanticQueryPlanValidatorV1({ current, resolveOperation: () => descriptor,
+    canonicalizeInput: () => { calls += 1; return freeze({ includeCompleted: false }); } });
+  assert.throws(() => validator.validate(value), (error) => error instanceof SemanticQueryPlanV1Error
+    && error.code === 'input_denied');
+  assert.equal(calls, 0);
+
+  const aliasedOutput = { includeCompleted: false } as Record<string, unknown>;
+  aliasedOutput.alias = aliasedOutput;
+  const outputValidator = createSemanticQueryPlanValidatorV1({ current, resolveOperation: () => descriptor,
+    canonicalizeInput: () => aliasedOutput });
+  assert.throws(() => outputValidator.validate(candidate()), /input_denied/);
+});

@@ -30,6 +30,8 @@ const { isProxy, isPromise } = types;
 const encoder = new TextEncoder();
 const regexpTest = RegExp.prototype.test, stringTrim = String.prototype.trim, promiseThen = Promise.prototype.then;
 const reflectApply = Reflect.apply;
+const MAX_COPY_NODES = 512, MAX_COPY_KEYS = 1_024;
+type CopyBudget = { bytes: number; keys: number; nodes: number; maxBytes: number; seen: WeakSet<object> };
 
 function fail(code: SemanticQueryPlanV1ErrorCode): never { throw new SemanticQueryPlanV1Error(code); }
 function record<T extends object>(value: T): Readonly<T> { return Object.freeze(Object.assign(Object.create(null), value)); }
@@ -77,14 +79,31 @@ function discardPromise(value: unknown): boolean {
   try { reflectApply(promiseThen, value, [() => undefined, () => undefined]); } catch { /* native promise is still denied */ }
   return true;
 }
-function canonicalCopy(value: unknown, depth = 0): unknown {
-  if (value === null || typeof value === 'string' || typeof value === 'boolean') return value;
-  if (typeof value === 'number' && Number.isFinite(value)) return value;
+function spend(budget: CopyBudget, bytes: number, keys = 0): void {
+  budget.bytes += bytes; budget.keys += keys;
+  if (budget.bytes > budget.maxBytes || budget.keys > MAX_COPY_KEYS) return fail('input_denied');
+}
+function canonicalCopy(value: unknown, maxBytes: number, budget: CopyBudget = {
+  bytes: 0, keys: 0, nodes: 0, maxBytes, seen: new WeakSet<object>(),
+}, depth = 0): unknown {
+  if (value === null) { spend(budget, 4); return value; }
+  if (typeof value === 'string') {
+    if (value.length > budget.maxBytes) return fail('input_denied');
+    spend(budget, encoder.encode(value).byteLength + 2); return value;
+  }
+  if (typeof value === 'boolean') { spend(budget, value ? 4 : 5); return value; }
+  if (typeof value === 'number' && Number.isFinite(value)) { spend(budget, String(value).length); return value; }
   if (depth >= 8) return fail('input_denied');
+  if (typeof value !== 'object' || value === null || isProxy(value)) return fail('input_denied');
+  if (budget.seen.has(value)) return fail('input_denied');
+  budget.seen.add(value); budget.nodes += 1;
+  if (budget.nodes > MAX_COPY_NODES) return fail('input_denied');
   const items = array(value, 64);
-  if (items) return list(items.map((item) => canonicalCopy(item, depth + 1)));
+  if (items) {
+    spend(budget, 2 + Math.max(0, items.length - 1));
+    return list(items.map((item) => canonicalCopy(item, maxBytes, budget, depth + 1)));
+  }
   try {
-    if (typeof value !== 'object' || value === null || isProxy(value)) return fail('input_denied');
     const prototype = Object.getPrototypeOf(value);
     if (prototype !== null && prototype !== Object.prototype) return fail('input_denied');
     const keys = Reflect.ownKeys(value);
@@ -93,8 +112,11 @@ function canonicalCopy(value: unknown, depth = 0): unknown {
     for (const key of keys as string[]) {
       const descriptor = Object.getOwnPropertyDescriptor(value, key);
       if (!descriptor?.enumerable || !('value' in descriptor)) return fail('input_denied');
-      output[key] = canonicalCopy(descriptor.value, depth + 1);
+      if (key.length > budget.maxBytes) return fail('input_denied');
+      spend(budget, encoder.encode(key).byteLength + 3, 1);
+      output[key] = canonicalCopy(descriptor.value, maxBytes, budget, depth + 1);
     }
+    spend(budget, 2 + Math.max(0, keys.length - 1));
     return Object.freeze(output);
   } catch { return fail('input_denied'); }
 }
@@ -153,11 +175,12 @@ export function createSemanticQueryPlanValidatorV1(sourcesValue: unknown) {
         || descriptor.applicationServiceRef.length > 128
         || !integer(descriptor.inputMaxBytes, 2) || (descriptor.inputMaxBytes as number) > 65_536) return fail('operation_denied');
       let canonical: unknown;
-      const safeInput = canonicalCopy(step.input);
+      const inputMaxBytes = descriptor.inputMaxBytes as number;
+      const safeInput = canonicalCopy(step.input, inputMaxBytes);
       try { canonical = inputSource(step.operationId, safeInput); } catch { return fail('input_denied'); }
       if (canonical === null || discardPromise(canonical)) return fail('input_denied');
-      canonical = canonicalCopy(canonical);
-      if (encoder.encode(JSON.stringify(canonical)).byteLength > (descriptor.inputMaxBytes as number)) return fail('input_denied');
+      canonical = canonicalCopy(canonical, inputMaxBytes);
+      if (encoder.encode(JSON.stringify(canonical)).byteLength > inputMaxBytes) return fail('input_denied');
       steps.push(record({ stepRef: step.stepRef, operationId: step.operationId, capabilityId: descriptor.capabilityId,
         applicationServiceRef: descriptor.applicationServiceRef, maximumStage: 'read_only' as const, input: canonical }));
     }
