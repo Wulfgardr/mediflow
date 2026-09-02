@@ -95,6 +95,51 @@ test('patient-version drift terminalizes before publishing another context', () 
   assert.equal(current.timers[0]?.cancelled, true);
 });
 
+test('reentrant revoke during either version fence cannot leak an available context', () => {
+  for (const revokeAt of [3, 4]) {
+    let calls = 0;
+    const holder: { mirror?: ReturnType<typeof createPortableSupervisorContextMirrorV1> } = {};
+    const current = fixture({ version: () => {
+      calls += 1;
+      if (calls === revokeAt) assert.equal(holder.mirror?.revoke(), true);
+      return 3;
+    } });
+    const mirror = current.mirror; holder.mirror = mirror;
+    assert.equal(mirror.activate(capture()), true);
+    assert.throws(() => mirror.readHostContext(), rejects('context_unavailable'));
+    assert.deepEqual(current.events, ['revoked']);
+    assert.equal(current.timers[0]?.cancelled, true);
+  }
+});
+
+test('recursive public calls abort their in-flight activation or read', () => {
+  let mirror: ReturnType<typeof createPortableSupervisorContextMirrorV1>;
+  let recurseActivation = true;
+  const activating = fixture({ version: () => {
+    if (recurseActivation) {
+      recurseActivation = false;
+      assert.throws(() => mirror.activate(capture()), rejects('already_bound'));
+    }
+    return 3;
+  } });
+  mirror = activating.mirror;
+  assert.throws(() => mirror.activate(capture()), rejects('context_unavailable'));
+  assert.equal(mirror.activate(capture()), true);
+
+  let recurseRead = false;
+  const reading = fixture({ version: () => {
+    if (recurseRead) {
+      recurseRead = false;
+      assert.throws(() => mirror.readHostContext(), rejects('context_unavailable'));
+    }
+    return 3;
+  } });
+  mirror = reading.mirror;
+  mirror.activate(capture()); recurseRead = true;
+  assert.throws(() => mirror.readHostContext(), rejects('context_unavailable'));
+  assert.deepEqual(reading.events, ['currentness_denied']);
+});
+
 test('expiry timer and independent clock fence terminalize exactly once', () => {
   const scheduled = fixture();
   scheduled.mirror.activate(capture({ expiresAt: 1_500 }));
@@ -126,6 +171,16 @@ test('fails closed on clock, hash, version and scheduler dependency failures', (
 test('synchronous scheduler reentry and terminal notification failure cannot publish or revive authority', () => {
   const reentrant = fixture({ schedule: (_delay, callback) => { callback(); return () => undefined; } });
   assert.throws(() => reentrant.mirror.activate(capture()), rejects('context_unavailable'));
+  const holder: { mirror?: ReturnType<typeof createPortableSupervisorContextMirrorV1> } = {};
+  let cancelled = false;
+  const revoked = fixture({ schedule: () => {
+    assert.equal(holder.mirror?.revoke(), true);
+    return () => { cancelled = true; };
+  } });
+  const mirror = revoked.mirror; holder.mirror = mirror;
+  assert.throws(() => mirror.activate(capture()), rejects('context_unavailable'));
+  assert.equal(cancelled, true);
+  assert.deepEqual(revoked.events, ['revoked']);
   const notification = fixture({ onTerminal: () => { throw new Error('synthetic terminal observer'); } });
   notification.mirror.activate(capture());
   assert.equal(notification.mirror.dispose(), true);

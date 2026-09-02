@@ -95,7 +95,8 @@ export function createPortableSupervisorContextMirrorV1(sourcesValue: unknown) {
   if (SOURCE_KEYS.some((key) => typeof source[key] !== 'function' || types.isProxy(source[key])
     || types.isAsyncFunction(source[key]))) return fail('input_invalid');
   const sources = source as unknown as Sources;
-  let active: Active | null = null, bound = false, lastNow = -1;
+  let active: Active | null = null, bound = false, binding = false, bindingCancelled = false;
+  let reading = false, lastNow = -1;
   let generation = 0, revocationGeneration = 0, restartGeneration = 1, parentGeneration = 0;
   const policyGeneration = 1;
   const increment = (value: number) => value < Number.MAX_SAFE_INTEGER
@@ -141,14 +142,24 @@ export function createPortableSupervisorContextMirrorV1(sourcesValue: unknown) {
     notify(reason);
     return true;
   };
+  const alive = (state: Active): boolean => active === state && state.active;
+  const bindingFence = (state?: Active): void => {
+    if (bindingCancelled || (state && !alive(state))) return fail('context_unavailable');
+  };
   const readHostContext = () => {
+    if (binding) { bindingCancelled = true; return fail('context_unavailable'); }
+    if (reading) { terminal('currentness_denied'); return fail('context_unavailable'); }
     const state = active;
     if (!state?.active) return fail('context_unavailable');
+    reading = true;
     try {
       version(state);
+      if (!alive(state)) return fail('context_unavailable');
       const timestamp = now();
+      if (!alive(state)) return fail('context_unavailable');
       if (timestamp >= state.expiresAt - 1) { terminal('expired'); return fail('context_unavailable'); }
       version(state);
+      if (!alive(state)) return fail('context_unavailable');
       return record({ status: 'available' as const, userRef: state.userRef, parentRef: state.parentRef,
         purposeCode: 'care_coordination', patientId: state.patientId, ambulatoryId: state.ambulatoryId,
         generation: state.generation, revocationGeneration: state.revocationGeneration,
@@ -159,39 +170,61 @@ export function createPortableSupervisorContextMirrorV1(sourcesValue: unknown) {
     } catch (error) {
       if (active === state) terminal('currentness_denied');
       throw error;
-    }
+    } finally { reading = false; }
   };
   const activate = (captureValue: unknown): boolean => {
-    if (bound) return fail('already_bound');
-    const capture = canonicalCapture(captureValue);
-    const timestamp = now();
-    const expiresAt = Math.min(capture.expiresAt as number, timestamp + CONTEXT_TTL_MS);
-    if (timestamp >= expiresAt - 1) return fail('context_unavailable');
-    const candidate: Active = { active: true, patientId: capture.patientId as string,
-      ambulatoryId: capture.ambulatoryId as string, expectedPatientVersion: capture.expectedPatientVersion as number,
-      userRef: hash('user', capture.userRef as string), parentRef: hash('parent', capture.parentRef as string),
-      generation: increment(generation), selectionEpoch: capture.selectionEpoch as number, revocationGeneration,
-      restartGeneration, parentGeneration: increment(parentGeneration), policyGeneration, expiresAt, cancel: null };
-    version(candidate);
-    let scheduling = true, fired = false, cancel: unknown;
-    active = candidate;
-    try { cancel = sources.schedule(expiresAt - timestamp, () => {
-      if (scheduling) { fired = true; return; }
-      if (active === candidate) terminal('expired');
-    }); } catch { active = null; return fail('context_unavailable'); }
-    scheduling = false;
-    if (fired || discardPromise(cancel) || typeof cancel !== 'function' || types.isProxy(cancel)
-      || types.isAsyncFunction(cancel)) {
-      active = null; try { if (typeof cancel === 'function') cancel(); } catch { /* unpublished */ }
-      return fail('context_unavailable');
+    if (bound || binding) {
+      if (binding) bindingCancelled = true;
+      return fail('already_bound');
     }
-    candidate.cancel = cancel as () => void;
-    try { version(candidate); if (now() >= expiresAt) return fail('context_unavailable'); }
-    catch (error) { active = null; try { candidate.cancel(); } catch { /* unpublished */ } throw error; }
-    generation = candidate.generation; parentGeneration = candidate.parentGeneration;
-    bound = true;
-    return true;
+    binding = true; bindingCancelled = false;
+    try {
+      const capture = canonicalCapture(captureValue);
+      const timestamp = now(); bindingFence();
+      const expiresAt = Math.min(capture.expiresAt as number, timestamp + CONTEXT_TTL_MS);
+      if (timestamp >= expiresAt - 1) return fail('context_unavailable');
+      const userRef = hash('user', capture.userRef as string); bindingFence();
+      const parentRef = hash('parent', capture.parentRef as string); bindingFence();
+      const candidate: Active = { active: true, patientId: capture.patientId as string,
+        ambulatoryId: capture.ambulatoryId as string, expectedPatientVersion: capture.expectedPatientVersion as number,
+        userRef, parentRef, generation: increment(generation), selectionEpoch: capture.selectionEpoch as number,
+        revocationGeneration, restartGeneration, parentGeneration: increment(parentGeneration), policyGeneration,
+        expiresAt, cancel: null };
+      version(candidate); bindingFence();
+      let scheduling = true, fired = false, cancel: unknown;
+      active = candidate;
+      try { cancel = sources.schedule(expiresAt - timestamp, () => {
+        if (scheduling) { fired = true; return; }
+        if (active === candidate) terminal('expired');
+      }); } catch { active = null; candidate.active = false; return fail('context_unavailable'); }
+      scheduling = false;
+      const cancelIsPromise = discardPromise(cancel);
+      if (fired || cancelIsPromise || typeof cancel !== 'function' || types.isProxy(cancel)
+        || types.isAsyncFunction(cancel)) {
+        active = null; candidate.active = false;
+        try { if (typeof cancel === 'function') cancel(); } catch { /* unpublished */ }
+        return fail('context_unavailable');
+      }
+      candidate.cancel = cancel as () => void;
+      try {
+        bindingFence(candidate);
+        version(candidate); bindingFence(candidate);
+        const checkedAt = now(); bindingFence(candidate);
+        if (checkedAt >= expiresAt) return fail('context_unavailable');
+      } catch (error) {
+        if (active === candidate) active = null; candidate.active = false;
+        try { candidate.cancel(); } catch { /* unpublished */ }
+        throw error;
+      }
+      generation = candidate.generation; parentGeneration = candidate.parentGeneration;
+      bound = true;
+      return true;
+    } finally { binding = false; bindingCancelled = false; }
   };
-  return record({ activate, readHostContext, revoke: () => terminal('revoked'),
-    restart: () => terminal('restarted'), dispose: () => terminal('disposed') });
+  const requestTerminal = (reason: TerminalReason): boolean => {
+    if (binding) bindingCancelled = true;
+    return terminal(reason);
+  };
+  return record({ activate, readHostContext, revoke: () => requestTerminal('revoked'),
+    restart: () => requestTerminal('restarted'), dispose: () => requestTerminal('disposed') });
 }
