@@ -145,9 +145,9 @@ Gli stati di scope sono espliciti:
 
 | Stato | Perimetro 0.8.5 |
 | --- | --- |
-| `INCLUDED` | Quattro path Fabric proposal-only; AnyDoc per testo estraibile; route OCR legacy autenticate in `410`; disclosure provider read-only. |
+| `INCLUDED` | Quattro path Fabric proposal-only; AnyDoc first-pass e pipeline selettiva `needsOcr`; selector guidato e binding atomico; provider v2 e adapter ufficiali `default OFF`; superficie figlia MCP/Mini candidata; core, operazione e superficie statica planner read-only; candidato interno write checkup F10. |
 | `VERIFIED_LOCAL` | Evidenza mirata presente nel tree per contratti, production root e crosswalk; la suite integrata finale resta separata. |
-| `RELEASE_SCOPE_EXCLUDED` | DeepSeek-OCR 2, provider cloud/configurazione credenziali, modello provider F7 completo e integrazione con host intelligente. |
+| `NOT_READY` | Runtime OCR qualificato, credenziali o rete cloud live, entrypoint production Headless, binding trusted-UI F10, production bridge del planner e recording visita `DEFER_NEXT_PATCH`. |
 
 Ogni caller usa una route autenticata e riceve una proposta con receipt,
 provenienza e currentness. Il caller non sceglie provider, modello, endpoint,
@@ -157,8 +157,8 @@ host-owned risolve questi elementi e mantiene lo stadio massimo
 
 Quando configurati, Ollama serve le prime tre capability e ATHENA su MLX serve
 soltanto Treatment Reasoning. I due provider hanno lifecycle host-owned
-separati e non ereditano stato, grant o fallback l'uno dall'altro. I provider
-cloud restano disabilitati.
+separati e non ereditano stato, grant o fallback l'uno dall'altro. OpenAI e
+Anthropic restano `default OFF` e non sono fallback.
 
 ATHENA è inclusa solo quando l'host configura sia l'artifact del modello sia un
 runner locale. `MEDIFLOW_ATHENA_MLX_GENERATE_BIN` può indicare soltanto un
@@ -167,11 +167,7 @@ dell'override, il launcher `uvx` resta offline e fallisce chiuso se la cache
 necessaria non è già disponibile. Questo percorso non implica readiness
 universale di ATHENA o del runtime MLX generico.
 
-La disclosure provider implementata elenca Ollama e ATHENA come provider
-locali. Elenca OpenAI e Anthropic soltanto come righe informative con esecuzione
-disabilitata. Il modello provider F7 completo è un requisito post-0.8.5 non
-implementato e `RELEASE_SCOPE_EXCLUDED`. Un contratto futuro deve separare
-almeno:
+Il modello provider v2 separa:
 
 - tipo e istanza del provider;
 - autenticazione e modello;
@@ -179,27 +175,53 @@ almeno:
 - classi di credenziale `local_model`, `api_key`, `provider_oauth` ufficiale e
   `host_subscription`.
 
-Un login consumer o un abbonamento a un prodotto host non costituisce accesso
-API o autorizzazione all'inferenza. OpenAI e Anthropic restano non eseguibili
-finché non esistono contratto ufficiale, egress esplicito e credenziali
-autorizzate. Non sono ammessi OAuth privati o ricostruiti.
+OpenAI Responses e Anthropic Messages hanno adapter HTTPS ufficiali e probe
+Document Synthesis review-only. Ogni composizione richiede lifecycle attivo,
+istanza host-owned, secret reference e policy egress/retention esplicita. Il
+default resta OFF. I test usano transport fake e non provano credenziali, rete
+live, account, retention o readiness cloud. Un login consumer o una
+subscription host non costituiscono accesso API; OAuth privati o ricostruiti
+restano vietati.
 
-La foundation Headless 0.8.5 non espone un runtime agentico generale esterno,
-un listener o accesso diretto al database. L'unica eccezione di scrittura
-accettata è `mediflow.clinical_diary.append_soap.v1`, con policy
-`clinician_confirmed_single_use.v1`. Anche questa operazione passa
-dall'Application Service e dal suo owner transazionale; non trasferisce
-authority alle altre capability.
+Il selector Fabric opera sulle cinque capability nominate. La discovery mostra
+solo profili compatibili, lo smoke usa fixture sintetiche e l'attivazione del
+binding è atomica, versionata e reversibile. Discovery e smoke non qualificano
+il runtime e non persistono segreti.
+
+La foundation Headless 0.8.5 non apre listener e non concede accesso diretto al
+database. Un launcher trusted avvia un processo figlio autenticato e gli passa
+un canale RPC AIP ereditato. MCP `stdio` e Mini espongono catalogo, ricerca
+terminologica, lettura patient-scoped delle Open Loops, proposta follow-up
+`proposal_only` e query semantica bounded read-only. Authority, purpose, scope,
+currentness e audit restano host-owned. Il launcher e il quickstart production
+restano
+`PRODUCTION_BRIDGE_BLOCKER`. La topologia Supervisor portabile come trusted
+parent, con processo figlio su IPC ereditato, è `DECIDED`; l'implementazione è
+`SPLIT_REQUIRED`. La factory esaminata non chiude il late-bind trusted-UI,
+l'owner sincrono di `readHostContext`, lifecycle e revoca production o l'audit
+terminale sincrono. Un broker residente o UDS è escluso dalla `0.8.5`.
+
+La transizione stato checkup F10 è un candidato interno verificato nel core e
+nella composizione SQLite. Non è collegata a launcher, MCP, Mini o UI. Il
+binding di conferma trusted-UI è un blocker di autorità e fa parte
+dell'implementazione mancante del production bridge selezionato:
+`INTERNAL_CANDIDATE_VERIFIED / AUTHORITY_UI_BINDING_BLOCKER`.
 
 Questa architettura distingue due modalità:
 
 1. **Provider dentro MediFlow.** Il Fabric sceglie un provider per una
    capability applicativa MediFlow. I quattro path locali 0.8.5 appartengono a
    questa modalità.
-2. **MediFlow dentro un host intelligente.** Un host può, in futuro, invocare
-   Application Services governati attraverso un adapter MCP, App o Headless.
-   Questa modalità è `RELEASE_SCOPE_EXCLUDED`: il candidato non promette server
-   MCP, installer, onboarding o accesso agentico generale.
+2. **MediFlow dentro un host intelligente.** Il candidato usa MCP `stdio` o
+   Mini sopra RPC AIP ereditato per le operazioni nominate. Non promette ancora
+   installer, onboarding o un entrypoint production supportato.
+
+Il core, l'operazione read-only e la superficie statica MCP/Mini del semantic
+query planner sono integrati sopra Application Services allowlisted:
+`STATIC_SURFACE_INTEGRATED / PRODUCTION_BRIDGE_BLOCKER`. Il piano compone solo
+terminology search e Open Loops patient-scoped, entro budget bounded. Il
+production bridge selezionato non ha callsite o test. Il planner non può
+produrre SQL libero o accedere direttamente a SQLite.
 
 ---
 
@@ -272,20 +294,22 @@ flowchart TB
   `main` (vedi [ADR 0060](./docs/adr/0060-kree8-cockpit-live-root-entry.md)); Graphite resta
   riferimento storico per il principio no-selector e nuove sperimentazioni non
   diventano selector runtime persistiti senza workstream e decisione espliciti.
+- Il selector guidato Fabric sceglie binding di capability, non shell web. Usa
+  discovery compatibile, smoke sintetico e attivazione atomica con rollback;
+  non modifica il principio no-selector della root.
 - Principio local-only: nessuna dipendenza cloud di default.
 - Boundary SISS/FSE: oggi coordinamento contestuale + percorsi ufficiali; niente claim
   di integrazione regionale nativa certificata fuori dal perimetro documentato.
-- Boundary documentale 0.8.5: AnyDoc è l'unica estrazione automatica locale per
-  testo estraibile. Immagini e scansioni falliscono chiuse verso review manuale
-  e le route OCR legacy, dopo l'autenticazione, rispondono `410`.
-  DeepSeek-OCR 2 è `RELEASE_SCOPE_EXCLUDED`: mancano adapter, E2E, benchmark
-  sintetico italiano, soglie e ricomposizione verificata con provenienza, hash
-  e qualità per pagina. Apple Vision non rientra nel target.
+- Boundary documentale 0.8.5: AnyDoc resta il primo passaggio automatico
+  locale. Nel core selettivo, solo le pagine `needsOcr` raggiungono
+  materializzazione, rendering e preflight DeepSeek-OCR 2 con fake seam. Il
+  runtime adapter non è integrato e non ha prova live o benchmark E2E di
+  promozione. Le route OCR legacy, dopo l'autenticazione, rispondono `410`.
 - Boundary Fabric: le quattro capability generative restano
   `proposal_only`; receipt e provenienza non autorizzano apply.
-- Boundary Headless: nessun adapter accede direttamente a SQLite. La sola
-  append SOAP con policy `clinician_confirmed_single_use.v1` è un'eccezione
-  stretta e non crea un canale di scrittura generale.
+- Boundary Headless: nessun adapter accede direttamente a SQLite. MCP/Mini
+  raggiungono solo Application Services nominati tramite RPC AIP ereditato; la
+  superficie resta candidata finché manca l'entrypoint production.
 
 ---
 

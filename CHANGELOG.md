@@ -27,24 +27,35 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
 
 ### Estrazione locale degli allegati
 
-- AnyDoc è l'unica corsia automatica locale per i formati supportati. La
-  conversione a Markdown è bounded, non usa rete e non è OCR.
-- Immagini, PDF scansionati senza text layer, documenti cifrati e formati non
-  supportati falliscono chiusi come
-  `review_required/unsupported_local_extraction`. Non producono sintesi o
-  proposte cliniche.
-- La capability `ocr` è `unavailable` nel runtime corrente e le route OCR
-  legacy rispondono `410`.
+- AnyDoc resta il primo passaggio automatico locale per i formati supportati.
+  La conversione a Markdown è bounded, non usa rete e non è OCR.
+- Il tree classifica le pagine `needsOcr`, le materializza e renderizza in modo
+  selettivo e include il preflight DeepSeek-OCR 2 con fake seam.
+- Il percorso DeepSeek non ha runtime adapter o readiness: mancano esecuzione
+  live, benchmark E2E di promozione e qualifica dell'host. Gli input non ammessi
+  falliscono chiusi e le route OCR legacy restano terminali `410`.
 
-### Headless e SOAP
+### Headless, MCP e Mini
 
-- Il piano Headless conserva 66 esiti terminali e zero operazioni generali
-  eseguibili. I 32 `GET` network osservati restano evidence candidate.
-- La sola eccezione stretta è la append SOAP locale server-side H1-H10:
-  sessione physician active-role, currentness, revisione clinica, gesto e
-  step-up monouso, CAS, audit, ledger e receipt.
-- L'eccezione SOAP non abilita Mini, apply generale, authority Fabric o un
-  trasporto agentico.
+- Un launcher trusted avvia il processo figlio autenticato e gli passa un
+  canale RPC AIP ereditato, senza listener o import diretti del database.
+- MCP `stdio` e Mini espongono catalogo, ricerca terminologica, lettura delle
+  Open Loops del paziente selezionato, proposta follow-up `proposal_only` e
+  query semantica bounded read-only.
+- Questa è una superficie candidata: launcher production e quickstart restano
+  `PRODUCTION_BRIDGE_BLOCKER` e non provano delivery di prodotto. La decisione
+  seleziona un Supervisor portabile come trusted parent su IPC ereditato. La
+  topologia è `DECIDED`, ma l'implementazione è `SPLIT_REQUIRED`: la factory non
+  chiude late-bind trusted-UI, owner sincrono di `readHostContext`, lifecycle e
+  revoca production o audit terminale sincrono. Broker residente e UDS sono
+  esclusi dalla `0.8.5`.
+- La transizione stato checkup F10 ha core e composizione SQLite verificati, ma
+  resta interna: nessun binding launcher, MCP, Mini o UI. Il gate è
+  `INTERNAL_CANDIDATE_VERIFIED / AUTHORITY_UI_BINDING_BLOCKER` e blocca il
+  production bridge finché manca una conferma trusted-UI.
+- Il planner semantico bounded è esposto come operazione read-only statica in
+  MCP e Mini. Compone soltanto terminology search e Open Loops patient-scoped;
+  il production bridge resta `PRODUCTION_BRIDGE_BLOCKER`.
 
 ### Provider e perimetro
 
@@ -59,24 +70,28 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
   Uno smoke sintetico sul percorso di produzione con modello BF16 locale ha
   completato in 10,6 secondi, con 64 token e 211 caratteri, senza registrare il
   raw output. È una singola osservazione, non un benchmark o una prova clinica.
-- Il registro e la UI elencano OpenAI e Anthropic come disclosure informative,
-  con esecuzione ed egress disabilitati. Non accettano configurazione di
-  credenziali; un login o abbonamento consumer non costituisce accesso API.
-- Cloud, egress, MCP, visita registrabile, semantic query planner, SQL diretto
-  e invocazione AI dai client paired restano fuori scope.
+- Il contratto provider v2, il secret broker, gli adapter HTTPS ufficiali e i
+  probe review-only OpenAI/Anthropic sono integrati. Restano `default OFF` e
+  richiedono opt-in host e policy egress/retention esplicite.
+- Le prove usano transport fake. Il tree non contiene credenziali e non prova
+  rete live, account, retention o runtime readiness cloud.
+- Il planner semantico ha core, operazione read-only e superficie statica
+  MCP/Mini integrati: `STATIC_SURFACE_INTEGRATED / PRODUCTION_BRIDGE_BLOCKER`.
+  SQL diretto resta vietato; il production bridge selezionato resta non
+  implementato. La registrazione visita è `DEFER_NEXT_PATCH` e l'invocazione AI
+  dai client paired resta fuori scope.
+- Il selector guidato Fabric rileva profili compatibili per cinque capability,
+  esegue uno smoke sintetico e attiva binding host-owned con CAS e rollback.
 
 ### Esiti di perimetro F6/F7
 
-- **F6 — `RELEASE_SCOPE_EXCLUDED`**: DeepSeek-OCR 2 selettivo sulle pagine
-  `needsOcr`, provenance/hash/quality per pagina, benchmark sintetico italiano
-  con soglie ed E2E non sono implementati o verificati. La patch include solo
-  AnyDoc per testo estraibile e il fallimento chiuso a revisione manuale per
-  immagini e scansioni.
-- **F7 — `RELEASE_SCOPE_EXCLUDED`**: esecuzione/configurazione credenziali
-  OpenAI o Anthropic e il contratto completo
-  type/instance/auth/model/capabilities/groups/bindings/allowlist/credential
-  classes non sono inclusi. I soli provider effettivi restano Ollama locale e
-  ATHENA/MLX, dove configurati e per le capability assegnate.
+- **F6 — `INTEGRATED CORE / NO_RUNTIME_READINESS`**: AnyDoc resta il primo
+  passaggio; pipeline `needsOcr` e preflight DeepSeek con fake seam sono
+  integrati. Restano assenti runtime adapter, qualifica, esecuzione live e
+  benchmark E2E di promozione.
+- **F7 — `INTEGRATED / DEFAULT_OFF`**: provider v2, secret broker, adapter
+  ufficiali e probe review-only sono presenti. Nessuna credenziale o prova di
+  rete live appartiene al candidato.
 
 ### Altri cambiamenti non rilasciati
 
@@ -224,7 +239,8 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
 
 ### Limiti dichiarati della release
 
-- **Nessun contenuto nativo Apple è stato compilato o testato.** La toolchain
+- **Nessun contenuto nativo Apple è stato compilato o testato per questa
+  release storica.** La toolchain
   Xcode non è disponibile sulla postazione (`xcode-select -p` punta a
   CommandLineTools). Restano quindi non verificati i 4 file `native/` mergiati
   con la terminology parity. Il lavoro dipendente da Xcode è tracciato come

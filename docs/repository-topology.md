@@ -7,7 +7,7 @@ read_when:
 
 # Repository Topology: MediFlow
 
-Ultimo aggiornamento: 2026-09-01
+Ultimo aggiornamento: 2026-09-02
 
 Mappa concisa delle aree top-level del repository, pensata per orientare agent e
 contributor: distingue il **runtime clinico** (codice che gira con dati paziente)
@@ -59,7 +59,11 @@ host-owned e locale:
 - `app/api/ai/{patient-insight,smart-import,document-synthesis,treatment-reasoning}/`
   contiene gli adapter HTTP autenticati dei quattro smart path generativi;
 - `lib/ai-providers/fabric/` contiene resolver, production root, lifecycle,
-  receipt e provenienza governati dall'host;
+  receipt, selector guidato e binding atomici governati dall'host;
+- `lib/ai-providers/v2/` contiene contratto provider, secret broker, adapter
+  HTTPS ufficiali e probe review-only OpenAI/Anthropic `default OFF`;
+- `packages/aip/`, `packages/mcp/` e `packages/mini/` contengono il broker
+  portabile e le superfici figlie candidate, senza import diretti del database;
 - quando configurato, Ollama serve Patient Insight, Smart Import e Document
   Synthesis;
 - quando configurata, ATHENA su MLX serve soltanto Treatment Reasoning, con
@@ -81,25 +85,22 @@ modello, endpoint, venue, prompt, fallback o apply. Ogni smart path restituisce
 una proposta review-only con receipt, provenienza e currentness; il production
 root host-owned resta l'unico punto di composizione.
 
-La capability `ocr` resta `unavailable` nel runtime corrente. AnyDoc fallisce
-chiusa per immagini o PDF scansionati senza text layer e le route OCR legacy,
-dopo l'autenticazione, rispondono `410`. DeepSeek-OCR 2 è
-`RELEASE_SCOPE_EXCLUDED`: mancano adapter, E2E e benchmark. Un workstream
-post-0.8.5 può ricevere soltanto pagine `needsOcr` e deve ricomporle con
-provenienza, hash e qualità per pagina. Benchmark sintetico italiano, soglie
-dichiarate e prova che nessun dato lascia il processo locale devono precedere
-ogni abilitazione. Apple Vision non appartiene al target.
+AnyDoc resta il primo passaggio. Il tree include routing, manifest,
+materializzazione e rendering bounded delle sole pagine `needsOcr`, oltre al
+preflight DeepSeek-OCR 2 con fake seam. Il runtime adapter non è integrato e
+il tree non contiene prove live, benchmark E2E o runtime readiness. Le route OCR
+legacy, dopo l'autenticazione, rispondono `410`.
 
-Non esistono provider cloud operativi o una superficie di consenso per l'invio
-esterno. OpenAI e Anthropic compaiono soltanto nel registro informativo e hanno
-esecuzione disabilitata. Il controllo resta `closed_pending_redaction_lane`.
+OpenAI e Anthropic hanno adapter HTTPS ufficiali e probe Document Synthesis
+review-only. Restano `default OFF` e richiedono lifecycle, secret reference e
+policy egress/retention host-owned. I test usano transport fake: il tree non
+contiene credenziali o prove di rete live. Login consumer e subscription non
+equivalgono a una credenziale di inferenza.
 
-La disclosure implementata non chiude F7. Il modello provider completo non è
-implementato ed è `RELEASE_SCOPE_EXCLUDED`. Un contratto post-0.8.5 dovrà
-separare provider type, istanza, autenticazione, modello, capability, gruppi,
-binding e function allowlist. Le classi `local_model`, `api_key`,
-`provider_oauth` ufficiale e `host_subscription` restano distinte. Login
-consumer e subscription non equivalgono a una credenziale di inferenza.
+Il selector Fabric opera sulle cinque capability nominate. La discovery mostra
+profili compatibili, lo smoke usa fixture sintetiche e l'attivazione del binding
+è atomica, versionata e reversibile. Non persiste segreti e non qualifica il
+runtime.
 
 Un futuro plug-in non può accedere direttamente al database. Può ricevere solo
 il contenuto minimo dopo regole, attivazione esplicita, controlli verificati e
@@ -118,29 +119,43 @@ conversazionale e l'automazione graduata restano roadmap.
 
 ## Confine Headless 0.8.5
 
-La foundation Headless non espone un runtime agentico generale esterno. Non
-espone listener, installer, onboarding o operazioni Headless eseguibili
-generalizzate. Gli adapter non importano SQLite e non duplicano regole di
-dominio: invocano solo Application Services host-owned.
+Un launcher trusted avvia un processo figlio autenticato con ambiente
+allowlisted e RPC AIP ereditato. MCP `stdio` e Mini espongono catalogo,
+terminology search, Open Loops patient-scoped, proposta follow-up
+`proposal_only` e query semantica bounded read-only. Gli adapter non importano
+SQLite, non duplicano regole di dominio e non aprono listener.
 
-L'unica eccezione di scrittura accettata è
-`mediflow.clinical_diary.append_soap.v1` con
-`clinician_confirmed_single_use.v1`. Il chiamante non fornisce authority, dati
-di sessione, idempotenza o binding clinici. L'Application Service ricontrolla
-la currentness e delega il commit atomico al solo owner SQLite. L'eccezione non
-autorizza altre capability, il Fabric o un canale Headless generale esterno.
+Authority, purpose, selezione, scope, lease, currentness e audit restano
+host-owned. Il launcher production, il quickstart e il lifecycle supportato
+restano `PRODUCTION_BRIDGE_BLOCKER`. La topologia Supervisor portabile come
+trusted parent su IPC ereditato è `DECIDED`; l'implementazione è
+`SPLIT_REQUIRED`. La factory esaminata non chiude late-bind trusted-UI, owner
+sincrono di `readHostContext`, lifecycle e revoca production o audit terminale
+sincrono. Broker residente e UDS sono esclusi dalla `0.8.5`.
+
+La transizione stato checkup F10 vive in `packages/aip/` e
+`lib/security/headless-checkup-status-transition-*` come candidato interno. Core
+e composizione SQLite sono verificati, ma non esiste binding launcher, MCP,
+Mini o UI. La conferma trusted-UI è
+`AUTHORITY_UI_BINDING_BLOCKER` per il production bridge.
 
 La topologia distingue due modalità e non le unisce:
 
 - **provider-in-MediFlow**: il Fabric governa il provider che esegue una
   capability MediFlow; i quattro path locali appartengono a questa modalità;
-- **MediFlow-in-intelligent-host**: un host futuro usa un adapter MCP, App o
-  Headless sopra gli stessi Application Services.
+- **MediFlow-in-intelligent-host**: MCP o Mini usano RPC AIP ereditato sopra gli
+  stessi Application Services.
 
-La seconda modalità è `RELEASE_SCOPE_EXCLUDED`. Il tree corrente non promette
-server MCP, installer, onboarding o integrazione con sessioni consumer.
-Qualunque OAuth provider futuro deve usare soltanto un contratto ufficiale,
-senza token privati o flussi ricostruiti.
+La seconda modalità è una superficie candidata, non un entrypoint production.
+Il tree non promette installer, onboarding o integrazione con sessioni
+consumer. Qualunque OAuth provider futuro deve usare soltanto un contratto
+ufficiale, senza token privati o flussi ricostruiti.
+
+Il core, l'operazione read-only e la superficie statica MCP/Mini del planner
+semantico sono integrati:
+`STATIC_SURFACE_INTEGRATED / PRODUCTION_BRIDGE_BLOCKER`. Il production bridge
+selezionato non ha callsite o test. Il planner non produce SQL libero. La
+registrazione visita è `DEFER_NEXT_PATCH`.
 
 ## ⚠️ Regole operative
 

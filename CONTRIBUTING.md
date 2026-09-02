@@ -36,11 +36,11 @@ destinazione di export. Dati e artifact sensibili restano fuori da Git secondo
 - Apple Silicon, artifact locale ATHENA e toolchain MLX (opzionali, solo per
   Treatment Reasoning)
 
-Nota documentale 0.8.5: AnyDoc è l'unica estrazione automatica locale degli
-allegati e la capability `ocr` resta `unavailable` nel runtime corrente.
-Immagini e PDF scansionati senza text layer richiedono revisione manuale; dopo
-l'autenticazione, le route OCR legacy rispondono `410`. DeepSeek-OCR 2 e Apple
-Vision sono `RELEASE_SCOPE_EXCLUDED` dalla 0.8.5.
+Nota documentale 0.8.5: AnyDoc resta il primo passaggio automatico locale. Il
+tree include routing, manifest, materializzazione e rendering delle sole pagine
+`needsOcr`, oltre al preflight DeepSeek-OCR 2 con fake seam. Il runtime adapter
+non è integrato; prova live e benchmark E2E mancano. Le route OCR legacy
+rispondono `410` dopo l'autenticazione.
 
 Nota ATHENA 0.8.5: Treatment Reasoning è incluso solo con artifact del modello
 e runner MLX locali configurati. L'override host-owned
@@ -196,16 +196,16 @@ Usalo quando tocchi:
 - `app/api/attachments/route.ts`
 - la persistenza/lettura di `summarySnapshot` o `parseEvidenceArtifactSnapshot`
 
-Se tocchi il confine OCR della 0.8.5, preserva AnyDoc come unica estrazione
-automatica per testo estraibile, failure fail-closed verso review manuale e
-`410` sulle route legacy autenticate. AnyDoc non deve essere classificato come
-OCR, provider o venue Fabric.
+Se tocchi il confine OCR della 0.8.5, preserva AnyDoc come primo passaggio e
+ammetti alla lane successiva soltanto pagine `needsOcr`. Routing, manifest,
+materializzazione, rendering e preflight devono restare bounded e fail-closed;
+le route legacy autenticate restano `410`. AnyDoc non è un provider o una venue
+Fabric.
 
-DeepSeek-OCR 2 è `RELEASE_SCOPE_EXCLUDED`. Un workstream post-0.8.5 dovrà
-fornire adapter, E2E, benchmark sintetico italiano e soglie dichiarate prima
-dell'implementazione. Potrà ricevere soltanto pagine `needsOcr` e dovrà
-ricomporre il documento con provenienza, hash e qualità per pagina, senza
-permettere a dati clinici di lasciare il processo locale.
+Il preflight DeepSeek-OCR 2 usa un fake seam. Non presentarlo come runtime
+adapter, esecuzione live o readiness. Una promozione futura richiede adapter,
+benchmark sintetico italiano, soglie dichiarate ed E2E, con provenienza, hash e
+qualità per pagina e nessun egress implicito.
 
 ### Verifica del crosswalk Fabric 0.8.5
 
@@ -224,14 +224,11 @@ lo stadio massimo `proposal_only`.
 
 ### Gate del modello provider F7
 
-La disclosure corrente distingue i provider locali da OpenAI e Anthropic,
-presenti soltanto come righe informative con esecuzione disabilitata. Non
-trattarla come completamento del modello provider.
-
-Il modello F7 completo non è implementato ed è `RELEASE_SCOPE_EXCLUDED`. Un
-contratto post-0.8.5 dovrà separare tipo e istanza del provider,
+Il modello provider v2, il secret broker e gli adapter HTTPS ufficiali OpenAI
+e Anthropic sono integrati. I probe Document Synthesis restano review-only e
+`default OFF`. Il contratto separa tipo e istanza del provider,
 autenticazione, modello, capability, gruppi, binding e allowlist delle funzioni.
-Le classi di credenziale previste dal requisito sono:
+Le classi di credenziale sono:
 
 - `local_model`;
 - `api_key`;
@@ -239,17 +236,28 @@ Le classi di credenziale previste dal requisito sono:
 - `host_subscription`, come classe distinta e non come accesso API implicito.
 
 Un login consumer, un abbonamento ChatGPT/Claude o una subscription dell'host
-non autorizzano inferenza API. Configurazione credenziali ed esecuzione
-OpenAI/Anthropic sono `RELEASE_SCOPE_EXCLUDED`. Un workstream futuro richiede
-contratto ufficiale, egress esplicito e credenziali autorizzate. Non copiare
-codice GPL né implementare OAuth privati, reverse-engineered o dipendenti da
-sessioni consumer.
+non autorizzano inferenza API. La composizione production richiede lifecycle
+attivo, opt-in host, egress/retention espliciti e secret reference. I test usano
+transport fake: non dichiarare credenziali, rete live o readiness cloud. Non
+copiare codice GPL né implementare OAuth privati, reverse-engineered o
+dipendenti da sessioni consumer.
 
 Mantieni inoltre separate le due modalità architetturali: un provider eseguito
 dentro MediFlow e MediFlow invocato come servizio governato da un host
-intelligente. La seconda modalità è `RELEASE_SCOPE_EXCLUDED` e non autorizza
-server MCP, installer, onboarding o un runtime Headless generale esposto
-all'esterno.
+intelligente. MCP `stdio` e Mini usano soltanto RPC AIP ereditato e Application
+Services nominati. Launcher production e quickstart restano
+`PRODUCTION_BRIDGE_BLOCKER`; non autorizzano installer, onboarding, listener o
+accesso diretto a SQLite. La soluzione scelta è un Supervisor portabile come
+trusted parent su IPC ereditato: la topologia è `DECIDED`, l'implementazione è
+`SPLIT_REQUIRED`. Prima di dichiarare delivery servono late-bind trusted-UI,
+owner sincrono di `readHostContext`, lifecycle e revoca production, audit
+terminale sincrono e relativi test. Non introdurre broker residente o UDS nella
+`0.8.5`.
+
+La transizione stato checkup F10 resta un candidato interno. Non aggiungerla al
+catalogo launcher, MCP o Mini senza un binding trusted-UI che mantenga gesto,
+proof monouso, currentness e authority host-owned. Finché manca quel binding,
+il gate è `INTERNAL_CANDIDATE_VERIFIED / AUTHORITY_UI_BINDING_BLOCKER`.
 
 ---
 
@@ -375,10 +383,13 @@ Una PR è considerata conclusa quando:
 - se cambi l'estrazione degli allegati, i check AnyDoc local-only passano,
   immagini/scansioni falliscono chiuse e le route OCR legacy autenticate
   restano `410`
-- se avvii un workstream post-0.8.5 sul modello provider, tipo, istanza, auth,
-  modello, capability, gruppi, binding, allowlist e classi di credenziale
-  restano separati; i provider cloud restano `RELEASE_SCOPE_EXCLUDED` senza
-  contratto ufficiale
+- se cambi Headless, AIP, MCP o Mini, esegui
+  `npm run check:headless-portable-imports`,
+  `npm run test:headless-portable`,
+  `npm run test:mcp:intelligent-host` e `npm run test:mini-cli`
+- se cambi un provider cloud, tipo, istanza, auth, modello, capability, gruppi,
+  binding, allowlist e classi di credenziale restano separati; il default resta
+  OFF e i test non richiedono credenziali live
 - Nessun PHI/PII introdotto in repo, fixture, log o screenshot
 - Se una feature è user-facing e interagibile, deve avere una UI/UX esplicita e coerente
   (CTA/pulsante, label comprensibile, percorso utente verificabile).

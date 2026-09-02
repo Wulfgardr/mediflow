@@ -203,18 +203,19 @@ selezionato dal nodo autorevole:
 5. Document Synthesis puo usare l'evidenza soltanto per una proposta Fabric da
    rivedere.
 
-AnyDoc non esegue OCR. Immagini, scansioni, documenti cifrati, malformati o
-privi di testo utile falliscono chiusi verso revisione manuale. Le route
-storiche `/api/ocr/extract` e `/api/pdf-extract` verificano prima la sessione e
-poi restituiscono `410`; non invocano Apple Vision, DeepSeek-OCR o altri
-fallback.
+AnyDoc non esegue OCR. Il tree include componenti bounded che, a partire dal suo
+segnale, costruiscono un manifest di pagina, materializzano il documento e
+renderizzano soltanto le pagine `needsOcr`. Questi componenti non sono composti
+in un production root OCR. Errori, input cifrati e formati ambigui falliscono
+chiusi. Le route storiche `/api/ocr/extract` e `/api/pdf-extract` verificano
+prima la sessione e poi restituiscono `410`.
 
-Il fallback selettivo DeepSeek-OCR 2 e un requisito deciso ma
-`RELEASE_SCOPE_EXCLUDED` dalla 0.8.5. Un packet futuro potra inviarvi soltanto
-le pagine `needsOcr` e dovra ricomporre provenienza, hash e qualita per pagina.
-Prima dell'abilitazione richiedera benchmark sintetico italiano, soglie fissate,
-E2E e misure prestazionali. Dovra restare locale, fail-closed, proposal-only e
-zero-write. Vedi [ADR 0109](./adr/0109-confini-programma-intelligence-fabric-headless-085.md).
+Il preflight DeepSeek-OCR 2 usa manifest fissati e un fake seam. Il runtime
+adapter non è integrato; il tree non contiene prove live, benchmark E2E o
+readiness.
+Una futura promozione deve conservare provenienza, hash e qualità per pagina,
+restare fail-closed, proposal-only e zero-write. Vedi
+[ADR 0111](./adr/0111-deepseek-ocr2-selective-page-routing.md).
 
 ### Diario protesico da documenti Assistente RL
 
@@ -470,14 +471,20 @@ restano follow-up. Vedi anche [docs/adr/0016-backup-artifact-v1-manifest-preflig
   host-owned dei quattro percorsi generativi.
 - `lib/ai-providers/fabric/provider-disclosure.ts`: disclosure read-only dei
   provider, distinta dall'osservazione di una singola operazione.
+- `lib/ai-providers/fabric/guided-setup.ts` e
+  `lib/ai-providers/fabric/capability-binding-store.ts`: discovery compatibile,
+  smoke sintetico e attivazione atomica dei binding per capability.
+- `lib/ai-providers/v2/*official-transport.ts`: transport ufficiali OpenAI e
+  Anthropic, composti soltanto dopo policy e lifecycle host-owned.
 - `docs/capability-mapping/fabric-generative-runtime-crosswalk.v1.json`:
   crosswalk verificabile tra UI, route, production root e publication.
 
-OpenAI e Anthropic compaiono soltanto come righe informative disabilitate.
-Configurazione credenziali, OAuth, esecuzione cloud ed egress sono
-`RELEASE_SCOPE_EXCLUDED` dalla 0.8.5. Un abbonamento consumer o host non concede
-accesso API o inference. I runtime inclusi sono Ollama locale e ATHENA su MLX
-dove configurati; il chiamante non sceglie provider, modello o fallback.
+OpenAI e Anthropic hanno adapter ufficiali e probe Document Synthesis
+review-only. Restano `default OFF` e richiedono lifecycle, secret reference e
+policy egress/retention host-owned. I test usano transport fake: il tree non
+contiene credenziali o prove di rete live. Un abbonamento consumer o host non
+concede accesso API o inference; il chiamante non sceglie provider, modello o
+fallback.
 
 ### Quattro percorsi generativi Fabric
 
@@ -540,6 +547,36 @@ La preview Smart Import non modifica diagnosi o terapie. Un eventuale apply
 successivo non fa parte del percorso Fabric e deve restare una operazione
 applicativa separata, esplicita e auditabile. ADR 0084 continua a vietare la
 scrittura diagnostica dalla sintesi documentale.
+
+### Intelligent Host candidato via MCP e Mini
+
+Il launcher trusted avvia un processo figlio autenticato e gli passa un canale
+RPC AIP ereditato. MCP `stdio` e Mini usano lo stesso catalogo governato:
+
+- ricerca terminologica locale `read_only`;
+- lettura minimizzata delle Open Loops del paziente selezionato;
+- proposta follow-up `proposal_only`, senza apply o scrittura clinica;
+- query semantica bounded `read_only` sulle due operazioni di lettura nominate.
+
+Purpose, selezione, scope, lease, currentness e audit restano host-owned. Il
+processo figlio non importa SQLite e non apre listener. Launcher production e
+quickstart restano `PRODUCTION_BRIDGE_BLOCKER`. La topologia Supervisor
+portabile come trusted parent su IPC ereditato è `DECIDED`; l'implementazione è
+`SPLIT_REQUIRED`. La factory esaminata non chiude late-bind trusted-UI, owner
+sincrono di `readHostContext`, lifecycle e revoca production o audit terminale
+sincrono. Broker residente e UDS sono esclusi dalla `0.8.5`. Il flusso non è
+ancora un entrypoint di prodotto supportato.
+
+La transizione stato checkup F10 ha core e composizione SQLite verificati come
+candidato interno, ma non è collegata a launcher, MCP, Mini o UI. La conferma
+trusted-UI resta `AUTHORITY_UI_BINDING_BLOCKER` e fa parte
+dell'implementazione mancante del production bridge selezionato.
+
+Il core, l'operazione read-only e la superficie statica MCP/Mini del planner
+semantico sono integrati:
+`STATIC_SURFACE_INTEGRATED / PRODUCTION_BRIDGE_BLOCKER`. La superficie compone
+solo terminology search e Open Loops patient-scoped. Il production bridge
+selezionato non ha callsite o test e il planner non produce SQL libero.
 
 ### Guard revisione shell web
 
@@ -704,14 +741,21 @@ sequenceDiagram
 - Il candidato sorgente locale 0.8.5 collega i quattro percorsi generativi al
   Fabric, ma il client paired resta `status_only` e non esegue AI. Nessun
   percorso Fabric applica o scrive dati clinici.
-- Il fallback selettivo DeepSeek-OCR 2 e l'esecuzione OpenAI/Anthropic sono
-  requisiti futuri `RELEASE_SCOPE_EXCLUDED`: non hanno adapter, E2E o authority
-  nel candidato. Cloud, egress, credenziali provider e fallback invisibile
-  restano fuori.
+- Il core selettivo OCR e il preflight DeepSeek con fake seam sono integrati,
+  ma runtime adapter, E2E e readiness restano assenti. Gli adapter ufficiali
+  OpenAI/Anthropic sono `default OFF`; non esistono credenziali o rete live nel
+  candidato.
+- MCP/Mini espongono letture nominate e una proposta tramite RPC AIP ereditato,
+  ma l'entrypoint production resta `PRODUCTION_BRIDGE_BLOCKER`.
+- La write checkup F10 resta un candidato interno senza binding trusted-UI:
+  `INTERNAL_CANDIDATE_VERIFIED / AUTHORITY_UI_BINDING_BLOCKER`.
+- Il planner ha core e operazione read-only integrati, ma non è ancora esposto
+  dalla superficie statica MCP/Mini. La registrazione visita è
+  `DEFER_NEXT_PATCH`.
 
 Claim ceiling per i flussi descritti: candidato sorgente locale 0.8.5. Il
 walkthrough non prova release, pubblicazione, certificazione, deployment cloud,
-AI paired, MCP operativo o authority agentica generale.
+AI paired, entrypoint MCP production o authority agentica generale.
 
 ---
 
