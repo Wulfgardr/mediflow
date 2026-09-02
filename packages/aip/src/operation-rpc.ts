@@ -1,13 +1,16 @@
 /* @Codex */
 import { types } from 'node:util';
-import { AIP_BOOTSTRAP_ENV_KEY_V1 } from './authenticated-ipc.ts';
+import {
+    AIP_BOOTSTRAP_ENV_KEY_V1, AIP_OPERATION_RPC_AUTHENTICATED_ENV_V1, AIP_OPERATION_RPC_ENV_KEY_V1,
+} from './child-ipc-contract.ts';
+export {
+    AIP_OPERATION_RPC_AUTHENTICATED_ENV_V1, AIP_OPERATION_RPC_ENV_KEY_V1,
+} from './child-ipc-contract.ts';
 export const AIP_OPERATION_RPC_REQUEST_SCHEMA_V1 = 'mediflow.aip.operation.request.v1' as const;
 export const AIP_OPERATION_RPC_RESULT_SCHEMA_V1 = 'mediflow.aip.operation.result.v1' as const;
 export const AIP_OPERATION_RPC_MAX_FRAME_BYTES_V1 = 64 * 1024;
 export const AIP_OPERATION_RPC_MAX_IN_FLIGHT_V1 = 8;
 export const AIP_OPERATION_RPC_MAX_REQUESTS_V1 = 256;
-export const AIP_OPERATION_RPC_ENV_KEY_V1 = 'MEDIFLOW_AIP_OPERATION_RPC' as const;
-export const AIP_OPERATION_RPC_AUTHENTICATED_ENV_V1 = 'authenticated_inherited_child_ipc_v1' as const;
 const SOURCE_KEYS = ['operations'] as const;
 const DEFINITION_KEYS = ['operationId', 'capabilityId', 'serviceRef', 'maximumStage', 'timeoutMs', 'execute'] as const;
 const PORT_KEYS = ['subscribe', 'publish'] as const;

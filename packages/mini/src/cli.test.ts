@@ -118,13 +118,13 @@ test('fails all valid commands closed when inherited host IPC is absent', () => 
 
 test('rejects oversized open stdin without waiting for EOF', async () => {
   const child = spawn(process.execPath, ['--experimental-strip-types', '--import', LOADER, CLI], {
-    cwd: ROOT, env: {}, stdio: ['pipe', 'pipe', 'pipe'],
+    cwd: ROOT, env: {} as NodeJS.ProcessEnv, stdio: ['pipe', 'pipe', 'pipe'],
   });
   let stdout = ''; let stderr = '';
-  child.stdout.setEncoding('utf8'); child.stderr.setEncoding('utf8');
-  child.stdout.on('data', (chunk) => { stdout += chunk; });
-  child.stderr.on('data', (chunk) => { stderr += chunk; });
-  child.stdin.write(Buffer.alloc(16 * 1024 + 1, 0x78));
+  child.stdout!.setEncoding('utf8'); child.stderr!.setEncoding('utf8');
+  child.stdout!.on('data', (chunk: string) => { stdout += chunk; });
+  child.stderr!.on('data', (chunk: string) => { stderr += chunk; });
+  child.stdin!.write(Buffer.alloc(16 * 1024 + 1, 0x78));
   const code = await new Promise<number | null>((resolve, reject) => {
     const timer = setTimeout(() => { child.kill(); reject(new Error('Mini waited for EOF')); }, 3000);
     child.on('exit', (status) => { clearTimeout(timer); resolve(status); });
