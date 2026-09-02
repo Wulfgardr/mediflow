@@ -93,6 +93,54 @@ test('bootstrap XPC per-user crea una connessione host-owned senza restituire au
     assert.equal(JSON.stringify(audit).includes(ACTIVATION.expectedProcessRef), false);
 });
 
+test('consegna una sola volta al launcher host l owner opaco della connessione autenticata', async () => {
+    const { host, broker } = fixture();
+    const connection = Object.freeze(Object.create(null));
+    host.stageLaunch(ACTIVATION);
+
+    assert.throws(() => host.claimAuthenticatedOwner(connection), code('connection_invalid'));
+    const response = await host.handleBootstrap(connection, frame());
+    assert.equal(new TextDecoder().decode(response).includes('owner'), false);
+
+    const owner = host.claimAuthenticatedOwner(connection);
+    assert.equal(Object.getPrototypeOf(owner), null);
+    assert.equal(Object.isFrozen(owner), true);
+    assert.deepEqual(Reflect.ownKeys(owner), []);
+    assert.throws(() => host.claimAuthenticatedOwner(connection), code('connection_invalid'));
+
+    assert.equal(host.close(connection), true);
+    assert.equal(broker.revokeOwner(owner), false);
+    assert.throws(() => host.claimAuthenticatedOwner(connection), code('connection_invalid'));
+});
+
+test('non rende reclamabile l owner durante auth e invalida il bridge a cancel e restart', async () => {
+    let resolvePeer!: (value: unknown) => void;
+    const pendingPeer = new Promise<unknown>((resolve) => { resolvePeer = resolve; });
+    const refs = ['agent.synthetic.aip.0001'];
+    const broker = createAipOwnerBrokerV1({ now: () => 1_000, nextRef: () => refs.shift(), hashRef: () => DIGEST,
+        writeAudit: async () => undefined });
+    const host = createAipAuthenticatedIpcHostV1({ broker, now: () => 1_000, nextBootstrapRef: () => BOOTSTRAP,
+        hashRef: () => DIGEST, writeAudit: async () => undefined, authenticateTrustedPortPeer: () => pendingPeer });
+    const connection = Object.freeze(Object.create(null));
+    host.stageLaunch(ACTIVATION);
+    const attempt = host.handleBootstrap(connection, frame());
+    assert.throws(() => host.claimAuthenticatedOwner(connection), code('connection_invalid'));
+    assert.equal(host.cancel(connection), true);
+    resolvePeer(XPC_PEER);
+    await assert.rejects(attempt, code('cancelled'));
+    assert.throws(() => host.claimAuthenticatedOwner(connection), code('connection_invalid'));
+
+    const restarted = fixture();
+    const restartedConnection = Object.freeze(Object.create(null));
+    restarted.host.stageLaunch(ACTIVATION);
+    await restarted.host.handleBootstrap(restartedConnection, frame());
+    restarted.host.restart();
+    assert.throws(() => restarted.host.claimAuthenticatedOwner(restartedConnection), code('connection_invalid'));
+
+    const hostile = new Proxy(Object.create(null), {});
+    assert.throws(() => restarted.host.claimAuthenticatedOwner(hostile), code('connection_invalid'));
+});
+
 test('bootstrap e connessione sono monouso e process-bound anche con chiamate concorrenti', async () => {
     let resolvePeer!: (value: unknown) => void;
     const peerPromise = new Promise<unknown>((resolve) => { resolvePeer = resolve; });
