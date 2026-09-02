@@ -160,13 +160,15 @@ export function createAuthenticatedAgentLauncherV1(sourcesValue: unknown) {
       active = false; clearTimeout(timer);
       for (const cancel of cancellers) { try { cancel(); } catch { /* terminal */ } }
       cancellers.clear();
-      if (rpcHost && rpcHandle) { try { restart ? rpcHost.restart() : rpcHost.revoke(rpcHandle); } catch { /* terminal */ } }
+      if (rpcHost && rpcHandle) {
+        try { if (restart) rpcHost.restart(); else rpcHost.revoke(rpcHandle); } catch { /* terminal */ }
+      }
       for (const state of operationStates) {
         try { registry.revoke(state.scopeSession); } catch { /* terminal */ }
         if (!restart) { try { broker.revokeOwner(state.owner); } catch { /* terminal */ } }
       }
       if (authScopeSession) { try { registry.revoke(authScopeSession); } catch { /* terminal */ } }
-      try { restart ? registry.restart() : authHost.close(child.connection); } catch { /* terminal */ }
+      try { if (restart) registry.restart(); else authHost.close(child.connection); } catch { /* terminal */ }
       if (restart) { try { authHost.restart(); } catch { /* terminal */ } }
       try { unsubscribeMessages?.(); } catch { /* terminal */ }
       try { unsubscribeClose?.(); } catch { /* terminal */ }
