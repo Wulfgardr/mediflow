@@ -100,7 +100,8 @@ const [{ createPortableSupervisorContextMirrorV1 },
   { createPortableSupervisorProductionChildProcessesV1 },
   { createPortableSupervisorPatientVersionProductionV1 },
   { createPortableSupervisorProductionRuntimeV1 },
-  { createPortableSupervisorSemanticAuditPortV1 }] = await Promise.all([
+  { createPortableSupervisorSemanticAuditPortV1 },
+  { createCheckupStatusTransitionSupervisorPortV1 }] = await Promise.all([
   import(url('packages/aip/src/portable-supervisor-context-mirror.ts')),
   import(url('lib/security/authenticated-headless-agent-launcher-production.ts')),
   import(url('lib/security/portable-supervisor-aip-audit-port.ts')),
@@ -108,6 +109,7 @@ const [{ createPortableSupervisorContextMirrorV1 },
   import(url('lib/security/portable-supervisor-patient-version-production.ts')),
   import(url('lib/security/portable-supervisor-production.ts')),
   import(url('lib/security/portable-supervisor-semantic-audit-port.ts')),
+  import(url('lib/security/checkup-status-transition-supervisor-port.ts')),
 ]);
 const now = () => Date.now();
 let runtime = null, expectedTermination = false;
@@ -135,12 +137,18 @@ const children = createPortableSupervisorProductionChildProcessesV1({
   dataDir: ${JSON.stringify(dataDir)},
   webDirectory: ${JSON.stringify(webDirectory)}, webTargetPath: ${JSON.stringify(webTarget)},
 });
+const checkup = createCheckupStatusTransitionSupervisorPortV1({
+  randomBytes, sendWeb: children.sendWeb,
+  schedule: (delay, callback) => { const timer = setTimeout(callback, delay); return () => clearTimeout(timer); },
+  onTerminal: () => runtime?.terminate('explicit'),
+});
 runtime = createPortableSupervisorProductionRuntimeV1({
   now, nextChallenge: () => 'pswc_' + randomBytes(32).toString('hex'),
   schedule: (delay, callback) => { const timer = setTimeout(callback, delay); return () => clearTimeout(timer); },
-  mirror: context, children,
+  mirror: context, children, checkup,
   launchMcp: () => createProductionMcpAgentLauncherWithPreSpawnedChildV1({
     readHostContext: context.readHostContext, writeAudit, commitTerminalAudit,
+    previewCheckupStatus: checkup.preview,
   }, children.mcpPort).launch(),
 });
 const onSignal = () => runtime.terminate('restart');

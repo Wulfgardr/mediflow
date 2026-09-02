@@ -12,6 +12,8 @@ import {
 import { decodePortableSupervisorWebIpcFrameV1 } from
   '../../packages/aip/src/portable-supervisor-web-ipc-contract.ts';
 import { getDataDir } from '../data-dir';
+import { createCheckupStatusTransitionSupervisorPortV1 } from
+  './checkup-status-transition-supervisor-port.ts';
 import { createProductionMcpAgentLauncherWithPreSpawnedChildV1 } from
   './authenticated-headless-agent-launcher-production.ts';
 import { createPortableSupervisorAipAuditPortV1 } from './portable-supervisor-aip-audit-port.ts';
@@ -42,6 +44,7 @@ type RuntimeSources = Readonly<{
   schedule(delayMs: number, callback: () => void): () => void;
   mirror: MirrorPort;
   launchMcp(): Promise<AuthenticatedSession>;
+  checkup: Readonly<{ acceptWebFrame(frame: unknown): boolean; close(): boolean }>;
   children: PortableSupervisorProductionChildProcessesV1;
 }>;
 
@@ -81,6 +84,7 @@ export function createPortableSupervisorProductionRuntimeV1(
     const current = session; session = null;
     try { current?.close(); } catch { failed = true; }
     try { mirror.revoke(); } catch { failed = true; }
+    try { sources.checkup.close(); } catch { failed = true; }
     try { children.terminateMcp(); } catch { failed = true; }
     if (failed) throw new Error('revoke_failed');
   };
@@ -158,6 +162,7 @@ export function createPortableSupervisorProductionRuntimeV1(
   };
   const handleWeb = async (frame: unknown): Promise<void> => {
     if (terminal || ackPending) return;
+    if (sources.checkup.acceptWebFrame(frame)) return;
     let revoke = false;
     try { revoke = decodePortableSupervisorWebIpcFrameV1(frame).method === 'revoke_all'; }
     catch { terminate('explicit'); return; }
@@ -212,6 +217,14 @@ export function createPortableSupervisorProductionV1(): PortableSupervisorProduc
     now, readHostContext: context.readHostContext,
   });
   const children = createPortableSupervisorProductionChildProcessesV1({ dataDir });
+  const checkup = createCheckupStatusTransitionSupervisorPortV1({
+    randomBytes,
+    sendWeb: children.sendWeb,
+    schedule: (delayMs: number, callback: () => void) => {
+      const timer = setTimeout(callback, delayMs); timer.unref(); return () => { clearTimeout(timer); };
+    },
+    onTerminal: (reason) => runtime?.terminate(reason === 'web_disconnect' ? 'web_disconnect' : 'explicit'),
+  });
   try {
     runtime = createPortableSupervisorProductionRuntimeV1({
       now,
@@ -220,9 +233,11 @@ export function createPortableSupervisorProductionV1(): PortableSupervisorProduc
         const timer = setTimeout(callback, delayMs); return () => { clearTimeout(timer); };
       },
       mirror: context,
+      checkup,
       children,
       launchMcp: () => createProductionMcpAgentLauncherWithPreSpawnedChildV1({
         readHostContext: context.readHostContext, writeAudit, commitTerminalAudit,
+        previewCheckupStatus: checkup.preview,
       }, children.mcpPort).launch(),
     });
     return runtime;

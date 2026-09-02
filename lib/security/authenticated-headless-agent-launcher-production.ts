@@ -14,7 +14,8 @@ import { createPatientOpenLoopsReadInternalCandidateV1 } from './patient-open-lo
 
 export { createLateBoundMcpChildPortV1 } from './authenticated-headless-agent-pre-spawned-mcp-child.ts';
 
-const SOURCE_KEYS = ['readHostContext', 'writeAudit', 'commitTerminalAudit'] as const;
+const REQUIRED_SOURCE_KEYS = ['readHostContext', 'writeAudit', 'commitTerminalAudit'] as const;
+const OPTIONAL_SOURCE_KEY = 'previewCheckupStatus' as const;
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 const LOADER = `${ROOT}/scripts/register-strip-types-loader.mjs`;
 const TARGETS = Object.freeze({
@@ -23,16 +24,24 @@ const TARGETS = Object.freeze({
 });
 
 type Sources = Readonly<{ readHostContext: () => unknown; writeAudit: (value: unknown) => unknown;
-  commitTerminalAudit: SemanticQueryOperationTerminalAuditCommitV1 }>;
+  commitTerminalAudit: SemanticQueryOperationTerminalAuditCommitV1;
+  previewCheckupStatus?: (value: unknown, signal: AbortSignal) => Promise<unknown> }>;
 type SpawnChild = (environment: Readonly<Record<string, string>>) => unknown;
 
 function sources(value: unknown): Sources {
   if (!value || typeof value !== 'object' || types.isProxy(value) || Array.isArray(value)) throw new Error('input_invalid');
   const descriptors = Object.getOwnPropertyDescriptors(value) as Record<string, PropertyDescriptor>;
-  if (Reflect.ownKeys(value).length !== SOURCE_KEYS.length || SOURCE_KEYS.some((key) =>
+  const ownKeys = Reflect.ownKeys(value);
+  if ((ownKeys.length !== REQUIRED_SOURCE_KEYS.length && ownKeys.length !== REQUIRED_SOURCE_KEYS.length + 1)
+    || ownKeys.some((key) => typeof key !== 'string'
+      || !([...REQUIRED_SOURCE_KEYS, OPTIONAL_SOURCE_KEY] as string[]).includes(key))
+    || REQUIRED_SOURCE_KEYS.some((key) =>
     !descriptors[key]?.enumerable || !('value' in descriptors[key]) || typeof descriptors[key].value !== 'function'
     || types.isProxy(descriptors[key].value)
-    || (key === 'commitTerminalAudit' && types.isAsyncFunction(descriptors[key].value)))) throw new Error('input_invalid');
+    || (key === 'commitTerminalAudit' && types.isAsyncFunction(descriptors[key].value)))
+    || (descriptors[OPTIONAL_SOURCE_KEY]
+      && (typeof descriptors[OPTIONAL_SOURCE_KEY].value !== 'function'
+        || types.isProxy(descriptors[OPTIONAL_SOURCE_KEY].value)))) throw new Error('input_invalid');
   return value as Sources;
 }
 
@@ -83,6 +92,8 @@ function createProductionLauncher(
     spawnChild: spawnChildOverride
       ?? ((environment: Readonly<Record<string, string>>) => childPort(TARGETS[kind], environment)),
     createOpenLoopsRead: createPatientOpenLoopsReadInternalCandidateV1,
+    previewCheckupStatus: ports.previewCheckupStatus
+      ?? (async () => { throw new AuthenticatedAgentLauncherV1Error('operation_unavailable'); }),
   });
 }
 
