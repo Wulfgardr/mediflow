@@ -245,6 +245,10 @@ export function createPortableSupervisorWebSessionControllerV1(sources: Sources)
         if (!RETIRE_REASONS.has(reason)) return Promise.reject(fail('input_invalid'));
         if (revocationPromise) return revocationPromise;
         if (phase === 'terminal') return terminalWithoutRevocation ??= Promise.resolve(false);
+        // The first patient selection precedes Intelligent Host activation. It is
+        // not a retirement event until this one-shot controller has started to
+        // acquire or own a capture.
+        if (phase === 'idle' && reason === 'reselection') return Promise.resolve(false);
         if (phase === 'idle') { terminalNoOwner(); return terminalWithoutRevocation as Promise<boolean>; }
         return revokeLocal(reason);
     };

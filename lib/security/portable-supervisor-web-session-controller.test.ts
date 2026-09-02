@@ -151,6 +151,15 @@ test('coalesces concurrent identical activation and denies a different tab const
     assert.equal(current.activations(), 1);
 });
 
+test('keeps an idle controller available across the initial patient selection', async () => {
+    const current = fixture();
+    assert.equal(await current.controller.retire('reselection'), false);
+    assert.equal(current.revocations(), 0);
+    assert.equal(current.disconnects(), 0);
+    assert.equal((await current.controller.activateCurrentSelection(INPUT)).state, 'active');
+    assert.equal(current.acquisitions(), 1);
+});
+
 test('fails closed when owner capture patient or epoch differs and revokes locally first', async () => {
     for (const drift of [
         { patientId: OTHER_PATIENT },
