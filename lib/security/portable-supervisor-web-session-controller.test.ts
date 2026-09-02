@@ -210,19 +210,24 @@ test('coalesces explicit retirement and orders local revocation before bridge IP
     assert.equal(current.revocations(), 1);
 });
 
-test('coalesces retirement during owner acquisition and never starts activation', async () => {
+test('cuts retirement during owner acquisition and revokes a late owner only locally', async () => {
     const current = fixture({ acquire: 'deferred' });
     const activating = current.controller.activateCurrentSelection(INPUT);
     const activationRejection = rejectsCode(activating, 'session_terminal');
     const first = current.controller.retire('logout');
     assert.equal(current.controller.retire('application_lock'), first);
+    const outcome = await Promise.race([
+        first,
+        new Promise<'still_pending'>((resolve) => setImmediate(() => resolve('still_pending'))),
+    ]);
+    assert.equal(outcome, false);
     assert.equal(current.revocations(), 0);
+    assert.equal(current.disconnects(), 1);
     current.acquisition.resolve();
-    assert.equal(await first, true);
     await activationRejection;
     assert.equal(current.activations(), 0);
-    assert.equal(current.revocations(), 1);
-    assert.ok(current.events.indexOf('local:logout') < current.events.indexOf('remote:logout'));
+    assert.equal(current.events.includes('local:logout'), true);
+    assert.equal(current.revocations(), 0);
     assert.equal(current.controller.retire('explicit'), first);
 });
 
