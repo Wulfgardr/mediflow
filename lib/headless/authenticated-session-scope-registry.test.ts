@@ -127,23 +127,24 @@ test('rejects replayed tickets, forged handles and hostile boundary values witho
 test('denies resolution when a trusted selection callback revokes or restarts reentrantly', () => {
   for (const action of ['revoke', 'restart'] as const) {
     let reads = 0;
-    let session: object;
-    let registry: ReturnType<typeof createAuthenticatedSessionScopeRegistryV1>;
-    registry = createAuthenticatedSessionScopeRegistryV1(record({
+    const registry = createAuthenticatedSessionScopeRegistryV1(record({
       now: () => NOW,
       nextNonce: () => 'scope_nonce_0000000000000001',
       hashRef: () => DIGEST_A,
       readHostSelection: () => {
         reads += 1;
         if (reads === 2) {
-          try { action === 'revoke' ? registry.revoke(session) : registry.restart(); } catch { /* observed */ }
+          try {
+            if (action === 'revoke') registry.revoke(session);
+            else registry.restart();
+          } catch { /* observed */ }
         }
         return selection();
       },
     }));
     const ticket = registry.capture();
     const owner = opaque();
-    session = registry.bindOwner(ticket, owner);
+    const session = registry.bindOwner(ticket, owner);
     const execution = opaque();
     registry.bindExecution(session, owner, execution);
     assert.equal(registry.resolveExecution(execution), null);
