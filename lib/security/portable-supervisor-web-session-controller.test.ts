@@ -123,8 +123,6 @@ after(() => rmSync(dataDir, { recursive: true, force: true }));
 test('activates once from the owner capture and exposes only active expiry', async () => {
     const current = fixture();
     const first = current.controller.activateCurrentSelection(INPUT);
-    const duplicate = current.controller.activateCurrentSelection({ ...INPUT });
-    assert.equal(duplicate, first);
     const result = await first;
     assert.equal(Object.getPrototypeOf(result), null);
     assert.equal(Object.isFrozen(result), true);
@@ -137,10 +135,10 @@ test('activates once from the owner capture and exposes only active expiry', asy
     assert.equal(JSON.stringify(result).includes('user.'), false);
 });
 
-test('coalesces concurrent identical activation and denies a different tab constraint', async () => {
+test('denies every sibling request without treating caller input equality as H1a identity', async () => {
     const current = fixture({ acquire: 'deferred' });
     const first = current.controller.activateCurrentSelection(INPUT);
-    assert.equal(current.controller.activateCurrentSelection({ ...INPUT }), first);
+    await rejectsCode(current.controller.activateCurrentSelection({ ...INPUT }), 'selection_conflict');
     await rejectsCode(current.controller.activateCurrentSelection({
         expectedPatientId: OTHER_PATIENT, selectionEpoch: INPUT.selectionEpoch,
     }), 'selection_conflict');
@@ -149,6 +147,7 @@ test('coalesces concurrent identical activation and denies a different tab const
     assert.equal((await first).state, 'active');
     assert.equal(current.acquisitions(), 1);
     assert.equal(current.activations(), 1);
+    await rejectsCode(current.controller.activateCurrentSelection({ ...INPUT }), 'selection_conflict');
 });
 
 test('keeps an idle controller available across the initial patient selection', async () => {

@@ -87,6 +87,7 @@ export function createIntelligentHostBrowserAdapter(sources: Sources = {}) {
         if (token !== generation || currentOperation !== operation) fail('operation_superseded');
     };
     const sync = async (method: 'initialize' | 'resync') => {
+        if (terminal) fail('operation_terminal');
         const token = generation;
         const currentOperation = ++operation;
         try {
@@ -104,7 +105,6 @@ export function createIntelligentHostBrowserAdapter(sources: Sources = {}) {
         reset() {
             generation += 1;
             operation += 1;
-            terminal = false;
             selection.reset();
         },
         async activate(value: unknown, confirmed: true): Promise<ActiveHost> {
