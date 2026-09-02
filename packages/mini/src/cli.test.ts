@@ -16,10 +16,15 @@ const success = { schemaVersion: 'mediflow.mini.transport.v1', ok: true, items }
 const failure = (code: 'INVALID_REQUEST' | 'TRANSPORT_UNBOUND') => `${JSON.stringify({
   schemaVersion: 'mediflow.mini.transport.v1', ok: false, error: { code },
 })}\n`;
+const npmExecPath = process.env.npm_execpath?.endsWith('.js') ? process.env.npm_execpath : null;
+const npmCommand = npmExecPath ? process.execPath : process.platform === 'win32' ? 'npm.cmd' : 'npm';
+const npmArgs = (args: string[]) => npmExecPath ? [npmExecPath, ...args] : args;
+const npmOptions = process.platform === 'win32' && !npmExecPath ? { shell: true } : {};
 
 function run(input: string | Buffer, args: string[] = []) {
-  const result = spawnSync('npm', ['run', '--silent', 'mini', '--', ...args], {
+  const result = spawnSync(npmCommand, npmArgs(['run', '--silent', 'mini', '--', ...args]), {
     cwd: new URL('../../..', import.meta.url), input, encoding: 'utf8', timeout: 5000,
+    ...npmOptions,
   });
   assert.equal(result.stderr, '');
   return result;
@@ -85,8 +90,8 @@ test('returns transport-unbound for a well-formed unknown command', () => {
 });
 
 test('rejects oversized open stdin without waiting for EOF', async () => {
-  const child = spawn('npm', ['run', '--silent', 'mini'], {
-    cwd: new URL('../../..', import.meta.url), stdio: ['pipe', 'pipe', 'pipe'],
+  const child = spawn(npmCommand, npmArgs(['run', '--silent', 'mini']), {
+    cwd: new URL('../../..', import.meta.url), stdio: ['pipe', 'pipe', 'pipe'], ...npmOptions,
   });
   let stdout = ''; let stderr = '';
   child.stdout.setEncoding('utf8'); child.stderr.setEncoding('utf8');

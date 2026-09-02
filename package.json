@@ -21,6 +21,8 @@
     "test:mini-cli": "node scripts/run-strip-types.mjs --test packages/mini/src/cli.test.ts",
     "mcp:intelligent-host": "node scripts/intelligent-host-mcp-stdio.mjs",
     "test:mcp:intelligent-host": "node --test scripts/intelligent-host-mcp-stdio.test.mjs",
+    "check:headless-portable-imports": "node scripts/check-headless-portable-imports.mjs",
+    "test:headless-portable": "node scripts/run-headless-portable-tests.mjs",
     "local:tls-proxy": "node scripts/local-api-tls-proxy.mjs",
     "docs:siss-corpus:validate": "node scripts/siss-docs-corpus.mjs validate",
     "docs:siss-corpus:fetch": "node scripts/siss-docs-corpus.mjs fetch",
