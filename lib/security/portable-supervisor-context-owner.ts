@@ -5,7 +5,10 @@ import { createHash } from 'node:crypto';
 import { types } from 'node:util';
 
 import type { Context } from '../headless/authenticated-agent-launcher-contract.ts';
-import { readAuthenticatedWebSession } from './server-auth';
+import {
+    acquireAuthenticatedWebSessionProjectionOwnerContext,
+    type AuthenticatedWebSessionProjectionOwnerContext,
+} from './server-auth';
 import type {
     ServerSessionSelectionBindingControllerV1,
     ServerSessionSelectionBindingSnapshotV1,
@@ -22,10 +25,9 @@ export const PORTABLE_SUPERVISOR_BOOTSTRAP_TTL_MS = 5_000;
 const DIGEST = /^sha256:[0-9a-f]{64}$/u;
 const REF = /^[a-z][a-z0-9._-]{15,127}$/u;
 
-type Session = Readonly<{ id: string; userId: string; expiresAt: number }>;
 type Scheduler = (delayMs: number, operation: () => void) => () => void;
 type Sources = Readonly<{
-    readCurrentSelectionSession(): Promise<unknown | null>;
+    acquireAuthenticatedContext(): Promise<AuthenticatedWebSessionProjectionOwnerContext | null>;
     selectionLifecycle: ServerSessionSelectionLifecycleControllerV1;
     selectionBinding: ServerSessionSelectionBindingControllerV1;
     selectionCommitBinding: ServerSessionSelectionCommitBindingControllerV1;
@@ -68,15 +70,6 @@ function safeInteger(value: unknown, minimum = 0): value is number {
 function hostId(value: unknown): value is string {
     return typeof value === 'string' && value.length > 0 && value.trim() === value
         && Buffer.byteLength(value, 'utf8') <= 256;
-}
-function session(value: unknown): Session | null {
-    if (!value || typeof value !== 'object' || types.isProxy(value)) return null;
-    try {
-        const candidate = value as Partial<Session>;
-        return typeof candidate.id === 'string' && candidate.id.length > 0
-            && typeof candidate.userId === 'string' && candidate.userId.length > 0
-            && safeInteger(candidate.expiresAt, 1) ? candidate as Session : null;
-    } catch { return null; }
 }
 function currentBinding(value: unknown, scope: unknown): value is ServerSessionSelectionBindingSnapshotV1 {
     if (!value || typeof value !== 'object' || types.isProxy(value)) return false;
@@ -184,14 +177,15 @@ export function createPortableSupervisorContextOwnerProcessV1(sources: Sources):
             expiresAt: state.expiresAt, bootstrapExpiresAt });
     };
     const acquire = async (): Promise<PortableSupervisorContextOwnerV1 | null> => {
-        let presented: unknown;
-        try { presented = await sources.readCurrentSelectionSession(); } catch { return null; }
-        const authenticated = session(presented); if (!authenticated) return null;
+        let authenticatedContext: AuthenticatedWebSessionProjectionOwnerContext | null;
+        try { authenticatedContext = await sources.acquireAuthenticatedContext(); } catch { return null; }
+        if (!authenticatedContext) return null;
+        const authenticated = authenticatedContext.session;
         let scope: ServerSessionSelectionScopeV1 | null = null;
         let registration: ServerSessionSelectionDependentRegistrationV1 | null = null;
         let state: RecordState | null = null, drained = false;
         try {
-            const attached = sources.selectionLifecycle.withCurrentSelection(presented as never, (candidate) => {
+            const attached = sources.selectionLifecycle.withCurrentSelection(authenticated, (candidate) => {
                 scope = candidate;
                 registration = sources.selectionLifecycle.registerDependent(candidate, () => {
                     if (state) terminal(state, true, false); else drained = true;
@@ -266,7 +260,7 @@ function hashRef(value: string): string {
 
 const productionSelectionOwner = serverSessionProjectionOwnerProductionOwner;
 const productionProcessOwner = createPortableSupervisorContextOwnerProcessV1({
-    readCurrentSelectionSession: readAuthenticatedWebSession,
+    acquireAuthenticatedContext: acquireAuthenticatedWebSessionProjectionOwnerContext,
     selectionLifecycle: productionSelectionOwner.selectionLifecycleController,
     selectionBinding: productionSelectionOwner.selectionBindingController,
     selectionCommitBinding: productionSelectionOwner.selectionCommitBindingController,
