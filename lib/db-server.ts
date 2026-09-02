@@ -143,6 +143,34 @@ const HEADLESS_SOAP_ACTIVE_ROLE_ATTESTATIONS_DDL = `
     )
 `;
 const HEADLESS_SOAP_ACTIVE_ROLE_ATTESTATIONS_SCHEMA = normalizeSchemaSql(HEADLESS_SOAP_ACTIVE_ROLE_ATTESTATIONS_DDL);
+/* @Codex */
+const HEADLESS_CHECKUP_ACTIVE_ROLE_ATTESTATIONS_DDL = `
+    CREATE TABLE headless_checkup_active_role_attestations (
+        attestation_ref TEXT PRIMARY KEY NOT NULL CHECK (length(attestation_ref) BETWEEN 1 AND 256 AND trim(attestation_ref) = attestation_ref),
+        actor_ref TEXT NOT NULL UNIQUE REFERENCES users(id) ON DELETE RESTRICT CHECK (length(actor_ref) BETWEEN 1 AND 256 AND trim(actor_ref) = actor_ref),
+        schema_version TEXT NOT NULL CHECK (schema_version = 'mediflow.headless-checkup-active-role-attestation.v1'),
+        role TEXT NOT NULL CHECK (role = 'physician'), operation_id TEXT NOT NULL CHECK (operation_id = 'mediflow.patient.checkup.status.transition.v1'),
+        policy_version TEXT NOT NULL CHECK (policy_version = 'physician_confirmed_single_use.v1'),
+        status TEXT NOT NULL CHECK (status IN ('inactive', 'active', 'revoked')), attestation_version INTEGER NOT NULL CHECK (attestation_version = 1),
+        issuer_ref TEXT, expires_at INTEGER, activated_at INTEGER,
+        revocation_generation INTEGER NOT NULL DEFAULT 0 CHECK (typeof(revocation_generation) = 'integer' AND revocation_generation BETWEEN 0 AND 9007199254740991),
+        revoked_at INTEGER, created_at INTEGER NOT NULL DEFAULT (unixepoch()), updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
+        CONSTRAINT headless_checkup_active_role_attestations_lifecycle_check CHECK (
+            (status = 'inactive' AND issuer_ref IS NULL AND expires_at IS NULL AND activated_at IS NULL AND revoked_at IS NULL AND revocation_generation = 0)
+            OR (status = 'active' AND issuer_ref IS NOT NULL AND length(issuer_ref) BETWEEN 1 AND 256 AND trim(issuer_ref) = issuer_ref AND expires_at IS NOT NULL AND activated_at IS NOT NULL AND revoked_at IS NULL AND revocation_generation = 0)
+            OR (status = 'revoked' AND revoked_at IS NOT NULL AND revocation_generation BETWEEN 1 AND 9007199254740991
+                AND ((issuer_ref IS NULL AND expires_at IS NULL AND activated_at IS NULL)
+                    OR (issuer_ref IS NOT NULL AND length(issuer_ref) BETWEEN 1 AND 256 AND trim(issuer_ref) = issuer_ref AND expires_at IS NOT NULL AND activated_at IS NOT NULL)))
+        ),
+        CONSTRAINT headless_checkup_active_role_attestations_timestamp_check CHECK (
+            typeof(created_at) = 'integer' AND created_at BETWEEN 0 AND 8640000000000 AND typeof(updated_at) = 'integer' AND updated_at BETWEEN created_at AND 8640000000000
+            AND (expires_at IS NULL OR (typeof(expires_at) = 'integer' AND expires_at BETWEEN created_at AND 8640000000000))
+            AND (activated_at IS NULL OR (typeof(activated_at) = 'integer' AND activated_at BETWEEN created_at AND 8640000000000 AND (expires_at IS NULL OR activated_at <= expires_at)))
+            AND (revoked_at IS NULL OR (typeof(revoked_at) = 'integer' AND revoked_at BETWEEN created_at AND 8640000000000 AND (activated_at IS NULL OR revoked_at >= activated_at)))
+        )
+    )
+`;
+const HEADLESS_CHECKUP_ACTIVE_ROLE_ATTESTATIONS_SCHEMA = normalizeSchemaSql(HEADLESS_CHECKUP_ACTIVE_ROLE_ATTESTATIONS_DDL);
 export type HeadlessSoapActiveRoleAttestationSchemaErrorCode = 'schema_incompatible' | 'schema_unavailable';
 /* @Codex */
 export class HeadlessSoapActiveRoleAttestationSchemaError extends Error {
@@ -231,6 +259,29 @@ function hasNoHeadlessSoapActiveRoleAttestationOrphans(): boolean {
 export function hasCanonicalHeadlessSoapActiveRoleAttestationSchema(): boolean {
     return headlessSoapActiveRoleAttestationSchemaEquals(HEADLESS_SOAP_ACTIVE_ROLE_ATTESTATIONS_SCHEMA)
         && hasNoHeadlessSoapActiveRoleAttestationOrphans();
+}
+/* @Codex */
+export function hasCanonicalHeadlessCheckupActiveRoleAttestationSchema(): boolean {
+    try {
+        const row = sqlite.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?")
+            .get('headless_checkup_active_role_attestations') as { sql?: unknown } | undefined;
+        if (typeof row?.sql !== 'string' || normalizeSchemaSql(row.sql) !== HEADLESS_CHECKUP_ACTIVE_ROLE_ATTESTATIONS_SCHEMA) return false;
+        const orphan = sqlite.prepare(`SELECT 1 FROM headless_checkup_active_role_attestations AS attestation
+            LEFT JOIN users AS actor ON actor.id = attestation.actor_ref WHERE actor.id IS NULL LIMIT 1`).get();
+        return !orphan;
+    } catch { return false; }
+}
+/* @Codex */
+function ensureHeadlessCheckupActiveRoleAttestationSchema(): void {
+    try {
+        const exists = Boolean(sqlite.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?")
+            .get('headless_checkup_active_role_attestations'));
+        if (!exists) sqlite.prepare(HEADLESS_CHECKUP_ACTIVE_ROLE_ATTESTATIONS_DDL
+            .replace('CREATE TABLE', 'CREATE TABLE IF NOT EXISTS')).run();
+    } catch { throw new Error('Headless checkup active-role attestation schema is unavailable.'); }
+    if (!hasCanonicalHeadlessCheckupActiveRoleAttestationSchema()) {
+        throw new Error('Headless checkup active-role attestation schema is incompatible.');
+    }
 }
 /* @Codex */
 function ensureHeadlessSoapActiveRoleAttestationSchema(): void {
@@ -452,6 +503,8 @@ function applySchemaGuards() {
     }
     /* @Codex */
     ensureHeadlessSoapActiveRoleAttestationSchema();
+    /* @Codex */
+    ensureHeadlessCheckupActiveRoleAttestationSchema();
     /* @Codex */
     try {
         ensureColumn('attachments', 'summary_snapshot', 'summary_snapshot TEXT');
