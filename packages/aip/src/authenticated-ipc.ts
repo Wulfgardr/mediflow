@@ -41,7 +41,7 @@ type BrokerPort = { issueOwner: (binding: unknown) => AipOwnerHandleV1;
 type Stage = { activation: readonly unknown[]; generation: number; state: 'available' | 'pending' | 'consumed'
     | 'revoked'; denialCode: AipAuthenticatedIpcV1ErrorCode | null };
 type Pending = { controller: AbortController; reason: AipAuthenticatedIpcV1ErrorCode };
-type Peer = { transport: 'xpc' | 'uds' | 'named_pipe'; peerRef: string; runtimeRef: string };
+type Peer = { transport: 'xpc' | 'uds' | 'named_pipe' | 'inherited_child_ipc'; peerRef: string; runtimeRef: string };
 type Session = { owner: AipOwnerHandleV1; claimed: boolean };
 function exactValues(value: unknown, keys: readonly string[]): unknown[] {
     if (!value || typeof value !== 'object' || types.isProxy(value) || Array.isArray(value)) {
@@ -99,7 +99,8 @@ function inputBytes(value: unknown): Uint8Array {
 function permissionAccepted(transport: unknown, permission: unknown): transport is Peer['transport'] {
     return (transport === 'xpc' && permission === 'per_user')
         || (transport === 'uds' && permission === 'mode_0600_peer_credentials')
-        || (transport === 'named_pipe' && permission === 'owner_only_acl');
+        || (transport === 'named_pipe' && permission === 'owner_only_acl')
+        || (transport === 'inherited_child_ipc' && permission === 'spawn_bound_private_channel');
 }
 export function createAipChildEnvironmentReplacementV1(bootstrapRef: unknown): Readonly<Record<string, string>> {
     if (typeof bootstrapRef !== 'string' || !BOOTSTRAP.test(bootstrapRef)) {
