@@ -106,3 +106,30 @@ test('late-bound MCP port terminates when the bind publication is not synchronou
   assert.equal(state.listeners.size, 0);
   assert.equal(state.terminated(), 1);
 });
+
+test('late-bound MCP port observes every rejected lifecycle Promise before denial', async () => {
+  const environment = createAipAuthenticatedOperationRpcChildEnvironmentV1(`aipb_${'e'.repeat(32)}`);
+  const cases = [
+    { method: 'subscribe', invoke: (port: ReturnType<typeof createLateBoundMcpChildPortV1>) =>
+      port.subscribe(() => undefined) },
+    { method: 'publish', invoke: (port: ReturnType<typeof createLateBoundMcpChildPortV1>) =>
+      port.subscribe(() => undefined) },
+    { method: 'onClose', invoke: (port: ReturnType<typeof createLateBoundMcpChildPortV1>) =>
+      port.onClose(() => undefined) },
+    { method: 'unsubscribe', invoke: (port: ReturnType<typeof createLateBoundMcpChildPortV1>) => {
+      const unsubscribe = port.subscribe(() => undefined); unsubscribe();
+    } },
+    { method: 'terminate', invoke: (port: ReturnType<typeof createLateBoundMcpChildPortV1>) => port.terminate() },
+  ] as const;
+  for (const candidate of cases) {
+    const state = fixture();
+    const rejected = () => Promise.reject(new Error(`synthetic rejected ${candidate.method}`));
+    const overrides = candidate.method === 'unsubscribe'
+      ? { subscribe: () => () => rejected() }
+      : { [candidate.method]: rejected };
+    const child = record({ ...state.port, ...overrides });
+    const port = createLateBoundMcpChildPortV1(child, environment);
+    assert.throws(() => candidate.invoke(port), /child_unavailable/u, candidate.method);
+    await new Promise<void>((resolve) => setImmediate(resolve));
+  }
+});
