@@ -330,6 +330,90 @@ final class PairedPatientsWorkspaceModelS7Tests: XCTestCase {
         XCTAssertFalse(reviewed, "a stale review must never authorize a different draft's insertion")
     }
 
+    func testTranscriptMutationInvalidatesDraftReviewAndInsertionGate() async {
+        let patient = detail(id: "p1")
+        let draft = visitDraftResponse(subjective: ["Bozza della versione A"])
+        let source = S7MockDataSource(details: ["p1": patient], visitDraft: draft)
+        let model = await makeModel(source: source)
+        await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: patient)
+
+        await MainActor.run { model.newEntryVisitTranscript = "Trascrizione sintetica A." }
+        await model.computeVisitDraftForNewEntry()
+        await MainActor.run { model.newEntryVisitDraftReviewed = true }
+        let canInsertBeforeMutation = await model.canInsertVisitDraftIntoNewEntry
+        XCTAssertTrue(canInsertBeforeMutation)
+
+        await MainActor.run { model.newEntryVisitTranscript = "Trascrizione sintetica B." }
+
+        let responseAfterMutation = await model.newEntryVisitDraftResponse
+        let reviewedAfterMutation = await model.newEntryVisitDraftReviewed
+        let canInsertAfterMutation = await model.canInsertVisitDraftIntoNewEntry
+        XCTAssertNil(responseAfterMutation)
+        XCTAssertFalse(reviewedAfterMutation)
+        XCTAssertFalse(canInsertAfterMutation)
+    }
+
+    func testInFlightVisitDraftDoesNotPublishAfterTranscriptChangesAwayAndBack() async {
+        let patient = detail(id: "p1")
+        let draft = visitDraftResponse(subjective: ["Bozza tardiva della versione A"])
+        let source = S7MockDataSource(
+            details: ["p1": patient],
+            visitDraft: draft,
+            visitDraftDelayNanoseconds: 50_000_000
+        )
+        let model = await makeModel(source: source)
+        await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: patient)
+        let originalTranscript = "Trascrizione sintetica A."
+        await MainActor.run { model.newEntryVisitTranscript = originalTranscript }
+
+        let computation = Task { await model.computeVisitDraftForNewEntry() }
+        for _ in 0..<100 {
+            if await source.computeVisitDraftCalls > 0 { break }
+            try? await Task.sleep(nanoseconds: 1_000_000)
+        }
+        let startedCalls = await source.computeVisitDraftCalls
+        XCTAssertEqual(startedCalls, 1)
+
+        await MainActor.run {
+            model.newEntryVisitTranscript = "Trascrizione sintetica B."
+            model.newEntryVisitTranscript = originalTranscript
+        }
+        await computation.value
+
+        let transcriptAfterCompletion = await model.newEntryVisitTranscript
+        let responseAfterCompletion = await model.newEntryVisitDraftResponse
+        let reviewedAfterCompletion = await model.newEntryVisitDraftReviewed
+        let canInsertAfterCompletion = await model.canInsertVisitDraftIntoNewEntry
+        XCTAssertEqual(transcriptAfterCompletion, originalTranscript)
+        XCTAssertNil(responseAfterCompletion)
+        XCTAssertFalse(reviewedAfterCompletion)
+        XCTAssertFalse(canInsertAfterCompletion)
+    }
+
+    func testVisitDraftRejectsUTF8OversizeBelowCharacterLimit() async {
+        let patient = detail(id: "p1")
+        let source = S7MockDataSource(
+            details: ["p1": patient],
+            visitDraft: visitDraftResponse(subjective: ["Non deve essere richiesta"])
+        )
+        let model = await makeModel(source: source)
+        await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: patient)
+        let oversizedSingleGrapheme = "a" + String(repeating: "\u{0301}", count: 140_000)
+        let maxCharacters = await PairedPatientsWorkspaceModel.maxVisitDraftTranscriptChars
+        XCTAssertLessThanOrEqual(oversizedSingleGrapheme.count, maxCharacters)
+        XCTAssertGreaterThan(oversizedSingleGrapheme.utf8.count, VisitRecordingLimits.standard.maxTranscriptUTF8Bytes)
+
+        await MainActor.run { model.newEntryVisitTranscript = oversizedSingleGrapheme }
+        let canCompute = await model.canComputeVisitDraft
+        XCTAssertFalse(canCompute)
+        await model.computeVisitDraftForNewEntry()
+
+        let computeCalls = await source.computeVisitDraftCalls
+        let response = await model.newEntryVisitDraftResponse
+        XCTAssertEqual(computeCalls, 0)
+        XCTAssertNil(response)
+    }
+
     func testVisitDraftNeverPersistsAnythingByItself() async {
         let patient = detail(id: "p1")
         let draft = visitDraftResponse(subjective: ["Riga"])
