@@ -5,6 +5,7 @@ import { types } from 'node:util';
 import type { ServerSession } from '../../security/server-session';
 import { bindAttachmentExtractionSelection } from './attachment-extraction-selection-binding';
 import { createAttachmentExtractionSourceAuthority } from './attachment-extraction-source-authority';
+import { continueAnyDocImageOrScanWithAppleVision } from './anydoc-apple-vision-ocr-composition';
 import {
     buildAnyDocLocalExtraction,
     type LocalAttachmentByteSource,
@@ -89,7 +90,11 @@ export async function composeAnyDocCurrentSourceExtraction(session: ServerSessio
         const begun = authority.consume(locator); if (begun.status !== 'begun') return denied();
         operation = begun.operation;
         let result: LocalExtractionResult;
-        try { result = await extractAnyDocLocalBytes(id, begun.bytes); }
+        try {
+            result = await extractAnyDocLocalBytes(id, begun.bytes);
+            if (result.status === 'review_required' && result.detail === 'image_or_scan')
+                result = await continueAnyDocImageOrScanWithAppleVision(id, begun.bytes, result);
+        }
         catch { authority.abort(operation); operation = null; return denied(); }
         const final = authority.finalize(operation); operation = null;
         return final.status === 'spent' && final.evidenceAdmissible ? publishFinalizedResult(result) : denied();

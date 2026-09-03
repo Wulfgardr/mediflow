@@ -1,10 +1,13 @@
 /* @Codex */
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { after, afterEach, test } from 'node:test';
+import { createCanvas } from '@napi-rs/canvas';
 import Database from 'better-sqlite3';
+import { PDFDocument } from 'pdf-lib';
 import type { ServerSession } from '../../security/server-session.ts';
 
 const root = process.cwd();
@@ -52,6 +55,17 @@ function session() {
     finalSessions.push(value);
     return value;
 }
+async function syntheticScannedPdf(): Promise<Buffer> {
+    const canvas = createCanvas(1600, 500); const context = canvas.getContext('2d');
+    context.fillStyle = '#ffffff'; context.fillRect(0, 0, canvas.width, canvas.height);
+    context.fillStyle = '#000000'; context.font = 'bold 92px Helvetica';
+    context.fillText('DOCUMENTO SINTETICO', 60, 210);
+    context.font = '56px Helvetica'; context.fillText('Controllo locale offline', 60, 340);
+    const document = await PDFDocument.create(); const page = document.addPage([800, 250]);
+    const raster = await document.embedPng(canvas.toBuffer('image/png'));
+    page.drawImage(raster, { x: 0, y: 0, width: 800, height: 250 });
+    return Buffer.from(await document.save({ useObjectStreams: false }));
+}
 afterEach(() => {
     while (finalSessions.length > 0) retireSyntheticWebSession(finalSessions.pop()!);
 });
@@ -69,6 +83,19 @@ test('reveals real AnyDoc Markdown and evidence only after a current host source
     assert.equal(result.writes, 0); assert.equal(result.apply, 'none'); assert.equal(Object.isFrozen(result), true);
     const owner = serverSessionProjectionOwnerRegistry.lookup(activeSession.id); assert.ok(owner);
     assert.deepEqual(owner.withLeaseCriticalSection(activeSession, (selection) => selection), { patientId: PATIENT, ambulatoryId: AMBULATORY });
+});
+
+test('continues a real AnyDoc image_or_scan result through offline Apple Vision', {
+    skip: process.platform !== 'darwin' || process.arch !== 'arm64',
+}, async () => {
+    const pdf = await syntheticScannedPdf(); seed(pdf.toString('base64'));
+    const result = await composeAnyDocCurrentSourceExtraction(session(), { attachmentId: ATTACHMENT });
+    assert.equal(result.status, 'extracted');
+    if (result.status !== 'extracted') return;
+    assert.match(result.markdown, /DOCUMENTO SINTETICO/iu);
+    assert.match(result.markdown, /Controllo locale offline/iu);
+    assert.equal(result.provenance.sourceSha256, createHash('sha256').update(pdf).digest('hex'));
+    assert.deepEqual([result.review, result.writes, result.apply, result.candidateUse], ['required', 0, 'none', 'review_only']);
 });
 
 test('denies zero or multiple host memberships without publishing candidate evidence', async () => {

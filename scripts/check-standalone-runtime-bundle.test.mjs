@@ -54,6 +54,8 @@ test('standalone checker preserves AnyDoc worker and native binding guards', () 
   assert.match(source, /createHash\('sha256'\).*ANYDOC_WORKER_SHA256/s);
   assert.match(source, /resolve\(`\$\{anyDocNativePackage\}\/package`\)/);
   assert.match(source, /nativeArtifacts\(anyDocNativeDir,[\s\S]*?name\.endsWith\('\.node'\)/);
+  assert.match(source, /bundledAppleVisionScriptFailure\(standaloneDir\)/);
+  assert.match(source, /createHash\('sha256'\).*APPLE_VISION_SCRIPT_SHA256/s);
 });
 
 test('standalone checker proves web auth owner physical copy and restart denial', () => {
@@ -75,6 +77,7 @@ test('standalone config traces the complete sharp libc detector', () => {
   const includes = configSource.match(/outputFileTracingIncludes:\s*\{[\s\S]*?["']\/\*["']:\s*\[([\s\S]*?)\]/u)?.[1];
   assert.ok(includes, 'missing global outputFileTracingIncludes roster');
   assert.ok(includes.includes(`"${detectLibcTracePattern}"`), 'detect-libc implementation is not traced for standalone sharp');
+  assert.ok(includes.includes('"./scripts/apple-vision-ocr.swift"'), 'Apple Vision OCR script is not traced for standalone');
 });
 
 /* @Codex */

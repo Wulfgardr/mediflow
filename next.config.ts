@@ -68,6 +68,7 @@ const nextConfig: NextConfig = {
     "/*": [
       "./package.json",
       "./scripts/anydoc-local-extraction-worker.mjs",
+      "./scripts/apple-vision-ocr.swift",
       "./node_modules/sharp/**/*",
       "./node_modules/detect-libc/**/*",
       "./node_modules/.pnpm/node_modules/semver/**/*",
