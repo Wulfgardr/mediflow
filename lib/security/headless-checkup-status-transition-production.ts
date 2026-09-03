@@ -153,6 +153,21 @@ export function createHeadlessCheckupStatusTransitionInternalCandidateV1(sources
                 }
             });
         },
+        readSelectedCheckupUiProjection(checkupRef: unknown): Readonly<{
+            title: string; expectedRevision: number;
+        }> {
+            return guarded(() => {
+                if (disposed) throw new HeadlessCheckupStatusTransitionV1Error('operation_unavailable');
+                try { return storage.readSelectedCheckupUiProjection(checkupRef); } catch (error) {
+                    const code = error instanceof Error ? error.message : 'operation_unavailable';
+                    if (['resource_unavailable', 'scope_changed', 'session_unavailable', 'role_unavailable',
+                        'restart_changed'].includes(code)) {
+                        throw new HeadlessCheckupStatusTransitionV1Error(code as 'resource_unavailable');
+                    }
+                    throw new HeadlessCheckupStatusTransitionV1Error('operation_unavailable');
+                }
+            });
+        },
         issueConfirmationProof(proposalRef: unknown): object {
             return guarded(() => {
                 if (disposed || typeof proposalRef !== 'string' || !PROPOSAL_REF.test(proposalRef)

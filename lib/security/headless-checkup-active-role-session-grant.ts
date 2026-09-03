@@ -30,6 +30,10 @@ type RecordState = { active: boolean; published: boolean; grant: HeadlessCheckup
   cancel: (() => void) | null; onTerminal: () => void };
 declare const grantIdentity: unique symbol;
 export type HeadlessCheckupActiveRoleSessionGrantV1 = Readonly<{ readonly [grantIdentity]?: never }>;
+export type HeadlessCheckupActiveRoleCurrentBindingV1 = Readonly<{
+  actorRef: string; sessionRef: string; role: 'physician'; patientId: string; ambulatoryId: string;
+  selectionEpoch: number; revocationGeneration: 0;
+}>;
 export type HeadlessCheckupActiveRoleSessionGrantSources = Readonly<{
   now(): unknown;
   readAttestation(actorRef: string): unknown;
@@ -198,16 +202,21 @@ export function createHeadlessCheckupActiveRoleSessionGrantOwner(sources: Headle
     }
     return record;
   };
-  const invoke = <T>(candidate: unknown, operation: () => T, presented?: unknown): T => {
-    if (!callback(operation)) return fail('lifecycle_unavailable');
+  const invoke = <T>(candidate: unknown,
+    operation: (binding: HeadlessCheckupActiveRoleCurrentBindingV1) => T, presented?: unknown): T => {
+    if (!callback(operation as unknown)) return fail('lifecycle_unavailable');
     if (operationActive) { operationPoisoned = true; return fail('lifecycle_unavailable'); }
     const request = presented === undefined ? undefined : context(presented), record = current(candidate, request);
     operationPoisoned = false; operationActive = true;
     try {
-      return resource(record, () => {
+      return resource<T>(record, () => {
         const before = stable({ session: record.snapshot.session, owner: record.snapshot.owner });
         if (!same(before, record.snapshot)) return fail('projection_stale');
-        const result = operation();
+        const binding = Object.freeze(Object.assign(Object.create(null), { actorRef: before.actorRef,
+          sessionRef: before.sessionRef, role: 'physician' as const, patientId: before.patientId,
+          ambulatoryId: before.ambulatoryId, selectionEpoch: before.selectionEpoch,
+          revocationGeneration: 0 as const }));
+        const result = operation(binding);
         if (operationPoisoned || types.isPromise(result) || !record.active) return fail('lifecycle_unavailable');
         const after = stable({ session: record.snapshot.session, owner: record.snapshot.owner });
         if (!same(after, record.snapshot)) return fail('projection_stale');
@@ -239,8 +248,11 @@ export function createHeadlessCheckupActiveRoleSessionGrantOwner(sources: Headle
         return fail('lifecycle_unavailable');
       }
     },
-    withCurrent<T>(candidate: unknown, operation: () => T): T { return invoke(candidate, operation); },
-    withCurrentRequest<T>(candidate: unknown, presented: unknown, operation: () => T): T {
+    withCurrent<T>(candidate: unknown, operation: (binding: HeadlessCheckupActiveRoleCurrentBindingV1) => T): T {
+      return invoke(candidate, operation);
+    },
+    withCurrentRequest<T>(candidate: unknown, presented: unknown,
+      operation: (binding: HeadlessCheckupActiveRoleCurrentBindingV1) => T): T {
       return invoke(candidate, operation, presented);
     },
     dispose(candidate: unknown): boolean {

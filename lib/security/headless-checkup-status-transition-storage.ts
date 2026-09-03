@@ -88,8 +88,8 @@ function commandDigest(canonical: string): string { return digest(COMMAND_DIGEST
 function denied(code: CommitAbort['code'] | 'resource_unavailable' | 'session_unavailable'
     | 'role_unavailable' | 'restart_changed') { return record({ status: 'denied' as const, code }); }
 
-function readCheckup(scope: Scope): { status: string; revision: number } | null {
-    const row = dbServer.$client.prepare(`SELECT checkup.status, checkup.version AS revision
+function readCheckup(scope: Scope): { status: string; revision: number; title: string } | null {
+    const row = dbServer.$client.prepare(`SELECT checkup.status, checkup.version AS revision, checkup.title
         FROM checkups AS checkup
         INNER JOIN patients_to_ambulatories AS membership ON membership.patient_id = checkup.patient_id
             AND membership.ambulatory_id = ?
@@ -99,9 +99,10 @@ function readCheckup(scope: Scope): { status: string; revision: number } | null 
             AND patient.deleted_at IS NULL AND patient.is_archived = 0 AND ambulatory.id = ? LIMIT 2`)
         .all(scope.ambulatoryId, scope.checkupId, scope.patientId, scope.ambulatoryId) as unknown[];
     if (rowsLength(row) !== 1) return null;
-    const value = exactRow(row[0], ['status', 'revision']);
+    const value = exactRow(row[0], ['status', 'revision', 'title']);
     return value && typeof value.status === 'string' && integer(value.revision, 1)
-        ? { status: value.status, revision: value.revision } : null;
+        && typeof value.title === 'string' && value.title.length >= 1 && value.title.length <= 512
+        ? { status: value.status, revision: value.revision, title: value.title } : null;
 }
 
 function rowsLength(value: unknown): number { return Array.isArray(value) ? value.length : -1; }
@@ -181,6 +182,18 @@ export function createHeadlessCheckupStatusTransitionStorageV1(sourcesValue: unk
             resourceRefHash: digest(RESOURCE_DIGEST_DOMAIN, secret) };
         resourcesByRef.set(ref, resource); resourcesByIdentity.set(resource.identity, resource); currentResource = resource;
         return ref;
+    };
+    const readSelectedCheckupUiProjection = (checkupRef: unknown) => {
+        if (disposed || typeof checkupRef !== 'string' || !CHECKUP_REF.test(checkupRef)) {
+            throw new Error('resource_unavailable');
+        }
+        const resource = resourcesByRef.get(checkupRef);
+        if (!resource || currentResource !== resource) throw new Error('resource_unavailable');
+        const scope = resolveCurrent(resource);
+        if ('status' in scope) throw new Error(String(scope.code));
+        const current = readCheckup(scope);
+        if (!current || current.status !== 'pending') throw new Error('resource_unavailable');
+        return record({ title: current.title, expectedRevision: current.revision });
     };
     const resolveCurrent = (resource: Resource): Scope | ReturnType<typeof denied> => {
         if (disposed) return denied('restart_changed');
@@ -287,5 +300,6 @@ export function createHeadlessCheckupStatusTransitionStorageV1(sourcesValue: unk
     };
     const restart = (): void => { restartGeneration += 1; resourcesByRef.clear(); currentResource = null; };
     const dispose = (): void => { disposed = true; resourcesByRef.clear(); currentResource = null; };
-    return record({ issueSelectedCheckupRef, digestCommand: commandDigest, readSnapshot, commit, restart, dispose });
+    return record({ issueSelectedCheckupRef, readSelectedCheckupUiProjection,
+        digestCommand: commandDigest, readSnapshot, commit, restart, dispose });
 }
