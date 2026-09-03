@@ -8,12 +8,12 @@ test('K4: tastiera cross-packet attraversa worklist, comandi e ricerca senza dup
   test.setTimeout(90_000);
   const fixtureMarker = `K4Synthetic${Date.now().toString().slice(-8)}`;
   const consoleErrors: string[] = [];
-  page.on('console', (message) => {
-    if (message.type() === 'error') consoleErrors.push(message.text());
-  });
 
   await page.setViewportSize({ width: 1440, height: 900 });
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+  page.on('console', (message) => {
+    if (message.type() === 'error') consoleErrors.push(message.text());
+  });
   const patients = await page.evaluate(async (marker) => {
     const created: Array<{ id: string; name: string }> = [];
     for (let index = 0; index < 120; index += 1) {
@@ -113,12 +113,12 @@ test('K4: tastiera cross-packet attraversa worklist, comandi e ricerca senza dup
 
 test('L9: i comandi raggiungono Analisi e Scale una sola volta senza scorciatoie di authority', async ({ page }) => {
   const consoleErrors: string[] = [];
-  page.on('console', (message) => {
-    if (message.type() === 'error') consoleErrors.push(message.text());
-  });
 
   await page.setViewportSize({ width: 1440, height: 900 });
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+  page.on('console', (message) => {
+    if (message.type() === 'error') consoleErrors.push(message.text());
+  });
   await page.goto('/?area=incarico');
 
   const commandTrigger = page.getByRole('button', { name: 'Apri comandi e aiuto tastiera', exact: true });

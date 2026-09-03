@@ -49,14 +49,14 @@ async function updatePatient(
   }, { id: patientId, body: payload });
 }
 
-test('patient insight renders structured stored markdown without fallback', async ({ page }) => {
+test('patient insight renders stored markdown as read-only history without fallback', async ({ page }) => {
   const pin = process.env.E2E_PIN || '1234';
   const suffix = `${Date.now()}`.slice(-6);
 
   await bootstrapUnlockedSession(page, pin);
 
   // Other specs share this DB and may leave Patient Insight disabled; ensure it is on
-  // so the structured summary renders instead of the disabled card.
+  // so the saved historical summary renders instead of the disabled card.
   await page.evaluate(async () => {
     await fetch('/api/settings', {
       method: 'POST',
@@ -93,15 +93,22 @@ test('patient insight renders structured stored markdown without fallback', asyn
   // /patients/:id lands on the cockpit "Quadro" which does not host the insight card.
   await page.goto(`/patients/${patientId}/modules`);
   await expect(page).toHaveURL(new RegExp(`/patients/${patientId}/modules$`));
+  const documents = page.getByRole('button', { name: /Documenti Archivio documenti ed evidenze/u });
+  await expect(documents).toBeVisible({ timeout: 20_000 });
+  if (await documents.getAttribute('aria-expanded') !== 'true') await documents.click();
+  await expect(documents).toHaveAttribute('aria-expanded', 'true');
 
-  // Labels drifted: heading "Insight clinico AI" -> "Supporto al ragionamento clinico";
-  // "Prossimi passi" -> "Follow-up proposto"; "Quadro Clinico" -> "Sintesi clinica".
+  // Saved summaries are historical Markdown in read-only mode. New structured
+  // proposals have their own review-only surface and are covered separately.
   await expect(page.getByRole('heading', { name: 'Supporto al ragionamento clinico' })).toBeVisible();
-  await expect(page.getByText('Follow-up proposto')).toBeVisible();
-  await expect(page.getByText('Attenzioni')).toBeVisible();
-  await expect(page.getByText('Sintesi clinica')).toBeVisible();
-  await expect(page.getByText('programma riabilitativo domiciliare in corso', { exact: false })).toBeVisible();
-  await expect(page.getByText('Mobilita ridotta con ausilio per la deambulazione.', { exact: false })).toBeVisible();
-  await expect(page.getByText('Verificare avanzamento della FKT domiciliare.', { exact: false })).toBeVisible();
+  const historicalSummary = page.getByTestId('patient-insight-historical-summary');
+  await expect(historicalSummary).toContainText('Riepilogo storico salvato · sola lettura');
+  await expect(historicalSummary).toContainText('Quadro attuale');
+  await expect(historicalSummary).toContainText('Attenzioni');
+  await expect(historicalSummary).toContainText('Prossimi passi');
+  await expect(historicalSummary).toContainText('programma riabilitativo domiciliare in corso');
+  await expect(historicalSummary).toContainText('Mobilita ridotta con ausilio per la deambulazione.');
+  await expect(historicalSummary).toContainText('Verificare avanzamento della FKT domiciliare.');
+  await expect(page.getByTestId('patient-insight-review-proposal')).toHaveCount(0);
   await expect(page.getByText('Insight AI declassato per supporto insufficiente o incoerente nel contesto locale.')).toHaveCount(0);
 });
