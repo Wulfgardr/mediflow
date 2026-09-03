@@ -113,6 +113,22 @@ function discardPromise(value: unknown): boolean {
     return true;
 }
 
+function canonicalAuthenticatedContext(value: unknown): AuthenticatedWebSessionProjectionOwnerContext | null {
+    if (!value || typeof value !== 'object' || types.isProxy(value)) return null;
+    try {
+        if (!Object.isFrozen(value) || Object.getPrototypeOf(value) !== null) return null;
+        const keys = Reflect.ownKeys(value);
+        if (keys.length !== 2 || !keys.includes('session') || !keys.includes('owner')) return null;
+        const session = Object.getOwnPropertyDescriptor(value, 'session');
+        const owner = Object.getOwnPropertyDescriptor(value, 'owner');
+        if (!session?.enumerable || session.configurable || session.writable || !('value' in session)
+            || !owner?.enumerable || owner.configurable || owner.writable || !('value' in owner)
+            || !session.value || typeof session.value !== 'object' || types.isProxy(session.value)
+            || !owner.value || typeof owner.value !== 'object' || types.isProxy(owner.value)) return null;
+        return value as AuthenticatedWebSessionProjectionOwnerContext;
+    } catch { return null; }
+}
+
 /** Web-only capture owner; the trusted Supervisor mints all downstream authority. */
 export function createPortableSupervisorWebCaptureOwnerProcessV1(sources: Sources): Readonly<{
     acquire(observeTerminal: TerminalObserver): Promise<PortableSupervisorWebCaptureOwnerV1 | null>;
@@ -257,9 +273,14 @@ export function createPortableSupervisorWebCaptureOwnerProcessV1(sources: Source
                 /* @Codex: bind a dependent operation to the exact H1a session and
                    projection owner without exporting either identity. */
                 matchesCurrentContext: (value: unknown) => {
-                    if (!published.active || !value || typeof value !== 'object' || types.isProxy(value)) return false;
-                    const candidate = value as Partial<AuthenticatedWebSessionProjectionOwnerContext>;
-                    if (candidate.session !== published.context.session || candidate.owner !== published.context.owner) return false;
+                    const candidate = canonicalAuthenticatedContext(value);
+                    if (!published.active || !candidate || candidate.owner !== published.context.owner) return false;
+                    let sameScope = false;
+                    try {
+                        if (!sources.selectionLifecycle.withCurrentSelection(candidate.session, (scope) => {
+                            sameScope = scope === published.scope;
+                        }) || !sameScope) return false;
+                    } catch { return false; }
                     try { return read(published) === published.capture && published.active; } catch { return false; }
                 },
                 revoke: (reason: PortableSupervisorWebCaptureRevokeReasonV1) =>
