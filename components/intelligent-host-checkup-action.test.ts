@@ -11,6 +11,8 @@ test('wires the governed checkup flow into the Lume patient header without expos
 
   assert.match(component, /data-testid="intelligent-host-checkup-action"/u);
   assert.match(component, /data-lume-action="quiet"/u);
+  assert.match(component, /aria-label="Checkup host"/u);
+  assert.match(component, /min-h-11 min-w-11 sm:min-w-0/u);
   assert.match(component, /type="password"/u);
   assert.match(component, /client\.select\(patientId, ambulatoryId, selectedId\)/u);
   assert.match(component, /await client\.revokeOperation\(patientId\)[\s\S]{0,220}setSelectedId\(nextId\)/u);
