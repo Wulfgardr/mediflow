@@ -33,3 +33,38 @@ test('rebuilds from migrations when the legacy database has no users table', () 
     fs.rmSync(sandbox, { recursive: true, force: true });
   }
 });
+
+test('isolated mode ignores a valid legacy database', () => {
+  const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-prepare-e2e-isolated-'));
+  const seedDir = path.join(sandbox, 'seed-data');
+  const dataDir = path.join(sandbox, 'isolated-data');
+  const prepare = (directory, extraEnvironment = {}) => spawnSync(
+    process.execPath,
+    [path.join(root, 'scripts', 'prepare-e2e-db.mjs')],
+    {
+      cwd: sandbox,
+      env: { ...process.env, MEDIFLOW_DATA_DIR: directory, ...extraEnvironment },
+      encoding: 'utf8',
+    },
+  );
+  try {
+    fs.cpSync(path.join(root, 'drizzle'), path.join(sandbox, 'drizzle'), { recursive: true });
+    const seed = prepare(seedDir);
+    assert.equal(seed.status, 0, `${seed.stdout}\n${seed.stderr}`);
+    fs.copyFileSync(path.join(seedDir, 'medical.db'), path.join(sandbox, 'medical.db'));
+    const legacy = new Database(path.join(sandbox, 'medical.db'));
+    try { legacy.exec('CREATE TABLE legacy_copy_marker (id INTEGER PRIMARY KEY)'); }
+    finally { legacy.close(); }
+
+    const isolated = prepare(dataDir, { MEDIFLOW_E2E_DISABLE_LEGACY_COPY: '1' });
+    assert.equal(isolated.status, 0, `${isolated.stdout}\n${isolated.stderr}`);
+    const db = new Database(path.join(dataDir, 'medical.db'), { readonly: true });
+    try {
+      assert.equal(db.prepare(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'legacy_copy_marker'",
+      ).get(), undefined);
+    } finally { db.close(); }
+  } finally {
+    fs.rmSync(sandbox, { recursive: true, force: true });
+  }
+});
