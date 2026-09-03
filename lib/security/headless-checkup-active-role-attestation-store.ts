@@ -89,7 +89,7 @@ function row(value: unknown): HeadlessCheckupActiveRoleAttestationV1 {
   })) as HeadlessCheckupActiveRoleAttestationV1;
 }
 
-/** Fixed-operation lifecycle store; activation and its audit commit in one SQLite transaction. */
+/** Fixed-operation lifecycle store; activation/revocation and their audits commit atomically. */
 export function createHeadlessCheckupActiveRoleAttestationStoreV1(sources: Sources = {}) {
   const now = sources.now ?? Date.now, entropy = sources.entropy ?? randomBytes;
   const eventRef = sources.eventRef ?? randomUUID, db = dbServer.$client;
@@ -178,6 +178,12 @@ export function createHeadlessCheckupActiveRoleAttestationStoreV1(sources: Sourc
           WHERE actor_ref=? AND attestation_ref=? AND status IN ('inactive','active') AND revocation_generation=0
           AND revoked_at IS NULL`).run(current, current, actorRef, before.attestationRef);
         if (result.changes !== 1) return fail('attestation_conflict');
+        const audit = db.prepare(`INSERT INTO audit_events (event_id,schema_version,event_type,occurred_at,outcome,
+          actor_type,actor_ref,subject_type,subject_ref,source_surface,request_id,redacted_metadata,created_at)
+          VALUES (?,1,'auth.checkup_active_role.revoked',?,'success','user',?,'active_role_attestation',?,'web',NULL,
+          '{"flags":["auth:session"],"reasonCode":"explicit_revoke"}',?)`)
+          .run(nextEventRef(), current, actorRef, before.attestationRef, current);
+        if (audit.changes !== 1) return fail('storage_unavailable');
         return readExact(actorRef);
       });
     },

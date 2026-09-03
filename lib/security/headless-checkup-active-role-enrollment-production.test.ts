@@ -16,6 +16,8 @@ const production = await import('./headless-checkup-active-role-enrollment-produ
 test('composes one server-only, PIN-only checkup enrollment function', () => {
   assert.equal(typeof production.enrollHeadlessCheckupActiveRoleAttestation, 'function');
   assert.equal(production.enrollHeadlessCheckupActiveRoleAttestation.length, 1);
+  assert.equal(typeof production.revokeHeadlessCheckupActiveRoleAttestation, 'function');
+  assert.equal(production.revokeHeadlessCheckupActiveRoleAttestation.length, 1);
   const source = fs.readFileSync(new URL('./headless-checkup-active-role-enrollment-production.ts', import.meta.url), 'utf8');
   assert.match(source, /readAuthenticatedWebSession/u); assert.match(source, /isWebAdminSession/u);
   assert.match(source, /verifyHostCredentials/u); assert.match(source, /createHeadlessCheckupActiveRoleAttestationStoreV1/u);
