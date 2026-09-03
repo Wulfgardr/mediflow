@@ -88,13 +88,16 @@ test.describe.configure({ retries: 0 });
 
 test('AnyDoc: le azioni allegato restano visibili al focus e sui viewport stretti', async ({ page }) => {
   const consoleErrors: string[] = [];
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await establishSyntheticSession(page);
+
+  // The deterministic login helper deliberately probes an already-locked state
+  // and receives one expected 409. Observe only the AnyDoc surface under test.
   page.on('console', (message) => {
     if (message.type() === 'error') consoleErrors.push(message.text());
   });
   page.on('pageerror', (error) => consoleErrors.push(error.message));
 
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await establishSyntheticSession(page);
   const patientId = await createSyntheticFixture(page);
   await openDocumentArchive(page, patientId);
 
