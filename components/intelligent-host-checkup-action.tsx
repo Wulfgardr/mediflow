@@ -14,7 +14,7 @@ type Checkup = Readonly<{ id: string; title: string; status?: string; version?: 
 type Proposal = Readonly<{ proposalRef: string; targetStatus: 'completed' | 'cancelled';
   expectedRevision: number; expiresAt: number; resourceTitle: string; resourceRevision: number }>;
 type SelectedResource = Readonly<{ checkupId: string; title: string; revision: number }>;
-const actionClass = `${workspaceStyles.headerActionButton} min-h-11 disabled:cursor-not-allowed disabled:opacity-[0.55]`;
+const actionClass = `${workspaceStyles.headerActionButton} min-h-11 min-w-11 sm:min-w-0 disabled:cursor-not-allowed disabled:opacity-[0.55]`;
 function status(error: unknown): string {
   if (!(error instanceof IntelligentHostCheckupBrowserAdapterError)) return 'Operazione non verificabile.';
   if (error.code === 'session_unavailable') return 'Sessione non disponibile.';
@@ -110,7 +110,8 @@ export function IntelligentHostCheckupAction({ patientId, ambulatoryId, checkups
   return (
     <div className={workspaceStyles.headerActionsMenu} data-testid="intelligent-host-checkup-action">
       <button type="button" className={actionClass} data-lume-action="quiet" aria-expanded={open}
-        aria-controls={statusId} onClick={() => setOpen((value) => !value)}>
+        aria-controls={statusId} aria-label="Checkup host" title="Checkup host"
+        onClick={() => setOpen((value) => !value)}>
         <ShieldCheck size={14} aria-hidden="true" /><span className="hidden sm:inline">Checkup host</span>
       </button>
       {open ? (
