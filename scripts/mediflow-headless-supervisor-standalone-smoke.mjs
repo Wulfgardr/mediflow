@@ -15,6 +15,14 @@ const META = Object.freeze({
   'io.modelcontextprotocol/clientCapabilities': {},
   'io.modelcontextprotocol/clientInfo': { name: 'mediflow-production-smoke', version: '1.0.0' },
 });
+function webMutationHeaders(cookieHeader, hasJsonBody = true) {
+  return {
+    Cookie: cookieHeader,
+    ...(hasJsonBody ? { 'Content-Type': 'application/json' } : {}),
+    Origin: BASE_URL,
+    'Sec-Fetch-Site': 'same-origin',
+  };
+}
 function withTimeout(promise, label, delayMs = 8_000) {
   return Promise.race([promise, new Promise((_, reject) => {
     const timer = setTimeout(() => reject(new Error(`Timed out: ${label}`)), delayMs);
@@ -118,7 +126,7 @@ async function activateSyntheticSelection() {
   const login = await loginWithWebAuthControl(BASE_URL, { username: USERNAME, password: '1234' });
   assert.equal(login.response.status, 200);
   assert.ok(login.cookieHeader);
-  const jsonHeaders = { Cookie: login.cookieHeader, 'Content-Type': 'application/json' };
+  const jsonHeaders = webMutationHeaders(login.cookieHeader);
   const ambulatoryResponse = await fetch(new URL('/api/ambulatories', BASE_URL),
     { headers: { Cookie: login.cookieHeader } });
   assert.equal(ambulatoryResponse.status, 200);
@@ -167,8 +175,9 @@ async function activateSyntheticSelection() {
     new URL(`/api/patients/${PATIENT_ID}/intelligent-host/checkup-status`, BASE_URL),
     { method: 'POST', headers: jsonHeaders, body: JSON.stringify({ checkupId: CHECKUP_ID }) },
   );
-  assert.equal(checkupSelectionResponse.status, 200);
-  const { checkupRef, uiBindingRef, resourceTitle, resourceRevision } = await checkupSelectionResponse.json();
+  const checkupSelection = await checkupSelectionResponse.json();
+  assert.equal(checkupSelectionResponse.status, 200, JSON.stringify(checkupSelection));
+  const { checkupRef, uiBindingRef, resourceTitle, resourceRevision } = checkupSelection;
   assert.match(checkupRef, /^hcsr_[0-9a-f]{64}$/u);
   assert.match(uiBindingRef, /^hcub_[0-9a-f]{64}$/u);
   assert.equal(resourceTitle, CHECKUP_TITLE);
@@ -193,7 +202,7 @@ function verifyCommittedTransition(dataDir, receipt) {
 function tool(name, argumentsValue = {}) { return { name, arguments: argumentsValue }; }
 async function main() {
   const dataDir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-production-smoke-')));
-  let child = null; try {
+  let child = null, stderr = ''; try {
     prepareSyntheticDatabase(dataDir);
     child = spawn(process.execPath,
       [path.join(ROOT, 'scripts', 'run-strip-types.mjs'),
@@ -203,7 +212,6 @@ async function main() {
         stdio: ['pipe', 'pipe', 'pipe'],
       });
     const exit = new Promise((resolve) => child.once('exit', (code) => resolve(code)));
-    let stderr = '';
     child.stderr.setEncoding('utf8');
     child.stderr.on('data', (chunk) => { stderr += chunk; });
     const rpc = rpcClient(child);
@@ -215,8 +223,9 @@ async function main() {
     assert.equal(prebind.result.content[0].text, 'MediFlow operation denied: host_unbound.');
     const selection = await activateSyntheticSelection();
     const { cookieHeader, checkupRef, uiBindingRef, resourceTitle, resourceRevision } = selection;
+    const jsonHeaders = webMutationHeaders(cookieHeader);
     const cloudProbe = await fetch(new URL('/api/system/cloud-provider-probe', BASE_URL), {
-      method: 'POST', headers: { Cookie: cookieHeader, 'Content-Type': 'application/json' },
+      method: 'POST', headers: jsonHeaders,
       body: JSON.stringify({ intent: 'run_synthetic_nonclinical_probe' }),
     });
     assert.equal(cloudProbe.status, 409);
@@ -268,7 +277,7 @@ async function main() {
     );
     const confirm = async (candidatePin) => {
       const response = await fetch(confirmationUrl, { method: 'POST',
-        headers: { Cookie: cookieHeader, 'Content-Type': 'application/json' },
+        headers: jsonHeaders,
         body: JSON.stringify({ targetStatus: 'completed', expectedRevision: 1, candidatePin,
           uiBindingRef }) });
       assert.equal(response.status, 200);
@@ -290,7 +299,7 @@ async function main() {
     assert.equal(committedCheckup.version, 2);
     const operationRevocationResponse = await fetch(
       new URL(`/api/patients/${PATIENT_ID}/intelligent-host/checkup-status`, BASE_URL),
-      { method: 'DELETE', headers: { Cookie: cookieHeader } },
+      { method: 'DELETE', headers: webMutationHeaders(cookieHeader, false) },
     );
     assert.equal(operationRevocationResponse.status, 200);
     assert.deepEqual(await operationRevocationResponse.json(), { state: 'revoked' });
@@ -301,7 +310,7 @@ async function main() {
     assert.equal(postOperationStatus.result.structuredContent.writes, 0);
     const roleRevocationResponse = await fetch(
       new URL('/api/system/intelligent-host/checkup-active-role', BASE_URL),
-      { method: 'DELETE', headers: { Cookie: cookieHeader, 'Content-Type': 'application/json' },
+      { method: 'DELETE', headers: jsonHeaders,
         body: JSON.stringify({ candidatePin: '1234' }) },
     );
     assert.equal(roleRevocationResponse.status, 200);
@@ -332,6 +341,9 @@ async function main() {
     assert.doesNotMatch(stderr, forbidden);
     assert.doesNotMatch(JSON.stringify(receipt), forbidden);
     process.stdout.write('Production Supervisor smoke passed: five operations, governed checkup, one update/audit, revoke and clean exit.\n');
+  } catch (error) {
+    if (stderr) process.stderr.write(stderr);
+    throw error;
   } finally {
     await terminateChild(child);
     fs.rmSync(dataDir, { recursive: true, force: true });

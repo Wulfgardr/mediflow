@@ -175,20 +175,21 @@ export function createHeadlessCheckupActiveRoleSessionGrantOwner(sources: Headle
     if (!same(before, after)) return fail('projection_stale');
     return after;
   };
-  const resource = <T>(record: Pick<RecordState, 'active' | 'port' | 'snapshot'>,
-    operation: () => T): T => {
+  /* @Codex: never execute projection or downstream lifecycle code while the
+     external P3 owner holds its resource-binding critical section. */
+  const confirmResource = (record: Pick<RecordState, 'active' | 'port' | 'snapshot'>): boolean => {
     const port = record.port; if (!record.active || !port) return fail('grant_unavailable');
-    let use: WebResourceUse | null = null, committed = false, invoked = false, output: T;
+    let use: WebResourceUse | null = null, committed = false, invoked = false;
     try {
       use = beginResourceUse(port); if (!use) return fail('grant_unavailable');
       const current = withCurrentResourceBinding(use, (binding) => {
         if (!validBinding(binding, record.snapshot.actorRef)) throw CALLBACK_FAILED;
-        output = operation(); invoked = true;
+        invoked = true;
       });
       if (!current || !invoked || !record.active) return fail('grant_unavailable');
       committed = commitResourceUse(use);
       if (!committed || !record.active) return fail('grant_unavailable');
-      return output!;
+      return true;
     } finally { if (use && !committed) abortResourceUse(use); }
   };
   const current = (candidate: unknown, presented?: Context): RecordState => {
@@ -209,19 +210,23 @@ export function createHeadlessCheckupActiveRoleSessionGrantOwner(sources: Headle
     const request = presented === undefined ? undefined : context(presented), record = current(candidate, request);
     operationPoisoned = false; operationActive = true;
     try {
-      return resource<T>(record, () => {
-        const before = stable({ session: record.snapshot.session, owner: record.snapshot.owner });
-        if (!same(before, record.snapshot)) return fail('projection_stale');
-        const binding = Object.freeze(Object.assign(Object.create(null), { actorRef: before.actorRef,
-          sessionRef: before.sessionRef, role: 'physician' as const, patientId: before.patientId,
-          ambulatoryId: before.ambulatoryId, selectionEpoch: before.selectionEpoch,
-          revocationGeneration: 0 as const }));
-        const result = operation(binding);
-        if (operationPoisoned || types.isPromise(result) || !record.active) return fail('lifecycle_unavailable');
-        const after = stable({ session: record.snapshot.session, owner: record.snapshot.owner });
-        if (!same(after, record.snapshot)) return fail('projection_stale');
-        return result;
-      });
+      const before = stable({ session: record.snapshot.session, owner: record.snapshot.owner });
+      if (operationPoisoned || !record.active) return fail('lifecycle_unavailable');
+      if (!same(before, record.snapshot)) return fail('projection_stale');
+      confirmResource(record);
+      if (operationPoisoned || !record.active) return fail('lifecycle_unavailable');
+      const binding = Object.freeze(Object.assign(Object.create(null), { actorRef: before.actorRef,
+        sessionRef: before.sessionRef, role: 'physician' as const, patientId: before.patientId,
+        ambulatoryId: before.ambulatoryId, selectionEpoch: before.selectionEpoch,
+        revocationGeneration: 0 as const }));
+      const result = operation(binding);
+      if (operationPoisoned || types.isPromise(result) || !record.active) return fail('lifecycle_unavailable');
+      const after = stable({ session: record.snapshot.session, owner: record.snapshot.owner });
+      if (operationPoisoned || !record.active) return fail('lifecycle_unavailable');
+      if (!same(after, record.snapshot)) return fail('projection_stale');
+      confirmResource(record);
+      if (operationPoisoned || !record.active) return fail('lifecycle_unavailable');
+      return result;
     } catch (error) { terminate(record); throw error === CALLBACK_FAILED ? fail('grant_unavailable') : error; }
     finally { operationActive = false; }
   };
@@ -233,14 +238,15 @@ export function createHeadlessCheckupActiveRoleSessionGrantOwner(sources: Headle
       const record: RecordState = { active: true, published: false, grant, snapshot: initial, port,
         registration: null, cancel: null, onTerminal: onTerminalValue as () => void };
       try {
-        resource(record, () => undefined);
+        confirmResource(record);
         const registration = registerPrivateResource(port, () => terminate(record, true, true));
         if (!registration || !record.active) return fail('lifecycle_unavailable');
         record.registration = registration;
         const cancel = sources.schedule(initial.expiresAt - now(sources.now), () => terminate(record));
         if (!callback(cancel) || !record.active) return fail('lifecycle_unavailable');
         record.cancel = cancel as () => void;
-        const final = resource(record, () => stable(captured));
+        const final = stable(captured);
+        confirmResource(record);
         if (!same(initial, final) || !record.active) return fail('projection_stale');
         grants.set(grant, record); record.published = true; return grant;
       } catch (error) {

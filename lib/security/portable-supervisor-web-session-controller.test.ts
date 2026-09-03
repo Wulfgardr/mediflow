@@ -63,6 +63,7 @@ function fixture(options: FixtureOptions = {}) {
     let active = true, acquisitions = 0, activations = 0, reads = 0, revocations = 0, disconnects = 0;
     const owner = Object.freeze({
         readCapture() { reads += 1; events.push('capture:read'); return capture; },
+        matchesCurrentContext() { return true; },
         revoke(reason: 'logout' | 'application_lock' | 'reselection' | 'explicit') {
             events.push(`local:${reason}`);
             if (!active) return false;

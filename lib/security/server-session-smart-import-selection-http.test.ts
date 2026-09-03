@@ -17,7 +17,13 @@ const LEASE = Object.freeze({ sessionRef: `ssr_${'1'.repeat(32)}`, selectionEpoc
 
 function request(body: unknown = REQUEST) {
     return new Request('http://127.0.0.1/api/ai/smart-import/selection', { method: 'POST',
-        headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+        headers: { 'content-type': 'application/json', origin: 'http://127.0.0.1',
+            'sec-fetch-site': 'same-origin' }, body: JSON.stringify(body) });
+}
+function requestValue(value: unknown) {
+    return { url: 'http://127.0.0.1/api/ai/smart-import/selection',
+        headers: new Headers({ 'content-type': 'application/json', origin: 'http://127.0.0.1',
+            'sec-fetch-site': 'same-origin' }), json: async () => value } as Request;
 }
 function rejects(status: number, code: string) {
     return async (response: Response) => {
@@ -51,12 +57,35 @@ test('fails closed for malformed, extra, prototype, and accessor JSON bodies wit
     const accessor = { expectedEpoch: 0, patientId: REQUEST.patientId };
     Object.defineProperty(accessor, 'ambulatoryId', { enumerable: true, get() { return REQUEST.ambulatoryId; } });
     const prototype = Object.assign(Object.create({ inherited: true }), REQUEST);
-    const malformed = new Request('http://127.0.0.1', { method: 'POST', body: '{' });
-    for (const value of [malformed, request({ ...REQUEST, extra: true }), { json: async () => accessor } as Request,
-        { json: async () => prototype } as Request]) {
+    const malformed = new Request('http://127.0.0.1', { method: 'POST', headers: {
+        'content-type': 'application/json', origin: 'http://127.0.0.1', 'sec-fetch-site': 'same-origin',
+    }, body: '{' });
+    for (const value of [malformed, request({ ...REQUEST, extra: true }), requestValue(accessor),
+        requestValue(prototype)]) {
         const response = await handle(value); await rejects(400, 'input_invalid')(response);
     }
     assert.equal(calls, 0);
+});
+
+test('rejects cross-port and text/plain transport before issuing a selection', async () => {
+    let acquisitions = 0; let selectionCalls = 0;
+    const handle = createSmartImportSelectionHttpHandler({
+        acquireSelection: async () => {
+            acquisitions += 1;
+            return Object.freeze({ issueSelection: async () => { selectionCalls += 1; return LEASE; } });
+        },
+    });
+    for (const headers of [
+        { origin: 'http://127.0.0.1:4000', 'sec-fetch-site': 'same-site', 'content-type': 'application/json' },
+        { origin: 'http://127.0.0.1', 'sec-fetch-site': 'same-origin', 'content-type': 'text/plain' },
+    ]) {
+        const denied = new Request('http://127.0.0.1/api/ai/smart-import/selection', {
+            method: 'POST', headers, body: JSON.stringify(REQUEST),
+        });
+        await rejects(403, 'request_transport_invalid')(await handle(denied));
+    }
+    assert.equal(acquisitions, 2);
+    assert.equal(selectionCalls, 0);
 });
 
 test('authenticates before observing a hostile selection request', async () => {

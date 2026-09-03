@@ -224,12 +224,16 @@ test('la factory production raggiunge entrambi i transport ufficiali solo attrav
         for (const name of names) delete process.env[name];
         for (const provider of ['openai', 'anthropic'] as const) {
             let calls = 0;
+            const cancellation = new AbortController();
             const secret = provider === 'openai' ? OPENAI_SECRET : ANTHROPIC_SECRET;
             globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
                 calls += 1;
                 const url = String(input);
                 const headers = init?.headers as Headers;
                 const body = String(init?.body ?? '');
+                assert.ok(init?.signal instanceof AbortSignal);
+                assert.notEqual(init.signal, cancellation.signal,
+                    'the adapter must retain its own timeout controller');
                 assert.equal(url, provider === 'openai'
                     ? OPENAI_RESPONSES_OFFICIAL_URL
                     : ANTHROPIC_MESSAGES_OFFICIAL_URL);
@@ -253,7 +257,7 @@ test('la factory production raggiunge entrambi i transport ufficiali solo attrav
                 process.env.MEDIFLOW_ANTHROPIC_WORKSPACE_ID = WORKSPACE_ID;
             }
 
-            const probe = createDocumentSynthesisCloudProbeFromHostEnvironment();
+            const probe = createDocumentSynthesisCloudProbeFromHostEnvironment(cancellation.signal);
             assert.ok(probe);
             const result = await probe.execute();
             assert.ok(result);
@@ -275,15 +279,67 @@ test('la factory production raggiunge entrambi i transport ufficiali solo attrav
     }
 });
 
+test('la revoca lifecycle abortisce il signal interno del transport senza sostituirlo', {
+    concurrency: false,
+}, async () => {
+    const names = [
+        'MEDIFLOW_PROVIDER_V2_ENABLED', 'MEDIFLOW_PROVIDER_V2_NETWORK',
+        'MEDIFLOW_PROVIDER_V2_SELECTION', 'OPENAI_API_KEY',
+    ] as const;
+    const previous = new Map(names.map((name) => [name, process.env[name]]));
+    const nativeFetch = globalThis.fetch;
+    const lifecycle = new AbortController();
+    let enterFetch!: (signal: AbortSignal) => void;
+    const fetchEntered = new Promise<AbortSignal>((resolve) => { enterFetch = resolve; });
+    try {
+        process.env.MEDIFLOW_PROVIDER_V2_ENABLED = '1';
+        process.env.MEDIFLOW_PROVIDER_V2_NETWORK = '1';
+        process.env.MEDIFLOW_PROVIDER_V2_SELECTION = 'openai';
+        process.env.OPENAI_API_KEY = OPENAI_SECRET;
+        globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+            assert.ok(init?.signal instanceof AbortSignal);
+            enterFetch(init.signal);
+            return new Promise<Response>((_resolve, reject) => {
+                init.signal?.addEventListener('abort', () => reject(new Error('synthetic abort')), { once: true });
+            });
+        }) as typeof fetch;
+
+        const probe = createDocumentSynthesisCloudProbeFromHostEnvironment(lifecycle.signal);
+        assert.ok(probe);
+        const execution = probe.execute();
+        const transportSignal = await fetchEntered;
+        assert.notEqual(transportSignal, lifecycle.signal);
+        assert.equal(transportSignal?.aborted, false);
+        lifecycle.abort();
+        assert.equal(await execution, null);
+        assert.equal(transportSignal?.aborted, true);
+    } finally {
+        for (const name of names) {
+            const value = previous.get(name);
+            if (value === undefined) delete process.env[name]; else process.env[name] = value;
+        }
+        globalThis.fetch = nativeFetch;
+    }
+});
+
 test('il callsite production accetta solo un gesto admin esplicito e non riceve provider, modello, prompt o segreti', () => {
     const route = readFileSync(new URL('../../../app/api/system/cloud-provider-probe/route.ts', import.meta.url), 'utf8');
-    assert.match(route, /requireSession\(\)/u);
+    assert.equal(route.match(/requireSession\(\)/gu)?.length, 2);
     assert.match(route, /isWebAdminSession\(session\)/u);
+    assert.match(route, /isTrustedWebMutationRequest\(request\)/u);
     assert.match(route, /run_synthetic_nonclinical_probe/u);
-    assert.match(route, /createDocumentSynthesisCloudProbeFromHostEnvironment\(\)/u);
+    assert.match(route, /createDocumentSynthesisCloudProbeFromHostEnvironment\(lifecycle\.signal\)/u);
+    assert.match(route, /registerPrivateResource/u);
+    assert.match(route, /new AbortController\(\)/u);
     assert.doesNotMatch(route, /requireSessionOrLocalToken|OPENAI_API_KEY|ANTHROPIC_API_KEY/u);
     const acceptedBody = route.slice(route.indexOf('function exactIntent'), route.indexOf('async function readIntent'));
     assert.doesNotMatch(acceptedBody, /\b(?:provider|model|prompt|secret)\b/u);
+    const callsite = route.slice(route.indexOf('export async function POST'));
+    const parsed = callsite.indexOf('if (!await readIntent(request))');
+    const revalidated = callsite.indexOf('const currentSession = await requireSession()');
+    const created = callsite.indexOf('createDocumentSynthesisCloudProbeFromHostEnvironment(lifecycle.signal)');
+    const executed = callsite.indexOf('await probe.execute()');
+    assert.ok(parsed >= 0 && revalidated > parsed && created > revalidated && executed > created);
 });
 
 test('la seam di test non e disponibile fuori dal Node test runner', () => {

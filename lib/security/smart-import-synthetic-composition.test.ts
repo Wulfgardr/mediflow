@@ -38,7 +38,14 @@ function resolution(chat: LocalProviderResolution['adapter']['chat']): LocalProv
     return { ...base, adapter: Object.freeze({ id: base.adapter.id, kind: base.adapter.kind, capabilities: base.adapter.capabilities,
         getBaseUrl: () => base.adapter.getBaseUrl(), getModel: () => base.adapter.getModel(), chat, listModels: async () => [] }) };
 }
-function request(path: string, init?: RequestInit): Request { return new Request(new URL(path, 'http://localhost'), { method: init?.method, headers: init?.headers, body: init?.body }); }
+function request(path: string, init?: RequestInit): Request {
+    const headers = new Headers(init?.headers);
+    if (init?.method && init.method !== 'GET') {
+        headers.set('origin', 'http://localhost');
+        headers.set('sec-fetch-site', 'same-origin');
+    }
+    return new Request(new URL(path, 'http://localhost'), { method: init?.method, headers, body: init?.body });
+}
 
 function harness(tamper = false) {
     const now = new Date().toISOString(); const noStore: string[] = []; let entropy = 0; let selectionAcquisitions = 0; let ingestAcquisitions = 0; let previewAcquisitions = 0; let selectionCalls = 0; let ingestCalls = 0; let previewCalls = 0; let killSwitchReads = 0; let consumes = 0; let chats = 0; let routers = 0;

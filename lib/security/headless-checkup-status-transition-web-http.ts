@@ -5,6 +5,7 @@ import { types } from 'node:util';
 import { NextResponse } from 'next/server.js';
 
 import { apiFailure } from '../api-error-response';
+import { isTrustedWebMutationRequest } from './request-transport';
 import { HeadlessCheckupStatusTransitionV1Error } from '../../packages/aip/src/checkup-status-transition';
 
 const MESSAGE = 'Transizione checkup non disponibile.';
@@ -117,6 +118,7 @@ export function createHeadlessCheckupStatusTransitionWebHttpHandlersV1(sources: 
   return Object.freeze({
     select: async (request: Request, context: RouteContext): Promise<NextResponse> => {
       if (!await authorized()) return failure('session_unavailable', 401);
+      if (!isTrustedWebMutationRequest(request)) return failure('request_transport_invalid', 403);
       const route = await params(context), input = await json(request, ['checkupId']);
       if (!route || !input || typeof input.checkupId !== 'string' || !ID.test(input.checkupId)) {
         return failure('invalid_input', 400);
@@ -136,6 +138,7 @@ export function createHeadlessCheckupStatusTransitionWebHttpHandlersV1(sources: 
     },
     confirm: async (request: Request, context: RouteContext): Promise<NextResponse> => {
       if (!await authorized()) return failure('session_unavailable', 401);
+      if (!isTrustedWebMutationRequest(request)) return failure('request_transport_invalid', 403);
       const route = await params(context, true);
       const input = await json(request, ['targetStatus', 'expectedRevision', 'candidatePin', 'uiBindingRef']);
       if (!route || !input || (input.targetStatus !== 'completed' && input.targetStatus !== 'cancelled')
@@ -150,8 +153,9 @@ export function createHeadlessCheckupStatusTransitionWebHttpHandlersV1(sources: 
         return result ? success(result) : failure('operation_unavailable', 503);
       } catch (error) { return controlled(error); }
     },
-    revoke: async (_request: Request, context: RouteContext): Promise<NextResponse> => {
+    revoke: async (request: Request, context: RouteContext): Promise<NextResponse> => {
       if (!await authorized()) return failure('session_unavailable', 401);
+      if (!isTrustedWebMutationRequest(request, false)) return failure('request_transport_invalid', 403);
       const route = await params(context); if (!route) return failure('invalid_input', 400);
       try { const result = await sources.revoke(route.patientId);
         if (result !== true && result !== false) return failure('operation_unavailable', 503);

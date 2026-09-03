@@ -163,7 +163,11 @@ function result(outputText: string, receipt: ProviderOperationReceiptV2): Docume
     })) as DocumentSynthesisCloudProbeResult;
 }
 
-function create(configurationValue: unknown, dependenciesValue: unknown): DocumentSynthesisCloudProbeComposition | null {
+function create(
+    configurationValue: unknown,
+    dependenciesValue: unknown,
+    operationSignal?: AbortSignal,
+): DocumentSynthesisCloudProbeComposition | null {
     const configuration = hostConfiguration(configurationValue); const sources = dependencies(dependenciesValue);
     if (!configuration || !sources) return null;
     let transport;
@@ -186,7 +190,8 @@ function create(configurationValue: unknown, dependenciesValue: unknown): Docume
             try {
                 const broker = createProviderSecretBrokerV2({ now: sources.now, readEnv: sources.readEnv });
                 const common = { lifecycle: configuration.lifecycle, evidence: configuration.evidence,
-                    secretRef: configuration.secretRef, broker, input: PROMPT, now: sources.now, transport };
+                    secretRef: configuration.secretRef, broker, input: PROMPT, now: sources.now,
+                    transport, signal: operationSignal };
                 const execution = configuration.provider === 'openai'
                     ? await executeOpenAIResponsesV2(common as Parameters<typeof executeOpenAIResponsesV2>[0])
                     : await executeAnthropicMessagesV2(common as Parameters<typeof executeAnthropicMessagesV2>[0]);
@@ -237,11 +242,15 @@ function productionConfiguration(): Readonly<Record<string, unknown>> | null {
 }
 
 /** Production factory with no caller input. Both explicit host opt-ins are required and cloud remains OFF by default. */
-export function createDocumentSynthesisCloudProbeFromHostEnvironment(): DocumentSynthesisCloudProbeComposition | null {
+export function createDocumentSynthesisCloudProbeFromHostEnvironment(
+    abortSignal?: AbortSignal,
+): DocumentSynthesisCloudProbeComposition | null {
+    if (abortSignal !== undefined && (!(abortSignal instanceof AbortSignal) || abortSignal.aborted)) return null;
     const configuration = productionConfiguration();
     return configuration ? create(configuration, Object.freeze({
-        now: () => Date.now(), readEnv: (name: string) => process.env[name], fetch: globalThis.fetch,
-    })) : null;
+        now: () => Date.now(), readEnv: (name: string) => process.env[name],
+        fetch: (url: string, init: RequestInit) => globalThis.fetch(url, init),
+    }), abortSignal) : null;
 }
 
 /** Test-only seam. It is unavailable before observing either argument outside Node's test runner. */

@@ -352,7 +352,13 @@ function readOrderedRows(db: Database.Database, table: string): Array<Record<str
     ).all() as Array<Record<string, unknown>>;
 }
 
-function restoreArtifact(targetDataDir: string, artifactPath: string): void {
+type RestoreFenceMode = 'complete' | 'throw' | 'async' | 'missing';
+
+function restoreArtifact(
+    targetDataDir: string,
+    artifactPath: string,
+    fenceMode: RestoreFenceMode = 'complete',
+): void {
     const artifactUrl = pathToFileURL(path.join(ROOT, 'lib/backup-artifact.ts')).href;
     const executorUrl = pathToFileURL(path.join(ROOT, 'lib/backup-restore-executor.ts')).href;
     const source = `
@@ -360,12 +366,77 @@ function restoreArtifact(targetDataDir: string, artifactPath: string): void {
         import { parseBackupArtifact } from ${JSON.stringify(artifactUrl)};
         import { restoreBackupArtifact } from ${JSON.stringify(executorUrl)};
         const artifact = await parseBackupArtifact(JSON.parse(fs.readFileSync(process.env.W7_ARTIFACT_PATH, 'utf8')));
-        restoreBackupArtifact(artifact);
+        const mode = process.env.W7_RESTORE_FENCE_MODE;
+        if (mode === 'missing') {
+            restoreBackupArtifact(artifact);
+        } else {
+            restoreBackupArtifact(artifact, () => {
+                if (mode === 'throw') throw new Error('synthetic fence failure');
+                if (mode === 'async') return Promise.resolve(false);
+                return false;
+            });
+        }
     `;
     runNode(
         ['--experimental-strip-types', '--import', LOADER, '--input-type=module', '--eval', source],
-        { MEDIFLOW_DATA_DIR: targetDataDir, W7_ARTIFACT_PATH: artifactPath },
+        {
+            MEDIFLOW_DATA_DIR: targetDataDir,
+            W7_ARTIFACT_PATH: artifactPath,
+            W7_RESTORE_FENCE_MODE: fenceMode,
+        },
     );
+}
+
+/* @Codex Exercises the real proposal owner across a same-ID/version restore in one Web process. */
+function exerciseCheckupAbaRestoreFence(targetDataDir: string, artifactPath: string): Record<string, unknown> {
+    const artifactUrl = pathToFileURL(path.join(ROOT, 'lib/backup-artifact.ts')).href;
+    const executorUrl = pathToFileURL(path.join(ROOT, 'lib/backup-restore-executor.ts')).href;
+    const ownerUrl = pathToFileURL(path.join(ROOT, 'lib/security/headless-checkup-status-transition-web-owner.ts')).href;
+    const ipcUrl = pathToFileURL(path.join(ROOT, 'packages/aip/src/checkup-status-transition-ipc.ts')).href;
+    const source = `
+        import fs from 'node:fs';
+        import { parseBackupArtifact } from ${JSON.stringify(artifactUrl)};
+        import { restoreBackupArtifact } from ${JSON.stringify(executorUrl)};
+        import { createHeadlessCheckupStatusTransitionWebOwnerV1 } from ${JSON.stringify(ownerUrl)};
+        import { CHECKUP_STATUS_TRANSITION_IPC_SCHEMA_V1, decodeCheckupStatusTransitionIpcFrameV1,
+            encodeCheckupStatusTransitionIpcFrameV1 } from ${JSON.stringify(ipcUrl)};
+        const closed = (value) => Object.freeze(Object.assign(Object.create(null), value));
+        const operationId = 'mediflow.patient.checkup.status.transition.v1';
+        const owner = createHeadlessCheckupStatusTransitionWebOwnerV1(closed({
+            now: () => 1_802_000_000_000,
+            readHostScopeCandidate: () => closed({ status: 'available', actorRef: 'synthetic-restore-actor',
+                patientId: 'restore-aba-patient', ambulatoryId: 'restore-aba-ambulatory',
+                checkupId: 'restore-aba-checkup', generation: 1, revocationGeneration: 0, selectionEpoch: 1 }),
+            readCurrentUiContext: async () => closed({ status: 'available', actorRef: 'synthetic-restore-actor',
+                sessionRef: 'synthetic-restore-session', role: 'physician', generation: 1,
+                revocationGeneration: 0, selectionEpoch: 1 }),
+            verifyFreshPin: async () => closed({ actorRef: 'synthetic-restore-actor',
+                sessionRef: 'synthetic-restore-session' }),
+            writeDenialAudit: async () => {},
+        }));
+        const checkupRef = owner.hostUi.issueSelectedCheckupRef();
+        const projection = owner.hostUi.readSelectedCheckupUiProjection(checkupRef);
+        const previewFrame = encodeCheckupStatusTransitionIpcFrameV1({
+            schemaVersion: CHECKUP_STATUS_TRANSITION_IPC_SCHEMA_V1,
+            type: 'preview', requestRef: 'hcqr_00000000000000000000000000000001', operationId,
+            input: { schemaVersion: 'mediflow.patient.checkup.status.transition.input.v1', operationId,
+                checkupRef, targetStatus: 'completed', expectedRevision: projection.expectedRevision },
+        });
+        const preview = decodeCheckupStatusTransitionIpcFrameV1(await owner.parent.handlePreview(previewFrame));
+        const artifact = await parseBackupArtifact(JSON.parse(fs.readFileSync(process.env.W7_ARTIFACT_PATH, 'utf8')));
+        restoreBackupArtifact(artifact, owner.dispose);
+        let proposalDenial = null;
+        try { await owner.hostUi.readCurrentProposal(preview.proposalRef); }
+        catch (error) { proposalDenial = error?.code ?? error?.message ?? 'denied'; }
+        let authorityDenial = null;
+        try { owner.hostUi.readSelectedCheckupUiProjection(checkupRef); }
+        catch (error) { authorityDenial = error?.code ?? error?.message ?? 'denied'; }
+        process.stdout.write(JSON.stringify({ previewOutcome: preview.outcome, proposalDenial, authorityDenial }));
+    `;
+    return JSON.parse(runNode(
+        ['--experimental-strip-types', '--import', LOADER, '--input-type=module', '--eval', source],
+        { MEDIFLOW_DATA_DIR: targetDataDir, W7_ARTIFACT_PATH: artifactPath },
+    )) as Record<string, unknown>;
 }
 
 /* @Codex */
@@ -500,6 +571,100 @@ function insertAuditSnapshot(db: Database.Database, audit: Record<string, unknow
 function countRows(db: Database.Database, table: string, where = ''): number {
     return (db.prepare(`SELECT COUNT(*) AS count FROM ${quoteIdentifier(table)} ${where}`).get() as { count: number }).count;
 }
+
+test('requires a synchronous runtime fence before the first destructive restore mutation', async () => {
+    const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-backup-runtime-fence-'));
+    const targetDataDir = path.join(workDir, 'target');
+    const artifactPath = path.join(workDir, 'empty.mediflow');
+    try {
+        prepareDatabase(targetDataDir);
+        fs.writeFileSync(artifactPath, await serializeBackupArtifact(createEmptyDataset()));
+        const target = new Database(path.join(targetDataDir, 'medical.db'));
+        try {
+            insertRow(target, 'ambulatories', {
+                id: 'restore-fence-sentinel',
+                name: 'Sentinella sintetica pre-restore',
+                type: 'synthetic',
+                created_at: 1_783_000_000,
+            });
+            for (const mode of ['missing', 'throw', 'async'] as const) {
+                assert.throws(
+                    () => restoreArtifact(targetDataDir, artifactPath, mode),
+                    (error: unknown) => String((error as { stderr?: unknown }).stderr ?? error)
+                        .includes('Restore blocked: runtime mutation fence unavailable.'),
+                );
+                assert.equal(countRows(target, 'ambulatories', "WHERE id = 'restore-fence-sentinel'"), 1);
+            }
+            restoreArtifact(targetDataDir, artifactPath);
+            assert.equal(countRows(target, 'ambulatories', "WHERE id = 'restore-fence-sentinel'"), 0);
+        } finally { target.close(); }
+    } finally { fs.rmSync(workDir, { recursive: true, force: true }); }
+});
+
+test('retires a pending Checkup proposal before a same-ID/version restore ABA swap', async () => {
+    const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-backup-checkup-aba-'));
+    const targetDataDir = path.join(workDir, 'target');
+    const artifactPath = path.join(workDir, 'replacement.mediflow');
+    try {
+        prepareDatabase(targetDataDir);
+        const target = new Database(path.join(targetDataDir, 'medical.db'));
+        try {
+            clearBackupTables(target, [...Object.values(BACKUP_TABLES), MEMBERSHIP_TABLE]);
+            insertRow(target, 'ambulatories', {
+                id: 'restore-aba-ambulatory', name: 'Ambulatorio sintetico ABA', type: 'synthetic',
+                version: 1, created_at: 1_783_000_000,
+            });
+            insertRow(target, 'patients', {
+                id: 'restore-aba-patient', first_name: 'Synthetic', last_name: 'Before', tax_code: 'SYNTHETIC-ABA',
+                ambulatory_id: 'restore-aba-ambulatory', is_archived: 0, version: 1,
+                created_at: 1_783_000_000, updated_at: 1_783_000_000,
+            });
+            insertRow(target, MEMBERSHIP_TABLE, {
+                patient_id: 'restore-aba-patient', ambulatory_id: 'restore-aba-ambulatory', assigned_at: 1_783_000_000,
+            });
+            insertRow(target, 'checkups', {
+                id: 'restore-aba-checkup', patient_id: 'restore-aba-patient', date: 1_783_000_100,
+                title: 'Checkup sintetico prima del restore', status: 'pending', source: 'manual', version: 1,
+                created_at: 1_783_000_100, updated_at: 1_783_000_100,
+            });
+        } finally { target.close(); }
+
+        const payload = createEmptyDataset();
+        payload.ambulatories = [{
+            id: 'restore-aba-ambulatory', name: 'Ambulatorio sintetico ABA', type: 'synthetic',
+            version: 1, createdAt: '2026-07-01T08:00:00.000Z',
+        }];
+        payload.patients = [{
+            id: 'restore-aba-patient', firstName: 'Synthetic', lastName: 'After', taxCode: 'SYNTHETIC-ABA',
+            ambulatoryId: 'restore-aba-ambulatory', assignedAmbulatoryIds: ['restore-aba-ambulatory'],
+            isArchived: false, version: 1, createdAt: '2026-07-01T08:00:00.000Z',
+            updatedAt: '2026-07-01T08:00:00.000Z',
+        }];
+        payload.checkups = [{
+            id: 'restore-aba-checkup', patientId: 'restore-aba-patient', date: '2026-07-01T09:00:00.000Z',
+            title: 'Checkup sintetico dopo il restore', status: 'pending', source: 'manual', version: 1,
+            createdAt: '2026-07-01T09:00:00.000Z', updatedAt: '2026-07-01T09:00:00.000Z',
+        }];
+        fs.writeFileSync(artifactPath, await serializeBackupArtifact(payload));
+
+        assert.deepEqual(exerciseCheckupAbaRestoreFence(targetDataDir, artifactPath), {
+            previewOutcome: 'proposed',
+            proposalDenial: 'invalid_input',
+            authorityDenial: 'operation_unavailable',
+        });
+        const restored = new Database(path.join(targetDataDir, 'medical.db'), { readonly: true });
+        try {
+            assert.deepEqual(
+                restored.prepare('SELECT title, status, version FROM checkups WHERE id = ?')
+                    .get('restore-aba-checkup'),
+                { title: 'Checkup sintetico dopo il restore', status: 'pending', version: 1 },
+            );
+        } finally { restored.close(); }
+
+        const routeSource = fs.readFileSync(path.join(ROOT, 'app/api/system/backup-restore/route.ts'), 'utf8');
+        assert.match(routeSource, /restoreBackupArtifact\(artifact,\s*disposeCheckupStatusTransitionForHostV1\)/u);
+    } finally { fs.rmSync(workDir, { recursive: true, force: true }); }
+});
 
 test('preflights H7b audit collisions before deleting target data', async () => {
     const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-backup-h7b-collision-'));

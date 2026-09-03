@@ -33,7 +33,8 @@ function context(proposal = false) {
 }
 function request(method: 'POST' | 'GET' | 'DELETE', body?: unknown, binding = UI_BINDING): Request {
   return new Request(`http://127.0.0.1/api/patients/${PATIENT}/intelligent-host/checkup-status`, {
-    method, headers: { ...(body === undefined ? {} : { 'content-type': 'application/json' }),
+    method, headers: { origin: 'http://127.0.0.1', 'sec-fetch-site': 'same-origin',
+      ...(body === undefined ? {} : { 'content-type': 'application/json' }),
       ...(binding ? { 'x-mediflow-checkup-ui-binding': binding } : {}) },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
@@ -103,6 +104,20 @@ test('rejects malformed bodies, route params, and missing or wrong-shaped UI bin
   }
   await failure(await current.handlers.revoke(request('DELETE'), Object.freeze({ params: Promise.resolve({ id: '../x' }) })),
     400, 'invalid_input');
+  assert.equal(current.received.length, 0);
+});
+
+test('rejects cross-port and non-JSON mutation transport before operation sources', async () => {
+  const current = fixture();
+  for (const headers of [
+    { origin: 'http://127.0.0.1:4000', 'sec-fetch-site': 'same-site', 'content-type': 'application/json' },
+    { origin: 'http://127.0.0.1', 'sec-fetch-site': 'same-origin', 'content-type': 'text/plain' },
+  ]) {
+    const denied = new Request(`http://127.0.0.1/api/patients/${PATIENT}/intelligent-host/checkup-status`, {
+      method: 'POST', headers, body: JSON.stringify({ checkupId: CHECKUP }),
+    });
+    await failure(await current.handlers.select(denied, context()), 403, 'request_transport_invalid');
+  }
   assert.equal(current.received.length, 0);
 });
 

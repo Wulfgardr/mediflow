@@ -21,6 +21,7 @@ const AMBULATORY = 'synthetic-ambulatory-web-owner', SUCCESS = 'synthetic-checku
 const DENIED = 'synthetic-checkup-web-denied', STALE = 'synthetic-checkup-web-stale';
 const EXPIRED = 'synthetic-checkup-web-expired', CUT = 'synthetic-checkup-web-cut';
 const VERTICAL = 'synthetic-checkup-web-vertical';
+const PIN_BUDGET = 'synthetic-checkup-web-pin-budget';
 bootstrap.prepare('INSERT INTO ambulatories (id, name, type, version) VALUES (?, ?, ?, 1)')
   .run(AMBULATORY, 'Ambulatorio sintetico', 'test');
 bootstrap.prepare(`INSERT INTO patients (id, first_name, last_name, tax_code, ambulatory_id, is_archived, version)
@@ -28,7 +29,8 @@ bootstrap.prepare(`INSERT INTO patients (id, first_name, last_name, tax_code, am
 bootstrap.prepare('INSERT INTO patients_to_ambulatories (patient_id, ambulatory_id) VALUES (?, ?)')
   .run(PATIENT, AMBULATORY);
 for (const [id, date] of [[SUCCESS, 1_800_000_000], [DENIED, 1_800_000_100], [STALE, 1_800_000_200],
-  [EXPIRED, 1_800_000_300], [CUT, 1_800_000_400], [VERTICAL, 1_800_000_500]] as const) {
+  [EXPIRED, 1_800_000_300], [CUT, 1_800_000_400], [VERTICAL, 1_800_000_500],
+  [PIN_BUDGET, 1_800_000_600]] as const) {
   bootstrap.prepare(`INSERT INTO checkups (id, patient_id, date, title, status, version)
     VALUES (?, ?, ?, 'Checkup sintetico', 'pending', 1)`).run(id, PATIENT, date);
 }
@@ -155,6 +157,31 @@ test('expires retained proposals and revokes a confirmation while PIN verificati
   finally { check.close(); expired.owner.dispose(); cut.owner.dispose(); }
 });
 
+test('terminalizes the exact operation after a PIN verifier denial', async () => {
+  const current = fixture(PIN_BUDGET), preview = await current.preview();
+  const gesture = await current.owner.hostUi.issueExactGesture(closed({ proposalRef: preview.proposalRef,
+    targetStatus: 'completed', expectedRevision: 1 }));
+  let verifications = 0;
+  current.setPinVerifier(async () => {
+    verifications += 1;
+    throw Object.assign(new Error('synthetic private detail'), { code: 'pin_attempts_exhausted' });
+  });
+
+  await assert.rejects(current.owner.hostUi.confirm(command(preview.proposalRef, gesture, '0000')),
+    (error: unknown) => (error as { code?: unknown }).code === 'confirmation_required');
+  await assert.rejects(current.owner.hostUi.confirm(command(preview.proposalRef, gesture, '0000')),
+    (error: unknown) => (error as { code?: unknown }).code === 'proof_replayed');
+  assert.equal(verifications, 1, 'a terminalized proposal never reaches PIN comparison again');
+  assert.equal(current.audits.some((value) => (value as { denialCode?: unknown }).denialCode
+    === 'confirmation_required'), true);
+  assert.doesNotMatch(JSON.stringify(current.audits), /synthetic private detail|pin_attempts_exhausted/u);
+  const check = new Database(databasePath, { readonly: true });
+  try {
+    assert.deepEqual(check.prepare('SELECT status, version FROM checkups WHERE id = ?').get(PIN_BUDGET),
+      { status: 'pending', version: 1 });
+  } finally { check.close(); current.owner.dispose(); }
+});
+
 test('denies wrong role, session cut, stale revision and duplicate preview with zero write', async () => {
   const wrongRole = fixture(DENIED), proposal = await wrongRole.preview(); wrongRole.setRole('admin');
   await assert.rejects(wrongRole.owner.hostUi.issueExactGesture(closed({ proposalRef: proposal.proposalRef,
@@ -230,7 +257,10 @@ test('runs activation, exact-parent MCP preview, UI reread, PIN confirm, receipt
     if (url.endsWith('/intelligent-host/activate')) {
       return new Response(JSON.stringify({ state: 'active', expiresAt: 1_900_000_000_000 }));
     }
-    const request = new Request(new URL(url, 'http://127.0.0.1'), init);
+    const headers = new Headers(init.headers);
+    headers.set('origin', 'http://127.0.0.1');
+    headers.set('sec-fetch-site', 'same-origin');
+    const request = new Request(new URL(url, 'http://127.0.0.1'), { ...init, headers });
     const route = Object.freeze({ params: Promise.resolve(Object.freeze({ id: PATIENT })) });
     const proposalRef = url.split('/proposals/')[1];
     const proposalRoute = Object.freeze({ params: Promise.resolve(Object.freeze({ id: PATIENT, proposalRef })) });
