@@ -30,9 +30,15 @@ const service = createHeadlessCheckupActiveRoleEnrollmentService({
   readAttestation: (actorRef) => lifecycle(() => store.read(actorRef)),
   createInactive: (actorRef) => lifecycle(() => store.createInactive(actorRef)),
   activate: (actorRef) => lifecycle(() => store.activate(actorRef)),
+  revoke: (actorRef, expected) => lifecycle(() => store.revoke(actorRef, expected)),
 });
 
 /** Controlled setup only; no session grant is returned. */
 export function enrollHeadlessCheckupActiveRoleAttestation(candidatePin: unknown) {
   return service.enroll(candidatePin);
+}
+
+/** Explicit same-admin revocation; callers must separately retire operation-local dependent state. */
+export function revokeHeadlessCheckupActiveRoleAttestation(candidatePin: unknown) {
+  return service.revoke(candidatePin);
 }

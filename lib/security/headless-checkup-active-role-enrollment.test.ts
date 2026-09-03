@@ -33,7 +33,9 @@ function sources(change: Partial<HeadlessCheckupActiveRoleEnrollmentSources> = {
     readAttestation: () => ({ kind: 'missing' }),
     createInactive: () => ({ kind: 'ok', value: attestation({ status: 'inactive', issuerRef: null,
       activatedAt: null, expiresAt: null }) }),
-    activate: () => ({ kind: 'ok', value: attestation() }), ...change };
+    activate: () => ({ kind: 'ok', value: attestation() }),
+    revoke: () => ({ kind: 'ok', value: attestation({ status: 'revoked', revocationGeneration: 1,
+      revokedAt: new Date(NOW), updatedAt: new Date(NOW) }) }), ...change };
 }
 function hasCode(code: string) {
   return (error: unknown) => error instanceof HeadlessCheckupActiveRoleEnrollmentError
@@ -96,6 +98,29 @@ test('preserves lifecycle conflicts and rejects expired or wrong-operation activ
       activate: () => ({ kind: 'ok', value: forged }),
     })).enroll(PIN), hasCode('storage_unavailable'));
   }
+});
+
+test('revokes only the exact active attestation after a fresh same-admin PIN check', async () => {
+  const trace: string[] = [];
+  const service = createHeadlessCheckupActiveRoleEnrollmentService(sources({
+    resolveCurrentWebAdmin: async () => { trace.push(trace.length === 0 ? 'before' : 'after'); return session(); },
+    verifyAdminPin: async () => { trace.push('pin'); return { kind: 'verified',
+      account: { id: ACTOR, username: USERNAME, role: 'admin' } }; },
+    readAttestation: () => { trace.push('read'); return { kind: 'ok', value: attestation() }; },
+    revoke: (actorRef, expected) => { trace.push('revoke'); assert.equal(actorRef, ACTOR);
+      assert.deepEqual(expected, { attestationRef: `hcar_${'b'.repeat(32)}`, attestationVersion: 1,
+        revocationGeneration: 0 }); return { kind: 'ok', value: attestation({ status: 'revoked',
+        revocationGeneration: 1, revokedAt: new Date(NOW), updatedAt: new Date(NOW) }) }; },
+  }));
+  assert.deepEqual({ ...await service.revoke(PIN) }, {
+    schemaVersion: 'mediflow.headless-checkup-active-role-revocation.v1', status: 'revoked',
+    attestationVersion: 1, revocationGeneration: 1,
+  });
+  assert.deepEqual(trace, ['before', 'pin', 'after', 'read', 'revoke']);
+  await assert.rejects(createHeadlessCheckupActiveRoleEnrollmentService(sources({
+    readAttestation: () => ({ kind: 'ok', value: attestation({ status: 'revoked', revocationGeneration: 1,
+      revokedAt: new Date(NOW) }) }),
+  })).revoke(PIN), hasCode('enrollment_conflict'));
 });
 
 test('keeps enrollment separate from review authority and clinical writers', () => {

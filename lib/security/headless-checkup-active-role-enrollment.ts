@@ -4,6 +4,7 @@ import 'server-only';
 import { types } from 'node:util';
 
 const ENROLLMENT_SCHEMA = 'mediflow.headless-checkup-active-role-enrollment.v1' as const;
+const REVOCATION_SCHEMA = 'mediflow.headless-checkup-active-role-revocation.v1' as const;
 const ATTESTATION_SCHEMA = 'mediflow.headless-checkup-active-role-attestation.v1' as const;
 const OPERATION = 'mediflow.patient.checkup.status.transition.v1' as const;
 const POLICY = 'physician_confirmed_single_use.v1' as const;
@@ -26,9 +27,14 @@ export type HeadlessCheckupActiveRoleEnrollmentSources = Readonly<{
   readAttestation(actorRef: string): HeadlessCheckupActiveRoleEnrollmentLifecycleResult;
   createInactive(actorRef: string): HeadlessCheckupActiveRoleEnrollmentLifecycleResult;
   activate(actorRef: string): HeadlessCheckupActiveRoleEnrollmentLifecycleResult;
+  revoke(actorRef: string, expected: unknown): HeadlessCheckupActiveRoleEnrollmentLifecycleResult;
 }>;
 export type HeadlessCheckupActiveRoleEnrollmentProjectionV1 = Readonly<{
   schemaVersion: typeof ENROLLMENT_SCHEMA; status: 'active'; attestationVersion: 1;
+}>;
+export type HeadlessCheckupActiveRoleRevocationProjectionV1 = Readonly<{
+  schemaVersion: typeof REVOCATION_SCHEMA; status: 'revoked'; attestationVersion: 1;
+  revocationGeneration: 1;
 }>;
 export class HeadlessCheckupActiveRoleEnrollmentError extends Error {
   constructor(readonly code: 'enrollment_denied' | 'enrollment_conflict' | 'storage_unavailable') {
@@ -103,45 +109,68 @@ function millis(value: unknown): number | null {
     return Number.isSafeInteger(result) && result >= 0 ? result : null;
   } catch { return null; }
 }
-function active(value: unknown, actorRef: string, now: number): boolean {
+function active(value: unknown, actorRef: string, now: number): Canonical | null {
   const item = exact(value, ATTESTATION, null);
   if (!item || !Object.isFrozen(value) || item.actorRef !== actorRef || item.schemaVersion !== ATTESTATION_SCHEMA
     || item.role !== 'physician' || item.operationId !== OPERATION || item.policyVersion !== POLICY
     || item.status !== 'active' || item.attestationVersion !== 1 || item.revocationGeneration !== 0
     || item.revokedAt !== null || typeof item.attestationRef !== 'string' || !ATTESTATION_REF.test(item.attestationRef)
-    || typeof item.issuerRef !== 'string' || !ISSUER_REF.test(item.issuerRef)) return false;
+    || typeof item.issuerRef !== 'string' || !ISSUER_REF.test(item.issuerRef)) return null;
   const created = millis(item.createdAt), updated = millis(item.updatedAt), activated = millis(item.activatedAt);
   const expires = millis(item.expiresAt);
   return created !== null && updated !== null && activated !== null && expires !== null && created <= activated
-    && activated <= updated && updated <= now && activated <= now && now < expires && expires - activated === TTL_MS;
+    && activated <= updated && updated <= now && activated <= now && now < expires && expires - activated === TTL_MS
+    ? item : null;
+}
+function revoked(value: unknown, actorRef: string, now: number, attestationRef: unknown): boolean {
+  const item = exact(value, ATTESTATION, null), revokedAt = millis(item?.revokedAt);
+  return !!item && Object.isFrozen(value) && item.actorRef === actorRef && item.attestationRef === attestationRef
+    && item.schemaVersion === ATTESTATION_SCHEMA && item.role === 'physician' && item.operationId === OPERATION
+    && item.policyVersion === POLICY && item.status === 'revoked' && item.attestationVersion === 1
+    && item.revocationGeneration === 1 && revokedAt !== null && revokedAt <= now;
 }
 
 /** Explicit admin + PIN enrollment. The returned projection is not a grant or write authority. */
 export function createHeadlessCheckupActiveRoleEnrollmentService(sources: HeadlessCheckupActiveRoleEnrollmentSources) {
+  const authenticate = async (candidatePin: unknown): Promise<string> => {
+    if (typeof candidatePin !== 'string' || candidatePin.length < 4 || candidatePin.length > 8) {
+      return fail('enrollment_denied');
+    }
+    let beforeValue: unknown;
+    try { beforeValue = await sources.resolveCurrentWebAdmin(); } catch { return fail('storage_unavailable'); }
+    const before = session(beforeValue, observedNow(sources.now));
+    if (!before) return fail('enrollment_denied');
+    let proof: unknown;
+    try { proof = await sources.verifyAdminPin({ username: before.username, pin: candidatePin }); }
+    catch { return fail('storage_unavailable'); }
+    if (!verified(proof, before)) return fail('enrollment_denied');
+    let afterValue: unknown;
+    try { afterValue = await sources.resolveCurrentWebAdmin(); } catch { return fail('storage_unavailable'); }
+    const after = session(afterValue, observedNow(sources.now));
+    if (!after || !sameSession(before, after)) return fail('enrollment_denied');
+    return before.userId as string;
+  };
   return Object.freeze({
     async enroll(candidatePin: unknown): Promise<HeadlessCheckupActiveRoleEnrollmentProjectionV1> {
-      if (typeof candidatePin !== 'string' || candidatePin.length < 4 || candidatePin.length > 8) {
-        return fail('enrollment_denied');
-      }
-      let beforeValue: unknown;
-      try { beforeValue = await sources.resolveCurrentWebAdmin(); } catch { return fail('storage_unavailable'); }
-      const before = session(beforeValue, observedNow(sources.now));
-      if (!before) return fail('enrollment_denied');
-      let proof: unknown;
-      try { proof = await sources.verifyAdminPin({ username: before.username, pin: candidatePin }); }
-      catch { return fail('storage_unavailable'); }
-      if (!verified(proof, before)) return fail('enrollment_denied');
-      let afterValue: unknown;
-      try { afterValue = await sources.resolveCurrentWebAdmin(); } catch { return fail('storage_unavailable'); }
-      const after = session(afterValue, observedNow(sources.now));
-      if (!after || !sameSession(before, after)) return fail('enrollment_denied');
-      const actorRef = before.userId as string, current = lifecycle(() => sources.readAttestation(actorRef));
+      const actorRef = await authenticate(candidatePin), current = lifecycle(() => sources.readAttestation(actorRef));
       if (current.kind === 'missing') requireOk(lifecycle(() => sources.createInactive(actorRef)));
       else requireOk(current);
       const attestation = requireOk(lifecycle(() => sources.activate(actorRef)));
       if (!active(attestation, actorRef, observedNow(sources.now))) return fail('storage_unavailable');
       return Object.freeze(Object.assign(Object.create(null), { schemaVersion: ENROLLMENT_SCHEMA,
         status: 'active' as const, attestationVersion: 1 as const }));
+    },
+    async revoke(candidatePin: unknown): Promise<HeadlessCheckupActiveRoleRevocationProjectionV1> {
+      const actorRef = await authenticate(candidatePin);
+      const current = requireOk(lifecycle(() => sources.readAttestation(actorRef)));
+      const valid = active(current, actorRef, observedNow(sources.now));
+      if (!valid) return fail('enrollment_conflict');
+      const expected = { attestationRef: valid.attestationRef, attestationVersion: 1 as const,
+        revocationGeneration: 0 as const };
+      const result = requireOk(lifecycle(() => sources.revoke(actorRef, expected)));
+      if (!revoked(result, actorRef, observedNow(sources.now), valid.attestationRef)) return fail('storage_unavailable');
+      return Object.freeze(Object.assign(Object.create(null), { schemaVersion: REVOCATION_SCHEMA,
+        status: 'revoked' as const, attestationVersion: 1 as const, revocationGeneration: 1 as const }));
     },
   });
 }

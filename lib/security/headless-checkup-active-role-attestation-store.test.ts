@@ -130,6 +130,15 @@ test('revokes only the exact current generation and terminalizes replay', () => 
   const revoked = store.revoke(actors[5], expected);
   assert.equal(revoked.status, 'revoked'); assert.equal(revoked.revocationGeneration, 1);
   assert.ok(revoked.revokedAt instanceof Date);
+  const database = db();
+  try {
+    assert.deepEqual(database.prepare(`SELECT event_type AS eventType,actor_ref AS actorRef,
+      subject_ref AS subjectRef,redacted_metadata AS metadata FROM audit_events
+      WHERE event_type='auth.checkup_active_role.revoked' AND actor_ref=?`).all(actors[5]), [{
+      eventType: 'auth.checkup_active_role.revoked', actorRef: actors[5], subjectRef: active.attestationRef,
+      metadata: '{"flags":["auth:session"],"reasonCode":"explicit_revoke"}',
+    }]);
+  } finally { database.close(); }
   assert.throws(() => store.revoke(actors[5], expected), code('attestation_conflict'));
   assert.throws(() => store.activate(actors[5]), code('attestation_conflict'));
 });
