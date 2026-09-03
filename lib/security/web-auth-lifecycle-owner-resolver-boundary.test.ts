@@ -15,7 +15,7 @@ const D1A = `lib/security/${OWNER_STEM}-boundary.test.ts`;
 const D1B = `lib/security/${OWNER_STEM}-resolver-boundary.test.ts`;
 const GUARD_SCRIPT = `check:${OWNER_STEM}-boundary`;
 const GUARD_COMMAND = `node scripts/run-strip-types.mjs --test ${D1A} ${D1B}`;
-const NEXT_RESOLVER_AST_SHA256 = 'b187421b3b715a0c94ef3f978ff0285c01a186ad04984b9e259dbad0dd38e214';
+const NEXT_RESOLVER_AST_SHA256 = '1852702e0bc24c53ba93e92e3c91ec6a2726ed0f4452ed71f971b19868b86433';
 const OWNER_DELIVERY_GLOB = `./node_modules/${PACKAGE}/**/*`;
 const EXPECTED_TSCONFIG_RESOLVER = {
     extends: null, moduleResolution: 'bundler', baseUrl: null, paths: { '@/*': ['./*'] }, rootDirs: null,

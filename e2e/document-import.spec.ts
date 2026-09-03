@@ -16,6 +16,7 @@ test('document import fails closed until the source is a saved AnyDoc attachment
       pathname === '/api/ocr/extract'
       || pathname.startsWith('/api/ai/document-synthesis/')
       || pathname === '/api/proxy/ollama/chat'
+      || pathname === '/api/icd/proxy'
     ) {
       forbiddenRequests.push(`${request.method()} ${pathname}`);
     }
