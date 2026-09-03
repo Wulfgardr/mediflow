@@ -257,7 +257,16 @@ test('proves prebind denial, activation, replay denial, revocation and clean std
     const after = await send('tools/call', {
       name: 'mediflow.system.capabilities.v1', arguments: {},
     });
-    assert.equal(after.result.structuredContent.operations.length, 4);
+    const operations = after.result.structuredContent.operations;
+    assert.equal(operations.length, 5);
+    assert.deepEqual(operations.find(({ operationId }) =>
+      operationId === 'mediflow.patient.checkup.status.transition.v1'), {
+      operationId: 'mediflow.patient.checkup.status.transition.v1',
+      capabilityId: 'mediflow.patient.checkup.status.transition.v1',
+      maximumStage: 'proposal_only',
+      inputSchema: 'mediflow.patient.checkup.status.transition.input.v1',
+      outputSchema: 'mediflow.patient.checkup.status.transition.preview-result.v1',
+    });
     await waitForStderr('WEB_REPLAY_DENIED');
     assert.equal(await requestRoute(port, '/revoke'), 204);
     await waitForStderr('WEB_ROUTE_RETURNED_204');
