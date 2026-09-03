@@ -18,7 +18,7 @@ read_when:
 > prevalgono [AGENTS.md](../AGENTS.md) e
 > [docs/repository-topology.md](./repository-topology.md).
 
-Ultimo aggiornamento: 2026-09-02 (candidato sorgente locale v0.8.5)
+Ultimo aggiornamento: 2026-09-03 (candidato sorgente locale v0.8.5)
 
 > [!NOTE]
 > Questo documento descrive il tree del candidato sorgente locale `0.8.5`.
@@ -73,10 +73,11 @@ La fotografia corrente e questa:
   portabilita del core in CI, non una parity applicativa completa.
 - **Parity UI 0.8**: iPhone 2/2, iPad 7/7, build/probe macOS e localhost 82/82
   sono PASS della baseline storica `0843726fe`, non del candidato exact-tree
-  `0.8.5`. Il volume Xcode non è montato e non esiste una nuova prova nativa
-  sullo SHA corrente. La parity resta clinico-semantica, non pixel. VoiceOver
-  reale mobile non è provato e la deroga storica non autorizza claim di
-  conformità.
+  `0.8.5`. Il volume Xcode è ora disponibile su questo host e la toolchain ha
+  completato prove preliminari prima del tree finale; la verifica terminale
+  exact-tree resta evidenza separata. La parity resta clinico-semantica, non
+  pixel. VoiceOver reale mobile non è provato e la deroga storica non
+  autorizza claim di conformità.
 - **Checkpoint pubblicato 0.8.2**: le PR 163-176 sono su `main`. I commit finali hanno
   review DeepSeek e Sol pulite. Sul push a `main`, Apple Native ha superato
   build, suite iPhone e 4/4 contratti iPad senza skip.
@@ -84,10 +85,11 @@ La fotografia corrente e questa:
   locali della patch. Non e una release, non e release-ready e non dispone di
   una prova CI remota sulla stessa SHA.
 - **Document intelligence**: AnyDoc resta il primo passaggio automatico locale
-  e non usa servizi hosted. Il tree include routing, manifest,
-  materializzazione e rendering delle pagine `needsOcr`, oltre al preflight
-  DeepSeek-OCR 2 con fake seam. Runtime adapter, prova live, benchmark E2E e
-  readiness OCR restano assenti; le route legacy rispondono `410`.
+  e non usa servizi hosted. Per i PDF supportati, il tree classifica e
+  renderizza soltanto le pagine `needsOcr`, usa Apple Vision localmente e
+  ricompone il risultato sotto currentness host-owned. Errori falliscono
+  chiusi e le route legacy rispondono `410`. DeepSeek-OCR 2/CUDA ha stato
+  `OUT_OF_SCOPE_FOR_0.8.5_NON_BLOCKING`.
 - **Evidence absorption**: il layer locale di assorbimento evidenza e ora
   misurato con corpus sintetico multi-fonte, recall di fonte, disciplina di
   citazione, recupero di fonti superate e leakage da fonti stale.
@@ -106,35 +108,32 @@ La fotografia corrente e questa:
   sul percorso di produzione ha completato in
   10,6 secondi con 64 token e 211 caratteri, senza registrare il raw output.
   Questa singola osservazione non prova readiness universale o qualità clinica.
-- **Gate F6/F7**: F6 integra il core selettivo e il preflight con fake seam, ma
-  non un runtime adapter DeepSeek. F7 integra provider v2, secret broker,
-  adapter ufficiali e probe OpenAI/Anthropic `default OFF`. Non esistono
-  credenziali, rete live o runtime readiness cloud nel candidato.
+- **Gate F6/F7**: F6 integra il fallback Apple Vision locale sulle sole pagine
+  `needsOcr`; DeepSeek-OCR 2/CUDA non è un gate della patch. F7 integra
+  provider v2, secret broker, adapter ufficiali e una probe amministrativa
+  OpenAI/Anthropic `default OFF`. Non esistono credenziali, rete live o runtime
+  readiness cloud nel candidato.
 - **Fabric capability-first**: il selector guidato copre cinque capability,
   filtra profili compatibili, esegue smoke sintetici e attiva binding host-owned
   in modo atomico con CAS e rollback. Non persiste segreti e non qualifica il
   runtime.
-- **Headless**: MCP `stdio` e Mini raggiungono catalogo, terminology search,
-  Open Loops patient-scoped, proposta follow-up e query semantica bounded
-  read-only tramite un processo figlio autenticato e RPC AIP ereditato.
-  Launcher e quickstart production restano
-  `PRODUCTION_BRIDGE_BLOCKER`. La topologia Supervisor portabile come trusted
-  parent su IPC ereditato è `DECIDED`; l'implementazione è `SPLIT_REQUIRED`.
-  Restano aperti late-bind trusted-UI, owner sincrono di `readHostContext`,
-  lifecycle e revoca production e audit terminale sincrono. Broker residente e
-  UDS sono esclusi dalla `0.8.5`.
-- **Write F10**: la transizione stato checkup ha core e composizione SQLite
-  verificati come candidato interno. Non è collegata a launcher, MCP, Mini o
-  UI; il binding trusted-UI resta
-  `AUTHORITY_UI_BINDING_BLOCKER` per il production bridge.
-- **Planner candidato**: core, operazione read-only e superficie statica
-  MCP/Mini sono integrati:
-  `STATIC_SURFACE_INTEGRATED / PRODUCTION_BRIDGE_BLOCKER`. Il production bridge
-  selezionato non ha callsite o test e SQL diretto resta vietato.
-- **Recording differito**: la visita registrabile è `DEFER_NEXT_PATCH`. Il
-  packet è solo foundation: nessuna integrazione runtime, callsite, UI o prova
-  Xcode exact-tree appartiene al candidato. Cloud default-on e AI dai client
-  paired restano fuori scope.
+- **Headless**: il Supervisor Node portabile avvia Web standalone e MCP
+  `stdio` come figli distinti su IPC ereditato. MCP e Mini raggiungono
+  catalogo, terminology search, Open Loops patient-scoped, proposta follow-up
+  e query semantica bounded read-only. Contesto, lifecycle, revoca e audit
+  restano host-owned; lo smoke standalone del tree finale è un gate separato.
+- **Write F10**: MCP produce soltanto la preview della transizione
+  `pending -> completed|cancelled`. La UI trusted rilegge la risorsa e richiede
+  ruolo medico attivo, step-up e gesto operation-specific; il commit Web usa
+  CAS, idempotenza, audit e receipt atomici. Il proof non attraversa MCP.
+- **Planner candidato**: core, operazione read-only, superficie MCP/Mini e
+  binding del Supervisor sono integrati. Il piano usa al massimo due
+  operazioni allowlisted; SQL diretto e scritture restano vietati.
+- **Recording locale**: la shell macOS integra cattura e trascrizione italiana
+  Apple on-device su macOS 26 o successivo, con consenso esplicito, audio
+  bounded solo in RAM e review del transcript. Non esegue writer automatici;
+  lo smoke con microfono reale e la validazione clinica restano fuori dal
+  claim del candidato.
 - **Attese locali**: la prima slice web collega prestazioni attese e risultati;
   il salvataggio resta esplicito e il workflow non e esteso ai client paired.
 - **SISS/FSE**: handoff contestuale e flussi `webapp-assisted`; nessuna
@@ -228,10 +227,11 @@ La document intelligence e `artifact-first`:
 - AnyDoc produce Markdown normalizzato, evidenza e provenienza senza usare rete
   o servizi hosted;
 - il candidato classifica le sole pagine `needsOcr`, le materializza e le
-  renderizza con limiti bounded; il preflight DeepSeek usa un fake seam e non è
-  un runtime adapter;
-- immagini, documenti cifrati e input ambigui falliscono chiusi; le route OCR
-  legacy rispondono `410`;
+  renderizza con limiti bounded e usa Apple Vision sul Mac, senza rete;
+- il risultato viene ricomposto nell'ordine originale e pubblicato soltanto se
+  sorgente e sessione sono ancora correnti;
+- immagini dirette, documenti cifrati, input ambigui e motore non disponibile
+  falliscono chiusi; le route OCR legacy rispondono `410`;
 - il risultato va trattato come evidenza reviewable;
 - `summarySnapshot` e `parseEvidenceArtifactSnapshot` sono dati clinici e
   persistono cifrati;
@@ -288,15 +288,15 @@ Documenti/ADR principali:
 | macOS Apple shell | Operativa | Fronte nativo piu maturo: shell Apple/home-base, workspace paziente condiviso, runtime panel e store locale verificabile; Lume e consegnata nella card clinica opaca, mentre le altre superfici restano in migrazione | Firma/notarizzazione esplicite, Ollama/MLX non app-managed |
 | `MediFlowCore` tri-OS | Verificato tri-OS | Core Swift condiviso per logica clinica, cifratura, contratti, filtri, conflict handling, clinical scales e SQLite locale | CI Linux/macOS/Windows; non equivale a app complete Windows/Linux |
 | iPhone/iPad | Paired | Client paired non-AI, cache cifrata degradabile e workflow online versionati sui moduli core | No SQLite diretto |
-| AnyDoc | Estrazione locale | Conversione deterministica degli allegati supportati in Markdown normalizzato | Processo figlio bounded; nessuna rete; non e OCR o provider Fabric |
-| Pipeline `needsOcr` | Core selettivo integrato | Routing, manifest, materializzazione, rendering e preflight DeepSeek con fake seam | Nessun runtime adapter, prova live o benchmark E2E |
+| AnyDoc | Estrazione locale | Conversione deterministica degli allegati supportati in Markdown normalizzato | Processo figlio bounded; nessuna rete; non è un provider Fabric |
+| Fallback `needsOcr` | Integrato sul Mac | Routing, manifest, rendering selettivo e riconoscimento Apple Vision | Review-only; fail-closed fuori da macOS o senza motore disponibile |
 | Selector Fabric | Integrato | Discovery compatibile, smoke sintetico e binding atomico per cinque capability | Nessun segreto persistito; discovery non equivale a readiness |
 | Ollama | Provider locale capability-specific | Percorsi generativi Fabric ammessi dalla capability | Solo loopback; nessun OCR o fallback implicito |
 | ATHENA/MLX | Provider locale capability-specific | Solo Treatment Reasoning review-only | Nessuna prescrizione o apply clinico |
-| OpenAI / Anthropic | Adapter ufficiali `default OFF` | Probe Document Synthesis review-only con policy e secret reference host-owned | Solo transport fake nel tree; nessuna credenziale, rete live o runtime readiness |
-| MCP / Mini | Superficie figlia candidata | Catalogo, terminology search, Open Loops patient-scoped, proposta follow-up e query semantica bounded read-only | RPC AIP ereditato; entrypoint production `PRODUCTION_BRIDGE_BLOCKER` |
-| Write checkup F10 | `INTERNAL_CANDIDATE_VERIFIED / AUTHORITY_UI_BINDING_BLOCKER` | Core e composizione SQLite verificati | Nessun binding launcher, MCP, Mini o UI; conferma trusted-UI richiesta |
-| Semantic planner | `STATIC_SURFACE_INTEGRATED / PRODUCTION_BRIDGE_BLOCKER` | Core, validazione, esecutore, operazione read-only e superficie statica MCP/Mini integrati | Production bridge senza callsite o test; nessun SQL libero |
+| OpenAI / Anthropic | Adapter ufficiali `default OFF` | Probe amministrativa Document Synthesis review-only con policy e secret reference host-owned | Solo transport fake nel tree; nessuna credenziale, rete live o runtime readiness |
+| MCP / Mini | Superficie figlia candidata | Catalogo, terminology search, Open Loops patient-scoped, proposta follow-up e query semantica bounded read-only | MCP usa il Supervisor locale del candidato; nessuna authority caller-supplied |
+| Write checkup F10 | Integrata end-to-end | Preview MCP e commit Web con ruolo, step-up, gesto, CAS, idempotenza, audit e receipt | L'agente non riceve proof e non esegue il commit |
+| Semantic planner | Integrato, sola lettura | Core, validazione, esecutore, superficie MCP/Mini e binding Supervisor integrati | Massimo due operazioni allowlisted; nessun SQL libero o write |
 | ICD-11 WHO | Application Service server-only | Ricerca diagnosi/coding con output MediFlow data-only | Disattivato per default; egress e credenziali host-owned espliciti |
 | OpenMed | Shadow/benchmark | Redaction lane locale non client-facing | Non runtime clinico |
 
@@ -326,19 +326,21 @@ Documenti/ADR principali:
 2. Il runtime riconosce il formato dai byte e invoca AnyDoc localmente con
    limiti di input, tempo e output.
 3. AnyDoc restituisce Markdown normalizzato, evidenza e provenienza.
-4. Un'immagine, un PDF scansionato senza text layer, un documento cifrato o un
-   input non supportato termina in
-   `review_required/unsupported_local_extraction`. Il flusso non produce
-   sintesi o proposta clinica.
-5. I servizi downstream possono trasformare l'evidenza corrente in proposte
+4. Per un PDF supportato, le sole pagine `needsOcr` vengono renderizzate e
+   passate ad Apple Vision locale; la composizione ricontrolla la sorgente e
+   ricompone le pagine nell'ordine originale.
+5. Immagini dirette, documenti cifrati, formati non supportati o indisponibilità
+   del motore locale terminano in revisione richiesta. Il flusso non inventa
+   testo né produce una proposta da contenuto incompleto.
+6. I servizi downstream possono trasformare l'evidenza corrente in proposte
    tipizzate e review-only. L'applicazione resta un gesto separato e non e
    autorizzata dalla preview Fabric.
-6. Gli artifact persistiti dai flussi di dominio restano cifrati:
+7. Gli artifact persistiti dai flussi di dominio restano cifrati:
    - allegato;
    - `summarySnapshot`;
    - `parseEvidenceArtifactSnapshot`;
    - projection `documentInsights` quando serve compatibilita.
-7. Consumer reviewable:
+8. Consumer reviewable:
    - `AI Patient Insight`;
    - Smart Import;
    - nuova anagrafica da documento;
@@ -406,7 +408,9 @@ Le quattro superfici producono solo proposte. Receipt, provenienza e currentness
 restano visibili nella UI; nessuna receipt e un grant e nessuna preview esegue
 apply. Ollama serve i percorsi generativi locali ammessi dalla capability.
 ATHENA/MLX serve soltanto Treatment Reasoning. AnyDoc resta una estrazione
-deterministica separata: non e un provider Fabric e non soddisfa `ocr`.
+deterministica separata dal Fabric; la sua composizione current-source può
+usare Apple Vision locale sulle sole pagine PDF `needsOcr`. Questo fallback non
+trasforma AnyDoc o Apple Vision in un provider Fabric `ocr`.
 
 ATHENA è inclusa soltanto se il modello e il runner MLX offline sono già
 presenti sulla macchina. Il runner viene indicato con
@@ -433,8 +437,9 @@ receipt storica `candidate_not_integrated`.
 - `smart_import`: `proposal_only`.
 - `document_synthesis`: `proposal_only`.
 - `treatment_reasoning`: `proposal_only`.
-- `ocr`: core selettivo e preflight integrati, senza runtime adapter o
-  production root qualificato.
+- `ocr`: il crosswalk Fabric resta `unavailable`; il fallback Apple Vision è
+  integrato nella composizione AnyDoc e non costituisce una production root
+  Fabric.
 
 Questo stato e locale al tree. Non prova CI remota, release readiness, tag,
 pubblicazione, installazione o disponibilita operativa su un altro host. Lo
@@ -450,8 +455,8 @@ implicite della patch.
 
 | Gate | Implementato | Verificato nel tree locale | Residuo escluso | Esito |
 | --- | --- | --- | --- | --- |
-| F6 — OCR selettivo | AnyDoc first-pass; routing, manifest, materializzazione e rendering `needsOcr`; preflight DeepSeek con fake seam | Test bounded e fail-closed del core selettivo | Runtime adapter, prova live, benchmark italiano E2E e qualifica hardware | `INTEGRATED CORE / NO_RUNTIME_READINESS` |
-| F7 — provider esterni | Provider v2, secret broker, adapter HTTPS ufficiali e probe review-only OpenAI/Anthropic | Test con transport fake e default OFF | Credenziali, rete live, retention account e runtime readiness remota | `INTEGRATED / DEFAULT_OFF` |
+| F6 — OCR selettivo | AnyDoc first-pass e fallback Apple Vision locale sulle sole pagine PDF `needsOcr`, con ricomposizione e controllo current-source | Contratti bounded, fail-closed e percorso sintetico sul Mac eleggibile | DeepSeek-OCR 2/CUDA, benchmark di qualifica e readiness universale | Fallback locale integrato |
+| F7 — provider esterni | Provider v2, secret broker, adapter HTTPS ufficiali e probe amministrativa review-only OpenAI/Anthropic | Transport fake, route admin-only e `default OFF` | Credenziali, rete live, retention account e runtime readiness remota | `INTEGRATED / DEFAULT_OFF` |
 
 Una sottoscrizione o un login consumer OpenAI/Anthropic non costituiscono
 accesso API. Registry, probe e adapter non autorizzano onboarding, invio di PHI
@@ -459,32 +464,27 @@ o esecuzione remota.
 
 ### 5.1.3 Headless, MCP e Mini candidati
 
-Un launcher trusted avvia un processo figlio autenticato con ambiente
-allowlisted e RPC AIP ereditato. MCP `stdio` e Mini pubblicano catalogo,
+Il Supervisor Node portabile è il trusted parent del candidato locale: avvia
+Web standalone e MCP come processi figli distinti su IPC ereditato e possiede
+contesto, lease, revoca e audit. MCP `stdio` e Mini pubblicano catalogo,
 terminology search, Open Loops patient-scoped, proposta follow-up
-`proposal_only` e query semantica bounded read-only. Ogni call passa dal broker
-e dagli Application Services host-owned; gli adapter non importano SQLite e non
-aprono listener.
+`proposal_only` e query semantica bounded read-only. Gli adapter non importano
+SQLite, non accettano authority caller-supplied e non aprono listener.
 
-Questa superficie resta un candidato integrato. Launcher production,
-quickstart, onboarding e lifecycle operativo supportato restano
-`PRODUCTION_BRIDGE_BLOCKER`. La topologia Supervisor portabile come trusted
-parent su IPC ereditato è `DECIDED`; l'implementazione è `SPLIT_REQUIRED`. La
-factory esaminata non chiude late-bind trusted-UI, owner sincrono di
-`readHostContext`, lifecycle e revoca production o audit terminale sincrono. Un
-broker residente o UDS non rientra nella `0.8.5`.
+F10 espone via MCP soltanto la preview `pending -> completed|cancelled`. La UI
+Web trusted ricontrolla la risorsa, richiede ruolo medico attivo, step-up e gesto
+specifico, quindi esegue il commit con CAS, idempotenza, audit e receipt. Proof
+e commit non sono delegati all'agente; replay, revoca, logout o cambio selezione
+negano l'operazione.
 
-La transizione stato checkup F10 è verificata soltanto come candidato interno
-nel core e nella composizione SQLite. Non ha binding launcher, MCP, Mini o UI.
-La conferma trusted-UI resta `AUTHORITY_UI_BINDING_BLOCKER` e blocca la chiusura
-del production bridge.
-
-Il core, l'operazione read-only e la superficie statica MCP/Mini del semantic
-query planner sono integrati:
-`STATIC_SURFACE_INTEGRATED / PRODUCTION_BRIDGE_BLOCKER`. Il production bridge
-selezionato non ha callsite o test. La visita registrabile è
-`DEFER_NEXT_PATCH` e non è integrata nel runtime. Egress implicito, SQL diretto
-ed esecuzione AI dai client paired restano chiusi.
+Il semantic query planner è collegato al Supervisor e resta read-only: compone
+al massimo due operazioni allowlisted, senza SQL libero o scritture. La shell
+macOS integra inoltre cattura e trascrizione italiana Apple on-device, con
+consenso esplicito, audio bounded solo in RAM e trasferimento al draft dopo
+review; non esegue writer clinici automatici. Il terminal smoke standalone sul
+tree finale, installer, onboarding ed esercizio su host esterni restano prove
+separate dal candidato sorgente locale. Egress implicito ed esecuzione AI dai
+client paired restano chiusi.
 
 ### 5.2 Lane benchmark-only
 
@@ -502,8 +502,9 @@ Le lane seguenti restano separate dal runtime clinico:
 
 MLX non diventa un provider generico: nel candidato 0.8.5 ATHENA/MLX e ammesso
 solo dalla capability Treatment Reasoning. Ollama resta capability-specific e
-non esegue OCR. Ogni altra lane MLX resta benchmark, shadow o hold secondo la
-matrice di serving.
+non esegue OCR; il fallback Apple Vision appartiene al confine AnyDoc locale.
+Ogni altra lane MLX resta benchmark, shadow o hold secondo la matrice di
+serving.
 
 OpenAI e Anthropic hanno adapter ufficiali e probe review-only. Restano
 `default OFF`; il tree usa transport fake e non contiene credenziali o prove di
@@ -641,13 +642,14 @@ Disponibile:
 
 - estrazione automatica locale con AnyDoc per i formati supportati;
 - routing, manifest, materializzazione e rendering bounded delle pagine
-  `needsOcr`, con preflight DeepSeek e fake seam;
+  `needsOcr`, con Apple Vision locale e ricomposizione current-source per i PDF
+  supportati;
 - review di suggerimenti;
 - soppressione rumore quando una fonte non introduce novita clinica;
 - create-flow document-driven con persistenza prudente delle terapie;
-- fallimento chiuso e revisione manuale per immagini, PDF scansionati senza
-  text layer, documenti cifrati o formati non supportati; nessuna proposta
-  clinica nasce da contenuto incompleto;
+- fallimento chiuso e revisione manuale per immagini dirette, documenti
+  cifrati, formati non supportati o motore locale indisponibile; nessuna
+  proposta clinica nasce da contenuto incompleto;
 - estrazione identita documentale prudente: nessun fallback prima-data-trovata
   per la data di nascita (meglio assente che sbagliata), date costruite in
   UTC e codice fiscale riconosciuto anche in forma omocodica.
@@ -655,7 +657,8 @@ Disponibile:
 Fuori scope:
 
 - auto-promozione di diagnosi/terapie da testo libero ambiguo;
-- runtime adapter DeepSeek-OCR 2, benchmark OCR e relativa esecuzione E2E;
+- DeepSeek-OCR 2/CUDA, benchmark OCR e readiness universale, con stato
+  `OUT_OF_SCOPE_FOR_0.8.5_NON_BLOCKING`;
 - import silenzioso di documenti reali senza review;
 - uso di documenti reali come fixture Git.
 

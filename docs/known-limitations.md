@@ -9,7 +9,7 @@ read_when:
 
 Stato documento: `CANONICAL`
 
-Ultimo aggiornamento: 2026-09-02
+Ultimo aggiornamento: 2026-09-03
 
 ## Stato del candidato
 
@@ -28,8 +28,9 @@ Gli audit di accessibilità XCTest e i test UI della baseline storica
 - iPad: 7/7.
 
 Queste prove valgono soltanto per quel tree e non equivalgono a un test
-VoiceOver reale. Sul candidato exact-tree `0.8.5` il volume Xcode non è montato
-e non esiste una nuova prova nativa.
+VoiceOver reale. Il volume Xcode è ora disponibile e la toolchain ha completato
+prove preliminari prima del tree finale; non esiste ancora una prova terminale
+exact-tree né una nuova prova VoiceOver mobile.
 
 Nel simulatore iOS 27, con Xcode 27 beta build `27A5194q`, la chiamata pubblica
 `XCUIDevice.shared.voiceOverService.enable()` non ha raggiunto uno stato
@@ -145,19 +146,23 @@ macchina, qualità clinica, stabilità, capacità o readiness universale.
 ## Estrazione allegati e OCR
 
 AnyDoc resta il primo passaggio automatico locale e non è un provider Fabric.
-Il tree include routing, manifest, materializzazione e rendering bounded delle
-sole pagine `needsOcr`, oltre al preflight DeepSeek-OCR 2 con fake seam.
+Per i PDF supportati, il tree materializza e renderizza soltanto le pagine
+`needsOcr`, le passa ad Apple Vision locale senza rete e ricompone il risultato
+sotto currentness host-owned. Immagini dirette, documenti cifrati, formati
+ambigui o motore locale indisponibile falliscono chiusi; le route OCR legacy
+rispondono `410`.
 
-Il runtime adapter DeepSeek non è integrato. Il tree non contiene prove live,
-benchmark E2E o runtime readiness. Errori, documenti cifrati e input ambigui
-falliscono chiusi; le route OCR legacy rispondono `410`.
+DeepSeek-OCR 2/CUDA, benchmark E2E e readiness universale hanno stato
+`OUT_OF_SCOPE_FOR_0.8.5_NON_BLOCKING`. Il crosswalk Fabric conserva `ocr` come
+`unavailable`: il fallback Apple Vision appartiene alla composizione AnyDoc,
+non a una production root Fabric.
 
 ## Esiti di perimetro F6 e F7
 
 | Gate | Implementato | Verificato localmente | Parte non pronta | Esito |
 | --- | --- | --- | --- | --- |
-| F6 — OCR selettivo | AnyDoc first-pass; pipeline bounded `needsOcr`; preflight DeepSeek con fake seam | Test del core selettivo e failure fail-closed | Runtime adapter, prova live, benchmark E2E e qualifica hardware | `INTEGRATED CORE / NO_RUNTIME_READINESS` |
-| F7 — provider esterni | Provider v2, secret broker, adapter ufficiali e probe review-only OpenAI/Anthropic `default OFF` | Test con transport fake e denial prima della rete | Credenziali, rete live, retention account e runtime readiness cloud | `INTEGRATED / DEFAULT_OFF` |
+| F6 — OCR selettivo | AnyDoc first-pass e fallback Apple Vision locale sulle sole pagine PDF `needsOcr` | Contratti bounded, fail-closed e percorso sintetico sul Mac eleggibile | DeepSeek-OCR 2/CUDA, benchmark di qualifica e readiness universale | Fallback locale integrato |
+| F7 — provider esterni | Provider v2, secret broker, adapter ufficiali e probe amministrativa review-only OpenAI/Anthropic `default OFF` | Transport fake, route admin-only e denial prima della rete | Credenziali, rete live, retention account e runtime readiness cloud | `INTEGRATED / DEFAULT_OFF` |
 
 Un account, login o abbonamento consumer OpenAI/Anthropic non fornisce accesso
 API. Registry, adapter e probe non autorizzano onboarding, esecuzione, invio di
@@ -170,37 +175,36 @@ prestazione e non sostituiscono la suite finale del tree esatto.
 
 ## Headless, MCP e Mini
 
-Il candidato avvia un processo figlio autenticato con RPC AIP ereditato. MCP
-`stdio` e Mini espongono catalogo, terminology search, Open Loops
-patient-scoped, proposta follow-up `proposal_only` e query semantica bounded
-read-only. Gli adapter non importano SQLite, non accettano authority
-caller-supplied e non aprono listener.
+Il Supervisor Node portabile avvia Web standalone e MCP come processi figli
+distinti e autenticati su IPC ereditato. MCP `stdio` e Mini espongono catalogo,
+terminology search, Open Loops patient-scoped, proposta follow-up
+`proposal_only` e query semantica bounded read-only. Contesto, lease, revoca e
+audit restano host-owned; gli adapter non importano SQLite, non accettano
+authority caller-supplied e non aprono listener.
 
-Il launcher e il quickstart production restano
-`PRODUCTION_BRIDGE_BLOCKER`. La topologia Supervisor portabile come trusted
-parent su IPC ereditato è `DECIDED`; l'implementazione è `SPLIT_REQUIRED`. La
-factory esaminata non chiude late-bind trusted-UI, owner sincrono di
-`readHostContext`, lifecycle e revoca production o audit terminale sincrono. La
-superficie figlia non è quindi un entrypoint supportato. Broker residente e UDS
-sono esclusi dalla `0.8.5`.
+F10 espone via MCP soltanto la preview `pending -> completed|cancelled`. Il
+commit appartiene alla UI Web trusted, che rilegge la risorsa e richiede ruolo
+medico attivo, step-up e gesto specifico; CAS, idempotenza, audit e receipt
+restano atomici. Proof e commit non attraversano MCP. Il planner è collegato al
+Supervisor ma resta read-only, con al massimo due operazioni allowlisted e
+senza SQL libero.
 
-La transizione stato checkup F10 ha core e composizione SQLite verificati, ma
-resta un candidato interno. Non esiste un binding launcher, MCP, Mini o UI. Il
-gate `AUTHORITY_UI_BINDING_BLOCKER` richiede una conferma trusted-UI prima di
-chiudere il production bridge.
+Questa integrazione resta un candidato locale. Il terminal smoke standalone sul
+tree finale, installer, onboarding, lifecycle supportato ed esercizio su host
+esterni sono prove separate e non sono dichiarati consegnati.
 
 ## Funzioni fuori scope
 
 Il candidato `0.8.5` non consegna:
 
-- runtime adapter DeepSeek-OCR 2, benchmark OCR o fallback automatico;
+- DeepSeek-OCR 2/CUDA, benchmark OCR o readiness universale, con stato
+  `OUT_OF_SCOPE_FOR_0.8.5_NON_BLOCKING`;
 - credenziali o rete live OpenAI/Anthropic, runtime readiness cloud o consenso
   implicito di invio esterno;
-- entrypoint production, installer o onboarding MCP/Mini;
-- binding trusted-UI e pubblicazione governata della write checkup F10;
-- registrazione o trascrizione della visita, classificata `DEFER_NEXT_PATCH`;
-- production bridge del semantic planner; core, operazione read-only e
-  superficie statica MCP/Mini sono integrati, mentre l'accesso SQL diretto
-  resta vietato;
+- installer, onboarding o validazione su host esterni per MCP/Mini;
+- authority agentica generale o commit checkup eseguito da MCP;
+- smoke con microfono reale, validazione clinica o writer automatico della
+  registrazione Apple on-device disponibile su macOS 26 o successivo;
+- operazioni planner ulteriori, accesso SQL diretto o scritture;
 - invocazione AI dai client paired;
 - app complete Windows o Linux.
