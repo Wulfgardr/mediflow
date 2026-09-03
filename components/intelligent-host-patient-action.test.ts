@@ -129,7 +129,7 @@ test('terminalizes host-side 409 and 503 without retry and fences a completion a
     await assert.rejects(() => pending, rejects('operation_superseded'));
 });
 
-test('declares an accessible quiet action and wires only authoritative patient fields', () => {
+test('keeps the retired standalone action accessible without wiring a second H1a caller', () => {
     const component = readFileSync(new URL('./intelligent-host-patient-action.tsx', import.meta.url), 'utf8');
     const page = readFileSync(new URL('../app/patients/[id]/modules/page.tsx', import.meta.url), 'utf8');
 
@@ -146,5 +146,6 @@ test('declares an accessible quiet action and wires only authoritative patient f
     assert.match(component, /client\.reset\(\)/u);
     assert.match(component, /code === 'operation_terminal'[\s\S]{0,100}'host_unavailable'/u);
     assert.doesNotMatch(component, /setInterval|setTimeout|console\.|framer-motion|animate-/u);
-    assert.match(page, /<IntelligentHostPatientAction\s+patientId=\{patient\.id\}\s+ambulatoryId=\{patient\.ambulatoryId \?\? null\}\s+\/>\s+<PatientSheetActionsMenu/u);
+    assert.doesNotMatch(page, /<IntelligentHostPatientAction/u);
+    assert.match(page, /<IntelligentHostCheckupAction\s+patientId=\{patient\.id\}/u);
 });

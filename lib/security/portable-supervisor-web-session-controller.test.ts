@@ -17,6 +17,8 @@ const {
 } = await import('./portable-supervisor-web-session-controller.ts');
 const { PortableSupervisorWebIpcBridgeV1Error } =
     await import('./portable-supervisor-web-ipc-bridge.ts');
+const { createPortableSupervisorCheckupWebSessionPortV1 } =
+    await import('./portable-supervisor-checkup-web-session-port.ts');
 
 const PATIENT = 'patient.synthetic.web-session.01';
 const OTHER_PATIENT = 'patient.synthetic.web-session.02';
@@ -72,6 +74,7 @@ function fixture(options: FixtureOptions = {}) {
             active = false; observer?.('web_disconnect'); return true;
         },
     });
+    const checkup = createPortableSupervisorCheckupWebSessionPortV1({ now: () => EXPIRES_AT - 10_000 });
     const controller = createPortableSupervisorWebSessionControllerV1({
         async acquireCaptureOwner(nextObserver) {
             acquisitions += 1; observer = nextObserver;
@@ -98,9 +101,10 @@ function fixture(options: FixtureOptions = {}) {
             return options.revocation === 'deferred' ? revocation.promise : Promise.resolve(true);
         },
         disconnectBridge: () => { disconnects += 1; events.push('transport:disconnect'); },
+        checkupLifecycle: checkup.controller,
     });
     return Object.freeze({
-        controller, events, acquisition, activation, revocation,
+        controller, checkupPort: checkup.port, events, acquisition, activation, revocation,
         acquisitions: () => acquisitions, activations: () => activations,
         reads: () => reads, revocations: () => revocations, disconnects: () => disconnects,
         setCapture(next: Partial<Capture>) { capture = Object.freeze({ ...capture, ...next }); },
@@ -128,11 +132,26 @@ test('activates once from the owner capture and exposes only active expiry', asy
     assert.equal(Object.isFrozen(result), true);
     assert.deepEqual(Reflect.ownKeys(result), ['state', 'expiresAt']);
     assert.deepEqual({ ...result }, { state: 'active', expiresAt: EXPIRES_AT - 1 });
-    assert.equal(current.reads(), 2);
+    assert.equal(current.reads(), 3);
     assert.equal(current.acquisitions(), 1);
     assert.equal(current.activations(), 1);
     assert.equal(JSON.stringify(result).includes(PATIENT), false);
     assert.equal(JSON.stringify(result).includes('user.'), false);
+});
+
+test('activates the checkup dependent port only after H1a and drains it on retirement', async () => {
+    const current = fixture(); let disposals = 0, observations = 0;
+    assert.equal(current.checkupPort.attach(() => { disposals += 1; }), null);
+    await current.controller.activateCurrentSelection(INPUT);
+    const binding = current.checkupPort.attach(() => { disposals += 1; }); assert.ok(binding);
+    assert.equal(current.checkupPort.withCurrent(binding, (capture) => {
+        observations += 1; assert.equal(capture.patientId, PATIENT);
+    }), true);
+    assert.equal(observations, 1); assert.equal(disposals, 0);
+    await current.controller.retire('explicit');
+    assert.equal(disposals, 1);
+    assert.equal(current.checkupPort.withCurrent(binding, () => { observations += 1; }), false);
+    assert.equal(observations, 1);
 });
 
 test('denies every sibling request without treating caller input equality as H1a identity', async () => {

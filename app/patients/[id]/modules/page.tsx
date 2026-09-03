@@ -16,7 +16,7 @@ import { EvidenceStackTile } from '@/components/evidence-stack-tile';
 import ObservationManager from '@/components/observation-manager';
 import type { ObservationPrefill } from '@/lib/observation-prefill';
 import PatientActionModal from '@/components/patient-action-modal';
-import { IntelligentHostPatientAction } from '@/components/intelligent-host-patient-action';
+import { IntelligentHostCheckupAction } from '@/components/intelligent-host-checkup-action';
 import { PatientIdentityLens } from '@/components/patient-identity-lens';
 import { PatientSheetActionsMenu } from '@/components/patient-sheet-actions-menu';
 import PatientReviewQueueSummaryPanel from '@/components/patient-review-queue-summary';
@@ -652,10 +652,8 @@ export default function PatientDetailPage() {
             primaryAction={{ href: `/patients/${id}/entries/new`, label: 'Nuova voce', icon: Plus }}
             headerActions={(
                 <>
-                    <IntelligentHostPatientAction
-                        patientId={patient.id}
-                        ambulatoryId={patient.ambulatoryId ?? null}
-                    />
+                    <IntelligentHostCheckupAction patientId={patient.id}
+                        ambulatoryId={patient.ambulatoryId ?? null} checkups={checkups ?? []} />
                     <PatientSheetActionsMenu
                         editHref={`/patients/${id}/edit`}
                         canShareFhirFile={canShareFhirFile}

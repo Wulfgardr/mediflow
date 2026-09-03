@@ -15,6 +15,8 @@ export const AUDIT_EVENT_TYPES = [
     'auth.logout',
     'auth.lock',
     'auth.soap_active_role.enrolled',
+    'auth.checkup_active_role.enrolled',
+    'auth.checkup_active_role.revoked',
     'patient.created',
     'patient.updated',
     'patient.deleted',
