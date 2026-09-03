@@ -224,15 +224,15 @@ cache richiesta non è disponibile. La presenza del runner non è una prova di
 readiness universale.
 
 AnyDoc resta il primo passaggio automatico locale degli allegati. Gira in un
-processo figlio bounded senza rete. Il tree classifica e materializza le sole
-pagine `needsOcr`, poi le renderizza per il preflight con fake seam. Errori,
-formati ambigui e documenti cifrati non vengono promossi a `needsOcr`.
+processo figlio bounded senza rete. Per i PDF supportati, il tree classifica e
+materializza le sole pagine `needsOcr`, le renderizza e usa Apple Vision locale
+con rete negata. La ricomposizione conserva ordine, provenienza e hash e
+pubblica il risultato soltanto se la sorgente è ancora corrente. Errori,
+formati ambigui, documenti cifrati e motore indisponibile falliscono chiusi.
 
-Il preflight DeepSeek-OCR 2 è integrato con manifest e limiti fissati. Il
-runtime adapter non è integrato e il test usa un engine fake. Il tree non prova
-un runtime live, un benchmark E2E o runtime readiness. La ricomposizione deve
-restare fail-closed e conservare ordine, provenienza, hash e qualità per pagina.
-Le route OCR legacy, dopo l'autenticazione, rispondono `410`.
+DeepSeek-OCR 2/CUDA, benchmark di qualifica e readiness universale hanno stato
+`OUT_OF_SCOPE_FOR_0.8.5_NON_BLOCKING`. Le route OCR legacy, dopo
+l'autenticazione, rispondono `410`.
 
 ### Application Services e Headless
 
@@ -242,36 +242,31 @@ host-owned risolvono currentness, authority, conflitti, transazioni e audit.
 Alcune route Web storiche importano ancora `dbServer` e non ereditano questo
 claim per analogia. Una receipt Fabric descrive un'esecuzione e non è un grant.
 
-La foundation Headless 0.8.5 avvia un processo figlio autenticato con ambiente
-allowlisted e canale RPC AIP ereditato. MCP `stdio` e Mini espongono soltanto
-catalogo, ricerca terminologica locale, lettura delle Open Loops del paziente
-selezionato, proposta follow-up `proposal_only` e query semantica bounded
-read-only. Nessun adapter importa il database, accetta authority dal caller o
-apre un listener.
+Il Supervisor Node production locale avvia Web standalone e MCP come processi
+figli distinti e autenticati su IPC privato ereditato. Il Supervisor possiede
+contesto, purpose, scope, lease, revoca e audit. MCP `stdio` e Mini espongono
+soltanto catalogo, ricerca terminologica locale, lettura delle Open Loops del
+paziente selezionato, proposta follow-up `proposal_only` e query semantica
+bounded read-only. Nessun adapter importa il database, accetta authority dal
+caller o apre un listener proprio. Il candidato non autorizza sessioni
+agentiche generali e non dichiara installer, onboarding o compatibilità con
+host MCP esterni.
 
-Il launcher e il quickstart production restano
-`PRODUCTION_BRIDGE_BLOCKER`. La topologia Supervisor portabile come trusted
-parent su IPC ereditato è `DECIDED`; l'implementazione è `SPLIT_REQUIRED`. La
-factory esaminata non chiude il late-bind trusted-UI, l'owner sincrono di
-`readHostContext`, lifecycle e revoca production o l'audit terminale sincrono.
-La superficie non è un entrypoint supportato e non autorizza sessioni agentiche
-generali. Broker residente e UDS sono esclusi dalla `0.8.5`.
+F10 espone via MCP soltanto la preview `pending -> completed|cancelled`. La UI
+Web trusted rilegge la risorsa e richiede ruolo medico attivo, step-up e gesto
+operation-specific prima del commit con CAS, idempotenza, audit e receipt
+atomici. Proof e commit non attraversano MCP. Replay, revoca, logout o cambio
+selezione negano l'operazione.
 
-F10 contiene una transizione stato checkup con core e composizione SQLite
-verificati. È soltanto un candidato interno: non è registrata nel launcher, in
-MCP, in Mini o nella UI. Nessun caller può sostituire il gesto di conferma del
-medico. Il binding trusted-UI resta un blocker di autorità collegato alla
-implementazione mancante del production bridge selezionato:
-`INTERNAL_CANDIDATE_VERIFIED / AUTHORITY_UI_BINDING_BLOCKER`.
+Il planner semantico è collegato al Supervisor e resta read-only. Accetta al
+massimo due operazioni allowlisted e closed-world su terminology search e Open
+Loops patient-scoped. Non produce SQL libero, non importa il database e non
+supera purpose, scope, budget o currentness host-owned.
 
-Il core, l'operazione read-only e la superficie statica MCP/Mini del planner
-semantico sono integrati:
-`STATIC_SURFACE_INTEGRATED / PRODUCTION_BRIDGE_BLOCKER`. La superficie accetta
-solo piani bounded e closed-world su terminology search e Open Loops
-patient-scoped. Il production bridge selezionato non ha callsite o test. Il
-planner non può produrre SQL libero, importare il database o superare purpose,
-scope, budget e currentness host-owned. La registrazione visita è
-`DEFER_NEXT_PATCH`; nessun audio o transcript appartiene al candidato corrente.
+Su macOS 26 o successivo, il recording usa API Apple on-device con consenso e
+permessi espliciti. L'audio resta bounded solo in RAM e il transcript passa al
+draft soltanto dopo review. Non esiste un writer clinico automatico; smoke con
+microfono reale e validazione clinica restano fuori dal claim del candidato.
 
 Esistono due modalità architetturali distinte. Nel modello
 provider-in-MediFlow, il Fabric governa un provider per una capability
@@ -290,11 +285,12 @@ restano distinte: `local_model`, `api_key`, `provider_oauth` ufficiale e
 Un login consumer o un abbonamento non è una credenziale di inferenza. Un
 flusso `provider_oauth` deve essere ufficiale, documentato dal provider e
 separato dalle sessioni consumer; non sono ammessi token estratti, OAuth
-privati o protocolli ricostruiti. Gli adapter HTTPS ufficiali e i probe
-Document Synthesis review-only sono integrati ma `default OFF`. Ogni uso
-richiede secret reference, lifecycle attivo e policy egress/retention
-host-owned. I test usano transport fake: nessuna credenziale o rete live è
-provata dal candidato.
+privati o protocolli ricostruiti. Gli adapter HTTPS ufficiali e la probe
+amministrativa Document Synthesis review-only sono integrati. La route è
+admin-only, richiede l'intento esatto `run_synthetic_nonclinical_probe` e resta
+`default OFF`. Ogni uso richiede secret reference, lifecycle attivo e policy
+egress/retention host-owned. I test usano transport fake: nessuna credenziale o
+rete live è provata dal candidato.
 
 ### Readiness dei provider locali
 
@@ -337,10 +333,11 @@ capability 0.8.5, le venue, i production root e l'assenza di authority caller.
 
 ## ⚠️ Provider remoti con opt-in obbligatorio
 
-OpenAI e Anthropic hanno adapter ufficiali e probe review-only. La factory
-production resta OFF senza i due opt-in host e non osserva credenziali quando
-è disabilitata. Il tree non prova rete live, account, retention o idoneità a
-dati clinici e non cambia il default `local-first`.
+OpenAI e Anthropic hanno adapter ufficiali e una probe amministrativa
+review-only. La route richiede sessione admin e intento esatto; provider ed
+egress restano OFF senza i due opt-in host. Quando è disabilitata, la factory
+non osserva credenziali. Il tree usa transport fake e non prova rete live,
+account, retention o idoneità a dati clinici; il default resta `local-first`.
 
 Regole minime:
 

@@ -29,33 +29,38 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
 
 - AnyDoc resta il primo passaggio automatico locale per i formati supportati.
   La conversione a Markdown è bounded, non usa rete e non è OCR.
-- Il tree classifica le pagine `needsOcr`, le materializza e renderizza in modo
-  selettivo e include il preflight DeepSeek-OCR 2 con fake seam.
-- Il percorso DeepSeek non ha runtime adapter o readiness: mancano esecuzione
-  live, benchmark E2E di promozione e qualifica dell'host. Gli input non ammessi
-  falliscono chiusi e le route OCR legacy restano terminali `410`.
+- Per i PDF supportati, la composizione current-source materializza e
+  renderizza soltanto le pagine `needsOcr`, usa Apple Vision locale senza rete
+  e ricompone il risultato nell'ordine originale.
+- DeepSeek-OCR 2/CUDA, benchmark di qualifica e readiness universale hanno stato
+  `OUT_OF_SCOPE_FOR_0.8.5_NON_BLOCKING`. Input cifrati o non ammessi, immagini
+  dirette e motore locale indisponibile falliscono chiusi; le route OCR legacy
+  restano terminali `410`.
 
 ### Headless, MCP e Mini
 
-- Un launcher trusted avvia il processo figlio autenticato e gli passa un
-  canale RPC AIP ereditato, senza listener o import diretti del database.
+- Il Supervisor Node portabile avvia Web standalone e MCP come processi figli
+  distinti e autenticati su IPC ereditato, senza listener o import diretti del
+  database.
 - MCP `stdio` e Mini espongono catalogo, ricerca terminologica, lettura delle
   Open Loops del paziente selezionato, proposta follow-up `proposal_only` e
   query semantica bounded read-only.
-- Questa è una superficie candidata: launcher production e quickstart restano
-  `PRODUCTION_BRIDGE_BLOCKER` e non provano delivery di prodotto. La decisione
-  seleziona un Supervisor portabile come trusted parent su IPC ereditato. La
-  topologia è `DECIDED`, ma l'implementazione è `SPLIT_REQUIRED`: la factory non
-  chiude late-bind trusted-UI, owner sincrono di `readHostContext`, lifecycle e
-  revoca production o audit terminale sincrono. Broker residente e UDS sono
-  esclusi dalla `0.8.5`.
-- La transizione stato checkup F10 ha core e composizione SQLite verificati, ma
-  resta interna: nessun binding launcher, MCP, Mini o UI. Il gate è
-  `INTERNAL_CANDIDATE_VERIFIED / AUTHORITY_UI_BINDING_BLOCKER` e blocca il
-  production bridge finché manca una conferma trusted-UI.
-- Il planner semantico bounded è esposto come operazione read-only statica in
-  MCP e Mini. Compone soltanto terminology search e Open Loops patient-scoped;
-  il production bridge resta `PRODUCTION_BRIDGE_BLOCKER`.
+- Il Supervisor possiede contesto, lease, revoca e audit. Gli adapter non
+  accettano authority caller-supplied; il terminal smoke standalone sul tree
+  finale, installer, onboarding ed esercizio su host esterni restano prove
+  separate dal candidato locale.
+- F10 espone via MCP soltanto la preview `pending -> completed|cancelled`. La UI
+  Web trusted rilegge la risorsa e richiede ruolo medico attivo, step-up e gesto
+  specifico prima del commit con CAS, idempotenza, audit e receipt. Proof e
+  commit non sono delegati all'agente.
+- Il planner semantico è collegato al Supervisor come percorso read-only
+  bounded. Compone al massimo due operazioni allowlisted, senza SQL libero o
+  scritture.
+- Su macOS 26 o successivo, la shell integra cattura e trascrizione italiana
+  Apple on-device, con consenso esplicito, audio bounded solo in RAM e
+  trasferimento al draft dopo review. Non esegue writer clinici automatici;
+  smoke con microfono reale e validazione clinica restano fuori dal claim del
+  candidato.
 
 ### Provider e perimetro
 
@@ -70,28 +75,25 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
   Uno smoke sintetico sul percorso di produzione con modello BF16 locale ha
   completato in 10,6 secondi, con 64 token e 211 caratteri, senza registrare il
   raw output. È una singola osservazione, non un benchmark o una prova clinica.
-- Il contratto provider v2, il secret broker, gli adapter HTTPS ufficiali e i
-  probe review-only OpenAI/Anthropic sono integrati. Restano `default OFF` e
-  richiedono opt-in host e policy egress/retention esplicite.
+- Il contratto provider v2, il secret broker, gli adapter HTTPS ufficiali e la
+  probe amministrativa review-only OpenAI/Anthropic sono integrati. La route è
+  admin-only, richiede un intento esplicito e resta `default OFF`, con opt-in
+  host e policy egress/retention esplicite.
 - Le prove usano transport fake. Il tree non contiene credenziali e non prova
   rete live, account, retention o runtime readiness cloud.
-- Il planner semantico ha core, operazione read-only e superficie statica
-  MCP/Mini integrati: `STATIC_SURFACE_INTEGRATED / PRODUCTION_BRIDGE_BLOCKER`.
-  SQL diretto resta vietato; il production bridge selezionato resta non
-  implementato. La registrazione visita è `DEFER_NEXT_PATCH` e l'invocazione AI
-  dai client paired resta fuori scope.
+- L'invocazione AI dai client paired resta fuori scope.
 - Il selector guidato Fabric rileva profili compatibili per cinque capability,
   esegue uno smoke sintetico e attiva binding host-owned con CAS e rollback.
 
 ### Esiti di perimetro F6/F7
 
-- **F6 — `INTEGRATED CORE / NO_RUNTIME_READINESS`**: AnyDoc resta il primo
-  passaggio; pipeline `needsOcr` e preflight DeepSeek con fake seam sono
-  integrati. Restano assenti runtime adapter, qualifica, esecuzione live e
-  benchmark E2E di promozione.
+- **F6 — fallback locale integrato**: AnyDoc resta il primo passaggio; le sole
+  pagine PDF `needsOcr` possono usare Apple Vision locale con ricomposizione
+  current-source. DeepSeek-OCR 2/CUDA, benchmark di qualifica e readiness
+  universale hanno stato `OUT_OF_SCOPE_FOR_0.8.5_NON_BLOCKING`.
 - **F7 — `INTEGRATED / DEFAULT_OFF`**: provider v2, secret broker, adapter
-  ufficiali e probe review-only sono presenti. Nessuna credenziale o prova di
-  rete live appartiene al candidato.
+  ufficiali e probe amministrativa review-only sono presenti. Nessuna
+  credenziale o prova di rete live appartiene al candidato.
 
 ### Altri cambiamenti non rilasciati
 

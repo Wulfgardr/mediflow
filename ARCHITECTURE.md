@@ -44,8 +44,8 @@ MediFlow è un **sistema ibrido locale**:
 - Servizi locali opzionali:
   - Ollama per Patient Insight, Smart Import e Document Synthesis
   - ATHENA-R1-Qwen3-8B su MLX per Treatment Reasoning
-  - AnyDoc come unica estrazione automatica locale e deterministica degli
-    allegati
+  - AnyDoc come primo passaggio deterministico degli allegati, con fallback
+    Apple Vision locale per le sole pagine PDF `needsOcr`
   - Application Service ICD-11 WHO server-only, egress opt-in
   - sidecar locale OpenMed per redaction shadow/benchmark (localhost, non client-facing)
 - Strategia client Apple:
@@ -71,7 +71,7 @@ create documentale manuale per client trusted su LAN.
 | TLS proxy (trasporto native) | `https://127.0.0.1:3443` | inoltra verso :3000 |
 | Ollama (AI generativa generale) | `http://127.0.0.1:11434` | opzionale; non esegue OCR nel percorso allegati 0.8.5 |
 | ATHENA su MLX | processo locale bounded | opzionale; solo Treatment Reasoning, con runner e modello locali configurati |
-| AnyDoc | processo figlio locale bounded | unica estrazione automatica degli allegati; nessuna rete e nessun OCR |
+| AnyDoc + Apple Vision | processi locali bounded | AnyDoc resta il primo passaggio; Apple Vision continua soltanto le pagine PDF `needsOcr`, senza rete |
 | ICD-11 WHO | HTTPS ufficiale, solo dal server | opzionale, egress opt-in |
 | OpenMed redaction (shadow) | `http://127.0.0.1:18080` | opzionale, non client-facing |
 
@@ -145,9 +145,10 @@ Gli stati di scope sono espliciti:
 
 | Stato | Perimetro 0.8.5 |
 | --- | --- |
-| `INCLUDED` | Quattro path Fabric proposal-only; AnyDoc first-pass e pipeline selettiva `needsOcr`; selector guidato e binding atomico; provider v2 e adapter ufficiali `default OFF`; superficie figlia MCP/Mini candidata; core, operazione e superficie statica planner read-only; candidato interno write checkup F10. |
+| `INCLUDED` | Quattro path Fabric proposal-only; AnyDoc e fallback Apple Vision locale sulle pagine PDF `needsOcr`; selector guidato e binding atomico; provider v2 e probe amministrativa `default OFF`; Supervisor locale con Web e MCP figli; planner read-only collegato; F10 end-to-end; recording Apple on-device review-first. |
 | `VERIFIED_LOCAL` | Evidenza mirata presente nel tree per contratti, production root e crosswalk; la suite integrata finale resta separata. |
-| `NOT_READY` | Runtime OCR qualificato, credenziali o rete cloud live, entrypoint production Headless, binding trusted-UI F10, production bridge del planner e recording visita `DEFER_NEXT_PATCH`. |
+| `NOT_READY` | Credenziali o rete cloud live; installer, onboarding e compatibilità con host MCP esterni; microfono reale e validazione clinica del recording; prova terminale sul tree finale. |
+| `OUT_OF_SCOPE_FOR_0.8.5_NON_BLOCKING` | DeepSeek-OCR 2/CUDA, benchmark di qualifica e readiness OCR universale. |
 
 Ogni caller usa una route autenticata e riceve una proposta con receipt,
 provenienza e currentness. Il caller non sceglie provider, modello, endpoint,
@@ -175,37 +176,34 @@ Il modello provider v2 separa:
 - classi di credenziale `local_model`, `api_key`, `provider_oauth` ufficiale e
   `host_subscription`.
 
-OpenAI Responses e Anthropic Messages hanno adapter HTTPS ufficiali e probe
-Document Synthesis review-only. Ogni composizione richiede lifecycle attivo,
-istanza host-owned, secret reference e policy egress/retention esplicita. Il
-default resta OFF. I test usano transport fake e non provano credenziali, rete
-live, account, retention o readiness cloud. Un login consumer o una
-subscription host non costituiscono accesso API; OAuth privati o ricostruiti
-restano vietati.
+OpenAI Responses e Anthropic Messages hanno adapter HTTPS ufficiali e una
+probe amministrativa Document Synthesis review-only. La route è admin-only e
+richiede l'intento esatto `run_synthetic_nonclinical_probe`. Il default resta
+`OFF`. Ogni composizione richiede lifecycle attivo, istanza host-owned, secret
+reference e policy egress/retention esplicita. I test usano transport fake e
+non provano credenziali, rete live, account, retention o readiness cloud. Un
+login consumer o una subscription host non costituiscono accesso API; OAuth
+privati o ricostruiti restano vietati.
 
 Il selector Fabric opera sulle cinque capability nominate. La discovery mostra
 solo profili compatibili, lo smoke usa fixture sintetiche e l'attivazione del
 binding è atomica, versionata e reversibile. Discovery e smoke non qualificano
 il runtime e non persistono segreti.
 
-La foundation Headless 0.8.5 non apre listener e non concede accesso diretto al
-database. Un launcher trusted avvia un processo figlio autenticato e gli passa
-un canale RPC AIP ereditato. MCP `stdio` e Mini espongono catalogo, ricerca
-terminologica, lettura patient-scoped delle Open Loops, proposta follow-up
-`proposal_only` e query semantica bounded read-only. Authority, purpose, scope,
-currentness e audit restano host-owned. Il launcher e il quickstart production
-restano
-`PRODUCTION_BRIDGE_BLOCKER`. La topologia Supervisor portabile come trusted
-parent, con processo figlio su IPC ereditato, è `DECIDED`; l'implementazione è
-`SPLIT_REQUIRED`. La factory esaminata non chiude il late-bind trusted-UI,
-l'owner sincrono di `readHostContext`, lifecycle e revoca production o l'audit
-terminale sincrono. Un broker residente o UDS è escluso dalla `0.8.5`.
+Il Supervisor Node production locale è il parent trusted del candidato. Avvia
+Web standalone e MCP come figli distinti su IPC privato ereditato e possiede
+contesto, purpose, scope, lease, revoca e audit. MCP `stdio` e Mini espongono
+catalogo, ricerca terminologica, lettura patient-scoped delle Open Loops,
+proposta follow-up `proposal_only` e query semantica bounded read-only. Gli
+adapter non importano SQLite, non accettano authority dal caller e non aprono
+listener propri. Il candidato non dichiara installer, onboarding o
+compatibilità con host MCP esterni.
 
-La transizione stato checkup F10 è un candidato interno verificato nel core e
-nella composizione SQLite. Non è collegata a launcher, MCP, Mini o UI. Il
-binding di conferma trusted-UI è un blocker di autorità e fa parte
-dell'implementazione mancante del production bridge selezionato:
-`INTERNAL_CANDIDATE_VERIFIED / AUTHORITY_UI_BINDING_BLOCKER`.
+F10 espone via MCP soltanto la preview della transizione
+`pending -> completed|cancelled`. La UI Web trusted rilegge la risorsa, richiede
+ruolo medico attivo, step-up e gesto operation-specific, quindi esegue il commit
+con CAS, idempotenza, audit e receipt atomici. Proof e commit non attraversano
+MCP e non sono delegati all'agente.
 
 Questa architettura distingue due modalità:
 
@@ -213,15 +211,20 @@ Questa architettura distingue due modalità:
    capability applicativa MediFlow. I quattro path locali 0.8.5 appartengono a
    questa modalità.
 2. **MediFlow dentro un host intelligente.** Il candidato usa MCP `stdio` o
-   Mini sopra RPC AIP ereditato per le operazioni nominate. Non promette ancora
-   installer, onboarding o un entrypoint production supportato.
+   Mini sopra RPC AIP ereditato per le operazioni nominate. L'entrypoint locale
+   usa il Supervisor, ma non promette installer, onboarding o compatibilità con
+   host MCP esterni.
 
-Il core, l'operazione read-only e la superficie statica MCP/Mini del semantic
-query planner sono integrati sopra Application Services allowlisted:
-`STATIC_SURFACE_INTEGRATED / PRODUCTION_BRIDGE_BLOCKER`. Il piano compone solo
-terminology search e Open Loops patient-scoped, entro budget bounded. Il
-production bridge selezionato non ha callsite o test. Il planner non può
-produrre SQL libero o accedere direttamente a SQLite.
+Il semantic query planner è collegato al Supervisor come percorso read-only.
+Compone al massimo due operazioni allowlisted tra terminology search e Open
+Loops patient-scoped, entro budget bounded. Non produce SQL libero, non scrive
+dati e non accede direttamente a SQLite.
+
+Su macOS 26 o successivo, la shell integra cattura e trascrizione italiana con
+API Apple on-device. Richiede consenso esplicito, mantiene l'audio bounded solo
+in RAM e trasferisce il transcript al draft soltanto dopo review. Non esegue
+writer clinici automatici; microfono reale e validazione clinica restano fuori
+dal claim del candidato.
 
 ---
 
@@ -247,7 +250,7 @@ flowchart TB
   subgraph "Services"
     Ollama["Ollama :11434"]
     Athena["ATHENA / MLX<br/>Treatment Reasoning"]
-    AnyDoc["AnyDoc<br/>estrazione locale"]
+    AnyDoc["AnyDoc + Apple Vision<br/>estrazione locale"]
     ICD["ICD-11 WHO<br/>server-only"]
   end
 
@@ -301,15 +304,18 @@ flowchart TB
 - Boundary SISS/FSE: oggi coordinamento contestuale + percorsi ufficiali; niente claim
   di integrazione regionale nativa certificata fuori dal perimetro documentato.
 - Boundary documentale 0.8.5: AnyDoc resta il primo passaggio automatico
-  locale. Nel core selettivo, solo le pagine `needsOcr` raggiungono
-  materializzazione, rendering e preflight DeepSeek-OCR 2 con fake seam. Il
-  runtime adapter non è integrato e non ha prova live o benchmark E2E di
-  promozione. Le route OCR legacy, dopo l'autenticazione, rispondono `410`.
+  locale. Nei PDF supportati, solo le pagine `needsOcr` raggiungono
+  materializzazione, rendering e Apple Vision locale. La ricomposizione
+  conserva ordine e provenienza e fallisce chiusa se la sorgente non è più
+  corrente o il motore non è disponibile. DeepSeek-OCR 2/CUDA ha stato
+  `OUT_OF_SCOPE_FOR_0.8.5_NON_BLOCKING`. Le route OCR legacy, dopo
+  l'autenticazione, rispondono `410`.
 - Boundary Fabric: le quattro capability generative restano
   `proposal_only`; receipt e provenienza non autorizzano apply.
 - Boundary Headless: nessun adapter accede direttamente a SQLite. MCP/Mini
-  raggiungono solo Application Services nominati tramite RPC AIP ereditato; la
-  superficie resta candidata finché manca l'entrypoint production.
+  raggiungono solo Application Services nominati tramite RPC AIP ereditato dal
+  Supervisor locale; installer, onboarding e host MCP esterni restano fuori dal
+  claim.
 
 ---
 

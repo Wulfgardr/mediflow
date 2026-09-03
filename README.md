@@ -128,15 +128,15 @@ Non esiste fallback silenzioso verso il cloud. Receipt, provenienza e
 currentness restano visibili, ma non sono grant e non autorizzano apply.
 MediFlow resta utile quando tutti i provider AI sono disabilitati.
 
-AnyDoc è una corsia separata e deterministica per l'estrazione locale degli
-allegati supportati. Non è OCR né un provider Fabric. Immagini e PDF
-scansionati senza text layer falliscono chiusi e richiedono revisione manuale;
-le route OCR legacy rispondono `410`.
+AnyDoc è la corsia deterministica per l'estrazione locale degli allegati e non
+è un provider Fabric. Quando un PDF supportato contiene pagine `needsOcr`, la
+composizione current-source renderizza soltanto quelle pagine e usa Apple
+Vision sul Mac, senza rete. Il risultato ricomposto resta review-only e legato
+alla sorgente corrente; errori, formati ambigui e motore non disponibile
+falliscono chiusi. Le route OCR legacy rispondono `410`.
 
-Il candidato include anche la pipeline selettiva per pagina: AnyDoc classifica
-le sole pagine `needsOcr` e prepara input bounded per un adapter OCR opzionale.
-Il tree si ferma al preflight con fake seam e non rende disponibile un runtime
-OCR qualificato.
+DeepSeek-OCR 2 e CUDA non sono requisiti della `0.8.5`: restano fuori dal
+percorso di prodotto con stato `OUT_OF_SCOPE_FOR_0.8.5_NON_BLOCKING`.
 
 ## Come si presenta
 
@@ -193,23 +193,26 @@ UI. La receipt storica `candidate_not_integrated` resta distinta e immutata.
 
 AnyDoc resta il primo passaggio automatico locale per gli allegati supportati.
 Il candidato include manifest, materializzazione e rendering selettivi delle
-sole pagine `needsOcr`, oltre al preflight DeepSeek-OCR 2 con fake seam. Il
-runtime adapter non è integrato. Il tree non contiene prove live, benchmark E2E
-di promozione o una qualifica di runtime su questo host.
-Le route OCR legacy continuano a rispondere `410`.
+sole pagine `needsOcr`, quindi usa il fallback Apple Vision locale sul Mac e
+ricompone le pagine nell'ordine originale. Input, output e tempo sono bounded;
+la currentness della sorgente viene rivalidata prima della pubblicazione e il
+risultato richiede revisione. DeepSeek-OCR 2/CUDA ha stato
+`OUT_OF_SCOPE_FOR_0.8.5_NON_BLOCKING`. Le route OCR legacy continuano a
+rispondere `410`.
 
 I gate F6/F7 distinguono il core integrato dai residui non pronti:
 
 | Gate | Incluso nel candidato | Escluso dalla 0.8.5 | Esito |
 | :-- | :-- | :-- | :-- |
-| F6 | AnyDoc come primo passaggio; pipeline selettiva `needsOcr` e preflight DeepSeek-OCR 2 con fake seam | Runtime adapter, esecuzione live e benchmark italiano E2E con soglie | `INTEGRATED CORE / NO_RUNTIME_READINESS` |
-| F7 | Contratto provider v2, secret broker, adapter HTTPS ufficiali e probe review-only OpenAI/Anthropic | Credenziali o rete live, invio di PHI e runtime readiness remota | `INTEGRATED / DEFAULT_OFF` |
+| F6 | AnyDoc come primo passaggio e fallback Apple Vision locale sulle sole pagine `needsOcr` | DeepSeek-OCR 2/CUDA, benchmark di qualifica e readiness universale | Fallback locale integrato |
+| F7 | Contratto provider v2, secret broker, adapter HTTPS ufficiali e probe amministrativa review-only OpenAI/Anthropic | Credenziali o rete live, invio di PHI e runtime readiness remota | `INTEGRATED / DEFAULT_OFF` |
 
-OpenAI e Anthropic hanno adapter HTTPS ufficiali e probe Document Synthesis
-review-only. Restano `default OFF` e richiedono opt-in host, lifecycle attivo,
-policy egress/retention e un secret broker. I test usano transport fake: il
-tree non contiene credenziali live e non prova rete, account, retention o
-readiness cloud. Un login o abbonamento consumer non costituisce accesso API.
+OpenAI e Anthropic hanno adapter HTTPS ufficiali e una probe amministrativa
+Document Synthesis review-only. Restano `default OFF` e richiedono opt-in host,
+lifecycle attivo, policy egress/retention e un secret broker. I test usano
+transport fake: il tree non contiene credenziali live e non prova rete,
+account, retention o readiness cloud. Un login o abbonamento consumer non
+costituisce accesso API.
 
 Il selector guidato Fabric rileva profili compatibili per cinque capability,
 esegue uno smoke sintetico e attiva il binding host-owned in modo atomico con
@@ -229,34 +232,29 @@ un benchmark di release per accuratezza OCR, qualità generativa, latenza o
 throughput. La suite finale del tree esatto resta un gate separato prima di ogni
 claim di readiness.
 
-Il candidato Headless avvia un processo figlio autenticato con RPC AIP
-ereditato. MCP `stdio` e Mini espongono catalogo, ricerca terminologica locale,
-lettura patient-scoped delle Open Loops, proposta follow-up `proposal_only` e
-query semantica bounded read-only. Gli adapter non accedono direttamente a
-SQLite e non ricevono authority dal caller. Il launcher e il quickstart
-production restano
-`PRODUCTION_BRIDGE_BLOCKER`: questa superficie non è ancora un entrypoint di
-prodotto supportato. La topologia Supervisor portabile, trusted parent del
-processo figlio su IPC ereditato, è `DECIDED`; l'implementazione è
-`SPLIT_REQUIRED`. Il packet esaminato si ferma alla factory e non chiude il
-late-bind trusted-UI, l'owner sincrono di `readHostContext`, lifecycle e revoca
-production o l'audit terminale sincrono. Un broker residente o UDS è escluso
-dalla `0.8.5`.
+Il candidato Headless include il Supervisor Node portabile: avvia Web
+standalone e MCP `stdio` come figli distinti, usa IPC ereditato e conserva
+contesto, lease, revoca e audit nel parent trusted. MCP e Mini espongono
+catalogo, ricerca terminologica locale, lettura patient-scoped delle Open
+Loops, proposta follow-up `proposal_only` e query semantica bounded read-only.
+Gli adapter non accedono direttamente a SQLite e non ricevono authority dal
+caller. L'entrypoint è integrato nel candidato locale; lo smoke standalone del
+tree finale resta una prova terminale separata e non dimostra compatibilità con
+ogni host MCP.
 
-F10 include anche una transizione dello stato checkup come candidato interno:
-core e composizione SQLite sono verificati, ma non esiste un binding in
-launcher, MCP, Mini o UI. Lo stato è
-`INTERNAL_CANDIDATE_VERIFIED / AUTHORITY_UI_BINDING_BLOCKER`. La conferma
-trusted-UI resta parte dell'implementazione mancante del production bridge
-selezionato.
+F10 collega la transizione `pending -> completed|cancelled` end-to-end. MCP
+può creare soltanto la preview. La UI MediFlow rilegge la risorsa corrente e
+richiede ruolo medico attivo, step-up e gesto operation-specific; il commit Web
+usa CAS, idempotenza, audit e receipt atomici. Revoca, logout, cambio selezione
+e replay negano l'uso successivo. Il proof non attraversa MCP e l'agente non
+può eseguire il commit.
 
-Il core, l'operazione read-only e la superficie statica MCP/Mini del semantic
-query planner sono integrati:
-`STATIC_SURFACE_INTEGRATED / PRODUCTION_BRIDGE_BLOCKER`. La superficie compone
-solo ricerca terminologica e Open Loops patient-scoped, con piano bounded e
-schema closed-world. SQL diretto resta vietato e il production bridge
-selezionato non è ancora implementato o testato. La visita registrabile è
-`DEFER_NEXT_PATCH`.
+Il semantic query planner è esposto dal percorso MCP/Mini e dal binding del
+Supervisor. Compone soltanto ricerca terminologica e Open Loops
+patient-scoped, entro due step, con budget bounded e schema closed-world. SQL
+diretto e scritture restano vietati. Su macOS 26 o successivo, la registrazione
+visita è integrata come percorso on-device, review-first e senza writer
+automatico.
 Ogni egress richiede opt-in host esplicito e i client paired non invocano AI. I
 limiti sono in [`docs/known-limitations.md`](./docs/known-limitations.md).
 
@@ -305,13 +303,15 @@ MediFlow non racconta più di quanto possa dimostrare.
   prove di rete live e non dichiara readiness cloud.
 - **I quattro percorsi Fabric sono proposal-only.** Receipt e provenienza sono
   visibili, ma nessuna preview applica dati clinici.
-- **OCR non ha runtime readiness.** AnyDoc resta il primo passaggio; la pipeline
-  `needsOcr` e il preflight DeepSeek-OCR 2 con fake seam sono integrati, ma
-  runtime adapter, prova live, benchmark E2E e qualifica dell'host mancano.
-- **Headless è un candidato integrato, non un entrypoint supportato.** MCP e
-  Mini espongono due letture nominate e una proposta bounded tramite RPC
-  host-owned. La write checkup F10 resta un candidato interno senza binding di
-  autorità UI. Launcher production e quickstart restano bloccanti.
+- **OCR resta host-bound.** AnyDoc usa Apple Vision soltanto sulle pagine
+  `needsOcr` di PDF supportati e fallisce chiuso quando il motore non è
+  disponibile. DeepSeek-OCR 2/CUDA e la readiness universale restano fuori
+  scope e non bloccanti.
+- **Headless è un candidato locale integrato.** Il Supervisor avvia Web e MCP
+  come figli distinti; letture, proposta e preview checkup passano da RPC
+  host-owned. Il commit checkup resta esclusivamente nella UI trusted. Questa
+  prova locale non equivale a installer, onboarding o compatibilità con ogni
+  host MCP.
 - **iPhone e iPad non sono app complete.** Il perimetro operativo è
   `home-base + client paired`; cache offline e alcune superfici derivate dai
   documenti restano parziali o disponibili solo sull'host.
@@ -325,12 +325,9 @@ MediFlow non racconta più di quanto possa dimostrare.
   sostituisce revisione, giudizio clinico o responsabilità professionale.
 - **La inbox intelligente non è consegnata.** Le route conversazionali di base
   non costituiscono un flusso di chiarimento o conversione in record clinici.
-- **Le nuove lane hanno stati distinti.** MCP/Mini sono integrati come
-  superficie figlia candidata ma non hanno ancora un entrypoint production. Il
-  planner ha core e operazione read-only integrati, ma non è ancora esposto
-  dalla superficie statica MCP/Mini. La registrazione visita è
-  `DEFER_NEXT_PATCH`: il packet è solo foundation e non ha integrazione runtime,
-  callsite o UI nel candidato.
+- **Le lane intelligenti conservano confini distinti.** Il planner resta
+  read-only, la proposta MCP non autorizza il commit checkup e la registrazione
+  visita resta on-device, review-first e senza writer automatico.
 
 Delle 43 capability per cui la parity è un obiettivo, 30 sono complete e 13
 parziali; altre 21 restano intenzionalmente host-only. La matrice fa fede sui
@@ -379,8 +376,8 @@ La prima lingua visiva del cockpit è derivata da
 originale. Il ragionamento terapeutico review-only usa
 [ATHENA](https://github.com/mims-harvard/ATHENA) di mims-harvard, con licenza
 MIT. Il lavoro sulla visita registrabile prende a riferimento l'ecosistema
-Fluid, ma la visita registrabile è `DEFER_NEXT_PATCH` e non fa parte del
-candidato `0.8.5`.
+Fluid per il confronto progettuale, ma l'implementazione del candidato usa
+soltanto API Apple on-device e non dipende da Fluid.
 
 Modelli, runtime, librerie e ispirazioni, con URL, ruolo e licenza, sono in
 **[CREDITS.md](./CREDITS.md)**.
