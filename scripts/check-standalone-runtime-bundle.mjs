@@ -9,6 +9,8 @@ import { assertNodeRuntime, readNodeContract, standaloneDirectory } from './node
 
 const ANYDOC_WORKER_FILE = 'anydoc-local-extraction-worker.mjs';
 const ANYDOC_WORKER_SHA256 = '5d6e2e60f1d71f3fd45065961258a7debe8a96e017abdcee92823986c8f08c67';
+const APPLE_VISION_SCRIPT_FILE = 'apple-vision-ocr.swift';
+const APPLE_VISION_SCRIPT_SHA256 = 'fb87dd9c0ca98a9ac68840c7c4c7517fec8199dbbd3dc1b3c93ad617d80dc314';
 const PDF_INSPECTOR_WORKER_FILE = 'pdf-inspector-worker.mjs';
 const PDF_ROUTE_DIRECTORY = path.join('server', 'app', 'api', 'pdf-extract');
 const PDF_RUNTIME_REFERENCE = /(?:pdf-inspector-worker\.mjs|pdf-inspector-router|(?:node_modules[\\/])?@firecrawl[\\/]pdf-inspector(?:[-/]|$))/i;
@@ -94,6 +96,25 @@ function bundledWorkerFailure(standaloneDir) {
     }
   } catch {
     return 'Standalone runtime cannot verify the AnyDoc worker.';
+  }
+  return null;
+}
+
+function bundledAppleVisionScriptFailure(standaloneDir) {
+  const scriptPath = path.join(standaloneDir, 'scripts', APPLE_VISION_SCRIPT_FILE);
+  try {
+    if (!fs.lstatSync(scriptPath).isFile()) return 'Standalone Apple Vision OCR script is not a regular file.';
+    const root = fs.realpathSync(standaloneDir);
+    const script = fs.realpathSync(scriptPath);
+    const relative = path.relative(root, script);
+    if (!relative || relative.startsWith('..') || path.isAbsolute(relative) || !fs.statSync(script).isFile()) {
+      return 'Standalone runtime resolves the Apple Vision OCR script outside the bundle.';
+    }
+    if (createHash('sha256').update(fs.readFileSync(script)).digest('hex') !== APPLE_VISION_SCRIPT_SHA256) {
+      return 'Standalone Apple Vision OCR script digest does not match the packaged script.';
+    }
+  } catch {
+    return 'Standalone runtime does not contain the Apple Vision OCR script.';
   }
   return null;
 }
@@ -327,6 +348,8 @@ function runSelfTest() {
   const scriptsDir = path.join(root, 'scripts');
   const workerPath = path.join(scriptsDir, ANYDOC_WORKER_FILE);
   const sourceWorker = path.join(process.cwd(), 'scripts', ANYDOC_WORKER_FILE);
+  const visionPath = path.join(scriptsDir, APPLE_VISION_SCRIPT_FILE);
+  const sourceVision = path.join(process.cwd(), 'scripts', APPLE_VISION_SCRIPT_FILE);
   try {
     fs.mkdirSync(scriptsDir);
     fs.copyFileSync(sourceWorker, workerPath);
@@ -336,6 +359,10 @@ function runSelfTest() {
     fs.copyFileSync(sourceWorker, workerPath);
     fs.appendFileSync(workerPath, '\n// self-test tamper\n');
     if (bundledWorkerFailure(root) === null) throw new Error('tampered bundled AnyDoc worker passed');
+    fs.copyFileSync(sourceVision, visionPath);
+    if (bundledAppleVisionScriptFailure(root) !== null) throw new Error('expected bundled Apple Vision OCR script to pass');
+    fs.appendFileSync(visionPath, '\n// self-test tamper\n');
+    if (bundledAppleVisionScriptFailure(root) === null) throw new Error('tampered Apple Vision OCR script passed');
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
@@ -543,6 +570,8 @@ function nativeArtifacts(packageDir, label, matcher) {
 // @Codex: The child-process parser must be fully self-contained and byte-identical.
 const anyDocWorkerFailure = bundledWorkerFailure(standaloneDir);
 if (anyDocWorkerFailure) fail(anyDocWorkerFailure);
+const appleVisionScriptFailure = bundledAppleVisionScriptFailure(standaloneDir);
+if (appleVisionScriptFailure) fail(appleVisionScriptFailure);
 const anyDocWorkerPath = path.join(standaloneDir, 'scripts', ANYDOC_WORKER_FILE);
 const packageScopes = fs.readdirSync(path.join(standaloneDir, 'node_modules'), { withFileTypes: true });
 const firecrawlScope = packageScopes.find((entry) => entry.isDirectory() && entry.name === '@firecrawl')?.name;
