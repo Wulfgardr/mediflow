@@ -48,10 +48,10 @@ La base corrente va letta cosi:
 * **Sicurezza**: i client sigillano i campi sensibili prima del wire/storage;
   pairing device e sessione operatore restano distinti; nessun client mobile
   accede direttamente al database del Mac.
-* **AIP macOS**: ADR 0114 decide un LaunchAgent per-user registrato con
-  `SMAppService`, con broker Node e listener `libxpc` nello stesso processo.
-  Il runtime, la registrazione e le prove cross-process appartengono a #330 e
-  non sono ancora una capability consegnata.
+* **Headless/AIP locale**: il Supervisor Node portabile avvia Web standalone e
+  MCP `stdio` come figli distinti su IPC ereditato. Contesto, lease, revoca e
+  audit restano host-owned. L'adapter LaunchAgent/libxpc macOS resta una
+  direzione opzionale separata e non è un requisito della 0.8.5.
 * **Parity**: la matrice post-Wave 5 e in [docs/parity-matrix.md](./parity-matrix.md).
   `WUL-401`/PR #21 hanno consegnato bundle, fixture, probe AX e runbook P6 di
   base. La candidata v0.8 chiude i gate UI sul candidato con iPhone 2/2, iPad
@@ -164,13 +164,16 @@ la family architecture. In questa slice il bundle **osserva** il runtime locale:
 * non mostra mai token, certificati, chiavi o dati paziente;
 * non installa, avvia, arresta o supervisiona i provider AI opzionali.
 
-`scripts/build-apple-macos-app.sh` produce il bundle universale macOS con il
-WebRuntime incluso, non firmato per default, e puo firmarlo con
-`MEDIFLOW_CODESIGN_IDENTITY` (`-` per ad-hoc, Developer ID per distribuzione).
-La notarizzazione resta un passaggio di distribuzione separato. I servizi
-opzionali sono visibili come health diagnostico, non come processi app-managed.
+`scripts/build-apple-macos-app.sh` produce un bundle macOS specifico per
+l'architettura corrente (`arm64` oppure `x86_64`) con il WebRuntime incluso. Il
+bundle non è firmato per default e può usare `MEDIFLOW_CODESIGN_IDENTITY` (`-`
+per ad-hoc, Developer ID Application per distribuzione diretta). La
+notarizzazione Apple è un passaggio separato della distribuzione diretta. La
+distribuzione Mac App Store usa invece il relativo percorso di firma e upload
+e richiede una decisione distinta su App Sandbox. I servizi opzionali sono
+visibili come health diagnostico, non come processi app-managed.
 
-### Topologia AIP macOS decisa per il packet successivo
+### Adapter AIP macOS opzionale
 
 ADR 0114 e #329 riservano nel bundle firmato un LaunchAgent
 `com.mediflow.aip-broker`, due launcher nativi, l'addon Node-API/libxpc e il
@@ -180,12 +183,21 @@ launcher MCP sostituisce l'ambiente e mantiene il PID quando esegue il Node 24
 approvato; il broker verifica PID, EUID e ASID dal canale XPC, il requisito di
 firma e una bootstrap reference monouso.
 
-Il `MediFlowMacApp` rimane l'unico owner di registrazione, update, rollback e
-unregister tramite `SMAppService`. Un bundle unsigned, l'approvazione di sistema
-mancante o un mismatch di firma/manifest mantiene AIP disabilitato. Non sono
-ammessi XPCService proxy, secondo IPC, fallback TCP, API private o raw audit
-token. Questa sezione descrive una decisione di packaging, non prova che gli
-artefatti esistano nel tree: l'implementazione e i test reali sono #330.
+In questa direzione, `MediFlowMacApp` resterebbe l'unico owner di registrazione,
+update, rollback e unregister tramite `SMAppService`. Un bundle unsigned,
+l'approvazione di sistema mancante o un mismatch di firma/manifest manterrebbe
+l'adapter disabilitato. Non sono ammessi XPCService proxy, secondo IPC,
+fallback TCP, API private o raw audit token. Questa sezione descrive una
+decisione di packaging futura, non il Supervisor portabile integrato nella
+0.8.5.
+
+### Registrazione visita 0.8.5
+
+Su macOS 26 o successivo, la shell integra cattura e trascrizione italiana con
+API Apple on-device. Il percorso richiede consenso esplicito, mantiene l'audio
+bounded solo in RAM e trasferisce il transcript al draft soltanto dopo review.
+Non esegue writer clinici automatici. La prova con microfono reale e la
+validazione clinica restano fuori dal claim del candidato.
 
 ### 1. Sessione e privacy
 

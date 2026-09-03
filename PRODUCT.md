@@ -2,7 +2,7 @@
 summary: "Product contract for MediFlow: audience, tasks, platform roles, boundaries, anti-goals, and success criteria."
 read_when:
   - "Changing product behavior, release claims, platform roles, or the public narrative."
-  - "Separating current MediFlow capabilities from the 0.8.5 source candidate and later direction."
+  - "Separating current MediFlow capabilities from later product direction."
 ---
 
 # MediFlow Product
@@ -80,26 +80,43 @@ The interface is calm, precise, and direct.
   and the versioned local API.
 - Deterministic workflows, records, terminology, and reference data remain
   first-class without AI.
-- The 0.8.5 local source candidate routes Patient Insight, Smart Import,
+- The 0.8.5 source tree routes Patient Insight, Smart Import,
   Document Synthesis, and Treatment Reasoning through four host-owned Fabric
   paths. Every path stops at a reviewable proposal and exposes receipt,
   provenance, and currentness.
 - When configured, Ollama serves general generative tasks and ATHENA on MLX
   serves only Treatment Reasoning. Their host-owned lifecycles are separate.
-  Cloud providers are disabled.
-- OpenAI and Anthropic appear only in an informational provider register. They
-  are not runtime options. A consumer login, product subscription, or host
-  subscription is not API access or authorization for inference.
+  Cloud providers are disabled by default.
+- OpenAI and Anthropic have provider v2 adapters and a review-only Document
+  Synthesis probe. Activation requires an explicit host opt-in, a secret
+  reference, and egress and retention policy. Tests use fake transports; the
+  source tree contains no credentials or live-network readiness evidence. A
+  consumer or host subscription is not API authorization for inference.
 - The caller cannot choose a provider, model, endpoint, venue, prompt,
   fallback, or apply policy. Receipt and provenance do not authorize a write.
-- AnyDoc is the only automatic local attachment extraction path. The `ocr`
-  capability is unavailable in the current runtime. Images and scans fail
-  closed to manual review, and authenticated legacy OCR routes return `410`.
-  DeepSeek-OCR 2 and Apple Vision are `RELEASE_SCOPE_EXCLUDED` from 0.8.5.
-- Headless is a foundation, not a general external agent runtime. It does not
-  access the database directly. The only accepted write exception is the SOAP
-  append with policy `clinician_confirmed_single_use.v1`, through a host-owned
-  Application Service.
+- AnyDoc is the first automatic local attachment extraction path. On macOS,
+  Apple Vision processes only supported PDF pages marked `needsOcr`; the
+  result remains source-bound, review-only, and fail-closed. Direct images and
+  unsupported inputs require manual review. The separate Fabric `ocr`
+  capability remains unavailable, and authenticated legacy OCR routes return
+  `410`. DeepSeek-OCR 2/CUDA is
+  `OUT_OF_SCOPE_FOR_0.8.5_NON_BLOCKING`.
+- The local 0.8.5 Headless path runs Web and MCP as separate children of a
+  trusted Node Supervisor. MCP reaches only named Application Services through
+  inherited AIP RPC and never accesses SQLite directly. Mini shares the typed
+  catalog and CLI foundation but has no production Supervisor callsite and
+  fails closed without a parent AIP channel. The MCP path includes bounded
+  reads, a follow-up proposal, the read-only semantic planner, and the F10
+  checkup preview. F10 commits only in the trusted Web UI after a
+  fresh role, step-up, gesture, currentness, CAS, audit, and receipt check.
+  The clinician-confirmed SOAP append remains a separate operation with its own
+  policy, proof, and receipt; authority never transfers between the two writes.
+  Installer, onboarding, and compatibility with external MCP hosts remain
+  outside the current claim.
+- On macOS 26 or later, visit recording uses Apple on-device capture and
+  transcription with explicit consent, bounded in-memory audio, and transcript
+  review. It has no automatic clinical writer; real-microphone and clinical
+  validation remain outside the 0.8.5 claim.
 - SISS and FSE use documented assisted handoffs. MediFlow does not claim native
   regional synchronization or writeback.
 - Mobile offline behavior is partial and read-only where documented.
@@ -133,33 +150,30 @@ MediFlow succeeds when:
 - failure and degraded states are honest and actionable;
 - synthetic tests can verify the contract without real patient data.
 
-## 0.8.5 source candidate and later direction
+## 0.8.5 delivery and later direction
 
-The **Intelligence Fabric** has a bounded implementation in the 0.8.5 local
-source candidate for four proposal-only capabilities. This implementation is
-not evidence of a release, deployment, general agent interface, cloud support,
-or clinical apply.
+The **Intelligence Fabric** has a bounded implementation in the 0.8.5 source
+tree for four proposal-only capabilities. Source presence alone is not evidence
+of deployment, a general agent interface, cloud readiness, or clinical apply.
 
-The complete provider model is not implemented and is
-`RELEASE_SCOPE_EXCLUDED`. A post-0.8.5 contract must keep provider type,
-instance, authentication, model, capabilities, groups, bindings, and function
-allowlists separate. It must also distinguish local models, API keys, official
-provider OAuth, and host subscriptions. OpenAI and Anthropic configuration and
-execution are excluded; the candidate includes only their informational
-register entries.
+The provider v2 model separates provider type, instance, authentication,
+model, capabilities, groups, bindings, and function allowlists. It also keeps
+local models, API keys, official provider OAuth, and host subscriptions
+distinct. OpenAI and Anthropic adapters remain `default OFF`; the source tree
+does not prove live credentials, account policy, retention, or cloud readiness.
 
-A post-0.8.5 DeepSeek-OCR 2 target may process only pages marked `needsOcr`.
-It requires an adapter, end-to-end evidence, a synthetic Italian benchmark,
-declared thresholds, per-page provenance, hashes, quality signals, fail-closed
+A future DeepSeek-OCR 2 adapter may process only pages marked `needsOcr`. It
+requires end-to-end evidence, a synthetic Italian benchmark, declared
+thresholds, per-page provenance, hashes, quality signals, fail-closed
 recomposition, and evidence that data stays inside the local process before
-promotion.
+promotion. Its absence does not block 0.8.5.
 
 Two integration modes remain distinct. MediFlow can govern a provider inside
-its own Fabric. Separately, an intelligent host may eventually invoke governed
-MediFlow Application Services through an MCP, App, or Headless adapter. The
-second mode is future work and does not claim an MCP server, installer,
-onboarding flow, or general external agent runtime. It is
-`RELEASE_SCOPE_EXCLUDED` from 0.8.5.
+its own Fabric. Separately, the local 0.8.5 runtime lets MCP invoke named,
+governed MediFlow Application Services through the trusted Supervisor. Mini is
+a fail-closed CLI foundation without that production binding. This
+does not claim an installer, onboarding flow, compatibility with external MCP
+hosts, or general agent authority.
 
 Broader routing to deterministic logic, on-device models, a paired home-base,
 or an approved cloud provider remains future work. Any future routing must be
@@ -167,6 +181,6 @@ explicit, policy-bound, observable, and fail-closed. There is no silent cloud
 fallback. Each clinical output must preserve patient identity boundaries,
 provenance, uncertainty, execution venue, and physician review.
 
-Windows and Linux applications, broader offline continuity, voice completeness,
-the intelligent scaffold, and conversational workflows remain post-0.8 or
-exploratory until separate decisions and evidence promote them.
+Windows and Linux applications, broader offline continuity, external-host
+onboarding, real-microphone validation, and conversational workflows remain
+later or exploratory work until separate decisions and evidence promote them.

@@ -63,9 +63,10 @@ cambia gli stati ammessi e non sostituisce i gate di questo documento.
 [ADR 0090](./adr/0090-giunture-fabric-trust-onboarding-routing-interazione.md)
 definisce trust, onboarding, routing osservabile e review. [ADR
 0094](./adr/0094-intelligence-fabric-headless-contract-085.md) fissa i quattro
-smart path generativi. Nel runtime corrente `ocr` resta `unavailable`.
-DeepSeek-OCR 2 è una decisione target ma è `RELEASE_SCOPE_EXCLUDED` dalla
-0.8.5 perché non dispone di adapter, E2E o benchmark.
+smart path generativi. Nel Fabric generativo `ocr` resta `unavailable`; la
+composizione documentale separata continua le pagine PDF `needsOcr` con Apple
+Vision locale sul Mac. DeepSeek-OCR 2/CUDA conserva soltanto contratto e seam
+sintetiche con stato `OUT_OF_SCOPE_FOR_0.8.5_NON_BLOCKING`.
 
 Nel candidato sorgente locale 0.8.5, Patient Insight, Smart Import, Document
 Synthesis e Treatment Reasoning attraversano il Fabric end-to-end. Ogni
@@ -84,18 +85,20 @@ La lane ATHENA è inclusa soltanto con runner e modello locali configurati.
 offline e fallisce chiuso senza cache pre-provisioned. Nessuno dei due percorsi
 dimostra readiness universale o promuove il runtime MLX generico.
 
-La disclosure corrente elenca OpenAI e Anthropic come record informativi con
-esecuzione disabilitata. Il modello provider F7 completo non è implementato ed
-è `RELEASE_SCOPE_EXCLUDED`. Un contratto post-0.8.5 dovrà separare provider
-type, istanza, autenticazione, modello, capability, gruppi, binding e function
-allowlist. Dovrà inoltre distinguere `local_model`, `api_key`,
-`provider_oauth` ufficiale e `host_subscription`. Login consumer e subscription
-non autorizzano inferenza.
+Il modello provider v2 separa provider type, istanza, autenticazione, modello,
+capability, gruppi, binding e function allowlist. Distingue inoltre
+`local_model`, `api_key`, `provider_oauth` ufficiale e `host_subscription`.
+OpenAI e Anthropic hanno adapter HTTPS ufficiali e una probe Document Synthesis
+review-only, ma restano `default OFF`. I test usano transport fake: il tree non
+contiene credenziali, prove di rete live o readiness cloud. Login consumer e
+subscription non autorizzano inferenza.
 
 La modalità provider-in-MediFlow descrive le righe runtime di questa matrice.
-La modalità MediFlow-in-intelligent-host resta `RELEASE_SCOPE_EXCLUDED` e
-separata sopra Application Services governati. Non prova un server MCP,
-installer, onboarding o runtime Headless generale esterno.
+La modalità MediFlow-in-intelligent-host usa il Supervisor locale e MCP `stdio`
+sopra Application Services governati. Mini condivide catalogo e foundation CLI
+ma non ha un callsite production del Supervisor e fallisce chiuso senza parent
+AIP. La 0.8.5 non prova installer, onboarding, compatibilità con host MCP
+esterni o runtime Headless generale.
 
 ## 2. Stati ammessi
 
@@ -121,23 +124,22 @@ verifica completa.
 | `smart_import` | `clinical` → Ollama → `qwen3.5:35b-a3b` | HTTP loopback | `runtime` | `proposal_only` | `INCLUDED` | `revalidation_required` | Nessuno | Nessun import silenzioso; apply resta separato |
 | `document_synthesis` | `reasoning` → Ollama → `qwen3.5:35b-a3b` | HTTP loopback | `runtime` | `proposal_only` | `INCLUDED` | `revalidation_required` | Nessuno | La sintesi non diventa un fatto clinico |
 | `treatment_reasoning` | ATHENA-R1-Qwen3-8B | processo MLX-LM locale su Apple Silicon | `runtime` | `proposal_only` | `INCLUDED` | `revalidation_required` | Nessuno | Nessuna prescrizione, terapia o modifica automatica |
-| `ocr` | Nessuno | Nessuna | `unavailable` | `unavailable` | `INCLUDED` come denial fail-closed/`410` autenticato | non applicabile | Nessuno attivo | Nessuna invocazione nel runtime corrente |
-| Estrazione allegati | AnyDoc, versione fissata | processo figlio locale bounded | `runtime` deterministico | non generativa | `INCLUDED` | non applicabile | Nessuno attivo | Unica estrazione automatica per testo estraibile; immagini/scansioni vanno a review manuale |
-| DeepSeek-OCR 2 selettivo | Nessun binding | Nessuna | `unavailable` | `not_implemented` | `RELEASE_SCOPE_EXCLUDED` | `not_verified` | Nessuno | Mancano adapter, E2E, benchmark italiano e soglie |
+| `ocr` Fabric | Nessuno | Nessuna | `unavailable` | `unavailable` | `INCLUDED` come denial fail-closed/`410` autenticato | non applicabile | Nessuno attivo | Nessuna invocazione generativa nel runtime corrente |
+| Estrazione allegati | AnyDoc + Apple Vision su macOS | processi locali bounded | `runtime` deterministico | review-only | `INCLUDED` | non applicabile | Nessuno invisibile | Apple Vision riceve solo pagine PDF `needsOcr`; input non supportati falliscono chiusi |
+| DeepSeek-OCR 2 selettivo | Nessun binding | seam sintetiche | `hold` | `synthetic_contract_only` | `OUT_OF_SCOPE_FOR_0.8.5_NON_BLOCKING` | `not_verified` | Nessuno | Nessun adapter runtime, E2E, benchmark italiano o soglia qualificata |
 | Redaction PII neurale | OpenMed / challenger NER | sidecar locale | `benchmark_only` | non client-facing | `INCLUDED` benchmark-only | `blocked` | Layer deterministico obbligatorio | Non abilita egress |
 | Apple Foundation Models | Nessun binding | Nessuna | `hold` | nessuna | `RELEASE_SCOPE_EXCLUDED` | `blocked` | Nessuno | Richiede decisione e gate per task |
 | MLX generico | Nessun binding applicativo | runtime MLX amministrativo/diagnostico | `benchmark_only` | non client-facing | `INCLUDED` benchmark-only | `blocked` | Nessuno | Non è la lane ATHENA e non sostituisce Ollama |
-| OpenAI / Anthropic | Registro informativo | Nessuna | `unavailable` | esecuzione disabilitata | `INCLUDED` disclosure; esecuzione `RELEASE_SCOPE_EXCLUDED` | non applicabile | Nessuno | Login/subscription consumer non è accesso API; nessun token, probe o egress |
+| OpenAI / Anthropic | Profili provider v2 host-owned | adapter HTTPS ufficiali | `hold` | `probe_only / default_off` | `INCLUDED` | `not_verified` | Nessuno | Probe review-only con transport fake; nessuna credenziale, rete live o readiness cloud |
 
 ### Lettura della matrice
 
 - `runtime` indica un percorso review-first osservato, non autonomia clinica né
   ricertificazione WUL-418 completa.
-- OCR non ha un percorso eseguibile nel runtime corrente. Una configurazione o
-  un lifecycle provider non bastano a promuoverlo.
-- AnyDoc è l'unica estrazione automatica deterministica corrente, non una
-  capability generativa o OCR. Il candidato DeepSeek riceverebbe solo le
-  pagine `needsOcr`.
+- La capability Fabric `ocr` non ha un entrypoint eseguibile. La composizione
+  AnyDoc separata usa Apple Vision sul Mac solo per pagine PDF `needsOcr`.
+- DeepSeek-OCR 2 resta contrattuale e test-only; non è un fallback del percorso
+  Apple Vision e non blocca la 0.8.5.
 - Il percorso ATHENA MLX è una lane governata separata. Non eredita il registry
   o il lifecycle Ollama.
 - Il runtime MLX generico resta benchmark-only e non dimostra readiness ATHENA.
@@ -153,9 +155,9 @@ verifica completa.
 | `smart_import` | output JSON strutturato | Envelope valido, source evidence e review |
 | `document_synthesis` | output JSON e contesto documentale | Envelope valido, retention del contesto e source boundary |
 | `treatment_reasoning` | JSON, source refs e contesto bounded | Contratto, source-ref validation e benchmark dedicato |
-| `ocr` corrente | Nessuna: capability non eseguibile | Catalogo senza entrypoint operativo e route autenticate in `410` |
-| Estrazione allegati | Conversione locale deterministica primaria | Guard AnyDoc local-only, limiti bounded e classificazione `needsOcr` |
-| DeepSeek-OCR 2 post-0.8.5 | Vision locale per singola pagina | Adapter, E2E, benchmark sintetico italiano, soglie predefinite, provenance/hash/quality, ricomposizione e prova di località |
+| `ocr` Fabric corrente | Nessuna: capability non eseguibile | Catalogo senza entrypoint operativo e route autenticate in `410` |
+| Estrazione allegati | Conversione locale deterministica e riconoscimento selettivo sul Mac | Guard AnyDoc local-only, limiti bounded, classificazione `needsOcr`, Apple Vision e ricomposizione source-bound |
+| DeepSeek-OCR 2 futuro | Vision locale per singola pagina | Adapter, E2E, benchmark sintetico italiano, soglie predefinite, provenance/hash/quality, ricomposizione e prova di località |
 | Redaction | rilevazione PII con leak proibiti a zero | Corpus governato e report ripetibile |
 
 Il manifest del provider descrive solo la capability di trasporto. La capability
@@ -218,8 +220,9 @@ Una regressione di località, qualità, privacy o kill switch riporta la lane a
 | Sintesi documentale | `app/api/ai/document-synthesis/preview/route.ts`, `lib/ai-providers/fabric/document-synthesis-production-operation.ts` |
 | Treatment Reasoning | `app/api/ai/treatment-reasoning/preview/route.ts`, `lib/ai-providers/fabric/treatment-reasoning-production-root.ts` |
 | Lifecycle Ollama e ATHENA | `lib/ai-providers/fabric/provider-lifecycle-service.ts`, `lib/ai-providers/fabric/provider-lifecycle-store.ts` |
-| OCR corrente non eseguibile | `lib/ai-providers/fabric/generative-catalog.ts`, `lib/ocr-production-retirement.test.ts` |
-| AnyDoc local-only | `lib/domain/documents/anydoc-local-extraction-runner.ts`, `scripts/check-anydoc-local-only.mjs` |
+| OCR Fabric non eseguibile | `lib/ai-providers/fabric/generative-catalog.ts`, `lib/ocr-production-retirement.test.ts` |
+| AnyDoc + Apple Vision local-only | `lib/domain/documents/anydoc-local-extraction-runner.ts`, `lib/domain/documents/anydoc-apple-vision-ocr-composition.ts`, `scripts/check-anydoc-local-only.mjs` |
+| Provider v2 OpenAI/Anthropic | `lib/ai-providers/v2/openai-responses-official-transport.ts`, `lib/ai-providers/v2/anthropic-messages-official-transport.ts`, `lib/ai-providers/v2/document-synthesis-cloud-probe-composition.ts` |
 | OpenMed e redaction | `docs/adr/0077-ai-provider-abstraction-and-egress-anonymization-boundary.md`, `scripts/benchmark-openmed-redaction.mjs` |
 | Challenger MLX | `docs/mlx-operational-parity.md` |
 | Apple Foundation Models | WUL-417 e ricerca negativa nel tree corrente |
@@ -236,14 +239,12 @@ Una regressione di località, qualità, privacy o kill switch riporta la lane a
 - definire una prova causale adeguata prima di riesaminare la qualified
   readiness in stato `HOLD`;
 - fissare benchmark e budget lane-specific aggiornati;
-- definire benchmark sintetico italiano e soglie prima di valutare il fallback
-  DeepSeek-OCR 2, mantenendo AnyDoc come unica estrazione automatica e ogni
-  dato nel processo locale;
+- definire benchmark sintetico italiano e soglie prima di valutare un adapter
+  DeepSeek-OCR 2, mantenendo AnyDoc come primo passaggio e ogni dato nel
+  processo locale;
 - verificare Apple Foundation Models in WUL-417 senza promozione implicita;
-- mantenere configurazione ed esecuzione dei provider remoti
-  `RELEASE_SCOPE_EXCLUDED` dalla 0.8.5;
-- completare F7 con modello provider tipizzato, classi di credenziale separate,
-  binding e function allowlist prima di abilitare provider esterni;
+- qualificare separatamente credenziali, rete, account policy e retention prima
+  di abilitare un provider esterno;
 - ricertificare separatamente ogni modello o provider prima di cambiare il
   binding host-owned;
 - mantenere il runtime MLX generico in `benchmark_only` senza usarlo come prova
@@ -255,10 +256,12 @@ state eseguite (WUL-502) e il contratto Intelligence Fabric e' definito in
 ADR 0090 e ADR 0091 chiudono il confine del candidato locale: paired solo
 status, fallback negato, nessun egress e nessuna scrittura clinica autonoma.
 ADR 0094 e il crosswalk 0.8.5 collegano i quattro smart path ai production root
-host-owned. ADR 0107 rende AnyDoc l'unica corsia automatica corrente e il
-runtime OCR resta non eseguibile. DeepSeek-OCR 2 è
-`RELEASE_SCOPE_EXCLUDED`: una direzione post-0.8.5 non modifica lo stato senza
-adapter, E2E, benchmark, soglie, ricomposizione e confini di egress verificati.
+host-owned. ADR 0107 rende AnyDoc il primo passaggio documentale; il candidato
+continua le sole pagine PDF `needsOcr` con Apple Vision sul Mac. La capability
+Fabric `ocr` resta non eseguibile. DeepSeek-OCR 2/CUDA è
+`OUT_OF_SCOPE_FOR_0.8.5_NON_BLOCKING`: una direzione futura non modifica lo
+stato senza adapter, E2E, benchmark, soglie, ricomposizione e confini di egress
+verificati.
 
 Queste decisioni non bloccano l'uso locale review-first già osservato come
 `runtime` sotto i boundary esistenti. Bloccano la ricertificazione WUL-418,

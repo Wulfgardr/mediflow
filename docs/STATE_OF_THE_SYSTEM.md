@@ -18,13 +18,13 @@ read_when:
 > prevalgono [AGENTS.md](../AGENTS.md) e
 > [docs/repository-topology.md](./repository-topology.md).
 
-Ultimo aggiornamento: 2026-09-03 (candidato sorgente locale v0.8.5)
+Ultimo aggiornamento: 2026-09-03 (contenuto sorgente v0.8.5)
 
 > [!NOTE]
-> Questo documento descrive il tree del candidato sorgente locale `0.8.5`.
-> Non prova CI remota, tag, GitHub Release, distribuzione o release readiness.
-> La release sorgente `0.8.2` resta l'ultimo checkpoint pubblicato descritto
-> nello storico del [CHANGELOG](../CHANGELOG.md).
+> Questo documento descrive il contenuto sorgente della `0.8.5`. Check CI su
+> exact SHA, artifact firmati, tag, GitHub Release e installazione esterna sono
+> evidenze di confine e non si deducono dal solo tree. Lo storico delle versioni
+> vive nel [CHANGELOG](../CHANGELOG.md).
 
 ---
 
@@ -72,18 +72,17 @@ La fotografia corrente e questa:
   clinical scales e store SQLite locale; Linux e Windows oggi verificano la
   portabilita del core in CI, non una parity applicativa completa.
 - **Parity UI 0.8**: iPhone 2/2, iPad 7/7, build/probe macOS e localhost 82/82
-  sono PASS della baseline storica `0843726fe`, non del candidato exact-tree
-  `0.8.5`. Il volume Xcode è ora disponibile su questo host e la toolchain ha
-  completato prove preliminari prima del tree finale; la verifica terminale
-  exact-tree resta evidenza separata. La parity resta clinico-semantica, non
+  sono PASS della baseline storica `0843726fe`, non una prova implicita per una
+  revisione successiva. Il volume Xcode è disponibile; le verifiche exact-SHA
+  appartengono ai receipt del closeout. La parity resta clinico-semantica, non
   pixel. VoiceOver reale mobile non è provato e la deroga storica non
   autorizza claim di conformità.
-- **Checkpoint pubblicato 0.8.2**: le PR 163-176 sono su `main`. I commit finali hanno
+- **Checkpoint storico 0.8.2**: le PR 163-176 sono su `main`. I commit finali hanno
   review DeepSeek e Sol pulite. Sul push a `main`, Apple Native ha superato
   build, suite iPhone e 4/4 contratti iPad senza skip.
-- **Candidato sorgente locale 0.8.5**: il tree integra i contratti e i percorsi
-  locali della patch. Non e una release, non e release-ready e non dispone di
-  una prova CI remota sulla stessa SHA.
+- **Perimetro sorgente 0.8.5**: il tree integra i contratti e i percorsi locali
+  della patch. Il suo contenuto non sostituisce i receipt exact-SHA e di
+  pubblicazione.
 - **Document intelligence**: AnyDoc resta il primo passaggio automatico locale
   e non usa servizi hosted. Per i PDF supportati, il tree classifica e
   renderizza soltanto le pagine `needsOcr`, usa Apple Vision localmente e
@@ -112,28 +111,31 @@ La fotografia corrente e questa:
   `needsOcr`; DeepSeek-OCR 2/CUDA non è un gate della patch. F7 integra
   provider v2, secret broker, adapter ufficiali e una probe amministrativa
   OpenAI/Anthropic `default OFF`. Non esistono credenziali, rete live o runtime
-  readiness cloud nel candidato.
+  readiness cloud nel perimetro 0.8.5.
 - **Fabric capability-first**: il selector guidato copre cinque capability,
   filtra profili compatibili, esegue smoke sintetici e attiva binding host-owned
   in modo atomico con CAS e rollback. Non persiste segreti e non qualifica il
   runtime.
 - **Headless**: il Supervisor Node portabile avvia Web standalone e MCP
-  `stdio` come figli distinti su IPC ereditato. MCP e Mini raggiungono
-  catalogo, terminology search, Open Loops patient-scoped, proposta follow-up
-  e query semantica bounded read-only. Contesto, lifecycle, revoca e audit
-  restano host-owned; lo smoke standalone del tree finale è un gate separato.
+  `stdio` come figli distinti su IPC ereditato. MCP raggiunge catalogo,
+  terminology search, Open Loops patient-scoped, proposta follow-up e query
+  semantica bounded read-only. Mini condivide catalogo e foundation CLI ma non
+  ha un binding production al Supervisor e fallisce chiuso senza parent AIP.
+  Contesto, lifecycle, revoca e audit restano host-owned; lo smoke standalone
+  del tree finale è un gate separato.
 - **Write F10**: MCP produce soltanto la preview della transizione
   `pending -> completed|cancelled`. La UI trusted rilegge la risorsa e richiede
   ruolo medico attivo, step-up e gesto operation-specific; il commit Web usa
   CAS, idempotenza, audit e receipt atomici. Il proof non attraversa MCP.
-- **Planner candidato**: core, operazione read-only, superficie MCP/Mini e
-  binding del Supervisor sono integrati. Il piano usa al massimo due
-  operazioni allowlisted; SQL diretto e scritture restano vietati.
+- **Planner candidato**: core, operazione read-only e adapter MCP/Mini sono
+  presenti; il binding production del Supervisor è soltanto MCP. Il piano usa
+  al massimo due operazioni allowlisted; SQL diretto e scritture restano
+  vietati.
 - **Recording locale**: la shell macOS integra cattura e trascrizione italiana
   Apple on-device su macOS 26 o successivo, con consenso esplicito, audio
   bounded solo in RAM e review del transcript. Non esegue writer automatici;
   lo smoke con microfono reale e la validazione clinica restano fuori dal
-  claim del candidato.
+  claim della 0.8.5.
 - **Attese locali**: la prima slice web collega prestazioni attese e risultati;
   il salvataggio resta esplicito e il workflow non e esteso ai client paired.
 - **SISS/FSE**: handoff contestuale e flussi `webapp-assisted`; nessuna
@@ -226,7 +228,7 @@ La document intelligence e `artifact-first`:
   AnyDoc in un processo locale bounded;
 - AnyDoc produce Markdown normalizzato, evidenza e provenienza senza usare rete
   o servizi hosted;
-- il candidato classifica le sole pagine `needsOcr`, le materializza e le
+- la 0.8.5 classifica le sole pagine `needsOcr`, le materializza e le
   renderizza con limiti bounded e usa Apple Vision sul Mac, senza rete;
 - il risultato viene ricomposto nell'ordine originale e pubblicato soltanto se
   sorgente e sessione sono ancora correnti;
@@ -294,9 +296,10 @@ Documenti/ADR principali:
 | Ollama | Provider locale capability-specific | Percorsi generativi Fabric ammessi dalla capability | Solo loopback; nessun OCR o fallback implicito |
 | ATHENA/MLX | Provider locale capability-specific | Solo Treatment Reasoning review-only | Nessuna prescrizione o apply clinico |
 | OpenAI / Anthropic | Adapter ufficiali `default OFF` | Probe amministrativa Document Synthesis review-only con policy e secret reference host-owned | Solo transport fake nel tree; nessuna credenziale, rete live o runtime readiness |
-| MCP / Mini | Superficie figlia candidata | Catalogo, terminology search, Open Loops patient-scoped, proposta follow-up e query semantica bounded read-only | MCP usa il Supervisor locale del candidato; nessuna authority caller-supplied |
+| MCP | Superficie figlia locale | Catalogo, terminology search, Open Loops patient-scoped, proposta follow-up e query semantica bounded read-only | Usa il Supervisor locale della 0.8.5; nessuna authority caller-supplied |
+| Mini | Foundation CLI fail-closed | Catalogo e adapter tipizzati senza callsite production del Supervisor | Nessun grant senza parent AIP; nessun accesso SQLite diretto |
 | Write checkup F10 | Integrata end-to-end | Preview MCP e commit Web con ruolo, step-up, gesto, CAS, idempotenza, audit e receipt | L'agente non riceve proof e non esegue il commit |
-| Semantic planner | Integrato, sola lettura | Core, validazione, esecutore, superficie MCP/Mini e binding Supervisor integrati | Massimo due operazioni allowlisted; nessun SQL libero o write |
+| Semantic planner | Integrato, sola lettura | Core, validazione, esecutore e adapter MCP/Mini presenti; binding Supervisor production soltanto MCP | Massimo due operazioni allowlisted; nessun SQL libero o write |
 | ICD-11 WHO | Application Service server-only | Ricerca diagnosi/coding con output MediFlow data-only | Disattivato per default; egress e credenziali host-owned espliciti |
 | OpenMed | Shadow/benchmark | Redaction lane locale non client-facing | Non runtime clinico |
 
@@ -385,7 +388,7 @@ Documenti/ADR principali:
 
 ## 🤖 5. AI stack e regole di promozione
 
-### 5.1 Runtime operativo del candidato locale 0.8.5
+### 5.1 Runtime operativo locale 0.8.5
 
 Il runtime AI operativo resta locale. Il default generativo protetto e trattato
 come baseline finche benchmark e governance non giustificano un cambio.
@@ -425,7 +428,7 @@ Il router documentale usa `shadow` come default. La modalita `active` puo
 evitare il modello solo su route esplicitamente eleggibili ad alta confidenza;
   non promuove mai proposte cliniche senza review e salvataggio espliciti.
 
-### 5.1.1 Candidato sorgente locale 0.8.5
+### 5.1.1 Perimetro sorgente 0.8.5
 
 Il crosswalk machine-readable
 [`fabric-generative-runtime-crosswalk.v1.json`](./capability-mapping/fabric-generative-runtime-crosswalk.v1.json)
@@ -441,11 +444,11 @@ receipt storica `candidate_not_integrated`.
   integrato nella composizione AnyDoc e non costituisce una production root
   Fabric.
 
-Questo stato e locale al tree. Non prova CI remota, release readiness, tag,
+Questo stato descrive il tree. Da solo non prova CI remota, firma, tag,
 pubblicazione, installazione o disponibilita operativa su un altro host. Lo
 smoke ATHENA è una singola osservazione, non un benchmark o uno SLI. Non esiste
 un benchmark di release per latenza, throughput, qualita generativa o
-accuratezza OCR; il candidato non fa claim di prestazione su questi aspetti.
+accuratezza OCR; la 0.8.5 non fa claim di prestazione su questi aspetti.
 
 ### 5.1.2 Esiti di perimetro F6 e F7
 
@@ -462,14 +465,16 @@ Una sottoscrizione o un login consumer OpenAI/Anthropic non costituiscono
 accesso API. Registry, probe e adapter non autorizzano onboarding, invio di PHI
 o esecuzione remota.
 
-### 5.1.3 Headless, MCP e Mini candidati
+### 5.1.3 Headless, MCP e Mini nella 0.8.5
 
-Il Supervisor Node portabile è il trusted parent del candidato locale: avvia
+Il Supervisor Node portabile è il trusted parent del runtime locale: avvia
 Web standalone e MCP come processi figli distinti su IPC ereditato e possiede
-contesto, lease, revoca e audit. MCP `stdio` e Mini pubblicano catalogo,
-terminology search, Open Loops patient-scoped, proposta follow-up
-`proposal_only` e query semantica bounded read-only. Gli adapter non importano
-SQLite, non accettano authority caller-supplied e non aprono listener.
+contesto, lease, revoca e audit. MCP `stdio` pubblica catalogo, terminology
+search, Open Loops patient-scoped, proposta follow-up `proposal_only` e query
+semantica bounded read-only. Mini condivide catalogo e foundation CLI ma non ha
+un callsite production del Supervisor e fallisce chiuso senza parent AIP. Gli
+adapter non importano SQLite, non accettano authority caller-supplied e non
+aprono listener.
 
 F10 espone via MCP soltanto la preview `pending -> completed|cancelled`. La UI
 Web trusted ricontrolla la risorsa, richiede ruolo medico attivo, step-up e gesto
@@ -483,7 +488,7 @@ macOS integra inoltre cattura e trascrizione italiana Apple on-device, con
 consenso esplicito, audio bounded solo in RAM e trasferimento al draft dopo
 review; non esegue writer clinici automatici. Il terminal smoke standalone sul
 tree finale, installer, onboarding ed esercizio su host esterni restano prove
-separate dal candidato sorgente locale. Egress implicito ed esecuzione AI dai
+separate dal contenuto sorgente della 0.8.5. Egress implicito ed esecuzione AI dai
 client paired restano chiusi.
 
 ### 5.2 Lane benchmark-only
@@ -500,7 +505,7 @@ Le lane seguenti restano separate dal runtime clinico:
 - esperimenti MLX diversi dalla capability nominata Treatment Reasoning;
 - comparator cloud storico, escluso dal candidato `0.8.5`.
 
-MLX non diventa un provider generico: nel candidato 0.8.5 ATHENA/MLX e ammesso
+MLX non diventa un provider generico: nella 0.8.5 ATHENA/MLX e ammesso
 solo dalla capability Treatment Reasoning. Ollama resta capability-specific e
 non esegue OCR; il fallback Apple Vision appartiene al confine AnyDoc locale.
 Ogni altra lane MLX resta benchmark, shadow o hold secondo la matrice di
@@ -708,7 +713,7 @@ Disponibile:
 
 Fotografia parity post-Wave 5:
 
-- 64 capability censite: 30 full, 13 partial, 21 host-only, 0 missing-both;
+- 66 capability censite: 30 full, 13 partial, 23 host-only, 0 missing-both;
 - tra le 43 capability per cui la parity è un obiettivo, 30 sono full (70%);
 - PR #21 e `WUL-401`, ora completata, hanno consegnato bundle, fixture, probe AX
   e runbook P6 di base; prerequisiti operativi e verbale manuale sul Mac

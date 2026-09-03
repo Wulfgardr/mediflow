@@ -38,9 +38,10 @@ destinazione di export. Dati e artifact sensibili restano fuori da Git secondo
 
 Nota documentale 0.8.5: AnyDoc resta il primo passaggio automatico locale. Il
 tree include routing, manifest, materializzazione e rendering delle sole pagine
-`needsOcr`, oltre al preflight DeepSeek-OCR 2 con fake seam. Il runtime adapter
-non è integrato; prova live e benchmark E2E mancano. Le route OCR legacy
-rispondono `410` dopo l'autenticazione.
+`needsOcr`, quindi usa Apple Vision localmente sul Mac e ricompone il risultato
+sotto currentness host-owned. DeepSeek-OCR 2/CUDA è
+`OUT_OF_SCOPE_FOR_0.8.5_NON_BLOCKING`; il tree ne conserva soltanto contratto e
+seam sintetiche. Le route OCR legacy rispondono `410` dopo l'autenticazione.
 
 Nota ATHENA 0.8.5: Treatment Reasoning è incluso solo con artifact del modello
 e runner MLX locali configurati. L'override host-owned
@@ -244,20 +245,18 @@ dipendenti da sessioni consumer.
 
 Mantieni inoltre separate le due modalità architetturali: un provider eseguito
 dentro MediFlow e MediFlow invocato come servizio governato da un host
-intelligente. MCP `stdio` e Mini usano soltanto RPC AIP ereditato e Application
-Services nominati. Launcher production e quickstart restano
-`PRODUCTION_BRIDGE_BLOCKER`; non autorizzano installer, onboarding, listener o
-accesso diretto a SQLite. La soluzione scelta è un Supervisor portabile come
-trusted parent su IPC ereditato: la topologia è `DECIDED`, l'implementazione è
-`SPLIT_REQUIRED`. Prima di dichiarare delivery servono late-bind trusted-UI,
-owner sincrono di `readHostContext`, lifecycle e revoca production, audit
-terminale sincrono e relativi test. Non introdurre broker residente o UDS nella
-`0.8.5`.
+intelligente. Il Supervisor Node locale avvia Web standalone e MCP `stdio` come
+figli distinti su IPC ereditato. MCP usa soltanto RPC AIP e Application Services
+nominate, senza listener proprio o accesso diretto a SQLite. Mini condivide il
+catalogo e la foundation CLI ma, senza un callsite production del Supervisor,
+deve fallire chiuso in assenza del parent AIP. Mantieni
+fuori dal claim installer, onboarding e compatibilità con host MCP esterni; non
+introdurre broker residente o UDS nella `0.8.5`.
 
-La transizione stato checkup F10 resta un candidato interno. Non aggiungerla al
-catalogo launcher, MCP o Mini senza un binding trusted-UI che mantenga gesto,
-proof monouso, currentness e authority host-owned. Finché manca quel binding,
-il gate è `INTERNAL_CANDIDATE_VERIFIED / AUTHORITY_UI_BINDING_BLOCKER`.
+Per F10, MCP può creare soltanto la preview della transizione checkup. Mantieni
+proof e commit nella UI Web trusted, con rilettura, ruolo medico attivo, step-up,
+gesto operation-specific, currentness, CAS, idempotenza, audit e receipt. Non
+concedere all'agente il proof o l'autorità di commit.
 
 ---
 
@@ -381,8 +380,8 @@ Una PR è considerata conclusa quando:
 - se cambi un path Fabric 0.8.5, il check e il test del crosswalk generativo
   passano
 - se cambi l'estrazione degli allegati, i check AnyDoc local-only passano,
-  immagini/scansioni falliscono chiuse e le route OCR legacy autenticate
-  restano `410`
+  Apple Vision riceve soltanto le pagine PDF `needsOcr`, gli input non
+  supportati falliscono chiusi e le route OCR legacy autenticate restano `410`
 - se cambi Headless, AIP, MCP o Mini, esegui
   `npm run check:headless-portable-imports`,
   `npm run test:headless-portable`,

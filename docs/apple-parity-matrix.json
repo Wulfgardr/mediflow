@@ -2,8 +2,8 @@
   "generated": "2026-08-21",
   "source": "MediFlow 0.8 parity closeout against the frozen local source candidate",
   "release08Gate": {
-    "asOf": "2026-07-28",
-    "status": "source-candidate-ready-with-external-limitation",
+    "asOf": "2026-09-03",
+    "status": "hold-promotion",
     "scope": [
       "iPhone/iPad",
       "macOS",
@@ -31,18 +31,18 @@
       {
         "surface": "macOS",
         "owner": "CoS parity 0.8",
-        "status": "verified",
-        "requiredEvidence": "build Xcode 27, resize, click-map, focus, Cmd-R contestuale e VoiceOver manuale"
+        "status": "historical-evidence-current-sha-pending",
+        "requiredEvidence": "receipt exact-SHA con suite e build Xcode stabile; resize, click-map, focus, Cmd-R contestuale e VoiceOver manuale restano evidenza della baseline storica"
       },
       {
         "surface": "localhost/web",
         "owner": "CoS parity 0.8",
-        "status": "verified",
-        "requiredEvidence": "82/82, responsive 320/390/768/1440, tastiera/focus e zoom browser reale 200/400"
+        "status": "historical-evidence-current-screen-reader-pending",
+        "requiredEvidence": "gate web exact-SHA e sessione screen-reader terminale; responsive 320/390/768/1440, tastiera/focus e zoom browser reale 200/400 restano evidenza della baseline storica"
       }
     ],
-    "blockingRule": "Un P1 confermato blocca il gate. La sola deroga accettata è il limite esterno VoiceOver mobile della candidata sorgente GitHub 0.8.",
-    "note": "Il limite non equivale a PASS VoiceOver, conformance, prova device, App Store readiness o certificazione. Questo oggetto non modifica i conteggi delle 64 capability.",
+    "blockingRule": "Un P1 confermato, un receipt exact-SHA richiesto assente o una prova assistiva non terminale bloccano la promozione. La sola deroga esterna già accettata è il limite VoiceOver mobile della candidata sorgente GitHub 0.8.",
+    "note": "Il limite non equivale a PASS VoiceOver, conformance, prova device, App Store readiness o certificazione. Questo oggetto non modifica i conteggi delle 66 capability.",
     "acceptedExternalLimitation": {
       "surface": "iPhone/iPad",
       "technology": "VoiceOver",
@@ -758,12 +758,14 @@
       "verifiedRealInteraction": [0, 31, 32],
       "platformSpecificDocumented": [14, 15],
       "partial": [2, 3, 4, 7, 9, 11, 19, 35, 44],
-      "blocked": [
+      "pending": [
         {
-          "scope": "new macOS Xcode 27 build and suite",
+          "scope": "exact-SHA macOS Xcode build and suite",
           "surfaces": ["macOS"],
-          "reason": "disk5s1 is not mountable and fsck_apfs exits with -69845. The existing built bundle passed at 1100, 1300 and 1600 points."
-        },
+          "reason": "The Xcode volume is available; exact-SHA evidence belongs to the release closeout receipt and is not inferred from this static parity manifest."
+        }
+      ],
+      "blocked": [
         {
           "scope": "real VoiceOver session",
           "surfaces": ["iPhone", "iPad"],
@@ -777,10 +779,10 @@
       ]
     },
     "currentEvidence": {
-      "backend": "8083bc05 source integrated with audit-flow and delegated-writer gate fixes",
-      "webEvidenceStack": "2/2 E2E PASS with synthetic PIN 0000; populated, curation, empty, loading and conservative error states",
-      "webProduction": "104 pages and standalone build PASS; Chrome production at exact 200% and 400% zoom, main controls visible, no dev badge",
-      "macOS": "clipping code integrated; built Xcode 27 bundle PASS at 1100, 1300 and 1600 points; click-map, focus, arrow input and real VoiceOver active before and after",
+      "backend": "Historical baseline 8083bc05: source integrated with audit-flow and delegated-writer gate fixes",
+      "webEvidenceStack": "Historical baseline: 2/2 E2E PASS with synthetic PIN 0000; populated, curation, empty, loading and conservative error states",
+      "webProduction": "Historical baseline: 104 pages and standalone build PASS; Chrome production at exact 200% and 400% zoom, main controls visible, no dev badge",
+      "macOS": "Historical baseline: clipping code integrated; built Xcode 27 bundle PASS at 1100, 1300 and 1600 points; click-map, focus, arrow input and real VoiceOver active before and after",
       "axProbe": "corrected to select native List rows, bind patient-specific detail content and avoid terminating external MediFlow sessions; typecheck and 6/6 tests PASS",
       "offline": "WUL-556 candidate makes loading/error/online/cache/offline/session-expired visible on iPhone/iPad and defines the stale presentation contract. WUL-403 remains open for live TTL metadata and stale-state wiring."
     },
@@ -795,7 +797,7 @@
     },
     "verdict": "PARTIAL / HOLD_PROMOTION"
   },
-  "updated": "2026-08-22: consumed the byte-identical Mini parity manifest from PR #184 head 3fd988b and PR #190 head 1e35733 without changing Apple gap classifications; promotion remains held for manager verification and WUL-564. Previous: 2026-08-07 aligned the 66-row feature contract with the AI settings information architecture and corrected the AI conversational endpoint evidence.",
+  "updated": "2026-09-03: corrected the stale capability narrative to 66/30/13/23 and recorded that exact-SHA Xcode proof is release-boundary evidence outside this static manifest. Previous: 2026-08-22 consumed the byte-identical Mini parity manifest from PR #184 head 3fd988b and PR #190 head 1e35733 without changing Apple gap classifications.",
   "version": 2,
   "summary": {
     "total": 66,
