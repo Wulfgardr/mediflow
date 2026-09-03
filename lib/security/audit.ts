@@ -55,6 +55,8 @@ export const AUDIT_EVENT_TYPES = [
     'ambulatory.cleared',
     'ai.review.accepted',
     'ai.review.rejected',
+    /* @Codex: terminal PHI-safe outcome for the fixed synthetic cloud-provider probe. */
+    'ai.provider_probe.executed',
     /* @Codex: terminal PHI-safe audit for the bounded semantic-query operation. */
     'agent.semantic_query.executed',
     /* @Codex: non-terminal PHI-safe attempt emitted by generic AIP ports. */

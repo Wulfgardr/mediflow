@@ -1,6 +1,7 @@
 /* @Codex */
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import {
@@ -195,12 +196,92 @@ test('la factory production resta OFF senza i due opt-in host e non osserva cred
     try {
         for (const name of names) delete process.env[name];
         assert.equal(createDocumentSynthesisCloudProbeFromHostEnvironment(), null);
+        process.env.MEDIFLOW_PROVIDER_V2_SELECTION = 'openai';
+        process.env.MEDIFLOW_PROVIDER_V2_ENABLED = '1';
+        assert.equal(createDocumentSynthesisCloudProbeFromHostEnvironment(), null);
+        delete process.env.MEDIFLOW_PROVIDER_V2_ENABLED;
+        process.env.MEDIFLOW_PROVIDER_V2_NETWORK = '1';
+        assert.equal(createDocumentSynthesisCloudProbeFromHostEnvironment(), null);
     } finally {
         names.forEach((name, index) => {
             const value = previous[index];
             if (value === undefined) delete process.env[name]; else process.env[name] = value;
         });
     }
+});
+
+test('la factory production raggiunge entrambi i transport ufficiali solo attraverso fetch intercettata', { concurrency: false }, async () => {
+    const names = [
+        'MEDIFLOW_PROVIDER_V2_ENABLED', 'MEDIFLOW_PROVIDER_V2_NETWORK', 'MEDIFLOW_PROVIDER_V2_SELECTION',
+        'MEDIFLOW_ANTHROPIC_KEY_SCOPE', 'MEDIFLOW_ANTHROPIC_WORKSPACE_ID',
+        'OPENAI_API_KEY', 'ANTHROPIC_API_KEY',
+    ] as const;
+    const previous = new Map(names.map((name) => [name, process.env[name]]));
+    const nativeFetch = globalThis.fetch;
+    try {
+        for (const name of names) delete process.env[name];
+        for (const provider of ['openai', 'anthropic'] as const) {
+            let calls = 0;
+            const secret = provider === 'openai' ? OPENAI_SECRET : ANTHROPIC_SECRET;
+            globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+                calls += 1;
+                const url = String(input);
+                const headers = init?.headers as Headers;
+                const body = String(init?.body ?? '');
+                assert.equal(url, provider === 'openai'
+                    ? 'https://api.openai.com/v1/responses'
+                    : 'https://api.anthropic.com/v1/messages');
+                assert.equal(headers.get(provider === 'openai' ? 'authorization' : 'x-api-key'),
+                    provider === 'openai' ? `Bearer ${secret}` : secret);
+                assert.match(body, /synthetic non-clinical fixture/iu);
+                assert.doesNotMatch(body, /patient|diagnos|therapy/iu);
+                assert.equal(body.includes(secret), false);
+                return provider === 'openai'
+                    ? new Response(JSON.stringify(openAIResponse()), { status: 200 })
+                    : new Response(JSON.stringify(anthropicResponse()), {
+                        status: 200, headers: { 'anthropic-workspace-id': WORKSPACE_ID },
+                    });
+            }) as typeof fetch;
+            process.env.MEDIFLOW_PROVIDER_V2_ENABLED = '1';
+            process.env.MEDIFLOW_PROVIDER_V2_NETWORK = '1';
+            process.env.MEDIFLOW_PROVIDER_V2_SELECTION = provider;
+            process.env[provider === 'openai' ? 'OPENAI_API_KEY' : 'ANTHROPIC_API_KEY'] = secret;
+            if (provider === 'anthropic') {
+                process.env.MEDIFLOW_ANTHROPIC_KEY_SCOPE = 'workspace_scoped';
+                process.env.MEDIFLOW_ANTHROPIC_WORKSPACE_ID = WORKSPACE_ID;
+            }
+
+            const probe = createDocumentSynthesisCloudProbeFromHostEnvironment();
+            assert.ok(probe);
+            const result = await probe.execute();
+            assert.ok(result);
+            assert.equal(result.receipt.providerId, provider);
+            assert.equal(result.receipt.outcome, 'complete');
+            assert.equal(result.writesPerformed, 0);
+            assert.equal(result.receipt.fallbackCount, 0);
+            assert.equal(JSON.stringify(result).includes(secret), false);
+            assert.equal(calls, 1);
+            assert.equal(await probe.execute(), null);
+            assert.equal(calls, 1);
+        }
+    } finally {
+        for (const name of names) {
+            const value = previous.get(name);
+            if (value === undefined) delete process.env[name]; else process.env[name] = value;
+        }
+        globalThis.fetch = nativeFetch;
+    }
+});
+
+test('il callsite production accetta solo un gesto admin esplicito e non riceve provider, modello, prompt o segreti', () => {
+    const route = readFileSync(new URL('../../../app/api/system/cloud-provider-probe/route.ts', import.meta.url), 'utf8');
+    assert.match(route, /requireSession\(\)/u);
+    assert.match(route, /isWebAdminSession\(session\)/u);
+    assert.match(route, /run_synthetic_nonclinical_probe/u);
+    assert.match(route, /createDocumentSynthesisCloudProbeFromHostEnvironment\(\)/u);
+    assert.doesNotMatch(route, /requireSessionOrLocalToken|OPENAI_API_KEY|ANTHROPIC_API_KEY/u);
+    const acceptedBody = route.slice(route.indexOf('function exactIntent'), route.indexOf('async function readIntent'));
+    assert.doesNotMatch(acceptedBody, /\b(?:provider|model|prompt|secret)\b/u);
 });
 
 test('la seam di test non e disponibile fuori dal Node test runner', () => {

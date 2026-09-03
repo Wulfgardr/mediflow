@@ -58,6 +58,7 @@ test('audit catalog includes the PHI-safe application lock and reference-data vo
     assert.equal(AUDIT_EVENT_TYPES.includes('auth.lock'), true);
     assert.equal(AUDIT_EVENT_TYPES.includes('auth.soap_active_role.enrolled'), true);
     assert.equal(AUDIT_EVENT_TYPES.includes('reference_data.icd11.search'), true);
+    assert.equal(AUDIT_EVENT_TYPES.includes('ai.provider_probe.executed'), true);
     assert.equal(AUDIT_EVENT_TYPES.includes('agent.semantic_query.executed'), true);
     assert.equal(AUDIT_EVENT_TYPES.includes('agent.operation.attempted'), true);
 });
