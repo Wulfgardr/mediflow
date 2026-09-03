@@ -48,7 +48,6 @@ const allowedUnsafeLoaderExpressions: ReadonlySet<string> = new Set([
     fingerprint('lib/pm2-manager.test.ts', 'unsafe:require', 'CallExpression', 'VariableStatement', 'require(managerPath)'),
     fingerprint('lib/pm2-manager.test.ts', 'unsafe:require', 'CallExpression', 'ExpressionStatement', 'require(managerPath)'),
     fingerprint('lib/backup-restore-preflight.ts', 'unsafe:require', 'CallExpression', 'ReturnStatement', "require('./data-dir')"),
-    fingerprint('lib/pdfjs-server.ts', 'unsafe:Function', 'NewExpression', 'VariableStatement', "new Function('specifier', 'return import(specifier);')"),
 ]);
 const allowedProtectedLoaderExpressions: ReadonlyMap<string, number> = new Map([
     [protectedFingerprint('lib/security/server-session', 'lib/security/server-session.test.ts', 'loader-resolve', 'CallExpression', 'VariableStatement', "nodeRequire.resolve('./server-session.ts')"), 30],

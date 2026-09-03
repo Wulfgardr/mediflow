@@ -7,13 +7,14 @@ import test from 'node:test';
 import { PDFDocument } from 'pdf-lib';
 import {
     ANYDOC_PDF_PAGE_MATERIALIZER_MAX_OUTPUT_BYTES,
+    ANYDOC_PDF_PAGE_MATERIALIZER_DESCRIPTOR,
     ANYDOC_PDF_PAGE_MATERIALIZER_SHA256,
     materializeAnyDocPdfPages,
 } from './anydoc-pdf-page-materializer';
 import { ANYDOC_LOCAL_EXTRACTION_MAX_SOURCE_BYTES } from './anydoc-local-extraction-contract';
 
-const ENGINE_SHA256 = 'a7cc1eaf12e41e612a7be581162a63b18118aefc01e90f6a1f35347b1f324a1c';
-const sha256 = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
+const ENGINE_SHA256 = '750792ee20855cf0060a5936efd9ad72907ab612db43c9ec28ff2d323918d8db';
+const sha256 = (bytes: Uint8Array | string) => createHash('sha256').update(bytes).digest('hex');
 const routing = (pageCount: number, pages: readonly number[] = [1]) => ({
     schemaVersion: 'mediflow.anydoc_page_routing.v1' as const, pages, pageCount,
 });
@@ -125,9 +126,10 @@ test('enforces source, page-count and cumulative output byte limits without part
     if (result.status === 'review_required') assert.equal(result.reason, 'resource_limit');
 });
 
-test('pins the reviewed engine graph and excludes renderer, parser, routing and fallback imports', () => {
+test('pins the reviewed child engine graph and excludes parser, renderer and PDF engines from the parent', () => {
     const root = new URL('../../../', import.meta.url); const pkg = JSON.parse(readFileSync(new URL('package.json', root), 'utf8'));
     const lock = JSON.parse(readFileSync(new URL('package-lock.json', root), 'utf8')); const source = readFileSync(new URL('./anydoc-pdf-page-materializer.ts', import.meta.url), 'utf8');
+    const worker = readFileSync(new URL('../../../scripts/anydoc-pdf-page-worker.mjs', import.meta.url), 'utf8');
     assert.equal(pkg.dependencies['pdf-lib'], '1.17.1');
     const expected = [
         ['node_modules/pdf-lib', '1.17.1', 'sha512-V/mpyJAoTsN4cnP31vc0wfNA1+p20evqqnap0KLoRUN0Yk/p3wN52DOEsL4oBFcLdb76hlpKPtzJIgo67j/XLw==', 'MIT'],
@@ -143,6 +145,10 @@ test('pins the reviewed engine graph and excludes renderer, parser, routing and 
         [version, integrity, license],
     );
     for (const [path] of expected) assert.equal(lock.packages[path]?.hasInstallScript, undefined);
-    assert.match(source, /from 'pdf-lib'/u); assert.match(source, /ignoreEncryption: false/u); assert.match(source, /copyPages\(/u); assert.match(source, /\.addPage\(/u); assert.match(source, /\.save\(/u);
-    assert.doesNotMatch(source, /@firecrawl\/anydoc|pdfjs-dist|jspdf|pdf-inspector|render|extractText|fetch\(|https?:/iu);
+    assert.equal(sha256(ANYDOC_PDF_PAGE_MATERIALIZER_DESCRIPTOR), ANYDOC_PDF_PAGE_MATERIALIZER_SHA256);
+    assert.match(source, /runAnyDocPdfMaterializationChild\(bytes, routing\.pageCount\)/u);
+    assert.doesNotMatch(source, /from 'pdf-lib'|import\('pdf-lib'\)/u);
+    assert.match(worker, /import\('pdf-lib'\)/u); assert.match(worker, /ignoreEncryption: false/u);
+    assert.match(worker, /copyPages\(/u); assert.match(worker, /\.addPage\(/u); assert.match(worker, /\.save\(/u);
+    assert.doesNotMatch(source, /@firecrawl\/anydoc|jspdf|pdf-inspector|extractText|fetch\(|https?:/iu);
 });

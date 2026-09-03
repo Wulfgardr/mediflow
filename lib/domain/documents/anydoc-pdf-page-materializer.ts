@@ -2,21 +2,34 @@
 import { createHash } from 'node:crypto';
 import { types } from 'node:util';
 
-import { PDFDocument } from 'pdf-lib';
 import { ANYDOC_LOCAL_EXTRACTION_MAX_SOURCE_BYTES } from './anydoc-local-extraction-contract';
 import {
     ANYDOC_PAGE_ROUTING_MAX_PAGE_COUNT,
     ANYDOC_PAGE_ROUTING_SCHEMA_VERSION,
     type AnyDocPageRoutingEvidence,
 } from './anydoc-local-extraction-runner';
+import {
+    ANYDOC_PDF_CHILD_PROTOCOL_SCHEMA_VERSION,
+    ANYDOC_PDF_CHILD_MAX_OLD_SPACE_MB,
+    ANYDOC_PDF_CHILD_WORKER_SHA256,
+    runAnyDocPdfMaterializationChild,
+    type AnyDocPdfChildFailureReason,
+} from './anydoc-pdf-child-process-owner';
 
 export const ANYDOC_PDF_PAGE_MATERIALIZER_SCHEMA_VERSION = 'mediflow.anydoc_pdf_page_materializer.v1' as const;
 export const ANYDOC_PDF_PAGE_MATERIALIZER_MAX_OUTPUT_BYTES = 25 * 1024 * 1024;
-export const ANYDOC_PDF_PAGE_MATERIALIZER_SHA256 = 'a7cc1eaf12e41e612a7be581162a63b18118aefc01e90f6a1f35347b1f324a1c' as const;
+export const ANYDOC_PDF_PAGE_MATERIALIZER_DESCRIPTOR = [
+    'engine=pdf-lib@1.17.1',
+    `isolation=${ANYDOC_PDF_CHILD_PROTOCOL_SCHEMA_VERSION};workerSha256=${ANYDOC_PDF_CHILD_WORKER_SHA256};maxOldSpaceMb=${ANYDOC_PDF_CHILD_MAX_OLD_SPACE_MB};permission=readOnlyPackageRoot,noWrite,noChild,noWorker;addons=denied;networkGuard=closedImportsAndGlobals`,
+    `limits=source:${ANYDOC_LOCAL_EXTRACTION_MAX_SOURCE_BYTES},pages:${ANYDOC_PAGE_ROUTING_MAX_PAGE_COUNT},output:${ANYDOC_PDF_PAGE_MATERIALIZER_MAX_OUTPUT_BYTES}`,
+    'options=ignoreEncryption:false,throwOnInvalidObject:true,updateMetadata:false,useObjectStreams:false',
+].join('\n');
+export const ANYDOC_PDF_PAGE_MATERIALIZER_SHA256 = '750792ee20855cf0060a5936efd9ad72907ab612db43c9ec28ff2d323918d8db' as const;
 
 export type AnyDocPdfPageMaterializationFailureReason =
     | 'invalid_input' | 'source_digest_mismatch' | 'invalid_routing'
-    | 'malformed_or_encrypted_pdf' | 'page_count_mismatch' | 'resource_limit';
+    | 'malformed_or_encrypted_pdf' | 'page_count_mismatch' | 'resource_limit'
+    | 'timeout' | 'worker_unavailable';
 
 export interface AnyDocPdfPageMaterializationReceipt {
     readonly sourceSha256: string;
@@ -86,36 +99,32 @@ function validatedRouting(input: unknown): AnyDocPageRoutingEvidence | null {
         pages: Object.freeze(pages as number[]), pageCount });
 }
 
-async function materialize(bytes: Buffer, sourceSha256: string, routing: AnyDocPageRoutingEvidence) {
-    let source: PDFDocument; let pageCount: number;
-    try {
-        source = await PDFDocument.load(bytes, {
-            ignoreEncryption: false, throwOnInvalidObject: true, updateMetadata: false, capNumbers: true,
-        });
-        pageCount = source.getPageCount();
-    } catch { return denied('malformed_or_encrypted_pdf'); }
-    if (pageCount !== routing.pageCount) return denied('page_count_mismatch');
+function childFailure(reason: AnyDocPdfChildFailureReason): AnyDocPdfPageMaterializationResult {
+    if (reason === 'malformed_or_encrypted_pdf' || reason === 'page_count_mismatch'
+        || reason === 'resource_limit' || reason === 'timeout') return denied(reason);
+    return denied('worker_unavailable');
+}
 
-    const pages: AnyDocMaterializedPdfPage[] = []; let totalBytes = 0;
-    for (let index = 0; index < routing.pageCount; index += 1) {
-        try {
-            const target = await PDFDocument.create({ updateMetadata: false });
-            const [page] = await target.copyPages(source, [index]);
-            if (!page) return denied('page_count_mismatch');
-            target.addPage(page);
-            const pdfBytes = Buffer.from(await target.save({
-                useObjectStreams: false, addDefaultPage: false, updateFieldAppearances: false,
-            }));
-            totalBytes += pdfBytes.byteLength;
-            if (pdfBytes.byteLength > ANYDOC_PDF_PAGE_MATERIALIZER_MAX_OUTPUT_BYTES
-                || totalBytes > ANYDOC_PDF_PAGE_MATERIALIZER_MAX_OUTPUT_BYTES) return denied('resource_limit');
-            const receipt = Object.freeze({
-                sourceSha256, sourceByteLength: bytes.byteLength, page: index + 1,
-                pageSha256: sha256(pdfBytes), pageByteLength: pdfBytes.byteLength,
-                materializerSha256: ANYDOC_PDF_PAGE_MATERIALIZER_SHA256,
-            });
-            pages.push(Object.freeze({ page: index + 1, pdfBytes, receipt }));
-        } catch { return denied('malformed_or_encrypted_pdf'); }
+async function materialize(bytes: Buffer, sourceSha256: string, routing: AnyDocPageRoutingEvidence) {
+    const isolated = await runAnyDocPdfMaterializationChild(bytes, routing.pageCount);
+    if (isolated.status !== 'materialized') return childFailure(isolated.reason);
+    if (isolated.pages.length !== routing.pageCount) return denied('worker_unavailable');
+    const pages: AnyDocMaterializedPdfPage[] = [];
+    let totalBytes = 0;
+    for (let index = 0; index < isolated.pages.length; index += 1) {
+        const page = isolated.pages[index];
+        if (!page || page.page !== index + 1 || !(page.pdfBytes instanceof Uint8Array))
+            return denied('worker_unavailable');
+        const pdfBytes = Buffer.from(page.pdfBytes);
+        totalBytes += pdfBytes.byteLength;
+        if (pdfBytes.byteLength < 1 || pdfBytes.byteLength > ANYDOC_PDF_PAGE_MATERIALIZER_MAX_OUTPUT_BYTES
+            || totalBytes > ANYDOC_PDF_PAGE_MATERIALIZER_MAX_OUTPUT_BYTES) return denied('resource_limit');
+        const receipt = Object.freeze({
+            sourceSha256, sourceByteLength: bytes.byteLength, page: index + 1,
+            pageSha256: sha256(pdfBytes), pageByteLength: pdfBytes.byteLength,
+            materializerSha256: ANYDOC_PDF_PAGE_MATERIALIZER_SHA256,
+        });
+        pages.push(Object.freeze({ page: index + 1, pdfBytes, receipt }));
     }
     return Object.freeze({
         schemaVersion: ANYDOC_PDF_PAGE_MATERIALIZER_SCHEMA_VERSION, status: 'materialized' as const,

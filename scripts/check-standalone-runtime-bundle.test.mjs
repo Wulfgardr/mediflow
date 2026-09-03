@@ -13,8 +13,16 @@ const detectLibcTracePattern = './node_modules/detect-libc/**/*';
 const pnpmNestedSharpSemverTracePattern = './node_modules/.pnpm/node_modules/semver/**/*';
 const npmNestedSharpSemverTracePattern = './node_modules/sharp/node_modules/semver/**/*';
 const sharpTracePattern = './node_modules/sharp/**/*';
+const anyDocPdfWorkerTracePattern = './scripts/anydoc-pdf-page-worker.mjs';
+const pdfLibTracePattern = './node_modules/pdf-lib/**/*';
+const pdfLibScopeTracePattern = './node_modules/@pdf-lib/**/*';
+const pdfJsManifestTracePattern = './node_modules/pdfjs-dist/package.json';
+const pdfJsLegacyTracePattern = './node_modules/pdfjs-dist/legacy/build/**/*';
 const webAuthOwnerPackage = '@mediflow/web-auth-lifecycle-owner';
 const webAuthOwnerTracePattern = './node_modules/@mediflow/web-auth-lifecycle-owner/**/*';
+const appleVisionCanvasPackage = '@napi-rs/canvas';
+const appleVisionCanvasTracePattern = './node_modules/@napi-rs/canvas/**/*';
+const appleVisionCanvasBackendTracePattern = './node_modules/@napi-rs/canvas-darwin-arm64/**/*';
 const webAuthOwnerRoster = [
   'index.d.ts',
   'index.js',
@@ -60,6 +68,38 @@ test('standalone checker preserves AnyDoc worker and native binding guards', () 
   assert.match(source, /createHash\('sha256'\).*APPLE_VISION_SCRIPT_SHA256/s);
 });
 
+test('standalone checker pins and smokes the isolated PDF page worker', () => {
+  const result = runSelfTest('--self-test=pdf-page-worker');
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+
+  const source = fs.readFileSync(checker, 'utf8');
+  assert.match(source, /ANYDOC_PDF_PAGE_WORKER_SHA256 = '[a-f0-9]{64}'/u);
+  assert.match(source, /bundledPdfPageWorkerFailure\(standaloneDir\)/u);
+  assert.match(source, /bundledPdfPageWorkerTraceFailure\(standaloneDir\)/u);
+  assert.match(source, /standalonePdfChildDependenciesFailure\(standaloneDir, requireFromStandalone\)/u);
+  assert.match(source, /framedPdfPageWorkerSmokeFailure/u);
+  assert.match(source, /--max-old-space-size=\$\{ANYDOC_PDF_CHILD_MAX_OLD_SPACE_MB\}/u);
+  assert.match(source, /--permission/u);
+  assert.match(source, /--allow-fs-read=\$\{packageRoot\}/u);
+  assert.match(source, /allowAddons \? \['--allow-addons'\] : \[\]/u);
+  assert.match(source, /missing PDF page worker passed/u);
+  assert.match(source, /tampered PDF page worker passed/u);
+  assert.match(source, /symlinked PDF page worker passed/u);
+});
+
+test('standalone checker rejects Apple Vision canvas drift, symlinks, and unexpected files', {
+  skip: process.platform !== 'darwin' || process.arch !== 'arm64',
+}, () => {
+  const result = runSelfTest('--self-test=apple-vision-canvas');
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+
+  const source = fs.readFileSync(checker, 'utf8');
+  assert.match(source, /APPLE_VISION_CANVAS_VERSION = '0\.1\.100'/);
+  assert.match(source, /does not match the exact pinned file roster/);
+  assert.match(source, /contains a symbolic link/);
+  assert.match(source, /createCanvas\(1, 1\)\.toBuffer\('image\/png'\)/);
+});
+
 test('standalone checker proves web auth owner physical copy and restart denial', () => {
   const result = runSelfTest('--self-test=web-auth-owner');
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
@@ -80,6 +120,26 @@ test('standalone config traces the complete sharp libc detector', () => {
   assert.ok(includes, 'missing global outputFileTracingIncludes roster');
   assert.ok(includes.includes(`"${detectLibcTracePattern}"`), 'detect-libc implementation is not traced for standalone sharp');
   assert.ok(includes.includes('"./scripts/apple-vision-ocr.swift"'), 'Apple Vision OCR script is not traced for standalone');
+});
+
+test('standalone config traces the isolated PDF worker dependency closure', () => {
+  const configSource = fs.readFileSync(path.join(root, 'next.config.ts'), 'utf8');
+  const includes = configSource.match(/outputFileTracingIncludes:\s*\{[\s\S]*?["']\/\*["']:\s*\[([\s\S]*?)\]/u)?.[1];
+  const externals = configSource.match(/serverExternalPackages:\s*\[([^\]]*)\]/u)?.[1];
+  assert.ok(includes, 'missing global outputFileTracingIncludes roster');
+  assert.ok(externals, 'missing serverExternalPackages roster');
+  for (const pattern of [
+    anyDocPdfWorkerTracePattern,
+    pdfLibTracePattern,
+    pdfLibScopeTracePattern,
+    pdfJsManifestTracePattern,
+    pdfJsLegacyTracePattern,
+    appleVisionCanvasTracePattern,
+    appleVisionCanvasBackendTracePattern,
+  ]) {
+    assert.ok(includes.includes(`"${pattern}"`), `isolated PDF runtime is not tracing ${pattern}`);
+  }
+  assert.doesNotMatch(externals, /['"](?:pdf-lib|pdfjs-dist|@napi-rs\/canvas)['"]/u);
 });
 
 /* @Codex */
@@ -116,4 +176,20 @@ test('standalone config externalizes and traces the exact web auth owner package
     .sort();
   assert.deepEqual(matchedRoster, webAuthOwnerRoster);
   assert.equal(webAuthOwnerPackage, JSON.parse(fs.readFileSync(path.join(installedPackage, 'package.json'), 'utf8')).name);
+});
+
+test('standalone config traces the pinned Apple Vision canvas runtime', () => {
+  const configSource = fs.readFileSync(path.join(root, 'next.config.ts'), 'utf8');
+  const includes = configSource.match(/outputFileTracingIncludes:\s*\{[\s\S]*?["']\/\*["']:\s*\[([\s\S]*?)\]/u)?.[1];
+  assert.ok(includes, 'missing global outputFileTracingIncludes roster');
+  assert.ok(includes.includes(`"${appleVisionCanvasTracePattern}"`), 'Apple Vision canvas package is not fully traced');
+  assert.ok(includes.includes(`"${appleVisionCanvasBackendTracePattern}"`), 'Apple Vision canvas backend is not fully traced');
+
+  const installedManifest = JSON.parse(fs.readFileSync(
+    path.join(root, 'node_modules', '@napi-rs', 'canvas', 'package.json'),
+    'utf8',
+  ));
+  assert.equal(installedManifest.name, appleVisionCanvasPackage);
+  assert.equal(installedManifest.version, '0.1.100');
+  assert.equal(installedManifest.optionalDependencies?.['@napi-rs/canvas-darwin-arm64'], '0.1.100');
 });
