@@ -305,7 +305,9 @@ struct VisitDraftComposerView: View {
                 .font(.caption2)
                 .foregroundStyle(.secondary)
 #if os(macOS)
-            VisitRecordingLumeShell(model: model)
+            VisitRecordingLumeShell(model: model) { transcript in
+                model.newEntryVisitTranscript = transcript
+            }
 #endif
             TextEditor(text: $model.newEntryVisitTranscript)
                 .scrollContentBackground(.hidden)
@@ -318,7 +320,7 @@ struct VisitDraftComposerView: View {
             HStack {
                 Text("\(model.newEntryVisitTranscript.count)/\(PairedPatientsWorkspaceModel.maxVisitDraftTranscriptChars)")
                     .font(.caption2)
-                    .foregroundStyle(model.newEntryVisitTranscript.count <= PairedPatientsWorkspaceModel.maxVisitDraftTranscriptChars ? Color.secondary : Color.red)
+                    .foregroundStyle(isTranscriptWithinLimits ? Color.secondary : Color.red)
                 Spacer(minLength: 8)
                 Button {
                     Task { await model.computeVisitDraftForNewEntry() }
@@ -326,7 +328,7 @@ struct VisitDraftComposerView: View {
                     Label("Elabora bozza", systemImage: "wand.and.stars")
                 }
                 .font(.caption)
-                .disabled(!model.canComputeVisitDraft)
+                .disabled(!model.canComputeVisitDraft || !isTranscriptWithinLimits)
                 .accessibilityIdentifier("visit-draft-compute-button")
             }
 
@@ -335,6 +337,11 @@ struct VisitDraftComposerView: View {
                 draftReview(draft)
             }
         }
+    }
+
+    private var isTranscriptWithinLimits: Bool {
+        model.newEntryVisitTranscript.count <= PairedPatientsWorkspaceModel.maxVisitDraftTranscriptChars
+            && model.newEntryVisitTranscript.utf8.count <= VisitRecordingLimits.standard.maxTranscriptUTF8Bytes
     }
 
     private var isUnsignedDraft: Bool {

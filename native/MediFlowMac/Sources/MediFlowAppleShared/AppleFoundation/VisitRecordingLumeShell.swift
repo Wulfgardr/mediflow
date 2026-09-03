@@ -1,10 +1,12 @@
 /* @Codex */
 #if os(macOS)
+import MediFlowCore
 import SwiftUI
 
 @MainActor
 struct VisitRecordingLumeShell: View {
     @ObservedObject var model: PairedPatientsWorkspaceModel
+    let onTransferTranscript: @MainActor (String) -> Void
     @StateObject private var coordinator = VisitRecordingLumeCoordinator()
     @Environment(\.openURL) private var openURL
     @Environment(\.scenePhase) private var scenePhase
@@ -26,8 +28,8 @@ struct VisitRecordingLumeShell: View {
         .padding(12)
         .lumeSurface(zone: .field, cornerRadius: 12)
         .accessibilityIdentifier("clinical-workspace-visit-recording")
-        .onChange(of: ownerBinding) { nextBinding in
-            Task { await coordinator.ownerDidChange(to: nextBinding) }
+        .task(id: ownerBinding) {
+            await coordinator.ownerDidChange(to: ownerBinding)
         }
         .onChange(of: scenePhase) { _ in
             guard scenePhase != .active else { return }
@@ -160,6 +162,7 @@ struct VisitRecordingLumeShell: View {
                     .font(.caption2)
                     .foregroundStyle(
                         coordinator.reviewText.count <= PairedPatientsWorkspaceModel.maxVisitDraftTranscriptChars
+                            && coordinator.reviewTextUTF8ByteCount <= VisitRecordingLimits.standard.maxTranscriptUTF8Bytes
                             ? Color.secondary : LumePalette.critical
                     )
                 Spacer(minLength: 8)
@@ -168,7 +171,7 @@ struct VisitRecordingLumeShell: View {
                         await coordinator.transferTranscript(
                             maxCharacters: PairedPatientsWorkspaceModel.maxVisitDraftTranscriptChars
                         ) { transcript in
-                            model.newEntryVisitTranscript = transcript
+                            onTransferTranscript(transcript)
                         }
                     }
                 } label: {

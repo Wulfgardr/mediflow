@@ -50,6 +50,7 @@ final class VisitRecordingLumeCoordinator: ObservableObject {
     let consumerGeneration: UInt64
 
     private static var nextConsumerGeneration: UInt64 = 0
+    private static weak var processLeaseOwner: VisitRecordingLumeCoordinator?
     private let makePreflight: @MainActor () -> VisitRecordingPreflight?
     private let makeCapture: VisitRecordingLumeCaptureFactory
     private var ownerBinding: VisitRecordingOwnerBinding?
@@ -57,6 +58,7 @@ final class VisitRecordingLumeCoordinator: ObservableObject {
     private var preflight: VisitRecordingPreflight?
     private var capture: VisitRecordingCaptureController?
     private var observationTask: Task<Void, Never>?
+    private var holdsProcessLease = false
     private var terminal = false
 
     convenience init() {
@@ -116,6 +118,10 @@ final class VisitRecordingLumeCoordinator: ObservableObject {
     func start() async {
         guard state == .ready, !terminal, let ownerBinding, let preflight else { return }
         guard isCurrentOwner else { await retire(as: .staleBinding); return }
+        guard claimProcessLease() else {
+            await retire(as: .failed)
+            return
+        }
         let reference = VisitRecordingSelectionReference(
             binding: ownerBinding.captureBinding,
             generation: consumerGeneration
@@ -156,7 +162,10 @@ final class VisitRecordingLumeCoordinator: ObservableObject {
         state == .transcriptReview && isCurrentOwner && maxCharacters > 0
             && !reviewText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && reviewText.count <= maxCharacters
+            && reviewText.utf8.count <= VisitRecordingLimits.standard.maxTranscriptUTF8Bytes
     }
+
+    var reviewTextUTF8ByteCount: Int { reviewText.utf8.count }
 
     func transferTranscript(
         maxCharacters: Int,
@@ -273,6 +282,25 @@ final class VisitRecordingLumeCoordinator: ObservableObject {
         observationTask = nil
         await ownedCapture?.dispose()
         await ownedPreflight?.releaseReservation()
+        releaseProcessLease()
+    }
+
+    private func claimProcessLease() -> Bool {
+        if let owner = Self.processLeaseOwner {
+            guard owner === self else { return false }
+        } else {
+            Self.processLeaseOwner = self
+        }
+        holdsProcessLease = true
+        return true
+    }
+
+    private func releaseProcessLease() {
+        guard holdsProcessLease else { return }
+        holdsProcessLease = false
+        if Self.processLeaseOwner === self {
+            Self.processLeaseOwner = nil
+        }
     }
 
     private static func claimConsumerGeneration() -> UInt64 {

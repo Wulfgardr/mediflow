@@ -203,6 +203,72 @@ final class VisitRecordingLumeCoordinatorTests: XCTestCase {
         XCTAssertNotEqual(first.consumerGeneration, second.consumerGeneration)
     }
 
+    func testProcessLeaseDeniesASecondRuntimeUntilTheFirstCoordinatorTearsDown() async {
+        let firstRuntime = LumeRuntimeSpy()
+        let secondRuntime = LumeRuntimeSpy()
+        let first = makeCoordinator(
+            generation: 51,
+            preflight: readyPreflight(),
+            runtime: firstRuntime
+        )
+        let second = makeCoordinator(
+            generation: 52,
+            preflight: readyPreflight(),
+            runtime: secondRuntime
+        )
+
+        await first.acceptDisclosure(for: binding, currentBinding: { self.binding })
+        await second.acceptDisclosure(for: binding, currentBinding: { self.binding })
+        await first.start()
+        await second.start()
+
+        XCTAssertEqual(first.state, .recording)
+        XCTAssertEqual(second.state, .denied(.failed))
+        XCTAssertEqual(firstRuntime.startCount, 1)
+        XCTAssertEqual(secondRuntime.prepareCount, 0)
+        XCTAssertEqual(secondRuntime.startCount, 0)
+
+        await first.cancelForLifecycle()
+        let replacementRuntime = LumeRuntimeSpy()
+        let replacement = makeCoordinator(
+            generation: 53,
+            preflight: readyPreflight(),
+            runtime: replacementRuntime
+        )
+        await replacement.acceptDisclosure(for: binding, currentBinding: { self.binding })
+        await replacement.start()
+
+        XCTAssertEqual(replacement.state, .recording)
+        XCTAssertEqual(replacementRuntime.startCount, 1)
+        await replacement.cancelForLifecycle()
+    }
+
+    func testEditedTranscriptOverUTF8LimitCannotTransferEvenBelowCharacterLimit() async {
+        let runtime = LumeRuntimeSpy()
+        runtime.finalResults = [
+            VisitRecordingTranscriptResult(text: "Trascrizione sintetica iniziale.", isFinal: true),
+        ]
+        let coordinator = makeCoordinator(preflight: readyPreflight(), runtime: runtime)
+        await coordinator.acceptDisclosure(for: binding, currentBinding: { self.binding })
+        await coordinator.start()
+        await coordinator.stop()
+
+        let oversizedSingleGrapheme = "a" + String(repeating: "\u{0301}", count: 140_000)
+        XCTAssertLessThanOrEqual(oversizedSingleGrapheme.count, 12_000)
+        XCTAssertGreaterThan(
+            oversizedSingleGrapheme.utf8.count,
+            VisitRecordingLimits.standard.maxTranscriptUTF8Bytes
+        )
+        coordinator.reviewText = oversizedSingleGrapheme
+
+        var destination = "unchanged"
+        XCTAssertFalse(coordinator.canTransferTranscript(maxCharacters: 12_000))
+        await coordinator.transferTranscript(maxCharacters: 12_000) { destination = $0 }
+
+        XCTAssertEqual(destination, "unchanged")
+        await coordinator.cancelForLifecycle()
+    }
+
     func testShellKeepsLifecycleAccessibilityAndManualReviewBoundariesVisible() throws {
         let sources = try appleFoundationSources(named: [
             "VisitRecordingLumeCoordinator.swift",
@@ -218,11 +284,15 @@ final class VisitRecordingLumeCoordinatorTests: XCTestCase {
             ".onDisappear",
             "scenePhase != .active",
             "ownerDidChange",
+            ".task(id: ownerBinding)",
             "VisitRecordingCaptureController.liveIfAvailable",
         ] {
             XCTAssertTrue(sources.contains(required), "missing shell contract: \(required)")
         }
         XCTAssertTrue(editor.contains("VisitRecordingLumeShell(model: model)"))
+        XCTAssertTrue(editor.contains("$model.newEntryVisitTranscript"))
+        XCTAssertTrue(editor.contains("computeVisitDraftForNewEntry"))
+        XCTAssertTrue(editor.contains("maxTranscriptUTF8Bytes"))
         for forbidden in [
             "computeVisitDraftForNewEntry", "insertVisitDraftIntoNewEntry",
             "createEntryForSelectedPatient", "URLSession", "Logger(", "print(",
@@ -232,11 +302,12 @@ final class VisitRecordingLumeCoordinatorTests: XCTestCase {
     }
 
     private func makeCoordinator(
+        generation: UInt64 = 41,
         preflight: VisitRecordingPreflight,
         runtime: LumeRuntimeSpy
     ) -> VisitRecordingLumeCoordinator {
         VisitRecordingLumeCoordinator(
-            generation: 41,
+            generation: generation,
             makePreflight: { preflight },
             makeCapture: { reference, preflight, current in
                 try? VisitRecordingCaptureController(
@@ -249,6 +320,13 @@ final class VisitRecordingLumeCoordinatorTests: XCTestCase {
                     }
                 )
             }
+        )
+    }
+
+    private func readyPreflight() -> VisitRecordingPreflight {
+        VisitRecordingPreflight(
+            permission: LumePermissionSpy(granted: true),
+            assets: LumeAssetSpy()
         )
     }
 
@@ -312,6 +390,7 @@ private final class LumeAssetSpy: VisitRecordingAssetPort {
 @MainActor
 private final class LumeRuntimeSpy: VisitRecordingRuntimePort {
     var finalResults: [VisitRecordingTranscriptResult] = []
+    private(set) var prepareCount = 0
     private(set) var startCount = 0
     private(set) var cancelCount = 0
     private var resultHandler: (@MainActor @Sendable (VisitRecordingTranscriptResult) -> Void)?
@@ -323,6 +402,7 @@ private final class LumeRuntimeSpy: VisitRecordingRuntimePort {
         onInterruption: @escaping @Sendable () -> Void,
         onFailure: @escaping @Sendable (VisitRecordingDenial) -> Void
     ) async throws {
+        prepareCount += 1
         resultHandler = onResult
     }
 

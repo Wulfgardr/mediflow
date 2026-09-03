@@ -88,7 +88,13 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     @Published var newEntryAttachmentIds: Set<String> = []
     // S7 (D5, ADR 0076 Classe E): system dictation transcript -> compute
     // visit-draft-only, never auto-saved. See computeVisitDraftForNewEntry.
-    @Published var newEntryVisitTranscript = ""
+    @Published var newEntryVisitTranscript = "" {
+        didSet {
+            guard oldValue != newEntryVisitTranscript else { return }
+            newEntryVisitTranscriptMutationReference = UUID()
+            invalidateVisitDraftForTranscriptMutation()
+        }
+    }
     @Published private(set) var newEntryVisitDraftResponse: HomeBaseVisitDraftResponse?
     // Mandatory review gate (ADR 0073 form_prefill_only): flips back to false
     // every time a NEW draft is computed, so a stale review never authorizes a
@@ -97,6 +103,12 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     // @Codex: defense in depth for the review/insert gate. A response can only
     // authorize insertion while the same patient remains selected.
     private var newEntryVisitDraftPatientId: String?
+    // @Codex: a draft is usable only for the exact transcript mutation that
+    // produced it. The UUID prevents A -> B -> A from reviving an in-flight or
+    // previously reviewed draft; the digest binds the exact UTF-8 payload.
+    private var newEntryVisitTranscriptMutationReference = UUID()
+    private var newEntryVisitDraftMutationReference: UUID?
+    private var newEntryVisitDraftTranscriptDigest: Data?
     @Published private(set) var editingEntryId: String?
     @Published private(set) var editingEntryVersion: Int?
     @Published var editEntryTitle = ""
@@ -1223,6 +1235,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             && connectionState == .pairedOnline
             && !newEntryVisitTranscript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && newEntryVisitTranscript.count <= Self.maxVisitDraftTranscriptChars
+            && newEntryVisitTranscript.utf8.count <= VisitRecordingLimits.standard.maxTranscriptUTF8Bytes
             && !isWorking
     }
 
@@ -1236,11 +1249,12 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             errorMessage = "Apri prima un paziente con sessione paired online."
             return
         }
-        let transcript = newEntryVisitTranscript.trimmingCharacters(in: .whitespacesAndNewlines)
+        let transcriptSnapshot = newEntryVisitTranscript
+        let transcript = transcriptSnapshot.trimmingCharacters(in: .whitespacesAndNewlines)
+        let transcriptMutationReference = newEntryVisitTranscriptMutationReference
+        let transcriptDigest = Self.visitDraftTranscriptDigest(transcriptSnapshot)
         let draftId = newEntryDraftId
-        newEntryVisitDraftResponse = nil
-        newEntryVisitDraftPatientId = nil
-        newEntryVisitDraftReviewed = false
+        discardVisitDraft()
         await runTask {
             let response = try await self.makeClient().computeVisitDraft(
                 input: HomeBaseVisitDraftInput(transcript: transcript),
@@ -1248,9 +1262,15 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
                 sessionCookie: sessionCookie,
                 ambulatoryId: self.ambulatoryId.trimmedOrNil
             )
-            guard self.selectedPatient?.id == patientId, self.newEntryDraftId == draftId else { return }
+            guard self.selectedPatient?.id == patientId,
+                  self.newEntryDraftId == draftId,
+                  self.newEntryVisitTranscriptMutationReference == transcriptMutationReference,
+                  self.newEntryVisitTranscript == transcriptSnapshot,
+                  Self.visitDraftTranscriptDigest(self.newEntryVisitTranscript) == transcriptDigest else { return }
             self.newEntryVisitDraftResponse = response
             self.newEntryVisitDraftPatientId = patientId
+            self.newEntryVisitDraftMutationReference = transcriptMutationReference
+            self.newEntryVisitDraftTranscriptDigest = transcriptDigest
             self.newEntryVisitDraftReviewed = false
             self.statusMessage = "Bozza visita elaborata: rivedi il contenuto prima di inserirlo nella voce."
         }
@@ -1259,6 +1279,8 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     func discardVisitDraft() {
         newEntryVisitDraftResponse = nil
         newEntryVisitDraftPatientId = nil
+        newEntryVisitDraftMutationReference = nil
+        newEntryVisitDraftTranscriptDigest = nil
         newEntryVisitDraftReviewed = false
     }
 
@@ -1266,6 +1288,8 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         newEntryVisitDraftResponse != nil
             && newEntryVisitDraftReviewed
             && newEntryVisitDraftPatientId == selectedPatient?.id
+            && newEntryVisitDraftMutationReference == newEntryVisitTranscriptMutationReference
+            && newEntryVisitDraftTranscriptDigest == Self.visitDraftTranscriptDigest(newEntryVisitTranscript)
     }
 
     /// ADR 0073 form_prefill_only: without the explicit review checkbox this is
@@ -1284,10 +1308,16 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         }
         newEntryEditorDocument.blocks.append(contentsOf: draftBlocks)
         newEntryVisitTranscript = ""
-        newEntryVisitDraftResponse = nil
-        newEntryVisitDraftPatientId = nil
-        newEntryVisitDraftReviewed = false
+        discardVisitDraft()
         statusMessage = "Bozza inserita nella voce: rivedi il contenuto prima di salvare."
+    }
+
+    private func invalidateVisitDraftForTranscriptMutation() {
+        discardVisitDraft()
+    }
+
+    private static func visitDraftTranscriptDigest(_ transcript: String) -> Data {
+        Data(SHA256.hash(data: Data(transcript.utf8)))
     }
 
     // ADR 0071 update: patient CREATE still works through the on-device local
