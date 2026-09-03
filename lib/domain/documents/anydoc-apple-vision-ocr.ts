@@ -21,7 +21,7 @@ const SANDBOX_PROFILE = '(version 1) (allow default) (deny network*)';
 
 export type AnyDocAppleVisionOcrFailureReason =
     | 'invalid_input' | 'engine_unavailable' | 'resource_limit' | 'timeout'
-    | 'empty_output' | 'recognition_failed';
+    | 'empty_output' | 'recognition_failed' | 'temporary_storage_unavailable' | 'cleanup_failed';
 export type AnyDocAppleVisionOcrResult = Readonly<{
     schemaVersion: typeof ANYDOC_APPLE_VISION_OCR_SCHEMA_VERSION;
     status: 'recognized'; text: string;
@@ -37,6 +37,13 @@ export type AnyDocAppleVisionOcrResult = Readonly<{
 }>;
 
 const sha256 = (value: Uint8Array | string) => createHash('sha256').update(value).digest('hex');
+const TEST_HARNESS = process.execArgv.some((argument) => argument === '--test'
+    || argument.startsWith('--test=') || argument.startsWith('--test-'));
+type TemporaryRootOwner = Readonly<{ create(): string; remove(temporaryRoot: string): void }>;
+const PRODUCTION_TEMPORARY_ROOT_OWNER: TemporaryRootOwner = Object.freeze({
+    create: () => mkdtempSync(path.join(os.tmpdir(), 'mediflow-vision-ocr-')),
+    remove: (temporaryRoot: string) => rmSync(temporaryRoot, { recursive: true, force: true }),
+});
 const denied = (reason: AnyDocAppleVisionOcrFailureReason): AnyDocAppleVisionOcrResult => Object.freeze({
     schemaVersion: ANYDOC_APPLE_VISION_OCR_SCHEMA_VERSION, status: 'review_required', reason,
     review: 'required', writes: 0, apply: 'none',
@@ -80,14 +87,20 @@ function processEnvelope(raw: string, exitCode: number | null): { text: string; 
     return failure?.schemaVersion === PROCESS_SCHEMA && failure.engine === 'apple_vision' && failure.ok === false
         && failure.error === 'empty_output' ? 'empty_output' : 'recognition_failed';
 }
-async function runOwnedScript(script: string, bytes: Buffer): Promise<{ raw: string; code: number | null; durationMs: number }
+async function runOwnedScript(script: string, bytes: Buffer, temporaryRootOwner: TemporaryRootOwner): Promise<{ raw: string; code: number | null; durationMs: number }
     | AnyDocAppleVisionOcrFailureReason> {
-    const temporaryRoot = mkdtempSync(path.join(os.tmpdir(), 'mediflow-vision-ocr-'));
+    let temporaryRoot: string;
+    try { temporaryRoot = temporaryRootOwner.create(); }
+    catch { bytes.fill(0); return 'temporary_storage_unavailable'; }
+    if (typeof temporaryRoot !== 'string' || !path.isAbsolute(temporaryRoot) || temporaryRoot.length < 2
+        || temporaryRoot.includes('\0')) { bytes.fill(0); return 'temporary_storage_unavailable'; }
     const startedAt = performance.now();
+    let result: { raw: string; code: number | null; durationMs: number } | AnyDocAppleVisionOcrFailureReason;
     try {
-        return await new Promise((resolve) => {
+        result = await new Promise((resolve) => {
             const child = spawn('/usr/bin/sandbox-exec', ['-p', SANDBOX_PROFILE, '/usr/bin/xcrun', 'swift', script], {
-                cwd: path.dirname(script), env: { PATH: '/usr/bin:/bin', LC_ALL: 'C', TMPDIR: `${temporaryRoot}${path.sep}` },
+                cwd: path.dirname(script), env: { PATH: '/usr/bin:/bin', LC_ALL: 'C',
+                    TMPDIR: `${temporaryRoot}${path.sep}` },
                 stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true,
             });
             const output: Buffer[] = []; let outputBytes = 0; let diagnosticBytes = 0;
@@ -106,13 +119,14 @@ async function runOwnedScript(script: string, bytes: Buffer): Promise<{ raw: str
                 durationMs: Math.max(0, Math.ceil(performance.now() - startedAt)) }));
             child.stdin.on('error', () => undefined); child.stdin.end(bytes);
         });
-    } finally {
-        bytes.fill(0); rmSync(temporaryRoot, { recursive: true, force: true });
-    }
+    } catch { result = 'engine_unavailable'; }
+    bytes.fill(0);
+    try { temporaryRootOwner.remove(temporaryRoot); }
+    catch { return 'cleanup_failed'; }
+    return result;
 }
 
-/** Runs the fixed Apple Vision engine offline; callers cannot supply paths, limits, runtime, or fallback. */
-export async function extractAnyDocAppleVisionImage(input: unknown): Promise<AnyDocAppleVisionOcrResult> {
+async function extractWithTemporaryRootOwner(input: unknown, temporaryRootOwner: TemporaryRootOwner): Promise<AnyDocAppleVisionOcrResult> {
     if (process.platform !== 'darwin') return denied('engine_unavailable');
     if (types.isProxy(input) || !(input instanceof Uint8Array)) return denied('invalid_input');
     let bytes: Buffer; try { bytes = Buffer.from(input); } catch { return denied('invalid_input'); }
@@ -120,7 +134,7 @@ export async function extractAnyDocAppleVisionImage(input: unknown): Promise<Any
     if (bytes.byteLength > MAX_INPUT_BYTES) { bytes.fill(0); return denied('resource_limit'); }
     const script = resolveOwnedScript(); if (!script) { bytes.fill(0); return denied('engine_unavailable'); }
     const inputSha256 = sha256(bytes); const inputByteLength = bytes.byteLength;
-    const processResult = await runOwnedScript(script, bytes);
+    const processResult = await runOwnedScript(script, bytes, temporaryRootOwner);
     if (typeof processResult === 'string') return denied(processResult);
     const parsed = processEnvelope(processResult.raw, processResult.code);
     if (typeof parsed === 'string') return denied(parsed);
@@ -132,4 +146,24 @@ export async function extractAnyDocAppleVisionImage(input: unknown): Promise<Any
             timeoutMs: ANYDOC_APPLE_VISION_OCR_TIMEOUT_MS, durationMs: processResult.durationMs,
             review: 'required', writes: 0, apply: 'none' }),
         review: 'required', writes: 0, apply: 'none' });
+}
+
+/** Runs the fixed Apple Vision engine offline; callers cannot supply paths, limits, runtime, or fallback. */
+export async function extractAnyDocAppleVisionImage(input: unknown): Promise<AnyDocAppleVisionOcrResult> {
+    return extractWithTemporaryRootOwner(input, PRODUCTION_TEMPORARY_ROOT_OWNER);
+}
+
+/** Test-only seam for exercising owned temporary-root failures without observing or mutating global tmp state. */
+export function createAnyDocAppleVisionImageExtractorForTest(dependencies: unknown) {
+    const value = TEST_HARNESS ? exact(dependencies, ['createTemporaryRoot', 'removeTemporaryRoot']) : null;
+    const createTemporaryRoot = value?.createTemporaryRoot;
+    const removeTemporaryRoot = value?.removeTemporaryRoot;
+    if (typeof createTemporaryRoot !== 'function' || types.isProxy(createTemporaryRoot)
+        || typeof removeTemporaryRoot !== 'function' || types.isProxy(removeTemporaryRoot))
+        return async (_input: unknown): Promise<AnyDocAppleVisionOcrResult> => denied('engine_unavailable');
+    const owner: TemporaryRootOwner = Object.freeze({
+        create: () => Reflect.apply(createTemporaryRoot, undefined, []) as string,
+        remove: (temporaryRoot: string) => { Reflect.apply(removeTemporaryRoot, undefined, [temporaryRoot]); },
+    });
+    return (input: unknown): Promise<AnyDocAppleVisionOcrResult> => extractWithTemporaryRootOwner(input, owner);
 }

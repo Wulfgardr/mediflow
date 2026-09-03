@@ -5,9 +5,13 @@ import { types } from 'node:util';
 import { buildAnyDocPageManifest } from './anydoc-page-manifest';
 import { materializeAnyDocPdfPages } from './anydoc-pdf-page-materializer';
 import { ANYDOC_PDF_PAGE_RENDERER_MAX_PAGES, renderAnyDocNeedsOcrPages } from './anydoc-pdf-page-renderer';
-import { extractAnyDocAppleVisionImage } from './anydoc-apple-vision-ocr';
+import {
+    ANYDOC_APPLE_VISION_OCR_SCRIPT_SHA256,
+    extractAnyDocAppleVisionImage,
+} from './anydoc-apple-vision-ocr';
 import {
     ANYDOC_LOCAL_EXTRACTION_MAX_MARKDOWN_BYTES,
+    ANYDOC_LOCAL_OCR_PROVENANCE_SCHEMA_VERSION,
     buildAnyDocLocalExtraction,
     mapAnyDocLocalFailure,
     type LocalExtractionFailure,
@@ -44,6 +48,7 @@ export async function continueAnyDocImageOrScanWithAppleVision(
     if (rendering.status !== 'rendered') return initial;
     const rendered = new Map(rendering.pages.map((page) => [page.page, page] as const));
     const output: string[] = [];
+    const ocrReceiptBindings: string[] = [];
     for (let pageIndex = 0; pageIndex < manifest.pageCount; pageIndex += 1) {
         const page = manifest.pages[pageIndex]; const materialized = materialization.pages[pageIndex];
         if (!page || !materialized || page.page !== pageIndex + 1 || materialized.page !== page.page) return initial;
@@ -58,6 +63,12 @@ export async function continueAnyDocImageOrScanWithAppleVision(
             }
             if (recognition.receipt.inputSha256 !== raster.receipt.rasterSha256
                 || recognition.receipt.inputByteLength !== raster.receipt.rasterByteLength) return initial;
+            ocrReceiptBindings.push([
+                'mediflow.anydoc_apple_vision_page_receipt.v1', page.page,
+                recognition.receipt.scriptSha256, recognition.receipt.inputSha256,
+                recognition.receipt.inputByteLength, recognition.receipt.outputSha256,
+                recognition.receipt.outputByteLength, recognition.receipt.averageConfidence,
+            ].join('|'));
             text = recognition.text;
         } else if (page.status === 'native') {
             const native = await extractAnyDocLocalBytes(`${sourceSha256}:p${page.page}`, materialized.pdfBytes);
@@ -67,8 +78,16 @@ export async function continueAnyDocImageOrScanWithAppleVision(
         } else return initial;
         output.push(manifest.pageCount === 1 ? text : `## Pagina ${page.page}\n\n${text}`);
     }
+    if (ocrReceiptBindings.length < 1 || ocrReceiptBindings.length !== rendered.size) return initial;
     const markdown = output.join('\n\n---\n\n');
     return Buffer.byteLength(markdown, 'utf8') > ANYDOC_LOCAL_EXTRACTION_MAX_MARKDOWN_BYTES
         ? mapAnyDocLocalFailure(source, 'resourceLimit')
-        : buildAnyDocLocalExtraction(source, markdown);
+        : buildAnyDocLocalExtraction(source, markdown, Object.freeze({
+            schemaVersion: ANYDOC_LOCAL_OCR_PROVENANCE_SCHEMA_VERSION,
+            engine: 'apple_vision' as const,
+            scriptSha256: ANYDOC_APPLE_VISION_OCR_SCRIPT_SHA256,
+            pageCount: manifest.pageCount,
+            ocrPageCount: ocrReceiptBindings.length,
+            receiptSetSha256: sha256(ocrReceiptBindings.join('\n')),
+        }));
 }

@@ -9,6 +9,7 @@ import { continueAnyDocImageOrScanWithAppleVision } from './anydoc-apple-vision-
 import {
     buildAnyDocLocalExtraction,
     type LocalAttachmentByteSource,
+    type LocalExtractionOcrProvenance,
     type LocalExtractionReceipt,
     type LocalExtractionResult,
 } from './anydoc-local-extraction-contract';
@@ -39,6 +40,14 @@ function publishedProvenance(value: LocalAttachmentByteSource): LocalAttachmentB
     ]);
 }
 
+function publishedOcrProvenance(value: LocalExtractionOcrProvenance): LocalExtractionOcrProvenance {
+    return frozenRecord([
+        ['schemaVersion', value.schemaVersion], ['engine', value.engine], ['scriptSha256', value.scriptSha256],
+        ['pageCount', value.pageCount], ['ocrPageCount', value.ocrPageCount],
+        ['receiptSetSha256', value.receiptSetSha256],
+    ]);
+}
+
 function publishedReceipt(value: LocalExtractionReceipt): LocalExtractionReceipt {
     const fields: Field[] = [
         ['receiptId', value.receiptId], ['parser', value.parser], ['outcome', value.outcome],
@@ -47,6 +56,9 @@ function publishedReceipt(value: LocalExtractionReceipt): LocalExtractionReceipt
     const markdownSha256 = getDescriptor(value, 'markdownSha256');
     if (markdownSha256 && 'value' in markdownSha256) fields.push(['markdownSha256', markdownSha256.value]);
     fields.push(['markdownByteLength', value.markdownByteLength]);
+    const ocrProvenance = getDescriptor(value, 'ocrProvenance');
+    if (ocrProvenance && 'value' in ocrProvenance)
+        fields.push(['ocrProvenance', publishedOcrProvenance(ocrProvenance.value as LocalExtractionOcrProvenance)]);
     return frozenRecord(fields);
 }
 

@@ -7,11 +7,15 @@ import test from 'node:test';
 import { requestAnyDocLocalExtractionPreview } from './anydoc-local-extraction-client.ts';
 
 const sha256 = (value: string) => createHash('sha256').update(value).digest('hex');
-function extracted(attachmentId = 'attachment.synthetic.l1d', markdown = 'Referto sintetico locale.') {
+function extracted(attachmentId = 'attachment.synthetic.l1d', markdown = 'Referto sintetico locale.', withOcr = false) {
+    const ocrProvenance = {
+        schemaVersion: 'mediflow.anydoc_local_ocr_provenance.v1', engine: 'apple_vision',
+        scriptSha256: 'c'.repeat(64), pageCount: 2, ocrPageCount: 1, receiptSetSha256: 'd'.repeat(64),
+    };
     return {
         schemaVersion: 'mediflow.anydoc_local_extraction.v1',
         provenance: { attachmentId, sourceSha256: 'a'.repeat(64), byteLength: 42 },
-        receipt: { receiptId: 'b'.repeat(64), parser: 'anydoc-local', outcome: 'extracted', sourceSha256: 'a'.repeat(64), sourceByteLength: 42, markdownSha256: sha256(markdown), markdownByteLength: Buffer.byteLength(markdown) },
+        receipt: { receiptId: 'b'.repeat(64), parser: 'anydoc-local', outcome: 'extracted', sourceSha256: 'a'.repeat(64), sourceByteLength: 42, markdownSha256: sha256(markdown), markdownByteLength: Buffer.byteLength(markdown), ...(withOcr ? { ocrProvenance } : {}) },
         review: 'required', writes: 0, apply: 'none', status: 'extracted', markdown, candidateUse: 'review_only',
     };
 }
@@ -29,6 +33,20 @@ test('requests one encoded host attachment without a caller payload and returns 
     assert.equal(preview?.markdown, 'Referto sintetico locale.');
     assert.equal(Object.isFrozen(preview), true);
     assert.equal(Object.getPrototypeOf(preview), null);
+});
+
+test('accepts exact Apple Vision provenance and rejects malformed OCR provenance', async () => {
+    const valid = extracted('attachment.synthetic.l1d', 'Testo sintetico OCR.', true);
+    assert.equal((await requestAnyDocLocalExtractionPreview('attachment.synthetic.l1d', async () => response(valid)))?.markdown,
+        'Testo sintetico OCR.');
+    for (const ocrProvenance of [
+        { ...valid.receipt.ocrProvenance!, engine: 'caller_selected' },
+        { ...valid.receipt.ocrProvenance!, ocrPageCount: 3 },
+        { ...valid.receipt.ocrProvenance!, extra: true },
+    ]) {
+        const malformed = { ...valid, receipt: { ...valid.receipt, ocrProvenance } };
+        assert.equal(await requestAnyDocLocalExtractionPreview('attachment.synthetic.l1d', async () => response(malformed)), null);
+    }
 });
 
 test('returns no candidate for review-required, denied, malformed, transport, or invalid attachment input', async () => {

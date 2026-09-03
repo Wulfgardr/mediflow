@@ -4,13 +4,14 @@ import assert from 'node:assert/strict';
 import {
     ANYDOC_LOCAL_EXTRACTION_MAX_MARKDOWN_BYTES,
     ANYDOC_LOCAL_EXTRACTION_MAX_SOURCE_BYTES,
+    ANYDOC_LOCAL_OCR_PROVENANCE_SCHEMA_VERSION,
     buildAnyDocLocalExtraction,
     mapAnyDocLocalFailure,
     type LocalAttachmentByteSource,
 } from './anydoc-local-extraction-contract';
 
 const source: LocalAttachmentByteSource = { attachmentId: 'synthetic-attachment-001', sourceSha256: 'a'.repeat(64), byteLength: 4096 };
-function assertDenied(result: ReturnType<typeof buildAnyDocLocalExtraction>, field: 'source' | 'signal' | 'markdown') {
+function assertDenied(result: ReturnType<typeof buildAnyDocLocalExtraction>, field: 'source' | 'signal' | 'markdown' | 'ocrProvenance') {
     assert.equal(result.status, 'denied');
     if (result.status === 'denied') assert.equal(result.field, field);
     assert.equal(result.writes, 0);
@@ -38,6 +39,32 @@ test('success binds minimized Markdown to validated metadata and an outcome rece
     assert.equal(result.candidateUse, 'review_only');
     assert.equal(result.writes, 0);
     assert.equal(result.apply, 'none');
+});
+
+test('OCR success preserves bounded versioned Apple Vision provenance in its receipt', () => {
+    const ocrProvenance = {
+        schemaVersion: ANYDOC_LOCAL_OCR_PROVENANCE_SCHEMA_VERSION,
+        engine: 'apple_vision',
+        scriptSha256: 'b'.repeat(64),
+        pageCount: 3,
+        ocrPageCount: 1,
+        receiptSetSha256: 'c'.repeat(64),
+    };
+    const result = buildAnyDocLocalExtraction(source, 'Testo sintetico OCR.', ocrProvenance);
+    assert.equal(result.status, 'extracted');
+    if (result.status !== 'extracted') return;
+    assert.deepEqual(result.receipt.ocrProvenance, ocrProvenance);
+    assert.notEqual(result.receipt.ocrProvenance, ocrProvenance);
+    assertFrozenExactRecord(result.receipt.ocrProvenance!, [
+        'schemaVersion', 'engine', 'scriptSha256', 'pageCount', 'ocrPageCount', 'receiptSetSha256',
+    ]);
+
+    for (const invalid of [
+        { ...ocrProvenance, engine: 'caller_selected' },
+        { ...ocrProvenance, ocrPageCount: 4 },
+        { ...ocrProvenance, receiptSetSha256: 'not-a-digest' },
+        { ...ocrProvenance, extra: true },
+    ]) assertDenied(buildAnyDocLocalExtraction(source, 'Testo sintetico OCR.', invalid), 'ocrProvenance');
 });
 
 test('failure receipt distinguishes needsOcr from io for the same source', () => {

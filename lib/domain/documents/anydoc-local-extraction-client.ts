@@ -7,6 +7,9 @@ const SCHEMA = 'mediflow.anydoc_local_extraction.v1';
 const ROOT_KEYS = ['schemaVersion', 'provenance', 'receipt', 'review', 'writes', 'apply', 'status', 'markdown', 'candidateUse'] as const;
 const SOURCE_KEYS = ['attachmentId', 'sourceSha256', 'byteLength'] as const;
 const RECEIPT_KEYS = ['receiptId', 'parser', 'outcome', 'sourceSha256', 'sourceByteLength', 'markdownSha256', 'markdownByteLength'] as const;
+const OCR_RECEIPT_KEYS = [...RECEIPT_KEYS, 'ocrProvenance'] as const;
+const OCR_PROVENANCE_KEYS = ['schemaVersion', 'engine', 'scriptSha256', 'pageCount', 'ocrPageCount', 'receiptSetSha256'] as const;
+const OCR_PROVENANCE_SCHEMA = 'mediflow.anydoc_local_ocr_provenance.v1';
 const SHA256 = /^[a-f0-9]{64}$/u;
 const MAX_SOURCE_BYTES = 25 * 1024 * 1024;
 const MAX_MARKDOWN_BYTES = 8 * 1024 * 1024;
@@ -42,7 +45,7 @@ async function parsePreview(raw: unknown, expectedAttachmentId: string): Promise
         || root.apply !== 'none' || root.status !== 'extracted' || root.candidateUse !== 'review_only'
         || typeof root.markdown !== 'string' || root.markdown.length < 1) return null;
     const source = exact(root.provenance, SOURCE_KEYS);
-    const receipt = exact(root.receipt, RECEIPT_KEYS);
+    const receipt = exact(root.receipt, RECEIPT_KEYS) ?? exact(root.receipt, OCR_RECEIPT_KEYS);
     if (!source || !receipt || source.attachmentId !== expectedAttachmentId
         || !SHA256.test(source.sourceSha256 as string) || !Number.isSafeInteger(source.byteLength)
         || (source.byteLength as number) < 1 || (source.byteLength as number) > MAX_SOURCE_BYTES
@@ -51,6 +54,15 @@ async function parsePreview(raw: unknown, expectedAttachmentId: string): Promise
         || receipt.sourceSha256 !== source.sourceSha256 || receipt.sourceByteLength !== source.byteLength
         || !Number.isSafeInteger(receipt.markdownByteLength) || (receipt.markdownByteLength as number) < 1
         || (receipt.markdownByteLength as number) > MAX_MARKDOWN_BYTES) return null;
+    if (Object.hasOwn(receipt, 'ocrProvenance')) {
+        const provenance = exact(receipt.ocrProvenance, OCR_PROVENANCE_KEYS);
+        if (!provenance || provenance.schemaVersion !== OCR_PROVENANCE_SCHEMA || provenance.engine !== 'apple_vision'
+            || !SHA256.test(provenance.scriptSha256 as string) || !SHA256.test(provenance.receiptSetSha256 as string)
+            || !Number.isSafeInteger(provenance.pageCount) || (provenance.pageCount as number) < 1
+            || (provenance.pageCount as number) > 500 || !Number.isSafeInteger(provenance.ocrPageCount)
+            || (provenance.ocrPageCount as number) < 1
+            || (provenance.ocrPageCount as number) > (provenance.pageCount as number)) return null;
+    }
     const markdownBytes = new TextEncoder().encode(root.markdown);
     if (markdownBytes.byteLength !== receipt.markdownByteLength) return null;
     let markdownSha256: string;
