@@ -20,6 +20,7 @@ const ACTOR = 'synthetic-physician-web-owner', PATIENT = 'synthetic-patient-web-
 const AMBULATORY = 'synthetic-ambulatory-web-owner', SUCCESS = 'synthetic-checkup-web-success';
 const DENIED = 'synthetic-checkup-web-denied', STALE = 'synthetic-checkup-web-stale';
 const EXPIRED = 'synthetic-checkup-web-expired', CUT = 'synthetic-checkup-web-cut';
+const VERTICAL = 'synthetic-checkup-web-vertical';
 bootstrap.prepare('INSERT INTO ambulatories (id, name, type, version) VALUES (?, ?, ?, 1)')
   .run(AMBULATORY, 'Ambulatorio sintetico', 'test');
 bootstrap.prepare(`INSERT INTO patients (id, first_name, last_name, tax_code, ambulatory_id, is_archived, version)
@@ -27,14 +28,19 @@ bootstrap.prepare(`INSERT INTO patients (id, first_name, last_name, tax_code, am
 bootstrap.prepare('INSERT INTO patients_to_ambulatories (patient_id, ambulatory_id) VALUES (?, ?)')
   .run(PATIENT, AMBULATORY);
 for (const [id, date] of [[SUCCESS, 1_800_000_000], [DENIED, 1_800_000_100], [STALE, 1_800_000_200],
-  [EXPIRED, 1_800_000_300], [CUT, 1_800_000_400]] as const) {
+  [EXPIRED, 1_800_000_300], [CUT, 1_800_000_400], [VERTICAL, 1_800_000_500]] as const) {
   bootstrap.prepare(`INSERT INTO checkups (id, patient_id, date, title, status, version)
     VALUES (?, ?, ?, 'Checkup sintetico', 'pending', 1)`).run(id, PATIENT, date);
 }
 bootstrap.close();
 
-const { createHeadlessCheckupStatusTransitionWebOwnerV1 } =
+const { createHeadlessCheckupStatusTransitionWebOwnerV1,
+  HEADLESS_CHECKUP_STATUS_REQUEST_LEDGER_LIMIT_V1 } =
   await import('./headless-checkup-status-transition-web-owner.ts');
+const { createHeadlessCheckupStatusTransitionWebHttpHandlersV1 } =
+  await import('./headless-checkup-status-transition-web-http.ts');
+const { createIntelligentHostCheckupBrowserAdapter } =
+  await import('./intelligent-host-checkup-browser-adapter.ts');
 const OPERATION = 'mediflow.patient.checkup.status.transition.v1';
 function closed<T extends Record<string, unknown>>(value: T): Readonly<T> {
   return Object.freeze(Object.assign(Object.create(null), value)) as Readonly<T>;
@@ -56,10 +62,10 @@ function fixture(checkupId: string) {
     writeDenialAudit: async (record: unknown) => { audits.push(record); },
   }));
   const select = () => owner.hostUi.issueSelectedCheckupRef();
-  const preview = async (targetStatus: 'completed' | 'cancelled' = 'completed') => {
+  const preview = async (targetStatus: 'completed' | 'cancelled' = 'completed', requestIndex = 0) => {
     const checkupRef = select();
     const frame = encodeCheckupStatusTransitionIpcFrameV1({ schemaVersion: CHECKUP_STATUS_TRANSITION_IPC_SCHEMA_V1,
-      type: 'preview', requestRef: `hcqr_${'a'.repeat(32)}`, operationId: OPERATION,
+      type: 'preview', requestRef: `hcqr_${requestIndex.toString(16).padStart(32, '0')}`, operationId: OPERATION,
       input: { schemaVersion: 'mediflow.patient.checkup.status.transition.input.v1', operationId: OPERATION,
         checkupRef, targetStatus, expectedRevision: version } });
     return decodeCheckupStatusTransitionIpcFrameV1(await owner.parent.handlePreview(frame));
@@ -89,7 +95,12 @@ test('retains the preview in Web and commits only through Web-local physician PI
   const input = command(preview.proposalRef, gesture);
   const receipt = await current.owner.hostUi.confirm(input);
   assert.equal(receipt.outcome, 'status_transitioned');
+  assert.equal(current.owner.hostUi.readCommittedReceipt(closed({ proposalRef: preview.proposalRef,
+    targetStatus: 'completed', expectedRevision: 1 })), receipt, 'lookup returns the canonical receipt');
   assert.equal(await current.owner.hostUi.confirm(input), receipt, 'duplicate confirm is receipt-only');
+  assert.throws(() => current.owner.hostUi.readCommittedReceipt(closed({ proposalRef: preview.proposalRef,
+    targetStatus: 'cancelled', expectedRevision: 1 })),
+  (error: unknown) => (error as { code?: unknown }).code === 'idempotency_conflict');
   await assert.rejects(current.owner.hostUi.confirm(command(preview.proposalRef, gesture, '2468', 'cancelled')),
     (error: unknown) => (error as { code?: unknown }).code === 'idempotency_conflict');
   await assert.rejects(current.owner.hostUi.confirm(command(preview.proposalRef, gesture, '2468', 'completed', 2)),
@@ -97,8 +108,26 @@ test('retains the preview in Web and commits only through Web-local physician PI
   assert.deepEqual(Reflect.ownKeys(current.owner.parent), ['handlePreview']);
   assert.equal('confirm' in current.owner.parent, false);
   const check = new Database(databasePath, { readonly: true });
-  try { assert.deepEqual(check.prepare('SELECT status, version FROM checkups WHERE id = ?').get(SUCCESS),
-    { status: 'completed', version: 2 }); } finally { check.close(); current.owner.dispose(); }
+  try {
+    assert.deepEqual(check.prepare('SELECT status, version FROM checkups WHERE id = ?').get(SUCCESS),
+      { status: 'completed', version: 2 });
+    assert.equal((check.prepare(`SELECT COUNT(*) AS count FROM audit_events
+      WHERE event_type='checkup.updated' AND subject_ref=?`).get(receipt.resourceRefHash) as { count: number }).count, 1);
+  } finally { check.close(); current.owner.dispose(); }
+});
+
+test('bounds the request ledger and denies N+1 without retaining another request', async () => {
+  const current = fixture(DENIED);
+  for (let index = 0; index < HEADLESS_CHECKUP_STATUS_REQUEST_LEDGER_LIMIT_V1; index += 1) {
+    assert.equal((await current.preview('completed', index)).outcome, 'proposed');
+  }
+  const overflow = await current.preview('completed', HEADLESS_CHECKUP_STATUS_REQUEST_LEDGER_LIMIT_V1);
+  assert.equal(overflow.outcome, 'denied'); assert.equal(overflow.denialCode, 'operation_unavailable');
+  const after = await current.preview('completed', HEADLESS_CHECKUP_STATUS_REQUEST_LEDGER_LIMIT_V1 + 1);
+  assert.equal(after.outcome, 'denied'); assert.equal(after.denialCode, 'operation_unavailable');
+  assert.equal(current.audits.filter((value) => (value as { denialCode?: unknown }).denialCode
+    === 'operation_unavailable').length, 2);
+  current.owner.dispose();
 });
 
 test('expires retained proposals and revokes a confirmation while PIN verification is pending', async () => {
@@ -156,4 +185,79 @@ test('rejects a wrong operation before the Web owner and emits only redacted den
     (error: unknown) => (error as { code?: unknown }).code === 'operation_unavailable');
   assert.doesNotMatch(JSON.stringify(current.audits), /synthetic-(?:patient|physician|checkup)/u);
   current.owner.dispose();
+});
+
+test('runs activation, exact-parent MCP preview, UI reread, PIN confirm, receipt replay, and revoke', async () => {
+  const current = fixture(VERTICAL), uiBindingRef = `hcub_${'9'.repeat(64)}`;
+  const handlers = createHeadlessCheckupStatusTransitionWebHttpHandlersV1({
+    readAuthenticated: async () => true,
+    select: async () => {
+      const checkupRef = current.owner.hostUi.issueSelectedCheckupRef();
+      const projection = current.owner.hostUi.readSelectedCheckupUiProjection(checkupRef);
+      return closed({ checkupRef, uiBindingRef, resourceTitle: projection.title,
+        resourceRevision: projection.expectedRevision });
+    },
+    read: async (value: unknown) => {
+      const input = value as { proposalRef: string; uiBindingRef: string };
+      assert.equal(input.uiBindingRef, uiBindingRef);
+      const proposal = await current.owner.hostUi.readCurrentProposal(input.proposalRef);
+      const projection = current.owner.hostUi.readSelectedCheckupUiProjection(
+        current.owner.hostUi.issueSelectedCheckupRef());
+      return closed({ ...proposal, resourceTitle: projection.title,
+        resourceRevision: projection.expectedRevision });
+    },
+    confirm: async (value: unknown) => {
+      const input = value as { proposalRef: string; targetStatus: 'completed' | 'cancelled';
+        expectedRevision: number; candidatePin: string; uiBindingRef: string };
+      assert.equal(input.uiBindingRef, uiBindingRef);
+      const binding = closed({ proposalRef: input.proposalRef, targetStatus: input.targetStatus,
+        expectedRevision: input.expectedRevision });
+      const replay = current.owner.hostUi.readCommittedReceipt(binding); if (replay) return replay;
+      const gesture = await current.owner.hostUi.issueExactGesture(binding);
+      return current.owner.hostUi.confirm(command(input.proposalRef, gesture, input.candidatePin,
+        input.targetStatus, input.expectedRevision));
+    },
+    revoke: async () => current.owner.dispose(),
+  });
+  const lease = { sessionRef: `ssr_${'1'.repeat(32)}`, selectionEpoch: 1,
+    patientRef: `ptr_${'2'.repeat(32)}`, ambulatoryRef: `abr_${'3'.repeat(32)}`,
+    leaseRef: `lsr_${'4'.repeat(32)}`, expiresAt: 1_900_000_000_000 };
+  const calls: string[] = [];
+  const browser = createIntelligentHostCheckupBrowserAdapter({ fetch: async (input, init = {}) => {
+    const url = String(input); calls.push(`${init.method}:${url}`);
+    if (url === '/api/ai/smart-import/selection') return new Response(JSON.stringify(init.method === 'GET'
+      ? { selectionEpoch: 0 } : { selection: lease }));
+    if (url.endsWith('/intelligent-host/activate')) {
+      return new Response(JSON.stringify({ state: 'active', expiresAt: 1_900_000_000_000 }));
+    }
+    const request = new Request(`http://127.0.0.1${url}`, init);
+    const route = Object.freeze({ params: Promise.resolve(Object.freeze({ id: PATIENT })) });
+    const proposalRef = url.split('/proposals/')[1];
+    const proposalRoute = Object.freeze({ params: Promise.resolve(Object.freeze({ id: PATIENT, proposalRef })) });
+    if (proposalRef && init.method === 'GET') return handlers.read(request, proposalRoute);
+    if (proposalRef && init.method === 'POST') return handlers.confirm(request, proposalRoute);
+    if (init.method === 'DELETE') return handlers.revoke(request, route);
+    return handlers.select(request, route);
+  } });
+
+  const selection = await browser.select(PATIENT, AMBULATORY, VERTICAL);
+  const preview = await current.preview('completed', 31);
+  assert.equal(preview.outcome, 'proposed'); assert.deepEqual(Reflect.ownKeys(current.owner.parent), ['handlePreview']);
+  const proposal = await browser.read(PATIENT, preview.proposalRef);
+  assert.deepEqual({ title: proposal.resourceTitle, revision: proposal.resourceRevision },
+    { title: 'Checkup sintetico', revision: 1 });
+  const receipt = await browser.confirm(PATIENT, proposal, '2468');
+  assert.deepEqual(await browser.confirm(PATIENT, proposal, '2468'), receipt);
+  assert.equal(await browser.revokeOperation(PATIENT), 'revoked');
+  assert.deepEqual(calls.slice(0, 4), ['GET:/api/ai/smart-import/selection',
+    'POST:/api/ai/smart-import/selection', `POST:/api/patients/${PATIENT}/intelligent-host/activate`,
+    `POST:/api/patients/${PATIENT}/intelligent-host/checkup-status`]);
+  const check = new Database(databasePath, { readonly: true });
+  try {
+    assert.deepEqual(check.prepare('SELECT status, version FROM checkups WHERE id=?').get(VERTICAL),
+      { status: 'completed', version: 2 });
+    assert.equal((check.prepare(`SELECT COUNT(*) AS count FROM audit_events WHERE event_type='checkup.updated'
+      AND redacted_metadata LIKE ?`).get(`%${receipt.receiptRefHash}%`) as { count: number }).count, 1);
+  } finally { check.close(); }
+  assert.equal(selection.resourceRevision, 1);
 });
