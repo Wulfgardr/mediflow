@@ -16,8 +16,9 @@ import {
 } from './server-session-projection-owner.ts';
 import type { ServerSession } from './server-session.ts';
 import {
-    issueSyntheticWebSession, retireSyntheticWebSession,
+    issueSyntheticWebSessionContext, retireSyntheticWebSession,
 } from './web-auth-lifecycle-owner-test-fixture.ts';
+import { resolve as resolveSyntheticWebSession } from './web-auth-lifecycle-owner-adapter.ts';
 
 const dataDir = mkdtempSync(path.join(os.tmpdir(), 'mediflow-portable-web-capture-'));
 process.env.MEDIFLOW_DATA_DIR = dataDir;
@@ -44,7 +45,8 @@ type SourceOverrides = Readonly<{
 }>;
 
 function fixture(acquisitionOutcome: AcquisitionOutcome = 'current', overrides: SourceOverrides = {}) {
-    const session = issueSyntheticWebSession(USER, `portable-web-capture-${sequence += 1}`);
+    const sessionContext = issueSyntheticWebSessionContext(USER, `portable-web-capture-${sequence += 1}`);
+    const session = sessionContext.session;
     sessions.add(session);
     let now = session.createdAt, patientVersion = 7, failBindingRead = false;
     const timers: Array<{ delay: number; active: boolean; fire(): void }> = [];
@@ -105,6 +107,15 @@ function fixture(acquisitionOutcome: AcquisitionOutcome = 'current', overrides: 
         acquisitionCount: () => acquisitions,
         registrationCounts: () => ({ registrations, confirmations, unregistrations }),
         resolveAcquisition() { assert.ok(resolveDeferred); resolveDeferred(); resolveDeferred = null; },
+        reacquireAuthenticatedContext() {
+            const resolution = resolveSyntheticWebSession(session.id, sessionContext.controlId);
+            assert.equal(resolution.status, 'active');
+            if (resolution.status !== 'active') throw new Error('Synthetic Web projection unavailable');
+            return Object.freeze(Object.assign(Object.create(null), {
+                session: resolution.projection as ServerSession,
+                owner,
+            }));
+        },
         setNow(value: number) { now = value; },
         setPatientVersion(value: number) { patientVersion = value; },
         failBindingRead() { failBindingRead = true; },
@@ -153,6 +164,20 @@ test('publishes only the canonical current Web capture required by the inherited
         schemaVersion: 'mediflow.portable-supervisor.web-ipc.v1', method: 'activate', requestRef, challenge, capture,
     }));
     assert.deepEqual({ ...(decoded.capture as Record<string, unknown>) }, { ...capture });
+});
+
+test('accepts a newly resolved authentic context for the same request session but rejects an equivalent clone', async () => {
+    const current = fixture(); const captureOwner = await current.acquire(); assert.ok(captureOwner);
+    const nextRequest = current.reacquireAuthenticatedContext();
+    assert.notEqual(nextRequest.session, current.session, 'the lifecycle owner reconstructs the projection per request');
+    assert.equal(nextRequest.owner, current.owner, 'the projection owner remains the stable host-owned identity');
+    assert.equal(captureOwner.matchesCurrentContext(nextRequest), true);
+
+    const forged = Object.freeze(Object.assign(Object.create(null), {
+        session: Object.freeze({ ...nextRequest.session }), owner: current.owner,
+    }));
+    assert.equal(captureOwner.matchesCurrentContext(forged), false);
+    assert.equal(captureOwner.readCapture().selectionEpoch, current.lease.selectionEpoch);
 });
 
 test('keeps one fixed capture bounded by H1a and selection expiry', async () => {
