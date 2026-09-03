@@ -230,7 +230,7 @@ test('runs activation, exact-parent MCP preview, UI reread, PIN confirm, receipt
     if (url.endsWith('/intelligent-host/activate')) {
       return new Response(JSON.stringify({ state: 'active', expiresAt: 1_900_000_000_000 }));
     }
-    const request = new Request(`http://127.0.0.1${url}`, init);
+    const request = new Request(new URL(url, 'http://127.0.0.1'), init);
     const route = Object.freeze({ params: Promise.resolve(Object.freeze({ id: PATIENT })) });
     const proposalRef = url.split('/proposals/')[1];
     const proposalRoute = Object.freeze({ params: Promise.resolve(Object.freeze({ id: PATIENT, proposalRef })) });

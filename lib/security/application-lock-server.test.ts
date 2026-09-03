@@ -112,6 +112,7 @@ test('route turns a rejected cookie lookup into one inert P3 lock delegation', (
             ['@/lib/security/server-session', ${JSON.stringify(toDataModule("export const SESSION_COOKIE_NAME = 'mediflow_session';"))}],
             ['@/lib/security/web-auth-control-transport', ${JSON.stringify(toDataModule("export function webAuthControlMutationFromRequest() { return Object.freeze({ controlId: 'synthetic-control', ifMatch: 'synthetic-etag', idempotencyKey: 'synthetic-key' }); }"))}],
             ['@/lib/security/web-auth-application-lock-server', ${JSON.stringify(toDataModule("export async function completeExactWebP3ApplicationLock(cookie, mutation) { globalThis.calls = (globalThis.calls ?? 0) + 1; globalThis.cookie = cookie; globalThis.mutation = mutation; return new Response(JSON.stringify({ schemaVersion: 'mediflow.application-lock-receipt.v1', state: 'server_invalidation_unconfirmed' }), { status: 409, headers: { 'Content-Type': 'application/json' } }); }"))}],
+            ['@/lib/security/portable-supervisor-web-lifecycle', ${JSON.stringify(toDataModule("export async function completePortableSupervisorWebLifecycleMutationV1(result, operation) { if (operation !== 'application_lock') throw new Error('wrong operation'); return result; }"))}],
         ]);
         registerHooks({ resolve(specifier, context, nextResolve) {
             if (context.parentURL === routeUrl && modules.has(specifier)) return { shortCircuit: true, url: modules.get(specifier), format: 'module' };

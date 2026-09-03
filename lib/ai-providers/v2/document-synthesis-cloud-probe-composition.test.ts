@@ -8,6 +8,8 @@ import {
     createDocumentSynthesisCloudProbeCompositionForTest,
     createDocumentSynthesisCloudProbeFromHostEnvironment,
 } from './document-synthesis-cloud-probe-composition.ts';
+import { ANTHROPIC_MESSAGES_OFFICIAL_URL } from './anthropic-messages-official-transport.ts';
+import { OPENAI_RESPONSES_OFFICIAL_URL } from './openai-responses-official-transport.ts';
 import { createAbsentProviderLifecycleV2, transitionProviderLifecycleV2 } from './provider-lifecycle.ts';
 
 const OPENAI_SECRET = 'sk-proj-SYNTHETIC_COMPOSITION_SENTINEL_0123456789';
@@ -229,8 +231,8 @@ test('la factory production raggiunge entrambi i transport ufficiali solo attrav
                 const headers = init?.headers as Headers;
                 const body = String(init?.body ?? '');
                 assert.equal(url, provider === 'openai'
-                    ? 'https://api.openai.com/v1/responses'
-                    : 'https://api.anthropic.com/v1/messages');
+                    ? OPENAI_RESPONSES_OFFICIAL_URL
+                    : ANTHROPIC_MESSAGES_OFFICIAL_URL);
                 assert.equal(headers.get(provider === 'openai' ? 'authorization' : 'x-api-key'),
                     provider === 'openai' ? `Bearer ${secret}` : secret);
                 assert.match(body, /synthetic non-clinical fixture/iu);
