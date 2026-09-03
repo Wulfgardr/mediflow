@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import Module, { createRequire } from 'node:module';
 import test, { describe } from 'node:test';
+import { runInNewContext } from 'node:vm';
 
 type AuthContext = Readonly<{ session: object; owner: object }>;
 type SessionReader = () => Promise<Record<string, unknown> | null>;
@@ -341,31 +342,84 @@ describe('external Web owner server-auth boundary', { concurrency: 1 }, () => {
         }
     });
 
-    test('H1a rejects ambient poison and consumes a native cookie rejection', async () => {
+    test('replays H1a/H1b poison at pre-entry, Promise settlement, and every synchronous callout', async () => {
+        const poison = () => Object.defineProperty(Object.prototype, 'then', {
+            configurable: true, value: () => undefined, writable: true,
+        });
+        for (const descriptor of [
+            { configurable: true, value: () => undefined, writable: true },
+            { configurable: true, get: () => { throw new Error('synthetic ambient getter'); } },
+        ] satisfies PropertyDescriptor[]) {
+            reset();
+            const observed = await noUnhandled(async () => {
+                Object.defineProperty(Object.prototype, 'then', descriptor);
+                try { return await acquire(); } finally { restoreThen(); }
+            });
+            assert.equal(observed.value, null);
+            assert.deepEqual(observed.unhandled, []);
+            assert.equal(state.cookiesCalls, 0);
+        }
+
         reset();
-        const preEntry = await noUnhandled(async () => {
-            Object.defineProperty(Object.prototype, 'then', { configurable: true, value: () => undefined, writable: true });
+        const settledCookieStore = { then: undefined, get: cookieStore.get };
+        state.cookieResult = new Promise((resolve) => queueMicrotask(() => { poison(); resolve(settledCookieStore); }));
+        const settlement = await noUnhandled(async () => {
             try { return await acquire(); } finally { restoreThen(); }
         });
-        assert.equal(preEntry.value, null);
-        assert.deepEqual(preEntry.unhandled, []);
-        assert.equal(state.cookiesCalls, 0);
+        assert.equal(settlement.value, null);
+        assert.deepEqual(settlement.unhandled, []);
+        assert.deepEqual(state.cookieGetNames, []);
+        assert.deepEqual(state.resolveArgs, []);
+        assert.deepEqual(state.acquireArgs, []);
 
-        reset(); state.cookieResult = Promise.reject(new Error('synthetic cookie failure'));
+        const stages = [
+            'onCookies', 'onCookieGet', 'onResolve', 'onEq', 'onSelect', 'onFrom', 'onWhere', 'onGet',
+            'onRetire', 'onAcquire',
+        ] as const;
+        for (const stage of stages) {
+            reset();
+            if (stage === 'onRetire') state.userResult = undefined;
+            state[stage] = poison;
+            const observed = await noUnhandled(async () => {
+                try { return await acquire(); } finally { restoreThen(); }
+            });
+            assert.equal(observed.value, null, stage);
+            assert.deepEqual(observed.unhandled, [], stage);
+            assert.equal(state.acquireArgs.length, stage === 'onAcquire' ? 1 : 0, stage);
+        }
+    });
+
+    test('denies fake, cross-realm, subclass, and Proxy cookie promises without assimilation', async () => {
+        class CookiePromise<Value> extends Promise<Value> {}
+        let thenReads = 0;
+        let proxyTraps = 0;
+        const factories: Array<() => unknown> = [
+            () => Object.create(Promise.prototype),
+            () => ({ get then() { thenReads += 1; throw new Error('synthetic thenable getter'); } }),
+            () => runInNewContext('Promise.resolve({})'),
+            () => new CookiePromise((resolve) => resolve(cookieStore)),
+            () => new Proxy(Promise.resolve(cookieStore), {
+                get() { proxyTraps += 1; throw new Error('synthetic proxy trap'); },
+            }),
+        ];
+        for (const factory of factories) {
+            reset();
+            const observed = await noUnhandled(() => { state.cookieResult = factory(); return acquire(); });
+            assert.equal(observed.value, null);
+            assert.deepEqual(observed.unhandled, []);
+            assert.deepEqual(state.cookieGetNames, []);
+            assert.deepEqual(state.resolveArgs, []);
+            assert.deepEqual(state.acquireArgs, []);
+        }
+        assert.equal(thenReads, 0);
+        assert.equal(proxyTraps, 0);
+
+        reset();
+        state.cookieResult = Promise.reject(new Error('synthetic canonical cookie rejection'));
         const rejected = await noUnhandled(acquire);
         assert.equal(rejected.value, null);
         assert.deepEqual(rejected.unhandled, []);
         assert.deepEqual(state.resolveArgs, []);
-
-        reset(); state.onResolve = () => {
-            Object.defineProperty(Object.prototype, 'then', { configurable: true, value: () => undefined, writable: true });
-        };
-        const reentered = await noUnhandled(async () => {
-            try { return await acquire(); } finally { restoreThen(); }
-        });
-        assert.equal(reentered.value, null);
-        assert.deepEqual(reentered.unhandled, []);
-        assert.deepEqual(state.acquireArgs, []);
     });
 
     test('local-token and native actor paths retain their separate fallback', async () => {

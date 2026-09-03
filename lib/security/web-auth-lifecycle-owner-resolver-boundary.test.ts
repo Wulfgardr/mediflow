@@ -13,8 +13,10 @@ const PACKAGE = `@mediflow/${OWNER_STEM}`;
 const PACKAGE_SOURCE_MANIFEST = `packages/${OWNER_STEM}/package.json`;
 const D1A = `lib/security/${OWNER_STEM}-boundary.test.ts`;
 const D1B = `lib/security/${OWNER_STEM}-resolver-boundary.test.ts`;
+const PRODUCER = 'lib/security/web-auth-next-producer-boundary.test.ts';
+const H1_MATRIX = 'lib/security/server-auth.test.ts';
 const GUARD_SCRIPT = `check:${OWNER_STEM}-boundary`;
-const GUARD_COMMAND = `node scripts/run-strip-types.mjs --test ${D1A} ${D1B}`;
+const GUARD_COMMAND = `node scripts/run-strip-types.mjs --test --test-concurrency=1 ${D1A} ${PRODUCER} ${D1B} ${H1_MATRIX}`;
 const NEXT_RESOLVER_AST_SHA256 = '1852702e0bc24c53ba93e92e3c91ec6a2726ed0f4452ed71f971b19868b86433';
 const OWNER_DELIVERY_GLOB = `./node_modules/${PACKAGE}/**/*`;
 const EXPECTED_TSCONFIG_RESOLVER = {
