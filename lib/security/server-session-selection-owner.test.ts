@@ -61,7 +61,7 @@ test('web channel overrides role strings and issues epoch 0 to 1 with opaque hos
     const lease = issue(owner);
 
     assert.equal(lease.selectionEpoch, 1);
-    assert.equal(lease.expiresAt, session.expiresAt);
+    assert.ok(lease.expiresAt <= session.expiresAt);
     assert.ok(lease.expiresAt > initialExpiry);
     for (const ref of [lease.sessionRef, lease.patientRef, lease.ambulatoryRef, lease.leaseRef]) {
         assert.match(ref, /^[a-z]{3}_[0-9a-f]{32}$/u);

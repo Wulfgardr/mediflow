@@ -2,12 +2,17 @@
 import assert from 'node:assert/strict';
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import test from 'node:test';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createAipOperationRpcChildEnvironmentV1, createAipOperationRpcHostV1 } from '../../aip/src/operation-rpc.ts';
 
 const CLI = fileURLToPath(new URL('./cli.ts', import.meta.url));
-const LOADER = process.env.MEDIFLOW_TEST_STRIP_TYPES_LOADER
-  ?? fileURLToPath(new URL('../../../scripts/register-strip-types-loader.mjs', import.meta.url));
+
+function asFileImportUrl(value: string) {
+  return value.startsWith('file:') ? new URL(value).href : pathToFileURL(value).href;
+}
+
+const LOADER = asFileImportUrl(process.env.MEDIFLOW_TEST_STRIP_TYPES_LOADER
+  ?? fileURLToPath(new URL('../../../scripts/register-strip-types-loader.mjs', import.meta.url)));
 const TEST_MODULE_ENV = process.env.MEDIFLOW_TEST_NODE_PATH
   ? { NODE_PATH: process.env.MEDIFLOW_TEST_NODE_PATH } : {};
 const ROOT = fileURLToPath(new URL('../../..', import.meta.url));
@@ -32,6 +37,15 @@ const capabilities = [{ operationId: 'mediflow.terminology.search.v1', capabilit
 const capabilityCatalog = { schemaVersion: 'mediflow.system.capabilities.v1', operations: capabilities };
 const status = { schemaVersion: 'mediflow.system.headless-status.v1', candidateVersion: '0.8.5',
   protocolVersion: '2026-07-28', dataScope: 'non_phi_system_status', writes: 0, apply: 'none' };
+
+test('uses a file URL for nested strip-types loader operands', () => {
+  const loaderPath = fileURLToPath(new URL('../../../scripts/register-strip-types-loader.mjs', import.meta.url));
+  const loaderUrl = pathToFileURL(loaderPath).href;
+  assert.equal(asFileImportUrl(loaderPath), loaderUrl);
+  assert.equal(asFileImportUrl(loaderUrl), loaderUrl);
+  assert.equal(new URL(LOADER).protocol, 'file:');
+});
+
 const terminology = { schemaVersion: 'mediflow.terminology.search.output.v1',
   operationId: 'mediflow.terminology.search.v1', capabilityId: 'mediflow.terminology.search.v1',
   applicationServiceRef: 'AipTerminologySearchServiceV1', outcome: 'read',

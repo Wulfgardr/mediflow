@@ -87,6 +87,20 @@ test('standalone checker pins and smokes the isolated PDF page worker', () => {
   assert.match(source, /symlinked PDF page worker passed/u);
 });
 
+test('digest-pinned text workers retain exact LF bytes on every checkout', () => {
+  const attributes = fs.readFileSync(path.join(root, '.gitattributes'), 'utf8');
+  for (const worker of [
+    'scripts/anydoc-local-extraction-worker.mjs',
+    'scripts/anydoc-pdf-page-worker.mjs',
+    'scripts/apple-vision-ocr.swift',
+  ]) {
+    assert.ok(
+      attributes.split(/\r?\n/u).includes(`${worker} text eol=lf`),
+      `${worker} is not pinned to LF checkout bytes`,
+    );
+  }
+});
+
 test('standalone checker rejects Apple Vision canvas drift, symlinks, and unexpected files', {
   skip: process.platform !== 'darwin' || process.arch !== 'arm64',
 }, () => {

@@ -23,6 +23,8 @@ import {
 const sha256 = (bytes: Uint8Array | string) => createHash('sha256').update(bytes).digest('hex');
 const SOURCE_REF = 'a'.repeat(64);
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+const SUPPORTS_REAL_RENDERER = process.platform === 'darwin' && process.arch === 'arm64'
+    && process.versions.node.split('.')[0] === '24';
 const routing = (pageCount: number, pages: readonly number[]) => ({
     schemaVersion: 'mediflow.anydoc_page_routing.v1' as const, pages, pageCount,
 });
@@ -82,7 +84,9 @@ async function classifiedNoiseFixture(jpeg: Buffer, size: number, pageCount: num
     assert.equal(manifest.status, 'classified'); return { manifest, materialization };
 }
 
-test('renders only canonical needsOcr pages in stable order with bounded PHI-safe receipts', async () => {
+test('renders only canonical needsOcr pages in stable order with bounded PHI-safe receipts', {
+    skip: !SUPPORTS_REAL_RENDERER,
+}, async () => {
     const fixture = await acceptedFixture();
     const result = await renderAnyDocNeedsOcrPages(fixture.manifest, fixture.materialization);
 
@@ -114,7 +118,9 @@ test('renders only canonical needsOcr pages in stable order with bounded PHI-saf
     assert.equal(result.review, 'required'); assert.equal(result.writes, 0); assert.equal(result.apply, 'none');
 });
 
-test('produces deterministic raster bytes and digests on the exact renderer profile', async () => {
+test('produces deterministic raster bytes and digests on the exact renderer profile', {
+    skip: !SUPPORTS_REAL_RENDERER,
+}, async () => {
     const fixture = await acceptedFixture();
     const first = await renderAnyDocNeedsOcrPages(fixture.manifest, fixture.materialization);
     const second = await renderAnyDocNeedsOcrPages(fixture.manifest, fixture.materialization);
@@ -122,6 +128,22 @@ test('produces deterministic raster bytes and digests on the exact renderer prof
     if (first.status !== 'rendered' || second.status !== 'rendered') return;
     assert.deepEqual(first.pages.map((page) => page.receipt.rasterSha256), second.pages.map((page) => page.receipt.rasterSha256));
     assert.deepEqual(first.pages.map((page, index) => Buffer.compare(page.pngBytes, second.pages[index]!.pngBytes)), [0, 0]);
+});
+
+test('fails closed when the exact renderer runtime is unavailable', {
+    skip: SUPPORTS_REAL_RENDERER,
+}, async () => {
+    const fixture = await acceptedFixture();
+    const result = await renderAnyDocNeedsOcrPages(fixture.manifest, fixture.materialization);
+
+    assert.deepEqual(result, {
+        schemaVersion: 'mediflow.anydoc_pdf_page_renderer.v1',
+        status: 'review_required',
+        reason: 'engine_unavailable',
+        review: 'required',
+        writes: 0,
+        apply: 'none',
+    });
 });
 
 test('rejects global review, alternate spelling, routing, order, digest and binding mismatches', async () => {
@@ -164,7 +186,9 @@ test('rejects reconstructed native evidence with invalid exact receipt fields', 
     }
 });
 
-test('copies bytes before async rendering and denies malformed, hostile and oversized pages without partial output', async () => {
+test('copies bytes before async rendering and denies malformed, hostile and oversized pages without partial output', {
+    skip: !SUPPORTS_REAL_RENDERER,
+}, async () => {
     const fixture = await acceptedFixture();
     const firstPage = fixture.materialization.pages[0]!; const original = Buffer.from(firstPage.pdfBytes);
     const pending = renderAnyDocNeedsOcrPages(fixture.manifest, fixture.materialization);
@@ -207,7 +231,9 @@ test('copies bytes before async rendering and denies malformed, hostile and over
     if (result.status === 'review_required') assert.equal(result.reason, 'page_evidence_mismatch');
 });
 
-test('enforces per-page and cumulative PNG byte limits without returning partial rasters', async () => {
+test('enforces per-page and cumulative PNG byte limits without returning partial rasters', {
+    skip: !SUPPORTS_REAL_RENDERER,
+}, async () => {
     const jpeg = syntheticNoiseJpeg(1850);
     const single = await classifiedNoiseFixture(jpeg, 1850, 1);
     const admitted = await renderAnyDocNeedsOcrPages(single.manifest, single.materialization);

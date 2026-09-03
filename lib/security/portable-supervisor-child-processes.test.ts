@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { after, test } from 'node:test';
+import { pathToFileURL } from 'node:url';
 
 import { createPortableSupervisorProductionChildProcessesV1 } from
   './portable-supervisor-child-processes.ts';
@@ -62,12 +63,14 @@ function setup() {
   return { calls, children, processes };
 }
 
-test('spawns one marker-only MCP child and one direct loopback standalone Web child', () => {
+test('spawns one marker-only MCP child with a file URL loader and one direct loopback Web child', () => {
   const current = setup();
   assert.equal(current.calls.length, 2);
   const [mcp, web] = current.calls;
   assert.equal(mcp?.command, paths.nodePath);
-  assert.deepEqual(mcp?.args, ['--experimental-strip-types', '--import', paths.loaderPath, paths.mcpTargetPath]);
+  assert.deepEqual(mcp?.args, [
+    '--experimental-strip-types', '--import', pathToFileURL(paths.loaderPath).href, paths.mcpTargetPath,
+  ]);
   assert.deepEqual(mcp?.options.stdio, ['inherit', 'inherit', 'inherit', 'ipc']);
   assert.deepEqual(mcp?.options.env, {
     MEDIFLOW_AIP_OPERATION_RPC: 'late_bound_authenticated_inherited_child_ipc_v1',
