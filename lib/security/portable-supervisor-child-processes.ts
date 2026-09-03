@@ -2,7 +2,7 @@
 import { spawn, type ChildProcess, type SpawnOptions } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import {
   AIP_OPERATION_RPC_ENV_KEY_V1,
@@ -79,6 +79,8 @@ export function createPortableSupervisorProductionChildProcessesV1(
 ): PortableSupervisorProductionChildProcessesV1 {
   const nodePath = requireAbsoluteFile(options.nodePath ?? process.execPath, 'node');
   const loaderPath = requireAbsoluteFile(options.loaderPath ?? LOADER, 'loader', ROOT_REAL);
+  // @Codex Node interprets Windows drive letters as URL schemes for --import unless encoded as file URLs.
+  const loaderUrl = pathToFileURL(loaderPath).href;
   const mcpTargetPath = requireAbsoluteFile(options.mcpTargetPath ?? MCP_TARGET, 'mcp', ROOT_REAL);
   const webDirectory = requireAbsoluteDirectory(options.webDirectory ?? WEB_DIRECTORY, 'web_directory');
   const webTargetPath = requireAbsoluteFile(options.webTargetPath ?? WEB_TARGET, 'web', webDirectory);
@@ -93,7 +95,7 @@ export function createPortableSupervisorProductionChildProcessesV1(
   let mcp: ChildProcess;
   try {
     mcp = spawnChild(nodePath,
-      ['--experimental-strip-types', '--import', loaderPath, mcpTargetPath], {
+      ['--experimental-strip-types', '--import', loaderUrl, mcpTargetPath], {
         cwd: ROOT_REAL,
         env: mcpEnvironment,
         stdio: ['inherit', 'inherit', 'inherit', 'ipc'],

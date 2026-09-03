@@ -17,7 +17,8 @@ export { createLateBoundMcpChildPortV1 } from './authenticated-headless-agent-pr
 const REQUIRED_SOURCE_KEYS = ['readHostContext', 'writeAudit', 'commitTerminalAudit'] as const;
 const OPTIONAL_SOURCE_KEY = 'previewCheckupStatus' as const;
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
-const LOADER = `${ROOT}/scripts/register-strip-types-loader.mjs`;
+// @Codex Keep the Node --import operand portable across Windows drive-letter paths.
+const LOADER = new URL('../../scripts/register-strip-types-loader.mjs', import.meta.url).href;
 const TARGETS = Object.freeze({
   mcp: `${ROOT}/scripts/intelligent-host-mcp-stdio.mjs`,
   mini: `${ROOT}/packages/mini/src/cli.ts`,

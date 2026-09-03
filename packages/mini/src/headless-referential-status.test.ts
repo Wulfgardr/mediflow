@@ -61,7 +61,8 @@ test('does not inspect hostile values or ambient iterator and then hooks', () =>
   }
   assert.equal(reads, 0);
 
-  const loader = fileURLToPath(new URL('../../../scripts/register-strip-types-loader.mjs', import.meta.url));
+  const loader = new URL('../../../scripts/register-strip-types-loader.mjs', import.meta.url).href;
+  assert.equal(new URL(loader).protocol, 'file:');
   const target = new URL('./headless-referential-status.ts', import.meta.url).href;
   const childSource = `const {MINI_HEADLESS_REFERENTIAL_STATUSES:s}=await import(${JSON.stringify(target)}); const getPrototypeOf=Object.getPrototypeOf,defineProperty=Object.defineProperty; let reads=0,unhandled=0; process.on('unhandledRejection',()=>unhandled++); defineProperty(Object.prototype,'then',{configurable:true,get(){reads++;throw Error('then')}}); defineProperty(Array.prototype,Symbol.iterator,{configurable:true,value(){throw Error('iterator')}}); if(s.length!==6||getPrototypeOf(s)!==null||getPrototypeOf(s[0])!==null||s[0].status!=='denied'||s[0].then!==undefined)process.exit(1); setImmediate(()=>process.exit(reads||unhandled?1:0));`;
   const child = spawnSync(process.execPath, ['--experimental-strip-types', '--import', loader, '--input-type=module', '-e', childSource], { encoding: 'utf8', timeout: 5000 });

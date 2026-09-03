@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { access, readFile } from 'node:fs/promises';
 import test from 'node:test';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
     AIP_BOOTSTRAP_BIND_MAX_FRAME_BYTES_V1,
     AIP_BOOTSTRAP_BIND_SCHEMA_V1,
@@ -17,29 +17,51 @@ import {
 } from '../packages/aip/src/operation-rpc.ts';
 
 const SERVER = fileURLToPath(new URL('./intelligent-host-mcp-stdio.mjs', import.meta.url));
-const STRIP_TYPES_LOADER = process.env.MEDIFLOW_TEST_STRIP_TYPES_LOADER
-    ?? fileURLToPath(new URL('./register-strip-types-loader.mjs', import.meta.url));
+
+function asFileImportUrl(value) {
+    return value.startsWith('file:') ? new URL(value).href : pathToFileURL(value).href;
+}
+
+const STRIP_TYPES_LOADER = asFileImportUrl(process.env.MEDIFLOW_TEST_STRIP_TYPES_LOADER
+    ?? fileURLToPath(new URL('./register-strip-types-loader.mjs', import.meta.url)));
 const TEST_MODULE_ENV = process.env.MEDIFLOW_TEST_NODE_PATH
     ? { NODE_PATH: process.env.MEDIFLOW_TEST_NODE_PATH } : {};
 const MODERN_VERSION = '2026-07-28';
+const TEST_SERVICE_ENTRY_TIMEOUT_MS = 4_000;
+const TEST_LONGEST_HOST_BUDGET_MS = 1_500;
+const TEST_RESPONSE_OBSERVATION_TIMEOUT_MS = TEST_SERVICE_ENTRY_TIMEOUT_MS + TEST_LONGEST_HOST_BUDGET_MS + 1_000;
 const META = Object.freeze({
     'io.modelcontextprotocol/protocolVersion': MODERN_VERSION,
     'io.modelcontextprotocol/clientCapabilities': {},
     'io.modelcontextprotocol/clientInfo': { name: 'mediflow-mcp-contract-test', version: '1.0.0' },
 });
 
+test('uses a file URL for the nested strip-types loader', () => {
+    const loaderPath = fileURLToPath(new URL('./register-strip-types-loader.mjs', import.meta.url));
+    const loaderUrl = pathToFileURL(loaderPath).href;
+    assert.equal(asFileImportUrl(loaderPath), loaderUrl);
+    assert.equal(asFileImportUrl(loaderUrl), loaderUrl);
+    assert.equal(new URL(STRIP_TYPES_LOADER).protocol, 'file:');
+});
+
+test('keeps response observation beyond startup and the longest host budget', () => {
+    assert.ok(TEST_RESPONSE_OBSERVATION_TIMEOUT_MS
+        > TEST_SERVICE_ENTRY_TIMEOUT_MS + TEST_LONGEST_HOST_BUDGET_MS);
+});
+
 function withTimeout(promise, label) {
     return Promise.race([
         promise,
         new Promise((_, reject) => {
-            const timer = setTimeout(() => reject(new Error(`Timed out: ${label}`)), 4_000);
+            const timer = setTimeout(() => reject(new Error(`Timed out: ${label}`)), TEST_RESPONSE_OBSERVATION_TIMEOUT_MS);
             timer.unref();
         }),
     ]);
 }
 
 async function waitFor(predicate, label) {
-    for (let index = 0; index < 100; index += 1) {
+    const deadline = Date.now() + TEST_SERVICE_ENTRY_TIMEOUT_MS;
+    while (Date.now() < deadline) {
         if (predicate()) return;
         await new Promise((resolve) => setTimeout(resolve, 5));
     }
@@ -537,13 +559,14 @@ test('maps the host budget denial without publishing a later service result', as
 
 test('cancels the host when the client budget expires and drops the late result', async (context) => {
     let entered = false; let signal; let finish;
-    const server = startServer(true, { timeoutMs: 1_500, terminology: (_input, serviceSignal) => {
+    const server = startServer(true, { timeoutMs: TEST_LONGEST_HOST_BUDGET_MS, terminology: (_input, serviceSignal) => {
         entered = true; signal = serviceSignal;
         return new Promise((resolve) => { finish = resolve; });
     } });
     context.after(() => { if (server.child.exitCode === null) server.child.kill(); });
     const call = server.begin('tools/call', { name: 'mediflow.terminology.search.v1',
         arguments: { system: 'LOINC', query: 'synthetic', limit: 1 } });
+    void call.response.catch(() => undefined);
     await waitFor(() => entered, 'service entry');
     const response = await call.response;
     assert.equal(response.result.isError, true);

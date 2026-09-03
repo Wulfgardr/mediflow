@@ -3,7 +3,7 @@
 /* @Codex */
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
 
 const args = process.argv.slice(2);
@@ -11,6 +11,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, '..');
 const registerLoaderPath = path.join(__dirname, 'register-strip-types-loader.mjs');
+const registerLoaderUrl = pathToFileURL(registerLoaderPath).href;
 
 if (args.length === 0) {
   console.error('Usage: node scripts/run-strip-types.mjs <script-or-node-arg> [...args]');
@@ -122,7 +123,7 @@ function expandArgs(rawArgs) {
 
 function resolveCommand(command) {
   if (!command) return null;
-  if (command.includes('/')) return command;
+  if (path.isAbsolute(command) || command.includes('/') || command.includes('\\')) return command;
 
   for (const entry of (process.env.PATH || '').split(path.delimiter)) {
     if (!entry) continue;
@@ -150,7 +151,7 @@ function collectCandidates() {
 
 function supportsStripTypes(nodePath) {
   if (!nodePath || !fs.existsSync(nodePath)) return false;
-  const result = spawnSync(nodePath, ['--experimental-strip-types', '--import', registerLoaderPath, '-e', ''], {
+  const result = spawnSync(nodePath, ['--experimental-strip-types', '--import', registerLoaderUrl, '-e', ''], {
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -176,7 +177,7 @@ if (!nodePath) {
 }
 
 const nodeArgs = expandArgs(args);
-const result = spawnSync(nodePath, ['--experimental-strip-types', '--import', registerLoaderPath, ...nodeArgs], {
+const result = spawnSync(nodePath, ['--experimental-strip-types', '--import', registerLoaderUrl, ...nodeArgs], {
   env: childEnvironment(),
   stdio: 'inherit',
 });
