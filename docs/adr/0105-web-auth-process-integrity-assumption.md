@@ -137,7 +137,7 @@ Prima della release, la review di sicurezza sull'exact release candidate deve:
 2. ripetere poison pre-entry e durante ogni callout sincrono;
 3. verificare che il poison persistente durante la Promise cookie produca al
    massimo denial/disponibilita e mai pubblicazione di sessione o owner;
-4. provare su Node.js 24.19 e Next.js 16.2.11 che il producer canonico
+4. provare su Node.js 24.19.0 e Next.js 16.3.4 che il producer canonico
    `cookies()` consegni una Promise nativa dello stesso realm, non un `Proxy` o
    un thenable arbitrario;
 5. verificare che ogni rejection ordinaria, accettata o del producer canonico
@@ -150,6 +150,47 @@ Prima della release, la review di sicurezza sull'exact release candidate deve:
 Un esito diverso, una mutazione globale raggiungibile da input, una modifica
 della semantica `cookies()`, un nuovo runtime multi-tenant o un plugin
 in-process non fidato sono trigger obbligatori di revisione.
+
+## Addendum 2026-09-03: evidenza sul producer Next 16.3.4
+
+La decisione e il claim ceiling restano invariati. Il gate unico
+`npm run check:web-auth-lifecycle-owner-boundary` include ora due prove prima
+della promozione:
+
+- `lib/security/web-auth-next-producer-boundary.test.ts` costruisce una App
+  Route temporanea con il Next installato, la avvia sul solo loopback in
+  configurazione production e osserva il vero `cookies()` di `next/headers`;
+- `lib/security/server-auth.test.ts` ripete sul consumer H1a/H1b la matrice
+  avversaria integrata.
+
+Sul runtime fissato dal gate, la App Route deve osservare esattamente:
+
+- Node.js `24.19.0` e Next.js `16.3.4` anche dentro la route;
+- una Promise riconosciuta da `node:util.types.isPromise`, non riconosciuta
+  come `Proxy` e con prototype identico a `Promise.prototype` dello stesso
+  realm;
+- per entrambi i cookie auth, un record non-Proxy con prototype
+  `Object.prototype`, sole chiavi proprie `name`, `value`, `path`, `path: "/"`
+  e data descriptor enumerabili, configurabili e scrivibili.
+
+La matrice consumer verifica diniego senza pubblicazione di owner per poison
+pre-entry, durante il settlement e in ciascun callout sincrono osservato:
+`cookies`, `cookieStore.get`, resolver, predicate, query builder, lettura,
+ritiro e acquisizione owner. Nega inoltre Promise fake, cross-realm, subclass
+e nascoste da `Proxy` senza assimilarle; i cookie Proxy o con accessor restano
+negati senza eseguire trap o getter. La rejection della Promise nativa
+accettata resta consumata dal boundary.
+
+La fixture e sintetica, viene rimossa nel `finally`, disabilita la telemetria
+Next e non modifica route applicative. Build e richiesta loopback hanno timeout
+espliciti; la suite gira con concorrenza uno per non sovrapporre mutation
+process-global o inventari del resolver.
+
+Questa prova non copre Edge runtime, host compromesso, dipendenze malevole,
+plugin in-process non fidati, disponibilita sotto poison persistente e
+concorrente, catena auth completa o sicurezza generale. Non rende valida per
+analogia una futura versione di Node o Next: il gate va ripetuto sull'exact
+release candidate e ogni drift riporta la promozione in `HOLD_SECURITY`.
 
 ## Claim ceiling e stop rule
 
