@@ -192,14 +192,22 @@ type RasterCanvas = { width: number; height: number; getContext: (kind: '2d') =>
 type RendererEngine = { getDocument: (input: unknown) => LoadingTask;
     createCanvas: (width: number, height: number) => RasterCanvas };
 class PageRenderTimeout extends Error { constructor() { super(); this.name = 'PageRenderTimeout'; } }
-function installedVersion(packageId: string): string | null {
-    try { const value = runtimeRequire(`${packageId}/package.json`) as { version?: unknown };
+function installedPdfJsVersion(): string | null {
+    try { const value = runtimeRequire('pdfjs-dist/package.json') as { version?: unknown };
+        return typeof value.version === 'string' ? value.version : null; } catch { return null; }
+}
+function installedCanvasVersion(): string | null {
+    try { const value = runtimeRequire('@napi-rs/canvas/package.json') as { version?: unknown };
+        return typeof value.version === 'string' ? value.version : null; } catch { return null; }
+}
+function installedCanvasProfileVersion(): string | null {
+    try { const value = runtimeRequire('@napi-rs/canvas-darwin-arm64/package.json') as { version?: unknown };
         return typeof value.version === 'string' ? value.version : null; } catch { return null; }
 }
 async function loadEngine(): Promise<RendererEngine | null> {
     if (process.platform !== 'darwin' || process.arch !== 'arm64' || process.versions.node.split('.')[0] !== '24'
-        || installedVersion('pdfjs-dist') !== PDFJS_VERSION || installedVersion('@napi-rs/canvas') !== CANVAS_VERSION
-        || installedVersion(BACKEND_PROFILE_ID) !== CANVAS_VERSION) return null;
+        || installedPdfJsVersion() !== PDFJS_VERSION || installedCanvasVersion() !== CANVAS_VERSION
+        || installedCanvasProfileVersion() !== CANVAS_VERSION) return null;
     try {
         const [pdfjs, canvas] = await Promise.all([import('pdfjs-dist/legacy/build/pdf.mjs'), import('@napi-rs/canvas')]);
         if (pdfjs.version !== PDFJS_VERSION || typeof pdfjs.getDocument !== 'function' || typeof canvas.createCanvas !== 'function') return null;

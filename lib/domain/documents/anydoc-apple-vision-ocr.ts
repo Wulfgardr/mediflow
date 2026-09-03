@@ -99,7 +99,7 @@ async function runOwnedScript(script: string, bytes: Buffer, temporaryRootOwner:
     try {
         result = await new Promise((resolve) => {
             const child = spawn('/usr/bin/sandbox-exec', ['-p', SANDBOX_PROFILE, '/usr/bin/xcrun', 'swift', script], {
-                cwd: path.dirname(script), env: { PATH: '/usr/bin:/bin', LC_ALL: 'C',
+                cwd: path.dirname(script), env: { NODE_ENV: 'production', PATH: '/usr/bin:/bin', LC_ALL: 'C',
                     TMPDIR: `${temporaryRoot}${path.sep}` },
                 stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true,
             });

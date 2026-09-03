@@ -17,6 +17,8 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const LOADER = path.join(ROOT, 'scripts/register-strip-types-loader.mjs');
 const MEMBERSHIP_TABLE = 'patients_to_ambulatories';
 const NON_BACKUP_TABLES = new Set(['audit_events', 'settings', 'users']);
+/* @Codex Checkup enrollment is host-local authorization state and is not exported by the v1 clinical backup. */
+const LOCAL_ONLY_AUTHORITY_TABLES = new Set(['headless_checkup_active_role_attestations']);
 /* @Codex Command replay remains empty until append-only audit restore has a separate contract. */
 const AUDIT_DEPENDENT_EMPTY_TABLES = new Set(['durable_review_command_operations', 'durable_review_command_states']);
 const BACKUP_TABLES = {
@@ -647,13 +649,15 @@ test('scheduled backup restores every clinical table and preserves ciphertext by
             const actualSchemaTables = schemaTables(sourceDb);
             const expectedSchemaTables = [
                 ...NON_BACKUP_TABLES,
+                ...LOCAL_ONLY_AUTHORITY_TABLES,
                 ...Object.values(BACKUP_TABLES),
                 MEMBERSHIP_TABLE,
             ].sort();
             assert.deepEqual(actualSchemaTables, expectedSchemaTables, 'new schema tables must be backed up or explicitly classified');
             assert.deepEqual([...Object.keys(BACKUP_TABLES)].sort(), [...BACKUP_COLLECTIONS].sort());
 
-            const clinicalTables = actualSchemaTables.filter((table) => !NON_BACKUP_TABLES.has(table) && !AUDIT_DEPENDENT_EMPTY_TABLES.has(table));
+            const clinicalTables = actualSchemaTables.filter((table) => !NON_BACKUP_TABLES.has(table)
+                && !LOCAL_ONLY_AUTHORITY_TABLES.has(table) && !AUDIT_DEPENDENT_EMPTY_TABLES.has(table));
             clearBackupTables(sourceDb, clinicalTables);
             clearBackupTables(targetDb, clinicalTables);
             const durableReviewCommand = await populateSyntheticClinicalFixture(sourceDb, sourceActorRef);

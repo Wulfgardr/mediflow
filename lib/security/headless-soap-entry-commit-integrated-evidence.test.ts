@@ -311,7 +311,7 @@ test('H10 integrates the exact H1-H8 production composition', async (t) => {
         const mini = spawnSync(process.execPath, [
             '--experimental-strip-types', '--import', path.join(root, 'scripts/register-strip-types-loader.mjs'),
             path.join(root, 'packages/mini/src/cli.ts'),
-        ], { input: '{"command":"draft preview","args":{}}', encoding: 'utf8', timeout: 5_000 });
+        ], { input: '{"command":"status","args":{}}', encoding: 'utf8', timeout: 5_000 });
         assert.equal(mini.status, 69);
         assert.equal(mini.stderr, '');
         assert.equal(mini.stdout, '{"schemaVersion":"mediflow.mini.transport.v1","ok":false,"error":{"code":"TRANSPORT_UNBOUND"}}\n');

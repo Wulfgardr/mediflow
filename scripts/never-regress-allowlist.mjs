@@ -142,6 +142,16 @@ export const NEVER_REGRESS_ALLOWLIST = {
             reason: 'Session-grant tests reuse one synthetic SOAP administrator identity across local lifecycle cases.',
         },
         {
+            path: 'lib/security/headless-checkup-active-role-session-grant-production.test.ts',
+            pattern: "username:\\s*'synthetic-checkup-production-(?:enrolled|not-enrolled)-user'",
+            reason: 'Checkup production grant tests bind two explicit synthetic administrators to isolated local enrollment states.',
+        },
+        {
+            path: 'lib/security/headless-checkup-active-role-session-grant.test.ts',
+            pattern: "username:\\s*'synthetic-checkup-admin'",
+            reason: 'Checkup grant lifecycle tests reuse one synthetic administrator identity in an isolated in-process owner.',
+        },
+        {
             path: 'lib/security/headless-soap-authorization-lineage.test.ts',
             pattern: "username:\\s*'synthetic\\.clinician'",
             reason: 'Authorization-lineage tests bind receipts to an explicit synthetic clinician identity.',
