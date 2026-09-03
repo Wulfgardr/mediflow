@@ -95,6 +95,13 @@ test('continues a real AnyDoc image_or_scan result through offline Apple Vision'
     assert.match(result.markdown, /DOCUMENTO SINTETICO/iu);
     assert.match(result.markdown, /Controllo locale offline/iu);
     assert.equal(result.provenance.sourceSha256, createHash('sha256').update(pdf).digest('hex'));
+    assert.equal(result.receipt.ocrProvenance?.schemaVersion, 'mediflow.anydoc_local_ocr_provenance.v1');
+    assert.equal(result.receipt.ocrProvenance?.engine, 'apple_vision');
+    assert.deepEqual([result.receipt.ocrProvenance?.pageCount, result.receipt.ocrProvenance?.ocrPageCount], [1, 1]);
+    assert.match(result.receipt.ocrProvenance?.scriptSha256 ?? '', /^[a-f0-9]{64}$/u);
+    assert.match(result.receipt.ocrProvenance?.receiptSetSha256 ?? '', /^[a-f0-9]{64}$/u);
+    assert.equal(Object.getPrototypeOf(result.receipt.ocrProvenance!), null);
+    assert.equal(Object.isFrozen(result.receipt.ocrProvenance), true);
     assert.deepEqual([result.review, result.writes, result.apply, result.candidateUse], ['required', 0, 'none', 'review_only']);
 });
 

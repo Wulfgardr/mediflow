@@ -17,7 +17,10 @@ for (const file of readdirSync(path.resolve('drizzle')).filter((name) => name.en
     bootstrap.exec(readFileSync(path.join(path.resolve('drizzle'), file), 'utf8').replace(/^-->\s+statement-breakpoint\s*$/gmu, ''));
 }
 bootstrap.close();
-const { createDocumentSynthesisProductionOperationForTest } = await import('./document-synthesis-production-operation.ts');
+const {
+    createDocumentSynthesisProductionOperationForTest,
+    resolveDocumentSynthesisAnyDocProjection,
+} = await import('./document-synthesis-production-operation.ts');
 
 const USER = Object.freeze({ id: 'user.synthetic.document.synthesis', username: 'clinician.synthetic', role: 'clinician' as const });
 const PAIR = Object.freeze({ patientId: 'patient.synthetic.document.synthesis', ambulatoryId: 'ambulatory.synthetic.document.synthesis' });
@@ -54,6 +57,24 @@ function unsupported(attachmentId: string) {
     });
 }
 
+function extractedWithAppleVision(attachmentId: string, markdown = 'Fonte sintetica OCR.') {
+    const value = extracted(attachmentId, markdown);
+    return Object.freeze({
+        ...value,
+        receipt: Object.freeze({
+            ...value.receipt,
+            ocrProvenance: Object.freeze({
+                schemaVersion: 'mediflow.anydoc_local_ocr_provenance.v1' as const,
+                engine: 'apple_vision' as const,
+                scriptSha256: 'e'.repeat(64),
+                pageCount: 2,
+                ocrPageCount: 1,
+                receiptSetSha256: 'f'.repeat(64),
+            }),
+        }),
+    });
+}
+
 afterEach(() => clearAllSessions());
 after(() => rmSync(DATA_DIRECTORY, { recursive: true, force: true }));
 
@@ -68,6 +89,21 @@ function context() {
     owner.issueSelection({ expectedEpoch: 0, ...PAIR });
     return Object.freeze({ session, owner });
 }
+
+test('classifies Apple Vision AnyDoc evidence as OCR text and keeps native extraction distinct', () => {
+    const native = resolveDocumentSynthesisAnyDocProjection(extracted('attachment.synthetic.document'),
+        'attachment.synthetic.document');
+    const ocr = resolveDocumentSynthesisAnyDocProjection(extractedWithAppleVision('attachment.synthetic.document'),
+        'attachment.synthetic.document');
+    assert.deepEqual([native?.sourceKind, native?.rationale], ['native_text', 'native_text_normalized']);
+    assert.deepEqual([ocr?.sourceKind, ocr?.rationale], ['ocr_text', 'ocr_text_normalized']);
+
+    const malformed = extractedWithAppleVision('attachment.synthetic.document');
+    assert.equal(resolveDocumentSynthesisAnyDocProjection({
+        ...malformed,
+        receipt: { ...malformed.receipt, ocrProvenance: { ...malformed.receipt.ocrProvenance, ocrPageCount: 3 } },
+    }, 'attachment.synthetic.document'), null);
+});
 
 test('binds one attachment intent and one host-owned AnyDoc result to currentness', async () => {
     const selected = context(); let entropy = 0; let reads = 0; let extractions = 0; let executions = 0;

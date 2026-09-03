@@ -12,7 +12,11 @@ import { isServerSessionProjectionOwner } from '@/lib/security/server-session-pr
 import { registerServerSessionResource } from '@/lib/security/server-session';
 import type { ServerSession } from '@/lib/security/server-session';
 import { composeAnyDocCurrentSourceExtraction } from '@/lib/domain/documents/anydoc-current-source-composition';
-import type { LocalExtractionResult } from '@/lib/domain/documents/anydoc-local-extraction-contract';
+import {
+    ANYDOC_LOCAL_OCR_PROVENANCE_SCHEMA_VERSION,
+    type LocalExtractionReceipt,
+    type LocalExtractionResult,
+} from '@/lib/domain/documents/anydoc-local-extraction-contract';
 import { createDocumentSynthesisFabricProductionComposition } from './document-synthesis-fabric-production-composition';
 import { resolveDocumentSynthesisHostProjection } from './document-synthesis-host-projection';
 import { captureDocumentSynthesisSourceSet } from './document-synthesis-source-set-contract';
@@ -49,6 +53,7 @@ type Dependencies = Readonly<{
 }>;
 
 const CAPTURE_HANDLE = /^dsc_[0-9a-f]{32}$/u; const PREVIEW_HANDLE = /^dsp_[0-9a-f]{32}$/u; const SOURCE_REF = /^[a-f0-9]{64}$/u;
+const SHA256 = /^[a-f0-9]{64}$/u;
 const MAX_U64 = BigInt('18446744073709551615');
 const MAX_SESSION_HANDLES = 256;
 const TEST_HARNESS = process.execArgv.some((argument) => argument === '--test' || argument.startsWith('--test=') || argument.startsWith('--test-'));
@@ -68,6 +73,31 @@ function exact(value: unknown, keys: readonly string[]): Record<string, unknown>
     } catch { return null; }
 }
 
+function extractionSourceKind(receipt: LocalExtractionReceipt): 'native_text' | 'ocr_text' | null {
+    try {
+        const descriptor = Object.getOwnPropertyDescriptor(receipt, 'ocrProvenance');
+        if (!descriptor) return 'native_text';
+        if (!descriptor.enumerable || !Object.hasOwn(descriptor, 'value')) return null;
+        const value = descriptor.value;
+        if (typeof value !== 'object' || value === null || types.isProxy(value)) return null;
+        const prototype = Object.getPrototypeOf(value);
+        if (prototype !== Object.prototype && prototype !== null) return null;
+        const keys = ['schemaVersion', 'engine', 'scriptSha256', 'pageCount', 'ocrPageCount', 'receiptSetSha256'];
+        const own = Reflect.ownKeys(value); const fields = Object.getOwnPropertyDescriptors(value);
+        if (own.length !== keys.length || own.some((key) => typeof key !== 'string' || !keys.includes(key))) return null;
+        for (const key of keys) if (!fields[key]?.enumerable || !Object.hasOwn(fields[key]!, 'value')) return null;
+        const schemaVersion = fields.schemaVersion!.value; const engine = fields.engine!.value;
+        const scriptSha256 = fields.scriptSha256!.value; const receiptSetSha256 = fields.receiptSetSha256!.value;
+        const pageCount = fields.pageCount!.value; const ocrPageCount = fields.ocrPageCount!.value;
+        return schemaVersion === ANYDOC_LOCAL_OCR_PROVENANCE_SCHEMA_VERSION && engine === 'apple_vision'
+            && typeof scriptSha256 === 'string' && SHA256.test(scriptSha256)
+            && typeof receiptSetSha256 === 'string' && SHA256.test(receiptSetSha256)
+            && Number.isSafeInteger(pageCount) && pageCount >= 1 && pageCount <= 500
+            && Number.isSafeInteger(ocrPageCount) && ocrPageCount >= 1 && ocrPageCount <= pageCount
+            ? 'ocr_text' : null;
+    } catch { return null; }
+}
+
 function parseCurrentness(value: unknown): Currentness | null {
     const input = exact(value, ['documentSourceRef', 'documentRevision', 'documentFreshnessEpoch']);
     return input && typeof input.documentSourceRef === 'string' && SOURCE_REF.test(input.documentSourceRef)
@@ -81,17 +111,21 @@ function sameCurrentness(left: Currentness, right: Currentness | null): boolean 
         && left.documentFreshnessEpoch === right.documentFreshnessEpoch;
 }
 
-function verifiedNativeProjection(result: LocalExtractionResult, attachmentId: string): ReturnType<typeof resolveDocumentSynthesisHostProjection> | null {
-    if (result.status !== 'extracted' || result.provenance.attachmentId !== attachmentId || result.review !== 'required'
-        || result.writes !== 0 || result.apply !== 'none' || result.candidateUse !== 'review_only'
-        || result.receipt.parser !== 'anydoc-local' || result.receipt.outcome !== 'extracted'
-        || result.receipt.sourceSha256 !== result.provenance.sourceSha256
-        || result.receipt.sourceByteLength !== result.provenance.byteLength
-        || typeof result.receipt.markdownSha256 !== 'string'
-        || result.receipt.markdownByteLength !== Buffer.byteLength(result.markdown, 'utf8')
-        || createHash('sha256').update(result.markdown, 'utf8').digest('hex') !== result.receipt.markdownSha256) return null;
-    try { return resolveDocumentSynthesisHostProjection({ sourceKind: 'native_text', sourceText: result.markdown }); }
-    catch { return null; }
+export function resolveDocumentSynthesisAnyDocProjection(
+    result: LocalExtractionResult, attachmentId: string,
+): ReturnType<typeof resolveDocumentSynthesisHostProjection> | null {
+    try {
+        if (result.status !== 'extracted' || result.provenance.attachmentId !== attachmentId || result.review !== 'required'
+            || result.writes !== 0 || result.apply !== 'none' || result.candidateUse !== 'review_only'
+            || result.receipt.parser !== 'anydoc-local' || result.receipt.outcome !== 'extracted'
+            || result.receipt.sourceSha256 !== result.provenance.sourceSha256
+            || result.receipt.sourceByteLength !== result.provenance.byteLength
+            || typeof result.receipt.markdownSha256 !== 'string'
+            || result.receipt.markdownByteLength !== Buffer.byteLength(result.markdown, 'utf8')
+            || createHash('sha256').update(result.markdown, 'utf8').digest('hex') !== result.receipt.markdownSha256) return null;
+        const sourceKind = extractionSourceKind(result.receipt);
+        return sourceKind ? resolveDocumentSynthesisHostProjection({ sourceKind, sourceText: result.markdown }) : null;
+    } catch { return null; }
 }
 
 function mint(prefix: 'dsc_' | 'dsp_', value: unknown): string | null {
@@ -157,7 +191,7 @@ function createOperation(context: AuthenticatedWebSessionProjectionOwnerContext,
             try { extraction = await dependencies.extract(context.session, capture.attachmentId); }
             catch { return ingestDenied('operation_unavailable'); }
             if (extraction.status === 'review_required' && extraction.reason === 'unsupported_local_extraction') return ingestDenied('unsupported_local_extraction');
-            const projection = verifiedNativeProjection(extraction, capture.attachmentId);
+            const projection = resolveDocumentSynthesisAnyDocProjection(extraction, capture.attachmentId);
             if (!projection) return ingestDenied('operation_unavailable');
             try {
                 return context.owner.withLeaseCriticalSection(context.session, (selection) => {
