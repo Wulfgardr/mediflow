@@ -7,6 +7,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { after, test } from 'node:test';
 
+import { createFullPortProjectionOwnerProcessOwner } from './server-session-projection-owner.ts';
+import { resolve as resolveSyntheticWebSession } from './web-auth-lifecycle-owner-adapter.ts';
+
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-checkup-grant-production-'));
 process.env.MEDIFLOW_DATA_DIR = dataDir;
 execFileSync(process.execPath, ['scripts/prepare-e2e-db.mjs'], {
@@ -63,6 +66,42 @@ test('issues against a real external P3 admin projection and denies an unenrolle
   sessions.push(absent);
   assert.throws(() => production.headlessCheckupActiveRoleSessionGrant.issue(context(absent), () => undefined),
     (error: unknown) => (error as { code?: unknown }).code === 'attestation_unavailable');
+});
+
+test('keeps a production grant current across authentic request projections and rejects an equivalent clone', () => {
+  const actorRef = 'synthetic-checkup-production-cross-request'; user(actorRef);
+  const store = storeModule.createHeadlessCheckupActiveRoleAttestationStoreV1();
+  store.createInactive(actorRef); store.activate(actorRef);
+  const issued = fixtureModule.issueSyntheticWebSessionContext({ id: actorRef,
+    username: actorRef, role: 'admin' },
+  'checkup-production-cross-request');
+  sessions.push(issued.session);
+  const selectionOwner = createFullPortProjectionOwnerProcessOwner({
+    resolve: (_session, pair) => Object.freeze({ ...pair, patientVersion: 3 }),
+    clock: Date.now,
+  });
+  const owner = selectionOwner.registry.acquire(issued.session);
+  owner.issueSelection({ expectedEpoch: 0, patientId: 'synthetic-patient-cross-request',
+    ambulatoryId: 'synthetic-ambulatory-cross-request' });
+  const initial = Object.freeze(Object.assign(Object.create(null), { session: issued.session, owner }));
+  const grant = production.headlessCheckupActiveRoleSessionGrant.issue(initial, () => undefined);
+
+  const resolved = resolveSyntheticWebSession(issued.session.id, issued.controlId);
+  assert.equal(resolved.status, 'active');
+  if (resolved.status !== 'active') throw new Error('Synthetic Web projection unavailable');
+  assert.notEqual(resolved.projection, issued.session);
+  const nextRequest = Object.freeze(Object.assign(Object.create(null), {
+    session: resolved.projection, owner,
+  }));
+  assert.equal(production.headlessCheckupActiveRoleSessionGrant.withCurrentRequest(
+    grant, nextRequest, () => 'current'), 'current');
+
+  const forgedSession = Object.freeze(Object.assign(Object.create(null), { ...resolved.projection }));
+  const forged = Object.freeze(Object.assign(Object.create(null), { session: forgedSession, owner }));
+  assert.throws(() => production.headlessCheckupActiveRoleSessionGrant.withCurrentRequest(
+    grant, forged, () => 'forbidden'),
+  (error: unknown) => (error as { code?: unknown }).code === 'projection_stale');
+  owner.dispose();
 });
 
 after(() => {

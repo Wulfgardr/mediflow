@@ -123,6 +123,13 @@ function same(left: Snapshot, right: Snapshot): boolean {
     && left.patientId === right.patientId && left.ambulatoryId === right.ambulatoryId
     && left.selectionEpoch === right.selectionEpoch;
 }
+function sameAuthenticatedScope(left: Snapshot, right: Snapshot): boolean {
+  return left.owner === right.owner && left.actorRef === right.actorRef && left.sessionRef === right.sessionRef
+    && left.attestationRef === right.attestationRef && left.issuerRef === right.issuerRef
+    && left.activatedAt === right.activatedAt && left.updatedAt === right.updatedAt
+    && left.expiresAt === right.expiresAt && left.patientId === right.patientId
+    && left.ambulatoryId === right.ambulatoryId && left.selectionEpoch === right.selectionEpoch;
+}
 function callback(value: unknown): value is (...args: unknown[]) => unknown {
   return typeof value === 'function' && !types.isProxy(value) && !types.isAsyncFunction(value)
     && !types.isGeneratorFunction(value);
@@ -198,8 +205,18 @@ export function createHeadlessCheckupActiveRoleSessionGrantOwner(sources: Headle
     if (!record?.active || now(sources.now) >= record.snapshot.expiresAt) {
       if (record) terminate(record); return fail('grant_unavailable');
     }
-    if (presented && (presented.session !== record.snapshot.session || presented.owner !== record.snapshot.owner)) {
-      terminate(record); return fail('projection_stale');
+    if (presented) {
+      try {
+        /* @Codex: server auth reconstructs the authentic projection per request;
+           the stable owner re-proves its opaque P3 and selection scope. */
+        if (presented.owner !== record.snapshot.owner
+          || !sameAuthenticatedScope(stable(presented), record.snapshot)) return fail('projection_stale');
+      } catch (error) {
+        terminate(record);
+        if (error instanceof HeadlessCheckupActiveRoleSessionGrantError
+          && error.code === 'session_unavailable') return fail('projection_stale');
+        throw error;
+      }
     }
     return record;
   };
@@ -207,9 +224,12 @@ export function createHeadlessCheckupActiveRoleSessionGrantOwner(sources: Headle
     operation: (binding: HeadlessCheckupActiveRoleCurrentBindingV1) => T, presented?: unknown): T => {
     if (!callback(operation as unknown)) return fail('lifecycle_unavailable');
     if (operationActive) { operationPoisoned = true; return fail('lifecycle_unavailable'); }
-    const request = presented === undefined ? undefined : context(presented), record = current(candidate, request);
     operationPoisoned = false; operationActive = true;
+    let record: RecordState | null = null;
     try {
+      const request = presented === undefined ? undefined : context(presented);
+      record = current(candidate, request);
+      if (operationPoisoned || !record.active) return fail('lifecycle_unavailable');
       const before = stable({ session: record.snapshot.session, owner: record.snapshot.owner });
       if (operationPoisoned || !record.active) return fail('lifecycle_unavailable');
       if (!same(before, record.snapshot)) return fail('projection_stale');
@@ -227,7 +247,7 @@ export function createHeadlessCheckupActiveRoleSessionGrantOwner(sources: Headle
       confirmResource(record);
       if (operationPoisoned || !record.active) return fail('lifecycle_unavailable');
       return result;
-    } catch (error) { terminate(record); throw error === CALLBACK_FAILED ? fail('grant_unavailable') : error; }
+    } catch (error) { if (record) terminate(record); throw error === CALLBACK_FAILED ? fail('grant_unavailable') : error; }
     finally { operationActive = false; }
   };
   return Object.freeze({
