@@ -11,36 +11,42 @@ No, di default no.
 
 Il progetto nasce `local-first`: database locale, AI locale, servizi locali. Se esistono lane di confronto o shadow evaluation, restano opt-in, separate e non fanno parte del runtime clinico ordinario.
 
-## 🧭 Che cosa porta `v0.7.3`?
+## 🧭 Che cosa porta `v0.8.5`?
 
-`v0.7.3` consolida la base multi-superficie senza ampliare i claim oltre le
-prove disponibili:
+La patch `0.8.5` consolida un sistema locale ibrido e mantiene review e
+autorità clinica fuori dai modelli:
 
-- adozione progressiva di Lume su prime superfici web e card clinica nativa;
-- stack AI locale più modulare, con Ollama come unico provider operativo e gate
-  egress ancora chiuso;
-- control-flow documentale `shadow` e attese locali sempre review-first;
-- hardening di backup, cifratura, transazioni, ricerca farmaci, campi nativi
-  bloccati, dipendenze di produzione e runtime PM2;
-- claims guard esteso al white paper e alle altre superfici pubbliche;
-- tooling packaged P6 con fixture sintetiche, probe e runbook;
-- repository pubblica unica come fonte di sviluppo e rilascio.
-
-Restano le capacità paired della `0.7.2`: ciclo di vita paziente, prestazioni,
-protesica ed export FHIR dal client Apple, entro contratti locali versionati.
+- Intelligence Fabric review-only per Patient Insight, Smart Import, Document
+  Synthesis e Treatment Reasoning;
+- estrazione AnyDoc locale e fallback Apple Vision sulle sole pagine PDF
+  `needsOcr`; DeepSeek-OCR 2/CUDA resta fuori scope non bloccante;
+- Supervisor portabile e MCP `stdio` con operazioni bounded, lease, revoca e
+  audit host-owned; Mini resta una foundation CLI fail-closed senza binding
+  production al Supervisor;
+- preview F10 via MCP e commit checkup soltanto nella UI Web trusted, dopo
+  rilettura, step-up e gesto del medico;
+- semantic planner read-only, limitato a due operazioni allowlisted;
+- cattura e trascrizione italiana Apple on-device su macOS 26+, con consenso,
+  audio bounded in RAM e review del transcript;
+- provider v2 e adapter ufficiali OpenAI/Anthropic integrati ma `default OFF`,
+  verificati con transport fake e senza credenziali o rete live.
 
 Per il quadro dettagliato, inclusi runtime reale, home-base, document
 intelligence, AI locale, SISS/FSE e Apple clients, vedi
 [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md).
 
-## ✨ Cosa resta aperto dopo `v0.7.3`?
+## ✨ Cosa resta aperto dopo `v0.8.5`?
 
 - **Lume**: componenti interni, filo, tipografia, Settings scene e QA manuale
   completa non sono ancora chiusi.
-- **P6 / `WUL-481`**: il tooling sintetico non sostituisce il verbale manuale
-  sul bundle macOS con macchina sbloccata; nessuna parity UI piena è dichiarata.
-- **AI e cloud**: registry, provider alternativi, redaction lane e consenso
-  cloud non sono consegnati. Nessun provider remoto è attivo di default.
+- **Apple**: VoiceOver reale mobile, device fisici, App Store readiness e
+  parity UI completa non sono dichiarati.
+- **AI esterna**: i provider remoti restano disabilitati salvo opt-in; account,
+  retention, egress live e qualità clinica restano fuori dalle prove sorgente.
+- **Headless**: installer, onboarding e compatibilità con host MCP esterni
+  richiedono prove separate.
+- **Recording**: microfono reale e validazione clinica non fanno parte del
+  claim; nessun writer clinico è automatico.
 - **Client paired**: offline, click-map UI e superfici derivate dai documenti
   restano parziali o host-only.
 
@@ -118,8 +124,17 @@ Non vuol dire ancora:
 
 Non nel path di default.
 
-OCR e sintesi usano runtime locali. `OllamaAdapter` e `AIService` preparano un
-boundary provider piu modulare, ma oggi Ollama resta l'unico provider operativo:
-il gate egress e `closed_pending_redaction_lane` e non esistono provider cloud o
-impostazioni di consenso consegnati. Le lane separate di benchmark o
-comparazione non sono comportamento standard del prodotto.
+AnyDoc, Apple Vision, Ollama e ATHENA/MLX operano localmente nei rispettivi
+confini. Gli adapter OpenAI/Anthropic esistono, ma sono `default OFF`: la probe
+è amministrativa, exact-intent e review-only; richiede opt-in host, secret
+reference e policy egress/retention esplicite. Il tree usa transport fake e non
+include credenziali né prova invii live. Nessuna preview Fabric autorizza una
+scrittura clinica.
+
+## 🤖 Che cosa può fare un agente tramite MCP?
+
+Può usare un catalogo bounded, cercare terminologia, leggere Open Loops nello
+scope paziente concesso, preparare una proposta follow-up e interrogare il
+planner read-only. Per F10 può produrre soltanto una preview di transizione:
+il commit resta nella UI Web trusted e richiede il gesto del medico. MCP non
+riceve proof, non importa SQLite e non possiede autorità generale.

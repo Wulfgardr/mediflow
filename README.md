@@ -3,428 +3,280 @@
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="./docs/design/lume/icona/mediflow-icon-grafite.svg">
   <source media="(prefers-color-scheme: light)" srcset="./docs/design/lume/icona/mediflow-icon-giorno.svg">
-  <img src="./docs/design/lume/icona/mediflow-icon-giorno.svg" alt="Icona MediFlow: il Filo del diario con il nodo del presente" width="120" height="120">
+  <img src="./docs/design/lume/icona/mediflow-icon-giorno.svg" alt="MediFlow Filo icon: the clinical journal thread and its present-time knot" width="120" height="120">
 </picture>
 
 # MediFlow
 
-<a href="https://claude.com/claude-code"><img src="https://img.shields.io/badge/costruito%20con-Claude%20Code-D97757?style=flat&amp;logo=claudecode&amp;logoColor=white" alt="Costruito con Claude Code"></a>
-<a href="https://openai.com/codex"><img src="https://img.shields.io/badge/costruito%20con-Codex-1f2937?style=flat" alt="Costruito con Codex"></a>
+<a href="https://claude.com/claude-code"><img src="https://img.shields.io/badge/built%20with-Claude%20Code-D97757?style=flat&amp;logo=claudecode&amp;logoColor=white" alt="Built with Claude Code"></a>
+<a href="https://openai.com/codex"><img src="https://img.shields.io/badge/built%20with-Codex-1f2937?style=flat" alt="Built with Codex"></a>
 
 _by Ordito & Concilio_
 
-**Cartella clinica territoriale local-first, open source e libera da usare.**
+**A local-first clinical workspace for longitudinal community care.**
 
-**Porta l'informazione giusta nel momento giusto.**
+Keep the right information, its source, and the next decision in view.
 
-[![Candidato sorgente](https://img.shields.io/badge/candidato%20locale-0.8.5-1f6feb)](#candidato-sorgente-locale-085)
-[![Ultima release](https://img.shields.io/badge/ultima%20release-0.8.2-6e7681)](./CHANGELOG.md)
-[![Licenza](https://img.shields.io/badge/licenza-MIT-2ea043)](./LICENSE)
-[![Local-first](https://img.shields.io/badge/dati-local--first-8957e5)](#confini-dichiarati)
-[![Core Swift](https://img.shields.io/badge/core%20Swift-macOS%20%7C%20Linux%20%7C%20Windows-6e7681)](#candidato-sorgente-locale-085)
+[![Latest release](https://img.shields.io/github/v/release/Wulfgardr/mediflow?label=release)](https://github.com/Wulfgardr/mediflow/releases/latest)
+[![License](https://img.shields.io/badge/license-MIT-2ea043)](./LICENSE)
+[![Local-first](https://img.shields.io/badge/data-local--first-8957e5)](#security-and-human-control)
+[![Swift core](https://img.shields.io/badge/Swift%20core-macOS%20%7C%20Linux%20%7C%20Windows-6e7681)](#product-surfaces)
 
-[In breve](#mediflow-in-breve) · [Uso attuale](#come-si-usa-oggi) · [Architettura](#come-collaborano-le-app) · [Schermate](#come-si-presenta) · [Stato](#candidato-sorgente-locale-085) · [Avvio](#avvio-rapido) · [Sviluppo](#sviluppo-assistito)
+[Why MediFlow](#why-mediflow) · [Capabilities](#what-mediflow-does) · [Architecture](#one-authoritative-home-base) · [Intelligence](#intelligence-without-giving-up-control) · [Get started](#get-started) · [Documentation](#documentation)
 
 </div>
 
-## MediFlow, in breve
+## Why MediFlow
 
-MediFlow nasce dalle difficoltà operative reali dei medici. È un workspace
-clinico open source e libero da usare. Aiuta a trovare un paziente, leggere la
-sua storia, seguire terapie, controlli e documenti e preparare il passaggio
-successivo. Non promette una pratica clinica senza attrito. Riduce l'attrito
-evitabile senza nascondere complessità, provenienza, privacy e responsabilità
-professionale.
+Clinical work rarely fails for lack of data. It becomes difficult when the
+right detail is scattered across notes, documents, therapies, appointments,
+tasks, and institutional systems just as a decision has to be made.
 
-Il prodotto è information-first, question-first e convenience-first. Non è
-AI-first. Dati clinici, terminologie, reference data, ricerca, navigazione e
-workflow deterministici restano funzioni di prima classe anche quando ogni
-provider AI è disabilitato.
+MediFlow brings those threads into one longitudinal workspace. It helps a
+clinician find a person, understand what changed, return to the source, and
+prepare the next action without pretending that clinical complexity can be
+automated away.
 
-Il cloud non è un requisito per lavorare. Nel candidato locale `0.8.5`, Ollama
-e ATHENA/MLX servono solo le capability locali assegnate. Quattro percorsi
-Fabric preparano proposte con receipt e provenienza visibili. Nessuna preview
-aggiunge diagnosi, terapie o altri dati clinici strutturati.
+The product is information-first and question-first, not AI-first. Records,
+terminologies, source navigation, search, and deterministic workflows remain
+first-class capabilities when every model provider is disabled.
 
-Nel contesto territoriale italiano, MediFlow aiuta ad aprire la scheda giusta,
-ritrovare la fonte, distinguere una terapia da una prestazione prescritta e
-preparare la decisione successiva. Il medico verifica le evidenze e decide.
-MediFlow non prescrive, non formula diagnosi autonome e non sostituisce il
-giudizio clinico.
+## What MediFlow does
 
-MediFlow non sostituisce SISS, FSE o gli altri canali ufficiali. Sta accanto al
-lavoro clinico quotidiano, con confini dichiarati e verificabili.
+| Capability | What it is for |
+| :-- | :-- |
+| **Longitudinal record** | Read the clinical journal, diagnoses, therapies, measurements, exemptions, and administrative context together. |
+| **Worklist and follow-up** | Keep appointments, open loops, tasks, and the next accountable action close to the record. |
+| **Source-bound documents** | Import supported documents locally, preserve provenance, and return to the current source before review or use. |
+| **AnyDoc extraction** | Extract supported attachments deterministically and use Apple Vision locally only for PDF pages that actually need OCR. |
+| **Intelligence Fabric** | Route four named review-only lanes—Patient Insight, Smart Import, Document Synthesis, and Treatment Reasoning—through host-owned policy. |
+| **Headless and MCP access** | Offer bounded terminology search, patient-scoped reads, semantic planning, and follow-up proposals without direct database access. |
+| **Visit recording** | On macOS 26+, use an on-device, review-first recording and transcription path without an automatic clinical writer; real-microphone and clinical validation remain outside the current claim. |
+| **Native and paired clients** | Use the Mac as the authoritative home base while iPhone and iPad evolve as explicitly paired clinical companions. |
 
-Lo sviluppo avviene nella repository pubblica
-[`Wulfgardr/mediflow`](https://github.com/Wulfgardr/mediflow). Database, dati
-sanitari, credenziali e altri artefatti locali restano fuori da Git secondo
-[`SECURITY.md`](./SECURITY.md) e
-[`docs/repository-topology.md`](./docs/repository-topology.md).
+## One authoritative home base
 
-## Come si usa oggi
-
-La superficie operativa principale è il workspace web su localhost, avviato sul
-Mac home-base. Qui MediFlow offre i flussi più estesi per pazienti, diario,
-agenda, documenti, impostazioni e amministrazione locale. Il database resta sul
-Mac.
-
-L'app nativa macOS appartiene allo stesso home-base e offre un accesso desktop
-coerente con il prodotto. iPhone e iPad sono client paired in sviluppo. Hanno
-già una base funzionale consolidata, ma richiedono ancora lavoro prima dell'uso
-operativo quotidiano.
-
-## Come collaborano le app
-
-Il Mac è il nodo autorevole (`home-base`). Ospita il database, l'app nativa e il
-workspace web locale. iPhone e iPad usano l'API locale versionata dopo un
-pairing esplicito. Localhost è oggi la superficie operativa principale. iPhone
-privilegia consultazione e cattura rapide; iPad è progettato come workspace sul
-campo. I dispositivi paired non accedono direttamente a SQLite.
+The Mac home base owns the local SQLite database, the versioned API, the web
+workspace, and the native macOS application. Paired devices use the local API
+after an explicit pairing flow; they never open the database directly.
 
 ```mermaid
 flowchart LR
-    subgraph paired["Client paired · in sviluppo"]
-        iphone["iPhone<br/>recupero e cattura"]
-        ipad["iPad<br/>workspace sul campo"]
+    subgraph clients["Paired clients · in development"]
+        iphone["iPhone<br/>quick retrieval and capture"]
+        ipad["iPad<br/>field workspace"]
     end
-    subgraph mac["Mac home-base · autorevole"]
-        native["App nativa macOS"]
-        web["Workspace localhost"]
-        api["API locale versionata"]
-        db[("SQLite locale")]
+    subgraph home["Mac home base · authoritative"]
+        native["Native macOS app"]
+        web["Local web workspace"]
+        api["Versioned local API"]
+        db[("Local SQLite")]
         native --> api
         web --> api
         api --> db
     end
-    iphone -- "pairing esplicito · TLS locale" --> api
-    ipad -- "pairing esplicito · TLS locale" --> api
+    iphone -- "explicit pairing · local TLS" --> api
+    ipad -- "explicit pairing · local TLS" --> api
 ```
 
-Le app condividono capacità e significato clinico, non la stessa disposizione
-pixel per pixel. Trasporto, pairing e limiti del data plane sono documentati in
-[`docs/topologia-dati-flussi.md`](./docs/topologia-dati-flussi.md).
+Each surface follows the same clinical meaning without forcing a pixel-for-pixel
+copy. The detailed transport, pairing, and data-plane boundaries are documented
+in [Data topology and flows](./docs/topologia-dati-flussi.md).
 
-### Intelligence Fabric nel candidato locale 0.8.5
+## Intelligence without giving up control
 
-> **Candidato sorgente locale. Non è una release e non prova CI remota o
-> disponibilità su un altro host.**
-
-L'Intelligence Fabric collega quattro attività nominate alla sede di esecuzione
-consentita dalla policy: `AI Patient Insight`, Smart Import, Document Synthesis
-e Treatment Reasoning. Ogni percorso ha un ingresso applicativo distinto,
-routing host-owned e disposition `proposal_only`.
+MediFlow's Intelligence Fabric connects each supported task to an explicitly
+allowed execution host. Local Ollama and ATHENA/MLX runtimes can serve assigned
+capabilities. OpenAI and Anthropic adapters are integrated but remain off by
+default and require explicit host-owned configuration, policy, lifecycle, and
+secret handling. The source tree does not claim live account, network,
+retention, or clinical-data readiness. There is no silent cloud fallback.
 
 ```mermaid
 flowchart LR
-    ui["UI MediFlow"] --> services["Application Service Layer"]
-    services --> fabric["Fabric host-owned"]
-    fabric --> ollama["Ollama<br/>capability-specific"]
-    fabric --> athena["ATHENA/MLX<br/>Treatment Reasoning"]
-    fabric --> review["Proposta + receipt + provenienza<br/>revisione del medico"]
-    fabric -. "chiuso" .-> cloud["Cloud / egress"]
+    ui["MediFlow UI"] --> services["Application services"]
+    services --> fabric["Host-owned Fabric"]
+    fabric --> local["Local runtimes"]
+    fabric --> optin["Optional providers<br/>default off"]
+    fabric --> review["Proposal + receipt + provenance<br/>clinician review"]
+    review -. "no automatic apply" .-> record["Clinical record"]
 ```
 
-Non esiste fallback silenzioso verso il cloud. Receipt, provenienza e
-currentness restano visibili, ma non sono grant e non autorizzano apply.
-MediFlow resta utile quando tutti i provider AI sono disabilitati.
+Every generative lane is `proposal_only`. Its preview carries provenance,
+receipt, and currentness information, but those signals do not grant authority
+to write. The clinician reviews the evidence and decides. MediFlow does not
+diagnose, prescribe, or replace professional judgement.
 
-AnyDoc è la corsia deterministica per l'estrazione locale degli allegati e non
-è un provider Fabric. Quando un PDF supportato contiene pagine `needsOcr`, la
-composizione current-source renderizza soltanto quelle pagine e usa Apple
-Vision sul Mac, senza rete. Il risultato ricomposto resta review-only e legato
-alla sorgente corrente; errori, formati ambigui e motore non disponibile
-falliscono chiusi. Le route OCR legacy rispondono `410`.
+The headless supervisor keeps the web runtime and MCP adapter as separate
+children of one trusted host. MCP can perform bounded, patient-scoped reads and
+create a follow-up preview. Mini shares the typed catalog and CLI foundation,
+but has no production Supervisor binding in 0.8.5 and fails closed without a
+parent AIP channel. A protected state transition still
+requires the trusted MediFlow UI, an active clinical role, a current resource
+reread, step-up proof, and an operation-specific gesture. The semantic planner
+is closed-world, read-only, and limited to approved terminology and Open Loops
+tools.
 
-DeepSeek-OCR 2 e CUDA non sono requisiti della `0.8.5`: restano fuori dal
-percorso di prodotto con stato `OUT_OF_SCOPE_FOR_0.8.5_NON_BLOCKING`.
+## Security and human control
 
-## Come si presenta
+MediFlow is designed around a small set of enforceable defaults:
 
-### Workspace operativo su localhost
+- authoritative records stay on the home base; optional egress is scoped by
+  capability and data class, requires explicit configuration, and does not
+  establish live clinical-data readiness;
+- no cloud provider, telemetry, or external AI is enabled in a fresh
+  installation;
+- paired clients, MCP adapters, and model runtimes do not receive direct SQLite
+  access;
+- patient context, leases, revocation, current-source checks, compare-and-swap,
+  idempotency, audit, and receipts are enforced at their owning boundary;
+- AI output remains review-first and cannot silently become structured clinical
+  data;
+- repository tests and screenshots use synthetic fixtures only; real clinical
+  data, databases, credentials, and authenticated corpora stay outside Git.
 
-<img src="./screenshots/01-worklist.png" alt="Cockpit web locale MediFlow con lista di lavoro e pazienti dimostrativi sintetici" width="820" loading="lazy" decoding="async"/>
+These controls are intended to support privacy by design, data minimisation,
+human oversight, and accountable operation under European healthcare
+expectations. They are engineering controls, not a certification, legal
+assurance, or substitute for an organisation's own regulatory assessment. See
+[Security](./SECURITY.md) and [Compliance](./docs/COMPLIANCE.md) for the exact
+boundaries.
 
-### App nativa macOS
+## Built in Italy, designed to localise
 
-<img src="./screenshots/0.8/macos-clinical-workspace.png" alt="Workspace nativo MediFlow per macOS con lista di lavoro e scheda clinica sintetica" width="820" loading="lazy" decoding="async"/>
+MediFlow is built in Italy, and some current workflows reflect Italian
+community care and the Lombardy health system. Assisted hand-offs to systems
+such as SISS and FSE, local terminology, exemptions, and regional operational
+patterns therefore have specific meaning today.
 
-### Client iPad in sviluppo
+SISS and FSE hand-offs already use bounded interfaces rather than becoming
+part of the clinical core. Other regional assumptions are still being
+isolated. The long-term direction is to make region-specific modules
+replaceable or removable while preserving the same local-first record,
+provenance, authority, and review model for other healthcare settings.
+
+## Product surfaces
+
+### Local web workspace
+
+<img src="./screenshots/01-worklist.png" alt="MediFlow local web workspace showing a worklist built from synthetic records" width="820" loading="lazy" decoding="async"/>
+
+### Native macOS workspace
+
+<img src="./screenshots/0.8/macos-clinical-workspace.png" alt="MediFlow native macOS workspace showing a synthetic clinical record" width="820" loading="lazy" decoding="async"/>
+
+### iPad client in development
 
 <table>
 <tr>
-<td><img src="./screenshots/0.8/ipados-workspace.png" alt="Workspace iPad in orizzontale con lista pazienti sintetici e pannello clinico in attesa di selezione" width="390" loading="lazy" decoding="async"/></td>
-<td><img src="./screenshots/0.8/ipados-detail.png" alt="Scheda iPad di un paziente sintetico con riepilogo clinico, diagnosi codificate e dati demografici" width="390" loading="lazy" decoding="async"/></td>
+<td><img src="./screenshots/0.8/ipados-workspace.png" alt="MediFlow iPad worklist using synthetic data" width="390" loading="lazy" decoding="async"/></td>
+<td><img src="./screenshots/0.8/ipados-detail.png" alt="MediFlow iPad patient detail using synthetic data" width="390" loading="lazy" decoding="async"/></td>
 </tr>
 </table>
 
-<p align="center"><img src="./screenshots/0.8/ipados-scale.png" alt="Modulo di una scala di valutazione aperto su iPad per un paziente sintetico" width="620" loading="lazy" decoding="async"/></p>
-
-### Client iPhone in sviluppo
+### iPhone client in development
 
 <table>
 <tr>
-<td><img src="./screenshots/0.8/ios-iphone-worklist.png" alt="Lista di lavoro iPhone con pazienti sintetici, diagnosi codificate e indicatori di assistenza domiciliare" width="260" loading="lazy" decoding="async"/></td>
-<td><img src="./screenshots/0.8/ios-iphone-detail.png" alt="Scheda iPhone di un paziente sintetico con dati demografici, diagnosi codificate ed esenzioni" width="260" loading="lazy" decoding="async"/></td>
-<td><img src="./screenshots/0.8/ios-iphone-therapies.png" alt="Terapie su iPhone con stati attiva, sospesa e conclusa, dati sintetici" width="260" loading="lazy" decoding="async"/></td>
+<td><img src="./screenshots/0.8/ios-iphone-worklist.png" alt="MediFlow iPhone worklist using synthetic data" width="260" loading="lazy" decoding="async"/></td>
+<td><img src="./screenshots/0.8/ios-iphone-detail.png" alt="MediFlow iPhone patient detail using synthetic data" width="260" loading="lazy" decoding="async"/></td>
+<td><img src="./screenshots/0.8/ios-iphone-therapies.png" alt="MediFlow iPhone therapies view using synthetic data" width="260" loading="lazy" decoding="async"/></td>
 </tr>
 </table>
 
-_Catture reali della candidata Apple e della build web di produzione. La
-galleria presenta prima le superfici del Mac home-base e poi i client paired in
-sviluppo. Le viste cliniche usano soltanto fixture sintetiche, deterministiche
-e versionate nel repository. Nessun dato paziente reale. Le viste web ristrette
-a dimensioni telefono o tablet restano evidenze di test e non fanno parte
-della galleria. Il [manifest media 0.8](./screenshots/0.8/manifest.json)
-registra dispositivo, runtime, scena, commit sorgente e hash._
+All clinical screenshots use synthetic, deterministic fixtures. Capture
+provenance is recorded in the [0.8 media manifest](./screenshots/0.8/manifest.json).
 
-## Candidato sorgente locale 0.8.5
+| Surface | Current role |
+| :-- | :-- |
+| Local web workspace | Primary operational surface on the Mac home base |
+| Native macOS app | Desktop access to the same authoritative home base |
+| iPhone and iPad | Paired clients in active development; not complete standalone apps |
+| Swift shared core | Built on macOS, Linux, and Windows; this is core portability, not full application parity |
 
-Il tree usa la versione `0.8.5`. È un candidato locale: non dichiara CI remota
-sulla stessa SHA, tag, GitHub Release, distribuzione, App Store o release
-readiness.
+The canonical capability counts and per-surface status live in the
+[Parity matrix](./docs/parity-matrix.md). Known product limits remain explicit
+in [Known limitations](./docs/known-limitations.md).
 
-Quattro percorsi Fabric sono collegati end-to-end alla UI come
-`proposal_only`: Patient Insight, Smart Import, Document Synthesis e Treatment
-Reasoning. Le preview espongono receipt, provenienza e currentness. Nessuna
-preview applica dati clinici. Il
-[crosswalk runtime](./docs/capability-mapping/fabric-generative-runtime-crosswalk.v1.json)
-lega ogni percorso al proprio entrypoint, production root, route ed evidenza
-UI. La receipt storica `candidate_not_integrated` resta distinta e immutata.
+## Get started
 
-AnyDoc resta il primo passaggio automatico locale per gli allegati supportati.
-Il candidato include manifest, materializzazione e rendering selettivi delle
-sole pagine `needsOcr`, quindi usa il fallback Apple Vision locale sul Mac e
-ricompone le pagine nell'ordine originale. Input, output e tempo sono bounded;
-la currentness della sorgente viene rivalidata prima della pubblicazione e il
-risultato richiede revisione. DeepSeek-OCR 2/CUDA ha stato
-`OUT_OF_SCOPE_FOR_0.8.5_NON_BLOCKING`. Le route OCR legacy continuano a
-rispondere `410`.
-
-I gate F6/F7 distinguono il core integrato dai residui non pronti:
-
-| Gate | Incluso nel candidato | Escluso dalla 0.8.5 | Esito |
-| :-- | :-- | :-- | :-- |
-| F6 | AnyDoc come primo passaggio e fallback Apple Vision locale sulle sole pagine `needsOcr` | DeepSeek-OCR 2/CUDA, benchmark di qualifica e readiness universale | Fallback locale integrato |
-| F7 | Contratto provider v2, secret broker, adapter HTTPS ufficiali e probe amministrativa review-only OpenAI/Anthropic | Credenziali o rete live, invio di PHI e runtime readiness remota | `INTEGRATED / DEFAULT_OFF` |
-
-OpenAI e Anthropic hanno adapter HTTPS ufficiali e una probe amministrativa
-Document Synthesis review-only. Restano `default OFF` e richiedono opt-in host,
-lifecycle attivo, policy egress/retention e un secret broker. I test usano
-transport fake: il tree non contiene credenziali live e non prova rete,
-account, retention o readiness cloud. Un login o abbonamento consumer non
-costituisce accesso API.
-
-Il selector guidato Fabric rileva profili compatibili per cinque capability,
-esegue uno smoke sintetico e attiva il binding host-owned in modo atomico con
-CAS e rollback. Non persiste segreti e non qualifica hardware, modello o
-runtime per effetto della sola discovery.
-
-ATHENA richiede un runner MLX offline pre-provisioned, indicato con un percorso
-eseguibile assoluto host-owned in `MEDIFLOW_ATHENA_MLX_GENERATE_BIN`, e il
-modello locale. Il commit `2574cf5fc`
-ha superato TDD 6/6, typecheck ed ESLint. Uno smoke sintetico sul percorso di
-produzione con modello BF16 locale ha completato in 10,6 secondi con 64 token e
-211 caratteri, senza registrare il raw output. È una prova locale singola, non
-readiness universale o validazione clinica.
-
-Il candidato registra i percorsi, i contratti e questa osservazione ATHENA, non
-un benchmark di release per accuratezza OCR, qualità generativa, latenza o
-throughput. La suite finale del tree esatto resta un gate separato prima di ogni
-claim di readiness.
-
-Il candidato Headless include il Supervisor Node portabile: avvia Web
-standalone e MCP `stdio` come figli distinti, usa IPC ereditato e conserva
-contesto, lease, revoca e audit nel parent trusted. MCP e Mini espongono
-catalogo, ricerca terminologica locale, lettura patient-scoped delle Open
-Loops, proposta follow-up `proposal_only` e query semantica bounded read-only.
-Gli adapter non accedono direttamente a SQLite e non ricevono authority dal
-caller. L'entrypoint è integrato nel candidato locale; lo smoke standalone del
-tree finale resta una prova terminale separata e non dimostra compatibilità con
-ogni host MCP.
-
-F10 collega la transizione `pending -> completed|cancelled` end-to-end. MCP
-può creare soltanto la preview. La UI MediFlow rilegge la risorsa corrente e
-richiede ruolo medico attivo, step-up e gesto operation-specific; il commit Web
-usa CAS, idempotenza, audit e receipt atomici. Revoca, logout, cambio selezione
-e replay negano l'uso successivo. Il proof non attraversa MCP e l'agente non
-può eseguire il commit.
-
-Il semantic query planner è esposto dal percorso MCP/Mini e dal binding del
-Supervisor. Compone soltanto ricerca terminologica e Open Loops
-patient-scoped, entro due step, con budget bounded e schema closed-world. SQL
-diretto e scritture restano vietati. Su macOS 26 o successivo, la registrazione
-visita è integrata come percorso on-device, review-first e senza writer
-automatico.
-Ogni egress richiede opt-in host esplicito e i client paired non invocano AI. I
-limiti sono in [`docs/known-limitations.md`](./docs/known-limitations.md).
-
-### Ultima release pubblicata: 0.8.2
-
-La release `0.8.2` distribuisce il codice sorgente verificato. Non costituisce
-una pubblicazione App Store, una certificazione o una dichiarazione di
-conformità completa.
-
-La release rafforza i confini di scrittura clinica, i messaggi delle API e i
-controlli di CI. Allinea anche le fixture Apple ai contratti dell'host.
-
-La prova iPad aggiunge quattro contratti UI su Xcode 27 e iPadOS 27. I quattro
-test sono passati senza fallimenti e senza skip. Le prove usano solo fixture
-sintetiche.
-
-Queste prove non dichiarano parity completa o conformità accessibilità. Il
-limite VoiceOver mobile resta registrato in
-[`docs/known-limitations.md`](./docs/known-limitations.md).
-
-#### Contenuti della 0.8.2
-
-La tranche integrata richiede una revisione umana prima di ogni scrittura
-clinica proposta dall'AI. Le API non espongono messaggi grezzi delle eccezioni.
-
-I controlli dello schema, OpenAPI e Apple sono collegati ai workflow pertinenti.
-La CI distingue un job non necessario da un controllo mancante. Sul push a
-`main`, la gamba iPad ha eseguito e superato i quattro contratti previsti senza
-skip.
-
-La compatibilità tra un client Apple aggiornato e un host precedente resta
-aperta. WUL-546 conserva il limite e la decisione di contratto.
-
-Il dettaglio è nel [CHANGELOG](./CHANGELOG.md). La fotografia completa vive in
-[`docs/STATE_OF_THE_SYSTEM.md`](./docs/STATE_OF_THE_SYSTEM.md); la matrice
-parity canonica vive in [`docs/parity-matrix.md`](./docs/parity-matrix.md).
-
-## Confini dichiarati
-
-MediFlow non racconta più di quanto possa dimostrare.
-
-- **Il default è locale.** Nessun cloud obbligatorio, nessuna telemetria o
-  uscita dati attiva per impostazione iniziale.
-- **I provider esterni restano spenti per default.** OpenAI e Anthropic hanno
-  adapter ufficiali e probe review-only, ma il tree non include credenziali o
-  prove di rete live e non dichiara readiness cloud.
-- **I quattro percorsi Fabric sono proposal-only.** Receipt e provenienza sono
-  visibili, ma nessuna preview applica dati clinici.
-- **OCR resta host-bound.** AnyDoc usa Apple Vision soltanto sulle pagine
-  `needsOcr` di PDF supportati e fallisce chiuso quando il motore non è
-  disponibile. DeepSeek-OCR 2/CUDA e la readiness universale restano fuori
-  scope e non bloccanti.
-- **Headless è un candidato locale integrato.** Il Supervisor avvia Web e MCP
-  come figli distinti; letture, proposta e preview checkup passano da RPC
-  host-owned. Il commit checkup resta esclusivamente nella UI trusted. Questa
-  prova locale non equivale a installer, onboarding o compatibilità con ogni
-  host MCP.
-- **iPhone e iPad non sono app complete.** Il perimetro operativo è
-  `home-base + client paired`; cache offline e alcune superfici derivate dai
-  documenti restano parziali o disponibili solo sull'host.
-- **Windows e Linux non hanno ancora parity applicativa.** La baseline verifica
-  il core Swift condiviso e il runtime di base, non applicazioni complete su
-  ogni piattaforma.
-- **SISS e FSE restano un handoff assistito.** MediFlow apre il contesto giusto,
-  ma non dichiara sincronizzazione FSE, writeback regionale o invio
-  prescrittivo diretto.
-- **L'AI resta review-first.** Può aiutare a leggere e organizzare, non
-  sostituisce revisione, giudizio clinico o responsabilità professionale.
-- **La inbox intelligente non è consegnata.** Le route conversazionali di base
-  non costituiscono un flusso di chiarimento o conversione in record clinici.
-- **Le lane intelligenti conservano confini distinti.** Il planner resta
-  read-only, la proposta MCP non autorizza il commit checkup e la registrazione
-  visita resta on-device, review-first e senza writer automatico.
-
-Delle 43 capability per cui la parity è un obiettivo, 30 sono complete e 13
-parziali; altre 21 restano intenzionalmente host-only. La matrice fa fede sui
-conteggi e sul significato di ciascuno stato.
-
-## Avvio rapido
+MediFlow requires Node.js 24.x. Installation, build, and launch checks also
+verify that the native `better-sqlite3` binding matches the active Node ABI.
 
 ```bash
 git clone https://github.com/Wulfgardr/mediflow
 cd mediflow
+# If you use nvm:
 nvm use
 npm ci
 ```
 
-MediFlow richiede Node.js 24.x. Installazione, build e launcher verificano anche
-che il binding nativo `better-sqlite3` appartenga alla stessa ABI di Node.
+Then use the launcher for your platform:
 
-Poi usa il launcher della tua piattaforma:
-
-| OS | Comando |
+| Platform | Command |
 | :-- | :-- |
 | macOS | `./Start_MediFlow.command` |
 | Windows | `powershell -ExecutionPolicy Bypass -File .\Start-MediFlow.ps1` |
 | Linux | `./scripts/start-mediflow.sh` |
 
-Apri `http://localhost:3000`. Ollama, ATHENA/MLX e l'accesso WHO ICD-11 sono
-opzionali e disattivati quando non configurati. Gli adapter OpenAI e Anthropic
-restano `default OFF`; non sono un fallback e richiedono configurazione
-host-owned esplicita. Il tree non contiene credenziali o prove di rete live.
+Open `http://localhost:3000`. Ollama, ATHENA/MLX, WHO ICD-11 access, and
+external providers are optional and remain unavailable when they have not been
+configured explicitly.
 
-## Documentazione
+For the native Apple workspace and its current prerequisites, see
+[Native applications](./docs/NATIVE.md). The local headless Supervisor and its
+authority boundary are described by [ADR 0117](./docs/adr/0117-headless-portable-agent-first-and-capability-first-fabric.md)
+and the [end-to-end walkthrough](./docs/walkthrough.md).
 
-| Documento | Cosa contiene |
+### Headless MCP quickstart
+
+Build the standalone web runtime, then start the trusted Supervisor. The
+process keeps MCP on `stdio`; an MCP client normally owns its lifecycle and
+launches this command directly rather than opening another network listener.
+
+```bash
+npm run build -- --webpack
+npm run mcp:intelligent-host:production
+```
+
+Authenticate in the local web workspace, select the intended record, and
+explicitly activate Intelligent Host for that record before a patient-scoped
+grant can exist. Revocation, logout, a selection change, or lease expiry closes
+the grant. The command does not onboard an external host, enable Mini, grant
+general database access, or authorize a clinical write.
+
+## Documentation
+
+| Document | Purpose |
 | :-- | :-- |
-| [FAQ](./docs/FAQ.md) | Risposte rapide alle domande più comuni |
-| [Stato del sistema](./docs/STATE_OF_THE_SYSTEM.md) | La fotografia completa e aggiornata |
-| [Roadmap](./docs/ROADMAP.md) | Dove sta andando il progetto |
-| [Compliance](./docs/COMPLIANCE.md) | Privacy, GDPR e confini regolatori |
-| [Crediti](./CREDITS.md) | Fonti, modelli, librerie e ispirazioni con licenze |
-| [Mappa documentale](./docs/README.md) | La guida alla documentazione canonica |
+| [System state](./docs/STATE_OF_THE_SYSTEM.md) | Canonical current implementation status and claim ceiling |
+| [Product](./PRODUCT.md) | Product principles, roles, and supported workflows |
+| [Architecture](./ARCHITECTURE.md) | System boundaries and architectural invariants |
+| [Roadmap](./docs/ROADMAP.md) | Delivered milestones and future direction |
+| [FAQ](./docs/FAQ.md) | Short answers to common questions |
+| [Compliance](./docs/COMPLIANCE.md) | Privacy, GDPR-oriented controls, and regulatory boundaries |
+| [Security](./SECURITY.md) | Threat boundaries, reporting, and safe handling |
+| [Changelog](./CHANGELOG.md) | Version-specific public notes |
+| [Credits](./CREDITS.md) | Models, libraries, sources, inspirations, and licences |
+| [Documentation map](./docs/README.md) | Index of canonical and supporting documents |
 
-## Fonti e attribuzioni
+## Assisted development
 
-La prima lingua visiva del cockpit è derivata da
-[Kree8](https://www.kree8.studio/), tradotta in un'implementazione clinica
-originale. Il ragionamento terapeutico review-only usa
-[ATHENA](https://github.com/mims-harvard/ATHENA) di mims-harvard, con licenza
-MIT. Il lavoro sulla visita registrabile prende a riferimento l'ecosistema
-Fluid per il confronto progettuale, ma l'implementazione del candidato usa
-soltanto API Apple on-device e non dipende da Fluid.
+MediFlow is written by a physician with substantial, openly acknowledged help
+from AI-assisted development tools. [Codex](https://openai.com/codex) and
+[Claude Code](https://claude.com/claude-code) have contributed to design,
+implementation, review, and verification. Their output remains a proposal:
+tests, source review, and automated guards decide whether a change belongs in
+the project.
 
-Modelli, runtime, librerie e ispirazioni, con URL, ruolo e licenza, sono in
-**[CREDITS.md](./CREDITS.md)**.
+The Filo icon—the journal thread and its present-time knot—connects the product
+identity to MediFlow's longitudinal model. Its day and graphite variants are
+documented in the [Lume icon specification](./docs/design/lume/09-icona.md).
 
-L'icona MediFlow porta in primo piano il **Filo del diario**, la stessa geometria
-che connette le voci cliniche lungo il tempo. Concetto, registri giorno/grafite
-e asset sono documentati nella [specifica dell'icona](./docs/design/lume/09-icona.md).
+## License
 
-## Sviluppo assistito
-
-Scrivo MediFlow da medico, con un aiuto sostanziale e dichiarato di strumenti di
-sviluppo assistito da AI.
-
-[Codex](https://openai.com/codex) e
-[Claude Code](https://claude.com/claude-code) hanno contribuito a progettazione,
-implementazione, review e verifica. Le proposte dei modelli restano materiale da
-controllare: test reali e guard automatici decidono se una modifica regge.
-
-<!-- usage-dashboard:start -->
-
-| Snapshot | Periodo dei log disponibili | Token di sessione | Ripartizione | Cache letta | Copertura storica |
-| :-- | :-- | --: | :-- | --: | :-- |
-| **11 agosto 2026** | 2026-04-20 → 2026-08-11 | **35.977.536.317** | Codex 28.202.844.089 · Claude Code 7.774.692.228 | 34.309.804.858 (95,4%) | Codex UNKNOWN · Claude Code attestata |
-
-<img src="./screenshots/token-models.svg" alt="Snapshot 11 agosto 2026: 35,98 Mld token di sessione, 28,2 Mld in Codex e 7,77 Mld in Claude Code; 34,31 Mld da cache letta." width="720" loading="lazy"/>
-
-La fonte è **CodexBar 0.48.1**, comando locale `cost --refresh`, con una finestra massima di 365 giorni. Il conteggio usa gli aggregati disponibili per Codex e Claude Code e non è filtrato per repository. CodexBar attribuisce ogni token al processo che lo registra. Un worker OpenAI avviato da Claude Code compare quindi nel totale Claude Code. Il grafico indica lo strumento che registra i token, non il fornitore del modello.
-
-**ATTESTATO:** i valori sono le somme esatte dei log disponibili nel periodo indicato. **STIMATO:** nessun valore. **UNKNOWN:** la completezza storica resta sconosciuta quando CodexBar non la attesta. L'attribuzione a MediFlow, a una release, a una PR o a un commit è sempre sconosciuta.
-
-Rigenera il grafico con `npm run build:usage-dashboard`. Usa `CODEXBAR_BIN` per scegliere un eseguibile diverso e `USAGE_DASHBOARD_DAYS` per impostare una finestra da 1 a 365 giorni.
-
-Le barre sono divise per modello e usano la stessa scala. La cache letta è una parte dell'input Codex, mentre CodexBar la espone come categoria separata per Claude Code: per questo il grafico non impila categorie di token con semantiche diverse. Sono pubblicati soltanto aggregati. Nessun prompt, contenuto di sessione, costo o percorso locale entra nel README o nell'SVG.
-
-Il dato misura contesto elaborato. Non misura righe di codice, costo o qualità.
-
-La responsabilità del progetto resta mia.
-
-<!-- usage-dashboard:end -->
-
-Lo snapshot pubblicato in precedenza (17,56 miliardi al 15 luglio 2026) usava una
-pipeline di conteggio diversa e non è direttamente confrontabile con questo.
-
-## Licenza
-
-MIT License.
+[MIT](./LICENSE)
 
 ---
 
-Progettato in Italia.
+Designed and built in Italy.

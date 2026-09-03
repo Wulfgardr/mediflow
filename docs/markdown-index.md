@@ -11,7 +11,7 @@ read_when:
 > GitHub mostra in alto solo alcuni file speciali (`README`, `CONTRIBUTING`, `SECURITY`, ecc.).
 > Questo file elenca invece **tutti** i `.md` tracciati nella repository con una sintesi rapida d'uso.
 
-Ultimo aggiornamento: 2026-09-01
+Ultimo aggiornamento: 2026-09-03
 
 ## 📚 Come usare questo indice
 
@@ -45,7 +45,7 @@ Ultimo aggiornamento: 2026-09-01
 | [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md) | Stato canonico complessivo del sistema, pensato come lettura unica per onboarding profondo e review trasversale. | Quando devi capire cosa esiste davvero oggi, cosa e direzione e quali confini non vanno superati. |
 | [docs/topologia-dati-flussi.md](./topologia-dati-flussi.md) | Topologia dati, trust boundaries, cifratura e percorsi digitali, inclusi AnyDoc, proposte Fabric, artifact cifrati e boundary `network-home-base`. | Per analisi data flow e impatti sicurezza. |
 | [docs/repository-topology.md](./repository-topology.md) | Fonte canonica per repository operativa, confine Git/fuori-Git e aree top-level: runtime clinico, publication/site e tooling. | Quando devi scegliere repository, branch o collocazione di codice, asset e artefatti locali. |
-| [docs/parity-matrix.md](./parity-matrix.md) | Stato canonico corrente tra localhost e client Apple, 64 capability con conteggi 30/13/21 e gate P6 residuo in `WUL-481`. | Per steering parity, click-map P6 e release readiness Apple. |
+| [docs/parity-matrix.md](./parity-matrix.md) | Stato canonico corrente tra localhost e client Apple, 66 capability con conteggi 30/13/23 e gate P6 residuo in `WUL-481`. | Per steering parity, click-map P6 e release readiness Apple. |
 | [docs/known-limitations.md](./known-limitations.md) | Limiti noti della candidata sorgente 0.8, inclusi VoiceOver mobile, tooling di sviluppo e claim non autorizzati. | Per release readiness, note pubbliche, security posture e claim di accessibilità. |
 | [docs/ARCHITETTURA.md](./ARCHITETTURA.md) | Deep dive tecnico esteso dell'architettura MediFlow. | Per approfondimenti implementativi. |
 | [docs/system_architecture.md](./system_architecture.md) | Sintesi rapida dell'architettura operativa; il boundary corrente dell'estrazione allegati e definito dal successivo ADR 0107. | Per overview veloce in onboarding/review, verificando gli ADR successivi per i confini aggiornati. |

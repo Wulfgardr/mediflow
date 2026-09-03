@@ -5,11 +5,11 @@ Questo file raccoglie i cambiamenti rilevanti di MediFlow.
 Il formato è basato su [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Non rilasciato] — candidato sorgente locale 0.8.5
+## [0.8.5] - 2026-09-03
 
-> Questa sezione descrive il tree locale della patch `0.8.5`. Non dichiara CI
-> remota sulla stessa SHA, tag, GitHub Release, distribuzione o release
-> readiness. La release sorgente `0.8.2` conserva lo storico separato.
+> Questa voce descrive il perimetro sorgente della patch `0.8.5`. Evidenze CI,
+> firma, tag e GitHub Release appartengono al closeout di promozione e non sono
+> implicate dal solo contenuto di questo changelog.
 
 ### Intelligence Fabric review-only
 
@@ -42,13 +42,15 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
 - Il Supervisor Node portabile avvia Web standalone e MCP come processi figli
   distinti e autenticati su IPC ereditato, senza listener o import diretti del
   database.
-- MCP `stdio` e Mini espongono catalogo, ricerca terminologica, lettura delle
-  Open Loops del paziente selezionato, proposta follow-up `proposal_only` e
-  query semantica bounded read-only.
+- MCP `stdio` espone catalogo, ricerca terminologica, lettura delle Open Loops
+  del paziente selezionato, proposta follow-up `proposal_only` e query semantica
+  bounded read-only. Mini conserva il catalogo tipizzato e la foundation CLI,
+  ma non ha un binding production al Supervisor e fallisce chiuso senza parent
+  AIP.
 - Il Supervisor possiede contesto, lease, revoca e audit. Gli adapter non
   accettano authority caller-supplied; il terminal smoke standalone sul tree
   finale, installer, onboarding ed esercizio su host esterni restano prove
-  separate dal candidato locale.
+  separate dal contenuto sorgente della `0.8.5`.
 - F10 espone via MCP soltanto la preview `pending -> completed|cancelled`. La UI
   Web trusted rilegge la risorsa e richiede ruolo medico attivo, step-up e gesto
   specifico prima del commit con CAS, idempotenza, audit e receipt. Proof e
@@ -59,8 +61,8 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
 - Su macOS 26 o successivo, la shell integra cattura e trascrizione italiana
   Apple on-device, con consenso esplicito, audio bounded solo in RAM e
   trasferimento al draft dopo review. Non esegue writer clinici automatici;
-  smoke con microfono reale e validazione clinica restano fuori dal claim del
-  candidato.
+  smoke con microfono reale e validazione clinica restano fuori dal claim della
+  `0.8.5`.
 
 ### Provider e perimetro
 
@@ -93,9 +95,9 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
   universale hanno stato `OUT_OF_SCOPE_FOR_0.8.5_NON_BLOCKING`.
 - **F7 — `INTEGRATED / DEFAULT_OFF`**: provider v2, secret broker, adapter
   ufficiali e probe amministrativa review-only sono presenti. Nessuna
-  credenziale o prova di rete live appartiene al candidato.
+  credenziale o prova di rete live appartiene al perimetro `0.8.5`.
 
-### Altri cambiamenti non rilasciati
+### Altri cambiamenti
 
 - La galleria usa una cattura reale dell'app macOS corrente con fixture
   sintetiche e non presenta la shell Apple precedente come stato attuale.

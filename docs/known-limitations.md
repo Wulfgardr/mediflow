@@ -1,23 +1,23 @@
 ---
-summary: "Known limitations and evidence gaps for the MediFlow 0.8.5 local source candidate."
+summary: "Known limitations and evidence boundaries for MediFlow 0.8.5."
 read_when:
-  - "Evaluating the MediFlow 0.8.5 local source candidate or its claim ceiling."
+  - "Evaluating MediFlow 0.8.5 or its claim ceiling."
   - "Preparing public notes, a tag, an App Store claim, or a conformance statement."
 ---
 
-# Limitazioni note del candidato sorgente locale MediFlow 0.8.5
+# Limitazioni note di MediFlow 0.8.5
 
 Stato documento: `CANONICAL`
 
 Ultimo aggiornamento: 2026-09-03
 
-## Stato del candidato
+## Stato ed evidenze
 
-Il tree locale usa la versione `0.8.5`, ma non costituisce una release. Non
-esistono ancora prove di CI remota sulla stessa SHA, tag, GitHub Release,
-distribuzione o installazione su un host esterno. Il claim massimo resta
-**candidato sorgente locale**. La release sorgente `0.8.2` conserva il proprio
-storico separato nel [CHANGELOG](../CHANGELOG.md).
+Il tree `0.8.5` definisce il contenuto sorgente della versione. CI remota sulla
+stessa SHA, firma, tag, GitHub Release, distribuzione e installazione su un host
+esterno sono evidenze di confine: vanno lette nei check e nei receipt del
+closeout, non inferite da questo documento statico. Lo storico delle versioni
+vive nel [CHANGELOG](../CHANGELOG.md).
 
 ## VoiceOver su iPhone e iPad
 
@@ -28,9 +28,9 @@ Gli audit di accessibilità XCTest e i test UI della baseline storica
 - iPad: 7/7.
 
 Queste prove valgono soltanto per quel tree e non equivalgono a un test
-VoiceOver reale. Il volume Xcode è ora disponibile e la toolchain ha completato
-prove preliminari prima del tree finale; non esiste ancora una prova terminale
-exact-tree né una nuova prova VoiceOver mobile.
+VoiceOver reale. Il volume Xcode è disponibile; i check Apple su una revisione
+exact-SHA appartengono ai receipt del closeout. Questo documento non dichiara
+una nuova prova VoiceOver mobile.
 
 Nel simulatore iOS 27, con Xcode 27 beta build `27A5194q`, la chiamata pubblica
 `XCUIDevice.shared.voiceOverService.enable()` non ha raggiunto uno stato
@@ -38,7 +38,7 @@ terminale. Il runtime ha riavviato in ciclo il servizio assistivo. Il test è
 stato interrotto e il risultato incompleto non è usato come prova positiva.
 
 Apple documenta il problema `173507341` nelle note di Xcode 27 beta. La deroga
-accettata riguardava la release sorgente GitHub `0.8.2`. Il candidato `0.8.5`
+accettata riguardava la release sorgente GitHub `0.8.2`. La `0.8.5`
 non aggiunge una nuova prova VoiceOver mobile.
 
 ### Cosa si può dichiarare
@@ -71,7 +71,7 @@ registra:
 
 - 30 capability complete;
 - 13 capability parziali;
-- 21 capability intenzionalmente host-only.
+- 23 capability intenzionalmente host-only.
 
 Le capability host-only non sono promesse mobile mancanti. Riflettono autorità,
 filesystem, runtime AI, sicurezza o policy del Mac home-base.
@@ -111,7 +111,7 @@ La chiusura richiede un packet dipendenze separato con:
 
 ## Intelligence Fabric e apply clinico
 
-Il candidato locale collega quattro percorsi generativi al Fabric:
+La 0.8.5 collega quattro percorsi generativi al Fabric:
 
 - `patient_insight`;
 - `smart_import`;
@@ -176,11 +176,13 @@ prestazione e non sostituiscono la suite finale del tree esatto.
 ## Headless, MCP e Mini
 
 Il Supervisor Node portabile avvia Web standalone e MCP come processi figli
-distinti e autenticati su IPC ereditato. MCP `stdio` e Mini espongono catalogo,
+distinti e autenticati su IPC ereditato. MCP `stdio` espone catalogo,
 terminology search, Open Loops patient-scoped, proposta follow-up
-`proposal_only` e query semantica bounded read-only. Contesto, lease, revoca e
-audit restano host-owned; gli adapter non importano SQLite, non accettano
-authority caller-supplied e non aprono listener.
+`proposal_only` e query semantica bounded read-only. Mini condivide catalogo e
+foundation CLI ma non ha binding production al Supervisor e fallisce chiuso
+senza parent AIP. Contesto, lease, revoca e audit restano host-owned; gli
+adapter non importano SQLite, non accettano authority caller-supplied e non
+aprono listener.
 
 F10 espone via MCP soltanto la preview `pending -> completed|cancelled`. Il
 commit appartiene alla UI Web trusted, che rilegge la risorsa e richiede ruolo
@@ -189,13 +191,14 @@ restano atomici. Proof e commit non attraversano MCP. Il planner è collegato al
 Supervisor ma resta read-only, con al massimo due operazioni allowlisted e
 senza SQL libero.
 
-Questa integrazione resta un candidato locale. Il terminal smoke standalone sul
-tree finale, installer, onboarding, lifecycle supportato ed esercizio su host
-esterni sono prove separate e non sono dichiarati consegnati.
+Questa integrazione resta bounded al runtime locale. Il terminal smoke
+standalone e la prova exact-SHA sono receipt di closeout separati dal presente
+documento. Installer, onboarding, lifecycle supportato ed esercizio su host
+esterni non sono dichiarati consegnati.
 
 ## Funzioni fuori scope
 
-Il candidato `0.8.5` non consegna:
+La `0.8.5` non consegna:
 
 - DeepSeek-OCR 2/CUDA, benchmark OCR o readiness universale, con stato
   `OUT_OF_SCOPE_FOR_0.8.5_NON_BLOCKING`;

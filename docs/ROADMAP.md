@@ -8,8 +8,9 @@ read_when:
 # 🧭 Roadmap MediFlow
 
 > **Dove siamo e dove vogliamo andare.**
-> La v0.8 è una release sorgente verificata. Non è una pubblicazione App Store
-> e non dichiara parity completa. Ultimo aggiornamento: 2026-07-29.
+> La linea v0.8.5 consolida il runtime locale descritto sotto. Non è una
+> pubblicazione App Store e non dichiara parity completa. Ultimo aggiornamento:
+> 2026-09-03.
 > Fonte roadmap prodotto canonica (vedi anche [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md) per la lettura completa corrente e [docs/README.md](./README.md) per mappa completa documenti).
 
 > [!NOTE]
@@ -160,21 +161,21 @@ control-flow documentale review-first, hardening di runtime e dati, il claims
 guard pubblico e il tooling P6 sintetico. La migrazione Lume completa e il
 verbale manuale di `WUL-481` restano lavoro successivo, non claim di release.
 
-## ✅ Release sorgente v0.8: integrazioni e gate
+## ✅ v0.8.5: integrazioni e gate
 
-La release riunisce hardening documentale, superfici web Lume e correzioni
-Apple presenti nel tree verificato. Non cambia l'intended purpose.
+Il tree `0.8.5` riunisce hardening documentale, superfici web Lume e correzioni
+Apple presenti nel tree locale. Non cambia l'intended purpose.
 
 | Area | Evidenza locale | Non dichiarato |
 | --- | --- | --- |
 | Lume | Token DTCG, mirror CSS e consumatori web sono attivi. | Parity estetica completa o redesign concluso. |
 | Documenti | Stati accessibili e registro separato delle proposte sono integrati. | Diagnosi auto-applicate o nuova inbox. |
-| Apple | iPhone 2/2, iPad 7/7, build/probe macOS, Cmd-R e media sintetici sono sul tree verificato. | VoiceOver mobile provato, conformità o App Store readiness. |
-| AI | I boundary review-first e no-egress restano nel prodotto. | Nuovi provider, cloud o automazione graduata. |
+| Apple | Fallback OCR Apple Vision, recording on-device review-first e core condiviso sono nel tree; le prove exact-SHA restano nel closeout separato. | VoiceOver mobile provato, conformità o App Store readiness. |
+| AI | Fabric review-only, provider v2 `default OFF`, Headless/MCP, F10 preview-only e planner read-only sono integrati. | Egress live, credenziali, autorità agentica generale o automazione clinica. |
 
-La deroga esterna VoiceOver mobile vale solo per questa release sorgente. Gli
-audit AX e i test UI non sostituiscono VoiceOver reale. Ogni altro gate rosso o
-indeterminato resta bloccante.
+La deroga VoiceOver mobile è un precedente storico, non una nuova prova della
+0.8.5. Gli audit AX e i test UI non sostituiscono VoiceOver reale.
+Ogni altro gate rosso o indeterminato resta bloccante.
 
 ### Modalita network home-base
 
@@ -193,25 +194,25 @@ indeterminato resta bloccante.
 
 ### Stack intelligente locale
 
-* **Provider scaffold**: `OllamaAdapter` e `AIService` sono su `main`; il gate
-  egress applica il primo strato deterministico e resta
-  `closed_pending_redaction_lane`.
-* **Boundary ancora chiuso**: provider alternativi, redaction lane e consenso
-  cloud non sono consegnati; Ollama resta l'unico provider operativo. Sulla
-  linea post-0.8 il registry locale per task e' consolidato (WUL-502) e ADR
-  0089 aggiunge il contratto Intelligence Fabric: capability, venue esplicite,
-  profili egress versionati chiusi per costruzione e ricevute che non
-  autorizzano consumer.
-* **Scaffold model-agnostic post-0.8**: `WUL-499` e ADR 0086 separano pipeline
-  locale, proposta, chiarimento, anteprima, autorizzazione ed eventuale
-  scrittura applicativa auditata. Il contratto e accettato per il programma
-  post-0.8, non modifica il candidato 0.8 e non apre nuovi runtime.
-* **Candidato locale Intelligence Fabric**: ADR 0090 e ADR 0091 aggiungono
-  lifecycle provider dichiarativo, routing osservabile fail-closed, stato
-  paired `status_only`, decode nel core Swift condiviso e un harness sintetico
-  receipt-provenance-review senza scritture. Il candidato resta sulla branch
-  post-0.8: non autorizza AI paired, cloud, on-device, nuovi provider o
-  promozione remota.
+* **Intelligence Fabric review-only**: Patient Insight, Smart Import, Document
+  Synthesis e Treatment Reasoning usano ingressi e production root distinti.
+  Receipt, provenienza e currentness restano visibili, ma non autorizzano apply.
+* **Provider capability-specific**: Ollama serve le capability locali ammesse;
+  ATHENA/MLX è limitato a Treatment Reasoning. Non esiste fallback generico.
+* **Provider v2 `default OFF`**: secret broker, adapter ufficiali
+  OpenAI/Anthropic e probe amministrativa exact-intent sono integrati. Le prove
+  usano transport fake: credenziali, rete live e retention account non sono
+  dichiarate.
+* **OCR model-agnostic**: AnyDoc resta il primo passaggio e Apple Vision il
+  fallback locale per le sole pagine PDF `needsOcr`. DeepSeek-OCR 2/CUDA è
+  `OUT_OF_SCOPE_FOR_0.8.5_NON_BLOCKING`.
+* **Headless governato**: il Supervisor Node portabile isola Web standalone e
+  MCP `stdio`, possiede lease, revoca, contesto e audit. Mini conserva catalogo
+  e foundation CLI ma non ha binding production al Supervisor; installer e
+  onboarding su host esterni restano prove separate.
+* **F10 e planner**: MCP prepara soltanto la preview F10; il commit richiede la
+  UI Web trusted, step-up e gesto medico. Il planner resta read-only e compone
+  al massimo due operazioni allowlisted senza SQL libero.
 * **Attese locali**: la prima slice web collega prestazione attesa e risultato;
   non estende il workflow ai client paired e non introduce scritture autonome.
 * **Automazione graduata futura**: proposta, anteprima, finestra di
@@ -232,9 +233,10 @@ indeterminato resta bloccante.
   gate manuale sul Mac sbloccato. `WUL-403` resta la corsia per l'offline
   degradato, mentre il workflow documentale nativo resta condizionato da ADR
   0076 e dagli spike `WUL-417`/`WUL-383`.
-* **Stack voice visit**: `WUL-419`, `WUL-421` e `WUL-422` mantengono transcript e
-  bozze sintetiche review-first, separati dall'audio reale e dalla promozione
-  runtime.
+* **Stack voice visit**: il target macOS 26+ integra cattura e trascrizione
+  italiana Apple on-device con consenso, audio bounded in RAM e transcript
+  review-first. Microfono reale, validazione clinica e writer automatici
+  restano fuori dal claim.
 * **Windows/Linux oltre il core**: procedere per slice piccole su launcher,
   floor hardware e distribuzione tri-OS, senza promettere parity applicativa
   prima delle prove.
@@ -261,7 +263,8 @@ indeterminato resta bloccante.
 
 ### Interazione vocale
 
-* **Dettatura**: Usare Whisper (locale) per dettare la visita invece di scrivere.
+* **Dettatura**: estendere la cattura Apple on-device oltre il percorso macOS
+  corrente soltanto con prove dedicate e mantenendo review e consenso.
 * **Chat**: Chiedere al sistema: *"Fammi un grafico della glicemia di Mario dell'ultimo anno"*.
 
 ---

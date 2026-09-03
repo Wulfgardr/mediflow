@@ -40,8 +40,11 @@ dato MIMIC e nessun modello ClinSeek è incluso nel runtime.
 
 ## Motore di registrazione della visita
 
-Riferimenti per la dettatura fluida e il post-processing della visita. Definiscono
-un confine di prodotto: nessun runtime o audio è integrato.
+Riferimenti per la dettatura fluida e il post-processing della visita. MediFlow
+0.8.5 integra una propria cattura e trascrizione Apple on-device su
+macOS 26+, con consenso, audio bounded in RAM e review del transcript. Non
+integra codice Fluid, microfono reale come prova di release o writer clinici
+automatici.
 
 ### Fluid
 
@@ -75,11 +78,13 @@ ToolUniverse e vLLM upstream non sono integrati. Lineage: Qwen3-8B.
 
 Famiglia text-only usata come default locale e base di ATHENA.
 
-### DeepSeek
+### DeepSeek (riferimento OCR opzionale)
 
-[![deepseek-ocr](https://img.shields.io/badge/deepseek--ocr-via%20Ollama-4d6bfe)](https://ollama.com/library/deepseek-ocr)
+[![deepseek-ocr](https://img.shields.io/badge/deepseek--ocr-opzionale-4d6bfe)](https://ollama.com/library/deepseek-ocr)
 
-OCR locale primario, eseguito tramite Ollama.
+Riferimento per un adapter OCR locale opzionale. DeepSeek-OCR 2/CUDA e la sua
+qualifica sono `OUT_OF_SCOPE_FOR_0.8.5_NON_BLOCKING`: l'estrazione corrente usa
+AnyDoc e, per le sole pagine PDF `needsOcr`, Apple Vision locale.
 
 ### MedGemma
 
@@ -132,7 +137,8 @@ con gli asset e in `app/fonts/IBM-Plex-Mono-OFL.txt`.
 
 [![Ollama](https://img.shields.io/badge/Ollama-runtime%20locale-000000?logo=ollama&logoColor=white)](https://ollama.com)
 
-Runtime locale per AI e OCR, opzionale.
+Runtime locale opzionale per le capability AI ammesse. Non è il percorso OCR
+della 0.8.5 e non costituisce un fallback generico.
 
 ### MLX / MLX-LM
 
@@ -145,6 +151,13 @@ Inferenza su Apple Silicon, runtime dei pesi ATHENA.
 [![Apple Vision](https://img.shields.io/badge/Apple%20Vision-OCR%20macOS-555555?logo=apple&logoColor=white)](https://developer.apple.com/documentation/vision)
 
 Fallback OCR disponibile solo su macOS, framework di sistema Apple.
+
+### OpenAI / Anthropic
+
+La 0.8.5 include adapter provider v2 ufficiali e una probe amministrativa
+review-only, tutti `default OFF`. Sono verificati con transport fake: nessuna
+credenziale, rete live, retention account o runtime readiness cloud è inclusa
+in questa attribuzione.
 
 ---
 

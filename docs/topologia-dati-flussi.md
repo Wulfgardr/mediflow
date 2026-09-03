@@ -444,32 +444,34 @@ record persistito non contiene segreti.
 launcher trusted
   -> processo figlio autenticato
   -> RPC AIP ereditato e revocabile
-  -> MCP stdio oppure Mini
+  -> MCP stdio
   -> Application Service nominato
   -> risultato read_only o proposal_only
+
+Mini: foundation CLI separata, fail-closed senza parent AIP e non avviata dal
+Supervisor production della 0.8.5.
 ```
 
 Le operazioni candidate sono terminology search, lettura patient-scoped delle
 Open Loops, proposta follow-up e query semantica bounded read-only. Il processo
 figlio non apre listener, non importa SQLite e non accetta authority dal caller.
-Launcher production e
-quickstart restano `PRODUCTION_BRIDGE_BLOCKER`. La topologia Supervisor
-portabile come trusted parent su IPC ereditato è `DECIDED`; l'implementazione è
-`SPLIT_REQUIRED`. La factory esaminata non chiude late-bind trusted-UI, owner
-sincrono di `readHostContext`, lifecycle e revoca production o audit terminale
-sincrono. Broker residente e UDS sono esclusi dalla `0.8.5`.
+Il Supervisor Node locale è il parent trusted e avvia Web standalone e MCP
+come figli distinti su IPC privato ereditato. Contesto, lifecycle, revoca e
+audit restano host-owned. La 0.8.5 non dichiara installer, onboarding o
+compatibilità con host MCP esterni; broker residente e UDS restano esclusi.
 
-La transizione stato checkup F10 non appartiene a quel catalogo. Core e
-composizione SQLite sono verificati come candidato interno, ma non esiste un
-binding launcher, MCP, Mini o UI. La conferma trusted-UI resta
-`AUTHORITY_UI_BINDING_BLOCKER` per il production bridge.
+F10 espone via MCP soltanto la preview della transizione
+`pending -> completed|cancelled`. La UI Web trusted rilegge la risorsa e
+richiede ruolo medico attivo, step-up e gesto operation-specific prima del
+commit con CAS, idempotenza, audit e receipt. Proof e commit non attraversano
+MCP.
 
-Il core, l'operazione read-only e la superficie statica MCP/Mini del planner
-semantico sono integrati:
-`STATIC_SURFACE_INTEGRATED / PRODUCTION_BRIDGE_BLOCKER`. La superficie compone
-solo terminology search e Open Loops patient-scoped. Il production bridge
-selezionato non ha callsite o test e il planner non produce SQL libero. La
-registrazione visita è `DEFER_NEXT_PATCH`.
+Il planner semantico è collegato al Supervisor e resta read-only. Compone al
+massimo due operazioni allowlisted e non produce SQL libero o scritture. Su
+macOS 26 o successivo, la registrazione visita usa API Apple on-device,
+consenso esplicito, audio bounded solo in RAM e review del transcript. Non
+esegue writer automatici; microfono reale e validazione clinica restano fuori
+dal claim.
 
 ### 4.9 File AIFA locale -> catalogo indicizzato con provenienza
 
@@ -548,9 +550,9 @@ completo, attachment remoti, cataloghi remoti, campi AI/documentali.
 | `/api/ai/treatment-reasoning/{ingest,preview}` | Web UI | Sessione web e selezione corrente | HTTP localhost | Ingest e preview Treatment Reasoning tramite Fabric e ATHENA locale |
 | `/api/ocr/extract`, `/api/pdf-extract` | Consumer legacy | Auth prima del body | HTTP localhost | Boundary terminale `410`; nessuna estrazione o invocazione OCR |
 | `/api/icd/proxy` | Web UI | Sessione + allowlist localhost | HTTP localhost | Lookup ICD-11 |
-| AIP child RPC | Processo figlio trusted | Bootstrap secret e contesto host-owned | IPC ereditato | Catalogo e operazioni nominate; nessun listener o DB diretto |
-| MCP Intelligent Host | Harness locale | Binding RPC ereditato dal launcher | `stdio` | Terminology, Open Loops, proposta follow-up e query semantica bounded; superficie candidata |
-| Mini | CLI locale | Binding RPC ereditato dal launcher | stdin/stdout JSON | Stesso catalogo MCP; entrypoint production ancora bloccato |
+| AIP child RPC | Figli del Supervisor trusted | Bootstrap secret e contesto host-owned | IPC ereditato | Catalogo e operazioni nominate; nessun listener o DB diretto |
+| MCP Intelligent Host | Harness locale | Binding RPC ereditato dal Supervisor | `stdio` | Terminology, Open Loops, proposta follow-up, query semantica bounded e preview F10 |
+| Mini | Foundation CLI locale | Nessun binding production al Supervisor; parent AIP richiesto | stdin/stdout JSON | Catalogo tipizzato, fail-closed senza parent; nessun claim di onboarding o host esterni |
 
 Nota auth: il token locale non porta privilegi admin web. Le route di sistema
 ad alto impatto richiedono una sessione admin web; le eccezioni token-aware fuori
@@ -599,8 +601,9 @@ read-only esplicitamente documentati in [SECURITY.md](../SECURITY.md).
   adapter, fallback pronto o prova di qualifica.
 - Gli adapter OpenAI/Anthropic restano `default OFF`. Registry e probe non sono
   credenziali, consenso egress o readiness cloud.
-- MCP/Mini raggiungono soltanto Application Services nominati tramite RPC AIP
-  ereditato; nessun accesso SQLite o authority caller-supplied.
+- MCP raggiunge soltanto Application Services nominati tramite RPC AIP
+  ereditato; Mini non ha un callsite production e fallisce chiuso senza parent.
+  Nessuno dei due ha accesso SQLite o authority caller-supplied.
 - `summarySnapshot` e `parseEvidenceArtifactSnapshot` restano dati clinici
   cifrati, non log di debug.
 - Il placeholder `[LOCKED DATA]` resta solo di presentazione (WUL-323): non deve
@@ -609,7 +612,7 @@ read-only esplicitamente documentati in [SECURITY.md](../SECURITY.md).
   (ADR 0066, WUL-306, WUL-308); la hard delete resta una erasure GDPR admin
   esplicita.
 
-Claim ceiling dei percorsi Fabric, AnyDoc e Headless: candidato sorgente locale
-0.8.5. Questa topologia non prova release, pubblicazione, certificazione,
+Claim ceiling dei percorsi Fabric, AnyDoc e Headless: contenuto sorgente 0.8.5.
+Questa topologia non costituisce prova di firma, pubblicazione, certificazione,
 deployment cloud, AI paired, entrypoint MCP production o authority agentica
 generale.

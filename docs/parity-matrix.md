@@ -8,7 +8,7 @@ read_when:
 # Matrice parity localhost ↔ client Apple
 
 Stato documento: `CANONICAL`
-Ultimo aggiornamento: 2026-08-07 (`MediFlow 0.8.1`, allineamento IA impostazioni)
+Ultimo aggiornamento: 2026-09-03 (`MediFlow 0.8.5`, closeout)
 
 ## Gate MediFlow 0.8
 
@@ -18,13 +18,17 @@ La base congelata del packet parity è
 registrato nel run record dopo la verifica post-commit.
 
 Il contratto funzionale resta `PARTIAL`: 13 capability sono parziali e 23 sono
-intenzionalmente host-only. Questo non impedisce la candidata sorgente 0.8.
+intenzionalmente host-only. Questo stato non blocca da solo una candidata
+sorgente, ma non sostituisce i gate di interazione e i receipt exact-SHA del
+closeout.
 
-Il gate UI è chiuso con una deroga esterna documentata: i test automatici,
-macOS e localhost sono terminali; VoiceOver reale su iPhone e iPad non è
-provato perché l'API pubblica della beta Xcode 27 non raggiunge uno stato
-terminale nel simulatore. La deroga non trasforma questa prova in PASS e non
-autorizza claim App Store o di conformità.
+Il gate di promozione è `HOLD_PROMOTION`. Le prove automatiche e le interazioni
+reali registrate restano evidenza della rispettiva baseline storica; sul tree
+0.8.5 devono ancora essere chiusi il receipt Xcode exact-SHA e la sessione web
+con screen reader. VoiceOver reale su iPhone e iPad non è provato perché l'API
+pubblica della beta Xcode 27 non raggiunge uno stato terminale nel simulatore:
+questa è una deroga esterna accettata, non un PASS, e non autorizza claim App
+Store o di conformità.
 
 Lume è il linguaggio comune. Liquid Glass è una declinazione nativa Apple e non
 viene copiata come identità CSS. La parity riguarda capacità, semantica,
@@ -100,8 +104,9 @@ Il manifest Apple-wide verifica 24 acceptance record tecnici separati.
 
 Le prove Apple basate su Xcode nella tabella seguente appartengono alla baseline
 storica `0843726fe`. Restano valide soltanto per quel tree e non costituiscono
-evidenza exact-tree del candidato `0.8.5`, sul quale il volume Xcode non è
-montato.
+evidenza implicita per una revisione successiva. Il volume Xcode è disponibile;
+le prove exact-SHA appartengono ai receipt del closeout e non si deducono da
+questa matrice statica.
 
 | Classe | Superficie | Prova | Stato |
 | --- | --- | --- | --- |
@@ -152,10 +157,9 @@ Wave 5 è una tranche consegnata, non la chiusura della parity complessiva.
 ### W6-A — convergenza UI macOS e click-map P6
 
 Il codice clipping e il probe AX corretto sono integrati. Le prove Xcode sul
-commit storico `0843726fe` restano valide soltanto per quel tree. Sul candidato
-exact-tree il volume Xcode non è disponibile, `xcode-select` punta a
-CommandLineTools e `xcodebuild` non è utilizzabile. W6-A non ha quindi una
-nuova prova nativa sullo SHA corrente.
+commit storico `0843726fe` restano valide soltanto per quel tree. Il volume
+Xcode è ora disponibile, ma W6-A non registra ancora una prova nativa sullo SHA
+corrente: l'esito exact-SHA appartiene al closeout terminale.
 
 ### W6-B — offline degradato onesto
 
@@ -264,9 +268,10 @@ Una capability può diventare `full-parity` solo con:
    review-first.
 
 Un gate assistivo resta non terminale finché la tecnologia assistiva richiesta
-non è stata usata sulla piattaforma dichiarata. La sola eccezione della
-candidata sorgente 0.8 è il limite VoiceOver mobile registrato in
-[docs/known-limitations.md](./known-limitations.md).
+non è stata usata sulla piattaforma dichiarata. L'unica limitazione esterna già
+accettata è VoiceOver mobile, registrata in
+[docs/known-limitations.md](./known-limitations.md); ogni altra prova non
+terminale conserva il `HOLD_PROMOTION`.
 
 ## Verifica
 

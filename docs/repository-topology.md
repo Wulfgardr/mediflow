@@ -53,7 +53,7 @@ runtime artifact e fonti riservate restano fuori da Git secondo
 
 ## Confine Application Services, Fabric e integrazioni opzionali
 
-La topologia intelligente del candidato sorgente locale 0.8.5 resta
+La topologia intelligente della 0.8.5 resta
 host-owned e locale:
 
 - `app/api/ai/{patient-insight,smart-import,document-synthesis,treatment-reasoning}/`
@@ -85,11 +85,13 @@ modello, endpoint, venue, prompt, fallback o apply. Ogni smart path restituisce
 una proposta review-only con receipt, provenienza e currentness; il production
 root host-owned resta l'unico punto di composizione.
 
-AnyDoc resta il primo passaggio. Il tree include routing, manifest,
-materializzazione e rendering bounded delle sole pagine `needsOcr`, oltre al
-preflight DeepSeek-OCR 2 con fake seam. Il runtime adapter non è integrato e
-il tree non contiene prove live, benchmark E2E o runtime readiness. Le route OCR
-legacy, dopo l'autenticazione, rispondono `410`.
+AnyDoc resta il primo passaggio. Per i PDF supportati, il tree classifica,
+materializza e renderizza soltanto le pagine `needsOcr`, quindi usa Apple
+Vision localmente sul Mac e ricompone il risultato sotto currentness
+host-owned. Il percorso è review-only e fallisce chiuso. DeepSeek-OCR 2/CUDA
+resta `OUT_OF_SCOPE_FOR_0.8.5_NON_BLOCKING`; il tree ne conserva soltanto il
+contratto e seam sintetiche. Le route OCR legacy, dopo l'autenticazione,
+rispondono `410`.
 
 OpenAI e Anthropic hanno adapter HTTPS ufficiali e probe Document Synthesis
 review-only. Restano `default OFF` e richiedono lifecycle, secret reference e
@@ -120,42 +122,43 @@ conversazionale e l'automazione graduata restano roadmap.
 ## Confine Headless 0.8.5
 
 Un launcher trusted avvia un processo figlio autenticato con ambiente
-allowlisted e RPC AIP ereditato. MCP `stdio` e Mini espongono catalogo,
-terminology search, Open Loops patient-scoped, proposta follow-up
-`proposal_only` e query semantica bounded read-only. Gli adapter non importano
-SQLite, non duplicano regole di dominio e non aprono listener.
+allowlisted e RPC AIP ereditato. MCP `stdio` espone catalogo, terminology
+search, Open Loops patient-scoped, proposta follow-up `proposal_only` e query
+semantica bounded read-only. Mini condivide catalogo e foundation CLI ma non ha
+un callsite production del Supervisor e fallisce chiuso senza parent AIP. Gli
+adapter non importano SQLite, non duplicano regole di dominio e non aprono
+listener.
 
 Authority, purpose, selezione, scope, lease, currentness e audit restano
-host-owned. Il launcher production, il quickstart e il lifecycle supportato
-restano `PRODUCTION_BRIDGE_BLOCKER`. La topologia Supervisor portabile come
-trusted parent su IPC ereditato è `DECIDED`; l'implementazione è
-`SPLIT_REQUIRED`. La factory esaminata non chiude late-bind trusted-UI, owner
-sincrono di `readHostContext`, lifecycle e revoca production o audit terminale
-sincrono. Broker residente e UDS sono esclusi dalla `0.8.5`.
+host-owned. Il Supervisor Node locale è il parent trusted e avvia Web
+standalone e MCP come figli distinti su IPC privato ereditato. Il percorso non
+usa broker residente o UDS. La 0.8.5 non dichiara installer, onboarding o
+compatibilità con host MCP esterni.
 
-La transizione stato checkup F10 vive in `packages/aip/` e
-`lib/security/headless-checkup-status-transition-*` come candidato interno. Core
-e composizione SQLite sono verificati, ma non esiste binding launcher, MCP,
-Mini o UI. La conferma trusted-UI è
-`AUTHORITY_UI_BINDING_BLOCKER` per il production bridge.
+La transizione stato checkup F10 collega la preview MCP al commit nella UI Web
+trusted. MCP non riceve proof e non può eseguire il commit. Il Web rilegge la
+risorsa e richiede ruolo medico attivo, step-up e gesto operation-specific,
+quindi applica CAS, idempotenza, audit e receipt atomici.
 
 La topologia distingue due modalità e non le unisce:
 
 - **provider-in-MediFlow**: il Fabric governa il provider che esegue una
   capability MediFlow; i quattro path locali appartengono a questa modalità;
-- **MediFlow-in-intelligent-host**: MCP o Mini usano RPC AIP ereditato sopra gli
-  stessi Application Services.
+- **MediFlow-in-intelligent-host**: MCP usa RPC AIP ereditato sopra gli stessi
+  Application Services; Mini resta una foundation CLI non collegata in
+  production.
 
-La seconda modalità è una superficie candidata, non un entrypoint production.
-Il tree non promette installer, onboarding o integrazione con sessioni
-consumer. Qualunque OAuth provider futuro deve usare soltanto un contratto
-ufficiale, senza token privati o flussi ricostruiti.
+La seconda modalità ha un entrypoint locale tramite Supervisor. Il
+tree non promette installer, onboarding, compatibilità con host MCP esterni o
+integrazione con sessioni consumer. Qualunque OAuth provider futuro deve usare
+soltanto un contratto ufficiale, senza token privati o flussi ricostruiti.
 
-Il core, l'operazione read-only e la superficie statica MCP/Mini del planner
-semantico sono integrati:
-`STATIC_SURFACE_INTEGRATED / PRODUCTION_BRIDGE_BLOCKER`. Il production bridge
-selezionato non ha callsite o test. Il planner non produce SQL libero. La
-registrazione visita è `DEFER_NEXT_PATCH`.
+Il planner semantico è collegato al Supervisor e resta read-only. Compone al
+massimo due operazioni allowlisted, non produce SQL libero e non scrive dati.
+La shell macOS integra la registrazione visita con API Apple on-device su
+macOS 26 o successivo, consenso esplicito, audio bounded solo in RAM e review
+del transcript. Non esiste writer clinico automatico; prova con microfono reale
+e validazione clinica restano fuori dal claim della 0.8.5.
 
 ## ⚠️ Regole operative
 
@@ -220,7 +223,7 @@ traduzione eseguibile di [ADR 0084](./adr/0084-document-diagnoses-review-only.md
 [ADR 0086](./adr/0086-intelligent-scaffold-and-graded-automation-boundary.md), fino a
 oggi affidate alla sola disciplina.
 
-Nel candidato 0.8.5 i quattro smart path attraversano route autenticate. La
+Nella 0.8.5 i quattro smart path attraversano route autenticate. La
 route resta un adapter: il punto di enforcement è il **production root e il
 writer del servizio**. Un controllo limitato ai nomi delle route non dimostra
 la separazione tra proposta e scrittura.
