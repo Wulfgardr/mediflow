@@ -1,110 +1,110 @@
 # Changelog
 
-Questo file raccoglie i cambiamenti rilevanti di MediFlow.
+This file collects MediFlow's relevant changes.
 
-Il formato è basato su [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [0.8.5] - 2026-09-03
 
-> Questa voce descrive il perimetro sorgente della patch `0.8.5`. Evidenze CI,
-> firma, tag e GitHub Release appartengono al closeout di promozione e non sono
-> implicate dal solo contenuto di questo changelog.
+> This entry describes the source scope of patch `0.8.5`. CI evidence,
+> signing, tag, and GitHub Release belong to the promotion closeout and are not
+> implied by the content of this changelog alone.
 
-### Intelligence Fabric review-only
+### Review-only Intelligence Fabric
 
-- `AI Patient Insight`, Smart Import, Document Synthesis e Treatment Reasoning
-  passano da ingressi e production root Fabric distinti.
-- I quattro percorsi hanno disposition `proposal_only`. Le UI mostrano
-  receipt, provenienza e currentness; nessuna preview applica dati clinici.
-- Il crosswalk machine-readable
-  `docs/capability-mapping/fabric-generative-runtime-crosswalk.v1.json` lega
-  capability, entrypoint, production root, route, evidenza wire e UI. Un guard
-  dedicato controlla il drift.
-- La receipt storica `fabric-product-crosswalk-receipt.v1.json` resta
-  immutabile con stato `candidate_not_integrated`. Non viene rietichettata come
-  prova del runtime corrente.
+- `AI Patient Insight`, Smart Import, Document Synthesis, and Treatment Reasoning
+  use distinct Fabric entrypoints and production roots.
+- The four paths have disposition `proposal_only`. The UIs show
+  receipt, provenance, and currentness; no preview applies clinical data.
+- The machine-readable crosswalk
+  `docs/capability-mapping/fabric-generative-runtime-crosswalk.v1.json` links
+  capability, entrypoint, production root, route, wire evidence, and UI. A
+  dedicated guard checks for drift.
+- The historical receipt `fabric-product-crosswalk-receipt.v1.json` remains
+  immutable with status `candidate_not_integrated`. It is not relabeled as
+  evidence of the current runtime.
 
-### Estrazione locale degli allegati
+### Local attachment extraction
 
-- AnyDoc resta il primo passaggio automatico locale per i formati supportati.
-  La conversione a Markdown è bounded, non usa rete e non è OCR.
-- Per i PDF supportati, la composizione current-source materializza e
-  renderizza soltanto le pagine `needsOcr`, usa Apple Vision locale senza rete
-  e ricompone il risultato nell'ordine originale.
-- DeepSeek-OCR 2/CUDA, benchmark di qualifica e readiness universale hanno stato
-  `OUT_OF_SCOPE_FOR_0.8.5_NON_BLOCKING`. Input cifrati o non ammessi, immagini
-  dirette e motore locale indisponibile falliscono chiusi; le route OCR legacy
-  restano terminali `410`.
+- AnyDoc remains the first automatic local pass for supported formats.
+  Markdown conversion is bounded, uses no network, and is not OCR.
+- For supported PDFs, current-source composition materializes and
+  renders only `needsOcr` pages, uses local Apple Vision without network,
+  and recomposes the result in the original order.
+- DeepSeek-OCR 2/CUDA, qualification benchmarks, and universal readiness have
+  status `OUT_OF_SCOPE_FOR_0.8.5_NON_BLOCKING`. Encrypted or disallowed input,
+  direct images, and an unavailable local engine fail closed; legacy OCR routes
+  remain terminal `410`.
 
-### Headless, MCP e Mini
+### Headless, MCP, and Mini
 
-- Il Supervisor Node portabile avvia Web standalone e MCP come processi figli
-  distinti e autenticati su IPC ereditato, senza listener o import diretti del
-  database.
-- MCP `stdio` espone catalogo, ricerca terminologica, lettura delle Open Loops
-  del paziente selezionato, proposta follow-up `proposal_only` e query semantica
-  bounded read-only. Mini conserva il catalogo tipizzato e la foundation CLI,
-  ma non ha un binding production al Supervisor e fallisce chiuso senza parent
-  AIP.
-- Il Supervisor possiede contesto, lease, revoca e audit. Gli adapter non
-  accettano authority caller-supplied; il terminal smoke standalone sul tree
-  finale, installer, onboarding ed esercizio su host esterni restano prove
-  separate dal contenuto sorgente della `0.8.5`.
-- F10 espone via MCP soltanto la preview `pending -> completed|cancelled`. La UI
-  Web trusted rilegge la risorsa e richiede ruolo medico attivo, step-up e gesto
-  specifico prima del commit con CAS, idempotenza, audit e receipt. Proof e
-  commit non sono delegati all'agente.
-- Il planner semantico è collegato al Supervisor come percorso read-only
-  bounded. Compone al massimo due operazioni allowlisted, senza SQL libero o
-  scritture.
-- Su macOS 26 o successivo, la shell integra cattura e trascrizione italiana
-  Apple on-device, con consenso esplicito, audio bounded solo in RAM e
-  trasferimento al draft dopo review. Non esegue writer clinici automatici;
-  smoke con microfono reale e validazione clinica restano fuori dal claim della
-  `0.8.5`.
+- The portable Node Supervisor starts standalone Web and MCP as distinct child
+  processes authenticated over inherited IPC, with no listener or direct
+  database imports.
+- MCP `stdio` exposes the catalog, terminology search, reads of the selected
+  patient's Open Loops, a `proposal_only` follow-up proposal, and a bounded
+  read-only semantic query. Mini retains the typed catalog and CLI foundation,
+  but has no production binding to the Supervisor and fails closed without a
+  parent AIP.
+- The Supervisor owns context, leases, revocation, and audit. Adapters do not
+  accept caller-supplied authority; the standalone terminal smoke on the final
+  tree, installer, onboarding, and operation on external hosts remain evidence
+  separate from the `0.8.5` source content.
+- F10 exposes only the `pending -> completed|cancelled` preview through MCP.
+  The trusted Web UI rereads the resource and requires an active medical role,
+  step-up, and a specific gesture before the commit with CAS, idempotency,
+  audit, and receipt. Proof and commit are not delegated to the agent.
+- The semantic planner is connected to the Supervisor as a bounded read-only
+  path. It composes at most two allowlisted operations, with no free SQL or
+  writes.
+- On macOS 26 or later, the shell integrates Apple on-device Italian capture
+  and transcription, with explicit consent, audio bounded to RAM only, and
+  transfer to the draft after review. It does not run automatic clinical
+  writers; real-microphone smoke and clinical validation remain outside the
+  `0.8.5` claim.
 
-### Provider e perimetro
+### Providers and scope
 
-- Ollama e ATHENA/MLX sono provider locali capability-specific. ATHENA/MLX è
-  ammesso soltanto per Treatment Reasoning; nessun provider è un fallback
-  generico.
-- Il runtime ATHENA accetta un runner MLX offline pre-provisioned tramite
-  `MEDIFLOW_ATHENA_MLX_GENERATE_BIN`, come percorso eseguibile assoluto
-  host-owned. Richiede runner e modello locali già presenti; non dichiara
-  readiness universale.
-- Il supporto del runner (`2574cf5fc`) ha superato TDD 6/6, typecheck ed ESLint.
-  Uno smoke sintetico sul percorso di produzione con modello BF16 locale ha
-  completato in 10,6 secondi, con 64 token e 211 caratteri, senza registrare il
-  raw output. È una singola osservazione, non un benchmark o una prova clinica.
-- Il contratto provider v2, il secret broker, gli adapter HTTPS ufficiali e la
-  probe amministrativa review-only OpenAI/Anthropic sono integrati. La route è
-  admin-only, richiede un intento esplicito e resta `default OFF`, con opt-in
-  host e policy egress/retention esplicite.
-- Le prove usano transport fake. Il tree non contiene credenziali e non prova
-  rete live, account, retention o runtime readiness cloud.
-- L'invocazione AI dai client paired resta fuori scope.
-- Il selector guidato Fabric rileva profili compatibili per cinque capability,
-  esegue uno smoke sintetico e attiva binding host-owned con CAS e rollback.
+- Ollama and ATHENA/MLX are capability-specific local providers. ATHENA/MLX is
+  allowed only for Treatment Reasoning; no provider is a generic fallback.
+- The ATHENA runtime accepts a pre-provisioned offline MLX runner through
+  `MEDIFLOW_ATHENA_MLX_GENERATE_BIN`, as an absolute host-owned executable
+  path. It requires a runner and local model already present; it does not
+  declare universal readiness.
+- Runner support (`2574cf5fc`) passed TDD 6/6, typecheck, and ESLint. A
+  synthetic smoke on the production path with a local BF16 model completed in
+  10.6 seconds, with 64 tokens and 211 characters, without recording the raw
+  output. This is a single observation, not a benchmark or clinical evidence.
+- The provider v2 contract, secret broker, official HTTPS adapters, and
+  review-only administrative OpenAI/Anthropic probe are integrated. The route
+  is admin-only, requires explicit intent, and remains `default OFF`, with
+  host opt-in and explicit egress/retention policies.
+- The evidence uses fake transport. The tree contains no credentials and does
+  not prove live network, account, retention, or cloud runtime readiness.
+- AI invocation from paired clients remains out of scope.
+- The guided Fabric selector detects compatible profiles for five capabilities,
+  runs a synthetic smoke, and activates a host-owned binding with CAS and
+  rollback.
 
-### Esiti di perimetro F6/F7
+### F6/F7 scope outcomes
 
-- **F6 — fallback locale integrato**: AnyDoc resta il primo passaggio; le sole
-  pagine PDF `needsOcr` possono usare Apple Vision locale con ricomposizione
-  current-source. DeepSeek-OCR 2/CUDA, benchmark di qualifica e readiness
-  universale hanno stato `OUT_OF_SCOPE_FOR_0.8.5_NON_BLOCKING`.
-- **F7 — `INTEGRATED / DEFAULT_OFF`**: provider v2, secret broker, adapter
-  ufficiali e probe amministrativa review-only sono presenti. Nessuna
-  credenziale o prova di rete live appartiene al perimetro `0.8.5`.
+- **F6 — integrated local fallback**: AnyDoc remains the first pass; only
+  `needsOcr` PDF pages may use local Apple Vision with current-source
+  recomposition. DeepSeek-OCR 2/CUDA, qualification benchmarks, and universal
+  readiness have status `OUT_OF_SCOPE_FOR_0.8.5_NON_BLOCKING`.
+- **F7 — `INTEGRATED / DEFAULT_OFF`**: the provider v2 contract, secret broker,
+  official adapters, and review-only administrative probe are present. No
+  credential or live-network evidence belongs to the `0.8.5` scope.
 
-### Altri cambiamenti
+### Other changes
 
-- La galleria usa una cattura reale dell'app macOS corrente con fixture
-  sintetiche e non presenta la shell Apple precedente come stato attuale.
-- Il dashboard dei token dichiara periodo e ambiente degli aggregati locali
-  CodexBar.
-- La modalità demo Apple tratta il dataset sintetico come fixture UI. Il
-  caricamento documenti non mostra più un falso errore di sessione paired.
+- The gallery uses a real capture of the current macOS app with synthetic
+  fixtures and does not present the previous Apple shell as the current state.
+- The token dashboard states the period and environment of local CodexBar
+  aggregates.
+- Apple demo mode treats the synthetic dataset as a UI fixture. Document
+  upload no longer shows a false paired-session error.
 
 ## [0.8.2] - 2026-08-11
 
