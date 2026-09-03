@@ -36,6 +36,7 @@ const REF = 'a'.repeat(64);
 const PATIENT = 'patient.synthetic.01';
 const ATTACHMENT = 'attachment.synthetic.01';
 const AMBULATORY = 'ambulatory.synthetic.01';
+const noVolatileRestoreAuthority = () => false;
 const sessions: ServerSession[] = [];
 let sequence = 0;
 
@@ -139,7 +140,7 @@ test('revokes same-tuple locators and operations before restore while preserving
     const copyAuthority = copy.createAttachmentExtractionSourceAuthority(current.session);
     const copyLocator = copyAuthority.issue({ attachmentId: ATTACHMENT }); assert.ok(copyLocator);
 
-    restoreBackupArtifact(await sameTupleArtifact());
+    restoreBackupArtifact(await sameTupleArtifact(), noVolatileRestoreAuthority);
 
     assert.equal(current.authority.consume(staleLocator).status, 'denied'); assert.equal(current.authority.consume(staleLocator).status, 'denied');
     assert.equal(current.authority.finalize(finalizeOperation.operation).status, 'denied'); assert.equal(current.authority.finalize(finalizeOperation.operation).status, 'denied');
@@ -157,13 +158,13 @@ test('keeps restore revocation fail-closed after precondition and transaction fa
     const artifact = await sameTupleArtifact(); const db = new Database(dbPath);
     db.prepare('INSERT INTO durable_review_command_states (review_id, review_state, revision, action) VALUES (?, ?, ?, ?)')
         .run(`review_${'c'.repeat(32)}`, 'accepted', 1, 'accept'); db.close();
-    assert.throws(() => restoreBackupArtifact(artifact), /append-only audit ledger/u);
+    assert.throws(() => restoreBackupArtifact(artifact, noVolatileRestoreAuthority), /append-only audit ledger/u);
     assert.equal(precondition.authority.consume(preconditionLocator).status, 'denied');
     const cleanup = new Database(dbPath); cleanup.exec('DELETE FROM durable_review_command_states'); cleanup.close();
 
     const transaction = fixture(); const transactionLocator = transaction.authority.issue({ attachmentId: ATTACHMENT }); assert.ok(transactionLocator);
     artifact.payload.ambulatories.push({ id: AMBULATORY, name: 'Duplicato sintetico', type: 'test' });
-    assert.throws(() => restoreBackupArtifact(artifact));
+    assert.throws(() => restoreBackupArtifact(artifact, noVolatileRestoreAuthority));
     assert.equal(transaction.authority.consume(transactionLocator).status, 'denied');
     const stillPresent = new Database(dbPath); const count = stillPresent.prepare('SELECT COUNT(*) AS count FROM attachments WHERE id = ?').get(ATTACHMENT) as { count: number };
     assert.equal(count.count, 1); stillPresent.close();

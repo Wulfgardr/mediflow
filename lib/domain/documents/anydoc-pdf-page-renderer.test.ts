@@ -13,7 +13,6 @@ import {
     ANYDOC_PDF_PAGE_RENDERER_DPI,
     ANYDOC_PDF_PAGE_RENDERER_ENGINE_DESCRIPTOR,
     ANYDOC_PDF_PAGE_RENDERER_ENGINE_SHA256,
-    ANYDOC_PDF_PAGE_RENDERER_INTERNAL_TEST_SEAM,
     ANYDOC_PDF_PAGE_RENDERER_MAX_DIMENSION_PIXELS,
     ANYDOC_PDF_PAGE_RENDERER_MAX_RASTER_BYTES,
     ANYDOC_PDF_PAGE_RENDERER_MAX_TOTAL_RASTER_BYTES,
@@ -208,54 +207,6 @@ test('copies bytes before async rendering and denies malformed, hostile and over
     if (result.status === 'review_required') assert.equal(result.reason, 'page_evidence_mismatch');
 });
 
-test('post-fences stalled render and cooperatively observes cleanup through an internal fake-engine seam', async () => {
-    const pending = new Promise<void>(() => undefined); let cancelled = 0; let pageCleaned = 0;
-    let documentCleaned = 0; let loadingDestroyed = 0;
-    const page = { getViewport: () => ({ width: 1, height: 1 }),
-        render: () => ({ promise: pending, cancel: () => { cancelled += 1; } }),
-        cleanup: () => { pageCleaned += 1; } };
-    const document = { numPages: 1, getPage: async () => page,
-        cleanup: () => { documentCleaned += 1; return pending; } };
-    const loading = { promise: Promise.resolve(document),
-        destroy: () => { loadingDestroyed += 1; return pending; } };
-    const engine = { getDocument: () => loading,
-        createCanvas: () => ({ width: 1, height: 1, getContext: () => ({}), toBuffer: () => PNG_SIGNATURE }) };
-    const started = performance.now();
-    await assert.rejects(ANYDOC_PDF_PAGE_RENDERER_INTERNAL_TEST_SEAM.renderPage(engine, Buffer.from('%PDF-test')), {
-        name: 'PageRenderTimeout',
-    });
-    assert.ok(performance.now() - started < 500);
-    assert.deepEqual([cancelled, pageCleaned, documentCleaned, loadingDestroyed], [1, 1, 1, 1]);
-});
-
-test('denies synchronous PNG encoding that returns after the page deadline', async () => {
-    const page = { getViewport: () => ({ width: 1, height: 1 }),
-        render: () => ({ promise: Promise.resolve(), cancel: () => undefined }), cleanup: () => undefined };
-    const document = { numPages: 1, getPage: async () => page, cleanup: async () => undefined };
-    const loading = { promise: Promise.resolve(document), destroy: async () => undefined };
-    const engine = { getDocument: () => loading, createCanvas: () => ({ width: 1, height: 1, getContext: () => ({}),
-        toBuffer: () => { const until = performance.now() + 35; while (performance.now() < until) { /* cooperative stall */ }
-            return Buffer.concat([PNG_SIGNATURE, Buffer.from([1])]); } }) };
-    await assert.rejects(ANYDOC_PDF_PAGE_RENDERER_INTERNAL_TEST_SEAM.renderPage(engine, Buffer.from('%PDF-test')), {
-        name: 'PageRenderTimeout',
-    });
-});
-
-test('post-fences cooperative synchronous cleanup that returns after the page deadline', async () => {
-    const stall = () => { const until = performance.now() + 35; while (performance.now() < until) { /* cooperative stall */ } };
-    const page = { getViewport: () => ({ width: 1, height: 1 }),
-        render: () => ({ promise: Promise.resolve(), cancel: () => undefined }), cleanup: stall };
-    const document = { numPages: 1, getPage: async () => page, cleanup: async () => undefined };
-    const loading = { promise: Promise.resolve(document), destroy: async () => undefined };
-    const engine = { getDocument: () => loading, createCanvas: () => ({ width: 1, height: 1, getContext: () => ({}),
-        toBuffer: () => Buffer.concat([PNG_SIGNATURE, Buffer.from([1])]) }) };
-    const started = performance.now();
-    await assert.rejects(ANYDOC_PDF_PAGE_RENDERER_INTERNAL_TEST_SEAM.renderPage(engine, Buffer.from('%PDF-test')), {
-        name: 'PageRenderTimeout',
-    });
-    assert.ok(performance.now() - started >= 35);
-});
-
 test('enforces per-page and cumulative PNG byte limits without returning partial rasters', async () => {
     const jpeg = syntheticNoiseJpeg(1850);
     const single = await classifiedNoiseFixture(jpeg, 1850, 1);
@@ -271,11 +222,12 @@ test('enforces per-page and cumulative PNG byte limits without returning partial
     assert.equal(ANYDOC_PDF_PAGE_RENDERER_MAX_TOTAL_RASTER_BYTES, 32 * 1024 * 1024);
 });
 
-test('pins the local engine graph and excludes URL, worker, path, model, parser and persistence surfaces', () => {
+test('pins the isolated local engine graph and excludes direct engine imports from the parent renderer', () => {
     const root = new URL('../../../', import.meta.url);
     const pkg = JSON.parse(readFileSync(new URL('package.json', root), 'utf8'));
     const lock = JSON.parse(readFileSync(new URL('package-lock.json', root), 'utf8'));
     const source = readFileSync(new URL('./anydoc-pdf-page-renderer.ts', import.meta.url), 'utf8');
+    const worker = readFileSync(new URL('../../../scripts/anydoc-pdf-page-worker.mjs', import.meta.url), 'utf8');
     assert.equal(pkg.dependencies['pdfjs-dist'], '4.10.38');
     const expected = [
         ['node_modules/pdfjs-dist', '4.10.38', 'sha512-/Y3fcFrXEAsMjJXeL9J8+ZG9U01LbuWaYypvDW2ycW1jL269L3js3DVBjDJ0Up9Np1uqDXsDrRihHANhZOlwdQ==', 'Apache-2.0'],
@@ -290,15 +242,18 @@ test('pins the local engine graph and excludes URL, worker, path, model, parser 
     assert.equal(lock.packages['node_modules/@napi-rs/canvas']?.optional, true);
     assert.equal(lock.packages['node_modules/@napi-rs/canvas-darwin-arm64']?.optional, true);
     assert.equal(pkg.dependencies['@napi-rs/canvas'], undefined);
-    assert.match(source, /disableWorker: true/u); assert.match(source, /isEvalSupported: false/u);
-    assert.match(source, /useSystemFonts: false/u); assert.match(source, /\.cancel\(\)/u);
-    assert.match(source, /\.cleanup\(\)/u); assert.match(source, /\.destroy\(\)/u);
-    assert.doesNotMatch(source, /Math\.min\(ANYDOC_PDF_PAGE_RENDERER_PAGE_TIMEOUT_MS/u);
+    assert.match(worker, /disableWorker: true/u); assert.match(worker, /isEvalSupported: false/u);
+    assert.match(worker, /useSystemFonts: false/u); assert.match(worker, /\.cancel\(\)/u);
+    assert.match(worker, /\.cleanup\(\)/u); assert.match(worker, /\.destroy\(\)/u);
+    assert.match(worker, /const deadline = started \+ PAGE_TIMEOUT_MS/u);
+    assert.match(source, /parentPngStructure:true/u);
+    assert.match(source, /permission=readOnlyPackageRoot,noWrite,noChild,noWorker/u);
+    assert.doesNotMatch(source, /import\(['"](?:pdfjs-dist|@napi-rs\/canvas)|from ['"](?:pdfjs-dist|@napi-rs\/canvas)/u);
     assert.doesNotMatch(source, /\b(?:url|workerSrc|GlobalWorkerOptions)\s*:|fetch\(|https?:|readFile|writeFile|child_process|spawn\(|exec\(|DeepSeek|Ollama|Apple Vision|@firecrawl\/anydoc|app\/api|dbServer|lib\/schema|markdown(?:Bytes|Text|\s*:)/iu);
     assert.equal(renderAnyDocNeedsOcrPages.length, 2);
     assert.equal(ANYDOC_PDF_PAGE_RENDERER_RUNTIME_PROFILE_ID, 'mediflow.pdfjs_png.node24.darwin_arm64.v1');
     assert.equal(sha256(ANYDOC_PDF_PAGE_RENDERER_ENGINE_DESCRIPTOR), ANYDOC_PDF_PAGE_RENDERER_ENGINE_SHA256);
-    assert.equal(ANYDOC_PDF_PAGE_RENDERER_ENGINE_SHA256, 'bad022a53e98dd0449e6a4e4b643da80aeabcc80252c949ae2cf2674b757f6d2');
+    assert.equal(ANYDOC_PDF_PAGE_RENDERER_ENGINE_SHA256, '775704ed6d5f6b5f2b9600dcd0aecc1178de0839cbec65ef2f8a13b318932d7f');
     assert.match(source, /1011b38553532d7078c59f26b15a471f8dae00f101b60e2add9b8511737a1ce0/u);
     assert.match(source, /ec7dc504d4ade7fd36846d16643e50eed5c914335f3a86b6a2a8d632391e5bfa/u);
     assert.match(source, /c7c8dcb69aae6ddb58fe23e5f20d1c772a8065b077560f5a18336307779add91/u);

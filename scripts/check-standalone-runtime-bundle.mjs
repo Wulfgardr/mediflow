@@ -9,8 +9,25 @@ import { assertNodeRuntime, readNodeContract, standaloneDirectory } from './node
 
 const ANYDOC_WORKER_FILE = 'anydoc-local-extraction-worker.mjs';
 const ANYDOC_WORKER_SHA256 = '5d6e2e60f1d71f3fd45065961258a7debe8a96e017abdcee92823986c8f08c67';
+const ANYDOC_PDF_PAGE_WORKER_FILE = 'anydoc-pdf-page-worker.mjs';
+const ANYDOC_PDF_PAGE_WORKER_SHA256 = 'b33e5363e25cfdb20a7cc6e852e38e2c331bdd54d86eed989a1d300fa92fc821';
+const ANYDOC_PDF_CHILD_SCHEMA_VERSION = 'mediflow.anydoc_pdf_child_protocol.v1';
+const ANYDOC_PDF_CHILD_MAX_OLD_SPACE_MB = 256;
+const ANYDOC_LOCAL_EXTRACTION_ROUTE_DIRECTORY = path.join(
+  'server', 'app', 'api', 'attachments', '[id]', 'local-extraction',
+);
 const APPLE_VISION_SCRIPT_FILE = 'apple-vision-ocr.swift';
 const APPLE_VISION_SCRIPT_SHA256 = 'fb87dd9c0ca98a9ac68840c7c4c7517fec8199dbbd3dc1b3c93ad617d80dc314';
+const APPLE_VISION_CANVAS_PACKAGE = '@napi-rs/canvas';
+const APPLE_VISION_CANVAS_BACKEND = '@napi-rs/canvas-darwin-arm64';
+const APPLE_VISION_CANVAS_VERSION = '0.1.100';
+const APPLE_VISION_CANVAS_FILES = Object.freeze([
+  'LICENSE', 'README.md', 'geometry.js', 'index.d.ts', 'index.js', 'js-binding.js',
+  'load-image.js', 'node-canvas.d.ts', 'node-canvas.js', 'package.json',
+]);
+const APPLE_VISION_CANVAS_BACKEND_FILES = Object.freeze([
+  'README.md', 'package.json', 'skia.darwin-arm64.node',
+]);
 const PDF_INSPECTOR_WORKER_FILE = 'pdf-inspector-worker.mjs';
 const PDF_ROUTE_DIRECTORY = path.join('server', 'app', 'api', 'pdf-extract');
 const PDF_RUNTIME_REFERENCE = /(?:pdf-inspector-worker\.mjs|pdf-inspector-router|(?:node_modules[\\/])?@firecrawl[\\/]pdf-inspector(?:[-/]|$))/i;
@@ -100,6 +117,171 @@ function bundledWorkerFailure(standaloneDir) {
   return null;
 }
 
+/* @Codex: the PDF parser and renderer execute only through this digest-pinned,
+   physically bundled child. A trace reference is required from the exact route. */
+function bundledPdfPageWorkerFailure(standaloneDir) {
+  const workerPath = path.join(standaloneDir, 'scripts', ANYDOC_PDF_PAGE_WORKER_FILE);
+  try {
+    const workerStat = fs.lstatSync(workerPath);
+    if (!workerStat.isFile() || workerStat.isSymbolicLink()) {
+      return 'Standalone PDF page worker is not a physical regular file.';
+    }
+    const root = fs.realpathSync(standaloneDir);
+    const worker = fs.realpathSync(workerPath);
+    const relative = path.relative(root, worker);
+    if (!relative || relative.startsWith('..') || path.isAbsolute(relative)
+        || !fs.statSync(worker).isFile()) {
+      return 'Standalone runtime resolves the PDF page worker outside the bundle.';
+    }
+    if (createHash('sha256').update(fs.readFileSync(worker)).digest('hex') !== ANYDOC_PDF_PAGE_WORKER_SHA256) {
+      return 'Standalone PDF page worker digest does not match the pinned child.';
+    }
+  } catch {
+    return 'Standalone runtime does not contain the PDF page worker.';
+  }
+  return null;
+}
+
+function bundledPdfPageWorkerTraceFailure(standaloneDir) {
+  const distDirectoryName = path.basename(path.dirname(standaloneDir));
+  const routeDirectory = path.join(standaloneDir, distDirectoryName, ANYDOC_LOCAL_EXTRACTION_ROUTE_DIRECTORY);
+  const routePath = path.join(routeDirectory, 'route.js');
+  const tracePath = path.join(routeDirectory, 'route.js.nft.json');
+  let trace;
+  try {
+    if (!fs.lstatSync(routePath).isFile() || !fs.lstatSync(tracePath).isFile()) {
+      return 'Standalone AnyDoc route or trace is not a physical regular file.';
+    }
+    trace = JSON.parse(fs.readFileSync(tracePath, 'utf8'));
+  } catch {
+    return 'Standalone runtime does not contain a valid AnyDoc route trace.';
+  }
+  if (trace?.version !== 1 || !Array.isArray(trace.files)
+      || trace.files.some((entry) => typeof entry !== 'string')) {
+    return 'Standalone AnyDoc route trace has an invalid shape.';
+  }
+  const expectedWorker = path.resolve(standaloneDir, 'scripts', ANYDOC_PDF_PAGE_WORKER_FILE);
+  if (!trace.files.some((entry) => path.resolve(routeDirectory, entry) === expectedWorker)) {
+    return 'Standalone AnyDoc route trace does not reference the PDF page worker.';
+  }
+  return null;
+}
+
+function encodePdfChildFrame(header, bodies) {
+  const headerBytes = Buffer.from(JSON.stringify(header), 'utf8');
+  const prefix = Buffer.allocUnsafe(4);
+  prefix.writeUInt32BE(headerBytes.byteLength, 0);
+  return Buffer.concat([prefix, headerBytes, ...bodies]);
+}
+
+function decodePdfChildFrame(output) {
+  if (!Buffer.isBuffer(output) || output.byteLength < 5) return null;
+  const headerLength = output.readUInt32BE(0);
+  if (headerLength < 1 || headerLength > 64 * 1024 || output.byteLength < 4 + headerLength) return null;
+  const headerText = output.subarray(4, 4 + headerLength).toString('utf8');
+  let header;
+  try { header = JSON.parse(headerText); } catch { return null; }
+  if (JSON.stringify(header) !== headerText) return null;
+  return { header, body: output.subarray(4 + headerLength) };
+}
+
+function syntheticPdfPage() {
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 72 36] /Resources << >> /Contents 4 0 R >>',
+    '<< /Length 3 >>\nstream\nq Q\nendstream',
+  ];
+  const parts = [Buffer.from('%PDF-1.4\n')];
+  const offsets = [];
+  for (let index = 0; index < objects.length; index += 1) {
+    offsets.push(parts.reduce((total, part) => total + part.byteLength, 0));
+    parts.push(Buffer.from(`${index + 1} 0 obj\n${objects[index]}\nendobj\n`));
+  }
+  const xrefOffset = parts.reduce((total, part) => total + part.byteLength, 0);
+  const xref = offsets.map((offset) => `${String(offset).padStart(10, '0')} 00000 n \n`).join('');
+  parts.push(Buffer.from(`xref\n0 5\n0000000000 65535 f \n${xref}trailer\n<< /Size 5 /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`));
+  return Buffer.concat(parts);
+}
+
+function runPdfChild(workerPath, input, { allowAddons = false, args = [] } = {}) {
+  const packageRoot = path.dirname(path.dirname(workerPath));
+  const runtimeArguments = [
+    `--max-old-space-size=${ANYDOC_PDF_CHILD_MAX_OLD_SPACE_MB}`,
+    '--permission',
+    '--disable-warning=SecurityWarning',
+    `--allow-fs-read=${packageRoot}`,
+    ...(allowAddons ? ['--allow-addons'] : []),
+    workerPath,
+    ...args,
+  ];
+  return spawnSync(process.execPath, runtimeArguments, {
+    cwd: path.dirname(workerPath),
+    env: { NODE_ENV: 'production', NAPI_RS_ENFORCE_VERSION_CHECK: '1' },
+    input,
+    encoding: 'buffer',
+    timeout: 30_000,
+    maxBuffer: 4 * 1024 * 1024,
+    windowsHide: true,
+  });
+}
+
+function framedPdfPageWorkerSmokeFailure(workerPath) {
+  const source = syntheticPdfPage();
+  const materialize = runPdfChild(workerPath, encodePdfChildFrame({
+    schemaVersion: ANYDOC_PDF_CHILD_SCHEMA_VERSION,
+    operation: 'materialize',
+    pageCount: 1,
+    sourceByteLength: source.byteLength,
+  }, [source]));
+  if (materialize.error || materialize.status !== 0 || materialize.signal !== null
+      || !Buffer.isBuffer(materialize.stderr) || materialize.stderr.byteLength !== 0) {
+    return 'Standalone PDF page worker did not complete the framed materialization smoke.';
+  }
+  const materialized = decodePdfChildFrame(materialize.stdout);
+  const page = materialized?.header?.pages?.[0];
+  if (materialized?.header?.schemaVersion !== ANYDOC_PDF_CHILD_SCHEMA_VERSION
+      || materialized.header.status !== 'materialized'
+      || materialized.header.bodyByteLength !== materialized.body.byteLength
+      || !Array.isArray(materialized.header.pages) || materialized.header.pages.length !== 1
+      || page?.page !== 1 || page?.byteLength !== materialized.body.byteLength
+      || materialized.body.byteLength < 1) {
+    return 'Standalone PDF page worker emitted an invalid materialization frame.';
+  }
+
+  const render = runPdfChild(workerPath, encodePdfChildFrame({
+    schemaVersion: ANYDOC_PDF_CHILD_SCHEMA_VERSION,
+    operation: 'render',
+    pages: [{ page: 1, byteLength: materialized.body.byteLength }],
+    bodyByteLength: materialized.body.byteLength,
+  }, [materialized.body]), { allowAddons: true });
+  if (render.error || render.status !== 0 || render.signal !== null
+      || !Buffer.isBuffer(render.stderr) || render.stderr.byteLength !== 0) {
+    return 'Standalone PDF page worker did not complete the framed rendering smoke.';
+  }
+  const rendered = decodePdfChildFrame(render.stdout);
+  if (process.platform !== 'darwin' || process.arch !== 'arm64') {
+    return rendered?.header?.schemaVersion === ANYDOC_PDF_CHILD_SCHEMA_VERSION
+      && rendered.header.status === 'error' && rendered.header.reason === 'engine_unavailable'
+      && rendered.header.bodyByteLength === 0 && rendered.body.byteLength === 0
+      ? null
+      : 'Standalone PDF page worker did not fail closed on an unsupported rendering host.';
+  }
+  const raster = rendered?.header?.pages?.[0];
+  const pngSignature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  if (rendered?.header?.schemaVersion !== ANYDOC_PDF_CHILD_SCHEMA_VERSION
+      || rendered.header.status !== 'rendered'
+      || rendered.header.bodyByteLength !== rendered.body.byteLength
+      || !Array.isArray(rendered.header.pages) || rendered.header.pages.length !== 1
+      || raster?.page !== 1 || raster?.byteLength !== rendered.body.byteLength
+      || raster?.width !== 144 || raster?.height !== 72
+      || !Number.isSafeInteger(raster?.durationMs) || raster.durationMs < 0
+      || !rendered.body.subarray(0, pngSignature.byteLength).equals(pngSignature)) {
+    return 'Standalone PDF page worker emitted an invalid rendering frame.';
+  }
+  return null;
+}
+
 function bundledAppleVisionScriptFailure(standaloneDir) {
   const scriptPath = path.join(standaloneDir, 'scripts', APPLE_VISION_SCRIPT_FILE);
   try {
@@ -115,6 +297,149 @@ function bundledAppleVisionScriptFailure(standaloneDir) {
     }
   } catch {
     return 'Standalone runtime does not contain the Apple Vision OCR script.';
+  }
+  return null;
+}
+
+/* @Codex: OCR rasterization needs the exact physical N-API package pair in the
+   standalone runtime. An exact roster also rejects accidental secret files. */
+function standaloneAppleVisionCanvasFailure(standaloneDir, requireFromStandalone) {
+  if (process.platform !== 'darwin' || process.arch !== 'arm64') return null;
+
+  const packageDirectory = path.join(standaloneDir, 'node_modules', '@napi-rs', 'canvas');
+  const backendDirectory = path.join(standaloneDir, 'node_modules', '@napi-rs', 'canvas-darwin-arm64');
+
+  try {
+    for (const [candidate, label] of [
+      [path.join(standaloneDir, 'node_modules'), 'node_modules directory'],
+      [path.join(standaloneDir, 'node_modules', '@napi-rs'), '@napi-rs scope directory'],
+      [packageDirectory, `${APPLE_VISION_CANVAS_PACKAGE} package directory`],
+      [backendDirectory, `${APPLE_VISION_CANVAS_BACKEND} package directory`],
+    ]) {
+      const stat = fs.lstatSync(candidate);
+      if (!stat.isDirectory() || stat.isSymbolicLink()) {
+        return `Standalone runtime ${label} is not a physical directory.`;
+      }
+    }
+
+    function exactPhysicalRoster(directory, expectedFiles, label) {
+      const pending = [directory];
+      const roster = [];
+      while (pending.length > 0) {
+        const current = pending.pop();
+        for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+          const candidate = path.join(current, entry.name);
+          const stat = fs.lstatSync(candidate);
+          if (stat.isSymbolicLink()) return `${label} contains a symbolic link.`;
+          if (stat.isDirectory()) pending.push(candidate);
+          else if (!stat.isFile()) return `${label} contains a non-file package entry.`;
+          else roster.push(path.relative(directory, candidate).split(path.sep).join('/'));
+        }
+      }
+      roster.sort();
+      if (JSON.stringify(roster) !== JSON.stringify(expectedFiles)) {
+        return `${label} does not match the exact pinned file roster.`;
+      }
+      return null;
+    }
+
+    const packageRosterFailure = exactPhysicalRoster(
+      packageDirectory,
+      APPLE_VISION_CANVAS_FILES,
+      `Standalone runtime ${APPLE_VISION_CANVAS_PACKAGE}`,
+    );
+    if (packageRosterFailure) return packageRosterFailure;
+    const backendRosterFailure = exactPhysicalRoster(
+      backendDirectory,
+      APPLE_VISION_CANVAS_BACKEND_FILES,
+      `Standalone runtime ${APPLE_VISION_CANVAS_BACKEND}`,
+    );
+    if (backendRosterFailure) return backendRosterFailure;
+
+    const packageManifestPath = path.join(packageDirectory, 'package.json');
+    const backendManifestPath = path.join(backendDirectory, 'package.json');
+    const packageManifest = JSON.parse(fs.readFileSync(packageManifestPath, 'utf8'));
+    const backendManifest = JSON.parse(fs.readFileSync(backendManifestPath, 'utf8'));
+    if (packageManifest?.name !== APPLE_VISION_CANVAS_PACKAGE
+        || packageManifest?.version !== APPLE_VISION_CANVAS_VERSION
+        || packageManifest?.main !== 'index.js'
+        || packageManifest?.optionalDependencies?.[APPLE_VISION_CANVAS_BACKEND] !== APPLE_VISION_CANVAS_VERSION) {
+      return `Standalone runtime does not contain pinned ${APPLE_VISION_CANVAS_PACKAGE} ${APPLE_VISION_CANVAS_VERSION}.`;
+    }
+    if (backendManifest?.name !== APPLE_VISION_CANVAS_BACKEND
+        || backendManifest?.version !== APPLE_VISION_CANVAS_VERSION
+        || backendManifest?.main !== 'skia.darwin-arm64.node'
+        || JSON.stringify(backendManifest?.cpu) !== '["arm64"]'
+        || JSON.stringify(backendManifest?.os) !== '["darwin"]') {
+      return `Standalone runtime does not contain pinned ${APPLE_VISION_CANVAS_BACKEND} ${APPLE_VISION_CANVAS_VERSION}.`;
+    }
+
+    for (const [request, expectedPath] of [
+      [`${APPLE_VISION_CANVAS_PACKAGE}/package.json`, packageManifestPath],
+      [`${APPLE_VISION_CANVAS_BACKEND}/package.json`, backendManifestPath],
+      [APPLE_VISION_CANVAS_PACKAGE, path.join(packageDirectory, 'index.js')],
+    ]) {
+      if (fs.realpathSync(requireFromStandalone.resolve(request)) !== fs.realpathSync(expectedPath)) {
+        return `Standalone runtime did not resolve ${request} from its physical copy.`;
+      }
+    }
+
+    const nativePath = path.join(backendDirectory, 'skia.darwin-arm64.node');
+    const nativeStat = fs.lstatSync(nativePath);
+    if (!nativeStat.isFile() || nativeStat.isSymbolicLink()) {
+      return `Standalone runtime ${APPLE_VISION_CANVAS_BACKEND} native binding is not a physical regular file.`;
+    }
+    const canvas = requireFromStandalone(APPLE_VISION_CANVAS_PACKAGE);
+    if (typeof canvas?.createCanvas !== 'function') {
+      return `Standalone runtime ${APPLE_VISION_CANVAS_PACKAGE} cannot load its pinned native backend.`;
+    }
+    canvas.createCanvas(1, 1).toBuffer('image/png');
+  } catch (error) {
+    return `Standalone runtime cannot inspect Apple Vision canvas dependencies: ${error instanceof Error ? error.message : String(error)}`;
+  }
+  return null;
+}
+
+function standalonePdfChildDependenciesFailure(standaloneDir, requireFromStandalone) {
+  try {
+    const pdfLibEntry = requireFromStandalone.resolve('pdf-lib');
+    const pdfLibManifest = requireFromStandalone.resolve('pdf-lib/package.json');
+    const pdfJsEntry = requireFromStandalone.resolve('pdfjs-dist/legacy/build/pdf.mjs');
+    const pdfJsManifest = requireFromStandalone.resolve('pdfjs-dist/package.json');
+    const requireFromPdfLib = createRequire(pdfLibEntry);
+    const standardFontsEntry = requireFromPdfLib.resolve('@pdf-lib/standard-fonts');
+    const upngEntry = requireFromPdfLib.resolve('@pdf-lib/upng');
+    const runtimeEntries = [
+      pdfLibEntry,
+      pdfLibManifest,
+      pdfJsEntry,
+      pdfJsManifest,
+      standardFontsEntry,
+      upngEntry,
+      requireFromPdfLib.resolve('pako'),
+      requireFromPdfLib.resolve('tslib'),
+      createRequire(standardFontsEntry).resolve('pako'),
+      createRequire(upngEntry).resolve('pako'),
+    ];
+    const root = fs.realpathSync(standaloneDir);
+    for (const entry of runtimeEntries) {
+      const stat = fs.lstatSync(entry);
+      const realEntry = fs.realpathSync(entry);
+      const relative = path.relative(root, realEntry);
+      if (!stat.isFile() || stat.isSymbolicLink() || !relative
+          || relative.startsWith('..') || path.isAbsolute(relative)
+          || !fs.statSync(realEntry).isFile()) {
+        return 'Standalone PDF child dependency resolved outside its physical bundle copy.';
+      }
+    }
+    const pdfLib = JSON.parse(fs.readFileSync(pdfLibManifest, 'utf8'));
+    const pdfJs = JSON.parse(fs.readFileSync(pdfJsManifest, 'utf8'));
+    if (pdfLib?.name !== 'pdf-lib' || pdfLib?.version !== '1.17.1'
+        || pdfJs?.name !== 'pdfjs-dist' || pdfJs?.version !== '4.10.38') {
+      return 'Standalone PDF child dependency versions do not match the pinned runtime.';
+    }
+  } catch {
+    return 'Standalone runtime does not contain the complete PDF child dependency closure.';
   }
   return null;
 }
@@ -368,6 +693,111 @@ function runSelfTest() {
   }
 }
 
+function runPdfPageWorkerSelfTest() {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-pdf-page-worker-checker-'));
+  const standaloneDir = path.join(root, '.next-self-test', 'standalone');
+  const scriptsDir = path.join(standaloneDir, 'scripts');
+  const workerPath = path.join(scriptsDir, ANYDOC_PDF_PAGE_WORKER_FILE);
+  const sourceWorker = path.join(process.cwd(), 'scripts', ANYDOC_PDF_PAGE_WORKER_FILE);
+  const routeDirectory = path.join(
+    standaloneDir,
+    '.next-self-test',
+    ANYDOC_LOCAL_EXTRACTION_ROUTE_DIRECTORY,
+  );
+  const routePath = path.join(routeDirectory, 'route.js');
+  const tracePath = path.join(routeDirectory, 'route.js.nft.json');
+
+  function writeValidTrace() {
+    const relativeWorker = path.relative(routeDirectory, workerPath).split(path.sep).join('/');
+    fs.writeFileSync(tracePath, `${JSON.stringify({ version: 1, files: [relativeWorker] })}\n`);
+  }
+
+  try {
+    fs.mkdirSync(scriptsDir, { recursive: true });
+    fs.mkdirSync(routeDirectory, { recursive: true });
+    fs.writeFileSync(routePath, "'use strict';\n");
+    fs.copyFileSync(sourceWorker, workerPath);
+    writeValidTrace();
+    if (bundledPdfPageWorkerFailure(standaloneDir) !== null) {
+      throw new Error('expected the pinned PDF page worker to pass');
+    }
+    if (bundledPdfPageWorkerTraceFailure(standaloneDir) !== null) {
+      throw new Error('expected the AnyDoc route trace to reference the PDF page worker');
+    }
+    const smokeFailure = framedPdfPageWorkerSmokeFailure(sourceWorker);
+    if (smokeFailure) throw new Error(smokeFailure);
+
+    fs.rmSync(workerPath);
+    if (!bundledPdfPageWorkerFailure(standaloneDir)?.includes('does not contain')) {
+      throw new Error('missing PDF page worker passed');
+    }
+    fs.copyFileSync(sourceWorker, workerPath);
+    fs.appendFileSync(workerPath, '\n// synthetic digest drift\n');
+    if (!bundledPdfPageWorkerFailure(standaloneDir)?.includes('digest')) {
+      throw new Error('tampered PDF page worker passed');
+    }
+    fs.rmSync(workerPath);
+    fs.symlinkSync(sourceWorker, workerPath, process.platform === 'win32' ? 'file' : undefined);
+    if (!bundledPdfPageWorkerFailure(standaloneDir)?.includes('physical regular file')) {
+      throw new Error('symlinked PDF page worker passed');
+    }
+    fs.rmSync(workerPath);
+    fs.copyFileSync(sourceWorker, workerPath);
+    fs.writeFileSync(tracePath, '{"version":1,"files":[]}\n');
+    if (!bundledPdfPageWorkerTraceFailure(standaloneDir)?.includes('does not reference')) {
+      throw new Error('missing AnyDoc route trace reference passed');
+    }
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+}
+
+function runAppleVisionCanvasSelfTest() {
+  if (process.platform !== 'darwin' || process.arch !== 'arm64') return;
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-apple-vision-canvas-checker-'));
+  const standaloneDir = path.join(root, 'standalone');
+  const serverPath = path.join(standaloneDir, 'server.js');
+  const installedScope = path.join(process.cwd(), 'node_modules', '@napi-rs');
+  const copiedScope = path.join(standaloneDir, 'node_modules', '@napi-rs');
+  const copiedPackage = path.join(copiedScope, 'canvas');
+  const copiedBackend = path.join(copiedScope, 'canvas-darwin-arm64');
+  try {
+    fs.mkdirSync(copiedScope, { recursive: true });
+    fs.cpSync(path.join(installedScope, 'canvas'), copiedPackage, { recursive: true, dereference: false });
+    fs.cpSync(path.join(installedScope, 'canvas-darwin-arm64'), copiedBackend, { recursive: true, dereference: false });
+    fs.writeFileSync(serverPath, "'use strict';\n");
+    const requireFromStandalone = createRequire(serverPath);
+    if (standaloneAppleVisionCanvasFailure(standaloneDir, requireFromStandalone) !== null) {
+      throw new Error('expected pinned Apple Vision canvas packages to pass');
+    }
+
+    const unexpectedSecret = path.join(copiedPackage, '.env');
+    fs.writeFileSync(unexpectedSecret, 'SYNTHETIC_SECRET_MUST_NOT_SHIP=1\n');
+    if (!standaloneAppleVisionCanvasFailure(standaloneDir, requireFromStandalone)?.includes('exact pinned file roster')) {
+      throw new Error('unexpected package file passed');
+    }
+    fs.rmSync(unexpectedSecret);
+
+    const copiedEntry = path.join(copiedPackage, 'index.js');
+    fs.rmSync(copiedEntry);
+    fs.symlinkSync(path.join(installedScope, 'canvas', 'index.js'), copiedEntry);
+    if (!standaloneAppleVisionCanvasFailure(standaloneDir, requireFromStandalone)?.includes('symbolic link')) {
+      throw new Error('symlinked package file passed');
+    }
+    fs.rmSync(copiedEntry);
+    fs.copyFileSync(path.join(installedScope, 'canvas', 'index.js'), copiedEntry);
+
+    const backendManifestPath = path.join(copiedBackend, 'package.json');
+    const backendManifest = JSON.parse(fs.readFileSync(backendManifestPath, 'utf8'));
+    fs.writeFileSync(backendManifestPath, `${JSON.stringify({ ...backendManifest, version: '0.1.99' }, null, 2)}\n`);
+    if (!standaloneAppleVisionCanvasFailure(standaloneDir, requireFromStandalone)?.includes(APPLE_VISION_CANVAS_VERSION)) {
+      throw new Error('backend version drift passed');
+    }
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+}
+
 function runPdfRetirementSelfTest() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-pdf-retirement-checker-'));
   const standaloneDir = path.join(root, '.next-self-test', 'standalone');
@@ -455,6 +885,14 @@ if (process.argv[2] === '--self-test=web-auth-owner') {
   runWebAuthOwnerSelfTest();
   process.exit(0);
 }
+if (process.argv[2] === '--self-test=apple-vision-canvas') {
+  runAppleVisionCanvasSelfTest();
+  process.exit(0);
+}
+if (process.argv[2] === '--self-test=pdf-page-worker') {
+  runPdfPageWorkerSelfTest();
+  process.exit(0);
+}
 
 const root = process.cwd();
 const standaloneDir = standaloneDirectory(root);
@@ -503,6 +941,18 @@ if (webAuthOwnerInspection.failure || !webAuthOwnerInspection.entryPath) {
 }
 const webAuthOwnerRestart = webAuthOwnerRestartFailure(webAuthOwnerInspection.entryPath);
 if (webAuthOwnerRestart) fail(webAuthOwnerRestart);
+const appleVisionCanvasFailure = standaloneAppleVisionCanvasFailure(standaloneDir, requireFromStandalone);
+if (appleVisionCanvasFailure) fail(appleVisionCanvasFailure);
+const pdfChildDependenciesFailure = standalonePdfChildDependenciesFailure(standaloneDir, requireFromStandalone);
+if (pdfChildDependenciesFailure) fail(pdfChildDependenciesFailure);
+const pdfPageWorkerFailure = bundledPdfPageWorkerFailure(standaloneDir);
+if (pdfPageWorkerFailure) fail(pdfPageWorkerFailure);
+const pdfPageWorkerTraceFailure = bundledPdfPageWorkerTraceFailure(standaloneDir);
+if (pdfPageWorkerTraceFailure) fail(pdfPageWorkerTraceFailure);
+const pdfPageWorkerSmokeFailure = framedPdfPageWorkerSmokeFailure(
+  path.join(standaloneDir, 'scripts', ANYDOC_PDF_PAGE_WORKER_FILE),
+);
+if (pdfPageWorkerSmokeFailure) fail(pdfPageWorkerSmokeFailure);
 
 function assertRealpathInsideStandalone(candidatePath, label) {
   let resolvedPath;
