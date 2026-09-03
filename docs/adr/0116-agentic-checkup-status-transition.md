@@ -161,6 +161,36 @@ sessione, selezione o canale. Un ACK di preview non autorizza il commit e un
 riavvio non ricostruisce riferimenti o proposte. Questa estensione non aggiunge
 altre operazioni write e non amplia i quattro frame di bootstrap H1a.
 
+### Addendum: ruolo attivo checkup-specific
+
+La production binding introduce una nuova attestation host-owned esclusiva per
+`mediflow.patient.checkup.status.transition.v1`. Schema, store, enrollment e
+grant sono distinti sia da `physician_terminal_review` sia dall'attestation
+SOAP: nessuno dei due artefatti esistenti puo essere convertito o usato come
+fallback.
+
+L'attestation `mediflow.headless-checkup-active-role-attestation.v1` ha ruolo
+fisso `physician`, operation ID fisso, policy
+`physician_confirmed_single_use.v1`, versione uno, scadenza otto ore e
+revocation generation monotona. Il record e inactive-by-default, uno per actor,
+non viene eliminato e accetta soltanto attivazione esplicita o revoca terminale.
+L'enrollment locale richiede la sessione Web amministratore corrente e una
+verifica PIN fresca; non esiste auto-enroll durante selezione, preview o
+conferma.
+
+Il grant e process-local, opaco e non serializzabile. Viene emesso solo dopo
+una doppia lettura stabile di sessione e attestation, si lega all'esatto actor e
+sessione e viene registrato nel lifecycle della sessione. Logout, lock, expiry,
+revoca, drift di sessione/attestation, reselection, restart o disconnect lo
+terminalizzano. La route cattura grant e owner dentro una request autenticata;
+il listener IPC successivo usa soltanto quel binding gia catturato e non tenta
+di leggere cookie o contesto request-scoped.
+
+Enrollment e attivazione persistono un audit PHI-safe nella stessa transazione.
+La conferma continua a richiedere un secondo step-up fresco e il proof privato
+operation-specific gia definito sopra: l'attestation non e il proof, non
+seleziona una risorsa e non abilita MCP al commit.
+
 ### Concorrenza, idempotenza e commit
 
 L'host genera una chiave di idempotenza opaca e la lega al digest completo del

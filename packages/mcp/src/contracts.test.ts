@@ -2,11 +2,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
-  FOLLOW_UP_PROPOSAL_OPERATION_ID, OPEN_LOOPS_OPERATION_ID, OPERATION_DESCRIPTORS, SEMANTIC_QUERY_OPERATION_ID,
+  CHECKUP_STATUS_TRANSITION_OPERATION_ID, FOLLOW_UP_PROPOSAL_OPERATION_ID, OPEN_LOOPS_OPERATION_ID,
+  OPERATION_DESCRIPTORS, SEMANTIC_QUERY_OPERATION_ID,
   TERMINOLOGY_OPERATION_ID,
   capabilitiesOutputSchema, followUpProposalArgumentsSchema, followUpProposalOutputSchema,
   headlessStatusOutputSchema, openLoopsOutputSchema, publicCatalog, selectBoundOperations,
   semanticQueryArgumentsSchema, semanticQueryOutputSchema, terminologyArgumentsSchema, terminologyOutputSchema,
+  checkupStatusTransitionArgumentsSchema, checkupStatusTransitionOutputSchema,
 } from './contracts.ts';
 
 const terminology = (items: unknown[]) => ({
@@ -113,7 +115,7 @@ test('binds one closed-world proposal-only follow-up contract without publishing
 });
 
 test('binds one operation-specific read-only semantic query contract', () => {
-  assert.deepEqual(OPERATION_DESCRIPTORS[3], {
+  assert.deepEqual(OPERATION_DESCRIPTORS[4], {
     operationId: SEMANTIC_QUERY_OPERATION_ID, capabilityId: SEMANTIC_QUERY_OPERATION_ID,
     serviceRef: 'SemanticQueryOperationServiceV1', maximumStage: 'read_only',
     inputSchema: 'mediflow.semantic-query-operation.input.v1',
@@ -127,6 +129,27 @@ test('binds one operation-specific read-only semantic query contract', () => {
   assert.equal(semanticQueryArgumentsSchema.safeParse({ ...semanticArguments,
     steps: [{ stepRef: 'step_generic', operationId: 'generic.invoke', input: { sql: 'SELECT *' } },
       semanticArguments.steps[1]] }).success, false);
+});
+
+test('publishes a strict proposal-only checkup preview contract with opaque references', () => {
+  assert.deepEqual(OPERATION_DESCRIPTORS[3], {
+    operationId: CHECKUP_STATUS_TRANSITION_OPERATION_ID,
+    capabilityId: CHECKUP_STATUS_TRANSITION_OPERATION_ID,
+    serviceRef: 'HeadlessCheckupStatusTransitionServiceV1', maximumStage: 'proposal_only',
+    inputSchema: 'mediflow.patient.checkup.status.transition.input.v1',
+    outputSchema: 'mediflow.patient.checkup.status.transition.preview-result.v1',
+  });
+  const args = { checkupRef: `hcsr_${'1'.repeat(64)}`, targetStatus: 'completed', expectedRevision: 7 };
+  assert.equal(checkupStatusTransitionArgumentsSchema.safeParse(args).success, true);
+  for (const extra of [{ ...args, patientId: 'forbidden' }, { ...args, pin: '0000' },
+    { ...args, checkupRef: 'database-id' }]) {
+    assert.equal(checkupStatusTransitionArgumentsSchema.safeParse(extra).success, false);
+  }
+  const proposed = { schemaVersion: 'mediflow.patient.checkup.status.transition.preview-result.v1',
+    operationId: CHECKUP_STATUS_TRANSITION_OPERATION_ID, outcome: 'proposed',
+    proposalRef: `hcsp_${'2'.repeat(64)}`, expiresAt: 2_000 };
+  assert.equal(checkupStatusTransitionOutputSchema.safeParse(proposed).success, true);
+  assert.equal(checkupStatusTransitionOutputSchema.safeParse({ ...proposed, checkupId: 'forbidden' }).success, false);
 });
 
 test('validates semantic query output as closed-world orchestration with zero writes', () => {

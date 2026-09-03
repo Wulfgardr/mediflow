@@ -463,6 +463,25 @@ test('riserva il permit broker-wide e rivalida l execution opaca subito prima de
         (error: unknown) => error instanceof Error && 'code' in error && error.code === 'permit_revoked');
 });
 
+test('lega lo stage massimo al permit opaco prima di eseguire una proposta', async () => {
+    let ref = 0;
+    const broker = createAipOwnerBrokerV1({ now: () => 1_000,
+        nextRef: () => `reference.synthetic.stage-${String(ref += 1).padStart(4, '0')}`,
+        hashRef: () => DIGEST, writeAudit: async () => undefined });
+    const permit = async (maxStage: 'read_only' | 'proposal_only') => broker.authorize(
+        broker.issueLease(broker.issueOwner(Object.freeze({ ...BINDING, maxStage }))), CURRENT, CLAIM);
+
+    const proposal = await permit('proposal_only');
+    const execution = broker.beginPermitAtStage(proposal, CURRENT, CLAIM, 'proposal_only');
+    assert.equal(broker.finalizePermit(execution, CURRENT, CLAIM), true);
+
+    const readOnly = await permit('read_only');
+    assert.throws(() => broker.beginPermitAtStage(readOnly, CURRENT, CLAIM, 'proposal_only'),
+        (error: unknown) => error instanceof Error && 'code' in error && error.code === 'claim_mismatch');
+    assert.throws(() => broker.beginPermit(readOnly, CURRENT, CLAIM),
+        (error: unknown) => error instanceof Error && 'code' in error && error.code === 'permit_revoked');
+});
+
 test('lega scope e selection al permit e li rivalida nel broker prima del finalize', async () => {
     let ref = 0;
     const broker = createAipOwnerBrokerV1({ now: () => 1_000,

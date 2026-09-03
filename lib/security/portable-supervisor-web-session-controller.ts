@@ -15,6 +15,8 @@ import {
     PortableSupervisorWebIpcBridgeV1Error,
     revokePortableSupervisorWebIpcV1,
 } from './portable-supervisor-web-ipc-bridge.ts';
+import { createPortableSupervisorCheckupWebSessionPortV1 } from
+    './portable-supervisor-checkup-web-session-port.ts';
 
 const INPUT_KEYS = ['expectedPatientId', 'selectionEpoch'] as const;
 const HOST_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
@@ -43,6 +45,10 @@ type Sources = Readonly<{
     activateBridge(readCapture: () => unknown): Promise<Readonly<{ expiresAt: number }>>;
     revokeBridge(reason: PortableSupervisorWebCaptureTerminalReasonV1): Promise<boolean>;
     disconnectBridge(): unknown;
+    checkupLifecycle: Readonly<{
+        activate(owner: PortableSupervisorWebCaptureOwnerV1): boolean;
+        terminate(): boolean;
+    }>;
 }>;
 type Deferred = Readonly<{
     promise: Promise<boolean>;
@@ -143,6 +149,7 @@ export function createPortableSupervisorWebSessionControllerV1(sources: Sources)
     };
     const revokeRemote = (reason: PortableSupervisorWebCaptureTerminalReasonV1): Promise<boolean> => {
         if (revocationPromise) return revocationPromise;
+        sources.checkupLifecycle.terminate();
         phase = 'revoking';
         const pending = deferred();
         revocationPromise = pending.promise;
@@ -167,9 +174,11 @@ export function createPortableSupervisorWebSessionControllerV1(sources: Sources)
         return pending.promise;
     };
     const observeTerminal = (reason: PortableSupervisorWebCaptureTerminalReasonV1): void => {
+        sources.checkupLifecycle.terminate();
         if (!acquisitionCut) revokeRemote(reason);
     };
     const terminalNoOwner = (): void => {
+        sources.checkupLifecycle.terminate();
         phase = 'terminal'; disconnect();
         terminalWithoutRevocation ??= Promise.resolve(false);
     };
@@ -240,6 +249,7 @@ export function createPortableSupervisorWebSessionControllerV1(sources: Sources)
             const expiresAt = bridgeExpiry(activated, currentCapture.expiresAt);
             if (expiresAt === null) throw fail('host_unavailable');
             const result = record({ state: 'active' as const, expiresAt });
+            if (!sources.checkupLifecycle.activate(acquired)) throw fail('host_unavailable');
             phase = 'active';
             return result;
         } catch (error) {
@@ -277,12 +287,16 @@ export function createPortableSupervisorWebSessionControllerV1(sources: Sources)
     return record({ activateCurrentSelection, retire });
 }
 
+const productionCheckupPort = createPortableSupervisorCheckupWebSessionPortV1({ now: Date.now });
 const productionController = createPortableSupervisorWebSessionControllerV1({
     acquireCaptureOwner: acquirePortableSupervisorWebCaptureOwnerV1,
     activateBridge: activatePortableSupervisorWebIpcV1,
     revokeBridge: revokePortableSupervisorWebIpcV1,
     disconnectBridge: disconnectPortableSupervisorWebIpcV1,
+    checkupLifecycle: productionCheckupPort.controller,
 });
 
 export const activatePortableSupervisorWebSessionV1 = productionController.activateCurrentSelection;
 export const retirePortableSupervisorWebSessionV1 = productionController.retire;
+/** Private operation-specific dependent surface; it cannot activate or revoke H1a. */
+export const portableSupervisorCheckupWebSessionPortV1 = productionCheckupPort.port;
