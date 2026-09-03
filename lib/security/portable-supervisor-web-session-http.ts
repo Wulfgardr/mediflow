@@ -10,6 +10,7 @@ import {
     type PortableSupervisorWebSessionActivationInputV1,
     type PortableSupervisorWebSessionActivationV1,
 } from './portable-supervisor-web-session-controller.ts';
+import { isTrustedWebMutationRequest } from './request-transport.ts';
 
 const HOST_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
 const MESSAGE = 'Host intelligente non disponibile.';
@@ -84,6 +85,7 @@ export function createPortableSupervisorWebSessionActivationHttpHandlerV1(source
         try {
             if (await sources.readAuthenticated() !== true) return failure('session_unavailable', 401);
         } catch { return failure('session_unavailable', 401); }
+        if (!isTrustedWebMutationRequest(request)) return failure('request_transport_invalid', 403);
 
         let patientId: string | null = null;
         try { patientId = patient(await context.params); } catch { /* invalid route context */ }

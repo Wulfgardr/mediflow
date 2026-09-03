@@ -7,6 +7,7 @@ import {
     AuthenticatedWebSessionSelectionError,
     type AuthenticatedWebSessionSelectionOperation,
 } from './server-session-authenticated-selection';
+import { isTrustedWebMutationRequest } from './request-transport';
 import { ServerSessionProjectionOwnerError } from './server-session-projection-owner';
 
 type SelectionInput = Readonly<{ expectedEpoch: number; patientId: string; ambulatoryId: string }>;
@@ -52,6 +53,7 @@ export function createSmartImportSelectionHttpHandler(sources: Sources) {
         try { operation = await sources.acquireSelection(); } catch (error) {
             return typedFailure(error) ?? apiInternalError('POST Smart Import selection', error);
         }
+        if (!isTrustedWebMutationRequest(request)) return failure('request_transport_invalid', 403);
         let value: unknown;
         try { value = await request.json(); } catch { return failure('input_invalid', 400); }
         const parsed = input(value);

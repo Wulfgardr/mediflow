@@ -74,3 +74,27 @@ export function sessionCookieOptionsForRequest(request: Request): SessionCookieO
         path: '/',
     };
 }
+
+/* @Codex: Web-only mutations must prove exact same-origin browser transport.
+   Native/local API routes use their separate bearer and TLS boundaries. */
+export function isTrustedWebMutationRequest(request: Request, requireJsonBody = true): boolean {
+    try {
+        const site = request.headers.get('sec-fetch-site');
+        if (site?.trim().toLowerCase() !== 'same-origin') return false;
+        if (requireJsonBody
+            && request.headers.get('content-type')?.trim().toLowerCase() !== 'application/json') return false;
+
+        const requestUrl = new URL(request.url);
+        const host = request.headers.get('host')?.trim() || requestUrl.host;
+        if (!host || /[\s/@\\]/u.test(host)) return false;
+        const protocol = isHttpsRequest(request) ? 'https:' : requestUrl.protocol;
+        if (protocol !== 'http:' && protocol !== 'https:') return false;
+        const expected = new URL(`${protocol}//${host}`).origin;
+        const originValue = request.headers.get('origin');
+        if (!originValue) return false;
+        const origin = new URL(originValue);
+        return originValue === origin.origin && origin.origin === expected;
+    } catch {
+        return false;
+    }
+}

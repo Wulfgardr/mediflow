@@ -42,7 +42,10 @@ import {
 import { enrichBackupPatientsWithAmbulatoryLinks } from '@/lib/backup-patient-ambulatory-links';
 import { restoreBackupArtifact } from '@/lib/backup-restore-executor';
 import { runBackupRestorePreflight } from '@/lib/backup-restore-preflight';
-import { apiInternalError } from '@/lib/api-error-response';
+import { apiFailure, apiInternalError } from '@/lib/api-error-response';
+import { disposeCheckupStatusTransitionForHostV1 } from
+    '@/lib/security/headless-checkup-status-transition-web-production';
+import { isTrustedWebMutationRequest } from '@/lib/security/request-transport';
 
 /* @Codex */
 export const dynamic = 'force-dynamic';
@@ -172,6 +175,9 @@ export async function POST(request: Request) {
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
     if (!isWebAdminSession(session)) return forbiddenResponse();
+    if (!isTrustedWebMutationRequest(request)) {
+        return apiFailure('request_transport_invalid', 'Ripristino backup non disponibile.', 403);
+    }
 
     try {
         const body = await request.json();
@@ -183,7 +189,7 @@ export async function POST(request: Request) {
             );
         }
 
-        restoreBackupArtifact(artifact);
+        restoreBackupArtifact(artifact, disposeCheckupStatusTransitionForHostV1);
 
         return NextResponse.json({
             success: true,

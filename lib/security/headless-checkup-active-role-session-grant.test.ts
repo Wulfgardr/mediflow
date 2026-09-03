@@ -5,6 +5,8 @@ import { afterEach, test } from 'node:test';
 
 import { createHeadlessCheckupActiveRoleSessionGrantOwner,
   HeadlessCheckupActiveRoleSessionGrantError } from './headless-checkup-active-role-session-grant.ts';
+import { beginResourceUse, commitResourceUse, mintResourcePort } from
+  './web-auth-lifecycle-owner-adapter.ts';
 import { issueSyntheticWebSession, retireSyntheticWebSession } from
   './web-auth-lifecycle-owner-test-fixture.ts';
 
@@ -17,7 +19,8 @@ function record<T extends object>(value: T): Readonly<T> {
 }
 function fixture() {
   const state = { now: NOW, patientId: 'synthetic-patient-a', ambulatoryId: 'synthetic-ambulatory-a',
-    epoch: 4, terminal: 0, cancel: 0, expiryDispose: null as (() => void) | null, attestationReads: 0 };
+    epoch: 4, terminal: 0, cancel: 0, expiryDispose: null as (() => void) | null, attestationReads: 0,
+    onAttestationRead: null as (() => void) | null };
   const session = issueSyntheticWebSession({ id: ACTOR, username: 'synthetic-checkup-admin', role: 'admin' },
     `checkup-grant-${sequence += 1}`);
   sessions.push(session);
@@ -36,7 +39,11 @@ function fixture() {
   const context = record({ session, owner });
   const grantOwner = createHeadlessCheckupActiveRoleSessionGrantOwner({
     now: () => state.now,
-    readAttestation: () => { state.attestationReads++; return currentAttestation; },
+    readAttestation: () => {
+      state.attestationReads++;
+      state.onAttestationRead?.();
+      return currentAttestation;
+    },
     schedule: (_delay, dispose) => {
       state.expiryDispose = dispose; return () => { state.cancel++; state.expiryDispose = null; };
     },
@@ -74,6 +81,29 @@ test('issues an opaque checkup-only grant after stable session, attestation, and
     role: 'physician' });
   assert.ok(current.state.attestationReads >= 6);
   assert.equal(current.grantOwner.withCurrentRequest(grant, current.context, () => 'current'), 'current');
+});
+
+test('keeps projection and downstream checks outside the external P3 critical section', () => {
+  const current = fixture();
+  const witnessPort = mintResourcePort(current.session);
+  assert.ok(witnessPort);
+  const witness = () => {
+    const use = beginResourceUse(witnessPort);
+    assert.ok(use);
+    assert.equal(commitResourceUse(use), true);
+  };
+  const owner = Object.freeze({
+    withLeaseCriticalSection(candidate: unknown, operation: (selection: unknown) => unknown) {
+      assert.equal(candidate, current.session); witness();
+      return operation({ patientId: current.state.patientId, ambulatoryId: current.state.ambulatoryId });
+    },
+    snapshotSelectionEpoch(candidate: unknown) {
+      assert.equal(candidate, current.session); witness(); return current.state.epoch;
+    },
+  });
+  const context = record({ session: current.session, owner });
+  const grant = current.grantOwner.issue(context, () => { current.state.terminal++; });
+  assert.equal(current.grantOwner.withCurrent(grant, () => { witness(); return 'current'; }), 'current');
 });
 
 test('rejects inactive, revoked, expired, wrong-operation, or ineligible session authority', () => {
@@ -132,6 +162,39 @@ test('external P3 retirement and async callbacks fail closed', () => {
   assert.throws(() => current.grantOwner.withCurrent(grant, async () => 'forbidden'), hasCode('lifecycle_unavailable'));
   assert.equal(current.state.terminal, 0);
   assert.equal(current.grantOwner.withCurrent(grant, () => 'current'), 'current');
+});
+
+test('poisons an outer operation when currentness checks trigger reentry', () => {
+  const before = fixture();
+  const beforeGrant = before.grantOwner.issue(before.context, () => { before.state.terminal++; });
+  before.state.attestationReads = 0;
+  before.state.onAttestationRead = () => {
+    before.state.onAttestationRead = null;
+    assert.throws(() => before.grantOwner.withCurrent(beforeGrant, () => 'nested'),
+      hasCode('lifecycle_unavailable'));
+  };
+  let beforeCalls = 0;
+  assert.throws(() => before.grantOwner.withCurrent(beforeGrant, () => {
+    beforeCalls += 1; return 'outer';
+  }), hasCode('lifecycle_unavailable'));
+  assert.equal(beforeCalls, 0, 'reentry in the first stable read must stop the downstream callback');
+  assert.throws(() => before.grantOwner.withCurrent(beforeGrant, () => 'replay'), hasCode('grant_unavailable'));
+
+  const after = fixture();
+  const afterGrant = after.grantOwner.issue(after.context, () => { after.state.terminal++; });
+  after.state.attestationReads = 0;
+  after.state.onAttestationRead = () => {
+    if (after.state.attestationReads !== 3) return;
+    after.state.onAttestationRead = null;
+    assert.throws(() => after.grantOwner.withCurrent(afterGrant, () => 'nested'),
+      hasCode('lifecycle_unavailable'));
+  };
+  let afterCalls = 0;
+  assert.throws(() => after.grantOwner.withCurrent(afterGrant, () => {
+    afterCalls += 1; return 'outer';
+  }), hasCode('lifecycle_unavailable'));
+  assert.equal(afterCalls, 1, 'the completed callback result must not escape a poisoned final read');
+  assert.throws(() => after.grantOwner.withCurrent(afterGrant, () => 'replay'), hasCode('grant_unavailable'));
 });
 
 test('imports no request ambient, review authority, PIN, proof, writer, or IPC boundary', () => {

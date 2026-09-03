@@ -119,6 +119,7 @@ const TABLE_LOOKUP = {
 
 type InsertRunner = Pick<typeof dbServer, 'insert'>;
 type InsertableTable = (typeof TABLE_LOOKUP)[BackupCollectionName] | typeof patientsToAmbulatories;
+export type BackupRestoreMutationFence = () => boolean;
 
 /* @Codex v1 cannot restore command replay receipts without their append-only audit ledger. */
 function assertCommandRecoveryIsRepresentable(): void {
@@ -256,6 +257,20 @@ function preflightHeadlessSoapAuditCollisions(rows: Record<string, unknown>[]): 
     }
 }
 
+/* @Codex Restore must synchronously retire volatile authority before the first destructive write. */
+function runMutationFence(fence: BackupRestoreMutationFence): void {
+    if (typeof fence !== 'function') {
+        throw new Error('Restore blocked: runtime mutation fence unavailable.');
+    }
+    try {
+        if (typeof fence() !== 'boolean') {
+            throw new Error('invalid fence result');
+        }
+    } catch {
+        throw new Error('Restore blocked: runtime mutation fence unavailable.');
+    }
+}
+
 /* @Codex Entries already exist at this point; audits are inserted/reused field-exactly before the ledger. */
 function restoreHeadlessSoapEntryCommits(rows: Record<string, unknown>[]): void {
     for (const row of rows) {
@@ -287,12 +302,16 @@ function restoreHeadlessSoapEntryCommits(rows: Record<string, unknown>[]): void 
     insertRows(dbServer, headlessSoapEntryCommits, rows);
 }
 
-export function restoreBackupArtifact(artifact: BackupArtifact): void {
+export function restoreBackupArtifact(
+    artifact: BackupArtifact,
+    beforeMutation: BackupRestoreMutationFence,
+): void {
     revokeAttachmentExtractionLocatorGeneration();
     runDbServerImmediateTransaction(() => {
         assertCommandRecoveryIsRepresentable();
         const headlessSoapRows = artifact.payload.headlessSoapEntryCommits ?? [];
         preflightHeadlessSoapAuditCollisions(headlessSoapRows);
+        runMutationFence(beforeMutation);
         for (const collection of CLEAR_ORDER) {
             dbServer.delete(TABLE_LOOKUP[collection]).run();
         }

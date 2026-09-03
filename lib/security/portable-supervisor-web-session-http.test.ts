@@ -26,8 +26,14 @@ const CONTEXT: RouteContextFixture = Object.freeze({
 
 function request(body: unknown = { selectionEpoch: EPOCH }): Request {
     return new Request(`http://127.0.0.1/api/patients/${PATIENT}/intelligent-host/activate`, {
-        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
+        method: 'POST', headers: { 'content-type': 'application/json', origin: 'http://127.0.0.1',
+            'sec-fetch-site': 'same-origin' }, body: JSON.stringify(body),
     });
+}
+function requestValue(value: unknown): Request {
+    return { url: `http://127.0.0.1/api/patients/${PATIENT}/intelligent-host/activate`,
+        headers: new Headers({ 'content-type': 'application/json', origin: 'http://127.0.0.1',
+            'sec-fetch-site': 'same-origin' }), json: async () => value } as Request;
 }
 
 function subject(result: unknown = Object.freeze({ state: 'active', expiresAt: EXPIRES_AT }),
@@ -83,18 +89,36 @@ test('accepts only the exact selectionEpoch body and a canonical path id', async
     const accessor = {};
     Object.defineProperty(accessor, 'selectionEpoch', { enumerable: true, get() { return EPOCH; } });
     const prototype = Object.assign(Object.create({ inherited: true }), { selectionEpoch: EPOCH });
-    const malformed = new Request('http://127.0.0.1', { method: 'POST', body: '{' });
+    const malformed = new Request('http://127.0.0.1', { method: 'POST', headers: {
+        'content-type': 'application/json', origin: 'http://127.0.0.1', 'sec-fetch-site': 'same-origin',
+    }, body: '{' });
     const cases: Array<readonly [Request, RouteContextFixture]> = [
         [request({}), CONTEXT], [request({ selectionEpoch: EPOCH, extra: true }), CONTEXT],
         [request({ selectionEpoch: 0 }), CONTEXT], [request({ selectionEpoch: 1.5 }), CONTEXT],
-        [{ json: async () => accessor } as Request, CONTEXT],
-        [{ json: async () => prototype } as Request, CONTEXT],
+        [requestValue(accessor), CONTEXT],
+        [requestValue(prototype), CONTEXT],
         [malformed, CONTEXT],
         [request(), Object.freeze({ params: Promise.resolve({ id: '../patient' }) })],
     ];
     for (const [candidate, context] of cases) {
         await failure(await current.handler(candidate, context), 400, 'input_invalid');
     }
+    assert.equal(current.calls(), 0);
+});
+
+test('rejects cross-port and text/plain transport before activating the host', async () => {
+    const current = subject();
+    for (const headers of [
+        { origin: 'http://127.0.0.1:4000', 'sec-fetch-site': 'same-site', 'content-type': 'application/json' },
+        { origin: 'http://127.0.0.1', 'sec-fetch-site': 'same-origin', 'content-type': 'text/plain' },
+    ]) {
+        const denied = new Request(
+            `http://127.0.0.1/api/patients/${PATIENT}/intelligent-host/activate`,
+            { method: 'POST', headers, body: JSON.stringify({ selectionEpoch: EPOCH }) },
+        );
+        await failure(await current.handler(denied, CONTEXT), 403, 'request_transport_invalid');
+    }
+    assert.equal(current.authReads(), 2);
     assert.equal(current.calls(), 0);
 });
 

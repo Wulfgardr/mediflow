@@ -17,8 +17,14 @@ const REVOKED = Object.freeze(Object.assign(Object.create(null), {
 
 function request(candidatePin: unknown = '2468'): Request {
   return new Request('http://127.0.0.1/api/system/intelligent-host/checkup-active-role', {
-    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ candidatePin }),
+    method: 'POST', headers: { 'content-type': 'application/json', origin: 'http://127.0.0.1',
+      'sec-fetch-site': 'same-origin' }, body: JSON.stringify({ candidatePin }),
   });
+}
+function requestValue(value: unknown): Request {
+  return { url: 'http://127.0.0.1/api/system/intelligent-host/checkup-active-role',
+    headers: new Headers({ 'content-type': 'application/json', origin: 'http://127.0.0.1',
+      'sec-fetch-site': 'same-origin' }), json: async () => value } as Request;
 }
 function fixture(options: Readonly<{ authorized?: unknown; enroll?: unknown; revoke?: unknown;
   retire?: unknown }> = {}) {
@@ -67,12 +73,26 @@ test('rejects non-exact input, accessor output, and an unbounded cleanup result'
   Object.defineProperty(accessor, 'schemaVersion', { enumerable: true, get() { return ACTIVE.schemaVersion; } });
   for (const malformed of [
     { candidatePin: '2468', extra: true }, {}, Object.assign(Object.create({ inherited: true }), { candidatePin: '2468' }),
-  ]) await failure(await current.handlers.POST({ json: async () => malformed } as Request), 400, 'invalid_input');
+  ]) await failure(await current.handlers.POST(requestValue(malformed)), 400, 'invalid_input');
   const badOutput = fixture({ enroll: accessor });
   await failure(await badOutput.handlers.POST(request()), 503, 'storage_unavailable');
   const badCleanup = fixture({ retire: Promise.resolve(true) });
   await failure(await badCleanup.handlers.DELETE(request()), 503, 'storage_unavailable');
   assert.equal(badCleanup.counts().retireCalls, 1);
+});
+
+test('rejects cross-port and text/plain mutation transport before enrollment', async () => {
+  const current = fixture();
+  for (const headers of [
+    { origin: 'http://127.0.0.1:4000', 'sec-fetch-site': 'same-site', 'content-type': 'application/json' },
+    { origin: 'http://127.0.0.1', 'sec-fetch-site': 'same-origin', 'content-type': 'text/plain' },
+  ]) {
+    const denied = new Request('http://127.0.0.1/api/system/intelligent-host/checkup-active-role', {
+      method: 'POST', headers, body: JSON.stringify({ candidatePin: '2468' }),
+    });
+    await failure(await current.handlers.POST(denied), 403, 'request_transport_invalid');
+  }
+  assert.deepEqual(current.counts(), { authReads: 2, enrollCalls: 0, revokeCalls: 0, retireCalls: 0 });
 });
 
 test('maps controlled enrollment failures without echoing sensitive errors', async () => {

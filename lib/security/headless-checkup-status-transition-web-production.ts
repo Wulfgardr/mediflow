@@ -28,8 +28,8 @@ const UI_BINDING = /^hcub_[0-9a-f]{64}$/u;
 type Owner = ReturnType<typeof createHeadlessCheckupStatusTransitionWebOwnerV1>;
 type State = { active: boolean; actorRef: string; checkupId: string; patientId: string; ambulatoryId: string;
   selectionEpoch: number; generation: number; uiBindingRef: string; resourceTitle: string;
-  resourceRevision: number; grant: HeadlessCheckupActiveRoleSessionGrantV1;
-  supervisorBinding: PortableSupervisorCheckupWebSessionBindingV1; owner: Owner };
+  resourceRevision: number; grant: HeadlessCheckupActiveRoleSessionGrantV1 | null;
+  supervisorBinding: PortableSupervisorCheckupWebSessionBindingV1 | null; owner: Owner | null };
 
 let state: State | null = null;
 let channel: ReturnType<typeof createCheckupStatusTransitionWebParentChannelV1> | null = null;
@@ -62,11 +62,12 @@ function exactUiBinding(current: State, candidate: unknown): void {
     || candidate !== current.uiBindingRef) return fail('scope_changed');
 }
 function currentBinding(current: State, presented?: AuthenticatedWebSessionProjectionOwnerContext) {
-  if (!current.active || state !== current) return fail('session_unavailable');
+  const grant = current.grant, supervisorBinding = current.supervisorBinding;
+  if (!current.active || state !== current || !grant || !supervisorBinding) return fail('session_unavailable');
   const read = (role: HeadlessCheckupActiveRoleCurrentBindingV1) => {
     let matched = false;
     const available = portableSupervisorCheckupWebSessionPortV1.withCurrent(
-      current.supervisorBinding,
+      supervisorBinding,
       (capture) => {
         if (capture.patientId !== role.patientId || capture.ambulatoryId !== role.ambulatoryId
           || capture.selectionEpoch !== role.selectionEpoch || role.patientId !== current.patientId
@@ -81,8 +82,8 @@ function currentBinding(current: State, presented?: AuthenticatedWebSessionProje
   };
   try {
     return presented
-      ? headlessCheckupActiveRoleSessionGrant.withCurrentRequest(current.grant, presented, read)
-      : headlessCheckupActiveRoleSessionGrant.withCurrent(current.grant, read);
+      ? headlessCheckupActiveRoleSessionGrant.withCurrentRequest(grant, presented, read)
+      : headlessCheckupActiveRoleSessionGrant.withCurrent(grant, read);
   } catch (error) {
     if (error instanceof HeadlessCheckupStatusTransitionV1Error) throw error;
     return fail('session_unavailable');
@@ -120,9 +121,10 @@ function disposeState(current = state): void {
   if (!current?.active) return;
   current.active = false;
   if (state === current) state = null;
-  try { portableSupervisorCheckupWebSessionPortV1.detach(current.supervisorBinding); } catch { /* terminal */ }
-  try { headlessCheckupActiveRoleSessionGrant.dispose(current.grant); } catch { /* terminal */ }
-  try { current.owner.dispose(); } catch { /* terminal */ }
+  try { if (current.supervisorBinding) portableSupervisorCheckupWebSessionPortV1.detach(current.supervisorBinding); }
+  catch { /* terminal */ }
+  try { if (current.grant) headlessCheckupActiveRoleSessionGrant.dispose(current.grant); } catch { /* terminal */ }
+  try { current.owner?.dispose(); } catch { /* terminal */ }
 }
 function denial(frame: string, code: 'resource_unavailable' | 'session_unavailable'): string {
   const parsed = decodeCheckupStatusTransitionIpcFrameV1(frame);
@@ -132,7 +134,7 @@ function denial(frame: string, code: 'resource_unavailable' | 'session_unavailab
 }
 async function handleParentPreview(frame: string): Promise<string> {
   const current = state;
-  if (!current?.active) return denial(frame, 'resource_unavailable');
+  if (!current?.active || !current.owner) return denial(frame, 'resource_unavailable');
   if (scope(current).status !== 'available') { disposeState(current); return denial(frame, 'session_unavailable'); }
   return current.owner.parent.handlePreview(frame);
 }
@@ -173,30 +175,37 @@ export async function selectCheckupStatusTransitionForHostV1(input: Readonly<{
       selectionEpoch: context.owner.snapshotSelectionEpoch(context.session) }));
   } catch { return fail('session_unavailable'); }
   if (selected.patientId !== parsed.expectedPatientId) return fail('scope_changed');
-  disposeState();
-  nextGeneration += 1;
-  if (!Number.isSafeInteger(nextGeneration)) return fail('operation_unavailable');
-  const current = { active: true, actorRef: context.session.userId, checkupId: parsed.checkupId,
+  const candidateGeneration = nextGeneration + 1;
+  if (!Number.isSafeInteger(candidateGeneration)) return fail('operation_unavailable');
+  const current: State = { active: true, actorRef: context.session.userId, checkupId: parsed.checkupId,
     patientId: selected.patientId, ambulatoryId: selected.ambulatoryId, selectionEpoch: selected.selectionEpoch,
-    generation: nextGeneration, uiBindingRef: '', resourceTitle: '', resourceRevision: 0,
-    grant: null as unknown as HeadlessCheckupActiveRoleSessionGrantV1,
-    supervisorBinding: null as unknown as PortableSupervisorCheckupWebSessionBindingV1,
-    owner: null as unknown as Owner };
-  state = current;
+    generation: candidateGeneration, uiBindingRef: '', resourceTitle: '', resourceRevision: 0,
+    grant: null, supervisorBinding: null, owner: null };
   try {
     current.grant = headlessCheckupActiveRoleSessionGrant.issue(context, () => disposeState(current));
+    const role = headlessCheckupActiveRoleSessionGrant.withCurrentRequest(current.grant, context,
+      (binding) => binding);
+    if (role.patientId !== selected.patientId || role.ambulatoryId !== selected.ambulatoryId
+      || role.selectionEpoch !== selected.selectionEpoch) return fail('scope_changed');
+    if (!portableSupervisorCheckupWebSessionPortV1.matchesCurrentContext(context)) return fail('scope_changed');
+
+    /* @Codex: an unauthorized replacement must not destroy the current operation. */
+    disposeState();
     const supervisorBinding = portableSupervisorCheckupWebSessionPortV1.attach(() => disposeState(current));
     if (!supervisorBinding) return fail('operation_unavailable');
     current.supervisorBinding = supervisorBinding;
+    nextGeneration = candidateGeneration;
+    state = current;
     const binding = currentBinding(current, context);
     if (binding.patientId !== parsed.expectedPatientId) return fail('scope_changed');
   } catch (error) { disposeState(current); throw error; }
-  current.owner = createHeadlessCheckupStatusTransitionWebOwnerV1(record({ now: Date.now,
-    readHostScopeCandidate: () => scope(current), readCurrentUiContext: () => ui(current),
-    verifyFreshPin: verifyFreshReviewPin, writeDenialAudit: (value: unknown) => auditDenied(current, value) }));
   try {
-    const checkupRef = current.owner.hostUi.issueSelectedCheckupRef();
-    const projection = current.owner.hostUi.readSelectedCheckupUiProjection(checkupRef);
+    const owner = createHeadlessCheckupStatusTransitionWebOwnerV1(record({ now: Date.now,
+      readHostScopeCandidate: () => scope(current), readCurrentUiContext: () => ui(current),
+      verifyFreshPin: verifyFreshReviewPin, writeDenialAudit: (value: unknown) => auditDenied(current, value) }));
+    current.owner = owner;
+    const checkupRef = owner.hostUi.issueSelectedCheckupRef();
+    const projection = owner.hostUi.readSelectedCheckupUiProjection(checkupRef);
     current.uiBindingRef = `hcub_${randomBytes(32).toString('hex')}`;
     current.resourceTitle = projection.title; current.resourceRevision = projection.expectedRevision;
     ensureParentChannel();
@@ -212,7 +221,7 @@ export async function readCheckupStatusTransitionProposalV1(input: Readonly<{
   const parsed = exact(input, ['expectedPatientId', 'proposalRef', 'uiBindingRef']);
   if (!parsed || typeof parsed.expectedPatientId !== 'string'
     || !CHECKUP_ID.test(parsed.expectedPatientId)) return fail('invalid_input');
-  const current = state; if (!current) return fail('session_unavailable');
+  const current = state; if (!current?.owner) return fail('session_unavailable');
   exactUiBinding(current, parsed.uiBindingRef);
   const context = await acquireAuthenticatedWebSessionProjectionOwnerContext();
   if (!context || currentBinding(current, context).patientId !== parsed.expectedPatientId) return fail('scope_changed');
@@ -231,7 +240,7 @@ export async function confirmCheckupStatusTransitionProposalV1(input: Readonly<{
     'expectedRevision', 'candidatePin', 'uiBindingRef']);
   if (!parsed || typeof parsed.expectedPatientId !== 'string'
     || !CHECKUP_ID.test(parsed.expectedPatientId)) return fail('invalid_input');
-  const current = state; if (!current) return fail('session_unavailable');
+  const current = state; if (!current?.owner) return fail('session_unavailable');
   exactUiBinding(current, parsed.uiBindingRef);
   const context = await acquireAuthenticatedWebSessionProjectionOwnerContext();
   if (!context || currentBinding(current, context).patientId !== parsed.expectedPatientId) return fail('scope_changed');

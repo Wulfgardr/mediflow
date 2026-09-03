@@ -128,7 +128,13 @@ after(() => rmSync(dataDir, { recursive: true, force: true }));
 test('publishes only the canonical current Web capture required by the inherited IPC contract', async () => {
     const current = fixture();
     const owner = await current.acquire(); assert.ok(owner);
-    assert.deepEqual(Reflect.ownKeys(owner), ['readCapture', 'revoke', 'dispose']);
+    assert.deepEqual(Reflect.ownKeys(owner), ['readCapture', 'matchesCurrentContext', 'revoke', 'dispose']);
+    assert.equal(owner.matchesCurrentContext(Object.freeze(Object.assign(Object.create(null), {
+        session: current.session, owner: current.owner,
+    }))), true);
+    assert.equal(owner.matchesCurrentContext(Object.freeze(Object.assign(Object.create(null), {
+        session: Object.freeze({ ...current.session }), owner: current.owner,
+    }))), false);
     const capture = owner.readCapture();
     assert.equal(Object.getPrototypeOf(capture), null);
     assert.equal(Object.isFrozen(capture), true);

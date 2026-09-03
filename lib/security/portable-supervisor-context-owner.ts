@@ -47,6 +47,7 @@ type Sources = Readonly<{
 type RecordState = {
     active: boolean; published: boolean; scope: ServerSessionSelectionScopeV1;
     registration: ServerSessionSelectionDependentRegistrationV1;
+    context: AuthenticatedWebSessionProjectionOwnerContext;
     binding: ServerSessionSelectionBindingSnapshotV1;
     expected: Readonly<Record<string, unknown>>;
     capture: PortableSupervisorWebCaptureV1;
@@ -56,6 +57,7 @@ type RecordState = {
 
 export type PortableSupervisorWebCaptureOwnerV1 = Readonly<{
     readCapture(): PortableSupervisorWebCaptureV1;
+    matchesCurrentContext(value: unknown): boolean;
     revoke(reason: PortableSupervisorWebCaptureRevokeReasonV1): boolean;
     dispose(): boolean;
 }>;
@@ -227,7 +229,8 @@ export function createPortableSupervisorWebCaptureOwnerProcessV1(sources: Source
                 patientId: clinical.patientId, ambulatoryId: clinical.ambulatoryId,
                 selectionEpoch: selected.selection.selectionEpoch,
                 expectedPatientVersion: selected.patientVersion, expiresAt });
-            state = { active: true, published: false, scope, registration, binding: selected,
+            state = { active: true, published: false, scope, registration, context: authenticatedContext,
+                binding: selected,
                 expected, capture, observeTerminal, cancel: null };
             let scheduling = true, firedSynchronously = false, cancel: unknown;
             try {
@@ -251,6 +254,14 @@ export function createPortableSupervisorWebCaptureOwnerProcessV1(sources: Source
             ownerSlot = state; spent = true; state.published = true;
             const published = state;
             return record({ readCapture: () => read(published),
+                /* @Codex: bind a dependent operation to the exact H1a session and
+                   projection owner without exporting either identity. */
+                matchesCurrentContext: (value: unknown) => {
+                    if (!published.active || !value || typeof value !== 'object' || types.isProxy(value)) return false;
+                    const candidate = value as Partial<AuthenticatedWebSessionProjectionOwnerContext>;
+                    if (candidate.session !== published.context.session || candidate.owner !== published.context.owner) return false;
+                    try { return read(published) === published.capture && published.active; } catch { return false; }
+                },
                 revoke: (reason: PortableSupervisorWebCaptureRevokeReasonV1) =>
                     REVOKE_REASONS.has(reason) && terminal(published, false, reason),
                 dispose: () => terminal(published, false, 'web_disconnect') });

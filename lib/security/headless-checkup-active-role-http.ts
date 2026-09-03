@@ -6,6 +6,7 @@ import { NextResponse } from 'next/server.js';
 
 import { apiFailure } from '../api-error-response';
 import { HeadlessCheckupActiveRoleEnrollmentError } from './headless-checkup-active-role-enrollment';
+import { isTrustedWebMutationRequest } from './request-transport';
 
 const MESSAGE = 'Ruolo checkup non disponibile.';
 type Sources = Readonly<{ readAuthorizedAdmin(): Promise<unknown>; enroll(pin: unknown): Promise<unknown>;
@@ -64,6 +65,7 @@ export function createHeadlessCheckupActiveRoleHttpHandlersV1(sources: Sources) 
   return Object.freeze({
     POST: async (request: Request): Promise<NextResponse> => {
       if (!await authorized()) return failure('session_unavailable', 401);
+      if (!isTrustedWebMutationRequest(request)) return failure('request_transport_invalid', 403);
       const candidatePin = await body(request); if (candidatePin === null) return failure('invalid_input', 400);
       try { const result = projection(await sources.enroll(candidatePin));
         return result ? success(result, 201) : failure('storage_unavailable', 503); }
@@ -71,6 +73,7 @@ export function createHeadlessCheckupActiveRoleHttpHandlersV1(sources: Sources) 
     },
     DELETE: async (request: Request): Promise<NextResponse> => {
       if (!await authorized()) return failure('session_unavailable', 401);
+      if (!isTrustedWebMutationRequest(request)) return failure('request_transport_invalid', 403);
       const candidatePin = await body(request); if (candidatePin === null) return failure('invalid_input', 400);
       try {
         const result = projection(await sources.revoke(candidatePin), true);

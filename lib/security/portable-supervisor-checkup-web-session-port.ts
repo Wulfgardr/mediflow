@@ -66,7 +66,7 @@ export function createPortableSupervisorCheckupWebSessionPortV1(sources: Readonl
   const controller = Object.freeze({
     activate(value: PortableSupervisorWebCaptureOwnerV1): boolean {
       if (phase !== 'idle' || !value || typeof value !== 'object' || types.isProxy(value)
-        || typeof value.readCapture !== 'function') return false;
+        || typeof value.readCapture !== 'function' || typeof value.matchesCurrentContext !== 'function') return false;
       const now = observedNow(sources.now);
       if (now === null) { terminal(); return false; }
       let current: unknown;
@@ -77,6 +77,10 @@ export function createPortableSupervisorCheckupWebSessionPortV1(sources: Readonl
     terminate: terminal,
   });
   const port = Object.freeze({
+    matchesCurrentContext(value: unknown): boolean {
+      if (operationActive || phase !== 'active' || !owner) return false;
+      try { return owner.matchesCurrentContext(value) === true; } catch { return false; }
+    },
     attach(disposeValue: () => void): PortableSupervisorCheckupWebSessionBindingV1 | null {
       if (phase !== 'active' || attached || !callback(disposeValue)) return null;
       const binding = Object.freeze(Object.create(null)) as PortableSupervisorCheckupWebSessionBindingV1;
