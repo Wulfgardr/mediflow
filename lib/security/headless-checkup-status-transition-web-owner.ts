@@ -19,6 +19,7 @@ const GESTURE = ['proposalRef', 'targetStatus', 'expectedRevision'] as const;
 const CONFIRM = ['schemaVersion', 'operationId', 'proposalRef', 'targetStatus', 'expectedRevision',
   'candidatePin', 'gesture'] as const;
 const PROPOSAL_REF = /^hcsp_[0-9a-f]{64}$/u;
+export const HEADLESS_CHECKUP_STATUS_REQUEST_LEDGER_LIMIT_V1 = 32;
 const DENIALS = new Set(['invalid_input', 'operation_unavailable', 'resource_unavailable', 'scope_changed',
   'session_unavailable', 'role_unavailable', 'preview_expired', 'confirmation_required', 'proof_unavailable',
   'proof_replayed', 'revision_conflict', 'transition_unavailable', 'idempotency_conflict', 'audit_unavailable',
@@ -79,7 +80,7 @@ export function createHeadlessCheckupStatusTransitionWebOwnerV1(sourcesValue: un
     readHostScopeCandidate: readScopeSource }));
   const proposals = new Map<string, Proposal>(), requests = new Set<string>();
   const gestures = new WeakMap<object, Gesture>();
-  let generation = 0, disposed = false;
+  let generation = 0, disposed = false, ledgerExhausted = false;
 
   const scope = (): Canonical => {
     let value: unknown;
@@ -123,6 +124,11 @@ export function createHeadlessCheckupStatusTransitionWebOwnerV1(sourcesValue: un
     catch (error) { return deny(error); }
     if (frame.type !== 'preview') return deny(new Error('wrong frame'));
     const requestRef = frame.requestRef as string;
+    if (ledgerExhausted || requests.size >= HEADLESS_CHECKUP_STATUS_REQUEST_LEDGER_LIMIT_V1) {
+      const code = 'operation_unavailable'; await auditDenied(code); revoke(); ledgerExhausted = true;
+      return encodeCheckupStatusTransitionIpcFrameV1({ schemaVersion: CHECKUP_STATUS_TRANSITION_IPC_SCHEMA_V1,
+        type: 'preview_result', requestRef, operationId: OPERATION, outcome: 'denied', denialCode: code });
+    }
     if (requests.has(requestRef)) {
       const code = 'proof_replayed'; await auditDenied(code); revoke();
       return encodeCheckupStatusTransitionIpcFrameV1({ schemaVersion: CHECKUP_STATUS_TRANSITION_IPC_SCHEMA_V1,
@@ -167,6 +173,24 @@ export function createHeadlessCheckupStatusTransitionWebOwnerV1(sourcesValue: un
     return record({ schemaVersion: 'mediflow.patient.checkup.status.transition.proposal-view.v1', proposalRef,
       targetStatus: proposal.input.targetStatus, expectedRevision: proposal.input.expectedRevision,
       expiresAt: proposal.expiresAt });
+  };
+  const readCommittedReceipt = (value: unknown): HeadlessCheckupStatusReceiptV1 | null => {
+    if (disposed) return fail('operation_unavailable');
+    const binding = exact(value, GESTURE);
+    if (!binding || typeof binding.proposalRef !== 'string' || !PROPOSAL_REF.test(binding.proposalRef)
+      || (binding.targetStatus !== 'completed' && binding.targetStatus !== 'cancelled')
+      || !integer(binding.expectedRevision, 1)) return fail('invalid_input');
+    const proposal = proposals.get(binding.proposalRef);
+    if (!proposal) return fail('proof_replayed');
+    const same = proposal.input.targetStatus === binding.targetStatus
+      && proposal.input.expectedRevision === binding.expectedRevision;
+    if (proposal.state === 'committed') {
+      if (!same) return fail('idempotency_conflict');
+      return proposal.receipt ?? fail('operation_unavailable');
+    }
+    if (proposal.state !== 'current') return fail('proof_replayed');
+    if (!same) return fail('proof_replayed');
+    return null;
   };
   const confirm = async (value: unknown): Promise<HeadlessCheckupStatusReceiptV1> => {
     const input = exact(value, CONFIRM);
@@ -218,5 +242,6 @@ export function createHeadlessCheckupStatusTransitionWebOwnerV1(sourcesValue: un
   };
   return record({ parent: record({ handlePreview }), hostUi: record({
     issueSelectedCheckupRef: candidate.candidateController.issueSelectedCheckupRef,
-    readCurrentProposal, issueExactGesture, confirm }), revoke, dispose });
+    readSelectedCheckupUiProjection: candidate.candidateController.readSelectedCheckupUiProjection,
+    readCurrentProposal, readCommittedReceipt, issueExactGesture, confirm }), revoke, dispose });
 }
