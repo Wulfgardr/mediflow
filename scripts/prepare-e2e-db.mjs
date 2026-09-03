@@ -133,6 +133,7 @@ async function main() {
   const username = process.env.E2E_USERNAME || 'admin';
   const displayName = process.env.E2E_DISPLAY_NAME || 'Dr. E2E Smoke';
   const ambulatoryName = process.env.E2E_AMBULATORY_NAME || 'Ambulatorio E2E';
+  const allowLegacyCopy = process.env.MEDIFLOW_E2E_DISABLE_LEGACY_COPY !== '1';
 
   if (!dataDir) {
     throw new Error('MEDIFLOW_DATA_DIR or MEDIFLOW_E2E_DATA_DIR is required');
@@ -141,7 +142,7 @@ async function main() {
   fs.mkdirSync(dataDir, { recursive: true });
   const dbPath = path.join(dataDir, 'medical.db');
   const legacyDbPath = path.join(projectRoot, 'medical.db');
-  ensureE2EDatabase(projectRoot, dbPath, legacyDbPath);
+  ensureE2EDatabase(projectRoot, dbPath, legacyDbPath, allowLegacyCopy);
 
   let db = new Database(dbPath);
   try {
