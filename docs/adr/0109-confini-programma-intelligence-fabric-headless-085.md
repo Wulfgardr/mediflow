@@ -78,6 +78,13 @@ artifact storici, con il suo stato `candidate_not_integrated` e il digest
 registrato. Non lo riscrive come prova dell'integrazione corrente. La nuova
 evidenza runtime resta distinta dalle receipt storiche.
 
+Addendum 2026-09-04: la rappresentazione pubblica della receipt sostituisce
+esclusivamente il locator host-specifico con il riferimento logico `external:`.
+Il digest passa da `f537bccc66f499329c3a4b8fdd884a9ff21633aa59767e064933e96bd4829dc4`
+a `92586d894827a8e920995fa7cf0e1ce771b636bce3ed77f564015e61606832fa`.
+Stato, apply policy, digest della decisione e claim ceiling restano invariati;
+i byte sanificati sono la rappresentazione pubblica immutabile da questo punto.
+
 ### Foundation Headless e sola eccezione SOAP
 
 La foundation Headless generale conserva zero operazioni eseguibili. Il piano
