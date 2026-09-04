@@ -165,11 +165,12 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                                     <label className="mf-field-label">Username</label>
                                     <div className="relative">
                                         <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--lume-ink-muted)' }} />
+                                        {/* @Codex: keep the shipped example synthetic and person-neutral. */}
                                         <input
                                             type="text"
                                             value={formData.username}
                                             onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                                            placeholder="es. leonardo.pegollo"
+                                            placeholder="es. operatore.demo"
                                             className="mf-input pl-10"
                                             autoFocus
                                         />

@@ -39,7 +39,7 @@ test.beforeEach(() => {
     warnings: [],
     evidence: {
       benchmarkFresh: true,
-      owner: 'leonardo',
+      owner: 'operatore-e2e',
       reportGeneratedAt: '2026-04-03T09:05:00.000Z',
     },
   }, '# Generative Challenger\n\nStatus: `hold`');

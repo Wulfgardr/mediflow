@@ -172,7 +172,7 @@ async function bootstrapFabricSession(page: Page, pin: string): Promise<void> {
     await expect(page.getByRole('heading', { name: 'Ruolo' })).toBeVisible();
     await page.getByRole('button', { name: 'Avanti' }).click();
     await expect(page.getByRole('heading', { name: 'Credenziali di Accesso' })).toBeVisible();
-    await page.getByPlaceholder('es. leonardo.pegollo').fill('admin');
+    await page.getByPlaceholder('es. operatore.demo').fill('admin');
     await page.getByPlaceholder('Password sicura').fill('password');
     await page.getByRole('button', { name: 'Avanti' }).click();
   }
