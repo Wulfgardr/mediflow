@@ -39,7 +39,7 @@ test.beforeEach(() => {
     warnings: [{ id: 'shadow-window', message: 'Shadow window active for review.' }],
     evidence: {
       benchmarkFresh: true,
-      owner: 'leonardo',
+      owner: 'operatore-e2e',
       reportGeneratedAt: '2026-04-03T09:00:00.000Z',
     },
   }, '# Patient Insight\n\nStatus: `shadow-ready`');
@@ -52,7 +52,7 @@ test.beforeEach(() => {
     warnings: [],
     evidence: {
       benchmarkFresh: true,
-      owner: 'leonardo',
+      owner: 'operatore-e2e',
       reportGeneratedAt: '2026-04-03T09:05:00.000Z',
     },
   }, '# Generative Challenger\n\nStatus: `hold`');
@@ -112,6 +112,7 @@ test('settings shows rollout readiness lanes, missing artifacts and markdown pre
   await expect(missingRedactionLane).toContainText('Redaction');
   // WUL-297: the missing-artifact copy is now "Report locale mancante".
   await expect(page.getByTestId('ai-rollout-missing-redaction')).toContainText('Report locale mancante');
+  await expect(page.getByTestId('ai-rollout-missing-redaction')).toContainText('--owner operatore-demo');
 
   const patientInsightLane = page.getByTestId('ai-rollout-lane-patient_insight');
   await expect(patientInsightLane).toContainText('qwen3.5:35b-a3b');
