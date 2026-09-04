@@ -8,13 +8,16 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
-const EXPECTED_NODE = '24.19.0';
+const EXPECTED_NODE = process.versions.node;
+const EXPECTED_NODE_MAJOR = 24;
+const EXPECTED_NODE_ABI = '137';
 const EXPECTED_NEXT = '16.3.4';
 const SESSION_ID = 'a'.repeat(64);
 const CONTROL_ID = 'c'.repeat(64);
 
 type ProducerEvidence = {
     node: string;
+    abi: string;
     next: string;
     promise: { native: boolean; proxy: boolean; sameRealm: boolean };
     cookies: Array<{
@@ -61,6 +64,7 @@ export async function GET() {
     const store = await cookiePromise;
     return Response.json({
         node: process.versions.node,
+        abi: process.versions.modules,
         next: nextPackage.version,
         promise,
         cookies: [store.get('mediflow_session'), store.get('mediflow_auth_control')].map(describeCookie),
@@ -101,8 +105,9 @@ function expectedCookie(name: string, value: string) {
     };
 }
 
-test('pins the real Next App Route cookies producer used by H1a and H1b', { timeout: 120_000 }, async () => {
-    assert.equal(process.versions.node, EXPECTED_NODE);
+test(`pins the real Next App Route cookies producer on Node ${EXPECTED_NODE}`, { timeout: 120_000 }, async () => {
+    assert.equal(Number.parseInt(EXPECTED_NODE, 10), EXPECTED_NODE_MAJOR);
+    assert.equal(process.versions.modules, EXPECTED_NODE_ABI);
     const installedNext = JSON.parse(readFileSync(path.join(ROOT, 'node_modules/next/package.json'), 'utf8')) as {
         version: string;
     };
@@ -142,6 +147,7 @@ test('pins the real Next App Route cookies producer used by H1a and H1b', { time
         const evidence = JSON.parse(body) as ProducerEvidence;
         assert.deepEqual(evidence, {
             node: EXPECTED_NODE,
+            abi: EXPECTED_NODE_ABI,
             next: EXPECTED_NEXT,
             promise: { native: true, proxy: false, sameRealm: true },
             cookies: [

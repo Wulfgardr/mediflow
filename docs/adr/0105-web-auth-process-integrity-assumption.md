@@ -137,9 +137,9 @@ Prima della release, la review di sicurezza sull'exact release candidate deve:
 2. ripetere poison pre-entry e durante ogni callout sincrono;
 3. verificare che il poison persistente durante la Promise cookie produca al
    massimo denial/disponibilita e mai pubblicazione di sessione o owner;
-4. provare su Node.js 24.19.0 e Next.js 16.3.4 che il producer canonico
-   `cookies()` consegni una Promise nativa dello stesso realm, non un `Proxy` o
-   un thenable arbitrario;
+4. provare sul runtime Node.js 24 / ABI 137 risolto per il candidato exact-SHA
+   e su Next.js 16.3.4 che il producer canonico `cookies()` consegni una Promise
+   nativa dello stesso realm, non un `Proxy` o un thenable arbitrario;
 5. verificare che ogni rejection ordinaria, accettata o del producer canonico
    sia gestita e non lasci lavoro differito o authority recuperabile;
 6. verificare il falsificatore sintetico del target nascosto con ownership
@@ -191,6 +191,20 @@ plugin in-process non fidati, disponibilita sotto poison persistente e
 concorrente, catena auth completa o sicurezza generale. Non rende valida per
 analogia una futura versione di Node o Next: il gate va ripetuto sull'exact
 release candidate e ogni drift riporta la promozione in `HOLD_SECURITY`.
+
+## Addendum 2026-09-04: patch Node risolta e riprovata dal gate
+
+Il requisito di prodotto resta Node.js 24 con ABI moduli `137`; Next.js resta
+fissato a `16.3.4`. La prova `24.19.0` sopra rimane evidenza storica, ma la patch
+Node non e piu un letterale nel sorgente del test. Il workflow `node-version: 24`
+puo ricevere una patch compatibile successiva e deve rieseguire l'intero probe,
+non accettarla per analogia.
+
+Il test ora registra la patch exact nel proprio nome, richiede major 24 e ABI
+137 nel processo del gate e verifica che la vera App Route riporti la stessa
+versione exact e lo stesso ABI. Un cambio di major, ABI, versione Next o
+semantica di Promise/cookie resta fail-closed e riporta la promozione in
+`HOLD_SECURITY`.
 
 ## Claim ceiling e stop rule
 

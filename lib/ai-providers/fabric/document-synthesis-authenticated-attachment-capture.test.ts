@@ -1,7 +1,7 @@
 /* @Codex */
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -10,15 +10,32 @@ const ROOT = path.resolve(__dirname, '../../..');
 const TARGET = path.join(ROOT, 'lib/ai-providers/fabric/document-synthesis-authenticated-attachment-capture.ts');
 const RUNNER = path.join(ROOT, 'scripts/register-strip-types-loader.mjs');
 
-function isNode2419(candidate: string | undefined): candidate is string {
-    return typeof candidate === 'string' && candidate.length > 0
-        && spawnSync(candidate, ['--version'], { encoding: 'utf8' }).stdout.trim() === 'v24.19.0';
+function isNode24Abi137(candidate: string | undefined): candidate is string {
+    if (typeof candidate !== 'string' || candidate.length === 0) return false;
+    const probe = spawnSync(
+        candidate,
+        ['--print', "`${process.versions.node}|${process.versions.modules}`"],
+        { encoding: 'utf8' },
+    );
+    return probe.status === 0 && /^24\.\d+\.\d+\|137\s*$/u.test(probe.stdout ?? '');
 }
 
-const NODE_24 = [process.env.MEDIFLOW_STRIP_TYPES_NODE, process.execPath, path.join(os.homedir(), '.nvm/versions/node/v24.19.0/bin/node')]
-    .find(isNode2419);
+function nvmNode24Candidates(): string[] {
+    const versions = path.join(os.homedir(), '.nvm/versions/node');
+    try {
+        return readdirSync(versions)
+            .filter((name) => /^v24\.\d+\.\d+$/u.test(name))
+            .sort((left, right) => right.localeCompare(left, undefined, { numeric: true }))
+            .map((name) => path.join(versions, name, 'bin/node'));
+    } catch {
+        return [];
+    }
+}
 
-if (!NODE_24) throw new Error('Document Synthesis attachment capture tests require Node 24.19.0.');
+const NODE_24 = [process.env.MEDIFLOW_STRIP_TYPES_NODE, process.execPath, ...nvmNode24Candidates()]
+    .find(isNode24Abi137);
+
+if (!NODE_24) throw new Error('Document Synthesis attachment capture tests require Node 24 with ABI 137.');
 
 test('exports only the fixed capture boundary and no production composition', () => {
     const source = readFileSync(TARGET, 'utf8');
