@@ -66,8 +66,10 @@ La base corrente va letta cosi:
 
 1. **Xcode corrente compatibile con Swift 5.9**; per i gate locali viene usato
    Xcode beta quando indicato dai runbook.
-2. **Node.js 24 consigliato**. Il runner TypeScript richiede almeno Node 22.6.
-3. **Mkcert** (per HTTPS locale).
+2. **Node.js 24 richiesto** per il bundle runnable/WebRuntime e per i launcher.
+   Il launcher rifiuta runtime o binding `better-sqlite3` non conformi prima
+   di avviare il setup.
+3. **OpenSSL** (per HTTPS locale).
 
 ### Quick start
 
@@ -241,11 +243,11 @@ sessione Mac era bloccata, quindi focus, resize e narrazione restano `PARTIAL`.
 ### 4. Temperamento mobile candidato e stato paired
 
 `WUL-556` usa **Guardia** come temperamento esplorativo su iPhone/iPadOS e
-**Carta** come substrato delle superfici cliniche. La scelta resta
-`PROPOSED_FOR_OWNER_REVIEW`: un rifiuto o un cambio del product owner blocca
-la promozione della candidata. Il client non forza il tema scuro; usa il canvas
-Guardia solo quando l'aspetto di sistema è scuro e mantiene componenti,
-materiali e navigazione di sistema.
+**Carta** come substrato delle superfici cliniche. La decisione owner è
+acquisita per la candidata: Carta descrive la grammatica del contenuto, non una
+palette. Non resta quindi una decisione di contratto aperta. Il client non forza
+il tema scuro; usa il canvas Guardia solo quando l'aspetto di sistema è scuro e
+mantiene componenti, materiali e navigazione di sistema.
 
 La decisione owner per questa slice è vincolante: **Carta descrive la grammatica
 del contenuto, non una palette**. Le superfici mobili non introducono crema,

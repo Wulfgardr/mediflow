@@ -56,7 +56,7 @@ public struct HomeBaseRuntimeSnapshot: Equatable, Sendable {
 
     public var summary: String {
         if statusFilePresent {
-            return "Bootstrap locale registrato. La app osserva lo stato runtime, ma non supervisiona ancora i processi."
+            return "Bootstrap locale registrato. Il bundle packaged può gestire WebRuntime e proxy TLS; i provider AI opzionali restano diagnostici."
         }
         return "Nessun bootstrap runtime registrato. Avvia il launcher corrente o riesegui il setup nativo."
     }

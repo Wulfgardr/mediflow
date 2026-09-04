@@ -63,6 +63,10 @@ final class HomeBaseRuntimeStatusTests: XCTestCase {
         XCTAssertTrue(snapshot.tokenPresent)
         XCTAssertTrue(snapshot.statusFilePresent)
         XCTAssertEqual(snapshot.tlsPinMatches, true)
+        XCTAssertEqual(
+            snapshot.summary,
+            "Bootstrap locale registrato. Il bundle packaged può gestire WebRuntime e proxy TLS; i provider AI opzionali restano diagnostici."
+        )
         XCTAssertTrue(snapshot.components.contains { $0.id == "local-token" && $0.state == .ready })
     }
 
