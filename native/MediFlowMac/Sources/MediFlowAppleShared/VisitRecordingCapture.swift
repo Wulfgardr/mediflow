@@ -420,6 +420,8 @@ public final class VisitRecordingCaptureController {
     private var closed = false
     private var captureStopped = false
     private var captureGenerationState = VisitRecordingCaptureGenerationState.idle
+    private var terminalCleanupInProgress = false
+    private var terminalCleanupWaiters: [CheckedContinuation<Void, Never>] = []
     private var retainedPreflight: VisitRecordingPreflight?
 
     init(
@@ -498,8 +500,7 @@ public final class VisitRecordingCaptureController {
     public func start() async {
         guard session.phase == .ready, !closed else { return }
         guard isCurrentSelection else {
-            finishDenied(.staleBinding)
-            await releaseReservationIfNeeded()
+            await finishDenied(.staleBinding)
             return
         }
         guard let generation = claimCaptureGeneration() else { return }
@@ -609,8 +610,12 @@ public final class VisitRecordingCaptureController {
     }
 
     public func stop() async {
+        if closed {
+            await waitForTerminalCleanupIfNeeded()
+            return
+        }
         guard case .active = captureGenerationState,
-              session.phase == .recording, !closed, let queue else { return }
+              session.phase == .recording, let queue else { return }
         guard isCurrentSelection else { await fail(.staleBinding); return }
         do { try session.apply(.stop) }
         catch { await fail(.failed); return }
@@ -625,7 +630,10 @@ public final class VisitRecordingCaptureController {
         durationTask?.cancel()
         queue.finish()
         await consumerTask?.value
-        guard !closed else { return }
+        guard !closed else {
+            await waitForTerminalCleanupIfNeeded()
+            return
+        }
         if consumerFailed { await fail(.failed); return }
         if let denial = failureLatch?.value { await fail(denial); return }
         guard session.phase == .finalizing, isCurrentSelection else {
@@ -645,7 +653,10 @@ public final class VisitRecordingCaptureController {
             await fail(.failed)
             return
         }
-        guard !closed else { return }
+        guard !closed else {
+            await waitForTerminalCleanupIfNeeded()
+            return
+        }
         if let denial = failureLatch?.value { await fail(denial); return }
         guard !transcriptOverflowed else { await fail(.transcriptExceeded); return }
         guard !finalTranscript.isEmpty else { await fail(.failed); return }
@@ -688,6 +699,7 @@ public final class VisitRecordingCaptureController {
 
     public func cancel() async {
         if closed {
+            await waitForTerminalCleanupIfNeeded()
             switch session.phase {
             case .transcriptReview, .draftReview:
                 session.cleanup(as: .cancelled)
@@ -761,8 +773,12 @@ public final class VisitRecordingCaptureController {
     }
 
     private func fail(_ denial: VisitRecordingDenial) async {
-        guard !closed else { return }
+        guard !closed else {
+            await waitForTerminalCleanupIfNeeded()
+            return
+        }
         failureLatch?.record(denial)
+        terminalCleanupInProgress = true
         closed = true
         retireCaptureGeneration()
         durationTask?.cancel()
@@ -781,9 +797,12 @@ public final class VisitRecordingCaptureController {
         currentnessTask = nil
         finalizationDeadlineTask = nil
         await releaseReservationIfNeeded()
+        terminalCleanupInProgress = false
+        resumeTerminalCleanupWaiters()
     }
 
-    private func finishDenied(_ denial: VisitRecordingDenial) {
+    private func finishDenied(_ denial: VisitRecordingDenial) async {
+        terminalCleanupInProgress = true
         closed = true
         retireCaptureGeneration()
         durationTask?.cancel()
@@ -796,11 +815,35 @@ public final class VisitRecordingCaptureController {
         durationTask = nil
         currentnessTask = nil
         finalizationDeadlineTask = nil
+        await releaseReservationIfNeeded()
+        terminalCleanupInProgress = false
+        resumeTerminalCleanupWaiters()
     }
 
     private func clearTranscriptAccumulator() {
         finalTranscript.removeAll(keepingCapacity: false)
         finalTranscriptBytes = 0
+    }
+
+    private var isTerminalCleanupPending: Bool {
+        terminalCleanupInProgress
+    }
+
+    private func waitForTerminalCleanupIfNeeded() async {
+        guard isTerminalCleanupPending else { return }
+        await withCheckedContinuation { continuation in
+            guard isTerminalCleanupPending else {
+                continuation.resume()
+                return
+            }
+            terminalCleanupWaiters.append(continuation)
+        }
+    }
+
+    private func resumeTerminalCleanupWaiters() {
+        let waiters = terminalCleanupWaiters
+        terminalCleanupWaiters.removeAll(keepingCapacity: false)
+        waiters.forEach { $0.resume() }
     }
 
     private func claimCaptureGeneration() -> UInt64? {
