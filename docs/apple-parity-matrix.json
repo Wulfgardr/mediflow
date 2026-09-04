@@ -2,7 +2,7 @@
   "generated": "2026-08-21",
   "source": "MediFlow 0.8 parity closeout against the frozen local source candidate",
   "release08Gate": {
-    "asOf": "2026-09-03",
+    "asOf": "2026-09-04",
     "status": "hold-promotion",
     "scope": [
       "iPhone/iPad",
@@ -37,12 +37,12 @@
       {
         "surface": "localhost/web",
         "owner": "CoS parity 0.8",
-        "status": "historical-evidence-current-screen-reader-pending",
-        "requiredEvidence": "gate web exact-SHA e sessione screen-reader terminale; responsive 320/390/768/1440, tastiera/focus e zoom browser reale 200/400 restano evidenza della baseline storica"
+        "status": "verified-current-runtime-bounded-screen-reader",
+        "requiredEvidence": "PASS_BOUNDED sul runtime 29b2c94b6a044b1639137403a2228ff172ea3d0f, tree 5706ade800d6a8caf2ab875882f61fe0881b3dd5: Chrome production in primo piano, VoiceOver attivo e input tastiera macOS nativo sui soli percorsi web esercitati con dati sintetici; non è un audit applicativo completo"
       }
     ],
     "blockingRule": "Un P1 confermato, un receipt exact-SHA richiesto assente o una prova assistiva non terminale bloccano la promozione. La sola deroga esterna già accettata è il limite VoiceOver mobile della candidata sorgente GitHub 0.8.",
-    "note": "Il limite non equivale a PASS VoiceOver, conformance, prova device, App Store readiness o certificazione. Questo oggetto non modifica i conteggi delle 66 capability.",
+    "note": "La deroga mobile non equivale a PASS VoiceOver, conformance, prova device, App Store readiness o certificazione. Questo oggetto non modifica i conteggi delle 66 capability.",
     "acceptedExternalLimitation": {
       "surface": "iPhone/iPad",
       "technology": "VoiceOver",
@@ -770,11 +770,6 @@
           "scope": "real VoiceOver session",
           "surfaces": ["iPhone", "iPad"],
           "reason": "No real VoiceOver session is evidenced. XCTest accessibility audits do not replace this proof."
-        },
-        {
-          "scope": "real screen-reader session",
-          "surfaces": ["web"],
-          "reason": "The screen-reader run is non-terminal."
         }
       ]
     },
@@ -782,6 +777,7 @@
       "backend": "Historical baseline 8083bc05: source integrated with audit-flow and delegated-writer gate fixes",
       "webEvidenceStack": "Historical baseline: 2/2 E2E PASS with synthetic PIN 0000; populated, curation, empty, loading and conservative error states",
       "webProduction": "Historical baseline: 104 pages and standalone build PASS; Chrome production at exact 200% and 400% zoom, main controls visible, no dev badge",
+      "webScreenReader": "Current bounded evidence: PASS_BOUNDED on runtime 29b2c94b6a044b1639137403a2228ff172ea3d0f, tree 5706ade800d6a8caf2ab875882f61fe0881b3dd5. Chrome production was foreground, VoiceOver was active and native macOS keyboard input reached the declared focus targets with synthetic data. This does not test the native macOS app or iPhone/iPad VoiceOver; the documenting successor is docs-only.",
       "macOS": "Historical baseline: clipping code integrated; built Xcode 27 bundle PASS at 1100, 1300 and 1600 points; click-map, focus, arrow input and real VoiceOver active before and after",
       "axProbe": "corrected to select native List rows, bind patient-specific detail content and avoid terminating external MediFlow sessions; typecheck and 6/6 tests PASS",
       "offline": "WUL-556 candidate makes loading/error/online/cache/offline/session-expired visible on iPhone/iPad and defines the stale presentation contract. WUL-403 remains open for live TTL metadata and stale-state wiring."
@@ -797,7 +793,7 @@
     },
     "verdict": "PARTIAL / HOLD_PROMOTION"
   },
-  "updated": "2026-09-03: corrected the stale capability narrative to 66/30/13/23 and recorded that exact-SHA Xcode proof is release-boundary evidence outside this static manifest. Previous: 2026-08-22 consumed the byte-identical Mini parity manifest from PR #184 head 3fd988b and PR #190 head 1e35733 without changing Apple gap classifications.",
+  "updated": "2026-09-04: closed only the bounded web screen-reader gate on runtime 29b2c94b6a04/tree 5706ade800d6; macOS exact-SHA remains pending and the iPhone/iPad VoiceOver limitation remains accepted, not PASS. Previous: 2026-09-03 corrected the stale capability narrative to 66/30/13/23 and recorded that exact-SHA Xcode proof is release-boundary evidence outside this static manifest. Previous: 2026-08-22 consumed the byte-identical Mini parity manifest from PR #184 head 3fd988b and PR #190 head 1e35733 without changing Apple gap classifications.",
   "version": 2,
   "summary": {
     "total": 66,
