@@ -289,6 +289,7 @@ final class VisitRecordingCaptureTests: XCTestCase {
 
         await controller.start()
         try await Task.sleep(nanoseconds: 50_000_000)
+        await waitUntil { controller.session.phase == .denied(.sessionDurationExceeded) }
 
         XCTAssertEqual(controller.session.phase, .denied(.sessionDurationExceeded))
         XCTAssertEqual(runtime.cancelCount, 1)
