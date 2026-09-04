@@ -15,7 +15,7 @@ const EXPECTED_IDS = Object.freeze([
   'treatment_reasoning',
 ]);
 const CLAIM_CEILING = 'local source runtime crosswalk for four review-only proposals; OCR unavailable; not release-ready, released, deployed, or authorized for clinical apply';
-const HISTORICAL_SHA256 = 'f537bccc66f499329c3a4b8fdd884a9ff21633aa59767e064933e96bd4829dc4';
+const HISTORICAL_SHA256 = '92586d894827a8e920995fa7cf0e1ce771b636bce3ed77f564015e61606832fa';
 const TOP_LEVEL_KEYS = Object.freeze([
   'schema',
   'release',
