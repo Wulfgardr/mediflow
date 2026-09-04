@@ -73,7 +73,8 @@ La fotografia corrente e questa:
   portabilita del core in CI, non una parity applicativa completa.
 - **Parity UI 0.8**: iPhone 2/2, iPad 7/7, build/probe macOS e localhost 82/82
   sono PASS della baseline storica `0843726fe`, non una prova implicita per una
-  revisione successiva. Il volume Xcode è disponibile; le verifiche exact-SHA
+  revisione successiva. La disponibilità di Xcode è un prerequisito operativo
+  della macchina, non uno stato durevole della repository; le verifiche exact-SHA
   appartengono ai receipt del closeout. La parity resta clinico-semantica, non
   pixel. VoiceOver reale mobile non è provato e la deroga storica non
   autorizza claim di conformità.
@@ -725,7 +726,8 @@ La fonte canonica è [docs/parity-matrix.md](./parity-matrix.md).
 
 Direzione:
 
-- app Windows/Linux e launcher dedicati oltre il core;
+- app Windows/Linux complete e distribuzione dedicata oltre i launcher sorgente
+  gia presenti;
 - closeout parity residuo tramite `WUL-481`/`WUL-403` e decisione separata per i quattro residui documentali;
 - cache locale cifrata derivata e riconciliazione esplicita.
 

@@ -104,9 +104,10 @@ Il manifest Apple-wide verifica 24 acceptance record tecnici separati.
 
 Le prove Apple basate su Xcode nella tabella seguente appartengono alla baseline
 storica `0843726fe`. Restano valide soltanto per quel tree e non costituiscono
-evidenza implicita per una revisione successiva. Il volume Xcode è disponibile;
-le prove exact-SHA appartengono ai receipt del closeout e non si deducono da
-questa matrice statica.
+evidenza implicita per una revisione successiva. La disponibilità di Xcode è
+una precondizione operativa della macchina, non uno stato persistente di questa
+matrice; le prove exact-SHA appartengono ai receipt del closeout e non si
+deducono da questa matrice statica.
 
 | Classe | Superficie | Prova | Stato |
 | --- | --- | --- | --- |
@@ -157,9 +158,9 @@ Wave 5 è una tranche consegnata, non la chiusura della parity complessiva.
 ### W6-A — convergenza UI macOS e click-map P6
 
 Il codice clipping e il probe AX corretto sono integrati. Le prove Xcode sul
-commit storico `0843726fe` restano valide soltanto per quel tree. Il volume
-Xcode è ora disponibile, ma W6-A non registra ancora una prova nativa sullo SHA
-corrente: l'esito exact-SHA appartiene al closeout terminale.
+commit storico `0843726fe` restano valide soltanto per quel tree. W6-A non
+registra una prova nativa implicita sullo SHA corrente: disponibilità Xcode ed
+esito exact-SHA appartengono al receipt del closeout terminale.
 
 ### W6-B — offline degradato onesto
 
