@@ -144,7 +144,10 @@ type Kree8DecisionCard = {
   pill: string;
   pillVariant: PillVariant;
   action: string;
-  target?: AreaId;
+  /* @Codex: every rendered decision CTA must resolve to an explicit area;
+     patient-bound actions may also switch context before navigation. */
+  target: AreaId;
+  patientId?: string;
 };
 
 const AREAS: { id: AreaId; label: string; icon: typeof Inbox; meta?: string }[] = [

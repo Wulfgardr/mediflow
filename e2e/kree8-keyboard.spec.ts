@@ -80,6 +80,8 @@ test('K4: tastiera cross-packet attraversa worklist, comandi e ricerca senza dup
   await commandSearch.press('Enter');
   await expect(page.getByTestId('lume-frame-canvas')).toHaveAttribute('data-lume-context', 'diario');
   await expect(search).not.toBeVisible();
+  const diaryHeading = page.getByRole('heading', { name: /Ultime voci del lavoro clinico/, level: 1 });
+  await expect(diaryHeading).toBeFocused();
 
   await page.keyboard.press('?');
   const helpDialog = page.getByRole('dialog', { name: 'Aiuto e scorciatoie', exact: true });
@@ -87,7 +89,7 @@ test('K4: tastiera cross-packet attraversa worklist, comandi e ricerca senza dup
   await expect(helpDialog.getByText('Apri la Scheda della riga attiva', { exact: true })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(helpDialog).toHaveCount(0);
-  await expect(commandTrigger).toBeFocused();
+  await expect(diaryHeading).toBeFocused();
 
   await commandTrigger.click();
   await expect(commandSearch).toBeFocused();
@@ -154,6 +156,8 @@ test('L9: i comandi raggiungono Analisi e Scale una sola volta senza scorciatoie
 
   await page.keyboard.press('ControlOrMeta+KeyK');
   await commandSearch.fill('Scale');
+  await expect(commandDialog.getByRole('option')).toHaveCount(1);
+  await expect(scalesCommand).toHaveCount(1);
   await commandSearch.press('Enter');
   await expect(page).toHaveURL(/\/scales$/);
   await expect(page.getByRole('heading', { name: 'Scale cliniche', level: 1 })).toBeVisible();
