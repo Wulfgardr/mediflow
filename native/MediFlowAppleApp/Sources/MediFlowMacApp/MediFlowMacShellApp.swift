@@ -2,8 +2,8 @@
 // (sidebar + detail + menu bar), not the mobile root: the two platforms share
 // the workspace model and the clinical views, not the navigation.
 // The Mac IS the home-base: HomeBaseRuntimeSupervisor (macOS-only, in
-// MediFlowAppleShared) supervises the bundled WebRuntime. WebRuntime bundling +
-// App Sandbox entitlements are a later-phase packaging task.
+// MediFlowAppleShared) supervises the bundled WebRuntime. App Sandbox remains
+// a separate distribution decision rather than an unfinished bundling task.
 import MediFlowAppleShared
 import SwiftUI
 
