@@ -9,7 +9,7 @@ read_when:
 
 Stato documento: `CANONICAL`
 
-Ultimo aggiornamento: 2026-09-03
+Ultimo aggiornamento: 2026-09-04
 
 ## Stato ed evidenze
 
@@ -86,24 +86,32 @@ multi-master.
 
 ## Tooling di sviluppo
 
-Con Node `v24.18.0`, l'audit delle sole dipendenze di produzione non rilevava
-vulnerabilità. L'audit completo del 29 luglio 2026 rilevava 21 rilievi nel
-tooling di sviluppo:
+La fotografia del 29 luglio 2026, eseguita con Node `v24.18.0`, non rilevava
+vulnerabilità nelle sole dipendenze di produzione e rilevava 21 rilievi
+nell'audit completo del tooling di sviluppo:
 
 - 1 low;
 - 5 moderate;
 - 15 high;
 - zero critical.
 
-Il rischio riguardava la toolchain dei contributor, non il grafo installato in
-produzione. Questa evidenza non è stata aggiornata sul candidato `0.8.5` e il
-limite non è classificato come risolto.
+Questi conteggi sono evidenza storica e non descrivono il grafo corrente. Il 4
+settembre 2026, un audit production-only con Node `v24.19.0` ha individuato
+`GHSA-px8p-9vwx-vf98` in `fflate@0.8.2`, dipendenza transitiva di
+`jspdf@4.2.1`. Il candidato ora risolve quell'unico edge a `fflate@0.8.3`,
+versione corretta dentro il range `^0.8.1` già dichiarato da jsPDF. Il lockfile,
+l'albero installato, la generazione PDF reale e una regressione ZIP64 bounded
+confermano la correzione; l'endpoint npm audit non ha restituito il rollup
+post-fix per timeout, quindi questo documento non dichiara un audit corrente a
+zero.
 
 Un candidato di aggiornamento portava l'audit a zero, ma forzava versioni
 transitive fuori dai range dichiarati e falliva l'installazione
 `strict-peer-deps`. La release 0.8 non assorbe quel workaround.
 
-La chiusura richiede un packet dipendenze separato con:
+Il debito più ampio resta tracciato in
+[issue #305](https://github.com/Wulfgardr/mediflow/issues/305). La sua chiusura
+richiede un packet dipendenze separato con:
 
 1. nessun override fuori range;
 2. installazione strict-peer verde;
