@@ -31,7 +31,7 @@ test('rollout readiness contract helper keeps all known lanes visible and marks 
             warnings: [{ id: 'stale-benchmark', message: 'Benchmark age approaching limit.' }],
             evidence: {
                 benchmarkFresh: true,
-                owner: 'leonardo',
+                owner: 'release-operator',
                 reportGeneratedAt: '2026-04-03T09:00:00.000Z',
             },
         }), 'utf8');

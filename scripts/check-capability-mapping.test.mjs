@@ -32,6 +32,11 @@ test('keeps every Fabric-to-canonical product decision explicit and non-identica
   assert.ok(records.every((record) => record.relationKind !== 'exact_identity' && record.authority === 'unresolved' && record.stage === 'unresolved'));
 });
 
+test('keeps the product decision reference portable and free of local paths', () => {
+  const receipt = JSON.parse(readFileSync('docs/capability-mapping/fabric-product-crosswalk-receipt.v1.json', 'utf8'));
+  assert.equal(receipt.decisionPath, 'external:mediflow-0.8.5-fabric-product-crosswalk-decision-v1.json');
+});
+
 test('keeps document identity resolution out of catalog until a non-test consumer exists', () => {
   const records = JSON.parse(readFileSync('docs/capability-mapping/nodes/fabric-inventory.v1.json', 'utf8')).records;
   assert.equal(records.find((record) => record.sourceIdentity.identifier === 'document_identity_resolution').terminalDisposition, 'out_of_catalog');

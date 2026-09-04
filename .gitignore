@@ -49,6 +49,9 @@ native/**/Build/
 # misc
 .DS_Store
 /.texpadtmp/
+# Xcode workspace state is per-user and must never enter source archives.
+**/xcuserdata/
+*.xcuserstate
 *.pem
 certs/
 *.key

@@ -5,7 +5,8 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
-const DECISION_PATH = '/Users/leonardopegollo/.codex/visualizations/2026/08/22/01a02a9c-3789-7032-8d93-1ed327390921/mediflow-0.8.5-fabric-product-crosswalk-decision-v1.json';
+const DECISION_PATH = process.env.MEDIFLOW_FABRIC_PRODUCT_DECISION_PATH?.trim();
+const DECISION_ARTIFACT_REF = 'external:mediflow-0.8.5-fabric-product-crosswalk-decision-v1.json';
 const DECISION_SHA256 = 'c6ca0769ceb84b60f43cd6f9f8ebf310570e243709b3a6056ff88da1b72fe851';
 const FABRIC_PATH = `${ROOT}/docs/capability-mapping/nodes/fabric-inventory.v1.json`;
 const ANCHOR_PATH = `${ROOT}/docs/capability-mapping/nodes/web-mini-crosswalk.v1.json`;
@@ -32,6 +33,7 @@ function relationEvidence(evidence) {
   return evidence.map(({ ref, locator }) => ({ evidenceKind: evidenceKind(ref), ref, locator, claim: 'approved product decision cites this independent frozen source' }));
 }
 
+if (!DECISION_PATH) fail('MEDIFLOW_FABRIC_PRODUCT_DECISION_PATH is required');
 const bytes = readFileSync(DECISION_PATH);
 if (sha256(bytes) !== DECISION_SHA256) fail('decision SHA-256 drifted');
 const decision = JSON.parse(bytes);
@@ -63,5 +65,5 @@ if (records.length !== 39 || new Set(records.map(({ id }) => id)).size !== recor
 
 write(FABRIC_PATH, fabric);
 write(RELATION_PATH, { schema: 'mediflow.capability-mapping.fabric-canonical-bindings.v1', status: 'candidate_not_integrated', applyPolicy: 'none', decisionId: decision.decisionId, decisionSha256: DECISION_SHA256, records });
-write(RECEIPT_PATH, { schema: 'mediflow.capability-mapping.product-decision-receipt.v1', status: 'candidate_not_integrated', applyPolicy: 'none', decisionId: decision.decisionId, decisionSha256: DECISION_SHA256, decisionPath: DECISION_PATH, claimCeiling: decision.claimCeiling, bindingRule: decision.bindingRule, globalEvidence: decision.globalEvidence, decisionCount: decision.decisions.length, functionalRelationCount: records.length - 16, registryExposureCount: 16, outOfCatalogFabricIds: decision.decisions.filter(({ terminalDisposition }) => terminalDisposition === 'out_of_catalog').map(({ fabricId }) => fabricId) });
+write(RECEIPT_PATH, { schema: 'mediflow.capability-mapping.product-decision-receipt.v1', status: 'candidate_not_integrated', applyPolicy: 'none', decisionId: decision.decisionId, decisionSha256: DECISION_SHA256, decisionPath: DECISION_ARTIFACT_REF, claimCeiling: decision.claimCeiling, bindingRule: decision.bindingRule, globalEvidence: decision.globalEvidence, decisionCount: decision.decisions.length, functionalRelationCount: records.length - 16, registryExposureCount: 16, outOfCatalogFabricIds: decision.decisions.filter(({ terminalDisposition }) => terminalDisposition === 'out_of_catalog').map(({ fabricId }) => fabricId) });
 write(CONFLICT_PATH, { schema: 'mediflow.capability-mapping.conflict-register.v1', status: 'resolved_by_product_decision', applyPolicy: 'none', decisionId: decision.decisionId, decisionSha256: DECISION_SHA256, records: [] });
