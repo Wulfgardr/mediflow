@@ -8,7 +8,7 @@ read_when:
 # Matrice parity localhost ↔ client Apple
 
 Stato documento: `CANONICAL`
-Ultimo aggiornamento: 2026-09-03 (`MediFlow 0.8.5`, closeout)
+Ultimo aggiornamento: 2026-09-04 (`MediFlow 0.8.5`, closeout)
 
 ## Gate MediFlow 0.8
 
@@ -22,13 +22,17 @@ intenzionalmente host-only. Questo stato non blocca da solo una candidata
 sorgente, ma non sostituisce i gate di interazione e i receipt exact-SHA del
 closeout.
 
-Il gate di promozione è `HOLD_PROMOTION`. Le prove automatiche e le interazioni
-reali registrate restano evidenza della rispettiva baseline storica; sul tree
-0.8.5 devono ancora essere chiusi il receipt Xcode exact-SHA e la sessione web
-con screen reader. VoiceOver reale su iPhone e iPad non è provato perché l'API
-pubblica della beta Xcode 27 non raggiunge uno stato terminale nel simulatore:
-questa è una deroga esterna accettata, non un PASS, e non autorizza claim App
-Store o di conformità.
+Il gate di promozione resta `HOLD_PROMOTION`. Le prove automatiche e le
+interazioni reali registrate restano evidenza della rispettiva baseline. Sul
+runtime `29b2c94b6a044b1639137403a2228ff172ea3d0f`, tree
+`5706ade800d6a8caf2ab875882f61fe0881b3dd5`, la sessione web con VoiceOver è
+terminale `PASS_BOUNDED`: Chrome production era in primo piano, VoiceOver era
+attivo e le azioni sono state esercitate con input tastiera macOS nativo su dati
+sintetici. Il successore che registra questa evidenza è docs-only e non modifica
+il runtime verificato. Il receipt Xcode exact-SHA resta un gate separato.
+VoiceOver reale su iPhone e iPad non è provato perché l'API pubblica della beta
+Xcode 27 non raggiunge uno stato terminale nel simulatore: questa è una deroga
+esterna accettata, non un PASS, e non autorizza claim App Store o di conformità.
 
 Lume è il linguaggio comune. Liquid Glass è una declinazione nativa Apple e non
 viene copiata come identità CSS. La parity riguarda capacità, semantica,
@@ -77,8 +81,10 @@ Gli stati di prova sono:
 - `platform-specific-documented`: adattamento intenzionale e documentato;
 - `out-of-scope`: capability esclusa dal perimetro dichiarato.
 
-VoiceOver attivo su macOS prova solo la sessione macOS eseguita. Gli audit
-XCTest non dimostrano VoiceOver reale su iPhone o iPad.
+VoiceOver prova soltanto la superficie effettivamente esercitata: una sessione
+in Chrome production prova la web app, non l'app nativa macOS; una sessione
+nell'app macOS prova soltanto quella superficie. Né queste sessioni né gli audit
+XCTest dimostrano VoiceOver reale su iPhone o iPad.
 
 ## Fotografia corrente
 
@@ -113,6 +119,7 @@ deducono da questa matrice statica.
 | --- | --- | --- | --- |
 | `verified-automatic` | Web | Evidence Stack 2/2 con PIN sintetico `0000`; build 104 pagine e standalone | PASS |
 | `verified-real-interaction` | Web | Chromium produzione a 320/390/768/1440 e zoom esatto 200%/400%; focus visibile e nessun overflow orizzontale | PASS |
+| `verified-real-interaction` | Web / VoiceOver | Chrome production in primo piano, VoiceOver attivo e tastiera macOS nativa; `Vai ai pazienti`, `Rivedi agenda`, `Apri revisione`, comando `Diario` e ricerca paziente hanno raggiunto il target di focus dichiarato | `PASS_BOUNDED` sul runtime `29b2c94b6a04`, tree `5706ade800d6`; dati sintetici, non audit applicativo completo |
 | `verified-automatic` | iPhone | XCUITest 2/2, tab identifier atomici e apertura delle sei superfici | PASS storico su `0843726fe`; non equivale a VoiceOver |
 | `verified-automatic` | iPad | XCUITest 7/7, list-detail, AX5, rotazione, geometria e audit AX | PASS storico su `0843726fe`; non equivale a VoiceOver |
 | `verified-real-interaction` | macOS | Build Xcode 27, click-map, focus, Cmd-R contestuale, resize e VoiceOver manuale | PASS storico su `0843726fe` |
@@ -238,6 +245,7 @@ La mappa registra i controlli esercitati nel closeout.
 | Superficie | Controllo | Identificatore | Azione | Evidenza |
 | --- | --- | --- | --- | --- |
 | Web | Agenda | nome AX `Agenda` | Cambia area cockpit | Chrome produzione |
+| Web | Rivedi agenda | nome AX `Rivedi agenda`; `aria-controls=turno-agenda-heading` | Mantiene `area=turno`, porta in viewport e focalizza il titolo `Agenda di oggi` | E2E e VoiceOver production `PASS_BOUNDED` sul runtime `29b2c94b6a04` |
 | Web | Pazienti | nome AX `Pazienti N` | Carica worklist | Chrome produzione |
 | Web | Diario | `lume-diario` | Carica feed globale | Chrome produzione |
 | Web | Scheda | `lume-scheda-header` | Carica paziente e aggregati | E2E candidato locale D1/D2 — SHA esatti |
