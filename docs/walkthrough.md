@@ -589,8 +589,9 @@ Comportamento:
 - `AppRevisionGuard` controlla il fingerprint quando la tab torna visibile e a
   intervalli regolari
 - se branch/revision/worktree cambiano, la tab fa un reload soft una sola volta
-- `Start_MediFlow.command` resetta `.next` quando la sorgente cambia e rifiuta
-  di riusare la porta `3000` se occupata da un worktree diverso
+- i tre launcher mostrano versione, checkout e fingerprint e riusano la porta
+  `3000` soltanto quando `/api/system/revision` identifica la stessa sorgente
+- `Start_MediFlow.command` resetta inoltre `.next` quando la sorgente cambia
 
 ---
 

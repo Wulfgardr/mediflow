@@ -219,6 +219,10 @@ Then use the launcher for your platform:
 | Windows | `powershell -ExecutionPolicy Bypass -File .\Start-MediFlow.ps1` |
 | Linux | `./scripts/start-mediflow.sh` |
 
+Each launcher prints the product version, absolute checkout, and source
+fingerprint. If port `3000` belongs to another checkout or an unrelated
+service, startup stops instead of opening a stale or foreign instance.
+
 Open `http://localhost:3000`. Ollama, ATHENA/MLX, WHO ICD-11 access, and
 external providers are optional and remain unavailable when they have not been
 configured explicitly.

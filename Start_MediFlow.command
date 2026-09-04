@@ -1,6 +1,7 @@
 #!/bin/bash
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$DIR"
+HELPER="$DIR/scripts/launcher-helpers.mjs"
 
 # @Codex: select a Node runtime that matches both .nvmrc and the installed native binding.
 REQUIRED_NODE_MAJOR="$(tr -dc '0-9' < "$DIR/.nvmrc")"
@@ -14,7 +15,7 @@ select_mediflow_node() {
         /usr/local/opt/node@"$REQUIRED_NODE_MAJOR"/bin/node \
         /opt/homebrew/bin/node /usr/local/bin/node /usr/bin/node; do
         [ -x "$candidate" ] || continue
-        if "$candidate" "$DIR/scripts/launcher-helpers.mjs" check-runtime >/dev/null 2>&1; then
+        if "$candidate" "$HELPER" check-runtime >/dev/null 2>&1; then
             export PATH="$(dirname "$candidate"):$PATH"
             return 0
         fi
@@ -40,19 +41,15 @@ MEDIFLOW_PORT="3000"
 # @Codex
 MEDIFLOW_URL="http://localhost:${MEDIFLOW_PORT}"
 # @Codex
-CURRENT_APP_REVISION="$(git rev-parse --short=12 HEAD 2>/dev/null || echo unknown)"
+CURRENT_APP_VERSION=""
 # @Codex
-CURRENT_APP_BRANCH="$(git branch --show-current 2>/dev/null || echo unknown)"
+CURRENT_APP_REVISION=""
 # @Codex
-CURRENT_APP_STATUS="$(git status --porcelain=v1 2>/dev/null)"
+CURRENT_APP_BRANCH=""
 # @Codex
-if [ -n "$CURRENT_APP_STATUS" ]; then
-    CURRENT_APP_WORKTREE_HASH="$(printf '%s' "$CURRENT_APP_STATUS" | shasum -a 1 | awk '{print substr($1,1,12)}')"
-else
-    CURRENT_APP_WORKTREE_HASH="clean"
-fi
+CURRENT_APP_WORKTREE_HASH=""
 # @Codex
-CURRENT_APP_SOURCE_FINGERPRINT="${CURRENT_APP_BRANCH}@${CURRENT_APP_REVISION}:${CURRENT_APP_WORKTREE_HASH}"
+CURRENT_APP_SOURCE_FINGERPRINT=""
 # @Codex
 CURRENT_APP_FINGERPRINT="${CURRENT_APP_SOURCE_FINGERPRINT}"
 # @Codex
@@ -60,59 +57,25 @@ NEXT_CACHE_REVISION_FILE="$DIR/.next/.mediflow-app-revision"
 # @Codex
 PORT_LISTENER_PID=""
 # @Codex
-PORT_LISTENER_CWD=""
-# @Codex
-PORT_LISTENER_COMMAND=""
-# @Codex
 PORT_STATUS="free"
-
-# /* @Codex */
-find_port_listener_pid() {
-    lsof -nP -iTCP:"$MEDIFLOW_PORT" -sTCP:LISTEN -Fp 2>/dev/null | sed -n 's/^p//p' | head -n 1
-}
-
 # @Codex
-find_process_cwd() {
-    local pid="$1"
-    lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' | head -n 1
-}
-
+PORT_INSPECTION_REASON=""
 # @Codex
-find_process_command() {
-    local pid="$1"
-    ps -p "$pid" -o command= 2>/dev/null
-}
-
+READY_WAITER_PID=""
 # @Codex
-fetch_running_revision() {
-    curl -fsS "${MEDIFLOW_URL}/api/system/revision" 2>/dev/null | /usr/bin/python3 -c 'import json,sys; print(json.load(sys.stdin).get("revision",""))' 2>/dev/null
-}
+READY_TIMEOUT_MS="${MEDIFLOW_LAUNCH_READY_TIMEOUT_MS:-30000}"
 
-# @Codex
-fetch_running_source_fingerprint() {
-    curl -fsS "${MEDIFLOW_URL}/api/system/revision" 2>/dev/null | /usr/bin/python3 -c 'import json,sys; print(json.load(sys.stdin).get("sourceFingerprint",""))' 2>/dev/null
-}
-
-# @Codex
-inspect_mediflow_port() {
-    PORT_LISTENER_PID="$(find_port_listener_pid)"
-    PORT_LISTENER_CWD=""
-    PORT_LISTENER_COMMAND=""
-    PORT_STATUS="free"
-
-    if [ -z "$PORT_LISTENER_PID" ]; then
-        return
-    fi
-
-    PORT_LISTENER_CWD="$(find_process_cwd "$PORT_LISTENER_PID")"
-    PORT_LISTENER_COMMAND="$(find_process_command "$PORT_LISTENER_PID")"
-
-    if [ "$PORT_LISTENER_CWD" = "$DIR" ]; then
-        PORT_STATUS="mediflow_running"
-    else
-        PORT_STATUS="occupied_other"
-    fi
-}
+# @Codex: all exported identity fields come from the same shared algorithm.
+if ! CURRENT_APP_VERSION="$(node "$HELPER" identity-field version)" \
+    || ! CURRENT_APP_REVISION="$(node "$HELPER" identity-field revision)" \
+    || ! CURRENT_APP_BRANCH="$(node "$HELPER" identity-field branch)" \
+    || ! CURRENT_APP_WORKTREE_HASH="$(node "$HELPER" identity-field worktreeHash)" \
+    || ! CURRENT_APP_SOURCE_FINGERPRINT="$(node "$HELPER" identity-field sourceFingerprint)" \
+    || [ -z "$CURRENT_APP_SOURCE_FINGERPRINT" ]; then
+    echo "Impossibile determinare in sicurezza l'identità del checkout MediFlow." >&2
+    exit 1
+fi
+CURRENT_APP_FINGERPRINT="$CURRENT_APP_SOURCE_FINGERPRINT"
 
 # @Codex
 reset_next_cache_if_revision_changed() {
@@ -130,9 +93,10 @@ reset_next_cache_if_revision_changed() {
     printf '%s' "$CURRENT_APP_SOURCE_FINGERPRINT" > "$NEXT_CACHE_REVISION_FILE"
 }
 
-echo "   🌿 Branch: ${CURRENT_APP_BRANCH}"
-echo "   🧬 Revisione: ${CURRENT_APP_REVISION}"
-echo "   🪪 Sorgente: ${CURRENT_APP_SOURCE_FINGERPRINT}"
+if ! node "$HELPER" identity-summary; then
+    echo "Impossibile mostrare l'identità del checkout MediFlow." >&2
+    exit 1
+fi
 echo ""
 
 # --- 1. Start Ollama (AI Engine) ---
@@ -163,18 +127,13 @@ else
     echo "   ✅ Ollama già attivo."
 fi
 
-inspect_mediflow_port
-if [ "$PORT_STATUS" = "occupied_other" ]; then
+PORT_INSPECTION="$(node "$HELPER" inspect-port "$MEDIFLOW_PORT" || true)"
+IFS='|' read -r PORT_STATUS PORT_LISTENER_PID PORT_INSPECTION_REASON <<< "$PORT_INSPECTION"
+if [ "$PORT_STATUS" != "free" ] && [ "$PORT_STATUS" != "occupied" ]; then
     echo ""
-    echo "   ❌ Porta ${MEDIFLOW_PORT} già occupata da un altro processo."
-    echo "      PID: ${PORT_LISTENER_PID}"
-    if [ -n "$PORT_LISTENER_COMMAND" ]; then
-        echo "      Comando: ${PORT_LISTENER_COMMAND}"
-    fi
-    if [ -n "$PORT_LISTENER_CWD" ]; then
-        echo "      Cartella: ${PORT_LISTENER_CWD}"
-    fi
-    echo "      Arresta quel processo oppure libera la porta ${MEDIFLOW_PORT} e rilancia MediFlow."
+    echo "   ❌ Impossibile determinare in sicurezza lo stato della porta ${MEDIFLOW_PORT}."
+    echo "      Dettaglio: ${PORT_INSPECTION_REASON:-ispezione non disponibile}"
+    echo "      Avvio bloccato: verifica la porta e rilancia MediFlow."
     exit 1
 fi
 
@@ -185,6 +144,13 @@ echo ""
 
 # Cleanup function
 cleanup() {
+    if [ -n "${READY_WAITER_PID:-}" ]; then
+        if jobs -pr | grep -qx "$READY_WAITER_PID"; then
+            kill "$READY_WAITER_PID" 2>/dev/null || true
+        fi
+        wait "$READY_WAITER_PID" 2>/dev/null || true
+        READY_WAITER_PID=""
+    fi
     if [ -n "${QUIET_EXIT:-}" ]; then
         exit 0
     fi
@@ -194,42 +160,28 @@ cleanup() {
     exit
 }
 
-trap cleanup SIGINT EXIT
+trap cleanup SIGINT TERM HUP EXIT
 
-if [ "$PORT_STATUS" = "mediflow_running" ]; then
-    RUNNING_APP_REVISION="$(fetch_running_revision)"
-    RUNNING_APP_SOURCE_FINGERPRINT="$(fetch_running_source_fingerprint)"
-    if [ -z "$RUNNING_APP_SOURCE_FINGERPRINT" ] || [ "$RUNNING_APP_SOURCE_FINGERPRINT" != "$CURRENT_APP_SOURCE_FINGERPRINT" ]; then
-        echo "   ♻️  Istanza MediFlow esistente ma non allineata alla revisione corrente."
-        echo "      PID: ${PORT_LISTENER_PID}"
-        echo "      Revisione in esecuzione: ${RUNNING_APP_REVISION:-sconosciuta}"
-        echo "      Sorgente in esecuzione: ${RUNNING_APP_SOURCE_FINGERPRINT:-sconosciuta}"
-        echo "      Sorgente richiesto: ${CURRENT_APP_SOURCE_FINGERPRINT}"
-        echo "   🔄 Arresto l'istanza precedente per evitare UI ibride o bundle stantii..."
-        kill "$PORT_LISTENER_PID" 2>/dev/null || true
-        sleep 2
-        inspect_mediflow_port
-        if [ "$PORT_STATUS" != "free" ]; then
-            echo "   ❌ Non sono riuscito a liberare la porta ${MEDIFLOW_PORT}. Arresta manualmente il processo e rilancia."
-            exit 1
-        fi
-    else
-        echo "   ✅ MediFlow risulta già attivo su ${MEDIFLOW_URL}"
-        echo "      PID: ${PORT_LISTENER_PID}"
-        echo "      Revisione: ${RUNNING_APP_REVISION}"
-        echo "      Sorgente: ${RUNNING_APP_SOURCE_FINGERPRINT}"
-        echo "   ⏭️  Riutilizzo l'istanza esistente senza avviare un secondo server."
-        echo ""
-        open "${MEDIFLOW_URL}"
-        QUIET_EXIT=1
-        exit 0
+if [ "$PORT_STATUS" = "occupied" ]; then
+    if ! READY_RESULT="$(node "$HELPER" wait-and-open "$MEDIFLOW_URL" "$CURRENT_APP_SOURCE_FINGERPRINT" 5000 250 2>&1)"; then
+        echo "   ❌ Porta ${MEDIFLOW_PORT} occupata, ma l'istanza non corrisponde a questo checkout."
+        echo "      PID: ${PORT_LISTENER_PID:-sconosciuto}"
+        echo "      Riuso negato senza arrestare alcun processo (${READY_RESULT})."
+        exit 1
     fi
+    echo "   ✅ MediFlow ${CURRENT_APP_SOURCE_FINGERPRINT} è già attivo su ${MEDIFLOW_URL}."
+    echo "      PID: ${PORT_LISTENER_PID:-sconosciuto}"
+    echo "      Verifica endpoint: ${READY_RESULT}"
+    echo "   ⏭️  Riutilizzo l'istanza esistente senza avviare un secondo server."
+    QUIET_EXIT=1
+    exit 0
 fi
 
 reset_next_cache_if_revision_changed
 
-# Open browser after delay
-(sleep 5 && open "${MEDIFLOW_URL}") &
+# @Codex: a free-port race or a mismatched server must never open the browser.
+node "$HELPER" wait-and-open "$MEDIFLOW_URL" "$CURRENT_APP_SOURCE_FINGERPRINT" "$READY_TIMEOUT_MS" 250 &
+READY_WAITER_PID=$!
 
 echo "   📍 URL: ${MEDIFLOW_URL}"
 echo "   ⏹️  Premi CTRL+C per arrestare."
