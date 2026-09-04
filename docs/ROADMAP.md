@@ -237,9 +237,9 @@ Ogni altro gate rosso o indeterminato resta bloccante.
   italiana Apple on-device con consenso, audio bounded in RAM e transcript
   review-first. Microfono reale, validazione clinica e writer automatici
   restano fuori dal claim.
-* **Windows/Linux oltre il core**: procedere per slice piccole su launcher,
-  floor hardware e distribuzione tri-OS, senza promettere parity applicativa
-  prima delle prove.
+* **Windows/Linux oltre il core**: i launcher sorgente 0.8.5 sono presenti;
+  procedere per slice piccole su floor hardware, packaging e distribuzione
+  tri-OS, senza promettere parity applicativa prima delle prove.
 * **Provider locali Apple**: `WUL-417` e `WUL-418` restano benchmark-first, con
   kill-switch, test e decisioni esplicite prima di qualunque promozione runtime.
 

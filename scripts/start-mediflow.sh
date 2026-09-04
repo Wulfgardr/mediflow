@@ -3,8 +3,8 @@
 # MediFlow - one-click launcher (Linux).
 # Avvia la web app locale Next.js e apre il browser. Equivalente di
 # Start_MediFlow.command (macOS) e Start-MediFlow.ps1 (Windows).
-# Non avvia i client Apple. Se Ollama o ICD-11 non sono installati,
-# MediFlow resta usabile con funzionalita ridotte.
+# Non avvia i client Apple. Se Ollama non è disponibile, MediFlow resta usabile
+# con funzionalita ridotte; l'accesso WHO ICD-11 è server-only e opt-in.
 set -euo pipefail
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"

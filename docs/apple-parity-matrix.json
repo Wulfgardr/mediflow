@@ -762,7 +762,7 @@
         {
           "scope": "exact-SHA macOS Xcode build and suite",
           "surfaces": ["macOS"],
-          "reason": "The Xcode volume is available; exact-SHA evidence belongs to the release closeout receipt and is not inferred from this static parity manifest."
+          "reason": "Xcode availability is a machine precondition, not persistent repository state; exact-SHA evidence belongs to the release closeout receipt and is not inferred from this static parity manifest."
         }
       ],
       "blocked": [

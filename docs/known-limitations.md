@@ -28,9 +28,10 @@ Gli audit di accessibilità XCTest e i test UI della baseline storica
 - iPad: 7/7.
 
 Queste prove valgono soltanto per quel tree e non equivalgono a un test
-VoiceOver reale. Il volume Xcode è disponibile; i check Apple su una revisione
-exact-SHA appartengono ai receipt del closeout. Questo documento non dichiara
-una nuova prova VoiceOver mobile.
+VoiceOver reale. La disponibilità di Xcode è una precondizione della macchina,
+non una proprietà persistente del tree; i check Apple su una revisione exact-SHA
+appartengono ai receipt del closeout. Questo documento non dichiara una nuova
+prova VoiceOver mobile.
 
 Nel simulatore iOS 27, con Xcode 27 beta build `27A5194q`, la chiamata pubblica
 `XCUIDevice.shared.voiceOverService.enable()` non ha raggiunto uno stato
