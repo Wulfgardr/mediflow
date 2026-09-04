@@ -137,7 +137,9 @@ function readGitValue(args, cwd, fallback = 'unknown') {
 /* @Codex: keep this algorithm identical to lib/app-revision.ts. */
 export function readProductIdentity(cwd = process.cwd()) {
     const resolvedCwd = path.resolve(cwd);
-    const checkoutPath = readGitValue(['rev-parse', '--show-toplevel'], resolvedCwd, resolvedCwd);
+    const checkoutPath = path.resolve(
+        readGitValue(['rev-parse', '--show-toplevel'], resolvedCwd, resolvedCwd)
+    );
     const manifest = JSON.parse(readFileSync(path.join(checkoutPath, 'package.json'), 'utf8'));
     if (typeof manifest.version !== 'string' || !manifest.version.trim()) {
         throw new Error('package.json non contiene una versione valida');
