@@ -364,6 +364,77 @@ final class VisitRecordingCaptureTests: XCTestCase {
         XCTAssertEqual(runtime.audioBudgetSnapshot?.seconds, 0)
     }
 
+    func testStopWaitsThroughReservationReleaseDuringFailureCleanup() async throws {
+        let runtime = FakeVisitRecordingRuntime()
+        var releaseStarted = false
+        var releaseContinuation: CheckedContinuation<Void, Never>?
+        var reservationReleased = false
+        let controller = try makeController(runtime: runtime, releaseReservation: {
+            await withCheckedContinuation { continuation in
+                releaseContinuation = continuation
+                releaseStarted = true
+            }
+            reservationReleased = true
+            return true
+        })
+
+        await controller.start()
+        runtime.triggerFailure(.failed)
+        await waitUntil { releaseStarted }
+
+        var stopEntered = false
+        var stopReturned = false
+        let stop = Task { @MainActor in
+            stopEntered = true
+            await controller.stop()
+            stopReturned = true
+        }
+        await waitUntil { stopEntered }
+        for _ in 0..<10 { await Task.yield() }
+
+        XCTAssertFalse(stopReturned)
+        releaseContinuation?.resume()
+        releaseContinuation = nil
+        await stop.value
+        XCTAssertTrue(stopReturned)
+        XCTAssertEqual(controller.session.phase, .denied(.failed))
+        XCTAssertNil(controller.session.transcript)
+        XCTAssertEqual(runtime.stopCount, 1)
+        XCTAssertEqual(runtime.cancelCount, 1)
+        XCTAssertEqual(runtime.activePreparedResourceCount, 0)
+        XCTAssertTrue(reservationReleased)
+    }
+
+    func testStopWaitsForFailureCleanupAfterFinalizationReturns() async throws {
+        let runtime = FakeVisitRecordingRuntime()
+        runtime.suspendFinalization = true
+        runtime.suspendCancellation = true
+        let controller = try makeController(runtime: runtime)
+
+        await controller.start()
+        var stopReturned = false
+        let stop = Task { @MainActor in
+            await controller.stop()
+            stopReturned = true
+        }
+        await waitUntil { runtime.finishCount > 0 }
+        runtime.triggerFailure(.failed)
+        await waitUntil { runtime.cancelCount > 0 }
+        await waitUntil { runtime.finishCompletionCount > 0 }
+        for _ in 0..<10 { await Task.yield() }
+
+        XCTAssertFalse(stopReturned)
+        runtime.resumeCancellations()
+        await stop.value
+        XCTAssertTrue(stopReturned)
+        XCTAssertEqual(controller.session.phase, .denied(.failed))
+        XCTAssertNil(controller.session.transcript)
+        XCTAssertEqual(runtime.stopCount, 1)
+        XCTAssertEqual(runtime.finishCount, 1)
+        XCTAssertEqual(runtime.finishCompletionCount, 1)
+        XCTAssertEqual(runtime.cancelCount, 1)
+    }
+
     func testFinalizeDeadlineFailsClosedAndRejectsLateCompletion() async throws {
         let runtime = FakeVisitRecordingRuntime()
         runtime.suspendFinalization = true
@@ -490,7 +561,6 @@ final class VisitRecordingCaptureTests: XCTestCase {
 
         await controller.start()
         await controller.stop()
-        await Task.yield()
 
         XCTAssertEqual(controller.session.phase, .denied(denial))
         XCTAssertNil(controller.session.transcript)
@@ -608,6 +678,7 @@ private final class FakeVisitRecordingRuntime: VisitRecordingRuntimePort {
     var suspendPreparation = false
     var suspendConsumption = false
     var suspendFinalization = false
+    var suspendCancellation = false
     var conversionReservationBytes = 0
     var consumeError: Error?
     var finishError: Error?
@@ -617,6 +688,7 @@ private final class FakeVisitRecordingRuntime: VisitRecordingRuntimePort {
     private(set) var prepareCount = 0
     private(set) var startCount = 0
     private(set) var finishCount = 0
+    private(set) var finishCompletionCount = 0
     private(set) var cancelCount = 0
     private(set) var activeConsumptionCount = 0
     private(set) var activePreparedResourceCount = 0
@@ -629,6 +701,7 @@ private final class FakeVisitRecordingRuntime: VisitRecordingRuntimePort {
     private var preparationContinuations: [CheckedContinuation<Void, Error>] = []
     private var consumptionContinuations: [CheckedContinuation<Void, Never>] = []
     private var finalizationContinuations: [CheckedContinuation<Void, Never>] = []
+    private var cancellationContinuations: [CheckedContinuation<Void, Never>] = []
 
     var audioBudgetSnapshot: VisitRecordingAudioBudgetSnapshot? { audioBudget?.snapshot }
     var peakAudioBudgetBytes: Int { audioBudget?.snapshot.peakBytes ?? 0 }
@@ -686,6 +759,7 @@ private final class FakeVisitRecordingRuntime: VisitRecordingRuntimePort {
         finishResults.forEach { resultHandler?($0) }
         if let finishError { throw finishError }
         activePreparedResourceCount = 0
+        finishCompletionCount += 1
     }
 
     func cancelAndFinishNow() async {
@@ -700,6 +774,9 @@ private final class FakeVisitRecordingRuntime: VisitRecordingRuntimePort {
         let finalizations = finalizationContinuations
         finalizationContinuations.removeAll()
         finalizations.forEach { $0.resume() }
+        if suspendCancellation {
+            await withCheckedContinuation { cancellationContinuations.append($0) }
+        }
     }
 
     func resumePreparations() {
@@ -714,6 +791,13 @@ private final class FakeVisitRecordingRuntime: VisitRecordingRuntimePort {
         let continuations = preparationContinuations
         preparationContinuations.removeAll()
         continuations.forEach { $0.resume(throwing: error) }
+    }
+
+    func resumeCancellations() {
+        suspendCancellation = false
+        let continuations = cancellationContinuations
+        cancellationContinuations.removeAll()
+        continuations.forEach { $0.resume() }
     }
 
     func emit(_ frame: VisitRecordingPCMFrame) {
