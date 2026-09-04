@@ -2,7 +2,7 @@
 
 /* @Codex */
 
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   CalendarClock,
@@ -103,15 +103,15 @@ export function Kree8CommandCenter({
     return commands.filter((command) => `${command.label} ${command.hint}`.toLocaleLowerCase('it-IT').includes(normalized));
   }, [commands, query]);
 
-  useEffect(() => {
+  /* @Codex: il dialog riceve focus nello stesso layout commit in cui compare;
+     cosi Escape e il focus trap sono operativi appena la modale e visibile. */
+  useLayoutEffect(() => {
     if (!mode) return;
     const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     setQuery('');
     setActiveIndex(0);
-    window.setTimeout(() => {
-      if (mode === 'commands') inputRef.current?.focus();
-      else dialogRef.current?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR)?.focus();
-    }, 0);
+    if (mode === 'commands') inputRef.current?.focus();
+    else dialogRef.current?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR)?.focus();
     return () => previouslyFocused?.focus();
   }, [mode]);
 

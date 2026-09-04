@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import {
   ArrowUpRight,
   ChevronRight,
@@ -21,8 +21,7 @@ import type {
 import type { PillVariant } from '@/lib/patient-workspace';
 import { agendaFilterMatches } from '@/lib/ui-semantic-signal';
 import styles from '../kree8-clinical-cockpit-foundation.module.css';
-
-
+/* @Codex */
 const AI_QUEUE: Kree8DecisionCard[] = [
   {
     title: 'Follow-up suggerito',
@@ -32,6 +31,7 @@ const AI_QUEUE: Kree8DecisionCard[] = [
     pillVariant: 'plum',
     action: 'Apri quadro',
     target: 'scheda',
+    patientId: 'p1',
   },
   {
     title: 'Codifica mancante',
@@ -39,7 +39,8 @@ const AI_QUEUE: Kree8DecisionCard[] = [
       '2 documenti in coda con diagnosi senza ICD. Suggerimento automatico disponibile.',
     pill: 'In coda',
     pillVariant: 'warning',
-    action: 'Vai alla revisione',
+    action: 'Apri documenti',
+    target: 'revisione',
   },
   {
     title: 'Esenzione in scadenza',
@@ -47,9 +48,14 @@ const AI_QUEUE: Kree8DecisionCard[] = [
       'Codice 031 su paziente CD-2026-088 · scade tra 27 giorni. Predisporre rinnovo.',
     pill: 'Attenzione',
     pillVariant: 'warning',
-    action: 'Apri esenzioni',
+    action: 'Apri paziente',
+    target: 'incarico',
+    patientId: 'p2',
   },
 ];
+
+/* @Codex */
+const AGENDA_HEADING_ID = 'turno-agenda-heading';
 
 /* @Codex */
 function formatCountLabel(count: number, singular: string, plural: string): string {
@@ -62,6 +68,7 @@ function TurnoArea({
   patientState,
   agendaState,
   isReview,
+  onSelectPatient,
   onOpenArea,
 }: {
   filter: StatusFilter;
@@ -69,8 +76,10 @@ function TurnoArea({
   patientState: Kree8PatientClientState;
   agendaState: Kree8AgendaClientState;
   isReview: boolean;
+  onSelectPatient: (patientId: string) => void;
   onOpenArea: (area: AreaId) => void;
 }) {
+  const agendaHeadingRef = useRef<HTMLHeadingElement>(null);
   const visibleAgenda = useMemo(() => {
     return agendaState.rows.filter((row) => agendaFilterMatches(filter, row.filterCategory));
   }, [agendaState.rows, filter]);
@@ -146,6 +155,21 @@ function TurnoArea({
       },
     ];
 
+  /* @Codex */
+  const runDecisionAction = (card: Kree8DecisionCard) => {
+    if (card.patientId) onSelectPatient(card.patientId);
+
+    if (card.target === 'turno') {
+      const agendaHeading = agendaHeadingRef.current;
+      if (!agendaHeading) return;
+      agendaHeading.scrollIntoView({ behavior: 'auto', block: 'start' });
+      agendaHeading.focus({ preventScroll: true });
+      return;
+    }
+
+    onOpenArea(card.target);
+  };
+
   return (
     <div className={styles.areaShell}>
       <header className={styles.areaHeader}>
@@ -203,7 +227,14 @@ function TurnoArea({
       <div className={styles.twoCol}>
         <section className={styles.panel}>
           <header className={styles.panelHeader}>
-            <h2 className={styles.panelTitle}>Agenda di oggi</h2>
+            <h2
+              ref={agendaHeadingRef}
+              id={AGENDA_HEADING_ID}
+              className={styles.panelTitle}
+              tabIndex={-1}
+            >
+              Agenda di oggi
+            </h2>
             <PillBadge variant="neutral">
               {formatCountLabel(visibleAgenda.length, 'evento', 'eventi')}
             </PillBadge>
@@ -273,9 +304,8 @@ function TurnoArea({
                   type="button"
                   className={styles.ghostBtnSm}
                   style={{ alignSelf: 'flex-start' }}
-                  onClick={() => {
-                    if (card.target) onOpenArea(card.target);
-                  }}
+                  aria-controls={card.target === 'turno' ? AGENDA_HEADING_ID : undefined}
+                  onClick={() => runDecisionAction(card)}
                 >
                   {card.action}
                   <ChevronRight size={13} />

@@ -6,7 +6,7 @@
    /mockups/kree8 as a review alias. WUL-273 starts the real-data migration for
    live patients/checkups after PIN unlock; the review alias remains synthetic. */
 
-import { type FocusEvent, useEffect, useMemo, useState } from 'react';
+import { type FocusEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { X } from 'lucide-react';
 
@@ -137,6 +137,7 @@ function AreaContent({
           patientState={patientState}
           agendaState={agendaState}
           isReview={isReview}
+          onSelectPatient={onSelectPatient}
           onOpenArea={onOpenArea}
         />
       );
@@ -208,6 +209,8 @@ export function Kree8ClinicalCockpit({
   const isReview = surface === 'review';
   const operatorName = operatorNameProp || (isReview ? 'Review design' : 'Sessione locale');
   const [area, setArea] = useState<AreaId>(() => (isReview ? 'turno' : initialArea));
+  const [areaFocusRequest, setAreaFocusRequest] = useState(0);
+  const focusSurfaceRef = useRef<HTMLElement>(null);
   const [filter, setFilter] = useState<StatusFilter>('all');
   const [patientSearchFocusSignal, setPatientSearchFocusSignal] = useState(0);
   const [commandCenterMode, setCommandCenterMode] = useState<CommandCenterMode>(null);
@@ -227,6 +230,32 @@ export function Kree8ClinicalCockpit({
   const [selectedPatientId, setSelectedPatientId] = useState<string | undefined>(() => (
     isReview ? REVIEW_PATIENT_LIST[0]?.id : initialPatientId
   ));
+
+  /* @Codex: ogni CTA interna termina sul titolo semantico della nuova area.
+     La ricerca conserva invece il proprio target di focus dedicato. */
+  const openArea = useCallback((nextArea: AreaId, focusDestination = true) => {
+    setArea(nextArea);
+    if (focusDestination) setAreaFocusRequest((current) => current + 1);
+  }, []);
+
+  /* @Codex: il contatore rende osservabile anche una richiesta verso l'area
+     gia attiva; requestAnimationFrame lascia completare render e cleanup di
+     eventuali dialog prima di spostare focus e viewport. */
+  useEffect(() => {
+    if (areaFocusRequest === 0) return;
+    const animationFrame = window.requestAnimationFrame(() => {
+      const focusSurface = focusSurfaceRef.current;
+      if (!focusSurface) return;
+      const focusTarget = focusSurface.querySelector<HTMLElement>(
+        'h1, [role="heading"][aria-level="1"]',
+      ) ?? focusSurface;
+      focusTarget.tabIndex = -1;
+      focusTarget.scrollIntoView({ behavior: 'auto', block: 'start' });
+      focusTarget.focus({ preventScroll: true });
+    });
+
+    return () => window.cancelAnimationFrame(animationFrame);
+  }, [areaFocusRequest]);
 
   /* @Codex: owner unico dei soli comandi globali della shell. K1 conserva / e
      j/k nella worklist; i target editabili e modificatori non standard restano
@@ -482,7 +511,7 @@ export function Kree8ClinicalCockpit({
             <button
               key={a.id}
               type="button"
-              onClick={() => setArea(a.id)}
+              onClick={() => openArea(a.id)}
               className={classNames(styles.navItem, selected && styles.navSelected)}
               aria-current={selected ? 'page' : undefined}
               data-lume-frame-nav="true"
@@ -515,9 +544,9 @@ export function Kree8ClinicalCockpit({
           activeArea={area}
           filter={filter}
           setFilter={setFilter}
-          onOpenArea={setArea}
+          onOpenArea={openArea}
           onSearchRequest={() => {
-            setArea('incarico');
+            openArea('incarico', false);
             setPatientSearchFocusSignal((current) => current + 1);
           }}
           onOpenCommand={() => setCommandCenterMode('commands')}
@@ -529,6 +558,8 @@ export function Kree8ClinicalCockpit({
           data-lume-frame-element="panel"
         >
           <main
+            ref={focusSurfaceRef}
+            tabIndex={-1}
             className={styles.focusSurface}
             data-lume-focus="true"
             data-testid="lume-frame-focus"
@@ -550,7 +581,7 @@ export function Kree8ClinicalCockpit({
                   <button
                     key={tab.id}
                     type="button"
-                    onClick={() => setArea(tab.id)}
+                    onClick={() => openArea(tab.id)}
                     aria-current={area === tab.id ? 'page' : undefined}
                     className={`${styles.subareaTab} ${area === tab.id ? styles.subareaTabActive : ''}`}
                   >
@@ -573,7 +604,7 @@ export function Kree8ClinicalCockpit({
                 patientSearchFocusSignal={patientSearchFocusSignal}
                 isReview={isReview}
                 onSelectPatient={setSelectedPatientId}
-                onOpenArea={setArea}
+                onOpenArea={openArea}
                 onRetryPatients={refreshPatients}
               />
             </div>
@@ -584,9 +615,9 @@ export function Kree8ClinicalCockpit({
       <Kree8CommandCenter
         mode={commandCenterMode}
         onClose={() => setCommandCenterMode(null)}
-        onOpenArea={setArea}
+        onOpenArea={openArea}
         onSearchRequest={() => {
-          setArea('incarico');
+          openArea('incarico', false);
           setPatientSearchFocusSignal((current) => current + 1);
         }}
         onShowHelp={() => setCommandCenterMode('help')}
