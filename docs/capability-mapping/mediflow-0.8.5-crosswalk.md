@@ -15,7 +15,7 @@ conflitti restano nei rispettivi file JSON referenziati dalla matrice.
 ## Provenienza congelata
 
 Il manifest sorgente ha SHA-256
-`283b818c4d83854a333cb36b43683049ce657ee76bf4458f3c817032034a9a07`.
+`3022b8c9b87f9a1e1b0aa55c637b6dd626834d3bf02b54cb2bf4a6dd4f975ce3`.
 Comprende nove head indipendenti: baseline, C0, AIP/Mini, Web, keyboard,
 iOS/iPadOS runtime, documenti iOS/iPadOS, macOS runtime e macOS receipt.
 `applyPolicy` è `none` in ogni artefatto di mapping.

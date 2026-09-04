@@ -16,6 +16,13 @@ jobs:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
+      - name: Reject Xcode per-user workspace state
+        run: |
+          tracked_user_state="$(git ls-files | grep -E '(^|/)xcuserdata/|\.xcuserstate$' || true)"
+          if [[ -n "$tracked_user_state" ]]; then
+            printf 'Xcode per-user state must not enter the source archive:\n%s\n' "$tracked_user_state" >&2
+            exit 1
+          fi
       - uses: actions/setup-node@v4
         with:
           node-version: 24
