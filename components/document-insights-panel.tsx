@@ -5,7 +5,6 @@ import { FileText, ChevronDown, ChevronUp, Calendar, Sparkles, AlertTriangle, Tr
 import { ApiConflictError, db, DocumentInsight, Patient } from '@/lib/db';
 import ReactMarkdown from 'react-markdown';
 import PrivacyBlur from '@/components/privacy-blur';
-import { refreshPatientSummaryIfEnabled } from '@/lib/ai-summary-service';
 import { useAiModelLabels } from '@/lib/hooks/use-ai-model-labels';
 import { qualityLabel, documentClassLabel } from '@/lib/ai-labels';
 import { parsePatientDatedRecords } from '@/lib/patient-structured-fields';
@@ -69,17 +68,6 @@ export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanel
             }, patient, nextInsights);
 
             setExpandedId((current) => nextInsights.some((insight) => insight.id === current) ? current : null);
-
-            try {
-                await refreshPatientSummaryIfEnabled(patient.id);
-            } catch (refreshError) {
-                console.warn('[DocumentInsightsPanel] AI summary refresh failed', refreshError);
-                showToast({
-                    tone: 'warning',
-                    title: 'Archivio aggiornato',
-                    description: 'Non è stato possibile riallineare subito AI Patient Insight.'
-                });
-            }
         } catch (error) {
             console.error('[DocumentInsightsPanel] Archive update failed', error);
             if (error instanceof ApiConflictError) {
@@ -151,7 +139,7 @@ export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanel
                     )}
                     <div className="flex items-center gap-1 rounded-full bg-[color:color-mix(in_srgb,var(--lume-ink)_6%,var(--lume-surface-field))] px-2 py-1 text-xs font-medium text-[color:var(--lume-ink-muted)]">
                         <Sparkles className="w-3 h-3" />
-                        OCR + AI
+                        Estrazione locale + AI
                     </div>
                     <button
                         type="button"
@@ -289,7 +277,7 @@ export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanel
 
             <div className="mt-4 flex items-center gap-2 border-t border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] pt-3 text-[10px] text-[color:var(--lume-ink-muted)]">
                 <AlertTriangle className="w-3 h-3 text-[color:color-mix(in_srgb,var(--lume-signal-warning)_60%,var(--lume-ink))]" />
-                <span>{modelLabels ? `Sintesi generata da IA locale (${modelLabels.ocr} + ${modelLabels.clinical}). Verificare sempre.` : 'Sintesi generata da IA locale. Verificare sempre.'}</span>
+                <span>{modelLabels ? `Sintesi generata da IA locale (${modelLabels.clinical}). Verificare sempre.` : 'Sintesi generata da IA locale. Verificare sempre.'}</span>
             </div>
         </div>
     );

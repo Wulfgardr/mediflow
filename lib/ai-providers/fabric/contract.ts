@@ -78,6 +78,13 @@ export type FabricDataClass =
 // proiezioni deterministiche che non producono candidati di scrittura.
 export type FabricReviewPolicy = 'review_first' | 'informational';
 
+/* @Codex */
+export type FabricAvailabilityDisposition =
+    | 'available'
+    | 'proposal_only'
+    | 'manual_only'
+    | 'unavailable';
+
 // ---------------------------------------------------------------------------
 // Venue
 // ---------------------------------------------------------------------------
@@ -164,6 +171,7 @@ export interface FabricCapabilityDescriptor {
     readonly venues: readonly FabricVenue[];
     readonly egressProfileId: EgressProfileId;
     readonly review: FabricReviewPolicy;
+    readonly availabilityDisposition: FabricAvailabilityDisposition;
     // Chiave del kill switch esistente quando la lane ne ha uno; null per le
     // capability deterministiche senza interruttore dedicato.
     readonly killSwitch: string | null;
@@ -173,7 +181,7 @@ export interface FabricCapabilityDescriptor {
     readonly contractSchema: string | null;
     // Punto di ingresso principale nel repository, per audit e provenance
     // (path relativo, non usato a runtime per il dispatch).
-    readonly entryPoint: string;
+    readonly entryPoint: string | null;
 }
 
 // ---------------------------------------------------------------------------

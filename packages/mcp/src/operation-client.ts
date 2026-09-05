@@ -1,0 +1,275 @@
+/* @Codex */
+import { z } from 'zod';
+import {
+  AIP_BOOTSTRAP_BIND_MAX_FRAME_BYTES_V1, AIP_BOOTSTRAP_BIND_SCHEMA_V1, AIP_BOOTSTRAP_ENV_KEY_V1,
+  AIP_BOOTSTRAP_REQUEST_SCHEMA_V1, AIP_BOOTSTRAP_RESULT_SCHEMA_V1,
+  AIP_OPERATION_RPC_AUTHENTICATED_ENV_V1, AIP_OPERATION_RPC_ENV_KEY_V1, AIP_OPERATION_RPC_LATE_BIND_ENV_V1,
+} from '../../aip/src/child-ipc-contract.ts';
+import {
+  CHECKUP_STATUS_TRANSITION_OPERATION_ID, FOLLOW_UP_PROPOSAL_OPERATION_ID, HEADLESS_STATUS,
+  OPEN_LOOPS_OPERATION_ID, OPERATION_DESCRIPTORS,
+  RPC_REQUEST_SCHEMA, RPC_RESULT_SCHEMA, TERMINOLOGY_OPERATION_ID, followUpProposalArgumentsSchema,
+  followUpProposalOutputSchema, openLoopsOutputSchema, publicCatalog, rpcOperationSchema,
+  SEMANTIC_QUERY_OPERATION_ID, selectBoundOperations, semanticQueryArgumentsSchema, semanticQueryOutputSchema,
+  terminologyArgumentsSchema, terminologyOutputSchema,
+  checkupStatusTransitionArgumentsSchema, checkupStatusTransitionOutputSchema,
+  type OperationDescriptor,
+} from './contracts.ts';
+
+const MAX_FRAME_BYTES = 64 * 1024;
+const MAX_REQUESTS = 256;
+const REQUEST_TIMEOUT_MS = 1_000;
+const encoder = new TextEncoder();
+const requestIdSchema = z.string().regex(/^rpc_[a-z0-9][a-z0-9_-]{0,63}$/u);
+const baseResultSchema = z.object({
+  schemaVersion: z.literal(RPC_RESULT_SCHEMA), requestId: requestIdSchema,
+  outcome: z.enum(['completed', 'denied', 'cancelled']),
+}).passthrough();
+type Pending = { resolve: (value: unknown) => void; reject: (error: OperationClientError) => void;
+  timer: ReturnType<typeof setTimeout>; abort?: () => void };
+
+export type OperationClientErrorCode = 'host_unbound' | 'protocol_invalid' | 'operation_denied' | 'cancelled';
+export class OperationClientError extends Error {
+  constructor(public readonly code: OperationClientErrorCode, public readonly denialCode?: string) {
+    super(`MediFlow operation unavailable: ${code}`); this.name = 'OperationClientError';
+  }
+}
+
+export function createOperationClient() {
+  const channel = process;
+  const bootstrapRef = channel.env[AIP_BOOTSTRAP_ENV_KEY_V1];
+  const rpcMode = channel.env[AIP_OPERATION_RPC_ENV_KEY_V1];
+  const validBootstrap = typeof bootstrapRef === 'string' && /^aipb_[0-9a-f]{32}$/u.test(bootstrapRef);
+  const lateBindable = rpcMode === AIP_OPERATION_RPC_LATE_BIND_ENV_V1 && bootstrapRef === undefined;
+  if (typeof channel.send !== 'function' || channel.connected !== true
+      || (!validBootstrap && !lateBindable)
+      || (validBootstrap && rpcMode !== 'inherited_child_ipc_v1'
+        && rpcMode !== AIP_OPERATION_RPC_AUTHENTICATED_ENV_V1)) {
+    throw new OperationClientError('host_unbound');
+  }
+  const pending = new Map<string, Pending>();
+  let sequence = 0;
+  let closed = false;
+  let state: 'unbound' | 'bootstrapping' | 'authenticated' = rpcMode === 'inherited_child_ipc_v1'
+    ? 'authenticated' : validBootstrap ? 'bootstrapping' : 'unbound';
+  let resolveBootstrap = (): void => undefined;
+  let rejectBootstrap: (error: OperationClientError) => void = () => undefined;
+  let bootstrapReady: Promise<void> | null = state === 'authenticated' ? Promise.resolve() : null;
+  let bootstrapTimer: ReturnType<typeof setTimeout> | null = null;
+  const failPending = (error: OperationClientError) => {
+    for (const entry of pending.values()) { clearTimeout(entry.timer); entry.abort?.(); entry.reject(error); }
+    pending.clear();
+  };
+  const onDisconnect = () => {
+    if (closed) return;
+    const error = new OperationClientError('host_unbound');
+    closed = true; channel.off('message', onMessage); failPending(error); rejectBootstrap(error);
+  };
+  const terminal = (error: OperationClientError) => {
+    if (closed) return;
+    closed = true; channel.off('message', onMessage); channel.off('disconnect', onDisconnect); failPending(error);
+    rejectBootstrap(error);
+    if (bootstrapTimer) { clearTimeout(bootstrapTimer); bootstrapTimer = null; }
+    if (channel.connected && typeof channel.disconnect === 'function') channel.disconnect();
+  };
+  const invalid = (): never => {
+    const error = new OperationClientError('protocol_invalid'); terminal(error); throw error;
+  };
+  const onMessage = (frame: unknown) => {
+    if (state === 'unbound') {
+      if (typeof frame !== 'string' || Buffer.byteLength(frame, 'utf8') > AIP_BOOTSTRAP_BIND_MAX_FRAME_BYTES_V1) {
+        terminal(new OperationClientError('protocol_invalid')); return;
+      }
+      let decoded: unknown;
+      try { decoded = JSON.parse(frame); } catch { terminal(new OperationClientError('protocol_invalid')); return; }
+      const bind = z.object({ schemaVersion: z.literal(AIP_BOOTSTRAP_BIND_SCHEMA_V1), operation: z.literal('bind'),
+        bootstrapRef: z.string().regex(/^aipb_[0-9a-f]{32}$/u) }).strict().safeParse(decoded);
+      if (!bind.success) { terminal(new OperationClientError('protocol_invalid')); return; }
+      beginBootstrap(bind.data.bootstrapRef);
+      return;
+    }
+    if (typeof frame !== 'string' || Buffer.byteLength(frame, 'utf8') > MAX_FRAME_BYTES) {
+      terminal(new OperationClientError('protocol_invalid')); return;
+    }
+    let decoded: unknown;
+    try { decoded = JSON.parse(frame); } catch { terminal(new OperationClientError('protocol_invalid')); return; }
+    if (state === 'bootstrapping') {
+      const connected = z.object({ schemaVersion: z.literal(AIP_BOOTSTRAP_RESULT_SCHEMA_V1),
+        outcome: z.literal('connected') }).strict().safeParse(decoded);
+      if (!connected.success) { terminal(new OperationClientError('protocol_invalid')); return; }
+      state = 'authenticated';
+      if (bootstrapTimer) { clearTimeout(bootstrapTimer); bootstrapTimer = null; }
+      resolveBootstrap();
+      return;
+    }
+    const parsed = baseResultSchema.safeParse(decoded);
+    if (!parsed.success) { terminal(new OperationClientError('protocol_invalid')); return; }
+    const entry = pending.get(parsed.data.requestId);
+    if (!entry) return;
+    pending.delete(parsed.data.requestId); clearTimeout(entry.timer); entry.abort?.(); entry.resolve(decoded);
+  };
+  channel.on('message', onMessage); channel.once('disconnect', onDisconnect);
+
+  const nextId = (label: string) => {
+    sequence += 1;
+    if (sequence > MAX_REQUESTS) return invalid();
+    return `rpc_mcp_${label}_${sequence}`;
+  };
+  const publish = (frame: object) => {
+    if (closed || typeof channel.send !== 'function' || channel.connected !== true) {
+      throw new OperationClientError('host_unbound');
+    }
+    const encoded = JSON.stringify(frame);
+    if (Buffer.byteLength(encoded, 'utf8') > MAX_FRAME_BYTES) throw new OperationClientError('protocol_invalid');
+    try { channel.send(encoded); } catch { throw new OperationClientError('host_unbound'); }
+  };
+  const exchangeBound = (frame: Record<string, unknown>, label: string, signal?: AbortSignal,
+    cancelOnTimeout = false): Promise<unknown> => {
+    const requestId = nextId(label);
+    if (signal?.aborted) return Promise.reject(new OperationClientError('cancelled'));
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        if (!pending.delete(requestId)) return;
+        abort?.();
+        if (cancelOnTimeout) {
+          try { publish({ schemaVersion: RPC_REQUEST_SCHEMA, method: 'cancel',
+            requestId: nextId('cancel'), targetRequestId: requestId }); } catch { /* channel is already terminal */ }
+          reject(new OperationClientError('operation_denied', 'timeout'));
+        } else reject(new OperationClientError('protocol_invalid'));
+      }, REQUEST_TIMEOUT_MS);
+      timer.unref();
+      const abort = signal ? () => signal.removeEventListener('abort', onAbort) : undefined;
+      const onAbort = () => {
+        if (!pending.delete(requestId)) return;
+        clearTimeout(timer); abort?.();
+        try { publish({ schemaVersion: RPC_REQUEST_SCHEMA, method: 'cancel',
+          requestId: nextId('cancel'), targetRequestId: requestId }); } catch { /* already terminal */ }
+        reject(new OperationClientError('cancelled'));
+      };
+      pending.set(requestId, { resolve, reject, timer, abort });
+      signal?.addEventListener('abort', onAbort, { once: true });
+      try { publish({ schemaVersion: RPC_REQUEST_SCHEMA, ...frame, requestId }); }
+      catch (error) { pending.delete(requestId); clearTimeout(timer); abort?.(); reject(error as OperationClientError); }
+    });
+  };
+  const exchange = (frame: Record<string, unknown>, label: string, signal?: AbortSignal,
+    cancelOnTimeout = false): Promise<unknown> => {
+    if (state === 'unbound' || (lateBindable && state !== 'authenticated') || !bootstrapReady) {
+      return Promise.reject(new OperationClientError('host_unbound'));
+    }
+    return bootstrapReady.then(() => exchangeBound(frame, label, signal, cancelOnTimeout));
+  };
+  const parseCompleted = (value: unknown, expected: OperationDescriptor): unknown => {
+    const completed = z.object({
+      schemaVersion: z.literal(RPC_RESULT_SCHEMA), requestId: requestIdSchema, outcome: z.literal('completed'),
+      result: z.object({ operation: rpcOperationSchema, value: z.unknown() }).strict(),
+    }).strict().safeParse(value);
+    if (!completed.success) {
+      const denied = z.object({ schemaVersion: z.literal(RPC_RESULT_SCHEMA), requestId: requestIdSchema,
+        outcome: z.literal('denied'), denialCode: z.string().max(64) }).strict().safeParse(value);
+      if (denied.success) throw new OperationClientError('operation_denied', denied.data.denialCode);
+      return invalid();
+    }
+    const actual = completed.data.result.operation;
+    if (actual.operationId !== expected.operationId || actual.capabilityId !== expected.capabilityId
+        || actual.serviceRef !== expected.serviceRef || actual.maximumStage !== expected.maximumStage) {
+      return invalid();
+    }
+    return completed.data.result.value;
+  };
+  const catalog = async (signal?: AbortSignal) => {
+    const value = await exchange({ method: 'catalog' }, 'catalog', signal);
+    const completed = z.object({ schemaVersion: z.literal(RPC_RESULT_SCHEMA), requestId: requestIdSchema,
+      outcome: z.literal('completed'), result: z.object({ operations: z.array(rpcOperationSchema).max(32) }).strict(),
+    }).strict().safeParse(value);
+    if (!completed.success) return invalid();
+    return selectBoundOperations(completed.data.result.operations);
+  };
+  const run = async (descriptor: OperationDescriptor, input: object, signal?: AbortSignal) => {
+    const bound = await catalog(signal);
+    if (!bound.some((item) => item.operationId === descriptor.operationId
+      && item.capabilityId === descriptor.capabilityId && item.serviceRef === descriptor.serviceRef
+      && item.maximumStage === descriptor.maximumStage)) throw new OperationClientError('operation_denied');
+    return parseCompleted(await exchange({ method: 'call', operationId: descriptor.operationId, input },
+      'call', signal, true), descriptor);
+  };
+
+  function beginBootstrap(reference: string): void {
+    state = 'bootstrapping';
+    bootstrapReady = new Promise<void>((resolve, reject) => {
+      resolveBootstrap = resolve; rejectBootstrap = reject;
+    });
+    void bootstrapReady.catch(() => undefined);
+    bootstrapTimer = setTimeout(() => terminal(new OperationClientError('host_unbound')), REQUEST_TIMEOUT_MS);
+    bootstrapTimer.unref();
+    try {
+      publish({ schemaVersion: AIP_BOOTSTRAP_REQUEST_SCHEMA_V1, operation: 'bootstrap', bootstrapRef: reference });
+    } catch { terminal(new OperationClientError('host_unbound')); }
+  }
+  if (state === 'bootstrapping') beginBootstrap(bootstrapRef as string);
+
+  return Object.freeze({
+    catalog,
+    status: async (signal?: AbortSignal) => { await catalog(signal); return HEADLESS_STATUS; },
+    publicCatalog: async (signal?: AbortSignal) => publicCatalog(await catalog(signal)),
+    searchTerminology: async (argumentsValue: unknown, signal?: AbortSignal) => {
+      const args = terminologyArgumentsSchema.parse(argumentsValue);
+      const descriptor = OPERATION_DESCRIPTORS.find((item) => item.operationId === TERMINOLOGY_OPERATION_ID)!;
+      const output = terminologyOutputSchema.safeParse(await run(descriptor, {
+        schemaVersion: descriptor.inputSchema, operationId: descriptor.operationId,
+        system: args.system, query: args.query.trim().replace(/\s+/gu, ' '), limit: args.limit,
+      }, signal));
+      if (!output.success || output.data.items.length > args.limit || output.data.receipt.system !== args.system) {
+        return invalid();
+      }
+      return output.data;
+    },
+    readOpenLoops: async (signal?: AbortSignal) => {
+      const descriptor = OPERATION_DESCRIPTORS.find((item) => item.operationId === OPEN_LOOPS_OPERATION_ID)!;
+      const output = openLoopsOutputSchema.safeParse(await run(descriptor,
+        { schemaVersion: descriptor.inputSchema, operationId: descriptor.operationId }, signal));
+      return output.success ? output.data : invalid();
+    },
+    proposeOpenLoopsFollowUp: async (argumentsValue: unknown, signal?: AbortSignal) => {
+      followUpProposalArgumentsSchema.parse(argumentsValue);
+      const descriptor = OPERATION_DESCRIPTORS.find((item) => item.operationId === FOLLOW_UP_PROPOSAL_OPERATION_ID)!;
+      const output = followUpProposalOutputSchema.safeParse(await run(descriptor,
+        { schemaVersion: descriptor.inputSchema, operationId: descriptor.operationId }, signal));
+      return output.success ? output.data : invalid();
+    },
+    previewCheckupStatusTransition: async (argumentsValue: unknown, signal?: AbortSignal) => {
+      const args = checkupStatusTransitionArgumentsSchema.parse(argumentsValue);
+      const descriptor = OPERATION_DESCRIPTORS.find(
+        (item) => item.operationId === CHECKUP_STATUS_TRANSITION_OPERATION_ID)!;
+      const output = checkupStatusTransitionOutputSchema.safeParse(await run(descriptor, {
+        schemaVersion: descriptor.inputSchema, operationId: descriptor.operationId,
+        checkupRef: args.checkupRef, targetStatus: args.targetStatus, expectedRevision: args.expectedRevision,
+      }, signal));
+      return output.success ? output.data : invalid();
+    },
+    executeSemanticQuery: async (argumentsValue: unknown, signal?: AbortSignal) => {
+      const args = semanticQueryArgumentsSchema.parse(argumentsValue);
+      const descriptor = OPERATION_DESCRIPTORS.find((item) => item.operationId === SEMANTIC_QUERY_OPERATION_ID)!;
+      const steps = args.steps.map((step) => step.operationId === TERMINOLOGY_OPERATION_ID
+        ? { stepRef: step.stepRef, operationId: step.operationId, input: {
+          schemaVersion: 'mediflow.terminology.search.input.v1' as const, operationId: step.operationId,
+          system: step.input.system, query: step.input.query.trim().replace(/\s+/gu, ' '), limit: step.input.limit,
+        } } : { stepRef: step.stepRef, operationId: step.operationId, input: {
+          schemaVersion: 'mediflow.patient.open_loops.read.input.v1' as const, operationId: step.operationId,
+        } });
+      const output = semanticQueryOutputSchema.safeParse(await run(descriptor, {
+        schemaVersion: descriptor.inputSchema, operationId: descriptor.operationId,
+        budget: args.budget, explanation: args.explanation, steps,
+      }, signal));
+      if (!output.success || output.data.steps.length !== args.steps.length
+        || output.data.receipt.durationMs > args.budget.maxDurationMs
+        || encoder.encode(JSON.stringify(output.data)).byteLength > args.budget.maxOutputBytes
+        || output.data.steps.some((step, index) => step.stepRef !== args.steps[index]?.stepRef
+          || step.operationId !== args.steps[index]?.operationId)) return invalid();
+      return output.data;
+    },
+    close: () => {
+      terminal(new OperationClientError('host_unbound'));
+    },
+  });
+}

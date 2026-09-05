@@ -3,8 +3,8 @@
 # MediFlow - one-click launcher (Linux).
 # Avvia la web app locale Next.js e apre il browser. Equivalente di
 # Start_MediFlow.command (macOS) e Start-MediFlow.ps1 (Windows).
-# Non avvia i client Apple. Se Ollama o ICD-11 non sono installati,
-# MediFlow resta usabile con funzionalita ridotte.
+# Non avvia i client Apple. Se Ollama non è disponibile, MediFlow resta usabile
+# con funzionalita ridotte; l'accesso WHO ICD-11 è server-only e opt-in.
 set -euo pipefail
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
@@ -12,6 +12,8 @@ cd "$DIR"
 
 PORT=3000
 URL="http://localhost:${PORT}"
+HELPER="$DIR/scripts/launcher-helpers.mjs"
+READY_TIMEOUT_MS="${MEDIFLOW_LAUNCH_READY_TIMEOUT_MS:-30000}"
 
 echo "==================================================="
 echo "   MediFlow - Avvio (Linux)"
@@ -29,35 +31,69 @@ for candidate in "$path_node" "$HOME"/.nvm/versions/node/v"$REQUIRED_NODE_MAJOR"
         break
     fi
 done
-if ! node scripts/launcher-helpers.mjs check-runtime >/dev/null 2>&1; then
+if ! node "$HELPER" check-runtime >/dev/null 2>&1; then
     echo "  Serve Node ${REQUIRED_NODE_MAJOR}.x con dipendenze installate dalla stessa versione." >&2
     echo "  Esegui npm ci con Node ${REQUIRED_NODE_MAJOR}; non usare npm rebuild." >&2
     exit 1
 fi
 
-# --- 2. Ollama (opzionale: AI/OCR locale) ---
+# @Codex: make the exact checkout identity visible and use it for safe reuse.
+CURRENT_SOURCE_FINGERPRINT="$(node "$HELPER" identity-field sourceFingerprint)"
+node "$HELPER" identity-summary
+echo ""
+
+# --- 2. Ollama (opzionale: funzioni generative locali) ---
 if ! pgrep -x ollama >/dev/null 2>&1; then
     if command -v ollama >/dev/null 2>&1; then
         echo "  Avvio Ollama..."
         ( ollama serve >/dev/null 2>&1 & ) || true
     else
-        echo "  Ollama non installato: AI e OCR locali disattivati. Vedi https://ollama.com"
+        echo "  Ollama non installato: le funzioni generative locali che lo richiedono non sono disponibili. Vedi https://ollama.com"
     fi
 fi
 
-# --- 3. Porta gia occupata? ---
-listener_pid="$(node scripts/launcher-helpers.mjs port-listener "$PORT" || true)"
-if [ -n "$listener_pid" ]; then
-    echo "  MediFlow risulta gia attivo su ${URL} (PID ${listener_pid}). Apro il browser sull'istanza esistente."
-    node scripts/launcher-helpers.mjs open "$URL" || true
+# --- 3. Stato porta: free / occupied / unknown ---
+# @Codex
+port_inspection="$(node "$HELPER" inspect-port "$PORT" || true)"
+IFS='|' read -r port_state listener_pid port_reason <<< "$port_inspection"
+if [ "$port_state" != "free" ] && [ "$port_state" != "occupied" ]; then
+    echo "  Impossibile determinare in sicurezza lo stato della porta ${PORT}." >&2
+    echo "  Avvio bloccato (${port_reason:-ispezione non disponibile})." >&2
+    exit 1
+fi
+if [ "$port_state" = "occupied" ]; then
+    if ! probe_result="$(node "$HELPER" wait-and-open "$URL" "$CURRENT_SOURCE_FINGERPRINT" 5000 250 2>&1)"; then
+        echo "  Porta ${PORT} occupata dal PID ${listener_pid:-sconosciuto}, ma l'istanza non corrisponde a questo checkout." >&2
+        echo "  Riuso negato senza arrestare alcun processo (${probe_result})." >&2
+        exit 1
+    fi
+    echo "  MediFlow ${CURRENT_SOURCE_FINGERPRINT} e gia attivo su ${URL} (PID ${listener_pid:-sconosciuto})."
+    echo "  Verifica endpoint: ${probe_result}"
     exit 0
 fi
 
-# --- 4. Avvio server + apertura browser (non bloccante) ---
-( sleep 5 && node scripts/launcher-helpers.mjs open "$URL" >/dev/null 2>&1 || true ) &
+# --- 4. Avvio server + apertura browser dopo readiness esatta ---
+# @Codex: a free-port race or a mismatched server must never open the browser.
+node "$HELPER" wait-and-open "$URL" "$CURRENT_SOURCE_FINGERPRINT" "$READY_TIMEOUT_MS" 250 &
+readiness_pid=$!
+cleanup_readiness() {
+    if jobs -pr | grep -qx "$readiness_pid"; then
+        kill "$readiness_pid" 2>/dev/null || true
+    fi
+    wait "$readiness_pid" 2>/dev/null || true
+}
+trap cleanup_readiness EXIT INT TERM
 
 echo ""
 echo "  URL: ${URL}"
 echo "  Premi CTRL+C per arrestare."
 echo ""
-exec npm run dev
+set +e
+MEDIFLOW_APP_SOURCE_FINGERPRINT="$CURRENT_SOURCE_FINGERPRINT" \
+MEDIFLOW_APP_FINGERPRINT="$CURRENT_SOURCE_FINGERPRINT" \
+npm run dev
+npm_exit_code=$?
+set -e
+cleanup_readiness
+trap - EXIT INT TERM
+exit "$npm_exit_code"

@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { performance } from 'node:perf_hooks';
+import { resolveAthenaMlxGenerateBin } from './athena-mlx-launcher-config.ts';
 import {
     ATHENA_MLX_DEFAULT_MAX_TOKENS,
     ATHENA_MLX_HARD_MAX_TOKENS,
@@ -45,6 +46,12 @@ export interface AthenaMlxModelArtifact {
     quantizationBits?: number;
 }
 
+export type AthenaMlxLauncher = Readonly<{
+    mode: 'direct' | 'uvx';
+    command: string;
+    prefixArgs: readonly string[];
+}>;
+
 const HF_BF16_REQUIRED_MODEL_FILES = [
     'config.json',
     'tokenizer.json',
@@ -63,6 +70,39 @@ const MLX_CONVERTED_REQUIRED_MODEL_FILES = [
 
 function shellBin(name: string): string {
     return process.env[name] || '';
+}
+
+/**
+ * Resolves either a pre-provisioned offline runner or the historical uvx
+ * launcher. The direct override is a host-owned executable path only: no
+ * arguments, shell fragments, package resolution or network access cross the
+ * boundary.
+ */
+export function resolveAthenaMlxLauncher(): AthenaMlxLauncher {
+    const direct = resolveAthenaMlxGenerateBin(process.env.MEDIFLOW_ATHENA_MLX_GENERATE_BIN);
+    if (direct !== undefined) {
+        return Object.freeze({
+            mode: 'direct' as const,
+            command: direct,
+            prefixArgs: Object.freeze([] as string[]),
+        });
+    }
+
+    const uvx = shellBin('MEDIFLOW_UVX_BIN') || 'uvx';
+    const python = process.env.MEDIFLOW_ATHENA_MLX_PYTHON || '3.12';
+    return Object.freeze({
+        mode: 'uvx' as const,
+        command: uvx,
+        prefixArgs: Object.freeze([
+            '--python',
+            python,
+            '--with',
+            'transformers==4.56.2',
+            '--from',
+            ATHENA_MLX_LM_PACKAGE,
+            'mlx_lm.generate',
+        ]),
+    });
 }
 
 export function defaultAthenaMlxModelDir(): string {
@@ -143,8 +183,7 @@ export async function generateWithAthenaMlx(options: AthenaMlxGenerateOptions): 
         throw new Error(`ATHENA-R1-Qwen3-8B local model artifact is incomplete or missing at ${modelDir}; missing: ${artifact.missingFiles.join(', ')}`);
     }
 
-    const uvx = shellBin('MEDIFLOW_UVX_BIN') || 'uvx';
-    const python = process.env.MEDIFLOW_ATHENA_MLX_PYTHON || '3.12';
+    const launcher = resolveAthenaMlxLauncher();
     const maxTokens = String(resolveAthenaMlxMaxTokens(options.maxTokens));
     const temperature = String(options.temperature ?? 0);
     const topP = String(options.topP ?? 1);
@@ -153,13 +192,7 @@ export async function generateWithAthenaMlx(options: AthenaMlxGenerateOptions): 
     const timeoutMs = options.timeoutMs ?? 420_000;
     const start = performance.now();
     const args = [
-        '--python',
-        python,
-        '--with',
-        'transformers==4.56.2',
-        '--from',
-        ATHENA_MLX_LM_PACKAGE,
-        'mlx_lm.generate',
+        ...launcher.prefixArgs,
         '--model',
         modelDir,
         '--prompt',
@@ -180,7 +213,7 @@ export async function generateWithAthenaMlx(options: AthenaMlxGenerateOptions): 
 
     return new Promise((resolve, reject) => {
         let forceKillTimer: NodeJS.Timeout | null = null;
-        const child = spawn(uvx, args, {
+        const child = spawn(launcher.command, args, {
             stdio: ['pipe', 'pipe', 'pipe'],
             env: {
                 ...process.env,

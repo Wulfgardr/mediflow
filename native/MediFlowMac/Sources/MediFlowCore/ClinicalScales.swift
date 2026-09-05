@@ -1,6 +1,7 @@
 // A10: clinical scales ported from lib/scale-definitions.ts. A completed scale is
 // stored exactly as the web stores it: a diary entry of type "scale" whose
 // encrypted metadata carries { title, scaleId, score, interpretation, answers }.
+// @Codex MF085-002: source-bound instruments additionally carry nested instrument provenance.
 // Pure and unit-tested; the view drives the questions and the model submits.
 import Foundation
 
@@ -17,9 +18,18 @@ public struct ClinicalScaleQuestion: Identifiable, Equatable, Sendable {
     public let id: String
     public let text: String
     public let options: [ClinicalScaleOption]
+    // @Codex MF085-003: all current catalog items are required; optional stays explicit.
+    public let isRequired: Bool
+
+    public init(id: String, text: String, options: [ClinicalScaleOption], isRequired: Bool = true) {
+        self.id = id
+        self.text = text
+        self.options = options
+        self.isRequired = isRequired
+    }
 }
 
-public struct ClinicalScaleResult: Equatable {
+public struct ClinicalScaleResult: Equatable, Sendable {
     public let score: Int
     public let interpretation: String
     public let answers: [String: Int]
@@ -30,6 +40,8 @@ public struct ClinicalScaleDefinition: Identifiable, Equatable, Sendable {
     public let title: String
     public let scaleDescription: String
     public let questions: [ClinicalScaleQuestion]
+    public let instrument: ClinicalScaleInstrumentProvenance?
+    public let isRetired: Bool
     // Total points if every question is answered with its maximum option.
     public var maxScore: Int {
         questions.reduce(0) { $0 + ($1.options.map(\.value).max() ?? 0) }
@@ -42,22 +54,47 @@ public struct ClinicalScaleDefinition: Identifiable, Equatable, Sendable {
         title: String,
         scaleDescription: String,
         questions: [ClinicalScaleQuestion],
+        instrument: ClinicalScaleInstrumentProvenance? = nil,
+        isRetired: Bool = false,
         interpret: @escaping @Sendable (Int) -> String
     ) {
         self.id = id
         self.title = title
         self.scaleDescription = scaleDescription
         self.questions = questions
+        self.instrument = instrument
+        self.isRetired = isRetired
         self.interpret = interpret
     }
 
     public static func == (lhs: ClinicalScaleDefinition, rhs: ClinicalScaleDefinition) -> Bool {
         lhs.id == rhs.id && lhs.questions == rhs.questions
+            && lhs.title == rhs.title && lhs.scaleDescription == rhs.scaleDescription
+            && lhs.instrument == rhs.instrument && lhs.isRetired == rhs.isRetired
     }
 
-    /// Sum scoring (matches every ported scale's scoringLogic), then interpret.
-    public func result(from answers: [String: Int]) -> ClinicalScaleResult {
-        let score = questions.reduce(0) { $0 + (answers[$1.id] ?? 0) }
+    /// @Codex MF085-003: no result for partial, foreign or invalid answers; explicit zero is valid.
+    public func result(from answers: [String: Int]) throws -> ClinicalScaleResult {
+        guard !isRetired else { throw ClinicalScaleValidationError.inactiveInstrument }
+        let ids = Set(questions.map(\.id))
+        guard !ids.isEmpty, ids.count == questions.count,
+              questions.allSatisfy({ !$0.options.isEmpty }) else {
+            throw ClinicalScaleValidationError.invalidDefinition
+        }
+        guard Set(answers.keys).isSubset(of: ids) else { throw ClinicalScaleValidationError.foreignAnswers }
+        var score = 0
+        for question in questions {
+            guard let answer = answers[question.id] else {
+                if question.isRequired { throw ClinicalScaleValidationError.missingAnswer(question.id) }
+                continue
+            }
+            guard question.options.contains(where: { $0.value == answer }) else {
+                throw ClinicalScaleValidationError.invalidAnswer(question.id)
+            }
+            let addition = score.addingReportingOverflow(answer)
+            guard !addition.overflow else { throw ClinicalScaleValidationError.invalidDefinition }
+            score = addition.partialValue
+        }
         return ClinicalScaleResult(score: score, interpretation: interpret(score), answers: answers)
     }
 }
@@ -110,6 +147,7 @@ public enum ClinicalScales {
             q("g7", "Tronco", [("0. Oscillazione/Flessione", 0), ("1. Stabile", 1)]),
             q("g8", "Cammino (Talloni)", [("0. Distanziati", 0), ("1. Quasi si toccano", 1)]),
         ],
+        isRetired: true, // @Codex MF085-002: preserved legacy semantics, never resubmitted.
         interpret: { score in
             if score <= 18 { return "ALTO Rischio di Caduta (< 19)" }
             if score <= 24 { return "MEDIO Rischio di Caduta (19-24)" }
@@ -211,12 +249,12 @@ public enum ClinicalScales {
         }
     )
 
-    // Web library order = Object.values(SCALES) = [tinetti, adl, iadl, mmse, gds].
-    public static let all: [ClinicalScaleDefinition] = [tinetti, adl, iadl, mmse, gds]
+    // @Codex: Web/native active catalogs use only the new source-bound Tinetti ID.
+    public static let all: [ClinicalScaleDefinition] = [tinettiPOMA28V1, adl, iadl, mmse, gds]
 
     // Multi-option question factory (Tinetti/MMSE have 3/4-way options; GDS inverts
     // per-item order), building options from (label, value) tuples in order.
-    private static func q(_ id: String, _ text: String, _ options: [(String, Int)]) -> ClinicalScaleQuestion {
+    static func q(_ id: String, _ text: String, _ options: [(String, Int)]) -> ClinicalScaleQuestion {
         ClinicalScaleQuestion(
             id: id, text: text,
             options: options.map { ClinicalScaleOption(label: $0.0, value: $0.1) }
@@ -233,20 +271,26 @@ public enum ClinicalScales {
         )
     }
 
-    /// The entry metadata JSON the web persists for a scale, byte-shape matching
-    /// app/patients/[id]/scales/[scaleId]/page.tsx so the web can read it back.
-    public static func metadataJSON(definition: ClinicalScaleDefinition, result: ClinicalScaleResult) -> String? {
+    /// @Codex: metadata is emitted only for a canonical, complete result.
+    public static func metadataJSON(definition: ClinicalScaleDefinition, result: ClinicalScaleResult) throws -> String {
+        let canonical = try activeDefinition(matching: definition)
+        let checked = try canonical.result(from: result.answers)
+        guard checked == result else { throw ClinicalScaleValidationError.inconsistentResult }
         let payload = ScaleMetadata(
-            title: definition.title,
-            scaleId: definition.id,
-            score: result.score,
-            interpretation: result.interpretation,
-            answers: result.answers
+            title: canonical.title,
+            scaleId: canonical.id,
+            score: checked.score,
+            interpretation: checked.interpretation,
+            answers: checked.answers,
+            instrument: canonical.instrument
         )
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-        guard let data = try? encoder.encode(payload) else { return nil }
-        return String(data: data, encoding: .utf8)
+        let data = try encoder.encode(payload)
+        guard let json = String(data: data, encoding: .utf8) else {
+            throw ClinicalScaleValidationError.metadataEncoding
+        }
+        return json
     }
 
     public static func contentSummary(definition: ClinicalScaleDefinition, result: ClinicalScaleResult) -> String {
@@ -259,5 +303,6 @@ public enum ClinicalScales {
         let score: Int
         let interpretation: String
         let answers: [String: Int]
+        let instrument: ClinicalScaleInstrumentProvenance?
     }
 }

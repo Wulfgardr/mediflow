@@ -28,7 +28,7 @@ Questo run è solo post-0.8. Non modifica, promuove o pubblica il candidato 0.8.
 
 | Campo | Valore |
 | --- | --- |
-| Root programma | `/Users/leonardopegollo/.codex/worktrees/wul269-post08-ollama-locality/medical-record-app` |
+| Root programma | `<wul269-worktree>/medical-record-app` |
 | Branch | `codex/WUL-269-post-0.8-ollama-locality` |
 | Baseline immutabile | `2355a46a4dde63b1956a2298d99ef0b5c4208222` |
 | Candidato 0.8 | `codex/mediflow-0.8-release-candidate-local`, pulito sulla baseline |
@@ -46,7 +46,7 @@ egress/privacy terminale.
 
 | Fonte | Uso nel run |
 | --- | --- |
-| Audit Open Minis `019fa026-2b8b-7201-a756-8861aa115fce` | Baseline clean-room e separazione dei piani di autorità |
+| Audit Open Minis `<historical-audit-task>` | Baseline clean-room e separazione dei piani di autorità |
 | ADR 0086 | Contratto scaffold intelligente, accettato per il programma post-0.8 |
 | WUL-269 | Packet locality/no-egress Ollama consegnato nel branch |
 | WUL-499 | ADR e contratto provider; nessuna mutazione Linear |
@@ -262,7 +262,7 @@ un altro piano.
 
 | Campo | Valore |
 | --- | --- |
-| Worktree | `/Users/leonardopegollo/.codex/worktrees/wul502-post08-provider-registry/medical-record-app` |
+| Worktree | `<wul502-worktree>/medical-record-app` |
 | Branch | `codex/WUL-502-post-0.8-provider-registry` |
 | Base | `b09b538d8647760f1d5bfa94de8d84b19497712d` |
 | Commit contratto | `4e2bb68f5` |
@@ -328,7 +328,7 @@ consenso, capability specifiche del modello e UX multipiattaforma.
 
 | Campo | Valore |
 | --- | --- |
-| Worktree | `/Users/leonardopegollo/.codex/worktrees/wul418-post08-runtime-matrix/medical-record-app` |
+| Worktree | `<wul418-worktree>/medical-record-app` |
 | Branch | `codex/WUL-418-post-0.8-runtime-matrix` |
 | Base | `18088c008` |
 | Commit matrice | `cc6c036cd` |

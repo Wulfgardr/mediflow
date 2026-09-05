@@ -6,6 +6,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { after, test } from 'node:test';
+import { loginWithWebAuthControl } from './web-auth-control-test-client.mjs';
 
 const BASE_URL = process.env.E2E_BASE_URL || 'http://127.0.0.1:3400';
 const LOCAL_API_TOKEN = process.env.MEDIFLOW_LOCAL_API_TOKEN || 'mediflow-network-write-smoke-local-token';
@@ -48,19 +49,14 @@ test('paired checkup write requires capability, session, scope, version, and PHI
             'Desk iPad checkup writer',
         );
 
-        const login = await request('POST', '/api/auth/login', {
-            body: {
-                username: USERNAME,
-                password: PIN,
-            },
-        });
+        const login = await loginWithWebAuthControl(BASE_URL, { username: USERNAME, password: PIN });
         assert.equal(login.response.status, 200);
-        const sessionCookie = extractSessionCookie(login.response);
+        const cookieHeader = login.cookieHeader;
 
         const readOnlyCreate = await request('POST', `/api/v1/network/patients/${patientId}/checkups`, {
             headers: {
                 ...pairedHeaders(readOnlyClient),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
             body: {
                 date: '2026-05-02T09:00:00.000Z',
@@ -87,7 +83,7 @@ test('paired checkup write requires capability, session, scope, version, and PHI
         const plaintextNotes = await request('POST', `/api/v1/network/patients/${patientId}/checkups`, {
             headers: {
                 ...pairedHeaders(checkupWriter),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
             body: {
                 date: '2026-05-02T09:00:00.000Z',
@@ -103,7 +99,7 @@ test('paired checkup write requires capability, session, scope, version, and PHI
         const create = await request('POST', `/api/v1/network/patients/${patientId}/checkups`, {
             headers: {
                 ...pairedHeaders(checkupWriter),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
             body: {
                 date: '2026-05-02T09:00:00.000Z',
@@ -118,10 +114,23 @@ test('paired checkup write requires capability, session, scope, version, and PHI
         assert.ok(typeof checkupId === 'string' && checkupId.length > 0);
         assert.equal(create.json?.version, 1);
 
+        const checkupList = await request('GET', `/api/v1/network/patients/${patientId}/checkups?status=pending&limit=10`, {
+            headers: {
+                ...pairedHeaders(checkupWriter),
+                Cookie: cookieHeader,
+            },
+        });
+        assert.equal(checkupList.response.status, 200);
+        assert.ok(Array.isArray(checkupList.json));
+        const listedCheckup = checkupList.json.find((checkup) => checkup.id === checkupId);
+        assert.ok(listedCheckup, 'Patient-scoped checkup list must include the synthetic checkup');
+        assert.equal(listedCheckup.title, 'Controllo rete');
+        assert.equal(listedCheckup.version, 1);
+
         const detail = await request('GET', `/api/v1/network/patients/${patientId}/checkups/${checkupId}`, {
             headers: {
                 ...pairedHeaders(checkupWriter),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
         });
         assert.equal(detail.response.status, 200);
@@ -135,7 +144,7 @@ test('paired checkup write requires capability, session, scope, version, and PHI
         const update = await request('PUT', `/api/v1/network/patients/${patientId}/checkups/${checkupId}`, {
             headers: {
                 ...pairedHeaders(checkupWriter),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
             body: {
                 version: 1,
@@ -148,7 +157,7 @@ test('paired checkup write requires capability, session, scope, version, and PHI
         const updatedDetail = await request('GET', `/api/v1/network/patients/${patientId}/checkups/${checkupId}`, {
             headers: {
                 ...pairedHeaders(checkupWriter),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
         });
         assert.equal(updatedDetail.response.status, 200);
@@ -158,7 +167,7 @@ test('paired checkup write requires capability, session, scope, version, and PHI
         const conflict = await request('PUT', `/api/v1/network/patients/${patientId}/checkups/${checkupId}`, {
             headers: {
                 ...pairedHeaders(checkupWriter),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
             body: {
                 version: 1,
@@ -175,7 +184,7 @@ test('paired checkup write requires capability, session, scope, version, and PHI
         const aiField = await request('PUT', `/api/v1/network/patients/${patientId}/checkups/${checkupId}`, {
             headers: {
                 ...pairedHeaders(checkupWriter),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
             body: {
                 version: 2,
@@ -188,7 +197,7 @@ test('paired checkup write requires capability, session, scope, version, and PHI
         const plaintextDeletionReason = await request('PUT', `/api/v1/network/patients/${patientId}/checkups/${checkupId}`, {
             headers: {
                 ...pairedHeaders(checkupWriter),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
             body: {
                 version: 2,
@@ -203,7 +212,7 @@ test('paired checkup write requires capability, session, scope, version, and PHI
         const softDelete = await request('PUT', `/api/v1/network/patients/${patientId}/checkups/${checkupId}`, {
             headers: {
                 ...pairedHeaders(checkupWriter),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
             body: {
                 version: 2,
@@ -216,7 +225,7 @@ test('paired checkup write requires capability, session, scope, version, and PHI
         const deletedDetail = await request('GET', `/api/v1/network/patients/${patientId}/checkups/${checkupId}`, {
             headers: {
                 ...pairedHeaders(checkupWriter),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
         });
         assert.equal(deletedDetail.response.status, 200);
@@ -227,7 +236,7 @@ test('paired checkup write requires capability, session, scope, version, and PHI
         const remoteHardDelete = await request('DELETE', `/api/v1/network/patients/${patientId}/checkups/${checkupId}`, {
             headers: {
                 ...pairedHeaders(checkupWriter),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
             body: {
                 version: 3,
@@ -235,7 +244,7 @@ test('paired checkup write requires capability, session, scope, version, and PHI
         });
         assert.equal(remoteHardDelete.response.status, 405);
 
-        const createdAudit = await findAuditEvent('checkup.created', checkupId, sessionCookie);
+        const createdAudit = await findAuditEvent('checkup.created', checkupId, cookieHeader);
         assert.equal(createdAudit.actorType, 'user');
         assert.equal(createdAudit.sourceSurface, 'native');
         assert.ok(createdAudit.redactedMetadata?.flags?.includes('auth:paired-client'));
@@ -243,11 +252,11 @@ test('paired checkup write requires capability, session, scope, version, and PHI
         assert.deepEqual(createdAudit.redactedMetadata?.changedFields, ['date', 'title', 'status', 'notes', 'source']);
         assert.equal(createdAudit.redactedMetadata?.resourceVersion, 1);
 
-        const updatedAudit = await findAuditEvent('checkup.updated', checkupId, sessionCookie);
+        const updatedAudit = await findAuditEvent('checkup.updated', checkupId, cookieHeader);
         assert.deepEqual(updatedAudit.redactedMetadata?.changedFields, ['status']);
         assert.equal(updatedAudit.redactedMetadata?.resourceVersion, 2);
 
-        const deletedAudit = await findAuditEvent('checkup.deleted', checkupId, sessionCookie);
+        const deletedAudit = await findAuditEvent('checkup.deleted', checkupId, cookieHeader);
         assert.deepEqual(deletedAudit.redactedMetadata?.changedFields, ['deletedAt', 'deletionReason']);
         assert.equal(deletedAudit.redactedMetadata?.resourceVersion, 3);
 
@@ -272,10 +281,10 @@ test('paired checkup write requires capability, session, scope, version, and PHI
     }
 });
 
-async function findAuditEvent(eventType, subjectRef, sessionCookie) {
+async function findAuditEvent(eventType, subjectRef, cookieHeader) {
     const audit = await request('GET', `/api/system/audit?eventType=${eventType}&subjectType=checkup&limit=20`, {
         headers: {
-            Cookie: sessionCookie,
+            Cookie: cookieHeader,
         },
     });
     assert.equal(audit.response.status, 200);
@@ -403,19 +412,6 @@ function pairedHeaders(client) {
         'x-mediflow-paired-client-id': client.pairedClientId,
         'x-mediflow-paired-client-token': client.pairedClientToken,
     };
-}
-
-function extractSessionCookie(response) {
-    const setCookies = typeof response.headers.getSetCookie === 'function'
-        ? response.headers.getSetCookie()
-        : [];
-    const cookieSource = setCookies.find((cookie) => cookie.startsWith('mediflow_session='))
-        ?? response.headers.get('set-cookie');
-    if (!cookieSource) {
-        throw new Error('mediflow_session cookie was not returned by /api/auth/login');
-    }
-
-    return cookieSource.split(';')[0];
 }
 
 async function request(method, pathname, { headers = {}, body } = {}) {

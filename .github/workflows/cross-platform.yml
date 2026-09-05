@@ -11,6 +11,46 @@ on:
       - main
 
 jobs:
+  headless-contracts:
+    name: Headless contracts (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install (npm ci)
+        run: npm ci
+      - name: Deny DB, Web, native and network imports in portable surfaces
+        run: npm run check:headless-portable-imports
+      - name: Run the shared AIP, Mini and MCP contracts
+        run: npm run test:headless-portable
+      - name: Verify cross-platform launcher identity and safe reuse
+        run: npm run test:launcher-helpers
+      - name: Parse the Windows launcher
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path './Start-MediFlow.ps1'),
+            [ref] $tokens,
+            [ref] $errors
+          ) | Out-Null
+          if ($errors.Count -gt 0) {
+            $errors | ForEach-Object { Write-Error $_ }
+            exit 1
+          }
+      - name: Verify the native development launcher
+        if: runner.os == 'macOS'
+        run: npm run test:native-launcher
+
   build-start:
     name: build + start (${{ matrix.os }})
     runs-on: ${{ matrix.os }}

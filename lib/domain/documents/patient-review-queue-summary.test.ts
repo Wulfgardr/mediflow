@@ -64,7 +64,8 @@ test('disabled kill switches surface as "bloccato" with a visible why', () => {
 
     assert.equal(smartImport.state, 'bloccato');
     assert.equal(smartImport.anchor, '#documenti');
-    assert.match(smartImport.blockedReason ?? '', /nessun suggerimento viene scritto/);
+    assert.match(smartImport.blockedReason ?? '', /nessuna anteprima parte/);
+    assert.match(smartImport.blockedReason ?? '', /nessuna proposta viene prodotta/);
 });
 
 test('insight row distinguishes saved insight from never-generated state', () => {
@@ -138,49 +139,20 @@ test('smart import without analysis stays on-demand and never auto-runs', () => 
     assert.equal(smartImport.anchor, '#documenti');
 });
 
-test('smart import analysis counts map to review-first states', () => {
-    const ready = baseInput();
-    ready.smartImport = {
+test('smart import ignores legacy analysis state and remains an on-demand preview', () => {
+    const input = baseInput();
+    const legacySmartImport = {
         enabled: true,
         sourceCount: 4,
         analysis: { hasAnalysis: true, reviewable: 2, blocked: 1, ready: 3 },
     };
-    const readyRow = buildPatientReviewQueueSummary(ready).rows[2];
-    assert.equal(readyRow.state, 'pronto-da-applicare');
-    assert.equal(readyRow.stateLabel, 'Pronto da applicare');
-    assert.match(readyRow.detail, /3 suggerimenti selezionati/);
-    assert.match(readyRow.detail, /2 da rivedere/);
-    assert.match(readyRow.detail, /1 bloccati/);
-    assert.match(readyRow.blockedReason ?? '', /non li scrive senza correzione manuale/);
+    input.smartImport = legacySmartImport;
 
-    const reviewable = baseInput();
-    reviewable.smartImport = {
-        enabled: true,
-        sourceCount: 4,
-        analysis: { hasAnalysis: true, reviewable: 2, blocked: 0, ready: 0 },
-    };
-    const reviewableRow = buildPatientReviewQueueSummary(reviewable).rows[2];
-    assert.equal(reviewableRow.state, 'da-rivedere');
-    assert.equal(reviewableRow.blockedReason, undefined);
-
-    const blocked = baseInput();
-    blocked.smartImport = {
-        enabled: true,
-        sourceCount: 4,
-        analysis: { hasAnalysis: true, reviewable: 0, blocked: 2, ready: 0 },
-    };
-    const blockedRow = buildPatientReviewQueueSummary(blocked).rows[2];
-    assert.equal(blockedRow.state, 'bloccato');
-    assert.match(blockedRow.blockedReason ?? '', /profilo attuale/);
-
-    const drained = baseInput();
-    drained.smartImport = {
-        enabled: true,
-        sourceCount: 4,
-        analysis: { hasAnalysis: true, reviewable: 0, blocked: 0, ready: 0 },
-    };
-    const drainedRow = buildPatientReviewQueueSummary(drained).rows[2];
-    assert.equal(drainedRow.state, 'gia-applicato');
+    const smartImport = buildPatientReviewQueueSummary(input).rows[2];
+    assert.equal(smartImport.state, 'disponibile');
+    assert.match(smartImport.detail, /anteprima/);
+    assert.match(smartImport.detail, /solo su richiesta/);
+    assert.doesNotMatch(`${smartImport.stateLabel} ${smartImport.detail} ${smartImport.blockedReason ?? ''}`, /applic|selezionat|già applicato/iu);
 });
 
 test('archive row flags attachments without extracted text as "serve testo"', () => {
@@ -190,7 +162,7 @@ test('archive row flags attachments without extracted text as "serve testo"', ()
     const archive = buildPatientReviewQueueSummary(input).rows[3];
     assert.equal(archive.state, 'serve-testo');
     assert.match(archive.detail, /2 allegati su 5/);
-    assert.match(archive.detail, /OCR o sintesi/);
+    assert.match(archive.detail, /estrazione locale o revisione manuale/);
 
     const complete = baseInput();
     complete.archive = { attachmentsCount: 3, missingTextCount: 0 };
@@ -204,13 +176,12 @@ test('attentionCount counts only rows that need clinician action', () => {
         smartImport: {
             enabled: true,
             sourceCount: 2,
-            analysis: { hasAnalysis: true, reviewable: 0, blocked: 0, ready: 1 }, // pronto
         },
         archive: { attachmentsCount: 1, missingTextCount: 0 },   // disponibile
     };
 
     const summary = buildPatientReviewQueueSummary(input);
-    assert.equal(summary.attentionCount, 3);
+    assert.equal(summary.attentionCount, 2);
 
     const calm: PatientReviewQueueInput = {
         insight: { enabled: true, hasSummary: true },

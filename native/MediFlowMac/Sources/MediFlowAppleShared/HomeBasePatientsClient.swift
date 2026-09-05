@@ -22,13 +22,24 @@ public actor HomeBasePatientsClient {
         self.session = URLSession(configuration: sessionConfiguration, delegate: delegate, delegateQueue: nil)
     }
 
-    public func login(username: String?, password: String) async throws -> HomeBaseLoginResult {
+    /* @Codex */
+    public func login(
+        username: String?, password: String, credentials: HomeBasePairedCredentials
+    ) async throws -> HomeBaseLoginResult {
+        guard Self.hasPairedCredentials(credentials) else { throw HomeBaseClientError.contract }
         let url = try configuration.serverURL()
             .appendingPathComponent("api")
             .appendingPathComponent("auth")
+            .appendingPathComponent("native")
             .appendingPathComponent("login")
         let body = try JSONEncoder().encode(AuthLoginRequest(username: username, password: password))
-        let (data, response) = try await send(to: url, method: "POST", body: body)
+        let (data, response) = try await send(
+            to: url,
+            method: "POST",
+            headers: pairedLoginHeaders(credentials: credentials),
+            body: body,
+            includesSourceSurface: false
+        )
         let sessionCookie = try Self.extractSessionCookie(from: response, url: url)
         // The login body carries the wrapped master key + PBKDF2 salt (same as the
         // web client). We keep them so the PIN can unwrap the field-crypto key.
@@ -60,7 +71,7 @@ public actor HomeBasePatientsClient {
         let (data, _) = try await send(
             to: url,
             method: "POST",
-            headers: accountHeaders(sessionCookie: sessionCookie),
+            headers: accountHeaders(credentials: credentials, sessionCookie: sessionCookie),
             body: encode(AuthChangePinRequest(
                 currentPin: currentPin,
                 newPin: newPin,
@@ -79,11 +90,19 @@ public actor HomeBasePatientsClient {
             .appendingPathComponent("api")
             .appendingPathComponent("auth")
             .appendingPathComponent("logout")
-        let (data, _) = try await send(
+        let (data, response) = try await send(
             to: url,
             method: "POST",
-            headers: accountHeaders(sessionCookie: sessionCookie)
+            headers: accountHeaders(credentials: credentials, sessionCookie: sessionCookie)
         )
+        // Logout is the only acknowledgement boundary that accepts the HTTP
+        // no-content variant. A body would contradict the 204 contract.
+        if response.statusCode == 204 {
+            guard data.isEmpty else {
+                throw HomeBaseClientError.contract
+            }
+            return HomeBaseMutationAcknowledgement(success: true)
+        }
         return try decode(HomeBaseMutationAcknowledgement.self, from: data)
     }
 
@@ -101,7 +120,7 @@ public actor HomeBasePatientsClient {
         let (data, _) = try await send(
             to: url,
             method: "PUT",
-            headers: accountHeaders(sessionCookie: sessionCookie),
+            headers: accountHeaders(credentials: credentials, sessionCookie: sessionCookie),
             body: encode(AuthProfileUpdateRequest(
                 id: userId,
                 displayName: displayName,
@@ -1245,8 +1264,25 @@ public actor HomeBasePatientsClient {
         ]
     }
 
-    private func accountHeaders(sessionCookie: String) -> [String: String] {
-        ["Cookie": sessionCookie]
+    /* @Codex */
+    private func pairedLoginHeaders(credentials: HomeBasePairedCredentials) -> [String: String] {
+        [
+            "x-mediflow-paired-client-id": credentials.clientId,
+            "x-mediflow-paired-client-token": credentials.clientToken,
+        ]
+    }
+
+    /* @Codex */
+    private func accountHeaders(
+        credentials: HomeBasePairedCredentials, sessionCookie: String
+    ) -> [String: String] {
+        pairedLoginHeaders(credentials: credentials).merging(["Cookie": sessionCookie]) { _, new in new }
+    }
+
+    /* @Codex */
+    private static func hasPairedCredentials(_ credentials: HomeBasePairedCredentials) -> Bool {
+        !credentials.clientId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !credentials.clientToken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     private static func queryDateValue(_ date: Date) -> String {
@@ -1259,12 +1295,15 @@ public actor HomeBasePatientsClient {
         to url: URL,
         method: String = "GET",
         headers: [String: String] = [:],
-        body: Data? = nil
+        body: Data? = nil,
+        includesSourceSurface: Bool = true
     ) async throws -> (Data, HTTPURLResponse) {
         var request = URLRequest(url: url)
         request.httpMethod = method
         request.httpBody = body
-        request.setValue("native", forHTTPHeaderField: "X-MediFlow-Source-Surface")
+        if includesSourceSurface {
+            request.setValue("native", forHTTPHeaderField: "X-MediFlow-Source-Surface")
+        }
         for (key, value) in headers {
             request.setValue(value, forHTTPHeaderField: key)
         }

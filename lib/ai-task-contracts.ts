@@ -2,6 +2,9 @@
 import { filterServicePrescriptionTherapyCandidates, isServicePrescriptionLikeTherapy } from './prescription-boundary';
 import { stripModelArtifacts } from './model-artifacts';
 import { AI_TASK_EXTRACTION_SCHEMA_VERSION } from './ai-task-contract-prompts';
+import { SMART_IMPORT_PROPOSAL_WIRE_LIMITS } from './smart-import-proposal-wire';
+
+export { SMART_IMPORT_PROPOSAL_WIRE_LIMITS } from './smart-import-proposal-wire';
 
 /* @Codex */
 export {
@@ -874,7 +877,10 @@ export type DocumentSynthesisExtraction = AITaskEnvelope<'document_synthesis', D
 
 const MAX_SHARED_SUMMARY_CHARS = 220;
 const MAX_INSIGHT_CLAIM_CHARS = 220;
-const MAX_SMART_IMPORT_TEXT_CHARS = 220;
+const MAX_SMART_IMPORT_TEXT_CHARS = SMART_IMPORT_PROPOSAL_WIRE_LIMITS.text;
+const MAX_SMART_IMPORT_REFERENCE_CHARS = SMART_IMPORT_PROPOSAL_WIRE_LIMITS.reference;
+const MAX_SMART_IMPORT_EXPLICIT_CODE_CHARS = SMART_IMPORT_PROPOSAL_WIRE_LIMITS.explicitCode;
+const MAX_SMART_IMPORT_PRIORITY_CHARS = SMART_IMPORT_PROPOSAL_WIRE_LIMITS.priority;
 const MAX_DOCUMENT_SUMMARY_CHARS = 700;
 const MAX_DOCUMENT_MEDICATION_CHARS = 180;
 
@@ -1152,8 +1158,8 @@ function normalizeSmartImportDiagnosis(value: unknown): SmartImportDiagnosisExtr
         icdQuery: normalizeCompactText(record.icdQuery, MAX_SMART_IMPORT_TEXT_CHARS) || label,
         confidence: normalizeConfidence(record.confidence),
         evidence,
-        sourceId: normalizeCompactText(record.sourceId, 80) || undefined,
-        explicitCode: normalizeCompactText(record.explicitCode, 32).toUpperCase() || undefined,
+        sourceId: normalizeCompactText(record.sourceId, MAX_SMART_IMPORT_REFERENCE_CHARS) || undefined,
+        explicitCode: normalizeCompactText(record.explicitCode, MAX_SMART_IMPORT_EXPLICIT_CODE_CHARS).toUpperCase() || undefined,
     };
 }
 
@@ -1184,11 +1190,11 @@ function normalizeServicePrescriptionItem(value: unknown, parent: { category?: S
     return {
         serviceName,
         category: normalizeServicePrescriptionCategory(record.category) ?? parent.category ?? inferServicePrescriptionCategory(`${serviceName} ${evidence}`),
-        codeSystem: normalizeCompactText(record.codeSystem, 80) || undefined,
-        serviceCode: normalizeCompactText(record.serviceCode ?? record.code, 80) || undefined,
+        codeSystem: normalizeCompactText(record.codeSystem, MAX_SMART_IMPORT_REFERENCE_CHARS) || undefined,
+        serviceCode: normalizeCompactText(record.serviceCode ?? record.code, MAX_SMART_IMPORT_REFERENCE_CHARS) || undefined,
         confidence: normalizeConfidence(record.confidence),
         evidence,
-        sourceId: normalizeCompactText(record.sourceId, 80) || parent.sourceId,
+        sourceId: normalizeCompactText(record.sourceId, MAX_SMART_IMPORT_REFERENCE_CHARS) || parent.sourceId,
     };
 }
 
@@ -1222,22 +1228,22 @@ function normalizeServicePrescription(value: unknown): SmartImportServicePrescri
     const normalized: SmartImportServicePrescriptionExtraction = {
         serviceName,
         category: normalizeServicePrescriptionCategory(record.category) ?? inferServicePrescriptionCategory(`${serviceName} ${evidence}`),
-        priority: normalizeCompactText(record.priority, 16).toUpperCase() || undefined,
-        codeSystem: normalizeCompactText(record.codeSystem, 80) || undefined,
-        serviceCode: normalizeCompactText(record.serviceCode ?? record.code, 80) || undefined,
+        priority: normalizeCompactText(record.priority, MAX_SMART_IMPORT_PRIORITY_CHARS).toUpperCase() || undefined,
+        codeSystem: normalizeCompactText(record.codeSystem, MAX_SMART_IMPORT_REFERENCE_CHARS) || undefined,
+        serviceCode: normalizeCompactText(record.serviceCode ?? record.code, MAX_SMART_IMPORT_REFERENCE_CHARS) || undefined,
         clinicalQuestion: normalizeCompactText(record.clinicalQuestion ?? record.motivation, MAX_SMART_IMPORT_TEXT_CHARS) || undefined,
         provider: normalizeCompactText(record.provider, MAX_SMART_IMPORT_TEXT_CHARS) || undefined,
         prescribedAt: normalizeCompactText(record.prescribedAt, 32) || undefined,
-        requestReference: normalizeCompactText(record.requestReference, 80) || undefined,
+        requestReference: normalizeCompactText(record.requestReference, MAX_SMART_IMPORT_REFERENCE_CHARS) || undefined,
         confidence: normalizeConfidence(record.confidence),
         evidence,
-        sourceId: normalizeCompactText(record.sourceId, 80) || undefined,
+        sourceId: normalizeCompactText(record.sourceId, MAX_SMART_IMPORT_REFERENCE_CHARS) || undefined,
     };
     const rawItems = Array.isArray(record.items) ? record.items : [];
     const items = rawItems
         .map((item) => normalizeServicePrescriptionItem(item, normalized))
         .filter((item): item is SmartImportServicePrescriptionItemExtraction => Boolean(item));
-    if (items.length > 0) normalized.items = items.slice(0, 20);
+    if (items.length > 0) normalized.items = items.slice(0, SMART_IMPORT_PROPOSAL_WIRE_LIMITS.items);
     return normalized;
 }
 
@@ -1266,7 +1272,7 @@ function normalizeServicePrescriptionFromTherapyLike(value: unknown): SmartImpor
 }
 
 function servicePrescriptionDedupeKey(item: Pick<SmartImportServicePrescriptionExtraction, 'serviceName' | 'serviceCode'>): string {
-    const code = normalizeCompactText(item.serviceCode, 80).toLowerCase();
+    const code = normalizeCompactText(item.serviceCode, MAX_SMART_IMPORT_REFERENCE_CHARS).toLowerCase();
     if (code) return `code:${code}`;
     return normalizeCompactText(item.serviceName, MAX_SMART_IMPORT_TEXT_CHARS)
         .normalize('NFKD')
@@ -1645,7 +1651,7 @@ export function parseSmartImportExtractionResponse(response: string): AITaskPars
             const normalized = normalizeSmartImportDiagnosis(value);
             if (!normalized) continue;
             diagnoses.push(normalized);
-            if (diagnoses.length >= 5) break;
+            if (diagnoses.length >= SMART_IMPORT_PROPOSAL_WIRE_LIMITS.diagnoses) break;
         }
     }
 
@@ -1668,7 +1674,7 @@ export function parseSmartImportExtractionResponse(response: string): AITaskPars
             seenTherapies.add(key);
             therapies.push(normalized);
 
-            if (therapies.length >= 10) break;
+            if (therapies.length >= SMART_IMPORT_PROPOSAL_WIRE_LIMITS.therapies) break;
         }
     }
     if (Array.isArray(envelope.data.servicePrescriptions)) {
@@ -1677,7 +1683,7 @@ export function parseSmartImportExtractionResponse(response: string): AITaskPars
             if (!normalized) continue;
             if (servicePrescriptions.findIndex((item) => servicePrescriptionDedupeKey(item) === servicePrescriptionDedupeKey(normalized)) >= 0) continue;
             servicePrescriptions.push(normalized);
-            if (servicePrescriptions.length >= 10) break;
+            if (servicePrescriptions.length >= SMART_IMPORT_PROPOSAL_WIRE_LIMITS.services) break;
         }
     }
 
@@ -1694,7 +1700,7 @@ export function parseSmartImportExtractionResponse(response: string): AITaskPars
             data: {
                 diagnoses,
                 therapies,
-                servicePrescriptions: servicePrescriptions.slice(0, 10),
+                servicePrescriptions: servicePrescriptions.slice(0, SMART_IMPORT_PROPOSAL_WIRE_LIMITS.services),
             },
         },
     };

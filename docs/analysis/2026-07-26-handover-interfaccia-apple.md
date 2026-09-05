@@ -52,15 +52,15 @@ Fuori perimetro (per istruzione): backend, schema, API, web. **Niente push.**
   >
   > **Rettifica di una rettifica, e conta piu' di quanto sembri.** Questa riga
   > dichiarava che l'UDID iPad citato piu' sotto non esisteva piu'. Falso:
-  > `D2216CF2-6EA0-4EA4-861F-41E0DED1E5F8` esiste, e' disponibile ed e' il
+  > Il simulatore iPad con runtime iOS 27 esiste, e' disponibile ed e' il
   > dispositivo giusto. Lo avevo cercato con un elenco troncato da `head -8`.
   >
   > La conseguenza non e' formale. Avendolo creduto sparito ne ho usato un
-  > altro, `B02B47BF-…`, che gira su **iOS 26.3**: tutte le misure iPad prese
+  > altro, che gira su **iOS 26.3**: tutte le misure iPad prese
   > prima di accorgermene, comprese le cinque rotture e i pixel del registro
   > scuro, non erano sul runtime di destinazione. **Il target e' iOS 27**, e
-  > `D2216CF2` e' l'unico iPad che lo monta. Le misure iPad valide sono solo
-  > quelle rifatte li'.
+  > solo il simulatore iPad selezionato monta il runtime target. Le misure iPad
+  > valide sono solo quelle rifatte li'.
 - Unit: `ClinicalContrastTests` 5/5, `ClinicalFieldCryptoTests` 7/7.
   > **Rettifica.** Sono due classi, non la batteria. Il pacchetto SwiftPM
   > completo e' **396 test con 1 fallimento** gia' su `c0b1ee2a9`:
@@ -308,18 +308,15 @@ la risoluzione dei colori funziona.
 
 ## Ambiente
 
-- Xcode-beta su sparsebundle esterno; `DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer`
-- **Simulatori di destinazione, iOS 27 e nient'altro.** iPhone 17 Pro
-  `97738497-D8C4-4ACB-94CB-93871F42D7DD` e iPad Pro 13 M5 (27)
-  `D2216CF2-6EA0-4EA4-861F-41E0DED1E5F8`. Sulla macchina esistono anche
-  dispositivi su iOS 26.3, fra cui un altro iPad Pro 13 M5
-  (`B02B47BF-…`): **non vanno usati**, il prodotto targetizza iOS 27.
-  Verificare sempre il runtime, non il solo nome del dispositivo, con
-  `xcrun simctl list devices | awk '/^-- /{rt=$0} /<udid>/{print rt}'`.
-- Demo: istanza Next su `:3100` con DB sintetico nello scratchpad (verificato
-  col descrittore di file, **non** dedotto dalla cwd), proxy TLS `:3543`,
-  `launch.sh` con auto-login.
-- **I pazienti reali di Leonardo sono su `:3000`.** `:3100` e' sintetica.
+- Xcode su volume esterno; `DEVELOPER_DIR` deve puntare al bundle selezionato
+  dal runbook corrente, senza persistere path macchina-specifici.
+- **Simulatori di destinazione, iOS 27 e nient'altro.** Selezionare iPhone e
+  iPad per runtime, nome e disponibilita; non persistere gli UDID locali nel
+  repository. Verificare sempre il runtime, non il solo nome del dispositivo,
+  con `xcrun simctl list devices`.
+- Demo: istanza Next isolata su porta alternativa, DB esclusivamente sintetico
+  nello scratchpad e proxy TLS dedicato. Non documentare nel repository porte,
+  identita o impostazioni di autenticazione di istanze locali con dati operativi.
 
 ## Nota di metodo, seconda parte: dedurre l'assenza da una vista parziale
 

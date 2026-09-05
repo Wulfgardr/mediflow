@@ -2,7 +2,10 @@
 'use client';
 
 import { useState } from 'react';
-import { CheckCircle, XCircle, AlertTriangle, Loader2, Play, Server, Database, Activity, Globe } from 'lucide-react';
+import { CheckCircle, XCircle, Loader2, Play, Server, Database, Activity, Globe } from 'lucide-react';
+/* @Codex */
+import { getICDReadiness, icdReadinessMessage } from '@/lib/icd-service';
+import { checkAuthHealthRequest } from '@/lib/security/client-auth-api';
 import { cn } from '@/lib/utils'; // Assuming cn exists, else use template literals
 
 interface ServiceCheck {
@@ -26,9 +29,9 @@ export default function DiagnosticHub() {
             checkFn: async () => {
                 const start = performance.now();
                 // We use auth/check as a proxy for DB health since it reads from DB
-                const res = await fetch('/api/auth/check');
+                const { response: res, payload: data, controlState } = await checkAuthHealthRequest();
                 /* @Codex */
-                const data = await res.json().catch(() => null);
+                if (controlState !== 'accepted') throw new Error('Controllo autenticazione non verificabile');
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 if (data?.status === 'error' || data?.error) {
                     throw new Error(data?.error?.message || 'Database non disponibile');
@@ -63,17 +66,18 @@ export default function DiagnosticHub() {
         },
         {
             id: 'icd',
-            name: 'ICD-11 API Proxy',
+            name: 'ICD-11 WHO',
             icon: <Globe className="w-4 h-4" />,
-            description: 'Accesso ai servizi WHO/API locali per le diagnosi',
+            description: 'Readiness WHO governata, senza ricerca diagnostica implicita',
             checkFn: async () => {
                 const start = performance.now();
-                const res = await fetch('/api/icd/proxy?q=diabete');
-                if (!res.ok) throw new Error("API non raggiungibile");
-                const data = await res.json();
-                // ICD API returns strict object, not array. Check for generic success keys or just lack of error.
-                if (!data || (data.error && data.status !== 'online')) throw new Error("Risposta API invalida");
-                return { status: 'ok', latency: Math.round(performance.now() - start) };
+                const readiness = await getICDReadiness();
+                if (readiness.status !== 'available') throw new Error(icdReadinessMessage(readiness.status));
+                return {
+                    status: 'ok',
+                    latency: Math.round(performance.now() - start),
+                    message: icdReadinessMessage(readiness.status),
+                };
             }
         },
         {
@@ -87,20 +91,6 @@ export default function DiagnosticHub() {
                 if (!res.ok) throw new Error("API Error");
                 return { status: 'ok', latency: Math.round(performance.now() - start) };
             }
-        },
-        {
-            id: 'ocr',
-            name: 'OCR Service (DeepSeek OCR 2)',
-            icon: <Database className="w-4 h-4" />,
-            description: 'Segreteria virtuale: lettura documenti',
-            checkFn: async () => {
-                const start = performance.now();
-                const res = await fetch('/api/ocr/extract');
-                if (!res.ok) throw new Error("OCR non disponibile");
-                const data = await res.json();
-                if (!data.available) throw new Error(data.message || "Modello non installato");
-                return { status: 'ok', latency: Math.round(performance.now() - start) };
-            }
         }
     ];
 
@@ -109,8 +99,8 @@ export default function DiagnosticHub() {
         try {
             const res = await check.checkFn();
             setResults(prev => ({ ...prev, [check.id]: { status: 'ok', latency: res.latency, message: res.message } }));
-        } catch (e: any) {
-            const msg = e?.message || "Errore sconosciuto";
+        } catch (error: unknown) {
+            const msg = error instanceof Error ? error.message : "Errore sconosciuto";
             setResults(prev => ({ ...prev, [check.id]: { status: 'error', message: msg } }));
         }
     };
@@ -181,7 +171,8 @@ export default function DiagnosticHub() {
                                 <button
                                     onClick={() => runCheck(check)}
                                     disabled={res.status === 'running'}
-                                    className="rounded-full bg-indigo-50 p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-100 transition-colors dark:bg-indigo-900/10 dark:hover:bg-indigo-900/20"
+                                    className="rounded-full bg-indigo-50 p-2 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-100 transition-colors dark:bg-indigo-900/10 dark:text-indigo-300 dark:hover:bg-indigo-900/20"
+                                    aria-label={`Esegui singolo test: ${check.name}`}
                                     title="Esegui singolo test"
                                 >
                                     <Play className="w-3 h-3" />

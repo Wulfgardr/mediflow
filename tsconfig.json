@@ -13,6 +13,7 @@
     "esModuleInterop": true,
     "module": "esnext",
     "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
     "jsx": "react-jsx",
@@ -58,6 +59,7 @@
     "node_modules",
     "scripts/**/*.ts",
     "scripts/**/*.mts",
+    "lib/security/*-fixture.ts",
     "native/**/Build/**/*",
     "native/**/.build/**/*"
   ]

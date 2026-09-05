@@ -1,40 +1,21 @@
 /* @Codex */
 import { db } from '@/lib/db';
-
-export const DEFAULT_TEXT_MODEL = 'qwen3.5:35b-a3b';
-export const DEFAULT_OCR_MODEL = 'deepseek-ocr';
-export const LEGACY_QWEN_TEXT_MODEL = 'qwen2.5:32b';
-export const LEGACY_MEDGEMMA_TEXT_MODEL = 'hf.co/unsloth/medgemma-1.5-4b-it-GGUF';
+import { DEFAULT_TEXT_MODEL, isStaleTextModel } from './ai-model-selection';
+export {
+    DEFAULT_TEXT_MODEL,
+    LEGACY_MEDGEMMA_TEXT_MODEL,
+    LEGACY_QWEN_TEXT_MODEL,
+    resolveTextModel,
+} from './ai-model-selection';
 
 const TEXT_MODEL_MIGRATION_VERSION = 'qwen35-default-v1';
-const STALE_TEXT_MODELS = new Set([
-    LEGACY_QWEN_TEXT_MODEL,
-    LEGACY_MEDGEMMA_TEXT_MODEL,
-]);
 
 let migrationComplete = false;
 let migrationPromise: Promise<void> | null = null;
 
-function normalizeModelName(model?: string | null): string | null {
-    const value = model?.trim();
-    return value ? value : null;
-}
-
-export function resolveTextModel(specificModel?: string | null, legacyModel?: string | null): string {
-    const specific = normalizeModelName(specificModel);
-    if (specific) return specific;
-
-    const legacy = normalizeModelName(legacyModel);
-    if (!legacy || STALE_TEXT_MODELS.has(legacy)) {
-        return DEFAULT_TEXT_MODEL;
-    }
-
-    return legacy;
-}
-
 async function migrateSettingIfNeeded(key: string, nextValue: string): Promise<void> {
     const current = await db.settings.get(key);
-    if (!current?.value || !STALE_TEXT_MODELS.has(current.value)) return;
+    if (!current?.value || !isStaleTextModel(current.value)) return;
     await db.settings.put({ key, value: nextValue });
 }
 

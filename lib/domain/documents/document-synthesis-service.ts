@@ -1,8 +1,7 @@
 /**
- * Document Synthesis Service
- * OCR-first pipeline: DeepSeek OCR -> Qwen clinical analysis -> review-only insight
- * ADR 0084: i suggerimenti restano materiale di revisione e non modificano
- * patients.diagnoses.
+ * Legacy Document Synthesis compatibility module.
+ * Non e un ingresso production della lane 0.8.5: la UI usa la composition
+ * Fabric autenticata e review-only su estrazione AnyDoc host-owned.
  */
 
 import { AIService } from '../../ai-service';

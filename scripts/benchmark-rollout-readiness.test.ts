@@ -34,7 +34,7 @@ test('patient insight can become shadow-ready when prerequisites and metrics pas
         },
         currentState: 'hold',
         fallbackWritten: true,
-        owner: 'leonardo',
+        owner: 'release-operator',
         licenseClear: true,
         maxAgeDays: 30,
     });
@@ -67,7 +67,7 @@ test('patient insight stays on hold when a required metric is missing', () => {
         },
         currentState: 'hold',
         fallbackWritten: true,
-        owner: 'leonardo',
+        owner: 'release-operator',
         licenseClear: true,
         maxAgeDays: 30,
     });
@@ -101,7 +101,7 @@ test('smart import stays on hold when a required metric is malformed', () => {
         },
         currentState: 'hold',
         fallbackWritten: true,
-        owner: 'leonardo',
+        owner: 'release-operator',
         licenseClear: true,
         maxAgeDays: 30,
     });
@@ -134,7 +134,7 @@ test('missing fallback keeps a lane on hold even when metrics pass', () => {
         },
         currentState: 'hold',
         fallbackWritten: false,
-        owner: 'leonardo',
+        owner: 'release-operator',
         licenseClear: true,
         maxAgeDays: 30,
     });
@@ -154,7 +154,7 @@ test('future benchmark timestamp is a blocker instead of fresh evidence', () => 
         },
         currentState: 'hold',
         fallbackWritten: true,
-        owner: 'leonardo',
+        owner: 'release-operator',
         licenseClear: true,
         maxAgeDays: 30,
     });
@@ -189,7 +189,7 @@ test('smart import regression becomes rollback-required when lane is already act
         },
         currentState: 'shadow-active',
         fallbackWritten: true,
-        owner: 'leonardo',
+        owner: 'release-operator',
         licenseClear: true,
         maxAgeDays: 30,
     });
@@ -212,7 +212,7 @@ test('redaction validation artifact maps to hold when shadow readiness fails bef
         },
         currentState: 'hold',
         fallbackWritten: true,
-        owner: 'leonardo',
+        owner: 'release-operator',
         licenseClear: true,
         maxAgeDays: 30,
     });
@@ -247,7 +247,7 @@ test('generative challenger stays on hold when parliament shows failed smart imp
         model: 'gemma4:e4b',
         currentState: 'hold',
         fallbackWritten: true,
-        owner: 'leonardo',
+        owner: 'release-operator',
         licenseClear: true,
         maxAgeDays: 30,
     });
@@ -303,7 +303,7 @@ test('markdown report includes status, blockers, warnings and evidence', () => {
         },
         currentState: 'hold',
         fallbackWritten: true,
-        owner: 'leonardo',
+        owner: 'release-operator',
         licenseClear: true,
         maxAgeDays: 30,
     });

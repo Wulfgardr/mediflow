@@ -2,9 +2,30 @@ import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
 
+// @Codex: apply the existing Next lint contract to the package CommonJS sources.
+const packageCommonJsConfig = {
+  ...nextVitals[0],
+  name: "mediflow/web-auth-lifecycle-owner-commonjs",
+  files: ["packages/web-auth-lifecycle-owner/**/*.{cjs,js}"],
+  languageOptions: {
+    ...nextVitals[0].languageOptions,
+    sourceType: "commonjs",
+    parserOptions: {
+      ...nextVitals[0].languageOptions?.parserOptions,
+      sourceType: "script",
+    },
+  },
+  rules: {
+    ...nextVitals[0].rules,
+    // @Codex: CommonJS is the package contract, so require() is intentional here.
+    "@typescript-eslint/no-require-imports": "off",
+  },
+};
+
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
+  packageCommonJsConfig,
   {
     rules: {
       // @Codex: temporary downgrade to unblock delivery while typed refactors are phased in.

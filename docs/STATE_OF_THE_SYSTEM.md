@@ -18,15 +18,23 @@ read_when:
 > prevalgono [AGENTS.md](../AGENTS.md) e
 > [docs/repository-topology.md](./repository-topology.md).
 
-Ultimo aggiornamento: 2026-08-11 (release sorgente v0.8.2)
+Ultimo aggiornamento: 2026-09-03 (contenuto sorgente v0.8.5)
 
 > [!NOTE]
-> Questo documento prepara la release sorgente per il tag `v0.8.2`. Il tag e
-> la GitHub Release devono essere verificati sul repository remoto prima di
-> usarli come prova di pubblicazione. Non dichiara una pubblicazione App Store.
-> La deroga VoiceOver mobile e i rischi residui restano documentati.
+> Questo documento descrive il contenuto sorgente della `0.8.5`. Check CI su
+> exact SHA, artifact firmati, tag, GitHub Release e installazione esterna sono
+> evidenze di confine e non si deducono dal solo tree. Lo storico delle versioni
+> vive nel [CHANGELOG](../CHANGELOG.md).
 
 ---
+
+## Aggiornamento di candidatura: 5 settembre 2026
+
+La successiva revisione Pro e i controlli locali sono raccolti nella
+[readiness 0.8.5](./release-085-readiness.md), riferita al commit runtime
+`4f2aa312c`. I vecchi receipt descritti sotto non attestano da soli questo
+candidato. AppleShared/XCTest e distribuzione restano gate aperti; il codice
+sorgente e il canale binario Apple hanno condizioni di consegna diverse.
 
 ## 🧭 1. Lettura rapida
 
@@ -72,38 +80,71 @@ La fotografia corrente e questa:
   clinical scales e store SQLite locale; Linux e Windows oggi verificano la
   portabilita del core in CI, non una parity applicativa completa.
 - **Parity UI 0.8**: iPhone 2/2, iPad 7/7, build/probe macOS e localhost 82/82
-  sono verdi sul tree verificato. La parity resta clinico-semantica, non pixel.
-  VoiceOver reale mobile non è provato per il limite esterno della beta Xcode
-  27; la deroga vale solo per la release sorgente e non autorizza claim di
-  conformità.
-- **Checkpoint 0.8.2**: le PR 163-176 sono su `main`. I commit finali hanno
+  sono PASS della baseline storica `0843726fe`, non una prova implicita per una
+  revisione successiva. La disponibilità di Xcode è un prerequisito operativo
+  della macchina, non uno stato durevole della repository; le verifiche exact-SHA
+  appartengono ai receipt del closeout. La parity resta clinico-semantica, non
+  pixel. VoiceOver reale mobile non è provato e la deroga storica non
+  autorizza claim di conformità.
+- **Checkpoint storico 0.8.2**: le PR 163-176 sono su `main`. I commit finali hanno
   review DeepSeek e Sol pulite. Sul push a `main`, Apple Native ha superato
   build, suite iPhone e 4/4 contratti iPad senza skip.
-- **Document intelligence**: Smart Import, nuova anagrafica da documento e
-  `AI Patient Insight` restano reviewable; gli allegati possono persistere
-  artifact cifrati `parse/evidence` con prime ancore sezionali. Il fallback OCR
-  Apple Vision e certificato solo su macOS; Windows non ha oggi un fallback OCR
-  platform-specific equivalente in MediFlow.
+- **Perimetro sorgente 0.8.5**: il tree integra i contratti e i percorsi locali
+  della patch. Il suo contenuto non sostituisce i receipt exact-SHA e di
+  pubblicazione.
+- **Document intelligence**: AnyDoc resta il primo passaggio automatico locale
+  e non usa servizi hosted. Per i PDF supportati, il tree classifica e
+  renderizza soltanto le pagine `needsOcr`, usa Apple Vision localmente e
+  ricompone il risultato sotto currentness host-owned. Errori falliscono
+  chiusi e le route legacy rispondono `410`. DeepSeek-OCR 2/CUDA ha stato
+  `OUT_OF_SCOPE_FOR_0.8.5_NON_BLOCKING`.
 - **Evidence absorption**: il layer locale di assorbimento evidenza e ora
   misurato con corpus sintetico multi-fonte, recall di fonte, disciplina di
   citazione, recupero di fonti superate e leakage da fonti stale.
 - **Prescrizioni di prestazione**: visite, esami, imaging, riabilitazione e
   screening sono separati dalle terapie farmacologiche; gli item figli e il
   catalog matching restano reviewable e non generano invii regionali.
-- **AI**: runtime locale per default, `OllamaAdapter` e `AIService` come
-  integrazioni presenti nel tree e gate egress ancora chiuso; benchmark e
-  shadow lane restano separati dal prodotto clinico. Lo scaffold intelligente
-  di ADR 0086 e un contratto accettato per il programma post-0.8 e non apre una
-  funzione nuova della v0.8. Sulla linea post-0.8 sono presenti il registry
-  provider locale per task (WUL-502) e lo scaffold Intelligence Fabric di ADR
-  0089: contratto congelato, cataloghi delle capability generative e
-  deterministiche, resolver fail-closed e stato read-only
-  `/api/ai/fabric/status`. ADR 0090 e ADR 0091 aggiungono un candidato locale
-  limitato: lifecycle provider dichiarativo senza segreti, continuita
-  fail-closed, proiezione PHI-safe `status_only` per i client paired e harness
-  sintetico receipt-provenance-review. Il candidato non aggiunge provider,
-  egress, grant paired o automazione: Intelligence Fabric resta una linea in
-  costruzione, non una funzione completa del prodotto corrente.
+- **Intelligence Fabric**: `AI Patient Insight`, Smart Import, Document
+  Synthesis e Treatment Reasoning attraversano ingressi applicativi distinti
+  e producono soltanto proposte da rivedere. Ogni preview mostra receipt,
+  provenienza e currentness; nessun percorso applica dati clinici. Ollama e
+  ATHENA/MLX restano provider locali capability-specific, senza fallback
+  silenzioso o grant riutilizzabile.
+- **ATHENA locale**: Treatment Reasoning richiede un runner MLX offline
+  pre-provisioned indicato come percorso eseguibile assoluto host-owned da
+  `MEDIFLOW_ATHENA_MLX_GENERATE_BIN` e il modello locale. Uno smoke sintetico
+  sul percorso di produzione ha completato in
+  10,6 secondi con 64 token e 211 caratteri, senza registrare il raw output.
+  Questa singola osservazione non prova readiness universale o qualità clinica.
+- **Gate F6/F7**: F6 integra il fallback Apple Vision locale sulle sole pagine
+  `needsOcr`; DeepSeek-OCR 2/CUDA non è un gate della patch. F7 integra
+  provider v2, secret broker, adapter ufficiali e una probe amministrativa
+  OpenAI/Anthropic `default OFF`. Non esistono credenziali, rete live o runtime
+  readiness cloud nel perimetro 0.8.5.
+- **Fabric capability-first**: il selector guidato copre cinque capability,
+  filtra profili compatibili, esegue smoke sintetici e attiva binding host-owned
+  in modo atomico con CAS e rollback. Non persiste segreti e non qualifica il
+  runtime.
+- **Headless**: il Supervisor Node portabile avvia Web standalone e MCP
+  `stdio` come figli distinti su IPC ereditato. MCP raggiunge catalogo,
+  terminology search, Open Loops patient-scoped, proposta follow-up e query
+  semantica bounded read-only. Mini condivide catalogo e foundation CLI ma non
+  ha un binding production al Supervisor e fallisce chiuso senza parent AIP.
+  Contesto, lifecycle, revoca e audit restano host-owned; lo smoke standalone
+  del tree finale è un gate separato.
+- **Write F10**: MCP produce soltanto la preview della transizione
+  `pending -> completed|cancelled`. La UI trusted rilegge la risorsa e richiede
+  ruolo medico attivo, step-up e gesto operation-specific; il commit Web usa
+  CAS, idempotenza, audit e receipt atomici. Il proof non attraversa MCP.
+- **Planner candidato**: core, operazione read-only e adapter MCP/Mini sono
+  presenti; il binding production del Supervisor è soltanto MCP. Il piano usa
+  al massimo due operazioni allowlisted; SQL diretto e scritture restano
+  vietati.
+- **Recording locale**: la shell macOS integra cattura e trascrizione italiana
+  Apple on-device su macOS 26 o successivo, con consenso esplicito, audio
+  bounded solo in RAM e review del transcript. Non esegue writer automatici;
+  lo smoke con microfono reale e la validazione clinica restano fuori dal
+  claim della 0.8.5.
 - **Attese locali**: la prima slice web collega prestazioni attese e risultati;
   il salvataggio resta esplicito e il workflow non e esteso ai client paired.
 - **SISS/FSE**: handoff contestuale e flussi `webapp-assisted`; nessuna
@@ -124,7 +165,8 @@ Il default architetturale e locale:
 - il dato nasce nel browser/client locale;
 - i campi clinici sensibili vengono cifrati prima della persistenza;
 - lo storage autorevole vive su disco locale;
-- i servizi AI/OCR e terminologici sono locali quando presenti;
+- i provider AI ammessi, AnyDoc e i servizi terminologici sono locali quando
+  presenti;
 - l'eventuale rete locale e opt-in e bounded.
 
 Questo significa che non sono ammessi, senza ADR e documentazione esplicita:
@@ -189,16 +231,18 @@ Documenti/ADR principali:
 
 ### 2.4 Il documento e evidenza, non testo da ingoiare
 
-La direzione document intelligence e `artifact-first`:
+La document intelligence e `artifact-first`:
 
-- il documento viene normalizzato;
-- OCR/estrazione restano locali;
-- OCR primario resta Ollama/DeepSeek OCR quando disponibile;
-- su macOS, se l'OCR primario produce testo vuoto o degenerato, il runtime puo
-  usare Apple Vision come fallback locale;
-- su Windows e Linux non esiste oggi un fallback platform-specific certificato:
-  senza OCR primario utile o testo gia disponibile il flusso deve fallire in modo
-  esplicito;
+- il formato viene riconosciuto dai byte e il documento supportato attraversa
+  AnyDoc in un processo locale bounded;
+- AnyDoc produce Markdown normalizzato, evidenza e provenienza senza usare rete
+  o servizi hosted;
+- la 0.8.5 classifica le sole pagine `needsOcr`, le materializza e le
+  renderizza con limiti bounded e usa Apple Vision sul Mac, senza rete;
+- il risultato viene ricomposto nell'ordine originale e pubblicato soltanto se
+  sorgente e sessione sono ancora correnti;
+- immagini dirette, documenti cifrati, input ambigui e motore non disponibile
+  falliscono chiusi; le route OCR legacy rispondono `410`;
 - il risultato va trattato come evidenza reviewable;
 - `summarySnapshot` e `parseEvidenceArtifactSnapshot` sono dati clinici e
   persistono cifrati;
@@ -215,7 +259,8 @@ Documenti/ADR principali:
 
 - ADR 0040 (private)
 - [ADR 0042](./adr/0042-document-driven-new-patient-review-and-prudent-therapy-persistence.md)
-- [ADR 0059](./adr/0059-macos-apple-vision-ocr-fallback.md)
+- [ADR 0102](./adr/0102-document-synthesis-source-authority.md)
+- [ADR 0107](./adr/0107-anydoc-local-attachment-extraction.md)
 
 ### 2.5 Le integrazioni regionali restano dentro canali ufficiali
 
@@ -251,12 +296,20 @@ Documenti/ADR principali:
 | `/api/*` | Runtime web | CRUD, auth, proxy locali, sistema | Session cookie |
 | `/api/v1/*` | Contratto locale/shared | Client native e superfici stabili | Bearer token locale, TLS proxy |
 | `/api/v1/network/*` | First slice home-base | Lista/dettaglio pazienti e write limitati/versionati su profilo/status, diario, terapie, checkup e osservazioni da device paired | Credenziale device + sessione operatore |
-| macOS Apple shell | Operativa | Fronte nativo piu maturo: shell Apple/home-base, workspace paziente condiviso, runtime panel e store locale verificabile; Lume e consegnata nella card clinica opaca, mentre le altre superfici restano in migrazione | Firma/notarizzazione esplicite, Ollama/Docker non app-managed |
+| macOS Apple shell | Operativa | Fronte nativo piu maturo: shell Apple/home-base, workspace paziente condiviso, runtime panel e store locale verificabile; Lume e consegnata nella card clinica opaca, mentre le altre superfici restano in migrazione | Firma/notarizzazione esplicite, Ollama/MLX non app-managed |
 | `MediFlowCore` tri-OS | Verificato tri-OS | Core Swift condiviso per logica clinica, cifratura, contratti, filtri, conflict handling, clinical scales e SQLite locale | CI Linux/macOS/Windows; non equivale a app complete Windows/Linux |
 | iPhone/iPad | Paired | Client paired non-AI, cache cifrata degradabile e workflow online versionati sui moduli core | No SQLite diretto |
-| Ollama | Opzionale locale | AI/OCR/sintesi dove disponibile | Solo localhost; OCR primario |
-| Apple Vision OCR | macOS-only fallback | Seconda lettura locale quando DeepSeek/Ollama OCR restituisce output blank/low-signal | Solo macOS, nessun equivalente certificato Windows/Linux |
-| ICD-11 Docker | Opzionale locale | Diagnosi/coding | Solo localhost |
+| AnyDoc | Estrazione locale | Conversione deterministica degli allegati supportati in Markdown normalizzato | Processo figlio bounded; nessuna rete; non è un provider Fabric |
+| Fallback `needsOcr` | Integrato sul Mac | Routing, manifest, rendering selettivo e riconoscimento Apple Vision | Review-only; fail-closed fuori da macOS o senza motore disponibile |
+| Selector Fabric | Integrato | Discovery compatibile, smoke sintetico e binding atomico per cinque capability | Nessun segreto persistito; discovery non equivale a readiness |
+| Ollama | Provider locale capability-specific | Percorsi generativi Fabric ammessi dalla capability | Solo loopback; nessun OCR o fallback implicito |
+| ATHENA/MLX | Provider locale capability-specific | Solo Treatment Reasoning review-only | Nessuna prescrizione o apply clinico |
+| OpenAI / Anthropic | Adapter ufficiali `default OFF` | Probe amministrativa Document Synthesis review-only con policy e secret reference host-owned | Solo transport fake nel tree; nessuna credenziale, rete live o runtime readiness |
+| MCP | Superficie figlia locale | Catalogo, terminology search, Open Loops patient-scoped, proposta follow-up e query semantica bounded read-only | Usa il Supervisor locale della 0.8.5; nessuna authority caller-supplied |
+| Mini | Foundation CLI fail-closed | Catalogo e adapter tipizzati senza callsite production del Supervisor | Nessun grant senza parent AIP; nessun accesso SQLite diretto |
+| Write checkup F10 | Integrata end-to-end | Preview MCP e commit Web con ruolo, step-up, gesto, CAS, idempotenza, audit e receipt | L'agente non riceve proof e non esegue il commit |
+| Semantic planner | Integrato, sola lettura | Core, validazione, esecutore e adapter MCP/Mini presenti; binding Supervisor production soltanto MCP | Massimo due operazioni allowlisted; nessun SQL libero o write |
+| ICD-11 WHO | Application Service server-only | Ricerca diagnosi/coding con output MediFlow data-only | Disattivato per default; egress e credenziali host-owned espliciti |
 | OpenMed | Shadow/benchmark | Redaction lane locale non client-facing | Non runtime clinico |
 
 ---
@@ -281,20 +334,25 @@ Documenti/ADR principali:
 
 ### 4.3 Allegati e artifact documentali
 
-1. Upload documento.
-2. Normalizzazione input e OCR locale: primario Ollama/DeepSeek OCR, con fallback
-   Apple Vision solo su macOS quando l'output primario e low-signal.
-3. Se il testo estratto e assente o insufficiente, il documento entra nella
-   coda OCR-needed con stato e motivo espliciti e nessuna proposta clinica;
-   al completamento dell'OCR il replay per hash documento riapplica la
-   pipeline in modo idempotente.
-4. Sintesi/estrazione locale.
-5. Persistenza cifrata di:
+1. Il medico carica o seleziona un allegato corrente host-owned.
+2. Il runtime riconosce il formato dai byte e invoca AnyDoc localmente con
+   limiti di input, tempo e output.
+3. AnyDoc restituisce Markdown normalizzato, evidenza e provenienza.
+4. Per un PDF supportato, le sole pagine `needsOcr` vengono renderizzate e
+   passate ad Apple Vision locale; la composizione ricontrolla la sorgente e
+   ricompone le pagine nell'ordine originale.
+5. Immagini dirette, documenti cifrati, formati non supportati o indisponibilità
+   del motore locale terminano in revisione richiesta. Il flusso non inventa
+   testo né produce una proposta da contenuto incompleto.
+6. I servizi downstream possono trasformare l'evidenza corrente in proposte
+   tipizzate e review-only. L'applicazione resta un gesto separato e non e
+   autorizzata dalla preview Fabric.
+7. Gli artifact persistiti dai flussi di dominio restano cifrati:
    - allegato;
    - `summarySnapshot`;
    - `parseEvidenceArtifactSnapshot`;
    - projection `documentInsights` quando serve compatibilita.
-6. Consumer reviewable:
+8. Consumer reviewable:
    - `AI Patient Insight`;
    - Smart Import;
    - nuova anagrafica da documento;
@@ -339,69 +397,108 @@ Documenti/ADR principali:
 
 ## 🤖 5. AI stack e regole di promozione
 
-### 5.1 Runtime operativo
+### 5.1 Runtime operativo locale 0.8.5
 
 Il runtime AI operativo resta locale. Il default generativo protetto e trattato
 come baseline finche benchmark e governance non giustificano un cambio.
 
-`OllamaAdapter` e `AIService` separano il provider dal servizio applicativo.
-Nel pacchetto post-0.8, `LocalProviderRegistry` centralizza il binding
-task-provider-modello per i task instradati tramite `AIService` e accetta solo
-Ollama su loopback, senza fallback. Non estende grant o fallback alle lane
-separate, come ATHENA MLX. Questo packet non appartiene alla candidata 0.8. Il
-gate egress resta
-`closed_pending_redaction_lane`: non esistono provider cloud o consenso egress
-consegnati.
+L'Application Service Layer resta host-owned. Il Fabric risolve provider,
+modello e venue per capability e restituisce receipt e provenienza PHI-safe.
+Il chiamante non sceglie provider, modello, venue o fallback. Il gate egress
+resta chiuso per default. Gli adapter cloud esistono, ma non sono attivi senza
+opt-in host, lifecycle, policy e secret reference; il tree non include
+credenziali o prove di rete live.
 
 Le superfici operative includono:
 
 - `AI Patient Insight`;
 - Smart Import reviewable;
-- sintesi documentale;
-- eventuali helper locali di normalizzazione/estrazione.
+- Document Synthesis;
+- Treatment Reasoning.
 
-Le superfici AI restano review-first e protette da safety gate (WUL-355,
-WUL-358): kill-switch dedicato per `patient-insight`, `smart-import` e
-`document-synthesis`, piu model governance delle decisioni documentali. Nessuna
-scrittura clinica autonoma: l'AI locale propone, il medico rivede.
+Le quattro superfici producono solo proposte. Receipt, provenienza e currentness
+restano visibili nella UI; nessuna receipt e un grant e nessuna preview esegue
+apply. Ollama serve i percorsi generativi locali ammessi dalla capability.
+ATHENA/MLX serve soltanto Treatment Reasoning. AnyDoc resta una estrazione
+deterministica separata dal Fabric; la sua composizione current-source può
+usare Apple Vision locale sulle sole pagine PDF `needsOcr`. Questo fallback non
+trasforma AnyDoc o Apple Vision in un provider Fabric `ocr`.
+
+ATHENA è inclusa soltanto se il modello e il runner MLX offline sono già
+presenti sulla macchina. Il runner viene indicato con
+`MEDIFLOW_ATHENA_MLX_GENERATE_BIN` come percorso eseguibile assoluto host-owned;
+MediFlow non scarica o prepara il modello.
+Il supporto del runner è nel commit `2574cf5fc`, verificato con TDD 6/6,
+typecheck ed ESLint. Uno smoke sintetico sul percorso di produzione con modello
+BF16 locale ha registrato 10,6 secondi, 64 token e 211 caratteri di output,
+senza conservare il raw output.
 
 Il router documentale usa `shadow` come default. La modalita `active` puo
 evitare il modello solo su route esplicitamente eleggibili ad alta confidenza;
   non promuove mai proposte cliniche senza review e salvataggio espliciti.
 
-### 5.1.1 Release sorgente v0.8: perimetro verificabile
+### 5.1.1 Perimetro sorgente 0.8.5
 
-Il tree della release contiene hardening delle superfici documentali, UI web
-Lume e aggiornamenti della family Apple. Le integrazioni sono incluse solo
-entro i gate e i limiti dichiarati.
+Il crosswalk machine-readable
+[`fabric-generative-runtime-crosswalk.v1.json`](./capability-mapping/fabric-generative-runtime-crosswalk.v1.json)
+lega ciascuna capability al proprio ingresso, production root, route, receipt,
+provenienza e UI. Il guard dedicato verifica il mapping e mantiene separata la
+receipt storica `candidate_not_integrated`.
 
-- Il registro delle proposte diagnostiche resta separato dalle diagnosi
-  cliniche. La promozione richiede review esplicita.
-- Le superfici web trattano gli stati documentali come stati accessibili.
-- La family Apple conserva i limiti paired, non-AI e local-first già dichiarati.
-- Nessuna voce aggiunge cloud, auto-write clinico, SISS/FSE nativo o una inbox
-  conversazionale.
+- `patient_insight`: `proposal_only`.
+- `smart_import`: `proposal_only`.
+- `document_synthesis`: `proposal_only`.
+- `treatment_reasoning`: `proposal_only`.
+- `ocr`: il crosswalk Fabric resta `unavailable`; il fallback Apple Vision è
+  integrato nella composizione AnyDoc e non costituisce una production root
+  Fabric.
 
-### 5.1.2 Candidato locale Intelligence Fabric post-0.8
+Questo stato descrive il tree. Da solo non prova CI remota, firma, tag,
+pubblicazione, installazione o disponibilita operativa su un altro host. Lo
+smoke ATHENA è una singola osservazione, non un benchmark o uno SLI. Non esiste
+un benchmark di release per latenza, throughput, qualita generativa o
+accuratezza OCR; la 0.8.5 non fa claim di prestazione su questi aspetti.
 
-Il branch di programma post-0.8 contiene un candidato tecnico locale regolato
-da ADR 0089, ADR 0090 e ADR 0091. Il candidato:
+### 5.1.2 Esiti di perimetro F6 e F7
 
-- applica onboarding, degrado e revoca provider a snapshot dichiarativi che
-  non contengono credenziali;
-- nega venue offline, sconosciute o degradate e non cambia provider in
-  fallback;
-- espone su `/api/v1/network/ai-runtime` una proiezione PHI-safe decodificabile
-  dal core Swift condiviso;
-- lascia il client paired in `status_only`, con esecuzione AI non autorizzata;
-- collega in un harness sintetico receipt, provenance, proposta e revisione
-  del medico senza eseguire scritture cliniche;
-- mantiene il core deterministico non-AI disponibile senza provider.
+I gate distinguono il comportamento incluso dai componenti non pronti. Le
+parti escluse non sono feature della `0.8.5` e non restano come dipendenze
+implicite della patch.
 
-Il router candidato non governa ancora tutti i call path AI operativi. Il
-lifecycle provider non e persistito e non parla con API vendor. Cloud,
-on-device e invocazione AI paired restano in `hold`. Il risultato e quindi un
-candidato locale verificabile, non una promozione prodotto o remota.
+| Gate | Implementato | Verificato nel tree locale | Residuo escluso | Esito |
+| --- | --- | --- | --- | --- |
+| F6 — OCR selettivo | AnyDoc first-pass e fallback Apple Vision locale sulle sole pagine PDF `needsOcr`, con ricomposizione e controllo current-source | Contratti bounded, fail-closed e percorso sintetico sul Mac eleggibile | DeepSeek-OCR 2/CUDA, benchmark di qualifica e readiness universale | Fallback locale integrato |
+| F7 — provider esterni | Provider v2, secret broker, adapter HTTPS ufficiali e probe amministrativa review-only OpenAI/Anthropic | Transport fake, route admin-only e `default OFF` | Credenziali, rete live, retention account e runtime readiness remota | `INTEGRATED / DEFAULT_OFF` |
+
+Una sottoscrizione o un login consumer OpenAI/Anthropic non costituiscono
+accesso API. Registry, probe e adapter non autorizzano onboarding, invio di PHI
+o esecuzione remota.
+
+### 5.1.3 Headless, MCP e Mini nella 0.8.5
+
+Il Supervisor Node portabile è il trusted parent del runtime locale: avvia
+Web standalone e MCP come processi figli distinti su IPC ereditato e possiede
+contesto, lease, revoca e audit. MCP `stdio` pubblica catalogo, terminology
+search, Open Loops patient-scoped, proposta follow-up `proposal_only` e query
+semantica bounded read-only. Mini condivide catalogo e foundation CLI ma non ha
+un callsite production del Supervisor e fallisce chiuso senza parent AIP. Gli
+adapter non importano SQLite, non accettano authority caller-supplied e non
+aprono listener.
+
+F10 espone via MCP soltanto la preview `pending -> completed|cancelled`. La UI
+Web trusted ricontrolla la risorsa, richiede ruolo medico attivo, step-up e gesto
+specifico, quindi esegue il commit con CAS, idempotenza, audit e receipt. Proof
+e commit non sono delegati all'agente; replay, revoca, logout o cambio selezione
+negano l'operazione.
+
+Il semantic query planner è collegato al Supervisor e resta read-only: compone
+al massimo due operazioni allowlisted, senza SQL libero o scritture. La shell
+macOS integra inoltre cattura e trascrizione italiana Apple on-device, con
+consenso esplicito, audio bounded solo in RAM e trasferimento al draft dopo
+review; non esegue writer clinici automatici. Il terminal smoke standalone sul
+tree finale, installer, onboarding ed esercizio su host esterni restano prove
+separate dal contenuto sorgente della 0.8.5. Egress implicito ed esecuzione AI dai
+client paired restano chiusi.
 
 ### 5.2 Lane benchmark-only
 
@@ -414,14 +511,18 @@ Le lane seguenti restano separate dal runtime clinico:
 - OpenMed `redaction.v1` (shadow/benchmark);
 - HUMADEX / OpenMed NER;
 - challenger generativi non promossi;
-- TurboQuant / MLX runtime experiments;
-- comparator cloud opt-in (`gpt-5.4`).
+- esperimenti MLX diversi dalla capability nominata Treatment Reasoning;
+- comparator cloud storico, escluso dal candidato `0.8.5`.
 
-`WUL-165` rende MLX benchmark-visible e diagnosticabile in read-only nella
-home-base, ma non lo promuove a runtime clinico: Ollama resta il default
-operativo generativo e il motore OCR primario. L'unico fallback OCR
-platform-specific certificato oggi e Apple Vision su macOS; Windows/Linux non
-hanno un fallback OCR equivalente dichiarato.
+MLX non diventa un provider generico: nella 0.8.5 ATHENA/MLX e ammesso
+solo dalla capability Treatment Reasoning. Ollama resta capability-specific e
+non esegue OCR; il fallback Apple Vision appartiene al confine AnyDoc locale.
+Ogni altra lane MLX resta benchmark, shadow o hold secondo la matrice di
+serving.
+
+OpenAI e Anthropic hanno adapter ufficiali e probe review-only. Restano
+`default OFF`; il tree usa transport fake e non contiene credenziali o prove di
+rete live. Registry e probe non autorizzano esecuzione o egress.
 
 Per promuovere una lane servono:
 
@@ -437,11 +538,11 @@ La classificazione completa per task, modello e runtime vive in
 separa `runtime`, `shadow`, `benchmark_only` e `hold`; un modello installato non
 è automaticamente un modello serving.
 
-### 5.3 Comparator cloud
+### 5.3 Comparator cloud escluso
 
-Il comparator cloud e ammesso solo come strumento interno opt-in di engineering,
-su case pack privati redatti/minimizzati e fuori Git. Non e un canale runtime,
-non scrive dati paziente e non cambia il default local-first.
+La documentazione storica conserva un comparator cloud di engineering, ma il
+candidato `0.8.5` non ne include esecuzione, configurazione credenziali o
+egress. Non e una lane runtime o una prova di provider disponibile.
 
 ---
 
@@ -553,15 +654,16 @@ Da preservare:
 
 Disponibile:
 
-- OCR/local parsing, con fallback Apple Vision solo su macOS quando il primario
-  locale produce output vuoto o degenerato;
+- estrazione automatica locale con AnyDoc per i formati supportati;
+- routing, manifest, materializzazione e rendering bounded delle pagine
+  `needsOcr`, con Apple Vision locale e ricomposizione current-source per i PDF
+  supportati;
 - review di suggerimenti;
 - soppressione rumore quando una fonte non introduce novita clinica;
 - create-flow document-driven con persistenza prudente delle terapie;
-- coda OCR-needed con stati espliciti (pending, processing, ocr_done,
-  ocr_failed, manual_review), motivi tracciati, pannello `Coda OCR` in upload
-  documenti e replay idempotente post-OCR per hash documento: nessuna proposta
-  clinica finche il testo non e sufficiente;
+- fallimento chiuso e revisione manuale per immagini dirette, documenti
+  cifrati, formati non supportati o motore locale indisponibile; nessuna
+  proposta clinica nasce da contenuto incompleto;
 - estrazione identita documentale prudente: nessun fallback prima-data-trovata
   per la data di nascita (meglio assente che sbagliata), date costruite in
   UTC e codice fiscale riconosciuto anche in forma omocodica.
@@ -569,6 +671,8 @@ Disponibile:
 Fuori scope:
 
 - auto-promozione di diagnosi/terapie da testo libero ambiguo;
+- DeepSeek-OCR 2/CUDA, benchmark OCR e readiness universale, con stato
+  `OUT_OF_SCOPE_FOR_0.8.5_NON_BLOCKING`;
 - import silenzioso di documenti reali senza review;
 - uso di documenti reali come fixture Git.
 
@@ -618,7 +722,7 @@ Disponibile:
 
 Fotografia parity post-Wave 5:
 
-- 64 capability censite: 30 full, 13 partial, 21 host-only, 0 missing-both;
+- 66 capability censite: 30 full, 13 partial, 23 host-only, 0 missing-both;
 - tra le 43 capability per cui la parity è un obiettivo, 30 sono full (70%);
 - PR #21 e `WUL-401`, ora completata, hanno consegnato bundle, fixture, probe AX
   e runbook P6 di base; prerequisiti operativi e verbale manuale sul Mac
@@ -630,7 +734,8 @@ La fonte canonica è [docs/parity-matrix.md](./parity-matrix.md).
 
 Direzione:
 
-- app Windows/Linux e launcher dedicati oltre il core;
+- app Windows/Linux complete e distribuzione dedicata oltre i launcher sorgente
+  gia presenti;
 - closeout parity residuo tramite `WUL-481`/`WUL-403` e decisione separata per i quattro residui documentali;
 - cache locale cifrata derivata e riconciliazione esplicita.
 

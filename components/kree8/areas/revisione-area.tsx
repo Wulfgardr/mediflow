@@ -84,6 +84,7 @@ const DOC_FIELDS: {
 
 /* ───────────────────────── Revisione documenti ───────────────────────── */
 
+/* @Codex */
 function RevisioneArea() {
   const [decisions, setDecisions] = useState<Record<string, DocDecision>>(() =>
     Object.fromEntries(DOC_FIELDS.map((f) => [f.id, 'pending'])),
@@ -165,7 +166,7 @@ function RevisioneArea() {
       <div className={documentStyles.docGrid}>
         <section className={documentStyles.docPreview}>
           <header style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <PillBadge variant="plum">Anteprima OCR</PillBadge>
+            <PillBadge variant="plum">Anteprima documentale</PillBadge>
             <span className={styles.rowSub}>2 pagine · 87% leggibile</span>
             <span style={{ marginLeft: 'auto' }}>
               <PillBadge variant="plum">PDF · 318 KB</PillBadge>

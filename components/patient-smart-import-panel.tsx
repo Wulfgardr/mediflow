@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
     AlertTriangle,
@@ -16,7 +16,8 @@ import {
 import PrivacyBlur from '@/components/privacy-blur';
 import { useLiveQuery } from '@/lib/live-query';
 import { confidenceLabel, matchTypeLabel } from '@/lib/ai-labels';
-import { db, type ClinicalEntry, type Patient } from '@/lib/db';
+import { db, type ClinicalEntry, type Patient, type Therapy } from '@/lib/db';
+import { PatientSmartImportFabricPreviewCard } from '@/components/patient-smart-import-fabric-preview-card';
 import {
     AI_SMART_IMPORT_KILL_SWITCH_KEY,
     AiSmartImportDisabledError,
@@ -31,6 +32,10 @@ import {
     type TherapySmartImportSuggestion,
     type TherapySuggestionState,
 } from '@/lib/domain/documents/patient-smart-import-service';
+import {
+    buildPatientSmartImportProjectionCaptureInput,
+    countUsableSources,
+} from '@/lib/domain/documents/patient-smart-import-projection-capture';
 import type { SmartImportReviewSnapshot } from '@/lib/domain/documents/patient-review-queue-summary';
 import { semanticSignalSurfaceClass } from '@/components/ui/semantic-signal';
 import {
@@ -41,24 +46,10 @@ import {
 interface PatientSmartImportPanelProps {
     patient: Patient;
     entries?: ClinicalEntry[];
+    activeTherapies?: Therapy[];
     /* WUL-262: lets patient detail mirror reviewable/blocked/ready counts in the
        review-queue summary without duplicating panel state or behavior. */
     onReviewSnapshotChange?: (snapshot: SmartImportReviewSnapshot) => void;
-}
-
-export function countUsableSources(
-    patient: Patient,
-    entries: ClinicalEntry[] | undefined,
-    attachmentSummaryCount: number
-): number {
-    const documentInsightCount = Array.isArray(patient.documentInsights) ? patient.documentInsights.length : 0;
-
-    return [
-        patient.notes?.trim() ? 1 : 0,
-        entries?.filter((entry) => !entry.deletedAt && entry.content?.trim()).length || 0,
-        documentInsightCount,
-        attachmentSummaryCount,
-    ].reduce((total, count) => total + count, 0);
 }
 
 function therapyStateLabel(state: TherapySuggestionState): string {
@@ -272,7 +263,7 @@ function TherapyResolverPreview({ therapy }: { therapy: TherapySmartImportSugges
     );
 }
 
-export default function PatientSmartImportPanel({ patient, entries = [], onReviewSnapshotChange }: PatientSmartImportPanelProps) {
+export default function PatientSmartImportPanel({ patient, entries, activeTherapies, onReviewSnapshotChange }: PatientSmartImportPanelProps) {
     const [analysis, setAnalysis] = useState<PatientSmartImportAnalysis | null>(null);
     const [isGenerating, setIsGenerating] = useState(false);
     const [isApplying, setIsApplying] = useState(false);
@@ -303,6 +294,8 @@ export default function PatientSmartImportPanel({ patient, entries = [], onRevie
 
     const sourceCount = countUsableSources(patient, entries, attachments?.length || 0);
     const smartImportEnabled = isAiSmartImportEnabledValue(smartImportKillSwitch?.value);
+    const fabricCaptureInput = useMemo(() => entries && attachments && activeTherapies
+        ? buildPatientSmartImportProjectionCaptureInput(patient, entries, attachments, activeTherapies) : null, [patient, entries, attachments, activeTherapies]);
 
     const reviewableCount = analysis
         ? analysis.diagnoses.filter((diagnosis) => diagnosis.canApply && !selectedDiagnosisIds.includes(diagnosis.id)).length
@@ -553,6 +546,7 @@ export default function PatientSmartImportPanel({ patient, entries = [], onRevie
                 </div>
             </div>
 
+            {fabricCaptureInput && <PatientSmartImportFabricPreviewCard patientId={patient.id} captureInput={fabricCaptureInput} enabled={smartImportEnabled} />}
             <div className="p-5">
                 {error && (
                     <div className="mb-4 flex items-start gap-2 rounded-[20px] border border-[color:color-mix(in_srgb,var(--lume-signal-critical)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-critical)_11%,var(--lume-surface-field))] p-3 text-xs text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]">

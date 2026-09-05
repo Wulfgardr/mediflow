@@ -51,7 +51,7 @@ function isApiVersionConflictPayload(value: unknown): value is ApiVersionConflic
         && (payload.entity === 'entry' || payload.entity === 'checkup')
         && typeof payload.recordId === 'string';
 }
-// Document insight from OCR + AI synthesis
+// Historical document insight persisted from local extraction and review-only synthesis
 /* @Codex */
 export type DocumentQualityLevel = 'green' | 'yellow' | 'red';
 
@@ -70,8 +70,8 @@ export interface DocumentInsight {
     attachmentId?: string;
     date: Date;
     fileName: string;
-    rawMarkdown: string;  // DeepSeek-OCR output
-    summary: string;      // Qwen synthesis on top of OCR text
+    rawMarkdown: string;  // Immutable source text retained for historical compatibility
+    summary: string;      // Historical review-only synthesis on locally extracted text
     /* @Codex */
     evidencePack?: DocumentEvidencePack;
     quality?: {

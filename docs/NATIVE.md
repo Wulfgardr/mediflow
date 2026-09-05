@@ -37,7 +37,7 @@ La base corrente va letta cosi:
 
 * **macOS**: `MediFlowMacApp` e il fronte nativo piu maturo. Il bundle packaged
   include il WebRuntime Next standalone e puo osservare o gestire esplicitamente
-  backend locale e proxy TLS senza diventare supervisore di Ollama o Docker.
+  backend locale e proxy TLS senza diventare supervisore dei provider AI opzionali.
 * **iPhone/iPad**: `MediFlowMobileApp` usa la stessa libreria SwiftUI e il
   boundary `/api/v1/network/*`. I workflow paired online coprono lifecycle
   paziente, moduli clinici non-AI, cataloghi, prestazioni/protesica e create
@@ -48,6 +48,10 @@ La base corrente va letta cosi:
 * **Sicurezza**: i client sigillano i campi sensibili prima del wire/storage;
   pairing device e sessione operatore restano distinti; nessun client mobile
   accede direttamente al database del Mac.
+* **Headless/AIP locale**: il Supervisor Node portabile avvia Web standalone e
+  MCP `stdio` come figli distinti su IPC ereditato. Contesto, lease, revoca e
+  audit restano host-owned. L'adapter LaunchAgent/libxpc macOS resta una
+  direzione opzionale separata e non è un requisito della 0.8.5.
 * **Parity**: la matrice post-Wave 5 e in [docs/parity-matrix.md](./parity-matrix.md).
   `WUL-401`/PR #21 hanno consegnato bundle, fixture, probe AX e runbook P6 di
   base. La candidata v0.8 chiude i gate UI sul candidato con iPhone 2/2, iPad
@@ -62,8 +66,10 @@ La base corrente va letta cosi:
 
 1. **Xcode corrente compatibile con Swift 5.9**; per i gate locali viene usato
    Xcode beta quando indicato dai runbook.
-2. **Node.js 24 consigliato**. Il runner TypeScript richiede almeno Node 22.6.
-3. **Mkcert** (per HTTPS locale).
+2. **Node.js 24 richiesto** per il bundle runnable/WebRuntime e per i launcher.
+   Il launcher rifiuta runtime o binding `better-sqlite3` non conformi prima
+   di avviare il setup.
+3. **OpenSSL** (per HTTPS locale).
 
 ### Quick start
 
@@ -156,16 +162,44 @@ la family architecture. In questa slice il bundle **osserva** il runtime locale:
   script `local-api-tls-proxy.mjs` incluso nel bundle;
 * arresta backend/proxy con timeout esplicito e escalation locale quando il
   processo non termina in modo ordinato;
-* mostra lo stato diagnostico read-only di Ollama (`127.0.0.1:11434`) e
-  Docker/ICD (`127.0.0.1:8888`) quando sono gia attivi;
+* mostra lo stato diagnostico read-only di Ollama (`127.0.0.1:11434`) e MLX;
 * non mostra mai token, certificati, chiavi o dati paziente;
-* non installa, avvia, arresta o supervisiona Ollama o container Docker.
+* non installa, avvia, arresta o supervisiona i provider AI opzionali.
 
-`scripts/build-apple-macos-app.sh` produce il bundle universale macOS con il
-WebRuntime incluso, non firmato per default, e puo firmarlo con
-`MEDIFLOW_CODESIGN_IDENTITY` (`-` per ad-hoc, Developer ID per distribuzione).
-La notarizzazione resta un passaggio di distribuzione separato. I servizi
-opzionali sono visibili come health diagnostico, non come processi app-managed.
+`scripts/build-apple-macos-app.sh` produce un bundle macOS specifico per
+l'architettura corrente (`arm64` oppure `x86_64`) con il WebRuntime incluso. Il
+bundle non è firmato per default e può usare `MEDIFLOW_CODESIGN_IDENTITY` (`-`
+per ad-hoc, Developer ID Application per distribuzione diretta). La
+notarizzazione Apple è un passaggio separato della distribuzione diretta. La
+distribuzione Mac App Store usa invece il relativo percorso di firma e upload
+e richiede una decisione distinta su App Sandbox. I servizi opzionali sono
+visibili come health diagnostico, non come processi app-managed.
+
+### Adapter AIP macOS opzionale
+
+ADR 0114 e #329 riservano nel bundle firmato un LaunchAgent
+`com.mediflow.aip-broker`, due launcher nativi, l'addon Node-API/libxpc e il
+runtime JavaScript AIP. Il plist vive in `Contents/Library/LaunchAgents`, usa
+`BundleProgram` e pubblica due Mach service per-user: control e RPC. Il
+launcher MCP sostituisce l'ambiente e mantiene il PID quando esegue il Node 24
+approvato; il broker verifica PID, EUID e ASID dal canale XPC, il requisito di
+firma e una bootstrap reference monouso.
+
+In questa direzione, `MediFlowMacApp` resterebbe l'unico owner di registrazione,
+update, rollback e unregister tramite `SMAppService`. Un bundle unsigned,
+l'approvazione di sistema mancante o un mismatch di firma/manifest manterrebbe
+l'adapter disabilitato. Non sono ammessi XPCService proxy, secondo IPC,
+fallback TCP, API private o raw audit token. Questa sezione descrive una
+decisione di packaging futura, non il Supervisor portabile integrato nella
+0.8.5.
+
+### Registrazione visita 0.8.5
+
+Su macOS 26 o successivo, la shell integra cattura e trascrizione italiana con
+API Apple on-device. Il percorso richiede consenso esplicito, mantiene l'audio
+bounded solo in RAM e trasferisce il transcript al draft soltanto dopo review.
+Non esegue writer clinici automatici. La prova con microfono reale e la
+validazione clinica restano fuori dal claim del candidato.
 
 ### 1. Sessione e privacy
 
@@ -193,11 +227,58 @@ Glass e un enhancement del chrome su OS compatibili, non un materiale da
 applicare alle card cliniche. macOS, iPhone e iPad condividono semantica e
 primitive, non la stessa navigazione o densita.
 
+La slice macOS WUL-566/WUL-567 conserva Carta come grammatica documentale, non
+come palette: nessuna resa crema, beige, avorio o parchment. L'inspector paziente usa
+colori neutrali nativi adattivi. Solo la major esatta macOS 27 usa lo sheet di
+compatibilita; macOS 28+ torna all'inspector di sistema.
+
 Gli audit XCTest e i test UI sono verdi su iPhone e iPad. VoiceOver è stato
 esercitato manualmente su macOS. La beta Xcode 27 non completa l'abilitazione
 VoiceOver nel simulatore mobile; il limite e la deroga della sola candidata
 sorgente 0.8 sono registrati in
 [docs/known-limitations.md](./known-limitations.md).
+La nuova slice inspector non aggiunge un PASS VoiceOver: nel run WUL-567 la
+sessione Mac era bloccata, quindi focus, resize e narrazione restano `PARTIAL`.
+
+### 4. Temperamento mobile candidato e stato paired
+
+`WUL-556` usa **Guardia** come temperamento esplorativo su iPhone/iPadOS e
+**Carta** come substrato delle superfici cliniche. La decisione owner è
+acquisita per la candidata: Carta descrive la grammatica del contenuto, non una
+palette. Non resta quindi una decisione di contratto aperta. Il client non forza
+il tema scuro; usa il canvas Guardia solo quando l'aspetto di sistema è scuro e
+mantiene componenti, materiali e navigazione di sistema.
+
+La decisione owner per questa slice è vincolante: **Carta descrive la grammatica
+del contenuto, non una palette**. Le superfici mobili non introducono crema,
+beige, avorio o parchment. Il giorno usa i colori neutrali adattivi già
+canonici (`canvas #eef0f2`, `field #f4f6f8`, `focal #fbfcfe`); il buio usa il
+canvas Guardia neutro `#0c0e12`. I colori success/warning/critical restano
+segnali funzionali e non derivano dalla metafora Carta. Le preview sintetiche
+coprono esplicitamente iPhone light e iPad dark.
+
+Il pannello `mobile-paired-status` rende distinguibili caricamento, errore,
+online, cache locale, offline in sola lettura e sessione scaduta. La resa stale
+ha preview e test sintetici, ma non è ancora cablata a metadata live: la cache
+oltre il TTL viene scartata. L'azione primaria misura almeno 48 pt, espone label
+VoiceOver e supporta `⌘R` e pointer su iPad.
+
+Questa superficie non concede capability. Il gate di consumo `WUL-557` usa il
+contratto machine-readable canonico
+`packages/mini/contracts/mini-parity.json`, verificato byte-identico nei head
+`3fd988bafe71a058fdd7d3c25ea569793dcba903` (PR #184) e
+`1e35733c0218eae67a1d6e158085aab7340bc26b` (PR #190). Il contratto dichiara
+4 righe `available` su 66 (`6.060606%`), 61 `manual_only`, 1 `proposal_only` e
+0 `unavailable`; le ragioni restano 23 `HOST_AUTHORITY_ONLY`, 38
+`NOT_IN_MINI_PILOT` e 1 `SYNTHETIC_PREVIEW_ONLY`.
+
+Per la slice `WUL-556`, `patient search/show` (riga 1), `whoami` (riga 39) e
+`capabilities` (riga 63) sono disponibili in Mini, ma non colmano i residui
+nativi e non diventano grant. La cache offline (riga 45) resta `manual_only`
+con ragione `NOT_IN_MINI_PILOT`, mentre iPhone/iPadOS restano `partial` per
+metadata stale live, dettaglio offline e write queue assenti. Manifest, receipt,
+stato paired e token locale non conferiscono autorità agentica. La parity resta
+incompleta fino alla verifica manager e a `WUL-564`.
 
 ---
 

@@ -85,7 +85,7 @@ export default function SettingsDangerZonePage() {
                             autoComplete="off"
                             spellCheck={false}
                             data-testid="danger-zone-confirm-input"
-                            className="mt-1 w-full max-w-xs rounded-[12px] border border-red-200 bg-white/90 px-3 py-2 font-mono text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-red-300 dark:border-red-500/30 dark:bg-red-950/30 dark:text-red-100"
+                            className="mt-1 w-full max-w-xs rounded-[12px] border border-red-200 bg-white/90 px-3 py-2 font-mono text-sm text-gray-900 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-red-300 dark:border-red-500/30 dark:bg-red-950/30 dark:text-red-100 dark:placeholder:text-red-100/60"
                         />
                     </label>
 

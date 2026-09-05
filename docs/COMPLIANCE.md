@@ -11,6 +11,32 @@ Riferimenti correlati:
 
 ---
 
+## Inventario tecnico in-app
+
+La superficie **Impostazioni → Evidenze e conformità** rende consultabile un
+inventario statico e versionato (`mediflow.compliance-evidence.v1`). Per ogni
+ambito mostra:
+
+- evidenze verificabili nel repository;
+- limite del claim;
+- owner della verifica successiva;
+- stato `evidenza nel sorgente`, `evidenza con limite esplicito` oppure
+  `valutazione esterna necessaria`.
+
+L'inventario non legge dati clinici, non esegue controlli sul deployment e non
+produce un verdetto legale. Le fonti ufficiali esterne — [articolo 25
+GDPR](https://eur-lex.europa.eu/eli/reg/2016/679/art_25/oj/eng), [articolo 32
+GDPR](https://eur-lex.europa.eu/eli/reg/2016/679/art_32/oj/eng) e [Regolamento
+(UE) 2024/1689](https://eur-lex.europa.eu/eli/reg/2024/1689/oj?locale=en) — sono
+input per la valutazione dell'organizzazione, del referente legale e del DPO;
+non classificano automaticamente MediFlow o il suo uso concreto.
+
+Il claim ceiling dell'inventario è quindi **solo inventario di evidenze
+tecniche**. Configurazione, finalità, ruoli privacy, procedure, classificazione
+del sistema AI e adempimenti restano fuori dal suo perimetro.
+
+---
+
 ## ⚖️ 1. GDPR e privacy
 
 MediFlow applica misure tecniche coerenti con il principio **Privacy by

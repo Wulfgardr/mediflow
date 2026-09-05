@@ -63,6 +63,15 @@ APP="$DERIVED/Build/Products/$CONFIG/MediFlow.app"
 # 3. Inject the WebRuntime + the TLS proxy script into the bundle
 RES="$APP/Contents/Resources"
 WEB="$RES/WebRuntime"
+FRAMEWORKS="$APP/Contents/Frameworks"
+WEB_NATIVE_TARGETS=(
+  "$FRAMEWORKS/mediflow-web-libvips.dylib"
+  "$FRAMEWORKS/mediflow-web-anydoc.node"
+  "$FRAMEWORKS/mediflow-web-sharp.node"
+  "$FRAMEWORKS/mediflow-web-canvas.node"
+  "$FRAMEWORKS/mediflow-web-better-sqlite3.node"
+  "$FRAMEWORKS/mediflow-web-fsevents.node"
+)
 echo "Injecting WebRuntime into the app bundle..."
 rm -rf "$WEB"
 mkdir -p "$WEB/.next"
@@ -70,15 +79,23 @@ cp -R "$STANDALONE_DIR/." "$WEB/"
 cp -R "$ROOT_DIR/$NEXT_DIST_DIR/static" "$WEB/.next/static"
 [[ -d "$ROOT_DIR/public" ]] && cp -R "$ROOT_DIR/public" "$WEB/public"
 cp "$ROOT_DIR/scripts/local-api-tls-proxy.mjs" "$RES/local-api-tls-proxy.mjs"
+"$ROOT_DIR/scripts/check-macos-web-runtime-native-payload.sh" --normalize --web-runtime "$WEB" --frameworks "$FRAMEWORKS"
 
 # 4. Optional codesign (so the injected runtime is covered for distribution)
 if [[ -n "${MEDIFLOW_CODESIGN_IDENTITY:-}" ]]; then
   echo "Codesigning ($MEDIFLOW_CODESIGN_IDENTITY)..."
   if [[ "$MEDIFLOW_CODESIGN_IDENTITY" == "-" ]]; then
-    codesign --force --deep --sign - "$APP"
+    SIGN_ARGS=(--force --sign -)
   else
-    codesign --force --deep --options runtime --timestamp --sign "$MEDIFLOW_CODESIGN_IDENTITY" "$APP"
+    SIGN_ARGS=(--force --options runtime --timestamp --sign "$MEDIFLOW_CODESIGN_IDENTITY")
   fi
+  # @Codex: sign nested code inside-out; --deep is verification-only here.
+  for native_code in "${WEB_NATIVE_TARGETS[@]}"; do
+    codesign "${SIGN_ARGS[@]}" "$native_code"
+    codesign --verify --strict "$native_code"
+  done
+  codesign "${SIGN_ARGS[@]}" "$APP"
+  codesign --verify --deep --strict "$APP"
 fi
 
 echo "Runnable macOS app: $APP"

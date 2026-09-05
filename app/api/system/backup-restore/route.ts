@@ -7,13 +7,19 @@ import {
     checkups,
     conversations,
     documentDiagnosisProposals,
+    durableReviewOperations,
+    durableReviewPatientLinks,
+    durableReviewRecords,
     drugs,
     entries,
     exemptions,
+    headlessSoapActiveRoleAttestations,
+    headlessSoapEntryCommits,
     messages,
     observations,
     patients,
     patientsToAmbulatories,
+    physicianReviewAttestations,
     prostheticPrescriptions,
     serviceCatalogEntries,
     servicePrescriptionItems,
@@ -36,7 +42,10 @@ import {
 import { enrichBackupPatientsWithAmbulatoryLinks } from '@/lib/backup-patient-ambulatory-links';
 import { restoreBackupArtifact } from '@/lib/backup-restore-executor';
 import { runBackupRestorePreflight } from '@/lib/backup-restore-preflight';
-import { apiInternalError } from '@/lib/api-error-response';
+import { apiFailure, apiInternalError } from '@/lib/api-error-response';
+import { disposeCheckupStatusTransitionForHostV1 } from
+    '@/lib/security/headless-checkup-status-transition-web-production';
+import { isTrustedWebMutationRequest } from '@/lib/security/request-transport';
 
 /* @Codex */
 export const dynamic = 'force-dynamic';
@@ -44,9 +53,10 @@ export const dynamic = 'force-dynamic';
 /* @Codex */
 function sortBackupRows<T extends Record<string, unknown>>(rows: T[]): T[] {
     return [...rows].sort((left, right) => {
-        const leftKey = String(left.id ?? left.key ?? left.code ?? left.aic ?? left.patientId ?? left.conversationId ?? '');
-        const rightKey = String(right.id ?? right.key ?? right.code ?? right.aic ?? right.patientId ?? right.conversationId ?? '');
-        return leftKey.localeCompare(rightKey);
+        const leftKey = String(left.idempotencyKey ?? left.attestationRef ?? left.actorRef ?? left.id ?? left.key ?? left.code ?? left.aic ?? left.patientId ?? left.conversationId ?? '');
+        const rightKey = String(right.idempotencyKey ?? right.attestationRef ?? right.actorRef ?? right.id ?? right.key ?? right.code ?? right.aic ?? right.patientId ?? right.conversationId ?? '');
+        const primary = leftKey.localeCompare(rightKey);
+        return primary === 0 ? String(left.actorRef ?? '').localeCompare(String(right.actorRef ?? '')) : primary;
     });
 }
 
@@ -69,12 +79,18 @@ function buildBackupDataset(): BackupDataset {
         const attachmentsRows = tx.select().from(attachments).all();
         const conversationsRows = tx.select().from(conversations).all();
         const documentDiagnosisProposalRows = tx.select().from(documentDiagnosisProposals).all();
+        const durableReviewRecordRows = tx.select().from(durableReviewRecords).all();
+        const durableReviewOperationRows = tx.select().from(durableReviewOperations).all();
+        const durableReviewPatientLinkRows = tx.select().from(durableReviewPatientLinks).all();
         const drugsRows = tx.select().from(drugs).all();
         const entriesRows = tx.select().from(entries).all();
         const exemptionsRows = tx.select().from(exemptions).all();
         const messagesRows = tx.select().from(messages).all();
         const observationsRows = tx.select().from(observations).all();
         const patientsRows = tx.select().from(patients).all();
+        const physicianReviewAttestationRows = tx.select().from(physicianReviewAttestations).all();
+        const headlessSoapActiveRoleAttestationRows = tx.select().from(headlessSoapActiveRoleAttestations).all();
+        const headlessSoapEntryCommitRows = tx.select().from(headlessSoapEntryCommits).all();
         const prostheticPrescriptionRows = tx.select().from(prostheticPrescriptions).all();
         const serviceCatalogRows = tx.select().from(serviceCatalogEntries).all();
         const servicePrescriptionItemRows = tx.select().from(servicePrescriptionItems).all();
@@ -96,18 +112,32 @@ function buildBackupDataset(): BackupDataset {
             .map((conversation) => conversation.id)
             .filter((value): value is string => typeof value === 'string' && value.trim().length > 0),
     );
+    const durableReviewIds = new Set(
+        durableReviewRecordRows
+            .map((record) => record.reviewId)
+            .filter((value): value is string => typeof value === 'string' && value.trim().length > 0),
+    );
 
         return {
             ambulatories: sortBackupRows(ambulatoriesRows),
             attachments: sortBackupRows(filterRowsByReference(attachmentsRows, 'patientId', patientIds)),
             conversations: sortBackupRows(conversationsRows),
             documentDiagnosisProposals: sortBackupRows(filterRowsByReference(documentDiagnosisProposalRows, 'patientId', patientIds)),
+            durableReviewPatientLinks: sortBackupRows(
+                filterRowsByReference(durableReviewPatientLinkRows, 'patientId', patientIds)
+                    .filter((link) => typeof link.reviewId === 'string' && durableReviewIds.has(link.reviewId)),
+            ),
+            durableReviewRecords: sortBackupRows(durableReviewRecordRows),
+            durableReviewOperations: sortBackupRows(durableReviewOperationRows),
             drugs: sortBackupRows(drugsRows),
             entries: sortBackupRows(filterRowsByReference(entriesRows, 'patientId', patientIds)),
             exemptions: sortBackupRows(exemptionsRows),
             messages: sortBackupRows(filterRowsByReference(messagesRows, 'conversationId', conversationIds)),
             observations: sortBackupRows(filterRowsByReference(observationsRows, 'patientId', patientIds)),
             patients: sortBackupRows(enrichedPatients),
+            physicianReviewAttestations: sortBackupRows(physicianReviewAttestationRows),
+            headlessSoapActiveRoleAttestations: sortBackupRows(headlessSoapActiveRoleAttestationRows),
+            headlessSoapEntryCommits: sortBackupRows(headlessSoapEntryCommitRows),
             prostheticPrescriptions: sortBackupRows(filterRowsByReference(prostheticPrescriptionRows, 'patientId', patientIds)),
             serviceCatalogEntries: sortBackupRows(serviceCatalogRows),
             servicePrescriptionItems: sortBackupRows(filterRowsByReference(servicePrescriptionItemRows, 'patientId', patientIds)),
@@ -145,6 +175,9 @@ export async function POST(request: Request) {
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
     if (!isWebAdminSession(session)) return forbiddenResponse();
+    if (!isTrustedWebMutationRequest(request)) {
+        return apiFailure('request_transport_invalid', 'Ripristino backup non disponibile.', 403);
+    }
 
     try {
         const body = await request.json();
@@ -156,7 +189,7 @@ export async function POST(request: Request) {
             );
         }
 
-        restoreBackupArtifact(artifact);
+        restoreBackupArtifact(artifact, disposeCheckupStatusTransitionForHostV1);
 
         return NextResponse.json({
             success: true,

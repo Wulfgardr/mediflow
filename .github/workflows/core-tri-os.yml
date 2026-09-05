@@ -13,6 +13,10 @@ name: Core tri-OS gate
 # apple-native.yml: un workflow non partito lascia il check ASSENTE (PR bloccata
 # in "Expected"), un job skippato emette un check run che vale come passato.
 # Il check da rendere required è `core-tri-os` (job `gate`), non `linux`/`windows`.
+#
+# @Codex H9: questa configurazione aggiunge i gate cross-platform, ma non è
+# evidenza di una loro esecuzione remota sullo stesso SHA. Il claim resta
+# `HOLD_TRI_OS_CI_SAME_SHA` finché quella receipt non esiste.
 
 on:
   pull_request:
@@ -113,6 +117,16 @@ jobs:
             case "$f" in
               native/MediFlowMac/Sources/MediFlowCore/*) core=true; continue ;;
               native/contracts/*)                        core=true; continue ;;
+              # @Codex
+              scripts/generate-headless-soap-entry-h4-golden.mjs) core=true; continue ;;
+              scripts/generate-headless-soap-entry-contract-golden.ts) core=true; continue ;;
+              scripts/run-strip-types.mjs) core=true; continue ;;
+              scripts/register-strip-types-loader.mjs) core=true; continue ;;
+              lib/headless/clinician-soap-write-contract.ts) core=true; continue ;;
+              lib/headless/clinician-soap-write-contract.test.ts) core=true; continue ;;
+              lib/headless/clinician-soap-entry-commit-receipt.ts) core=true; continue ;;
+              lib/headless/clinician-soap-entry-commit-receipt.test.ts) core=true; continue ;;
+              package.json | package-lock.json) core=true; continue ;;
             esac
             if [ "$EVENT" != push ]; then
               case "$f" in
@@ -139,6 +153,33 @@ jobs:
         run: swift build --package-path native/MediFlowMac --target MediFlowCore
       - name: Golden-vector gate (MediFlowCoreTests)
         run: swift test --package-path native/MediFlowMac --filter CryptoGoldenVectorsTests
+      - name: H4 SOAP field-set and seal golden gate
+        run: swift test --package-path native/MediFlowMac --filter HeadlessSoapEntryH4GoldenTests
+      - name: H9 SOAP draft and receipt contract golden gate
+        run: swift test --package-path native/MediFlowMac --filter HeadlessSoapEntryContractGoldenTests
+
+  # @Codex
+  h4-golden:
+    needs: changes
+    if: ${{ needs.changes.outputs.core == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install golden codec dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: H4 golden fixture drift check
+        run: node scripts/generate-headless-soap-entry-h4-golden.mjs --check
+      - name: H9 golden fixture drift check
+        run: node scripts/run-strip-types.mjs scripts/generate-headless-soap-entry-contract-golden.ts --check
+      - name: H9 TypeScript draft and receipt contract tests
+        run: >-
+          node scripts/run-strip-types.mjs --test
+          lib/headless/clinician-soap-write-contract.test.ts
+          lib/headless/clinician-soap-entry-commit-receipt.test.ts
 
   windows:
     needs: changes
@@ -164,11 +205,17 @@ jobs:
       - name: Golden-vector gate (MediFlowCoreTests)
         run: swift test --package-path native/MediFlowMac --filter CryptoGoldenVectorsTests
         shell: pwsh
+      - name: H4 SOAP field-set and seal golden gate
+        run: swift test --package-path native/MediFlowMac --filter HeadlessSoapEntryH4GoldenTests
+        shell: pwsh
+      - name: H9 SOAP draft and receipt contract golden gate
+        run: swift test --package-path native/MediFlowMac --filter HeadlessSoapEntryContractGoldenTests
+        shell: pwsh
 
   # Contesto da rendere required: `core-tri-os`.
   gate:
     name: core-tri-os
-    needs: [changes, linux, windows]
+    needs: [changes, h4-golden, linux, windows]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     steps:

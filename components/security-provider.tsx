@@ -34,16 +34,26 @@ import { notifyDbChange } from '@/lib/live-query';
 import {
     checkAuthHealthRequest,
     changePinRequest,
+    createClientAuthorityNetworkBarrier,
     loginWithPinRequest,
-    logoutSecuritySession,
     repairLegacyDbRequest,
     rewrapMasterKeyRequest,
+    requestApplicationLockConfirmation,
     setupSecurityRequest,
     type AuthHealthPayload,
     type LoginFailurePayload,
 } from '@/lib/security/client-auth-api';
 /* @Codex */
 import { MEDIFLOW_API_AUTH_UNAVAILABLE_EVENT } from '@/lib/api-table-response';
+/* @Codex */
+import {
+    createClinicianSoapEntrySealOwner,
+    type ClinicianSoapEntryReopenResult,
+    type ClinicianSoapEntrySealOwner,
+    type ClinicianSoapEntrySealResult,
+    type ClinicianSoapEntrySealV1,
+} from '@/lib/headless/clinician-soap-entry-seal';
+import type { ClinicianSoapEntryFieldSetV1 } from '@/lib/headless/clinician-soap-entry-field-set';
 
 export interface User {
     id: string;
@@ -62,6 +72,11 @@ interface SecurityContextType {
     login: (pin: string) => Promise<boolean>;
     setupPin: (pin: string) => Promise<void>;
     changePin: (currentPin: string, newPin: string) => Promise<{ ok: true } | { ok: false; message: string }>;
+    sealClinicianSoapEntry: (fieldSet: ClinicianSoapEntryFieldSetV1) => Promise<ClinicianSoapEntrySealResult>;
+    reopenClinicianSoapEntry: (
+        bundle: ClinicianSoapEntrySealV1,
+        expectedFieldSet: ClinicianSoapEntryFieldSetV1,
+    ) => Promise<ClinicianSoapEntryReopenResult>;
     lock: () => void;
     updateUser: (data: Partial<User>) => void;
 }
@@ -121,6 +136,28 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
     /* @Codex */
     const masterKeyRef = useRef<CryptoKey | null>(null);
     /* @Codex */
+    const authorityAttemptGenerationRef = useRef(0);
+    /* @Codex */
+    const clinicianSoapEntrySealOwnerRef = useRef<ClinicianSoapEntrySealOwner | null>(null);
+    if (clinicianSoapEntrySealOwnerRef.current === null) {
+        const browserCrypto = globalThis.crypto;
+        clinicianSoapEntrySealOwnerRef.current = createClinicianSoapEntrySealOwner({
+            readAuthority: () => {
+                const key = masterKeyRef.current;
+                return key ? { key, generation: authorityAttemptGenerationRef.current } : null;
+            },
+            crypto: {
+                subtle: browserCrypto.subtle,
+                getRandomValues: (target) => browserCrypto.getRandomValues(target),
+            },
+        });
+    }
+    /* @Codex */
+    const authorityNetworkBarrierRef = useRef<ReturnType<typeof createClientAuthorityNetworkBarrier> | null>(null);
+    if (authorityNetworkBarrierRef.current === null) {
+        authorityNetworkBarrierRef.current = createClientAuthorityNetworkBarrier();
+    }
+    /* @Codex */
     const [authHealth, setAuthHealth] = useState<AuthHealthPayload | null>(null);
     /* @Codex */
     const [isRepairing, setIsRepairing] = useState(false);
@@ -135,12 +172,49 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         notifyDbChange();
     };
 
-    const lock = () => {
+    /* @Codex */
+    const clearClientAuthority = () => {
+        clearSecuritySession();
+        setActiveMasterKey(null);
+        setUser(null);
+        setIsAuthenticated(false);
         setIsLocked(true);
+    };
+
+    /* @Codex */
+    const runAuthorityNetworkRequest = <T,>(request: () => Promise<T>): Promise<T> => {
+        const barrier = authorityNetworkBarrierRef.current;
+        return barrier ? barrier.run(request) : request();
+    };
+
+    /* @Codex */
+    const sealClinicianSoapEntry = (fieldSet: ClinicianSoapEntryFieldSetV1) =>
+        clinicianSoapEntrySealOwnerRef.current!.seal(fieldSet);
+
+    /* @Codex */
+    const reopenClinicianSoapEntry = (
+        bundle: ClinicianSoapEntrySealV1,
+        expectedFieldSet: ClinicianSoapEntryFieldSetV1,
+    ) => clinicianSoapEntrySealOwnerRef.current!.reopen(bundle, expectedFieldSet);
+
+    /* @Codex */
+    const lock = () => {
+        const attemptGeneration = ++authorityAttemptGenerationRef.current;
         setAuthErrorMessage(null);
-        // @Codex - clear server session when locking
-        logoutSecuritySession();
-        // setIsAuthenticated(false); // Do not de-auth, just lock screen.
+        clearClientAuthority();
+
+        // The revocation fence must overtake any in-flight or queued login/setup request.
+        void requestApplicationLockConfirmation()
+            .then((confirmed) => {
+                if (!confirmed && authorityAttemptGenerationRef.current === attemptGeneration) {
+                    setAuthErrorMessage('Server lock not confirmed.');
+                }
+            })
+            .catch(() => {
+                if (authorityAttemptGenerationRef.current === attemptGeneration) {
+                    setAuthErrorMessage('Server lock not confirmed.');
+                }
+            });
     };
 
     useInactivityLock({
@@ -151,10 +225,8 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
     /* @Codex */
     useEffect(() => {
         const handleApiAuthUnavailable = () => {
-            clearSecuritySession();
-            setActiveMasterKey(null);
-            setIsAuthenticated(false);
-            setIsLocked(true);
+            ++authorityAttemptGenerationRef.current;
+            clearClientAuthority();
             setAuthErrorMessage('Sessione scaduta.');
         };
 
@@ -164,18 +236,21 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         };
     }, []);
 
-    // Initial check
-    useEffect(() => {
-        const init = async () => {
-            const restored = await restoreSession();
-            checkAuthStatus(restored);
-        };
-        init();
-    }, []);
-
     const checkAuthStatus = async (isSessionRestored?: boolean) => {
         try {
-            const { response: res, payload: data } = await checkAuthHealthRequest();
+            const { response: res, payload: data, controlState } = await checkAuthHealthRequest();
+            /* @Codex */
+            if (controlState === 'stale') return;
+            /* @Codex */
+            if (controlState === 'invalid') {
+                setAuthHealth({
+                    status: 'error',
+                    error: { code: 'AUTH_CONTROL_INVALID', message: 'Controllo autenticazione non verificabile.' }
+                });
+                setRequiresSetup(false);
+                clearClientAuthority();
+                return;
+            }
             /* @Codex */
             if (!data) {
                 setAuthHealth({
@@ -186,8 +261,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                     }
                 });
                 setRequiresSetup(false);
-                setIsAuthenticated(false);
-                setIsLocked(true);
+                clearClientAuthority();
                 return;
             }
             /* @Codex */
@@ -198,8 +272,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                     error: data.error ?? { code: 'AUTH_CHECK_HTTP', message: `Errore server (HTTP ${res.status}).` }
                 });
                 setRequiresSetup(false);
-                setIsAuthenticated(false);
-                setIsLocked(true);
+                clearClientAuthority();
                 return;
             }
 
@@ -207,8 +280,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             if (data?.status === 'error' || data?.error) {
                 setAuthHealth(data);
                 setRequiresSetup(false);
-                setIsAuthenticated(false);
-                setIsLocked(true);
+                clearClientAuthority();
                 return;
             }
             /* @Codex */
@@ -216,17 +288,14 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
 
             // If setup is missing on server, force setup flow regardless of session
             if (!data.isSetup) {
+                clearClientAuthority();
                 setRequiresSetup(true);
-                setIsAuthenticated(false);
             } else {
                 // Setup exists.
                 setRequiresSetup(false);
                 // @Codex - if server session is missing, lock and clear local session
                 if (data.hasSession === false) {
-                    clearSecuritySession();
-                    setActiveMasterKey(null);
-                    setIsAuthenticated(false);
-                    setIsLocked(true);
+                    lock();
                     return;
                 }
                 // If we didn't restore session, we remain unauthenticated (showing lock screen if set)
@@ -240,8 +309,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                 error: { code: 'AUTH_CHECK_FAILED', message: 'Impossibile verificare lo stato di sicurezza.' }
             });
             setRequiresSetup(false);
-            setIsAuthenticated(false);
-            setIsLocked(true);
+            clearClientAuthority();
         }
     };
 
@@ -265,9 +333,11 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
     };
 
     const restoreSession = async (): Promise<boolean> => {
+        const attemptGeneration = ++authorityAttemptGenerationRef.current;
         try {
             const session = await restoreSecuritySession<User>();
             if (!session) return false;
+            if (authorityAttemptGenerationRef.current !== attemptGeneration) return false;
 
             setActiveMasterKey(session.key);
             setUser(session.userData);
@@ -280,15 +350,45 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         }
     };
 
+    // Initial check
+    useEffect(() => {
+        const init = async () => {
+            const restored = await restoreSession();
+            await checkAuthStatus(restored);
+        };
+        void init();
+    }, []);
+
     const login = async (pin: string): Promise<boolean> => {
+        const attemptGeneration = ++authorityAttemptGenerationRef.current;
+        /* @Codex */
+        let unacceptedServerAuthority = false;
         try {
             setAuthErrorMessage(null);
-            const { response: res, payload } = await loginWithPinRequest(pin);
+            const result = await runAuthorityNetworkRequest(async () => {
+                if (authorityAttemptGenerationRef.current !== attemptGeneration) return null;
+                return loginWithPinRequest(pin);
+            });
+            if (!result) return false;
+            const { response: res, payload, controlState } = result;
+            if (authorityAttemptGenerationRef.current !== attemptGeneration) return false;
 
-            if (!res.ok) {
-                setAuthErrorMessage(formatLoginFailure((payload as LoginFailurePayload | null) ?? null, res.status));
+            /* @Codex */
+            if (res.ok && controlState !== 'accepted') {
+                lock();
+                setAuthErrorMessage('Risposta di login non verificabile. Sessione bloccata.');
                 return false;
             }
+
+            if (!res.ok) {
+                if (authorityAttemptGenerationRef.current === attemptGeneration) {
+                    setAuthErrorMessage(formatLoginFailure((payload as LoginFailurePayload | null) ?? null, res.status));
+                }
+                return false;
+            }
+
+            /* @Codex */
+            unacceptedServerAuthority = true;
 
             const data = payload as {
                 encryptedMasterKey: string;
@@ -299,11 +399,29 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                 ambulatoryName?: string;
                 role: string;
             } | null;
-            if (!data) {
+            /* @Codex */
+            if (!data
+                || typeof data.id !== 'string' || !data.id
+                || typeof data.username !== 'string' || !data.username
+                || typeof data.role !== 'string' || !data.role
+                || typeof data.encryptedMasterKey !== 'string' || !data.encryptedMasterKey
+                || !(typeof data.salt === 'string'
+                    || (Array.isArray(data.salt) && data.salt.every((value) => Number.isInteger(value) && value >= 0 && value <= 255)))
+                || (data.displayName !== undefined && data.displayName !== null && typeof data.displayName !== 'string')
+                || (data.ambulatoryName !== undefined && data.ambulatoryName !== null && typeof data.ambulatoryName !== 'string')) {
+                lock();
                 setAuthErrorMessage('Errore durante il login.');
                 return false;
             }
-            const { encryptedMasterKey, salt, ...userData } = data;
+            const { encryptedMasterKey, salt } = data;
+            /* @Codex */
+            const userData: User = {
+                id: data.id,
+                username: data.username,
+                role: data.role,
+                ...(typeof data.displayName === 'string' ? { displayName: data.displayName } : {}),
+                ...(typeof data.ambulatoryName === 'string' ? { ambulatoryName: data.ambulatoryName } : {}),
+            };
 
             // Convert salt from B64 string
             let saltBytes: Uint8Array;
@@ -316,6 +434,12 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             }
 
             const masterKey = await unwrapMasterKeyVersioned(encryptedMasterKey, pin, saltBytes);
+            if (authorityAttemptGenerationRef.current !== attemptGeneration) {
+                lock();
+                return false;
+            }
+            /* @Codex */
+            unacceptedServerAuthority = false;
 
             setActiveMasterKey(masterKey);
             setUser(userData);
@@ -328,6 +452,10 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                 await persistSecuritySession(masterKey, userData);
             } catch (e) {
                 console.error("Failed to save session", e);
+            }
+            if (authorityAttemptGenerationRef.current !== attemptGeneration) {
+                clearClientAuthority();
+                return false;
             }
 
             // Lazy KDF upgrade: if the stored blob is below the current version,
@@ -350,7 +478,13 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
 
         } catch (e) {
             console.error("Login failed", e);
-            setAuthErrorMessage('Errore durante il login.');
+            /* @Codex */
+            if (unacceptedServerAuthority) {
+                lock();
+                setAuthErrorMessage('Errore durante il login.');
+            } else if (authorityAttemptGenerationRef.current === attemptGeneration) {
+                setAuthErrorMessage('Errore durante il login.');
+            }
             return false;
         }
     };
@@ -371,8 +505,11 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             return { ok: false, message: validationError };
         }
 
+        /* @Codex */
+        let pinMutationDispatched = false;
         try {
             const rotation = await createPinRotationBundle(masterKey, newPin);
+            pinMutationDispatched = true;
             const { response: res, payload } = await changePinRequest({
                 currentPin,
                 newPin,
@@ -384,9 +521,15 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                 return { ok: false, message: formatPinChangeFailure((payload as PinChangeFailurePayload | null) ?? null, res.status) };
             }
 
+            /* @Codex - a successful credential CAS terminally retires this Web session. */
+            ++authorityAttemptGenerationRef.current;
+            clearClientAuthority();
+            setAuthErrorMessage('PIN aggiornato. Accedi con il nuovo PIN.');
             return { ok: true };
         } catch (e) {
             console.error('Change PIN failed', e);
+            /* @Codex - after dispatch the server outcome may be terminal even if the response is lost. */
+            if (pinMutationDispatched) lock();
             return { ok: false, message: 'Errore durante il cambio PIN.' };
         }
     };
@@ -398,6 +541,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
 
     // New handler for Onboarding Wizard
     const handleWizardComplete = async (data: { displayName: string; ambulatoryName: string; pin: string }) => {
+        const attemptGeneration = ++authorityAttemptGenerationRef.current;
         const { displayName, ambulatoryName, pin } = data;
         setFlowError(null);
 
@@ -407,32 +551,49 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             const masterKey = await generateMasterKey();
             const encryptedMasterKey = await wrapMasterKeyVersioned(masterKey, pin, salt);
             const saltB64 = btoa(String.fromCharCode(...salt));
+            if (authorityAttemptGenerationRef.current !== attemptGeneration) return;
 
             // Send to Server
-            const { response: res, payload } = await setupSecurityRequest({
-                username: 'admin',
-                password: pin,
-                encryptedMasterKey,
-                salt: saltB64,
-                displayName,
-                ambulatoryName
+            const result = await runAuthorityNetworkRequest(async () => {
+                if (authorityAttemptGenerationRef.current !== attemptGeneration) return null;
+                return setupSecurityRequest({
+                    username: 'admin',
+                    password: pin,
+                    encryptedMasterKey,
+                    salt: saltB64,
+                    displayName,
+                    ambulatoryName
+                });
             });
+            if (!result) return;
+            const { response: res, payload, controlState } = result;
+            if (authorityAttemptGenerationRef.current !== attemptGeneration) return;
+
+            /* @Codex */
+            if (res.ok && controlState !== 'accepted') {
+                lock();
+                setFlowError('Risposta di configurazione non verificabile. Sessione bloccata.');
+                return;
+            }
 
             /* @Codex */
             if (!res.ok) {
-                if ((res.status === 403 || res.status === 409) && payload?.code === 'SETUP_ALREADY_COMPLETED') {
+                if (res.status === 409 && payload?.code === 'SETUP_ALREADY_COMPLETED') {
+                    clearClientAuthority();
                     setRequiresSetup(false);
-                    const success = await login(pin);
-                    if (!success) {
-                        setIsAuthenticated(false);
-                        setIsLocked(true);
-                        // Messaggio mostrato inline dalla LockScreen tramite authErrorMessage.
-                        setAuthErrorMessage("Accesso già configurato.");
-                    }
+                    // Il recupero richiede un nuovo gesto esplicito sulla LockScreen.
+                    setAuthErrorMessage("Accesso già configurato. Accedi con il PIN.");
                     return;
                 }
 
                 throw new Error(payload?.error || "Setup failed server-side");
+            }
+
+            /* @Codex */
+            if (payload?.success !== true) {
+                lock();
+                setFlowError('Risposta di configurazione non valida. Sessione bloccata.');
+                return;
             }
 
             // Set Active
@@ -448,6 +609,9 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                 await persistSecuritySession(masterKey, userData);
             } catch (sessionError) {
                 console.error("Failed to save session", sessionError);
+            }
+            if (authorityAttemptGenerationRef.current !== attemptGeneration) {
+                clearClientAuthority();
             }
         } catch (e) {
             console.error("Setup failed", e);
@@ -514,6 +678,8 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                 login,
                 setupPin,
                 changePin,
+                sealClinicianSoapEntry,
+                reopenClinicianSoapEntry,
                 lock,
                 updateUser: (data) => setUser(prev => prev ? { ...prev, ...data } : null)
             }}>
@@ -533,6 +699,8 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             login,
             setupPin,
             changePin,
+            sealClinicianSoapEntry,
+            reopenClinicianSoapEntry,
             lock,
             updateUser: (data) => setUser(prev => prev ? { ...prev, ...data } : null)
         }}>

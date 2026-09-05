@@ -34,10 +34,11 @@ function applySqlMigrations(db, projectRoot) {
   }
 }
 
-function ensureE2EDatabase(projectRoot, dbPath, legacyDbPath) {
+/* @Codex */
+function ensureE2EDatabase(projectRoot, dbPath, legacyDbPath, allowLegacyCopy = true) {
   if (fs.existsSync(dbPath)) return;
 
-  if (fs.existsSync(legacyDbPath)) {
+  if (allowLegacyCopy && fs.existsSync(legacyDbPath)) {
     fs.copyFileSync(legacyDbPath, dbPath);
     return;
   }
@@ -132,6 +133,7 @@ async function main() {
   const username = process.env.E2E_USERNAME || 'admin';
   const displayName = process.env.E2E_DISPLAY_NAME || 'Dr. E2E Smoke';
   const ambulatoryName = process.env.E2E_AMBULATORY_NAME || 'Ambulatorio E2E';
+  const allowLegacyCopy = process.env.MEDIFLOW_E2E_DISABLE_LEGACY_COPY !== '1';
 
   if (!dataDir) {
     throw new Error('MEDIFLOW_DATA_DIR or MEDIFLOW_E2E_DATA_DIR is required');
@@ -140,7 +142,7 @@ async function main() {
   fs.mkdirSync(dataDir, { recursive: true });
   const dbPath = path.join(dataDir, 'medical.db');
   const legacyDbPath = path.join(projectRoot, 'medical.db');
-  ensureE2EDatabase(projectRoot, dbPath, legacyDbPath);
+  ensureE2EDatabase(projectRoot, dbPath, legacyDbPath, allowLegacyCopy);
 
   let db = new Database(dbPath);
   try {
@@ -150,7 +152,9 @@ async function main() {
     if (!hasUsersTable) {
       db.close();
       fs.rmSync(dbPath, { force: true });
-      ensureE2EDatabase(projectRoot, dbPath, legacyDbPath);
+      // A present but non-MediFlow legacy file must not be copied a second time:
+      // rebuild the isolated E2E database from the canonical SQL migrations.
+      ensureE2EDatabase(projectRoot, dbPath, legacyDbPath, false);
       db = new Database(dbPath);
       hasUsersTable = db
         .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'users'")

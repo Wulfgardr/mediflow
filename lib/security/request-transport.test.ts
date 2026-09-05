@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 /* @Codex */
-import { isHttpsRequest, sessionCookieOptionsForRequest } from './request-transport.ts';
+import { isHttpsRequest, isTrustedWebMutationRequest, sessionCookieOptionsForRequest } from './request-transport.ts';
 
 const PROXY_HEADERS = { 'x-mediflow-tls-proxy': 'local-api' };
 
@@ -103,4 +103,38 @@ test('isHttpsRequest trusts the proxy marker on a localhost host', () => {
     });
 
     assert.equal(isHttpsRequest(request), true);
+});
+
+test('accepts only exact same-origin JSON mutation transport', () => {
+    const trusted = new Request('http://127.0.0.1:3000/api/system/probe', { method: 'POST', headers: {
+        origin: 'http://127.0.0.1:3000', 'sec-fetch-site': 'same-origin', 'content-type': 'application/json',
+    }, body: '{}' });
+    assert.equal(isTrustedWebMutationRequest(trusted), true);
+
+    const deniedHeaders: Array<Record<string, string>> = [
+        { origin: 'http://127.0.0.1:4000', 'sec-fetch-site': 'same-site', 'content-type': 'application/json' },
+        { origin: 'http://127.0.0.1:3000', 'sec-fetch-site': 'same-origin', 'content-type': 'text/plain' },
+        { origin: 'http://localhost:3000', 'sec-fetch-site': 'same-origin', 'content-type': 'application/json' },
+        { origin: 'http://127.0.0.1:3000', 'content-type': 'application/json' },
+    ];
+
+    for (const headers of deniedHeaders) {
+        const denied = new Request('http://127.0.0.1:3000/api/system/probe', {
+            method: 'POST', headers, body: '{}',
+        });
+        assert.equal(isTrustedWebMutationRequest(denied), false);
+    }
+});
+
+test('accepts a same-origin bodyless mutation and reconstructs TLS-proxy origin', () => {
+    const bodyless = new Request('http://127.0.0.1:3000/api/system/revoke', { method: 'DELETE', headers: {
+        origin: 'http://127.0.0.1:3000', 'sec-fetch-site': 'same-origin',
+    } });
+    assert.equal(isTrustedWebMutationRequest(bodyless, false), true);
+
+    const proxied = new Request('http://mediflow-home.local:3000/api/system/probe', { method: 'POST', headers: {
+        ...PROXY_HEADERS, 'x-forwarded-proto': 'https', origin: 'https://mediflow-home.local:3000',
+        'sec-fetch-site': 'same-origin', 'content-type': 'application/json',
+    }, body: '{}' });
+    assert.equal(isTrustedWebMutationRequest(proxied), true);
 });

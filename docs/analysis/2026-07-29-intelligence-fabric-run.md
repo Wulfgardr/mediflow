@@ -245,7 +245,7 @@ Base codice: `54040f2e8`. Closeout S4 documentale: `31c506c25`.
 
 ### Riconciliazione sorgente
 
-- La checkout dichiarata `/Users/leonardopegollo/Antigravity/medical-record-app`
+- La checkout dichiarata `<primary-checkout>/medical-record-app`
   era su `main` a `2876c583`, quindi e stato registrato `SOURCE_DRIFT`.
 - Il worktree Fable sospeso era pulito e su `54040f2e8`, ma con processi
   attivi. E rimasto invariato.
@@ -414,9 +414,9 @@ SHA-256:
 
 | Lane | Sessione | Modello/effort | Stato | Output promosso |
 | --- | --- | --- | --- | --- |
-| R1 inventario | `98E7DA8C-2872-4424-A584-B8B15F2E7973` | Luna high | DONE | mappa implementato/contrattuale/mock/assente/bloccato |
-| R2 architettura + P2 | `2164723C-C30E-46A9-A766-1BBFFA4FFF68` | Sol xhigh | DONE | confine status-only, OpenAPI e decode Swift |
-| R3 verifica + P1 | `19F25776-72C8-4BDA-8A3A-378FB4CC850D` | Terra high | DONE | lifecycle, admissione, continuita e test |
+| R1 inventario | `<inventory-session-id>` | Luna high | DONE | mappa implementato/contrattuale/mock/assente/bloccato |
+| R2 architettura + P2 | `<architecture-session-id>` | Sol xhigh | DONE | confine status-only, OpenAPI e decode Swift |
+| R3 verifica + P1 | `<verification-session-id>` | Terra high | DONE | lifecycle, admissione, continuita e test |
 | V1/V2 verifier | `/root/fresh_verifier` | Sol high | HOLD_FIX, poi GO | finding TOCTOU/EOF chiusi e battery terminale |
 
 P3 e le correzioni del controller non hanno aperto una quinta lane. Nessuna

@@ -28,7 +28,7 @@ export function PrivacyModeToggle({
             title={title}
             data-testid="privacy-mode-header-toggle"
             className={cn(
-                'inline-flex h-7 items-center justify-center gap-1.5 rounded-full border px-2 text-[11px] font-semibold transition-colors',
+                'inline-flex h-11 min-w-11 items-center justify-center gap-1.5 rounded-full border px-2 text-[11px] font-semibold transition-colors',
                 isPrivacyMode
                     ? 'border-[color:color-mix(in_srgb,var(--lume-accent)_28%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-accent)_12%,transparent)] text-[color:var(--lume-accent)]'
                     : 'border-[color:color-mix(in_srgb,var(--lume-ink)_20%,transparent)] bg-transparent text-[color:var(--lume-ink-muted)] hover:text-[color:var(--lume-ink)]',

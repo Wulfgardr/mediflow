@@ -8,7 +8,7 @@ read_when:
 # Matrice parity localhost ↔ client Apple
 
 Stato documento: `CANONICAL`
-Ultimo aggiornamento: 2026-08-07 (`MediFlow 0.8.1`, allineamento IA impostazioni)
+Ultimo aggiornamento: 2026-09-04 (`MediFlow 0.8.5`, closeout)
 
 ## Gate MediFlow 0.8
 
@@ -18,13 +18,21 @@ La base congelata del packet parity è
 registrato nel run record dopo la verifica post-commit.
 
 Il contratto funzionale resta `PARTIAL`: 13 capability sono parziali e 23 sono
-intenzionalmente host-only. Questo non impedisce la candidata sorgente 0.8.
+intenzionalmente host-only. Questo stato non blocca da solo una candidata
+sorgente, ma non sostituisce i gate di interazione e i receipt exact-SHA del
+closeout.
 
-Il gate UI è chiuso con una deroga esterna documentata: i test automatici,
-macOS e localhost sono terminali; VoiceOver reale su iPhone e iPad non è
-provato perché l'API pubblica della beta Xcode 27 non raggiunge uno stato
-terminale nel simulatore. La deroga non trasforma questa prova in PASS e non
-autorizza claim App Store o di conformità.
+Il gate di promozione resta `HOLD_PROMOTION`. Le prove automatiche e le
+interazioni reali registrate restano evidenza della rispettiva baseline. Sul
+runtime `29b2c94b6a044b1639137403a2228ff172ea3d0f`, tree
+`5706ade800d6a8caf2ab875882f61fe0881b3dd5`, la sessione web con VoiceOver è
+terminale `PASS_BOUNDED`: Chrome production era in primo piano, VoiceOver era
+attivo e le azioni sono state esercitate con input tastiera macOS nativo su dati
+sintetici. Il successore che registra questa evidenza è docs-only e non modifica
+il runtime verificato. Il receipt Xcode exact-SHA resta un gate separato.
+VoiceOver reale su iPhone e iPad non è provato perché l'API pubblica della beta
+Xcode 27 non raggiunge uno stato terminale nel simulatore: questa è una deroga
+esterna accettata, non un PASS, e non autorizza claim App Store o di conformità.
 
 Lume è il linguaggio comune. Liquid Glass è una declinazione nativa Apple e non
 viene copiata come identità CSS. La parity riguarda capacità, semantica,
@@ -73,8 +81,10 @@ Gli stati di prova sono:
 - `platform-specific-documented`: adattamento intenzionale e documentato;
 - `out-of-scope`: capability esclusa dal perimetro dichiarato.
 
-VoiceOver attivo su macOS prova solo la sessione macOS eseguita. Gli audit
-XCTest non dimostrano VoiceOver reale su iPhone o iPad.
+VoiceOver prova soltanto la superficie effettivamente esercitata: una sessione
+in Chrome production prova la web app, non l'app nativa macOS; una sessione
+nell'app macOS prova soltanto quella superficie. Né queste sessioni né gli audit
+XCTest dimostrano VoiceOver reale su iPhone o iPad.
 
 ## Fotografia corrente
 
@@ -96,16 +106,24 @@ conteggio delle prove correnti e non autorizzano il claim “parity completa”.
 La chiave `reconciliation` del JSON collega il contratto alle prove 0.8.
 Il manifest Apple-wide verifica 24 acceptance record tecnici separati.
 
-## Evidenza corrente
+## Evidenza registrata
+
+Le prove Apple basate su Xcode nella tabella seguente appartengono alla baseline
+storica `0843726fe`. Restano valide soltanto per quel tree e non costituiscono
+evidenza implicita per una revisione successiva. La disponibilità di Xcode è
+una precondizione operativa della macchina, non uno stato persistente di questa
+matrice; le prove exact-SHA appartengono ai receipt del closeout e non si
+deducono da questa matrice statica.
 
 | Classe | Superficie | Prova | Stato |
 | --- | --- | --- | --- |
 | `verified-automatic` | Web | Evidence Stack 2/2 con PIN sintetico `0000`; build 104 pagine e standalone | PASS |
 | `verified-real-interaction` | Web | Chromium produzione a 320/390/768/1440 e zoom esatto 200%/400%; focus visibile e nessun overflow orizzontale | PASS |
-| `verified-automatic` | iPhone | XCUITest 2/2, tab identifier atomici e apertura delle sei superfici | PASS, non equivale a VoiceOver |
-| `verified-automatic` | iPad | XCUITest 7/7, list-detail, AX5, rotazione, geometria e audit AX | PASS, non equivale a VoiceOver |
-| `verified-real-interaction` | macOS | Build Xcode 27, click-map, focus, Cmd-R contestuale, resize e VoiceOver manuale | PASS |
-| `verified-automatic` | macOS probe | `typecheck` e 6/6 test del probe AX corretto e process-safe | PASS |
+| `verified-real-interaction` | Web / VoiceOver | Chrome production in primo piano, VoiceOver attivo e tastiera macOS nativa; `Vai ai pazienti`, `Rivedi agenda`, `Apri revisione`, comando `Diario` e ricerca paziente hanno raggiunto il target di focus dichiarato | `PASS_BOUNDED` sul runtime `29b2c94b6a04`, tree `5706ade800d6`; dati sintetici, non audit applicativo completo |
+| `verified-automatic` | iPhone | XCUITest 2/2, tab identifier atomici e apertura delle sei superfici | PASS storico su `0843726fe`; non equivale a VoiceOver |
+| `verified-automatic` | iPad | XCUITest 7/7, list-detail, AX5, rotazione, geometria e audit AX | PASS storico su `0843726fe`; non equivale a VoiceOver |
+| `verified-real-interaction` | macOS | Build Xcode 27, click-map, focus, Cmd-R contestuale, resize e VoiceOver manuale | PASS storico su `0843726fe` |
+| `verified-automatic` | macOS probe | `typecheck` e 6/6 test del probe AX corretto e process-safe | PASS storico su `0843726fe` |
 | `accepted-external-limitation` | iPhone/iPad | VoiceOver reale | Non provato; Xcode 27 beta, issue Apple `173507341` |
 
 ## Stato per area
@@ -146,9 +164,10 @@ Wave 5 è una tranche consegnata, non la chiusura della parity complessiva.
 
 ### W6-A — convergenza UI macOS e click-map P6
 
-Il codice clipping e il probe AX corretto sono integrati. Il bundle Xcode 27
-ha superato build, resize, click-map, focus e Cmd-R contestuale. Il precedente
-blocco del volume Xcode è superato e non descrive più lo stato corrente.
+Il codice clipping e il probe AX corretto sono integrati. Le prove Xcode sul
+commit storico `0843726fe` restano valide soltanto per quel tree. W6-A non
+registra una prova nativa implicita sullo SHA corrente: disponibilità Xcode ed
+esito exact-SHA appartengono al receipt del closeout terminale.
 
 ### W6-B — offline degradato onesto
 
@@ -156,6 +175,45 @@ Owner: `WUL-403`.
 
 Rende visibili età/TTL della cache, stato stale, read-only e assenza di write
 queue. Non introduce sync multi-master né scritture offline.
+
+La candidata `WUL-556` aggiunge su iPhone e iPad un pannello nativo per gli
+stati `loading`, `error`, `online`, `cache`, `offline read-only` e
+`session-expired`. La preview e i test sintetici coprono anche la resa
+`stale`. Il runtime continua però a scartare lo snapshot oltre il TTL di 24
+ore: finché il contratto cache/headless non espone metadata separati, lo stato
+stale live resta `partial`, non `complete`.
+
+Per decisione owner, Carta resta una grammatica del contenuto e non introduce
+una palette calda. Le superfici della slice usano canvas e field neutrali
+adattivi; i soli colori non neutrali sono segnali funzionali di stato.
+
+Il gate di consumo `WUL-557` è aperto sul manifest canonico
+`packages/mini/contracts/mini-parity.json`. I head PR #184
+`3fd988bafe71a058fdd7d3c25ea569793dcba903` e PR #190
+`1e35733c0218eae67a1d6e158085aab7340bc26b` espongono lo stesso contenuto
+(SHA-256 `8f84108732b7a8a9c1feb20cdedee17f4865044de98d8d997896f3a914d0e4d9`).
+La metrica Mini è 4/66 (`6.060606%`): 4 `available`, 61 `manual_only`, 1
+`proposal_only` e 0 `unavailable`. Le ragioni non vengono appiattite: 23 righe
+sono `HOST_AUTHORITY_ONLY`, 38 `NOT_IN_MINI_PILOT` e 1
+`SYNTHETIC_PREVIEW_ONLY`.
+
+| Riga web canonica | Contratto Mini esatto | Stato iPhone/iPadOS | Motivo residuo o confine |
+| --- | --- | --- | --- |
+| 1 — anagrafica paziente | `available`: `patient search`, `patient show` | `partial` | Mini copre ricerca/dettaglio; la riga Apple resta più ampia e mancano assign/unassign/move/duplicate |
+| 39 — blocco/stato sessione | `available`: `whoami` | `full-parity` nella matrice Apple; stati visuali coperti dalla slice | `whoami`, pairing o token locale non sono un grant agentico |
+| 45 — cache offline | `manual_only`: `NOT_IN_MINI_PILOT` | `partial` | Lista cifrata read-only; metadata stale live, dettaglio offline e write queue assenti |
+| 63 — discovery capability | `available`: `capabilities` | `full-parity` per consumo API | Il manifest descrive capability; non autorizza operazioni cliniche |
+
+`open-loops` (riga 11) è la quarta riga Mini `available`, ma non appartiene alla
+slice `WUL-556`. `draft preview` (riga 4) resta `proposal_only` con ragione
+`SYNTHETIC_PREVIEW_ONLY`. Le altre righe conservano la disposizione e la ragione
+del manifest; le 23 `HOST_AUTHORITY_ONLY` restano host-only nella matrice Apple.
+
+| Superficie mobile | Stato candidata | Evidenza | Dipendenza host/headless |
+| --- | --- | --- | --- |
+| iPhone | `partial` | Test di presentazione, XCUITest e screenshot sintetico | Nessun grant nuovo; usa solo stato paired esistente |
+| iPadOS | `partial` | Stesso contratto, layout adattivo, `⌘R`, pointer, XCUITest e screenshot sintetico | Metadata TTL/stale live non esposti |
+| Capability AIP/Mini | Gap Apple e disposizione Mini restano assi separati | Manifest WUL-557: 4/66 disponibili | Le ragioni `partial`, host-only e `manual_only` restano esplicite; manifest e receipt non diventano autorità client; verifica manager e `WUL-564` bloccano la promozione |
 
 ### W6-C — decisione sul workflow documentale nativo
 
@@ -187,15 +245,17 @@ La mappa registra i controlli esercitati nel closeout.
 | Superficie | Controllo | Identificatore | Azione | Evidenza |
 | --- | --- | --- | --- | --- |
 | Web | Agenda | nome AX `Agenda` | Cambia area cockpit | Chrome produzione |
+| Web | Rivedi agenda | nome AX `Rivedi agenda`; `aria-controls=turno-agenda-heading` | Mantiene `area=turno`, porta in viewport e focalizza il titolo `Agenda di oggi` | E2E e VoiceOver production `PASS_BOUNDED` sul runtime `29b2c94b6a04` |
 | Web | Pazienti | nome AX `Pazienti N` | Carica worklist | Chrome produzione |
 | Web | Diario | `lume-diario` | Carica feed globale | Chrome produzione |
-| Web | Scheda | `lume-quadro` | Carica paziente e aggregati | Chrome produzione |
+| Web | Scheda | `lume-scheda-header` | Carica paziente e aggregati | E2E candidato locale D1/D2 — SHA esatti |
 | Web | Evidence Stack | tile documento | Mostra stati e avvia curation | E2E 2/2 |
 | Apple | Sezione clinica | `clinical-workspace-section-*-button` | Seleziona area | Audit automatico |
 | Apple | Lista pazienti | `patients-selection-list` | Seleziona dettaglio | Audit automatico |
 | macOS | Agenda sidebar | `clinical-workspace-section-agenda-button` | Seleziona riga `List` | Click-map e probe AX PASS |
 | macOS | Riga paziente | `patient-cell-*` | Seleziona e carica dettaglio | Click-map e probe AX PASS |
 | macOS | Focus | focus system | Avanza con `Tab` e freccia | Interazione reale PASS |
+| macOS | Inspector paziente | `clinical-workspace-inspector-toggle` | Toolbar o `⌥⌘I` mostra/nasconde il contesto della finestra focalizzata | WUL-566/WUL-567: test focalizzati, 2 finestre simultanee osservate nello stesso PID, suite nativa, build Xcode e screenshot light/dark PASS; focus, resize e VoiceOver interattivi della slice `PARTIAL` per sessione bloccata. Il manifest Mini PR #184 mantiene `sourceRow: 32` a `manual_only`, senza comandi Mini. |
 
 ### AXPress
 
@@ -217,9 +277,10 @@ Una capability può diventare `full-parity` solo con:
    review-first.
 
 Un gate assistivo resta non terminale finché la tecnologia assistiva richiesta
-non è stata usata sulla piattaforma dichiarata. La sola eccezione della
-candidata sorgente 0.8 è il limite VoiceOver mobile registrato in
-[docs/known-limitations.md](./known-limitations.md).
+non è stata usata sulla piattaforma dichiarata. L'unica limitazione esterna già
+accettata è VoiceOver mobile, registrata in
+[docs/known-limitations.md](./known-limitations.md); ogni altra prova non
+terminale conserva il `HOLD_PROMOTION`.
 
 ## Verifica
 

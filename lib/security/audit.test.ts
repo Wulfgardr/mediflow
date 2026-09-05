@@ -4,6 +4,7 @@ import Database from 'better-sqlite3';
 import { AUDIT_APPEND_ONLY_ERROR, ensureAuditSqliteSchema } from './audit-db';
 import {
     AUDIT_SOURCE_SURFACE_HEADER,
+    AUDIT_EVENT_TYPES,
     auditContextFromRequest,
     auditContextFromSession,
     auditSourceSurfaceFromRequest,
@@ -51,6 +52,15 @@ test('sanitizeAuditMetadata keeps only the PHI-safe whitelist', () => {
         flags: ['admin', 'contains_phi_'],
         reasonCode: 'invalid_credentials',
     });
+});
+
+test('audit catalog includes the PHI-safe application lock and reference-data vocabulary', () => {
+    assert.equal(AUDIT_EVENT_TYPES.includes('auth.lock'), true);
+    assert.equal(AUDIT_EVENT_TYPES.includes('auth.soap_active_role.enrolled'), true);
+    assert.equal(AUDIT_EVENT_TYPES.includes('reference_data.icd11.search'), true);
+    assert.equal(AUDIT_EVENT_TYPES.includes('ai.provider_probe.executed'), true);
+    assert.equal(AUDIT_EVENT_TYPES.includes('agent.semantic_query.executed'), true);
+    assert.equal(AUDIT_EVENT_TYPES.includes('agent.operation.attempted'), true);
 });
 
 test('audit schema blocks update and delete to preserve append-only semantics', () => {
@@ -342,6 +352,7 @@ test('summarizeAuditEvents groups PHI-safe operational KPIs', () => {
     });
     assert.deepEqual(summary.subjectTypes, {
         session: 1,
+        active_role_attestation: 0,
         patient: 2,
         ambulatory: 0,
         checkup: 0,
@@ -354,6 +365,9 @@ test('summarizeAuditEvents groups PHI-safe operational KPIs', () => {
         service_prescription_item: 0,
         siss_handoff: 0,
         settings: 0,
+        ai_review: 0,
+        agent_operation: 0,
+        reference_data: 0,
     });
     assert.deepEqual(summary.topEventTypes, [
         { eventType: 'patient.updated', count: 2 },

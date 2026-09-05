@@ -1,5 +1,5 @@
 ---
-summary: "Canonical MediFlow data-flow topology covering data origin, encryption, persistence, trust boundaries, and protected digital paths."
+summary: "Canonical MediFlow data-flow topology covering data origin, encryption, persistence, AnyDoc, Intelligence Fabric, trust boundaries, and protected digital paths."
 read_when:
   - "Reviewing data flow, encryption, trust boundaries, or PHI-safe routing."
   - "Changing APIs, document artifacts, local services, network home-base, or security-sensitive workflows."
@@ -11,6 +11,28 @@ read_when:
 > **Stato documento: CANONICAL (topologia dati e percorsi digitali end-to-end).**
 > Per principi stabili e confini, prevale [ARCHITECTURE.md](../ARCHITECTURE.md).
 > Per policy di sicurezza e redazione, prevale [SECURITY.md](../SECURITY.md).
+
+## Il percorso dei dati, in breve
+
+Una visita produce informazioni: alcune si prestano a una codifica, altre
+richiedono testo e documenti. MediFlow le organizza nella stessa cartella.
+La struttura aiuta a cercare e scambiare; la fonte permette di verificare.
+
+L’host locale conserva il database e ospita i servizi. Le interfacce, i client
+collegati e le capacità headless passano da questi servizi. Fabric aggiunge
+percorsi di elaborazione senza attribuire al modello autorità sulla cartella.
+
+| Domanda | Dove approfondire |
+| --- | --- |
+| Dove stanno le informazioni? | Componenti e dati a riposo, sezioni 1 e 2. |
+| Come diventano una storia consultabile? | Modello relazionale e flussi, sezioni 3 e 4. |
+| Come entrano documenti e cataloghi? | Percorsi AnyDoc, Fabric e AIFA, sezione 4. |
+| Chi può leggere o modificare? | API, fonti canoniche e invarianti, sezioni 5–7. |
+
+Per provider esterni e offuscamento, la disponibilità corrente è nella
+[matrice AI](./ai-runtime-serving-matrix.md). La guida a
+[privacy e governance](./privacy-and-ai-governance.md) spiega responsabilità
+e limiti; i diagrammi sottostanti descrivono i contratti tecnici.
 
 Questo documento mappa in modo operativo:
 
@@ -52,7 +74,9 @@ flowchart TB
   end
   subgraph "Local Services"
     Ollama["Ollama :11434"]
-    ICD["ICD-11 Docker :8888"]
+    Athena["ATHENA su MLX (processo locale)"]
+    AnyDoc["AnyDoc (worker locale)"]
+    ICD["ICD-11 WHO<br/>server-only"]
     OpenMed["OpenMed redaction :18080 (shadow)"]
   end
   subgraph "Local Filesystem"
@@ -78,6 +102,8 @@ flowchart TB
   V1API -->|"token check"| TokenSvc
   TokenSvc --> LocalToken
   WebAPI --> Ollama
+  WebAPI --> Athena
+  WebAPI --> AnyDoc
   WebAPI --> ICD
   WebAPI --> OpenMed
   NativeUI --> NativeCfg
@@ -282,102 +308,194 @@ sequenceDiagram
     Client-->>NativeUI: DTO
 ```
 
-### 4.4 Pipeline documento -> OCR -> sintesi -> storage
+### 4.4 Allegato -> AnyDoc -> Document Synthesis review-only
 
 ```mermaid
 sequenceDiagram
     participant Clinician as Medico
     participant UI as Web UI
-    participant API as Next.js API
-    participant OCR as ocr-service
-    participant LLM as Ollama/DeepSeek OCR
-    participant Vision as Apple Vision (macOS-only)
-    participant Synth as document-synthesis-service
-    participant DB as SQLite
-    Clinician->>UI: Carica PDF/immagine
-    UI->>API: Upload documento
-    API->>OCR: Estrai testo
-    OCR->>LLM: Richiesta OCR multimodale primaria
-    LLM-->>OCR: Testo estratto o output low-signal
-    alt macOS + output OCR low-signal
-        OCR->>Vision: Fallback locale Apple Vision
-        Vision-->>OCR: Testo estratto
-    else Windows/Linux o fallback non disponibile
-        OCR-->>API: Failure esplicito se non c'e testo utile
+    participant Capture as Document Synthesis capture
+    participant DB as SQLite host-owned
+    participant AnyDoc as AnyDoc worker locale
+    participant DocAPI as Document Synthesis API
+    participant Fabric as Intelligence Fabric
+    participant Ollama as Ollama locale
+    Clinician->>UI: Seleziona un allegato gia persistito
+    UI->>Capture: POST capture con attachmentId
+    Capture->>DB: Verifica sessione, selezione e currentness
+    DB-->>Capture: Sorgente e revisione correnti
+    Capture-->>UI: captureHandle opaco
+    UI->>DocAPI: POST ingest con captureHandle
+    DocAPI->>DB: Riacquisisce byte e currentness host-owned
+    DocAPI->>AnyDoc: Estrazione locale bounded
+    alt testo estraibile e sorgente ancora corrente
+        AnyDoc-->>DocAPI: Markdown + receipt + hash + provenienza
+        DocAPI-->>UI: previewHandle opaco
+        UI->>DocAPI: POST preview con previewHandle
+        DocAPI->>Fabric: Risoluzione host-owned proposal-only
+        Fabric->>Ollama: Invocazione locale senza fallback
+        Ollama-->>Fabric: Output candidato
+        Fabric-->>UI: Publication + receipt PHI-safe + provenienza
+    else pagine needsOcr e sorgente corrente
+        AnyDoc-->>DocAPI: Segnale needsOcr + routing per pagina
+        Note over AnyDoc,DocAPI: Core candidato separato: manifest, materializzazione, rendering e preflight fake
+        DocAPI-->>UI: Review required, nessuna publication automatica
+    else sorgente non corrente o input non ammesso
+        DocAPI-->>UI: Denial fail-closed
     end
-    OCR-->>API: OCR markdown
-    API->>Synth: Analisi clinica strutturata
-    Synth->>LLM: Prompt Qwen text-only
-    LLM-->>Synth: Summary + quality + proposte ICD
-    Synth-->>API: Insight + proposte review-only + parse/evidence artifact
-    API->>DB: Salva summary/parse-evidence sugli attachments + aggiorna documentInsights
-    API-->>UI: Esito + dati
 ```
 
-La filiera OCR certificata corrente e platform-aware:
+AnyDoc resta il primo passaggio automatico locale. Non esegue OCR e non
+persiste il risultato nel record clinico. Il tree include routing, manifest,
+materializzazione e rendering delle sole pagine `needsOcr`, oltre al preflight
+DeepSeek con fake seam. Questi componenti non sono composti in un production
+root OCR. La publication Document Synthesis dichiara `writesPerformed=0` e
+`applyPolicy=none`.
 
-- `Ollama/DeepSeek OCR` resta il motore OCR primario locale.
-- `Apple Vision` e un fallback locale **solo macOS**, attivato quando l'output
-  primario e vuoto o degenerato.
-- Windows e Linux non hanno oggi un fallback OCR platform-specific equivalente
-  in MediFlow; senza testo utile dal primario o dal documento, il flusso deve
-  fallire in modo esplicito.
-- Il fallback OCR cambia solo la recognition: Smart Import, nuova anagrafica da
-  documento e Patient Insight restano reviewable e non scrivono dati clinici
-  strutturati senza conferma.
-- La sintesi documentale non aggiorna `patients.diagnoses`. Le proposte
-  diagnostiche restano in `documentInsights` fino alla revisione.
-- I documenti senza testo finiscono nella `Coda OCR` (WUL-237) con stati e motivi
-  in italiano e riprocesso idempotente; nessuna proposta clinica parte finche il
-  testo non basta.
+Le route legacy `/api/ocr/extract` e `/api/pdf-extract` acquisiscono prima la
+sessione e poi restituiscono `410`. Il runtime adapter DeepSeek-OCR 2 non è
+integrato: il tree non contiene un'esecuzione live, una prova E2E o un benchmark
+di promozione. Una futura promozione deve conservare provenienza, hash e qualità
+per pagina e superare un benchmark sintetico italiano con soglie fissate.
+Restano vietati cloud egress implicito e write.
 
-### 4.5 Documento archiviato -> Patient Insight artifact-first
-
-```mermaid
-sequenceDiagram
-    participant Upload as Document Upload
-    participant Attach as attachments
-    participant Artifact as parse/evidence artifact
-    participant Insight as AI Patient Insight
-    Upload->>Attach: Salva attachment + summarySnapshot cifrato
-    Upload->>Artifact: Persiste parseEvidenceArtifactSnapshot cifrato
-    Insight->>Attach: Legge allegati recenti
-    Insight->>Artifact: Prova prima il context artifact-first
-    Artifact-->>Insight: facts/evidence/provenance
-    Insight-->>Insight: Fallback a documentInsights solo se l'artifact manca
-```
-
-### 4.6 Profilo paziente -> smart import reviewable
+### 4.5 Patient Insight -> preview Fabric
 
 ```mermaid
 sequenceDiagram
     participant Clinician as Medico
-    participant UI as Web UI
-    participant AI as AIService
-    participant ICD as ICD local proxy
-    participant Drugs as AIFA local catalog
-    participant DB as SQLite
-    Clinician->>UI: Avvia smart import dal profilo paziente
-    UI->>DB: Legge note, diario, documentInsights, terapie/diagnosi correnti
-    UI->>AI: Prompt strutturato con fonti locali
-    AI-->>UI: Suggerimenti reviewable (diagnosi + terapie)
-    UI->>ICD: Match locale ICD-11 per diagnosi free-text
-    UI->>Drugs: Match locale farmaci/AIC/ATC
-    UI-->>Clinician: Mostra proposte con evidenze e selezione esplicita
-    Clinician->>UI: Conferma solo i suggerimenti validi
-    UI->>DB: Aggiorna diagnoses + therapies con dedupe
+    participant UI as AI Patient Insight
+    participant API as /api/ai/patient-insight/preview
+    participant Host as Projection owner host-owned
+    participant Fabric as Intelligence Fabric
+    participant Ollama as Ollama locale
+    Clinician->>UI: Richiede una preview
+    UI->>API: POST projection intent
+    API->>Host: Verifica sessione, selezione e currentness
+    Host->>Fabric: Projection minimizzata corrente
+    Fabric->>Ollama: Invocazione locale senza fallback
+    Ollama-->>Fabric: Proposta candidata
+    Fabric-->>API: Proposal + receipt + provenienza
+    API-->>UI: Preview review-only, zero write
 ```
 
-Nota operativa: ADR 0084 vieta la scrittura diagnostica dalla sintesi
-documentale. Solo Smart Import puo applicare i suggerimenti selezionati, dopo
-una conferma umana esplicita. Diagnosi e terapie non selezionate restano
-proposte.
+Artifact e snapshot documentali cifrati possono contribuire alla projection,
+ma il provider non legge SQLite. La preview non aggiorna `aiSummary` o altre
+colonne e viene negata se la sorgente non e piu corrente.
 
-Nota aggiuntiva: se una fonte e solo referral/follow-up senza novita clinica e
-una diagnosi o terapia e gia presente, il suggerimento viene soppresso per
-ridurre rumore operativo.
+### 4.6 Smart Import -> preview Fabric
 
-### 4.7 File AIFA locale -> catalogo indicizzato con provenienza
+```mermaid
+sequenceDiagram
+    participant Clinician as Medico
+    participant UI as Smart Import controller
+    participant Ingest as /api/ai/smart-import/ingest
+    participant Preview as /api/ai/smart-import/preview
+    participant Host as Selection owner host-owned
+    participant Fabric as Intelligence Fabric
+    participant Ollama as Ollama locale
+    Clinician->>UI: Conferma paziente e fonte correnti
+    UI->>Ingest: POST tuple + fonte + requestId
+    Ingest->>Host: Verifica sessione, selezione, lease e currentness
+    Host-->>UI: Handle opaco monouso
+    UI->>Preview: POST handle + nuovo requestId
+    Preview->>Fabric: Projection host-owned proposal-only
+    Fabric->>Ollama: Invocazione locale senza fallback
+    Ollama-->>Fabric: Suggerimenti candidati
+    Fabric-->>UI: Preview + receipt + provenienza, zero write
+```
+
+La preview Smart Import non scrive diagnosi o terapie. Un eventuale apply e un
+Application Service separato, con conferma, authority, currentness, idempotenza
+e audit propri. Non eredita authority dalla receipt o dalla proposta. ADR 0084
+continua a vietare la scrittura diagnostica dalla sintesi documentale.
+
+### 4.7 Treatment Reasoning -> preview Fabric ATHENA
+
+```mermaid
+sequenceDiagram
+    participant Clinician as Medico
+    participant UI as Treatment Reasoning panel
+    participant Controller as Browser controller
+    participant Ingest as /api/ai/treatment-reasoning/ingest
+    participant Preview as /api/ai/treatment-reasoning/preview
+    participant Host as Projection owner host-owned
+    participant Fabric as Intelligence Fabric
+    participant Athena as ATHENA su MLX locale
+    Clinician->>UI: Genera bozza
+    UI->>Controller: Contesto e selezione confermata
+    Controller->>Ingest: POST projection + requestId
+    Ingest->>Host: Verifica auth e currentness
+    Host-->>Controller: Handle opaco monouso
+    Controller->>Preview: POST handle + nuovo requestId
+    Preview->>Fabric: Risoluzione host-owned
+    Fabric->>Athena: Invocazione locale senza fallback
+    Athena-->>Fabric: Output candidato
+    Fabric-->>UI: Publication review-only + source binding
+```
+
+La route storica `/api/system/treatment-reasoning/athena-mlx` e auth-first e
+termina con `410 legacy_route_retired`. Il percorso corrente non usa un
+fallback Ollama e non applica terapie o diagnosi.
+
+### 4.8 Matrice dei confini generativi
+
+| Capability | Provider/venue | Stadio massimo | Currentness owner | Apply e write |
+| --- | --- | --- | --- | --- |
+| `patient_insight` | Ollama / loopback | preview | host | nessuno; `writesPerformed=0` |
+| `smart_import` | Ollama / loopback | proposal | host | nessuno; `writesPerformed=0` |
+| `document_synthesis` | Ollama / loopback | proposal | host | nessuno; `writesPerformed=0` |
+| `treatment_reasoning` | ATHENA / processo MLX locale | preview | host | nessuno; `writesPerformed=0` |
+
+Tutte le receipt sono PHI-safe e descrittive. Non sono grant. Il client paired
+espone solo stato e non invoca queste capability. OpenAI e Anthropic hanno
+adapter HTTPS ufficiali e probe review-only `default OFF`. I test usano
+transport fake; il tree non contiene credenziali o prove di rete live.
+
+#### Selector Fabric guidato
+
+Il selector opera sui binding di capability, non sulla shell web. Rileva
+profili compatibili, esegue uno smoke sintetico e attiva il nuovo binding con
+CAS e persistenza atomica. Un fallimento mantiene o ripristina il binding
+precedente. Discovery e smoke non qualificano hardware, modello o runtime e il
+record persistito non contiene segreti.
+
+#### Intelligent Host candidato
+
+```text
+launcher trusted
+  -> processo figlio autenticato
+  -> RPC AIP ereditato e revocabile
+  -> MCP stdio
+  -> Application Service nominato
+  -> risultato read_only o proposal_only
+
+Mini: foundation CLI separata, fail-closed senza parent AIP e non avviata dal
+Supervisor production della 0.8.5.
+```
+
+Le operazioni candidate sono terminology search, lettura patient-scoped delle
+Open Loops, proposta follow-up e query semantica bounded read-only. Il processo
+figlio non apre listener, non importa SQLite e non accetta authority dal caller.
+Il Supervisor Node locale è il parent trusted e avvia Web standalone e MCP
+come figli distinti su IPC privato ereditato. Contesto, lifecycle, revoca e
+audit restano host-owned. La 0.8.5 non dichiara installer, onboarding o
+compatibilità con host MCP esterni; broker residente e UDS restano esclusi.
+
+F10 espone via MCP soltanto la preview della transizione
+`pending -> completed|cancelled`. La UI Web trusted rilegge la risorsa e
+richiede ruolo medico attivo, step-up e gesto operation-specific prima del
+commit con CAS, idempotenza, audit e receipt. Proof e commit non attraversano
+MCP.
+
+Il planner semantico è collegato al Supervisor e resta read-only. Compone al
+massimo due operazioni allowlisted e non produce SQL libero o scritture. Su
+macOS 26 o successivo, la registrazione visita usa API Apple on-device,
+consenso esplicito, audio bounded solo in RAM e review del transcript. Non
+esegue writer automatici; microfono reale e validazione clinica restano fuori
+dal claim.
+
+### 4.9 File AIFA locale -> catalogo indicizzato con provenienza
 
 ```mermaid
 sequenceDiagram
@@ -399,7 +517,7 @@ provenienza e l'hash dell'artifact importato. Il canale paired espone solo la
 lettura del catalogo tramite `network.catalogs.readonly`; non accetta dataset
 remoti e non trasferisce il catalogo completo.
 
-### 4.8 Modalita `network-home-base` -> paired client read/write limitato
+### 4.10 Modalita `network-home-base` -> paired client read/write limitato
 
 ```mermaid
 sequenceDiagram
@@ -447,8 +565,16 @@ completo, attachment remoti, cataloghi remoti, campi AI/documentali.
 | `/api/v1/*` | Client nativo macOS | `Authorization: Bearer <token>` | HTTPS locale via TLS proxy | Contratto stabile native |
 | `/api/v1/network/*` | Client paired trusted | Paired client credential + sessione operatore | HTTPS trusted LAN via TLS proxy | Home-base read-only-first + write versionati su ciclo di vita paziente, diario, terapie, checkup, osservazioni, prestazioni e protesica, piu export FHIR lato client, validazione FSE, revisione e discovery; cataloghi in sola lettura |
 | `/api/proxy/ollama/*` | Web UI (solo runtime browser; lato server il provider parla direttamente al loopback) | Sessione web (`requireSession`) | HTTP localhost | Proxy verso il runtime Ollama locale (`chat` e `generate`) su loopback stretto, con attestazione del modello |
-| `/api/ocr/extract`, `/api/pdf-extract` | Web UI | `/api/ocr/extract`: sessione web o token locale; `/api/pdf-extract`: sessione web | HTTP localhost | OCR locale (Apple Vision o modello vision su target locale validato) e ispezione/estrazione testo nativo dei PDF |
+| `/api/attachments/{id}/local-extraction` | Web UI | Sessione web | HTTP localhost | Estrazione AnyDoc dell'allegato host-owned corrente; preview locale con hash e provenienza, senza write |
+| `/api/ai/patient-insight/preview` | Web UI | Sessione web acquisita prima del payload | HTTP localhost | Preview Patient Insight host-owned con receipt e provenienza PHI-safe |
+| `/api/ai/smart-import/{selection,ingest,preview}` | Web UI | Sessione web e selezione corrente | HTTP localhost | Selezione, ingest e preview Smart Import con handle opaco; nessun apply |
+| `/api/ai/document-synthesis/{capture,ingest,preview}` | Web UI | Sessione web e allegato corrente | HTTP localhost | Capture AnyDoc, ingest e publication Document Synthesis proposal-only |
+| `/api/ai/treatment-reasoning/{ingest,preview}` | Web UI | Sessione web e selezione corrente | HTTP localhost | Ingest e preview Treatment Reasoning tramite Fabric e ATHENA locale |
+| `/api/ocr/extract`, `/api/pdf-extract` | Consumer legacy | Auth prima del body | HTTP localhost | Boundary terminale `410`; nessuna estrazione o invocazione OCR |
 | `/api/icd/proxy` | Web UI | Sessione + allowlist localhost | HTTP localhost | Lookup ICD-11 |
+| AIP child RPC | Figli del Supervisor trusted | Bootstrap secret e contesto host-owned | IPC ereditato | Catalogo e operazioni nominate; nessun listener o DB diretto |
+| MCP Intelligent Host | Harness locale | Binding RPC ereditato dal Supervisor | `stdio` | Terminology, Open Loops, proposta follow-up, query semantica bounded e preview F10 |
+| Mini | Foundation CLI locale | Nessun binding production al Supervisor; parent AIP richiesto | stdin/stdout JSON | Catalogo tipizzato, fail-closed senza parent; nessun claim di onboarding o host esterni |
 
 Nota auth: il token locale non porta privilegi admin web. Le route di sistema
 ad alto impatto richiedono una sessione admin web; le eccezioni token-aware fuori
@@ -467,7 +593,14 @@ read-only esplicitamente documentati in [SECURITY.md](../SECURITY.md).
 - API native v1: `app/api/v1/*`
 - Controllo token locale: `lib/local-api-auth.ts`, `lib/local-api-token.ts`
 - Proxy TLS locale: `scripts/local-api-tls-proxy.mjs`
-- Pipeline OCR/sintesi: `lib/ocr-service.ts`, `lib/document-synthesis-service.ts`
+- AnyDoc e source authority: `lib/domain/documents/anydoc-current-source-composition.ts`, `lib/domain/documents/anydoc-local-extraction-runner.ts`
+- Core OCR selettivo: `lib/domain/documents/anydoc-page-manifest.ts`, `lib/domain/documents/anydoc-pdf-page-materializer.ts`, `lib/domain/documents/anydoc-pdf-page-renderer.ts`, `lib/domain/documents/deepseek-ocr2-runtime-preflight.ts`
+- Catalogo e production root Fabric: `lib/ai-providers/fabric/generative-catalog.ts`, `lib/ai-providers/fabric/*production*`
+- Selector Fabric: `lib/ai-providers/fabric/guided-setup.ts`, `lib/ai-providers/fabric/capability-binding-store.ts`
+- Provider ufficiali default OFF: `lib/ai-providers/v2/*official-transport.ts`, `lib/ai-providers/v2/document-synthesis-cloud-probe-composition.ts`
+- Headless/AIP/MCP/Mini: `packages/aip/`, `packages/mcp/`, `packages/mini/`, `scripts/intelligent-host-mcp-stdio.mjs`
+- Crosswalk dei quattro percorsi: `docs/capability-mapping/fabric-generative-runtime-crosswalk.v1.json`
+- Disclosure provider: `lib/ai-providers/fabric/provider-disclosure.ts`
 
 ---
 
@@ -482,6 +615,17 @@ read-only esplicitamente documentati in [SECURITY.md](../SECURITY.md).
   non deve autorizzare audit, backup/restore, scheduler, repair DB o lifecycle
   MLX.
 - Proxy verso servizi locali sempre allowlist localhost.
+- I quattro percorsi Fabric restano preview/proposal-only, host-owned e
+  `writesPerformed=0`; receipt e provenienza non concedono authority.
+- AnyDoc legge soltanto l'allegato corrente. Solo le pagine `needsOcr`
+  raggiungono la pipeline bounded; le route OCR legacy restano terminali `410`.
+- Il preflight DeepSeek usa un fake seam. Non deve apparire come runtime
+  adapter, fallback pronto o prova di qualifica.
+- Gli adapter OpenAI/Anthropic restano `default OFF`. Registry e probe non sono
+  credenziali, consenso egress o readiness cloud.
+- MCP raggiunge soltanto Application Services nominati tramite RPC AIP
+  ereditato; Mini non ha un callsite production e fallisce chiuso senza parent.
+  Nessuno dei due ha accesso SQLite o authority caller-supplied.
 - `summarySnapshot` e `parseEvidenceArtifactSnapshot` restano dati clinici
   cifrati, non log di debug.
 - Il placeholder `[LOCKED DATA]` resta solo di presentazione (WUL-323): non deve
@@ -489,3 +633,8 @@ read-only esplicitamente documentati in [SECURITY.md](../SECURITY.md).
 - La cancellazione clinica passa sempre per soft-delete con version guard
   (ADR 0066, WUL-306, WUL-308); la hard delete resta una erasure GDPR admin
   esplicita.
+
+Claim ceiling dei percorsi Fabric, AnyDoc e Headless: contenuto sorgente 0.8.5.
+Questa topologia non costituisce prova di firma, pubblicazione, certificazione,
+deployment cloud, AI paired, entrypoint MCP production o authority agentica
+generale.

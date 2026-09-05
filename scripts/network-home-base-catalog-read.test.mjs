@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { after, test } from 'node:test';
+import { loginWithWebAuthControl } from './web-auth-control-test-client.mjs';
 
 const BASE_URL = process.env.E2E_BASE_URL || 'http://127.0.0.1:3200';
 const LOCAL_API_TOKEN = process.env.MEDIFLOW_LOCAL_API_TOKEN || 'mediflow-network-smoke-local-token';
@@ -39,15 +40,10 @@ test('home-base catalog read is paired, capability-gated and response-compatible
     const catalogClient = await pairClient([CATALOG_READ_CAPABILITY], 'Desk iPad catalog');
     const noCatalogClient = await pairClient(['network.replica.readonly-patients'], 'Desk iPad patients-only');
 
-    const login = await request('POST', '/api/auth/login', {
-        body: {
-            username: USERNAME,
-            password: PIN,
-        },
-    });
+    const login = await loginWithWebAuthControl(BASE_URL, { username: USERNAME, password: PIN });
     assert.equal(login.response.status, 200);
-    const sessionCookie = extractSessionCookie(login.response);
-    assert.ok(sessionCookie);
+    const cookieHeader = login.cookieHeader;
+    assert.ok(cookieHeader);
 
     const catalogHeaders = pairedHeaders(catalogClient);
 
@@ -59,14 +55,14 @@ test('home-base catalog read is paired, capability-gated and response-compatible
     const missingCapability = await request('GET', '/api/v1/network/drugs?q=amoxi', {
         headers: {
             ...pairedHeaders(noCatalogClient),
-            Cookie: sessionCookie,
+            Cookie: cookieHeader,
         },
     });
     assert.equal(missingCapability.response.status, 403);
 
     const authenticatedHeaders = {
         ...catalogHeaders,
-        Cookie: sessionCookie,
+        Cookie: cookieHeader,
     };
 
     const drugsHost = await request('GET', '/api/v1/drugs?q=amoxi&limit=10', {
@@ -288,19 +284,6 @@ function pairedHeaders(client) {
         'x-mediflow-paired-client-id': client.clientId,
         'x-mediflow-paired-client-token': client.token,
     };
-}
-
-function extractSessionCookie(response) {
-    const setCookies = typeof response.headers.getSetCookie === 'function'
-        ? response.headers.getSetCookie()
-        : [];
-    const cookieSource = setCookies.find((cookie) => cookie.startsWith('mediflow_session='))
-        ?? response.headers.get('set-cookie');
-    if (!cookieSource) {
-        throw new Error('mediflow_session cookie was not returned by /api/auth/login');
-    }
-
-    return cookieSource.split(';')[0];
 }
 
 async function request(method, pathname, { headers = {}, body } = {}) {

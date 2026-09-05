@@ -53,7 +53,7 @@ test('smart import kill switch disables analysis on patient detail', async ({ pa
     await disableSmartImport();
 
     // WUL-274/Kree8: create via API and open the primary Scheda route (/modules), where the
-    // smart-import panel mounts. The legacy new-patient submit ("Crea Nuova Scheda") and the
+    // Fabric preview mounts. The legacy new-patient submit ("Crea Nuova Scheda") and the
     // cockpit patient-search navigation no longer expose a patients-search-input testid.
     const patientId = await page.evaluate(async (body) => {
       const response = await fetch('/api/patients', {
@@ -70,13 +70,18 @@ test('smart import kill switch disables analysis on patient detail', async ({ pa
 
     await page.goto(`/patients/${patientId}/modules`);
     await expect(page).toHaveURL(new RegExp(`/patients/${patientId}/modules$`));
+    const documents = page.getByRole('button', { name: /Documenti Archivio documenti ed evidenze/u });
+    await expect(documents).toBeVisible({ timeout: 20_000 });
+    if (await documents.getAttribute('aria-expanded') !== 'true') await documents.click();
+    await expect(documents).toHaveAttribute('aria-expanded', 'true');
 
-    const disabledCard = page.getByTestId('smart-import-disabled-card');
-    await expect(disabledCard).toBeVisible();
-    await expect(disabledCard).toContainText('Smart Import disabilitato');
-    await expect(disabledCard).toContainText('Apri Impostazioni AI');
-    // When disabled the analysis trigger renders "Disabilitata", so "Analizza fonti" is absent.
-    await expect(page.getByRole('button', { name: 'Analizza fonti' })).toHaveCount(0);
+    const reviewRow = page.getByTestId('review-queue-row-smart-import');
+    await expect(reviewRow).toContainText('Bloccato');
+    await expect(reviewRow).toContainText('Smart Import è disattivato localmente');
+
+    const fabricCard = page.getByTestId('fabric-preview-card');
+    await expect(fabricCard).toContainText('Fabric · anteprima sola lettura');
+    await expect(fabricCard.getByRole('button', { name: 'Carica contesto' })).toBeDisabled();
   } finally {
     await restoreSmartImport();
   }

@@ -47,7 +47,7 @@ function createOverview(overrides: Partial<NetworkOverviewPayload> = {}): Networ
                 hardwareProfile: 'medium',
                 clinicalModel: 'qwen3.5:35b-a3b',
                 reasoningModel: 'qwen3.5:35b-a3b',
-                ocrModel: 'deepseek-ocr',
+                ocrModel: null,
             },
             centralRuntime: {
                 state: 'disabled',
@@ -199,7 +199,7 @@ test('deriveNetworkOperatingModeViewModel maps network-unpaired into the availab
                 hardwareProfile: 'high',
                 clinicalModel: 'qwen3.5:35b-a3b',
                 reasoningModel: 'qwen3.5:35b-a3b',
-                ocrModel: 'deepseek-ocr',
+                ocrModel: null,
             },
             centralRuntime: {
                 state: 'available',

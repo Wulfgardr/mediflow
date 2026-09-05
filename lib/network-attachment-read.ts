@@ -55,7 +55,8 @@ export const NETWORK_ATTACHMENT_METADATA_COLUMNS = {
     createdAt: attachments.createdAt,
 } as const;
 
-type AttachmentSummaryRow = Omit<typeof attachments.$inferSelect, 'data'>;
+type AttachmentSummaryRow = Omit<typeof attachments.$inferSelect,
+    'data' | 'documentSourceRef' | 'documentRevision' | 'documentFreshnessEpoch'>;
 
 function toIsoString(value: unknown): string | null {
     if (!value) return null;

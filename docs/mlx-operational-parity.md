@@ -2,21 +2,25 @@
 
 > Stato documento: `SECONDARY`, slice `WUL-165`.
 > Le decisioni architetturali prevalenti restano ADR 0028, ADR 0029, ADR 0037,
-> ADR 0044 e, per il boundary OCR platform-specific, ADR 0059.
+> ADR 0044 e il ritiro OCR deciso per la 0.8.5.
 
 ## Decisione
 
-Per MediFlow, `MLX` diventa **benchmark-visible** e verificabile come runtime locale
-alternativo nei benchmark, ma resta **non runtime clinico** del prodotto.
+Per MediFlow, il runtime MLX generico resta **benchmark-visible** e verificabile
+nei benchmark, ma resta **non runtime clinico** del prodotto. La lane governata
+`ATHENA MLX` di Treatment Reasoning è un'eccezione esplicita e separata: produce
+solo anteprime locali, usa il proprio lifecycle e non promuove il server MLX
+generico a provider clinico.
 
 Questo significa:
 
 - `Ollama` resta il runtime operativo standard dell'app.
-- `MLX` resta confinato a benchmark, diagnostica e superfici esplicitamente
-  etichettate come sperimentali o benchmark-only.
-- OCR primario resta Ollama/DeepSeek OCR; l'unica eccezione certificata e il
-  fallback Apple Vision solo macOS descritto in ADR 0059. MLX resta escluso
-  dalla pipeline OCR operativa.
+- Il server `mlx_chat` generico resta confinato a benchmark, diagnostica e
+  superfici esplicitamente etichettate come benchmark-only.
+- `ATHENA MLX` resta confinato a Treatment Reasoning, con esecuzione locale,
+  lifecycle dedicato, receipt e output `proposal_only`.
+- OCR non disponibile nella 0.8.5: nessun task, modello o fallback OCR e
+  raggiungibile dal runtime prodotto.
 - Nessun default modello o provider viene cambiato solo perché MLX è presente.
 - Qualunque promozione futura richiede ADR, benchmark lane-specific, stop-rule e
   governance rollout.
@@ -28,7 +32,8 @@ Questo significa:
 | Runtime app (`lib/ai-service.ts`) | Operativo standard | Non operativo | Differenza intenzionale |
 | Health/status locale | Diagnostica `11434` | Diagnostica `8080/v1/models` | Parity read-only |
 | Runtime app nativa (WebRuntime bundled, `lib/ai-service.ts`) | Operativo standard | Fallback esplicito verso Ollama | Parity controllata |
-| OCR | Primario locale; fallback Apple Vision solo macOS | Escluso | MLX fuori dalla pipeline OCR deliberatamente |
+| Treatment Reasoning | Non usato | `ATHENA MLX`, lane governata | Anteprima locale `proposal_only` |
+| OCR | Non disponibile | Non disponibile | Nessun task o fallback runtime |
 | Benchmark `ai-task-contracts` | `ollama_chat` | `mlx_chat` | Parity benchmark |
 | Registry comparativo modelli | Runtime distinto | Runtime distinto | Parity reportistica |
 | Start/stop app-managed home-base | Non app-managed | Non app-managed | Parity di non gestione |
@@ -50,10 +55,8 @@ mantenga i confini operativi dichiarati:
 - diagnostica home-base read-only per MLX già attivo;
 - fallback esplicito verso Ollama nel runtime bundled dell'app nativa
   (`lib/ai-service.ts`; dalla Fase 0 non esiste piu un resolver Swift dedicato);
-- OCR resta Ollama-only per MLX: DeepSeek/Ollama resta primario e Apple Vision
-  resta l'unica eccezione macOS-only;
-- OCR primario Ollama/DeepSeek con sola eccezione Apple Vision macOS-only
-  dichiarata da ADR 0059;
+- OCR resta terminalmente non disponibile e assente dal registro dei task;
+- la lane ATHENA di Treatment Reasoning resta distinta dal server MLX generico;
 - documentazione del boundary benchmark-only.
 
 ## Verifiche reali opzionali

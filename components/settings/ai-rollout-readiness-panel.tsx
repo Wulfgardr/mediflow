@@ -17,8 +17,7 @@ type RolloutLocalControlLane =
     | 'patient_insight'
     | 'smart_import'
     | 'document_synthesis'
-    | 'treatment_reasoning'
-    | 'ocr';
+    | 'treatment_reasoning';
 
 type RolloutArtifactPayload = {
     lanes: Array<{
@@ -149,7 +148,7 @@ export default function AiRolloutReadinessPanel() {
                 <div className="rounded-[20px] border border-dashed border-slate-200/80 bg-white/60 p-4 text-xs leading-6 text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-400">
                     <p>{state.message}</p>
                     <p className="mt-2 font-mono text-[11px] text-slate-700 dark:text-slate-200">
-                        npm run validate:ai-rollout-readiness -- --lane patient_insight --report &lt;artifact.json&gt; --fallback-written --owner leonardo --license-clear
+                        npm run validate:ai-rollout-readiness -- --lane patient_insight --report &lt;artifact.json&gt; --fallback-written --owner operatore-demo --license-clear
                     </p>
                 </div>
             ) : null}
@@ -170,7 +169,7 @@ export default function AiRolloutReadinessPanel() {
                         <div className="rounded-[20px] border border-dashed border-slate-200/80 bg-white/60 p-4 text-xs leading-6 text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-400">
                             <p>Nessun esito locale disponibile al momento. La governance AI resta comunque osservabile: tutte le aree note sono elencate qui sotto come report mancanti.</p>
                             <p className="mt-2 font-mono text-[11px] text-slate-700 dark:text-slate-200">
-                                npm run validate:ai-rollout-readiness -- --lane patient_insight --report &lt;artifact.json&gt; --fallback-written --owner leonardo --license-clear
+                                npm run validate:ai-rollout-readiness -- --lane patient_insight --report &lt;artifact.json&gt; --fallback-written --owner operatore-demo --license-clear
                             </p>
                         </div>
                     ) : null}
@@ -367,7 +366,7 @@ function LaneCard({
                 >
                     <p>Report locale mancante per questa area AI. Nessun esito salvato da mostrare.</p>
                     <p className="mt-2 font-mono text-[10px] text-slate-700 dark:text-slate-200">
-                        npm run validate:ai-rollout-readiness -- --lane {entry.lane} --report &lt;artifact.json&gt; --fallback-written --owner leonardo --license-clear
+                        npm run validate:ai-rollout-readiness -- --lane {entry.lane} --report &lt;artifact.json&gt; --fallback-written --owner operatore-demo --license-clear
                     </p>
                 </div>
             )}

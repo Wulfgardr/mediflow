@@ -14,7 +14,6 @@ Riferimenti utili:
 ### Requisiti
 
 * Un computer recente (consigliato: Apple Silicon M1/M2/M3 o successivi).
-* **Docker Desktop** (solo per i servizi opzionali come ICD-11).
 * Circa 15GB liberi se usi i modelli AI locali.
 
 ### Avvio rapido

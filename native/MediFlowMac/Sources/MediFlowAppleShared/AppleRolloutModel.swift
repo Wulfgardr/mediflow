@@ -214,12 +214,12 @@ public extension AppleFoundationSnapshot {
     static let live = AppleFoundationSnapshot(
         title: "Family Apple MediFlow",
         summary: "Mac come home-base autorevole, shell distinte per macOS e mobile, convergenza disciplinata tramite contratti condivisi.",
-        statusLine: "Questa build porta il shell home-base Apple in primo piano e rende visibile lo stato runtime locale. La supervisione automatica dei processi resta nel prossimo slice WUL-192.",
+        statusLine: "Questa build porta il shell home-base Apple in primo piano: il bundle packaged supervisiona WebRuntime e proxy TLS, mentre i provider opzionali restano diagnostici.",
         lanes: [
             AppleCapabilityLane(
                 id: "home-base",
                 title: "Home-base e trasporto",
-                summary: "Il backend locale e `/api/v1/network/*` read-only esistono gia. Pairing, HTTPS LAN e discovery Bonjour ora hanno smoke ripetibile; il runtime packaged viene dopo.",
+                summary: "Il backend locale e `/api/v1/network/*` read-only esistono gia. Pairing, HTTPS LAN e discovery Bonjour hanno smoke ripetibile; il bundle packaged supervisiona WebRuntime e proxy TLS.",
                 sourceOfTruth: "ADR 0034, ADR 0038, ADR 0047",
                 macOS: ApplePlatformStatus(phase: .foundation, detail: "HTTPS LAN e node summary PHI-safe verificati dal Mac home-base"),
                 iPhone: ApplePlatformStatus(phase: .foundation, detail: "Shell mobile paired con smoke iPhone e selection harden"),
@@ -249,12 +249,12 @@ public extension AppleFoundationSnapshot {
             AppleCapabilityLane(
                 id: "runtime",
                 title: "Runtime locale e AI plane",
-                summary: "La app macOS espone ora il readiness del bootstrap locale senza ancora supervisionare backend, TLS, Ollama e componenti Docker. L'AI mobile resta separata dal data plane clinico.",
-                sourceOfTruth: "ADR 0037, ADR 0047",
-                macOS: ApplePlatformStatus(phase: .foundation, detail: "Shell home-base primaria con osservabilita runtime read-only"),
+                summary: "La app macOS espone il readiness del bootstrap locale e il bundle packaged supervisiona backend e proxy TLS; Ollama e MLX restano diagnostici, mentre Docker è fuori scope e non app-managed. L'AI mobile resta separata dal data plane clinico.",
+                sourceOfTruth: "ADR 0048",
+                macOS: ApplePlatformStatus(phase: .foundation, detail: "Shell home-base primaria con supervisione WebRuntime/TLS e diagnostica provider"),
                 iPhone: ApplePlatformStatus(phase: .blocked, detail: "Nessun comando AI remoto in questa wave"),
                 iPad: ApplePlatformStatus(phase: .blocked, detail: "Consultazione output solo dopo boundary esplicito"),
-                nextIssue: "WUL-192"
+                nextIssue: "Post-0.8 provider lifecycle"
             )
         ],
         milestones: [
@@ -282,7 +282,7 @@ public extension AppleFoundationSnapshot {
             AppleMilestone(
                 id: "runtime",
                 title: "macOS packaged runtime host",
-                summary: "Primo slice: shell home-base primaria e readiness runtime. Avvio/supervisione automatica di backend locale, TLS, Ollama e Docker resta da completare.",
+                summary: "Shell home-base primaria, readiness runtime e supervisione di backend e proxy TLS nel bundle packaged. Ollama e MLX restano diagnostici; Docker è fuori scope e non app-managed.",
                 issue: "WUL-192",
                 phase: .foundation
             ),

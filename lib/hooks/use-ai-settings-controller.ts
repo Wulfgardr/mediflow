@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { db } from '@/lib/db';
 import { useToast } from '@/components/ui/toast-provider';
 import {
-    DEFAULT_OCR_MODEL,
     DEFAULT_TEXT_MODEL,
     ensureTextModelDefaultsUpgraded,
     resolveTextModel,
@@ -38,11 +37,6 @@ import {
     serializeAiTreatmentReasoningKillSwitchState,
 } from '@/lib/ai-treatment-reasoning-kill-switch';
 import {
-    AI_OCR_KILL_SWITCH_KEY,
-    isAiOcrEnabledValue,
-    serializeAiOcrKillSwitchState,
-} from '@/lib/ai-ocr-kill-switch';
-import {
     DEFAULT_DOCUMENT_ROUTER_CONTROL_FLOW_MODE,
     DOCUMENT_ROUTER_CONTROL_FLOW_SETTING_KEY,
     parseDocumentRouterControlFlowMode,
@@ -55,7 +49,6 @@ type AIConfigState = {
     provider: string;
     model_clinical: string;
     model_reasoning: string;
-    model_ocr: string;
     url: string;
 };
 
@@ -73,7 +66,6 @@ export function useAiSettingsController() {
         provider: 'ollama',
         model_clinical: '',
         model_reasoning: '',
-        model_ocr: '',
         url: '',
     });
     const [aiInsightSettings, setAiInsightSettings] = useState<{
@@ -90,14 +82,9 @@ export function useAiSettingsController() {
     const [documentSynthesisEnabled, setDocumentSynthesisEnabled] = useState(true);
     const [smartImportEnabled, setSmartImportEnabled] = useState(true);
     const [treatmentReasoningEnabled, setTreatmentReasoningEnabled] = useState(false);
-    const [ocrEnabled, setOcrEnabled] = useState(true);
     const [documentRouterControlFlowMode, setDocumentRouterControlFlowMode] = useState<DocumentRouterControlFlowMode>(
         DEFAULT_DOCUMENT_ROUTER_CONTROL_FLOW_MODE,
     );
-
-    useEffect(() => {
-        void loadAiConfig();
-    }, []);
 
     useEffect(() => {
         const checkOllama = async () => {
@@ -108,7 +95,7 @@ export function useAiSettingsController() {
         void checkOllama();
     }, []);
 
-    const loadAiConfig = async () => {
+    async function loadAiConfig() {
         try {
             await ensureTextModelDefaultsUpgraded();
             const safeGet = async (key: string) => {
@@ -122,7 +109,6 @@ export function useAiSettingsController() {
             const hardware = await safeGet('hardwareProfile');
             const modelClinical = await safeGet('aiModel_clinical');
             const modelReasoning = await safeGet('aiModel_reasoning');
-            const modelOcr = await safeGet('aiModel_ocr');
             const legacyModel = await safeGet('aiModel');
             const genericUrl = await safeGet('aiUrl');
             const legacyUrl = await safeGet('ollamaUrl');
@@ -130,7 +116,6 @@ export function useAiSettingsController() {
             const documentSynthesisKillSwitch = await safeGet(AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY);
             const smartImportKillSwitch = await safeGet(AI_SMART_IMPORT_KILL_SWITCH_KEY);
             const treatmentReasoningKillSwitch = await safeGet(AI_TREATMENT_REASONING_KILL_SWITCH_KEY);
-            const ocrKillSwitch = await safeGet(AI_OCR_KILL_SWITCH_KEY);
             const documentRouterControlFlow = await safeGet(DOCUMENT_ROUTER_CONTROL_FLOW_SETTING_KEY);
 
             let currentUrl = genericUrl?.value;
@@ -143,7 +128,6 @@ export function useAiSettingsController() {
                 provider: 'ollama',
                 model_clinical: resolveTextModel(modelClinical?.value, legacyModel?.value),
                 model_reasoning: resolveTextModel(modelReasoning?.value, legacyModel?.value),
-                model_ocr: modelOcr?.value || DEFAULT_OCR_MODEL,
                 url: currentUrl,
             });
             setAiInsightSettings({
@@ -154,12 +138,15 @@ export function useAiSettingsController() {
             setDocumentSynthesisEnabled(isAiDocumentSynthesisEnabledValue(documentSynthesisKillSwitch?.value));
             setSmartImportEnabled(isAiSmartImportEnabledValue(smartImportKillSwitch?.value));
             setTreatmentReasoningEnabled(isAiTreatmentReasoningEnabledValue(treatmentReasoningKillSwitch?.value));
-            setOcrEnabled(isAiOcrEnabledValue(ocrKillSwitch?.value));
             setDocumentRouterControlFlowMode(parseDocumentRouterControlFlowMode(documentRouterControlFlow?.value));
         } catch (e) {
             console.error('Failed to load AI config:', e);
         }
-    };
+    }
+
+    useEffect(() => {
+        void loadAiConfig();
+    }, []);
 
     const applyHardwareProfile = (profile: Exclude<HardwareProfile, 'custom'>) => {
         setHardwareProfile(profile);
@@ -200,7 +187,6 @@ export function useAiSettingsController() {
             await db.settings.put({ key: 'hardwareProfile', value: hardwareProfile });
             await db.settings.put({ key: 'aiModel_clinical', value: aiConfig.model_clinical });
             await db.settings.put({ key: 'aiModel_reasoning', value: aiConfig.model_reasoning });
-            await db.settings.put({ key: 'aiModel_ocr', value: aiConfig.model_ocr });
             await db.settings.put({ key: 'aiModel', value: aiConfig.model_clinical });
             await db.settings.put({ key: 'aiUrl', value: aiConfig.url });
             await db.settings.put({ key: 'ollamaUrl', value: aiConfig.url });
@@ -223,10 +209,6 @@ export function useAiSettingsController() {
             await db.settings.put({
                 key: AI_TREATMENT_REASONING_KILL_SWITCH_KEY,
                 value: serializeAiTreatmentReasoningKillSwitchState(treatmentReasoningEnabled),
-            });
-            await db.settings.put({
-                key: AI_OCR_KILL_SWITCH_KEY,
-                value: serializeAiOcrKillSwitchState(ocrEnabled),
             });
             await saveAIInsightStoredSettings(aiInsightSettings);
             setAiTestStatus('idle');
@@ -270,7 +252,6 @@ export function useAiSettingsController() {
 
             if (isMissing(aiConfig.model_clinical)) missingModels.push(aiConfig.model_clinical);
             if (isMissing(aiConfig.model_reasoning)) missingModels.push(aiConfig.model_reasoning);
-            if (isMissing(aiConfig.model_ocr)) missingModels.push(aiConfig.model_ocr);
 
             if (missingModels.length > 0) {
                 setAiHealth({
@@ -328,8 +309,6 @@ export function useAiSettingsController() {
         setSmartImportEnabled,
         treatmentReasoningEnabled,
         setTreatmentReasoningEnabled,
-        ocrEnabled,
-        setOcrEnabled,
         documentRouterControlFlowMode,
         setDocumentRouterControlFlowMode,
         selectedInsightMode,

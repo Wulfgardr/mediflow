@@ -3,6 +3,7 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import Database from 'better-sqlite3';
 
 import { normalizeRowDates } from './scheduled-backup-date-fields.mjs';
@@ -26,12 +27,20 @@ const BACKUP_TABLES = {
   attachments: 'attachments',
   conversations: 'conversations',
   documentDiagnosisProposals: 'document_diagnosis_proposals',
+  durableReviewCommandStates: 'durable_review_command_states',
+  durableReviewCommandOperations: 'durable_review_command_operations',
+  durableReviewPatientLinks: 'durable_review_patient_links',
+  durableReviewRecords: 'durable_review_records',
+  durableReviewOperations: 'durable_review_operations',
   drugs: 'drugs',
   entries: 'entries',
   exemptions: 'exemptions',
   messages: 'messages',
   observations: 'observations',
   patients: 'patients',
+  physicianReviewAttestations: 'physician_review_attestations',
+  headlessSoapActiveRoleAttestations: 'headless_soap_active_role_attestations',
+  headlessSoapEntryCommits: 'headless_soap_entry_commits',
   prostheticPrescriptions: 'prosthetic_prescriptions',
   serviceCatalogEntries: 'service_catalog_entries',
   servicePrescriptionItems: 'service_prescription_items',
@@ -120,11 +129,24 @@ async function sha256Hex(value) {
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
-async function serializeBackupArtifact(payload, createdAt = new Date()) {
-  const payloadSnapshot = normalizeJson(payload);
+export function canonicalizeHeadlessSoapActiveRoleAttestations(payload) {
+  return {
+    ...payload,
+    headlessSoapActiveRoleAttestations: [...(payload.headlessSoapActiveRoleAttestations || [])].sort((left, right) => {
+      const primary = String(left.attestationRef).localeCompare(String(right.attestationRef));
+      return primary === 0 ? String(left.actorRef).localeCompare(String(right.actorRef)) : primary;
+    }),
+    headlessSoapEntryCommits: [...(payload.headlessSoapEntryCommits || [])].sort((left, right) =>
+      String(left.idempotencyKey).localeCompare(String(right.idempotencyKey))),
+  };
+}
+
+export async function serializeBackupArtifact(payload, createdAt = new Date()) {
+  const canonicalPayload = canonicalizeHeadlessSoapActiveRoleAttestations(payload);
+  const payloadSnapshot = normalizeJson(canonicalPayload);
   const checksum = await sha256Hex(stableStringify(payloadSnapshot));
   const recordCounts = Object.fromEntries(
-    Object.keys(BACKUP_TABLES).map((collection) => [collection, payload[collection]?.length ?? 0]),
+    Object.keys(BACKUP_TABLES).map((collection) => [collection, canonicalPayload[collection]?.length ?? 0]),
   );
   const artifact = {
     format: BACKUP_ARTIFACT_FORMAT,
@@ -137,7 +159,7 @@ async function serializeBackupArtifact(payload, createdAt = new Date()) {
       collections: Object.keys(BACKUP_TABLES),
       recordCounts,
     },
-    payload,
+    payload: canonicalPayload,
   };
   return JSON.stringify(normalizeJson(artifact), null, 2);
 }
@@ -404,6 +426,9 @@ function buildDataset(db, backupCollections) {
 
     dataset.attachments = filterRowsByReference(dataset.attachments, 'patientId', patientIds);
     dataset.documentDiagnosisProposals = filterRowsByReference(dataset.documentDiagnosisProposals, 'patientId', patientIds);
+    dataset.durableReviewPatientLinks = filterRowsByReference(dataset.durableReviewPatientLinks, 'patientId', patientIds);
+    const durableReviewIds = new Set(dataset.durableReviewRecords.map((row) => row.reviewId).filter((value) => typeof value === 'string' && value.length > 0));
+    dataset.durableReviewPatientLinks = filterRowsByReference(dataset.durableReviewPatientLinks, 'reviewId', durableReviewIds);
     dataset.entries = filterRowsByReference(dataset.entries, 'patientId', patientIds);
     dataset.observations = filterRowsByReference(dataset.observations, 'patientId', patientIds);
     dataset.checkups = filterRowsByReference(dataset.checkups, 'patientId', patientIds);
@@ -414,6 +439,13 @@ function buildDataset(db, backupCollections) {
 
     return dataset;
   })();
+}
+
+/* @Codex The command replay receipt is incomplete until the append-only audit ledger has its own restore contract. */
+function assertBackupEligibility(dataset) {
+  if (dataset.durableReviewCommandStates.length > 0 || dataset.durableReviewCommandOperations.length > 0) {
+    throw new Error('Il backup dei comandi review richiede il ledger audit append-only.');
+  }
 }
 
 async function main() {
@@ -440,6 +472,7 @@ async function main() {
 
     const createdAt = new Date();
     const payload = buildDataset(db, Object.keys(BACKUP_TABLES));
+    assertBackupEligibility(payload);
     const artifact = await serializeBackupArtifact(payload, createdAt);
     const fileName = `mediflow-backup-v1-${formatTimestamp(createdAt)}.mediflow`;
     const finalPath = path.join(destinationDir, fileName);
@@ -518,4 +551,6 @@ async function main() {
   }
 }
 
-await main();
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  await main();
+}

@@ -6,6 +6,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { after, test } from 'node:test';
+import { loginWithWebAuthControl } from './web-auth-control-test-client.mjs';
 
 const BASE_URL = process.env.E2E_BASE_URL || 'http://127.0.0.1:3400';
 const LOCAL_API_TOKEN = process.env.MEDIFLOW_LOCAL_API_TOKEN || 'mediflow-network-write-smoke-local-token';
@@ -40,19 +41,14 @@ test('paired patient profile write requires write capability, session, scope, an
         const readOnlyClient = await pairClient(['network.replica.readonly-patients'], 'Desk iPad readonly');
         const writeClient = await pairClient([READ_CAPABILITY, WRITE_CAPABILITY], 'Desk iPad writer');
 
-        const login = await request('POST', '/api/auth/login', {
-            body: {
-                username: USERNAME,
-                password: PIN,
-            },
-        });
+        const login = await loginWithWebAuthControl(BASE_URL, { username: USERNAME, password: PIN });
         assert.equal(login.response.status, 200);
-        const sessionCookie = extractSessionCookie(login.response);
+        const cookieHeader = login.cookieHeader;
 
         const readOnlyWrite = await request('PUT', `/api/v1/network/patients/${patientId}`, {
             headers: {
                 ...pairedHeaders(readOnlyClient),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
             body: {
                 version: 1,
@@ -73,7 +69,7 @@ test('paired patient profile write requires write capability, session, scope, an
         const update = await request('PUT', `/api/v1/network/patients/${patientId}`, {
             headers: {
                 ...pairedHeaders(writeClient),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
             body: {
                 version: 1,
@@ -87,7 +83,7 @@ test('paired patient profile write requires write capability, session, scope, an
         const detail = await request('GET', `/api/v1/network/patients/${patientId}`, {
             headers: {
                 ...pairedHeaders(writeClient),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
         });
         assert.equal(detail.response.status, 200);
@@ -98,7 +94,7 @@ test('paired patient profile write requires write capability, session, scope, an
         const conflict = await request('PUT', `/api/v1/network/patients/${patientId}`, {
             headers: {
                 ...pairedHeaders(writeClient),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
             body: {
                 version: 1,
@@ -112,7 +108,7 @@ test('paired patient profile write requires write capability, session, scope, an
         const aiField = await request('PUT', `/api/v1/network/patients/${patientId}`, {
             headers: {
                 ...pairedHeaders(writeClient),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
             body: {
                 version: 2,
@@ -124,7 +120,7 @@ test('paired patient profile write requires write capability, session, scope, an
 
         const audit = await request('GET', `/api/system/audit?eventType=patient.updated&subjectType=patient&limit=20`, {
             headers: {
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
         });
         assert.equal(audit.response.status, 200);
@@ -163,21 +159,16 @@ test('disabling home-base mode makes paired-client tokens inert until re-enabled
     try {
         const writeClient = await pairClient([READ_CAPABILITY, WRITE_CAPABILITY], 'Desk iPad mode gate');
 
-        const login = await request('POST', '/api/auth/login', {
-            body: {
-                username: USERNAME,
-                password: PIN,
-            },
-        });
+        const login = await loginWithWebAuthControl(BASE_URL, { username: USERNAME, password: PIN });
         assert.equal(login.response.status, 200);
-        const sessionCookie = extractSessionCookie(login.response);
+        const cookieHeader = login.cookieHeader;
 
         await setNetworkMode('local-only');
 
         const gatedWrite = await request('PUT', `/api/v1/network/patients/${patientId}`, {
             headers: {
                 ...pairedHeaders(writeClient),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
             body: {
                 version: 1,
@@ -190,7 +181,7 @@ test('disabling home-base mode makes paired-client tokens inert until re-enabled
         const gatedRead = await request('GET', `/api/v1/network/patients/${patientId}`, {
             headers: {
                 ...pairedHeaders(writeClient),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
         });
         assert.equal(gatedRead.response.status, 403);
@@ -201,7 +192,7 @@ test('disabling home-base mode makes paired-client tokens inert until re-enabled
         const update = await request('PUT', `/api/v1/network/patients/${patientId}`, {
             headers: {
                 ...pairedHeaders(writeClient),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
             body: {
                 version: 1,
@@ -334,19 +325,6 @@ function pairedHeaders(client) {
         'x-mediflow-paired-client-id': client.pairedClientId,
         'x-mediflow-paired-client-token': client.pairedClientToken,
     };
-}
-
-function extractSessionCookie(response) {
-    const setCookies = typeof response.headers.getSetCookie === 'function'
-        ? response.headers.getSetCookie()
-        : [];
-    const cookieSource = setCookies.find((cookie) => cookie.startsWith('mediflow_session='))
-        ?? response.headers.get('set-cookie');
-    if (!cookieSource) {
-        throw new Error('mediflow_session cookie was not returned by /api/auth/login');
-    }
-
-    return cookieSource.split(';')[0];
 }
 
 async function request(method, pathname, { headers = {}, body } = {}) {

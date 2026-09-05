@@ -7,6 +7,7 @@ import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';
 import { after, test } from 'node:test';
+import { loginWithWebAuthControl } from './web-auth-control-test-client.mjs';
 
 const BASE_URL = process.env.E2E_BASE_URL || 'http://127.0.0.1:3400';
 const LOCAL_API_TOKEN = process.env.MEDIFLOW_LOCAL_API_TOKEN || 'mediflow-network-write-smoke-local-token';
@@ -38,22 +39,22 @@ test('paired document projection persists sealed payloads and legacy pairing req
             [READ_PATIENTS_CAPABILITY, READ_DOCUMENTS_CAPABILITY, WRITE_DOCUMENTS_CAPABILITY, VISIT_DRAFT_CAPABILITY],
             'Desk iPad W5 re-approved',
         );
-        const sessionCookie = await login();
+        const cookieHeader = await login();
 
         const legacyDocuments = await request('GET', `/api/v1/network/patients/${patientId}/attachments`, {
-            headers: { ...pairedHeaders(legacyClient), Cookie: sessionCookie },
+            headers: { ...pairedHeaders(legacyClient), Cookie: cookieHeader },
         });
         assert.equal(legacyDocuments.response.status, 403, 'Legacy pairing without document capability must receive 403');
 
         const legacyVisitDraft = await request('POST', '/api/v1/network/visit-draft', {
-            headers: { ...pairedHeaders(legacyClient), Cookie: sessionCookie },
+            headers: { ...pairedHeaders(legacyClient), Cookie: cookieHeader },
             body: { transcript: 'S: sintomo sintetico. P: controllo programmato.' },
         });
         assert.equal(legacyVisitDraft.response.status, 403, 'Legacy pairing without visit-draft capability must receive 403');
 
         const payload = sealedDocumentProjection();
         const created = await request('POST', `/api/v1/network/patients/${patientId}/attachments`, {
-            headers: { ...pairedHeaders(approvedClient), Cookie: sessionCookie }, body: payload,
+            headers: { ...pairedHeaders(approvedClient), Cookie: cookieHeader }, body: payload,
         });
         assert.equal(created.response.status, 201, 'Re-approved paired client must create a sealed document projection');
         assert.ok(typeof created.json?.id === 'string' && created.json.id.length > 0, 'Document create response must include an id');
@@ -61,7 +62,7 @@ test('paired document projection persists sealed payloads and legacy pairing req
         createdAttachmentIds.push(attachmentId);
 
         const listed = await request('GET', `/api/v1/network/patients/${patientId}/attachments`, {
-            headers: { ...pairedHeaders(approvedClient), Cookie: sessionCookie },
+            headers: { ...pairedHeaders(approvedClient), Cookie: cookieHeader },
         });
         assert.equal(listed.response.status, 200, 'Re-approved paired client must list documents');
         const summary = listed.json?.find((item) => item.id === attachmentId);
@@ -69,7 +70,7 @@ test('paired document projection persists sealed payloads and legacy pairing req
         assert.equal(Object.hasOwn(summary, 'data'), false, 'Paired document list must omit encrypted data');
 
         const detail = await request('GET', `/api/v1/network/patients/${patientId}/attachments/${attachmentId}`, {
-            headers: { ...pairedHeaders(approvedClient), Cookie: sessionCookie },
+            headers: { ...pairedHeaders(approvedClient), Cookie: cookieHeader },
         });
         assert.equal(detail.response.status, 200, 'Re-approved paired client must fetch document detail');
         assert.equal(detail.json?.data, payload.data, 'Paired document detail must return the sealed data envelope unchanged');
@@ -79,25 +80,25 @@ test('paired document projection persists sealed payloads and legacy pairing req
         assert.equal(persisted?.ocr_queue_reason, 'paired_upload', 'Paired document must persist paired_upload OCR queue reason');
 
         const forbidden = await request('POST', `/api/v1/network/patients/${patientId}/attachments`, {
-            headers: { ...pairedHeaders(approvedClient), Cookie: sessionCookie },
+            headers: { ...pairedHeaders(approvedClient), Cookie: cookieHeader },
             body: { ...sealedDocumentProjection(), summarySnapshot: 'forbidden-client-derived-value' },
         });
         assert.equal(forbidden.response.status, 400, 'Document create must reject summarySnapshot by presence');
 
         const plaintext = await request('POST', `/api/v1/network/patients/${patientId}/attachments`, {
-            headers: { ...pairedHeaders(approvedClient), Cookie: sessionCookie },
+            headers: { ...pairedHeaders(approvedClient), Cookie: cookieHeader },
             body: { ...sealedDocumentProjection(), data: 'data:text/plain;base64,c3ludGhldGlj' },
         });
         assert.equal(plaintext.response.status, 400, 'Document create must reject plaintext data');
 
         const oversized = await request('POST', `/api/v1/network/patients/${patientId}/attachments`, {
-            headers: { ...pairedHeaders(approvedClient), Cookie: sessionCookie },
+            headers: { ...pairedHeaders(approvedClient), Cookie: cookieHeader },
             body: { ...sealedDocumentProjection(), data: `ENC:${'A'.repeat(2_048)}:QQ==` },
         });
         assert.equal(oversized.response.status, 413, 'Document create must enforce the configured wire-size limit before parsing');
 
         const visitDraft = await request('POST', '/api/v1/network/visit-draft', {
-            headers: { ...pairedHeaders(approvedClient), Cookie: sessionCookie },
+            headers: { ...pairedHeaders(approvedClient), Cookie: cookieHeader },
             body: { transcript: 'S: sintomo sintetico. P: controllo programmato.' },
         });
         assert.equal(visitDraft.response.status, 200, 'Re-approved paired client must access visit draft');
@@ -152,13 +153,10 @@ async function pairClient(requestedCapabilities, deviceName) {
 }
 
 async function login() {
-    const response = await request('POST', '/api/auth/login', { body: { username: USERNAME, password: PIN } });
+    const response = await loginWithWebAuthControl(BASE_URL, { username: USERNAME, password: PIN });
     assert.equal(response.response.status, 200, 'Smoke operator login must succeed');
-    const raw = typeof response.response.headers.getSetCookie === 'function'
-        ? response.response.headers.getSetCookie().find((entry) => entry.startsWith('mediflow_session='))
-        : response.response.headers.get('set-cookie');
-    assert.ok(raw, 'Operator login must set mediflow_session');
-    return raw.split(';')[0];
+    assert.ok(response.cookieHeader, 'Operator login must set mediflow_session');
+    return response.cookieHeader;
 }
 
 async function createSeedPatient(ambulatoryId) {

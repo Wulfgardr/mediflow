@@ -129,7 +129,8 @@ test('a bootstrapped DB has no patient_id table outside the canonical cascade', 
 
     // Raw-SQL tables that exist only in lib/db-server.ts must be covered too.
     const dbServerSource = fs.readFileSync(path.join(ROOT_DIR, 'lib/db-server.ts'), 'utf8');
-    const createStatements = dbServerSource.match(/CREATE TABLE IF NOT EXISTS[\s\S]*?\n\s*\)/g) ?? [];
+    const createStatements = (dbServerSource.match(/CREATE TABLE IF NOT EXISTS[\s\S]*?\n\s*\)/g) ?? [])
+      .filter((statement) => /^CREATE TABLE IF NOT EXISTS [A-Za-z_]/.test(statement));
     assert.ok(createStatements.length > 0, 'expected raw CREATE TABLE statements in lib/db-server.ts');
     for (const statement of createStatements) {
       sqlite.exec(statement);
@@ -162,6 +163,7 @@ test('the cascade keeps the ADR 0066 child-first ordering', () => {
     'prostheticPrescriptions',
     'sissHandoffEvents',
     'documentDiagnosisProposals',
+    'durableReviewPatientLinks',
     'observations',
     'checkups',
     'therapies',

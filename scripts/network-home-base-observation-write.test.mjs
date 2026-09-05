@@ -6,6 +6,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { after, test } from 'node:test';
+import { loginWithWebAuthControl } from './web-auth-control-test-client.mjs';
 
 const BASE_URL = process.env.E2E_BASE_URL || 'http://127.0.0.1:3400';
 const LOCAL_API_TOKEN = process.env.MEDIFLOW_LOCAL_API_TOKEN || 'mediflow-network-write-smoke-local-token';
@@ -49,17 +50,12 @@ test('paired observation write requires capability, session, scope, version, and
             'Desk iPad observation writer',
         );
 
-        const login = await request('POST', '/api/auth/login', {
-            body: {
-                username: USERNAME,
-                password: PIN,
-            },
-        });
+        const login = await loginWithWebAuthControl(BASE_URL, { username: USERNAME, password: PIN });
         assert.equal(login.response.status, 200);
-        const sessionCookie = extractSessionCookie(login.response);
+        const cookieHeader = login.cookieHeader;
 
         const otherPrescription = await request('POST', '/api/service-prescriptions', {
-            headers: { Cookie: sessionCookie },
+            headers: { Cookie: cookieHeader },
             body: {
                 patientId: otherPatientId,
                 prescribedAt: '2026-07-12T08:00:00.000Z',
@@ -72,7 +68,7 @@ test('paired observation write requires capability, session, scope, version, and
         assert.equal(otherPrescription.response.status, 201);
 
         const otherItem = await request('POST', '/api/service-prescription-items', {
-            headers: { Cookie: sessionCookie },
+            headers: { Cookie: cookieHeader },
             body: {
                 prescriptionId: otherPrescription.json.id,
                 ordinal: 1,
@@ -96,7 +92,7 @@ test('paired observation write requires capability, session, scope, version, and
             source: 'manual',
         };
         const crossPatientCreate = await request('POST', '/api/observations', {
-            headers: { Cookie: sessionCookie },
+            headers: { Cookie: cookieHeader },
             body: {
                 ...observationPayload,
                 patientId,
@@ -107,7 +103,7 @@ test('paired observation write requires capability, session, scope, version, and
         assert.equal(crossPatientCreate.json?.error, 'Service prescription item not found or does not belong to observation patient');
 
         const missingItemCreate = await request('POST', '/api/observations', {
-            headers: { Cookie: sessionCookie },
+            headers: { Cookie: cookieHeader },
             body: {
                 ...observationPayload,
                 patientId,
@@ -117,20 +113,20 @@ test('paired observation write requires capability, session, scope, version, and
         assert.equal(missingItemCreate.response.status, 422);
 
         const unlinkedObservation = await request('POST', '/api/observations', {
-            headers: { Cookie: sessionCookie },
+            headers: { Cookie: cookieHeader },
             body: { ...observationPayload, patientId },
         });
         assert.equal(unlinkedObservation.response.status, 201);
 
         const crossPatientUpdate = await request('PUT', `/api/observations/${unlinkedObservation.json.id}`, {
-            headers: { Cookie: sessionCookie },
+            headers: { Cookie: cookieHeader },
             body: { version: 1, servicePrescriptionItemId: otherItem.json.id },
         });
         assert.equal(crossPatientUpdate.response.status, 422);
         assert.equal(crossPatientUpdate.json?.error, 'Service prescription item not found or does not belong to observation patient');
 
         const samePatientCreate = await request('POST', '/api/observations', {
-            headers: { Cookie: sessionCookie },
+            headers: { Cookie: cookieHeader },
             body: {
                 ...observationPayload,
                 patientId: otherPatientId,
@@ -140,13 +136,13 @@ test('paired observation write requires capability, session, scope, version, and
         assert.equal(samePatientCreate.response.status, 201);
 
         const samePatientUnlinkedObservation = await request('POST', '/api/observations', {
-            headers: { Cookie: sessionCookie },
+            headers: { Cookie: cookieHeader },
             body: { ...observationPayload, patientId: otherPatientId },
         });
         assert.equal(samePatientUnlinkedObservation.response.status, 201);
 
         const samePatientUpdate = await request('PUT', `/api/observations/${samePatientUnlinkedObservation.json.id}`, {
-            headers: { Cookie: sessionCookie },
+            headers: { Cookie: cookieHeader },
             body: { version: 1, servicePrescriptionItemId: otherItem.json.id },
         });
         assert.equal(samePatientUpdate.response.status, 200);
@@ -154,7 +150,7 @@ test('paired observation write requires capability, session, scope, version, and
         const readOnlyCreate = await request('POST', `/api/v1/network/patients/${patientId}/observations`, {
             headers: {
                 ...pairedHeaders(readOnlyClient),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
             body: {
                 codeSystem: 'LOINC',
@@ -189,7 +185,7 @@ test('paired observation write requires capability, session, scope, version, and
         const plaintextNotes = await request('POST', `/api/v1/network/patients/${patientId}/observations`, {
             headers: {
                 ...pairedHeaders(observationWriter),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
             body: {
                 codeSystem: 'LOINC',
@@ -209,7 +205,7 @@ test('paired observation write requires capability, session, scope, version, and
         const create = await request('POST', `/api/v1/network/patients/${patientId}/observations`, {
             headers: {
                 ...pairedHeaders(observationWriter),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
             body: {
                 codeSystem: 'LOINC',
@@ -228,10 +224,23 @@ test('paired observation write requires capability, session, scope, version, and
         assert.ok(typeof observationId === 'string' && observationId.length > 0);
         assert.equal(create.json?.version, 1);
 
+        const observationList = await request('GET', `/api/v1/network/patients/${patientId}/observations?code=8480-6&limit=10`, {
+            headers: {
+                ...pairedHeaders(observationWriter),
+                Cookie: cookieHeader,
+            },
+        });
+        assert.equal(observationList.response.status, 200);
+        assert.ok(Array.isArray(observationList.json));
+        const listedObservation = observationList.json.find((observation) => observation.id === observationId);
+        assert.ok(listedObservation, 'Patient-scoped observation list must include the synthetic observation');
+        assert.equal(listedObservation.code, '8480-6');
+        assert.equal(listedObservation.version, 1);
+
         const detail = await request('GET', `/api/v1/network/patients/${patientId}/observations/${observationId}`, {
             headers: {
                 ...pairedHeaders(observationWriter),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
         });
         assert.equal(detail.response.status, 200);
@@ -248,7 +257,7 @@ test('paired observation write requires capability, session, scope, version, and
         const update = await request('PUT', `/api/v1/network/patients/${patientId}/observations/${observationId}`, {
             headers: {
                 ...pairedHeaders(observationWriter),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
             body: {
                 version: 1,
@@ -261,7 +270,7 @@ test('paired observation write requires capability, session, scope, version, and
         const updatedDetail = await request('GET', `/api/v1/network/patients/${patientId}/observations/${observationId}`, {
             headers: {
                 ...pairedHeaders(observationWriter),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
         });
         assert.equal(updatedDetail.response.status, 200);
@@ -271,7 +280,7 @@ test('paired observation write requires capability, session, scope, version, and
         const conflict = await request('PUT', `/api/v1/network/patients/${patientId}/observations/${observationId}`, {
             headers: {
                 ...pairedHeaders(observationWriter),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
             body: {
                 version: 1,
@@ -288,7 +297,7 @@ test('paired observation write requires capability, session, scope, version, and
         const aiField = await request('PUT', `/api/v1/network/patients/${patientId}/observations/${observationId}`, {
             headers: {
                 ...pairedHeaders(observationWriter),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
             body: {
                 version: 2,
@@ -301,7 +310,7 @@ test('paired observation write requires capability, session, scope, version, and
         const plaintextDeletionReason = await request('PUT', `/api/v1/network/patients/${patientId}/observations/${observationId}`, {
             headers: {
                 ...pairedHeaders(observationWriter),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
             body: {
                 version: 2,
@@ -316,7 +325,7 @@ test('paired observation write requires capability, session, scope, version, and
         const softDelete = await request('PUT', `/api/v1/network/patients/${patientId}/observations/${observationId}`, {
             headers: {
                 ...pairedHeaders(observationWriter),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
             body: {
                 version: 2,
@@ -329,7 +338,7 @@ test('paired observation write requires capability, session, scope, version, and
         const deletedDetail = await request('GET', `/api/v1/network/patients/${patientId}/observations/${observationId}`, {
             headers: {
                 ...pairedHeaders(observationWriter),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
         });
         assert.equal(deletedDetail.response.status, 200);
@@ -340,7 +349,7 @@ test('paired observation write requires capability, session, scope, version, and
         const remoteHardDelete = await request('DELETE', `/api/v1/network/patients/${patientId}/observations/${observationId}`, {
             headers: {
                 ...pairedHeaders(observationWriter),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
             body: {
                 version: 3,
@@ -348,7 +357,7 @@ test('paired observation write requires capability, session, scope, version, and
         });
         assert.equal(remoteHardDelete.response.status, 405);
 
-        const createdAudit = await findAuditEvent('observation.created', observationId, sessionCookie);
+        const createdAudit = await findAuditEvent('observation.created', observationId, cookieHeader);
         assert.equal(createdAudit.actorType, 'user');
         assert.equal(createdAudit.sourceSurface, 'native');
         assert.ok(createdAudit.redactedMetadata?.flags?.includes('auth:paired-client'));
@@ -356,11 +365,11 @@ test('paired observation write requires capability, session, scope, version, and
         assert.deepEqual(createdAudit.redactedMetadata?.changedFields, ['codeSystem', 'code', 'display', 'unitSystem', 'unitCode', 'value', 'observedAt', 'notes', 'source']);
         assert.equal(createdAudit.redactedMetadata?.resourceVersion, 1);
 
-        const updatedAudit = await findAuditEvent('observation.updated', observationId, sessionCookie);
+        const updatedAudit = await findAuditEvent('observation.updated', observationId, cookieHeader);
         assert.deepEqual(updatedAudit.redactedMetadata?.changedFields, ['value']);
         assert.equal(updatedAudit.redactedMetadata?.resourceVersion, 2);
 
-        const deletedAudit = await findAuditEvent('observation.deleted', observationId, sessionCookie);
+        const deletedAudit = await findAuditEvent('observation.deleted', observationId, cookieHeader);
         assert.deepEqual(deletedAudit.redactedMetadata?.changedFields, ['deletedAt', 'deletionReason']);
         assert.equal(deletedAudit.redactedMetadata?.resourceVersion, 3);
 
@@ -391,15 +400,13 @@ test('web clinical lifecycle rejects stale writes, preserves observation tombsto
 
     const ambulatoryId = await resolveDefaultAmbulatoryId();
     const patientId = await createSeedPatient(ambulatoryId);
-    const login = await request('POST', '/api/auth/login', {
-        body: { username: USERNAME, password: PIN },
-    });
+    const login = await loginWithWebAuthControl(BASE_URL, { username: USERNAME, password: PIN });
     assert.equal(login.response.status, 200);
-    const sessionCookie = extractSessionCookie(login.response);
+    const cookieHeader = login.cookieHeader;
 
     try {
         const therapy = await request('POST', '/api/therapies', {
-            headers: { Cookie: sessionCookie },
+            headers: { Cookie: cookieHeader },
             body: {
                 patientId,
                 drugName: 'Lifecycle test therapy',
@@ -410,13 +417,13 @@ test('web clinical lifecycle rejects stale writes, preserves observation tombsto
         assert.equal(therapy.response.status, 201);
 
         const therapyUpdate = await request('PUT', `/api/therapies/${therapy.json.id}`, {
-            headers: { Cookie: sessionCookie },
+            headers: { Cookie: cookieHeader },
             body: { version: 1, status: 'suspended' },
         });
         assert.equal(therapyUpdate.response.status, 200);
 
         const staleTherapyUpdate = await request('PUT', `/api/therapies/${therapy.json.id}`, {
-            headers: { Cookie: sessionCookie },
+            headers: { Cookie: cookieHeader },
             body: { version: 1, status: 'completed' },
         });
         assert.equal(staleTherapyUpdate.response.status, 409);
@@ -425,7 +432,7 @@ test('web clinical lifecycle rejects stale writes, preserves observation tombsto
         assert.equal(staleTherapyUpdate.json?.currentVersion, 2);
 
         const observation = await request('POST', '/api/observations', {
-            headers: { Cookie: sessionCookie },
+            headers: { Cookie: cookieHeader },
             body: {
                 patientId,
                 codeSystem: 'LOINC',
@@ -441,13 +448,13 @@ test('web clinical lifecycle rejects stale writes, preserves observation tombsto
         assert.equal(observation.response.status, 201);
 
         const observationDelete = await request('DELETE', `/api/observations/${observation.json.id}`, {
-            headers: { Cookie: sessionCookie },
+            headers: { Cookie: cookieHeader },
             body: { version: 1 },
         });
         assert.equal(observationDelete.response.status, 200);
 
         const deletedObservations = await request('GET', `/api/observations?patientId=${patientId}&includeDeleted=true`, {
-            headers: { Cookie: sessionCookie },
+            headers: { Cookie: cookieHeader },
         });
         assert.equal(deletedObservations.response.status, 200);
         const deletedObservation = deletedObservations.json.find((item) => item.id === observation.json.id);
@@ -472,7 +479,7 @@ test('web clinical lifecycle rejects stale writes, preserves observation tombsto
             ['/api/observations', { patientId, codeSystem: 'LOINC', code: '8480-6', display: 'Systolic blood pressure', unitSystem: 'UCUM', unitCode: 'mm[Hg]', value: 128, observedAt: '2026-05-02T09:00:00.000Z', source: 'manual' }],
         ];
         for (const [pathname, body] of webCreates) {
-            const response = await request('POST', pathname, { headers: { Cookie: sessionCookie }, body });
+            const response = await request('POST', pathname, { headers: { Cookie: cookieHeader }, body });
             assert.equal(response.response.status, 404, `Expected deleted patient create guard for ${pathname}`);
         }
 
@@ -499,10 +506,10 @@ test('web clinical lifecycle rejects stale writes, preserves observation tombsto
     }
 });
 
-async function findAuditEvent(eventType, subjectRef, sessionCookie) {
+async function findAuditEvent(eventType, subjectRef, cookieHeader) {
     const audit = await request('GET', `/api/system/audit?eventType=${eventType}&subjectType=observation&limit=20`, {
         headers: {
-            Cookie: sessionCookie,
+            Cookie: cookieHeader,
         },
     });
     assert.equal(audit.response.status, 200);
@@ -630,19 +637,6 @@ function pairedHeaders(client) {
         'x-mediflow-paired-client-id': client.pairedClientId,
         'x-mediflow-paired-client-token': client.pairedClientToken,
     };
-}
-
-function extractSessionCookie(response) {
-    const setCookies = typeof response.headers.getSetCookie === 'function'
-        ? response.headers.getSetCookie()
-        : [];
-    const cookieSource = setCookies.find((cookie) => cookie.startsWith('mediflow_session='))
-        ?? response.headers.get('set-cookie');
-    if (!cookieSource) {
-        throw new Error('mediflow_session cookie was not returned by /api/auth/login');
-    }
-
-    return cookieSource.split(';')[0];
 }
 
 async function request(method, pathname, { headers = {}, body } = {}) {

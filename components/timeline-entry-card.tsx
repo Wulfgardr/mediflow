@@ -1,4 +1,6 @@
 import { format } from 'date-fns';
+import { scaleHistoryNotice } from '@/lib/scale-history'; // @Codex MF085-002
+
 import { it } from 'date-fns/locale';
 import { ClinicalEntry, Attachment, db } from '@/lib/db';
 import { FileText, Stethoscope, Activity, Trash2, AlertCircle, Undo, Phone, Home, Building2, Paperclip } from 'lucide-react';
@@ -226,6 +228,13 @@ export function TimelineEntryCard({
                 {/* Attachments List */}
                 {entry.attachments && entry.attachments.length > 0 && !isDeleted && onViewAttachment && (
                     <EntryAttachments attachmentIds={entry.attachments} onView={onViewAttachment} />
+                )}
+
+                {/* @Codex MF085-002: descriptive provenance; never recompute a recorded score. */}
+                {entry.type === 'scale' && scaleHistoryNotice(entry.metadata, entry.title) && (
+                    <p className="mt-3 text-xs text-[color:var(--lume-ink-muted)]" data-testid="scale-provenance-notice">
+                        {scaleHistoryNotice(entry.metadata, entry.title)}
+                    </p>
                 )}
 
                 {/* Scale Metadata Viz */}

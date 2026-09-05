@@ -54,6 +54,13 @@ test('searching "backup" surfaces backup & restore first', () => {
     assert.equal(matches[0].item.id, 'backup');
 });
 
+/* @Codex */
+test('searching "conformita" surfaces the evidence inventory first', () => {
+    const matches = searchSettingsNav('conformita');
+    assert.ok(matches.length > 0);
+    assert.equal(matches[0].item.id, 'compliance-evidence');
+});
+
 test('searching "tema" surfaces appearance', () => {
     const matches = searchSettingsNav('tema');
     assert.ok(matches.length > 0);

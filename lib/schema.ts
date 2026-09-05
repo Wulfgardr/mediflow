@@ -20,6 +20,53 @@ export const users = sqliteTable('users', {
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
 });
 
+/* @Codex */
+export const physicianReviewAttestations = sqliteTable('physician_review_attestations', {
+    actorRef: text('actor_ref').primaryKey().references(() => users.id).notNull(),
+    schemaVersion: text('schema_version').notNull(),
+    capability: text('capability').notNull(),
+    status: text('status').notNull(),
+    attestationVersion: integer('attestation_version').notNull(),
+    policyVersion: text('policy_version').notNull(),
+    revokedAt: integer('revoked_at', { mode: 'timestamp' }),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+});
+
+/* @Codex */
+export const headlessSoapActiveRoleAttestations = sqliteTable('headless_soap_active_role_attestations', {
+    attestationRef: text('attestation_ref').primaryKey().notNull(),
+    actorRef: text('actor_ref').references(() => users.id, { onDelete: 'restrict' }).notNull().unique(),
+    schemaVersion: text('schema_version').notNull(),
+    role: text('role').notNull(),
+    operationId: text('operation_id').notNull(),
+    policyVersion: text('policy_version').notNull(),
+    status: text('status').notNull(),
+    attestationVersion: integer('attestation_version').notNull(),
+    issuerRef: text('issuer_ref'),
+    expiresAt: integer('expires_at', { mode: 'timestamp' }),
+    activatedAt: integer('activated_at', { mode: 'timestamp' }),
+    revocationGeneration: integer('revocation_generation').notNull().default(0),
+    revokedAt: integer('revoked_at', { mode: 'timestamp' }),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+});
+
+/* @Codex */
+export const headlessCheckupActiveRoleAttestations = sqliteTable('headless_checkup_active_role_attestations', {
+    attestationRef: text('attestation_ref').primaryKey().notNull(),
+    actorRef: text('actor_ref').references(() => users.id, { onDelete: 'restrict' }).notNull().unique(),
+    schemaVersion: text('schema_version').notNull(), role: text('role').notNull(),
+    operationId: text('operation_id').notNull(), policyVersion: text('policy_version').notNull(),
+    status: text('status').notNull(), attestationVersion: integer('attestation_version').notNull(),
+    issuerRef: text('issuer_ref'), expiresAt: integer('expires_at', { mode: 'timestamp' }),
+    activatedAt: integer('activated_at', { mode: 'timestamp' }),
+    revocationGeneration: integer('revocation_generation').notNull().default(0),
+    revokedAt: integer('revoked_at', { mode: 'timestamp' }),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+});
+
 // --- Ambulatories (Multi-Tenant) ---
 export const ambulatories = sqliteTable('ambulatories', {
     id: text('id').primaryKey(),
@@ -332,6 +379,42 @@ export const documentDiagnosisProposals = sqliteTable('document_diagnosis_propos
     ),
 }));
 
+/* @Codex */
+export const durableReviewRecords = sqliteTable('durable_review_records', {
+    id: text('id').primaryKey(), patientRef: text('patient_ref').notNull(), reviewId: text('review_id').notNull().unique(), reviewRevision: integer('review_revision').notNull(),
+    receiptRef: text('receipt_ref').notNull(), provenanceRef: text('provenance_ref').notNull(),
+    receiptBinding: text('receipt_binding').notNull(), provenanceBinding: text('provenance_binding').notNull(),
+    presentationVersion: text('presentation_version').notNull(), sealedCiphertext: text('sealed_ciphertext').notNull(), sealedDigest: text('sealed_digest').notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+});
+
+/* @Codex */
+export const durableReviewPatientLinks = sqliteTable('durable_review_patient_links', {
+    reviewId: text('review_id').primaryKey().references(() => durableReviewRecords.reviewId).notNull(),
+    patientId: text('patient_id').references(() => patients.id).notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+});
+
+/* @Codex */
+export const durableReviewOperations = sqliteTable('durable_review_operations', {
+    id: text('id').primaryKey(), reviewId: text('review_id').notNull(), idempotencyKey: text('idempotency_key').notNull(),
+    operation: text('operation').notNull(), expectedReviewRevision: integer('expected_review_revision').notNull(), operationDigest: text('operation_digest').notNull(), recordSnapshot: text('record_snapshot').notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+}, (t) => ({ reviewKeyUnique: uniqueIndex('durable_review_operations_review_key_unique').on(t.reviewId, t.idempotencyKey) }));
+
+/* @Codex */
+export const durableReviewCommandStates = sqliteTable('durable_review_command_states', {
+    reviewId: text('review_id').primaryKey(), reviewState: text('review_state').notNull(), revision: integer('revision').notNull(), action: text('action').notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+});
+
+/* @Codex */
+export const durableReviewCommandOperations = sqliteTable('durable_review_command_operations', {
+    id: text('id').primaryKey(), reviewId: text('review_id').notNull(), idempotencyKey: text('idempotency_key').notNull(), commandDigest: text('command_digest').notNull(),
+    resultSnapshot: text('result_snapshot').notNull(), auditEventId: text('audit_event_id').notNull(), createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+}, (t) => ({ reviewKeyUnique: uniqueIndex('durable_review_command_operations_review_key_unique').on(t.reviewId, t.idempotencyKey) }));
+
 // --- Checkups / Appointments ---
 export const checkups = sqliteTable('checkups', {
     id: text('id').primaryKey(),
@@ -408,6 +491,30 @@ export const auditEvents = sqliteTable('audit_events', {
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
 });
 
+/* @Codex */
+export const headlessSoapEntryCommits = sqliteTable('headless_soap_entry_commits', {
+    idempotencyKey: text('idempotency_key').primaryKey().notNull(),
+    approvalRef: text('approval_ref').notNull(),
+    authorizationProofDigest: text('authorization_proof_digest').notNull(),
+    commandId: text('command_id').notNull(),
+    entryId: text('entry_id').references(() => entries.id, { onDelete: 'cascade' }).notNull(),
+    auditEventId: text('audit_event_id').references(() => auditEvents.eventId, { onDelete: 'restrict' }).notNull(),
+    receiptRef: text('receipt_ref').notNull(),
+    bindingSnapshot: text('binding_snapshot').notNull(),
+    bindingDigest: text('binding_digest').notNull(),
+    entryDigest: text('entry_digest').notNull(),
+    auditSnapshot: text('audit_snapshot').notNull(),
+    auditDigest: text('audit_digest').notNull(),
+    receiptSnapshot: text('receipt_snapshot').notNull(),
+    receiptDigest: text('receipt_digest').notNull(),
+    committedAt: integer('committed_at', { mode: 'timestamp' }).notNull(),
+}, (table) => ({
+    commandIdUnique: uniqueIndex('headless_soap_entry_commits_command_id_unique').on(table.commandId),
+    entryIdUnique: uniqueIndex('headless_soap_entry_commits_entry_id_unique').on(table.entryId),
+    auditEventIdUnique: uniqueIndex('headless_soap_entry_commits_audit_event_id_unique').on(table.auditEventId),
+    receiptRefUnique: uniqueIndex('headless_soap_entry_commits_receipt_ref_unique').on(table.receiptRef),
+}));
+
 // --- Attachments ---
 export const attachments = sqliteTable('attachments', {
     id: text('id').primaryKey(),
@@ -426,6 +533,12 @@ export const attachments = sqliteTable('attachments', {
     ocrQueueUpdatedAt: integer('ocr_queue_updated_at', { mode: 'timestamp' }),
     ocrReplayArtifactSnapshot: text('ocr_replay_artifact_snapshot'),
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+    /* @Codex */
+    documentSourceRef: text('document_source_ref').notNull().unique(),
+    /* @Codex */
+    documentRevision: integer('document_revision').notNull(),
+    /* @Codex */
+    documentFreshnessEpoch: integer('document_freshness_epoch').notNull(),
 }, (t) => ({
     // WUL-268 (STREAM A): mirrors runtime guards in db-server.ts.
     patientIdx: index('attachments_patient_idx').on(t.patientId),

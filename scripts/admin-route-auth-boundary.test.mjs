@@ -2,10 +2,11 @@
 /* @Codex */
 
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -13,6 +14,7 @@ const WEB_ADMIN_ROUTES = [
     { file: 'app/api/system/audit/route.ts', handlers: ['GET'] },
     { file: 'app/api/system/backup-restore/route.ts', handlers: ['GET', 'POST'] },
     { file: 'app/api/system/backup-scheduler/route.ts', handlers: ['GET', 'POST'] },
+    { file: 'app/api/system/cloud-provider-probe/route.ts', handlers: ['POST'] },
     { file: 'app/api/system/fix-orphans/route.ts', handlers: ['GET', 'POST'] },
     { file: 'app/api/system/purge-patient/route.ts', handlers: ['GET', 'POST'] },
     { file: 'app/api/system/repair-db/route.ts', handlers: ['POST'] },
@@ -49,6 +51,69 @@ test('admin system routes require a web admin session instead of local-token adm
             assert.doesNotMatch(block, /session\.role\s*!==\s*['"]admin['"]/, `${route.file} ${handler} should not use role-only admin checks`);
         }
     }
+});
+
+test('backup restore rejects cross-port and text/plain transport before preflight, fence, or database mutation', () => {
+    const routeUrl = pathToFileURL(path.join(ROOT, 'app/api/system/backup-restore/route.ts')).href;
+    const transportUrl = pathToFileURL(path.join(ROOT, 'lib/security/request-transport.ts')).href;
+    const toDataModule = (source) => `data:text/javascript,${encodeURIComponent(source)}`;
+    const program = `
+        import { registerHooks } from 'node:module';
+        const routeUrl = ${JSON.stringify(routeUrl)};
+        const modules = new Map([
+            ['next/server', ${JSON.stringify(toDataModule("export const NextResponse = Response;"))}],
+            ['@/lib/db-server', ${JSON.stringify(toDataModule("export const dbServer = { transaction() { globalThis.dbCalls = (globalThis.dbCalls ?? 0) + 1; throw new Error('database touched'); } };"))}],
+            ['@/lib/schema', ${JSON.stringify(toDataModule(`export const ${[
+                'attachments', 'ambulatories', 'checkups', 'conversations', 'documentDiagnosisProposals',
+                'durableReviewOperations', 'durableReviewPatientLinks', 'durableReviewRecords', 'drugs', 'entries',
+                'exemptions', 'headlessSoapActiveRoleAttestations', 'headlessSoapEntryCommits', 'messages',
+                'observations', 'patients', 'patientsToAmbulatories', 'physicianReviewAttestations',
+                'prostheticPrescriptions', 'serviceCatalogEntries', 'servicePrescriptionItems',
+                'servicePrescriptions', 'sissHandoffEvents', 'therapies',
+            ].map((name) => `${name} = Object.freeze({})`).join(', ')};`))}],
+            ['@/lib/security/server-auth', ${JSON.stringify(toDataModule("export async function requireSession() { globalThis.sessionCalls = (globalThis.sessionCalls ?? 0) + 1; return Object.freeze({ id: 'session.synthetic.restore', userId: 'user.synthetic.restore', role: 'admin' }); } export function unauthorizedResponse() { return new Response(null, { status: 401 }); } export function forbiddenResponse() { return new Response(null, { status: 403 }); }"))}],
+            ['@/lib/security/server-auth-policy', ${JSON.stringify(toDataModule("export function isWebAdminSession() { globalThis.adminCalls = (globalThis.adminCalls ?? 0) + 1; return true; }"))}],
+            ['@/lib/backup-artifact', ${JSON.stringify(toDataModule("export const BACKUP_COLLECTIONS = Object.freeze([]); export async function serializeBackupArtifact() { return '{}'; }"))}],
+            ['@/lib/backup-patient-ambulatory-links', ${JSON.stringify(toDataModule("export function enrichBackupPatientsWithAmbulatoryLinks(rows) { return rows; }"))}],
+            ['@/lib/backup-restore-preflight', ${JSON.stringify(toDataModule("export async function runBackupRestorePreflight() { globalThis.preflightCalls = (globalThis.preflightCalls ?? 0) + 1; return { artifact: { format: 'mediflow-backup', version: 1, manifest: { recordCounts: {} } }, result: { ok: true } }; }"))}],
+            ['@/lib/backup-restore-executor', ${JSON.stringify(toDataModule("export function restoreBackupArtifact(_artifact, fence) { globalThis.restoreCalls = (globalThis.restoreCalls ?? 0) + 1; fence(); }"))}],
+            ['@/lib/api-error-response', ${JSON.stringify(toDataModule("export function apiFailure(code, error, status) { const response = Response.json({ error, code }, { status }); response.headers.set('Cache-Control', 'no-store'); return response; } export function apiInternalError() { return Response.json({ error: 'internal' }, { status: 500 }); }"))}],
+            ['@/lib/security/headless-checkup-status-transition-web-production', ${JSON.stringify(toDataModule("export function disposeCheckupStatusTransitionForHostV1() { globalThis.fenceCalls = (globalThis.fenceCalls ?? 0) + 1; return true; }"))}],
+            ['@/lib/security/request-transport', ${JSON.stringify(toDataModule(`export { isTrustedWebMutationRequest } from ${JSON.stringify(transportUrl)};`))}],
+        ]);
+        registerHooks({ resolve(specifier, context, nextResolve) {
+            if (context.parentURL === routeUrl && modules.has(specifier)) {
+                return { shortCircuit: true, url: modules.get(specifier), format: 'module' };
+            }
+            return nextResolve(specifier, context);
+        } });
+        const { POST } = await import(routeUrl);
+        const cases = [
+            { origin: 'http://127.0.0.1:4000', 'sec-fetch-site': 'same-site', 'content-type': 'application/json' },
+            { origin: 'http://127.0.0.1:3000', 'sec-fetch-site': 'same-origin', 'content-type': 'text/plain' },
+        ];
+        for (const headers of cases) {
+            const response = await POST(new Request('http://127.0.0.1:3000/api/system/backup-restore', {
+                method: 'POST', headers, body: '{}',
+            }));
+            const observed = { status: response.status, cacheControl: response.headers.get('cache-control'),
+                body: await response.json() };
+            const expected = { status: 403, cacheControl: 'no-store', body: {
+                error: 'Ripristino backup non disponibile.', code: 'request_transport_invalid',
+            } };
+            if (JSON.stringify(observed) !== JSON.stringify(expected)) throw new Error(JSON.stringify(observed));
+        }
+        const counters = { sessionCalls: globalThis.sessionCalls ?? 0, adminCalls: globalThis.adminCalls ?? 0,
+            preflightCalls: globalThis.preflightCalls ?? 0, restoreCalls: globalThis.restoreCalls ?? 0,
+            fenceCalls: globalThis.fenceCalls ?? 0, dbCalls: globalThis.dbCalls ?? 0 };
+        const expectedCounters = { sessionCalls: 2, adminCalls: 2, preflightCalls: 0,
+            restoreCalls: 0, fenceCalls: 0, dbCalls: 0 };
+        if (JSON.stringify(counters) !== JSON.stringify(expectedCounters)) throw new Error(JSON.stringify(counters));
+    `;
+    const child = spawnSync(process.execPath, [
+        '--experimental-strip-types', '--input-type=module', '--eval', program,
+    ], { cwd: ROOT, encoding: 'utf8' });
+    assert.equal(child.status, 0, child.stderr || child.stdout);
 });
 
 /* @Codex */

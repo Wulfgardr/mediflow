@@ -59,8 +59,8 @@ test('local token cannot write an unknown key (400) but web session can (allowed
     assert.equal(webDecision.allowed === true && webDecision.unregistered, true);
 });
 
-test('server-managed keys are denied on every HTTP channel', () => {
-    for (const key of ['network.nodeId', 'network.pairing.state', 'backupScheduler']) {
+test('server-managed and retired OCR keys are denied on every HTTP channel', () => {
+    for (const key of ['network.nodeId', 'network.pairing.state', 'backupScheduler', 'aiModel_ocr', 'aiOcrKillSwitch']) {
         assert.equal(evaluateSettingsWrite(key, webAdminSession).allowed, false, `${key} denied for web-admin`);
         assert.equal(evaluateSettingsWrite(key, webSession).allowed, false, `${key} denied for web-session`);
         assert.equal(evaluateSettingsWrite(key, localTokenSession).allowed, false, `${key} denied for local-token`);
@@ -88,11 +88,11 @@ test('web session can write all web-session registry keys (current UI writers ke
 test('current key/writer pairs still resolve to allowed', () => {
     const webWritten = [
         'aiProvider', 'aiUrl', 'ollamaUrl', 'aiModel', 'aiModel_clinical',
-        'aiModel_reasoning', 'aiModel_ocr', 'aiModelDefaultVersion', 'hardwareProfile',
+        'aiModel_reasoning', 'aiModelDefaultVersion', 'hardwareProfile',
         'aiInsightMode', 'aiInsightManualConfig', 'aiPatientInsightKillSwitch',
         'documentRouterControlFlow',
         'aiDocumentSynthesisKillSwitch', 'aiSmartImportKillSwitch', 'aiTreatmentReasoningKillSwitch',
-        'aiOcrKillSwitch', 'uiReduceMotion',
+        'uiReduceMotion',
         'uiReduceTransparency', 'uiStyleMode', 'terminologyRegistry', 'clinicName', 'network.mode',
     ];
     for (const key of webWritten) {

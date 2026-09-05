@@ -1,8 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 /* @Codex */
-import { deriveNetworkAiRuntimeSummary } from './network-ai-runtime-model.ts';
-import { resolveNetworkAiRuntimeKillSwitches } from './network-ai-runtime.ts';
+import {
+    deriveNetworkAiRuntimeSummary,
+    resolveNetworkAiRuntimeKillSwitches,
+} from './network-ai-runtime-model.ts';
 
 test('resolveNetworkAiRuntimeKillSwitches is fail-closed for absent and unknown settings', () => {
     assert.deepEqual(resolveNetworkAiRuntimeKillSwitches({}), {
@@ -32,7 +34,6 @@ test('deriveNetworkAiRuntimeSummary keeps AI local while the node stays local-on
         hardwareProfile: 'medium',
         clinicalModel: 'qwen3.5:35b-a3b',
         reasoningModel: 'qwen3.5:35b-a3b',
-        ocrModel: 'deepseek-ocr',
         killSwitches: {
             patientInsight: 'disabled',
             documentSynthesis: 'disabled',
@@ -43,6 +44,7 @@ test('deriveNetworkAiRuntimeSummary keeps AI local while the node stays local-on
 
     assert.equal(summary.mode, 'local-ai');
     assert.equal(summary.localRuntime.state, 'configured');
+    assert.equal(summary.localRuntime.ocrModel, null);
     assert.equal(summary.centralRuntime.state, 'disabled');
     assert.equal(summary.centralRuntime.capabilityStatus, 'disabled');
     assert.equal(summary.centralRuntime.accessMode, 'status-only');
@@ -83,7 +85,6 @@ test('deriveNetworkAiRuntimeSummary exposes centralized AI when home-base mode a
         hardwareProfile: 'high',
         clinicalModel: 'qwen3.5:35b-a3b',
         reasoningModel: 'qwen3.5:35b-a3b',
-        ocrModel: 'deepseek-ocr',
         killSwitches: {
             patientInsight: 'enabled',
             documentSynthesis: 'enabled',
@@ -94,6 +95,7 @@ test('deriveNetworkAiRuntimeSummary exposes centralized AI when home-base mode a
 
     assert.equal(summary.mode, 'centralized-available');
     assert.equal(summary.localRuntime.state, 'configured');
+    assert.equal(summary.localRuntime.ocrModel, null);
     assert.equal(summary.centralRuntime.state, 'available');
     assert.equal(summary.centralRuntime.capabilityStatus, 'available');
     assert.equal(summary.centralRuntime.accessMode, 'status-only');
@@ -118,7 +120,6 @@ test('deriveNetworkAiRuntimeSummary marks centralized AI unavailable when the lo
         hardwareProfile: 'custom',
         clinicalModel: null,
         reasoningModel: null,
-        ocrModel: null,
         killSwitches: {
             patientInsight: 'disabled',
             documentSynthesis: 'disabled',

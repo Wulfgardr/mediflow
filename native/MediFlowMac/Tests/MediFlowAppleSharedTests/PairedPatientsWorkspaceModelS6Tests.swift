@@ -227,7 +227,7 @@ actor S6MockDataSource: HomeBasePatientsDataSource {
         self.aiRuntime = aiRuntime
     }
 
-    func login(username: String?, password: String) async throws -> HomeBaseLoginResult {
+    func login(username: String?, password: String, credentials: HomeBasePairedCredentials) async throws -> HomeBaseLoginResult {
         HomeBaseLoginResult(sessionCookie: "sid=test", encryptedMasterKey: nil, salt: nil)
     }
 

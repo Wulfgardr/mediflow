@@ -315,6 +315,15 @@
   color: var(--k8-ink);
 }
 
+/* @Codex WUL-562 D2: in Scheda i controlli del telaio restano una penombra
+   opaca. Così canvas, chrome, field e l'unica Carta focale usano registri
+   distinti senza introdurre una seconda elevazione o un segnale cromatico. */
+.clinicalShell .backButton,
+.clinicalShell .sectionLink,
+.clinicalShell .headerActionButton {
+  background: var(--k8-control-bg);
+}
+
 .backButton:active,
 .sectionLink:active { transform: scale(0.985); }
 
@@ -330,6 +339,55 @@
 }
 
 .sectionRail::-webkit-scrollbar { display: none; }
+
+/* @Codex WUL-560 L7A: grouped disclosure is opt-in. Flat callers keep the
+   exact unmapped rail until their own mapping packet supplies the closed tuple. */
+.groupedSectionRail {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: start;
+  overflow: visible;
+  scroll-snap-type: none;
+}
+
+.sectionGroup {
+  min-width: 0;
+  border: 1px solid var(--k8-line-strong);
+  border-radius: 12px;
+  background: var(--k8-control-bg);
+}
+
+.sectionGroupButton {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 11px;
+  background: transparent;
+  color: var(--k8-ink);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sectionGroupButton:focus-visible {
+  outline: 2px solid var(--k8-focus);
+  outline-offset: 2px;
+}
+
+.sectionGroupChevron { flex: 0 0 auto; transition: transform var(--lume-dur-fuoco) var(--lume-ease); }
+.sectionGroupButton[aria-expanded='true'] .sectionGroupChevron { transform: rotate(90deg); }
+.sectionGroupItems { margin: 0; padding: 0 6px 6px; list-style: none; }
+.sectionGroupItems li + li { margin-top: 4px; }
+.sectionGroupItems .sectionLink { box-sizing: border-box; width: 100%; min-height: 44px; justify-content: space-between; }
+.sectionActivePeek { box-sizing: border-box; width: calc(100% - 12px); min-height: 44px; margin: 0 6px 6px; justify-content: space-between; }
 
 .sectionLink {
   flex: 0 0 auto;
@@ -366,6 +424,16 @@
     width: 100%;
     justify-content: space-between;
   }
+
+  .groupedSectionRail .sectionActivePeek { width: calc(100% - 12px); }
+}
+
+@media (max-width: 900px) {
+  .groupedSectionRail { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 480px) {
+  .groupedSectionRail { grid-template-columns: 1fr; }
 }
 
 /* @Codex WUL-UIUX: sezione attiva (scrollspy). Stile coerente con :hover ma
@@ -625,6 +693,15 @@
   .clinicalChrome { border-radius: 10px; }
   .clinicalSurface { border-radius: 14px; }
   .clinicalName { font-size: 18px; }
+  /* @Codex WUL-562 D2: il viewport stretto e un controllo diretto della
+     Scheda; i controlli della testata non dipendono dal solo media-query del
+     puntatore per raggiungere il minimo tattile. */
+  .clinicalShell .backButton,
+  .clinicalShell .headerPrimaryAction,
+  .clinicalShell .headerActionButton,
+  .clinicalShell .sectionLink,
+  .clinicalShell .sectionGroupButton,
+  .clinicalShell :global([data-testid='privacy-mode-header-toggle']) { min-height: 44px; }
   .attentionBand,
   .clinicalSection,
   .synoptic { padding: 16px; }
@@ -639,4 +716,59 @@
   .clinicalSurface *,
   .clinicalSurface *::before,
   .clinicalSurface *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+}
+
+/* @Codex WUL-UIUX: focus visibile sui restanti controlli della shell e
+   target tattili 44pt su pointer coarse. */
+.backButton:focus-visible,
+.sectionLink:focus-visible,
+.attentionAction:focus-visible {
+  outline: 2px solid var(--k8-focus);
+  outline-offset: 2px;
+}
+
+@media (pointer: coarse) {
+  .headerActionButton,
+  .backButton,
+  .sectionLink,
+  .sectionGroupButton,
+  .attentionAction {
+    min-height: 44px;
+  }
+}
+
+/* @Codex: synoptic facts stay grouped and wrap at the available panel width. */
+.synopticDetails {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: 12px;
+}
+.synopticDetail {
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--k8-line);
+  border-radius: 10px;
+}
+.synopticDetailHeading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  min-height: 28px;
+  border-radius: 4px;
+}
+.synopticDetailHeading:hover { color: var(--lume-accent); }
+.synopticDetailHeading:focus-visible { outline: 2px solid var(--lume-accent); outline-offset: 3px; }
+.synopticCount { font-size: 11px; font-variant-numeric: tabular-nums; color: var(--lume-ink-muted); }
+.synopticTherapy { display: grid; gap: 2px; padding: 8px 0; overflow-wrap: anywhere; }
+.synopticDetailMeta { font-size: 12px; line-height: 1.5; color: var(--lume-ink-muted); overflow-wrap: anywhere; }
+.synopticMeasure { display: grid; justify-items: start; gap: 4px; margin-top: 8px; overflow-wrap: anywhere; }
+.synopticMeasure > :global(.lume-registro) { font-size: 15px; line-height: 1.5; }
+
+/* @Codex: prevent clinical header actions from overlapping the back button. */
+@media (max-width: 760px) {
+  .clinicalChrome .chromeTopRow { flex-wrap: wrap; }
+  .clinicalChrome .backButton { flex: 0 0 auto; }
+  .clinicalChrome .headerActionCluster { flex-wrap: wrap; max-width: 100%; }
+  .clinicalChrome .headerActionCluster > * { flex-shrink: 0; }
 }

@@ -7,6 +7,7 @@ import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';
 import { after, test } from 'node:test';
+import { loginWithWebAuthControl } from './web-auth-control-test-client.mjs';
 
 const BASE_URL = process.env.E2E_BASE_URL || 'http://127.0.0.1:3400';
 const LOCAL_API_TOKEN = process.env.MEDIFLOW_LOCAL_API_TOKEN || 'mediflow-network-write-smoke-local-token';
@@ -39,14 +40,9 @@ test('paired patient lifecycle create, tombstone, and restore preserves sealed s
     const readOnlyClient = await pairClient([READ_CAPABILITY], 'Desk iPad lifecycle readonly');
     const lifecycleClient = await pairClient([READ_CAPABILITY, LIFECYCLE_CAPABILITY], 'Desk iPad lifecycle writer');
 
-    const login = await request('POST', '/api/auth/login', {
-        body: {
-            username: USERNAME,
-            password: PIN,
-        },
-    });
+    const login = await loginWithWebAuthControl(BASE_URL, { username: USERNAME, password: PIN });
     assert.equal(login.response.status, 200);
-    const sessionCookie = extractSessionCookie(login.response);
+    const cookieHeader = login.cookieHeader;
 
     const patientId = crypto.randomUUID();
     const suffix = patientId.replace(/-/g, '').slice(0, 13).toUpperCase();
@@ -82,7 +78,7 @@ test('paired patient lifecycle create, tombstone, and restore preserves sealed s
         const readOnlyCreate = await request('POST', '/api/v1/network/patients', {
             headers: {
                 ...pairedHeaders(readOnlyClient),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
             body: {
                 id: crypto.randomUUID(),
@@ -96,7 +92,7 @@ test('paired patient lifecycle create, tombstone, and restore preserves sealed s
         const readOnlyTrash = await request('GET', '/api/v1/network/patients?includeDeleted=true', {
             headers: {
                 ...pairedHeaders(readOnlyClient),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
         });
         assert.equal(readOnlyTrash.response.status, 403);
@@ -104,7 +100,7 @@ test('paired patient lifecycle create, tombstone, and restore preserves sealed s
         const plaintextCreate = await request('POST', '/api/v1/network/patients', {
             headers: {
                 ...pairedHeaders(lifecycleClient),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
             body: {
                 id: crypto.randomUUID(),
@@ -120,7 +116,7 @@ test('paired patient lifecycle create, tombstone, and restore preserves sealed s
         const aiCreate = await request('POST', '/api/v1/network/patients', {
             headers: {
                 ...pairedHeaders(lifecycleClient),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
             body: {
                 id: crypto.randomUUID(),
@@ -136,7 +132,7 @@ test('paired patient lifecycle create, tombstone, and restore preserves sealed s
         const create = await request('POST', '/api/v1/network/patients', {
             headers: {
                 ...pairedHeaders(lifecycleClient),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
             body: {
                 id: patientId,
@@ -161,7 +157,7 @@ test('paired patient lifecycle create, tombstone, and restore preserves sealed s
         const detail = await request('GET', `/api/v1/network/patients/${patientId}`, {
             headers: {
                 ...pairedHeaders(lifecycleClient),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
         });
         assert.equal(detail.response.status, 200);
@@ -173,7 +169,7 @@ test('paired patient lifecycle create, tombstone, and restore preserves sealed s
         const staleDelete = await request('DELETE', `/api/v1/network/patients/${patientId}`, {
             headers: {
                 ...pairedHeaders(lifecycleClient),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
             body: {
                 version: 999,
@@ -187,7 +183,7 @@ test('paired patient lifecycle create, tombstone, and restore preserves sealed s
         const deletion = await request('DELETE', `/api/v1/network/patients/${patientId}`, {
             headers: {
                 ...pairedHeaders(lifecycleClient),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
             body: {
                 version: 1,
@@ -200,7 +196,7 @@ test('paired patient lifecycle create, tombstone, and restore preserves sealed s
         const deletedDetail = await request('GET', `/api/v1/network/patients/${patientId}`, {
             headers: {
                 ...pairedHeaders(lifecycleClient),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
         });
         assert.equal(deletedDetail.response.status, 404);
@@ -208,7 +204,7 @@ test('paired patient lifecycle create, tombstone, and restore preserves sealed s
         const trashList = await request('GET', '/api/v1/network/patients?includeDeleted=true', {
             headers: {
                 ...pairedHeaders(lifecycleClient),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
         });
         assert.equal(trashList.response.status, 200);
@@ -223,7 +219,7 @@ test('paired patient lifecycle create, tombstone, and restore preserves sealed s
         const staleRestore = await request('POST', `/api/v1/network/patients/${patientId}/restore`, {
             headers: {
                 ...pairedHeaders(lifecycleClient),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
             body: {
                 version: 1,
@@ -236,7 +232,7 @@ test('paired patient lifecycle create, tombstone, and restore preserves sealed s
         const restore = await request('POST', `/api/v1/network/patients/${patientId}/restore`, {
             headers: {
                 ...pairedHeaders(lifecycleClient),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
             body: {
                 version: 2,
@@ -248,7 +244,7 @@ test('paired patient lifecycle create, tombstone, and restore preserves sealed s
         const activeList = await request('GET', '/api/v1/network/patients', {
             headers: {
                 ...pairedHeaders(lifecycleClient),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
         });
         assert.equal(activeList.response.status, 200);
@@ -257,7 +253,7 @@ test('paired patient lifecycle create, tombstone, and restore preserves sealed s
         const postRestoreList = await request('GET', '/api/v1/network/patients?includeDeleted=true', {
             headers: {
                 ...pairedHeaders(lifecycleClient),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
         });
         assert.equal(postRestoreList.response.status, 200);
@@ -420,19 +416,6 @@ function pairedHeaders(client) {
         'x-mediflow-paired-client-id': client.pairedClientId,
         'x-mediflow-paired-client-token': client.pairedClientToken,
     };
-}
-
-function extractSessionCookie(response) {
-    const setCookies = typeof response.headers.getSetCookie === 'function'
-        ? response.headers.getSetCookie()
-        : [];
-    const cookieSource = setCookies.find((cookie) => cookie.startsWith('mediflow_session='))
-        ?? response.headers.get('set-cookie');
-    if (!cookieSource) {
-        throw new Error('mediflow_session cookie was not returned by /api/auth/login');
-    }
-
-    return cookieSource.split(';')[0];
 }
 
 async function request(method, pathname, { headers = {}, body } = {}) {

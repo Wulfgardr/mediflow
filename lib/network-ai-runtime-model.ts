@@ -5,6 +5,27 @@ import type {
     NetworkAiRuntimeSummary,
     NetworkOperatingMode,
 } from './api/v1/types';
+/* @Codex */
+import { resolveAiLaneKillSwitchState } from './ai-lane-kill-switch';
+
+/* @Codex */
+type NetworkAiRuntimeKillSwitchSnapshot = Partial<Record<
+    | 'aiPatientInsightKillSwitch'
+    | 'aiDocumentSynthesisKillSwitch'
+    | 'aiSmartImportKillSwitch'
+    | 'aiTreatmentReasoningKillSwitch',
+    string | null | undefined
+>>;
+
+/* @Codex */
+export function resolveNetworkAiRuntimeKillSwitches(snapshot: NetworkAiRuntimeKillSwitchSnapshot) {
+    return {
+        patientInsight: resolveAiLaneKillSwitchState(snapshot.aiPatientInsightKillSwitch),
+        documentSynthesis: resolveAiLaneKillSwitchState(snapshot.aiDocumentSynthesisKillSwitch),
+        smartImport: resolveAiLaneKillSwitchState(snapshot.aiSmartImportKillSwitch),
+        treatmentReasoning: resolveAiLaneKillSwitchState(snapshot.aiTreatmentReasoningKillSwitch),
+    } as const;
+}
 
 export type NetworkAiRuntimeInput = {
     operatingMode: NetworkOperatingMode;
@@ -13,7 +34,6 @@ export type NetworkAiRuntimeInput = {
     hardwareProfile: string | null;
     clinicalModel: string | null;
     reasoningModel: string | null;
-    ocrModel: string | null;
     killSwitches: NetworkAiRuntimeKillSwitches;
 };
 
@@ -66,7 +86,7 @@ export function deriveNetworkAiRuntimeSummary(input: NetworkAiRuntimeInput): Net
             hardwareProfile: normalizeHardwareProfile(input.hardwareProfile),
             clinicalModel: input.clinicalModel,
             reasoningModel: input.reasoningModel,
-            ocrModel: input.ocrModel,
+            ocrModel: null,
         },
         centralRuntime: {
             state: centralRuntimeState,
