@@ -253,6 +253,35 @@ scritture cliniche. Il planner semantico resta limitato a strumenti approvati.
 I percorsi SISS/FSE restano handoff o webapp-assisted. L’export FHIR segue
 il contratto ADR0081; la parità FHIRv2 resta da verificare.
 
+## Sviluppo assistito
+
+<details>
+<summary><strong>Uso dei modelli: conteggi locali e limiti di attribuzione</strong></summary>
+
+<!-- usage-dashboard:start -->
+
+| Snapshot | Periodo dei log disponibili | Token di sessione | Ripartizione | Cache letta | Copertura storica |
+| :-- | :-- | --: | :-- | --: | :-- |
+| **5 settembre 2026** | 2026-02-01 → 2026-09-05 | **50.810.826.389** | Codex 44.773.273.634 · Claude Code 6.037.552.755 | 48.607.240.570 (95,7%) | Codex UNKNOWN · Claude Code attestata |
+
+<img src="./screenshots/token-models.svg" alt="Snapshot 5 settembre 2026: 50,81 Mld token di sessione, 44,77 Mld in Codex e 6,04 Mld in Claude Code; 48,61 Mld da cache letta." width="720" loading="lazy"/>
+
+La fonte è **CodexBar 0.56.4**, comando locale `cost --refresh`, con una finestra massima di 365 giorni. Il conteggio usa gli aggregati disponibili per Codex e Claude Code e non è filtrato per repository. CodexBar attribuisce ogni token al processo che lo registra. Un worker OpenAI avviato da Claude Code compare quindi nel totale Claude Code. Il grafico indica lo strumento che registra i token, non il fornitore del modello.
+
+**ATTESTATO:** i valori sono le somme esatte dei log disponibili nel periodo indicato. **STIMATO:** nessun valore. **UNKNOWN:** la completezza storica resta sconosciuta quando CodexBar non la attesta. L'attribuzione a MediFlow, a una release, a una PR o a un commit è sempre sconosciuta.
+
+Rigenera il grafico con `npm run build:usage-dashboard`. Usa `CODEXBAR_BIN` per scegliere un eseguibile diverso e `USAGE_DASHBOARD_DAYS` per impostare una finestra da 1 a 365 giorni.
+
+Le barre sono divise per modello e usano la stessa scala. La cache letta è una parte dell'input Codex, mentre CodexBar la espone come categoria separata per Claude Code: per questo il grafico non impila categorie di token con semantiche diverse. Sono pubblicati soltanto aggregati. Nessun prompt, contenuto di sessione, costo o percorso locale entra nel README o nell'SVG.
+
+Il dato misura contesto elaborato. Non misura righe di codice, costo o qualità.
+
+La responsabilità del progetto resta mia.
+
+<!-- usage-dashboard:end -->
+
+</details>
+
 ## Licenza e contributi
 
 Codice sotto [licenza MIT](./LICENSE). Dataset, terminologie, modelli e fonti
