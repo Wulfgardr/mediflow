@@ -24,7 +24,7 @@ Ultimo aggiornamento: 2026-09-05
 - **Dati e responsabilità**: [privacy, GDPR e governance AI](./privacy-and-ai-governance.md), poi policy e contratti richiamati.
 - **Valutazione della 0.8.5**: [readiness e canali Apple](./release-085-readiness.md); i gate aperti restano espliciti.
 - **Contributi tecnici**: [topologia repository](./repository-topology.md), [architettura](../ARCHITECTURE.md), quindi il contratto del componente.
-- **Proposta pubblica**: [getmediflow e rinnovo editoriale](./getmediflow-editorial-proposal.md), distinta dai contratti runtime.
+- **Presentazione del prodotto**: [Get MediFlow e linea editoriale](./getmediflow-editorial-proposal.md), distinta dai contratti runtime.
 
 ## Candidato Web 0.8.5: editor e analytics
 

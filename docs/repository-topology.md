@@ -17,12 +17,11 @@ dagli **artefatti di pubblicazione/sito** e dagli **strumenti di sviluppo**.
 
 Il gestionale si costruisce qui. Per orientarsi, conviene distinguere tre aree: il prodotto che lavora sulla
 cartella, gli strumenti che lo costruiscono e verificano, e i documenti che lo
-spiegano. Il sito getmediflow è una proposta di presentazione separata: non
+spiegano. Il sito [Get MediFlow](https://getmediflow.wulfgardr.chatgpt.site) è il riferimento di presentazione del prodotto: non
 ospita la cartella, non importa i servizi clinici e non riceve dati del runtime.
 
 Per chi arriva al progetto: [Inizia qui](./start-here.md). Per la candidatura
-in esame: [readiness 0.8.5](./release-085-readiness.md). Per la proposta del
-sito e l'ordine della documentazione: [piano editoriale](./getmediflow-editorial-proposal.md).
+in esame: [readiness 0.8.5](./release-085-readiness.md). Per il sito e l'ordine della documentazione: [piano editoriale](./getmediflow-editorial-proposal.md).
 
 ## Repository operativa
 

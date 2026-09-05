@@ -17,7 +17,7 @@ Informazioni, fonti e prossimi passi. Un po’ più facili da ritrovare.
 [![Local-first](https://img.shields.io/badge/data-local--first-8957e5?style=flat)](#dove-stanno-i-dati)
 [![Swift core](https://img.shields.io/badge/Swift%20core-macOS%20%7C%20Linux%20%7C%20Windows-6e7681?style=flat)](./docs/NATIVE.md)
 
-[Perché nasce](#perché-nasce) · [Cosa puoi fare](#cosa-puoi-fare) · [Provalo](#provalo) · [Per chi sviluppa](#per-chi-sviluppa) · [Documentazione](#documentazione)
+[**Scopri Get MediFlow**](https://getmediflow.wulfgardr.chatgpt.site) · [Perché nasce](#perché-nasce) · [Cosa puoi fare](#cosa-puoi-fare) · [Provalo](#provalo) · [Per chi sviluppa](#per-chi-sviluppa) · [Documentazione](#documentazione)
 
 </div>
 
@@ -242,12 +242,12 @@ scritture cliniche. Il planner semantico resta limitato a strumenti approvati.
 
 | Se vuoi… | Parti da… |
 | --- | --- |
-| Capire il progetto senza conoscere il codice | [Inizia qui](./docs/start-here.md) |
+| Capire il progetto senza conoscere il codice | [Get MediFlow](https://getmediflow.wulfgardr.chatgpt.site) |
 | Vedere cosa è implementato e cosa resta da provare | [Stato del sistema](./docs/STATE_OF_THE_SYSTEM.md) e [readiness 0.8.5](./docs/release-085-readiness.md) |
 | Trovare la fonte autorevole di un tema | [Mappa della documentazione](./docs/README.md) |
 | Capire piattaforme e parità | [Guida nativa](./docs/NATIVE.md) e [matrice di parità](./docs/parity-matrix.md) |
 | Ricostruire una decisione tecnica | [ADR](./docs/adr/README.md) |
-| Valutare il nuovo racconto pubblico | [Proposta getmediflow e piano editoriale](./docs/getmediflow-editorial-proposal.md) |
+| Capire come viene presentato il prodotto | [Get MediFlow e linea editoriale](./docs/getmediflow-editorial-proposal.md) |
 | Trovare un documento preciso | [Indice completo](./docs/markdown-index.md) |
 
 I percorsi SISS/FSE restano handoff o webapp-assisted. L’export FHIR segue
