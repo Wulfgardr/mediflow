@@ -81,6 +81,9 @@ jobs:
           exit 1
 
       - name: Run Playwright suite
+        # @Codex: the preceding steps seed and start an isolated synthetic DB.
+        env:
+          MF085_SYNTHETIC_E2E: "1"
         run: npx playwright test --workers=1
 
       # Seconda fase di `npm run check:terminology-parity`, l'unica che non
