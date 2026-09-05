@@ -26,6 +26,17 @@ Ultimo aggiornamento: 2026-09-05
 - **Contributi tecnici**: [topologia repository](./repository-topology.md), [architettura](../ARCHITECTURE.md), quindi il contratto del componente.
 - **Presentazione del prodotto**: [Get MediFlow e linea editoriale](./getmediflow-editorial-proposal.md), distinta dai contratti runtime.
 
+## Sviluppo 0.8.6
+
+[Baseline operativa WUL-670](./analysis/2026-09-05-mediflow-086-baseline.md):
+base corrente, prove sintetiche, recuperi prioritari e ordine di sviluppo.
+
+[Mini roadmap di consolidamento](./roadmap-086-consolidamento.md): dettaglio
+preparatorio della roadmap prodotto per OCR, ICD-11, impostazioni e scheda
+paziente, onboarding assistito, deslop e GDPR/AI Act, con recupero selettivo
+dei branch locali, design arena e collegamenti al filone Linear creato.
+Non modifica i contratti runtime o il design attivo.
+
 ## Candidato Web 0.8.5: editor e analytics
 
 [Snapshot/CAS del modulo, recupero dei salvataggi parziali e conteggio Schede](./web-patient-edit-and-analytics-085.md): contratto della lane `mf085-fix-a-web-20260904`, limiti e regressioni. Candidato sorgente, non evidenza di rilascio.

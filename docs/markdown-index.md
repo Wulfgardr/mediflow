@@ -28,6 +28,13 @@ Ultimo aggiornamento: 2026-09-05
 - Se aggiungi/rimuovi/rinomini un `.md`, aggiorna subito questo file e [docs/README.md](./README.md).
 
 <!-- @Codex -->
+## Preparazione 0.8.6
+
+| File | Scopo | Quando consultarlo |
+| --- | --- | --- |
+| [docs/analysis/2026-09-05-mediflow-086-baseline.md](./analysis/2026-09-05-mediflow-086-baseline.md) | Baseline WUL-670, prove sintetiche e recuperi selettivi. | Prima delle tranche 0.8.6; limiti runtime espliciti. |
+| [docs/roadmap-086-consolidamento.md](./roadmap-086-consolidamento.md) | Piano e issue Linear per OCR, WHO, UI/design arena, onboarding, deslop, GDPR/AI Act e recupero branch. | Prima di avviare le tranche 0.8.6; non è evidenza runtime o attestazione di conformità. |
+
 ## Candidato Web 0.8.5
 
 | File | Scopo | Quando consultarlo |
