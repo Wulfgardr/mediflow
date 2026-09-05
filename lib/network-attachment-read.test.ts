@@ -91,6 +91,9 @@ function resetDatabase(): void {
             ocrQueueReason: 'paired_upload',
             ocrQueueUpdatedAt: new Date('2026-07-10T09:00:00.000Z'),
             createdAt: new Date('2026-07-10T09:00:00.000Z'),
+            documentSourceRef: 'b'.repeat(64),
+            documentRevision: 1,
+            documentFreshnessEpoch: 1,
         },
         {
             id: OTHER_PATIENT_ATTACHMENT_ID,
@@ -101,6 +104,9 @@ function resetDatabase(): void {
             path: `attachments/${OTHER_PATIENT_ATTACHMENT_ID}-altro.pdf`,
             data: SEALED_DATA,
             createdAt: new Date('2026-07-10T08:00:00.000Z'),
+            documentSourceRef: 'c'.repeat(64),
+            documentRevision: 1,
+            documentFreshnessEpoch: 1,
         },
     ]).run();
 }
@@ -123,6 +129,9 @@ test('listNetworkScopedAttachments returns metadata without the data payload', a
     assert.ok(summary.ocrQueueUpdatedAt);
     assert.ok(summary.createdAt);
     assert.equal('data' in summary, false);
+    assert.equal('documentSourceRef' in summary, false);
+    assert.equal('documentRevision' in summary, false);
+    assert.equal('documentFreshnessEpoch' in summary, false);
 });
 
 test('the network attachment list projection never selects the data blob', () => {

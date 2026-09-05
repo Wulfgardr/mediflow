@@ -8,25 +8,35 @@ import { GENERATIVE_CAPABILITY_DESCRIPTORS } from './generative-catalog.ts';
 test('registra il catalogo generativo congelato', () => {
     assert.deepEqual(Object.keys(GENERATIVE_CAPABILITY_DESCRIPTORS), GENERATIVE_CAPABILITY_IDS);
     const compact = Object.fromEntries(Object.entries(GENERATIVE_CAPABILITY_DESCRIPTORS).map(
-        ([id, value]) => [id, [value.operation, value.killSwitch, value.entryPoint]],
+        ([id, value]) => [id, [
+            value.operation,
+            value.availabilityDisposition,
+            value.killSwitch,
+            value.entryPoint,
+        ]],
     ));
     assert.deepEqual(compact, {
-        patient_insight: ['synthesis', 'aiPatientInsightKillSwitch', 'lib/ai-summary-service.ts'],
-        smart_import: ['extraction', 'aiSmartImportKillSwitch', 'app/api/patients/[id]/smart-import/route.ts'],
-        document_synthesis: ['synthesis', 'aiDocumentSynthesisKillSwitch', 'lib/domain/documents/document-synthesis-service.ts'],
-        ocr: ['ocr', 'aiOcrKillSwitch', 'app/api/ocr/extract/route.ts'],
-        treatment_reasoning: ['reasoning', 'aiTreatmentReasoningKillSwitch', 'lib/treatment-reasoning-service.ts'],
+        patient_insight: ['synthesis', 'proposal_only', 'aiPatientInsightKillSwitch', 'app/api/ai/patient-insight/preview/route.ts'],
+        smart_import: ['extraction', 'proposal_only', 'aiSmartImportKillSwitch', 'app/api/ai/smart-import/preview/route.ts'],
+        document_synthesis: ['synthesis', 'proposal_only', 'aiDocumentSynthesisKillSwitch', 'app/api/ai/document-synthesis/preview/route.ts'],
+        ocr: ['ocr', 'unavailable', null, null],
+        treatment_reasoning: ['reasoning', 'proposal_only', 'aiTreatmentReasoningKillSwitch', 'app/api/ai/treatment-reasoning/preview/route.ts'],
     });
     for (const [id, descriptor] of Object.entries(GENERATIVE_CAPABILITY_DESCRIPTORS)) {
         assert.equal(descriptor.id, id);
         assert.equal(descriptor.class, 'generative');
         assert.equal(descriptor.authorityPlane, 'clinical_application');
         assert.equal(descriptor.dataClass, 'clinical');
-        assert.deepEqual(descriptor.venues, ['local_process', 'home_base']);
+        assert.deepEqual(descriptor.venues, id === 'ocr' ? [] : ['local_process', 'home_base']);
         assert.equal(descriptor.egressProfileId, 'local_only');
         assert.equal(descriptor.review, 'review_first');
         assert.equal(Object.isFrozen(descriptor), true);
     }
+
+    const ocr = GENERATIVE_CAPABILITY_DESCRIPTORS.ocr;
+    assert.deepEqual(ocr.venues, []);
+    assert.equal('provider' in ocr, false);
+    assert.equal('fallback' in ocr, false);
 });
 
 test('ogni schema non nullo compare letteralmente nella sua fonte', () => {

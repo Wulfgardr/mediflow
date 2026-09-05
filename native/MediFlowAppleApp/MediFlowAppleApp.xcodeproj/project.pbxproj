@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		033BF77802FE8AAAEA132414 /* MediFlowAppleShared in Frameworks */ = {isa = PBXBuildFile; productRef = 72EEC18E3E55264AEE14AA58 /* MediFlowAppleShared */; };
 		18CDE82377A243F4B41B0C9B /* MediFlowMacShellApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4691B9860CA77FA5871DC2A8 /* MediFlowMacShellApp.swift */; };
+		1D1D34F7A87FD455B29493B7 /* MobilePairedStatusOverrideUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC5F0A7BD278D6125B67FD3A /* MobilePairedStatusOverrideUITests.swift */; };
 		45E4F741A3B8FBFFA75DD465 /* MediFlowMobileAppUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22294E85FD406F50AFBC48A9 /* MediFlowMobileAppUITests.swift */; };
 		4D5A03A67EC34FC88CAF655C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 8724FDBA2290730AC0ED1F7E /* Assets.xcassets */; };
 		72DB344A36DDDCFFBD637E1F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 8724FDBA2290730AC0ED1F7E /* Assets.xcassets */; };
@@ -35,6 +36,7 @@
 		4D79840B7DA781EA15CC8B29 /* MediFlowMobileApp.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = MediFlowMobileApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		8724FDBA2290730AC0ED1F7E /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		AFEA3F590AD845053A0F0558 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		CC5F0A7BD278D6125B67FD3A /* MobilePairedStatusOverrideUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobilePairedStatusOverrideUITests.swift; sourceTree = "<group>"; };
 		E91940CED10687F6D9D7CF0F /* MediFlowMacApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MediFlowMacApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		FFE1A092411BBD96AD35DDFF /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -107,6 +109,7 @@
 			isa = PBXGroup;
 			children = (
 				22294E85FD406F50AFBC48A9 /* MediFlowMobileAppUITests.swift */,
+				CC5F0A7BD278D6125B67FD3A /* MobilePairedStatusOverrideUITests.swift */,
 			);
 			path = MediFlowMobileAppUITests;
 			sourceTree = "<group>";
@@ -223,8 +226,8 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				EA5A5E56B9AFA0C54E1C530F /* MediFlowMacApp */,
 				83356432730EE4403A18FB8C /* MediFlowMobileApp */,
+				EA5A5E56B9AFA0C54E1C530F /* MediFlowMacApp */,
 				AD8CE4C65DCDFB8994D15EFC /* MediFlowMobileAppUITests */,
 			);
 		};
@@ -255,6 +258,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				45E4F741A3B8FBFFA75DD465 /* MediFlowMobileAppUITests.swift in Sources */,
+				1D1D34F7A87FD455B29493B7 /* MobilePairedStatusOverrideUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -308,14 +312,14 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 85;
 				INFOPLIST_FILE = Sources/MediFlowMacApp/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 0.8.2;
+				MARKETING_VERSION = 0.8.5;
 				PRODUCT_BUNDLE_IDENTIFIER = com.mediflow.mobile;
 				PRODUCT_NAME = MediFlow;
 				SDKROOT = macosx;
@@ -345,14 +349,14 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 85;
 				INFOPLIST_FILE = Sources/MediFlowMacApp/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 0.8.2;
+				MARKETING_VERSION = 0.8.5;
 				PRODUCT_BUNDLE_IDENTIFIER = com.mediflow.mobile;
 				PRODUCT_NAME = MediFlow;
 				SDKROOT = macosx;
@@ -364,14 +368,14 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 85;
 				INFOPLIST_FILE = Sources/MediFlowMobileApp/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.8.2;
+				MARKETING_VERSION = 0.8.5;
 				PRODUCT_BUNDLE_IDENTIFIER = com.mediflow.mobile;
 				PRODUCT_NAME = MediFlow;
 				SDKROOT = iphoneos;
@@ -385,14 +389,14 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 85;
 				INFOPLIST_FILE = Sources/MediFlowMobileApp/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.8.2;
+				MARKETING_VERSION = 0.8.5;
 				PRODUCT_BUNDLE_IDENTIFIER = com.mediflow.mobile;
 				PRODUCT_NAME = MediFlow;
 				SDKROOT = iphoneos;

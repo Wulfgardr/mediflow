@@ -9,7 +9,7 @@ import {
     toPatientInsightRenderContract,
 } from '@/lib/ai-task-contracts';
 import { db } from '@/lib/db';
-import { DEFAULT_OCR_MODEL, ensureTextModelDefaultsUpgraded, resolveTextModel } from '@/lib/ai-models';
+import { ensureTextModelDefaultsUpgraded, resolveTextModel } from '@/lib/ai-models';
 /* @Codex */
 import {
     sanitizeInsightMarkdown,
@@ -134,11 +134,9 @@ export async function getAiModelLabels() {
     await ensureTextModelDefaultsUpgraded();
     const modelClinical = await db.settings.get('aiModel_clinical');
     const legacyModel = await db.settings.get('aiModel');
-    const modelOcr = await db.settings.get('aiModel_ocr');
 
     return {
         clinical: resolveTextModel(modelClinical?.value, legacyModel?.value),
-        ocr: modelOcr?.value || DEFAULT_OCR_MODEL
     };
 }
 

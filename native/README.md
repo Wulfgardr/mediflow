@@ -2,7 +2,8 @@
 
 One universal SwiftUI app for iOS, iPadOS and macOS, sharing the home-base +
 `/api/v1` boundary with the web app. Lume is the active design language. Vetro
-Clinico is historical and transitional. The local v0.8 candidate is not a release.
+Clinico is historical and transitional. Source content alone does not prove a
+signed, notarized, or published release.
 No long dash in this repo's text by convention.
 
 ## Layout
@@ -75,9 +76,10 @@ matches the native WebRuntime; it does not claim a universal macOS artifact.
 
 ## Known limitations (tracked follow-ups)
 
-- App Store distribution needs Developer ID signing + notarization (the script
-  supports `MEDIFLOW_CODESIGN_IDENTITY` / a notarization step) and an App Sandbox
-  decision, since the app spawns a node child process and binds a local port.
+- Direct distribution outside the Mac App Store needs Developer ID Application
+  signing and Apple notarization. Mac App Store distribution instead uses the
+  App Store signing/upload path and requires a separate App Sandbox decision,
+  because the app spawns a Node child process and binds a local port.
 - The `/api/v1/network` live-contract wiring of `PatchValue` / `VersionConflict`
   into `HomeBasePatientsClient` is Fase 1 work that needs the backend running to
   verify round-trips.

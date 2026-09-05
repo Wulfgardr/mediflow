@@ -12,7 +12,23 @@ const DEFAULT_OUT = 'tmp-audit-quality-gate-report.json';
 
 const REQUIRED_ROUTE_AUDIT = [
     { route: 'app/api/auth/login/route.ts', events: ['auth.login.failed', 'auth.login.succeeded'], reason: 'auth login success/failure must stay auditable' },
-    { route: 'app/api/auth/logout/route.ts', events: ['auth.logout'], reason: 'auth logout must stay auditable' },
+    {
+        route: 'app/api/auth/logout/route.ts', events: ['auth.logout'], reason: 'auth logout must stay auditable',
+        writerContracts: [{
+            target: 'auth.logout',
+            modes: {
+                inline: { handler: 'POST', writerModule: '@/lib/security/audit', writerExport: 'writeAuditEvent', eventType: 'auth.logout' },
+                delegated: {
+                    handler: 'POST', serviceModule: '@/lib/security/web-auth-logout-server', serviceExport: 'completeExactWebP3Logout',
+                    ownerFile: 'lib/security/web-auth-logout-server.ts', ownerName: 'completeExactWebP3Logout',
+                    writerModule: './audit', writerExport: 'writeAuditEvent', hashExport: 'hashAuditRef',
+                    ownerModule: './web-auth-lifecycle-owner-adapter', resolveExport: 'resolve', retireExport: 'retire',
+                    transportModule: './web-auth-control-transport', etagExport: 'strongWebAuthControlEtag',
+                    eventType: 'auth.logout', sourcesName: 'productionSources', receiptValidator: 'retirementReceipt',
+                },
+            },
+        }],
+    },
     {
         route: 'app/api/auth/change-pin/route.ts', events: ['settings.updated'], reason: 'PIN rotation is an administrative settings mutation',
         writerContracts: [{
@@ -20,6 +36,7 @@ const REQUIRED_ROUTE_AUDIT = [
             target: 'change-pin', ownerFile: 'lib/security/pin-change-service.ts', ownerName: 'changePin',
             writerModule: '@/lib/security/audit', writerExport: 'writeAuditEvent', eventType: 'settings.updated',
             dependencyFallback: { parameter: 'dependencies', property: 'writeAuditEvent' },
+            requirePinRetirementOrder: true,
         }],
     },
     { route: 'app/api/settings/route.ts', events: ['settings.updated'], reason: 'bulk settings mutations must stay auditable' },
@@ -230,6 +247,11 @@ function constantBoolean(expression) {
 function alwaysTerminates(statement) {
     if (ts.isReturnStatement(statement) || ts.isThrowStatement(statement)) return true;
     if (ts.isBlock(statement)) return statement.statements.some(alwaysTerminates);
+    if (ts.isTryStatement(statement)) {
+        if (statement.finallyBlock && alwaysTerminates(statement.finallyBlock)) return true;
+        if (!statement.catchClause) return alwaysTerminates(statement.tryBlock);
+        return alwaysTerminates(statement.tryBlock) && alwaysTerminates(statement.catchClause.block);
+    }
     if (!ts.isIfStatement(statement)) return false;
     const constant = constantBoolean(statement.expression);
     if (constant !== null) return constant
@@ -257,8 +279,7 @@ function isReachableCall(call, owner) {
                 || ts.isIterationStatement(statement, false)
                 || ts.isSwitchStatement(statement)
                 || ts.isBreakStatement(statement)
-                || ts.isContinueStatement(statement)
-                || ts.isTryStatement(statement))) return false;
+                || ts.isContinueStatement(statement))) return false;
         }
         if (ts.isIterationStatement(parent, false) || ts.isSwitchStatement(parent) || ts.isLabeledStatement(parent)) return false;
     }
@@ -272,6 +293,134 @@ function isReachableStandaloneCall(call, owner) {
 }
 
 /* @Codex */
+function validatePinRetirementAuditOrder(sourceFile, owner, writerCall) {
+    const problems = [];
+    const statements = owner.body ? [...owner.body.statements] : [];
+    const compact = (node) => node?.getText(sourceFile).replace(/\s+/gu, ' ') ?? '';
+    const findIndex = (predicate) => statements.findIndex((statement) => predicate(statement, compact(statement)));
+    const variableInitializer = (statement, name) => {
+        if (!ts.isVariableStatement(statement) || statement.declarationList.declarations.length !== 1) return null;
+        const declaration = statement.declarationList.declarations[0];
+        return ts.isIdentifier(declaration.name) && declaration.name.text === name
+            ? declaration.initializer ?? null
+            : null;
+    };
+    const identifierCalls = (root, callee, argument = null) => {
+        const calls = [];
+        const visit = (node) => {
+            if (node !== root && ts.isFunctionLike(node)) return;
+            if (ts.isCallExpression(node) && !node.questionDotToken) {
+                const expression = unwrap(node.expression);
+                const exactArgument = argument === null
+                    || (node.arguments.length === 1
+                        && ts.isIdentifier(unwrap(node.arguments[0]))
+                        && unwrap(node.arguments[0]).text === argument);
+                if (ts.isIdentifier(expression) && expression.text === callee && exactArgument) calls.push(node);
+            }
+            ts.forEachChild(node, visit);
+        };
+        visit(root);
+        return calls;
+    };
+    const exactReachableCall = (root, callee, argument = null) => {
+        const calls = identifierCalls(root, callee, argument);
+        return calls.length === 1 && isReachableStandaloneCall(calls[0], root);
+    };
+
+    const prepareNativeAlias = findIndex((_statement, text) => text
+        === 'const prepareNativeRetirement = dependencies.prepareNativeSessionsForUserRetirement ?? prepareNativeLegacyUserRetirement;');
+    const commitNativeAlias = findIndex((_statement, text) => text
+        === 'const commitNativeRetirement = dependencies.commitNativeSessionsForUserRetirement ?? commitNativeLegacyUserRetirement;');
+    const abortNativeAlias = findIndex((_statement, text) => text
+        === 'const abortNativeRetirement = dependencies.abortNativeSessionsForUserRetirement ?? abortNativeLegacyUserRetirement;');
+    const prepareWebAlias = findIndex((_statement, text) => text
+        === 'const prepareWebRetirement = dependencies.prepareWebSessionsForUserRetirement ?? prepareUserRetirement;');
+    const commitWebAlias = findIndex((_statement, text) => text
+        === 'const commitWebRetirement = dependencies.commitWebSessionsForUserRetirement ?? commitUserRetirement;');
+    const abortWebAlias = findIndex((_statement, text) => text
+        === 'const abortWebRetirement = dependencies.abortWebSessionsForUserRetirement ?? abortUserRetirement;');
+    const nativeCapability = findIndex((_statement, text) => text
+        === 'const nativeRetirement = prepareNativeRetirement(user.id);');
+    const nativeCapabilityGuard = findIndex((statement) => ts.isIfStatement(statement)
+        && compact(statement.expression) === '!nativeRetirement' && alwaysTerminates(statement.thenStatement));
+    const webCapability = findIndex((_statement, text) => text
+        === 'const webRetirement = prepareWebRetirement(input.session);');
+    const webCapabilityGuard = findIndex((statement) => ts.isIfStatement(statement)
+        && compact(statement.expression) === '!webRetirement'
+        && exactReachableCall(statement.thenStatement, 'abortNativeRetirement', 'nativeRetirement')
+        && alwaysTerminates(statement.thenStatement));
+    const abortPrepared = findIndex((statement) => {
+        const initializer = variableInitializer(statement, 'abortPreparedRetirements');
+        if (!initializer || (!ts.isArrowFunction(initializer) && !ts.isFunctionExpression(initializer))) return false;
+        const webCalls = identifierCalls(initializer, 'abortWebRetirement', 'webRetirement');
+        const nativeCalls = identifierCalls(initializer, 'abortNativeRetirement', 'nativeRetirement');
+        return webCalls.length === 1 && nativeCalls.length === 1
+            && isReachableStandaloneCall(webCalls[0], initializer)
+            && isReachableStandaloneCall(nativeCalls[0], initializer)
+            && webCalls[0].pos < nativeCalls[0].pos;
+    });
+    const hashDeclaration = findIndex((_statement, text) => text === 'let nextPasswordHash: string;');
+    const hash = findIndex((statement, text) => ts.isTryStatement(statement)
+        && text.includes('nextPasswordHash = await bcrypt.hash(input.newPin, 10);')
+        && statement.catchClause
+        && exactReachableCall(statement.catchClause.block, 'abortPreparedRetirements')
+        && alwaysTerminates(statement.catchClause.block));
+    const updateDeclaration = findIndex((_statement, text) => text === 'let updateResult: { changes: number };');
+    const transaction = findIndex((statement, text) => ts.isTryStatement(statement)
+        && text.includes('updateResult = db.transaction(')
+        && statement.catchClause
+        && exactReachableCall(statement.catchClause.block, 'abortPreparedRetirements')
+        && alwaysTerminates(statement.catchClause.block));
+    const casGuard = findIndex((statement) => ts.isIfStatement(statement)
+        && compact(statement.expression) === 'updateResult.changes !== 1'
+        && exactReachableCall(statement.thenStatement, 'abortPreparedRetirements')
+        && alwaysTerminates(statement.thenStatement));
+    const webOutcome = findIndex((_statement, text) => text
+        === "let webRetirementOutcome: 'completed' | 'failed' | 'denied' = 'failed';");
+    const webCommit = findIndex((statement, text) => ts.isTryStatement(statement)
+        && text.includes('webRetirementOutcome = commitWebRetirement(webRetirement).outcome;')
+        && text.includes("webRetirementOutcome = 'failed';"));
+    const nativeOutcome = findIndex((_statement, text) => text
+        === "let nativeRetirementOutcome: 'completed' | 'failed' | 'denied' = 'failed';");
+    const nativeCommit = findIndex((statement, text) => ts.isTryStatement(statement)
+        && text.includes('nativeRetirementOutcome = commitNativeRetirement(nativeRetirement).outcome;')
+        && text.includes('abortNativeRetirement(nativeRetirement)')
+        && text.endsWith("nativeRetirementOutcome = 'failed'; }"));
+    const completedGuard = findIndex((statement) => ts.isIfStatement(statement)
+        && compact(statement.expression)
+        === "webRetirementOutcome !== 'completed' || nativeRetirementOutcome !== 'completed'"
+        && alwaysTerminates(statement.thenStatement));
+    const auditStatement = writerCall ? directStatement(owner, writerCall) : null;
+    const audit = auditStatement ? statements.indexOf(auditStatement) : -1;
+    const ordered = [
+        prepareNativeAlias, commitNativeAlias, abortNativeAlias,
+        prepareWebAlias, commitWebAlias, abortWebAlias,
+        nativeCapability, nativeCapabilityGuard, webCapability, webCapabilityGuard, abortPrepared,
+        hashDeclaration, hash, updateDeclaration, transaction, casGuard,
+        webOutcome, webCommit, nativeOutcome, nativeCommit, completedGuard, audit,
+    ];
+    if (importedName(sourceFile, '@/lib/security/web-auth-lifecycle-owner-adapter', 'prepareUserRetirement')
+            !== 'prepareUserRetirement'
+        || importedName(sourceFile, '@/lib/security/web-auth-lifecycle-owner-adapter', 'commitUserRetirement')
+            !== 'commitUserRetirement'
+        || importedName(sourceFile, '@/lib/security/web-auth-lifecycle-owner-adapter', 'abortUserRetirement')
+            !== 'abortUserRetirement'
+        || importedName(sourceFile, '@/lib/security/server-session', 'prepareNativeLegacyUserRetirement')
+            !== 'prepareNativeLegacyUserRetirement'
+        || importedName(sourceFile, '@/lib/security/server-session', 'commitNativeLegacyUserRetirement')
+            !== 'commitNativeLegacyUserRetirement'
+        || importedName(sourceFile, '@/lib/security/server-session', 'abortNativeLegacyUserRetirement')
+            !== 'abortNativeLegacyUserRetirement') {
+        problems.push('PIN audit must retain the exact Web and native retirement owner imports');
+    }
+    if (ordered.some((index) => index < 0)
+        || ordered.some((index, position) => position > 0 && index <= ordered[position - 1])) {
+        problems.push('PIN audit must prepare both owners, abort both before failed CAS tails, commit Web then native, and audit only after completion');
+    }
+    return problems;
+}
+
+/* @Codex */
 export function validateAuditWriterControlFlow({
     source,
     fileName = 'fixture.ts',
@@ -282,6 +431,7 @@ export function validateAuditWriterControlFlow({
     eventType,
     writerArgumentIndex = 0,
     dependencyFallback = null,
+    requirePinRetirementOrder = false,
 }) {
     const problems = sourceFile.parseDiagnostics.length > 0 ? [`${fileName} has parser diagnostics`] : [];
     const binding = importedName(sourceFile, writerModule, writerExport);
@@ -308,6 +458,9 @@ export function validateAuditWriterControlFlow({
         if (hasUnsafeProperty || events.length !== 1 || !ts.isStringLiteral(events[0].initializer)
             || events[0].initializer.text !== eventType) problems.push('writer event literal is missing or incorrect');
         if (!isReachableStandaloneCall(calls.direct[0], owner)) problems.push('writer call is unreachable or uses unsupported control flow');
+        if (requirePinRetirementOrder) {
+            problems.push(...validatePinRetirementAuditOrder(sourceFile, owner, calls.direct[0]));
+        }
     }
     return problems;
 }
@@ -409,9 +562,743 @@ export function validateDelegatedRouteAudit({ spec, routeSource, serviceSource }
     return problems;
 }
 
+function anyNamedImport(sourceFile, exportName) {
+    return sourceFile.statements.some((statement) => ts.isImportDeclaration(statement)
+        && statement.importClause?.namedBindings && ts.isNamedImports(statement.importClause.namedBindings)
+        && statement.importClause.namedBindings.elements.some((element) =>
+            !element.isTypeOnly && (element.propertyName?.text ?? element.name.text) === exportName));
+}
+
+function exactDirectObjectCalls(owner, objectName, allowedNames) {
+    const calls = new Map(allowedNames.map((name) => [name, []]));
+    let exact = true;
+    const visit = (node) => {
+        if (ts.isIdentifier(node) && node.text === objectName) {
+            const property = node.parent;
+            const call = property && ts.isPropertyAccessExpression(property)
+                && property.expression === node && !property.questionDotToken
+                && allowedNames.includes(property.name.text)
+                && property.parent && ts.isCallExpression(property.parent)
+                && unwrap(property.parent.expression) === property ? property.parent : null;
+            if (!call) exact = false;
+            else calls.get(property.name.text).push(call);
+        }
+        ts.forEachChild(node, visit);
+    };
+    if (owner.body) visit(owner.body);
+    return { calls, exact };
+}
+
+function isAwaited(call) {
+    let current = call;
+    while (ts.isParenthesizedExpression(current.parent)) current = current.parent;
+    return ts.isAwaitExpression(current.parent);
+}
+
+function objectLiteral(initializer) {
+    const value = initializer && unwrap(initializer);
+    if (value && ts.isObjectLiteralExpression(value)) return value;
+    return value && ts.isCallExpression(value) && ts.isPropertyAccessExpression(value.expression)
+        && ts.isIdentifier(value.expression.expression) && value.expression.expression.text === 'Object'
+        && value.expression.name.text === 'freeze' && value.arguments.length === 1
+        && ts.isObjectLiteralExpression(unwrap(value.arguments[0])) ? unwrap(value.arguments[0]) : null;
+}
+
+function exactFrozenObjectLiteral(initializer, sourceFile) {
+    const value = initializer && unwrap(initializer);
+    if (!value || !ts.isCallExpression(value) || value.questionDotToken
+        || value.typeArguments?.length || value.arguments.length !== 1
+        || !ts.isPropertyAccessExpression(value.expression) || value.expression.questionDotToken
+        || !ts.isIdentifier(value.expression.expression) || value.expression.expression.text !== 'Object'
+        || value.expression.name.text !== 'freeze' || moduleScopeBindingExists(sourceFile, 'Object')) return null;
+    const literal = unwrap(value.arguments[0]);
+    return ts.isObjectLiteralExpression(literal) ? literal : null;
+}
+
+function hasDeferredWork(root) {
+    let found = false;
+    const visit = (node) => {
+        if (found) return;
+        if (ts.isIdentifier(node) && ['setTimeout', 'setInterval', 'setImmediate', 'queueMicrotask'].includes(node.text)) found = true;
+        if (ts.isPropertyAccessExpression(node) && ['then', 'catch', 'finally'].includes(node.name.text)) found = true;
+        if ((ts.isCallExpression(node) || ts.isNewExpression(node))) {
+            const callee = unwrap(node.expression);
+            if ((ts.isIdentifier(callee) && ['setTimeout', 'setInterval', 'setImmediate', 'queueMicrotask', 'Promise'].includes(callee.text))
+                || (ts.isPropertyAccessExpression(callee) && ['then', 'catch', 'finally'].includes(callee.name.text))) found = true;
+        }
+        ts.forEachChild(node, visit);
+    };
+    visit(root);
+    return found;
+}
+
+function directStatement(owner, node) {
+    let current = node;
+    while (current.parent && current.parent !== owner.body) current = current.parent;
+    return current.parent === owner.body && ts.isStatement(current) ? current : null;
+}
+
+function isUnconditionalOwnerCall(owner, call) {
+    let child = call;
+    for (let parent = child.parent; parent && parent !== owner; child = parent, parent = parent.parent) {
+        if (ts.isFunctionLike(parent) || ts.isIfStatement(parent) || ts.isConditionalExpression(parent)
+            || ts.isIterationStatement(parent, false) || ts.isSwitchStatement(parent)) return false;
+        if (ts.isBinaryExpression(parent) && parent.operatorToken.kind !== ts.SyntaxKind.EqualsToken) return false;
+        if (!ts.isExpressionStatement(parent)) continue;
+        if (parent.parent === owner.body) return true;
+        return Boolean(ts.isBlock(parent.parent) && parent.parent.parent && ts.isTryStatement(parent.parent.parent)
+            && parent.parent.parent.tryBlock === parent.parent && parent.parent.parent.parent === owner.body);
+    }
+    return false;
+}
+
+const EXACT_LOGOUT_RECORD_VALIDATOR_BODY = `{ if (!value || typeof value !== 'object' || isProxy(value)) return null; try { if (ObjectGetPrototypeOf(value) !== prototype || (frozen && !ObjectIsFrozen(value)) || ObjectGetOwnPropertySymbols(value).length !== 0) return null; const names = ObjectGetOwnPropertyNames(value); if (names.length !== keys.length) return null; for (const key of keys) { if (!names.includes(key)) return null; const descriptor = ObjectGetOwnPropertyDescriptor(value, key); if (!descriptor || !('value' in descriptor) || !descriptor.enumerable) return null; if (frozen && (descriptor.configurable || descriptor.writable)) return null; } return value as ExactRecord; } catch { return null; } }`;
+const EXACT_LOGOUT_COOKIE_VALIDATOR_BODY = `{ const plain = exactRecord(value, ['name', 'value'], Object.prototype, false); const framework = plain ? null : exactRecord(value, ['name', 'value', 'path'], Object.prototype, false); const record = plain ?? (framework?.path === '/' ? framework : null); return record?.name === name && typeof record.value === 'string' && pattern.test(record.value) ? record.value : null; }`;
+const EXACT_LOGOUT_PROJECTION_VALIDATOR_BODY = `{ const resolution = exactRecord(value, ['status', 'projection'], null, true); if (!resolution || resolution.status !== 'active') return null; const projection = exactRecord(resolution.projection, SESSION_KEYS, null, true); if (!projection || projection.id !== sessionId || projection.authChannel !== 'web' || typeof projection.userId !== 'string' || !projection.userId || typeof projection.username !== 'string' || !projection.username || typeof projection.role !== 'string' || !projection.role || typeof projection.createdAt !== 'number' || !Number.isSafeInteger(projection.createdAt) || typeof projection.expiresAt !== 'number' || !Number.isSafeInteger(projection.expiresAt) || projection.expiresAt <= DateNow()) return null; return resolution.projection as WebSessionProjection; }`;
+const EXACT_LOGOUT_RECEIPT_VALIDATOR_BODY = `{ const oneField = exactRecord(value, ['outcome'], null, true); const twoFields = oneField ? null : exactRecord(value, ['outcome', 'etag'], null, true); const record = oneField ?? twoFields; if (!record || (record.outcome !== 'completed' && record.outcome !== 'denied' && record.outcome !== 'failed')) return null; if (!twoFields) return { outcome: record.outcome, etag: null }; const etag = strongWebAuthControlEtag(twoFields.etag); return etag ? { outcome: record.outcome, etag } : null; }`;
+
+function exactModuleConstProperty(sourceFile, checker, name, object, property, objectSymbol = null) {
+    const matches = sourceFile.statements.flatMap((statement) => ts.isVariableStatement(statement)
+        ? [...statement.declarationList.declarations].filter((declaration) =>
+            ts.isIdentifier(declaration.name) && declaration.name.text === name) : []);
+    const declaration = matches.length === 1 ? matches[0] : null;
+    const initializer = declaration?.initializer && unwrap(declaration.initializer);
+    return Boolean(declaration && ts.isVariableDeclarationList(declaration.parent)
+        && (declaration.parent.flags & ts.NodeFlags.Const)
+        && initializer && ts.isPropertyAccessExpression(initializer) && !initializer.questionDotToken
+        && ts.isIdentifier(initializer.expression) && initializer.expression.text === object
+        && (!objectSymbol || checker.getSymbolAtLocation(initializer.expression) === objectSymbol)
+        && initializer.name.text === property);
+}
+
+function hasExactLogoutValidationPrimitives(sourceFile, checker) {
+    const exactRecord = namedFunction(sourceFile, 'exactRecord');
+    const exactObjectCaptures = [
+        ['ObjectGetPrototypeOf', 'getPrototypeOf'],
+        ['ObjectGetOwnPropertyDescriptor', 'getOwnPropertyDescriptor'],
+        ['ObjectGetOwnPropertyNames', 'getOwnPropertyNames'],
+        ['ObjectGetOwnPropertySymbols', 'getOwnPropertySymbols'],
+        ['ObjectIsFrozen', 'isFrozen'],
+    ].every(([binding, property]) => exactModuleConstProperty(sourceFile, checker, binding, 'Object', property));
+    const typesBinding = importedBinding(sourceFile, checker, 'node:util', 'types');
+    return Boolean(exactRecord && exactObjectCaptures && !moduleScopeBindingExists(sourceFile, 'Object')
+        && importedName(sourceFile, 'node:util', 'types') === 'types' && typesBinding
+        && exactModuleConstProperty(sourceFile, checker, 'isProxy', 'types', 'isProxy', typesBinding.symbol)
+        && exactRecord.parameters.map((parameter) => parameter.name.getText(sourceFile)).join(',') === 'value,keys,prototype,frozen'
+        && exactRecord.body?.getText(sourceFile).replace(/\s+/gu, ' ') === EXACT_LOGOUT_RECORD_VALIDATOR_BODY);
+}
+
+function exactLogoutValidator(sourceFile, name, parameters, body) {
+    const validator = namedFunction(sourceFile, name);
+    return validator
+        && validator.parameters.map((parameter) => parameter.name.getText(sourceFile)).join(',') === parameters
+        && validator.body?.getText(sourceFile).replace(/\s+/gu, ' ') === body
+        ? validator : null;
+}
+
+function exactPropertyAssignments(literal, allowedNames) {
+    if (!literal || literal.properties.some((item) => !ts.isPropertyAssignment(item)
+        || ts.isComputedPropertyName(item.name)
+        || !(ts.isIdentifier(item.name) || ts.isStringLiteral(item.name)))) return null;
+    const names = literal.properties.map((item) => item.name.text);
+    if (new Set(names).size !== names.length || names.some((name) => !allowedNames.includes(name))) return null;
+    return new Map(literal.properties.map((item) => [item.name.text, item]));
+}
+
+function exactArguments(call, expected) {
+    return call.arguments.length === expected.length && expected.every((item, index) => {
+        const value = unwrap(call.arguments[index]);
+        return 'identifier' in item ? ts.isIdentifier(value) && value.text === item.identifier
+            : ts.isStringLiteral(value) && value.text === item.literal
+            || item.null && value.kind === ts.SyntaxKind.NullKeyword;
+    });
+}
+
+function isNullOrUndefined(expression) {
+    const value = unwrap(expression);
+    return value.kind === ts.SyntaxKind.NullKeyword || ts.isIdentifier(value) && value.text === 'undefined';
+}
+
+function exactNamedImport(statement, moduleName, exportName) {
+    if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)
+        || statement.moduleSpecifier.text !== moduleName || !statement.importClause
+        || statement.importClause.isTypeOnly || statement.importClause.name
+        || !statement.importClause.namedBindings || !ts.isNamedImports(statement.importClause.namedBindings)) return false;
+    const [element] = statement.importClause.namedBindings.elements;
+    return statement.importClause.namedBindings.elements.length === 1 && !element.isTypeOnly
+        && (element.propertyName?.text ?? element.name.text) === exportName && element.name.text === exportName;
+}
+
+function exactIdentifierBinding(checker, node, binding) {
+    return Boolean(node && binding && ts.isIdentifier(node) && checker.getSymbolAtLocation(node) === binding);
+}
+
+function bindingIsWritten(root, checker, binding) {
+    let found = false;
+    const containsBinding = (node) => exactIdentifierBinding(checker, node, binding)
+        || ts.isShorthandPropertyAssignment(node) && checker.getShorthandAssignmentValueSymbol(node) === binding
+        || node.getChildren().some(containsBinding);
+    const visit = (node) => {
+        const assignment = ts.isBinaryExpression(node)
+            && node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment
+            && node.operatorToken.kind <= ts.SyntaxKind.LastAssignment && containsBinding(node.left);
+        const update = (ts.isPrefixUnaryExpression(node) || ts.isPostfixUnaryExpression(node))
+            && [ts.SyntaxKind.PlusPlusToken, ts.SyntaxKind.MinusMinusToken].includes(node.operator)
+            && containsBinding(node.operand);
+        const iteration = (ts.isForInStatement(node) || ts.isForOfStatement(node))
+            && containsBinding(node.initializer);
+        if (assignment || update || iteration) found = true;
+        else if (!found) ts.forEachChild(node, visit);
+    };
+    visit(root);
+    return found;
+}
+
+function exactCookieLookup(expression, checker, cookieStore, sessionCookieName) {
+    const value = unwrap(expression);
+    return ts.isCallExpression(value) && !value.questionDotToken && ts.isPropertyAccessExpression(value.expression)
+        && !value.expression.questionDotToken
+        && exactIdentifierBinding(checker, value.expression.expression, cookieStore)
+        && value.expression.name.text === 'get' && value.arguments.length === 1
+        && exactIdentifierBinding(checker, unwrap(value.arguments[0]), sessionCookieName);
+}
+
+function validateExactServiceOwnedLogoutRoute(sourceFile, checker, spec) {
+    const delegated = spec.modes.delegated;
+    const lifecycleModule = '@/lib/security/portable-supervisor-web-lifecycle';
+    const lifecycleExport = 'completePortableSupervisorWebLifecycleMutationV1';
+    const [cookiesImport, serviceImport, lifecycleImport, sessionConstant, controlConstant, handler] = sourceFile.statements;
+    const problems = [];
+    const cookiesBinding = importedBinding(sourceFile, checker, 'next/headers', 'cookies')?.symbol;
+    const serviceBinding = importedBinding(
+        sourceFile, checker, delegated.serviceModule, delegated.serviceExport,
+    )?.symbol;
+    const lifecycleBinding = importedBinding(sourceFile, checker, lifecycleModule, lifecycleExport)?.symbol;
+    const exactStringConstant = (statement, name, value) => {
+        if (!ts.isVariableStatement(statement) || !(statement.declarationList.flags & ts.NodeFlags.Const)
+            || statement.declarationList.declarations.length !== 1) return null;
+        const [declaration] = statement.declarationList.declarations;
+        return ts.isIdentifier(declaration.name) && declaration.name.text === name
+            && declaration.initializer && ts.isStringLiteral(declaration.initializer) && declaration.initializer.text === value
+            ? checker.getSymbolAtLocation(declaration.name) : null;
+    };
+    const sessionCookieBinding = exactStringConstant(sessionConstant, 'SESSION_COOKIE_NAME', 'mediflow_session');
+    const controlCookieBinding = exactStringConstant(controlConstant, 'CONTROL_COOKIE_NAME', 'mediflow_auth_control');
+    if (sourceFile.statements.length !== 6
+        || !exactNamedImport(cookiesImport, 'next/headers', 'cookies')
+        || !exactNamedImport(serviceImport, delegated.serviceModule, delegated.serviceExport)
+        || !exactNamedImport(lifecycleImport, lifecycleModule, lifecycleExport)
+        || !sessionCookieBinding || !controlCookieBinding
+        || !handler || !ts.isFunctionDeclaration(handler) || !handler.name || handler.name.text !== delegated.handler
+        || !ts.getModifiers(handler)?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)) {
+        problems.push('logout route must expose only cookies, the terminal service, both fixed cookie names, and POST');
+        return problems;
+    }
+    const [request] = handler.parameters;
+    const statements = handler.body ? [...handler.body.statements] : [];
+    const exactInertCookie = (statement, name) => {
+        if (!ts.isVariableStatement(statement) || !(statement.declarationList.flags & ts.NodeFlags.Let)
+            || statement.declarationList.declarations.length !== 1) return null;
+        const [declaration] = statement.declarationList.declarations;
+        return ts.isIdentifier(declaration.name) && declaration.name.text === name
+            && declaration.initializer && isNullOrUndefined(declaration.initializer)
+            ? { name, symbol: checker.getSymbolAtLocation(declaration.name) } : null;
+    };
+    const bearer = exactInertCookie(statements[0], 'bearerCookie');
+    const control = exactInertCookie(statements[1], 'controlCookie');
+    const acquisition = statements[2] && ts.isTryStatement(statements[2]) ? statements[2] : null;
+    const acquisitionStatements = acquisition?.tryBlock ? [...acquisition.tryBlock.statements] : [];
+    const cookieStoreDeclaration = acquisitionStatements[0] && ts.isVariableStatement(acquisitionStatements[0])
+        ? acquisitionStatements[0] : null;
+    const [cookieStore] = cookieStoreDeclaration?.declarationList.declarations ?? [];
+    const cookieStoreBinding = cookieStore && ts.isIdentifier(cookieStore.name) ? cookieStore.name.text : null;
+    const cookieStoreSymbol = cookieStore && ts.isIdentifier(cookieStore.name)
+        ? checker.getSymbolAtLocation(cookieStore.name) : null;
+    const cookieStoreInitializer = cookieStore?.initializer && unwrap(cookieStore.initializer);
+    const cookiesCall = cookieStoreInitializer && ts.isAwaitExpression(cookieStoreInitializer)
+        ? unwrap(cookieStoreInitializer.expression) : null;
+    const bearerRead = acquisitionStatements[1] && ts.isExpressionStatement(acquisitionStatements[1])
+        ? unwrap(acquisitionStatements[1].expression) : null;
+    const controlRead = acquisitionStatements[2] && ts.isExpressionStatement(acquisitionStatements[2])
+        ? unwrap(acquisitionStatements[2].expression) : null;
+    const returnStatement = statements[3] && ts.isReturnStatement(statements[3]) ? statements[3] : null;
+    const lifecycleCall = returnStatement?.expression && unwrap(returnStatement.expression);
+    const delegateCall = lifecycleCall && ts.isCallExpression(lifecycleCall)
+        ? unwrap(lifecycleCall.arguments[0]) : null;
+    const lifecycleReason = lifecycleCall && ts.isCallExpression(lifecycleCall)
+        ? unwrap(lifecycleCall.arguments[1]) : null;
+    const exactDelegate = Boolean(lifecycleCall && ts.isCallExpression(lifecycleCall)
+        && !lifecycleCall.questionDotToken && exactIdentifierBinding(checker, lifecycleCall.expression, lifecycleBinding)
+        && lifecycleCall.arguments.length === 2 && ts.isStringLiteral(lifecycleReason) && lifecycleReason.text === 'logout'
+        && delegateCall && ts.isCallExpression(delegateCall) && !delegateCall.questionDotToken
+        && exactIdentifierBinding(checker, delegateCall.expression, serviceBinding)
+        && exactArguments(delegateCall, [
+            { identifier: bearer?.name ?? '' }, { identifier: control?.name ?? '' },
+            { identifier: request?.name && ts.isIdentifier(request.name) ? request.name.text : '' },
+        ]));
+    const exactRead = (read, target, cookieName) => Boolean(read && ts.isBinaryExpression(read)
+        && read.operatorToken.kind === ts.SyntaxKind.EqualsToken
+        && exactIdentifierBinding(checker, read.left, target?.symbol)
+        && exactCookieLookup(read.right, checker, cookieStoreSymbol, cookieName));
+    if (handler.parameters.length !== 1 || !request || !ts.isIdentifier(request.name) || request.name.text !== 'request'
+        || statements.length !== 4 || !bearer || !control
+        || !acquisition || acquisition.finallyBlock || !acquisition.catchClause || acquisition.catchClause.variableDeclaration
+        || acquisition.catchClause.block.statements.length !== 0 || acquisitionStatements.length !== 3
+        || !cookieStoreBinding || !cookieStoreDeclaration || !(cookieStoreDeclaration.declarationList.flags & ts.NodeFlags.Const)
+        || cookieStoreDeclaration.declarationList.declarations.length !== 1
+        || !cookiesCall || !ts.isCallExpression(cookiesCall) || cookiesCall.questionDotToken || !ts.isIdentifier(cookiesCall.expression)
+        || !exactIdentifierBinding(checker, cookiesCall.expression, cookiesBinding)
+        || cookiesCall.arguments.length !== 0
+        || !exactRead(bearerRead, bearer, sessionCookieBinding)
+        || !exactRead(controlRead, control, controlCookieBinding) || !exactDelegate) {
+        problems.push('POST must read both fixed cookies inertly and directly return the exact service-owned response');
+    }
+    return problems;
+}
+
+function moduleScopeBindingExists(sourceFile, name) {
+    return sourceFile.statements.some((statement) => {
+        if (ts.isImportDeclaration(statement) && statement.importClause) {
+            if (statement.importClause.name?.text === name) return true;
+            const bindings = statement.importClause.namedBindings;
+            if (bindings && ts.isNamespaceImport(bindings) && bindings.name.text === name) return true;
+            return bindings && ts.isNamedImports(bindings) && bindings.elements.some((element) => element.name.text === name);
+        }
+        if (ts.isImportEqualsDeclaration(statement)) return statement.name.text === name;
+        if ((ts.isFunctionDeclaration(statement) || ts.isClassDeclaration(statement) || ts.isEnumDeclaration(statement)
+            || ts.isModuleDeclaration(statement)) && statement.name?.getText(sourceFile) === name) return true;
+        return ts.isVariableStatement(statement) && statement.declarationList.declarations.some((declaration) =>
+            bindingNameContains(declaration.name, name));
+    });
+}
+
+function hasPriorUnconditionalTermination(owner, node) {
+    const statement = directStatement(owner, node);
+    if (!statement || !owner.body) return true;
+    const index = owner.body.statements.indexOf(statement);
+    return index < 0 || owner.body.statements.slice(0, index).some(alwaysTerminates);
+}
+
+function exactNoStoreResponseFactory(sourceFile) {
+    const factory = namedFunction(sourceFile, 'empty');
+    const [statusParameter, etagParameter] = factory?.parameters ?? [];
+    const status = statusParameter && ts.isIdentifier(statusParameter.name) ? statusParameter.name.text : null;
+    const etag = etagParameter && ts.isIdentifier(etagParameter.name) ? etagParameter.name.text : null;
+    const [headersStatement, etagStatement, returnStatement] = factory?.body?.statements ?? [];
+    const headersDeclaration = ts.isVariableStatement(headersStatement)
+        && Boolean(headersStatement.declarationList.flags & ts.NodeFlags.Const)
+        && headersStatement.declarationList.declarations.length === 1
+        ? headersStatement.declarationList.declarations[0] : null;
+    const headersName = headersDeclaration && ts.isIdentifier(headersDeclaration.name)
+        ? headersDeclaration.name.text : null;
+    const headersInitializer = headersDeclaration?.initializer && unwrap(headersDeclaration.initializer);
+    const headerOptions = headersInitializer && ts.isNewExpression(headersInitializer)
+        && ts.isIdentifier(headersInitializer.expression) && headersInitializer.expression.text === 'Headers'
+        && headersInitializer.arguments?.length === 1 ? objectLiteral(headersInitializer.arguments[0]) : null;
+    const headerProperties = exactPropertyAssignments(headerOptions, ['Cache-Control']);
+    const cacheControl = headerProperties?.get('Cache-Control')?.initializer
+        && unwrap(headerProperties.get('Cache-Control').initializer);
+    const etagIf = etagStatement && ts.isIfStatement(etagStatement) ? etagStatement : null;
+    const setStatement = etagIf && ts.isExpressionStatement(etagIf.thenStatement)
+        ? etagIf.thenStatement : etagIf && ts.isBlock(etagIf.thenStatement)
+            && etagIf.thenStatement.statements.length === 1 && ts.isExpressionStatement(etagIf.thenStatement.statements[0])
+            ? etagIf.thenStatement.statements[0] : null;
+    const setCall = setStatement && ts.isCallExpression(unwrap(setStatement.expression))
+        ? unwrap(setStatement.expression) : null;
+    const response = returnStatement && ts.isReturnStatement(returnStatement)
+        && returnStatement.expression && unwrap(returnStatement.expression);
+    if (factory?.parameters.length !== 2 || status !== 'status' || etag !== 'etag'
+        || !etagParameter.initializer || unwrap(etagParameter.initializer).kind !== ts.SyntaxKind.NullKeyword
+        || factory?.body?.statements.length !== 3 || moduleScopeBindingExists(sourceFile, 'Response')
+        || moduleScopeBindingExists(sourceFile, 'Headers') || !headersName || !headerOptions
+        || !etagIf || etagIf.elseStatement || !ts.isIdentifier(unwrap(etagIf.expression))
+        || unwrap(etagIf.expression).text !== etag || !setCall || setCall.questionDotToken
+        || !ts.isPropertyAccessExpression(setCall.expression) || setCall.expression.questionDotToken
+        || !ts.isIdentifier(setCall.expression.expression) || setCall.expression.expression.text !== headersName
+        || setCall.expression.name.text !== 'set' || !exactArguments(setCall, [{ literal: 'ETag' }, { identifier: etag }])
+        || !response || !ts.isNewExpression(response) || !ts.isIdentifier(response.expression)
+        || response.expression.text !== 'Response' || response.arguments?.length !== 2
+        || unwrap(response.arguments[0]).kind !== ts.SyntaxKind.NullKeyword) return false;
+    const options = objectLiteral(response.arguments[1]);
+    const statusProperty = options?.properties.find((property) => ts.isShorthandPropertyAssignment(property)
+        && property.name.text === 'status');
+    const headersProperty = options?.properties.find((property) => ts.isShorthandPropertyAssignment(property)
+        && property.name.text === headersName);
+    let responseConstructors = 0; let headersConstructors = 0;
+    const visit = (node) => {
+        if (ts.isNewExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === 'Response') responseConstructors += 1;
+        if (ts.isNewExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === 'Headers') headersConstructors += 1;
+        ts.forEachChild(node, visit);
+    };
+    visit(sourceFile);
+    return Boolean(options && options.properties.length === 2 && statusProperty && headersProperty && cacheControl)
+        && statusProperty.name.text === status && ts.isStringLiteral(cacheControl) && cacheControl.text === 'no-store'
+        && responseConstructors === 1 && headersConstructors === 1;
+}
+
+function exactEmptyStatusReturn(statement) {
+    const expression = statement.expression && unwrap(statement.expression);
+    return Boolean(expression && ts.isCallExpression(expression) && !expression.questionDotToken
+        && ts.isIdentifier(expression.expression) && expression.expression.text === 'empty'
+        && [1, 2].includes(expression.arguments.length) && ts.isNumericLiteral(unwrap(expression.arguments[0]))
+        && [204, 401, 409].includes(Number(unwrap(expression.arguments[0]).text))
+        && (expression.arguments.length === 1 || (() => {
+            const etag = unwrap(expression.arguments[1]);
+            return ts.isPropertyAccessExpression(etag) && !etag.questionDotToken
+                && ts.isIdentifier(etag.expression) && etag.expression.text === 'receipt' && etag.name.text === 'etag';
+        })()));
+}
+
+function directAwaitedExpressionStatement(owner, call) {
+    let current = call;
+    while (ts.isParenthesizedExpression(current.parent)) current = current.parent;
+    if (!ts.isAwaitExpression(current.parent)) return null;
+    current = current.parent;
+    while (ts.isParenthesizedExpression(current.parent)) current = current.parent;
+    return ts.isExpressionStatement(current.parent) && directStatement(owner, current.parent) === current.parent
+        ? current.parent : null;
+}
+
+function directReturnStatements(owner) {
+    const returns = [];
+    const visit = (node) => {
+        if (node !== owner && ts.isFunctionLike(node)) return;
+        if (ts.isReturnStatement(node)) returns.push(node);
+        ts.forEachChild(node, visit);
+    };
+    if (owner.body) visit(owner.body);
+    return returns;
+}
+
+function auditLiteralSyntaxIsExactAndSafe(root) {
+    let safe = true;
+    const forbidden = /^(?:authorization|bearer|cookie|token|raw)$/iu;
+    const visit = (node) => {
+        if (!safe) return;
+        if (ts.isObjectLiteralExpression(node)) {
+            const names = [];
+            for (const property of node.properties) {
+                if (!ts.isPropertyAssignment(property) || ts.isComputedPropertyName(property.name)
+                    || !(ts.isIdentifier(property.name) || ts.isStringLiteral(property.name))) {
+                    safe = false;
+                    return;
+                }
+                names.push(property.name.text);
+                if (forbidden.test(property.name.text)) {
+                    safe = false;
+                    return;
+                }
+            }
+            if (new Set(names).size !== names.length) {
+                safe = false;
+                return;
+            }
+        } else if (ts.isArrayLiteralExpression(node)
+            && node.elements.some((item) => ts.isSpreadElement(item))) {
+            safe = false;
+            return;
+        } else if (ts.isPropertyAccessExpression(node)
+            && (forbidden.test(node.name.text)
+                || (ts.isIdentifier(node.expression) && node.expression.text === 'session' && node.name.text === 'id'))) {
+            safe = false;
+            return;
+        } else if (ts.isElementAccessExpression(node)) {
+            const argument = node.argumentExpression && unwrap(node.argumentExpression);
+            if (argument && ts.isStringLiteral(argument) && forbidden.test(argument.text)) {
+                safe = false;
+                return;
+            }
+        } else if (ts.isStringLiteral(node) && forbidden.test(node.text)) {
+            safe = false;
+            return;
+        } else if (ts.isIdentifier(node) && forbidden.test(node.text)) {
+            safe = false;
+            return;
+        }
+        ts.forEachChild(node, visit);
+    };
+    visit(root);
+    return safe;
+}
+
+/* @Codex */
+export function validateLogoutAuditModes({ spec, routeSource, serviceSource = null }) {
+    const problems = [];
+    const route = checkedSource('route.ts', routeSource);
+    const inline = spec.modes.inline;
+    const delegated = spec.modes.delegated;
+    const inlinePresent = anyNamedImport(route.sourceFile, inline.writerExport)
+        || routeSource.includes(`'${inline.eventType}'`);
+    const delegatedPresent = anyNamedImport(route.sourceFile, delegated.serviceExport)
+        || routeSource.includes(delegated.serviceExport);
+    if (inlinePresent === delegatedPresent) return ['logout must use exactly one inline or delegated audit mode'];
+    if (inlinePresent) {
+        return validateAuditWriterControlFlow({
+            source: routeSource, fileName: 'route.ts', ownerName: inline.handler,
+            writerModule: inline.writerModule, writerExport: inline.writerExport, eventType: inline.eventType,
+        });
+    }
+    if (!serviceSource) return ['delegated logout owner source is missing'];
+    problems.push(...validateExactServiceOwnedLogoutRoute(route.sourceFile, route.checker, spec));
+    const handler = namedFunction(route.sourceFile, delegated.handler, true);
+    const delegate = importedBinding(route.sourceFile, route.checker, delegated.serviceModule, delegated.serviceExport);
+    const routeCalls = handler && delegate ? bindingCalls(handler, route.checker, delegate.symbol) : [];
+    const routeCall = routeCalls[0];
+    const directDelegate = routeCall && ts.isIdentifier(unwrap(routeCall.expression))
+        && unwrap(routeCall.expression).text === importedName(route.sourceFile, delegated.serviceModule, delegated.serviceExport);
+    const serviceStatement = routeCall ? directStatement(handler, routeCall) : null;
+    const serviceReturn = serviceStatement && ts.isReturnStatement(serviceStatement) ? serviceStatement : null;
+    const routeReturns = handler ? directReturnStatements(handler) : [];
+    if (routeCalls.length !== 1 || !directDelegate || !serviceReturn
+        || routeReturns.length !== 1 || routeReturns[0] !== serviceReturn) {
+        problems.push('delegated logout route must return exactly one direct service-owned terminal response');
+    }
+    if (handler && hasDeferredWork(handler)) problems.push('logout route must not defer audit work');
+
+    const service = checkedSource('service.ts', serviceSource);
+    const owner = namedFunction(service.sourceFile, delegated.ownerName, true);
+    const writer = importedName(service.sourceFile, delegated.writerModule, delegated.writerExport);
+    const hash = importedName(service.sourceFile, delegated.writerModule, delegated.hashExport);
+    const writerBinding = importedBinding(service.sourceFile, service.checker, delegated.writerModule, delegated.writerExport);
+    const resolveBinding = importedBinding(service.sourceFile, service.checker, delegated.ownerModule, delegated.resolveExport);
+    const retireBinding = importedBinding(service.sourceFile, service.checker, delegated.ownerModule, delegated.retireExport);
+    const etagBinding = importedBinding(service.sourceFile, service.checker, delegated.transportModule, delegated.etagExport);
+    const sourcesDeclaration = service.sourceFile.statements.flatMap((statement) => ts.isVariableStatement(statement)
+        ? [...statement.declarationList.declarations] : []).find((declaration) =>
+        ts.isIdentifier(declaration.name) && declaration.name.text === delegated.sourcesName);
+    const sources = exactFrozenObjectLiteral(sourcesDeclaration?.initializer, service.sourceFile);
+    const sourceProperties = exactPropertyAssignments(sources, ['resolve', 'retire', 'audit']);
+    const resolveProperty = sourceProperties?.get('resolve');
+    const resolveInitializer = resolveProperty?.initializer && unwrap(resolveProperty.initializer);
+    const retireProperty = sourceProperties?.get('retire');
+    const retireInitializer = retireProperty?.initializer && unwrap(retireProperty.initializer);
+    const auditProperty = sourceProperties?.get('audit');
+    const auditOwner = auditProperty && ts.isFunctionLike(auditProperty.initializer) ? auditProperty.initializer : null;
+    const sourcesAreConst = sourcesDeclaration && ts.isVariableDeclarationList(sourcesDeclaration.parent)
+        && Boolean(sourcesDeclaration.parent.flags & ts.NodeFlags.Const);
+    const ownerReturns = owner ? directReturnStatements(owner) : [];
+    const exactCookie = exactLogoutValidator(
+        service.sourceFile, 'exactCookie', 'value,name,pattern', EXACT_LOGOUT_COOKIE_VALIDATOR_BODY,
+    );
+    const exactProjection = exactLogoutValidator(
+        service.sourceFile, 'exactActiveWebProjection', 'value,sessionId', EXACT_LOGOUT_PROJECTION_VALIDATOR_BODY,
+    );
+    const receiptValidator = exactLogoutValidator(
+        service.sourceFile, delegated.receiptValidator, 'value', EXACT_LOGOUT_RECEIPT_VALIDATOR_BODY,
+    );
+    const transportName = importedName(service.sourceFile, delegated.transportModule, delegated.etagExport);
+    if (!owner || !writer || !hash || !writerBinding || !resolveBinding || !retireBinding || !etagBinding
+        || transportName !== delegated.etagExport || !sourcesAreConst || !sourceProperties || !auditOwner
+        || !exactIdentifierBinding(service.checker, resolveInitializer, resolveBinding.symbol)
+        || !exactIdentifierBinding(service.checker, retireInitializer, retireBinding.symbol)
+        || !hasExactLogoutValidationPrimitives(service.sourceFile, service.checker)
+        || !exactCookie || !exactProjection || !receiptValidator
+        || localBindingExists(receiptValidator, delegated.etagExport)
+        || !exactNoStoreResponseFactory(service.sourceFile)
+        || serviceSource.includes("from './server-session'")
+        || serviceSource.includes('dispatchActiveWebServerSessionRetirement')) {
+        problems.push('delegated service must use the exact package owner transport, validators, writer, and no-store response factory');
+    }
+    if (!owner || !writer || !hash || !writerBinding || !auditOwner) return problems;
+    if (localBindingExists(owner, 'empty') || ownerReturns.length === 0 || ownerReturns.some((statement) => !exactEmptyStatusReturn(statement))) {
+        problems.push('all delegated service terminal statuses must return through the exact no-store response factory');
+    }
+
+    const [bearerParameter, controlParameter, requestParameter, sourceParameter] = owner.parameters;
+    const sourceInitializer = sourceParameter?.initializer && unwrap(sourceParameter.initializer);
+    const sourcesSymbol = sourcesDeclaration && ts.isIdentifier(sourcesDeclaration.name)
+        ? service.checker.getSymbolAtLocation(sourcesDeclaration.name) : null;
+    if (owner.parameters.length !== 4
+        || !bearerParameter || !ts.isIdentifier(bearerParameter.name) || bearerParameter.name.text !== 'bearerCookie'
+        || !controlParameter || !ts.isIdentifier(controlParameter.name) || controlParameter.name.text !== 'controlCookie'
+        || !requestParameter || !ts.isIdentifier(requestParameter.name) || requestParameter.name.text !== 'request'
+        || !sourceParameter || !ts.isIdentifier(sourceParameter.name) || sourceParameter.name.text !== 'sources'
+        || !exactIdentifierBinding(service.checker, sourceInitializer, sourcesSymbol)
+        || localBindingExists(owner, 'sources', true)) {
+        problems.push('owner must use the exact immutable production sources binding');
+    }
+    const sourceCalls = exactDirectObjectCalls(owner, 'sources', ['resolve', 'retire', 'audit']);
+    const resolveCalls = sourceCalls.calls.get('resolve');
+    const retireCalls = sourceCalls.calls.get('retire');
+    const auditCalls = sourceCalls.calls.get('audit');
+    const moduleConstant = (name) => service.sourceFile.statements.flatMap((statement) => ts.isVariableStatement(statement)
+        ? [...statement.declarationList.declarations] : []).filter((declaration) =>
+        ts.isIdentifier(declaration.name) && declaration.name.text === name);
+    const exactModuleInitializer = (name, expected) => {
+        const [declaration] = moduleConstant(name);
+        return moduleConstant(name).length === 1 && declaration.initializer
+            && ts.isVariableDeclarationList(declaration.parent) && Boolean(declaration.parent.flags & ts.NodeFlags.Const)
+            && declaration.initializer.getText(service.sourceFile).replace(/\s+/gu, ' ') === expected;
+    };
+    const exactCookieDeclaration = (name, parameterName, cookieName, patternName) => {
+        const declarations = owner.body.statements.flatMap((statement) => ts.isVariableStatement(statement)
+            ? [...statement.declarationList.declarations].filter((declaration) =>
+                ts.isIdentifier(declaration.name) && declaration.name.text === name) : []);
+        const declaration = declarations.length === 1 ? declarations[0] : null;
+        const initializer = declaration?.initializer && unwrap(declaration.initializer);
+        const symbol = declaration && ts.isIdentifier(declaration.name)
+            ? service.checker.getSymbolAtLocation(declaration.name) : null;
+        return declaration && ts.isVariableDeclarationList(declaration.parent)
+            && Boolean(declaration.parent.flags & ts.NodeFlags.Const)
+            && initializer && ts.isCallExpression(initializer) && !initializer.questionDotToken
+            && ts.isIdentifier(initializer.expression) && initializer.expression.text === 'exactCookie'
+            && exactArguments(initializer, [
+                { identifier: parameterName }, { identifier: cookieName }, { identifier: patternName },
+            ]) && !bindingIsWritten(owner.body, service.checker, symbol) ? { declaration, symbol } : null;
+    };
+    const sessionId = exactCookieDeclaration('sessionId', 'bearerCookie', 'SESSION_COOKIE_NAME', 'SESSION_ID');
+    const controlId = exactCookieDeclaration('controlId', 'controlCookie', 'CONTROL_COOKIE_NAME', 'CONTROL_ID');
+    const exactConstants = exactModuleInitializer('SESSION_COOKIE_NAME', "'mediflow_session'")
+        && exactModuleInitializer('CONTROL_COOKIE_NAME', "'mediflow_auth_control'")
+        && exactModuleInitializer('SESSION_ID', '/^[a-f0-9]{64}$/u')
+        && exactModuleInitializer('CONTROL_ID', '/^[A-Za-z0-9_-]{32,256}$/u')
+        && exactModuleInitializer('SESSION_KEYS', "Object.freeze(['id', 'userId', 'username', 'role', 'authChannel', 'createdAt', 'expiresAt'])")
+        && exactModuleConstProperty(service.sourceFile, service.checker, 'DateNow', 'Date', 'now');
+    if (!sessionId || !controlId || !exactConstants
+        || moduleScopeBindingExists(service.sourceFile, 'sessionId') || moduleScopeBindingExists(service.sourceFile, 'controlId')) {
+        problems.push('owner must derive exact immutable bearer and control ids from the two fixed cookies');
+    }
+    const resolveCall = resolveCalls.length === 1 ? resolveCalls[0] : null;
+    const projectionCall = resolveCall?.parent && ts.isCallExpression(resolveCall.parent)
+        && ts.isIdentifier(resolveCall.parent.expression) && resolveCall.parent.expression.text === 'exactActiveWebProjection'
+        ? resolveCall.parent : null;
+    if (!resolveCall || !isUnconditionalOwnerCall(owner, resolveCall)
+        || !exactArguments(resolveCall, [{ identifier: 'sessionId' }, { identifier: 'controlId' }])
+        || !projectionCall || projectionCall.arguments.length !== 2 || projectionCall.arguments[0] !== resolveCall
+        || !ts.isIdentifier(unwrap(projectionCall.arguments[1])) || unwrap(projectionCall.arguments[1]).text !== 'sessionId') {
+        problems.push('owner must resolve exactly once with both ids and validate the ACTIVE Web projection');
+    }
+    const auditCall = auditCalls[0];
+    if (!sourceCalls.exact || resolveCalls.length !== 1 || retireCalls.length !== 1 || auditCalls.length !== 1
+        || !auditCall || !isAwaited(auditCall)
+        || !exactArguments(retireCalls[0], [{ identifier: 'projection' }, { literal: 'delete' }])
+        || !exactArguments(auditCall, [{ identifier: 'projection' }, { identifier: 'sessionId' }, { identifier: 'request' }])) {
+        problems.push('owner must resolve and retire the exact projection before one awaited audit');
+    }
+    if ([resolveCalls[0], retireCalls[0], auditCalls[0]].some((call) =>
+        !call || hasPriorUnconditionalTermination(owner, call))) {
+        problems.push('owner must not terminate before the exact resolution, retirement, and audit flow');
+    }
+    const receiptWrapper = retireCalls[0]?.parent && ts.isCallExpression(retireCalls[0].parent)
+        && ts.isIdentifier(retireCalls[0].parent.expression)
+        && retireCalls[0].parent.expression.text === delegated.receiptValidator ? retireCalls[0].parent : null;
+    const compact = (statement) => statement?.getText(service.sourceFile).replace(/\s+/gu, ' ');
+    const cookieGuard = owner.body?.statements.find((statement) => compact(statement) === 'if (!sessionId || !controlId) return empty(401);');
+    const projectionGuard = owner.body?.statements.find((statement) => compact(statement) === 'if (!projection) return empty(401);');
+    const receiptGuard = owner.body?.statements.find((statement) => compact(statement) === 'if (!receipt) return empty(409);');
+    const completedGuard = owner.body?.statements.find((statement) =>
+        compact(statement) === "if (receipt.outcome !== 'completed') return empty(409, receipt.etag);");
+    if (!cookieGuard || !projectionGuard || !receiptWrapper || receiptWrapper.arguments.length !== 1
+        || !receiptGuard || !completedGuard || localBindingExists(owner, delegated.receiptValidator)
+        || !isUnconditionalOwnerCall(owner, retireCalls[0]) || !isUnconditionalOwnerCall(owner, auditCall)
+        || retireCalls[0].getStart() > receiptGuard.getStart() || receiptGuard.getStart() > completedGuard.getStart()
+        || completedGuard.getStart() > auditCall.getStart()) {
+        problems.push('completed package-owner retirement and its ETag must be checked before audit');
+    }
+    const terminal204 = ownerReturns.filter((statement) => {
+        const expression = statement.expression && unwrap(statement.expression);
+        return ts.isCallExpression(expression) && ts.isIdentifier(expression.expression)
+            && expression.expression.text === 'empty' && expression.arguments.length === 2
+            && ts.isNumericLiteral(unwrap(expression.arguments[0])) && unwrap(expression.arguments[0]).text === '204'
+            && ts.isPropertyAccessExpression(unwrap(expression.arguments[1]))
+            && ts.isIdentifier(unwrap(expression.arguments[1]).expression)
+            && unwrap(expression.arguments[1]).expression.text === 'receipt'
+            && unwrap(expression.arguments[1]).name.text === 'etag';
+    });
+    const auditTry = auditCall?.parent && ts.isAwaitExpression(auditCall.parent)
+        && auditCall.parent.parent && ts.isExpressionStatement(auditCall.parent.parent)
+        && auditCall.parent.parent.parent && ts.isBlock(auditCall.parent.parent.parent)
+        && auditCall.parent.parent.parent.parent && ts.isTryStatement(auditCall.parent.parent.parent.parent)
+        ? auditCall.parent.parent.parent.parent : null;
+    const guardIndex = owner.body?.statements.indexOf(completedGuard) ?? -1;
+    const exactTerminalSequence = guardIndex >= 0 && owner.body.statements[guardIndex + 1] === auditTry
+        && owner.body.statements[guardIndex + 2] === terminal204[0];
+    if (!completedGuard || !auditCall || !auditTry?.catchClause || auditTry.catchClause.block.statements.length !== 0
+        || auditTry.catchClause.variableDeclaration
+        || auditTry.tryBlock.statements.length !== 1 || auditTry.tryBlock.statements[0] !== auditCall.parent.parent
+        || auditTry.finallyBlock
+        || !terminal204[0] || terminal204.length !== 1 || ownerReturns.at(-1) !== terminal204[0]
+        || completedGuard.getStart() > auditCall.getStart() || auditCall.getStart() > terminal204[0].getStart()
+        || !exactTerminalSequence) {
+        problems.push('completed retirement must contain the awaited audit before one service-owned terminal 204 with ETag');
+    }
+
+    const context = importedName(service.sourceFile, delegated.writerModule, 'auditContextFromSession');
+    const requestId = importedName(service.sourceFile, delegated.writerModule, 'requestIdFromRequest');
+    const metadataBuilder = importedName(service.sourceFile, delegated.writerModule, 'withAuditContextMetadata');
+    const writerCalls = directWriterCalls(auditOwner, writer, null);
+    const allWriterCalls = bindingCalls(service.sourceFile, service.checker, writerBinding.symbol);
+    const input = writerCalls.direct[0]?.arguments[0];
+    const auditProperties = exactPropertyAssignments(input && ts.isObjectLiteralExpression(input) ? input : null, [
+        'eventType', 'outcome', 'actorType', 'actorRef', 'subjectType', 'subjectRef',
+        'sourceSurface', 'occurredAt', 'requestId', 'redactedMetadata',
+    ]);
+    const event = auditProperties?.get('eventType');
+    const subject = auditProperties?.get('subjectRef');
+    const subjectValue = subject && unwrap(subject.initializer);
+    const writerCall = writerCalls.direct[0];
+    const writerStatement = writerCall && directAwaitedExpressionStatement(auditOwner, writerCall);
+    const exactWriterCallee = writerCall && !writerCall.questionDotToken
+        && ts.isIdentifier(writerCall.expression) && writerCall.expression.text === writer;
+    const auditStatements = ts.isBlock(auditOwner.body) ? [...auditOwner.body.statements] : [];
+    const contextDeclaration = auditStatements[0] && ts.isVariableStatement(auditStatements[0])
+        ? auditStatements[0].declarationList.declarations[0] : null;
+    const contextInitializer = contextDeclaration?.initializer && unwrap(contextDeclaration.initializer);
+    const requestIdValue = auditProperties?.get('requestId')?.initializer && unwrap(auditProperties.get('requestId').initializer);
+    const metadataValue = auditProperties?.get('redactedMetadata')?.initializer && unwrap(auditProperties.get('redactedMetadata').initializer);
+    const exactContextValue = (name, property) => {
+        const value = auditProperties?.get(name)?.initializer && unwrap(auditProperties.get(name).initializer);
+        return Boolean(value && ts.isPropertyAccessExpression(value) && !value.questionDotToken
+            && ts.isIdentifier(value.expression) && value.expression.text === 'context' && value.name.text === property);
+    };
+    const exactStringValue = (name, expected) => {
+        const value = auditProperties?.get(name)?.initializer;
+        return Boolean(value && ts.isStringLiteral(value) && value.text === expected);
+    };
+    const safeAuditInput = Boolean(auditProperties && auditLiteralSyntaxIsExactAndSafe(input));
+    const exactAuditIdentity = Boolean(auditProperties
+        && exactStringValue('outcome', 'success')
+        && exactContextValue('actorType', 'actorType') && exactContextValue('actorRef', 'actorRef')
+        && exactStringValue('subjectType', 'session')
+        && exactContextValue('sourceSurface', 'sourceSurface'));
+    if (localBindingExists(auditOwner, writer) || localBindingExists(auditOwner, hash)
+        || !context || !requestId || !metadataBuilder || localBindingExists(auditOwner, context)
+        || localBindingExists(auditOwner, requestId) || localBindingExists(auditOwner, metadataBuilder)
+        || allWriterCalls.length !== 1 || writerCalls.all.length !== 1 || writerCalls.direct.length !== 1 || !isAwaited(writerCall)
+        || !exactWriterCallee || !writerStatement || auditStatements.length !== 2 || auditStatements[1] !== writerStatement
+        || !contextDeclaration || !ts.isIdentifier(contextDeclaration.name) || contextDeclaration.name.text !== 'context'
+        || !ts.isCallExpression(contextInitializer) || !ts.isIdentifier(contextInitializer.expression) || contextInitializer.expression.text !== context
+        || !exactArguments(contextInitializer, [{ identifier: 'session' }])
+        || !ts.isCallExpression(requestIdValue) || !ts.isIdentifier(requestIdValue.expression) || requestIdValue.expression.text !== requestId
+        || !exactArguments(requestIdValue, [{ identifier: 'request' }])
+        || !ts.isCallExpression(metadataValue) || !ts.isIdentifier(metadataValue.expression) || metadataValue.expression.text !== metadataBuilder
+        || !exactArguments(metadataValue, [{ identifier: 'context' }, { null: true }])
+        || !auditProperties || !event || !ts.isStringLiteral(event.initializer) || event.initializer.text !== delegated.eventType) {
+        problems.push('delegated writer must await exactly one auth.logout event');
+    }
+    if (safeAuditInput && !exactAuditIdentity) problems.push('delegated writer must bind the exact success identity and session subject');
+    let eventLiteralCount = 0;
+    const countEvent = (node) => { if (ts.isStringLiteral(node) && node.text === delegated.eventType) eventLiteralCount += 1; ts.forEachChild(node, countEvent); };
+    countEvent(service.sourceFile);
+    if (eventLiteralCount !== 1) problems.push('delegated service must contain exactly one auth.logout literal');
+    if (!subjectValue || !ts.isCallExpression(subjectValue) || !ts.isIdentifier(subjectValue.expression)
+        || subjectValue.expression.text !== hash || subjectValue.arguments.length !== 1
+        || subjectValue.arguments[0].getText(service.sourceFile) !== 'sessionId') problems.push('logout subject must be the approved hash of the exact session id');
+    let rawSessionIdUses = 0;
+    const countSessionId = (node) => { if (ts.isIdentifier(node) && node.text === 'sessionId') rawSessionIdUses += 1; ts.forEachChild(node, countSessionId); };
+    if (input) countSessionId(input);
+    const metadata = auditProperties?.get('redactedMetadata');
+    if (!auditProperties || [...auditProperties.keys()].some((name) => /authorization|bearer|cookie|token|raw/iu.test(name))
+        || rawSessionIdUses !== 1 || !safeAuditInput) {
+        problems.push('delegated audit exposes raw bearer material or unsafe metadata');
+    }
+    if (hasDeferredWork(owner) || hasDeferredWork(auditOwner)) problems.push('delegated owner must not defer or float audit work');
+    return problems;
+}
+
 function checkAuditWriterControlFlow(findings) {
     const contracts = REQUIRED_ROUTE_AUDIT.flatMap((entry) =>
-        (entry.writerContracts ?? []).map((contract) => ({ ...contract, route: entry.route })));
+        (entry.writerContracts ?? []).filter((contract) => !contract.modes).map((contract) => ({ ...contract, route: entry.route })));
     const parsedFiles = new Map();
     for (const contract of contracts) {
         if (!parsedFiles.has(contract.ownerFile)) {
@@ -477,15 +1364,23 @@ function checkRouteCoverage(findings) {
         const source = read(entry.route);
         if (entry.writerContracts) {
             for (const contract of entry.writerContracts) {
-                for (const problem of validateDelegatedRouteAudit({
-                    spec: contract,
-                    routeSource: source,
-                    serviceSource: read(contract.ownerFile),
-                })) {
+                const problems = contract.modes
+                    ? validateLogoutAuditModes({
+                        spec: contract,
+                        routeSource: source,
+                        serviceSource: exists(contract.modes.delegated.ownerFile)
+                            ? read(contract.modes.delegated.ownerFile) : null,
+                    })
+                    : validateDelegatedRouteAudit({
+                        spec: contract,
+                        routeSource: source,
+                        serviceSource: read(contract.ownerFile),
+                    });
+                for (const problem of problems) {
                     addFinding(findings, 'AUDIT_ROUTE_DELEGATION', `${entry.route}: ${problem}`, {
                         route: entry.route,
                         target: contract.target,
-                        eventType: contract.eventType,
+                        eventType: contract.eventType ?? entry.events[0],
                     });
                 }
             }

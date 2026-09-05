@@ -16,10 +16,11 @@ import { EvidenceStackTile } from '@/components/evidence-stack-tile';
 import ObservationManager from '@/components/observation-manager';
 import type { ObservationPrefill } from '@/lib/observation-prefill';
 import PatientActionModal from '@/components/patient-action-modal';
+import { IntelligentHostCheckupAction } from '@/components/intelligent-host-checkup-action';
 import { PatientIdentityLens } from '@/components/patient-identity-lens';
 import { PatientSheetActionsMenu } from '@/components/patient-sheet-actions-menu';
 import PatientReviewQueueSummaryPanel from '@/components/patient-review-queue-summary';
-import PatientSmartImportPanel, { countUsableSources } from '@/components/patient-smart-import-panel';
+import { PatientSmartImportFabricPreviewCard } from '@/components/patient-smart-import-fabric-preview-card';
 import ProstheticPrescriptionManager from '@/components/prosthetic-prescription-manager';
 import ServicePrescriptionManager from '@/components/service-prescription-manager';
 import SissHandoffDiary from '@/components/siss-handoff-diary';
@@ -38,14 +39,31 @@ import { useLiveQuery, useLiveQueryState } from '@/lib/live-query';
 import { buildPatientWorkspaceFromRecords } from '@/lib/patient-workspace';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { useToast } from '@/components/ui/toast-provider';
-import { buildPatientReviewQueueSummary, type SmartImportReviewSnapshot } from '@/lib/domain/documents/patient-review-queue-summary';
+import { buildPatientReviewQueueSummary } from '@/lib/domain/documents/patient-review-queue-summary';
+import {
+    buildPatientSmartImportProjectionCaptureInput,
+    countUsableSources,
+} from '@/lib/domain/documents/patient-smart-import-projection-capture';
 import { classifyInsightReadability } from '@/lib/patient-insight-view-model';
 import { classifyObservationRange, toNumericValue } from '@/lib/observation-range';
 import { resolveStaticTerminology } from '@/lib/terminology';
 import { projectFollowupSuggestions } from '@/lib/patient-followup-projection';
 import { deriveOpenLoopProjection, type OpenLoop } from '@/lib/patient-open-loops';
+import { buildPatientModuleRailGroups } from '@/lib/patient-module-rail-mapping';
 import FollowupSuggestions from '@/components/followup-suggestions';
 import { calculateAge, estimateBirthYearFromTaxCode } from '@/lib/utils';
+
+/* @Codex These helpers are invoked only from explicit UI events. Keeping their
+   time and navigation side effects outside render makes that boundary visible
+   to React's purity checks. */
+function buildObservationRequestId(loop: OpenLoop): string {
+    return `${loop.kind}:${loop.sourceRef.id ?? loop.sourceRef.code ?? 'unknown'}:${Date.now()}`;
+}
+
+function navigateToObservationForm(): void {
+    window.location.assign('#parametri');
+    requestAnimationFrame(() => document.getElementById('parametri')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+}
 
 export default function PatientDetailPage() {
     const params = useParams();
@@ -64,8 +82,9 @@ export default function PatientDetailPage() {
     }, []);
     const [isDocumentUploadOpen, setIsDocumentUploadOpen] = useState(false);
     const [observationPrefill, setObservationPrefill] = useState<ObservationPrefill | undefined>();
-    /* WUL-262: mirror of the Smart Import review counts reported by the panel. */
-    const [smartImportReview, setSmartImportReview] = useState<SmartImportReviewSnapshot | null>(null);
+    /* @Codex One stable clock sample is sufficient for this read-only staleness
+       projection; it must not change as a side effect of an unrelated render. */
+    const [currentTimestampMs] = useState(() => Date.now());
     const confirm = useConfirm();
     const { showToast } = useToast();
 
@@ -306,6 +325,14 @@ export default function PatientDetailPage() {
         () => new Map((linkedServiceCatalogEntries ?? []).map((entry) => [entry.id, entry])),
         [linkedServiceCatalogEntries],
     );
+    /* @Codex Smart Import production receives one pure host projection. The
+       legacy generator/apply service is deliberately absent from this page. */
+    const smartImportFabricCaptureInput = useMemo(
+        () => patient && entries && attachments && activeTherapies
+            ? buildPatientSmartImportProjectionCaptureInput(patient, entries, attachments, activeTherapies)
+            : null,
+        [patient, entries, attachments, activeTherapies],
+    );
 
     if (!patient) {
         return (
@@ -345,7 +372,7 @@ export default function PatientDetailPage() {
     // Proiezione read-only dei follow-up suggeriti dai documenti (nessun auto-write).
     const followupSuggestions = projectFollowupSuggestions(documentInsights);
     const openObservationForm = (loop: OpenLoop) => {
-        const requestId = `${loop.kind}:${loop.sourceRef.id ?? loop.sourceRef.code ?? 'unknown'}:${Date.now()}`;
+        const requestId = buildObservationRequestId(loop);
         let prefill: ObservationPrefill = { requestId };
 
         if (loop.kind === 'results_pending' && loop.sourceRef.id) {
@@ -389,8 +416,7 @@ export default function PatientDetailPage() {
         }
 
         setObservationPrefill(prefill);
-        window.location.hash = 'parametri';
-        requestAnimationFrame(() => document.getElementById('parametri')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+        navigateToObservationForm();
     };
     const summaryText = leadDiagnosis
         ? `${leadDiagnosis.code} · ${leadDiagnosis.description}${patient.isAdi ? ' con continuita territoriale attiva.' : '.'}`
@@ -442,7 +468,6 @@ export default function PatientDetailPage() {
         smartImport: {
             enabled: isAiSmartImportEnabledValue(smartImportKillSwitch?.value),
             sourceCount: smartImportSourceCount,
-            analysis: smartImportReview ?? undefined,
         },
         archive: {
             attachmentsCount: attachmentItems.length,
@@ -450,7 +475,7 @@ export default function PatientDetailPage() {
         },
     });
     const reviewQueueAttentionRows = reviewQueueSummary.rows.filter((row) =>
-        ['da-rivedere', 'bloccato', 'serve-testo', 'pronto-da-applicare'].includes(row.state),
+        ['da-rivedere', 'bloccato', 'serve-testo'].includes(row.state),
     );
     /* @Codex WUL-UIUX: i numeri che contano subito, soprattutto su pazienti
        complessi. Nessun "fuori range": senza range di riferimento clinici non si
@@ -459,7 +484,7 @@ export default function PatientDetailPage() {
     // percorso e ancora aperto (rilevante soprattutto per l'ADI).
     const lastEntryDate = activeEntries[0]?.date ? new Date(activeEntries[0].date) : null;
     const daysSinceContact = lastEntryDate
-        ? Math.floor((Date.now() - lastEntryDate.getTime()) / (1000 * 60 * 60 * 24))
+        ? Math.floor((currentTimestampMs - lastEntryDate.getTime()) / (1000 * 60 * 60 * 24))
         : null;
     const contactStale = daysSinceContact !== null && daysSinceContact > 90 && !patient.isArchived;
     // Documenti caricati senza sintesi: azionabile, a differenza del conteggio referti.
@@ -503,22 +528,24 @@ export default function PatientDetailPage() {
     });
     const openLoopCount = openLoopProjection.groups.reduce((total, group) => total + group.loops.length, 0)
         + openLoopProjection.standaloneLoops.length;
-    /* @Codex LUME-104/68: il rail segue l'ordine clinico della superficie unica. */
+    /* @Codex WUL-560 L7B / D-WebRail-01: ordine raggruppato esplicito; ogni
+       oggetto conserva href, label e meta del caller senza binding inferiti. */
     const workspaceNavItems: Kree8WorkspaceNavItem[] = [
-        { href: '#attenzione', label: 'Attenzione', meta: String(reviewQueueSummary.attentionCount + openLoopCount) },
         { href: '#quadro', label: 'Quadro' },
+        { href: '#attenzione', label: 'Attenzione', meta: String(reviewQueueSummary.attentionCount + openLoopCount) },
         { href: '#identita', label: 'Identità' },
-        { href: '#timeline', label: 'Timeline', meta: String(nonScaleEntries.length + (checkups ?? []).length + documentInsights.length) },
-        { href: '#diario', label: 'Diario', meta: String(nonScaleEntries.length) },
+        { href: '#parametri', label: 'Parametri', meta: workspace ? String(workspace.observationsCount) : undefined },
         { href: '#terapie', label: 'Terapie', meta: workspace ? String(workspace.activeTherapiesCount) : undefined },
         { href: '#prestazioni', label: 'Prestazioni', meta: prestazioniCount !== undefined ? String(prestazioniCount) : undefined },
-        { href: '#parametri', label: 'Parametri', meta: workspace ? String(workspace.observationsCount) : undefined },
         { href: '#protesica', label: 'Protesica', meta: protesicaCount !== undefined ? String(protesicaCount) : undefined },
-        { href: '#siss', label: 'SISS/FSE' },
-        { href: '#documenti', label: 'Documenti', meta: String(attachmentItems.length) },
         { href: '#scale', label: 'Scale' },
+        { href: '#documenti', label: 'Documenti', meta: String(attachmentItems.length) },
+        { href: '#siss', label: 'SISS/FSE' },
+        { href: '#timeline', label: 'Timeline', meta: String(nonScaleEntries.length + (checkups ?? []).length + documentInsights.length) },
+        { href: '#diario', label: 'Diario', meta: String(nonScaleEntries.length) },
         { href: '#follow-up', label: 'Follow-up', meta: workspace ? String(workspace.pendingCheckupsCount) : undefined },
     ];
+    const workspaceNavGroups = buildPatientModuleRailGroups(workspaceNavItems);
 
     /* @Codex Validates against the FSE and builds the bundle, or returns null
        when the export must not proceed.
@@ -614,23 +641,27 @@ export default function PatientDetailPage() {
             eyebrow="Scheda clinica"
             title={`${patient.lastName} ${patient.firstName}`}
             subtitle=""
-            backHref={`/patients/${id}`}
-            backLabel="Quadro paziente"
+            backHref="/?area=incarico"
+            backLabel="Pazienti"
             patientAtoms={[
                 patient.taxCode ? `Codice ${patient.taxCode}` : 'Codice non disponibile',
                 ageLabel,
                 `Aggiornato ${updatedLabel}`,
             ]}
-            navItems={workspaceNavItems}
+            navGroups={workspaceNavGroups}
             primaryAction={{ href: `/patients/${id}/entries/new`, label: 'Nuova voce', icon: Plus }}
             headerActions={(
-                <PatientSheetActionsMenu
-                    editHref={`/patients/${id}/edit`}
-                    canShareFhirFile={canShareFhirFile}
-                    onExportFhir={() => setIsExportModalOpen(true)}
-                    onShareFhir={handleShareFhir}
-                    onReportPdf={handleReportPdf}
-                />
+                <>
+                    <IntelligentHostCheckupAction patientId={patient.id}
+                        ambulatoryId={patient.ambulatoryId ?? null} checkups={checkups ?? []} />
+                    <PatientSheetActionsMenu
+                        editHref={`/patients/${id}/edit`}
+                        canShareFhirFile={canShareFhirFile}
+                        onExportFhir={() => setIsExportModalOpen(true)}
+                        onShareFhir={handleShareFhir}
+                        onReportPdf={handleReportPdf}
+                    />
+                </>
             )}
         >
             <div className={workspaceStyles.clinicalStack}>
@@ -849,11 +880,11 @@ export default function PatientDetailPage() {
                             <p className={workspaceStyles.emptyState}>Nessuna evidenza documentale in primo piano.</p>
                         )}
                         </div>
-                        {smartImportSourceCount > 0 ? (
-                            <PatientSmartImportPanel
-                                patient={patient}
-                                entries={entries}
-                                onReviewSnapshotChange={setSmartImportReview}
+                        {smartImportSourceCount > 0 && smartImportFabricCaptureInput ? (
+                            <PatientSmartImportFabricPreviewCard
+                                patientId={patient.id}
+                                captureInput={smartImportFabricCaptureInput}
+                                enabled={isAiSmartImportEnabledValue(smartImportKillSwitch?.value)}
                             />
                         ) : null}
                         <DocumentInsightsPanel patient={patient} />
@@ -874,11 +905,12 @@ export default function PatientDetailPage() {
                         title="Scale di valutazione"
                         icon={Activity}
                         surfaceClassName={workspaceStyles.clinicalSection}
-                        summary="Tinetti, MMSE, ADL (Katz), GDS e libreria completa."
+                        summary="Tinetti POMA-28 v1, MMSE, ADL (Katz), GDS e libreria completa."
                     >
                         <div className="space-y-3">
-                            <Link href={`/patients/${id}/scales/tinetti`} className={workspaceStyles.rowLink}>
-                                <span>Tinetti</span>
+                            {/* @Codex MF085-002: distinct new instrument, never a legacy alias. */}
+                            <Link href={`/patients/${id}/scales/tinetti-poma28-v1`} className={workspaceStyles.rowLink}>
+                                <span>Tinetti POMA-28 (v1)</span>
                                 <Plus className="h-4 w-4 text-[color:var(--lume-ink-muted)]" />
                             </Link>
                             <Link href={`/patients/${id}/scales/mmse`} className={workspaceStyles.rowLink}>

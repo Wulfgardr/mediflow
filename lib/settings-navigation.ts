@@ -78,6 +78,14 @@ export const SETTINGS_NAV_GROUPS: SettingsNavGroup[] = [
                 description: 'Schedulazione e restore',
                 keywords: ['backup', 'ripristino', 'restore', 'schedulazione backup', 'export dati', 'archivio cifrato'],
             },
+            /* @Codex */
+            {
+                id: 'compliance-evidence',
+                href: '/settings/compliance',
+                label: 'Evidenze e conformità',
+                description: 'Inventario tecnico e limiti legali',
+                keywords: ['conformità', 'conformita', 'compliance', 'gdpr', 'ai act', 'privacy', 'evidenze tecniche', 'dpo'],
+            },
             {
                 id: 'repertori',
                 href: '/settings/repertori',

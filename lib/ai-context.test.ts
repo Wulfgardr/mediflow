@@ -416,6 +416,45 @@ test('buildPatientInsightContext recovers direct attachment text when the stored
     }
 });
 
+/* @Codex */
+test('buildPatientInsightContext does not perform hidden local extraction for low-signal attachments', async () => {
+    const restore = await withHarness({
+        documentInsights: JSON.stringify([]),
+        attachments: [
+            {
+                id: 'attachment-scan',
+                patientId: 'patient-1',
+                name: 'scan-sintetico.png',
+                type: 'image/png',
+                data: 'data:image/png;base64,ZmFrZQ==',
+                summarySnapshot: 'Nessuna informazione rilevante trovata.',
+                createdAt: new Date('2025-03-14T00:00:00Z'),
+            },
+        ],
+    });
+    const originalFetch = globalThis.fetch;
+    let fetchCalls = 0;
+    globalThis.fetch = (async () => {
+        fetchCalls += 1;
+        return new Response(new Blob(['synthetic']));
+    }) as typeof fetch;
+
+    try {
+        const { buildPatientInsightContext } = await import('./ai-context');
+        const snapshot = await buildPatientInsightContext('patient-1');
+
+        assert.equal(fetchCalls, 0);
+        assert.doesNotMatch(snapshot.prompt, /Estratto diretto allegato|scan-sintetico\.png/i);
+        assert.match(
+            snapshot.limitations.join('\n'),
+            /allegati con snapshot generico o assente non sono stati usati come fonti documentali/i,
+        );
+    } finally {
+        globalThis.fetch = originalFetch;
+        restore();
+    }
+});
+
 test('buildPatientInsightContext applies attachment text recovery budget to low-signal candidates only', async () => {
     const restore = await withHarness({
         documentInsights: JSON.stringify([]),
@@ -2105,7 +2144,15 @@ test('smart import generation rejects an envelope with a mismatched task', async
     db.attachments.filter = (() => ({ toArray: async () => [] })) as unknown as typeof db.attachments.filter;
     db.therapies.filter = (() => ({ toArray: async () => [] })) as unknown as typeof db.therapies.filter;
     AIService.create = (async () => ({
-        getModelInfo: () => ({ provider: 'local', model: 'synthetic', baseUrl: 'http://127.0.0.1' }),
+        getModelInfo: () => ({
+            provider: 'ollama', model: 'synthetic', baseUrl: 'http://127.0.0.1:11434',
+            receipt: {
+                schemaVersion: 'mediflow.ai.provider-selection.v1', authorityPlane: 'clinical_application',
+                task: 'clinical', provider: 'ollama', model: 'synthetic', execution: 'local',
+                endpointClass: 'loopback', egress: 'none', runtimeReadiness: 'required', fallbackCount: 0,
+            },
+        }),
+        getHealth: async () => ({ status: 'ok', message: 'synthetic', models: ['synthetic'] }),
         generate: async () => JSON.stringify({
             schemaVersion: 'mediflow.ai.extract.v1',
             task: 'patient_insight',

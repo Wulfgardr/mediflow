@@ -1,5 +1,6 @@
 /* @Codex */
 import type { PairingReconnectionClass } from '../../network-pairing-lifecycle';
+import { ProviderRegistryError } from '../registry';
 import { FABRIC_CAPABILITY_DESCRIPTORS } from './catalog';
 import type { ProviderOnboardingState } from './onboarding';
 import {
@@ -23,7 +24,11 @@ import {
     observeVenue,
     type VenueObservation,
 } from './routing-observability';
-import type { FabricResolution } from './resolver';
+import {
+    resolveFabricCapabilityWithHostResolution,
+    type FabricResolution,
+    type HostResolvedFabricRequest,
+} from './resolver';
 
 type FabricResolutionRequest = Parameters<typeof observeAndResolve>[1];
 
@@ -59,6 +64,15 @@ export type CandidateRoutingInput = Readonly<{
     reconnection?: PairingReconnectionClass;
 }>;
 
+export type HostCandidateRoutingInput = Omit<CandidateRoutingInput, 'onboarding' | 'lifecycle'>;
+
+export type HostResolvedCandidateRoutingInput = Readonly<{
+    policy: FabricExecutionPolicy;
+    request: HostResolvedFabricRequest;
+    observations: readonly VenueObservation[];
+    reconnection?: PairingReconnectionClass;
+}>;
+
 export type CandidateRoutingResult = Readonly<{
     decision: CandidateRoutingDecision;
     resolution: FabricResolution | null;
@@ -66,11 +80,18 @@ export type CandidateRoutingResult = Readonly<{
 
 type CandidateDecisionContext = Readonly<{
     policy: FabricExecutionPolicy;
-    request: FabricResolutionRequest;
+    request: FabricResolutionRequest | HostResolvedFabricRequest;
     requestId: string;
     capability: FabricCapabilityId;
     requestedVenue: FabricVenue;
     descriptor: FabricCapabilityDescriptor;
+}>;
+
+type CandidateRoutingGateInput = Readonly<{
+    policy: FabricExecutionPolicy;
+    request: FabricResolutionRequest | HostResolvedFabricRequest;
+    observations: readonly VenueObservation[];
+    reconnection?: PairingReconnectionClass;
 }>;
 
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
@@ -96,7 +117,21 @@ function snapshotCandidateRoutingInput(input: CandidateRoutingInput): CandidateR
     });
 }
 
-function snapshotCandidateDecisionContext(input: CandidateRoutingInput): CandidateDecisionContext {
+function snapshotHostRoutingInput<
+    T extends HostCandidateRoutingInput | HostResolvedCandidateRoutingInput,
+>(input: T): T {
+    if (!isRecord(input)) {
+        throw new FabricPolicyError('policy_invalid');
+    }
+    return Object.freeze({
+        policy: input.policy,
+        request: input.request,
+        observations: input.observations,
+        reconnection: input.reconnection,
+    }) as T;
+}
+
+function snapshotCandidateDecisionContext(input: CandidateRoutingGateInput): CandidateDecisionContext {
     // Copy each caller-owned input before inspecting it. This denies getters
     // that change identifiers after validation and keeps invalid values out of
     // the observable decision shape.
@@ -209,15 +244,35 @@ function snapshotGenerativeAdmission(input: CandidateRoutingInput): ProviderLife
     return lifecycle;
 }
 
-/**
- * Candidate-only admission layer for ADR 0091. It composes the pure resolver
- * with provider lifecycle and paired trust, but introduces no provider call,
- * persistence, credential handling, or fallback selection.
- */
-export function routeCandidateCapability(
-    input: CandidateRoutingInput,
+function snapshotPersistedGenerativeAdmission(value: unknown): ProviderLifecycleState | null {
+    const lifecycle = snapshotProviderLifecycle(value);
+    return lifecycle.credentialClass === 'local_model'
+        && lifecycle.status === 'available_unqualified'
+        ? lifecycle
+        : null;
+}
+
+function resolveObservedCandidate(
+    context: CandidateDecisionContext,
+    observations: readonly VenueObservation[],
+): FabricResolution | null {
+    const routed = observeAndResolve(
+        context.policy,
+        context.request as FabricResolutionRequest,
+        observations,
+    );
+    return routed.resolution && routed.decision.receipt ? routed.resolution : null;
+}
+
+function routeCandidateCapabilityWithAdmission(
+    inputSnapshot: CandidateRoutingGateInput,
+    snapshotAdmission: () => ProviderLifecycleState | null,
+    mapsOnboardingErrors: boolean,
+    resolve: (
+        context: CandidateDecisionContext,
+        observations: readonly VenueObservation[],
+    ) => FabricResolution | null,
 ): CandidateRoutingResult {
-    const inputSnapshot = snapshotCandidateRoutingInput(input);
     const context = snapshotCandidateDecisionContext(inputSnapshot);
     const observations = observationsFor(context.requestedVenue, inputSnapshot.observations);
     const requestedObservation = observations.find(
@@ -245,7 +300,7 @@ export function routeCandidateCapability(
     let admittedLifecycle: ProviderLifecycleState | null = null;
     if (context.descriptor.class === 'generative') {
         try {
-            admittedLifecycle = snapshotGenerativeAdmission(inputSnapshot);
+            admittedLifecycle = snapshotAdmission();
             if (!admittedLifecycle) {
                 return denied(context, observations, 'provider_lifecycle_unavailable');
             }
@@ -254,9 +309,9 @@ export function routeCandidateCapability(
                 return denied(
                     context,
                     observations,
-                    error.code === 'onboarding_not_enabled'
+                    mapsOnboardingErrors && (error.code === 'onboarding_not_enabled'
                         || error.code === 'credential_class_forbidden'
-                        || error.code === 'egress_profile_unsatisfied'
+                        || error.code === 'egress_profile_unsatisfied')
                         ? 'provider_onboarding_required'
                         : 'provider_lifecycle_invalid',
                 );
@@ -265,18 +320,14 @@ export function routeCandidateCapability(
         }
     }
 
-    const routed = observeAndResolve(
-        context.policy,
-        context.request,
-        observations,
-    );
-    if (!routed.resolution || !routed.decision.receipt) {
+    const resolution = resolve(context, observations);
+    if (!resolution) {
         return denied(context, observations, 'fabric_resolution_denied');
     }
 
     if (context.descriptor.class === 'generative') {
         const lifecycle = admittedLifecycle;
-        const receipt = routed.decision.receipt;
+        const receipt = resolution.receipt;
         if (
             !lifecycle
             || receipt.provider !== lifecycle.provider
@@ -293,8 +344,63 @@ export function routeCandidateCapability(
             observations,
             'resolved',
             null,
-            routed.decision.receipt,
+            resolution.receipt,
         ),
-        resolution: routed.resolution,
+        resolution,
     });
+}
+
+/**
+ * Candidate-only admission layer for ADR 0091. It composes the pure resolver
+ * with provider lifecycle and paired trust, but introduces no provider call,
+ * persistence, credential handling, or fallback selection.
+ */
+export function routeCandidateCapability(
+    input: CandidateRoutingInput,
+): CandidateRoutingResult {
+    const inputSnapshot = snapshotCandidateRoutingInput(input);
+    return routeCandidateCapabilityWithAdmission(
+        inputSnapshot,
+        () => snapshotGenerativeAdmission(inputSnapshot),
+        true,
+        resolveObservedCandidate,
+    );
+}
+
+export function routeHostCandidateCapability(
+    input: HostCandidateRoutingInput,
+    lifecycle: ProviderLifecycleState,
+): CandidateRoutingResult {
+    const inputSnapshot = snapshotHostRoutingInput(input);
+    return routeCandidateCapabilityWithAdmission(
+        inputSnapshot,
+        () => snapshotPersistedGenerativeAdmission(lifecycle),
+        false,
+        resolveObservedCandidate,
+    );
+}
+
+export function routeHostResolvedCandidateCapability(
+    input: HostResolvedCandidateRoutingInput,
+    lifecycle: ProviderLifecycleState,
+): CandidateRoutingResult {
+    const inputSnapshot = snapshotHostRoutingInput(input);
+    return routeCandidateCapabilityWithAdmission(
+        inputSnapshot,
+        () => snapshotPersistedGenerativeAdmission(lifecycle),
+        false,
+        (context) => {
+            try {
+                return resolveFabricCapabilityWithHostResolution(
+                    context.policy,
+                    context.request as HostResolvedFabricRequest,
+                );
+            } catch (error) {
+                if (error instanceof FabricPolicyError || error instanceof ProviderRegistryError) {
+                    return null;
+                }
+                throw error;
+            }
+        },
+    );
 }

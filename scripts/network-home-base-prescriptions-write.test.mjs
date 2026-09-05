@@ -7,6 +7,7 @@ import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';
 import { after, test } from 'node:test';
+import { loginWithWebAuthControl } from './web-auth-control-test-client.mjs';
 
 const BASE_URL = process.env.E2E_BASE_URL || 'http://127.0.0.1:3400';
 const LOCAL_API_TOKEN = process.env.MEDIFLOW_LOCAL_API_TOKEN || 'mediflow-network-write-smoke-local-token';
@@ -60,19 +61,14 @@ test('paired prescriptions and prosthetics write smoke covers capability, scope,
             'Desk iPad prescriptions writer',
         );
 
-        const login = await request('POST', '/api/auth/login', {
-            body: {
-                username: USERNAME,
-                password: PIN,
-            },
-        });
+        const login = await loginWithWebAuthControl(BASE_URL, { username: USERNAME, password: PIN });
         assert.equal(login.response.status, 200);
-        const sessionCookie = extractSessionCookie(login.response);
+        const cookieHeader = login.cookieHeader;
 
         const readOnlyServiceCreate = await request('POST', '/api/v1/network/service-prescriptions', {
             headers: {
                 ...pairedHeaders(readOnlyClient),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
             body: servicePrescriptionPayload(patientId),
         });
@@ -81,7 +77,7 @@ test('paired prescriptions and prosthetics write smoke covers capability, scope,
         const outsideScopeServiceCreate = await request('POST', '/api/v1/network/service-prescriptions', {
             headers: {
                 ...pairedHeaders(writerClient),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
             body: servicePrescriptionPayload(outsideScopePatientId),
         });
@@ -90,7 +86,7 @@ test('paired prescriptions and prosthetics write smoke covers capability, scope,
         const serviceCreate = await request('POST', '/api/v1/network/service-prescriptions', {
             headers: {
                 ...pairedHeaders(writerClient),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
             body: servicePrescriptionPayload(patientId),
         });
@@ -102,7 +98,7 @@ test('paired prescriptions and prosthetics write smoke covers capability, scope,
         const itemA = await request('POST', '/api/v1/network/service-prescription-items', {
             headers: {
                 ...pairedHeaders(writerClient),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
             body: servicePrescriptionItemPayload(servicePrescriptionId, 1, 'Emocromo completo', '90.62.2'),
         });
@@ -112,7 +108,7 @@ test('paired prescriptions and prosthetics write smoke covers capability, scope,
         const itemB = await request('POST', '/api/v1/network/service-prescription-items', {
             headers: {
                 ...pairedHeaders(writerClient),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
             body: servicePrescriptionItemPayload(servicePrescriptionId, 2, 'Creatinina', '90.16.3'),
         });
@@ -122,7 +118,7 @@ test('paired prescriptions and prosthetics write smoke covers capability, scope,
         const serviceList = await request('GET', `/api/v1/network/service-prescriptions?patientId=${encodeURIComponent(patientId)}`, {
             headers: {
                 ...pairedHeaders(writerClient),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
         });
         assert.equal(serviceList.response.status, 200);
@@ -134,7 +130,7 @@ test('paired prescriptions and prosthetics write smoke covers capability, scope,
         const itemList = await request('GET', `/api/v1/network/service-prescription-items?prescriptionId=${encodeURIComponent(servicePrescriptionId)}`, {
             headers: {
                 ...pairedHeaders(writerClient),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
         });
         assert.equal(itemList.response.status, 200);
@@ -146,7 +142,7 @@ test('paired prescriptions and prosthetics write smoke covers capability, scope,
         const serviceUpdate = await request('PUT', `/api/v1/network/service-prescriptions/${servicePrescriptionId}`, {
             headers: {
                 ...pairedHeaders(writerClient),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
             body: {
                 version: 1,
@@ -162,7 +158,7 @@ test('paired prescriptions and prosthetics write smoke covers capability, scope,
         const staleServiceUpdate = await request('PUT', `/api/v1/network/service-prescriptions/${servicePrescriptionId}`, {
             headers: {
                 ...pairedHeaders(writerClient),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
             body: {
                 version: 1,
@@ -177,7 +173,7 @@ test('paired prescriptions and prosthetics write smoke covers capability, scope,
         const serviceCatalog = await request('GET', '/api/v1/network/service-catalog?q=emocromo&limit=10', {
             headers: {
                 ...pairedHeaders(writerClient),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
         });
         assert.equal(serviceCatalog.response.status, 200);
@@ -186,7 +182,7 @@ test('paired prescriptions and prosthetics write smoke covers capability, scope,
         const remoteServiceDelete = await request('DELETE', `/api/v1/network/service-prescriptions/${servicePrescriptionId}`, {
             headers: {
                 ...pairedHeaders(writerClient),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
             body: {
                 version: 2,
@@ -197,7 +193,7 @@ test('paired prescriptions and prosthetics write smoke covers capability, scope,
         const readOnlyProstheticCreate = await request('POST', '/api/v1/network/prosthetic-prescriptions', {
             headers: {
                 ...pairedHeaders(readOnlyClient),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
             body: prostheticPrescriptionPayload(patientId),
         });
@@ -206,7 +202,7 @@ test('paired prescriptions and prosthetics write smoke covers capability, scope,
         const outsideScopeProstheticCreate = await request('POST', '/api/v1/network/prosthetic-prescriptions', {
             headers: {
                 ...pairedHeaders(writerClient),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
             body: prostheticPrescriptionPayload(outsideScopePatientId),
         });
@@ -215,7 +211,7 @@ test('paired prescriptions and prosthetics write smoke covers capability, scope,
         const prostheticCreate = await request('POST', '/api/v1/network/prosthetic-prescriptions', {
             headers: {
                 ...pairedHeaders(writerClient),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
             body: prostheticPrescriptionPayload(patientId),
         });
@@ -227,7 +223,7 @@ test('paired prescriptions and prosthetics write smoke covers capability, scope,
         const prostheticUpdate = await request('PUT', `/api/v1/network/prosthetic-prescriptions/${prostheticPrescriptionId}`, {
             headers: {
                 ...pairedHeaders(writerClient),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
             body: {
                 version: 1,
@@ -242,7 +238,7 @@ test('paired prescriptions and prosthetics write smoke covers capability, scope,
         const staleProstheticUpdate = await request('PUT', `/api/v1/network/prosthetic-prescriptions/${prostheticPrescriptionId}`, {
             headers: {
                 ...pairedHeaders(writerClient),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
             body: {
                 version: 1,
@@ -257,7 +253,7 @@ test('paired prescriptions and prosthetics write smoke covers capability, scope,
         const prostheticList = await request('GET', `/api/v1/network/prosthetic-prescriptions?patientId=${encodeURIComponent(patientId)}`, {
             headers: {
                 ...pairedHeaders(writerClient),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
         });
         assert.equal(prostheticList.response.status, 200);
@@ -270,7 +266,7 @@ test('paired prescriptions and prosthetics write smoke covers capability, scope,
         const remoteProstheticDelete = await request('DELETE', `/api/v1/network/prosthetic-prescriptions/${prostheticPrescriptionId}`, {
             headers: {
                 ...pairedHeaders(writerClient),
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
             body: {
                 version: 2,
@@ -529,19 +525,6 @@ function pairedHeaders(client) {
         'x-mediflow-paired-client-id': client.pairedClientId,
         'x-mediflow-paired-client-token': client.pairedClientToken,
     };
-}
-
-function extractSessionCookie(response) {
-    const setCookies = typeof response.headers.getSetCookie === 'function'
-        ? response.headers.getSetCookie()
-        : [];
-    const cookieSource = setCookies.find((cookie) => cookie.startsWith('mediflow_session='))
-        ?? response.headers.get('set-cookie');
-    if (!cookieSource) {
-        throw new Error('mediflow_session cookie was not returned by /api/auth/login');
-    }
-
-    return cookieSource.split(';')[0];
 }
 
 async function request(method, pathname, { headers = {}, body } = {}) {

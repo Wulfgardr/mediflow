@@ -1,0 +1,96 @@
+{
+  "version": 1,
+  "purpose": "Byte-exact, language-neutral H9 SOAP draft and commit receipt oracle for ADR 0103.",
+  "draftKeyOrder": [
+    "schema",
+    "operationId",
+    "subjective",
+    "objective",
+    "assessment",
+    "plan"
+  ],
+  "receiptKeyOrder": [
+    "schema",
+    "receiptRef",
+    "operationId",
+    "outcome",
+    "commandId",
+    "entryRef",
+    "auditEventRef",
+    "patientVersion",
+    "entryVersion",
+    "committedAt",
+    "bindingDigest",
+    "entryDigest",
+    "auditDigest"
+  ],
+  "draft": {
+    "schema": "mediflow.soap-draft.v1",
+    "operationId": "mediflow.clinical_diary.append_soap.v1",
+    "subjective": "Riferisce & controlla <valore> / \"test\"\nSeconda riga  ",
+    "objective": "é 🩺",
+    "assessment": "",
+    "plan": "Controllo\ttra 7 giorni"
+  },
+  "draftDigest": {
+    "codec": "mediflow.headless.soap-draft-digest.v1",
+    "sha256": {
+      "bytes": [
+        228,
+        56,
+        29,
+        0,
+        70,
+        154,
+        173,
+        123,
+        253,
+        13,
+        55,
+        93,
+        72,
+        157,
+        124,
+        9,
+        137,
+        168,
+        116,
+        99,
+        180,
+        180,
+        34,
+        2,
+        82,
+        3,
+        48,
+        183,
+        77,
+        162,
+        21,
+        111
+      ],
+      "hex": "e4381d00469aad7bfd0d375d489d7c0989a87463b4b42202520330b74da2156f"
+    }
+  },
+  "receipt": {
+    "schema": "mediflow.headless.soap-entry-commit-receipt.v1",
+    "receiptRef": "hser_e5bdc96f3ec004423c2ca2716bf49e40ade4e1f7ab196a6b7a3ac6699bf57b14",
+    "operationId": "mediflow.clinical_diary.append_soap.v1",
+    "outcome": "entry_committed",
+    "commandId": "hsac_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "entryRef": "hsei_36647f110c8e0f4271a40a0bff529323bb5dfcf83615d1384703560aaa82d19f",
+    "auditEventRef": "hsea_3be641fc6ff30e2cebb20f7cb14b3ce99dfab5065b3a7dc9b4d2130b6ef3fcce",
+    "patientVersion": 7,
+    "entryVersion": 1,
+    "committedAt": "2026-08-31T23:45:12.000Z",
+    "bindingDigest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "entryDigest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "auditDigest": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "canonical": {
+    "draftJSON": "{\"schema\":\"mediflow.soap-draft.v1\",\"operationId\":\"mediflow.clinical_diary.append_soap.v1\",\"subjective\":\"Riferisce & controlla <valore> / \\\"test\\\"\\nSeconda riga  \",\"objective\":\"é 🩺\",\"assessment\":\"\",\"plan\":\"Controllo\\ttra 7 giorni\"}",
+    "receiptJSON": "{\"schema\":\"mediflow.headless.soap-entry-commit-receipt.v1\",\"receiptRef\":\"hser_e5bdc96f3ec004423c2ca2716bf49e40ade4e1f7ab196a6b7a3ac6699bf57b14\",\"operationId\":\"mediflow.clinical_diary.append_soap.v1\",\"outcome\":\"entry_committed\",\"commandId\":\"hsac_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"entryRef\":\"hsei_36647f110c8e0f4271a40a0bff529323bb5dfcf83615d1384703560aaa82d19f\",\"auditEventRef\":\"hsea_3be641fc6ff30e2cebb20f7cb14b3ce99dfab5065b3a7dc9b4d2130b6ef3fcce\",\"patientVersion\":7,\"entryVersion\":1,\"committedAt\":\"2026-08-31T23:45:12.000Z\",\"bindingDigest\":\"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\",\"entryDigest\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"auditDigest\":\"0000000000000000000000000000000000000000000000000000000000000000\"}",
+    "receiptDigestCodec": "mediflow.headless.soap-entry-commit-receipt-digest.v1",
+    "receiptDigestHex": "4374289aaf2aff0ea046e7c3bc301d940d41f3fc38d905dee1496051139fe483"
+  }
+}

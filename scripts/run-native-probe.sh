@@ -3,10 +3,7 @@
 
 set -euo pipefail
 
-export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode-beta.app/Contents/Developer}"
-
-readonly DEFAULT_APP_PATH="/Users/leonardopegollo/Library/Developer/Xcode/DerivedData/MediFlowAppleApp-edpphlcvfcupapayqnhdhkuegdnn/Build/Products/Debug/MediFlow.app"
-APP_PATH="$DEFAULT_APP_PATH"
+APP_PATH="${MEDIFLOW_NATIVE_PROBE_APP_PATH:-}"
 
 usage() {
     printf 'Usage: %s [--app-path /path/to/MediFlow.app]\n' "$(basename "$0")"
@@ -34,6 +31,12 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+if [[ -z "$APP_PATH" ]]; then
+    printf 'MediFlow app path required. Pass --app-path /path/to/MediFlow.app or set MEDIFLOW_NATIVE_PROBE_APP_PATH.\n' >&2
+    usage >&2
+    exit 2
+fi
 
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly PROBE_PATH="$SCRIPT_DIR/native-click-map-probe.swift"

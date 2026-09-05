@@ -4,9 +4,16 @@ import { users, settings } from '@/lib/schema';
 import { v4 as uuidv4 } from 'uuid';
 import bcrypt from 'bcryptjs';
 /* @Codex */
-import { auditSourceSurfaceFromRequest } from '@/lib/security/audit';
+import { SESSION_COOKIE_NAME } from '@/lib/security/server-session';
 /* @Codex */
-import { createSession, SESSION_COOKIE_NAME } from '@/lib/security/server-session';
+import {
+    abortWebAuthControl,
+    beginWebAuthControl,
+    issueWebAuthControl,
+    setWebAuthControlEtag,
+    webAuthControlMutationFromRequest,
+    type WebAuthControlMutation,
+} from '@/lib/security/web-auth-control-transport';
 /* @Codex */
 import { sessionCookieOptionsForRequest } from '@/lib/security/request-transport';
 /* @Codex */
@@ -14,17 +21,44 @@ import { authSetupSchema } from '@/lib/api-schemas/auth';
 /* @Codex */
 import { parseApiBody } from '@/lib/api-schemas/parse';
 
+/* @Codex */
+function setupResponse(payload: Record<string, unknown>, status: number, etag?: string) {
+    const response = NextResponse.json(payload, { status });
+    response.headers.set('Cache-Control', 'no-store');
+    if (etag) setWebAuthControlEtag(response, etag);
+    return response;
+}
+
 export async function POST(request: Request) {
+    let mutation: WebAuthControlMutation | null = null;
+    let attempt: unknown | null = null;
     try {
+        mutation = webAuthControlMutationFromRequest(request);
+        if (!mutation) {
+            return setupResponse({ error: 'Setup unavailable', code: 'SETUP_AUTH_UNAVAILABLE' }, 503);
+        }
+        attempt = beginWebAuthControl('setup', mutation);
+        if (!attempt) {
+            return setupResponse({ error: 'Setup unavailable', code: 'SETUP_AUTH_UNAVAILABLE' }, 503, mutation.ifMatch);
+        }
+
         const existingUsers = await dbServer.select().from(users).limit(1);
         if (existingUsers.length > 0) {
             /* @Codex */
-            return NextResponse.json({ error: "Setup already completed", code: "SETUP_ALREADY_COMPLETED" }, { status: 403 });
+            abortWebAuthControl(attempt);
+            attempt = null;
+            return setupResponse({ error: "Setup already completed", code: "SETUP_ALREADY_COMPLETED" }, 409, mutation.ifMatch);
         }
 
         const rawBody = await request.json();
         const parsedBody = parseApiBody(authSetupSchema, rawBody);
-        if (!parsedBody.ok) return parsedBody.response;
+        if (!parsedBody.ok) {
+            abortWebAuthControl(attempt);
+            attempt = null;
+            parsedBody.response.headers.set('Cache-Control', 'no-store');
+            setWebAuthControlEtag(parsedBody.response, mutation.ifMatch);
+            return parsedBody.response;
+        }
         const { username, password, encryptedMasterKey, salt, displayName, ambulatoryName } = parsedBody.data;
 
         const hashedPassword = await bcrypt.hash(password, 10);
@@ -57,16 +91,21 @@ export async function POST(request: Request) {
         });
 
         /* @Codex */
-        const sourceSurface = auditSourceSurfaceFromRequest(request, 'web');
-        const session = createSession(
-            { id: userId, username, role: 'admin' },
-            sourceSurface === 'native' ? 'native' : 'web',
-        );
-        const response = NextResponse.json({ success: true });
-        response.cookies.set(SESSION_COOKIE_NAME, session.id, sessionCookieOptionsForRequest(request));
+        const session = issueWebAuthControl(attempt, { id: userId, username, role: 'admin' });
+        attempt = null;
+        if (!session) {
+            return setupResponse({
+                error: 'Setup completed. Sign in to continue.',
+                code: 'SETUP_COMMITTED_AUTH_UNAVAILABLE',
+            }, 409, mutation.ifMatch);
+        }
+        const response = NextResponse.json({ success: true, id: userId });
+        response.cookies.set(SESSION_COOKIE_NAME, session.sessionId, sessionCookieOptionsForRequest(request));
+        setWebAuthControlEtag(response, session.etag);
         return response;
     } catch (error) {
+        if (attempt) abortWebAuthControl(attempt);
         console.error("Setup error:", error);
-        return NextResponse.json({ error: "Setup failed" }, { status: 500 });
+        return setupResponse({ error: "Setup failed" }, 500, mutation?.ifMatch);
     }
 }

@@ -50,31 +50,34 @@ const checks = [
     parity: 'Reports distinguish runtime+model pairs instead of flattening MLX and Ollama model IDs.',
   },
   {
-    id: 'native-runtime-fallback-explicit',
+    id: 'native-runtime-fallback-no-ocr',
     // Fase 0 (76fb55ab6) deleted the dead Swift AISettingsResolver; the native
     // macOS app now ships the bundled WebRuntime, so the explicit fallback and
-    // OCR pinning it guarded live in lib/ai-service.ts.
+    // runtime fallback it guarded lives in lib/ai-service.ts.
     //
     // ac0322e43 ("instrada i servizi nel provider registry") then moved the
     // provider pinning itself out of this file: the literal
     // `const provider: AIProvider = 'ollama'` became a registry resolution
     // (`this.provider = resolution.receipt.provider`). What stays here is the
-    // loopback fallback for stale MLX URLs and the OCR default; the pinning is
+    // loopback fallback for stale MLX URLs; the provider pinning is
     // asserted by registry-provider-binding-fail-closed below, where it now
     // lives. The check was relocated, not relaxed.
     file: 'lib/ai-service.ts',
     mustContain: [
       'resolveOllamaBaseUrl(genericUrl?.value, legacyUrl?.value, DEFAULT_OLLAMA_BASE_URL)',
+    ],
+    mustNotContain: [
       "task === 'ocr'",
       'DEFAULT_OCR_MODEL',
+      "AIService.create('ocr')",
     ],
-    parity: 'The runtime bundled in the native app keeps an explicit loopback fallback for stale MLX URLs, and OCR stays on the Ollama OCR default.',
+    parity: 'The bundled runtime keeps the loopback Ollama fallback for general AI roles and exposes no OCR execution task.',
   },
   {
     id: 'registry-provider-binding-fail-closed',
     // Successore di native-runtime-fallback-explicit per la parte di pinning.
     // Asserisce il rifiuto, non solo il default: un default puo' essere
-    // scavalcato da un setting, un throw no. Le tre bindings per task devono
+    // scavalcato da un setting, un throw no. Le due bindings per task devono
     // restare esplicite, perche' un task nuovo senza binding cadrebbe altrimenti
     // su undefined invece che su ollama.
     //
@@ -88,12 +91,16 @@ const checks = [
     file: 'lib/ai-providers/registry.ts',
     mustContain: [
       "if (provider !== 'ollama') throw new ProviderRegistryError('provider_not_registered')",
+      "export const AI_SERVICE_TASKS = ['clinical', 'reasoning'] as const",
       "clinical: 'ollama'",
       "reasoning: 'ollama'",
-      "ocr: 'ollama'",
       "if (OLLAMA_MANIFEST_BASE.execution !== 'local' || OLLAMA_MANIFEST_BASE.egress !== 'none')",
     ],
-    parity: 'Provider resolution is fail-closed to the local Ollama adapter: every task binds to ollama and any other value is rejected instead of defaulted.',
+    mustNotContain: [
+      "ocr: 'ollama'",
+      "['clinical', 'reasoning', 'ocr']",
+    ],
+    parity: 'General AI roles remain fail-closed to Ollama while the retired OCR task cannot re-enter the registry.',
   },
   {
     id: 'homebase-optional-mlx-readonly',
@@ -111,10 +118,17 @@ const checks = [
     mustContain: [
       'benchmark-visible',
       'non runtime clinico',
-      'OCR resta Ollama-only',
+      'OCR non disponibile',
+      'ATHENA',
+      'Treatment Reasoning',
       'WUL-165',
     ],
-    parity: 'The operational contract is documented as parity of visibility and guardrails, not product promotion.',
+    mustNotContain: [
+      'OCR resta Ollama-only',
+      'DeepSeek/Ollama resta primario',
+      'fallback Apple Vision',
+    ],
+    parity: 'The contract separates generic MLX benchmark visibility, governed ATHENA execution, and retired OCR.',
   },
 ];
 
@@ -133,16 +147,21 @@ const matrix = checks.map((check) => {
   }
 
   const missing = check.mustContain.filter((needle) => !text.includes(needle));
+  const forbidden = (check.mustNotContain ?? []).filter((needle) => text.includes(needle));
   if (missing.length > 0) {
     failures.push(`${check.id}: ${check.file} is missing ${missing.map((item) => JSON.stringify(item)).join(', ')}`);
+  }
+  if (forbidden.length > 0) {
+    failures.push(`${check.id}: ${check.file} still contains ${forbidden.map((item) => JSON.stringify(item)).join(', ')}`);
   }
 
   return {
     id: check.id,
     file: check.file,
-    status: missing.length === 0 ? 'pass' : 'fail',
+    status: missing.length === 0 && forbidden.length === 0 ? 'pass' : 'fail',
     parity: check.parity,
     missing,
+    forbidden,
   };
 });
 
@@ -152,8 +171,8 @@ const report = {
   scope: {
     issue: 'WUL-165',
     defaultRuntime: 'ollama',
-    mlxStatus: 'benchmark-visible',
-    ocrRuntime: 'ollama-only',
+    mlxStatus: 'benchmark-visible-with-governed-athena-lane',
+    ocrRuntime: 'unavailable',
     promotionPolicy: 'no runtime promotion without separate ADR, benchmark evidence, and rollout governance',
   },
   matrix,

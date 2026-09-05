@@ -40,8 +40,11 @@ dato MIMIC e nessun modello ClinSeek è incluso nel runtime.
 
 ## Motore di registrazione della visita
 
-Riferimenti per la dettatura fluida e il post-processing della visita. Definiscono
-un confine di prodotto: nessun runtime o audio è integrato.
+Riferimenti per la dettatura fluida e il post-processing della visita. MediFlow
+0.8.5 integra una propria cattura e trascrizione Apple on-device su
+macOS 26+, con consenso, audio bounded in RAM e review del transcript. Non
+integra codice Fluid, microfono reale come prova di release o writer clinici
+automatici.
 
 ### Fluid
 
@@ -75,11 +78,13 @@ ToolUniverse e vLLM upstream non sono integrati. Lineage: Qwen3-8B.
 
 Famiglia text-only usata come default locale e base di ATHENA.
 
-### DeepSeek
+### DeepSeek (riferimento OCR opzionale)
 
-[![deepseek-ocr](https://img.shields.io/badge/deepseek--ocr-via%20Ollama-4d6bfe)](https://ollama.com/library/deepseek-ocr)
+[![deepseek-ocr](https://img.shields.io/badge/deepseek--ocr-opzionale-4d6bfe)](https://ollama.com/library/deepseek-ocr)
 
-OCR locale primario, eseguito tramite Ollama.
+Riferimento per un adapter OCR locale opzionale. DeepSeek-OCR 2/CUDA e la sua
+qualifica sono `OUT_OF_SCOPE_FOR_0.8.5_NON_BLOCKING`: l'estrazione corrente usa
+AnyDoc e, per le sole pagine PDF `needsOcr`, Apple Vision locale.
 
 ### MedGemma
 
@@ -132,7 +137,8 @@ con gli asset e in `app/fonts/IBM-Plex-Mono-OFL.txt`.
 
 [![Ollama](https://img.shields.io/badge/Ollama-runtime%20locale-000000?logo=ollama&logoColor=white)](https://ollama.com)
 
-Runtime locale per AI e OCR, opzionale.
+Runtime locale opzionale per le capability AI ammesse. Non è il percorso OCR
+della 0.8.5 e non costituisce un fallback generico.
 
 ### MLX / MLX-LM
 
@@ -146,6 +152,13 @@ Inferenza su Apple Silicon, runtime dei pesi ATHENA.
 
 Fallback OCR disponibile solo su macOS, framework di sistema Apple.
 
+### OpenAI / Anthropic
+
+La 0.8.5 include adapter provider v2 ufficiali e una probe amministrativa
+review-only, tutti `default OFF`. Sono verificati con transport fake: nessuna
+credenziale, rete live, retention account o runtime readiness cloud è inclusa
+in questa attribuzione.
+
 ---
 
 ## Sviluppo assistito
@@ -158,16 +171,21 @@ Strumenti del processo di scrittura del codice, non fonti del prodotto.
 [![CodexBar](https://img.shields.io/badge/uso-CodexBar-181717?logo=github&logoColor=white)](https://github.com/steipete/CodexBar)
 
 Codex e Claude Code hanno contribuito a progettazione, implementazione, review
-e verifica. I modelli registrati nei log MediFlow comprendono le famiglie
+e verifica. Le famiglie usate nello sviluppo assistito comprendono
 OpenAI GPT-5.2, GPT-5.3 Codex/Spark, GPT-5.4/mini, GPT-5.5 e GPT-5.6
-Sol/Terra/Luna; sul lato Anthropic, Opus 4.8, Fable 5, Sonnet 5 e una quota
+Sol/Terra/Luna e GPT-6 Astra; sul lato Anthropic, Opus 4.8, Fable 5, Sonnet 5 e una quota
 esplorativa storica di Haiku 4.5.
 
-Lo snapshot locale del 15 luglio 2026 conta circa 17,56 miliardi di token di
-sessione: 11,33 miliardi con Codex e 6,22 con Claude Code. Circa 16,41 miliardi
-sono input recuperato dalla cache; il dato misura soprattutto contesto riletto
-nel lavoro assistito, non righe di codice, costo o qualità. Un conteggio
-precedente basato su una metodologia diversa non è direttamente confrontabile.
+Lo snapshot locale del 5 settembre 2026, da CodexBar 0.56.4, conta
+**50.810.826.389 token di sessione**: 44.773.273.634 registrati da Codex e
+6.037.552.755 da Claude Code. La cache letta è 48.607.240.570 token (95,7%).
+Il periodo disponibile va dal 1 febbraio al 5 settembre 2026.
+
+Questi aggregati **non sono filtrati per repository**: non sono il conteggio
+dei token impiegati esclusivamente per MediFlow o per la 0.8.5. La completezza
+storica Codex non è attestata. Il dato misura contesto elaborato, non righe di
+codice, costo o qualità; conteggi con copertura diversa non sono direttamente
+confrontabili. [Dashboard e metodo](./README.md#sviluppo-assistito).
 
 - **[Repo Prompt CE](https://github.com/repoprompt/repoprompt-ce)** (Eric Provencher): context engineering open source, usato in alcune sessioni per preparare selezioni e diff per gli agenti.
 - **[CodexBar](https://github.com/steipete/CodexBar)** (Peter Steinberger): visibilità locale sull'uso dei modelli e fonte del conteggio storico del README.

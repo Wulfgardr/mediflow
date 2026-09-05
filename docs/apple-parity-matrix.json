@@ -1,9 +1,9 @@
 {
-  "generated": "2026-07-28",
+  "generated": "2026-08-21",
   "source": "MediFlow 0.8 parity closeout against the frozen local source candidate",
   "release08Gate": {
-    "asOf": "2026-07-28",
-    "status": "source-candidate-ready-with-external-limitation",
+    "asOf": "2026-09-04",
+    "status": "hold-promotion",
     "scope": [
       "iPhone/iPad",
       "macOS",
@@ -31,18 +31,18 @@
       {
         "surface": "macOS",
         "owner": "CoS parity 0.8",
-        "status": "verified",
-        "requiredEvidence": "build Xcode 27, resize, click-map, focus, Cmd-R contestuale e VoiceOver manuale"
+        "status": "historical-evidence-current-sha-pending",
+        "requiredEvidence": "receipt exact-SHA con suite e build Xcode stabile; resize, click-map, focus, Cmd-R contestuale e VoiceOver manuale restano evidenza della baseline storica"
       },
       {
         "surface": "localhost/web",
         "owner": "CoS parity 0.8",
-        "status": "verified",
-        "requiredEvidence": "82/82, responsive 320/390/768/1440, tastiera/focus e zoom browser reale 200/400"
+        "status": "verified-current-runtime-bounded-screen-reader",
+        "requiredEvidence": "PASS_BOUNDED sul runtime 29b2c94b6a044b1639137403a2228ff172ea3d0f, tree 5706ade800d6a8caf2ab875882f61fe0881b3dd5: Chrome production in primo piano, VoiceOver attivo e input tastiera macOS nativo sui soli percorsi web esercitati con dati sintetici; non è un audit applicativo completo"
       }
     ],
-    "blockingRule": "Un P1 confermato blocca il gate. La sola deroga accettata è il limite esterno VoiceOver mobile della candidata sorgente GitHub 0.8.",
-    "note": "Il limite non equivale a PASS VoiceOver, conformance, prova device, App Store readiness o certificazione. Questo oggetto non modifica i conteggi delle 64 capability.",
+    "blockingRule": "Un P1 confermato, un receipt exact-SHA richiesto assente o una prova assistiva non terminale bloccano la promozione. La sola deroga esterna già accettata è il limite VoiceOver mobile della candidata sorgente GitHub 0.8.",
+    "note": "La deroga mobile non equivale a PASS VoiceOver, conformance, prova device, App Store readiness o certificazione. Questo oggetto non modifica i conteggi delle 66 capability.",
     "acceptedExternalLimitation": {
       "surface": "iPhone/iPad",
       "technology": "VoiceOver",
@@ -367,11 +367,11 @@
       "area": "shell-globale",
       "feature": "Cockpit shell / rail navigazione globale + toolbar + deep-link",
       "web": "Kree8 cockpit shell con 5 aree, toolbar ricerca/filtri, deep-link query string, sub-area tabs (components/kree8/kree8-clinical-cockpit.tsx)",
-      "native": "partial: NavigationSplitView (macOS/iPad) / TabView (iPhone) con sezioni cliniche Pazienti/Agenda/Diario/Analytics/Scale e gruppo Progetto separato, piu master-detail pazienti (AppleFoundationViews.swift:210-292). Residuo ristretto: nessun deep-link/URL scheme nativo equivalente alla query string web ?area=&paziente=. Ricerca globale non conteggiata come residuo di parita: non esiste nemmeno come ricerca globale unica sulla web.",
-      "boundary": "n-a: chrome UI locale",
+      "native": "partial: NavigationSplitView (macOS/iPad) / TabView (iPhone) con sezioni cliniche Pazienti/Agenda/Diario/Analytics/Scale e gruppo Progetto separato. Su macOS WUL-566 isola stato e comandi per finestra; WUL-567 aggiunge un inspector paziente status-only su colori neutrali nativi adattivi. Carta resta grammatica documentale e non introduce crema, beige, avorio, parchment o skeuomorfismo. Solo la major esatta macOS 27 usa lo sheet compatibile; macOS 28+ torna all'inspector nativo. Residui: nessun deep-link/URL scheme equivalente alla query string web ?area=&paziente=; focus, resize e VoiceOver interattivi della nuova slice inspector restano partial.",
+      "boundary": "n-a: chrome UI locale. Il manifest Mini PR #184 a 3fd988bafe71a058fdd7d3c25ea569793dcba903 mantiene sourceRow 32 a manual_only, miniCommands [], reason NOT_IN_MINI_PILOT: nessun comando Mini o claim di parity.",
       "gap": "partial",
       "wave": "W3-macos-clinical-shell",
-      "evidence": "web-global.shell query string in components/kree8/kree8-clinical-cockpit.tsx:204-219; native-ui.navigazione; W3 S5 f01346656 AppleFoundationViews.swift"
+      "evidence": "web-global.shell query string in components/kree8/kree8-clinical-cockpit.tsx:204-219; native-ui.navigazione; W3 S5 f01346656 AppleFoundationViews.swift; WUL-566 520f8b9f15a3b7f9f198c0e096aadf9cf764a6e7; WUL-567 556f06d3fa6a950bb8a6423dcdb00ef000a4f576; manifest Mini PR #184 3fd988bafe71a058fdd7d3c25ea569793dcba903 sourceRow 32"
     },
     {
       "area": "turno",
@@ -487,7 +487,7 @@
       "area": "ai-runtime",
       "feature": "Configurazione/invocazione runtime AI (Ollama/modelli/kill switch)",
       "web": "selezione modelli per ruolo, connessione Ollama, profilo hardware, kill switch funzioni AI, budget contesto (app/settings/ai/*)",
-      "native": "missing (view-only): pannello runtime mostra stato Ollama/Docker come diagnostica, mai avviato/configurato; nessuna inferenza via boundary",
+      "native": "missing (view-only): pannello runtime mostra stato Ollama/MLX come diagnostica, mai avviato/configurato; nessuna inferenza via boundary",
       "boundary": "partial/host-only: GET /api/v1/network/ai-runtime solo stato; central-runtime 'gated by benchmark/rollout', nessuna route chat/generate paired",
       "gap": "host-only",
       "wave": "W5-ai-avanzate",
@@ -497,11 +497,11 @@
       "area": "cache-offline",
       "feature": "Cache pazienti cifrata offline (consultazione degradata)",
       "web": "n-a (web è online contro DB locale)",
-      "native": "partial: snapshot cifrato AES-GCM lista pazienti (Keychain, TTL 24h, scoping server+ambulatorio), restore offline-degraded; SOLO lista, no dettaglio/sotto-risorse, NO write queue (HomeBasePatientCacheStore.swift)",
+      "native": "partial: iPhone/iPad mostrano loading/error/online/cache/offline/sessione scaduta con azione accessibile e snapshot cifrato AES-GCM lista pazienti (Keychain, TTL 24h, scoping server+ambulatorio); restore offline-degraded in sola lettura. Lo stato visuale stale e coperto da preview/test sintetici, ma il runtime scarta ancora lo snapshot oltre TTL perche il contratto non espone metadata separati. SOLO lista, no dettaglio/sotto-risorse, NO write queue (MobilePairedStatusView.swift; HomeBasePatientCacheStore.swift)",
       "boundary": "n-a: derivata dal boundary, mai autorevole (vincolo docs-plan: no seconda source of truth)",
       "gap": "partial",
       "wave": "W1-mobile-core",
-      "evidence": "native-ui.cache offline; gap corrente WUL-403; nessuna offline write queue"
+      "evidence": "WUL-556 candidate: MobilePairedStatusPresentationTests e XCUITest iPhone/iPad con fixture sintetiche; WUL-403 resta aperta per metadata stale live; nessuna offline write queue"
     },
     {
       "area": "settings-host",
@@ -730,36 +730,57 @@
       "partial": [0, 2, 3, 4, 7, 9, 11, 14, 15, 19, 31, 35, 44],
       "outOfScope": [8, 16, 18, 29, 30, 34, 42, 43, 45, 46, 47, 48, 49, 51, 52, 53, 57, 58, 59, 61, 63, 64, 65]
     },
+    "miniContractConsumption": {
+      "status": "CONSUMED / HOLD_PROMOTION",
+      "canonicalPath": "packages/mini/contracts/mini-parity.json",
+      "schemaVersion": "mediflow.mini.parity-manifest.v1",
+      "heads": {
+        "pr184": "3fd988bafe71a058fdd7d3c25ea569793dcba903",
+        "pr190": "1e35733c0218eae67a1d6e158085aab7340bc26b"
+      },
+      "contentSha256": "8f84108732b7a8a9c1feb20cdedee17f4865044de98d8d997896f3a914d0e4d9",
+      "mappingRule": "rows[sourceRow - 1] maps to capabilities[sourceRow]; Mini disposition and Apple gap remain separate axes.",
+      "metric": {"definition": "Rows with miniDisposition=available divided by canonical web capability rows.", "availableRows": 4, "totalRows": 66, "parityPercent": 6.060606},
+      "dispositionCounts": {"available": 4, "manual_only": 61, "proposal_only": 1, "unavailable": 0},
+      "reasonCounts": {"HOST_AUTHORITY_ONLY": 23, "NOT_IN_MINI_PILOT": 38, "SYNTHETIC_PREVIEW_ONLY": 1, "none": 4},
+      "wul556Rows": [
+        {"sourceRow": 1, "webCapabilityId": "web-01-anagrafica-paziente-lista-ricerca-view-create-update", "miniCommands": ["patient search", "patient show"], "miniDisposition": "available", "reason": null, "appleGap": "partial", "interpretation": "Mini covers search/show only; broader Apple row residues remain."},
+        {"sourceRow": 39, "webCapabilityId": "web-39-blocco-sessione-immediato-stato-sessione", "miniCommands": ["whoami"], "miniDisposition": "available", "reason": null, "appleGap": "full-parity", "interpretation": "Session identity is observable; pairing and local tokens are not agentic grants."},
+        {"sourceRow": 45, "webCapabilityId": "web-45-cache-pazienti-cifrata-offline-consultazione-degradata", "miniCommands": [], "miniDisposition": "manual_only", "reason": "NOT_IN_MINI_PILOT", "appleGap": "partial", "interpretation": "Encrypted read-only list exists; live stale metadata, offline detail and write queue remain absent."},
+        {"sourceRow": 63, "webCapabilityId": "web-63-get-api-v1-network-capabilities-api-v1-network-identity-api-v1-n", "miniCommands": ["capabilities"], "miniDisposition": "available", "reason": null, "appleGap": "full-parity", "interpretation": "Capability discovery does not authorize clinical operations."}
+      ],
+      "excludedAvailableRow": {"sourceRow": 11, "miniCommands": ["open-loops"], "reason": "Outside WUL-556 slice."},
+      "authorityGuard": "Manifest, receipt, paired state and local token do not grant agentic or clinical authority.",
+      "remainingGates": ["manager verification", "WUL-564"]
+    },
     "interactionParity": {
       "verifiedAutomatic": [0, 12, 13, 14, 15, 17, 20, 31, 32, 33],
       "verifiedRealInteraction": [0, 31, 32],
       "platformSpecificDocumented": [14, 15],
       "partial": [2, 3, 4, 7, 9, 11, 19, 35, 44],
-      "blocked": [
+      "pending": [
         {
-          "scope": "new macOS Xcode 27 build and suite",
+          "scope": "exact-SHA macOS Xcode build and suite",
           "surfaces": ["macOS"],
-          "reason": "disk5s1 is not mountable and fsck_apfs exits with -69845. The existing built bundle passed at 1100, 1300 and 1600 points."
-        },
+          "reason": "Xcode availability is a machine precondition, not persistent repository state; exact-SHA evidence belongs to the release closeout receipt and is not inferred from this static parity manifest."
+        }
+      ],
+      "blocked": [
         {
           "scope": "real VoiceOver session",
           "surfaces": ["iPhone", "iPad"],
           "reason": "No real VoiceOver session is evidenced. XCTest accessibility audits do not replace this proof."
-        },
-        {
-          "scope": "real screen-reader session",
-          "surfaces": ["web"],
-          "reason": "The screen-reader run is non-terminal."
         }
       ]
     },
     "currentEvidence": {
-      "backend": "8083bc05 source integrated with audit-flow and delegated-writer gate fixes",
-      "webEvidenceStack": "2/2 E2E PASS with synthetic PIN 0000; populated, curation, empty, loading and conservative error states",
-      "webProduction": "104 pages and standalone build PASS; Chrome production at exact 200% and 400% zoom, main controls visible, no dev badge",
-      "macOS": "clipping code integrated; built Xcode 27 bundle PASS at 1100, 1300 and 1600 points; click-map, focus, arrow input and real VoiceOver active before and after",
+      "backend": "Historical baseline 8083bc05: source integrated with audit-flow and delegated-writer gate fixes",
+      "webEvidenceStack": "Historical baseline: 2/2 E2E PASS with synthetic PIN 0000; populated, curation, empty, loading and conservative error states",
+      "webProduction": "Historical baseline: 104 pages and standalone build PASS; Chrome production at exact 200% and 400% zoom, main controls visible, no dev badge",
+      "webScreenReader": "Current bounded evidence: PASS_BOUNDED on runtime 29b2c94b6a044b1639137403a2228ff172ea3d0f, tree 5706ade800d6a8caf2ab875882f61fe0881b3dd5. Chrome production was foreground, VoiceOver was active and native macOS keyboard input reached the declared focus targets with synthetic data. This does not test the native macOS app or iPhone/iPad VoiceOver; the documenting successor is docs-only.",
+      "macOS": "Historical baseline: clipping code integrated; built Xcode 27 bundle PASS at 1100, 1300 and 1600 points; click-map, focus, arrow input and real VoiceOver active before and after",
       "axProbe": "corrected to select native List rows, bind patient-specific detail content and avoid terminating external MediFlow sessions; typecheck and 6/6 tests PASS",
-      "offline": "WUL-403 remains open for visible TTL, stale state and explicit reconciliation"
+      "offline": "WUL-556 candidate makes loading/error/online/cache/offline/session-expired visible on iPhone/iPad and defines the stale presentation contract. WUL-403 remains open for live TTL metadata and stale-state wiring."
     },
     "controlToActionReference": {
       "canonicalDocument": "docs/parity-matrix.md#control-to-action-map",
@@ -772,7 +793,7 @@
     },
     "verdict": "PARTIAL / HOLD_PROMOTION"
   },
-  "updated": "2026-08-07 (0.8.1): aligned the 66-row feature contract with the AI settings information architecture (Fabric registry and governance split); 2026-08-07: fixed matrix drift in the 'AI conversazionale' row — the cited app/api/proxy/ai/chat/route.ts does not exist in the checkout; repointed to the real app/api/proxy/ollama/{chat,generate}/route.ts (L4 verification, host-only classification and guarded counts 30/13/21 unchanged). Previous: 2026-07-28 reconciled the 64-row feature contract against current web, macOS and assistive-technology evidence",
+  "updated": "2026-09-04: closed only the bounded web screen-reader gate on runtime 29b2c94b6a04/tree 5706ade800d6; macOS exact-SHA remains pending and the iPhone/iPad VoiceOver limitation remains accepted, not PASS. Previous: 2026-09-03 corrected the stale capability narrative to 66/30/13/23 and recorded that exact-SHA Xcode proof is release-boundary evidence outside this static manifest. Previous: 2026-08-22 consumed the byte-identical Mini parity manifest from PR #184 head 3fd988b and PR #190 head 1e35733 without changing Apple gap classifications.",
   "version": 2,
   "summary": {
     "total": 66,

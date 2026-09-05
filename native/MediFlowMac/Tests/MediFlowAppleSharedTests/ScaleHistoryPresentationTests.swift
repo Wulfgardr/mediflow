@@ -3,14 +3,14 @@ import XCTest
 
 /* @Codex */
 final class ScaleHistoryPresentationTests: XCTestCase {
-    func testRunnerMetadataBuildsHistoryItemWithNameAndScore() {
+    func testRunnerMetadataBuildsHistoryItemWithNameAndScore() throws {
         let definition = ClinicalScales.adl
-        let result = definition.result(from: ["bath": 1, "dress": 1, "toilet": 0, "transfer": 0, "cont": 0, "feed": 0])
+        let result = try definition.result(from: ["bath": 1, "dress": 1, "toilet": 0, "transfer": 0, "cont": 0, "feed": 0])
         let entry = makeEntry(
             type: "scale",
             title: definition.title,
             content: ClinicalScales.contentSummary(definition: definition, result: result),
-            metadata: ClinicalScales.metadataJSON(definition: definition, result: result)
+            metadata: try ClinicalScales.metadataJSON(definition: definition, result: result)
         )
 
         let item = ScaleHistoryPresentation.item(from: entry)
@@ -43,6 +43,39 @@ final class ScaleHistoryPresentationTests: XCTestCase {
         let entry = makeEntry(type: "note", title: "Nota", content: "Contenuto", metadata: nil)
 
         XCTAssertNil(ScaleHistoryPresentation.item(from: entry))
+    }
+
+    // @Codex: these are stored legacy literals, not recalculated scores or newly asserted cutoffs.
+    func testLegacyHistoricalScoresAndInterpretationsAreNotRecomputed() throws {
+        for (score, interpretation) in [(18, "ALTO Rischio di Caduta (< 19)"),
+                                         (24, "MEDIO Rischio di Caduta (19-24)"),
+                                         (25, "BASSO Rischio di Caduta (> 24)")] {
+            let payload: [String: Any] = ["scaleId": "tinetti", "score": score,
+                "title": "Scala Tinetti (Balance & Gait)", "interpretation": interpretation,
+                "answers": ["b8": 1]]
+            let metadata = String(decoding: try JSONSerialization.data(withJSONObject: payload), as: UTF8.self)
+            let entry = makeEntry(type: "scale", title: "Tinetti", content: "Contenuto storico originale", metadata: metadata)
+            let item = try XCTUnwrap(ScaleHistoryPresentation.item(from: entry))
+            XCTAssertEqual(item.scoreLabel, String(score))
+            XCTAssertEqual(item.interpretation, interpretation)
+            XCTAssertEqual(item.content, entry.content)
+            XCTAssertEqual(item.provenanceLabel, ClinicalScales.legacyTinettiNotice)
+            XCTAssertEqual(entry.metadata, metadata)
+        }
+    }
+
+    func testCorrectedMissingOrMalformedProvenanceDoesNotGainDenominator() throws {
+        for instrument: Any in [NSNull(), "unknown", ["instrumentVersion": "poma28-16b12g"]] {
+            let metadata = String(decoding: try JSONSerialization.data(withJSONObject: [
+                "scaleId": "tinetti-poma28-v1", "score": 24,
+                "interpretation": "Originale", "instrument": instrument
+            ]), as: UTF8.self)
+            let item = try XCTUnwrap(ScaleHistoryPresentation.item(from:
+                makeEntry(type: "scale", title: "Tinetti", content: "Originale", metadata: metadata)))
+            XCTAssertEqual(item.scoreLabel, "24")
+            XCTAssertEqual(item.interpretation, "Originale")
+            XCTAssertEqual(item.provenanceLabel, ClinicalScales.legacyTinettiNotice)
+        }
     }
 
     private func makeEntry(

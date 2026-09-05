@@ -15,6 +15,7 @@ const START = '<!-- usage-dashboard:start -->';
 const END = '<!-- usage-dashboard:end -->';
 
 const CODEX_FAMILIES = [
+  ['astra', 'GPT-6 Astra', '#33506b', (model) => model.startsWith('gpt-6-astra')],
   ['sol', 'GPT-5.6 Sol', '#5f50b7', (model) => model === 'gpt-5.6-sol'],
   ['gpt54', 'GPT-5.4 + mini', '#4b3f97', (model) => model.startsWith('gpt-5.4')],
   ['terra', 'GPT-5.6 Terra', '#887bcf', (model) => model === 'gpt-5.6-terra'],

@@ -18,6 +18,10 @@ export const DATE_FIELDS = new Set([
   'startDate',
   'startedAt',
   'completedAt',
+  'committedAt', // @Codex H7b ledger timestamp.
+  'expiresAt',
+  'activatedAt',
+  'revokedAt',
   'deletedAt',
   'updatedAt',
 ]);

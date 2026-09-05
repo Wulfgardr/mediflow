@@ -1,6 +1,6 @@
 {
   "name": "medical-record-app",
-  "version": "0.8.2",
+  "version": "0.8.5",
   "private": false,
   "engines": {
     "node": ">=24 <25"
@@ -17,6 +17,15 @@
     "postbuild": "node scripts/node-runtime-contract.mjs write-standalone-manifest && node scripts/check-standalone-runtime-bundle.mjs",
     "prestart": "node scripts/node-runtime-contract.mjs verify",
     "start": "next start --hostname 127.0.0.1 --port 3000",
+    "mini": "node scripts/run-strip-types.mjs packages/mini/src/cli.ts",
+    "test:mini-cli": "node scripts/run-strip-types.mjs --test packages/mini/src/cli.test.ts",
+    "mcp:intelligent-host": "node scripts/run-strip-types.mjs scripts/intelligent-host-mcp-stdio.mjs",
+    "mcp:intelligent-host:production": "node scripts/run-strip-types.mjs scripts/mediflow-headless-supervisor.mjs",
+    "smoke:intelligent-host:production": "node scripts/mediflow-headless-supervisor-standalone-smoke.mjs",
+    "benchmark:visit-recording:synthetic": "node scripts/run-visit-recording-synthetic-benchmark.mjs",
+    "test:mcp:intelligent-host": "node scripts/run-strip-types.mjs --test packages/mcp/src/contracts.test.ts packages/mcp/src/import-boundary.test.ts scripts/intelligent-host-mcp-stdio.test.mjs",
+    "check:headless-portable-imports": "node scripts/check-headless-portable-imports.mjs",
+    "test:headless-portable": "node scripts/run-headless-portable-tests.mjs",
     "local:tls-proxy": "node scripts/local-api-tls-proxy.mjs",
     "docs:siss-corpus:validate": "node scripts/siss-docs-corpus.mjs validate",
     "docs:siss-corpus:fetch": "node scripts/siss-docs-corpus.mjs fetch",
@@ -29,6 +38,10 @@
     "check:schema-drift": "node scripts/check-schema-drift.mjs",
     "check:schema-writers": "node scripts/check-schema-writers.mjs",
     "check:ai-clinical-writes": "node scripts/check-ai-clinical-write-gate.mjs",
+    "check:fabric-generative-runtime-crosswalk": "node scripts/check-fabric-generative-runtime-crosswalk.mjs",
+    "test:fabric-generative-runtime-crosswalk": "node --test scripts/check-fabric-generative-runtime-crosswalk.test.mjs",
+    "check:attachment-currentness-writers": "node scripts/check-attachment-currentness-writers.mjs",
+    "test:attachment-currentness-writers": "node --test scripts/check-attachment-currentness-writers.test.mjs",
     "check:node-runtime": "node scripts/node-runtime-contract.mjs verify",
     "check:standalone-runtime-bundle": "node scripts/check-standalone-runtime-bundle.mjs",
     "check:mlx-operational-parity": "node scripts/check-mlx-operational-parity.mjs",
@@ -38,6 +51,7 @@
     "workflow-monitor": "node scripts/codex-workflow-monitor.mjs",
     "rehearse:api-v1-compatibility": "node scripts/api-v1-compatibility-rehearsal.mjs",
     "check:never-regress": "node scripts/check-never-regress.mjs",
+    "check:web-auth-lifecycle-owner-boundary": "node scripts/run-strip-types.mjs --test --test-concurrency=1 lib/security/web-auth-lifecycle-owner-boundary.test.ts lib/security/web-auth-next-producer-boundary.test.ts lib/security/web-auth-lifecycle-owner-resolver-boundary.test.ts lib/security/server-auth.test.ts",
     "check:lume-tokens": "node scripts/check-lume-tokens.mjs",
     "test:lume-tokens": "node --test scripts/check-lume-tokens.test.mjs",
     "check:motion-budget": "node scripts/check-motion-budget.mjs",
@@ -45,8 +59,10 @@
     "test:workflow-monitor": "node --test scripts/codex-workflow-monitor.test.mjs",
     "test:run-strip-types": "node --test scripts/run-strip-types.test.mjs",
     "test:node-runtime-contract": "node --test scripts/node-runtime-contract.test.mjs",
+    "test:launcher-helpers": "node --test scripts/launcher-helpers.test.mjs",
+    "test:native-launcher": "node --test scripts/launch-mediflow-mac.test.mjs",
     "test:installability-v0": "node --test scripts/installability-v0-macos.test.mjs",
-    "test:unit": "node scripts/run-strip-types.mjs --test --glob \"lib/**/*.test.ts\" --glob \"components/**/*.test.ts\" scripts/check-schema-drift.test.ts scripts/run-native-probe.test.mjs scripts/audit-quality-gate.test.mjs",
+    "test:unit": "node scripts/run-unit-suite.mjs",
     "test:api-v1-contract-negative": "bash scripts/api-v1-contract-negative-test.sh",
     "test:api-v1-put-negative-routes": "bash scripts/api-v1-put-negative-routes-test.sh",
     "test:legacy-clinical-writes": "bash scripts/legacy-clinical-writes-test.sh",
@@ -65,7 +81,7 @@
     "test:pdf-service": "node scripts/run-strip-types.mjs --test lib/pdf-service.test.ts",
     "test:patient-document-import": "node scripts/run-strip-types.mjs --test lib/domain/documents/patient-import-decision.test.ts lib/domain/documents/patient-document-import-service.test.ts lib/domain/documents/patient-document-review.test.ts",
     "test:patient-document-decision": "node scripts/run-strip-types.mjs --test lib/domain/documents/patient-document-decision.test.ts",
-    "test:patient-smart-import": "node scripts/run-strip-types.mjs --test lib/domain/documents/patient-smart-import-service.test.ts",
+    "test:patient-smart-import": "node scripts/run-strip-types.mjs --test lib/domain/documents/patient-smart-import-fabric.test.ts lib/domain/documents/patient-smart-import-service.test.ts",
     "test:patient-structured-fields": "node scripts/run-strip-types.mjs --test lib/patient-structured-fields.test.ts",
     "test:locked-field-guard": "node scripts/run-strip-types.mjs --test lib/locked-field-guard.test.ts",
     "test:attachment-payload": "node scripts/run-strip-types.mjs --test lib/attachment-payload.test.ts",
@@ -121,7 +137,6 @@
     "seed:performance-baseline": "node scripts/run-strip-types.mjs scripts/seed-performance-baseline.mjs",
     "benchmark:list-routes": "node scripts/benchmark-list-routes.mjs",
     "benchmark:clinical-facts:observations": "node scripts/run-strip-types.mjs scripts/benchmark-observation-facts.mjs",
-    "benchmark:icd-resolver": "node scripts/run-strip-types.mjs scripts/benchmark-icd-resolver.ts",
     "benchmark:aifa-resolver": "node scripts/run-strip-types.mjs scripts/benchmark-aifa-resolver.ts",
     "benchmark:ai-task-contracts": "node scripts/run-strip-types.mjs scripts/benchmark-ai-task-contracts.ts",
     "benchmark:document-decision": "node scripts/run-strip-types.mjs scripts/benchmark-document-decision.ts",
@@ -192,12 +207,16 @@
     "e2e:ai-rollout-governance": "E2E_SPECS='e2e/ai-rollout-readiness-panel.spec.ts e2e/ai-rollout-guard-settings.spec.ts e2e/patient-insight-kill-switch.spec.ts e2e/smart-import-kill-switch.spec.ts e2e/document-synthesis-kill-switch.spec.ts e2e/treatment-reasoning-kill-switch.spec.ts' bash scripts/e2e-smoke.sh",
     "e2e:fabric-settings": "E2E_SPECS='e2e/settings-fabric.spec.ts' E2E_BASE_URL='http://127.0.0.1:3189' bash scripts/e2e-smoke.sh",
     "e2e:smoke": "bash scripts/e2e-smoke.sh",
+    "check:anydoc-local-only": "node scripts/check-anydoc-local-only.mjs",
+    "test:anydoc-local-only": "node --test scripts/check-anydoc-local-only.test.mjs",
     "check:api-error-leak": "node scripts/check-api-error-leak.mjs",
     "test:api-error-leak": "node scripts/check-api-error-leak.mjs --self-test"
   },
   "dependencies": {
-    "@firecrawl/pdf-inspector": "1.12.0",
+    "@firecrawl/anydoc": "0.2.4",
     "@hookform/resolvers": "^5.2.2",
+    "@mediflow/web-auth-lifecycle-owner": "file:packages/web-auth-lifecycle-owner/artifacts/mediflow-web-auth-lifecycle-owner-0.8.6.tgz",
+    "@modelcontextprotocol/server": "2.0.0",
     "@tailwindcss/typography": "^0.5.19",
     "@tanstack/react-virtual": "^3.14.5",
     "@types/bcryptjs": "^2.4.6",
@@ -214,10 +233,11 @@
     "jspdf": "4.2.1",
     "jspdf-autotable": "^5.0.2",
     "lucide-react": "^0.562.0",
-    "next": "16.2.11",
+    "next": "16.3.4",
     "openai": "^6.16.0",
+    "pdf-lib": "1.17.1",
     "pdfjs-dist": "4.10.38",
-    "pm2": "^7.0.3",
+    "pm2": "7.0.4",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-dropzone": "^14.3.8",
@@ -229,12 +249,15 @@
   },
   "overrides": {
     "jspdf": {
-      "dompurify": "3.4.12"
+      "dompurify": "3.4.14",
+      "fflate": "0.8.3"
     },
     "next": {
-      "postcss": "8.5.22",
-      "sharp": "0.35.3"
-    }
+      "postcss": "8.5.23",
+      "sharp": "0.35.4"
+    },
+    "ip-address": "10.7.0",
+    "nanoid": "3.3.18"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",
@@ -246,8 +269,8 @@
     "@types/react-dom": "^19",
     "drizzle-kit": "^0.31.8",
     "eslint": "^9",
-    "eslint-config-next": "16.1.1",
-    "js-yaml": "^4.3.0",
+    "eslint-config-next": "16.3.4",
+    "js-yaml": "4.3.1",
     "tailwindcss": "^4",
     "typescript": "5.9.3"
   }

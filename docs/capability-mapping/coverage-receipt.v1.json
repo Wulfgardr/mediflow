@@ -1,0 +1,23 @@
+{
+  "schema": "mediflow.capability-mapping.coverage-receipt.v1",
+  "mappingVersion": 1,
+  "status": "candidate_not_integrated",
+  "applyPolicy": "none",
+  "sourceManifestSha256": "3022b8c9b87f9a1e1b0aa55c637b6dd626834d3bf02b54cb2bf4a6dd4f975ce3",
+  "claimCeiling": "ledger semantico locale su exact head; C1 non prova runtime composition o integration; non integrato, non release-ready, non released",
+  "populationCoverage": [
+    {"populationId":"anchors","expectedCount":66,"observedCount":66,"terminalDispositionCounts":{"mapped":66,"infrastructure_only":0,"out_of_catalog":0,"unmapped":0,"conflicted":0}},
+    {"populationId":"aip","expectedCount":109,"observedCount":109,"terminalDispositionCounts":{"mapped":109,"infrastructure_only":0,"out_of_catalog":0,"unmapped":0,"conflicted":0}},
+    {"populationId":"fabric","expectedCount":16,"observedCount":16,"terminalDispositionCounts":{"mapped":15,"infrastructure_only":0,"out_of_catalog":1,"unmapped":0,"conflicted":0}},
+    {"populationId":"surfaces","expectedCount":177,"observedCount":177,"terminalDispositionCounts":{"mapped":6,"infrastructure_only":0,"out_of_catalog":171,"unmapped":0,"conflicted":0}}
+  ],
+  "relationCoverage": {"expectedCount":127,"observedCount":127},
+  "conflictCoverage": {
+    "observedCount": 0,
+    "residualCount": 0,
+    "residualConflictIds": []
+  },
+  "ledgerComplete": true,
+  "semanticBindingComplete": true,
+  "requiredEvidence": []
+}

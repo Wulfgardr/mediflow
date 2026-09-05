@@ -1,62 +1,119 @@
 # Changelog
 
-Questo file raccoglie i cambiamenti rilevanti di MediFlow.
+This file collects MediFlow's relevant changes.
 
-Il formato è basato su [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Non rilasciato] - linea post-0.8
+## [0.8.5] - 2026-09-03
 
-> Voci della linea di sviluppo post-0.8. Nessuna e' parte della release 0.8.0.
+> This entry describes the source scope of patch `0.8.5`. CI evidence,
+> signing, tag, and GitHub Release belong to the promotion closeout and are not
+> implied by the content of this changelog alone.
 
-### Documentazione pubblica
+### Post-review candidate corrections (2026-09-05)
 
-- La galleria usa una cattura reale dell'app macOS corrente con fixture
-  sintetiche. Rimuove lo screenshot della shell Apple precedente.
-- Il README distingue il rapporto operativo tra Mac home-base, localhost e
-  client paired dalla direzione futura Intelligence Fabric.
-- Il dashboard dei token usa gli aggregati locali CodexBar e dichiara il
-  periodo e l'ambiente di registrazione.
+- Patient editor keeps initial versions, preserves concurrent additions and resumes only unconfirmed operations. Checkup writes require an available parent in the atomic CAS predicate.
+- Web/native scales distinguish unanswered fields from explicit zero; POMA28 is versioned and historical values are retained.
+- Native FHIR DTO carries lifecycle fields; FHIRv2 parity remains separate debt.
+- ATHENA runner configuration is passed only to the Web child. Analytics counts distinct patients per existing diagnosis key.
+- Fabric/context and operational review links filter patient tombstones while retaining historical link rows.
+- README and documentation offer progressive entry points; [candidate readiness](./docs/release-085-readiness.md) records verified scope and open Apple/distribution gates.
 
-### App native
+### Review-only Intelligence Fabric
 
-- La modalità demo Apple tratta il dataset sintetico come fixture UI. Il
-  caricamento documenti non mostra più un falso errore di sessione paired.
+- `AI Patient Insight`, Smart Import, Document Synthesis, and Treatment Reasoning
+  use distinct Fabric entrypoints and production roots.
+- The four paths have disposition `proposal_only`. The UIs show
+  receipt, provenance, and currentness; no preview applies clinical data.
+- The machine-readable crosswalk
+  `docs/capability-mapping/fabric-generative-runtime-crosswalk.v1.json` links
+  capability, entrypoint, production root, route, wire evidence, and UI. A
+  dedicated guard checks for drift.
+- The historical receipt `fabric-product-crosswalk-receipt.v1.json` remains
+  immutable with status `candidate_not_integrated`. It is not relabeled as
+  evidence of the current runtime.
 
-### Stack intelligente locale
+### Local attachment extraction
 
-- **Modifica**: consolidato lo stack provider post-0.8 (WUL-269, WUL-418,
-  WUL-502): locality Ollama loopback, registry locale per task senza fallback,
-  matrice serving e limite digest-bound (ADR 0088).
-  **Stato**: integrato nella branch di programma WUL-522 e verificato in
-  locale (typecheck, lint, guard e suite unit complete).
-  **Limite**: il digest resta identita osservata, non prova causale
-  (`observed_not_causal`); la qualified readiness resta `HOLD`.
-- **Modifica**: contratto Intelligence Fabric (ADR 0089) con scaffold locale:
-  capability generative e deterministiche, venue esplicite, profili egress
-  versionati, resolver fail-closed e stato read-only.
-  **Stato**: scaffold locale con test dedicati; nessun provider nuovo.
-  **Limite**: il profilo cloud esiste ed e' chiuso per costruzione; nessun
-  egress, credenziale o consenso e' stato aggiunto.
-- **Modifica**: giunture fabric (ADR 0090): ciclo di vita del trust paired
-  con revoca host-side dei client, onboarding provider fail-closed per classe
-  di credenziale, decisioni di routing osservabili con fallback negato e
-  contratto di interazione clinica (incertezza con origine, campi illeggibili
-  distinti dagli assenti, revisione deny-by-default senza stato applicato).
-  **Stato**: contratti e runtime locali con test dedicati; route
-  `/api/ai/fabric/observability` e revoca `DELETE
-  /api/v1/network/pairing-clients/{clientId}`.
-  **Limite**: nessuna UI nuova e nessuna adozione nativa in questa fase; la
-  scrittura clinica resta un comando applicativo separato.
-- **Modifica**: candidato locale Fabric (ADR 0091) con lifecycle provider
-  dichiarativo, admissione e continuita fail-closed, proiezione paired
-  `status_only`, decode Swift condiviso e harness sintetico
-  receipt-provenance-review.
-  **Stato**: candidato locale sulla branch CoS post-0.8, senza credenziali o
-  servizi esterni.
-  **Limite**: il router non governa ancora tutti i call path AI; lifecycle
-  vendor, cloud, on-device, AI paired e persistenza della review restano
-  bloccati o fuori scope. Nessuna voce promuove la release 0.8.
+- AnyDoc remains the first automatic local pass for supported formats.
+  Markdown conversion is bounded, uses no network, and is not OCR.
+- For supported PDFs, current-source composition materializes and
+  renders only `needsOcr` pages, uses local Apple Vision without network,
+  and recomposes the result in the original order.
+- DeepSeek-OCR 2/CUDA, qualification benchmarks, and universal readiness have
+  status `OUT_OF_SCOPE_FOR_0.8.5_NON_BLOCKING`. Encrypted or disallowed input,
+  direct images, and an unavailable local engine fail closed; legacy OCR routes
+  remain terminal `410`.
+
+### Headless, MCP, and Mini
+
+- The portable Node Supervisor starts standalone Web and MCP as distinct child
+  processes authenticated over inherited IPC, with no listener or direct
+  database imports.
+- MCP `stdio` exposes the catalog, terminology search, reads of the selected
+  patient's Open Loops, a `proposal_only` follow-up proposal, and a bounded
+  read-only semantic query. Mini retains the typed catalog and CLI foundation,
+  but has no production binding to the Supervisor and fails closed without a
+  parent AIP.
+- The Supervisor owns context, leases, revocation, and audit. Adapters do not
+  accept caller-supplied authority; the standalone terminal smoke on the final
+  tree, installer, onboarding, and operation on external hosts remain evidence
+  separate from the `0.8.5` source content.
+- F10 exposes only the `pending -> completed|cancelled` preview through MCP.
+  The trusted Web UI rereads the resource and requires an active medical role,
+  step-up, and a specific gesture before the commit with CAS, idempotency,
+  audit, and receipt. Proof and commit are not delegated to the agent.
+- The semantic planner is connected to the Supervisor as a bounded read-only
+  path. It composes at most two allowlisted operations, with no free SQL or
+  writes.
+- On macOS 26 or later, the shell integrates Apple on-device Italian capture
+  and transcription, with explicit consent, audio bounded to RAM only, and
+  transfer to the draft after review. It does not run automatic clinical
+  writers; real-microphone smoke and clinical validation remain outside the
+  `0.8.5` claim.
+
+### Providers and scope
+
+- Ollama and ATHENA/MLX are capability-specific local providers. ATHENA/MLX is
+  allowed only for Treatment Reasoning; no provider is a generic fallback.
+- The ATHENA runtime accepts a pre-provisioned offline MLX runner through
+  `MEDIFLOW_ATHENA_MLX_GENERATE_BIN`, as an absolute host-owned executable
+  path. It requires a runner and local model already present; it does not
+  declare universal readiness.
+- Runner support (`2574cf5fc`) passed TDD 6/6, typecheck, and ESLint. A
+  synthetic smoke on the production path with a local BF16 model completed in
+  10.6 seconds, with 64 tokens and 211 characters, without recording the raw
+  output. This is a single observation, not a benchmark or clinical evidence.
+- The provider v2 contract, secret broker, official HTTPS adapters, and
+  review-only administrative OpenAI/Anthropic probe are integrated. The route
+  is admin-only, requires explicit intent, and remains `default OFF`, with
+  host opt-in and explicit egress/retention policies.
+- The evidence uses fake transport. The tree contains no credentials and does
+  not prove live network, account, retention, or cloud runtime readiness.
+- AI invocation from paired clients remains out of scope.
+- The guided Fabric selector detects compatible profiles for five capabilities,
+  runs a synthetic smoke, and activates a host-owned binding with CAS and
+  rollback.
+
+### F6/F7 scope outcomes
+
+- **F6 — integrated local fallback**: AnyDoc remains the first pass; only
+  `needsOcr` PDF pages may use local Apple Vision with current-source
+  recomposition. DeepSeek-OCR 2/CUDA, qualification benchmarks, and universal
+  readiness have status `OUT_OF_SCOPE_FOR_0.8.5_NON_BLOCKING`.
+- **F7 — `INTEGRATED / DEFAULT_OFF`**: the provider v2 contract, secret broker,
+  official adapters, and review-only administrative probe are present. No
+  credential or live-network evidence belongs to the `0.8.5` scope.
+
+### Other changes
+
+- The gallery uses a real capture of the current macOS app with synthetic
+  fixtures and does not present the previous Apple shell as the current state.
+- The token dashboard states the period and environment of local CodexBar
+  aggregates.
+- Apple demo mode treats the synthetic dataset as a UI fixture. Document
+  upload no longer shows a false paired-session error.
 
 ## [0.8.2] - 2026-08-11
 
@@ -195,7 +252,8 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
 
 ### Limiti dichiarati della release
 
-- **Nessun contenuto nativo Apple è stato compilato o testato.** La toolchain
+- **Nessun contenuto nativo Apple è stato compilato o testato per questa
+  release storica.** La toolchain
   Xcode non è disponibile sulla postazione (`xcode-select -p` punta a
   CommandLineTools). Restano quindi non verificati i 4 file `native/` mergiati
   con la terminology parity. Il lavoro dipendente da Xcode è tracciato come

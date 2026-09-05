@@ -19,6 +19,8 @@ import { activePatients } from './patient-lifecycle';
 import type { NetworkWriteContext } from './network-write-context';
 /* @Codex */
 import { attachments, patients, patientsToAmbulatories } from './schema';
+/* @Codex */
+import { createHostAttachmentCurrentness } from './attachment-currentness-host';
 
 /* @Codex */
 export const NETWORK_ATTACHMENT_WRITE_CAPABILITY = 'network.replica.write-documents';
@@ -178,6 +180,7 @@ export async function createNetworkScopedAttachment(
         if (!patientIsActiveAndInScope(tx, context.patientId, context.scopeAmbulatoryId)) {
             return { status: 404, value: { error: 'Not found' } };
         }
+        const currentness = createHostAttachmentCurrentness();
 
         tx.insert(attachments).values({
             id: newId,
@@ -193,6 +196,9 @@ export async function createNetworkScopedAttachment(
             ocrQueueReason: 'paired_upload',
             ocrQueueUpdatedAt: now,
             createdAt: now,
+            documentSourceRef: currentness.sourceRef,
+            documentRevision: currentness.revision,
+            documentFreshnessEpoch: currentness.freshnessEpoch,
         }).run();
 
         return { status: 201, value: { id: newId } };

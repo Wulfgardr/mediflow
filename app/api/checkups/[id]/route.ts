@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
-import { checkups } from '@/lib/schema';
-import { and, eq } from 'drizzle-orm';
+import { checkups, patients } from '@/lib/schema';
+import { and, eq, exists } from 'drizzle-orm';
+import { activePatients } from '@/lib/patient-lifecycle';
 /* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 /* @Codex */
@@ -12,6 +13,13 @@ import { normalizeCheckupUpdateInput } from '@/lib/api-v1-clinical-write-normali
 import { buildCheckupVersionConflictPayload, parseCheckupExpectedVersion } from '@/lib/checkup-concurrency';
 /* @Codex */
 import { parseClinicalDeleteBody } from '@/lib/api-v1-clinical-lifecycle';
+
+/* @Codex MF085 combined review: a child CAS does not detect a patient tombstone.
+   Keep this correlated predicate in the UPDATE itself, not only the prior read. */
+function activeCheckupParent() {
+    return exists(dbServer.select({ id: patients.id }).from(patients)
+        .where(and(eq(patients.id, checkups.patientId), activePatients())));
+}
 
 /* @Codex */
 async function selectCheckupConflictSnapshot(checkupId: string) {
@@ -24,7 +32,7 @@ async function selectCheckupConflictSnapshot(checkupId: string) {
             deletedAt: checkups.deletedAt,
         })
         .from(checkups)
-        .where(eq(checkups.id, checkupId))
+        .where(and(eq(checkups.id, checkupId), activeCheckupParent()))
         .get() ?? null;
 }
 
@@ -44,7 +52,7 @@ export async function PUT(
             return NextResponse.json({ error: 'Version is required' }, { status: 400 });
         }
 
-        const existing = await dbServer.select({ id: checkups.id }).from(checkups).where(eq(checkups.id, id)).get();
+        const existing = await dbServer.select({ id: checkups.id }).from(checkups).where(and(eq(checkups.id, id), activeCheckupParent())).get();
         if (!existing) {
             return NextResponse.json({ error: 'Not found' }, { status: 404 });
         }
@@ -59,7 +67,7 @@ export async function PUT(
                 ...normalized.values,
                 version: expectedVersion + 1,
             })
-            .where(and(eq(checkups.id, id), eq(checkups.version, expectedVersion)))
+            .where(and(eq(checkups.id, id), eq(checkups.version, expectedVersion), activeCheckupParent()))
             .run();
 
         if (updateResult.changes === 0) {
@@ -121,7 +129,7 @@ export async function DELETE(
             return NextResponse.json({ error: normalized.error }, { status: 400 });
         }
 
-        const existing = await dbServer.select({ id: checkups.id }).from(checkups).where(eq(checkups.id, id)).get();
+        const existing = await dbServer.select({ id: checkups.id }).from(checkups).where(and(eq(checkups.id, id), activeCheckupParent())).get();
         if (!existing) {
             return NextResponse.json({ error: 'Not found' }, { status: 404 });
         }
@@ -131,7 +139,7 @@ export async function DELETE(
                 ...normalized.values,
                 version: expectedVersion + 1,
             })
-            .where(and(eq(checkups.id, id), eq(checkups.version, expectedVersion)))
+            .where(and(eq(checkups.id, id), eq(checkups.version, expectedVersion), activeCheckupParent()))
             .run();
 
         if (updateResult.changes === 0) {

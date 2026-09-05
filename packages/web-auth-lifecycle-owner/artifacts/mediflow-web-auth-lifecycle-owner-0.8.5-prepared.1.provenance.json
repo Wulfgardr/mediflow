@@ -1,0 +1,83 @@
+{
+  "schemaVersion": "mediflow.web-auth-lifecycle-owner.package-provenance.v1",
+  "acceptedBase": "fe514f77f437bd762ba045a726bc0e6229f826a8",
+  "predecessor": {
+    "version": "0.8.5-prepared.0",
+    "tarSha256": "4f03a28891ff1dbe4539e2a297334d7bbeee23dfc42c7cf4793fb38c3fde5d5a",
+    "provenanceSha256": "9c7dfeb27b9cfc7fbfb1d08a71478912cb9d51e31b662b4bc587b4bb1b61b96a"
+  },
+  "package": {
+    "name": "@mediflow/web-auth-lifecycle-owner",
+    "version": "0.8.5-prepared.1"
+  },
+  "toolchain": {
+    "node": "v24.19.0",
+    "npm": "11.17.0"
+  },
+  "pack": {
+    "command": "npm pack --ignore-scripts --pack-destination ./artifacts",
+    "runs": 2,
+    "network": "offline",
+    "scripts": "ignored",
+    "cache": "empty_temporary",
+    "byteIdentical": true
+  },
+  "artifact": {
+    "path": "packages/web-auth-lifecycle-owner/artifacts/mediflow-web-auth-lifecycle-owner-0.8.5-prepared.1.tgz",
+    "bytes": 433,
+    "sha256": "d24e919fb1709cdfd4a78cdb618a565e647922d63e28c15ff79b4a6e46bab1f2",
+    "integrity": "sha512-LuOI8iBDJzt2D3JW4n8r1UIzCwn5dI/5vkcgEbw+l8Br4nKbSpVIeB3rDOX+7SsoeYF5OlCxGVEqmTH2UvmtrA=="
+  },
+  "inputs": [
+    {
+      "path": "index.js",
+      "bytes": 80,
+      "sha256": "7bc72383ad0639480702aadb8bad2cacf135c2c1b1cb7013a68ed5eef6d26a4f"
+    },
+    {
+      "path": "internal/owner.cjs",
+      "bytes": 94,
+      "sha256": "70a65a0cea7dd3ba4e29799d1f899d3df0a0d9e832499841e2de7d67ab403add"
+    },
+    {
+      "path": "internal/support/value.cjs",
+      "bytes": 47,
+      "sha256": "9f0968a0290c6184c898f06de2c408540d4eda1ecd0e3e80ae013bb37a782be1"
+    },
+    {
+      "path": "package.json",
+      "bytes": 251,
+      "sha256": "80ceecdb6d109dfd860769220883a6a78797e24677c09e9479e5994a5595fd81"
+    }
+  ],
+  "roster": [
+    {
+      "path": "package/internal/owner.cjs",
+      "type": "file",
+      "mode": "0644",
+      "bytes": 94,
+      "sha256": "70a65a0cea7dd3ba4e29799d1f899d3df0a0d9e832499841e2de7d67ab403add"
+    },
+    {
+      "path": "package/internal/support/value.cjs",
+      "type": "file",
+      "mode": "0644",
+      "bytes": 47,
+      "sha256": "9f0968a0290c6184c898f06de2c408540d4eda1ecd0e3e80ae013bb37a782be1"
+    },
+    {
+      "path": "package/index.js",
+      "type": "file",
+      "mode": "0644",
+      "bytes": 80,
+      "sha256": "7bc72383ad0639480702aadb8bad2cacf135c2c1b1cb7013a68ed5eef6d26a4f"
+    },
+    {
+      "path": "package/package.json",
+      "type": "file",
+      "mode": "0644",
+      "bytes": 251,
+      "sha256": "80ceecdb6d109dfd860769220883a6a78797e24677c09e9479e5994a5595fd81"
+    }
+  ]
+}

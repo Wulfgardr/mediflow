@@ -179,7 +179,9 @@ final class PairedPatientsWorkspaceModelS7Tests: XCTestCase {
         let model = await makeModel(source: source)
         await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: patient)
 
-        await model.submitScale(ClinicalScales.tinetti, answers: [:])
+        // @Codex: retain the less-than escaping regression using a complete, valid MMSE.
+        await model.submitScale(ClinicalScales.mmse, answers:
+            Dictionary(uniqueKeysWithValues: ClinicalScales.mmse.questions.map { ($0.id, 0) }))
 
         let capturedPayload = await source.lastCreateEntryPayload
         let payload = try XCTUnwrap(capturedPayload)
@@ -187,8 +189,67 @@ final class PairedPatientsWorkspaceModelS7Tests: XCTestCase {
         let content = try XCTUnwrap(CryptoService.jsonDecodeString(decrypted))
         let stabilized = ClinicalRichText.render(document: ClinicalRichText.parse(html: content))
         XCTAssertEqual(content, stabilized)
-        XCTAssertTrue(content.contains("&lt; 19"))
-        XCTAssertFalse(content.contains("(< 19)"))
+        XCTAssertTrue(content.contains("&lt; 10"))
+        XCTAssertFalse(content.contains("(< 10)"))
+    }
+
+    // @Codex MF085-003: exercises the real paired model -> createEntry writer, not just the validator.
+    func testInvalidScaleFormsNeverReachCreateEntry() async throws {
+        let patient = detail(id: "p1")
+        let source = S7MockDataSource(details: ["p1": patient])
+        let model = await makeModel(source: source)
+        await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: patient)
+        for definition in ClinicalScales.all {
+            let complete = Dictionary(uniqueKeysWithValues: definition.questions.map { ($0.id, 0) })
+            let first = try XCTUnwrap(definition.questions.first)
+            var partial = complete
+            partial.removeValue(forKey: first.id)
+            var foreign = complete
+            foreign["foreignQuestion"] = 0
+            var invalid = complete
+            invalid[first.id] = (first.options.map(\.value).max() ?? 0) + 1
+            for answers in [[:], partial, foreign, invalid] {
+                await model.submitScale(definition, answers: answers)
+                let calls = await source.createEntryCalls
+                let payload = await source.lastCreateEntryPayload
+                let error = await model.errorMessage
+                let entries = await model.entries
+                XCTAssertEqual(calls, 0, definition.id)
+                XCTAssertNil(payload)
+                XCTAssertNotNil(error)
+                XCTAssertTrue(entries.isEmpty)
+            }
+        }
+        await model.submitScale(ClinicalScales.tinetti, answers: [:])
+        let calls = await source.createEntryCalls
+        XCTAssertEqual(calls, 0)
+    }
+
+    func testCompleteExplicitZeroScaleFormsWriteCanonicalEncryptedMetadata() async throws {
+        for definition in ClinicalScales.all {
+            let patient = detail(id: "p1")
+            let source = S7MockDataSource(details: ["p1": patient])
+            let model = await makeModel(source: source)
+            await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: patient)
+            let answers = Dictionary(uniqueKeysWithValues: definition.questions.map { ($0.id, 0) })
+            await model.submitScale(definition, answers: answers)
+            let calls = await source.createEntryCalls
+            let captured = await source.lastCreateEntryPayload
+            let payload = try XCTUnwrap(captured)
+            XCTAssertEqual(calls, 1)
+            let sealed = try XCTUnwrap(payload.metadata)
+            XCTAssertTrue(sealed.hasPrefix("ENC:"))
+            let decrypted = try XCTUnwrap(CryptoService.decryptField(sealed, masterKey: masterKey))
+            let json = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(decrypted.utf8)) as? [String: Any])
+            XCTAssertEqual(json["scaleId"] as? String, definition.id)
+            XCTAssertEqual(json["score"] as? Int, 0)
+            XCTAssertEqual(json["answers"] as? [String: Int], answers)
+            if definition.id == ClinicalScales.tinettiPOMA28ID {
+                let instrument = try XCTUnwrap(json["instrument"] as? [String: Any])
+                XCTAssertEqual(instrument["definitionVersion"] as? String, "mediflow.poma28.v1")
+                XCTAssertEqual(instrument["riskClassification"] as? String, "not-classified")
+            }
+        }
     }
 
     func testUpdateEditingEntryOmitsAttachmentsFieldWhenSelectionUntouched() async throws {
@@ -328,6 +389,90 @@ final class PairedPatientsWorkspaceModelS7Tests: XCTestCase {
 
         let reviewed = await model.newEntryVisitDraftReviewed
         XCTAssertFalse(reviewed, "a stale review must never authorize a different draft's insertion")
+    }
+
+    func testTranscriptMutationInvalidatesDraftReviewAndInsertionGate() async {
+        let patient = detail(id: "p1")
+        let draft = visitDraftResponse(subjective: ["Bozza della versione A"])
+        let source = S7MockDataSource(details: ["p1": patient], visitDraft: draft)
+        let model = await makeModel(source: source)
+        await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: patient)
+
+        await MainActor.run { model.newEntryVisitTranscript = "Trascrizione sintetica A." }
+        await model.computeVisitDraftForNewEntry()
+        await MainActor.run { model.newEntryVisitDraftReviewed = true }
+        let canInsertBeforeMutation = await model.canInsertVisitDraftIntoNewEntry
+        XCTAssertTrue(canInsertBeforeMutation)
+
+        await MainActor.run { model.newEntryVisitTranscript = "Trascrizione sintetica B." }
+
+        let responseAfterMutation = await model.newEntryVisitDraftResponse
+        let reviewedAfterMutation = await model.newEntryVisitDraftReviewed
+        let canInsertAfterMutation = await model.canInsertVisitDraftIntoNewEntry
+        XCTAssertNil(responseAfterMutation)
+        XCTAssertFalse(reviewedAfterMutation)
+        XCTAssertFalse(canInsertAfterMutation)
+    }
+
+    func testInFlightVisitDraftDoesNotPublishAfterTranscriptChangesAwayAndBack() async {
+        let patient = detail(id: "p1")
+        let draft = visitDraftResponse(subjective: ["Bozza tardiva della versione A"])
+        let source = S7MockDataSource(
+            details: ["p1": patient],
+            visitDraft: draft,
+            visitDraftDelayNanoseconds: 50_000_000
+        )
+        let model = await makeModel(source: source)
+        await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: patient)
+        let originalTranscript = "Trascrizione sintetica A."
+        await MainActor.run { model.newEntryVisitTranscript = originalTranscript }
+
+        let computation = Task { await model.computeVisitDraftForNewEntry() }
+        for _ in 0..<100 {
+            if await source.computeVisitDraftCalls > 0 { break }
+            try? await Task.sleep(nanoseconds: 1_000_000)
+        }
+        let startedCalls = await source.computeVisitDraftCalls
+        XCTAssertEqual(startedCalls, 1)
+
+        await MainActor.run {
+            model.newEntryVisitTranscript = "Trascrizione sintetica B."
+            model.newEntryVisitTranscript = originalTranscript
+        }
+        await computation.value
+
+        let transcriptAfterCompletion = await model.newEntryVisitTranscript
+        let responseAfterCompletion = await model.newEntryVisitDraftResponse
+        let reviewedAfterCompletion = await model.newEntryVisitDraftReviewed
+        let canInsertAfterCompletion = await model.canInsertVisitDraftIntoNewEntry
+        XCTAssertEqual(transcriptAfterCompletion, originalTranscript)
+        XCTAssertNil(responseAfterCompletion)
+        XCTAssertFalse(reviewedAfterCompletion)
+        XCTAssertFalse(canInsertAfterCompletion)
+    }
+
+    func testVisitDraftRejectsUTF8OversizeBelowCharacterLimit() async {
+        let patient = detail(id: "p1")
+        let source = S7MockDataSource(
+            details: ["p1": patient],
+            visitDraft: visitDraftResponse(subjective: ["Non deve essere richiesta"])
+        )
+        let model = await makeModel(source: source)
+        await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: patient)
+        let oversizedSingleGrapheme = "a" + String(repeating: "\u{0301}", count: 140_000)
+        let maxCharacters = await PairedPatientsWorkspaceModel.maxVisitDraftTranscriptChars
+        XCTAssertLessThanOrEqual(oversizedSingleGrapheme.count, maxCharacters)
+        XCTAssertGreaterThan(oversizedSingleGrapheme.utf8.count, VisitRecordingLimits.standard.maxTranscriptUTF8Bytes)
+
+        await MainActor.run { model.newEntryVisitTranscript = oversizedSingleGrapheme }
+        let canCompute = await model.canComputeVisitDraft
+        XCTAssertFalse(canCompute)
+        await model.computeVisitDraftForNewEntry()
+
+        let computeCalls = await source.computeVisitDraftCalls
+        let response = await model.newEntryVisitDraftResponse
+        XCTAssertEqual(computeCalls, 0)
+        XCTAssertNil(response)
     }
 
     func testVisitDraftNeverPersistsAnythingByItself() async {
@@ -520,7 +665,7 @@ actor S7MockDataSource: HomeBasePatientsDataSource {
         self.visitDraftDelayNanoseconds = visitDraftDelayNanoseconds
     }
 
-    func login(username: String?, password: String) async throws -> HomeBaseLoginResult {
+    func login(username: String?, password: String, credentials: HomeBasePairedCredentials) async throws -> HomeBaseLoginResult {
         HomeBaseLoginResult(sessionCookie: "sid=test", encryptedMasterKey: nil, salt: nil)
     }
 

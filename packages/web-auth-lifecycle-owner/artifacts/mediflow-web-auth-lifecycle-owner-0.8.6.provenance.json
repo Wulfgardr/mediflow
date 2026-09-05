@@ -1,0 +1,187 @@
+{
+  "schemaVersion": "mediflow.web-auth-lifecycle-owner.package-provenance.v1",
+  "acceptedBase": "5fa27923613b1932993a57f46b06e51264193e01",
+  "predecessor": {
+    "version": "0.8.5",
+    "tarSha256": "c9e64cd0857a8c9e0e869857af9f023654e79ac2959d630dd2eff14fc90bcf2c",
+    "provenanceSha256": "1d745decc7676c7ef11d0837e7300e8da5159785b10e7a79ef581ddd050696f3"
+  },
+  "package": {
+    "name": "@mediflow/web-auth-lifecycle-owner",
+    "version": "0.8.6"
+  },
+  "toolchain": {
+    "node": "v24.19.0",
+    "npm": "11.17.0"
+  },
+  "pack": {
+    "command": "npm pack <clean-temporary-copy> --ignore-scripts --offline --cache <empty-temporary-cache> --pack-destination <temporary-directory>",
+    "runs": 2,
+    "sourceCopies": 2,
+    "network": "offline",
+    "scripts": "ignored",
+    "cache": "empty_temporary",
+    "byteIdentical": true
+  },
+  "installation": {
+    "command": "npm install --offline --ignore-scripts --no-audit --no-fund --cache <empty-temporary-cache> <tracked-tarball>",
+    "scratch": "empty_package",
+    "physical": true,
+    "symlink": false,
+    "hardlink": false
+  },
+  "artifact": {
+    "path": "packages/web-auth-lifecycle-owner/artifacts/mediflow-web-auth-lifecycle-owner-0.8.6.tgz",
+    "bytes": 19785,
+    "sha256": "044dfb1a9aedfc52da181707ddab2c582c097909d2f54cff886f6f33273f2b45",
+    "integrity": "sha512-itcn0K8Ru1BHWcpd4sVOrzl0qMX4+8gZr+EX+JABsdOid0yYz2qgYJX5naSBPLp+6xkz7X/a5TieIJ25OKQlmw=="
+  },
+  "inputs": [
+    {
+      "path": "index.js",
+      "bytes": 116,
+      "sha256": "1abc52ee8abe9fd25b28046f1f00ecc2f09d699ba220c61e6222730c22ca44c5"
+    },
+    {
+      "path": "index.d.ts",
+      "bytes": 3529,
+      "sha256": "647385b9d57d2bd2309f70de08866d326736c200f2fce201e54857ec63da3987"
+    },
+    {
+      "path": "internal/control-record.cjs",
+      "bytes": 19478,
+      "sha256": "3d443096679799ffde96e744060de5be59c9a86ddb383bdd975de75c913b9aa4"
+    },
+    {
+      "path": "internal/owner.cjs",
+      "bytes": 37866,
+      "sha256": "f9d5e54e89a41788ecdf228841473a7210616fc054d9b3e3ded6316a91c94d2d"
+    },
+    {
+      "path": "internal/session-activation.cjs",
+      "bytes": 6143,
+      "sha256": "5ed4c9543f8bc15903c0915a8565b997d697d004e9ccfaaa54a3da6236a2aa96"
+    },
+    {
+      "path": "internal/session-cell.cjs",
+      "bytes": 23897,
+      "sha256": "4cd0c2e9f8b40b346d43a93de561e20e85c5662fc8a2f9a0a170403fc80c2e31"
+    },
+    {
+      "path": "internal/session-resolver.cjs",
+      "bytes": 2965,
+      "sha256": "75409d670b8411dbadcc95e4bd9bfebeff47d2f687bde0d638809bb9114b5fa0"
+    },
+    {
+      "path": "internal/session-resource.cjs",
+      "bytes": 14096,
+      "sha256": "127de77dfb73f91f313e5318fd64e838f3f5e3147e801e19b492e0876127d876"
+    },
+    {
+      "path": "internal/session-retirement.cjs",
+      "bytes": 5664,
+      "sha256": "8848c92cb88635c6c09baf685839e7c6f1aca40d667ea6580e84e275349f1516"
+    },
+    {
+      "path": "internal/support/successor-fence.cjs",
+      "bytes": 1172,
+      "sha256": "7e36178331d5f899d81d877603acb0100eef1436d1873287ad4b27ccc227e7ff"
+    },
+    {
+      "path": "internal/support/value.cjs",
+      "bytes": 47,
+      "sha256": "9f0968a0290c6184c898f06de2c408540d4eda1ecd0e3e80ae013bb37a782be1"
+    },
+    {
+      "path": "package.json",
+      "bytes": 281,
+      "sha256": "06f785441953621ac6b2fd6f313471f8bbd33bd730d1e603de94b45da382f99d"
+    }
+  ],
+  "roster": [
+    {
+      "path": "package/internal/control-record.cjs",
+      "type": "file",
+      "mode": "0644",
+      "bytes": 19478,
+      "sha256": "3d443096679799ffde96e744060de5be59c9a86ddb383bdd975de75c913b9aa4"
+    },
+    {
+      "path": "package/internal/owner.cjs",
+      "type": "file",
+      "mode": "0644",
+      "bytes": 37866,
+      "sha256": "f9d5e54e89a41788ecdf228841473a7210616fc054d9b3e3ded6316a91c94d2d"
+    },
+    {
+      "path": "package/internal/session-activation.cjs",
+      "type": "file",
+      "mode": "0644",
+      "bytes": 6143,
+      "sha256": "5ed4c9543f8bc15903c0915a8565b997d697d004e9ccfaaa54a3da6236a2aa96"
+    },
+    {
+      "path": "package/internal/session-cell.cjs",
+      "type": "file",
+      "mode": "0644",
+      "bytes": 23897,
+      "sha256": "4cd0c2e9f8b40b346d43a93de561e20e85c5662fc8a2f9a0a170403fc80c2e31"
+    },
+    {
+      "path": "package/internal/session-resolver.cjs",
+      "type": "file",
+      "mode": "0644",
+      "bytes": 2965,
+      "sha256": "75409d670b8411dbadcc95e4bd9bfebeff47d2f687bde0d638809bb9114b5fa0"
+    },
+    {
+      "path": "package/internal/session-resource.cjs",
+      "type": "file",
+      "mode": "0644",
+      "bytes": 14096,
+      "sha256": "127de77dfb73f91f313e5318fd64e838f3f5e3147e801e19b492e0876127d876"
+    },
+    {
+      "path": "package/internal/session-retirement.cjs",
+      "type": "file",
+      "mode": "0644",
+      "bytes": 5664,
+      "sha256": "8848c92cb88635c6c09baf685839e7c6f1aca40d667ea6580e84e275349f1516"
+    },
+    {
+      "path": "package/internal/support/successor-fence.cjs",
+      "type": "file",
+      "mode": "0644",
+      "bytes": 1172,
+      "sha256": "7e36178331d5f899d81d877603acb0100eef1436d1873287ad4b27ccc227e7ff"
+    },
+    {
+      "path": "package/internal/support/value.cjs",
+      "type": "file",
+      "mode": "0644",
+      "bytes": 47,
+      "sha256": "9f0968a0290c6184c898f06de2c408540d4eda1ecd0e3e80ae013bb37a782be1"
+    },
+    {
+      "path": "package/index.js",
+      "type": "file",
+      "mode": "0644",
+      "bytes": 116,
+      "sha256": "1abc52ee8abe9fd25b28046f1f00ecc2f09d699ba220c61e6222730c22ca44c5"
+    },
+    {
+      "path": "package/package.json",
+      "type": "file",
+      "mode": "0644",
+      "bytes": 281,
+      "sha256": "06f785441953621ac6b2fd6f313471f8bbd33bd730d1e603de94b45da382f99d"
+    },
+    {
+      "path": "package/index.d.ts",
+      "type": "file",
+      "mode": "0644",
+      "bytes": 3529,
+      "sha256": "647385b9d57d2bd2309f70de08866d326736c200f2fce201e54857ec63da3987"
+    }
+  ]
+}

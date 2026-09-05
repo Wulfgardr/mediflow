@@ -1,0 +1,154 @@
+/* @Codex */
+import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import test from 'node:test';
+
+const ROOT = path.resolve(__dirname, '../../..');
+const TARGET = path.join(ROOT, 'lib/ai-providers/fabric/document-synthesis-authenticated-attachment-capture.ts');
+const RUNNER = path.join(ROOT, 'scripts/register-strip-types-loader.mjs');
+
+function isNode24Abi137(candidate: string | undefined): candidate is string {
+    if (typeof candidate !== 'string' || candidate.length === 0) return false;
+    const probe = spawnSync(
+        candidate,
+        ['--print', "`${process.versions.node}|${process.versions.modules}`"],
+        { encoding: 'utf8' },
+    );
+    return probe.status === 0 && /^24\.\d+\.\d+\|137\s*$/u.test(probe.stdout ?? '');
+}
+
+function nvmNode24Candidates(): string[] {
+    const versions = path.join(os.homedir(), '.nvm/versions/node');
+    try {
+        return readdirSync(versions)
+            .filter((name) => /^v24\.\d+\.\d+$/u.test(name))
+            .sort((left, right) => right.localeCompare(left, undefined, { numeric: true }))
+            .map((name) => path.join(versions, name, 'bin/node'));
+    } catch {
+        return [];
+    }
+}
+
+const NODE_24 = [process.env.MEDIFLOW_STRIP_TYPES_NODE, process.execPath, ...nvmNode24Candidates()]
+    .find(isNode24Abi137);
+
+if (!NODE_24) throw new Error('Document Synthesis attachment capture tests require Node 24 with ABI 137.');
+
+test('exports only the fixed capture boundary and no production composition', () => {
+    const source = readFileSync(TARGET, 'utf8');
+    assert.equal((source.match(/^export /gmu) ?? []).length, 1);
+    assert.match(source, /export async function captureDocumentSynthesisAuthenticatedAttachment/u);
+    assert.doesNotMatch(source, /createDocumentSynthesisAuthenticatedAttachmentCapture|Sources|acquireContext:|lookup\(|entropy:|export (?:type|interface|const|class|\{)/u);
+    assert.match(source, /withLeaseCriticalSection[\s\S]*?INNER JOIN patients_to_ambulatories/u);
+    assert.doesNotMatch(source, /production\.ts/u);
+    assert.throws(() => readFileSync(path.join(ROOT, 'lib/ai-providers/fabric/document-synthesis-authenticated-attachment-capture-production.ts')),
+        { code: 'ENOENT' });
+});
+
+test('uses the fixed server boundary with an isolated database, session, and selection', () => {
+    const directory = mkdtempSync(path.join(os.tmpdir(), 'mediflow-i1b-capture-'));
+    const mockAuth = path.join(directory, 'mock-server-auth.cjs');
+    const worker = path.join(directory, 'capture-boundary.cjs');
+    try {
+        writeFileSync(mockAuth, `
+const { createSession, deleteSession } = require(${JSON.stringify(path.join(ROOT, 'lib/security/server-session.ts'))});
+const { createServerSessionProjectionOwnerRegistry } = require(${JSON.stringify(path.join(ROOT, 'lib/security/server-session-projection-owner.ts'))});
+const registry = createServerSessionProjectionOwnerRegistry({ resolve: (_session, pair) => Object.freeze({ ...pair, patientVersion: 1 }) });
+const makeContext = (patientId) => {
+  const session = createSession({ id: 'user.synthetic.capture', username: ['cap', 'ture'].join(''), role: 'admin' }, 'web');
+  const owner = registry.acquire(session);
+  owner.issueSelection({ expectedEpoch: 0, patientId, ambulatoryId: 'ambulatory.synthetic.capture' });
+  return Object.freeze({ session, owner });
+};
+const primary = makeContext('patient.synthetic.capture');
+const other = makeContext('patient.synthetic.other');
+const poisoned = makeContext('patient.synthetic.capture');
+const contexts = [primary, primary, other, other, other, poisoned];
+let calls = 0;
+module.exports = {
+  acquireAuthenticatedWebSessionProjectionOwnerContext: async () => {
+    const context = contexts[calls++] ?? null;
+    if (calls === 5) deleteSession(other.session.id);
+    return context;
+  },
+};
+`);
+        writeFileSync(worker, `
+(async () => {
+const assert = require('node:assert/strict');
+const crypto = require('node:crypto');
+const { registerHooks } = require('node:module');
+const { pathToFileURL } = require('node:url');
+const target = ${JSON.stringify(TARGET)};
+const mockAuth = ${JSON.stringify(mockAuth)};
+registerHooks({ resolve(specifier, context, nextResolve) {
+  if (specifier === '../../security/server-auth' && context.parentURL === pathToFileURL(target).href) {
+    return { shortCircuit: true, url: pathToFileURL(mockAuth).href, format: 'commonjs' };
+  }
+  return nextResolve(specifier, context);
+} });
+const fs = require('node:fs');
+const path = require('node:path');
+const Database = require(${JSON.stringify(path.join(ROOT, 'node_modules/better-sqlite3'))});
+fs.mkdirSync(process.env.MEDIFLOW_DATA_DIR, { recursive: true });
+const bootstrap = new Database(path.join(process.env.MEDIFLOW_DATA_DIR, 'medical.db'));
+for (const file of fs.readdirSync(${JSON.stringify(path.join(ROOT, 'drizzle'))}).filter((name) => name.endsWith('.sql')).sort()) {
+  bootstrap.exec(fs.readFileSync(path.join(${JSON.stringify(path.join(ROOT, 'drizzle'))}, file), 'utf8').replace(/^-->\\s+statement-breakpoint\\s*$/gmu, ''));
+}
+bootstrap.close();
+const { dbServer } = require(${JSON.stringify(path.join(ROOT, 'lib/db-server.ts'))});
+const { sql } = require(${JSON.stringify(path.join(ROOT, 'node_modules/drizzle-orm'))});
+dbServer.run(sql.raw("INSERT INTO ambulatories (id, name, type) VALUES ('ambulatory.synthetic.capture', 'Synthetic capture', 'test')"));
+dbServer.run(sql.raw("INSERT INTO patients (id, first_name, last_name, tax_code) VALUES ('patient.synthetic.capture', 'First', 'Synthetic', 'CAPTUREFIRST00001'), ('patient.synthetic.other', 'Other', 'Synthetic', 'CAPTUREOTHER00002')"));
+dbServer.run(sql.raw("INSERT INTO patients_to_ambulatories (patient_id, ambulatory_id) VALUES ('patient.synthetic.capture', 'ambulatory.synthetic.capture'), ('patient.synthetic.other', 'ambulatory.synthetic.capture')"));
+dbServer.run(sql.raw("INSERT INTO attachments (id, patient_id, name, type, size, path, document_source_ref, document_revision, document_freshness_epoch) VALUES ('attachment.synthetic.capture', 'patient.synthetic.capture', 'capture.pdf', 'application/pdf', 1, 'capture.pdf', '${'a'.repeat(64)}', 7, 11), ('attachment.synthetic.other', 'patient.synthetic.other', 'other.pdf', 'application/pdf', 1, 'other.pdf', '${'b'.repeat(64)}', 5, 13)"));
+const { captureDocumentSynthesisAuthenticatedAttachment: capture } = require(target);
+const first = await capture({ attachmentId: 'attachment.synthetic.capture' });
+assert.equal(first.status, 'available');
+assert.equal(first.code, null);
+assert.match(first.captureHandle, /^dsc_[0-9a-f]{32}$/u);
+assert.deepEqual({ reviewOnly: first.reviewOnly, writesPerformed: first.writesPerformed, applyPolicy: first.applyPolicy }, { reviewOnly: true, writesPerformed: 0, applyPolicy: 'none' });
+let traps = 0;
+const hostile = new Proxy({ attachmentId: 'attachment.synthetic.capture' }, { get() { traps += 1; throw new Error('trap'); }, ownKeys() { traps += 1; throw new Error('trap'); } });
+const hostileResult = await capture(hostile);
+assert.deepEqual({ ...hostileResult }, { status: 'denied', code: 'input_invalid', captureHandle: null, reviewOnly: true, writesPerformed: 0, applyPolicy: 'none' });
+assert.equal(traps, 0);
+const missing = await capture({ attachmentId: 'attachment.synthetic.missing' });
+const wrongPatient = await capture({ attachmentId: 'attachment.synthetic.capture' });
+assert.deepEqual({ ...missing }, { ...wrongPatient });
+assert.deepEqual({ ...missing }, { status: 'denied', code: 'unavailable', captureHandle: null, reviewOnly: true, writesPerformed: 0, applyPolicy: 'none' });
+assert.deepEqual({ ...await capture({ attachmentId: first.captureHandle }) }, { ...missing });
+assert.deepEqual({ ...await capture({ attachmentId: 'attachment.synthetic.other' }) }, { ...missing });
+const originals = { assign: Object.assign, hasOwn: Object.hasOwn, array: Array.isArray, safe: Number.isSafeInteger, map: global.Map, weakMap: global.WeakMap, entropy: crypto.randomBytes };
+const poison = () => { throw new Error('post-import poison'); };
+Object.assign = poison; Object.hasOwn = poison; Array.isArray = poison; Number.isSafeInteger = poison; global.Map = poison; global.WeakMap = poison; crypto.randomBytes = poison;
+let poisonedResult;
+try { poisonedResult = await capture({ attachmentId: 'attachment.synthetic.capture' }); } finally {
+  Object.assign = originals.assign; Object.hasOwn = originals.hasOwn; Array.isArray = originals.array; Number.isSafeInteger = originals.safe; global.Map = originals.map; global.WeakMap = originals.weakMap; crypto.randomBytes = originals.entropy;
+}
+assert.deepEqual({ ...poisonedResult }, { ...missing });
+})().catch((error) => { console.error(error); process.exitCode = 1; });
+`);
+        const result = spawnSync(NODE_24, ['--experimental-strip-types', '--import', RUNNER, worker], {
+            cwd: ROOT,
+            encoding: 'utf8',
+            env: { ...process.env, MEDIFLOW_DATA_DIR: path.join(directory, 'data') },
+        });
+        assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+    } finally {
+        rmSync(directory, { recursive: true, force: true });
+    }
+});
+
+test('captures every runtime intrinsic before the boundary is called', () => {
+    const source = readFileSync(TARGET, 'utf8');
+    for (const token of [
+        'ObjectAssign = Object.assign', 'ObjectHasOwn = Object.hasOwn', 'ArrayIsArray = Array.isArray',
+        'NumberIsSafeInteger = Number.isSafeInteger', 'MapConstructor = Map', 'WeakMapConstructor = WeakMap',
+        'DbGet = dbServer.get.bind(dbServer)', 'Entropy = randomBytes', "'input_invalid'", "'unavailable'",
+        'reviewOnly: true', "applyPolicy: 'none'",
+    ]) assert.match(source, new RegExp(token.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&'), 'u'));
+});

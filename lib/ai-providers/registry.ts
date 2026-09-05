@@ -6,7 +6,7 @@ import {
 } from './ollama-locality';
 import type { AIProvider, ProviderAdapter } from './provider';
 
-export const AI_SERVICE_TASKS = ['clinical', 'reasoning', 'ocr'] as const;
+export const AI_SERVICE_TASKS = ['clinical', 'reasoning'] as const;
 export type AIServiceTask = typeof AI_SERVICE_TASKS[number];
 export interface ProviderCapabilityManifest {
     readonly provider: AIProvider;
@@ -71,7 +71,6 @@ export class ProviderRegistryError extends Error {
 const TASK_PROVIDER_BINDINGS: Readonly<Record<AIServiceTask, AIProvider>> = {
     clinical: 'ollama',
     reasoning: 'ollama',
-    ocr: 'ollama',
 };
 
 const OLLAMA_MANIFEST_BASE: Omit<ProviderCapabilityManifest, 'capabilities'> = Object.freeze({

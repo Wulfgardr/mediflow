@@ -1,6 +1,6 @@
 'use client';
 
-import { DependencyList, useEffect, useRef, useState } from 'react';
+import { DependencyList, useCallback, useEffect, useRef, useState } from 'react';
 import { createDbChangeBus } from './live-query-scope';
 import type { DbChangeScope } from './live-query-scope';
 
@@ -22,11 +22,14 @@ export function useLiveQuery<T, TDefault = undefined>(
     const [revision, setRevision] = useState(0);
     /* @Codex */
     const tablesRef = useRef(tables);
-    tablesRef.current = tables;
 
     useEffect(() => {
         querierRef.current = querier;
     }, [querier]);
+
+    useEffect(() => {
+        tablesRef.current = tables;
+    }, [tables]);
 
     useEffect(() => dbChangeBus.subscribeWithScopeResolver(() => {
         setRevision((previous) => previous + 1);
@@ -63,6 +66,9 @@ export type LiveQueryState<T, TDefault = undefined> = {
     data: T | TDefault | undefined;
     error: unknown;
     loading: boolean;
+    /* @Codex WUL-UIUX: riesegue la query adesso (es. azione «Riprova» su errore).
+       Additivo: i chiamanti che non lo destrutturano non cambiano. */
+    refresh: () => void;
 };
 
 export function useLiveQueryState<T, TDefault = undefined>(
@@ -76,13 +82,17 @@ export function useLiveQueryState<T, TDefault = undefined>(
     const [error, setError] = useState<unknown>(null);
     const [loading, setLoading] = useState(true);
     const [revision, setRevision] = useState(0);
+    const refresh = useCallback(() => setRevision((previous) => previous + 1), []);
     /* @Codex */
     const tablesRef = useRef(tables);
-    tablesRef.current = tables;
 
     useEffect(() => {
         querierRef.current = querier;
     }, [querier]);
+
+    useEffect(() => {
+        tablesRef.current = tables;
+    }, [tables]);
 
     useEffect(() => dbChangeBus.subscribeWithScopeResolver(() => {
         setRevision((previous) => previous + 1);
@@ -115,5 +125,5 @@ export function useLiveQueryState<T, TDefault = undefined>(
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [revision, ...(deps ?? [])]);
 
-    return { data, error, loading };
+    return { data, error, loading, refresh };
 }

@@ -16,7 +16,8 @@ import { useConfirm } from '@/components/ui/confirm-dialog';
 
 // --- Model Selector Component ---
 export interface ModelSelectorProps {
-    selectorId: 'clinical' | 'reasoning' | 'ocr';
+    /* @Codex */
+    selectorId: 'clinical' | 'reasoning';
     label: string;
     description: string;
     icon: ReactNode;

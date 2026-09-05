@@ -1,20 +1,14 @@
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
-import { attachments, patients } from '@/lib/schema';
-import { activePatients } from '@/lib/patient-lifecycle';
-import { and, asc, eq, desc, type SQL } from 'drizzle-orm';
-import { v4 as uuidv4 } from 'uuid';
+import { attachments } from '@/lib/schema';
+import { asc, eq, desc, type SQL } from 'drizzle-orm';
 /* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 import { buildAttachmentPath } from '@/lib/attachment-path';
-/* @Codex */
-import { getAttachmentPayloadByteSize, resolveMaxAttachmentBytes } from '@/lib/attachment-payload';
 /* STREAM B: server-side list params (whitelisted, plaintext columns only). */
 import { parseListParams } from '@/lib/list-query-params';
 /* @Codex */
-import { attachmentCreateSchema } from '@/lib/api-schemas/attachments';
-/* @Codex */
-import { parseApiBody } from '@/lib/api-schemas/parse';
+import { createWebAttachment } from '@/lib/attachment-web-create';
 
 // Only plaintext columns are sortable (name/path/data are ENC:). size/type are
 // plaintext metadata and safe to sort on.
@@ -42,7 +36,10 @@ const ATTACHMENT_METADATA_COLUMNS = {
     createdAt: attachments.createdAt,
 } as const;
 
-import { isDocumentOcrQueueReason, isDocumentOcrQueueState } from '@/lib/domain/documents/document-ocr-queue';
+const ATTACHMENT_RESPONSE_COLUMNS = {
+    ...ATTACHMENT_METADATA_COLUMNS,
+    data: attachments.data,
+} as const;
 
 /* @Codex */
 function serializeAttachment<T extends { id: string; name: string; path: string }>(row: T): T {
@@ -79,9 +76,7 @@ export async function GET(request: Request) {
         // Metadata mode omits the base64 `data` blob entirely: the list never
         // ships (nor decrypts) attachment payloads. Full retrieval is via
         // GET /api/attachments/[id].
-        let query = (metadataOnly
-            ? dbServer.select(ATTACHMENT_METADATA_COLUMNS).from(attachments)
-            : dbServer.select().from(attachments))
+        let query = dbServer.select(metadataOnly ? ATTACHMENT_METADATA_COLUMNS : ATTACHMENT_RESPONSE_COLUMNS).from(attachments)
             .where(whereClause)
             .orderBy(orderExpr)
             .$dynamic();
@@ -98,66 +93,5 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
     /* @Codex */
     const session = await requireSession();
-    if (!session) return unauthorizedResponse();
-
-    try {
-        /* @Codex */
-        const contentLength = Number.parseInt(request.headers.get('content-length') ?? '', 10);
-        if (Number.isFinite(contentLength) && contentLength > resolveMaxAttachmentBytes()) {
-            return NextResponse.json({ error: 'Attachment payload too large' }, { status: 413 });
-        }
-
-        const rawBody = await request.json();
-        const parsedBody = parseApiBody(attachmentCreateSchema, rawBody);
-        if (!parsedBody.ok) return parsedBody.response;
-        const body = parsedBody.data;
-        const newId = body.id || uuidv4();
-        /* @Codex */
-        if (typeof body.patientId !== 'string' || body.patientId.trim().length === 0) {
-            return NextResponse.json({ error: 'patientId required' }, { status: 400 });
-        }
-        /* @Codex */
-        // WUL-306 (ADR 0066): soft-deleted patients must not accept new attachments.
-        const patient = await dbServer.select({ id: patients.id }).from(patients).where(and(eq(patients.id, body.patientId), activePatients())).get();
-        if (!patient) {
-            return NextResponse.json({ error: 'Patient not found' }, { status: 404 });
-        }
-        /* @Codex */
-        const dataSize = getAttachmentPayloadByteSize(body.data);
-        if (!dataSize.ok) {
-            return NextResponse.json({ error: dataSize.error }, { status: 400 });
-        }
-        /* @Codex */
-        if (dataSize.size > resolveMaxAttachmentBytes()) {
-            return NextResponse.json({ error: 'Attachment payload too large' }, { status: 413 });
-        }
-
-        // Note: The actual file upload is handled separately (usually).
-        // This endpoint likely stores the metadata of the attachment.
-        // If the 'path' doesn't exist, we might need a separate upload endpoint
-        // or this endpoint expects the path to be already determined (e.g. valid URL or local path).
-
-        await dbServer.insert(attachments).values({
-            id: newId,
-            patientId: body.patientId,
-            name: body.name,
-            type: body.type,
-            size: body.size,
-            /* @Codex */
-            path: buildAttachmentPath(body.path, body.name, newId),
-            /* @Codex */
-            data: body.data ?? null,
-            summarySnapshot: body.summarySnapshot ?? null,
-            /* @Codex */
-            parseEvidenceArtifactSnapshot: body.parseEvidenceArtifactSnapshot ?? null,
-            ocrQueueState: isDocumentOcrQueueState(body.ocrQueueState) ? body.ocrQueueState : null,
-            ocrQueueReason: isDocumentOcrQueueReason(body.ocrQueueReason) ? body.ocrQueueReason : null,
-            ocrQueueUpdatedAt: isDocumentOcrQueueState(body.ocrQueueState) ? new Date() : null,
-            createdAt: new Date()
-        });
-
-        return NextResponse.json({ id: newId }, { status: 201 });
-    } catch (error) {
-        return NextResponse.json({ error: "Create Failed" }, { status: 500 });
-    }
+    return createWebAttachment(request, session);
 }

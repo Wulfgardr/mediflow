@@ -5,13 +5,23 @@ read_when:
   - "Placing code, documentation, publication assets, or private local artifacts."
 ---
 
-# Repository Topology: MediFlow
+# Dove vive MediFlow: topologia della repository
 
-Ultimo aggiornamento: 2026-08-07
+Ultimo aggiornamento: 2026-09-05
 
 Mappa concisa delle aree top-level del repository, pensata per orientare agent e
 contributor: distingue il **runtime clinico** (codice che gira con dati paziente)
 dagli **artefatti di pubblicazione/sito** e dagli **strumenti di sviluppo**.
+
+## Orientarsi prima dei percorsi
+
+Il gestionale si costruisce qui. Per orientarsi, conviene distinguere tre aree: il prodotto che lavora sulla
+cartella, gli strumenti che lo costruiscono e verificano, e i documenti che lo
+spiegano. Il sito [Get MediFlow](https://getmediflow.dev) è il riferimento di presentazione del prodotto: non
+ospita la cartella, non importa i servizi clinici e non riceve dati del runtime.
+
+Per chi arriva al progetto: [Inizia qui](./start-here.md). Per la candidatura
+in esame: [readiness 0.8.5](./release-085-readiness.md). Per il sito e l'ordine della documentazione: [piano editoriale](./getmediflow-editorial-proposal.md).
 
 ## Repository operativa
 
@@ -51,35 +61,114 @@ runtime artifact e fonti riservate restano fuori da Git secondo
 | `Farmaci/` | dati di riferimento | Dataset farmaceutici di riferimento. |
 | `certs/` | dev tooling | Certificati TLS locali per dev. |
 
-## Confine AI e integrazioni opzionali
+## Confine Application Services, Fabric e integrazioni opzionali
 
-La topologia AI implementata resta locale:
+La topologia intelligente della 0.8.5 resta
+host-owned e locale:
 
-- `lib/ai-service.ts` è la facciata usata dalle funzioni applicative;
-- `lib/ai-providers/` contiene il connettore operativo Ollama;
-- `lib/ai-egress-gate.ts` e `lib/ai-egress-audit.ts` applicano una chiusura
-  sicura in caso di errore (`fail-closed`) e scrivono un registro locale privo
-  di contenuto clinico.
+- `app/api/ai/{patient-insight,smart-import,document-synthesis,treatment-reasoning}/`
+  contiene gli adapter HTTP autenticati dei quattro smart path generativi;
+- `lib/ai-providers/fabric/` contiene resolver, production root, lifecycle,
+  receipt, selector guidato e binding atomici governati dall'host;
+- `lib/ai-providers/v2/` contiene contratto provider, secret broker, adapter
+  HTTPS ufficiali e probe review-only OpenAI/Anthropic `default OFF`;
+- `packages/aip/`, `packages/mcp/` e `packages/mini/` contengono il broker
+  portabile e le superfici figlie candidate, senza import diretti del database;
+- quando configurato, Ollama serve Patient Insight, Smart Import e Document
+  Synthesis;
+- quando configurata, ATHENA su MLX serve soltanto Treatment Reasoning, con
+  lifecycle separato da Ollama;
+- AnyDoc esegue l'unica estrazione automatica deterministica locale degli
+  allegati e non è un provider o una venue Fabric;
+- `lib/ai-egress-gate.ts` e `lib/ai-egress-audit.ts` mantengono la chiusura
+  sicura in caso di errore (`fail-closed`) e un registro locale privo di
+  contenuto clinico.
 
-Non esistono fornitori cloud operativi, registri esterni o una superficie di
-consenso per l'invio esterno. Il controllo resta
-`closed_pending_redaction_lane`.
+ATHENA è inclusa soltanto con runner e modello locali configurati. L'override
+host-owned `MEDIFLOW_ATHENA_MLX_GENERATE_BIN` accetta un eseguibile assoluto
+`mlx_lm.generate`, senza argomenti o shell. Il launcher `uvx` predefinito opera
+offline e fallisce chiuso se la cache richiesta non è disponibile; non prova
+readiness universale.
+
+Il caller presenta soltanto input applicativo tipizzato. Non sceglie provider,
+modello, endpoint, venue, prompt, fallback o apply. Ogni smart path restituisce
+una proposta review-only con receipt, provenienza e currentness; il production
+root host-owned resta l'unico punto di composizione.
+
+AnyDoc resta il primo passaggio. Per i PDF supportati, il tree classifica,
+materializza e renderizza soltanto le pagine `needsOcr`, quindi usa Apple
+Vision localmente sul Mac e ricompone il risultato sotto currentness
+host-owned. Il percorso è review-only e fallisce chiuso. DeepSeek-OCR 2/CUDA
+resta `OUT_OF_SCOPE_FOR_0.8.5_NON_BLOCKING`; il tree ne conserva soltanto il
+contratto e seam sintetiche. Le route OCR legacy, dopo l'autenticazione,
+rispondono `410`.
+
+OpenAI e Anthropic hanno adapter HTTPS ufficiali e probe Document Synthesis
+review-only. Restano `default OFF` e richiedono lifecycle, secret reference e
+policy egress/retention host-owned. I test usano transport fake: il tree non
+contiene credenziali o prove di rete live. Login consumer e subscription non
+equivalgono a una credenziale di inferenza.
+
+Il selector Fabric opera sulle cinque capability nominate. La discovery mostra
+profili compatibili, lo smoke usa fixture sintetiche e l'attivazione del binding
+è atomica, versionata e reversibile. Non persiste segreti e non qualifica il
+runtime.
 
 Un futuro plug-in non può accedere direttamente al database. Può ricevere solo
 il contenuto minimo dopo regole, attivazione esplicita, controlli verificati e
 registrazione. La redazione o pseudonimizzazione deve essere dimostrata per il
 flusso specifico. MediFlow non dichiara anonimizzazione garantita.
 
-Le funzioni deterministiche restano disponibili senza plug-in. Il percorso AI
-locale richiede Ollama configurato. L'output esterno resta una proposta:
-chiarimento interattivo e scrittura autorizzata sono fasi separate. Questa
-regola descrive il confine, non una funzione cloud già consegnata.
+Le funzioni deterministiche restano disponibili senza provider. Receipt e
+provenienza descrivono l'esecuzione, ma non autorizzano un apply o una scrittura
+clinica.
 
 L'[ADR 0086](./adr/0086-intelligent-scaffold-and-graded-automation-boundary.md)
 propone la sequenza comune
 `pipeline locale -> proposta -> chiarimento -> anteprima -> autorizzazione ->
 eventuale scrittura auditata`. Non aggiunge una nuova area runtime. La inbox
 conversazionale e l'automazione graduata restano roadmap.
+
+## Confine Headless 0.8.5
+
+Un launcher trusted avvia un processo figlio autenticato con ambiente
+allowlisted e RPC AIP ereditato. MCP `stdio` espone catalogo, terminology
+search, Open Loops patient-scoped, proposta follow-up `proposal_only` e query
+semantica bounded read-only. Mini condivide catalogo e foundation CLI ma non ha
+un callsite production del Supervisor e fallisce chiuso senza parent AIP. Gli
+adapter non importano SQLite, non duplicano regole di dominio e non aprono
+listener.
+
+Authority, purpose, selezione, scope, lease, currentness e audit restano
+host-owned. Il Supervisor Node locale è il parent trusted e avvia Web
+standalone e MCP come figli distinti su IPC privato ereditato. Il percorso non
+usa broker residente o UDS. La 0.8.5 non dichiara installer, onboarding o
+compatibilità con host MCP esterni.
+
+La transizione stato checkup F10 collega la preview MCP al commit nella UI Web
+trusted. MCP non riceve proof e non può eseguire il commit. Il Web rilegge la
+risorsa e richiede ruolo medico attivo, step-up e gesto operation-specific,
+quindi applica CAS, idempotenza, audit e receipt atomici.
+
+La topologia distingue due modalità e non le unisce:
+
+- **provider-in-MediFlow**: il Fabric governa il provider che esegue una
+  capability MediFlow; i quattro path locali appartengono a questa modalità;
+- **MediFlow-in-intelligent-host**: MCP usa RPC AIP ereditato sopra gli stessi
+  Application Services; Mini resta una foundation CLI non collegata in
+  production.
+
+La seconda modalità ha un entrypoint locale tramite Supervisor. Il
+tree non promette installer, onboarding, compatibilità con host MCP esterni o
+integrazione con sessioni consumer. Qualunque OAuth provider futuro deve usare
+soltanto un contratto ufficiale, senza token privati o flussi ricostruiti.
+
+Il planner semantico è collegato al Supervisor e resta read-only. Compone al
+massimo due operazioni allowlisted, non produce SQL libero e non scrive dati.
+La shell macOS integra la registrazione visita con API Apple on-device su
+macOS 26 o successivo, consenso esplicito, audio bounded solo in RAM e review
+del transcript. Non esiste writer clinico automatico; prova con microfono reale
+e validazione clinica restano fuori dal claim della 0.8.5.
 
 ## ⚠️ Regole operative
 
@@ -144,17 +233,20 @@ traduzione eseguibile di [ADR 0084](./adr/0084-document-diagnoses-review-only.md
 [ADR 0086](./adr/0086-intelligent-scaffold-and-graded-automation-boundary.md), fino a
 oggi affidate alla sola disciplina.
 
-MediFlow è local-first: i servizi AI sono invocati direttamente dai componenti, non
-dietro una route. Il punto di enforcement è quindi il **writer del servizio**, non la
-route — un gate route-based passerebbe a vuoto, ed è l'errore che questo gate evita.
+Nella 0.8.5 i quattro smart path attraversano route autenticate. La
+route resta un adapter: il punto di enforcement è il **production root e il
+writer del servizio**. Un controllo limitato ai nomi delle route non dimostra
+la separazione tra proposta e scrittura.
 
 Il confine ha due lati e il gate controlla entrambi:
 
-1. **Il percorso AI scrive solo proiezioni derivate.** Ogni scrittura in uno dei 75 moduli
-   del percorso AI dev'essere dichiarata, e i campi scritti devono stare nell'allowlist
-   della lane: `documentInsights` per la sintesi documentale, `aiSummary` e i suoi
-   metadati per Patient Insight. L'allowlist è a sua volta verificata: ammettere
-   `diagnoses` fa fallire il gate, quindi non si aggira allargandola.
+1. **Il percorso AI scrive solo proiezioni derivate.** Ogni scrittura in un
+   modulo scansionato del percorso AI dev'essere dichiarata, e i campi scritti
+   devono stare nell'allowlist della lane: `documentInsights` per la sintesi
+   documentale, `aiSummary` e i suoi metadati per Patient Insight. Il guard
+   riporta a ogni esecuzione il conteggio corrente dei file analizzati, senza
+   fissarlo nella documentazione. L'allowlist è a sua volta verificata:
+   ammettere `diagnoses` fa fallire il gate, quindi non si aggira allargandola.
 2. **La lane che può scrivere dati clinici non importa il percorso AI.** È ciò che rende
    la revisione umana una proprietà strutturale invece che una convenzione: proporre e
    applicare restano due percorsi separati, e l'operatore che seleziona i candidati sta

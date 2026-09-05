@@ -73,14 +73,14 @@ for _ in {1..90}; do
     exit 1
   fi
 
-  if curl -fsS "$BASE_URL/api/auth/check" >/dev/null 2>&1; then
+  if curl -fsS "$BASE_URL/api/system/revision" >/dev/null 2>&1; then
     echo "Server is ready."
     break
   fi
   sleep 1
 done
 
-if ! curl -fsS "$BASE_URL/api/auth/check" >/dev/null 2>&1; then
+if ! curl -fsS "$BASE_URL/api/system/revision" >/dev/null 2>&1; then
   echo "Server did not become ready in time."
   echo "Check log: $DEV_LOG"
   exit 1

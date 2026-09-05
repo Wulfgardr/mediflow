@@ -1,0 +1,68 @@
+{
+  "schema": "mediflow.capability-mapping.source-manifest.v1",
+  "mappingVersion": 1,
+  "status": "candidate",
+  "integrationStatus": "not_integrated",
+  "applyPolicy": "none",
+  "digestAlgorithm": "sha256(path + NUL + gitBlob + NUL + byteLength + LF)",
+  "sources": [
+    { "sourceId": "baseline", "commit": "0d55c6d0f29a86c3333efc49bc0159563d9518b9", "status": "baseline_not_integrated" },
+    { "sourceId": "c0", "commit": "28a1a36b162f160e872ce5153cad03f38eacfd22", "status": "candidate_not_integrated" },
+    { "sourceId": "aip_mini", "commit": "1e35733c0218eae67a1d6e158085aab7340bc26b", "status": "candidate_not_integrated" },
+    { "sourceId": "web", "commit": "93362ca505149f5d6c51502784395e65126921df", "status": "candidate_not_integrated" },
+    { "sourceId": "keyboard", "commit": "5fbe5eaa16b6f79eb578644afe0131dd58544238", "status": "candidate_not_integrated" },
+    { "sourceId": "ios_runtime", "commit": "7bb2fe7d6931bdadb42d43c65b747ed1977f5722", "status": "candidate_not_integrated" },
+    { "sourceId": "ios_docs", "commit": "14d23caef5513a61dd10f16afcec41b1381179ef", "status": "candidate_not_integrated" },
+    { "sourceId": "macos", "commit": "7a8f12c8c94ed2110f4c2a4b8150fd3924cb18c4", "status": "candidate_not_integrated" },
+    { "sourceId": "macos_receipt", "commit": "fd442fda1fb1cc0f9f30d61b238ae5fdc51b0b18", "status": "candidate_not_integrated" }
+  ],
+  "sourceSets": [
+    {
+      "sourceSetId": "c0-core-contracts",
+      "sourceId": "c0",
+      "paths": [
+        { "path": "docs/apple-parity-matrix.json", "gitBlob": "6f1f6f85e3bde9033c28a2bdd16df796e117828e", "byteLength": 61849 },
+        { "path": "lib/ai-providers/fabric/application-catalog-contract.ts", "gitBlob": "08e2cd243cea576f757294b2d925839a030198a0", "byteLength": 17363 },
+        { "path": "lib/ai-providers/fabric/application-catalog-contract.test.ts", "gitBlob": "5436ee22ae60f773a7282152a60edd6bc7303235", "byteLength": 5849 },
+        { "path": "lib/ai-providers/fabric/catalog.ts", "gitBlob": "64dfc7fe3688a4a3e79862cbd55e10f82209f824", "byteLength": 796 },
+        { "path": "lib/ai-providers/fabric/contract.ts", "gitBlob": "f8a52bd7d626740c5f39e04a18df32f59477e4fb", "byteLength": 11963 },
+        { "path": "lib/ai-providers/fabric/deterministic-catalog.ts", "gitBlob": "ea41a3b985988914dcd9112a8947e7cc1a8ce51f", "byteLength": 5496 },
+        { "path": "lib/ai-providers/fabric/generative-catalog.ts", "gitBlob": "9d215295bba05bfa8741c9b1f3e9ecb156897bf1", "byteLength": 1705 },
+        { "path": "docs/adr/0089-contratto-intelligence-fabric-e-venue-esecutive.md", "gitBlob": "7d00b3a279c11237be13413ddeb944b1ab4b797e", "byteLength": 9086 },
+        { "path": "docs/adr/0090-giunture-fabric-trust-onboarding-routing-interazione.md", "gitBlob": "221d96751457666d91f01db05c4dcd10e92e9738", "byteLength": 12169 },
+        { "path": "docs/adr/0094-intelligence-fabric-headless-contract-085.md", "gitBlob": "d080008acc7ac72762fd0bd8f840ac834143e53e", "byteLength": 14103 },
+        { "path": "docs/adr/0095-broker-projection-e-servizi-host-per-capability.md", "gitBlob": "23fb7fdd2ea9fc5d3125bab4563614d50aa222e9", "byteLength": 10189 },
+        { "path": "docs/adr/0096-owner-sessione-selezione-e-lifetime-broker.md", "gitBlob": "c71b7a9e53a30c42247037139e991e9b8a0efbc5", "byteLength": 8902 }
+      ],
+      "recordCount": 12,
+      "sourceSetSha256": "60110905db895bf2a04e963f3563c403f05933395c9dbeaf94552b8adc3b5284",
+      "parser": "git-ls-tree-v1",
+      "rosterFile": "docs/capability-mapping/sources/c0-core-contracts.v1.json",
+      "rosterSha256": "99191ed87b57b02c5ddb6998c941c1f9f8fc2a39a474e8897a27a99be32e462f"
+    },
+    {
+      "sourceSetId": "aip-mini-contracts",
+      "sourceId": "aip_mini",
+      "paths": [
+        { "path": "packages/mini/contracts/mini-parity.json", "gitBlob": "ecde8213824a2e46e6ec3216ce63009366a1f373", "byteLength": 22248 },
+        { "path": "packages/mini/contracts/mini-parity.schema.json", "gitBlob": "6c9efb98740275a3fc8abebe325572afa3eed725", "byteLength": 1744 },
+        { "path": "lib/agent-interface/manifest.ts", "gitBlob": "2ce57b1b52f56dbd44eb93216d540386d849aaca", "byteLength": 12979 },
+        { "path": "lib/agent-interface/manifest.test.ts", "gitBlob": "28e8ceb053129eda54e19bef5268361bd2bd6b7d", "byteLength": 2932 }
+      ],
+      "recordCount": 4,
+      "sourceSetSha256": "390bdc23aef4ff38e8a30eeb92820f6329de43a965cc5883769e475d98deaa94",
+      "parser": "git-ls-tree-v1",
+      "rosterFile": "docs/capability-mapping/sources/aip-mini-contracts.v1.json",
+      "rosterSha256": "4e0028dbc34d8685d7baa7e21de29bba0f35883764a67fc84f0fa547120d4d11"
+    },
+    { "sourceSetId": "web-http-routes", "sourceId": "web", "pathMatcher": "^app/api(?:/|$).*\\/route\\.ts$", "recordCount": 140, "sourceSetSha256": "0aba6a8fd770581fc9c3801b3bc863f8b9e1f7a72eca84f029329aa9cf35ec0e", "parser": "git-ls-tree-v1", "rosterFile": "docs/capability-mapping/sources/web-http-routes.v1.json", "rosterSha256": "e98e5bb5985e6a8f63b89e298d83a803821485d25e5dbd94454c173a8456fef2" },
+    { "sourceSetId": "web-product-pages", "sourceId": "web", "pathMatcher": "^app(?:/(?!mockups(?:/|$)).*)?/page\\.tsx$", "recordCount": 26, "sourceSetSha256": "2dce0a922ef970325bc2f16e443cc7b921604752c4504a834df472bcc49ddae2", "parser": "git-ls-tree-v1", "rosterFile": "docs/capability-mapping/sources/web-product-pages.v1.json", "rosterSha256": "ff95551d75a91d5ce0eab0712cb2ec4ca853a38f5234c5cb746eafe06d578a41" },
+    { "sourceSetId": "keyboard-http-routes", "sourceId": "keyboard", "pathMatcher": "^app/api(?:/|$).*\\/route\\.ts$", "recordCount": 140, "sourceSetSha256": "0aba6a8fd770581fc9c3801b3bc863f8b9e1f7a72eca84f029329aa9cf35ec0e", "parser": "git-ls-tree-v1", "rosterFile": "docs/capability-mapping/sources/keyboard-http-routes.v1.json", "rosterSha256": "e98e5bb5985e6a8f63b89e298d83a803821485d25e5dbd94454c173a8456fef2" },
+    { "sourceSetId": "keyboard-product-pages", "sourceId": "keyboard", "pathMatcher": "^app(?:/(?!mockups(?:/|$)).*)?/page\\.tsx$", "recordCount": 26, "sourceSetSha256": "2a24b8818d5a67ac705854e2d4628684f133497b65b20780963db7f284a286c8", "parser": "git-ls-tree-v1", "rosterFile": "docs/capability-mapping/sources/keyboard-product-pages.v1.json", "rosterSha256": "7c66c01f7c311a56ca1ed5c0b765b71442522145bd68b74e325d8a89a37ec2f7" },
+    { "sourceSetId": "ios-ipados-runtime", "sourceId": "ios_runtime", "pathMatcher": "^native/MediFlowAppleApp/", "recordCount": 25, "sourceSetSha256": "cf2d03c45695c5e40101972e01d3ef07c4b6af7e698d96bac29694ea9c6e5da8", "parser": "git-ls-tree-v1", "rosterFile": "docs/capability-mapping/sources/ios-ipados-runtime.v1.json", "rosterSha256": "da7afbd4227ac7850b9a12f7ee72e59d4698d7c054072857fa84d47e6fe0f68f" },
+    { "sourceSetId": "ios-ipados-docs", "sourceId": "ios_docs", "pathMatcher": "^docs/.*(apple|ios|ipados|parity|native).*$", "pathMatcherFlags": "i", "recordCount": 27, "sourceSetSha256": "0e2b9b0eba5623eb2a6c85ab055f5bd747161ca81c9aa259f183a15a303bbe64", "parser": "git-ls-tree-v1", "rosterFile": "docs/capability-mapping/sources/ios-ipados-docs.v1.json", "rosterSha256": "77daf6ccc3ba45d212ce9530bfce67061475da9e32d96f53a1b28cd6aea32e89" },
+    { "sourceSetId": "macos-runtime", "sourceId": "macos", "pathMatcher": "^(?:native/MediFlowMac/(?!.*(?:/xcuserdata/|\\.xcuserstate$)).*|native/MediFlowAppleApp/Sources/MediFlowMacApp/MediFlowMacShellApp\\.swift)$", "recordCount": 175, "sourceSetSha256": "bd8fcd198f2917d0284154f762ea8708032a4673edcacfaba319d2bbeeca64a0", "parser": "git-ls-tree-v1", "rosterFile": "docs/capability-mapping/sources/macos-runtime.v1.json", "rosterSha256": "70a7a2995afd4e4b8454abaa21efb546ca3551357958c25d42e7256d146a36a2" },
+    { "sourceSetId": "macos-boundary-receipt", "sourceId": "macos_receipt", "paths": [{ "path": "docs/NATIVE.md", "gitBlob": "df09063f114abcb59b883a143c5e6ae7bbd5a7d7", "byteLength": 10969 }, { "path": "docs/analysis/2026-08-22-macos-inspector-boundary-inventory.md", "gitBlob": "91f7e072f029b790c495c2e3f980a68d9110bab0", "byteLength": 4215 }, { "path": "docs/native-testing.md", "gitBlob": "ed8aa7f2a2d5501f15470edc8fde2b7a4f2a0060", "byteLength": 5301 }, { "path": "docs/parity-click-map-macos.md", "gitBlob": "0f451da813f7c0f0e31b7a991c7b80d00fbcf73b", "byteLength": 5159 }], "recordCount": 4, "sourceSetSha256": "2f78bd701df4b274b03a7a3381207a638068c2dae2dd1f0bf7f7133e12253f56", "parser": "git-ls-tree-v1", "rosterFile": "docs/capability-mapping/sources/macos-boundary-receipt.v1.json", "rosterSha256": "dd764f4d1457a873be37e8d8598bcec415d6f6a94721b85abce3c2b253b02620" },
+    { "sourceSetId": "keyboard-command-evidence", "sourceId": "keyboard", "paths": [{ "path": "e2e/kree8-keyboard.spec.ts", "gitBlob": "34d68392eddd8f0172771cc9ddcce1a21f5f7eb0", "byteLength": 2637 }], "recordCount": 1, "sourceSetSha256": "87f8eb21ec1ab6e55f04403519d9baba750b49cf1eb7167eddd5cc194249989e", "parser": "git-ls-tree-v1", "rosterFile": "docs/capability-mapping/sources/keyboard-command-evidence.v1.json", "rosterSha256": "5b551c950d2f38f89a10417f665321493bb9f8c80d6193c3dbd34becd7b08767" }
+  ]
+}

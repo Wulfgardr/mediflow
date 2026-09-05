@@ -10,6 +10,7 @@ export type OllamaLocalityFailure =
     | 'response_not_local';
 
 export const OLLAMA_LOCAL_KEEP_ALIVE = '30m';
+export const OLLAMA_LOCAL_MODEL_REFERENCE_MAX_UTF8_BYTES = 674;
 const SUPPORTED_OLLAMA_LOCALITY_VERSION = /^0\.32\.\d+(?:[-+].+)?$/;
 
 export class OllamaLocalityError extends Error {
@@ -57,10 +58,11 @@ function sameModel(left: string, right: string): boolean {
 }
 
 export function assertLocalOllamaModelReference(model: unknown): asserts model is string {
-    if (typeof model !== 'string' || model.trim().length === 0) {
+    if (typeof model !== 'string') {
         throw new OllamaLocalityError('model_not_local');
     }
-    const normalized = model.trim().toLowerCase();
+    const trimmed = model.trim();
+    const normalized = trimmed.toLowerCase();
     if (
         normalized.includes('://')
         || normalized.startsWith('ollama.com/')
@@ -68,6 +70,9 @@ export function assertLocalOllamaModelReference(model: unknown): asserts model i
         || normalized.endsWith('-cloud')
     ) {
         throw new OllamaLocalityError('model_cloud_reference');
+    }
+    if (!trimmed || new TextEncoder().encode(trimmed).byteLength > OLLAMA_LOCAL_MODEL_REFERENCE_MAX_UTF8_BYTES) {
+        throw new OllamaLocalityError('model_not_local');
     }
 }
 

@@ -92,3 +92,12 @@
   .primaryAction,
   .quietAction { transition-duration: 0ms; }
 }
+
+/* @Codex WUL-UIUX: focus visibile su stage e launcher. */
+.stageBtn:focus-visible,
+.launcherTile:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--lume-ink) 14%, transparent),
+    var(--lume-focus-ring);
+}

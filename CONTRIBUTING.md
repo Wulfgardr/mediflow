@@ -32,13 +32,23 @@ destinazione di export. Dati e artifact sensibili restano fuori da Git secondo
 
 - Node.js **24.x**, come fissato da `.nvmrc` e `package.json`
 - npm (incluso con Node)
-- Docker Desktop (opzionale, per API ICD-11)
-- Ollama (opzionale, per AI/OCR locale)
+- Ollama (opzionale, per Patient Insight, Smart Import e Document Synthesis)
+- Apple Silicon, artifact locale ATHENA e toolchain MLX (opzionali, solo per
+  Treatment Reasoning)
 
-Nota OCR: Ollama resta il motore primario locale. Su macOS il runtime puo usare
-Apple Vision come fallback locale (ADR 0059) quando l'OCR primario produce
-output vuoto o degenerato. Windows e Linux non hanno oggi un fallback OCR
-platform-specific equivalente in MediFlow.
+Nota documentale 0.8.5: AnyDoc resta il primo passaggio automatico locale. Il
+tree include routing, manifest, materializzazione e rendering delle sole pagine
+`needsOcr`, quindi usa Apple Vision localmente sul Mac e ricompone il risultato
+sotto currentness host-owned. DeepSeek-OCR 2/CUDA è
+`OUT_OF_SCOPE_FOR_0.8.5_NON_BLOCKING`; il tree ne conserva soltanto contratto e
+seam sintetiche. Le route OCR legacy rispondono `410` dopo l'autenticazione.
+
+Nota ATHENA 0.8.5: Treatment Reasoning è incluso solo con artifact del modello
+e runner MLX locali configurati. L'override host-owned
+`MEDIFLOW_ATHENA_MLX_GENERATE_BIN` accetta soltanto il percorso assoluto di un
+eseguibile `mlx_lm.generate`, senza argomenti o shell. Senza override, `uvx`
+resta offline e fallisce chiuso quando la cache richiesta non è già presente.
+La disponibilità del runner non prova readiness universale.
 
 ---
 
@@ -173,21 +183,80 @@ Per verificare la first slice runtime del `document evidence ledger`:
 npm run test:document-synthesis
 npm run test:ai-context
 npm run test:pdf-service
+npm run check:anydoc-local-only
+npm run test:anydoc-local-only
 ```
 
 Usalo quando tocchi:
-- `lib/document-synthesis-service.ts`
-- `lib/document-parse-evidence-artifact.ts`
+- `lib/domain/documents/document-synthesis-service.ts`
+- `lib/domain/documents/document-parse-evidence-artifact.ts`
 - `lib/ai-context.ts`
-- `lib/ocr-service.ts`
-- `app/api/ocr/extract/route.ts`
+- `lib/domain/documents/anydoc-*`
+- `lib/domain/documents/ocr-service.ts` e le route OCR legacy fail-closed
 - `components/document-upload.tsx`
 - `app/api/attachments/route.ts`
 - la persistenza/lettura di `summarySnapshot` o `parseEvidenceArtifactSnapshot`
 
-Se tocchi il fallback OCR macOS, documenta nella PR che Apple Vision e stato
-verificato solo su macOS e che Windows/Linux restano senza fallback
-platform-specific certificato.
+Se tocchi il confine OCR della 0.8.5, preserva AnyDoc come primo passaggio e
+ammetti alla lane successiva soltanto pagine `needsOcr`. Routing, manifest,
+materializzazione, rendering e preflight devono restare bounded e fail-closed;
+le route legacy autenticate restano `410`. AnyDoc non è un provider o una venue
+Fabric.
+
+Il preflight DeepSeek-OCR 2 usa un fake seam. Non presentarlo come runtime
+adapter, esecuzione live o readiness. Una promozione futura richiede adapter,
+benchmark sintetico italiano, soglie dichiarate ed E2E, con provenienza, hash e
+qualità per pagina e nessun egress implicito.
+
+### Verifica del crosswalk Fabric 0.8.5
+
+Se tocchi uno dei quattro smart path, il production root, il wire contract o la
+UI che mostra receipt e provenienza, esegui:
+
+```bash
+npm run check:fabric-generative-runtime-crosswalk
+npm run test:fabric-generative-runtime-crosswalk
+```
+
+I quattro path sono Patient Insight, Smart Import, Document Synthesis e
+Treatment Reasoning. Il caller non deve scegliere provider, modello, endpoint,
+venue, prompt, fallback o apply. I production root host-owned devono mantenere
+lo stadio massimo `proposal_only`.
+
+### Gate del modello provider F7
+
+Il modello provider v2, il secret broker e gli adapter HTTPS ufficiali OpenAI
+e Anthropic sono integrati. I probe Document Synthesis restano review-only e
+`default OFF`. Il contratto separa tipo e istanza del provider,
+autenticazione, modello, capability, gruppi, binding e allowlist delle funzioni.
+Le classi di credenziale sono:
+
+- `local_model`;
+- `api_key`;
+- `provider_oauth`, soltanto tramite flusso ufficiale del provider;
+- `host_subscription`, come classe distinta e non come accesso API implicito.
+
+Un login consumer, un abbonamento ChatGPT/Claude o una subscription dell'host
+non autorizzano inferenza API. La composizione production richiede lifecycle
+attivo, opt-in host, egress/retention espliciti e secret reference. I test usano
+transport fake: non dichiarare credenziali, rete live o readiness cloud. Non
+copiare codice GPL né implementare OAuth privati, reverse-engineered o
+dipendenti da sessioni consumer.
+
+Mantieni inoltre separate le due modalità architetturali: un provider eseguito
+dentro MediFlow e MediFlow invocato come servizio governato da un host
+intelligente. Il Supervisor Node locale avvia Web standalone e MCP `stdio` come
+figli distinti su IPC ereditato. MCP usa soltanto RPC AIP e Application Services
+nominate, senza listener proprio o accesso diretto a SQLite. Mini condivide il
+catalogo e la foundation CLI ma, senza un callsite production del Supervisor,
+deve fallire chiuso in assenza del parent AIP. Mantieni
+fuori dal claim installer, onboarding e compatibilità con host MCP esterni; non
+introdurre broker residente o UDS nella `0.8.5`.
+
+Per F10, MCP può creare soltanto la preview della transizione checkup. Mantieni
+proof e commit nella UI Web trusted, con rilettura, ruolo medico attivo, step-up,
+gesto operation-specific, currentness, CAS, idempotenza, audit e receipt. Non
+concedere all'agente il proof o l'autorità di commit.
 
 ---
 
@@ -216,11 +285,15 @@ Documentazione tecnica:
 ## 🗄️ Modifiche database (Drizzle / SQLite)
 
 Le schema guard additive di `lib/db-server.ts` sono serializzate con una
-transazione SQLite `IMMEDIATE`. Questo vincolo vale anche durante `next build`,
-che valuta i moduli server con piu processi: non introdurre guard che aprono una
-seconda connessione o aggirano la transazione. La regressione dedicata e
-`npm run test:db-bootstrap-concurrency` e usa solo un database temporaneo
-sintetico.
+transazione SQLite `IMMEDIATE` nel runtime dev/server. Durante la sola fase
+`NEXT_PHASE=phase-production-build`, la raccolta dei metadati Next usa invece
+SQLite in-memory e non apre, copia, recupera o migra il database clinico
+persistente. Non introdurre side effect persistenti durante la build, né guard
+runtime che aprono una seconda connessione o aggirano la transazione. Le
+regressioni dedicate sono
+`lib/db-server-attachment-currentness-bootstrap.test.ts` e
+`npm run test:db-bootstrap-concurrency`; usano soltanto database temporanei
+sintetici.
 
 Fonti autorevoli:
 - Schema: `lib/schema.ts`
@@ -304,6 +377,18 @@ Una PR è considerata conclusa quando:
 - se cambi `/api/v1/*`, `npm run check:openapi:drift` passa
 - se cambi la concorrenza pazienti o i write path `/api/patients/*` / `/api/v1/patients/*`, `npm run test:concurrency:patients` passa
 - se cambi il create-flow da documento della nuova anagrafica, `npm run test:patient-document-import` passa
+- se cambi un path Fabric 0.8.5, il check e il test del crosswalk generativo
+  passano
+- se cambi l'estrazione degli allegati, i check AnyDoc local-only passano,
+  Apple Vision riceve soltanto le pagine PDF `needsOcr`, gli input non
+  supportati falliscono chiusi e le route OCR legacy autenticate restano `410`
+- se cambi Headless, AIP, MCP o Mini, esegui
+  `npm run check:headless-portable-imports`,
+  `npm run test:headless-portable`,
+  `npm run test:mcp:intelligent-host` e `npm run test:mini-cli`
+- se cambi un provider cloud, tipo, istanza, auth, modello, capability, gruppi,
+  binding, allowlist e classi di credenziale restano separati; il default resta
+  OFF e i test non richiedono credenziali live
 - Nessun PHI/PII introdotto in repo, fixture, log o screenshot
 - Se una feature è user-facing e interagibile, deve avere una UI/UX esplicita e coerente
   (CTA/pulsante, label comprensibile, percorso utente verificabile).

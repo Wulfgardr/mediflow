@@ -31,12 +31,12 @@ export const SETTINGS_WRITE_REGISTRY: Record<string, SettingsKeyPolicy> = {
     // controller only; treated as operator config because it steers where PHI is
     // sent for inference). ---
     aiProvider: { write: ['web-session'], note: 'AI provider selection (lib/ai-models.ts)' },
-    aiUrl: { write: ['web-session'], note: 'AI/OCR endpoint URL (lib/ai-service.ts, use-ai-settings-controller)' },
+    aiUrl: { write: ['web-session'], note: 'AI endpoint URL (lib/ai-service.ts, use-ai-settings-controller)' },
     ollamaUrl: { write: ['web-session'], note: 'legacy AI endpoint URL (lib/ai-service.ts)' },
     aiModel: { write: ['web-session'], note: 'legacy AI model (use-ai-settings-controller)' },
     aiModel_clinical: { write: ['web-session'], note: 'clinical model (use-ai-settings-controller)' },
     aiModel_reasoning: { write: ['web-session'], note: 'reasoning model (use-ai-settings-controller)' },
-    aiModel_ocr: { write: ['web-session'], note: 'OCR model (use-ai-settings-controller)' },
+    aiModel_ocr: { write: [], note: 'retired historical OCR model key; HTTP writes denied' },
     aiModelDefaultVersion: { write: ['web-session'], note: 'text-model migration marker (lib/ai-models.ts)' },
     hardwareProfile: { write: ['web-session'], note: 'AI hardware profile (use-ai-settings-controller, ai-insight-settings)' },
     aiInsightMode: { write: ['web-session'], note: 'AI insight mode (lib/ai-insight-settings.ts)' },
@@ -48,7 +48,7 @@ export const SETTINGS_WRITE_REGISTRY: Record<string, SettingsKeyPolicy> = {
     aiDocumentSynthesisKillSwitch: { write: ['web-session'], note: 'kill switch (lib/ai-document-synthesis-kill-switch.ts)' },
     aiSmartImportKillSwitch: { write: ['web-session'], note: 'kill switch (lib/ai-smart-import-kill-switch.ts)' },
     aiTreatmentReasoningKillSwitch: { write: ['web-session'], note: 'kill switch (lib/ai-treatment-reasoning-kill-switch.ts)' },
-    aiOcrKillSwitch: { write: ['web-session'], note: 'kill switch (lib/ai-ocr-kill-switch.ts)' },
+    aiOcrKillSwitch: { write: [], note: 'retired historical OCR toggle; HTTP writes denied' },
 
     // --- UI / accessibility preferences (per-operator, web session). ---
     uiReduceMotion: { write: ['web-session'], note: 'accessibility pref (components/ui-accessibility-provider.tsx)' },

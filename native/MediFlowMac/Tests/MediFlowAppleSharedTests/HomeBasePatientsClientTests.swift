@@ -69,12 +69,15 @@ final class HomeBasePatientsClientTests: XCTestCase {
         XCTAssertEqual(created, HomeBaseCreatedResource(id: "attachment-1", version: nil))
     }
 
-    func testLoginSendsNativePayloadAndReturnsSessionCookie() async throws {
+    /* @Codex */
+    func testLoginUsesPairedNativeRouteWithoutSourceSurfaceAuthority() async throws {
         let client = makeClient { request in
             XCTAssertEqual(request.httpMethod, "POST")
             XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "application/json")
-            XCTAssertEqual(request.value(forHTTPHeaderField: "X-MediFlow-Source-Surface"), "native")
-            XCTAssertEqual(request.url?.absoluteString, "https://localhost:3443/api/auth/login")
+            XCTAssertNil(request.value(forHTTPHeaderField: "X-MediFlow-Source-Surface"))
+            XCTAssertEqual(request.url?.absoluteString, "https://localhost:3443/api/auth/native/login")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "x-mediflow-paired-client-id"), "paired-client-1")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "x-mediflow-paired-client-token"), "paired-token-1")
 
             let body = try self.readRequestBody(from: request)
             let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
@@ -93,7 +96,7 @@ final class HomeBasePatientsClientTests: XCTestCase {
             return (response, Data(#"{"success":true,"id":"user-1","username":"doctor","displayName":"Dott.ssa Ada","ambulatoryName":"Centro Salute","role":"admin","encryptedMasterKey":"d3JhcHBlZE1L","salt":"c2FsdA=="}"#.utf8))
         }
 
-        let result = try await client.login(username: "doctor", password: "1992")
+        let result = try await client.login(username: "doctor", password: "1992", credentials: creds)
 
         XCTAssertEqual(result.sessionCookie, "mediflow_session=session-123")
         XCTAssertEqual(result.encryptedMasterKey, "d3JhcHBlZE1L", "login must surface the wrapped master key")
@@ -103,6 +106,157 @@ final class HomeBasePatientsClientTests: XCTestCase {
         XCTAssertEqual(result.displayName, "Dott.ssa Ada")
         XCTAssertEqual(result.ambulatoryName, "Centro Salute")
         XCTAssertEqual(result.role, "admin")
+    }
+
+    /* @Codex */
+    func testLoginRejectsMissingPairedCredentialsBeforeNetwork() async {
+        let client = makeClient { _ in
+            XCTFail("missing paired credentials must not create a request")
+            throw URLError(.badServerResponse)
+        }
+
+        do {
+            _ = try await client.login(
+                username: "doctor",
+                password: "1992",
+                credentials: HomeBasePairedCredentials(clientId: "", clientToken: "")
+            )
+            XCTFail("missing paired credentials must fail")
+        } catch {
+            XCTAssertEqual(error as? HomeBaseClientError, .contract)
+        }
+    }
+
+    /* @Codex */
+    func testLogoutAcceptsExactEmpty204AcknowledgementWithoutRetry() async throws {
+        var requestCount = 0
+        let client = makeClient { request in
+            requestCount += 1
+            self.assertLogoutRequest(request)
+            let response = HTTPURLResponse(
+                url: try XCTUnwrap(request.url), statusCode: 204, httpVersion: nil, headerFields: nil
+            )!
+            return (response, Data())
+        }
+
+        let acknowledgement = try await client.logout(credentials: creds, sessionCookie: cookie)
+
+        XCTAssertEqual(acknowledgement, HomeBaseMutationAcknowledgement(success: true))
+        XCTAssertEqual(requestCount, 1)
+    }
+
+    /* @Codex */
+    func testLogoutRejectsNonempty204BodyAsContractWithoutRetry() async {
+        var requestCount = 0
+        let client = makeClient { request in
+            requestCount += 1
+            self.assertLogoutRequest(request)
+            let response = HTTPURLResponse(
+                url: try XCTUnwrap(request.url), statusCode: 204, httpVersion: nil, headerFields: nil
+            )!
+            return (response, Data("unexpected".utf8))
+        }
+
+        do {
+            _ = try await client.logout(credentials: creds, sessionCookie: cookie)
+            XCTFail("A nonempty 204 body must fail the acknowledgement contract")
+        } catch let error as HomeBaseClientError {
+            XCTAssertEqual(error, .contract)
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+        XCTAssertEqual(requestCount, 1)
+    }
+
+    /* @Codex */
+    func testLogoutKeepsJson2xxAcknowledgementCompatibility() async throws {
+        var requestCount = 0
+        let client = makeClient { request in
+            requestCount += 1
+            self.assertLogoutRequest(request)
+            let response = HTTPURLResponse(
+                url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil,
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            return (response, Data(#"{"success":true}"#.utf8))
+        }
+
+        let acknowledgement = try await client.logout(credentials: creds, sessionCookie: cookie)
+
+        XCTAssertEqual(acknowledgement, HomeBaseMutationAcknowledgement(success: true))
+        XCTAssertEqual(requestCount, 1)
+    }
+
+    /* @Codex */
+    func testLogoutRejectsEmpty200AcknowledgementAsContractWithoutRetry() async {
+        var requestCount = 0
+        let client = makeClient { request in
+            requestCount += 1
+            self.assertLogoutRequest(request)
+            let response = HTTPURLResponse(
+                url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil, headerFields: nil
+            )!
+            return (response, Data())
+        }
+
+        do {
+            _ = try await client.logout(credentials: creds, sessionCookie: cookie)
+            XCTFail("An empty 200 body must fail the acknowledgement contract")
+        } catch let error as HomeBaseClientError {
+            XCTAssertEqual(error, .contract)
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+        XCTAssertEqual(requestCount, 1)
+    }
+
+    /* @Codex */
+    func testLogoutPreservesNon2xxTypedFailuresWithoutRetry() async {
+        for (statusCode, message) in [(401, "Sessione non valida"), (409, "Logout in conflitto")] {
+            var requestCount = 0
+            let client = makeClient { request in
+                requestCount += 1
+                self.assertLogoutRequest(request)
+                let response = HTTPURLResponse(
+                    url: try XCTUnwrap(request.url), statusCode: statusCode, httpVersion: nil,
+                    headerFields: ["Content-Type": "application/json"]
+                )!
+                return (response, Data("{\"error\":\"\(message)\"}".utf8))
+            }
+
+            do {
+                _ = try await client.logout(credentials: creds, sessionCookie: cookie)
+                XCTFail("Expected HTTP \(statusCode) failure")
+            } catch let error as HomeBaseClientError {
+                XCTAssertEqual(error, .httpStatus(statusCode, message))
+            } catch {
+                XCTFail("Unexpected error: \(error)")
+            }
+            XCTAssertEqual(requestCount, 1)
+        }
+    }
+
+    /* @Codex */
+    func testLocalDataSourceForwardsPairedLoginCredentialsUnchanged() async throws {
+        let client = makeClient { request in
+            XCTAssertEqual(request.url?.path, "/api/auth/native/login")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "x-mediflow-paired-client-id"), "paired-client-1")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "x-mediflow-paired-client-token"), "paired-token-1")
+            let response = HTTPURLResponse(
+                url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil,
+                headerFields: ["Set-Cookie": "mediflow_session=session-123; Path=/; HttpOnly"]
+            )!
+            return (response, Data(#"{"success":true}"#.utf8))
+        }
+        let source = LocalPatientsDataSource(
+            databasePath: "/tmp/mediflow-unused-login-forwarding.db",
+            masterKey: SymmetricKey(data: Data(repeating: 1, count: 32)),
+            fallback: client
+        )
+
+        let result = try await source.login(username: "doctor", password: "1992", credentials: creds)
+
+        XCTAssertEqual(result.sessionCookie, "mediflow_session=session-123")
     }
 
     func testFetchPatientsUsesPairedHeadersAndAmbulatoryCookie() async throws {
@@ -2078,6 +2232,8 @@ final class HomeBasePatientsClientTests: XCTestCase {
             switch (method, url.path) {
             case ("POST", "/api/auth/change-pin"):
                 XCTAssertEqual(request.value(forHTTPHeaderField: "Cookie"), self.cookie)
+                XCTAssertEqual(request.value(forHTTPHeaderField: "x-mediflow-paired-client-id"), "paired-client-1")
+                XCTAssertEqual(request.value(forHTTPHeaderField: "x-mediflow-paired-client-token"), "paired-token-1")
                 let payload = try self.requestObject(request)
                 XCTAssertEqual(payload["currentPin"] as? String, "1357")
                 XCTAssertEqual(payload["newPin"] as? String, "2468")
@@ -2086,9 +2242,13 @@ final class HomeBasePatientsClientTests: XCTestCase {
                 return (response, Data(#"{"success":true,"message":"PIN aggiornato con successo."}"#.utf8))
             case ("POST", "/api/auth/logout"):
                 XCTAssertEqual(request.value(forHTTPHeaderField: "Cookie"), self.cookie)
+                XCTAssertEqual(request.value(forHTTPHeaderField: "x-mediflow-paired-client-id"), "paired-client-1")
+                XCTAssertEqual(request.value(forHTTPHeaderField: "x-mediflow-paired-client-token"), "paired-token-1")
                 return (response, Data(#"{"success":true}"#.utf8))
             case ("PUT", "/api/auth/profile"):
                 XCTAssertEqual(request.value(forHTTPHeaderField: "Cookie"), self.cookie)
+                XCTAssertEqual(request.value(forHTTPHeaderField: "x-mediflow-paired-client-id"), "paired-client-1")
+                XCTAssertEqual(request.value(forHTTPHeaderField: "x-mediflow-paired-client-token"), "paired-token-1")
                 let payload = try self.requestObject(request)
                 XCTAssertEqual(payload["id"] as? String, "user-1")
                 XCTAssertEqual(payload["displayName"] as? String, "Dott.ssa Ada")
@@ -2300,6 +2460,18 @@ final class HomeBasePatientsClientTests: XCTestCase {
     private var cookie: String { "mediflow_session=session-123" }
 
     private var fixtureDate: Date { Date(timeIntervalSince1970: 1_751_961_600) }
+
+    private func assertLogoutRequest(_ request: URLRequest) {
+        XCTAssertEqual(request.httpMethod, "POST")
+        XCTAssertEqual(request.url?.absoluteString, "https://localhost:3443/api/auth/logout")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "X-MediFlow-Source-Surface"), "native")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Cookie"), cookie)
+        XCTAssertEqual(request.value(forHTTPHeaderField: "x-mediflow-paired-client-id"), "paired-client-1")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "x-mediflow-paired-client-token"), "paired-token-1")
+        XCTAssertNil(request.value(forHTTPHeaderField: "Content-Type"))
+        XCTAssertNil(request.httpBody)
+        XCTAssertNil(request.httpBodyStream)
+    }
 
     private func makeClient(
         handler: @escaping (URLRequest) throws -> (HTTPURLResponse, Data)

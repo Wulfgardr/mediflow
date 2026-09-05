@@ -94,8 +94,9 @@ const LOINC_PILOT: StaticCatalogItem[] = [
 
 /*
  * @Codex WUL-UIUX: voci LOINC con ambiguita CLINICA che NON vanno spedite senza
- * la validazione di Leonardo (scelta di unita/formula/metodo con impatto sul
- * valore letto dal medico). NON incluse in staticCatalogFor: promuovere in
+ * la validazione del responsabile della terminologia clinica (scelta di
+ * unita/formula/metodo con impatto sul valore letto dal medico). NON incluse
+ * in staticCatalogFor: promuovere in
  * LOINC_PILOT una alla volta dopo aver confermato code + unita + eventuale
  * grandezza. La `note` documenta la decisione aperta.
  */

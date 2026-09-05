@@ -1,98 +1,101 @@
 #!/usr/bin/env swift
 /* @Codex */
-import AppKit
+import CoreGraphics
 import Foundation
+import ImageIO
 import Vision
 
-struct PageOCR {
-    let text: String
-    let confidence: Double
+private let schemaVersion = "mediflow.apple_vision_ocr.v1"
+private let maximumInputBytes = 16 * 1024 * 1024
+private let maximumOutputBytes = 8 * 1024 * 1024
+private let maximumDimensionPixels = 4096
+private let maximumPixelCount = 12_000_000
+
+private func emit(_ value: [String: Any], exitCode: Int32) -> Never {
+    guard let data = try? JSONSerialization.data(withJSONObject: value, options: [.sortedKeys]) else { exit(70) }
+    FileHandle.standardOutput.write(data)
+    FileHandle.standardOutput.write(Data([0x0a]))
+    exit(exitCode)
 }
 
-enum OCRError: Error, CustomStringConvertible {
-    case missingFile(String)
-    case unsupported(String)
-    case imageLoadFailed(String)
+private func deny(_ reason: String, exitCode: Int32 = 1) -> Never {
+    emit([
+        "engine": "apple_vision",
+        "error": reason,
+        "ok": false,
+        "schemaVersion": schemaVersion,
+    ], exitCode: exitCode)
+}
 
-    var description: String {
-        switch self {
-        case .missingFile(let path): return "file not found: \(path)"
-        case .unsupported(let ext): return "unsupported extension: \(ext)"
-        case .imageLoadFailed(let path): return "cannot load image: \(path)"
+private func boundedStandardInput() -> Data? {
+    var input = Data()
+    do {
+        while let chunk = try FileHandle.standardInput.read(upToCount: 64 * 1024), !chunk.isEmpty {
+            guard input.count + chunk.count <= maximumInputBytes else { return nil }
+            input.append(chunk)
         }
+        return input
+    } catch {
+        return nil
     }
 }
 
-func recognize(cgImage: CGImage) throws -> PageOCR {
+private func rasterImage(_ data: Data) -> CGImage? {
+    guard let source = CGImageSourceCreateWithData(data as CFData, [
+        kCGImageSourceShouldCache: false,
+    ] as CFDictionary), CGImageSourceGetCount(source) == 1,
+    let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+    let width = (properties[kCGImagePropertyPixelWidth] as? NSNumber)?.intValue,
+    let height = (properties[kCGImagePropertyPixelHeight] as? NSNumber)?.intValue,
+    width > 0, height > 0, width <= maximumDimensionPixels, height <= maximumDimensionPixels,
+    width.multipliedReportingOverflow(by: height).overflow == false,
+    width * height <= maximumPixelCount else { return nil }
+    return CGImageSourceCreateImageAtIndex(source, 0, [
+        kCGImageSourceShouldCacheImmediately: true,
+    ] as CFDictionary)
+}
+
+private func recognize(_ image: CGImage) throws -> (text: String, confidence: Double) {
     let request = VNRecognizeTextRequest()
     request.recognitionLevel = .accurate
     request.usesLanguageCorrection = true
-    if #available(macOS 11.0, *) {
-        request.recognitionLanguages = ["it-IT", "en-US"]
+    request.recognitionLanguages = ["it-IT", "en-US"]
+    try VNImageRequestHandler(cgImage: image, options: [:]).perform([request])
+
+    let observations = (request.results ?? []).sorted { left, right in
+        let verticalDistance = abs(left.boundingBox.midY - right.boundingBox.midY)
+        return verticalDistance > 0.01
+            ? left.boundingBox.midY > right.boundingBox.midY
+            : left.boundingBox.minX < right.boundingBox.minX
     }
-
-    let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
-    try handler.perform([request])
-
     var lines: [String] = []
-    var confidences: [Double] = []
-    for observation in request.results ?? [] {
+    var confidenceTotal = 0.0
+    for observation in observations {
         guard let candidate = observation.topCandidates(1).first else { continue }
-        lines.append(candidate.string)
-        confidences.append(Double(candidate.confidence))
+        let line = candidate.string.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !line.isEmpty else { continue }
+        lines.append(line)
+        confidenceTotal += Double(candidate.confidence)
     }
-
-    let confidence = confidences.isEmpty ? 0.0 : confidences.reduce(0.0, +) / Double(confidences.count)
-    return PageOCR(text: lines.joined(separator: "\n"), confidence: confidence)
+    let text = lines.joined(separator: "\n")
+    return (text, lines.isEmpty ? 0 : confidenceTotal / Double(lines.count))
 }
 
-func imageCGImage(url: URL) throws -> CGImage {
-    guard let image = NSImage(contentsOf: url) else {
-        throw OCRError.imageLoadFailed(url.path)
-    }
-    var rect = NSRect(origin: .zero, size: image.size)
-    guard let cgImage = image.cgImage(forProposedRect: &rect, context: nil, hints: nil) else {
-        throw OCRError.imageLoadFailed(url.path)
-    }
-    return cgImage
-}
-
-func printJSON(_ object: Any) {
-    if let data = try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]),
-       let text = String(data: data, encoding: .utf8) {
-        print(text)
-    }
-}
-
-let args = Array(CommandLine.arguments.dropFirst())
-if args.isEmpty || args.contains("--help") {
-    print("usage: apple-vision-ocr.swift <image-file>")
-    exit(args.isEmpty ? 1 : 0)
-}
-
-let inputPath = args[0]
-let url = URL(fileURLWithPath: inputPath)
-guard FileManager.default.fileExists(atPath: url.path) else {
-    printJSON(["ok": false, "engine": "apple_vision", "error": "\(OCRError.missingFile(inputPath))"])
-    exit(1)
-}
-
-let ext = url.pathExtension.lowercased()
-guard ["png", "jpg", "jpeg", "tif", "tiff", "bmp", "heic", "heif", "webp"].contains(ext) else {
-    printJSON(["ok": false, "engine": "apple_vision", "error": "\(OCRError.unsupported(ext))"])
-    exit(1)
-}
+guard CommandLine.arguments.count == 1 else { deny("invalid_arguments", exitCode: 64) }
+guard let input = boundedStandardInput(), !input.isEmpty else { deny("invalid_or_oversized_input") }
+guard let image = rasterImage(input) else { deny("unsupported_or_oversized_image") }
 
 do {
-    let result = try recognize(cgImage: imageCGImage(url: url))
-    printJSON([
-        "ok": true,
+    let result = try recognize(image)
+    guard !result.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { deny("empty_output", exitCode: 2) }
+    guard result.text.lengthOfBytes(using: .utf8) <= maximumOutputBytes else { deny("output_limit", exitCode: 3) }
+    emit([
+        "avgConfidence": result.confidence,
         "engine": "apple_vision",
-        "avg_confidence": result.confidence,
+        "ok": true,
+        "schemaVersion": schemaVersion,
         "text": result.text,
-    ])
-    exit(0)
+    ], exitCode: 0)
 } catch {
-    printJSON(["ok": false, "engine": "apple_vision", "error": "\(error)"])
-    exit(2)
+    deny("recognition_failed", exitCode: 4)
 }

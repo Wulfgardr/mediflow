@@ -108,7 +108,7 @@ Regole minime:
   solo il token locale.
 - Le eccezioni token-aware fuori da `/api/v1/*` restano superfici locali di
   supporto/bootstrap, non privilegi admin generali: cataloghi locali,
-  settings/native bootstrap, proxy AI/OCR locale, health/redaction locali,
+  settings/native bootstrap, proxy AI locale, health/redaction locali,
   network overview e stato MLX read-only. Ogni nuova eccezione deve documentare
   perche non richiede una sessione admin web.
 
@@ -159,6 +159,24 @@ La policy canonica è definita in [docs/adr/0017-auth-lockout-policy.md](./docs/
   - `423 AUTH_LOCKED` quando il lockout è attivo, con header `Retry-After`
 - Il bearer token `/api/v1` già bootstrapato non introduce una policy separata: il controllo avviene sul PIN condiviso prima dell'emissione della sessione web o dell'unlock native.
 
+### Integrita del processo per l'acquisizione auth web H1a
+
+[ADR 0105](./docs/adr/0105-web-auth-process-integrity-assumption.md) limita
+l'acquisizione privata H1a a un processo server trusted: input di richiesta e
+adapter non possono modificare prototype globali o eseguire monkeypatch nello
+stesso processo. Poison presente all'ingresso o introdotto da un callout
+sincrono osservato deve negare senza pubblicare sessione o projection owner.
+
+Resta un rischio di disponibilita: una mutazione persistente e concorrente di
+`Object.prototype.then` durante il settlement della Promise nativa di
+`cookies()` puo negare l'acquisizione. Non deve produrre un contesto autenticato,
+authority recuperabile o lavoro post-denial. Il rischio va riprovato sul tree
+integrato H1b e nell'audit di sicurezza dell'exact release candidate.
+
+Questa assunzione non copre host compromesso, dipendenze malevole o plugin
+in-process non fidati e non dimostra la catena auth completa o la sicurezza
+generale del prodotto.
+
 ---
 
 ## 🧱 Proxy verso servizi locali (sicurezza SSRF)
@@ -170,23 +188,111 @@ Regole minime:
 - Permettere solo porte previste.
 - Trattare ogni risposta come input non fidato.
 
-## 🤖 AI locale e import clinico guidato
+## 🤖 Fabric locale e import clinico guidato
 
-I flussi AI locali che leggono note paziente, diario clinico o documenti analizzati
-devono rispettare queste regole aggiuntive:
+I quattro smart path 0.8.5 sono Patient Insight, Smart Import, Document
+Synthesis e Treatment Reasoning. Quando leggono note paziente, diario clinico o
+documenti analizzati, devono rispettare queste regole aggiuntive:
 
-- usare solo servizi locali allowlisted (`localhost`, `127.0.0.1`)
+- usare solo provider risolti dal production root host-owned; i provider
+  remoti richiedono lifecycle attivo e opt-in esplicito
 - trattare l'output del modello come **non fidato** finché un operatore non lo conferma
 - non eseguire import silenziosi da testo libero verso diagnosi o terapie
 - mantenere review esplicita prima di scrivere nuovi dati strutturati in scheda
 - trattare `summarySnapshot` e `parseEvidenceArtifactSnapshot` degli allegati
   come artifact clinici locali, non come payload innocui di debug
+- esporre receipt, provenienza e currentness senza prompt, output grezzo,
+  credenziali o testo clinico
+- rifiutare provider, modello, endpoint, venue, prompt, fallback o apply forniti
+  dal caller
 
 Le diagnosi estratte da documenti restano review-only, anche quando il codice
 ICD e esplicito. Il payload automatico della sintesi non include
 `patients.diagnoses` (vedi ADR 0084).
 
-### Readiness dei modelli Ollama
+Quando configurati, Ollama serve Patient Insight, Smart Import e Document
+Synthesis e ATHENA su MLX serve soltanto Treatment Reasoning. I due lifecycle
+sono host-owned e separati: stato, revoca, grant o fallback di un provider non
+valgono per l'altro. OpenAI e Anthropic restano `default OFF` e non sono
+fallback.
+
+ATHENA richiede runner e artifact del modello locali. L'override host-owned
+`MEDIFLOW_ATHENA_MLX_GENERATE_BIN` accetta soltanto un percorso assoluto a
+`mlx_lm.generate`, senza argomenti, shell o risoluzione di pacchetti. Il
+launcher `uvx` predefinito forza la modalità offline e fallisce chiuso se la
+cache richiesta non è disponibile. La presenza del runner non è una prova di
+readiness universale.
+
+AnyDoc resta il primo passaggio automatico locale degli allegati. Gira in un
+processo figlio bounded senza rete. Per i PDF supportati, il tree classifica e
+materializza le sole pagine `needsOcr`, le renderizza e usa Apple Vision locale
+con rete negata. La ricomposizione conserva ordine, provenienza e hash e
+pubblica il risultato soltanto se la sorgente è ancora corrente. Errori,
+formati ambigui, documenti cifrati e motore indisponibile falliscono chiusi.
+
+DeepSeek-OCR 2/CUDA, benchmark di qualifica e readiness universale hanno stato
+`OUT_OF_SCOPE_FOR_0.8.5_NON_BLOCKING`. Le route OCR legacy, dopo
+l'autenticazione, rispondono `410`.
+
+### Application Services e Headless
+
+Le route sottili e gli adapter Fabric/Headless del perimetro 0.8.5 non accedono
+direttamente al database. I relativi production root e Application Services
+host-owned risolvono currentness, authority, conflitti, transazioni e audit.
+Alcune route Web storiche importano ancora `dbServer` e non ereditano questo
+claim per analogia. Una receipt Fabric descrive un'esecuzione e non è un grant.
+
+Il Supervisor Node production locale avvia Web standalone e MCP come processi
+figli distinti e autenticati su IPC privato ereditato. Il Supervisor possiede
+contesto, purpose, scope, lease, revoca e audit. MCP `stdio` e Mini espongono
+soltanto catalogo, ricerca terminologica locale, lettura delle Open Loops del
+paziente selezionato, proposta follow-up `proposal_only` e query semantica
+bounded read-only. Nessun adapter importa il database, accetta authority dal
+caller o apre un listener proprio. Il candidato non autorizza sessioni
+agentiche generali e non dichiara installer, onboarding o compatibilità con
+host MCP esterni.
+
+F10 espone via MCP soltanto la preview `pending -> completed|cancelled`. La UI
+Web trusted rilegge la risorsa e richiede ruolo medico attivo, step-up e gesto
+operation-specific prima del commit con CAS, idempotenza, audit e receipt
+atomici. Proof e commit non attraversano MCP. Replay, revoca, logout o cambio
+selezione negano l'operazione.
+
+Il planner semantico è collegato al Supervisor e resta read-only. Accetta al
+massimo due operazioni allowlisted e closed-world su terminology search e Open
+Loops patient-scoped. Non produce SQL libero, non importa il database e non
+supera purpose, scope, budget o currentness host-owned.
+
+Su macOS 26 o successivo, il recording usa API Apple on-device con consenso e
+permessi espliciti. L'audio resta bounded solo in RAM e il transcript passa al
+draft soltanto dopo review. Non esiste un writer clinico automatico; smoke con
+microfono reale e validazione clinica restano fuori dal claim del candidato.
+
+Esistono due modalità architetturali distinte. Nel modello
+provider-in-MediFlow, il Fabric governa un provider per una capability
+applicativa. Nel modello MediFlow-in-intelligent-host, MCP/Mini raggiungono
+Application Services governati tramite RPC AIP ereditato. Questa seconda
+modalità resta candidata: non autorizza installer, onboarding, sessioni
+agentiche generali, listener o accesso diretto a SQLite.
+
+### Modello provider F7
+
+Il modello provider v2 separa provider type, istanza, autenticazione, modello,
+capability, gruppi, binding e function allowlist. Le classi di credenziale
+restano distinte: `local_model`, `api_key`, `provider_oauth` ufficiale e
+`host_subscription`. Nessuna classe implica un'altra.
+
+Un login consumer o un abbonamento non è una credenziale di inferenza. Un
+flusso `provider_oauth` deve essere ufficiale, documentato dal provider e
+separato dalle sessioni consumer; non sono ammessi token estratti, OAuth
+privati o protocolli ricostruiti. Gli adapter HTTPS ufficiali e la probe
+amministrativa Document Synthesis review-only sono integrati. La route è
+admin-only, richiede l'intento esatto `run_synthetic_nonclinical_probe` e resta
+`default OFF`. Ogni uso richiede secret reference, lifecycle attivo e policy
+egress/retention host-owned. I test usano transport fake: nessuna credenziale o
+rete live è provata dal candidato.
+
+### Readiness dei provider locali
 
 [ADR 0092](./docs/adr/0092-limite-digest-bound-readiness-ai-locale.md) definisce
 l'annotazione `available_unqualified` per i percorsi Ollama correnti.
@@ -200,7 +306,9 @@ Il digest pre/post è detection best-effort. Non impedisce lo swap ABA del
 modello durante l'inferenza.
 
 Nessuna receipt o dichiarazione di tipo autorizza un consumer. La qualified
-readiness resta bloccata.
+readiness resta bloccata. La lane ATHENA mantiene attestazione, kill switch e
+lifecycle propri; il runtime MLX generico di amministrazione e benchmark non è
+una prova di readiness ATHENA.
 
 `clinical_application` e `engineering_operator` non condividono grant.
 
@@ -214,26 +322,30 @@ verificare modello locale, cloud disabilitato, strumenti, rete e processo.
 Le nuove API manterranno timeout e abort interni. Non accetteranno
 `AbortSignal` dal chiamante e scarteranno i completamenti tardivi.
 
-ADR 0092 non definisce il contratto Intelligence Fabric. Un ADR separato deve
-governare capability, venue, home-base, provider cloud e authority.
+ADR 0092 non definisce il contratto Intelligence Fabric. ADR 0094 governa le
+capability 0.8.5, le venue, i production root e l'assenza di authority caller.
 
 > [!IMPORTANT]
-> I flussi AI clinici sono dietro safety gate con kill-switch (patient-insight,
-> smart-import, document-synthesis) e model governance delle decisioni
-> documentali. Restano AI locale review-first: nessuna scrittura clinica
-> autonoma.
+> I quattro flussi AI clinici sono dietro safety gate con kill-switch
+> (patient-insight, smart-import, document-synthesis e treatment-reasoning) e
+> model governance delle decisioni documentali. Restano AI locale
+> review-first: nessuna scrittura clinica autonoma.
 
-## ⚠️ Comparator cloud opt-in
+## ⚠️ Provider remoti con opt-in obbligatorio
 
-non cambia il default `local-first`.
+OpenAI e Anthropic hanno adapter ufficiali e una probe amministrativa
+review-only. La route richiede sessione admin e intento esatto; provider ed
+egress restano OFF senza i due opt-in host. Quando è disabilitata, la factory
+non osserva credenziali. Il tree usa transport fake e non prova rete live,
+account, retention o idoneità a dati clinici; il default resta `local-first`.
 
 Regole minime:
 
-- e ammesso solo come lane interna di engineering, mai come runtime clinico
-- usa solo case pack privati, redatti/minimizzati e fuori Git
-- richiede approvazione umana esplicita prima di qualunque export
-- non puo scrivere dati paziente, generare apply automatici o essere committato
-  nel repository
+- resta OFF senza opt-in provider ed egress espliciti
+- usa soltanto la data class ammessa dalla policy host-owned
+- non riceve authority clinica e non può generare apply automatici
+- non espone segreti, prompt, output clinico o raw response in receipt e log
+- non autorizza claim di zero retention senza prova dell'account
 
 ---
 
@@ -252,7 +364,7 @@ La taxonomy audit canonica e definita in [docs/adr/0015-audit-taxonomy-minimum-c
 
 ### Non loggare
 - campi paziente decifrati
-- testo OCR grezzo
+- testo estratto dai documenti o contenuto OCR storico
 - testo note/diario usato nei prompt AI
 - suggerimenti clinici grezzi prima della conferma utente
 - allegati caricati (base64)

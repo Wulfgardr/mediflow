@@ -1,5 +1,6 @@
 /* @Codex */
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import test from 'node:test';
 import {
     collectAiRolloutLocalControlGuards,
@@ -101,33 +102,9 @@ test('collectAiRolloutModelGuards ignores missing artifacts, shadow-ready artifa
     assert.deepEqual(guards, []);
 });
 
-test('OCR selections receive non-blocking rollout and local-control notices', () => {
-    const payload: AiRolloutGuardPayload = {
-        lanes: [{
-            lane: 'generative_challenger',
-            available: true,
-            report: {
-                status: 'hold',
-                selectedModel: 'deepseek-ocr',
-                blockers: [{ message: 'OCR validation still pending.' }],
-            },
-        }],
-        localControls: [
-            { lane: 'ocr', label: 'OCR documentale', state: 'disabled' },
-        ],
-    };
-    const selections = [{ roleId: 'ocr' as const, roleLabel: 'Segreteria (OCR)', model: 'deepseek-ocr' }];
-
-    const guards = collectAiRolloutModelGuards(payload, selections);
-    const localGuards = collectAiRolloutLocalControlGuards(payload, selections);
-
-    assert.deepEqual(guards[0]?.roles, ['Segreteria (OCR)']);
-    assert.deepEqual(localGuards, [{
-        lane: 'ocr',
-        label: 'OCR documentale',
-        roles: ['Segreteria (OCR)'],
-        state: 'disabled',
-    }]);
+test('rollout model guards expose only active model-selection roles and controls', () => {
+    const source = fs.readFileSync(new URL('./ai-rollout-model-guard.ts', import.meta.url), 'utf8');
+    assert.doesNotMatch(source, /\| 'ocr'|\bocr:\s*\[/u);
 });
 
 test('collectAiRolloutLocalControlGuards reports disabled productized lanes for the clinical selector only', () => {

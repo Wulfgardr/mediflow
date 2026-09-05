@@ -66,9 +66,22 @@ const nextConfig: NextConfig = {
   /* @Codex */
   outputFileTracingIncludes: {
     "/*": [
+      "./package.json",
+      "./scripts/anydoc-local-extraction-worker.mjs",
+      "./scripts/anydoc-pdf-page-worker.mjs",
+      "./scripts/apple-vision-ocr.swift",
+      "./node_modules/pdf-lib/**/*",
+      "./node_modules/@pdf-lib/**/*",
+      "./node_modules/pdfjs-dist/package.json",
+      "./node_modules/pdfjs-dist/legacy/build/**/*",
       "./node_modules/sharp/**/*",
+      "./node_modules/detect-libc/**/*",
+      "./node_modules/.pnpm/node_modules/semver/**/*",
       "./node_modules/@img/**/*",
-      "./node_modules/@firecrawl/pdf-inspector*/**/*",
+      "./node_modules/@firecrawl/anydoc*/**/*",
+      "./node_modules/@mediflow/web-auth-lifecycle-owner/**/*",
+      "./node_modules/@napi-rs/canvas/**/*",
+      "./node_modules/@napi-rs/canvas-darwin-arm64/**/*",
     ],
   },
   /* @Codex */
@@ -113,7 +126,7 @@ const nextConfig: NextConfig = {
     return [{ source: '/:path*', headers: securityHeaders }];
   },
   turbopack: {},
-  serverExternalPackages: ['pdfjs-dist', 'pm2'],
+  serverExternalPackages: ['@mediflow/web-auth-lifecycle-owner', 'pm2'],
   webpack: (config) => {
     config.resolve.alias.canvas = false;
     return config;

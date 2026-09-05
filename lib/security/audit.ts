@@ -13,6 +13,10 @@ export const AUDIT_EVENT_TYPES = [
     'auth.login.succeeded',
     'auth.login.failed',
     'auth.logout',
+    'auth.lock',
+    'auth.soap_active_role.enrolled',
+    'auth.checkup_active_role.enrolled',
+    'auth.checkup_active_role.revoked',
     'patient.created',
     'patient.updated',
     'patient.deleted',
@@ -51,12 +55,22 @@ export const AUDIT_EVENT_TYPES = [
     'ambulatory.updated',
     'ambulatory.deleted',
     'ambulatory.cleared',
+    'ai.review.accepted',
+    'ai.review.rejected',
+    /* @Codex: terminal PHI-safe outcome for the fixed synthetic cloud-provider probe. */
+    'ai.provider_probe.executed',
+    /* @Codex: terminal PHI-safe audit for the bounded semantic-query operation. */
+    'agent.semantic_query.executed',
+    /* @Codex: non-terminal PHI-safe attempt emitted by generic AIP ports. */
+    'agent.operation.attempted',
+    /* @Codex: PHI-safe receipt for the host-owned WHO reference-data boundary. */
+    'reference_data.icd11.search',
 ] as const;
 
 export type AuditEventType = (typeof AUDIT_EVENT_TYPES)[number];
 export type AuditOutcome = 'success' | 'failure' | 'denied';
 export type AuditActorType = 'user' | 'system';
-export type AuditSubjectType = 'session' | 'patient' | 'ambulatory' | 'checkup' | 'entry' | 'therapy' | 'observation' | 'attachment' | 'prosthetic_prescription' | 'service_prescription' | 'service_prescription_item' | 'siss_handoff' | 'settings';
+export type AuditSubjectType = 'session' | 'active_role_attestation' | 'patient' | 'ambulatory' | 'checkup' | 'entry' | 'therapy' | 'observation' | 'attachment' | 'prosthetic_prescription' | 'service_prescription' | 'service_prescription_item' | 'siss_handoff' | 'settings' | 'ai_review' | 'agent_operation' | 'reference_data';
 export type AuditSourceSurface = 'web' | 'native' | 'api' | 'job';
 export type AuditAuthContext = 'session' | 'local-token' | 'anonymous';
 
@@ -377,6 +391,7 @@ export function summarizeAuditEvents(records: AuditRecord[], isTruncated = false
     };
     const subjectTypes: Record<AuditSubjectType, number> = {
         session: 0,
+        active_role_attestation: 0,
         patient: 0,
         ambulatory: 0,
         checkup: 0,
@@ -389,6 +404,9 @@ export function summarizeAuditEvents(records: AuditRecord[], isTruncated = false
         service_prescription_item: 0,
         siss_handoff: 0,
         settings: 0,
+        ai_review: 0,
+        agent_operation: 0,
+        reference_data: 0,
     };
     const eventTypeCounts = new Map<AuditEventType, number>();
     const actors = new Set<string>();

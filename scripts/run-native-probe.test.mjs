@@ -93,6 +93,16 @@ function assertProcessStopped(pid) {
     assert.throws(() => process.kill(pid, 0), (error) => error?.code === 'ESRCH');
 }
 
+test('requires an explicit app path and contains no user-specific build path', () => {
+    const result = spawnSync('bash', [scriptPath], {
+        encoding: 'utf8',
+        env: { ...process.env, MEDIFLOW_NATIVE_PROBE_APP_PATH: '' },
+    });
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /app path required/);
+    assert.doesNotMatch(fs.readFileSync(scriptPath, 'utf8'), /\/Users\//);
+});
+
 test('launches the synthetic probe with volatile UI overrides and no defaults-domain mutation', () => {
     const scenario = createScenario();
     try {

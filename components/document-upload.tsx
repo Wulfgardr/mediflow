@@ -1,57 +1,43 @@
+/* @Codex */
 'use client';
 
 import { useCallback, useState } from 'react';
 import { useDropzone, type FileRejection } from 'react-dropzone';
-import { Upload, FileText, X, Eye, Loader2, RefreshCw, AlertTriangle } from 'lucide-react';
-import { db, Attachment } from '@/lib/db';
+import { Eye, FileText, Loader2, RefreshCw, Upload, X } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
-import { cn } from '@/lib/utils';
-import { useLiveQuery, notifyDbChange } from '@/lib/live-query';
-import {
-    AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY,
-    AiDocumentSynthesisDisabledError,
-    isAiDocumentSynthesisEnabledValue,
-} from '@/lib/ai-document-synthesis-kill-switch';
-/* @Codex */
-import { extractPatientDataSmart, extractDocumentTextForSummary, isImageDocumentInput, isPdfDocumentInput, DocumentTextUnavailableError } from '@/lib/pdf-service';
-import {
-    canTransitionDocumentOcrQueueState,
-    describeDocumentOcrQueueEntry,
-    evaluateDocumentOcrQueueCandidate,
-    type HostDocumentOcrQueueReason,
-    type DocumentOcrQueueState,
-} from '@/lib/domain/documents/document-ocr-queue';
-/* @Codex */
-import { synthesizeDocument } from '@/lib/domain/documents/document-synthesis-service';
-/* @Codex */
-import { refreshPatientSummaryIfEnabled } from '@/lib/ai-summary-service';
-import { useAiModelLabels } from '@/lib/hooks/use-ai-model-labels';
-/* @Codex */
-import { serializeDocumentParseEvidenceArtifact } from '@/lib/domain/documents/document-parse-evidence-artifact';
+
+import DocumentSynthesisFabricReviewCard from '@/components/document-synthesis-fabric-review-card';
 import DocumentViewer from '@/components/document-viewer';
-import { useToast } from '@/components/ui/toast-provider';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { semanticSignalSurfaceClass } from '@/components/ui/semantic-signal';
+import { useToast } from '@/components/ui/toast-provider';
+import {
+    AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY,
+    isAiDocumentSynthesisEnabledValue,
+} from '@/lib/ai-document-synthesis-kill-switch';
+import { db, type Attachment } from '@/lib/db';
+import { requestAnyDocLocalExtractionPreview } from '@/lib/domain/documents/anydoc-local-extraction-client';
+import { useLiveQuery } from '@/lib/live-query';
 import { sharedKillSwitchSignal } from '@/lib/ui-semantic-signal';
+import { cn } from '@/lib/utils';
 
 interface DocumentUploadProps {
     patientId: string;
 }
 
-async function sha256Hex(value: string): Promise<string> {
-    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
-    return Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, '0')).join('');
-}
+type LocalExtractionState = Readonly<{
+    attachmentId: string;
+    status: 'available' | 'review_required';
+    markdown?: string;
+}>;
 
-/* @Codex */
-async function readSourceBytes(source: Blob | undefined): Promise<ArrayBuffer | undefined> {
-    if (!source) return undefined;
-
-    try {
-        return await source.arrayBuffer();
-    } catch {
-        return undefined;
-    }
+function fileAsDataUrl(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
 }
 
 export default function DocumentUpload({ patientId }: DocumentUploadProps) {
@@ -59,18 +45,14 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
     const confirm = useConfirm();
     const [isProcessing, setIsProcessing] = useState(false);
     const [viewingFile, setViewingFile] = useState<Attachment | null>(null);
-    const [replayingId, setReplayingId] = useState<string | null>(null);
-    /* @Codex */
-    const [aiStage, setAiStage] = useState<string>("");
-    /* @Codex */
-    const aiModels = useAiModelLabels();
+    const [extractingId, setExtractingId] = useState<string | null>(null);
+    const [localExtraction, setLocalExtraction] = useState<LocalExtractionState | null>(null);
+    const [fileRejections, setFileRejections] = useState<string[]>([]);
 
     const attachments = useLiveQuery(
         async () => {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const items = await db.attachments.filter((a: any) => a.patientId === patientId).toArray();
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            return items.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+            const items = await db.attachments.filter((attachment) => attachment.patientId === patientId).toArray();
+            return items.sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
         },
         [patientId],
         undefined,
@@ -83,14 +65,6 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
         ['settings'],
     );
     const documentSynthesisEnabled = isAiDocumentSynthesisEnabledValue(documentSynthesisKillSwitch?.value);
-
-
-
-    // Logic to update Patient AI Summary REMOVED to avoid conflict with AIPatientInsight
-
-    /* @Codex WUL-UIUX: feedback inline sulle rejection (max 10 file, 25 MB)
-       invece del silenzio (la caption prometteva max 10 senza applicarlo). */
-    const [fileRejections, setFileRejections] = useState<string[]>([]);
 
     const onDropRejected = useCallback((rejected: FileRejection[]) => {
         const messages = rejected.map((entry) => {
@@ -105,132 +79,29 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
     const onDrop = useCallback(async (acceptedFiles: File[]) => {
         setFileRejections([]);
         setIsProcessing(true);
-        /* @Codex */
-        setAiStage("Inizializzazione AI...");
-        let shouldRefreshSummary = false;
-        // Limit total files if needed, here we just process
         for (const file of acceptedFiles) {
             try {
-                // Auto-extract analysis on upload
-                let summary: string | undefined = "Nessuna informazione rilevante trovata.";
-                let parseEvidenceArtifactSnapshot: string | undefined;
-                let ocrQueue: { state: DocumentOcrQueueState; reason: HostDocumentOcrQueueReason } | undefined;
                 const attachmentId = uuidv4();
-                const isPdf = isPdfDocumentInput(file);
-                const isImage = isImageDocumentInput(file);
+                const base64Data = await fileAsDataUrl(file);
 
-                /* @Codex */
-                /* @Codex */
-                if (isPdf || isImage) {
-                    try {
-                        setAiStage(`OCR in corso (${aiModels?.ocr ?? 'deepseek-ocr'})...`);
-                        const extracted = await extractPatientDataSmart(file);
-                        let rawText = extracted.rawText;
-                        if (!rawText || rawText.length < 200) {
-                            rawText = await extractDocumentTextForSummary(file);
-                        }
-
-                        const queueCandidate = evaluateDocumentOcrQueueCandidate({
-                            inputKind: isPdf ? 'pdf' : 'image',
-                            extractedText: rawText || '',
-                        });
-                        if (queueCandidate.queued) {
-                            // Documento muto: niente classificazione debole né summarySnapshot
-                            // (la review queue lo legge come "serve testo") finché l'OCR non produce testo.
-                            ocrQueue = { state: queueCandidate.state, reason: queueCandidate.reason };
-                            summary = undefined;
-                            console.info('[DocumentUpload] Documento in coda OCR-needed', {
-                                attachmentId,
-                                state: queueCandidate.state,
-                                reason: queueCandidate.reason,
-                            });
-                        } else if (rawText && documentSynthesisEnabled) {
-                            setAiStage(`Sintesi documento (${aiModels?.clinical ?? 'qwen3.5:35b-a3b'})...`);
-                            try {
-                                const sourceBytes = await readSourceBytes(file);
-                                const result = await synthesizeDocument(rawText, file.name, patientId, { attachmentId, sourceBytes });
-                                const insight = result.insight;
-                                summary = insight.summary;
-                                parseEvidenceArtifactSnapshot = serializeDocumentParseEvidenceArtifact(result.parseEvidenceArtifact);
-                                shouldRefreshSummary = true;
-                            } catch (synthesisError) {
-                                if (synthesisError instanceof AiDocumentSynthesisDisabledError) {
-                                    summary = 'Sintesi clinica documento disabilitata localmente.';
-                                } else {
-                                    throw synthesisError;
-                                }
-                            }
-                        } else if (rawText && !documentSynthesisEnabled) {
-                            summary = 'Sintesi clinica documento disabilitata localmente.';
-                        } else if (extracted.notes) {
-                            summary = extracted.notes;
-                        } else {
-                            summary = "Analisi completata (nessuna diagnosi esplicita rilevata)";
-                        }
-                    } catch (err) {
-                        if (err instanceof DocumentTextUnavailableError) {
-                            const queueCandidate = evaluateDocumentOcrQueueCandidate({
-                                inputKind: isPdf ? 'pdf' : 'image',
-                                extractedText: '',
-                                extractionFailure: err.textLayerFailure,
-                            });
-                            if (queueCandidate.queued) {
-                                ocrQueue = { state: queueCandidate.state, reason: queueCandidate.reason };
-                                summary = undefined;
-                                console.info('[DocumentUpload] Documento in coda OCR-needed', {
-                                    attachmentId,
-                                    state: queueCandidate.state,
-                                    reason: queueCandidate.reason,
-                                });
-                            }
-                        } else {
-                            console.warn('[DocumentUpload] OCR/Sintesi fallita', err);
-                        }
-                    }
-                }
-
-                const base64Data = await new Promise<string>((resolve, reject) => {
-                    const reader = new FileReader();
-                    reader.onload = () => resolve(reader.result as string);
-                    reader.onerror = reject;
-                    reader.readAsDataURL(file);
-                });
-
+                // The host persists the source before any local extraction or Fabric request.
                 await db.attachments.add({
                     id: attachmentId,
-                    patientId: patientId,
+                    patientId,
                     name: file.name,
                     type: file.type,
                     size: file.size,
                     path: `uploads/${file.name}`,
                     data: base64Data,
-                    summarySnapshot: summary,
-                    parseEvidenceArtifactSnapshot,
-                    ocrQueueState: ocrQueue?.state,
-                    ocrQueueReason: ocrQueue?.reason,
-                    createdAt: new Date()
+                    createdAt: new Date(),
                 });
-
-                // Trigger global update REMOVED
-
-            } catch (e) {
-                console.error("Upload failed", e);
+            } catch (error) {
+                console.error('[DocumentUpload] Upload failed', error);
                 showToast({ tone: 'error', title: 'Caricamento file non riuscito', description: file.name });
             }
         }
-        /* @Codex */
-        if (shouldRefreshSummary) {
-            try {
-                setAiStage("Aggiornamento AI Patient Summary...");
-                await refreshPatientSummaryIfEnabled(patientId);
-            } catch (err) {
-                console.warn('[DocumentUpload] Aggiornamento summary fallito', err);
-            }
-        }
         setIsProcessing(false);
-        /* @Codex */
-        setAiStage("");
-    }, [patientId, aiModels, documentSynthesisEnabled, showToast]);
+    }, [patientId, showToast]);
 
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
         onDrop,
@@ -246,132 +117,57 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
             confirmLabel: 'Elimina',
             tone: 'danger',
         });
-        if (confirmed) {
-            await db.attachments.delete(id);
-            // Re-calculate summary REMOVED
-        }
+        if (!confirmed) return;
+        await db.attachments.delete(id);
+        if (localExtraction?.attachmentId === id) setLocalExtraction(null);
     };
 
-    // Replay documentale post-OCR: aggiorna l'allegato in-place (mai duplicato),
-    // idempotente per hash documento lato server.
-    const handleOcrReplay = async (file: Attachment) => {
-        if (!file.data || replayingId) return;
-        setReplayingId(file.id);
+    const handleLocalExtractionPreview = async (file: Attachment) => {
+        if (extractingId) return;
+        setExtractingId(file.id);
+        setLocalExtraction(null);
         try {
-            await db.attachments.update(file.id, { ocrQueueState: 'processing' });
-            let ocrText = '';
-            let blob: Blob | undefined;
-            try {
-                blob = await (await fetch(file.data)).blob();
-                const replayFile = new File([blob], file.name, { type: file.type || blob.type });
-                ocrText = await extractDocumentTextForSummary(replayFile);
-            } catch (ocrError) {
-                console.warn('[DocumentUpload] Replay OCR: estrazione fallita', ocrError);
+            const preview = await requestAnyDocLocalExtractionPreview(file.id);
+            if (preview) {
+                setLocalExtraction({ attachmentId: file.id, status: 'available', markdown: preview.markdown });
+                return;
             }
-
-            const documentSha256 = await sha256Hex(file.data);
-            const response = await fetch(`/api/attachments/${file.id}/ocr-replay`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ocrText, documentSha256 }),
+            setLocalExtraction({ attachmentId: file.id, status: 'review_required' });
+            showToast({
+                tone: 'warning',
+                title: 'review_required · unsupported_local_extraction',
+                description: 'Il documento richiede revisione manuale.',
             });
-            if (!response.ok) {
-                const err = await response.json().catch(() => ({}));
-                throw new Error(err?.error || 'Replay OCR fallito');
-            }
-            const replay = await response.json();
-            console.info('[DocumentUpload] Replay OCR', {
-                attachmentId: file.id,
-                outcome: replay.outcome,
-                state: replay.state,
-                reason: replay.reason,
-            });
-
-            // Niente proposta clinica finché il testo non è sufficiente.
-            if (replay.outcome === 'applied' && replay.state === 'ocr_done' && replay.sufficientText) {
-                if (documentSynthesisEnabled) {
-                    try {
-                        const sourceBytes = await readSourceBytes(blob);
-                        const result = await synthesizeDocument(ocrText, file.name, patientId, { attachmentId: file.id, sourceBytes });
-                        await db.attachments.update(file.id, {
-                            summarySnapshot: result.insight.summary,
-                            parseEvidenceArtifactSnapshot: serializeDocumentParseEvidenceArtifact(result.parseEvidenceArtifact),
-                        });
-                        await refreshPatientSummaryIfEnabled(patientId);
-                    } catch (synthesisError) {
-                        if (synthesisError instanceof AiDocumentSynthesisDisabledError) {
-                            await db.attachments.update(file.id, { summarySnapshot: 'Sintesi clinica documento disabilitata localmente.' });
-                        } else {
-                            console.warn('[DocumentUpload] Replay OCR: sintesi fallita', synthesisError);
-                        }
-                    }
-                } else {
-                    await db.attachments.update(file.id, { summarySnapshot: 'Sintesi clinica documento disabilitata localmente.' });
-                }
-            }
-        } catch (err) {
-            console.warn('[DocumentUpload] Replay OCR fallito', err);
-            await db.attachments.update(file.id, { ocrQueueState: 'ocr_failed' }).catch(() => undefined);
         } finally {
-            setReplayingId(null);
-            notifyDbChange('attachments');
+            setExtractingId(null);
         }
     };
-
-    const handleOcrManualReview = async (file: Attachment) => {
-        if (!file.ocrQueueState || !canTransitionDocumentOcrQueueState(file.ocrQueueState, 'manual_review')) return;
-        try {
-            await db.attachments.update(file.id, { ocrQueueState: 'manual_review' });
-        } catch (err) {
-            console.warn('[DocumentUpload] Passaggio a revisione manuale fallito', err);
-        }
-    };
-
-    const ocrQueueEntries = (attachments ?? []).filter(
-        (file) => file.ocrQueueState && file.ocrQueueState !== 'ocr_done'
-    );
 
     return (
         <div className="space-y-6">
-
-            {/* AI Summary Card REMOVED */}
-
-            {/* Upload Zone */}
             <div
                 {...getRootProps()}
                 className={cn(
-                    "rounded-[var(--lume-radius-card)] border p-6 flex flex-col items-center justify-center cursor-pointer transition-[border-color,background-color] duration-[var(--lume-dur-fuoco)] ease-[var(--lume-ease)]",
+                    'flex cursor-pointer flex-col items-center justify-center rounded-[var(--lume-radius-card)] border p-6 transition-[border-color,background-color] duration-[var(--lume-dur-fuoco)] ease-[var(--lume-ease)]',
                     isDragActive
-                        ? "lume-focal border-[color:color-mix(in_srgb,var(--lume-ink)_24%,transparent)] bg-[color:var(--lume-surface-focal)]"
-                        : "border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] hover:bg-[color:color-mix(in_srgb,var(--lume-ink)_5%,var(--lume-surface-field))]"
+                        ? 'lume-focal border-[color:color-mix(in_srgb,var(--lume-ink)_24%,transparent)] bg-[color:var(--lume-surface-focal)]'
+                        : 'border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] hover:bg-[color:color-mix(in_srgb,var(--lume-ink)_5%,var(--lume-surface-field))]',
                 )}
             >
-                <input {...getInputProps()} />
+                <input {...getInputProps()} aria-label="Carica documenti" />
                 <div className="mb-3 rounded-full bg-[color:color-mix(in_srgb,var(--lume-accent)_11%,var(--lume-surface-field))] p-3 text-[color:var(--lume-accent)]">
-                    {isProcessing ? <Loader2 className="w-6 h-6 animate-spin" /> : <Upload className="w-6 h-6" />}
+                    {isProcessing ? <Loader2 className="h-6 w-6 animate-spin" /> : <Upload className="h-6 w-6" />}
                 </div>
-                <p className="text-sm font-medium text-[color:var(--lume-ink)]">Carica Documenti</p>
-                <p className="mt-1 text-xs text-[color:var(--lume-ink-muted)]">L&apos;IA estrarrà il contesto (max 10 file, 25 MB ciascuno).</p>
+                <p className="text-sm font-medium text-[color:var(--lume-ink)]">Carica documenti</p>
+                <p className="mt-1 text-center text-xs text-[color:var(--lume-ink-muted)]">
+                    Prima viene registrato l&apos;allegato; estrazione locale e sintesi partono solo su azione manuale (max 10 file, 25 MB ciascuno).
+                </p>
             </div>
 
             {fileRejections.length > 0 && (
-                <ul className="mt-2 space-y-1 rounded-xl border border-[color:color-mix(in_srgb,var(--lume-signal-critical)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-critical)_11%,var(--lume-surface-field))] px-3 py-2 text-xs text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]">
-                    {fileRejections.map((message) => (
-                        <li key={message}>{message}</li>
-                    ))}
+                <ul className="space-y-1 rounded-xl border border-[color:color-mix(in_srgb,var(--lume-signal-critical)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-critical)_11%,var(--lume-surface-field))] px-3 py-2 text-xs text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]">
+                    {fileRejections.map((message) => <li key={message}>{message}</li>)}
                 </ul>
-            )}
-
-            {/* @Codex */}
-            {(isProcessing || aiStage) && (
-                <div className="text-xs text-[color:var(--lume-ink-muted)]">
-                    <span className="font-medium">AI:</span> {aiStage || "Attesa..."}
-                    {aiModels && (
-                        <div className="mt-1 text-[10px] text-[color:var(--lume-ink-muted)]">
-                            OCR: {aiModels.ocr} · Sintesi: {aiModels.clinical}
-                        </div>
-                    )}
-                </div>
             )}
 
             {!documentSynthesisEnabled && (
@@ -382,104 +178,76 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
                     )}
                     data-testid="document-upload-synthesis-disabled-note"
                 >
-                    La sintesi clinica documento è disabilitata localmente. L&apos;upload e l&apos;OCR restano disponibili, ma l&apos;Archivio Intelligente e l&apos;aggiornamento di AI Patient Insight non vengono eseguiti.
+                    La sintesi Fabric è disabilitata localmente. Upload, anteprima AnyDoc e revisione manuale restano disponibili; nessuna proposta viene generata.
                 </div>
             )}
 
-            {/* Coda OCR-needed: documenti bloccati con stato e motivo */}
-            {ocrQueueEntries.length > 0 && (
-                <div
-                    className="rounded-2xl border border-[color:color-mix(in_srgb,var(--lume-signal-warning)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-warning)_11%,var(--lume-surface-field))] p-3 text-xs leading-5 text-[color:color-mix(in_srgb,var(--lume-signal-warning)_60%,var(--lume-ink))]"
-                    data-testid="document-ocr-queue-panel"
-                >
-                    <p className="font-medium">
-                        Coda OCR: {ocrQueueEntries.length} {ocrQueueEntries.length === 1 ? 'documento bloccato' : 'documenti bloccati'} (nessuna proposta clinica finché manca testo utile)
-                    </p>
-                    <ul className="mt-1 space-y-0.5">
-                        {ocrQueueEntries.map((file) => (
-                            <li key={file.id} className="truncate">
-                                {file.name} · {describeDocumentOcrQueueEntry(file.ocrQueueState as string, file.ocrQueueReason)}
-                            </li>
-                        ))}
-                    </ul>
-                </div>
-            )}
-
-            {/* File List */}
             <div className="flex flex-col gap-3">
                 {attachments?.map((file) => (
-                    <div key={file.id} className="lume-card group flex items-center gap-3 p-3 transition-colors hover:border-[color:color-mix(in_srgb,var(--lume-ink)_24%,transparent)]">
-                        <div className="rounded-lg border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-ink)_6%,var(--lume-surface-field))] p-2 text-[color:var(--lume-ink-muted)]">
-                            <FileText className="w-5 h-5" />
+                    <article key={file.id} className="lume-card group p-3 transition-colors hover:border-[color:color-mix(in_srgb,var(--lume-ink)_24%,transparent)]">
+                        <div className="flex items-center gap-3">
+                            <div className="rounded-lg border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-ink)_6%,var(--lume-surface-field))] p-2 text-[color:var(--lume-ink-muted)]">
+                                <FileText className="h-5 w-5" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <h4 className="truncate text-sm font-bold text-[color:var(--lume-ink)]">{file.name}</h4>
+                                <p className="text-[10px] uppercase tracking-wider text-[color:var(--lume-ink-muted)]">
+                                    {new Date(file.createdAt).toLocaleDateString()}
+                                </p>
+                            </div>
+                            <div className="flex items-center gap-1 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100">
+                                <button
+                                    type="button"
+                                    onClick={() => handleLocalExtractionPreview(file)}
+                                    disabled={extractingId !== null}
+                                    className="rounded-lg p-2 text-[color:var(--lume-accent)] transition-colors hover:bg-[color:color-mix(in_srgb,var(--lume-accent)_9%,var(--lume-surface-field))] disabled:opacity-50"
+                                    title="Estrai testo localmente"
+                                    aria-label={`Estrai testo localmente da ${file.name}`}
+                                >
+                                    <RefreshCw className={cn('h-4 w-4', extractingId === file.id && 'animate-spin')} />
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setViewingFile(file)}
+                                    className="rounded-lg p-2 text-[color:var(--lume-ink-muted)] transition-colors hover:bg-[color:color-mix(in_srgb,var(--lume-ink)_6%,var(--lume-surface-field))] hover:text-[color:var(--lume-ink)]"
+                                    title="Visualizza"
+                                    aria-label={`Visualizza ${file.name}`}
+                                >
+                                    <Eye className="h-4 w-4" />
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleDelete(file.id)}
+                                    className="rounded-lg p-2 text-[color:var(--lume-ink-muted)] transition-colors hover:bg-[color:color-mix(in_srgb,var(--lume-signal-critical)_11%,var(--lume-surface-field))] hover:text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]"
+                                    title="Elimina"
+                                    aria-label={`Elimina ${file.name}`}
+                                >
+                                    <X className="h-4 w-4" />
+                                </button>
+                            </div>
                         </div>
 
-                        <div className="flex-1 min-w-0">
-                            <h4 className="truncate text-sm font-bold text-[color:var(--lume-ink)]">{file.name}</h4>
-                            <p className="text-[10px] uppercase tracking-wider text-[color:var(--lume-ink-muted)]">
-                                {new Date(file.createdAt).toLocaleDateString()}
+                        {localExtraction?.attachmentId === file.id && localExtraction.status === 'available' && (
+                            <div className="mt-3 rounded-lg border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] p-2" role="status" data-testid="anydoc-local-extraction-preview">
+                                <p className="text-[10px] font-semibold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">Anteprima AnyDoc locale · sola lettura</p>
+                                <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap text-xs text-[color:var(--lume-ink)]">{localExtraction.markdown}</pre>
+                            </div>
+                        )}
+                        {localExtraction?.attachmentId === file.id && localExtraction.status === 'review_required' && (
+                            <p className="mt-3 rounded-lg border border-[color:color-mix(in_srgb,var(--lume-signal-warning)_28%,transparent)] p-2 text-xs text-[color:color-mix(in_srgb,var(--lume-signal-warning)_65%,var(--lume-ink))]" role="status">
+                                review_required · unsupported_local_extraction — revisione manuale necessaria.
                             </p>
-                            {file.summarySnapshot && (
-                                <p className="mt-0.5 truncate text-xs text-[color:var(--lume-ink-muted)]">
-                                    AI: {file.summarySnapshot}
-                                </p>
-                            )}
-                            {file.ocrQueueState && (
-                                <p
-                                    className="mt-0.5 truncate text-xs font-medium text-[color:color-mix(in_srgb,var(--lume-signal-warning)_60%,var(--lume-ink))]"
-                                    data-testid="document-ocr-queue-entry"
-                                >
-                                    OCR: {describeDocumentOcrQueueEntry(file.ocrQueueState as string, file.ocrQueueReason)}
-                                </p>
-                            )}
-                        </div>
+                        )}
 
-                        <div className="flex items-center gap-1 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
-                            {file.ocrQueueState && file.ocrQueueState !== 'ocr_done' && (
-                                <button
-                                    onClick={() => handleOcrReplay(file)}
-                                    disabled={replayingId !== null}
-                                    className="rounded-lg p-2 text-[color:color-mix(in_srgb,var(--lume-signal-warning)_60%,var(--lume-ink))] transition-colors hover:bg-[color:color-mix(in_srgb,var(--lume-signal-warning)_11%,var(--lume-surface-field))] disabled:opacity-50"
-                                    title="Riprova OCR"
-                                    aria-label={`Riprova OCR su ${file.name}`}
-                                >
-                                    <RefreshCw className={cn("w-4 h-4", replayingId === file.id && "animate-spin")} />
-                                </button>
-                            )}
-                            {file.ocrQueueState && canTransitionDocumentOcrQueueState(file.ocrQueueState, 'manual_review') && file.ocrQueueState !== 'manual_review' && (
-                                <button
-                                    onClick={() => handleOcrManualReview(file)}
-                                    disabled={replayingId !== null}
-                                    className="rounded-lg p-2 text-[color:color-mix(in_srgb,var(--lume-signal-warning)_60%,var(--lume-ink))] transition-colors hover:bg-[color:color-mix(in_srgb,var(--lume-signal-warning)_11%,var(--lume-surface-field))] disabled:opacity-50"
-                                    title="Segna per revisione manuale"
-                                    aria-label={`Segna ${file.name} per revisione manuale`}
-                                >
-                                    <AlertTriangle className="w-4 h-4" />
-                                </button>
-                            )}
-                            <button
-                                onClick={() => setViewingFile(file)}
-                                className="rounded-lg p-2 text-[color:var(--lume-ink-muted)] transition-colors hover:bg-[color:color-mix(in_srgb,var(--lume-ink)_6%,var(--lume-surface-field))] hover:text-[color:var(--lume-ink)]"
-                                title="Visualizza"
-                                aria-label={`Visualizza ${file.name}`}
-                            >
-                                <Eye className="w-4 h-4" />
-                            </button>
-
-                            <button
-                                onClick={() => handleDelete(file.id)}
-                                className="rounded-lg p-2 text-[color:var(--lume-ink-muted)] transition-colors hover:bg-[color:color-mix(in_srgb,var(--lume-signal-critical)_11%,var(--lume-surface-field))] hover:text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]"
-                                title="Elimina"
-                                aria-label={`Elimina ${file.name}`}
-                            >
-                                <X className="w-4 h-4" />
-                            </button>
-                        </div>
-                    </div>
+                        <DocumentSynthesisFabricReviewCard
+                            attachmentId={file.id}
+                            enabled={documentSynthesisEnabled}
+                        />
+                    </article>
                 ))}
             </div>
 
-            {/* Viewer Modal */}
-            {viewingFile && viewingFile.data && (
+            {viewingFile?.data && (
                 <DocumentViewer
                     file={viewingFile.data}
                     fileName={viewingFile.name}

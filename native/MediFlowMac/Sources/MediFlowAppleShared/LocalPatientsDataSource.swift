@@ -54,8 +54,10 @@ public actor LocalPatientsDataSource: HomeBasePatientsDataSource {
 
     // MARK: Delegated to HTTP when local authority cannot serve the operation
 
-    public func login(username: String?, password: String) async throws -> HomeBaseLoginResult {
-        try await fallback.login(username: username, password: password)
+    public func login(
+        username: String?, password: String, credentials: HomeBasePairedCredentials
+    ) async throws -> HomeBaseLoginResult {
+        try await fallback.login(username: username, password: password, credentials: credentials)
     }
 
     public func changePin(

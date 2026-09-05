@@ -38,7 +38,7 @@ export function ThemeToggle() {
                         key={tab.id}
                         onClick={() => setTheme(tab.id)}
                         className={cn(
-                            "relative z-10 flex h-7 w-7 items-center justify-center rounded-full border transition-[background-color,border-color,color] duration-[var(--lume-dur-fuoco)] ease-[var(--lume-ease)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--lume-accent)]",
+                            "relative z-10 flex h-11 w-11 items-center justify-center rounded-full border transition-[background-color,border-color,color] duration-[var(--lume-dur-fuoco)] ease-[var(--lume-ease)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--lume-accent)]",
                             isActive
                                 ? "border-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)] bg-[color:var(--lume-surface-focal)] text-[color:var(--lume-ink)] shadow-[var(--lume-shadow-focal)]"
                                 : "border-transparent text-[color:var(--lume-ink-muted)] hover:bg-[color:color-mix(in_srgb,var(--lume-ink)_5%,transparent)] hover:text-[color:var(--lume-ink)]"

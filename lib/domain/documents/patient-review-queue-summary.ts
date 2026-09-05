@@ -63,7 +63,6 @@ export interface PatientReviewQueueInput {
     smartImport: {
         enabled: boolean;
         sourceCount: number;
-        analysis?: SmartImportReviewSnapshot;
     };
     archive: {
         attachmentsCount: number;
@@ -235,69 +234,25 @@ function buildSmartImportRow(input: PatientReviewQueueInput['smartImport']): Pat
             'smart-import',
             'Smart Import',
             'bloccato',
-            `${input.sourceCount} fonti presenti, ma analisi e applicazione sono ferme.`,
+            `${input.sourceCount} fonti presenti, ma anteprima e proposte sono ferme.`,
             {
                 anchor,
                 blockedReason:
-                    'Smart Import è disattivato localmente: nessuna analisi parte e nessun suggerimento viene scritto in scheda.',
+                    'Smart Import è disattivato localmente: nessuna anteprima parte e nessuna proposta viene prodotta.',
             },
-        );
-    }
-
-    if (!input.analysis || !input.analysis.hasAnalysis) {
-        return row(
-            'smart-import',
-            'Smart Import',
-            'disponibile',
-            `${input.sourceCount} fonti pronte: l'analisi parte solo su richiesta dal pannello.`,
-            { anchor },
-        );
-    }
-
-    const { reviewable, blocked, ready } = input.analysis;
-    const blockedReason = blocked > 0
-        ? 'I suggerimenti bloccati non coincidono con il profilo attuale: il sistema non li scrive senza correzione manuale.'
-        : undefined;
-
-    if (ready > 0) {
-        return row(
-            'smart-import',
-            'Smart Import',
-            'pronto-da-applicare',
-            `${ready} suggerimenti selezionati · ${reviewable} da rivedere · ${blocked} bloccati.`,
-            { anchor, blockedReason },
-        );
-    }
-
-    if (reviewable > 0) {
-        return row(
-            'smart-import',
-            'Smart Import',
-            'da-rivedere',
-            `${reviewable} suggerimenti da confermare · ${blocked} bloccati.`,
-            { anchor, blockedReason },
-        );
-    }
-
-    if (blocked > 0) {
-        return row(
-            'smart-import',
-            'Smart Import',
-            'bloccato',
-            `${blocked} suggerimenti bloccati: correggili o scartali dal pannello.`,
-            { anchor, blockedReason },
         );
     }
 
     return row(
         'smart-import',
         'Smart Import',
-        'gia-applicato',
-        'Nessun suggerimento residuo da rivedere.',
+        'disponibile',
+        `${input.sourceCount} fonti pronte: l'anteprima parte solo su richiesta dal pannello.`,
         { anchor },
     );
 }
 
+/* @Codex */
 function buildArchiveRow(input: PatientReviewQueueInput['archive']): PatientReviewQueueRow {
     const anchor = DOCUMENTS_PANEL_ANCHOR;
 
@@ -316,7 +271,7 @@ function buildArchiveRow(input: PatientReviewQueueInput['archive']): PatientRevi
             'archive',
             'Archivio documenti',
             'serve-testo',
-            `${input.missingTextCount} allegati su ${input.attachmentsCount} senza testo estratto: OCR o sintesi da completare.`,
+            `${input.missingTextCount} allegati su ${input.attachmentsCount} senza testo estratto: estrazione locale o revisione manuale da completare.`,
             { anchor },
         );
     }

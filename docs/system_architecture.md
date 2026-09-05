@@ -1,8 +1,8 @@
 ---
-summary: "Compact operational architecture overview for the current MediFlow mainline shell, home-base, AI/document lanes, SISS/FSE boundaries, and local guardrails."
+summary: "Compact operational architecture overview for MediFlow 0.8.5, its home-base, AI/document lanes, SISS/FSE boundaries, and local guardrails."
 read_when:
   - "Needing a fast technical architecture overview without reading the full walkthrough."
-  - "Checking current mainline runtime boundaries before implementation or review."
+  - "Checking current 0.8.5 boundaries before implementation or review."
 ---
 
 # Architettura di MediFlow (sintesi operativa)
@@ -12,7 +12,8 @@ read_when:
 > La visione architetturale stabile resta [ARCHITECTURE.md](../ARCHITECTURE.md).
 > Il walkthrough operativo canonico resta [docs/walkthrough.md](./walkthrough.md).
 
-Panoramica tecnica rapida aggiornata allo stato reale di `main`.
+Panoramica tecnica rapida del contenuto sorgente `0.8.5`. Non sostituisce i
+receipt exact-SHA, di firma, tag o pubblicazione.
 Per la lettura completa e trasversale usa [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md).
 Per il dettaglio completo usa [docs/walkthrough.md](./walkthrough.md).
 Per la mappa documentale completa usa [docs/README.md](./README.md) e [docs/markdown-index.md](./markdown-index.md).
@@ -55,9 +56,17 @@ Per la mappa documentale completa usa [docs/README.md](./README.md) e [docs/mark
 | --- | --- | --- |
 | Web app Next.js | Superficie primaria | Root Kree8 live, UI clinica locale, `/api/*`, `/api/v1/*`, overview `home-base`, coordinamento AI locale |
 | SQLite + Drizzle | Storage autorevole | `medical.db`, schema in `lib/schema.ts` |
-| Ollama | Runtime AI/OCR locale | Default text-only `qwen3.5:35b-a3b`, OCR primario locale separato |
-| Apple Vision OCR | Fallback macOS-only | Seconda lettura locale quando l'OCR primario restituisce output vuoto/degenerato; nessun equivalente certificato Windows/Linux (ADR 0059) |
-| ICD-11 Docker | Servizio locale opzionale | Resolver diagnostico OMS |
+| Ollama | Runtime generativo locale configurabile | Serve Patient Insight, Smart Import e Document Synthesis quando host e modello locali superano la readiness; non e un runtime OCR della 0.8.5 |
+| ATHENA/MLX | Runtime locale configurabile | Serve Treatment Reasoning solo con modello e runner `mlx_lm.generate` pre-provisionati; assenza o configurazione incompleta falliscono in modo chiuso |
+| AnyDoc + Apple Vision | Estrazione documentale locale | AnyDoc resta il primo passaggio; Apple Vision continua soltanto le pagine PDF `needsOcr` sul Mac, con provenienza, currentness e fail-closed |
+| Selector Fabric | Integrato | Discovery compatibile, smoke sintetico e binding atomico per cinque capability; nessuna qualifica runtime implicita |
+| OpenAI / Anthropic | Adapter ufficiali `default OFF` | Probe review-only con transport fake; nessuna credenziale o rete live nel tree |
+| MCP | Superficie figlia locale integrata | Supervisor locale, Web e MCP figli distinti, RPC AIP ereditato; nessun installer, onboarding o claim per host MCP esterni |
+| Mini | Foundation CLI fail-closed | Catalogo e adapter tipizzati presenti; nessun callsite production del Supervisor e nessun grant senza parent AIP |
+| Write checkup F10 | Integrato end-to-end | Preview MCP e commit Web trusted con ruolo, step-up, gesto, CAS, idempotenza, audit e receipt; proof e commit non passano all'agente |
+| Semantic planner | Integrato, sola lettura | Collegato al Supervisor; massimo due operazioni allowlisted, nessun SQL libero o write |
+| Recording visita | Integrato sul Mac, review-first | API Apple on-device su macOS 26+; consenso esplicito, audio bounded in RAM e nessun writer clinico automatico |
+| ICD-11 WHO | Application Service server-only opzionale | Output MediFlow data-only, egress e credenziali espliciti |
 | OpenMed redaction | Sidecar shadow opzionale | Lane `redaction.v1` benchmark/shadow, non client-facing |
 | TLS proxy `:3443` | Trasporto locale fidato | Base di `/api/v1` per native e `home-base` |
 
@@ -125,18 +134,16 @@ Boundary importanti:
 
 Pipeline corrente:
 
-1. upload documento
-2. normalizzazione input locale
-3. OCR locale primario via Ollama/DeepSeek OCR; i documenti senza testo finiscono
-   in una `Coda OCR` con riprocesso idempotente e nessuna proposta clinica finche
-   il testo non basta (WUL-237)
-4. fallback Apple Vision solo su macOS se il primario produce testo low-signal;
-   su Windows/Linux non esiste oggi un fallback platform-specific certificato
-5. estrazione/sintesi con runtime generativo locale
+1. upload e validazione locale del documento
+2. estrazione AnyDoc per i formati con testo estraibile
+3. registrazione di provenienza, hash e currentness della fonte estratta
+4. classificazione delle sole pagine `needsOcr`, materializzazione e rendering
+   bounded, riconoscimento Apple Vision locale sul Mac e ricomposizione
+   source-bound; DeepSeek-OCR 2/CUDA resta fuori scope e non bloccante
+5. estrazione/sintesi review-first con runtime generativo locale configurato
 6. persistenza di:
    - `summarySnapshot`
-   - artifact `parse/evidence` cifrato, section-aware (`sectionMap`, ancore
-     page/section/snippet)
+   - artifact `parse/evidence` cifrato e tracciabile
    - `documentInsights` come projection compatibile
 7. refresh dei consumer reviewable (`AI Patient Insight`, smart import, create
    flow document-driven)
@@ -144,14 +151,33 @@ Pipeline corrente:
 `Smart Import` resta reviewable e filtra il rumore da fonti senza novita clinica
 quando diagnosi/terapie sono gia presenti. L'estrazione identita e prudente
 (niente data di nascita da data arbitraria, codice fiscale con omocodie) e gli
-errori AI sono visibili, con timeout sull'OCR (WUL-324, WUL-325).
+errori AI sono visibili e non attivano fallback impliciti.
 
-L'AI locale e il default review-first. Le lane comparator cloud (`gpt-5.4`) e
-OpenMed `redaction.v1` sono opt-in / shadow / benchmark-only, separate dal runtime
-clinico e non sono claim di prodotto. Il benchmark di assorbimento evidenza misura
-questa direzione su corpus sintetico multi-fonte: recall delle fonti, disciplina
-di citazione, recupero di fonti superate e contenimento del leakage da fonti
-stale.
+L'AI locale è il default review-first. OpenAI e Anthropic hanno adapter HTTPS
+ufficiali e probe review-only, ma restano `default OFF`. Ogni composizione
+richiede lifecycle, secret reference e policy egress/retention host-owned. I
+test usano transport fake: il tree non contiene credenziali o prove di rete
+live. Le lane comparator e OpenMed `redaction.v1` restano benchmark-only.
+
+Il Supervisor Node locale avvia Web standalone e MCP `stdio` come figli
+distinti su IPC ereditato. MCP espone terminology search, Open Loops
+patient-scoped, follow-up proposal e query semantica bounded read-only, senza
+accesso diretto a SQLite. Mini condivide catalogo e foundation CLI ma non è
+avviato dal Supervisor production e fallisce chiuso senza parent AIP. Contesto,
+lifecycle, revoca e audit restano
+host-owned. La 0.8.5 non dichiara installer, onboarding o compatibilità con
+host MCP esterni.
+
+La transizione stato checkup F10 collega una preview MCP al commit nella UI Web
+trusted. Il Web rilegge la risorsa e richiede ruolo medico attivo, step-up e
+gesto operation-specific prima di CAS, idempotenza, audit e receipt atomici.
+Proof e commit non attraversano MCP.
+
+Il planner semantico è collegato al Supervisor e compone al massimo due
+operazioni allowlisted senza SQL libero o scritture. Su macOS 26 o successivo,
+la registrazione visita usa API Apple on-device, consenso esplicito, audio
+bounded solo in RAM e review del transcript. Non esegue writer clinici
+automatici; microfono reale e validazione clinica restano fuori dal claim.
 
 > [!NOTE]
 > Il safety gate AI (WUL-358) espone un kill-switch per `patient-insight`,
@@ -169,6 +195,8 @@ stale.
   della sorgente locale.
 - Il cockpit Kree8 e la root web live su `main`; nuove sperimentazioni non
   vivono come selector persistito in Settings.
+- Il selector Fabric sceglie binding di capability, non shell web. Discovery e
+  smoke sintetico non dimostrano readiness.
 - I benchmark/shadow lane (`OpenMed`, comparator cloud, NER benchmark-only)
   restano separati dal runtime clinico.
 - SISS/FSE resta `portal-handoff` / webapp-assisted: niente integrazione
@@ -193,4 +221,4 @@ stale.
 
 ---
 
-*Ultimo aggiornamento: 2026-06-16 - v0.7.0 mainline*
+*Ultimo aggiornamento: 2026-09-03 - contenuto sorgente v0.8.5*

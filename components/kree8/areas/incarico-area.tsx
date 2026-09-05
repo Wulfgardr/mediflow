@@ -1,10 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { createPortal } from 'react-dom';
 import {
   Activity,
   Archive,
   Cloud,
+  Ellipsis,
   FileSearch,
   FileText,
   MapPin,
@@ -27,6 +30,7 @@ import type {
   Kree8PatientStatus,
 } from '../cockpit-shared';
 import type { InboxList, Kree8Patient } from '@/lib/patient-workspace';
+import { nextVirtualRowIndex, type VirtualListNavigationKey } from '@/lib/kree8-keyboard-navigation';
 import styles from '../kree8-clinical-cockpit-foundation.module.css';
 import patientStyles from '../kree8-clinical-cockpit-patient-inbox.module.css';
 
@@ -49,6 +53,7 @@ function IncaricoArea({
   searchFocusSignal,
   onSelectPatient,
   onOpenArea,
+  onRetryPatients,
   isReview,
 }: {
   patients: Kree8Patient[];
@@ -57,12 +62,19 @@ function IncaricoArea({
   searchFocusSignal: number;
   onSelectPatient: (patientId: string) => void;
   onOpenArea: (area: AreaId) => void;
+  onRetryPatients?: () => void;
   isReview: boolean;
 }) {
+  const router = useRouter();
   const [scope, setScope] = useState<InboxScope>('ambulatorio');
   const [list, setList] = useState<InboxList>('attivi');
   const [query, setQuery] = useState('');
+  const [isActionsOpen, setIsActionsOpen] = useState(false);
+  const [actionsMenuPosition, setActionsMenuPosition] = useState<{ left: number; top: number } | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const actionsRef = useRef<HTMLDivElement>(null);
+  const actionsTriggerRef = useRef<HTMLButtonElement>(null);
+  const actionsMenuRef = useRef<HTMLDivElement>(null);
   const normalizedQuery = useMemo(() => normalizeClinicalSearch(query), [query]);
 
   useEffect(() => {
@@ -70,6 +82,7 @@ function IncaricoArea({
     searchInputRef.current?.focus();
     searchInputRef.current?.select();
   }, [searchFocusSignal]);
+
 
   const scopedPatients = useMemo(
     () =>
@@ -89,13 +102,180 @@ function IncaricoArea({
 
   const selected = visible.find((p) => p.id === selectedPatientId) ?? visible[0] ?? null;
 
+  /* @Codex WUL-560 L6A: the disclosure owns focus and closes when its patient
+     context changes. The four existing actions keep their original handlers. */
+  useEffect(() => {
+    setIsActionsOpen(false);
+  }, [selected?.id]);
+
+  useLayoutEffect(() => {
+    if (!isActionsOpen) return;
+    const positionMenu = () => {
+      const trigger = actionsTriggerRef.current?.getBoundingClientRect();
+      const menu = actionsMenuRef.current;
+      if (!trigger || !menu) return;
+      const margin = 8;
+      const gap = 8;
+      const below = trigger.bottom + gap;
+      const above = trigger.top - gap - menu.offsetHeight;
+      const top = below + menu.offsetHeight <= innerHeight - margin
+        ? below
+        : above >= margin && above + menu.offsetHeight <= innerHeight - margin ? above : Math.max(margin, innerHeight - margin - menu.offsetHeight);
+      const left = Math.min(Math.max(margin, trigger.right - menu.offsetWidth), innerWidth - margin - menu.offsetWidth);
+      setActionsMenuPosition({ left, top });
+    };
+    positionMenu();
+    window.addEventListener('resize', positionMenu);
+    window.addEventListener('scroll', positionMenu, true);
+    return () => {
+      window.removeEventListener('resize', positionMenu);
+      window.removeEventListener('scroll', positionMenu, true);
+    };
+  }, [isActionsOpen]);
+
+  useEffect(() => {
+    if (!isActionsOpen) return;
+    const firstItem = actionsMenuRef.current?.querySelector<HTMLElement>('[role="menuitem"]');
+    window.requestAnimationFrame(() => firstItem?.focus());
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (event.target instanceof Node && !actionsRef.current?.contains(event.target) && !actionsMenuRef.current?.contains(event.target)) {
+        setIsActionsOpen(false);
+      }
+    };
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      setIsActionsOpen(false);
+      window.requestAnimationFrame(() => actionsTriggerRef.current?.focus());
+    };
+    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [isActionsOpen]);
+
+  const handleActionMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    const items = [...event.currentTarget.querySelectorAll<HTMLElement>('[role="menuitem"]')];
+    const currentIndex = items.findIndex((item) => item === document.activeElement);
+    const lastIndex = items.length - 1;
+    let nextIndex: number | null = null;
+    if (event.key === 'ArrowDown') nextIndex = currentIndex >= lastIndex ? 0 : currentIndex + 1;
+    else if (event.key === 'ArrowUp') nextIndex = currentIndex <= 0 ? lastIndex : currentIndex - 1;
+    else if (event.key === 'Home') nextIndex = 0;
+    else if (event.key === 'End') nextIndex = lastIndex;
+    if (nextIndex === null) return;
+    event.preventDefault();
+    items[nextIndex]?.focus();
+  };
+
+  const overflowActions: Array<{ href?: string; icon: ReactNode; label: string; run?: () => void }> = selected ? [
+    { label: 'Quadro', icon: <FileSearch size={14} aria-hidden="true" />, run: () => onOpenArea('scheda') },
+    { label: 'Nuova voce', icon: <Plus size={14} aria-hidden="true" />, href: `${selected.href}/entries/new` },
+    { label: 'Documenti', icon: <FileText size={14} aria-hidden="true" />, href: `${selected.modulesHref}#documenti` },
+    { label: 'Prepara SISS', icon: <Workflow size={14} aria-hidden="true" />, run: () => onOpenArea('handoff') },
+  ] : [];
+
   const patientListParentRef = useRef<HTMLDivElement>(null);
+
   const patientRowVirtualizer = useVirtualizer({
     count: visible.length,
     getScrollElement: () => patientListParentRef.current,
     estimateSize: () => 52,
     overscan: 8,
   });
+
+  /* @Codex: il focus segue l'indice completo, non il sottoinsieme DOM prodotto
+     dalla virtualizzazione. Dopo lo scroll attende il nuovo render e porta il
+     focus sulla riga corrispondente. */
+  const focusRowAtIndex = useCallback((requestedIndex: number) => {
+    if (visible.length === 0) return;
+    const index = Math.min(visible.length - 1, Math.max(0, requestedIndex));
+    const patient = visible[index];
+    if (!patient) return;
+    onSelectPatient(patient.id);
+    patientRowVirtualizer.scrollToIndex(index, { align: 'auto' });
+
+    const focusRenderedRow = (attempts: number) => {
+      const row = patientListParentRef.current?.querySelector<HTMLButtonElement>(
+        `[data-patient-index="${index}"]`,
+      );
+      if (row) {
+        row.focus();
+        return;
+      }
+      if (attempts > 0) window.requestAnimationFrame(() => focusRenderedRow(attempts - 1));
+    };
+    window.requestAnimationFrame(() => focusRenderedRow(2));
+  }, [onSelectPatient, patientRowVirtualizer, visible]);
+
+  const currentRowIndex = useCallback((target: EventTarget | null) => {
+    const focusedRow = target instanceof HTMLElement
+      ? target.closest<HTMLElement>('[data-patient-index]')
+      : null;
+    const parsed = focusedRow ? Number(focusedRow.dataset.patientIndex) : Number.NaN;
+    if (Number.isInteger(parsed)) return parsed;
+    const selectedIndex = visible.findIndex((patient) => patient.id === selectedPatientId);
+    return selectedIndex >= 0 ? selectedIndex : 0;
+  }, [selectedPatientId, visible]);
+
+  const navigateRows = useCallback((key: VirtualListNavigationKey, target: EventTarget | null) => {
+    const viewportHeight = patientListParentRef.current?.clientHeight ?? 62;
+    const index = nextVirtualRowIndex({
+      key,
+      currentIndex: currentRowIndex(target),
+      rowCount: visible.length,
+      pageSize: Math.max(1, Math.floor(viewportHeight / 62)),
+    });
+    if (index !== null) focusRowAtIndex(index);
+  }, [currentRowIndex, focusRowAtIndex, visible.length]);
+
+  const handleListKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    const navigationKeys: VirtualListNavigationKey[] = [
+      'ArrowDown', 'ArrowUp', 'j', 'k', 'Home', 'End', 'PageDown', 'PageUp',
+    ];
+    if (navigationKeys.includes(event.key as VirtualListNavigationKey)) {
+      event.preventDefault();
+      navigateRows(event.key as VirtualListNavigationKey, event.target);
+      return;
+    }
+    if (event.key !== 'Enter') return;
+    const patient = visible[currentRowIndex(event.target)];
+    if (!patient) return;
+    event.preventDefault();
+    onSelectPatient(patient.id);
+    if (isReview) onOpenArea('scheda');
+    else router.push(patient.modulesHref);
+  };
+
+  /* @Codex: scorciatoie contestuali, disattivate nei campi editabili. */
+  useEffect(() => {
+    const handleGlobalKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
+      const target = event.target;
+      if (target instanceof HTMLElement) {
+        const tag = target.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable) return;
+      }
+      if (event.key === '/') {
+        event.preventDefault();
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select();
+      }
+      else if (event.key === 'n' || event.key === 'N') {
+        event.preventDefault();
+        const patient = visible[currentRowIndex(document.activeElement)];
+        router.push(patient ? `${patient.href}/entries/new` : '/patients/new');
+      } else if (event.key === 'j' || event.key === 'k') {
+        event.preventDefault();
+        navigateRows(event.key, document.activeElement);
+      }
+    };
+    document.addEventListener('keydown', handleGlobalKeyDown);
+    return () => document.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [currentRowIndex, navigateRows, router, visible]);
 
   return (
     <div className={styles.areaShell}>
@@ -107,7 +287,7 @@ function IncaricoArea({
           </h1>
           <p className={styles.areaSubtitle}>
             {patientStatus === 'ready'
-              ? 'Casi dell’ambulatorio e della rete locale, tra attivi e archivio.'
+              ? 'Casi dell’ambulatorio e della rete locale. Usa le frecce o j/k per navigare, Invio per aprire; premi ? per l’aiuto completo.'
               : patientStatus === 'error'
                 ? 'Lista pazienti non disponibile: verifica sessione e servizi locali.'
                 : 'Preparazione della lista pazienti.'}
@@ -224,13 +404,22 @@ function IncaricoArea({
           <div style={{ marginTop: 8 }}>
             {/* @Codex */}
             {patientStatus === 'idle' || patientStatus === 'loading' ? (
-              <p className={styles.emptyState} role="status" aria-live="polite">
-                Caricamento pazienti…
-              </p>
+              <div className={styles.emptyState} role="status" aria-live="polite" aria-label="Caricamento pazienti">
+                <div className="mf-skeleton h-12" />
+                <div className="mf-skeleton h-12 mt-2" />
+                <div className="mf-skeleton h-12 mt-2" />
+              </div>
             ) : patientStatus === 'error' ? (
-              <p className={styles.emptyState} role="alert">
-                Lista pazienti non disponibile. Verifica sessione e servizi locali.
-              </p>
+              <div className={styles.emptyState} role="alert">
+                {/* @Codex WUL-UIUX: l'errore dichiara cosa è successo e offre
+                    l'azione di recupero, come chiede il contratto PRODUCT.md. */}
+                <p>Lista pazienti non disponibile. Verifica sessione e servizi locali.</p>
+                {onRetryPatients ? (
+                  <button type="button" className={styles.ghostBtnSm} onClick={onRetryPatients}>
+                    Riprova
+                  </button>
+                ) : null}
+              </div>
             ) : visible.length === 0 ? (
               <p className={styles.emptyState}>
                 {normalizedQuery
@@ -241,9 +430,10 @@ function IncaricoArea({
               <div
                 ref={patientListParentRef}
                 className={patientStyles.patientListViewport}
-                role="list"
+                role="listbox"
                 aria-label="Elenco pazienti in carico"
                 data-testid="lume-patient-list"
+                onKeyDown={handleListKeyDown}
               >
                 <div
                   className={patientStyles.patientList}
@@ -260,7 +450,7 @@ function IncaricoArea({
                         ref={patientRowVirtualizer.measureElement}
                         data-index={virtualRow.index}
                         className={patientStyles.patientRowWrap}
-                        role="listitem"
+                        role="presentation"
                         style={{
                           position: 'absolute',
                           top: 0,
@@ -276,7 +466,10 @@ function IncaricoArea({
                             isSelected && patientStyles.patientRowSelected,
                           )}
                           onClick={() => onSelectPatient(p.id)}
-                          aria-pressed={isSelected}
+                          role="option"
+                          aria-selected={isSelected}
+                          tabIndex={isSelected ? 0 : -1}
+                          data-patient-index={virtualRow.index}
                           data-testid="lume-patient-row"
                         >
                           <span className={patientStyles.patientRowContent} data-lume-row-part="content">
@@ -371,22 +564,49 @@ function IncaricoArea({
                 <UserSquare2 size={13} />
                 Apri scheda paziente
               </Link>
-              <button type="button" className={styles.ghostBtnSm} data-lume-action="quiet" onClick={() => onOpenArea('scheda')}>
-                <FileSearch size={12} />
-                Quadro
-              </button>
-              <Link href={`${selected.href}/entries/new`} className={styles.ghostBtnSm} data-lume-action="quiet">
-                <Plus size={12} />
-                Nuova voce
-              </Link>
-              <Link href={`${selected.modulesHref}#documenti`} className={styles.ghostBtnSm} data-lume-action="quiet">
-                <FileText size={12} />
-                Documenti
-              </Link>
-              <button type="button" className={styles.ghostBtnSm} data-lume-action="quiet" onClick={() => onOpenArea('handoff')}>
-                <Workflow size={12} />
-                Prepara SISS
-              </button>
+              <div ref={actionsRef} className={patientStyles.caseLensActionOverflow}>
+                <button
+                  ref={actionsTriggerRef}
+                  type="button"
+                  className={patientStyles.caseLensOverflowTrigger}
+                  aria-label="Altre azioni paziente"
+                  aria-haspopup="menu"
+                  aria-expanded={isActionsOpen}
+                  aria-controls={isActionsOpen ? 'lume-patient-actions-menu' : undefined}
+                  data-lume-action="overflow"
+                  onClick={() => setIsActionsOpen((open) => !open)}
+                  onKeyDown={(event) => {
+                    if (event.key !== 'ArrowDown') return;
+                    event.preventDefault();
+                    setIsActionsOpen(true);
+                  }}
+                >
+                  <Ellipsis size={18} aria-hidden="true" />
+                </button>
+                {isActionsOpen ? createPortal(
+                  <div
+                    ref={actionsMenuRef}
+                    id="lume-patient-actions-menu"
+                    className={patientStyles.caseLensActionMenu}
+                    role="menu"
+                    aria-label="Azioni paziente"
+                    data-positioned={actionsMenuPosition ? 'true' : 'false'}
+                    style={actionsMenuPosition ?? undefined}
+                    onKeyDown={handleActionMenuKeyDown}
+                  >
+                    {overflowActions.map(({ href, icon, label, run }) => href ? (
+                      <Link key={label} href={href} className={patientStyles.caseLensMenuItem} role="menuitem" tabIndex={-1} onClick={() => setIsActionsOpen(false)}>
+                        {icon}{label}
+                      </Link>
+                    ) : (
+                      <button key={label} type="button" className={patientStyles.caseLensMenuItem} role="menuitem" tabIndex={-1} onClick={() => { setIsActionsOpen(false); run?.(); }}>
+                        {icon}{label}
+                      </button>
+                    ))}
+                  </div>,
+                  document.body,
+                ) : null}
+              </div>
             </div>
           </aside>
         ) : (

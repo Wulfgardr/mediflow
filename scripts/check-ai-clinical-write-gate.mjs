@@ -9,9 +9,9 @@
 // diagnosi, terapie o altri record clinici strutturati (0086 §3). ADR 0086 chiude con una
 // regola generale: diagnosi, prescrizioni e identità paziente non sono auto-applicabili.
 //
-// MediFlow è local-first: i servizi AI sono invocati direttamente dai componenti, non
-// dietro una route. Il punto di enforcement quindi NON è la route ma il writer del
-// servizio. Un gate route-based passerebbe a vuoto.
+// MediFlow è local-first: nel candidato 0.8.5 i quattro smart path attraversano route
+// autenticate, ma la route resta un adapter. Il punto di enforcement è il production
+// root e il writer del servizio; un gate limitato ai nomi delle route passerebbe a vuoto.
 //
 // Il confine reale ha due lati, e il gate controlla entrambi:
 //
@@ -122,6 +122,22 @@ const AI_PATH_WRITE_CONTRACTS = [
         table: 'settings',
         reason: 'Selezione del modello e default: configurazione, non dato clinico.',
         reference: 'docs/adr/0086-intelligent-scaffold-and-graded-automation-boundary.md',
+    },
+    {
+        module: 'lib/ai-providers/fabric/durable-review-record-store.ts',
+        lane: 'durable-review',
+        policy: 'non-clinical',
+        table: 'durableReviewRecords',
+        reason: 'Conserva soltanto envelope review sigillati e ledger di replay con digest; non scrive record clinici strutturati, decisioni o apply.',
+        reference: 'docs/adr/0094-intelligence-fabric-headless-contract-085.md',
+    },
+    {
+        module: 'lib/ai-providers/fabric/physician-review-command.ts',
+        lane: 'physician-review',
+        policy: 'non-clinical',
+        table: 'durableReviewCommandStates',
+        reason: 'La transazione registra solo stato review terminale, replay idempotente e audit PHI-safe; non scrive record clinici strutturati né espone apply.',
+        reference: 'docs/adr/0095-broker-projection-e-servizi-host-per-capability.md',
     },
     {
         module: 'lib/patient-smart-import-apply.ts',

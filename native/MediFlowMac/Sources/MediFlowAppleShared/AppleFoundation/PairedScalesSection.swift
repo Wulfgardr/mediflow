@@ -128,11 +128,15 @@ struct PairedScalesSection: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(item.title)
                                     .chartRowTitle()
+                                // @Codex MF085-002: provenance visible before expanding stored interpretation.
+                                if let provenance = item.provenanceLabel {
+                                    Text(provenance).chartMetadata()
+                                }
                                 Text(Self.dateFormatter.string(from: item.date))
                                     .chartMetadata()
                             }
                             Spacer(minLength: 8)
-                            scaleChip(item.scoreLabel ?? "Punteggio n.d.", tone: .positive)
+                            scaleChip(item.scoreLabel ?? "Punteggio n.d.", tone: item.provenanceLabel == nil ? .positive : .info)
                         }
                     }
                     .accessibilityIdentifier("scale-history-row-\(item.id)")
@@ -155,7 +159,7 @@ struct PairedScalesSection: View {
 
     static func area(for scaleId: String) -> String {
         switch scaleId {
-        case "tinetti":
+        case ClinicalScales.tinettiPOMA28ID:
             return "Equilibrio"
         case "adl", "iadl":
             return "Autonomia"

@@ -15,17 +15,13 @@ const runtimeSource = fs.readFileSync(
     'utf8',
 );
 
-test('ATHENA treatment route keeps session-only and server-side kill switch boundary', () => {
+test('legacy ATHENA prompt route authenticates first and remains terminally retired', () => {
     assert.match(routeSource, /requireSession\(\)/);
     assert.doesNotMatch(routeSource, /requireSessionOrLocalToken/);
-    assert.match(routeSource, /AI_TREATMENT_REASONING_KILL_SWITCH_KEY/);
-    assert.match(routeSource, /isAiTreatmentReasoningEnabledValue/);
-    assert.match(routeSource, /status:\s*403/);
-});
-
-test('ATHENA treatment route stays schema-scoped instead of becoming a generic local oracle', () => {
-    assert.match(routeSource, /TREATMENT_REASONING_SCHEMA_VERSION/);
-    assert.match(routeSource, /prompt\.includes\(TREATMENT_REASONING_SCHEMA_VERSION\)/);
+    assert.match(routeSource, /unauthorizedResponse\(\)/);
+    assert.match(routeSource, /legacy_route_retired/);
+    assert.match(routeSource, /,\s*410\)/);
+    assert.doesNotMatch(routeSource, /request\.json|AI_TREATMENT_REASONING_KILL_SWITCH_KEY|generateWithAthenaMlx|prompt|maxTokens|TREATMENT_REASONING_SCHEMA_VERSION/u);
 });
 
 test('ATHENA MLX runtime keeps dependency and stderr handling clinical-safe', () => {

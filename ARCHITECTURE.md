@@ -42,10 +42,11 @@ MediFlow è un **sistema ibrido locale**:
   - accesso al database SQLite locale
   - contratto versionato `/api/v1/*`, inclusa la slice `network` paired con read pazienti, write profilo/status e primi read/write diario clinico, terapie, checkup e osservazioni
 - Servizi locali opzionali:
-  - Ollama per AI/OCR (localhost)
-  - Apple Vision OCR come fallback locale solo macOS quando l'OCR primario
-    produce output vuoto/degenerato
-  - ICD-11 Docker API per ricerca diagnosi (localhost)
+  - Ollama per Patient Insight, Smart Import e Document Synthesis
+  - ATHENA-R1-Qwen3-8B su MLX per Treatment Reasoning
+  - AnyDoc come primo passaggio deterministico degli allegati, con fallback
+    Apple Vision locale per le sole pagine PDF `needsOcr`
+  - Application Service ICD-11 WHO server-only, egress opt-in
   - sidecar locale OpenMed per redaction shadow/benchmark (localhost, non client-facing)
 - Strategia client Apple:
   - la web app sul Mac resta la superficie primaria di oggi
@@ -68,9 +69,10 @@ create documentale manuale per client trusted su LAN.
 | --- | --- | --- |
 | Next.js (UI + API) | `http://127.0.0.1:3000` | solo locale |
 | TLS proxy (trasporto native) | `https://127.0.0.1:3443` | inoltra verso :3000 |
-| Ollama (AI/OCR) | `http://127.0.0.1:11434` | opzionale |
-| Apple Vision OCR | n/a | fallback OCR locale solo macOS; nessun fallback equivalente certificato Windows/Linux |
-| ICD-11 (Docker) | `http://127.0.0.1:8888` | opzionale |
+| Ollama (AI generativa generale) | `http://127.0.0.1:11434` | opzionale; non esegue OCR nel percorso allegati 0.8.5 |
+| ATHENA su MLX | processo locale bounded | opzionale; solo Treatment Reasoning, con runner e modello locali configurati |
+| AnyDoc + Apple Vision | processi locali bounded | AnyDoc resta il primo passaggio; Apple Vision continua soltanto le pagine PDF `needsOcr`, senza rete |
+| ICD-11 WHO | HTTPS ufficiale, solo dal server | opzionale, egress opt-in |
 | OpenMed redaction (shadow) | `http://127.0.0.1:18080` | opzionale, non client-facing |
 
 ---
@@ -122,6 +124,108 @@ Ogni endpoint proxy verso servizi locali deve:
 - evitare SSRF e target remoti
 - trattare ogni risposta come input non fidato
 
+### Application Services, Fabric e Headless 0.8.5
+
+Nel perimetro Fabric/Headless 0.8.5, i production root e gli Application
+Services host-owned possiedono regole di dominio, currentness, conflitti,
+transazioni e accesso a SQLite. Le route sottili e gli adapter Headless di
+questo perimetro non accedono direttamente al database e non duplicano tali
+regole. Alcune route Web storiche importano ancora `dbServer`: non sono prova
+di questo boundary e restano fuori dal claim generale Fabric/Headless.
+
+Il candidato sorgente locale 0.8.5 collega quattro capability generative al
+Fabric end-to-end:
+
+- Patient Insight;
+- Smart Import;
+- Document Synthesis;
+- Treatment Reasoning.
+
+Gli stati di scope sono espliciti:
+
+| Stato | Perimetro 0.8.5 |
+| --- | --- |
+| `INCLUDED` | Quattro path Fabric proposal-only; AnyDoc e fallback Apple Vision locale sulle pagine PDF `needsOcr`; selector guidato e binding atomico; provider v2 e probe amministrativa `default OFF`; Supervisor locale con Web e MCP figli; planner read-only collegato; F10 end-to-end; recording Apple on-device review-first. |
+| `VERIFIED_LOCAL` | Evidenza mirata presente nel tree per contratti, production root e crosswalk; la suite integrata finale resta separata. |
+| `NOT_READY` | Credenziali o rete cloud live; installer, onboarding e compatibilità con host MCP esterni; microfono reale e validazione clinica del recording; prova terminale sul tree finale. |
+| `OUT_OF_SCOPE_FOR_0.8.5_NON_BLOCKING` | DeepSeek-OCR 2/CUDA, benchmark di qualifica e readiness OCR universale. |
+
+Ogni caller usa una route autenticata e riceve una proposta con receipt,
+provenienza e currentness. Il caller non sceglie provider, modello, endpoint,
+venue, prompt o fallback e non può richiedere apply. Il production root
+host-owned risolve questi elementi e mantiene lo stadio massimo
+`proposal_only`.
+
+Quando configurati, Ollama serve le prime tre capability e ATHENA su MLX serve
+soltanto Treatment Reasoning. I due provider hanno lifecycle host-owned
+separati e non ereditano stato, grant o fallback l'uno dall'altro. OpenAI e
+Anthropic restano `default OFF` e non sono fallback.
+
+ATHENA è inclusa solo quando l'host configura sia l'artifact del modello sia un
+runner locale. `MEDIFLOW_ATHENA_MLX_GENERATE_BIN` può indicare soltanto un
+eseguibile assoluto `mlx_lm.generate`, senza argomenti o shell. In assenza
+dell'override, il launcher `uvx` resta offline e fallisce chiuso se la cache
+necessaria non è già disponibile. Questo percorso non implica readiness
+universale di ATHENA o del runtime MLX generico.
+
+Il modello provider v2 separa:
+
+- tipo e istanza del provider;
+- autenticazione e modello;
+- capability, gruppi, binding e allowlist delle funzioni;
+- classi di credenziale `local_model`, `api_key`, `provider_oauth` ufficiale e
+  `host_subscription`.
+
+OpenAI Responses e Anthropic Messages hanno adapter HTTPS ufficiali e una
+probe amministrativa Document Synthesis review-only. La route è admin-only e
+richiede l'intento esatto `run_synthetic_nonclinical_probe`. Il default resta
+`OFF`. Ogni composizione richiede lifecycle attivo, istanza host-owned, secret
+reference e policy egress/retention esplicita. I test usano transport fake e
+non provano credenziali, rete live, account, retention o readiness cloud. Un
+login consumer o una subscription host non costituiscono accesso API; OAuth
+privati o ricostruiti restano vietati.
+
+Il selector Fabric opera sulle cinque capability nominate. La discovery mostra
+solo profili compatibili, lo smoke usa fixture sintetiche e l'attivazione del
+binding è atomica, versionata e reversibile. Discovery e smoke non qualificano
+il runtime e non persistono segreti.
+
+Il Supervisor Node production locale è il parent trusted del candidato. Avvia
+Web standalone e MCP come figli distinti su IPC privato ereditato e possiede
+contesto, purpose, scope, lease, revoca e audit. MCP `stdio` e Mini espongono
+catalogo, ricerca terminologica, lettura patient-scoped delle Open Loops,
+proposta follow-up `proposal_only` e query semantica bounded read-only. Gli
+adapter non importano SQLite, non accettano authority dal caller e non aprono
+listener propri. Il candidato non dichiara installer, onboarding o
+compatibilità con host MCP esterni.
+
+F10 espone via MCP soltanto la preview della transizione
+`pending -> completed|cancelled`. La UI Web trusted rilegge la risorsa, richiede
+ruolo medico attivo, step-up e gesto operation-specific, quindi esegue il commit
+con CAS, idempotenza, audit e receipt atomici. Proof e commit non attraversano
+MCP e non sono delegati all'agente.
+
+Questa architettura distingue due modalità:
+
+1. **Provider dentro MediFlow.** Il Fabric sceglie un provider per una
+   capability applicativa MediFlow. I quattro path locali 0.8.5 appartengono a
+   questa modalità.
+2. **MediFlow dentro un host intelligente.** Il candidato usa MCP `stdio` o
+   Mini sopra RPC AIP ereditato per le operazioni nominate. L'entrypoint locale
+   usa il Supervisor, ma non promette installer, onboarding o compatibilità con
+   host MCP esterni.
+
+Il semantic query planner è collegato al Supervisor come percorso read-only.
+Compone al massimo due operazioni allowlisted tra terminology search e Open
+Loops patient-scoped, entro budget bounded. Non produce SQL libero, non scrive
+dati e non accede direttamente a SQLite.
+
+Su macOS 26 o successivo, la shell integra cattura e trascrizione italiana con
+API Apple on-device. Richiede consenso esplicito, mantiene l'audio bounded solo
+in RAM e trasferisce il transcript al draft soltanto dopo review. Non esegue
+writer clinici automatici; microfono reale e validazione clinica restano fuori
+dal claim del candidato.
+
 ---
 
 ## 🗄️ Flusso dati (alto livello)
@@ -145,7 +249,9 @@ flowchart TB
 
   subgraph "Services"
     Ollama["Ollama :11434"]
-    ICD["ICD-11 Docker :8888"]
+    Athena["ATHENA / MLX<br/>Treatment Reasoning"]
+    AnyDoc["AnyDoc + Apple Vision<br/>estrazione locale"]
+    ICD["ICD-11 WHO<br/>server-only"]
   end
 
   Web -->|HTTP| Next
@@ -154,6 +260,8 @@ flowchart TB
 
   Next --> DB
   Next --> Ollama
+  Next --> Athena
+  Next --> AnyDoc
   Next --> ICD
 ```
 
@@ -165,7 +273,7 @@ flowchart TB
 | --- | --- |
 | `app/` | pagine Next.js + route handlers |
 | `components/` | componenti UI, logica client |
-| `lib/` | cifratura, strato DB, servizi (AI/OCR/ICD), auth/session server |
+| `lib/` | cifratura, strato DB, Application Services, Fabric, AnyDoc, ICD e auth/session server |
 | `drizzle/` | migrazioni SQLite |
 | `scripts/` | script avvio, TLS proxy, helper native |
 | `native/` | app SwiftUI macOS/iPhone/iPad e core Swift condiviso tri-OS |
@@ -189,12 +297,25 @@ flowchart TB
   `main` (vedi [ADR 0060](./docs/adr/0060-kree8-cockpit-live-root-entry.md)); Graphite resta
   riferimento storico per il principio no-selector e nuove sperimentazioni non
   diventano selector runtime persistiti senza workstream e decisione espliciti.
+- Il selector guidato Fabric sceglie binding di capability, non shell web. Usa
+  discovery compatibile, smoke sintetico e attivazione atomica con rollback;
+  non modifica il principio no-selector della root.
 - Principio local-only: nessuna dipendenza cloud di default.
 - Boundary SISS/FSE: oggi coordinamento contestuale + percorsi ufficiali; niente claim
   di integrazione regionale nativa certificata fuori dal perimetro documentato.
-- Boundary OCR platform-specific: DeepSeek/Ollama resta OCR primario locale;
-  Apple Vision e fallback certificato solo su macOS; Windows/Linux non hanno
-  oggi un fallback OCR platform-specific equivalente dichiarato.
+- Boundary documentale 0.8.5: AnyDoc resta il primo passaggio automatico
+  locale. Nei PDF supportati, solo le pagine `needsOcr` raggiungono
+  materializzazione, rendering e Apple Vision locale. La ricomposizione
+  conserva ordine e provenienza e fallisce chiusa se la sorgente non è più
+  corrente o il motore non è disponibile. DeepSeek-OCR 2/CUDA ha stato
+  `OUT_OF_SCOPE_FOR_0.8.5_NON_BLOCKING`. Le route OCR legacy, dopo
+  l'autenticazione, rispondono `410`.
+- Boundary Fabric: le quattro capability generative restano
+  `proposal_only`; receipt e provenienza non autorizzano apply.
+- Boundary Headless: nessun adapter accede direttamente a SQLite. MCP/Mini
+  raggiungono solo Application Services nominati tramite RPC AIP ereditato dal
+  Supervisor locale; installer, onboarding e host MCP esterni restano fuori dal
+  claim.
 
 ---
 
