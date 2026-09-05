@@ -1,7 +1,7 @@
 /* @Codex */
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useDropzone, type FileRejection } from 'react-dropzone';
 import { Eye, FileText, Loader2, RefreshCw, Upload, X } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
@@ -26,7 +26,7 @@ interface DocumentUploadProps {
 }
 
 type LocalExtractionState = (Readonly<{ attachmentId: string }> & AnyDocLocalExtractionPreview)
-    | Readonly<{ attachmentId: string; status: 'review_required' }>;
+    | Readonly<{ attachmentId: string; status: 'review_required' | 'interrupted' }>;
 
 function fileAsDataUrl(file: File): Promise<string> {
     return new Promise((resolve, reject) => {
@@ -44,7 +44,15 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
     const [viewingFile, setViewingFile] = useState<Attachment | null>(null);
     const [extractingId, setExtractingId] = useState<string | null>(null);
     const [localExtraction, setLocalExtraction] = useState<LocalExtractionState | null>(null);
+    const activeExtraction = useRef<{ attachmentId: string; controller: AbortController } | null>(null);
     const [fileRejections, setFileRejections] = useState<string[]>([]);
+
+    useEffect(() => () => {
+        activeExtraction.current?.controller.abort();
+        activeExtraction.current = null;
+        setExtractingId(null);
+        setLocalExtraction(null);
+    }, [patientId]);
 
     const attachments = useLiveQuery(
         async () => {
@@ -116,15 +124,32 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
         });
         if (!confirmed) return;
         await db.attachments.delete(id);
+        if (activeExtraction.current?.attachmentId === id) {
+            activeExtraction.current.controller.abort();
+            activeExtraction.current = null;
+            setExtractingId(null);
+        }
         if (localExtraction?.attachmentId === id) setLocalExtraction(null);
     };
 
+    const interruptLocalExtraction = () => {
+        const operation = activeExtraction.current;
+        if (!operation) return;
+        operation.controller.abort();
+        activeExtraction.current = null;
+        setExtractingId(null);
+        setLocalExtraction({ attachmentId: operation.attachmentId, status: 'interrupted' });
+    };
+
     const handleLocalExtractionPreview = async (file: Attachment) => {
-        if (extractingId) return;
+        if (activeExtraction.current) return;
+        const operation = { attachmentId: file.id, controller: new AbortController() };
+        activeExtraction.current = operation;
         setExtractingId(file.id);
         setLocalExtraction(null);
         try {
-            const preview = await requestAnyDocLocalExtractionPreview(file.id);
+            const preview = await requestAnyDocLocalExtractionPreview(file.id, globalThis.fetch, operation.controller.signal);
+            if (activeExtraction.current !== operation) return;
             if (preview) {
                 setLocalExtraction({ attachmentId: file.id, ...preview });
                 return;
@@ -136,7 +161,10 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
                 description: 'Il documento richiede revisione manuale.',
             });
         } finally {
-            setExtractingId(null);
+            if (activeExtraction.current === operation) {
+                activeExtraction.current = null;
+                setExtractingId(null);
+            }
         }
     };
 
@@ -224,6 +252,14 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
                             </div>
                         </div>
 
+                        {extractingId === file.id && (
+                            <div className="mt-3 flex items-center gap-3 text-xs" role="status">
+                                <span>Estrazione locale in corso.</span>
+                                <button type="button" onClick={interruptLocalExtraction} className="rounded-lg border px-3 py-2">
+                                    Interrompi attesa
+                                </button>
+                            </div>
+                        )}
                         {localExtraction?.attachmentId === file.id && localExtraction.status === 'available' && (
                             <div className="mt-3 rounded-lg border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] p-2" role="status" data-testid="anydoc-local-extraction-preview">
                                 <p className="text-[10px] font-semibold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
@@ -237,9 +273,11 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
                                 <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap text-xs text-[color:var(--lume-ink)]">{localExtraction.markdown}</pre>
                             </div>
                         )}
-                        {localExtraction?.attachmentId === file.id && localExtraction.status === 'review_required' && (
+                        {localExtraction?.attachmentId === file.id && localExtraction.status !== 'available' && (
                             <p className="mt-3 rounded-lg border border-[color:color-mix(in_srgb,var(--lume-signal-warning)_28%,transparent)] p-2 text-xs text-[color:color-mix(in_srgb,var(--lume-signal-warning)_65%,var(--lume-ink))]" role="status">
-                                review_required · unsupported_local_extraction — revisione manuale necessaria.
+                                {localExtraction.status === 'interrupted'
+                                    ? 'Attesa interrotta · revisione manuale necessaria. Puoi riprovare.'
+                                    : 'review_required · unsupported_local_extraction — revisione manuale necessaria.'}
                             </p>
                         )}
 

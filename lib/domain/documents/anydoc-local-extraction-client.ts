@@ -85,13 +85,17 @@ async function parsePreview(raw: unknown, expectedAttachmentId: string): Promise
 export async function requestAnyDocLocalExtractionPreview(
     attachmentId: unknown,
     request: typeof fetch = globalThis.fetch,
+    signal?: AbortSignal,
 ): Promise<AnyDocLocalExtractionPreview | null> {
     if (typeof attachmentId !== 'string' || attachmentId.length < 1 || attachmentId.length > 200
-        || /[\u0000-\u001f\u007f]/u.test(attachmentId)) return null;
+        || /[\u0000-\u001f\u007f]/u.test(attachmentId) || signal?.aborted) return null;
     try {
-        const response = await request(`/api/attachments/${encodeURIComponent(attachmentId)}/local-extraction`, { method: 'POST', cache: 'no-store' });
-        if (!response.ok) return null;
-        return parsePreview(await response.text(), attachmentId);
+        const response = await request(`/api/attachments/${encodeURIComponent(attachmentId)}/local-extraction`, {
+            method: 'POST', cache: 'no-store', ...(signal ? { signal } : {}),
+        });
+        if (!response.ok || signal?.aborted) return null;
+        const preview = await parsePreview(await response.text(), attachmentId);
+        return signal?.aborted ? null : preview;
     }
     catch { return null; }
 }
