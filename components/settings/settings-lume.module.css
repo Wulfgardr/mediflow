@@ -801,3 +801,20 @@
         transition-duration: 0.01ms;
     }
 }
+
+/* @Codex WUL-676: the index is navigation, not a second stack of cards. */
+:global(html[data-runtime-twin-design='proposal']) .navItem { min-height: 40px; padding: 9px 12px; border: 0; border-radius: 7px; box-shadow: none; }
+:global(html[data-runtime-twin-design='proposal']) .navItemDescription { display: none; }
+:global(html[data-runtime-twin-design='proposal']) .navGroupLabel { font-family: var(--lume-font-sans); font-size: 11px; }
+:global(html[data-runtime-twin-design='proposal']) .navItemActive { background: var(--lume-ink); color: var(--lume-surface-focal); box-shadow: none; }
+:global(html[data-runtime-twin-design='proposal']) .navItemActive :is(strong, span, svg) { color: inherit; }
+:global(html[data-runtime-twin-design='proposal']) .currentLabel { display: none; }
+:global(html[data-runtime-twin-design='proposal']) .searchButton { background: var(--lume-surface-focal); font-size: 12px; }
+:global(html[data-runtime-twin-design='proposal']) .overviewFocus { padding: 0 0 28px; border: 0; border-bottom: 1px solid color-mix(in srgb, var(--lume-ink) 12%, transparent); border-radius: 0; box-shadow: none; }
+:global(html[data-runtime-twin-design='proposal']) .sectionLabel { display: none; }
+
+:global(html[data-runtime-twin-design='proposal']) .navItemActive:hover { background: var(--lume-ink); color: var(--lume-surface-focal); }
+:global(html[data-runtime-twin-design='proposal']) .navItem { min-height: 44px; }
+:global(html[data-runtime-twin-design='proposal']) .settingSurface { padding: 28px 0; border: 0; border-top: 1px solid color-mix(in srgb, var(--lume-ink) 12%, transparent); border-radius: 0; box-shadow: none; background: transparent; }
+:global(html[data-runtime-twin-design='proposal']) .settingSurface > div:first-child p:global(.section-kicker) { display: none; }
+:global(html[data-runtime-twin-design='proposal']) .sectionIntro h2 { font-size: 24px; font-weight: 550; letter-spacing: -0.025em; }

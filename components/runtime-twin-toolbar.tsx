@@ -1,16 +1,12 @@
 'use client';
 
 /* @Codex WUL-676: local design comparison; never changes clinical state. */
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRuntimeTwinDesign } from './runtime-twin-design';
 import styles from './runtime-twin-toolbar.module.css';
 
 export function RuntimeTwinToolbar() {
-    const [proposal, setProposal] = useState(true);
-
-    useEffect(() => {
-        document.documentElement.dataset.runtimeTwinDesign = proposal ? 'proposal' : 'original';
-    }, [proposal]);
+    const { proposal, setProposal } = useRuntimeTwinDesign();
 
     return (
         <aside className={styles.toolbar} aria-label="Confronto del prototipo" data-testid="runtime-twin-toolbar">

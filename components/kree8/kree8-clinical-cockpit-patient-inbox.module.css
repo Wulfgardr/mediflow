@@ -710,3 +710,57 @@
     min-height: 44px;
   }
 }
+
+/* @Codex WUL-676: a broad patient register with an attached selected-record
+   preview. Extra recorded context opens on hover, focus, or touch selection. */
+.recordContent { display: grid; grid-template-columns: minmax(160px, 0.9fr) minmax(0, 1.5fr); gap: 0 32px; min-width: 0; }
+.recordIdentity { display: flex; flex-direction: column; gap: 7px; }
+.recordIdentity strong { font-size: 16px; font-weight: 570; letter-spacing: -0.02em; }
+.recordIdentity > span { font-size: 11px; color: var(--lume-ink-muted); overflow-wrap: anywhere; }
+.recordDiagnosis { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.recordDiagnosis > span { font-size: 13px; line-height: 1.5; }
+.recordDiagnosis small { color: var(--lume-ink-muted); font-size: 11px; }
+.recordDisclosure { grid-column: 1 / -1; display: grid; grid-template-rows: 0fr; color: var(--lume-ink-muted); font-size: 12px; line-height: 1.6; transition: grid-template-rows 180ms cubic-bezier(.22, 1, .36, 1); }
+.recordDisclosure > span { overflow: hidden; min-height: 0; }
+.recordDisclosure > span > span { display: block; padding-top: 8px; max-width: 75ch; }
+:global(html[data-runtime-twin-design='proposal']) .patientRow:is(:hover, :focus-visible, [aria-selected='true']) .recordDisclosure { grid-template-rows: 1fr; }
+:global(html[data-runtime-twin-design='proposal']) .inboxLayout { grid-template-columns: minmax(0, 1fr); gap: 28px; }
+:global(html[data-runtime-twin-design='proposal']) .worklistPanel { padding: 0; border: 0; border-radius: 0; background: transparent; }
+:global(html[data-runtime-twin-design='proposal']) .patientListViewport { max-height: min(52vh, 560px); margin-top: 16px; border-top: 1px solid var(--line-strong); scrollbar-width: thin; scrollbar-color: var(--lume-ink-muted) transparent; }
+:global(html[data-runtime-twin-design='proposal']) .patientRow { padding: 19px 18px; border: 0; border-bottom: 1px solid var(--line-strong); border-radius: 0; gap: 28px; min-height: 94px; background: transparent; }
+:global(html[data-runtime-twin-design='proposal']) .patientRow:is(:hover, :focus-visible) { background: var(--lume-surface-field); }
+:global(html[data-runtime-twin-design='proposal']) .patientRowSelected { background: var(--lume-surface-field); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--lume-ink) 16%, transparent); }
+:global(html[data-runtime-twin-design='proposal']) .patientSearchField { background: var(--lume-surface-field); min-height: 46px; border: 1px solid var(--lume-ink-muted); border-radius: 8px; }
+:global(html[data-runtime-twin-design='proposal']) .scopeChip { min-height: 40px; border-radius: 7px; }
+:global(html[data-runtime-twin-design='proposal']) .scopeChipActive { background: var(--lume-ink); color: var(--lume-surface-focal); border-color: var(--lume-ink); }
+:global(html[data-runtime-twin-design='proposal']) .caseLens { display: grid; grid-template-columns: minmax(220px, 0.8fr) minmax(0, 1.2fr) auto; gap: 12px 28px; position: relative; padding: 28px; border: 0; border-radius: 14px; background: var(--lume-surface-field); box-shadow: none; }
+:global(html[data-runtime-twin-design='proposal']) .caseLensHeader { grid-column: 1; grid-row: 1 / 3; }
+:global(html[data-runtime-twin-design='proposal']) .caseLensName { font-size: 22px; }
+:global(html[data-runtime-twin-design='proposal']) .caseLensDiagnoses { grid-column: 2; grid-row: 1; }
+:global(html[data-runtime-twin-design='proposal']) .caseLensSummary { grid-column: 2; grid-row: 2; padding: 0; background: transparent; border-radius: 0; }
+:global(html[data-runtime-twin-design='proposal']) .caseLensActions { grid-column: 3; grid-row: 1 / 3; align-self: center; }
+:global(html[data-runtime-twin-design='proposal']) .caseLensStatus { grid-column: 1 / -1; padding-top: 12px; border-top: 1px solid var(--line-strong); }
+:global(html[data-runtime-twin-design='proposal']) .patientDiagnosisPill > span { white-space: normal; overflow: visible; }
+@media (max-width: 1100px) {
+  :global(html[data-runtime-twin-design='proposal']) .caseLens { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  :global(html[data-runtime-twin-design='proposal']) .caseLensActions { grid-column: 1 / -1; grid-row: auto; }
+}
+@media (max-width: 640px) {
+  .recordContent { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .recordIdentity strong { font-size: 16px; }
+  :global(html[data-runtime-twin-design='proposal']) .patientRow { padding: 18px 12px; gap: 12px; align-items: start; }
+  :global(html[data-runtime-twin-design='proposal']) .patientSide { padding-top: 3px; }
+  :global(html[data-runtime-twin-design='proposal']) .patientListViewport { max-height: 58vh; }
+  :global(html[data-runtime-twin-design='proposal']) .caseLens { display: flex; padding: 20px; gap: 16px; }
+  :global(html[data-runtime-twin-design='proposal']) .scopeChip { min-height: 44px; }
+}
+@media (prefers-reduced-motion: reduce) { .recordDisclosure { transition: none; } }
+:global(html[data-motion='reduced']) .recordDisclosure { transition: none; }
+@keyframes recordReveal { from { opacity: .7; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+:global(html[data-runtime-twin-design='proposal']) .caseLens { animation: recordReveal 160ms cubic-bezier(.22, 1, .36, 1); }
+:global(html[data-runtime-twin-design='proposal']) .patientRow:focus-visible .recordDisclosure { transition: none; }
+@media (prefers-reduced-motion: reduce) {
+  :global(html[data-runtime-twin-design='proposal']) .caseLens { animation: none; }
+}
+:global(html[data-ui-reduce-motion='true']) .recordDisclosure { transition: none; }
+:global(html[data-ui-reduce-motion='true'][data-runtime-twin-design='proposal']) .caseLens { animation: none; }

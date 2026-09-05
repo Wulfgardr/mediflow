@@ -725,6 +725,7 @@ export default function PatientDetailPage() {
                 </section>
 
                 <PatientSynopticSheet
+                    notes={patient.notes}
                     leadDiagnosis={leadDiagnosis}
                     otherProblemsCount={otherProblemsCount}
                     signals={synopticSignals}

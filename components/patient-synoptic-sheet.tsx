@@ -10,6 +10,7 @@
    lib/observation-range via la pagina). undefined = caricamento, [] / null =
    dato vero assente (stato onesto). */
 
+import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
 import { Minus, TrendingDown, TrendingUp } from 'lucide-react';
 import type { ReactNode } from 'react';
 
@@ -46,6 +47,7 @@ export interface SynopticSignal {
 }
 
 export interface PatientSynopticSheetProps {
+    notes?: string;
     leadDiagnosis?: Diagnosis;
     otherProblemsCount: number;
     signals: SynopticSignal[];
@@ -60,7 +62,7 @@ export interface PatientSynopticSheetProps {
 
 const SIGNAL_TONE: Record<NonNullable<SynopticSignal['tone']>, string> = {
     neutral: 'text-[color:var(--lume-ink)]',
-    warning: 'text-[color:var(--lume-signal-warning)]',
+    warning: styles.synopticWarning,
     critical: 'text-[color:var(--lume-signal-critical)]',
 };
 
@@ -85,6 +87,7 @@ function MicroLabel({ children }: { children: ReactNode }) {
 }
 
 export function PatientSynopticSheet({
+    notes,
     leadDiagnosis,
     otherProblemsCount,
     signals,
@@ -94,6 +97,7 @@ export function PatientSynopticSheet({
     nextCheckupLabel,
     nextCheckupTitle,
 }: PatientSynopticSheetProps) {
+    const { proposal } = useRuntimeTwinDesign();
     const visibleTherapies = therapies ? therapies.slice(0, THERAPY_CAP) : [];
     const extraTherapies = therapiesTotal !== undefined ? therapiesTotal - visibleTherapies.length : 0;
 
@@ -101,7 +105,8 @@ export function PatientSynopticSheet({
         <section id="quadro" aria-labelledby="synoptic-title" className={styles.synoptic}>
             <div className="mb-4">
                 <p className={styles.sectionLabel}>Quadro clinico</p>
-                <h2 id="synoptic-title" className={styles.sectionTitle}>Baseline e dati verificabili</h2>
+                <h2 id="synoptic-title" className={styles.sectionTitle}>{proposal ? 'Quadro clinico' : 'Baseline e dati verificabili'}</h2>
+                {proposal ? <div className={styles.synopticNotes}><strong>Note in cartella</strong><p>{notes?.trim() || 'Nessuna nota generale registrata.'}</p></div> : null}
             </div>
 
             {/* Problema guida (prima diagnosi di qualunque sistema) */}
@@ -227,7 +232,7 @@ export function PatientSynopticSheet({
                         </a>
                         {nextCheckupLabel ? (
                             <div className={styles.synopticMeasure}>
-                                <span className="lume-registro text-[13px] font-semibold text-[color:var(--lume-signal-warning)]" data-testid="lume-register-value">{nextCheckupLabel}</span>
+                                <span className={`lume-registro text-[13px] font-semibold ${styles.synopticWarning}`} data-testid="lume-register-value">{nextCheckupLabel}</span>
                                 {nextCheckupTitle ? <span className={styles.synopticDetailMeta}>{nextCheckupTitle}</span> : null}
                             </div>
                         ) : (

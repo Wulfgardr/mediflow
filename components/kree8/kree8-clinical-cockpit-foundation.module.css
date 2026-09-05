@@ -809,3 +809,9 @@
     border: 0;
   }
 }
+
+/* @Codex WUL-676: clear directory heading, one working plane. */
+:global(html[data-runtime-twin-design='proposal']) .areaCaption { display: none; }
+:global(html[data-runtime-twin-design='proposal']) .areaTitle { font-size: 30px; font-weight: 550; letter-spacing: -0.035em; }
+:global(html[data-runtime-twin-design='proposal']) .areaTitle em { display: none; }
+:global(html[data-runtime-twin-design='proposal']) .areaHeader { padding: 14px 0 24px; }

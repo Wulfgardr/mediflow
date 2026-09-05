@@ -12,6 +12,7 @@ import { getAppFingerprint } from '@/lib/app-revision';
 import { RootRuntimeShell } from '@/components/root-runtime-shell';
 /* @Codex */
 import { RuntimeTwinToolbar } from '@/components/runtime-twin-toolbar';
+import { RuntimeTwinDesignProvider } from '@/components/runtime-twin-design';
 import {
   UI_REDUCE_MOTION_STORAGE_KEY,
 } from '@/lib/ui-accessibility-preferences';
@@ -91,10 +92,12 @@ export default function RootLayout({
         className={`${voce.variable} ${registro.variable} min-h-screen overflow-x-hidden antialiased`}
         suppressHydrationWarning
       >
-        <RootRuntimeShell fingerprint={appFingerprint}>
-          {children}
-        </RootRuntimeShell>
-        {runtimeTwin ? <RuntimeTwinToolbar /> : null}
+        <RuntimeTwinDesignProvider enabled={runtimeTwin}>
+          <RootRuntimeShell fingerprint={appFingerprint}>
+            {children}
+          </RootRuntimeShell>
+          {runtimeTwin ? <RuntimeTwinToolbar /> : null}
+        </RuntimeTwinDesignProvider>
       </body>
     </html>
   );
