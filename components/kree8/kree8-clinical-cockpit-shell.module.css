@@ -802,3 +802,20 @@
     min-height: 44px;
   }
 }
+
+/* @Codex WUL-676: the record directory joins the new folder workspace. */
+:global(html[data-runtime-twin-design='proposal']) .shell { padding: 0; gap: 0; grid-template-columns: 224px minmax(0, 1fr); }
+:global(html[data-runtime-twin-design='proposal']) .rail { border: 0; border-radius: 0; background: var(--lume-surface-field); box-shadow: none; padding: 22px 12px; }
+:global(html[data-runtime-twin-design='proposal']) .canvas { border: 0; border-left: 1px solid var(--line-strong); border-radius: 0; box-shadow: none; padding: 20px 32px 40px; background: var(--lume-surface-focal); }
+:global(html[data-runtime-twin-design='proposal']) .framePanel,
+:global(html[data-runtime-twin-design='proposal']) .focusSurface { padding: 0; border: 0; border-radius: 0; box-shadow: none; background: transparent; }
+:global(html[data-runtime-twin-design='proposal']) .focusSurface::before { display: none; }
+:global(html[data-runtime-twin-design='proposal']) .navItem { border: 0; border-radius: 7px; min-height: 44px; }
+:global(html[data-runtime-twin-design='proposal']) .navSelected { background: var(--lume-ink); color: var(--lume-surface-focal); box-shadow: none; }
+:global(html[data-runtime-twin-design='proposal']) .navSelected .navMeta { color: inherit; }
+:global(html[data-runtime-twin-design='proposal']) .railLabel { display: none; }
+@media (max-width: 1024px) {
+  :global(html[data-runtime-twin-design='proposal']) .shell { grid-template-columns: minmax(0, 1fr); }
+  :global(html[data-runtime-twin-design='proposal']) .rail { padding: 12px; border-bottom: 1px solid var(--line-strong); }
+  :global(html[data-runtime-twin-design='proposal']) .canvas { border-left: 0; padding: 20px; }
+}

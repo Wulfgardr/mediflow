@@ -30,9 +30,11 @@ import type {
   Kree8PatientStatus,
 } from '../cockpit-shared';
 import type { InboxList, Kree8Patient } from '@/lib/patient-workspace';
+import { parseDiagnosisLabels } from '@/lib/patient-workspace';
 import { nextVirtualRowIndex, type VirtualListNavigationKey } from '@/lib/kree8-keyboard-navigation';
 import styles from '../kree8-clinical-cockpit-foundation.module.css';
 import patientStyles from '../kree8-clinical-cockpit-patient-inbox.module.css';
+import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
 
 
 /* ───────────────────────── Pazienti in carico ───────────────────────── */
@@ -66,6 +68,7 @@ function IncaricoArea({
   isReview: boolean;
 }) {
   const router = useRouter();
+  const { proposal } = useRuntimeTwinDesign();
   const [scope, setScope] = useState<InboxScope>('ambulatorio');
   const [list, setList] = useState<InboxList>('attivi');
   const [query, setQuery] = useState('');
@@ -183,9 +186,10 @@ function IncaricoArea({
   const patientRowVirtualizer = useVirtualizer({
     count: visible.length,
     getScrollElement: () => patientListParentRef.current,
-    estimateSize: () => 52,
+    estimateSize: () => proposal ? 94 : 52,
     overscan: 8,
   });
+  useEffect(() => { patientRowVirtualizer.measure(); }, [proposal, patientRowVirtualizer]);
 
   /* @Codex: il focus segue l'indice completo, non il sottoinsieme DOM prodotto
      dalla virtualizzazione. Dopo lo scroll attende il nuovo render e porta il
@@ -227,10 +231,10 @@ function IncaricoArea({
       key,
       currentIndex: currentRowIndex(target),
       rowCount: visible.length,
-      pageSize: Math.max(1, Math.floor(viewportHeight / 62)),
+      pageSize: Math.max(1, Math.floor(viewportHeight / (proposal ? 94 : 62))),
     });
     if (index !== null) focusRowAtIndex(index);
-  }, [currentRowIndex, focusRowAtIndex, visible.length]);
+  }, [currentRowIndex, focusRowAtIndex, proposal, visible.length]);
 
   const handleListKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     const navigationKeys: VirtualListNavigationKey[] = [
@@ -278,7 +282,7 @@ function IncaricoArea({
   }, [currentRowIndex, navigateRows, router, visible]);
 
   return (
-    <div className={styles.areaShell}>
+    <div className={styles.areaShell} data-patient-directory={proposal ? 'proposal' : undefined}>
       <header className={styles.areaHeader}>
         <div>
           <p className={styles.areaCaption}>Ambulatorio e rete locale</p>
@@ -444,6 +448,9 @@ function IncaricoArea({
                   {patientRowVirtualizer.getVirtualItems().map((virtualRow) => {
                     const p = visible[virtualRow.index];
                     const isSelected = p.id === selected?.id;
+                    const recordedDiagnoses = parseDiagnosisLabels(p.raw.diagnoses);
+                    const diagnosisParts = recordedDiagnoses[0]?.split(' · ') ?? [];
+                    const diagnosisDescription = diagnosisParts.length > 1 ? diagnosisParts.slice(1).join(' · ') : diagnosisParts[0];
                     return (
                       <div
                         key={p.id}
@@ -472,7 +479,23 @@ function IncaricoArea({
                           data-patient-index={virtualRow.index}
                           data-testid="lume-patient-row"
                         >
-                          <span className={patientStyles.patientRowContent} data-lume-row-part="content">
+                          {proposal ? <span className={patientStyles.recordContent} data-lume-row-part="content">
+                            <span className={patientStyles.recordIdentity}>
+                              <strong>{p.name}</strong>
+                              <span>{p.ageLabel} · {p.code}</span>
+                            </span>
+                            <span className={patientStyles.recordDiagnosis}>
+                              <span>{diagnosisDescription || 'Diagnosi non registrata'}</span>
+                              <small>{diagnosisParts.length > 1 ? diagnosisParts[0] : ''}{recordedDiagnoses.length > 1 ? ' · altre diagnosi in cartella' : ''}</small>
+                            </span>
+                            <span className={patientStyles.recordDisclosure}>
+                              <span>
+                                {recordedDiagnoses.length > 1 ? <span>{recordedDiagnoses.slice(1).join(' · ')}</span> : null}
+                                <span>{p.raw.notes || 'Nessuna nota generale registrata.'}</span>
+                                <span>{p.pathway} · {p.statusLabel}</span>
+                              </span>
+                            </span>
+                          </span> : <span className={patientStyles.patientRowContent} data-lume-row-part="content">
                             <span className={patientStyles.patientName}>{p.name}</span>
                             <span className={patientStyles.patientSubline}>
                               <span
@@ -493,7 +516,7 @@ function IncaricoArea({
                                 {p.statusLabel}
                               </span>
                             </span>
-                          </span>
+                          </span>}
                           <span className={patientStyles.patientSide}>
                             <span
                               className={classNames(patientStyles.patientSignal, PATIENT_SIGNAL_CLASSES[p.status])}

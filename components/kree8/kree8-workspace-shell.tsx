@@ -9,6 +9,7 @@ import { ArrowLeft, ChevronRight, FolderOpen, type LucideIcon } from 'lucide-rea
 // WUL-297: Privacy Mode is always reachable from the workspace header.
 import PrivacyBlur from '@/components/privacy-blur';
 import { PrivacyModeToggle } from '@/components/privacy-mode-toggle';
+import { RuntimeTwinFolderContext, useRuntimeTwinDesign } from '@/components/runtime-twin-design';
 import styles from './kree8-workspace-shell.module.css';
 
 export type Kree8WorkspaceNavItem = {
@@ -83,6 +84,26 @@ export function Kree8WorkspaceShell({
   const renderedNavItems = navGroups ? navGroups.flatMap((group) => group.items) : navItems;
   const navKey = renderedNavItems.map((item) => item.href).join('|');
   const PrimaryActionIcon = primaryAction?.icon;
+  const { proposal } = useRuntimeTwinDesign();
+  const [folderSection, setFolderSection] = useState('quadro');
+  const [folderNavOpen, setFolderNavOpen] = useState(false);
+  const folderToggleRef = useRef<HTMLButtonElement>(null);
+  const folderMode = isClinical && proposal;
+
+  /* @Codex: the existing anchors are the folder's navigation contract, including
+     deep links and Back/Forward. A selection changes visibility, never data. */
+  useEffect(() => {
+    if (!folderMode) return;
+    const selectFromHash = () => {
+      const href = window.location.hash;
+      const section = navKey.split('|').includes(href) ? href.slice(1) : 'quadro';
+      setFolderSection(section);
+      setFolderNavOpen(false);
+    };
+    selectFromHash();
+    window.addEventListener('hashchange', selectFromHash);
+    return () => window.removeEventListener('hashchange', selectFromHash);
+  }, [folderMode, navKey]);
 
   /* Lume focal locus + scrollspy (WUL-55, F2c). Un solo effetto governa la vita
      dei bersagli: li scopre nel DOM dentro QUESTO guscio (querySelector sul ref,
@@ -233,8 +254,9 @@ export function Kree8WorkspaceShell({
   }, [isClinical, navKey]);
 
   return (
+    <RuntimeTwinFolderContext.Provider value={folderMode ? folderSection : null}>
     <div className={`${styles.shell} ${isClinical ? styles.clinicalShell : ''}`} ref={rootRef}>
-      <main className={`${styles.canvas} ${isClinical ? styles.clinicalCanvas : ''}`} data-testid={isClinical ? 'lume-scheda-scroll' : undefined}>
+      <main className={`${styles.canvas} ${isClinical ? styles.clinicalCanvas : ''}`} data-folder-section={folderMode ? folderSection : undefined} data-testid={isClinical ? 'lume-scheda-scroll' : undefined}>
         <header
           className={`${styles.chrome} ${isClinical ? styles.clinicalChrome : ''}`}
           data-testid={isClinical ? 'lume-scheda-header' : undefined}
@@ -292,19 +314,43 @@ export function Kree8WorkspaceShell({
           )}
         </header>
 
+        {folderMode ? (
+          <button ref={folderToggleRef} type="button" className={styles.folderMobileToggle} aria-expanded={folderNavOpen}
+            data-testid="folder-navigation-toggle"
+            onKeyDown={(event) => { if (event.key === 'Escape') setFolderNavOpen(false); }}
+            aria-controls={`${railId}-nav`} onClick={() => setFolderNavOpen(value => !value)}>
+            <FolderOpen size={18} aria-hidden />
+            <span>Cartella <strong>{renderedNavItems.find(item => item.href === `#${folderSection}`)?.label}</strong></span>
+            <ChevronRight size={16} aria-hidden />
+          </button>
+        ) : null}
         {renderedNavItems.length > 0 ? (
           <nav
+            id={`${railId}-nav`}
             className={`${styles.sectionRail} ${navGroups ? styles.groupedSectionRail : ''}`}
             aria-label="Sezioni della vista"
             data-rail-mode={navGroups ? 'grouped' : 'unmapped'}
+            data-folder-nav-open={folderNavOpen}
+            onClick={(event) => {
+              if (folderMode && folderNavOpen && (event.target as HTMLElement).closest('a')) {
+                setFolderNavOpen(false);
+                requestAnimationFrame(() => folderToggleRef.current?.focus());
+              }
+            }}
+            onKeyDown={(event) => {
+              if (folderMode && folderNavOpen && event.key === 'Escape') {
+                setFolderNavOpen(false);
+                requestAnimationFrame(() => folderToggleRef.current?.focus());
+              }
+            }}
           >
             {navGroups ? navGroups.map((group) => {
               const activeItem = group.items.find((item) => item.href === activeHref);
-              const expanded = openGroups[group.id] === true;
+              const expanded = folderMode || openGroups[group.id] === true;
               const panelId = `${railId}-${group.id}`;
               return (
                 <div className={styles.sectionGroup} key={group.id}>
-                  <button
+                  {folderMode ? <div className={styles.folderGroupLabel}>{group.label}</div> : <button
                     type="button"
                     className={styles.sectionGroupButton}
                     aria-controls={panelId}
@@ -313,14 +359,14 @@ export function Kree8WorkspaceShell({
                   >
                     <span>{group.label}</span>
                     <ChevronRight className={styles.sectionGroupChevron} size={14} aria-hidden="true" />
-                  </button>
+                  </button>}
                   <ul id={panelId} className={styles.sectionGroupItems} hidden={!expanded}>
                     {group.items.map((item) => (
                       <li key={item.href}>
                         <a
                           href={item.href}
                           className={styles.sectionLink}
-                          aria-current={expanded && item.href === activeHref ? 'location' : undefined}
+                          aria-current={expanded && item.href === (folderMode ? `#${folderSection}` : activeHref) ? 'location' : undefined}
                         >
                           <span>{item.label}</span>
                           {item.meta ? <small>{item.meta}</small> : null}
@@ -363,5 +409,6 @@ export function Kree8WorkspaceShell({
         </div>
       </main>
     </div>
+    </RuntimeTwinFolderContext.Provider>
   );
 }
