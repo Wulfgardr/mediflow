@@ -5,7 +5,7 @@ read_when:
   - "Placing code, documentation, publication assets, or private local artifacts."
 ---
 
-# Repository Topology: MediFlow
+# Dove vive MediFlow: topologia della repository
 
 Ultimo aggiornamento: 2026-09-05
 
@@ -15,7 +15,7 @@ dagli **artefatti di pubblicazione/sito** e dagli **strumenti di sviluppo**.
 
 ## Orientarsi prima dei percorsi
 
-La repository contiene tre superfici diverse: il prodotto che lavora sulla
+Il gestionale si costruisce qui. Per orientarsi, conviene distinguere tre aree: il prodotto che lavora sulla
 cartella, gli strumenti che lo costruiscono e verificano, e i documenti che lo
 spiegano. Il sito getmediflow è una proposta di presentazione separata: non
 ospita la cartella, non importa i servizi clinici e non riceve dati del runtime.

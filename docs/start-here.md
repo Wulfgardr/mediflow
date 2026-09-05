@@ -1,39 +1,44 @@
 # Inizia qui
 
-MediFlow è una cartella clinica territoriale: raccoglie informazioni e le rende
-consultabili nel tempo. Serve a lavorare su una storia clinica, con le fonti e
-le azioni ancora da seguire nello stesso contesto.
+MediFlow è il gestionale open source per i pazienti dell’ambulatorio. Raccoglie
+la storia clinica, organizza documenti e terapie, tiene vicine misure e attività.
 
-## Primo livello: il bisogno
+## Capire il prodotto
 
-Una visita non esaurisce il percorso di una persona. Restano esami, documenti,
-terapie, appuntamenti e decisioni da rivedere. MediFlow parte da questa
-continuità, descritta nel [contratto prodotto](../PRODUCT.md).
+Si parte dalla cartella. Diario, dati strutturati e documenti permettono di
+lavorare anche senza intelligenza artificiale. Il testo conserva il contesto;
+le codifiche aiutano a organizzare e scambiare le informazioni.
 
-Per una prima lettura bastano il [README](../README.md), lo
-[stato della candidatura](./release-085-readiness.md) e i
-[limiti noti](./known-limitations.md). Non è necessario conoscere API o modelli AI.
+Il [README](../README.md) presenta le capacità e l’avvio. Il
+[contratto prodotto](../PRODUCT.md) ne definisce finalità e confini.
 
-## Secondo livello: come lavora
+## Capire come aiuta nel lavoro
 
-- La **cartella** conserva la storia e le modifiche versionate.
-- Una **fonte** è il documento o dato a cui tornare quando si verifica un'informazione.
-- Una **proposta** è un risultato preparato per essere rivisto; non è una modifica già eseguita.
-- La **home base** è il nodo autorevole che ospita dati e servizi.
-- **Fabric** coordina capacità intelligenti con regole definite dal sistema locale.
-- **Headless** espone alcune capacità senza attraversare ogni schermata, conservando i confini di accesso.
+Una terapia può essere descritta in un referto; un controllo può perdersi
+tra le attività. Le capacità intelligenti aiutano a recuperare gli elementi
+utili senza separare i dati dalle fonti. Richiedono configurazione e revisione.
 
-Il [walkthrough](./walkthrough.md) mostra il percorso end-to-end. La
-[topologia dati](./topologia-dati-flussi.md) spiega dove passano le informazioni.
+- **La persona**: riprendere diagnosi, terapie, misure e contesto.
+- **La fonte**: consultare l’originale anche dopo un’estrazione o una sintesi.
+- **Il prossimo passo**: ritrovare ciò che serve a pianificare un’attività.
 
-## Terzo livello: come si costruisce
+Il [walkthrough](./walkthrough.md) descrive il percorso operativo.
+La [matrice AI](./ai-runtime-serving-matrix.md) distingue capacità disponibili,
+prove controllate e sviluppi. [Privacy e governance AI](./privacy-and-ai-governance.md)
+spiegano il rapporto tra controlli tecnici e responsabilità d’uso.
 
-Leggi [architettura](../ARCHITECTURE.md), [sicurezza](../SECURITY.md) e
-[contribuzione](../CONTRIBUTING.md), poi il contratto del componente interessato.
-La [mappa canonica](./README.md) indica quale documento prevale sul tema;
-l'[indice](./markdown-index.md) aiuta a trovare i file.
+## Capire come è costruito
 
-Non confondere tre stati: codice presente, comportamento verificato e capacità
-pronta per un uso reale. Il primo si vede nei sorgenti; il secondo richiede
-prove sul codice corrente; il terzo comprende ambiente, responsabilità e gate
-di distribuzione o adozione pertinenti.
+La **home base** è il nodo che conserva dati e servizi. **Fabric** coordina
+le capacità intelligenti; **headless** permette di usare alcune funzioni senza
+attraversare ogni schermata. Questi accessi passano dai controlli del sistema.
+
+La [topologia dei dati](./topologia-dati-flussi.md) mostra il percorso delle
+informazioni. La [topologia repository](./repository-topology.md) spiega dove
+vive il codice. Per contribuire: [architettura](../ARCHITECTURE.md),
+[sicurezza](../SECURITY.md), [contribuzione](../CONTRIBUTING.md) e contratto del
+componente. L’[indice canonico](./README.md) indica quale fonte prevale.
+
+La [readiness 0.8.5](./release-085-readiness.md) raccoglie evidenze e gate aperti.
+Codice presente, comportamento verificato e disponibilità per l’uso concreto
+sono stati distinti; la documentazione li mantiene visibili.

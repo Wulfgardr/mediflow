@@ -12,6 +12,28 @@ read_when:
 > Per principi stabili e confini, prevale [ARCHITECTURE.md](../ARCHITECTURE.md).
 > Per policy di sicurezza e redazione, prevale [SECURITY.md](../SECURITY.md).
 
+## Il percorso dei dati, in breve
+
+Una visita produce informazioni: alcune si prestano a una codifica, altre
+richiedono testo e documenti. MediFlow le organizza nella stessa cartella.
+La struttura aiuta a cercare e scambiare; la fonte permette di verificare.
+
+L’host locale conserva il database e ospita i servizi. Le interfacce, i client
+collegati e le capacità headless passano da questi servizi. Fabric aggiunge
+percorsi di elaborazione senza attribuire al modello autorità sulla cartella.
+
+| Domanda | Dove approfondire |
+| --- | --- |
+| Dove stanno le informazioni? | Componenti e dati a riposo, sezioni 1 e 2. |
+| Come diventano una storia consultabile? | Modello relazionale e flussi, sezioni 3 e 4. |
+| Come entrano documenti e cataloghi? | Percorsi AnyDoc, Fabric e AIFA, sezione 4. |
+| Chi può leggere o modificare? | API, fonti canoniche e invarianti, sezioni 5–7. |
+
+Per provider esterni e offuscamento, la disponibilità corrente è nella
+[matrice AI](./ai-runtime-serving-matrix.md). La guida a
+[privacy e governance](./privacy-and-ai-governance.md) spiega responsabilità
+e limiti; i diagrammi sottostanti descrivono i contratti tecnici.
+
 Questo documento mappa in modo operativo:
 
 - dove nasce il dato

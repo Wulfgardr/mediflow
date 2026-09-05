@@ -9,7 +9,7 @@ read_when:
 
 Questo file è il punto di ingresso unico: dove leggere, cosa aggiornare e quale documento prevale.
 
-Ultimo aggiornamento: 2026-09-03
+Ultimo aggiornamento: 2026-09-05
 
 > [!NOTE]
 > Questa documentazione descrive il contenuto sorgente della `0.8.5`.
@@ -21,6 +21,7 @@ Ultimo aggiornamento: 2026-09-03
 ## Percorsi di lettura
 
 - **Prima visita**: [Inizia qui](./start-here.md), poi [README del progetto](../README.md).
+- **Dati e responsabilità**: [privacy, GDPR e governance AI](./privacy-and-ai-governance.md), poi policy e contratti richiamati.
 - **Valutazione della 0.8.5**: [readiness e canali Apple](./release-085-readiness.md); i gate aperti restano espliciti.
 - **Contributi tecnici**: [topologia repository](./repository-topology.md), [architettura](../ARCHITECTURE.md), quindi il contratto del componente.
 - **Proposta pubblica**: [getmediflow e rinnovo editoriale](./getmediflow-editorial-proposal.md), distinta dai contratti runtime.

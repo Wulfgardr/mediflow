@@ -265,6 +265,8 @@ Ultimo aggiornamento: 2026-09-05
 | [docs/adr/0058-manual-evidence-reabsorb-affordance.md](./adr/0058-manual-evidence-reabsorb-affordance.md) | Proposed ADR `WUL-220`: futura affordance manuale e auditabile per riassorbire una fonte evidence invalidated/superseded, con stati espliciti, motivi PHI-safe e nessuna scrittura clinica strutturata. |
 | [docs/adr/0059-macos-apple-vision-ocr-fallback.md](./adr/0059-macos-apple-vision-ocr-fallback.md) | Decisione storica sull'adapter Apple Vision; ADR 0107 rende AnyDoc il primo passaggio e ADR 0117 governa gli engine OCR configurabili senza fallback silenzioso. |
 
+| [docs/privacy-and-ai-governance.md](./privacy-and-ai-governance.md) | Introduzione progressiva a responsabilità, GDPR, AI Act, provider e offuscamento; rinvia alle policy e ai contratti canonici. |
+
 ## ✅ Checklist manutenzione indice
 
 | [docs/analysis/2026-07-30-smart-import-clinical-series-run.md](./analysis/2026-07-30-smart-import-clinical-series-run.md) | Run record sintetico del contratto provider-neutral, serie temporali e collegamento prescrizioni per Smart Import. |
