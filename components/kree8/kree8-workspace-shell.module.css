@@ -46,6 +46,8 @@
   --k8-focal-shadow: 0 2px 8px color-mix(in srgb, var(--lume-ink) 10%, transparent);
   position: fixed;
   inset: 0;
+  /* @Codex: preserve a separate comparison strip in the isolated twin. */
+  top: var(--runtime-twin-inset, 0px);
   z-index: 1000;
   overflow: hidden;
   padding: 14px;
@@ -460,6 +462,47 @@
 }
 
 .workspaceBody { flex: 0 0 auto; }
+/* @Codex WUL-676: the settings index and detailed content each keep their place
+   on desktop. Small screens retain the existing disclosure and single scroll. */
+@media (min-width: 1024px) {
+  :global(html[data-runtime-twin-design='proposal']) .canvas:has([data-runtime-settings]) {
+    overflow: hidden;
+    border-radius: 20px;
+  }
+  :global(html[data-runtime-twin-design='proposal']) .canvas:has([data-runtime-settings]) .chrome {
+    position: relative;
+    top: auto;
+    flex: 0 0 auto;
+    border: 0;
+    border-bottom: 1px solid var(--k8-line);
+    border-radius: 0;
+    padding: 0 4px 18px;
+    background: transparent;
+  }
+  :global(html[data-runtime-twin-design='proposal']) .workspaceBody:has([data-runtime-settings]) {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow: hidden;
+  }
+  :global(html[data-runtime-twin-design='proposal']) .workspaceBody [data-runtime-settings] {
+    height: 100%;
+    grid-template-columns: 272px minmax(0, 1fr);
+    gap: 30px;
+  }
+  :global(html[data-runtime-twin-design='proposal']) .workspaceBody [data-runtime-settings] > aside {
+    position: static;
+    height: 100%;
+    overflow: auto;
+    scrollbar-gutter: stable;
+    padding: 4px 8px 24px 4px;
+  }
+  :global(html[data-runtime-twin-design='proposal']) .workspaceBody [data-testid='settings-subroute-content'] {
+    height: 100%;
+    overflow: auto;
+    scrollbar-gutter: stable;
+    padding: 4px 12px 40px 2px;
+  }
+}
 .anchorStack { scroll-margin-top: 132px; }
 
 .workspaceBody :global(section[id]) {

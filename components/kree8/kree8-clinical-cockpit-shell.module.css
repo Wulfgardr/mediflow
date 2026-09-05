@@ -72,6 +72,8 @@
 
   position: fixed;
   inset: 0;
+  /* @Codex WUL-676: the prototype strip has its own reserved space. */
+  top: var(--runtime-twin-inset, 0px);
   z-index: 1000;
   background: var(--canvas);
   color: var(--ink);

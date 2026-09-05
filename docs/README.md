@@ -25,6 +25,7 @@ Ultimo aggiornamento: 2026-09-06
 - **Valutazione della 0.8.5**: [readiness e canali Apple](./release-085-readiness.md); i gate aperti restano espliciti.
 - **Contributi tecnici**: [topologia repository](./repository-topology.md), [architettura](../ARCHITECTURE.md), quindi il contratto del componente.
 - **Presentazione del prodotto**: [Get MediFlow e linea editoriale](./getmediflow-editorial-proposal.md), distinta dai contratti runtime.
+- **Prototipo 0.8.6**: [gemello web navigabile e confronto visuale](./design/2026-09-05-086-runtime-twin.md), candidato sintetico locale WUL-676.
 
 ## Sviluppo 0.8.6
 
