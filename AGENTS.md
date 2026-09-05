@@ -6,24 +6,22 @@ MediFlow e una cartella clinica territoriale local-first. Gli agent devono
 preservare privacy, sicurezza, semplicita e verificabilita, con diff piccoli e
 revisionabili.
 
-## Avvio obbligatorio
+## Orientamento proporzionato
 
-Prima di ogni attivita nel repository, leggere nell'ordine:
+Leggere `AGENTS.md`, verificare branch e stato del worktree, poi consultare
+le parti di `README.md` e `docs/STATE_OF_THE_SYSTEM.md` pertinenti al compito.
+Verificare data e checkout delle fotografie documentali: non attestano da sole
+lo stato della release corrente.
 
-1. `AGENTS.md`
-2. `README.md`
-3. `docs/README.md`
-4. `docs/STATE_OF_THE_SYSTEM.md`
-5. `docs/repository-topology.md`
-6. `docs/markdown-index.md`
-7. `ARCHITECTURE.md`
-8. `CONTRIBUTING.md`
-9. `SECURITY.md`
-10. gli ADR piu recenti in `docs/adr/`
-11. `docs/walkthrough.md` quando serve una vista end-to-end
+- Per trovare la fonte canonica: `docs/README.md` e `docs/markdown-index.md`.
+- Per repository, branch e consegna: `docs/repository-topology.md`.
+- Prima di modificare codice: `CONTRIBUTING.md` e i contratti del componente.
+- Per dati, sicurezza o architettura: `SECURITY.md`, `ARCHITECTURE.md` e gli
+  ADR del confine interessato, non tutti gli ADR recenti.
+- Per una vista end-to-end: `docs/walkthrough.md`.
 
-Non dedurre intenti architetturali dal solo codice quando esiste una fonte
-documentale canonica.
+Non caricare documenti estranei al compito e non dedurre intenti architetturali
+dal solo codice quando esiste una fonte canonica pertinente.
 
 ## Repository canonica
 
@@ -47,17 +45,24 @@ La fonte canonica per questa decisione e
 - Non committare PHI/PII, database reali, screenshot o log con dati clinici.
 - Usare solo fixture sintetiche.
 - Nessun cloud, telemetria o egress dati e attivo per default.
-- Le modifiche a confini di sicurezza, dati o architettura richiedono un ADR
-  prima dell'implementazione.
+- Prima di cambiare confini di sicurezza, contratti dei dati/API o decisioni
+  architetturali durevoli, scrivere o aggiornare l'ADR pertinente secondo
+  `CONTRIBUTING.md`. Correzioni che rispettano il contratto esistente non
+  richiedono un nuovo ADR per il solo fatto di toccarne l'implementazione.
 
 ## Disciplina operativa
 
-- Un workstream usa un issue, un branch `codex/<issue>-<slug>` e un worktree
-  dedicato.
-- La checkout primaria e una superficie di coordinamento, non di sviluppo.
+- Un workstream di implementazione usa un issue, un branch
+  `codex/<issue>-<slug>` e un worktree dedicato. Non creare issue o PR senza
+  autorizzazione; un collegamento mancante va dichiarato, non inventato.
+- La checkout primaria resta una superficie di coordinamento, non di sviluppo
+  runtime. Ispezioni e correzioni solo documentali, esplicitamente richieste e
+  isolate dalle modifiche altrui, non richiedono nuovi worktree.
 - Preferire un solo cambiamento logico per commit e nessun refactor laterale.
-- Se la modifica supera circa 300 LOC o coinvolge piu confini architetturali,
-  fermarsi e proporre una suddivisione.
+- Suddividere quando obiettivi indipendenti, ownership concorrente o impatto
+  rendono difficile verificare e ripristinare il cambiamento. Il numero di
+  righe, da solo, non e uno stop; fermarsi per un conflitto o una decisione di
+  contratto non risolta.
 - Prima del commit verificare branch corrente, scope del diff e stato del
   worktree.
 
