@@ -2,6 +2,8 @@
 
 import { useState, useRef } from 'react';
 import { cn } from '@/lib/utils';
+/* @Codex: keep answered scales within the prototype navigation guard. */
+import { useRuntimeTwinPendingForm } from '@/components/runtime-twin-design';
 
 // @Codex MF085-003: neutral types keep validators executable without React.
 import { calculateScaleResult, isScaleAnswerValid, type ScaleDefinition } from '@/lib/scale-validation';
@@ -33,6 +35,7 @@ function ProgressBar({ progress }: { progress: number }) {
 
 export default function ScaleEngine({ scale, onComplete, onCancel }: ScaleEngineProps) {
     const [answers, setAnswers] = useState<Record<string, string | number>>({});
+    useRuntimeTwinPendingForm(Object.keys(answers).length > 0);
     const [currentStep, setCurrentStep] = useState(0);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [validationError, setValidationError] = useState<string | null>(null);

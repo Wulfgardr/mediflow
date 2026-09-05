@@ -5,6 +5,7 @@
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 
+import { RuntimeTwinWorkspace } from '@/components/runtime-twin-workspace';
 import { AppRevisionGuard } from '@/components/app-revision-guard';
 import { PrivacyProvider } from '@/components/privacy-provider';
 import { SecurityProvider } from '@/components/security-provider';
@@ -45,7 +46,7 @@ export function RootRuntimeShell({
               <PrivacyProvider>
                 <ToastProvider>
                   <ConfirmProvider>
-                    <main className="relative z-10 min-h-screen">{children}</main>
+                    <main className="relative z-10 min-h-screen"><RuntimeTwinWorkspace>{children}</RuntimeTwinWorkspace></main>
                   </ConfirmProvider>
                 </ToastProvider>
               </PrivacyProvider>

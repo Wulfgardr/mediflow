@@ -819,3 +819,15 @@
   :global(html[data-runtime-twin-design='proposal']) .rail { padding: 12px; border-bottom: 1px solid var(--line-strong); }
   :global(html[data-runtime-twin-design='proposal']) .canvas { border-left: 0; padding: 20px; }
 }
+/* @Codex: prototype-wide frame owns application navigation and identity. */
+:global(html[data-runtime-twin-design='proposal']) .shell { position: absolute; inset: 0; padding: 0; display: block; }
+:global(html[data-runtime-twin-design='proposal']) .shell > .rail { display: none; }
+:global(html[data-runtime-twin-design='proposal']) .canvas { height: 100%; border: 0; border-radius: 0; background: var(--lume-surface-focal); }
+:global(html[data-runtime-twin-design='proposal']) .toolbar { padding: 10px 28px; min-height: 48px; border-radius: 0; border: 0; border-bottom: 1px solid var(--line); background: transparent; gap: 10px; }
+:global(html[data-runtime-twin-design='proposal']) .toolbar .avatarPill { margin-left: auto; background: transparent; }
+:global(html[data-runtime-twin-design='proposal']) .canvas[data-lume-context='incarico'] .toolbar .search,
+:global(html[data-runtime-twin-design='proposal']) .canvas[data-lume-context='incarico'] .toolbar > a,
+:global(html[data-runtime-twin-design='proposal']) .canvas[data-lume-context='incarico'] .toolbar > button:not(.commandToolChip) { display: none; }
+:global(html[data-runtime-twin-design='proposal']) .framePanel { padding: 26px 30px 40px; background: transparent; }
+:global(html[data-runtime-twin-design='proposal']) .focusSurface { background: transparent; }
+@media (max-width: 700px) { :global(html[data-runtime-twin-design='proposal']) .framePanel { padding: 20px 14px; } :global(html[data-runtime-twin-design='proposal']) .toolbar { padding-inline: 14px; } }

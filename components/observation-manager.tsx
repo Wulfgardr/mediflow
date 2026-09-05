@@ -16,12 +16,16 @@ import {
 } from '@/lib/observation-prefill';
 import { useToast } from '@/components/ui/toast-provider';
 import { useConfirm } from '@/components/ui/confirm-dialog';
+import { useRuntimeTwinPendingForm } from '@/components/runtime-twin-design';
 
 /* @Codex */
 function toLocalDateTimeInput(date: Date): string {
     const offsetMs = date.getTimezoneOffset() * 60_000;
     return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
 }
+
+const DEFAULT_OBSERVATION_CODE = '8480-6';
+const DEFAULT_OBSERVATION_UNIT = 'mm[Hg]';
 
 /*
  * @Codex Observation.value e tipizzato number | string (lib/db.ts): import/API
@@ -85,10 +89,10 @@ export default function ObservationManager({
 }) {
     const { showToast } = useToast();
     const confirm = useConfirm();
-    const [code, setCode] = useState('8480-6');
-    const [unitCode, setUnitCode] = useState('mm[Hg]');
+    const [code, setCode] = useState(DEFAULT_OBSERVATION_CODE);
+    const [unitCode, setUnitCode] = useState(DEFAULT_OBSERVATION_UNIT);
     const [value, setValue] = useState('');
-    const [observedAt, setObservedAt] = useState(toLocalDateTimeInput(new Date()));
+    const [observedAt, setObservedAt] = useState(() => toLocalDateTimeInput(new Date()));
     const [notes, setNotes] = useState('');
     // S6: range di riferimento del referto (opzionali). Se assenti, nessun flag.
     const [refLow, setRefLow] = useState('');
@@ -97,6 +101,7 @@ export default function ObservationManager({
     const [servicePrescriptionItem, setServicePrescriptionItem] = useState<ServicePrescriptionItemLink | undefined>();
     const [isSaving, setIsSaving] = useState(false);
     const [valueError, setValueError] = useState<string | null>(null);
+    const initialObservedAt = useRef(observedAt);
     const codeSelectRef = useRef<HTMLSelectElement>(null);
     const valueInputRef = useRef<HTMLInputElement>(null);
     /* @Codex WUL-UIUX: piu analiti possono restare aperti insieme (confronto tra
@@ -110,6 +115,19 @@ export default function ObservationManager({
     const [viewMode, setViewMode] = useState<'parametro' | 'data'>('parametro');
     const loincOptions = useMemo(() => searchStaticTerminology('LOINC', '', 500), []);
     const ucumOptions = useMemo(() => searchStaticTerminology('UCUM', '', 500), []);
+
+    const hasPendingObservation = Boolean(
+        value.trim()
+        || notes.trim()
+        || refLow.trim()
+        || refHigh.trim()
+        || code !== DEFAULT_OBSERVATION_CODE
+        || unitCode !== DEFAULT_OBSERVATION_UNIT
+        || observedAt !== initialObservedAt.current
+        || servicePrescriptionItemId
+        || servicePrescriptionItem,
+    );
+    useRuntimeTwinPendingForm(hasPendingObservation);
 
     useEffect(() => {
         if (!prefill) return;

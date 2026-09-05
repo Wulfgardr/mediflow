@@ -8,6 +8,7 @@ import { useLiveQuery } from '@/lib/live-query';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { DocumentReferenceChip } from '@/components/document-reference-chip';
 import { Badge } from '@/components/ui/badge';
+import { useRuntimeTwinPendingForm } from '@/components/runtime-twin-design';
 import type { SemanticSignal } from '@/lib/ui-semantic-signal';
 
 type Props = {
@@ -114,6 +115,9 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [form, setForm] = useState<FormState>(() => emptyForm());
+
+    /* @Codex: the conditional form's open state is the pending-form signal. */
+    useRuntimeTwinPendingForm(isFormOpen);
 
     /* @Codex */
     const prescriptions = useLiveQuery(

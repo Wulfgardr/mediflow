@@ -13,6 +13,7 @@ import { estimateBirthYearFromTaxCode, calculateAge } from '@/lib/utils';
 import { patientSchema, PatientFormValues } from '@/lib/schemas';
 /* @Codex */
 import { patientFormDefaults, type PatientFormSeed } from '@/lib/patient-edit-session';
+import { useRuntimeTwinPendingForm } from '@/components/runtime-twin-design';
 
 interface PatientFormProps {
     defaultValues?: PatientFormSeed;
@@ -211,13 +212,14 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
     /* @Codex: useForm caches defaults; its comparison baseline must share that lifetime. */
     const [formattedDefaults] = useState(() => patientFormDefaults(defaultValues));
     const submittingRef = useRef(false);
-    const { register, control, handleSubmit, setValue, watch, formState: { errors, isSubmitting: formSubmitting } } = useForm<PatientFormValues>({
+    const { register, control, handleSubmit, setValue, watch, formState: { errors, isDirty, isSubmitting: formSubmitting } } = useForm<PatientFormValues>({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         resolver: zodResolver(patientSchema) as any,
         // HTML dates are strings; the existing resolver returns Date objects.
         defaultValues: formattedDefaults as unknown as DefaultValues<PatientFormValues>,
     });
     const submitting = isSubmitting || formSubmitting;
+    useRuntimeTwinPendingForm(isDirty);
     const submitOnce = async (data: PatientFormValues) => {
         if (disabled || submittingRef.current) return;
         submittingRef.current = true;

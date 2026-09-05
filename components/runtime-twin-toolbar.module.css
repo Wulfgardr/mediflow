@@ -29,3 +29,4 @@
     .identity { flex-direction: column; align-items: flex-start; gap: 3px; font-size: 11px; }
     .comparison button { padding: 6px; font-size: 11px; }
 }
+@media (max-width: 540px) { .identity span { display: none; } .identity strong { font-size: 11px; white-space: nowrap; } .comparison { gap: 0; padding: 2px; } .comparison button { padding: 8px 6px; white-space: nowrap; } }

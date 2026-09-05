@@ -3,3 +3,5 @@ html[data-runtime-twin='true'] { --runtime-twin-inset: 44px; }
 @media (max-width: 540px) {
     html[data-runtime-twin='true'] { --runtime-twin-inset: 64px; }
 }
+/* @Codex: the study selector remains one compact row on phones. */
+@media (max-width: 540px) { html[data-runtime-twin='true'] { --runtime-twin-inset: 44px; } }

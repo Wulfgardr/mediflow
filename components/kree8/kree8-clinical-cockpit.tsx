@@ -8,6 +8,8 @@
 
 import { type FocusEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
 import { X } from 'lucide-react';
 
 import {
@@ -206,6 +208,8 @@ export function Kree8ClinicalCockpit({
   initialPatientId,
   operatorName: operatorNameProp,
 }: Kree8ClinicalCockpitProps) {
+  const { proposal } = useRuntimeTwinDesign();
+  const router = useRouter();
   const isReview = surface === 'review';
   const operatorName = operatorNameProp || (isReview ? 'Review design' : 'Sessione locale');
   const [area, setArea] = useState<AreaId>(() => (isReview ? 'turno' : initialArea));
@@ -230,6 +234,20 @@ export function Kree8ClinicalCockpit({
   const [selectedPatientId, setSelectedPatientId] = useState<string | undefined>(() => (
     isReview ? REVIEW_PATIENT_LIST[0]?.id : initialPatientId
   ));
+
+  /* @Codex: Next keeps the cockpit mounted when only the query changes. */
+  useEffect(() => {
+    if (proposal && !isReview) setArea(initialArea);
+  }, [initialArea, isReview, proposal]);
+  useEffect(() => {
+    if (proposal && !isReview && initialPatientId) setSelectedPatientId(initialPatientId);
+  }, [initialPatientId, isReview, proposal]);
+
+  /* @Codex: resolve the selected id after React batches row selection and
+     Apri quadro; the canonical route owns identity and open-record state. */
+  useEffect(() => {
+    if (proposal && !isReview && area === 'scheda' && selectedPatientId) router.push(`/patients/${selectedPatientId}/modules`);
+  }, [area, isReview, proposal, router, selectedPatientId]);
 
   /* @Codex: ogni CTA interna termina sul titolo semantico della nuova area.
      La ricerca conserva invece il proprio target di focus dedicato. */
@@ -296,7 +314,8 @@ export function Kree8ClinicalCockpit({
       url.searchParams.delete('paziente');
     }
     window.history.replaceState(window.history.state, '', url);
-  }, [area, selectedPatientId, isReview]);
+    if (proposal) window.dispatchEvent(new Event('mediflow:twin-area'));
+  }, [area, selectedPatientId, isReview, proposal]);
 
   const selectedPatient = useMemo(
     () => {

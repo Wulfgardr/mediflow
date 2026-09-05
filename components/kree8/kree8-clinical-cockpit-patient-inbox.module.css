@@ -764,3 +764,10 @@
 }
 :global(html[data-ui-reduce-motion='true']) .recordDisclosure { transition: none; }
 :global(html[data-ui-reduce-motion='true'][data-runtime-twin-design='proposal']) .caseLens { animation: none; }
+/* @Codex: one-click directory has no second selected-patient summary. */
+:global(html[data-runtime-twin-design='proposal']) .caseLens { display: none; }
+:global(html[data-runtime-twin-design='proposal']) .inboxLayout { display: block; }
+:global(html[data-runtime-twin-design='proposal']) .worklistPanel { padding: 0; border: 0; border-radius: 0; background: transparent; }
+:global(html[data-runtime-twin-design='proposal']) .patientSearchField { max-width: 560px; min-height: 42px; }
+:global(html[data-runtime-twin-design='proposal']) .recordIdentity strong { font-size: 16px; }
+:global(html[data-runtime-twin-design='proposal']) .patientRow { border-radius: 0; }
