@@ -95,3 +95,34 @@ test('connects only the existing attachment retry control to the read-only local
     assert.doesNotMatch(source, /\/ocr-replay|documentSha256|Replay OCR/u);
     assert.doesNotMatch(source, /body:\s*JSON\.stringify/u);
 });
+
+test('interruption cancels transport, suppresses late content and allows a fresh request', async () => {
+    const controller = new AbortController();
+    const held = Promise.withResolvers<Response>();
+    let passedSignal: AbortSignal | null | undefined;
+    const pending = requestAnyDocLocalExtractionPreview('attachment.synthetic.l1d', async (_url, init) => {
+        passedSignal = init?.signal;
+        return held.promise;
+    }, controller.signal);
+    controller.abort();
+    held.resolve(response(extracted()));
+    assert.equal(await pending, null, 'a late successful response must not revive an interrupted preview');
+    assert.equal(passedSignal, controller.signal);
+    assert.equal((await requestAnyDocLocalExtractionPreview('attachment.synthetic.l1d', async () => response(extracted())))?.status, 'available');
+    let calls = 0;
+    assert.equal(await requestAnyDocLocalExtractionPreview('attachment.synthetic.l1d', async () => {
+        calls += 1; return response(extracted());
+    }, controller.signal), null);
+    assert.equal(calls, 0, 'an already interrupted request must not start');
+});
+
+test('interruption while reading the response body cannot publish the completed preview', async () => {
+    const controller = new AbortController();
+    const reading = Promise.withResolvers<void>(); const body = Promise.withResolvers<string>();
+    const pending = requestAnyDocLocalExtractionPreview('attachment.synthetic.l1d', async () => ({
+        ok: true, text() { reading.resolve(); return body.promise; },
+    }) as Response, controller.signal);
+    await reading.promise;
+    controller.abort(); body.resolve(JSON.stringify(extracted()));
+    assert.equal(await pending, null);
+});
