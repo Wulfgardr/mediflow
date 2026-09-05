@@ -398,6 +398,29 @@ const ATTACHMENT_CURRENTNESS_CANONICAL_DDL = `
     )
 `;
 /* @Codex */
+// Installed currentness schema before the safe-integer constraints. Preserve
+// existing identities and counters when upgrading this exact fingerprint.
+const ATTACHMENT_CURRENTNESS_HISTORICAL_DDL = `
+    CREATE TABLE attachments (
+        id TEXT PRIMARY KEY NOT NULL, patient_id TEXT NOT NULL, name TEXT NOT NULL,
+        type TEXT NOT NULL, size INTEGER NOT NULL, path TEXT NOT NULL, data TEXT,
+        summary_snapshot TEXT,
+        parse_evidence_artifact_snapshot TEXT, ocr_queue_state TEXT,
+        ocr_queue_reason TEXT, ocr_queue_updated_at INTEGER,
+        ocr_replay_artifact_snapshot TEXT, created_at INTEGER DEFAULT (unixepoch()),
+        document_source_ref TEXT NOT NULL UNIQUE CHECK (
+            length(document_source_ref) = 64 AND document_source_ref NOT GLOB '*[^0-9a-f]*'
+        ),
+        document_revision INTEGER NOT NULL CHECK (
+            typeof(document_revision) = 'integer' AND document_revision >= 1
+        ),
+        document_freshness_epoch INTEGER NOT NULL CHECK (
+            typeof(document_freshness_epoch) = 'integer' AND document_freshness_epoch >= 1
+        ),
+        FOREIGN KEY (patient_id) REFERENCES patients(id) ON UPDATE NO ACTION ON DELETE NO ACTION
+    )
+`;
+/* @Codex */
 const ATTACHMENT_CURRENTNESS_LEGACY_SCHEMA = normalizeSchemaSql(ATTACHMENT_CURRENTNESS_LEGACY_DDL);
 /* @Codex */
 const ATTACHMENT_CURRENTNESS_CANONICAL_SCHEMA = normalizeSchemaSql(ATTACHMENT_CURRENTNESS_CANONICAL_DDL);
@@ -418,12 +441,15 @@ function denyAttachmentCurrentnessMigration(): never {
     throw new Error(ATTACHMENT_CURRENTNESS_ERROR);
 }
 /* @Codex */
-function attachmentCurrentnessSchemaMatches(expected: string, canonical: boolean): boolean {
+function attachmentCurrentnessSchemaMatches(expected: string, canonical: boolean, historical = false): boolean {
     const table = sqlite.prepare("SELECT name, sql FROM sqlite_master WHERE type = 'table' AND lower(name) = 'attachments'").get() as { name?: unknown; sql?: unknown } | undefined;
     const columns = sqlite.prepare('PRAGMA table_xinfo(attachments)').all() as Array<{ name?: unknown; type?: unknown; notnull?: unknown; dflt_value?: unknown; pk?: unknown; hidden?: unknown }>;
-    const expectedColumns = canonical
-        ? [...ATTACHMENT_CURRENTNESS_COLUMNS, ['document_source_ref', 'TEXT', 1, null, 0], ['document_revision', 'INTEGER', 1, null, 0], ['document_freshness_epoch', 'INTEGER', 1, null, 0]]
+    const baseColumns = historical
+        ? [...ATTACHMENT_CURRENTNESS_COLUMNS.slice(0, 7), ...ATTACHMENT_CURRENTNESS_COLUMNS.slice(8), ATTACHMENT_CURRENTNESS_COLUMNS[7]]
         : ATTACHMENT_CURRENTNESS_COLUMNS;
+    const expectedColumns = canonical
+        ? [...baseColumns, ['document_source_ref', 'TEXT', 1, null, 0], ['document_revision', 'INTEGER', 1, null, 0], ['document_freshness_epoch', 'INTEGER', 1, null, 0]]
+        : baseColumns;
     const foreignKeys = sqlite.prepare('PRAGMA foreign_key_list(attachments)').all() as Array<Record<string, unknown>>;
     const indexes = sqlite.prepare('PRAGMA index_list(attachments)').all() as Array<{ name?: unknown; unique?: unknown; origin?: unknown; partial?: unknown }>;
     const expectedIndexes = canonical ? 3 : 2;
@@ -452,15 +478,17 @@ function upgradeLegacyAttachmentCurrentness(): void {
         const stale = sqlite.prepare("SELECT 1 FROM sqlite_master WHERE lower(name) = 'attachments_currentness_legacy' LIMIT 1").get();
         const trigger = sqlite.prepare("SELECT 1 FROM sqlite_master WHERE type = 'trigger' AND lower(tbl_name) = 'attachments' LIMIT 1").get();
         if (stale || trigger) denyAttachmentCurrentnessMigration();
-        if (attachmentCurrentnessSchemaMatches(ATTACHMENT_CURRENTNESS_CANONICAL_SCHEMA, true)) {
+        const canonical = attachmentCurrentnessSchemaMatches(ATTACHMENT_CURRENTNESS_CANONICAL_SCHEMA, true);
+        const historical = !canonical && attachmentCurrentnessSchemaMatches(normalizeSchemaSql(ATTACHMENT_CURRENTNESS_HISTORICAL_DDL), true, true);
+        if (canonical || historical) {
             const invalid = sqlite.prepare(`SELECT 1 FROM attachments WHERE typeof(document_source_ref) != 'text'
                 OR length(document_source_ref) != 64 OR document_source_ref GLOB '*[^0-9a-f]*'
                 OR typeof(document_revision) != 'integer' OR document_revision NOT BETWEEN 1 AND 9007199254740991
                 OR typeof(document_freshness_epoch) != 'integer' OR document_freshness_epoch NOT BETWEEN 1 AND 9007199254740991 LIMIT 1`).get();
             if (invalid) denyAttachmentCurrentnessMigration();
-            return;
+            if (canonical) return;
         }
-        if (!attachmentCurrentnessSchemaMatches(ATTACHMENT_CURRENTNESS_LEGACY_SCHEMA, false)) denyAttachmentCurrentnessMigration();
+        if (!historical && !attachmentCurrentnessSchemaMatches(ATTACHMENT_CURRENTNESS_LEGACY_SCHEMA, false)) denyAttachmentCurrentnessMigration();
         if (sqlite.prepare('SELECT 1 FROM attachments AS attachment LEFT JOIN patients AS patient ON patient.id = attachment.patient_id WHERE patient.id IS NULL LIMIT 1').get()) denyAttachmentCurrentnessMigration();
         sqlite.exec('ALTER TABLE attachments RENAME TO attachments_currentness_legacy');
         sqlite.exec(ATTACHMENT_CURRENTNESS_CANONICAL_DDL);
@@ -469,7 +497,8 @@ function upgradeLegacyAttachmentCurrentness(): void {
             document_source_ref, document_revision, document_freshness_epoch)
             SELECT id, patient_id, name, type, size, path, data, created_at, summary_snapshot,
             parse_evidence_artifact_snapshot, ocr_queue_state, ocr_queue_reason, ocr_queue_updated_at, ocr_replay_artifact_snapshot,
-            lower(hex(randomblob(32))), 1, 1 FROM attachments_currentness_legacy`);
+            ${historical ? 'document_source_ref, document_revision, document_freshness_epoch' : 'lower(hex(randomblob(32))), 1, 1'}
+            FROM attachments_currentness_legacy`);
         sqlite.exec('DROP TABLE attachments_currentness_legacy');
         sqlite.exec('CREATE INDEX attachments_patient_idx ON attachments(patient_id)');
     } catch (error) {

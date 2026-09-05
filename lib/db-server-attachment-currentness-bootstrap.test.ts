@@ -146,3 +146,77 @@ test('serializes concurrent O1b workers without busy errors or duplicate renames
         } finally { db.close(); }
     } finally { fs.rmSync(current.dataDir, { recursive: true, force: true }); }
 });
+
+/* @Codex */
+// Historical installed schema: currentness exists, but created_at follows OCR
+// metadata and the counters have no safe-integer upper-bound constraint.
+function historicalCurrentness(dbPath: string): void {
+    const db = new Database(dbPath);
+    try {
+        db.exec(`ALTER TABLE attachments RENAME TO historical_fixture;
+            CREATE TABLE attachments (
+                id TEXT PRIMARY KEY NOT NULL, patient_id TEXT NOT NULL, name TEXT NOT NULL,
+                type TEXT NOT NULL, size INTEGER NOT NULL, path TEXT NOT NULL, data TEXT,
+                summary_snapshot TEXT, parse_evidence_artifact_snapshot TEXT,
+                ocr_queue_state TEXT, ocr_queue_reason TEXT, ocr_queue_updated_at INTEGER,
+                ocr_replay_artifact_snapshot TEXT, created_at INTEGER DEFAULT (unixepoch()),
+                document_source_ref TEXT NOT NULL UNIQUE CHECK (
+                    length(document_source_ref) = 64 AND document_source_ref NOT GLOB '*[^0-9a-f]*'
+                ),
+                document_revision INTEGER NOT NULL CHECK (
+                    typeof(document_revision) = 'integer' AND document_revision >= 1
+                ),
+                document_freshness_epoch INTEGER NOT NULL CHECK (
+                    typeof(document_freshness_epoch) = 'integer' AND document_freshness_epoch >= 1
+                ),
+                FOREIGN KEY (patient_id) REFERENCES patients(id) ON UPDATE NO ACTION ON DELETE NO ACTION
+            );
+            INSERT INTO attachments (${columns}, document_source_ref, document_revision, document_freshness_epoch)
+                SELECT ${columns}, '${'b'.repeat(64)}', 7, 9 FROM historical_fixture;
+            DROP TABLE historical_fixture;
+            CREATE INDEX attachments_patient_idx ON attachments(patient_id)`);
+    } finally { db.close(); }
+}
+
+/* @Codex */
+test('upgrades historical installed currentness preserving every value and replays without changes', async () => {
+    const current = tempCase();
+    try {
+        historicalCurrentness(current.dbPath);
+        const before = JSON.parse(attachmentSnapshot(current.dbPath)).rows;
+        const results = await Promise.all(Array.from({ length: 3 }, () => bootstrapAsync(current.dataDir)));
+        for (const result of results) assert.equal(result.code, 0, result.output);
+        assert.deepEqual(JSON.parse(attachmentSnapshot(current.dbPath)).rows, before);
+        const migrated = attachmentSnapshot(current.dbPath);
+        assert.equal(bootstrap(current.dataDir).status, 0);
+        assert.equal(attachmentSnapshot(current.dbPath), migrated);
+        const db = new Database(current.dbPath);
+        try {
+            for (const counter of ['document_revision', 'document_freshness_epoch']) {
+                assert.throws(() => db.exec(`UPDATE attachments SET ${counter} = 9007199254740992`), /CHECK constraint failed/u);
+            }
+        } finally { db.close(); }
+    } finally { fs.rmSync(current.dataDir, { recursive: true, force: true }); }
+});
+
+/* @Codex */
+test('historical currentness rejects invalid counters and schema drift atomically', () => {
+    for (const mutation of [
+        'UPDATE attachments SET document_revision = 9007199254740992',
+        'UPDATE attachments SET document_freshness_epoch = 9007199254740992',
+        "PRAGMA ignore_check_constraints = ON; UPDATE attachments SET document_source_ref = 'invalid'",
+        'ALTER TABLE attachments ADD COLUMN unknown_metadata TEXT',
+        'CREATE INDEX unexpected_index ON attachments(name)',
+    ]) {
+        const current = tempCase();
+        try {
+            historicalCurrentness(current.dbPath);
+            const db = new Database(current.dbPath); db.exec(mutation); db.close();
+            const before = attachmentSnapshot(current.dbPath);
+            const result = bootstrap(current.dataDir);
+            assert.notEqual(result.status, 0);
+            assert.match(`${result.stdout}${result.stderr}`, /ATTACHMENT_CURRENTNESS_MIGRATION_UNSUPPORTED/u);
+            assert.equal(attachmentSnapshot(current.dbPath), before);
+        } finally { fs.rmSync(current.dataDir, { recursive: true, force: true }); }
+    }
+});
