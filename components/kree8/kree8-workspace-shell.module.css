@@ -736,3 +736,39 @@
     min-height: 44px;
   }
 }
+
+/* @Codex: synoptic facts stay grouped and wrap at the available panel width. */
+.synopticDetails {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: 12px;
+}
+.synopticDetail {
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--k8-line);
+  border-radius: 10px;
+}
+.synopticDetailHeading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  min-height: 28px;
+  border-radius: 4px;
+}
+.synopticDetailHeading:hover { color: var(--lume-accent); }
+.synopticDetailHeading:focus-visible { outline: 2px solid var(--lume-accent); outline-offset: 3px; }
+.synopticCount { font-size: 11px; font-variant-numeric: tabular-nums; color: var(--lume-ink-muted); }
+.synopticTherapy { display: grid; gap: 2px; padding: 8px 0; overflow-wrap: anywhere; }
+.synopticDetailMeta { font-size: 12px; line-height: 1.5; color: var(--lume-ink-muted); overflow-wrap: anywhere; }
+.synopticMeasure { display: grid; justify-items: start; gap: 4px; margin-top: 8px; overflow-wrap: anywhere; }
+.synopticMeasure > :global(.lume-registro) { font-size: 15px; line-height: 1.5; }
+
+/* @Codex: prevent clinical header actions from overlapping the back button. */
+@media (max-width: 760px) {
+  .clinicalChrome .chromeTopRow { flex-wrap: wrap; }
+  .clinicalChrome .backButton { flex: 0 0 auto; }
+  .clinicalChrome .headerActionCluster { flex-wrap: wrap; max-width: 100%; }
+  .clinicalChrome .headerActionCluster > * { flex-shrink: 0; }
+}
