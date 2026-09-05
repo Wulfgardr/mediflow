@@ -54,6 +54,8 @@ export const SETTINGS_WRITE_REGISTRY: Record<string, SettingsKeyPolicy> = {
     uiReduceMotion: { write: ['web-session'], note: 'accessibility pref (components/ui-accessibility-provider.tsx)' },
     uiReduceTransparency: { write: ['web-session'], note: 'accessibility pref (components/ui-accessibility-provider.tsx)' },
     uiStyleMode: { write: ['web-session'], note: 'appearance pref (lib/ui-style-mode.ts)' },
+    /* @Codex: the onboarding owner performs preview, revision CAS and rollback. */
+    'onboarding.workProfile': { write: [], note: 'server-managed work profile; dedicated authenticated Web route only (ADR 0120)' },
 
     // --- Terminology registry (web session). ---
     terminologyRegistry: { write: ['web-session'], note: 'terminology registry (lib/terminology-registry.ts)' },

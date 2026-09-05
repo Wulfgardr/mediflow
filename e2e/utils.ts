@@ -92,15 +92,7 @@ export async function completeOnboardingIfNeeded(page: Page, pin: string): Promi
   await page.getByPlaceholder('es. Studio Medico Centrale').fill('Ambulatorio E2E');
   await page.getByRole('button', { name: 'Avanti' }).click();
 
-  await expect(page.getByRole('heading', { name: 'Ruolo' })).toBeVisible();
-  await page.getByRole('button', { name: 'Avanti' }).click();
-
-  await expect(page.getByRole('heading', { name: 'Credenziali di Accesso' })).toBeVisible();
-  await page.getByPlaceholder('es. operatore.demo').fill('admin');
-  await page.getByPlaceholder('Password sicura').fill('password');
-  await page.getByRole('button', { name: 'Avanti' }).click();
-
-  await expect(page.getByRole('heading', { name: 'Sicurezza Locale' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Sicurezza', exact: true })).toBeVisible();
   const pinInputs = page.locator('input[placeholder="••••••"]');
   await pinInputs.nth(0).fill(pin);
   await pinInputs.nth(1).fill(pin);
@@ -150,7 +142,13 @@ export async function bootstrapUnlockedSession(page: Page, pin: string): Promise
   await page.waitForLoadState('domcontentloaded');
 
   for (let attempt = 0; attempt < 5; attempt += 1) {
-    if (await hasStableUnlockedShell(page)) return;
+    if (await hasStableUnlockedShell(page)) {
+      // @Codex: unrelated E2E flows use the always-available manual entry.
+      if (await isVisible(page.getByTestId('work-profile-onboarding'))) {
+        await page.getByRole('link', { name: 'Apri la cartella manualmente' }).click();
+      }
+      return;
+    }
 
     await completeOnboardingIfNeeded(page, pin);
     await setupPinLegacyIfNeeded(page, pin);

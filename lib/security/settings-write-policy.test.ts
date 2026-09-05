@@ -60,7 +60,7 @@ test('local token cannot write an unknown key (400) but web session can (allowed
 });
 
 test('server-managed and retired OCR keys are denied on every HTTP channel', () => {
-    for (const key of ['network.nodeId', 'network.pairing.state', 'backupScheduler', 'aiModel_ocr', 'aiOcrKillSwitch']) {
+    for (const key of ['network.nodeId', 'network.pairing.state', 'backupScheduler', 'aiModel_ocr', 'aiOcrKillSwitch', 'onboarding.workProfile']) {
         assert.equal(evaluateSettingsWrite(key, webAdminSession).allowed, false, `${key} denied for web-admin`);
         assert.equal(evaluateSettingsWrite(key, webSession).allowed, false, `${key} denied for web-session`);
         assert.equal(evaluateSettingsWrite(key, localTokenSession).allowed, false, `${key} denied for local-token`);
