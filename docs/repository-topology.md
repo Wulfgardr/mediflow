@@ -7,11 +7,22 @@ read_when:
 
 # Repository Topology: MediFlow
 
-Ultimo aggiornamento: 2026-09-02
+Ultimo aggiornamento: 2026-09-05
 
 Mappa concisa delle aree top-level del repository, pensata per orientare agent e
 contributor: distingue il **runtime clinico** (codice che gira con dati paziente)
 dagli **artefatti di pubblicazione/sito** e dagli **strumenti di sviluppo**.
+
+## Orientarsi prima dei percorsi
+
+La repository contiene tre superfici diverse: il prodotto che lavora sulla
+cartella, gli strumenti che lo costruiscono e verificano, e i documenti che lo
+spiegano. Il sito getmediflow è una proposta di presentazione separata: non
+ospita la cartella, non importa i servizi clinici e non riceve dati del runtime.
+
+Per chi arriva al progetto: [Inizia qui](./start-here.md). Per la candidatura
+in esame: [readiness 0.8.5](./release-085-readiness.md). Per la proposta del
+sito e l'ordine della documentazione: [piano editoriale](./getmediflow-editorial-proposal.md).
 
 ## Repository operativa
 

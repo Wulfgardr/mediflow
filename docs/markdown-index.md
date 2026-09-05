@@ -11,7 +11,15 @@ read_when:
 > GitHub mostra in alto solo alcuni file speciali (`README`, `CONTRIBUTING`, `SECURITY`, ecc.).
 > Questo file elenca invece **tutti** i `.md` tracciati nella repository con una sintesi rapida d'uso.
 
-Ultimo aggiornamento: 2026-09-03
+Ultimo aggiornamento: 2026-09-05
+
+## Ingresso progressivo e candidatura
+
+| File | Scopo | Quando consultarlo |
+| --- | --- | --- |
+| [start-here.md](./start-here.md) | Bisogno, glossario e tre livelli di lettura. | Primo accesso al progetto. |
+| [release-085-readiness.md](./release-085-readiness.md) | Evidenze runtime, gate aperti, account Apple e promozione. | Prima di presentare o distribuire la 0.8.5. |
+| [getmediflow-editorial-proposal.md](./getmediflow-editorial-proposal.md) | Proposta sito e rinnovo progressivo della documentazione. | Revisione del racconto pubblico. |
 
 ## 📚 Come usare questo indice
 

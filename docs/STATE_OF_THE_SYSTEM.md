@@ -28,6 +28,14 @@ Ultimo aggiornamento: 2026-09-03 (contenuto sorgente v0.8.5)
 
 ---
 
+## Aggiornamento di candidatura: 5 settembre 2026
+
+La successiva revisione Pro e i controlli locali sono raccolti nella
+[readiness 0.8.5](./release-085-readiness.md), riferita al commit runtime
+`4f2aa312c`. I vecchi receipt descritti sotto non attestano da soli questo
+candidato. AppleShared/XCTest e distribuzione restano gate aperti; il codice
+sorgente e il canale binario Apple hanno condizioni di consegna diverse.
+
 ## 🧭 1. Lettura rapida
 
 MediFlow e una cartella clinica local-first per il lavoro territoriale quotidiano.

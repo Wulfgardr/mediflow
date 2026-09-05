@@ -11,6 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > signing, tag, and GitHub Release belong to the promotion closeout and are not
 > implied by the content of this changelog alone.
 
+### Post-review candidate corrections (2026-09-05)
+
+- Patient editor keeps initial versions, preserves concurrent additions and resumes only unconfirmed operations. Checkup writes require an available parent in the atomic CAS predicate.
+- Web/native scales distinguish unanswered fields from explicit zero; POMA28 is versioned and historical values are retained.
+- Native FHIR DTO carries lifecycle fields; FHIRv2 parity remains separate debt.
+- ATHENA runner configuration is passed only to the Web child. Analytics counts distinct patients per existing diagnosis key.
+- Fabric/context and operational review links filter patient tombstones while retaining historical link rows.
+- README and documentation offer progressive entry points; [candidate readiness](./docs/release-085-readiness.md) records verified scope and open Apple/distribution gates.
+
 ### Review-only Intelligence Fabric
 
 - `AI Patient Insight`, Smart Import, Document Synthesis, and Treatment Reasoning
