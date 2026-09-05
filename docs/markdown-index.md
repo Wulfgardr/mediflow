@@ -41,6 +41,13 @@ Ultimo aggiornamento: 2026-09-05
 | --- | --- | --- |
 | [docs/web-patient-edit-and-analytics-085.md](./web-patient-edit-and-analytics-085.md) | Snapshot del modulo, CAS iniziale, recupero parziale e metrica Schede per paziente. | Quando si modificano editor paziente/checkup o aggregazione diagnosi; candidato da integrare. |
 
+## OCR locale 0.8.6
+
+| File | Scopo | Quando consultarlo |
+| --- | --- | --- |
+| [docs/analysis/2026-09-05-086-ocr-verification.md](./analysis/2026-09-05-086-ocr-verification.md) | Prove della prima tranche OCR e residui WUL-671. | Per riprendere errori/recupero e prova del pacchetto target. |
+| [docs/adr/0119-anydoc-apple-vision-current-source.md](./adr/0119-anydoc-apple-vision-current-source.md) | Precedenza AnyDoc e Apple Vision, matrice e preview OCR. | Per il percorso documentale; prevale sulle formulazioni incompatibili di ADR 0107/0111/0117. |
+
 ## ⚙️ Orchestrazione e governance (consultazione sempre)
 
 | File | Scopo | Quando consultarlo |
@@ -50,7 +57,7 @@ Ultimo aggiornamento: 2026-09-05
 | [PRODUCT.md](../PRODUCT.md) | Contratto prodotto: purpose, audience, task, ruoli piattaforma, confini, anti-goal e direzione post-0.8. | Per decisioni prodotto, release narrative e separazione tra stato corrente e aspirazione. |
 | [DESIGN.md](../DESIGN.md) | Contratto design multipiattaforma: Lume, gerarchia, stati, adattamenti nativi/web, accessibilità ed eccezioni. | Prima di progettare o verificare una superficie utente. |
 | [docs/README.md](./README.md) | Mappa canonica della documentazione (fonte autorevole per tema). | Sempre, per decidere precedenze. |
-| [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md) | Lettura completa del sistema; per l'estrazione degli allegati e il ritiro del fallback OCR prevale il successivo ADR 0107. | Sempre, quando serve una vista unica del sistema, verificando le decisioni successive per i confini aggiornati. |
+| [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md) | Lettura completa del sistema; per il percorso AnyDoc e il fallback PDF Apple Vision consultare ADR 0119. | Sempre, quando serve una vista unica del sistema, verificando le decisioni successive per i confini aggiornati. |
 | [ARCHITECTURE.md](../ARCHITECTURE.md) | Visione architetturale stabile, confini e non-obiettivi. | Sempre, per cambi tecnici non banali. |
 | [SECURITY.md](../SECURITY.md) | Policy sicurezza, threat model e regole redazione/logging. | Sempre, per qualunque cambio dati/API. |
 | [CONTRIBUTING.md](../CONTRIBUTING.md) | Workflow contributivo e Definition of Done. | Sempre, prima di chiudere un task. |

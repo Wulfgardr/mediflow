@@ -31,14 +31,17 @@ test('requests one encoded host attachment without a caller payload and returns 
     assert.deepEqual(calls, [['/api/attachments/attachment%2Fsynthetic%20l1d/local-extraction', { method: 'POST', cache: 'no-store' }]]);
     assert.equal(preview?.status, 'available');
     assert.equal(preview?.markdown, 'Referto sintetico locale.');
+    assert.equal(preview?.ocr, undefined);
     assert.equal(Object.isFrozen(preview), true);
     assert.equal(Object.getPrototypeOf(preview), null);
 });
 
 test('accepts exact Apple Vision provenance and rejects malformed OCR provenance', async () => {
     const valid = extracted('attachment.synthetic.l1d', 'Testo sintetico OCR.', true);
-    assert.equal((await requestAnyDocLocalExtractionPreview('attachment.synthetic.l1d', async () => response(valid)))?.markdown,
-        'Testo sintetico OCR.');
+    const preview = await requestAnyDocLocalExtractionPreview('attachment.synthetic.l1d', async () => response(valid));
+    assert.equal(preview?.markdown, 'Testo sintetico OCR.');
+    assert.deepEqual(preview?.ocr, { pageCount: 2, ocrPageCount: 1 });
+    assert.equal(Object.isFrozen(preview?.ocr), true);
     for (const ocrProvenance of [
         { ...valid.receipt.ocrProvenance!, engine: 'caller_selected' },
         { ...valid.receipt.ocrProvenance!, ocrPageCount: 3 },

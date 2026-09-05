@@ -6,6 +6,8 @@ Questa cartella contiene le decisioni di MediFlow (web + native).
 
 ## ADR piu recente
 
+- [0119-anydoc-apple-vision-current-source.md](./0119-anydoc-apple-vision-current-source.md): fissa la precedenza del fallback PDF AnyDoc + Apple Vision, distinto da Fabric, con matrice e provenienza della preview.
+
 <!-- @Codex MF085-002/003: bounded source-bound scale contract. -->
 - [0118-tinetti-poma28-source-bound-submission.md](./0118-tinetti-poma28-source-bound-submission.md): propone POMA-28 versionata e source-bound, separazione dello storico, validazione completa e gate dei writer Web/Swift; nessuna validazione clinica o nuova soglia dichiarata.
 
