@@ -1,6 +1,6 @@
 # getmediflow: prodotto in vista, dettagli a scelta
 
-[Get MediFlow](https://getmediflow.wulfgardr.chatgpt.site) è il sito di presentazione
+[Get MediFlow](https://getmediflow.dev) è il sito di presentazione
 ufficiale del progetto, approvato il 5 settembre 2026 e ospitato su ChatGPT Sites.
 È il primo riferimento per conoscere il prodotto; GitHub conserva codice,
 contributi e contratti tecnici. Il sito non ospita la cartella e non riceve dati

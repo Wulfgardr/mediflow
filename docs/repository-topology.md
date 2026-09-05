@@ -17,7 +17,7 @@ dagli **artefatti di pubblicazione/sito** e dagli **strumenti di sviluppo**.
 
 Il gestionale si costruisce qui. Per orientarsi, conviene distinguere tre aree: il prodotto che lavora sulla
 cartella, gli strumenti che lo costruiscono e verificano, e i documenti che lo
-spiegano. Il sito [Get MediFlow](https://getmediflow.wulfgardr.chatgpt.site) è il riferimento di presentazione del prodotto: non
+spiegano. Il sito [Get MediFlow](https://getmediflow.dev) è il riferimento di presentazione del prodotto: non
 ospita la cartella, non importa i servizi clinici e non riceve dati del runtime.
 
 Per chi arriva al progetto: [Inizia qui](./start-here.md). Per la candidatura

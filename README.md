@@ -17,7 +17,7 @@ Informazioni, fonti e prossimi passi. Un po’ più facili da ritrovare.
 [![Local-first](https://img.shields.io/badge/data-local--first-8957e5?style=flat)](#dove-stanno-i-dati)
 [![Swift core](https://img.shields.io/badge/Swift%20core-macOS%20%7C%20Linux%20%7C%20Windows-6e7681?style=flat)](./docs/NATIVE.md)
 
-[**Scopri Get MediFlow**](https://getmediflow.wulfgardr.chatgpt.site) · [Perché nasce](#perché-nasce) · [Cosa puoi fare](#cosa-puoi-fare) · [Provalo](#provalo) · [Per chi sviluppa](#per-chi-sviluppa) · [Documentazione](#documentazione)
+[**Scopri Get MediFlow**](https://getmediflow.dev) · [Perché nasce](#perché-nasce) · [Cosa puoi fare](#cosa-puoi-fare) · [Provalo](#provalo) · [Per chi sviluppa](#per-chi-sviluppa) · [Documentazione](#documentazione)
 
 </div>
 
@@ -32,6 +32,15 @@ Informazioni, fonti e prossimi passi. Un po’ più facili da ritrovare.
 > documentati; i gate Apple completi e di distribuzione restano aperti.
 > Una build riuscita non equivale a una release pubblicata.
 > [Verifiche e limiti della candidatura](./docs/release-085-readiness.md).
+
+</details>
+
+<details>
+<summary><strong>La scheda clinica, da vicino</strong></summary>
+
+![Scheda clinica: terapie con posologia, ultima misura e prossimo follow-up](./docs/images/getmediflow-085/record.png)
+
+Schermata reale con dati interamente sintetici.
 
 </details>
 
@@ -242,7 +251,7 @@ scritture cliniche. Il planner semantico resta limitato a strumenti approvati.
 
 | Se vuoi… | Parti da… |
 | --- | --- |
-| Capire il progetto senza conoscere il codice | [Get MediFlow](https://getmediflow.wulfgardr.chatgpt.site) |
+| Capire il progetto senza conoscere il codice | [Get MediFlow](https://getmediflow.dev) |
 | Vedere cosa è implementato e cosa resta da provare | [Stato del sistema](./docs/STATE_OF_THE_SYSTEM.md) e [readiness 0.8.5](./docs/release-085-readiness.md) |
 | Trovare la fonte autorevole di un tema | [Mappa della documentazione](./docs/README.md) |
 | Capire piattaforme e parità | [Guida nativa](./docs/NATIVE.md) e [matrice di parità](./docs/parity-matrix.md) |

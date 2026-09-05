@@ -153,12 +153,12 @@ export function PatientSynopticSheet({
 
             <hr className="my-4 border-0 border-t border-[color:color-mix(in_srgb,var(--lume-ink)_8%,transparent)]" />
 
-            <div className="grid gap-4 md:grid-cols-2">
-                {/* D. Terapie attive */}
-                <div className="min-w-0">
-                    <a href="#terapie" className="mf-listrow !px-1 !py-0.5 justify-between">
+            <div className={styles.synopticDetails}>
+                {/* @Codex: keep medication, dose and count within one readable group. */}
+                <div className={styles.synopticDetail}>
+                    <a href="#terapie" className={styles.synopticDetailHeading}>
                         <MicroLabel>Terapie attive</MicroLabel>
-                        <span className="lume-registro text-[11px] text-[color:var(--lume-ink-muted)]" data-testid="lume-register-value">{therapiesTotal ?? '–'}</span>
+                        <span className={`${styles.synopticCount} lume-registro`} data-testid="lume-register-value">{therapiesTotal ?? '–'}</span>
                     </a>
                     {therapies === undefined ? (
                         <div className="mt-2"><SkeletonLines rows={3} /></div>
@@ -167,10 +167,10 @@ export function PatientSynopticSheet({
                     ) : (
                         <ul className="mt-1 divide-y divide-[color:color-mix(in_srgb,var(--lume-ink)_6%,transparent)]">
                             {visibleTherapies.map((therapy) => (
-                                <li key={therapy.id} className="flex items-baseline justify-between gap-3 py-1">
-                                    <span className="min-w-0 truncate text-[13px] font-medium text-[color:var(--lume-ink)]">{therapy.drugName}</span>
+                                <li key={therapy.id} className={styles.synopticTherapy}>
+                                    <span className="text-[13px] font-medium leading-5 text-[color:var(--lume-ink)]">{therapy.drugName}</span>
                                     {therapy.dosage ? (
-                                        <span className="lume-registro shrink-0 text-[12px] text-[color:var(--lume-ink-muted)]" data-testid="lume-register-value">{therapy.dosage}</span>
+                                        <span className={styles.synopticDetailMeta}>{therapy.dosage}</span>
                                     ) : null}
                                 </li>
                             ))}
@@ -186,9 +186,9 @@ export function PatientSynopticSheet({
                 </div>
 
                 {/* F. Ultima misura + G. Follow-up */}
-                <div className="min-w-0 space-y-4">
-                    <div>
-                        <a href="#parametri" className="mf-listrow !px-1 !py-0.5 justify-between">
+                <div className="contents">
+                    <div className={styles.synopticDetail}>
+                        <a href="#parametri" className={styles.synopticDetailHeading}>
                             <MicroLabel>Ultima misura</MicroLabel>
                         </a>
                         {latestMeasure === undefined ? (
@@ -196,7 +196,7 @@ export function PatientSynopticSheet({
                         ) : latestMeasure === null ? (
                             <p className="mt-1 text-sm text-[color:var(--lume-ink-muted)]">Nessun parametro registrato.</p>
                         ) : (
-                            <div className="mt-1 flex flex-wrap items-baseline gap-x-2">
+                            <div className={styles.synopticMeasure}>
                                 <span className="text-[13px] text-[color:var(--lume-ink)]">{latestMeasure.display}</span>
                                 <span className={`lume-registro text-[15px] font-semibold ${latestMeasure.outOfRange ? 'text-[color:var(--lume-signal-critical)]' : 'text-[color:var(--lume-ink)]'}`} data-testid="lume-register-value">
                                     {latestMeasure.valueLabel}
@@ -216,19 +216,19 @@ export function PatientSynopticSheet({
                                         ) : null}
                                     </span>
                                 ) : null}
-                                <span className="lume-registro text-[11px] text-[color:var(--lume-ink-muted)]" data-testid="lume-register-value">{latestMeasure.dateLabel}</span>
+                                <span className={styles.synopticDetailMeta}>Rilevata il {latestMeasure.dateLabel}</span>
                             </div>
                         )}
                     </div>
 
-                    <div>
-                        <a href="#follow-up" className="mf-listrow !px-1 !py-0.5 justify-between">
+                    <div className={styles.synopticDetail}>
+                        <a href="#follow-up" className={styles.synopticDetailHeading}>
                             <MicroLabel>Prossimo follow-up</MicroLabel>
                         </a>
                         {nextCheckupLabel ? (
-                            <div className="mt-1 flex flex-wrap items-baseline gap-x-2">
+                            <div className={styles.synopticMeasure}>
                                 <span className="lume-registro text-[13px] font-semibold text-[color:var(--lume-signal-warning)]" data-testid="lume-register-value">{nextCheckupLabel}</span>
-                                {nextCheckupTitle ? <span className="min-w-0 truncate text-[12px] text-[color:var(--lume-ink-muted)]">{nextCheckupTitle}</span> : null}
+                                {nextCheckupTitle ? <span className={styles.synopticDetailMeta}>{nextCheckupTitle}</span> : null}
                             </div>
                         ) : (
                             <p className="mt-1 text-sm text-[color:var(--lume-ink-muted)]">Nessun follow-up pianificato.</p>
