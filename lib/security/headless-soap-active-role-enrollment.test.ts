@@ -15,6 +15,8 @@ const USERNAME = 'synthetic-soap-admin';
 const SESSION_ID = 'a'.repeat(64);
 const NOW = Math.floor(Date.now() / 1_000) * 1_000;
 const TTL_MS = 8 * 60 * 60 * 1_000;
+// @Codex: future fixtures must remain future under full-suite CI scheduling.
+const FUTURE = NOW + TTL_MS;
 const baseSession = { id: SESSION_ID, userId: ACTOR, username: USERNAME, role: 'admin', authChannel: 'web', createdAt: NOW - 2_000, expiresAt: NOW + TTL_MS };
 function session(change: Record<string, unknown> = {}): unknown {
     return Object.freeze(Object.assign(Object.create(null), baseSession, change));
@@ -76,7 +78,7 @@ test('denies invalid PIN, non-current session, credential mismatch, and every se
         await assert.rejects(createHeadlessSoapActiveRoleEnrollmentService(sources({ resolveCurrentWebAdmin: async () => { observed++; return session(); } })).enroll(invalid as never), hasCode('enrollment_denied'));
         assert.equal(observed, 0);
     }
-    for (const current of [null, session({ role: 'doctor' }), session({ authChannel: 'native' }), session({ createdAt: NOW - 2_000, expiresAt: NOW - 1_000 }), session({ createdAt: NOW + 1_000, expiresAt: NOW + TTL_MS })]) {
+    for (const current of [null, session({ role: 'doctor' }), session({ authChannel: 'native' }), session({ createdAt: NOW - 2_000, expiresAt: NOW - 1_000 }), session({ createdAt: FUTURE, expiresAt: FUTURE + TTL_MS })]) {
         let verified = 0;
         await assert.rejects(createHeadlessSoapActiveRoleEnrollmentService(sources({ resolveCurrentWebAdmin: async () => current, verifyCredentials: async () => { verified++; return { kind: 'denied' }; } })).enroll(PIN), hasCode('enrollment_denied'));
         assert.equal(verified, 0);
@@ -97,7 +99,7 @@ test('maps dependency and forged lifecycle failures to sanitized fail-closed err
     await assert.rejects(createHeadlessSoapActiveRoleEnrollmentService(sources({ readAttestation: () => ({ kind: 'unavailable' }) })).enroll(PIN), hasCode('storage_unavailable'));
     for (const forged of [attestation({ actorRef: 'other' }), attestation({ status: 'revoked', revocationGeneration: 1 }),
         attestation({ activatedAt: new Date(NOW - TTL_MS - 1_000), expiresAt: new Date(NOW - 1_000), createdAt: new Date(NOW - TTL_MS - 2_000), updatedAt: new Date(NOW - TTL_MS - 1_000) }),
-        attestation({ activatedAt: new Date(NOW + 1_000), expiresAt: new Date(NOW + 1_000 + TTL_MS), updatedAt: new Date(NOW + 1_000) }),
+        attestation({ activatedAt: new Date(FUTURE), expiresAt: new Date(FUTURE + TTL_MS), updatedAt: new Date(FUTURE) }),
         attestation({ expiresAt: new Date(NOW - 999) })]) {
         await assert.rejects(createHeadlessSoapActiveRoleEnrollmentService(sources({ activate: () => ({ kind: 'ok', value: forged }) })).enroll(PIN), hasCode('storage_unavailable'));
     }
