@@ -28,6 +28,11 @@ Ultimo aggiornamento: 2026-09-05
 
 ## Sviluppo 0.8.6
 
+Contratto estrazione documentale: [ADR 0119](./adr/0119-anydoc-apple-vision-current-source.md),
+AnyDoc e fallback PDF Apple Vision distinti dal catalogo Fabric.
+[Prima verifica OCR](./analysis/2026-09-05-086-ocr-verification.md): preview,
+matrice browser sintetica e gate ancora aperti.
+
 [Baseline operativa WUL-670](./analysis/2026-09-05-mediflow-086-baseline.md):
 base corrente, prove sintetiche, recuperi prioritari e ordine di sviluppo.
 

@@ -3,6 +3,10 @@
 Date: 2026-09-01
 Status: Accepted
 
+Aggiornamento 0.8.6: [ADR 0119](./0119-anydoc-apple-vision-current-source.md) prevale per il percorso documentale
+AnyDoc + Apple Vision già composto; preserva i confini non modificati qui.
+
+
 Issue: [GitHub #278](https://github.com/Wulfgardr/mediflow/issues/278)
 
 Program line: candidata `0.8.5`, packet `F6`

@@ -20,6 +20,11 @@ read_when:
 
 Ultimo aggiornamento: 2026-09-03 (contenuto sorgente v0.8.5)
 
+Nota candidato 0.8.6: [ADR 0119](./adr/0119-anydoc-apple-vision-current-source.md)
+chiarisce la precedenza del percorso AnyDoc + Apple Vision descritto qui.
+Questa fotografia 0.8.5 non è una verifica della release 0.8.6.
+
+
 > [!NOTE]
 > Questo documento descrive il contenuto sorgente della `0.8.5`. Check CI su
 > exact SHA, artifact firmati, tag, GitHub Release e installazione esterna sono

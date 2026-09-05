@@ -16,7 +16,7 @@ import {
     isAiDocumentSynthesisEnabledValue,
 } from '@/lib/ai-document-synthesis-kill-switch';
 import { db, type Attachment } from '@/lib/db';
-import { requestAnyDocLocalExtractionPreview } from '@/lib/domain/documents/anydoc-local-extraction-client';
+import { requestAnyDocLocalExtractionPreview, type AnyDocLocalExtractionPreview } from '@/lib/domain/documents/anydoc-local-extraction-client';
 import { useLiveQuery } from '@/lib/live-query';
 import { sharedKillSwitchSignal } from '@/lib/ui-semantic-signal';
 import { cn } from '@/lib/utils';
@@ -25,11 +25,8 @@ interface DocumentUploadProps {
     patientId: string;
 }
 
-type LocalExtractionState = Readonly<{
-    attachmentId: string;
-    status: 'available' | 'review_required';
-    markdown?: string;
-}>;
+type LocalExtractionState = (Readonly<{ attachmentId: string }> & AnyDocLocalExtractionPreview)
+    | Readonly<{ attachmentId: string; status: 'review_required' }>;
 
 function fileAsDataUrl(file: File): Promise<string> {
     return new Promise((resolve, reject) => {
@@ -129,7 +126,7 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
         try {
             const preview = await requestAnyDocLocalExtractionPreview(file.id);
             if (preview) {
-                setLocalExtraction({ attachmentId: file.id, status: 'available', markdown: preview.markdown });
+                setLocalExtraction({ attachmentId: file.id, ...preview });
                 return;
             }
             setLocalExtraction({ attachmentId: file.id, status: 'review_required' });
@@ -229,7 +226,14 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
 
                         {localExtraction?.attachmentId === file.id && localExtraction.status === 'available' && (
                             <div className="mt-3 rounded-lg border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] p-2" role="status" data-testid="anydoc-local-extraction-preview">
-                                <p className="text-[10px] font-semibold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">Anteprima AnyDoc locale · sola lettura</p>
+                                <p className="text-[10px] font-semibold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
+                                    {localExtraction.ocr ? 'Anteprima OCR locale · sola lettura' : 'Anteprima AnyDoc locale · sola lettura'}
+                                </p>
+                                {localExtraction.ocr && (
+                                    <p className="mt-1 text-xs text-[color:var(--lume-ink-muted)]">
+                                        OCR completato su questo Mac · {localExtraction.ocr.ocrPageCount} {localExtraction.ocr.ocrPageCount === 1 ? 'pagina' : 'pagine'} su {localExtraction.ocr.pageCount}. Rivedi il testo prima di usarlo.
+                                    </p>
+                                )}
                                 <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap text-xs text-[color:var(--lume-ink)]">{localExtraction.markdown}</pre>
                             </div>
                         )}

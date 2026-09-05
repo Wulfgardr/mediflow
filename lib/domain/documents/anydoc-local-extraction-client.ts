@@ -1,7 +1,11 @@
 /* @Codex */
 'use client';
 
-export type AnyDocLocalExtractionPreview = Readonly<{ status: 'available'; markdown: string }>;
+export type AnyDocLocalExtractionPreview = Readonly<{
+    status: 'available';
+    markdown: string;
+    ocr?: Readonly<{ pageCount: number; ocrPageCount: number }>;
+}>;
 
 const SCHEMA = 'mediflow.anydoc_local_extraction.v1';
 const ROOT_KEYS = ['schemaVersion', 'provenance', 'receipt', 'review', 'writes', 'apply', 'status', 'markdown', 'candidateUse'] as const;
@@ -54,6 +58,7 @@ async function parsePreview(raw: unknown, expectedAttachmentId: string): Promise
         || receipt.sourceSha256 !== source.sourceSha256 || receipt.sourceByteLength !== source.byteLength
         || !Number.isSafeInteger(receipt.markdownByteLength) || (receipt.markdownByteLength as number) < 1
         || (receipt.markdownByteLength as number) > MAX_MARKDOWN_BYTES) return null;
+    let ocr: AnyDocLocalExtractionPreview['ocr'];
     if (Object.hasOwn(receipt, 'ocrProvenance')) {
         const provenance = exact(receipt.ocrProvenance, OCR_PROVENANCE_KEYS);
         if (!provenance || provenance.schemaVersion !== OCR_PROVENANCE_SCHEMA || provenance.engine !== 'apple_vision'
@@ -62,6 +67,7 @@ async function parsePreview(raw: unknown, expectedAttachmentId: string): Promise
             || (provenance.pageCount as number) > 500 || !Number.isSafeInteger(provenance.ocrPageCount)
             || (provenance.ocrPageCount as number) < 1
             || (provenance.ocrPageCount as number) > (provenance.pageCount as number)) return null;
+        ocr = Object.freeze({ pageCount: provenance.pageCount as number, ocrPageCount: provenance.ocrPageCount as number });
     }
     const markdownBytes = new TextEncoder().encode(root.markdown);
     if (markdownBytes.byteLength !== receipt.markdownByteLength) return null;
@@ -71,7 +77,9 @@ async function parsePreview(raw: unknown, expectedAttachmentId: string): Promise
         markdownSha256 = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
     } catch { return null; }
     if (markdownSha256 !== receipt.markdownSha256) return null;
-    return Object.freeze(Object.assign(Object.create(null), { status: 'available' as const, markdown: root.markdown }));
+    return Object.freeze(Object.assign(Object.create(null), {
+        status: 'available' as const, markdown: root.markdown, ...(ocr ? { ocr } : {}),
+    }));
 }
 
 export async function requestAnyDocLocalExtractionPreview(
