@@ -171,16 +171,21 @@ Strumenti del processo di scrittura del codice, non fonti del prodotto.
 [![CodexBar](https://img.shields.io/badge/uso-CodexBar-181717?logo=github&logoColor=white)](https://github.com/steipete/CodexBar)
 
 Codex e Claude Code hanno contribuito a progettazione, implementazione, review
-e verifica. I modelli registrati nei log MediFlow comprendono le famiglie
+e verifica. Le famiglie usate nello sviluppo assistito comprendono
 OpenAI GPT-5.2, GPT-5.3 Codex/Spark, GPT-5.4/mini, GPT-5.5 e GPT-5.6
-Sol/Terra/Luna; sul lato Anthropic, Opus 4.8, Fable 5, Sonnet 5 e una quota
+Sol/Terra/Luna e GPT-6 Astra; sul lato Anthropic, Opus 4.8, Fable 5, Sonnet 5 e una quota
 esplorativa storica di Haiku 4.5.
 
-Lo snapshot locale del 15 luglio 2026 conta circa 17,56 miliardi di token di
-sessione: 11,33 miliardi con Codex e 6,22 con Claude Code. Circa 16,41 miliardi
-sono input recuperato dalla cache; il dato misura soprattutto contesto riletto
-nel lavoro assistito, non righe di codice, costo o qualità. Un conteggio
-precedente basato su una metodologia diversa non è direttamente confrontabile.
+Lo snapshot locale del 5 settembre 2026, da CodexBar 0.56.4, conta
+**50.810.826.389 token di sessione**: 44.773.273.634 registrati da Codex e
+6.037.552.755 da Claude Code. La cache letta è 48.607.240.570 token (95,7%).
+Il periodo disponibile va dal 1 febbraio al 5 settembre 2026.
+
+Questi aggregati **non sono filtrati per repository**: non sono il conteggio
+dei token impiegati esclusivamente per MediFlow o per la 0.8.5. La completezza
+storica Codex non è attestata. Il dato misura contesto elaborato, non righe di
+codice, costo o qualità; conteggi con copertura diversa non sono direttamente
+confrontabili. [Dashboard e metodo](./README.md#sviluppo-assistito).
 
 - **[Repo Prompt CE](https://github.com/repoprompt/repoprompt-ce)** (Eric Provencher): context engineering open source, usato in alcune sessioni per preparare selezioni e diff per gli agenti.
 - **[CodexBar](https://github.com/steipete/CodexBar)** (Peter Steinberger): visibilità locale sull'uso dei modelli e fonte del conteggio storico del README.
