@@ -24,16 +24,22 @@ ambito mostra:
   `valutazione esterna necessaria`.
 
 L'inventario non legge dati clinici, non esegue controlli sul deployment e non
-produce un verdetto legale. Le fonti ufficiali esterne — [articolo 25
-GDPR](https://eur-lex.europa.eu/eli/reg/2016/679/art_25/oj/eng), [articolo 32
-GDPR](https://eur-lex.europa.eu/eli/reg/2016/679/art_32/oj/eng) e [Regolamento
-(UE) 2024/1689](https://eur-lex.europa.eu/eli/reg/2024/1689/oj?locale=en) — sono
+produce un verdetto legale. Le fonti ufficiali esterne — [GDPR, testo
+consolidato corrente](https://eur-lex.europa.eu/eli/reg/2016/679), in particolare
+articoli 25 e 32, e [AI Act, testo consolidato
+corrente](https://eur-lex.europa.eu/eli/reg/2024/1689) — sono
 input per la valutazione dell'organizzazione, del referente legale e del DPO;
 non classificano automaticamente MediFlow o il suo uso concreto.
 
 Il claim ceiling dell'inventario è quindi **solo inventario di evidenze
 tecniche**. Configurazione, finalità, ruoli privacy, procedure, classificazione
 del sistema AI e adempimenti restano fuori dal suo perimetro.
+
+La [matrice regolatoria del 6 settembre 2026](./analysis/2026-09-06-086-regulatory-evidence.md)
+registra versioni, calendario aggiornato, evidenze statiche e gap per la 0.8.6.
+Include la modifica dell'AI Act introdotta dal Regolamento (UE) 2026/1744 e
+separa controlli tecnici, documenti adottati nel progetto e adempimenti del
+deployment. È un dossier candidato: la revisione competente resta aperta.
 
 ---
 
