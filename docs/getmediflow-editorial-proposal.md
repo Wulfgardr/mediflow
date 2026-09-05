@@ -4,7 +4,7 @@
 ufficiale del progetto, approvato il 5 settembre 2026 e ospitato su ChatGPT Sites.
 È il primo riferimento per conoscere il prodotto; GitHub conserva codice,
 contributi e contratti tecnici. Il sito non ospita la cartella e non riceve dati
-del runtime. L’accesso resta privato: il collegamento non concede accesso ai visitatori.
+del runtime. L’accesso è pubblico: chi visita il sito personale può aprire la presentazione.
 Non è stato registrato un dominio autonomo.
 
 ## Il filo del racconto
