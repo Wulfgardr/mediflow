@@ -1,13 +1,14 @@
 'use client';
 
 import { ApiConflictError, db } from '@/lib/db';
-import { v4 as uuidv4 } from 'uuid';
 import { useRouter, useParams } from 'next/navigation';
 import { Trash2, Archive, Download, ShieldAlert, RotateCcw } from 'lucide-react';
-import PatientForm from '@/components/patient-form';
+/* @Codex */
+import PatientEditForm from '@/components/patient-edit-form';
 import { useLiveQuery } from '@/lib/live-query';
 import PatientActionModal, { ActionData } from '@/components/patient-action-modal';
-import { useState } from 'react';
+/* @Codex */
+import { useEffect, useState } from 'react';
 import { useToast } from '@/components/ui/toast-provider';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 /* @Codex */
@@ -31,89 +32,24 @@ export default function EditPatientPage() {
     const confirm = useConfirm();
 
     /* @Codex */
-    const patient = useLiveQuery(async () => {
+    const livePatient = useLiveQuery(async () => {
         const p = await db.patients.get(id);
         if (!p) return null;
 
         // Fetch relations
-        const checkups = await db.checkups.filter((c: any) => c.patientId === id).toArray();
+        const checkups = await db.checkups.query({ patientId: id }).toArray();
         return { ...p, checkups };
     }, [id], undefined, ['patients', 'checkups']);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const onSubmit = async (data: any) => {
-        if (!patient || typeof patient.version !== 'number') {
-            showToast({ tone: 'error', title: 'Versione paziente non disponibile', description: 'Ricarica la pagina e riprova.' });
-            return;
-        }
-
-        try {
-            /* @Codex */
-            const { checkups, ...cleanData } = data;
-            const patientVersion = patient.version;
-
-            await db.patients.update(id, {
-                ...cleanData,
-                birthDate: new Date(cleanData.birthDate),
-                version: patientVersion,
-                updatedAt: new Date(),
-            });
-
-            // Handle Checkups (Diffing)
-            // 1. Get current IDs to find deletions
-            const existingCheckups = await db.checkups.filter((c: any) => c.patientId === id).toArray();
-            const existingCheckupById = new Map(existingCheckups.map(c => [c.id, c]));
-            const comingIds = new Set(checkups.filter((c: any) => c.id).map((c: any) => c.id));
-
-            // Delete removed
-            const toDelete = existingCheckups.filter(c => !comingIds.has(c.id)).map(c => c.id);
-            if (toDelete.length > 0) {
-                await db.checkups.bulkDelete(toDelete);
-            }
-
-            // Upsert
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const checkupWrites = checkups.map((c: any) => {
-                const existingCheckup = c.id ? existingCheckupById.get(c.id) : undefined;
-                return {
-                    id: c.id || uuidv4(),
-                    patientId: id,
-                    date: new Date(c.date),
-                    title: c.title,
-                    notes: c.notes,
-                    status: c.status || 'pending',
-                    source: c.source || 'manual',
-                    createdAt: existingCheckup?.createdAt || new Date(),
-                    version: existingCheckup?.version,
-                };
-            });
-
-            const toUpdate = checkupWrites.filter((c: typeof checkupWrites[number]) => existingCheckupById.has(c.id));
-            for (const checkup of toUpdate) {
-                if (typeof checkup.version !== 'number') {
-                    throw new Error('Versione controllo non disponibile. Ricarica la pagina e riprova.');
-                }
-                await db.checkups.update(checkup.id, {
-                    date: checkup.date,
-                    title: checkup.title,
-                    notes: checkup.notes,
-                    status: checkup.status,
-                    source: checkup.source,
-                    version: checkup.version,
-                });
-            }
-
-            const toCreate = checkupWrites.filter((c: typeof checkupWrites[number]) => !existingCheckupById.has(c.id));
-            if (toCreate.length > 0) {
-                await db.checkups.bulkPut(toCreate);
-            }
-
-            router.push(`/patients/${id}`);
-        } catch (error) {
-            console.error("Failed to update patient", error);
-            showToast({ tone: 'error', title: 'Aggiornamento non riuscito', description: messageFromError(error, "Errore durante l'aggiornamento.") });
-        }
-    };
+    /* @Codex: a missing live reread must not unmount an interrupted draft/journal.
+       Keep the last available record for this route; writes still use the editor's
+       original CAS tokens and the server remains authoritative for availability. */
+    const [lastAvailablePatient, setLastAvailablePatient] = useState<typeof livePatient>(undefined);
+    useEffect(() => {
+        if (livePatient?.id === id) setLastAvailablePatient(livePatient);
+    }, [livePatient, id]);
+    const patient = livePatient?.id === id ? livePatient
+        : lastAvailablePatient?.id === id ? lastAvailablePatient : null;
 
     const [isActionModalOpen, setIsActionModalOpen] = useState(false);
     const [actionType, setActionType] = useState<'delete' | 'archive' | 'export'>('archive');
@@ -229,7 +165,7 @@ export default function EditPatientPage() {
         { href: '#azioni', label: 'Azioni' },
     ];
 
-    if (!patient) {
+    if (!patient || patient.id !== id) {
         return (
             <Kree8WorkspaceShell
                 eyebrow="Scheda paziente"
@@ -287,11 +223,11 @@ export default function EditPatientPage() {
                 )}
 
                 <div id="dati" className={workspaceStyles.anchorStack}>
-                    <PatientForm
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                        defaultValues={patient as any}
-                        onSubmit={onSubmit}
-                        isEditMode={true}
+                    {/* @Codex: one snapshot per mounted patient, not per live-query revision. */}
+                    <PatientEditForm
+                        key={id}
+                        initialRecord={patient}
+                        onSaved={() => router.push(`/patients/${id}`)}
                     />
                 </div>
 

@@ -12,6 +12,7 @@ import {
 import { decodePortableSupervisorWebIpcFrameV1 } from
   '../../packages/aip/src/portable-supervisor-web-ipc-contract.ts';
 import { getDataDir } from '../data-dir';
+import { resolveAthenaMlxGenerateBin } from '../athena-mlx-launcher-config.ts';
 import { createCheckupStatusTransitionSupervisorPortV1 } from
   './checkup-status-transition-supervisor-port.ts';
 import { createProductionMcpAgentLauncherWithPreSpawnedChildV1 } from
@@ -188,6 +189,7 @@ export function createPortableSupervisorProductionRuntimeV1(
 
 /** Starts the production mirror, audit ports, launcher and exact child-process topology. */
 export function createPortableSupervisorProductionV1(): PortableSupervisorProductionRuntimeV1 {
+  const athenaMlxGenerateBin = resolveAthenaMlxGenerateBin(process.env.MEDIFLOW_ATHENA_MLX_GENERATE_BIN);
   const now = () => Date.now();
   const dataDir = getDataDir();
   if (!path.isAbsolute(dataDir)) throw new Error('data_directory_path_invalid');
@@ -216,16 +218,16 @@ export function createPortableSupervisorProductionV1(): PortableSupervisorProduc
   const commitTerminalAudit = createPortableSupervisorSemanticAuditPortV1({
     now, readHostContext: context.readHostContext,
   });
-  const children = createPortableSupervisorProductionChildProcessesV1({ dataDir });
-  const checkup = createCheckupStatusTransitionSupervisorPortV1({
-    randomBytes,
-    sendWeb: children.sendWeb,
-    schedule: (delayMs: number, callback: () => void) => {
-      const timer = setTimeout(callback, delayMs); timer.unref(); return () => { clearTimeout(timer); };
-    },
-    onTerminal: (reason) => runtime?.terminate(reason === 'web_disconnect' ? 'web_disconnect' : 'explicit'),
-  });
+  const children = createPortableSupervisorProductionChildProcessesV1({ dataDir, athenaMlxGenerateBin });
   try {
+    const checkup = createCheckupStatusTransitionSupervisorPortV1({
+      randomBytes,
+      sendWeb: children.sendWeb,
+      schedule: (delayMs: number, callback: () => void) => {
+        const timer = setTimeout(callback, delayMs); timer.unref(); return () => { clearTimeout(timer); };
+      },
+      onTerminal: (reason) => runtime?.terminate(reason === 'web_disconnect' ? 'web_disconnect' : 'explicit'),
+    });
     runtime = createPortableSupervisorProductionRuntimeV1({
       now,
       nextChallenge: () => `pswc_${randomBytes(32).toString('hex')}`,

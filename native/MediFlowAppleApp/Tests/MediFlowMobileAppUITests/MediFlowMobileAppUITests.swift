@@ -1439,11 +1439,22 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertTrue(adlOption.waitForExistence(timeout: 5), "The ADL scale option should be available")
         adlOption.tap()
 
-        // The ADL form rendered: items + the live score (scoring is unit-tested).
-        XCTAssertTrue(app.switches["scale-question-bath"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["scale-score"].exists, "The live score should be shown")
-        app.switches["scale-question-bath"].tap()
-
+        // @Codex MF085-003: no first-option defaults; explicit zero is a real response.
+        XCTAssertTrue(app.buttons["scale-question-bath"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["scale-incomplete"].exists)
+        XCTAssertFalse(app.staticTexts["scale-score"].exists)
+        XCTAssertFalse(app.buttons["submit-scale-button"].isEnabled)
+        for (index, id) in ["bath", "dress", "toilet", "transfer", "cont", "feed"].enumerated() {
+            let picker = app.buttons["scale-question-\(id)"]
+            XCTAssertTrue(scrollDown(to: picker))
+            picker.tap()
+            app.buttons["Dipendente"].tap()
+            if index < 5 {
+                XCTAssertFalse(app.buttons["submit-scale-button"].isEnabled)
+                XCTAssertFalse(app.staticTexts["scale-score"].exists)
+            }
+        }
+        XCTAssertTrue(app.buttons["submit-scale-button"].isEnabled)
         app.buttons["submit-scale-button"].tap()
 
         // The scale entry appears in the diary (seed short-circuit inserts it).

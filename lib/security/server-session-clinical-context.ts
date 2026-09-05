@@ -4,6 +4,7 @@ import 'server-only';
 import { and, eq } from 'drizzle-orm';
 import type { dbServer } from '../db-server';
 import { ambulatories, patients, patientsToAmbulatories } from '../schema';
+import { activePatients } from '../patient-lifecycle';
 import type { ServerSession } from './server-session';
 import {
     abortResourceUse,
@@ -60,7 +61,7 @@ export function createCanonicalClinicalContextResolver(database: ClinicalContext
             use = beginResourceUse(port);
             if (!use || session.authChannel !== 'web' || session.id === 'local-api') return fail('session_ineligible');
             const patient = database.select({ id: patients.id, version: patients.version })
-                .from(patients).where(eq(patients.id, request.patientId)).get();
+                .from(patients).where(and(eq(patients.id, request.patientId), activePatients())).get();
             if (!patient) return fail('patient_missing');
             if (!Number.isSafeInteger(patient.version) || patient.version < 1) return fail('patient_version_invalid');
             const ambulatory = database.select({ id: ambulatories.id })

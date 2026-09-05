@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { performance } from 'node:perf_hooks';
+import { resolveAthenaMlxGenerateBin } from './athena-mlx-launcher-config.ts';
 import {
     ATHENA_MLX_DEFAULT_MAX_TOKENS,
     ATHENA_MLX_HARD_MAX_TOKENS,
@@ -78,17 +79,8 @@ function shellBin(name: string): string {
  * boundary.
  */
 export function resolveAthenaMlxLauncher(): AthenaMlxLauncher {
-    const direct = (process.env.MEDIFLOW_ATHENA_MLX_GENERATE_BIN || '').trim();
-    if (direct) {
-        try {
-            if (!path.isAbsolute(direct) || path.basename(direct) !== 'mlx_lm.generate') {
-                throw new Error('invalid');
-            }
-            if (!fs.statSync(direct).isFile()) throw new Error('invalid');
-            fs.accessSync(direct, fs.constants.X_OK);
-        } catch {
-            throw new Error('ATHENA MLX direct runner configuration rejected.');
-        }
+    const direct = resolveAthenaMlxGenerateBin(process.env.MEDIFLOW_ATHENA_MLX_GENERATE_BIN);
+    if (direct !== undefined) {
         return Object.freeze({
             mode: 'direct' as const,
             command: direct,

@@ -8,6 +8,7 @@ public struct ScaleHistoryItem: Identifiable, Equatable, Sendable {
     public let scoreLabel: String?
     public let interpretation: String?
     public let content: String
+    public let provenanceLabel: String?
 
     public init(
         id: String,
@@ -15,7 +16,8 @@ public struct ScaleHistoryItem: Identifiable, Equatable, Sendable {
         title: String,
         scoreLabel: String?,
         interpretation: String?,
-        content: String
+        content: String,
+        provenanceLabel: String? = nil
     ) {
         self.id = id
         self.date = date
@@ -23,6 +25,7 @@ public struct ScaleHistoryItem: Identifiable, Equatable, Sendable {
         self.scoreLabel = scoreLabel
         self.interpretation = interpretation
         self.content = content
+        self.provenanceLabel = provenanceLabel
     }
 }
 
@@ -49,7 +52,10 @@ public enum ScaleHistoryPresentation {
             title: title,
             scoreLabel: scoreLabel,
             interpretation: interpretation,
-            content: entry.content
+            content: entry.content,
+            provenanceLabel: ClinicalScales.tinettiHistoryNotice(
+                scaleId: metadata?.scaleId, title: title, instrument: metadata?.instrument
+            )
         )
     }
 
@@ -64,6 +70,11 @@ public enum ScaleHistoryPresentation {
             let scaleId = metadata.scaleId?.trimmedOrNil,
             let definition = ClinicalScales.all.first(where: { $0.id == scaleId })
         else {
+            return "\(score)"
+        }
+        // @Codex: do not attach the corrected denominator to legacy/unbound data.
+        if scaleId == ClinicalScales.tinettiPOMA28ID,
+           metadata.instrument != ClinicalScales.tinettiPOMA28Instrument {
             return "\(score)"
         }
         return "\(score)/\(definition.maxScore)"
@@ -83,5 +94,18 @@ public enum ScaleHistoryPresentation {
         let scaleId: String?
         let score: Int?
         let interpretation: String?
+        let instrument: ClinicalScaleInstrumentProvenance?
+
+        private enum CodingKeys: String, CodingKey { case title, scaleId, score, interpretation, instrument }
+
+        init(from decoder: Decoder) throws {
+            let values = try decoder.container(keyedBy: CodingKeys.self)
+            title = try values.decodeIfPresent(String.self, forKey: .title)
+            scaleId = try values.decodeIfPresent(String.self, forKey: .scaleId)
+            score = try values.decodeIfPresent(Int.self, forKey: .score)
+            interpretation = try values.decodeIfPresent(String.self, forKey: .interpretation)
+            // Bad provenance must not erase the other stored historical fields.
+            instrument = try? values.decode(ClinicalScaleInstrumentProvenance.self, forKey: .instrument)
+        }
     }
 }

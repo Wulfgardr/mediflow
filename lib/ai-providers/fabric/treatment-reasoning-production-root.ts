@@ -2,7 +2,7 @@ import 'server-only';
 
 /* @Codex */
 import { randomBytes } from 'node:crypto';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 
 import {
     AI_TREATMENT_REASONING_KILL_SWITCH_KEY,
@@ -13,6 +13,7 @@ import {
     isAthenaMlxModelAvailable,
 } from '../../athena-mlx-runtime';
 import { dbServer } from '../../db-server';
+import { activePatients } from '../../patient-lifecycle';
 import { acquireAuthenticatedWebSessionProjectionOwnerContext } from '../../security/server-auth';
 import { registerServerSessionResource } from '../../security/server-session';
 import { patients, patientsToAmbulatories, settings } from '../../schema';
@@ -32,7 +33,7 @@ const projectionBroker = createTreatmentReasoningAuthenticatedProjectionBroker({
             .where(and(
                 eq(patients.id, patientId),
                 eq(patientsToAmbulatories.ambulatoryId, ambulatoryId),
-                isNull(patients.deletedAt),
+                activePatients(),
             )).get();
         return Number.isSafeInteger(row?.version) ? row!.version : null;
     },

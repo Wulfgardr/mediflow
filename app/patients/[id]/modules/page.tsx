@@ -905,11 +905,12 @@ export default function PatientDetailPage() {
                         title="Scale di valutazione"
                         icon={Activity}
                         surfaceClassName={workspaceStyles.clinicalSection}
-                        summary="Tinetti, MMSE, ADL (Katz), GDS e libreria completa."
+                        summary="Tinetti POMA-28 v1, MMSE, ADL (Katz), GDS e libreria completa."
                     >
                         <div className="space-y-3">
-                            <Link href={`/patients/${id}/scales/tinetti`} className={workspaceStyles.rowLink}>
-                                <span>Tinetti</span>
+                            {/* @Codex MF085-002: distinct new instrument, never a legacy alias. */}
+                            <Link href={`/patients/${id}/scales/tinetti-poma28-v1`} className={workspaceStyles.rowLink}>
+                                <span>Tinetti POMA-28 (v1)</span>
                                 <Plus className="h-4 w-4 text-[color:var(--lume-ink-muted)]" />
                             </Link>
                             <Link href={`/patients/${id}/scales/mmse`} className={workspaceStyles.rowLink}>

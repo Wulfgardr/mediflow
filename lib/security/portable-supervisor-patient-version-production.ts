@@ -1,9 +1,10 @@
 /* @Codex */
 import 'server-only';
 
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 
 import { dbServer } from '../db-server';
+import { activePatients } from '../patient-lifecycle';
 import { ambulatories, patients, patientsToAmbulatories } from '../schema';
 
 type PatientVersionDatabase = Pick<typeof dbServer, 'select'>;
@@ -44,7 +45,7 @@ export function createPortableSupervisorPatientVersionProductionV1(
         .where(and(
           eq(patients.id, patientId),
           eq(patients.isArchived, false),
-          isNull(patients.deletedAt),
+          activePatients(),
         ))
         .limit(2)
         .all();

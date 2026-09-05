@@ -1,8 +1,10 @@
-import { ScaleDefinition } from '@/components/scale-engine';
+// @Codex MF085-002/003: active versioned catalog; legacy is never an active alias.
+import { type ScaleDefinition, withValidatedScoring } from './scale-validation';
+import { TINETTI_POMA28, TINETTI_POMA28_ID } from './scales/tinetti-poma28-v1';
 
-export const SCALES: Record<string, ScaleDefinition> = {
-    // === FUNZIONALI / MOTORIE ===
-    'tinetti': {
+export const LEGACY_TINETTI: ScaleDefinition = withValidatedScoring({
+        // @Codex MF085-002: frozen answer semantics; no new submissions or rescore.
+        retired: true,
         id: 'tinetti',
         title: 'Scala Tinetti (Balance & Gait)',
         description: 'Valutazione del rischio di caduta (Equilibrio + Andatura). Max 28 punti.',
@@ -33,7 +35,10 @@ export const SCALES: Record<string, ScaleDefinition> = {
             if (score <= 24) return 'MEDIO Rischio di Caduta (19-24)';
             return 'BASSO Rischio di Caduta (> 24)';
         }
-    },
+});
+
+const definitions: Record<string, ScaleDefinition> = {
+    [TINETTI_POMA28_ID]: TINETTI_POMA28,
 
     'adl': {
         id: 'adl',
@@ -153,3 +158,8 @@ export const SCALES: Record<string, ScaleDefinition> = {
         }
     }
 };
+
+// @Codex: direct scoring and writer-bound scoring share the completeness contract.
+export const SCALES: Readonly<Record<string, ScaleDefinition>> = Object.freeze(Object.fromEntries(
+    Object.entries(definitions).map(([id, definition]) => [id, withValidatedScoring(definition)]),
+));

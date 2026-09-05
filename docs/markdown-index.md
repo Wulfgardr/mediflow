@@ -19,6 +19,13 @@ Ultimo aggiornamento: 2026-09-03
 - Se devi trovare **dove sta un tema specifico**, usa le tabelle qui sotto.
 - Se aggiungi/rimuovi/rinomini un `.md`, aggiorna subito questo file e [docs/README.md](./README.md).
 
+<!-- @Codex -->
+## Candidato Web 0.8.5
+
+| File | Scopo | Quando consultarlo |
+| --- | --- | --- |
+| [docs/web-patient-edit-and-analytics-085.md](./web-patient-edit-and-analytics-085.md) | Snapshot del modulo, CAS iniziale, recupero parziale e metrica Schede per paziente. | Quando si modificano editor paziente/checkup o aggregazione diagnosi; candidato da integrare. |
+
 ## ⚙️ Orchestrazione e governance (consultazione sempre)
 
 | File | Scopo | Quando consultarlo |
@@ -192,6 +199,7 @@ Ultimo aggiornamento: 2026-09-03
 | [docs/adr/0115-icd11-who-reference-data-adapter.md](./adr/0115-icd11-who-reference-data-adapter.md) | ADR accettato per sostituire il target Docker ICD-11 con un Application Service host-owned verso WHO API v2/MMS, egress opt-in, cache exact-binding e output MediFlow data-only; route, client e UI sono migrati, mentre la prova live richiede configurazione WHO. |
 | [docs/adr/0116-agentic-checkup-status-transition.md](./adr/0116-agentic-checkup-status-transition.md) | ADR accettato per il primo write agentico non-SOAP: sola transizione `pending -> completed|cancelled`, proposta AIP, conferma UI operation-specific, CAS, idempotenza e receipt PHI-safe; nessun runtime nel packet. |
 | [docs/adr/0117-headless-portable-agent-first-and-capability-first-fabric.md](./adr/0117-headless-portable-agent-first-and-capability-first-fabric.md) | ADR accettato: rende Headless/CLI/MCP agent-first e OS-agnostico un requisito 0.8.5, impone una superficie utile governata e riclassifica OCR come capability model-agnostic con adapter DeepSeek opzionale. |
+| [docs/adr/0118-tinetti-poma28-source-bound-submission.md](./adr/0118-tinetti-poma28-source-bound-submission.md) | @Codex: ADR proposta per POMA-28 versionata e source-bound, storico non ricalcolato, completezza delle risposte e validazione dei writer Web/Swift; nessun claim di validazione clinica. |
 | [docs/adr/0012-operator-reviewed-smart-import-from-patient-context.md](./adr/0012-operator-reviewed-smart-import-from-patient-context.md) | Smart import reviewable da note, diario e documenti verso diagnosi ICD-11 e terapie nel profilo paziente. |
 | [docs/adr/0013-qwen35-default-text-only-medgemma-specialist.md](./adr/0013-qwen35-default-text-only-medgemma-specialist.md) | Aggiorna il default text-only a `qwen3.5:35b-a3b` e mantiene MedGemma come opzione specialistica non-default. |
 | [docs/adr/0014-native-token-bootstrap-secure-first.md](./adr/0014-native-token-bootstrap-secure-first.md) | Precedenza secure-first del token native (`Keychain -> config -> legacy`) e failure mode espliciti. |
@@ -228,6 +236,7 @@ Ultimo aggiornamento: 2026-09-03
 | [docs/adr/0079-local-open-loops-and-result-link.md](./adr/0079-local-open-loops-and-result-link.md) | Accetta le attese locali deterministiche: prima slice web consegnata, salvataggio esplicito e nessuna estensione paired. |
 | [docs/adr/0080-serialize-sqlite-schema-guards-at-bootstrap.md](./adr/0080-serialize-sqlite-schema-guards-at-bootstrap.md) | Propone di serializzare le schema guard SQLite al bootstrap per rendere deterministici build e avvii multiprocesso. |
 | [docs/adr/0081-fhir-r4-export-v0-contract.md](./adr/0081-fhir-r4-export-v0-contract.md) | Decisione `Accepted`: fissa copertura, parità web/native, validazione locale e nessun claim FSE per l'export FHIR R4 v0. |
+| [docs/fhir-lifecycle-fix.md](./fhir-lifecycle-fix.md) | Candidato MF085-004: conserva archivio e setting nella proiezione FHIR nativa, con test e limiti v1 espliciti. |
 | [docs/adr/0082-persistent-expectations-register-v0.md](./adr/0082-persistent-expectations-register-v0.md) | Decisione `Accepted`: definisce un registro persistente host-only delle attese con provenienza univoca, matching fail-closed e conferma esplicita della chiusura. |
 | [docs/adr/0050-functional-preview-profiles-retired-on-mainline.md](./adr/0050-functional-preview-profiles-retired-on-mainline.md) | Fissa `WUL-199`: i preview profiles funzionali vengono ritirati da `main`, con AI e Smart Import gia live e il contesto paziente SISS promosso a parte stabile della scheda paziente. |
 | [docs/adr/0048-apple-shared-client-architecture-and-home-base-runtime.md](./adr/0048-apple-shared-client-architecture-and-home-base-runtime.md) | Formalizza `WUL-188`: family Apple ricostruita con core Swift condiviso, shell distinte per macOS/iPhone/iPad, Mac packaged come `home-base` autorevole e mobile paired senza accesso diretto a SQLite. |

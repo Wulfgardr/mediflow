@@ -1,13 +1,11 @@
 import SwiftUI
 
-/// A10: fills a clinical scale and submits the result. Binary (ADL/Katz) items are
-/// Toggles (on = the autonomous/higher-value option); the score updates live.
+/// @Codex MF085-003: unanswered is nil, not the first option or a false toggle.
 struct ClinicalScaleFormView: View {
     let definition: ClinicalScaleDefinition
     let onSubmit: ([String: Int]) -> Void
     let onCancel: () -> Void
-
-    @State private var answers: [String: Int]
+    @State private var answers: [String: Int] = [:]
 
     init(
         definition: ClinicalScaleDefinition,
@@ -17,13 +15,12 @@ struct ClinicalScaleFormView: View {
         self.definition = definition
         self.onSubmit = onSubmit
         self.onCancel = onCancel
-        // Seed every item to its FIRST option value (0 for all ported scales, incl.
-        // GDS positive items whose first option is the non-depressive Si=0), so the
-        // picker shows a concrete selection and an untouched item contributes 0.
-        _answers = State(initialValue: Dictionary(uniqueKeysWithValues: definition.questions.map { ($0.id, $0.options.first?.value ?? 0) }))
+        _answers = State(initialValue: [:])
     }
 
-    private var result: ClinicalScaleResult { definition.result(from: answers) }
+    private var result: ClinicalScaleResult? {
+        try? definition.result(from: answers)
+    }
 
     var body: some View {
         NavigationStack {
@@ -32,57 +29,50 @@ struct ClinicalScaleFormView: View {
                     Text(definition.scaleDescription)
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    // Live score kept near the top so it stays on screen while the
-                    // operator answers. Standalone leaf Text so the identifier is
-                    // not merged into a combined Form-row accessibility element.
-                    Text("Punteggio: \(result.score)/\(definition.maxScore)")
-                        .font(.subheadline.weight(.semibold))
-                        .accessibilityIdentifier("scale-score")
-                    Text(result.interpretation)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    if let result {
+                        Text("Punteggio: \(result.score)/\(definition.maxScore)")
+                            .font(.subheadline.weight(.semibold))
+                            .accessibilityIdentifier("scale-score")
+                        Text(result.interpretation)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text("Valutazione incompleta: selezionare esplicitamente tutte le risposte richieste.")
+                            .font(.callout)
+                            .accessibilityIdentifier("scale-incomplete")
+                    }
                 }
                 Section("Voci") {
                     ForEach(definition.questions) { question in
-                        if isAutonomyToggleQuestion(question) {
-                            Toggle(question.text, isOn: Binding(
-                                get: { (answers[question.id] ?? 0) == 1 },
-                                set: { answers[question.id] = $0 ? 1 : 0 }
-                            ))
-                            .accessibilityIdentifier("scale-question-\(question.id)")
-                        } else {
-                            // @Codex: keep multi-option and inverted binary scales on explicit choices.
-                            Picker(question.text, selection: Binding(
-                                get: { answers[question.id] ?? question.options.first?.value ?? 0 },
-                                set: { answers[question.id] = $0 }
-                            )) {
-                                ForEach(question.options, id: \.value) { option in
-                                    Text(option.label).tag(option.value)
-                                }
+                        Picker(question.text, selection: Binding<Int?>(
+                            get: { answers[question.id] },
+                            set: { answers[question.id] = $0 }
+                        )) {
+                            Text("Seleziona…").tag(nil as Int?)
+                            ForEach(question.options, id: \.value) { option in
+                                Text(option.label).tag(Optional(option.value))
                             }
-                            .pickerStyle(.menu)
-                            .accessibilityIdentifier("scale-question-\(question.id)")
                         }
+                        .pickerStyle(.menu)
+                        .accessibilityIdentifier("scale-question-\(question.id)")
                     }
                 }
             }
             .navigationTitle(definition.title)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Annulla") { onCancel() }
+                    Button("Annulla", action: onCancel)
                         .accessibilityIdentifier("cancel-scale-button")
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Invia") { onSubmit(answers) }
-                        .accessibilityIdentifier("submit-scale-button")
+                    Button("Invia") {
+                        guard result != nil else { return }
+                        onSubmit(answers)
+                    }
+                    .disabled(result == nil)
+                    .accessibilityIdentifier("submit-scale-button")
                 }
             }
         }
-    }
-
-    private func isAutonomyToggleQuestion(_ question: ClinicalScaleQuestion) -> Bool {
-        guard question.options.count == 2 else { return false }
-        return question.options[0] == ClinicalScaleOption(label: "Dipendente", value: 0)
-            && question.options[1] == ClinicalScaleOption(label: "Autonomo", value: 1)
     }
 }

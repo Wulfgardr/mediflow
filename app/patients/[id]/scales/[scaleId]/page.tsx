@@ -6,6 +6,7 @@ import { db } from '@/lib/db';
 import { useParams, useRouter } from 'next/navigation';
 import ScaleEngine from '@/components/scale-engine';
 import { SCALES } from '@/lib/scale-definitions';
+import { submitScale } from '@/lib/scale-submission';
 import { v4 as uuidv4 } from 'uuid';
 import { cn } from '@/lib/utils';
 import { Home, Building2, Activity, BookOpenCheck, Save } from 'lucide-react';
@@ -24,30 +25,25 @@ export default function ScaleRunnerPage() {
 
     /* @Codex */
     const patient = useLiveQuery(() => db.patients.get(patientId), [patientId], undefined, ['patients']);
-    const scaleDef = SCALES[scaleId];
+    const scaleDef = Object.prototype.hasOwnProperty.call(SCALES, scaleId) ? SCALES[scaleId] : undefined;
 
     const handleComplete = async (result: { score: number; answers: Record<string, string | number>; interpretation: string }) => {
         try {
             if (!scaleDef) return;
-            await db.entries.add({
+            // @Codex MF085-003: validation and canonical metadata precede db.entries.add.
+            await submitScale(scaleId, result.answers, submission => db.entries.add({
                 id: uuidv4(),
                 patientId,
                 date: new Date(),
                 type: 'scale',
-                title: scaleDef.title,
+                title: submission.title,
                 setting,
-                content: `Valutazione ${scaleDef.title} completata.\nPunteggio: ${result.score}\nInterpretazione: ${result.interpretation}`,
-                metadata: {
-                    title: scaleDef.title,
-                    scaleId,
-                    score: result.score,
-                    interpretation: result.interpretation,
-                    answers: result.answers
-                },
+                content: submission.content,
+                metadata: submission.metadata,
                 createdAt: new Date(),
                 updatedAt: new Date(),
                 attachments: []
-            });
+            }));
 
             router.push(`/patients/${patientId}`);
         } catch (error) {
@@ -71,7 +67,9 @@ export default function ScaleRunnerPage() {
             <Kree8WorkspaceShell
                 eyebrow="Valutazioni"
                 title="Scala non disponibile"
-                subtitle="La scala richiesta non è presente nella libreria locale di MediFlow."
+                subtitle={scaleId === 'tinetti'
+                    ? 'Versione Tinetti precedente ritirata. I risultati storici restano invariati; per una nuova valutazione scegliere POMA-28 v1.'
+                    : 'La scala richiesta non è presente nella libreria locale di MediFlow.'}
                 backHref={`/patients/${patientId}/scales`}
                 backLabel="Torna alle scale"
                 patientLabel={patient ? `${patient.lastName} ${patient.firstName}` : undefined}
@@ -104,6 +102,7 @@ export default function ScaleRunnerPage() {
                         <div className={workspaceStyles.loadingCard}>Caricamento paziente...</div>
                     ) : (
                         <ScaleEngine
+                            key={`${patientId}:${scaleDef.id}`}
                             scale={scaleDef}
                             onComplete={handleComplete}
                             onCancel={handleCancel}

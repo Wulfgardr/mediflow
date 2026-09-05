@@ -6,6 +6,9 @@ Questa cartella contiene le decisioni di MediFlow (web + native).
 
 ## ADR piu recente
 
+<!-- @Codex MF085-002/003: bounded source-bound scale contract. -->
+- [0118-tinetti-poma28-source-bound-submission.md](./0118-tinetti-poma28-source-bound-submission.md): propone POMA-28 versionata e source-bound, separazione dello storico, validazione completa e gate dei writer Web/Swift; nessuna validazione clinica o nuova soglia dichiarata.
+
 - [0117-headless-portable-agent-first-and-capability-first-fabric.md](./0117-headless-portable-agent-first-and-capability-first-fabric.md): rende Headless/CLI/MCP agent-first e OS-agnostico un requisito della 0.8.5, fissa una superficie minima utile attraverso Application Services e riclassifica OCR come capability model-agnostic con DeepSeek opzionale.
 - [0116-agentic-checkup-status-transition.md](./0116-agentic-checkup-status-transition.md): accetta il primo write agentico non-SOAP come sola transizione `pending -> completed|cancelled` di un checkup esistente, con proposta AIP, conferma UI operation-specific, CAS, idempotenza e receipt PHI-safe; il packet resta docs-only.
 - [0115-icd11-who-reference-data-adapter.md](./0115-icd11-who-reference-data-adapter.md): accetta un Application Service ICD-11 host-owned con binding WHO API v2/MMS/release esplicita, egress opt-in, cache exact-binding e transport ufficiale separato; il primo packet resta fake-transport e non migra i caller.

@@ -1,9 +1,10 @@
 /* @Codex */
 import 'server-only';
 
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 
 import { dbServer, hasCanonicalDurableReviewPatientLinkSchema, runDbServerImmediateTransaction } from '../db-server';
+import { activePatients } from '../patient-lifecycle';
 import { durableReviewPatientLinks, durableReviewRecords, patients } from '../schema';
 
 export type DurableReviewPatientLink = Readonly<{ reviewId: string; patientId: string }>;
@@ -72,14 +73,19 @@ function storedLink(row: unknown): DurableReviewPatientLink {
     } catch { return fail('stored_state_invalid'); }
 }
 
-function verifyReferences(link: DurableReviewPatientLink): void {
+function verifyOperationalReferences(link: DurableReviewPatientLink): void {
     const review = dbServer.select({ reviewId: durableReviewRecords.reviewId }).from(durableReviewRecords)
         .where(eq(durableReviewRecords.reviewId, link.reviewId)).get();
-    const patient = dbServer.select({ id: patients.id }).from(patients).where(eq(patients.id, link.patientId)).get();
-    if (!review || !patient) fail('stored_state_invalid');
+    const patient = dbServer.select({ id: patients.id }).from(patients).where(and(eq(patients.id, link.patientId), activePatients())).get();
+    if (!review) fail('stored_state_invalid');
+    if (!patient) fail('patient_missing');
 }
 
-/** Persists one opaque review-to-canonical-patient association; it never resolves patientRef or locates reviews. */
+/** Persists an immutable association; never resolves patientRef or locates reviews.
+ * ADR 0066: create/read require an operationally available (non-tombstoned) patient.
+ * Historical links survive deletion; backup/restore/purge access their own tables.
+ * patient_missing is an availability denial, not a claim that history is corrupt.
+ */
 export function createDurableReviewPatientLinkStore() {
     return Object.freeze({
         create(value: unknown): DurableReviewPatientLink {
@@ -91,14 +97,14 @@ export function createDurableReviewPatientLinkStore() {
                         .where(eq(durableReviewPatientLinks.reviewId, input.reviewId)).get();
                     if (existing) {
                         const link = storedLink(existing);
-                        verifyReferences(link);
+                        verifyOperationalReferences(link);
                         if (link.patientId !== input.patientId) fail('link_conflict');
                         return link;
                     }
                     const review = dbServer.select({ reviewId: durableReviewRecords.reviewId }).from(durableReviewRecords)
                         .where(eq(durableReviewRecords.reviewId, input.reviewId)).get();
                     if (!review) fail('review_missing');
-                    const patient = dbServer.select({ id: patients.id }).from(patients).where(eq(patients.id, input.patientId)).get();
+                    const patient = dbServer.select({ id: patients.id }).from(patients).where(and(eq(patients.id, input.patientId), activePatients())).get();
                     if (!patient) fail('patient_missing');
                     dbServer.insert(durableReviewPatientLinks).values(input).run();
                     return input;
@@ -112,7 +118,7 @@ export function createDurableReviewPatientLinkStore() {
                 const row = dbServer.select().from(durableReviewPatientLinks).where(eq(durableReviewPatientLinks.reviewId, reviewId)).get();
                 if (!row) fail('link_missing');
                 const link = storedLink(row);
-                verifyReferences(link);
+                verifyOperationalReferences(link);
                 return link;
             } catch (error) { return storage(error); }
         },

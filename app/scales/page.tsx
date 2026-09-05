@@ -30,7 +30,7 @@ type ScaleCatalogItem = {
 const SCALE_CATALOG: ScaleCatalogItem[] = [
     { id: 'mmse', category: 'Cognitivo e umore', icon: Brain },
     { id: 'gds', category: 'Cognitivo e umore', icon: Activity },
-    { id: 'tinetti', category: 'Autonomia e mobilità', icon: Ruler },
+    { id: 'tinetti-poma28-v1', category: 'Autonomia e mobilità', icon: Ruler },
     { id: 'adl', category: 'Autonomia e mobilità', icon: ClipboardList },
     { id: 'iadl', category: 'Autonomia e mobilità', icon: ClipboardList },
 ].filter((item) => Boolean(SCALES[item.id]));

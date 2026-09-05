@@ -8,6 +8,7 @@ import {
   AIP_OPERATION_RPC_ENV_KEY_V1,
   AIP_OPERATION_RPC_LATE_BIND_ENV_V1,
 } from '../../packages/aip/src/child-ipc-contract.ts';
+import { resolveAthenaMlxGenerateBin } from '../athena-mlx-launcher-config.ts';
 import type { LateBoundMcpChildPortV1 } from './authenticated-headless-agent-pre-spawned-mcp-child.ts';
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
@@ -23,6 +24,8 @@ type SpawnChild = (command: string, args: readonly string[], options: SpawnOptio
 
 export type PortableSupervisorChildProcessesOptionsV1 = Readonly<{
   dataDir: string;
+  /** Explicit host-owned runner for Web only; no parent environment is inherited here. */
+  athenaMlxGenerateBin?: string;
   spawnChild?: SpawnChild;
   nodePath?: string;
   loaderPath?: string;
@@ -77,6 +80,7 @@ function stop(child: ChildProcess): void {
 export function createPortableSupervisorProductionChildProcessesV1(
   options: PortableSupervisorChildProcessesOptionsV1,
 ): PortableSupervisorProductionChildProcessesV1 {
+  const athenaMlxGenerateBin = resolveAthenaMlxGenerateBin(options.athenaMlxGenerateBin);
   const nodePath = requireAbsoluteFile(options.nodePath ?? process.execPath, 'node');
   const loaderPath = requireAbsoluteFile(options.loaderPath ?? LOADER, 'loader', ROOT_REAL);
   // @Codex Node interprets Windows drive letters as URL schemes for --import unless encoded as file URLs.
@@ -89,6 +93,12 @@ export function createPortableSupervisorProductionChildProcessesV1(
 
   const spawnChild = options.spawnChild ?? ((command, args, spawnOptions) =>
     spawn(command, [...args], spawnOptions));
+  const webEnvironment: NodeJS.ProcessEnv = {
+    NODE_ENV: 'production', HOSTNAME: '127.0.0.1', PORT: '3000', MEDIFLOW_DATA_DIR: dataDir,
+  };
+  if (athenaMlxGenerateBin !== undefined) {
+    webEnvironment.MEDIFLOW_ATHENA_MLX_GENERATE_BIN = athenaMlxGenerateBin;
+  }
   const mcpEnvironment = {
     [AIP_OPERATION_RPC_ENV_KEY_V1]: AIP_OPERATION_RPC_LATE_BIND_ENV_V1,
   } as unknown as NodeJS.ProcessEnv;
@@ -97,6 +107,7 @@ export function createPortableSupervisorProductionChildProcessesV1(
     mcp = spawnChild(nodePath,
       ['--experimental-strip-types', '--import', loaderUrl, mcpTargetPath], {
         cwd: ROOT_REAL,
+        shell: false,
         env: mcpEnvironment,
         stdio: ['inherit', 'inherit', 'inherit', 'ipc'],
       });
@@ -106,7 +117,8 @@ export function createPortableSupervisorProductionChildProcessesV1(
   try {
     web = spawnChild(nodePath, [webTargetPath], {
       cwd: webDirectory,
-      env: { NODE_ENV: 'production', HOSTNAME: '127.0.0.1', PORT: '3000', MEDIFLOW_DATA_DIR: dataDir },
+      env: webEnvironment,
+      shell: false,
       // Descriptor 2 is the Supervisor's stderr. Its stdout remains reserved for the MCP child.
       stdio: ['ignore', 2, 2, 'ipc'],
     });

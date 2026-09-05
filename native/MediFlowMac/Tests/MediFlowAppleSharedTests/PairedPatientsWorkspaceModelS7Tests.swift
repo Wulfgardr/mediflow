@@ -179,7 +179,9 @@ final class PairedPatientsWorkspaceModelS7Tests: XCTestCase {
         let model = await makeModel(source: source)
         await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: patient)
 
-        await model.submitScale(ClinicalScales.tinetti, answers: [:])
+        // @Codex: retain the less-than escaping regression using a complete, valid MMSE.
+        await model.submitScale(ClinicalScales.mmse, answers:
+            Dictionary(uniqueKeysWithValues: ClinicalScales.mmse.questions.map { ($0.id, 0) }))
 
         let capturedPayload = await source.lastCreateEntryPayload
         let payload = try XCTUnwrap(capturedPayload)
@@ -187,8 +189,67 @@ final class PairedPatientsWorkspaceModelS7Tests: XCTestCase {
         let content = try XCTUnwrap(CryptoService.jsonDecodeString(decrypted))
         let stabilized = ClinicalRichText.render(document: ClinicalRichText.parse(html: content))
         XCTAssertEqual(content, stabilized)
-        XCTAssertTrue(content.contains("&lt; 19"))
-        XCTAssertFalse(content.contains("(< 19)"))
+        XCTAssertTrue(content.contains("&lt; 10"))
+        XCTAssertFalse(content.contains("(< 10)"))
+    }
+
+    // @Codex MF085-003: exercises the real paired model -> createEntry writer, not just the validator.
+    func testInvalidScaleFormsNeverReachCreateEntry() async throws {
+        let patient = detail(id: "p1")
+        let source = S7MockDataSource(details: ["p1": patient])
+        let model = await makeModel(source: source)
+        await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: patient)
+        for definition in ClinicalScales.all {
+            let complete = Dictionary(uniqueKeysWithValues: definition.questions.map { ($0.id, 0) })
+            let first = try XCTUnwrap(definition.questions.first)
+            var partial = complete
+            partial.removeValue(forKey: first.id)
+            var foreign = complete
+            foreign["foreignQuestion"] = 0
+            var invalid = complete
+            invalid[first.id] = (first.options.map(\.value).max() ?? 0) + 1
+            for answers in [[:], partial, foreign, invalid] {
+                await model.submitScale(definition, answers: answers)
+                let calls = await source.createEntryCalls
+                let payload = await source.lastCreateEntryPayload
+                let error = await model.errorMessage
+                let entries = await model.entries
+                XCTAssertEqual(calls, 0, definition.id)
+                XCTAssertNil(payload)
+                XCTAssertNotNil(error)
+                XCTAssertTrue(entries.isEmpty)
+            }
+        }
+        await model.submitScale(ClinicalScales.tinetti, answers: [:])
+        let calls = await source.createEntryCalls
+        XCTAssertEqual(calls, 0)
+    }
+
+    func testCompleteExplicitZeroScaleFormsWriteCanonicalEncryptedMetadata() async throws {
+        for definition in ClinicalScales.all {
+            let patient = detail(id: "p1")
+            let source = S7MockDataSource(details: ["p1": patient])
+            let model = await makeModel(source: source)
+            await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: patient)
+            let answers = Dictionary(uniqueKeysWithValues: definition.questions.map { ($0.id, 0) })
+            await model.submitScale(definition, answers: answers)
+            let calls = await source.createEntryCalls
+            let captured = await source.lastCreateEntryPayload
+            let payload = try XCTUnwrap(captured)
+            XCTAssertEqual(calls, 1)
+            let sealed = try XCTUnwrap(payload.metadata)
+            XCTAssertTrue(sealed.hasPrefix("ENC:"))
+            let decrypted = try XCTUnwrap(CryptoService.decryptField(sealed, masterKey: masterKey))
+            let json = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(decrypted.utf8)) as? [String: Any])
+            XCTAssertEqual(json["scaleId"] as? String, definition.id)
+            XCTAssertEqual(json["score"] as? Int, 0)
+            XCTAssertEqual(json["answers"] as? [String: Int], answers)
+            if definition.id == ClinicalScales.tinettiPOMA28ID {
+                let instrument = try XCTUnwrap(json["instrument"] as? [String: Any])
+                XCTAssertEqual(instrument["definitionVersion"] as? String, "mediflow.poma28.v1")
+                XCTAssertEqual(instrument["riskClassification"] as? String, "not-classified")
+            }
+        }
     }
 
     func testUpdateEditingEntryOmitsAttachmentsFieldWhenSelectionUntouched() async throws {
