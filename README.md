@@ -5,32 +5,63 @@
 
 **Ritrova il filo.**
 
-Una cartella clinica territoriale local-first.<br>
-Informazioni, fonti e prossimi passi, nello stesso contesto.
+Il gestionale open source per i pazienti dell’ambulatorio.<br>
+Informazioni, fonti e prossimi passi. Un po’ più facili da ritrovare.
 
-_by Ordito & Concilio · Open source · [MIT](./LICENSE)_
+<a href="https://claude.com/claude-code"><img src="https://img.shields.io/badge/built%20with-Claude%20Code-D97757?style=flat&amp;logo=claudecode&amp;logoColor=white" alt="Built with Claude Code"></a>
+<a href="https://openai.com/codex"><img src="https://img.shields.io/badge/built%20with-Codex-1f2937?style=flat" alt="Built with Codex"></a>
+
+[![Versione sorgente](https://img.shields.io/badge/sorgente-0.8.5-33506b?style=flat)](./docs/release-085-readiness.md)
+[![Release pubblica](https://img.shields.io/github/v/release/Wulfgardr/mediflow?label=release&style=flat)](https://github.com/Wulfgardr/mediflow/releases/latest)
+[![Licenza](https://img.shields.io/badge/license-MIT-2ea043?style=flat)](./LICENSE)
+[![Local-first](https://img.shields.io/badge/data-local--first-8957e5?style=flat)](#dove-stanno-i-dati)
+[![Swift core](https://img.shields.io/badge/Swift%20core-macOS%20%7C%20Linux%20%7C%20Windows-6e7681?style=flat)](./docs/NATIVE.md)
 
 [Perché nasce](#perché-nasce) · [Cosa puoi fare](#cosa-puoi-fare) · [Provalo](#provalo) · [Per chi sviluppa](#per-chi-sviluppa) · [Documentazione](#documentazione)
 
 </div>
+
+![MediFlow: pazienti e anteprima della cartella](./docs/images/getmediflow-085/worklist.png)
+
+*Schermata reale della candidatura 0.8.5, con soli dati sintetici.*
+
+<details>
+<summary><strong>Versione sorgente e stato della candidatura</strong></summary>
 
 > **Stato del ramo: 0.8.5 candidata.** I controlli locali della revisione sono
 > documentati; i gate Apple completi e di distribuzione restano aperti.
 > Una build riuscita non equivale a una release pubblicata.
 > [Verifiche e limiti della candidatura](./docs/release-085-readiness.md).
 
+</details>
+
 ## Perché nasce
 
-Una terapia in una nota. Un esame in un allegato. Un controllo rimasto in
-sospeso. Il lavoro clinico sul territorio richiede continuità fra informazioni
-raccolte in momenti e sistemi diversi.
+MediFlow è un sistema di gestione elettronica dei pazienti dell’ambulatorio.
+Organizza cartelle, diario, terapie, documenti, misure e attività da seguire.
+Questa base funziona anche con tutti i modelli AI spenti.
 
-MediFlow nasce dalle difficoltà operative della pratica medica: aiuta a
-ritrovare una persona, leggere cosa è cambiato, tornare alla fonte e preparare
-il prossimo passo. Il dato resta vicino al suo contesto e a chi deve decidere.
+Il percorso del paziente è una storia lunga. Una struttura coerente aiuta a
+leggerla: dati codificati dove servono, testo per descrivere il contesto,
+fonti consultabili per tornare al dettaglio.
 
-La cartella, la ricerca e i percorsi deterministici funzionano anche con tutti
-i modelli AI spenti. Il progetto non sostituisce il giudizio professionale.
+Poi c’è ciò che una struttura, da sola, non risolve. Una terapia descritta in
+un referto, un esame rilevante dentro un allegato, un controllo indicato e perso
+tra le cose da fare. Le funzioni intelligenti aiutano a recuperare queste
+informazioni e a servirle nel loro contesto. Richiedono capacità configurate
+e revisione professionale: i modelli possono sbagliare.
+
+### Ordine dove serve. Spazio per ragionare.
+
+La ricerca terminologica, i cataloghi farmaceutici e le scale danno una forma
+riconoscibile alle informazioni. Versione e provenienza contano: riferimenti,
+cataloghi e strumenti di misura possono cambiare nel tempo.
+
+Il catalogo AIFA può essere importato da file locale. Il servizio WHO ICD-11
+richiede configurazione esplicita. L’export FHIR segue il contratto documentato
+nell’[ADR 0081](./docs/adr/0081-fhir-r4-export-v0-contract.md): un formato
+condiviso facilita lo scambio, ma non garantisce compatibilità con ogni sistema.
+La parità FHIRv2 resta da verificare.
 
 ## Cosa puoi fare
 
@@ -43,6 +74,16 @@ i modelli AI spenti. Il progetto non sostituisce il giudizio professionale.
 | Registrare una misura | Scale Web/native con risposte esplicite | Zero e risposta mancante sono distinti; fonte e versione restano nello storico. |
 | Rivedere informazioni complesse | Quattro percorsi Intelligence Fabric | Output da rivedere, senza scrittura clinica automatica. |
 | Usare capacità senza ogni schermata | Supervisor, AIP e MCP | Accessi delimitati; nessun accesso diretto al database per gli adapter. |
+
+<details>
+<summary><strong>Guarda la revisione documentale</strong></summary>
+
+![Documenti, provenienza e passaggi da rivedere](./docs/images/getmediflow-085/documents.png)
+
+Schermata reale con fixture sintetiche. Le sintesi mostrate sono contenuti
+preparati per la dimostrazione, non risultati di una generazione AI live.
+
+</details>
 
 ### Intelligence Fabric, in parole semplici
 
@@ -57,7 +98,7 @@ limiti. La risposta del modello è una proposta da esaminare.
 
 Ollama può servire i primi tre percorsi; ATHENA/MLX è separata e destinata a
 Treatment Reasoning. Entrambi richiedono configurazione e verifica locali.
-Gli adapter OpenAI e Anthropic restano **spenti per default**. Non esiste un
+Gli adapter OpenAI e Anthropic sono limitati a **prove controllate e spenti per default**. Non esiste un
 ripiego silenzioso sul cloud. La presenza dell'adapter non prova la disponibilità
 di un account, del servizio o di un uso con dati clinici reali.
 
@@ -72,6 +113,33 @@ controlli di ruolo, contesto, conferma e audit.
 [Confini Fabric e headless](./docs/adr/0117-headless-portable-agent-first-and-capability-first-fabric.md).
 
 </details>
+
+<details>
+<summary><strong>Provider esterni e offuscamento: il percorso in sviluppo</strong></summary>
+
+La scelta di un provider esterno è esplicita. Il percorso previsto minimizza il
+contenuto in uscita, sostituisce gli identificativi e riconcilia il risultato
+in locale. È un rollout progressivo: non una protezione già disponibile per
+ogni funzione. Il testo narrativo clinico resta bloccato finché i controlli
+richiesti non sono pronti.
+
+Pseudonimizzazione e anonimizzazione non sono equivalenti. Dati riconducibili
+alla persona restano soggetti al GDPR. La presenza di un adapter non attesta
+un servizio cloud clinico pronto all’uso.
+
+[Matrice dei runtime](./docs/ai-runtime-serving-matrix.md) ·
+[Decisione sul confine egress](./docs/adr/0077-ai-provider-abstraction-and-egress-anonymization-boundary.md)
+
+</details>
+
+## Dati sanitari e responsabilità
+
+Accessi delimitati, fonti consultabili e revisione umana orientano il progetto.
+La valutazione dell’uso concreto comprende finalità, ruoli, base giuridica,
+sicurezza e obblighi applicabili. Il funzionamento locale non dimostra da solo
+la conformità; la presenza di supervisione umana non è una certificazione.
+
+[GDPR, AI Act e scelte di progetto](./docs/privacy-and-ai-governance.md).
 
 ## Dove stanno i dati
 

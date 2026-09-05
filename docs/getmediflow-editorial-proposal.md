@@ -1,62 +1,59 @@
-# getmediflow: proposta di sito e percorso documentale
+# getmediflow: prodotto in vista, dettagli a scelta
 
-Stato: proposta editoriale locale del 5 settembre 2026. Non modifica il
-contratto clinico né annuncia una release. Il nome getmediflow è un titolo di
-progetto: non attesta la disponibilità o la registrazione di un dominio autonomo.
+Revisione editoriale del 5 settembre 2026. Il sito presenta il gestionale;
+non ospita la cartella e non riceve dati del runtime. Il nome getmediflow non
+attesta la registrazione di un dominio autonomo.
 
-## Idea guida
+## Il filo del racconto
 
-**Ritrova il filo.**
+**Ritrova il filo.** MediFlow è il gestionale open source per i pazienti
+dell’ambulatorio. Informazioni, fonti e prossimi passi diventano più facili
+da ritrovare. Il prodotto deve essere visibile dall’apertura.
 
-Il sito presenta un problema comprensibile prima di nominare la tecnologia:
-la continuità della cura fra note, documenti e cose da fare. Il dettaglio tecnico
-entra per scelta del lettore. Il tono resta concreto; il movimento spiega
-passaggi, non attribuisce poteri al prodotto.
+| Passaggio | Cosa mostra |
+| --- | --- |
+| Il gestionale | Cartella in vista e schede esplorabili; lavoro possibile anche senza AI. |
+| Dati organizzati | Codifiche, scale, farmaci, documenti ed esportazione FHIR. |
+| Il contesto | Informazioni distribuite tra referti, allegati e attività. |
+| Intelligence Fabric | Quattro percorsi selezionabili, con dettagli sulla revisione. |
+| Scelta dei runtime | Locale, provider esterni in prova e offuscamento in sviluppo. |
+| Aprire il cofano | Tre letture: generale, professionale e tecnica; anche Mini e headless. |
+| Responsabilità | GDPR e AI Act con approfondimenti e fonti, senza claim di certificazione. |
 
-## Percorso della pagina
+## Forma e interazioni
 
-| Capitolo | Domanda del lettore | Risposta e interazione |
-| --- | --- | --- |
-| Apertura | A cosa serve? | Cartella territoriale, informazioni, fonti e prossimi passi. |
-| Il perché | Quale problema affronta? | Tre passaggi selezionabili: persona, fonte, prossimo passo. |
-| Dentro MediFlow | Quali strumenti contiene? | Codifiche e scale; dettagli espandibili su condizioni e limiti. |
-| Fabric | Cosa fa l'AI? | Quattro percorsi selezionabili, proposta e revisione umana visibili. |
-| Sotto il cofano | Come è costruito? | Due livelli: parole semplici oppure host, API, AIP, MCP e SQLite. |
-| Stato | Posso adottarlo ora? | Candidatura, prove disponibili e gate aperti; link alle fonti. |
-| Repository | Come approfondisco o contribuisco? | Accesso al codice e alla documentazione pubblica. |
+Un sito semplice, un po’ giocoso, con il prodotto come soggetto. Tipografia
+leggibile, pannelli morbidi e piccoli movimenti accompagnano l’esplorazione.
+La palette riprende Lume: carta, grafite e blu minerale. Il contrasto scuro e
+verde acceso distingue Fabric. Nessun accento arancio decorativo.
 
-## Forma
+Le schermate reali provengono esclusivamente da un runtime con fixture
+sintetiche. Le ricostruzioni interattive sono dichiarate illustrative e non
+simulano un servizio AI live. Una cattura di Mini deve mostrare il comportamento
+reale del candidato, incluso un eventuale trasporto non collegato.
 
-Tipografia ampia, blu deciso, fondo bianco, accento arancio e verde acceso nel
-capitolo Fabric. Icona Filo originale del progetto. Nessun volto, dato paziente
-o schermata clinica reale. I diagrammi sono illustrativi, non simulano una
-sessione clinica né una generazione AI live.
+Nessuna etichetta di capitolo superflua, contatore, firma Ordito/Concilio o
+freccia senza funzione. Gli approfondimenti rispondono a domande concrete.
+Il movimento rispetta la preferenza di riduzione ed è disattivabile.
 
-Le transizioni rispettano `prefers-reduced-motion`; un controllo consente di
-fermare le animazioni. Interazioni accessibili da tastiera, layout adattabile,
-testo principale leggibile. La proposta non dichiara conformità di accessibilità
-senza un audit dedicato.
+## La stessa progressione nella documentazione
 
-## README e documenti: una sola progressione
+Il README parte dal gestionale, presenta le capacità e porta a fonti e avvio.
+Mantiene i badge Codex, Claude Code, versione sorgente, release, licenza e
+piattaforme, distinguendo sorgente 0.8.5 e release pubblica.
 
-- **README**: perché, capacità, dati, avvio, dettagli tecnici espandibili e limiti.
-- **start-here.md**: tre livelli di lettura e piccolo glossario operativo.
-- **docs/README.md**: mappa delle fonti autorevoli, senza duplicare ogni contratto.
-- **repository-topology.md**: dove vive il codice e cosa resta fuori dal runtime.
-- **STATE_OF_THE_SYSTEM.md**: fotografia verificabile, distinta da roadmap e vecchie ricevute.
-- **release-085-readiness.md**: evidenze e gate del candidato, inclusi i canali Apple.
-- **ADR, specifiche e guide profonde**: mantenute; il sito rimanda a esse invece di riscriverne il significato.
+`start-here.md` accompagna il lettore dal prodotto al lavoro clinico e alla
+costruzione tecnica. Le topologie iniziano con una spiegazione accessibile,
+poi conservano diagrammi, contratti e confini. La guida privacy rende leggibili
+le scelte senza sostituire SECURITY, ADR o matrice dei runtime.
 
-## Cosa non cambiare per fare marketing
+La candidatura e i gate aperti stanno negli approfondimenti pertinenti. Gli
+adapter cloud, la parità FHIRv2 e la distribuzione Apple non diventano promesse
+commerciali per effetto della revisione editoriale.
 
-Nessuna promessa di parità completa Apple, adozione clinica validata, conformità
-FHIRv2 o integrazione regionale certificata. Provider esterni spenti per
-default; configurazione locale e prova hardware restano requisiti espliciti.
-I link alla main pubblica possono precedere la candidatura non ancora inviata.
+## Pubblicazione
 
-## Passaggio successivo alla proposta
-
-Valutare il racconto e i testi nel sito privato. Dopo approvazione, scegliere
-l'audience di pubblicazione e l'eventuale dominio; non renderlo pubblico per il
-solo fatto che la proposta è ospitata. Il sito rimane separato dalla cartella
-clinica e non riceve dati o credenziali del runtime.
+Il sito resta separato dal runtime clinico. L’aggiornamento della versione
+ospitata e l’invio a GitHub sono passaggi esterni distinti dalla preparazione
+locale; le rispettive ricevute attestano solo le operazioni effettivamente
+eseguite. Le fonti su GitHub possono precedere questa candidatura.
