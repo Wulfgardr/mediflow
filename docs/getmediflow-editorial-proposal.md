@@ -1,8 +1,11 @@
 # getmediflow: prodotto in vista, dettagli a scelta
 
-Revisione editoriale del 5 settembre 2026. Il sito presenta il gestionale;
-non ospita la cartella e non riceve dati del runtime. Il nome getmediflow non
-attesta la registrazione di un dominio autonomo.
+[Get MediFlow](https://getmediflow.wulfgardr.chatgpt.site) è il sito di presentazione
+ufficiale del progetto, approvato il 5 settembre 2026 e ospitato su ChatGPT Sites.
+È il primo riferimento per conoscere il prodotto; GitHub conserva codice,
+contributi e contratti tecnici. Il sito non ospita la cartella e non riceve dati
+del runtime. L’accesso resta privato: il collegamento non concede accesso ai visitatori.
+Non è stato registrato un dominio autonomo.
 
 ## Il filo del racconto
 
@@ -53,7 +56,7 @@ commerciali per effetto della revisione editoriale.
 
 ## Pubblicazione
 
-Il sito resta separato dal runtime clinico. L’aggiornamento della versione
-ospitata e l’invio a GitHub sono passaggi esterni distinti dalla preparazione
-locale; le rispettive ricevute attestano solo le operazioni effettivamente
-eseguite. Le fonti su GitHub possono precedere questa candidatura.
+La versione approvata è ospitata su ChatGPT Sites. Il sito personale rimanda
+qui per le informazioni di prodotto. La repository pubblica resta la fonte
+canonica del codice; l’aggiornamento del branch non equivale a un merge su main
+o a una release. Le ricevute di consegna identificano le versioni pubblicate.
