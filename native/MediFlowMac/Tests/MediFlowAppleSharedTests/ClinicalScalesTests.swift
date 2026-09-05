@@ -1,3 +1,4 @@
+// @Codex MF085-002/003: complete vectors replace impossible partial-total injections; legacy literals are tested in history.
 import XCTest
 @testable import MediFlowAppleShared
 
@@ -10,22 +11,22 @@ final class ClinicalScalesTests: XCTestCase {
         XCTAssertEqual(adl.maxScore, 6)
     }
 
-    func testAdlScoringAndInterpretationThresholds() {
-        func score(_ on: Set<String>) -> ClinicalScaleResult {
-            adl.result(from: Dictionary(uniqueKeysWithValues: adl.questions.map { ($0.id, on.contains($0.id) ? 1 : 0) }))
+    func testAdlScoringAndInterpretationThresholds() throws {
+        func score(_ on: Set<String>) throws -> ClinicalScaleResult {
+            try adl.result(from: Dictionary(uniqueKeysWithValues: adl.questions.map { ($0.id, on.contains($0.id) ? 1 : 0) }))
         }
-        XCTAssertEqual(score([]).score, 0)
-        XCTAssertEqual(score([]).interpretation, "Compromissione Grave (0-1/6)")
-        XCTAssertEqual(score(["bath", "dress"]).interpretation, "Compromissione Moderata (2-3/6)")
-        XCTAssertEqual(score(["bath", "dress", "toilet", "transfer"]).interpretation, "Compromissione Lieve (4-5/6)")
-        let full = score(["bath", "dress", "toilet", "transfer", "cont", "feed"])
+        XCTAssertEqual(try score([]).score, 0)
+        XCTAssertEqual(try score([]).interpretation, "Compromissione Grave (0-1/6)")
+        XCTAssertEqual(try score(["bath", "dress"]).interpretation, "Compromissione Moderata (2-3/6)")
+        XCTAssertEqual(try score(["bath", "dress", "toilet", "transfer"]).interpretation, "Compromissione Lieve (4-5/6)")
+        let full = try score(["bath", "dress", "toilet", "transfer", "cont", "feed"])
         XCTAssertEqual(full.score, 6)
         XCTAssertEqual(full.interpretation, "Autonomia Conservata (6/6)")
     }
 
-    func testMetadataJsonMatchesWebShape() {
-        let result = adl.result(from: ["bath": 1, "dress": 1, "toilet": 0, "transfer": 0, "cont": 0, "feed": 0])
-        let json = ClinicalScales.metadataJSON(definition: adl, result: result)!
+    func testMetadataJsonMatchesWebShape() throws {
+        let result = try adl.result(from: ["bath": 1, "dress": 1, "toilet": 0, "transfer": 0, "cont": 0, "feed": 0])
+        let json = try ClinicalScales.metadataJSON(definition: adl, result: result)
         // The web persists { title, scaleId, score, interpretation, answers }.
         XCTAssertTrue(json.contains("\"scaleId\":\"adl\""))
         XCTAssertTrue(json.contains("\"score\":2"))
@@ -36,8 +37,8 @@ final class ClinicalScalesTests: XCTestCase {
         XCTAssertNoThrow(try JSONSerialization.jsonObject(with: Data(json.utf8)))
     }
 
-    func testContentSummaryIsHumanReadable() {
-        let result = adl.result(from: Dictionary(uniqueKeysWithValues: adl.questions.map { ($0.id, 1) }))
+    func testContentSummaryIsHumanReadable() throws {
+        let result = try adl.result(from: Dictionary(uniqueKeysWithValues: adl.questions.map { ($0.id, 1) }))
         let summary = ClinicalScales.contentSummary(definition: adl, result: result)
         XCTAssertTrue(summary.contains("Punteggio: 6"))
         XCTAssertTrue(summary.contains("Autonomia Conservata"))
@@ -45,19 +46,26 @@ final class ClinicalScalesTests: XCTestCase {
 
     // --- Scale library (G1 parity: Tinetti/IADL/MMSE/GDS added) ---
 
-    // Inject an arbitrary total by putting it on the first question; result() sums
-    // answers over the questions, so this exercises the interpret() thresholds
-    // directly (independent of per-option validity).
-    private func interpretation(_ def: ClinicalScaleDefinition, at total: Int) -> String {
-        def.result(from: [def.questions[0].id: total]).interpretation
+    // Build a complete in-domain answer vector, never inject a total into one item.
+    private func interpretation(_ def: ClinicalScaleDefinition, at total: Int) throws -> String {
+        var remainder = total
+        var answers: [String: Int] = [:]
+        for question in def.questions {
+            let value = question.options.map(\.value).filter { $0 <= remainder }.max() ?? 0
+            answers[question.id] = value
+            remainder -= value
+        }
+        XCTAssertEqual(remainder, 0, "Synthetic total must be representable by actual options")
+        return try def.result(from: answers).interpretation
     }
 
     func testLibraryOrderMatchesWeb() {
-        XCTAssertEqual(ClinicalScales.all.map(\.id), ["tinetti", "adl", "iadl", "mmse", "gds"])
+        XCTAssertEqual(ClinicalScales.all.map(\.id), ["tinetti-poma28-v1", "adl", "iadl", "mmse", "gds"])
     }
 
     func testQuestionCountsMatchWeb() {
-        XCTAssertEqual(ClinicalScales.tinetti.questions.count, 17)
+        XCTAssertEqual(ClinicalScales.tinetti.questions.count, 17) // Legacy remains distinct.
+        XCTAssertEqual(ClinicalScales.tinettiPOMA28V1.questions.count, 20)
         XCTAssertEqual(ClinicalScales.adl.questions.count, 6)
         XCTAssertEqual(ClinicalScales.iadl.questions.count, 8)
         XCTAssertEqual(ClinicalScales.mmse.questions.count, 28) // 28 items, but 30 max points (lang4 worth 3)
@@ -67,33 +75,35 @@ final class ClinicalScalesTests: XCTestCase {
     func testMaxScoresMatchOptionSums() {
         // Tinetti options sum to 24 (the "Max 28" in the description is web text only).
         XCTAssertEqual(ClinicalScales.tinetti.maxScore, 24)
+        XCTAssertEqual(ClinicalScales.tinettiPOMA28V1.maxScore, 28)
         XCTAssertEqual(ClinicalScales.iadl.maxScore, 8)
         XCTAssertEqual(ClinicalScales.mmse.maxScore, 30)
         XCTAssertEqual(ClinicalScales.gds.maxScore, 15)
     }
 
-    func testTinettiInterpretationThresholds() {
-        XCTAssertEqual(interpretation(ClinicalScales.tinetti, at: 18), "ALTO Rischio di Caduta (< 19)")
-        XCTAssertEqual(interpretation(ClinicalScales.tinetti, at: 24), "MEDIO Rischio di Caduta (19-24)")
-        XCTAssertEqual(interpretation(ClinicalScales.tinetti, at: 25), "BASSO Rischio di Caduta (> 24)")
+    func testCorrectedTinettiNeverClassifiesAndLegacyCannotBeRecomputed() throws {
+        for total in [0, 18, 24, 25, 28] {
+            XCTAssertEqual(try interpretation(ClinicalScales.tinettiPOMA28V1, at: total), ClinicalScales.tinettiNonclassification)
+        }
+        XCTAssertThrowsError(try ClinicalScales.tinetti.result(from: [:]))
     }
 
-    func testMmseInterpretationThresholds() {
-        XCTAssertEqual(interpretation(ClinicalScales.mmse, at: 9), "Decadimento Grave (< 10)")
-        XCTAssertEqual(interpretation(ClinicalScales.mmse, at: 17), "Decadimento Moderato-Grave (10-17)")
-        XCTAssertEqual(interpretation(ClinicalScales.mmse, at: 23), "Decadimento Lieve-Moderato (18-23)")
-        XCTAssertEqual(interpretation(ClinicalScales.mmse, at: 24), "Assenza di decadimento cognitivo (24-30)")
+    func testMmseInterpretationThresholds() throws {
+        XCTAssertEqual(try interpretation(ClinicalScales.mmse, at: 9), "Decadimento Grave (< 10)")
+        XCTAssertEqual(try interpretation(ClinicalScales.mmse, at: 17), "Decadimento Moderato-Grave (10-17)")
+        XCTAssertEqual(try interpretation(ClinicalScales.mmse, at: 23), "Decadimento Lieve-Moderato (18-23)")
+        XCTAssertEqual(try interpretation(ClinicalScales.mmse, at: 24), "Assenza di decadimento cognitivo (24-30)")
     }
 
-    func testGdsInterpretationThresholds() {
-        XCTAssertEqual(interpretation(ClinicalScales.gds, at: 5), "Normale (0-5)")
-        XCTAssertEqual(interpretation(ClinicalScales.gds, at: 6), "Depressione Lieve (6-10)")
-        XCTAssertEqual(interpretation(ClinicalScales.gds, at: 11), "Depressione Severa (11-15)")
+    func testGdsInterpretationThresholds() throws {
+        XCTAssertEqual(try interpretation(ClinicalScales.gds, at: 5), "Normale (0-5)")
+        XCTAssertEqual(try interpretation(ClinicalScales.gds, at: 6), "Depressione Lieve (6-10)")
+        XCTAssertEqual(try interpretation(ClinicalScales.gds, at: 11), "Depressione Severa (11-15)")
     }
 
-    func testIadlInterpretationInterpolatesScore() {
+    func testIadlInterpretationInterpolatesScore() throws {
         XCTAssertEqual(
-            interpretation(ClinicalScales.iadl, at: 8),
+            try interpretation(ClinicalScales.iadl, at: 8),
             "Punteggio totale: 8/8. (Minore è il punteggio, maggiore è la dipendenza strumentale)."
         )
     }
@@ -107,12 +117,14 @@ final class ClinicalScalesTests: XCTestCase {
         XCTAssertEqual(options("g2"), [ClinicalScaleOption(label: "No", value: 0), ClinicalScaleOption(label: "Sì (+1)", value: 1)])
     }
 
-    func testTinettiMetadataJsonShape() {
-        let result = ClinicalScales.tinetti.result(from: [ClinicalScales.tinetti.questions[0].id: 20])
-        let json = ClinicalScales.metadataJSON(definition: ClinicalScales.tinetti, result: result)!
-        XCTAssertTrue(json.contains("\"scaleId\":\"tinetti\""))
-        XCTAssertTrue(json.contains("\"score\":20"))
-        XCTAssertTrue(json.contains("\"title\":\"Scala Tinetti (Balance & Gait)\""))
+    func testCorrectedTinettiMetadataJsonShape() throws {
+        let definition = ClinicalScales.tinettiPOMA28V1
+        let result = try definition.result(from: Dictionary(uniqueKeysWithValues: definition.questions.map { ($0.id, $0.options.map(\.value).max()!) }))
+        let json = try ClinicalScales.metadataJSON(definition: definition, result: result)
+        XCTAssertTrue(json.contains("\"scaleId\":\"tinetti-poma28-v1\""))
+        XCTAssertTrue(json.contains("\"score\":28"))
+        XCTAssertTrue(json.contains("\"definitionVersion\":\"mediflow.poma28.v1\""))
+        XCTAssertTrue(json.contains("\"riskClassification\":\"not-classified\""))
         XCTAssertNoThrow(try JSONSerialization.jsonObject(with: Data(json.utf8)))
     }
 }

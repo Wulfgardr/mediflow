@@ -1,6 +1,8 @@
 'use client';
 
-import { useForm, useFieldArray, Control, Controller, FieldErrors, UseFormRegister, UseFormSetValue, UseFormWatch } from 'react-hook-form';
+/* @Codex */
+import { useRef, useState } from 'react';
+import { useForm, useFieldArray, Control, Controller, FieldErrors, UseFormRegister, UseFormSetValue, UseFormWatch, type DefaultValues } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Save, User, Phone, MapPin, HeartHandshake, FileText, Activity, Plus, Trash2, AlertTriangle, Calendar, Ticket, ChevronDown } from 'lucide-react';
 import ICDAutocomplete from '@/components/icd-autocomplete';
@@ -9,13 +11,16 @@ import ExemptionSelector from '@/components/exemption-selector';
 import { estimateBirthYearFromTaxCode, calculateAge } from '@/lib/utils';
 
 import { patientSchema, PatientFormValues } from '@/lib/schemas';
+/* @Codex */
+import { patientFormDefaults, type PatientFormSeed } from '@/lib/patient-edit-session';
 
 interface PatientFormProps {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    defaultValues?: any;
+    defaultValues?: PatientFormSeed;
     onSubmit: (data: PatientFormValues) => Promise<void>;
     isSubmitting?: boolean;
     isEditMode?: boolean;
+    /* @Codex */
+    disabled?: boolean;
 }
 
 /* @Codex WUL-229: patient form sections now inherit the vitreous tier directly */
@@ -104,7 +109,8 @@ function DiagnosesFieldArray({ control, register, errors, setValue, watch }: { c
                             </div>
                         </div>
 
-                        <input type="hidden" {...register(`diagnoses.${index}.date`)} value={new Date().toISOString()} />
+                        {/* @Codex: existing diagnosis dates belong to the displayed snapshot. */}
+                        <input type="hidden" {...register(`diagnoses.${index}.date`)} />
                     </div>
                 ))}
             </div>
@@ -124,7 +130,9 @@ function DiagnosesFieldArray({ control, register, errors, setValue, watch }: { c
 function CheckupsFieldArray({ control, register, errors }: { control: Control<PatientFormValues>, register: UseFormRegister<PatientFormValues>, errors: FieldErrors<PatientFormValues> }) {
     const { fields, append, remove: removeField } = useFieldArray({
         control,
-        name: "checkups"
+        name: "checkups",
+        /* @Codex: RHF row keys must not shadow persisted checkup IDs. */
+        keyName: "formKey",
     });
 
     return (
@@ -139,7 +147,7 @@ function CheckupsFieldArray({ control, register, errors }: { control: Control<Pa
 
             <div className="grid grid-cols-1 gap-4">
                 {fields.map((field, index) => (
-                    <div key={field.id} className="mf-section mf-section-tight relative group">
+                    <div key={field.formKey} className="mf-section mf-section-tight relative group">
                         <button
                             type="button"
                             onClick={() => removeField(index)}
@@ -179,6 +187,8 @@ function CheckupsFieldArray({ control, register, errors }: { control: Control<Pa
                                 className="mf-input resize-y leading-relaxed"
                             />
                         </div>
+                        {/* @Codex */}
+                        <input type="hidden" {...register(`checkups.${index}.id`)} />
                         <input type="hidden" {...register(`checkups.${index}.status`)} />
                         <input type="hidden" {...register(`checkups.${index}.source`)} />
                     </div>
@@ -197,34 +207,22 @@ function CheckupsFieldArray({ control, register, errors }: { control: Control<Pa
     );
 }
 
-export default function PatientForm({ defaultValues, onSubmit, isSubmitting = false, isEditMode = false }: PatientFormProps) {
-    // Format date for input if it's a Date object
-    const formattedDefaults = defaultValues ? {
-        ...defaultValues,
-        birthDate: (defaultValues.birthDate instanceof Date && !isNaN(defaultValues.birthDate.getTime()))
-            ? defaultValues.birthDate.toISOString().split('T')[0]
-            : defaultValues.birthDate,
-        /* @Codex */
-        exemptions: Array.isArray(defaultValues.exemptions) ? defaultValues.exemptions : [],
-        checkups: defaultValues.checkups?.map((c: any) => ({
-            ...c,
-            date: (c.date instanceof Date && !isNaN(c.date.getTime())) ? c.date.toISOString().split('T')[0] : c.date
-        }))
-    } : undefined;
-
-    const { register, control, handleSubmit, setValue, watch, formState: { errors } } = useForm<PatientFormValues>({
+export default function PatientForm({ defaultValues, onSubmit, isSubmitting = false, isEditMode = false, disabled = false }: PatientFormProps) {
+    /* @Codex: useForm caches defaults; its comparison baseline must share that lifetime. */
+    const [formattedDefaults] = useState(() => patientFormDefaults(defaultValues));
+    const submittingRef = useRef(false);
+    const { register, control, handleSubmit, setValue, watch, formState: { errors, isSubmitting: formSubmitting } } = useForm<PatientFormValues>({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         resolver: zodResolver(patientSchema) as any,
-        defaultValues: formattedDefaults || {
-            isAdi: false,
-            monitoringProfile: 'taken_in_charge',
-            /* @Codex */
-            exemptions: [],
-            diagnoses: [],
-            checkups: [],
-            statusReason: ''
-        }
+        // HTML dates are strings; the existing resolver returns Date objects.
+        defaultValues: formattedDefaults as unknown as DefaultValues<PatientFormValues>,
     });
+    const submitting = isSubmitting || formSubmitting;
+    const submitOnce = async (data: PatientFormValues) => {
+        if (disabled || submittingRef.current) return;
+        submittingRef.current = true;
+        try { await onSubmit(data); } finally { submittingRef.current = false; }
+    };
 
     // eslint-disable-next-line react-hooks/incompatible-library
     const currentStatus = watch('monitoringProfile');
@@ -237,7 +235,9 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
     const estimatedAge = estimatedYear ? calculateAge(estimatedYear) : null;
 
     return (
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-10">
+        <form onSubmit={handleSubmit(submitOnce)} className="space-y-10">
+            {/* @Codex: freeze a pending/partial plan instead of accepting ignored edits. */}
+            <fieldset disabled={disabled || submitting} className="min-w-0 space-y-10">
 
             {/* Personal Info Section */}
             <div className={FORM_SECTION_CLASS}>
@@ -490,13 +490,14 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
                 </p>
                 <button
                     type="submit"
-                    disabled={isSubmitting}
+                    disabled={disabled || submitting}
                     className="ui-btn-primary w-full md:w-auto px-8 py-3.5 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                     <Save className="w-5 h-5" />
-                    {isSubmitting ? 'Salvataggio in corso…' : (isEditMode ? 'Aggiorna scheda' : 'Crea scheda')}
+                    {submitting ? 'Salvataggio in corso…' : (isEditMode ? 'Aggiorna scheda' : 'Crea scheda')}
                 </button>
             </div>
+            </fieldset>
         </form>
     );
 }

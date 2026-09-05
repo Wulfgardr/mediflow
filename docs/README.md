@@ -17,6 +17,11 @@ Ultimo aggiornamento: 2026-09-03
 > del confine di pubblicazione e non si deducono dal solo tree. Lo storico delle
 > versioni vive nel [CHANGELOG](../CHANGELOG.md).
 
+<!-- @Codex -->
+## Candidato Web 0.8.5: editor e analytics
+
+[Snapshot/CAS del modulo, recupero dei salvataggi parziali e conteggio Schede](./web-patient-edit-and-analytics-085.md): contratto della lane `mf085-fix-a-web-20260904`, limiti e regressioni. Candidato sorgente, non evidenza di rilascio.
+
 ## 📚 Policy di consultazione (agent)
 
 Per orientarti rapidamente:
@@ -32,6 +37,9 @@ Per orientarti rapidamente:
 9. [docs/adr/](./adr/README.md) (partendo dai più recenti)
 
 Approfondimenti utili:
+
+<!-- @Codex MF085-002/003 -->
+- Scale cliniche source-bound e invio completo: [ADR 0118](./adr/0118-tinetti-poma28-source-bound-submission.md) (candidato; storico preservato, nessuna classificazione automatica del rischio per la nuova Tinetti).
 
 - Contratto prodotto: [PRODUCT.md](../PRODUCT.md)
 - Contratto design multipiattaforma: [DESIGN.md](../DESIGN.md)
@@ -53,6 +61,7 @@ Approfondimenti utili:
 - Astrazione provider AI e boundary egress: [ADR 0077](./adr/0077-ai-provider-abstraction-and-egress-anonymization-boundary.md)
 - Matrice task, modelli e serving gate post-0.8: [docs/ai-runtime-serving-matrix.md](./ai-runtime-serving-matrix.md)
 - Contratto export FHIR R4 v0: [ADR 0081](./adr/0081-fhir-r4-export-v0-contract.md)
+- Correzione indipendente lifecycle nativo MF085-004: [candidato e test](./fhir-lifecycle-fix.md); non attiva FHIR v2.
 - Registro persistente delle attese v0: [ADR 0082](./adr/0082-persistent-expectations-register-v0.md)
 - Diagnosi da documento review-only: [ADR 0084](./adr/0084-document-diagnoses-review-only.md)
 - Scaffold intelligente e automazione graduata: [ADR 0086](./adr/0086-intelligent-scaffold-and-graded-automation-boundary.md)

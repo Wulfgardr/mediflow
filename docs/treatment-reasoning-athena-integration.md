@@ -223,11 +223,60 @@ MediFlow usa il modello locale come componente di supporto alla revisione. Non
 dichiara ATHENA o Treatment Reasoning come dispositivo medico, prescrittore o
 decisore autonomo.
 
+## Avvio tramite Supervisor portable (MF085-006)
+
+<!-- @Codex -->
+Il production root legge soltanto `MEDIFLOW_ATHENA_MLX_GENERATE_BIN`, lo valida
+con il resolver condiviso e lo passa come opzione tipizzata
+`athenaMlxGenerateBin` al costruttore dei figli. Il costruttore lo ricontrolla
+prima del primo spawn e aggiunge quella sola variabile all'ambiente Web.
+L'ambiente MCP resta la sua allowlist preesistente, senza configurazione ATHENA.
+Non vengono propagati `PATH`, `HOME`, `NODE_OPTIONS`, directory del modello,
+selettori di Python/package/uvx o altre variabili del parent.
+
+Il valore deve essere un singolo path assoluto senza padding o quoting, con
+basename `mlx_lm.generate`, file regolare ed eseguibile. Gli spazi interni al
+path sono ammessi; argomenti accodati non lo sono. Rimane la policy storica del
+runner: i link host-owned sono seguiti tramite `stat`, non vietati come i target
+deterministici Web/MCP. Il path e il target devono restare sotto il controllo
+dell'host trusted; non si verifica l'ownership del sistema operativo e non si
+fissa l'inode. Nessuna shell viene aggiunta.
+
+Soltanto la variabile **assente** mantiene l'avvio opzionale del Supervisor e la
+selezione storica `uvx` del runtime ATHENA. Questo non prova che `uvx` sia
+risolvibile nell'ambiente minimo. Valori espliciti vuoti, blank o invalidi sono
+rifiutati: non degradano a `uvx`. Il costruttore restituisce l'errore redatto
+`ATHENA MLX direct runner configuration rejected.`; il comando production
+mantiene la policy di stderr generico già esistente e non stampa il path.
+
+Il runner va preprovisionato offline con il proprio interprete risolvibile senza
+il `PATH` del parent, per esempio con un interprete assoluto già presente nella
+venv. Dipendenze, modello e cache devono essere disponibili all'utente Web sotto
+le regole esistenti del runtime; la sola propagazione del runner non trasporta
+un override della directory modello. `stat`/`X_OK` non attestano interprete,
+compatibilità MLX/macOS, pesi, integrità o readiness clinica. La configurazione
+non viene provata eseguendo il runner all'avvio. I flag offline del runtime
+restano invariati; non equivalgono a un sandbox di rete per un eseguibile
+host-owned arbitrario.
+
+Il cleanup mantiene disconnect/terminate dei figli già creati quando lo spawn
+successivo fallisce, e copre anche errori successivi nella composizione dei
+port. Non cambia API, authority MCP, lease o permessi di scrittura.
+
+I test di processo usano entrypoint sintetici senza listener, DB o inferenza:
+verificano la composizione reale e i veri ambienti OS, non il servizio Next
+completo, il protocollo MCP autenticato o un modello MLX.
+
 ## Verifica mirata
 
-I controlli repository disponibili includono:
+I controlli repository disponibili includono (Node 24.x e dipendenze coerenti):
 
 ```bash
+node scripts/run-strip-types.mjs --test lib/athena-mlx-launcher-config.test.ts lib/security/portable-supervisor-child-processes.test.ts scripts/mediflow-headless-supervisor-athena.test.mjs
+npm run check:headless-portable-imports
+npm run test:headless-portable
+npm run test:mcp:intelligent-host
+npm run test:mini-cli
 npm run test:treatment-reasoning
 npm run check:fabric-generative-runtime-crosswalk
 npm run test:fabric-generative-runtime-crosswalk

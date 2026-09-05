@@ -5,7 +5,9 @@ import { AlertTriangle, ShieldCheck } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 import { Kree8WorkspaceShell } from '@/components/kree8/kree8-workspace-shell';
-import { db, type Diagnosis, type Patient } from '@/lib/db';
+import { db } from '@/lib/db';
+/* @Codex */
+import { buildAnalyticsStats, isAnalyticsPatient, normalizeAgeRange } from '@/lib/patient-analytics';
 import { useLiveQuery } from '@/lib/live-query';
 
 import styles from './analytics.module.css';
@@ -21,26 +23,6 @@ type AuditSummary = {
     isTruncated: boolean;
 };
 
-type AgeBucket = '0-18' | '19-64' | '65-80' | '80+';
-
-type DiagnosisStat = {
-    key: string;
-    description: string;
-    system: string;
-    code: string;
-    count: number;
-};
-
-type AnalyticsStats = {
-    totalInRange: number;
-    withBirthDate: number;
-    withoutBirthDate: number;
-    adiCount: number;
-    withDiagnoses: number;
-    ageDist: Record<AgeBucket, number>;
-    topDiagnoses: DiagnosisStat[];
-};
-
 const ANALYTICS_NAV_ITEMS = [
     { href: '#domanda', label: 'Domanda', meta: 'fuoco' },
     { href: '#indicatori', label: 'Indicatori', meta: 'lettura' },
@@ -48,95 +30,6 @@ const ANALYTICS_NAV_ITEMS = [
     { href: '#diagnosi', label: 'Diagnosi', meta: 'tabella' },
     { href: '#audit', label: 'Audit', meta: 'locale' },
 ];
-
-const EMPTY_AGE_DIST: Record<AgeBucket, number> = {
-    '0-18': 0,
-    '19-64': 0,
-    '65-80': 0,
-    '80+': 0,
-};
-
-function normalizeAgeRange(range: [number, number]): [number, number] {
-    return range[0] <= range[1] ? range : [range[1], range[0]];
-}
-
-function toDate(value: Patient['birthDate']): Date | null {
-    if (!value) return null;
-    const date = value instanceof Date ? value : new Date(value);
-    return Number.isNaN(date.getTime()) ? null : date;
-}
-
-function getAgeBucket(age: number): AgeBucket {
-    if (age <= 18) return '0-18';
-    if (age <= 64) return '19-64';
-    if (age <= 80) return '65-80';
-    return '80+';
-}
-
-function diagnosisKey(diagnosis: Diagnosis): string {
-    const system = diagnosis.system?.trim() || 'ICD';
-    const code = diagnosis.code?.trim() || 'senza-codice';
-    const description = diagnosis.description?.trim() || code;
-    return `${system}:${code}:${description.toLocaleLowerCase('it-IT')}`;
-}
-
-function buildAnalyticsStats(patients: Patient[], ageRange: [number, number]): AnalyticsStats {
-    const now = new Date();
-    const [minAge, maxAge] = normalizeAgeRange(ageRange);
-    const ageDist: Record<AgeBucket, number> = { ...EMPTY_AGE_DIST };
-    const diagnosisCounts = new Map<string, DiagnosisStat>();
-    let totalInRange = 0;
-    let withBirthDate = 0;
-    let withoutBirthDate = 0;
-    let adiCount = 0;
-    let withDiagnoses = 0;
-
-    for (const patient of patients) {
-        const birthDate = toDate(patient.birthDate);
-        if (!birthDate) {
-            withoutBirthDate += 1;
-            continue;
-        }
-
-        withBirthDate += 1;
-        const age = differenceInYears(now, birthDate);
-        if (age < minAge || age > maxAge) continue;
-
-        totalInRange += 1;
-        if (patient.isAdi) adiCount += 1;
-        ageDist[getAgeBucket(age)] += 1;
-
-        if (!patient.diagnoses?.length) continue;
-        withDiagnoses += 1;
-        for (const diagnosis of patient.diagnoses) {
-            const key = diagnosisKey(diagnosis);
-            const current = diagnosisCounts.get(key);
-            if (current) {
-                current.count += 1;
-                continue;
-            }
-            diagnosisCounts.set(key, {
-                key,
-                description: diagnosis.description?.trim() || diagnosis.code || 'Diagnosi senza descrizione',
-                system: diagnosis.system?.trim() || 'ICD',
-                code: diagnosis.code?.trim() || 'n/d',
-                count: 1,
-            });
-        }
-    }
-
-    return {
-        totalInRange,
-        withBirthDate,
-        withoutBirthDate,
-        adiCount,
-        withDiagnoses,
-        ageDist,
-        topDiagnoses: Array.from(diagnosisCounts.values())
-            .sort((left, right) => right.count - left.count)
-            .slice(0, 10),
-    };
-}
 
 function percent(part: number, total: number): number {
     return total > 0 ? Math.round((part / total) * 100) : 0;
@@ -170,7 +63,7 @@ function SectionHeading({ label, title, description }: { label: string; title: s
 export default function AnalyticsPage() {
     /* @Codex */
     const patients = useLiveQuery(async () => db.patients
-        .filter((patient) => !patient.isArchived)
+        .filter(isAnalyticsPatient)
         .toArray(), [], undefined, ['patients', 'patients_to_ambulatories']);
     const [ageRange, setAgeRange] = useState<[number, number]>([0, 120]);
     const [auditDays, setAuditDays] = useState(30);
@@ -214,7 +107,7 @@ export default function AnalyticsPage() {
 
     const normalizedAgeRange = normalizeAgeRange(ageRange);
     const stats = useMemo(
-        () => patients ? buildAnalyticsStats(patients, ageRange) : null,
+        () => patients ? buildAnalyticsStats(patients, ageRange, differenceInYears) : null,
         [patients, ageRange],
     );
 

@@ -17,7 +17,7 @@ const requestBody = Object.freeze({
     sources: Object.freeze({ focus: Object.freeze({ summary: 'Synthetic follow-up' }), conditions: Object.freeze([{ label: 'Synthetic condition' }]), activeTherapies: Object.freeze([{ label: 'Synthetic therapy' }]), recentEvents: Object.freeze([{ summary: 'Synthetic review' }]) }),
 });
 
-function fixture(revision = 4) {
+function fixture(revision: number | null = 4) {
     const calls: string[] = [];
     const currentRef = Object.freeze({}); let stagedRef: object | null = null; let generation = 0; let terminal = false;
     const port = Object.freeze({
@@ -32,9 +32,10 @@ function fixture(revision = 4) {
     const session = Object.freeze({ id: '1'.repeat(64), userId: 'user.synthetic', username: 'synthetic', role: 'doctor', authChannel: 'web' as const,
         createdAt: Date.parse('2026-09-01T09:00:00.000Z'), expiresAt: lease.expiresAt });
     let liveRevision = revision;
+    let afterSelection: (() => void) | undefined;
     const owner = Object.freeze({
         snapshotSelectionEpoch: () => { calls.push('epoch'); return 6; },
-        issueSelection: () => { calls.push('selection'); return lease; },
+        issueSelection: () => { calls.push('selection'); afterSelection?.(); return lease; },
         dereferenceSelection: () => { calls.push('dereference'); return Object.freeze({ patientId: requestBody.patientId, ambulatoryId: requestBody.ambulatoryId }); },
         mintPatientInsightLeaseCommitPort: () => { calls.push('port'); return port; },
     });
@@ -48,7 +49,9 @@ function fixture(revision = 4) {
         clock: () => '2026-09-01T10:00:01.000Z',
         entropy: () => new Uint8Array(32).fill(7),
     });
-    return { calls, service, port, capabilityInput: () => capabilityInput, setRevision: (value: number) => { liveRevision = value; } };
+    return { calls, service, port, capabilityInput: () => capabilityInput,
+        setRevision: (value: number | null) => { liveRevision = value; },
+        afterSelection: (callback: () => void) => { afterSelection = callback; } };
 }
 
 test('authenticates first, atomically binds the host-owned projection, and invokes no apply seam', async () => {
@@ -89,4 +92,25 @@ test('HTTP maps authentication failures without parsing request content', async 
     const response = await handler({ json: async () => { jsonReads += 1; return requestBody; } } as Request);
     assert.equal(response.status, 401); assert.equal(jsonReads, 0);
     assert.doesNotMatch(await response.text(), /patient\.synthetic|Synthetic follow-up/u);
+});
+
+/* @Codex: unavailable includes missing and soft-deleted patients (ADR 0066).
+ * Source/session/provider ports remain the existing declared unit-test doubles. */
+test('unavailable revision denies preview before selection, lease or capability', async () => {
+    const value = fixture(null);
+    const result = await (await value.service.acquire()).preview(requestBody);
+    assert.deepEqual(result, { writesPerformed: 0, apply: 'denied', status: 'denied', code: 'source_stale',
+        proposal: null, receipt: null, provenance: null, reviewRef: null });
+    assert.deepEqual(value.calls, ['auth', 'revision']);
+});
+
+test('revision becoming unavailable after selection denies broker use and disposes the lease', async () => {
+    const value = fixture(); value.afterSelection(() => value.setRevision(null));
+    const result = await (await value.service.acquire()).preview(requestBody);
+    assert.deepEqual(result, { writesPerformed: 0, apply: 'denied', status: 'denied', code: 'source_stale',
+        proposal: null, receipt: null, provenance: null, reviewRef: null });
+    assert.equal(value.calls.includes('selection'), true);
+    assert.ok(value.calls.filter((call) => call === 'revision').length >= 2, 'availability is read again');
+    assert.equal(value.calls.includes('capability'), false);
+    assert.equal(value.port.snapshot().terminal, true);
 });

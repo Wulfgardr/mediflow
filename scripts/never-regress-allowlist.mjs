@@ -349,6 +349,16 @@ export const NEVER_REGRESS_ALLOWLIST = {
             reason: 'SISS session observer tests use documented IdPC checkpoints only as synthetic fixtures for remote-sign detection.',
         },
         {
+            path: 'lib/scales/tinetti-poma28-v1.ts',
+            pattern: '^\\s*"sourceUrl": "https://www\\.shropscommunityhealth\\.nhs\\.uk/content/doclib/10756\\.pdf",\\s*$',
+            reason: 'ADR 0118: exact NHS FPS 006 V1 provenance property, like a FHIR identifier; copied into scale metadata, never fetched. Not a runtime egress permission.',
+        },
+        {
+            path: 'native/MediFlowMac/Sources/MediFlowCore/TinettiPOMA28.swift',
+            pattern: '^\\s*sourceUrl: "https://www\\.shropscommunityhealth\\.nhs\\.uk/content/doclib/10756\\.pdf",\\s*$',
+            reason: 'ADR 0118: the identical NHS provenance String in the native value object, encoded as metadata without URLSession or automatic fetch; exact file/property/literal only.',
+        },
+        {
             path: 'native/MediFlowMac/Sources/MediFlowCore/FHIRBundleGenerator.swift',
             pattern: 'http://id\\.who\\.int/icd/release/11/mms',
             reason: 'FHIR coding-system URI identifier inside generated resources, mirroring lib/fhir/clinical-adapter.ts (directory exempted by the scanner); never fetched at runtime.',

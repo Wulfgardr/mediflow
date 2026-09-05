@@ -12,7 +12,7 @@ import { useLiveQuery } from '@/lib/live-query';
 import { SCALES } from '@/lib/scale-definitions';
 
 function getScaleArea(scaleId: string): string {
-    if (scaleId === 'tinetti') return 'Equilibrio';
+    if (scaleId === 'tinetti-poma28-v1') return 'Equilibrio';
     if (scaleId === 'adl' || scaleId === 'iadl') return 'Autonomia';
     if (scaleId === 'mmse') return 'Cognitivo';
     if (scaleId === 'gds') return 'Umore';
@@ -23,7 +23,7 @@ function getScaleIcon(scaleId: string) {
     if (scaleId === 'mmse') return Brain;
     if (scaleId === 'gds') return HeartPulse;
     if (scaleId === 'adl' || scaleId === 'iadl') return ClipboardCheck;
-    if (scaleId === 'tinetti') return Activity;
+    if (scaleId === 'tinetti-poma28-v1') return Activity;
     return ListChecks;
 }
 

@@ -36,7 +36,8 @@ function webSession(): ServerSession {
 function fixture() {
     const sqlite = new Database(':memory:');
     sqlite.exec(`
-        CREATE TABLE patients (id TEXT PRIMARY KEY NOT NULL, version INTEGER NOT NULL);
+        CREATE TABLE patients (id TEXT PRIMARY KEY NOT NULL, version INTEGER NOT NULL,
+            deleted_at INTEGER, is_archived INTEGER DEFAULT 0);
         CREATE TABLE ambulatories (id TEXT PRIMARY KEY NOT NULL);
         CREATE TABLE patients_to_ambulatories (
             patient_id TEXT NOT NULL,
@@ -154,4 +155,28 @@ test('production resolver has no provider, apply, Smart Import, or owner-install
 
     assert.doesNotMatch(source, /from ['"][^'"]*(?:provider|apply|patient-smart-import|projection-owner)[^'"]*['"]/u);
     assert.doesNotMatch(source, /\.install\s*\(/u);
+});
+
+/* @Codex: post-fix ADR 0066; retained membership never makes a tombstone live. */
+test('canonical context denies a tombstoned patient and observes an explicit restore', (context) => {
+    const { sqlite, resolve } = fixture(); context.after(() => sqlite.close());
+    const session = webSession();
+    const request = { patientId: 'patient.synthetic.01', ambulatoryId: 'ambulatory.synthetic.01' };
+    assert.equal(resolve(session, request).patientVersion, 3);
+    sqlite.prepare('UPDATE patients SET deleted_at = ?, version = version + 1 WHERE id = ?')
+        .run(1893456001, request.patientId);
+    const before = sqlite.prepare('SELECT * FROM patients').all();
+    assert.throws(() => resolve(session, request), rejects('patient_missing'));
+    assert.deepEqual(sqlite.prepare('SELECT * FROM patients').all(), before, 'denial is read-only');
+    sqlite.prepare('UPDATE patients SET deleted_at = NULL, version = version + 1 WHERE id = ?').run(request.patientId);
+    assert.equal(resolve(session, request).patientVersion, 5);
+});
+
+test('canonical context keeps an archived non-deleted patient available without writes', (context) => {
+    const { sqlite, resolve } = fixture(); context.after(() => sqlite.close());
+    const session = webSession();
+    sqlite.prepare('UPDATE patients SET is_archived = 1 WHERE id = ?').run('patient.synthetic.01');
+    const before = sqlite.prepare('SELECT * FROM patients').all();
+    assert.equal(resolve(session, { patientId: 'patient.synthetic.01', ambulatoryId: 'ambulatory.synthetic.01' }).patientVersion, 3);
+    assert.deepEqual(sqlite.prepare('SELECT * FROM patients').all(), before);
 });

@@ -208,6 +208,36 @@ stdin, stdout o listener. Il processo non accetta un secondo binding: dopo
 revoca, lock, logout, reselection o expiry, un nuovo contesto richiede un nuovo
 avvio del comando MCP.
 
+#### Configurazione ATHENA del solo Web (MF085-006)
+
+Il parent trusted legge esclusivamente `MEDIFLOW_ATHENA_MLX_GENERATE_BIN` per
+questo binding e lo passa come opzione tipizzata al costruttore dei figli. Solo
+il Web riceve la corrispondente variabile, oltre alle quattro variabili gia
+ammesse. MCP mantiene esattamente il marker IPC precedente: niente runner,
+`PATH`, ambiente parentale, credenziali o altre variabili ATHENA.
+
+Un validatore condiviso con il launcher applica le regole esistenti: path
+assoluto a `mlx_lm.generate`, file regolare raggiungibile ed eseguibile, senza
+argomenti o shell. La risoluzione dei link del runner resta quella storica di
+`stat`/`access`; non modifica il divieto di link sui target Node/Web/MCP e sulla
+directory dati. Il filesystem e il provisioning restano host-owned. Soltanto
+una variabile non definita significa assenza: valori vuoti, blank o con padding
+sono invalidi, non richieste di fallback. Il valore viene validato prima della
+composizione e rivalidato prima di qualunque spawn; il runtime Web lo verifica
+nuovamente quando risolve il launcher. Non e un pin dell'inode o del contenuto.
+
+L'assenza non rende ATHENA obbligatoria per il core. Il launcher storico `uvx`
+resta offline e non riceve qui override di PATH, package, Python o modello.
+File, interprete e dipendenze del runner devono essere gia preprovisioned e
+funzionare nell'ambiente minimo; un path valido non prova readiness MLX,
+disponibilita del modello, assenza di egress di codice host-owned o qualita
+clinica. Un valore esplicito invalido nega prima di avviare entrambi i figli,
+con errore di configurazione senza path; il CLI conserva il messaggio terminale
+redatto esistente. I fallimenti dopo lo spawn ripuliscono i figli gia creati.
+
+Questa correzione non cambia authority, API, catalogo MCP, grant, lifecycle
+clinico o policy di scrittura. Non introduce listener, download o inferenza.
+
 #### Comando Web minimizzato
 
 L'attivazione nasce da un controllo patient-scoped nella UI Web. Il click e un

@@ -20,6 +20,8 @@ public enum FHIRBundleDTOAdapter {
                 birthDate: patient.birthDate.map(isoDate),
                 address: patient.address,
                 phone: patient.phone,
+                // @Codex Preserve lifecycle semantics in the export projection.
+                isArchived: patient.isArchived,
                 caregiver: patient.caregiver,
                 exemptions: decodeStringArray(patient.exemptions),
                 diagnoses: DiagnosesCodec.decode(patient.diagnoses).map {
@@ -39,7 +41,9 @@ public enum FHIRBundleDTOAdapter {
                     type: $0.type,
                     title: $0.title,
                     content: $0.content,
-                    metadata: decodeEntryMetadata($0.metadata)
+                    metadata: decodeEntryMetadata($0.metadata),
+                    // @Codex Preserve the recorded care setting.
+                    setting: $0.setting
                 )
             },
             therapies: therapies.filter { $0.deletedAt == nil }.map {
