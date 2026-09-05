@@ -1,0 +1,16 @@
+/* @Codex: journal rows prioritize prose, keeping state and provenance explicit. */
+.diary { display: grid; padding-bottom: 24px; }
+.entry { padding: 24px 0; border-bottom: 1px solid color-mix(in srgb, var(--lume-ink) 13%, transparent); }
+.entry:first-child { padding-top: 0; }
+.entry > div { padding: 18px 22px; border-radius: 8px; box-shadow: none; background: transparent; }
+.entry:focus-visible { outline: 2px solid var(--lume-accent); outline-offset: 5px; border-radius: 3px; }
+.header { gap: 16px; margin-bottom: 14px; }
+.header > div:first-child { min-width: 0; }
+.identity { display: flex; flex-direction: column; gap: 6px; }
+.identity > span { font-size: 14px; font-weight: 600; text-transform: none; color: var(--lume-ink) !important; }
+.identity > div, .identity > div > span { font-family: var(--lume-font-sans); font-size: 12px; text-transform: none; }
+.identity > div { margin: 0; gap: 7px 12px; }
+.identity > div > span:first-child { padding: 0; border: 0; font-weight: 500; }
+.header button { width: 34px; height: 34px; border-radius: 7px; }
+.entry :global(.prose) { max-width: 75ch; }
+@media (max-width: 700px) { .header button { width: 44px; height: 44px; } .entry { padding-block: 12px; } .entry > div { padding: 16px 18px; } }

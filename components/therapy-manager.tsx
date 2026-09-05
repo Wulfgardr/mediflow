@@ -16,6 +16,7 @@ import DrugAutocomplete from './drug-autocomplete';
 import { AifaDrug } from '@/lib/db';
 import { useToast } from '@/components/ui/toast-provider';
 import { useConfirm } from '@/components/ui/confirm-dialog';
+import { useRuntimeTwinPendingForm } from '@/components/runtime-twin-design';
 
 const therapySchema = z.object({
     drugName: z.string().min(2, "Il nome del farmaco è richiesto"),
@@ -40,6 +41,7 @@ const chipClassName = 'inline-flex min-h-8 items-center gap-1.5 rounded-full bor
 
 export default function TherapyManager({ patientId, embedded = false }: { patientId: string; embedded?: boolean }) {
     const [isAdding, setIsAdding] = useState(false);
+    useRuntimeTwinPendingForm(isAdding);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [isGalenic, setIsGalenic] = useState(false); // Toggle for Free Text vs AIFA
     const [selectedDiagnosis, setSelectedDiagnosis] = useState<{ code: string; title: string } | null>(null);

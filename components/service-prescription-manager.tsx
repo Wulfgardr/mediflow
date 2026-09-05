@@ -26,6 +26,7 @@ import { notifyDbChange, useLiveQuery } from '@/lib/live-query';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { DocumentReferenceChip } from '@/components/document-reference-chip';
 import { Badge } from '@/components/ui/badge';
+import { useRuntimeTwinPendingForm } from '@/components/runtime-twin-design';
 import {
     catalogMatchStatusSignal,
     type SemanticSignal,
@@ -193,6 +194,9 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [form, setForm] = useState<FormState>(() => emptyForm());
+
+    /* @Codex: the conditional form's open state is the pending-form signal. */
+    useRuntimeTwinPendingForm(isFormOpen);
 
     /* @Codex */
     const prescriptions = useLiveQuery(

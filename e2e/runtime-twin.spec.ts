@@ -83,7 +83,7 @@ test('design comparison preserves an unfinished form and profile writes reach st
     await page.getByRole('button', { name: 'Originale', exact: true }).click();
     await expect(page.locator('html')).toHaveAttribute('data-runtime-twin-design', 'original');
     await expect(name).toHaveValue(savedName);
-    await page.getByRole('button', { name: 'Proposta', exact: true }).click();
+    await page.getByRole('button', { name: 'A · Postazione', exact: true }).click();
     await expect(name).toHaveValue(savedName);
     const saved = page.waitForResponse(response => response.url().endsWith('/api/auth/profile') && response.request().method() === 'PUT');
     await page.getByRole('button', { name: 'Salva profilo', exact: true }).click();
@@ -151,114 +151,9 @@ test('real diary save returns to the folder and survives reload', async () => {
     }
 });
 
-test('directory proposal exposes recorded diagnoses and context across input modes', async () => {
-    test.setTimeout(60_000);
-    await page.setViewportSize({ width: 1440, height: 960 });
-    await page.goto('/?area=incarico&paziente=twin-086-05');
-    const rows = page.getByTestId('lume-patient-row');
-    await expect(rows).toHaveCount(5);
-    // A URL retaining an archived patient must resolve to a visible record.
-    await expect(page).not.toHaveURL(/paziente=twin-086-05/);
-    await expect(page.getByTestId('lume-patient-lens').getByRole('link', { name: 'Apri scheda paziente' }))
-        .toHaveAttribute('href', `/patients/${new URL(page.url()).searchParams.get('paziente')}/modules`);
-    const row = rows.filter({ hasText: 'Persona 02' });
-    await expect(row.getByText('Condizione dimostrativa per revisione periodica', { exact: true })).toBeVisible();
-    const empty = rows.filter({ hasText: 'Persona 06' });
-    await expect(empty.getByText('Diagnosi non registrata', { exact: true })).toBeVisible();
-    const detail = row.locator('[class*="recordDisclosure"]');
-    await rows.filter({ hasText: 'Persona 03' }).click();
-    await page.getByRole('heading', { name: 'Pazienti in carico', exact: true }).first().hover();
-    await expect.poll(async () => (await detail.boundingBox())?.height ?? 0).toBeLessThan(1);
-    await row.hover();
-    await expect.poll(async () => (await detail.boundingBox())?.height ?? 0).toBeGreaterThan(20);
-    await row.focus();
-    await page.mouse.move(0, 0);
-    await expect.poll(async () => (await detail.boundingBox())?.height ?? 0).toBeGreaterThan(20);
-    await page.keyboard.press('Enter');
-    await expect(page).toHaveURL(/patients\/twin-086-02\/modules/);
-    await expect(page.locator('#quadro').getByText('Note in cartella', { exact: true })).toBeVisible();
-
-    for (const theme of ['light', 'dark']) {
-        await page.goto('/settings/aspetto');
-        await page.getByRole('button', { name: theme === 'light' ? 'Tema Chiaro' : 'Tema Scuro', exact: true }).click();
-        for (const width of [1440, 390]) {
-            await page.setViewportSize({ width, height: width === 390 ? 844 : 960 });
-            await page.goto('/?area=incarico');
-            await expect(rows).toHaveCount(5);
-            await rows.filter({ hasText: 'Persona 02' }).click();
-            await page.mouse.move(0, 0);
-            await expect.poll(async () => (await detail.boundingBox())?.height ?? 0).toBeGreaterThan(20);
-            expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
-            await page.screenshot({ path: `tmp-086-twin/directory-${theme}-${width}.png` });
-        }
-    }
-    await page.emulateMedia({ reducedMotion: 'reduce' });
-    expect(await detail.evaluate(el => getComputedStyle(el).transitionDuration)).toBe('0s');
-    await page.emulateMedia({ reducedMotion: 'no-preference' });
-    await page.setViewportSize({ width: 1440, height: 960 });
-});
-
-test('folder proposal changes topology, opens every module and retains unfinished therapy', async () => {
-    test.setTimeout(90_000);
-    await page.setViewportSize({ width: 1440, height: 960 });
-    await page.goto(`/patients/${patient}/modules`);
-    const workspace = page.getByTestId('lume-scheda-scroll');
-    const rail = page.getByRole('navigation', { name: 'Sezioni della vista' });
-    await expect(workspace).toHaveAttribute('data-folder-section', 'quadro');
-    const overview = await page.locator('#quadro').boundingBox();
-    const nav = await rail.boundingBox();
-    expect(nav!.x + nav!.width).toBeLessThan(overview!.x);
-    expect(overview!.y).toBeLessThan(260);
-    await page.getByRole('button', { name: 'Originale', exact: true }).click();
-    await expect(workspace).not.toHaveAttribute('data-folder-section');
-    const originalNav = await rail.boundingBox();
-    const originalOverview = await page.locator('#quadro').boundingBox();
-    expect(originalNav!.y + originalNav!.height).toBeLessThan(originalOverview!.y);
-    await page.screenshot({ path: 'tmp-086-twin/patient-original-1440.png' });
-    await page.getByRole('button', { name: 'Proposta', exact: true }).click();
-
-    const hrefs = await rail.locator('a').evaluateAll(links => links.map(link => link.getAttribute('href')!));
-    expect(hrefs).toHaveLength(13);
-    for (const href of hrefs) {
-        await rail.locator(`a[href="${href}"]`).click();
-        await expect(workspace).toHaveAttribute('data-folder-section', href.slice(1));
-        await expect(page.locator(href)).toBeVisible();
-        await expect(rail.locator(`a[href="${href}"]`)).toHaveAttribute('aria-current', 'location');
-    }
-    await rail.locator('a[href="#terapie"]').click();
-    await page.getByRole('button', { name: 'Nuova terapia', exact: true }).click();
-    const dosage = page.getByPlaceholder('Es. 1 cp ore 8:00, 1/2 cp ore 20:00');
-    await dosage.fill('Bozza sintetica non salvata');
-    await expect(page.getByText('Posologia', { exact: true })).toBeVisible();
-    await rail.locator('a[href="#parametri"]').click();
-    await rail.locator('a[href="#terapie"]').click();
-    await expect(dosage).toHaveValue('Bozza sintetica non salvata');
-    await page.getByRole('button', { name: 'Originale', exact: true }).click();
-    await expect(dosage).toHaveValue('Bozza sintetica non salvata');
-    await page.getByRole('button', { name: 'Proposta', exact: true }).click();
-    await expect(dosage).toHaveValue('Bozza sintetica non salvata');
-    await page.getByRole('button', { name: 'Chiudi scheda terapia', exact: true }).click();
-    await page.reload();
-    await expect(workspace).toHaveAttribute('data-folder-section', 'terapie');
-    await expect(page.getByRole('button', { name: 'Nuova terapia', exact: true })).toBeVisible();
-
-    await page.setViewportSize({ width: 390, height: 844 });
-    const toggle = page.getByTestId('folder-navigation-toggle');
-    await toggle.click();
-    await rail.locator('a[href="#documenti"]').click();
-    await expect(toggle).toBeFocused();
-    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    await expect(page.locator('#documenti')).toBeVisible();
-    await page.goBack();
-    await expect(workspace).toHaveAttribute('data-folder-section', 'terapie');
-    await page.goForward();
-    await expect(workspace).toHaveAttribute('data-folder-section', 'documenti');
-    await toggle.click();
-    await page.keyboard.press('Escape');
-    await expect(toggle).toBeFocused();
-    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    await page.setViewportSize({ width: 1440, height: 960 });
-});
+// @Codex: directory single-click, patient navigation, draft preservation and
+// replacement geometry are asserted in runtime-workbench.spec.ts. The earlier
+// selection-lens and nested-sidebar assertions described the rejected proposal.
 
 test('settings search, mobile navigation, focus and both palettes', async () => {
     test.setTimeout(90_000);

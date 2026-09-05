@@ -13,6 +13,7 @@ import {
 import { SETTINGS_NAV_GROUPS } from '@/lib/settings-navigation';
 
 import styles from '@/components/settings/settings-lume.module.css';
+import proposalStyles from '@/components/settings/settings-proposal.module.css';
 
 const LEGACY_ANCHOR_REDIRECTS: Record<string, string> = {
     '#account': '/settings/profilo',
@@ -118,40 +119,73 @@ export default function SettingsPage() {
                 ? 'Home-base abilitato. Il canale dati resta disponibile solo ai dispositivi associati con sessione operatore valida.'
                 : 'Home-base abilitato. Pairing e sessione non sono verificabili finché i dettagli del nodo non tornano disponibili.'
             : 'Home-base disabilitato. Questa postazione non espone il canale dati ai dispositivi associati.';
+    const networkEffectForProposal = !currentNetworkMode
+        ? networkError
+            ? 'Stato non verificabile. Home-base non confermato.'
+            : 'Lettura in corso. Home-base non ancora determinato.'
+        : isHomeBase
+            ? 'Home-base attivo.'
+            : 'Home-base disattivato.';
+    const networkStatusForProposal = !currentNetworkMode
+        ? networkError ? 'Non disponibile' : 'Lettura'
+        : isHomeBase ? 'Home-base' : 'Locale';
+    const networkDetailForProposal = !currentNetworkMode
+        ? networkError
+            ? 'La modalità operativa non è verificabile. Non viene fatta alcuna ipotesi sullo stato di home-base.'
+            : 'La modalità operativa è ancora in lettura. Lo stato di home-base non è determinato.'
+        : isHomeBase
+            ? networkOverview
+                ? 'Il canale dati resta disponibile solo ai dispositivi associati con sessione operatore valida.'
+                : 'Pairing e sessione non sono verificabili finché i dettagli del nodo non tornano disponibili.'
+            : 'Questa postazione non espone il canale dati ai dispositivi associati.';
 
     return (
         <div className={styles.overview} data-testid="settings-overview-section">
             <section
-                className={styles.overviewFocus}
+                className={`${styles.overviewFocus} ${proposalStyles.proposalOverviewFocus}`}
                 data-testid="settings-focus-section"
                 data-settings-section="system-status"
                 data-lume-elevation="focal"
             >
                 <div>
-                    <p className={styles.sectionLabel}>Modalità operativa</p>
+                    <p className={`${styles.sectionLabel} ${proposalStyles.blockOriginal}`}>Modalità operativa</p>
                     <h2>
-                        {networkViewModel?.currentState.title
-                            ?? (currentNetworkMode
-                                ? 'Modalità salvata, dettagli del nodo non disponibili'
-                                : 'Lettura del nodo locale')}
+                        <span className={proposalStyles.inlineOriginal}>
+                            {networkViewModel?.currentState.title
+                                ?? (currentNetworkMode
+                                    ? 'Modalità salvata, dettagli del nodo non disponibili'
+                                    : 'Lettura del nodo locale')}
+                        </span>
+                        <span className={proposalStyles.inlineProposal}>Postazione</span>
                     </h2>
                     <p
-                        className={`${styles.overviewValue} lume-registro`}
+                        className={`${styles.overviewValue} ${proposalStyles.proposalNetworkStatus} lume-registro`}
                         data-lume-register-value="true"
                         data-testid="settings-network-mode-value"
                         aria-live="polite"
                     >
-                        {networkStatus}
+                        <span className={proposalStyles.inlineOriginal}>{networkStatus}</span>
+                        <span className={proposalStyles.proposalStatusLabel}>Stato</span>
+                        <span className={`${proposalStyles.inlineProposal} ${proposalStyles.proposalNetworkStatusValue}`}>
+                            {networkStatusForProposal}
+                        </span>
                     </p>
                     <p className={styles.supportingCopy}>
-                        {networkEffect} Esportazione e backup restano percorsi separati ed espliciti.
+                        <span className={proposalStyles.inlineOriginal}>
+                            {networkEffect} Esportazione e backup restano percorsi separati ed espliciti.
+                        </span>
+                        <span className={proposalStyles.inlineProposal}>{networkEffectForProposal}</span>
                     </p>
+                    <details className={proposalStyles.proposalDetail}>
+                        <summary>Dettagli stato</summary>
+                        <p>{networkDetailForProposal} Esportazione e backup restano percorsi separati ed espliciti.</p>
+                    </details>
                     {networkError ? <p className={styles.errorNote} role="status">{networkError}</p> : null}
                 </div>
-                <div className={styles.focusActions}>
+                <div className={`${styles.focusActions} ${proposalStyles.proposalFocusActions}`}>
                     <button
                         type="button"
-                        className={styles.primaryAction}
+                        className={`${styles.primaryAction} ${proposalStyles.proposalAction}`}
                         data-settings-primary="true"
                         data-testid="settings-network-mode-action"
                         disabled={isNetworkLoading || isNetworkSaving || !currentNetworkMode}
@@ -165,7 +199,7 @@ export default function SettingsPage() {
                                     ? 'Disattiva home-base'
                                     : 'Abilita home-base'}
                     </button>
-                    <Link href="/settings/diagnostica" className={styles.secondaryAction}>
+                    <Link href="/settings/diagnostica" className={`${styles.secondaryAction} ${proposalStyles.proposalAction}`}>
                         Apri diagnostica
                         <ArrowUpRight aria-hidden="true" />
                     </Link>
@@ -173,21 +207,27 @@ export default function SettingsPage() {
             </section>
 
             <section
-                className={styles.previewSection}
+                className={`${styles.previewSection} ${proposalStyles.previewSectionProposal}`}
                 data-testid="settings-preview-section"
                 data-settings-section="appearance-preview"
             >
                 <div className={styles.previewCopy}>
-                    <p className={styles.sectionLabel}>Anteprima immediata</p>
-                    <h2>Lettura della postazione</h2>
+                    <p className={`${styles.sectionLabel} ${proposalStyles.blockOriginal}`}>Anteprima immediata</p>
+                    <h2>
+                        <span className={proposalStyles.inlineOriginal}>Lettura della postazione</span>
+                        <span className={proposalStyles.inlineProposal}>Aspetto</span>
+                    </h2>
                     <p className={styles.supportingCopy}>
-                        Il cambio di registro si vede subito su questa superficie ed è reversibile dallo stesso controllo.
+                        <span className={proposalStyles.inlineOriginal}>
+                            Il cambio di registro si vede subito su questa superficie ed è reversibile dallo stesso controllo.
+                        </span>
+                        <span className={proposalStyles.inlineProposal}>Tema della postazione, subito reversibile.</span>
                     </p>
                 </div>
-                <div className={styles.previewField} aria-live="polite">
-                    <span>Valore verificabile</span>
-                    <strong className="lume-registro" data-lume-register-value="true">08:30</strong>
-                    <span>Testo operativo nella Voce</span>
+                <div className={`${styles.previewField} ${proposalStyles.originalOnly}`} aria-live="polite">
+                    <span className={proposalStyles.inlineOriginal}>Valore verificabile</span>
+                    <strong className={`${proposalStyles.inlineOriginal} lume-registro`} data-lume-register-value="true">08:30</strong>
+                    <span className={proposalStyles.inlineOriginal}>Testo operativo nella Voce</span>
                 </div>
                 <div className={styles.previewActions}>
                     <ThemeToggle />
@@ -196,14 +236,15 @@ export default function SettingsPage() {
                         className={styles.primaryAction}
                         data-settings-primary="true"
                     >
-                        Regola aspetto
+                        <span className={proposalStyles.inlineOriginal}>Regola aspetto</span>
+                        <span className={proposalStyles.inlineProposal}>Apri aspetto</span>
                         <ArrowUpRight aria-hidden="true" />
                     </Link>
                 </div>
             </section>
 
             <nav className={styles.settingsIndex} aria-labelledby="settings-index-title">
-                <div className={styles.indexHeading}>
+                <div className={`${styles.indexHeading} ${proposalStyles.originalOnly}`}>
                     <p className={styles.sectionLabel}>Indice</p>
                     <div>
                         <h2 id="settings-index-title">Tutte le impostazioni</h2>
@@ -211,7 +252,7 @@ export default function SettingsPage() {
                     </div>
                 </div>
 
-                <div className={styles.indexGroups}>
+                <div className={`${styles.indexGroups} ${proposalStyles.originalOnly}`}>
                     {SETTINGS_NAV_GROUPS.map((group) => (
                         <div className={styles.indexGroup} key={group.id}>
                             <p className={styles.indexGroupTitle}>{group.label}</p>
@@ -226,7 +267,7 @@ export default function SettingsPage() {
                                         >
                                             <span>
                                                 <strong>{item.label}</strong>
-                                                <small>{item.description}</small>
+                                                <small className={proposalStyles.blockOriginal}>{item.description}</small>
                                             </span>
                                             <ArrowUpRight aria-hidden="true" />
                                         </Link>
@@ -235,6 +276,12 @@ export default function SettingsPage() {
                             </ul>
                         </div>
                     ))}
+                </div>
+
+                <div className={proposalStyles.proposalQuickLinks} aria-label="Scorciatoie impostazioni">
+                    <Link href="/settings/backup" className={styles.secondaryAction}>Backup</Link>
+                    <Link href="/settings/profilo" className={styles.secondaryAction}>Profilo</Link>
+                    <Link href="/settings/repertori" className={styles.secondaryAction}>Repertori</Link>
                 </div>
             </nav>
         </div>

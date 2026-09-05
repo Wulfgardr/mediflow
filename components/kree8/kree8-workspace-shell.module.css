@@ -1016,3 +1016,19 @@
 .synopticNotes p { margin: 5px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 :global(html[data-ui-reduce-motion='true'][data-runtime-twin-design='proposal']) .clinicalStack > :global([data-folder-active='true']) { animation: none; }
 :global(html[data-ui-reduce-motion='true'][data-runtime-twin-design='proposal']) .clinicalBody { scroll-behavior: auto; }
+/* @Codex: the surrounding workbench supplies the sole application frame. */
+:global(html[data-runtime-twin-design='proposal']) .shell { position: absolute; inset: 0; padding: 0; }
+:global(html[data-runtime-twin-design='proposal']) .canvas { border: 0; border-radius: 0; padding: 0; gap: 0; background: var(--lume-surface-focal); }
+:global(html[data-runtime-twin-design='proposal']) .chrome { position: relative; top: 0; border-radius: 0; padding: 24px 32px 20px; border: 0; border-bottom: 1px solid var(--k8-line); background: transparent; }
+:global(html[data-runtime-twin-design='proposal']) .chromeTopRow { min-height: 34px; }
+:global(html[data-runtime-twin-design='proposal']) .hero { padding: 8px 0 0; }
+:global(html[data-runtime-twin-design='proposal']) .title { font-size: 26px; line-height: 1.25; }
+:global(html[data-runtime-twin-design='proposal']) .brandMark { display: none; }
+:global(html[data-runtime-twin-design='proposal']) .workspaceBody { padding: 26px 32px 50px; }
+/* @Codex: secondary navigation is a compact link, never a full-width pill. */
+:global(html[data-runtime-twin-design='proposal']) .backButton { flex: 0 0 auto; width: fit-content; min-height: 36px; border: 0; border-radius: 5px; background: transparent; padding: 6px 0; justify-content: flex-start; }
+/* @Codex: the workspace already supplies Pazienti and Privacy once. */
+:global(html[data-runtime-twin-design='proposal']) .canvas:has([data-runtime-settings]) .chromeTopRow { display: none; }
+:global(html[data-runtime-twin-design='proposal']) .canvas:has([data-runtime-settings]) .chrome { grid-template-columns: minmax(0, 1fr); padding-block: 20px; }
+:global(html[data-runtime-twin-design='proposal']) .canvas:has([data-runtime-settings]) .hero { padding: 0; }
+@media (max-width: 700px) { :global(html[data-runtime-twin-design='proposal']) .chrome { padding: 20px; } :global(html[data-runtime-twin-design='proposal']) .workspaceBody { padding: 22px 20px; } }

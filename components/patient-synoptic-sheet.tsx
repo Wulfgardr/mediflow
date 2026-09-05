@@ -16,6 +16,7 @@ import type { ReactNode } from 'react';
 
 import type { Diagnosis } from '@/lib/db';
 import styles from '@/components/kree8/kree8-workspace-shell.module.css';
+import reading from './twin-synoptic-sheet.module.css';
 
 export interface SynopticTherapyLine {
     id: string;
@@ -97,9 +98,39 @@ export function PatientSynopticSheet({
     nextCheckupLabel,
     nextCheckupTitle,
 }: PatientSynopticSheetProps) {
-    const { proposal } = useRuntimeTwinDesign();
+    const { proposal, composition } = useRuntimeTwinDesign();
     const visibleTherapies = therapies ? therapies.slice(0, THERAPY_CAP) : [];
     const extraTherapies = therapiesTotal !== undefined ? therapiesTotal - visibleTherapies.length : 0;
+
+    /* @Codex: a selective reading surface uses only supplied records. Absent
+       secondary modules stay in navigation; no empty specialist cards. */
+    if (proposal) return (
+      <section id="quadro" aria-label="Riepilogo clinico" className={reading.sheet} data-layout={composition}>
+        <div className={reading.main}>
+          <div className={reading.problem}>
+            <div className={reading.sectionHead}><h2>Quadro clinico</h2><a href="#identita">Anagrafica e diagnosi</a></div>
+            {leadDiagnosis ? <><p className={reading.diagnosis}>{leadDiagnosis.description || leadDiagnosis.code}</p><p className={reading.meta}>{[leadDiagnosis.code, leadDiagnosis.system, otherProblemsCount > 0 ? `altre ${otherProblemsCount} diagnosi` : null].filter(Boolean).join(' · ')}</p></>
+              : <p className={reading.muted}>Diagnosi non registrata. <a href="#identita">Completa la scheda</a></p>}
+            {notes?.trim() ? <div className={reading.notes}><h3>Note in cartella</h3><p>{notes.length > 320 ? `${notes.slice(0, 320).trimEnd()}…` : notes}</p>{notes.length > 320 ? <details><summary>Leggi la nota completa</summary><p>{notes}</p></details> : null}</div> : null}
+          </div>
+          {therapies === undefined || visibleTherapies.length > 0 ? <div className={reading.therapies}>
+            <div className={reading.sectionHead}><h2>Terapie attive <span>{therapiesTotal ?? ''}</span></h2><a href="#terapie">Gestisci</a></div>
+            {therapies === undefined ? <SkeletonLines rows={2} /> : <ul>{visibleTherapies.map(therapy => <li key={therapy.id}><strong>{therapy.drugName}</strong><span>{therapy.dosage || 'Posologia non registrata'}</span></li>)}</ul>}
+            {extraTherapies > 0 ? <a href="#terapie" className={reading.more}>Vedi tutte le {therapiesTotal} terapie</a> : null}
+          </div> : null}
+        </div>
+        <aside className={reading.context} aria-label="Contesto della cartella">
+          {signals.filter(signal => Number(signal.value) !== 0 && signal.label !== 'Da rivedere').map(signal => <div className={reading.fact} key={signal.label}><span>{signal.label}</span>{signal.href ? <a href={signal.href} className={SIGNAL_TONE[signal.tone ?? 'neutral']}>{signal.value}</a> : <strong>{signal.value}</strong>}</div>)}
+          {latestMeasure ? <div className={reading.measure}>
+            <div className={reading.sectionHead}><h3>Ultima misura</h3><a href="#parametri">Apri</a></div>
+            <p>{latestMeasure.display}</p><strong className={latestMeasure.outOfRange ? 'text-[color:var(--lume-signal-critical)]' : undefined}>{latestMeasure.valueLabel}{latestMeasure.outOfRange ? ` · ${latestMeasure.outOfRange}` : ''}</strong>
+            <span>{latestMeasure.dateLabel}</span>
+            {latestMeasure.delta ? <small>{latestMeasure.delta.direction === 'up' ? 'In aumento' : latestMeasure.delta.direction === 'down' ? 'In calo' : 'Stabile'} · {latestMeasure.delta.label} {latestMeasure.delta.sinceLabel}</small> : null}
+          </div> : null}
+          {nextCheckupLabel ? <div className={reading.followup}><h3>Controllo pianificato</h3><a href="#follow-up">{nextCheckupLabel}</a>{nextCheckupTitle ? <p>{nextCheckupTitle}</p> : null}</div> : null}
+        </aside>
+      </section>
+    );
 
     return (
         <section id="quadro" aria-labelledby="synoptic-title" className={styles.synoptic}>

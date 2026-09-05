@@ -8,12 +8,16 @@ import { TimelineEntryCard, TimelineEntryData } from './timeline-entry-card';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { useToast } from '@/components/ui/toast-provider';
 import { LumeFilo } from '@/components/ui/lume-filo';
+/* @Codex */
+import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
+import twin from './twin-diary.module.css';
 
 interface TimelineProps {
     entries: TimelineEntryData[];
 }
 
 export default function Timeline({ entries }: TimelineProps) {
+    const { proposal } = useRuntimeTwinDesign();
     const [showDeleted, setShowDeleted] = useState(false);
     const [viewingFile, setViewingFile] = useState<Attachment | null>(null);
     const [activeEntryId, setActiveEntryId] = useState<string | null>(null);
@@ -107,16 +111,16 @@ export default function Timeline({ entries }: TimelineProps) {
             <div className="flex justify-end">{auditToggle}</div>
 
             <div
-                className="relative ml-3 space-y-3 pb-8"
+                className={proposal ? twin.diary : 'relative ml-3 space-y-3 pb-8'}
                 role="feed"
                 aria-label="Diario clinico del paziente"
             >
-                <LumeFilo
+                {!proposal && <LumeFilo
                     variant="spina"
                     nodeCount={visibleEntries.length}
                     anchorSelector="[data-lume-timeline-node]"
                     className="absolute left-[-0.5px] w-px"
-                />
+                />}
                 {visibleEntries.map((entry, index) => (
                     <TimelineEntryCard
                         key={entry.id}

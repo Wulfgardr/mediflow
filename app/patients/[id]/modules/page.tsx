@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
 import { useParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { Accessibility, Activity, ChevronRight, FileText, Pill, Plus, ShieldCheck, Stethoscope } from 'lucide-react';
@@ -66,6 +67,7 @@ function navigateToObservationForm(): void {
 }
 
 export default function PatientDetailPage() {
+    const { proposal } = useRuntimeTwinDesign();
     const params = useParams();
     const id = params.id as string;
     const [isExportModalOpen, setIsExportModalOpen] = useState(false);
@@ -538,7 +540,7 @@ export default function PatientDetailPage() {
         { href: '#terapie', label: 'Terapie', meta: workspace ? String(workspace.activeTherapiesCount) : undefined },
         { href: '#prestazioni', label: 'Prestazioni', meta: prestazioniCount !== undefined ? String(prestazioniCount) : undefined },
         { href: '#protesica', label: 'Protesica', meta: protesicaCount !== undefined ? String(protesicaCount) : undefined },
-        { href: '#scale', label: 'Scale' },
+        { href: '#scale', label: 'Scale', meta: String(scaleEntries.length) },
         { href: '#documenti', label: 'Documenti', meta: String(attachmentItems.length) },
         { href: '#siss', label: 'SISS/FSE' },
         { href: '#timeline', label: 'Timeline', meta: String(nonScaleEntries.length + (checkups ?? []).length + documentInsights.length) },
@@ -665,12 +667,12 @@ export default function PatientDetailPage() {
             )}
         >
             <div className={workspaceStyles.clinicalStack}>
-                <section id="attenzione" className={workspaceStyles.attentionBand} aria-labelledby="attention-title" data-testid="lume-scheda-attention">
+                <section id="attenzione" className={workspaceStyles.attentionBand} data-has-attention={reviewQueueSummary.attentionCount + openLoopCount > 0} aria-labelledby="attention-title" data-testid="lume-scheda-attention">
                     <div className={workspaceStyles.attentionHead}>
                         <div>
-                            <p className={workspaceStyles.sectionLabel}>Attenzione</p>
-                            <h2 id="attention-title" className={workspaceStyles.sectionTitle}>Cosa fare adesso</h2>
-                            <p className={workspaceStyles.sectionCopy}>Decisioni e attese aperte prima del resto della scheda.</p>
+                            {!proposal ? <p className={workspaceStyles.sectionLabel}>Attenzione</p> : null}
+                            <h2 id="attention-title" className={workspaceStyles.sectionTitle}>{proposal ? 'Da rivedere' : 'Cosa fare adesso'}</h2>
+                            {!proposal ? <p className={workspaceStyles.sectionCopy}>Decisioni e attese aperte prima del resto della scheda.</p> : null}
                         </div>
                     </div>
                     <div className={workspaceStyles.attentionContent}>

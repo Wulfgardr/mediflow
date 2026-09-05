@@ -11,6 +11,8 @@ import PrivacyBlur from '@/components/privacy-blur';
 import { PrivacyModeToggle } from '@/components/privacy-mode-toggle';
 import { RuntimeTwinFolderContext, useRuntimeTwinDesign } from '@/components/runtime-twin-design';
 import styles from './kree8-workspace-shell.module.css';
+import { RuntimeTwinPatientNavigation } from '@/components/runtime-twin-workspace';
+import twin from './twin-patient-shell.module.css';
 
 export type Kree8WorkspaceNavItem = {
   href: string;
@@ -84,7 +86,7 @@ export function Kree8WorkspaceShell({
   const renderedNavItems = navGroups ? navGroups.flatMap((group) => group.items) : navItems;
   const navKey = renderedNavItems.map((item) => item.href).join('|');
   const PrimaryActionIcon = primaryAction?.icon;
-  const { proposal } = useRuntimeTwinDesign();
+  const { proposal, composition } = useRuntimeTwinDesign();
   const [folderSection, setFolderSection] = useState('quadro');
   const [folderNavOpen, setFolderNavOpen] = useState(false);
   const folderToggleRef = useRef<HTMLButtonElement>(null);
@@ -96,14 +98,14 @@ export function Kree8WorkspaceShell({
     if (!folderMode) return;
     const selectFromHash = () => {
       const href = window.location.hash;
-      const section = navKey.split('|').includes(href) ? href.slice(1) : 'quadro';
+      const section = navKey.split('|').includes(href) ? href.slice(1) : composition === 'stream' ? 'diario' : 'quadro';
       setFolderSection(section);
       setFolderNavOpen(false);
     };
     selectFromHash();
     window.addEventListener('hashchange', selectFromHash);
     return () => window.removeEventListener('hashchange', selectFromHash);
-  }, [folderMode, navKey]);
+  }, [folderMode, navKey, composition]);
 
   /* Lume focal locus + scrollspy (WUL-55, F2c). Un solo effetto governa la vita
      dei bersagli: li scopre nel DOM dentro QUESTO guscio (querySelector sul ref,
@@ -255,12 +257,22 @@ export function Kree8WorkspaceShell({
 
   return (
     <RuntimeTwinFolderContext.Provider value={folderMode ? folderSection : null}>
-    <div className={`${styles.shell} ${isClinical ? styles.clinicalShell : ''}`} ref={rootRef}>
-      <main className={`${styles.canvas} ${isClinical ? styles.clinicalCanvas : ''}`} data-folder-section={folderMode ? folderSection : undefined} data-testid={isClinical ? 'lume-scheda-scroll' : undefined}>
+    <div className={folderMode ? twin.patientShell : `${styles.shell} ${isClinical ? styles.clinicalShell : ''}`} ref={rootRef}>
+      <main className={folderMode ? twin.patientCanvas : `${styles.canvas} ${isClinical ? styles.clinicalCanvas : ''}`} data-folder-section={folderMode ? folderSection : undefined} data-testid={isClinical ? 'lume-scheda-scroll' : undefined}>
         <header
-          className={`${styles.chrome} ${isClinical ? styles.clinicalChrome : ''}`}
+          className={folderMode ? twin.patientHeader : `${styles.chrome} ${isClinical ? styles.clinicalChrome : ''}`}
           data-testid={isClinical ? 'lume-scheda-header' : undefined}
         >
+          {folderMode ? <>
+            <div className={twin.identity}>
+              <h1><PrivacyBlur>{title}</PrivacyBlur></h1>
+              <p>{patientAtoms.slice(0, 2).map((atom, index) => <span key={atom}>{index > 0 ? ' · ' : ''}<PrivacyBlur>{atom}</PrivacyBlur></span>)}</p>
+            </div>
+            <div className={twin.actions}>
+              {primaryAction && PrimaryActionIcon ? <Link href={primaryAction.href} className={twin.primary}><PrimaryActionIcon size={16} aria-hidden />{primaryAction.label}</Link> : null}
+              {headerActions}
+            </div>
+          </> : <>
           <div className={styles.chromeTopRow}>
             <Link href={backHref} className={styles.backButton} aria-label={backLabel} title={backLabel}>
               <ArrowLeft size={13} aria-hidden />
@@ -268,7 +280,7 @@ export function Kree8WorkspaceShell({
             </Link>
             <div className={styles.headerActionCluster}>
               {/* WUL-297: persistent privacy affordance in the app header */}
-              <PrivacyModeToggle showLabel />
+              {!proposal ? <PrivacyModeToggle showLabel /> : null}
               {primaryAction && PrimaryActionIcon ? (
                 <Link href={primaryAction.href} className={styles.headerPrimaryAction}>
                   <PrimaryActionIcon size={14} aria-hidden="true" />
@@ -298,7 +310,7 @@ export function Kree8WorkspaceShell({
                 <FolderOpen size={12} />
               </span>
               <div className={styles.heroText}>
-                <p className={styles.eyebrow}>{eyebrow}</p>
+                {!proposal ? <p className={styles.eyebrow}>{eyebrow}</p> : null}
                 <h1 className={styles.title}>
                   <span className={styles.titleMain}>{title}</span>
                 </h1>
@@ -307,24 +319,15 @@ export function Kree8WorkspaceShell({
                     <PrivacyBlur>{patientLabel}</PrivacyBlur>
                   </p>
                 ) : null}
-                <p className={styles.subtitle}>{subtitle}</p>
-                {statusLabel ? <p className={styles.statusLine}>{statusLabel}</p> : null}
+                {!proposal ? <p className={styles.subtitle}>{subtitle}</p> : null}
+                {statusLabel && !proposal ? <p className={styles.statusLine}>{statusLabel}</p> : null}
               </div>
             </div>
           )}
+          </>}
         </header>
 
-        {folderMode ? (
-          <button ref={folderToggleRef} type="button" className={styles.folderMobileToggle} aria-expanded={folderNavOpen}
-            data-testid="folder-navigation-toggle"
-            onKeyDown={(event) => { if (event.key === 'Escape') setFolderNavOpen(false); }}
-            aria-controls={`${railId}-nav`} onClick={() => setFolderNavOpen(value => !value)}>
-            <FolderOpen size={18} aria-hidden />
-            <span>Cartella <strong>{renderedNavItems.find(item => item.href === `#${folderSection}`)?.label}</strong></span>
-            <ChevronRight size={16} aria-hidden />
-          </button>
-        ) : null}
-        {renderedNavItems.length > 0 ? (
+        {folderMode ? <RuntimeTwinPatientNavigation items={renderedNavItems} active={folderSection} /> : renderedNavItems.length > 0 ? (
           <nav
             id={`${railId}-nav`}
             className={`${styles.sectionRail} ${navGroups ? styles.groupedSectionRail : ''}`}
@@ -396,12 +399,12 @@ export function Kree8WorkspaceShell({
           </nav>
         ) : null}
 
-        <div className={`${styles.workspaceBody} ${isClinical ? styles.clinicalBody : ''}`}>
+        <div key="workspace-body" className={folderMode ? twin.patientBody : `${styles.workspaceBody} ${isClinical ? styles.clinicalBody : ''}`} data-folder-section={folderMode ? folderSection : undefined}>
           {isClinical ? (
             <article
-              className={styles.clinicalSurface}
+              className={folderMode ? twin.readingPane : styles.clinicalSurface}
               data-testid="lume-scheda-surface"
-              data-lume-elevation="focal"
+              data-lume-elevation={folderMode ? undefined : "focal"}
             >
               {children}
             </article>

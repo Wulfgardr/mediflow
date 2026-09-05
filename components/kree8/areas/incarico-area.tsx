@@ -479,7 +479,7 @@ function IncaricoArea({
                             patientStyles.patientRow,
                             isSelected && patientStyles.patientRowSelected,
                           )}
-                          onClick={() => onSelectPatient(p.id)}
+                          onClick={() => { if (proposal) router.push(`/patients/${p.id}/modules`); else onSelectPatient(p.id); }}
                           role="option"
                           aria-selected={isSelected}
                           tabIndex={isSelected ? 0 : -1}
