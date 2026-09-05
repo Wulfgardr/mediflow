@@ -1,0 +1,5 @@
+/* @Codex WUL-676: reserved space exists only in the opt-in prototype. */
+html[data-runtime-twin='true'] { --runtime-twin-inset: 44px; }
+@media (max-width: 540px) {
+    html[data-runtime-twin='true'] { --runtime-twin-inset: 64px; }
+}

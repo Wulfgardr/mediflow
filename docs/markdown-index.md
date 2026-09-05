@@ -20,6 +20,7 @@ Ultimo aggiornamento: 2026-09-06
 | [start-here.md](./start-here.md) | Bisogno, glossario e tre livelli di lettura. | Primo accesso al progetto. |
 | [release-085-readiness.md](./release-085-readiness.md) | Evidenze runtime, gate aperti, account Apple e promozione. | Prima di presentare o distribuire la 0.8.5. |
 | [getmediflow-editorial-proposal.md](./getmediflow-editorial-proposal.md) | Proposta sito e rinnovo progressivo della documentazione. | Revisione del racconto pubblico. |
+| [design/2026-09-05-086-runtime-twin.md](./design/2026-09-05-086-runtime-twin.md) | Gemello web sintetico 0.8.6, copertura, confronto visuale e launcher locale. | Esplorazione e verifica del candidato WUL-676. |
 
 ## 📚 Come usare questo indice
 
