@@ -32,7 +32,8 @@ dipendenze locali nel worktree. Nessun database reale o configurazione privata.
 | Verifica | Esito |
 | --- | --- |
 | Test client preview | 6 passati; prima della modifica l'asserzione sui conteggi OCR falliva, dopo passa. Provenienza malformata continua a essere rifiutata. |
-| Browser `document-upload-ocr` e `document-upload-anydoc-focus` | 6 passati, un worker, 51,9 secondi; server webpack isolato, database sintetico da migrazioni, copia legacy disabilitata. |
+| Browser `document-upload-ocr` e `document-upload-anydoc-focus`, sviluppo | 6 passati, un worker, 51,9 secondi; server webpack isolato, database sintetico da migrazioni, copia legacy disabilitata. |
+| Stessi test browser, bundle di produzione standalone | 6 passati, un worker, 34,8 secondi; server loopback separato e nuovo database sintetico. La route revision ha restituito `737e22c59006`, branch OCR e stato clean. |
 | `test:document-synthesis` | 47 passati. |
 | `test:ai-context` | 72 passati. |
 | `test:pdf-service` | 20 passati. |
@@ -63,13 +64,18 @@ conservando parole, ordine, digest del risultato e provenienza. Lo screenshot
 del PDF misto è stato riletto visivamente; il testo resta in un'anteprima con
 scorrimento interno, come prima della modifica.
 
-Le prove browser usano sviluppo webpack. La build è stata verificata
-separatamente; questo non è un test E2E del pacchetto installato.
+Le prove browser coprono sia sviluppo webpack sia il bundle standalone prodotto
+dalla build, con i suoi asset statici e la directory public. Il secondo server
+è stato arrestato dopo la prova e la porta verificata libera. Questo dimostra
+il percorso nel bundle locale di produzione; resta distinto dal pacchetto
+distribuito, firmato o installato su un altro Mac.
 
 ## Allestimento e ripetibilità
 
 I log locali restano in `tmp-086-ocr/`, escluso da Git; screenshot e report
 Playwright restano in `test-results/` e `playwright-report/`, esclusi da Git.
+Le prove standalone sono in `tmp-086-ocr/standalone-browser.log`,
+`standalone-server.log`, `standalone-revision.json` e `standalone-test-results/`.
 
 Eseguire con Node 24 nel PATH e dipendenze realmente sotto il package root.
 Il renderer non ammette dipendenze raggiunte attraverso symlink esterni.
@@ -77,6 +83,12 @@ Per la prova browser impostare `MEDIFLOW_E2E_DISABLE_LEGACY_COPY=1`, una directo
 dati sintetica dedicata e una porta loopback libera; usare
 `E2E_SPECS='e2e/document-upload-ocr.spec.ts e2e/document-upload-anydoc-focus.spec.ts'`
 con `E2E_NEXT_BUNDLER=webpack` in `scripts/e2e-smoke.sh`.
+
+Per la prova standalone, dopo la build e la copia degli asset nel bundle,
+preparare un nuovo database sintetico con `scripts/prepare-e2e-db.mjs` e avviare
+`.next/standalone/server.js` con Node 24, `HOSTNAME=127.0.0.1`, porta libera e
+`MEDIFLOW_DATA_DIR` dedicata. Eseguire i due spec Playwright con `E2E_BASE_URL`
+verso quel server, un worker, poi arrestare il solo processo creato per la prova.
 
 Il primo tentativo di build usava una directory dati nel lungo percorso del
 worktree: il guard del socket PM2 l'ha rifiutata oltre 103 byte. La build valida
