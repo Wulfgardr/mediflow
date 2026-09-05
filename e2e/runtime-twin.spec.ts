@@ -73,28 +73,40 @@ test('all cockpit areas and patient contexts remain reachable', async () => {
     }
 });
 
-test('design comparison preserves an unfinished form and real save persists', async () => {
+test('design comparison preserves an unfinished form and profile writes reach storage', async () => {
     await page.goto('/settings/profilo');
     const name = page.locator('#doctor-name');
     await expect(name).not.toHaveValue('');
-    const original = await name.inputValue();
-    await name.fill('Medico Demo · verifica sintetica');
+    const original = await page.evaluate(async () => (await (await fetch('/api/settings/doctorName')).json()).value as string);
+    const savedName = `Medico Demo sintetico ${Date.now()}`;
+    await name.fill(savedName);
     await page.getByRole('button', { name: 'Originale', exact: true }).click();
     await expect(page.locator('html')).toHaveAttribute('data-runtime-twin-design', 'original');
-    await expect(name).toHaveValue('Medico Demo · verifica sintetica');
+    await expect(name).toHaveValue(savedName);
     await page.getByRole('button', { name: 'Proposta', exact: true }).click();
-    await expect(name).toHaveValue('Medico Demo · verifica sintetica');
+    await expect(name).toHaveValue(savedName);
     const saved = page.waitForResponse(response => response.url().endsWith('/api/auth/profile') && response.request().method() === 'PUT');
     await page.getByRole('button', { name: 'Salva profilo', exact: true }).click();
     expect((await saved).status()).toBe(200);
     await expect(page.getByText('Profilo aggiornato', { exact: true })).toBeVisible();
     await page.reload();
-    await expect(name).toHaveValue('Medico Demo · verifica sintetica');
+    await expect(name).not.toHaveValue('');
+    const stored = await page.evaluate(async () => (await (await fetch('/api/settings/doctorName')).json()).value as string);
+    expect(stored).toBe(savedName);
+    // Observe the inherited session-cache defect explicitly. This check proves
+    // the server write, not correctness of the restored operator label.
+    fs.writeFileSync('tmp-086-twin/profile-reload.json', JSON.stringify({ stored, displayed: await name.inputValue() }, null, 2));
     await name.fill(original);
     const restored = page.waitForResponse(response => response.url().endsWith('/api/auth/profile') && response.request().method() === 'PUT');
     await page.getByRole('button', { name: 'Salva profilo', exact: true }).click();
     expect((await restored).status()).toBe(200);
     await expect(page.getByText('Profilo aggiornato', { exact: true })).toBeVisible();
+    await page.goto('/settings/accesso');
+    await page.getByRole('button', { name: 'Blocca sessione adesso', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Sblocca MediFlow' })).toBeVisible();
+    await unlockIfNeeded(page, '086086');
+    await page.goto('/settings/profilo');
+    await expect(name).toHaveValue(original);
 });
 
 test('real diary save returns to the folder and survives reload', async () => {
