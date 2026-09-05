@@ -6,6 +6,8 @@ import { useState, useEffect } from 'react';
 import { Save, User } from 'lucide-react';
 import { useSecurity } from '@/components/security-provider';
 import { useToast } from '@/components/ui/toast-provider';
+/* @Codex */
+import { WorkProfileSettings } from '@/components/work-profile-onboarding';
 import {
     SETTINGS_CARD_CLASS,
     SETTINGS_INPUT_CLASS,
@@ -71,6 +73,9 @@ export default function SettingsProfilePage() {
                 title="Profilo"
                 description="Identità mostrata nei documenti generati: intestazione, ricette e referti."
             />
+
+            {/* @Codex: work preferences have their own reversible owner, separate from identity. */}
+            <WorkProfileSettings />
 
             <div className={SETTINGS_CARD_CLASS}>
                 {/* @Codex WUL-229: header icon disc + ink copy mapped to MediFlow tokens */}

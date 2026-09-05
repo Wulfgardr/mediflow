@@ -169,15 +169,8 @@ async function bootstrapFabricSession(page: Page, pin: string): Promise<void> {
     await page.getByPlaceholder('es. Dott. Nome Medico').fill('Dr. E2E Fabric');
     await page.getByPlaceholder('es. Studio Medico Centrale').fill('Ambulatorio E2E');
     await page.getByRole('button', { name: 'Avanti' }).click();
-    await expect(page.getByRole('heading', { name: 'Ruolo' })).toBeVisible();
-    await page.getByRole('button', { name: 'Avanti' }).click();
-    await expect(page.getByRole('heading', { name: 'Credenziali di Accesso' })).toBeVisible();
-    await page.getByPlaceholder('es. operatore.demo').fill('admin');
-    await page.getByPlaceholder('Password sicura').fill('password');
-    await page.getByRole('button', { name: 'Avanti' }).click();
-  }
-  const security = page.getByRole('heading', { name: /^Sicurezza(?: Locale)?$/u });
-  if (await isVisible(security)) {
+    // @Codex: the security wizard collects identity and PIN only.
+    await expect(page.getByRole('heading', { name: 'Sicurezza', exact: true })).toBeVisible();
     const pinInputs = page.locator('input[placeholder="••••••"]');
     await pinInputs.nth(0).fill(pin);
     await pinInputs.nth(1).fill(pin);
