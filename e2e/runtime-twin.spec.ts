@@ -154,9 +154,13 @@ test('real diary save returns to the folder and survives reload', async () => {
 test('directory proposal exposes recorded diagnoses and context across input modes', async () => {
     test.setTimeout(60_000);
     await page.setViewportSize({ width: 1440, height: 960 });
-    await page.goto('/?area=incarico');
+    await page.goto('/?area=incarico&paziente=twin-086-05');
     const rows = page.getByTestId('lume-patient-row');
     await expect(rows).toHaveCount(5);
+    // A URL retaining an archived patient must resolve to a visible record.
+    await expect(page).not.toHaveURL(/paziente=twin-086-05/);
+    await expect(page.getByTestId('lume-patient-lens').getByRole('link', { name: 'Apri scheda paziente' }))
+        .toHaveAttribute('href', `/patients/${new URL(page.url()).searchParams.get('paziente')}/modules`);
     const row = rows.filter({ hasText: 'Persona 02' });
     await expect(row.getByText('Condizione dimostrativa per revisione periodica', { exact: true })).toBeVisible();
     const empty = rows.filter({ hasText: 'Persona 06' });

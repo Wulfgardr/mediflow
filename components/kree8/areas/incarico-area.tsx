@@ -105,6 +105,13 @@ function IncaricoArea({
 
   const selected = visible.find((p) => p.id === selectedPatientId) ?? visible[0] ?? null;
 
+  /* @Codex: a filtered directory can display its first visible record while
+     the cockpit still retains an archived/nonmatching patient. Keep actions
+     and the visible record aligned in the proposal. This changes view state. */
+  useEffect(() => {
+    if (proposal && selected && selected.id !== selectedPatientId) onSelectPatient(selected.id);
+  }, [proposal, selected, selectedPatientId, onSelectPatient]);
+
   /* @Codex WUL-560 L6A: the disclosure owns focus and closes when its patient
      context changes. The four existing actions keep their original handlers. */
   useEffect(() => {
