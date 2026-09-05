@@ -33,6 +33,7 @@ Ultimo aggiornamento: 2026-09-05
 | File | Scopo | Quando consultarlo |
 | --- | --- | --- |
 | [docs/analysis/2026-09-05-mediflow-086-baseline.md](./analysis/2026-09-05-mediflow-086-baseline.md) | Baseline WUL-670, prove sintetiche e recuperi selettivi. | Prima delle tranche 0.8.6; limiti runtime espliciti. |
+| [docs/analysis/2026-09-05-086-who-decision.md](./analysis/2026-09-05-086-who-decision.md) | Proposta WHO online o locale, contratti e piano di verifica. | Prima della scelta WUL-672 e dell'implementazione WUL-673; non attiva il servizio. |
 | [docs/roadmap-086-consolidamento.md](./roadmap-086-consolidamento.md) | Piano e issue Linear per OCR, WHO, UI/design arena, onboarding, deslop, GDPR/AI Act e recupero branch. | Prima di avviare le tranche 0.8.6; non è evidenza runtime o attestazione di conformità. |
 
 ## Candidato Web 0.8.5

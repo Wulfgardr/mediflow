@@ -33,6 +33,10 @@ AnyDoc e fallback PDF Apple Vision distinti dal catalogo Fabric.
 [Prima verifica OCR](./analysis/2026-09-05-086-ocr-verification.md): preview,
 matrice browser sintetica e gate ancora aperti.
 
+[Proposta WHO WUL-672](./analysis/2026-09-05-086-who-decision.md): opzioni
+online e catalogo locale, contratto del cross-check e prove richieste.
+Candidato in attesa della scelta utente; ADR e servizio attivi non cambiano.
+
 [Baseline operativa WUL-670](./analysis/2026-09-05-mediflow-086-baseline.md):
 base corrente, prove sintetiche, recuperi prioritari e ordine di sviluppo.
 
