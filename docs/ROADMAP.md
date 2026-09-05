@@ -15,6 +15,16 @@ read_when:
 
 > [!NOTE]
 
+## Proposta preparatoria 0.8.6 — consolidamento
+
+La [mini roadmap 0.8.6](./roadmap-086-consolidamento.md) raccoglie OCR con fallback
+locale funzionante, ICD-11 WHO accessibile, impostazioni più semplici, revisione
+della scheda paziente localhost, onboarding assistito, deslop globale e filone
+GDPR/AI Act con applicabilità e prove. Include template di lavoro,
+criteri di accettazione, alternative visive e selezione preliminare dei branch
+locali da riesaminare. Stato al 5 settembre 2026: progetto Linear creato con
+20 issue e sei milestone; nessuna consegna runtime o conformità attestata.
+
 ## ✅ Fatto (v0.3.0)
 
 Le fondamenta sono solide e usabili in produzione locale.
