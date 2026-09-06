@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { webcrypto } from 'node:crypto';
-import { validateStep, compareRecords, acceptVerifiedStep, readRoutesForStep } from './mobile-home-base-interop-module-verifier.mjs';
+import { validateStep, compareRecords, acceptVerifiedStep, readRoutesForStep, assertHostRevision } from './mobile-home-base-interop-module-verifier.mjs';
 import { sealField } from './mobile-home-base-interop.mjs';
 
 const descriptor = { fixtureId: 'synthetic-fixture', patient: { id: 'synthetic-patient' } };
@@ -171,4 +171,31 @@ test('each clinical module requires authenticated sealed fields while canonical 
         const encryptedCode = { ...wire, [plainField]: await sealField(plainValue, key) };
         await assert.rejects(compareRecords(candidate, [encryptedCode], [encryptedCode], key, key), module);
     }
+});
+
+// @Codex: PublicAppRevisionSummary uses the shared git --short=12 summary;
+// descriptor provenance retains the immutable full owner-provided commit.
+test('host revision accepts the canonical 12-character prefix with coherent clean fingerprints', () => {
+    const source = '25e8f8708f47a51c45f2bdfd64a8caa5e422d45b';
+    const fingerprint = 'codex/synthetic-host@25e8f8708f47:clean';
+    assert.doesNotThrow(() => assertHostRevision({ revision: source.slice(0, 12),
+        sourceFingerprint: fingerprint, fingerprint }, source));
+});
+
+test('host revision rejects wrong, unknown, ambiguous or incoherent provenance', () => {
+    const source = '25e8f8708f47a51c45f2bdfd64a8caa5e422d45b';
+    const fingerprint = 'codex/synthetic-host@25e8f8708f47:clean';
+    const summary = { revision: source.slice(0, 12), sourceFingerprint: fingerprint, fingerprint };
+    for (const patch of [{ revision: 'aaaaaaaaaaaa' }, { revision: 'unknown' }, { revision: '' },
+        { revision: source }, { revision: source.slice(0, 7) }, { sourceFingerprint: 'unknown' },
+        { sourceFingerprint: 'codex/synthetic-host@aaaaaaaaaaaa:clean' }, { fingerprint: 'unknown' },
+        { fingerprint: 'codex/another-host@25e8f8708f47:clean' },
+        { sourceFingerprint: 'unknown@25e8f8708f47:clean', fingerprint: 'unknown@25e8f8708f47:clean' },
+        { sourceFingerprint: 'codex/synthetic-host@25e8f8708f47:dirty', fingerprint: 'codex/synthetic-host@25e8f8708f47:dirty' }]) {
+        assert.throws(() => assertHostRevision({ ...summary, ...patch }, source));
+    }
+    for (const badSource of ['unknown', source.slice(0, 12), '', null]) {
+        assert.throws(() => assertHostRevision(summary, badSource));
+    }
+    for (const missing of [null, undefined, {}]) assert.throws(() => assertHostRevision(missing, source));
 });

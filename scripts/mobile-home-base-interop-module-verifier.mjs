@@ -155,6 +155,26 @@ export async function compareRecords(step, webRows, pairedRows, webKey, pairedKe
         pairedObservation: 'exact-record-fields-and-version', nativePeerApp: 'not-proven-by-this-API-receipt' };
 }
 
+// @Codex: Shared PublicAppRevisionSummary defaults to git --short=12.
+// Bind that response to this fixture owner's immutable full commit and clean
+// fingerprint. This checks consistency; it does not attest binary contents.
+export function assertHostRevision(summary, sourceCommit) {
+    assert.equal(typeof sourceCommit, 'string', 'Missing owner source commit');
+    assert.match(sourceCommit, /^[a-f0-9]{40}$/u, 'Expected an immutable full owner commit');
+    assert.ok(summary && typeof summary === 'object' && !Array.isArray(summary), 'Missing revision summary');
+    const expectedRevision = sourceCommit.slice(0, 12);
+    assert.equal(summary.revision, expectedRevision, 'Host revision prefix changed');
+    assert.equal(typeof summary.sourceFingerprint, 'string', 'Missing source fingerprint');
+    const source = /^([^\s:]+)@([a-f0-9]{12}):clean$/u.exec(summary.sourceFingerprint);
+    assert.ok(source && source[1].toLowerCase() !== 'unknown', 'Expected the frozen fixture clean fingerprint');
+    assert.equal(source[2], expectedRevision, 'Source fingerprint revision changed');
+    // These owner-frozen fixtures attest the canonical clean fingerprint.
+    // An unknown or independently overridden fingerprint needs owner review.
+    assert.equal(summary.fingerprint, summary.sourceFingerprint, 'Runtime fingerprint differs from the frozen source fingerprint');
+    return { revision: expectedRevision, sourceFingerprint: summary.sourceFingerprint,
+        fingerprint: summary.fingerprint, ownerSourceCommit: sourceCommit };
+}
+
 export async function verifyStep(descriptor, clientPlatform, step) {
     const fetchHost = pinnedFetch(descriptor);
     const web = await loginWithWebAuthControl(descriptor.host.httpsURL,
@@ -170,7 +190,8 @@ export async function verifyStep(descriptor, clientPlatform, step) {
     try {
         const revisionResponse = await fetchHost('/api/v1/network/revision', { headers: pairing });
         assert.equal(revisionResponse.status, 200, 'Revision read failed');
-        assert.equal((await revisionResponse.json()).revision, descriptor.host.sourceCommit, 'Host revision changed');
+        checks.push({ operation: 'Host revision consistency',
+            ...assertHostRevision(await revisionResponse.json(), descriptor.host.sourceCommit) });
         const native = await fetchHost('/api/auth/native/login', { method: 'POST',
             headers: { ...pairing, 'Content-Type': 'application/json' },
             body: JSON.stringify({ username: descriptor.operator.username, password: descriptor.operator.pin }) });
