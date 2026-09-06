@@ -40,9 +40,12 @@ final class ClinicalNavigationURLTests: XCTestCase {
         XCTAssertNil(parse("mediflow://navigate?area=patients&%74oken=synthetic"))
     }
 
-    func testOnlyTheLocalSchemeAndEmptyPathAreAccepted() {
+    func testOnlyTheLocalSchemeAndEmptyPathAreAccepted() throws {
+        var wrongScheme = try XCTUnwrap(URLComponents(string: "mediflow://navigate?area=agenda"))
+        wrongScheme.scheme = "https"
+        XCTAssertNil(ClinicalNavigationURL.parse(try XCTUnwrap(wrongScheme.url)))
         for text in [
-            "https://navigate?area=agenda", "file:///navigate?area=agenda",
+            "file:///navigate?area=agenda",
             "mediflow://other?area=agenda", "mediflow://navigate/?area=agenda",
             "mediflow://navigate/agenda?area=agenda", "mediflow://navigate:1234?area=agenda",
             "mediflow://synthetic@navigate?area=agenda", "mediflow://navigate?area=agenda#",
