@@ -139,7 +139,7 @@ deducono da questa matrice statica.
 | Prestazioni e protesica | `FULL` nel perimetro paired | read/write versionati e UI nativa | nessun invio regionale o generazione NRE |
 | Export FHIR/FSE pre-check | `FULL` nel perimetro locale | bundle on-device e validazione boundary | nessun writeback FSE |
 | SISS / PRREG | `HOST-ONLY` per integrazione, utilità PRREG parziale | web con pannello/diario; Apple copia il CF e apre la dashboard PRREG dal paziente | FSE, stato sessione, diario handoff e canale regionale restano sul Mac o fuori scope |
-| Viste globali | `MIXED` | agenda, diario globale, analytics e interazione macOS reale | shell/deep-link e cockpit sintetico restano partial |
+| Viste globali | `MIXED` | agenda, diario globale, analytics e interazione macOS reale; row32 introduce il contratto di navigazione locale in `NATIVE.md` | deep-link Mac/iOS collegati a reader/sessione ordinari; apertura OS e UI dei link non ancora attestate, cockpit sintetico partial |
 | Documenti | `PARTIAL` e policy-limited | upload cifrato, archivio, insight, follow-up, allegati e stati web verificati | OCR e curation restano host per ADR 0076; questa divisione intenzionale non è equivalenza mancante |
 | Offline mobile | `PARTIAL` | cache cifrata derivata, TTL/stale live e ultimo profilo read-only nel candidato WUL-676 | Verifica UI/device del renderer integrato (`WUL-403`) |
 | AI generativa, Fabric e governance | `HOST-ONLY` | stato runtime/kill switch leggibile; registro Fabric read-only (16 capability, 4 venue, profili egress) e parliament/readiness del nodo host | ADR 0076 esclude l'invocazione AI paired; il registro e la governance descrivono il calcolo della macchina host, quindi non sono gap del client Apple |

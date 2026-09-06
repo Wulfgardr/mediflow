@@ -8,7 +8,7 @@ import UIKit
 #endif
 
 @MainActor
-final class PairedPatientsWorkspaceModel: ObservableObject {
+final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWorkspace {
     /// The operator field-crypto master key, derived from the PIN at login and
     /// held only in memory (never @Published, never persisted in clear). nil until
     /// a successful login delivers and unwraps it.
@@ -372,6 +372,11 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     private var activePatientLoadRequestID: UUID?
     /* @Codex */
     private var workspaceGeneration: UInt = 0
+    // @Codex: A navigation read leaves the selected workspace editable until
+    // commit. It owns no clinical writer, selection lease or persisted intent.
+    private var navigationLoadRequestID: UUID?
+    private enum NavigationDraftForm: CaseIterable, Hashable { case therapy, checkup, observation, service, prosthetic }
+    private var navigationCleanDates: [NavigationDraftForm: [Date]] = [:]
     /* @Codex */
     private var exclusiveOperationIDs: Set<UUID> = []
     // S3 (D3, lane PRREG): injectable seam for the "Prescrittivo regionale"
@@ -415,6 +420,9 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         self.systemActions = systemActions
         let launchOverrides = AppleFoundationLaunchOverrides.load()
         self.automaticActions = launchOverrides.automaticActions
+        // @Codex: Exact defaults also protect date-only drafts, without treating
+        // the form's initial Date() values as user changes.
+        defer { for form in NavigationDraftForm.allCases { markNavigationDatesClean(form) } }
 
         #if DEBUG
         /* @Codex */
@@ -995,6 +1003,137 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             invalidateCacheAfterReadFailure(error)
             applyPatientLoadFailure(error)
         }
+    }
+
+    /* @Codex */
+    var navigationAvailability: ClinicalNavigationAvailability {
+        guard connectionState == .pairedOnline, sessionCookie != nil,
+              pairedCredentials != nil, masterKey != nil else { return .locked }
+        guard !isWorking, canChangePatientSelection, pendingConflict == nil,
+              !hasNavigationBlockingDraft else { return .busy }
+        return .ready
+    }
+
+    /// Resolve only through the currently paired reader. In particular,
+    /// loadPatients()/beginPatientLoad(clearingWorkspace:) would clear the old
+    /// draft before the target has been validated, so neither is used here.
+    func openNavigationPatient(
+        id: String, section: ClinicalNavigationPatientSection,
+        isCurrent: @escaping @MainActor () -> Bool
+    ) async -> ClinicalNavigationPatientResult {
+        guard isCurrent(), !Task.isCancelled else { return .superseded }
+        guard ClinicalNavigationURL.isValidPatientID(id),
+              let targetSection = PatientWorkspaceSection(rawValue: section.rawValue) else { return .notFound }
+        guard navigationAvailability == .ready, let sessionCookie, let credentials = pairedCredentials else {
+            return .blocked
+        }
+        let requestID = UUID()
+        navigationLoadRequestID = requestID
+        let loginGeneration = self.loginGeneration
+        let selectedID = selectedPatientID
+        let selectedDetail = selectedPatient
+        let context = PatientLoadContext(
+            requestID: requestID, patientID: id, workspaceGeneration: workspaceGeneration,
+            sessionCookie: sessionCookie, credentials: credentials,
+            ambulatoryID: ambulatoryId.trimmedOrNil, serverURL: serverURL, tlsPin: tlsPin,
+            connectionState: connectionState, client: makeClient(), masterKey: masterKey
+        )
+        // Any intervening model mutation supersedes this optional intent. This
+        // includes draft A -> B -> A, a new operation, conflict or manual section
+        // change; comparing only the final draft text/selection would miss them.
+        var interveningMutation = false
+        let observation = objectWillChange.sink { interveningMutation = true }
+        defer {
+            observation.cancel()
+            if navigationLoadRequestID == requestID { navigationLoadRequestID = nil }
+        }
+        let canApply = {
+            isCurrent() && !Task.isCancelled && !interveningMutation
+                && self.navigationLoadRequestID == requestID
+                && self.loginGeneration == loginGeneration
+                && self.workspaceGeneration == context.workspaceGeneration
+                && self.sessionCookie == context.sessionCookie && self.pairedCredentials == context.credentials
+                && self.ambulatoryId.trimmedOrNil == context.ambulatoryID
+                && self.serverURL == context.serverURL && self.tlsPin == context.tlsPin
+                && self.selectedPatientID == selectedID && self.selectedPatient == selectedDetail
+                && self.navigationAvailability == .ready
+        }
+        do {
+            let payload = try await fetchPatientWorkspace(context, isCurrent: canApply)
+            guard canApply() else { return .superseded }
+            guard payload.detail.id == id else { return .failed }
+            // The entire read has completed. No await occurs between this last
+            // currentness check and the ordinary workspace publication.
+            observation.cancel()
+            invalidatePatientLoadContext()
+            clearSelectedPatientWorkspace(preservingSelectionID: id)
+            errorMessage = nil
+            publishPatientWorkspace(payload, context: context)
+            activePatientSection = targetSection
+            statusMessage = "Cartella aperta dal collegamento."
+            return .opened
+        } catch {
+            guard canApply() else { return .superseded }
+            if case HomeBaseClientError.httpStatus(let status, _) = error {
+                if status == 404 { return .notFound }
+                if status == 401 || status == 403 {
+                    // Retain the ordinary denial/session handling, without
+                    // creating an offline fallback or clearing a draft on a 404.
+                    invalidateCacheAfterReadFailure(error)
+                    applyPatientLoadFailure(error)
+                }
+            }
+            return .failed
+        }
+    }
+
+    /// Conservative navigation guard: an open editor, non-default choice,
+    /// date-only change or any text/reference is a draft, even before it can save.
+    private var hasNavigationBlockingDraft: Bool {
+        if isCreatingPatient || isEditingPatient || editingEntryId != nil || editingTherapyId != nil
+            || editingCheckupId != nil || editingObservationId != nil || pendingFHIRWarningValidation != nil {
+            return true
+        }
+        // Patient creation/profile fields remain populated after save/cancel.
+        // Their active editors are guarded above; retained inactive values are
+        // not a new draft. Inline clinical composers remain guarded below.
+        if [
+            newEntryTitle, newEntryVisitTranscript,
+            newTherapyDrugName, newTherapyAIC, newTherapyATC, newTherapyActivePrinciple,
+            newTherapyDosage, newTherapyMotivation, newTherapyDiagnosisCode,
+            newCheckupTitle, newCheckupNotes, newObservationDisplay, newObservationCode,
+            newObservationValue, newObservationUnitCode, newObservationNotes,
+            newServiceCode, newServiceName, newServiceClinicalQuestion, newServiceProvider,
+            newServiceOutcomeNote, newServiceRequestReference, newServiceDocumentRefs,
+            newServiceNotes, newServiceItemsText, newProstheticISOCode, newProstheticDescription,
+            newProstheticMeasures, newProstheticClinicalReason, newProstheticRegionalPrescriptionId,
+            newProstheticSupplier, newProstheticCollaudoOutcome, newProstheticDocumentRefs, newProstheticNotes
+        ].contains(where: { !$0.isEmpty }) { return true }
+        if !newEntryEditorDocument.blocks.isEmpty || !newEntryAttachmentIds.isEmpty
+            || newEntryVisitDraftResponse != nil || newEntryVisitDraftReviewed
+            || newEntryType != .note
+            || newTherapyStatus != .active || newTherapyHasEndDate
+            || newCheckupStatus != .pending || newCheckupSource != "manual"
+            || newServiceStatus != .prescribed || newServiceCategory != .visit || newServicePriority != .routine
+            || newServiceCodeSystem != "NTR" || newServiceSource != .manual
+            || newServiceHasScheduledAt || newServiceHasPerformedAt || newServiceHasReportReceivedAt
+            || newProstheticStatus != .prescribed || newProstheticCategory != .standard
+            || newProstheticHasCollaudoAt || newProstheticSource != .manual { return true }
+        return NavigationDraftForm.allCases.contains { navigationDates($0) != navigationCleanDates[$0] }
+    }
+
+    private func navigationDates(_ form: NavigationDraftForm) -> [Date] {
+        switch form {
+        case .therapy: [newTherapyStartDate, newTherapyEndDate]
+        case .checkup: [newCheckupDate]
+        case .observation: [newObservationObservedAt]
+        case .service: [newServicePrescribedAt, newServiceScheduledAt, newServicePerformedAt, newServiceReportReceivedAt]
+        case .prosthetic: [newProstheticPrescribedAt, newProstheticCollaudoAt]
+        }
+    }
+
+    private func markNavigationDatesClean(_ form: NavigationDraftForm) {
+        navigationCleanDates[form] = navigationDates(form)
     }
 
     /// Refetch the selected patient and all sub-resources after a version conflict,
@@ -3840,32 +3979,43 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     }
 
     /* @Codex */
-    private func fetchPatientWorkspace(_ context: PatientLoadContext) async throws -> PatientWorkspacePayload {
+    private func fetchPatientWorkspace(
+        _ context: PatientLoadContext, isCurrent: () -> Bool = { true }
+    ) async throws -> PatientWorkspacePayload {
         let client = context.client
         let credentials = context.credentials
         let cookie = context.sessionCookie
         let scope = context.ambulatoryID
         guard let patientID = context.patientID else { throw HomeBaseClientError.contract }
+        guard isCurrent() else { throw CancellationError() } // @Codex
         let detail = try await client.fetchPatient(
             id: patientID, credentials: credentials, sessionCookie: cookie, ambulatoryId: scope)
+        guard isCurrent() else { throw CancellationError() } // @Codex
         let entries = try await client.fetchEntries(
             patientId: patientID, credentials: credentials, sessionCookie: cookie, ambulatoryId: scope)
             .map { ClinicalFieldCrypto.decryptEntry($0, masterKey: context.masterKey) }
+        guard isCurrent() else { throw CancellationError() } // @Codex
         let therapies = try await client.fetchTherapies(
             patientId: patientID, credentials: credentials, sessionCookie: cookie, ambulatoryId: scope)
             .map { ClinicalFieldCrypto.decryptTherapy($0, masterKey: context.masterKey) }
+        guard isCurrent() else { throw CancellationError() } // @Codex
         let checkups = try await client.fetchCheckups(
             patientId: patientID, credentials: credentials, sessionCookie: cookie, ambulatoryId: scope)
             .map { ClinicalFieldCrypto.decryptCheckup($0, masterKey: context.masterKey) }
+        guard isCurrent() else { throw CancellationError() } // @Codex
         let observations = try await client.fetchObservations(
             patientId: patientID, credentials: credentials, sessionCookie: cookie, ambulatoryId: scope)
             .map { ClinicalFieldCrypto.decryptObservation($0, masterKey: context.masterKey) }
+        guard isCurrent() else { throw CancellationError() } // @Codex
         let services = ServicePrescriptionFiltering.sorted(try await client.fetchServicePrescriptions(
             patientId: patientID, credentials: credentials, sessionCookie: cookie, ambulatoryId: scope))
+        guard isCurrent() else { throw CancellationError() } // @Codex
         let serviceItems = ServicePrescriptionFiltering.sortedItems(try await client.fetchServicePrescriptionItems(
             patientId: patientID, prescriptionId: nil, credentials: credentials, sessionCookie: cookie, ambulatoryId: scope))
+        guard isCurrent() else { throw CancellationError() } // @Codex
         let prosthetics = ProstheticPrescriptionFiltering.sorted(try await client.fetchProstheticPrescriptions(
             patientId: patientID, credentials: credentials, sessionCookie: cookie, ambulatoryId: scope))
+        guard isCurrent() else { throw CancellationError() } // @Codex
         return PatientWorkspacePayload(
             detail: detail, entries: entries, therapies: therapies, checkups: checkups,
             observations: observations, services: services, serviceItems: serviceItems,
@@ -4466,6 +4616,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         newTherapyHasEndDate = false
         newTherapyEndDate = Date()
         newTherapyDiagnosisCode = ""
+        markNavigationDatesClean(.therapy) // @Codex
         resetNewTherapyDrugCatalogSearch(clearAvailability: false)
     }
 
@@ -4476,6 +4627,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         newCheckupStatus = .pending
         newCheckupDate = Date()
         newCheckupSource = "manual"
+        markNavigationDatesClean(.checkup) // @Codex
     }
 
     /* @Codex */
@@ -4486,6 +4638,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         newObservationUnitCode = ""
         newObservationNotes = ""
         newObservationObservedAt = Date()
+        markNavigationDatesClean(.observation) // @Codex
         resetObservationTerminologySearch(target: .newCode)
         resetObservationTerminologySearch(target: .newUnit)
     }
@@ -4513,6 +4666,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         newServiceDocumentRefs = ""
         newServiceNotes = ""
         newServiceItemsText = ""
+        markNavigationDatesClean(.service) // @Codex
     }
 
     /* @Codex */
@@ -4532,6 +4686,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         newProstheticSource = .manual
         newProstheticDocumentRefs = ""
         newProstheticNotes = ""
+        markNavigationDatesClean(.prosthetic) // @Codex
     }
 
     /* @Codex */

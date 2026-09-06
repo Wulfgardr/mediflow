@@ -1,6 +1,7 @@
 // Codex: created 2026-04-17
 // @Codex
 import SwiftUI
+import MediFlowCore // @Codex
 #if os(macOS)
 import AppKit
 #else
@@ -283,6 +284,9 @@ public struct AppleFoundationMobileRootView: View {
     #endif
     @State private var section: ClinicalWorkspaceSection
     @State private var showsProjectSurfaces = false
+    // @Codex: URL intents and project paths belong to this window, never to defaults.
+    @State private var projectNavigationPath: [ClinicalWorkspaceSection] = []
+    @StateObject private var navigationRouter = ClinicalNavigationRouter()
     @StateObject private var workspaceModel = PairedPatientsWorkspaceModel()
     @StateObject private var capabilitiesStore = ClinicalWorkspaceCapabilitiesStore()
 
@@ -331,7 +335,7 @@ public struct AppleFoundationMobileRootView: View {
                 .navigationSplitViewStyle(.prominentDetail)
                 #endif
             } else {
-                TabView(selection: $section) {
+                TabView(selection: Binding(get: { section }, set: selectSection)) {
                     ForEach(ClinicalWorkspaceSection.clinicalSections + ClinicalWorkspaceSection.settingsSections) { item in
                         NavigationStack {
                             detailView(for: item)
@@ -339,7 +343,11 @@ public struct AppleFoundationMobileRootView: View {
                                 .toolbar {
                                     if item == .patients {
                                         ToolbarItem(placement: .automatic) {
-                                            Button("Progetto", systemImage: "ellipsis.circle") { showsProjectSurfaces = true }
+                                            Button("Progetto", systemImage: "ellipsis.circle") {
+                                                navigationRouter.cancel()
+                                                projectNavigationPath = []
+                                                showsProjectSurfaces = true
+                                            }
                                                 .accessibilityIdentifier("clinical-workspace-project-menu-button")
                                         }
                                     }
@@ -383,6 +391,10 @@ public struct AppleFoundationMobileRootView: View {
             workspaceModel.updateAvailableCapabilities(capabilitiesStore.settledCapabilityKeys)
         }
         .sheet(isPresented: $showsProjectSurfaces) { projectSurfaceSheet }
+        .modifier(ClinicalNavigationReception(
+            router: navigationRouter, platform: .mobile, workspace: workspaceModel,
+            navigate: navigateFromLink
+        ))
         .environment(\.appleReduceMotionOverride, appearance.reduceMotionOverride)
         .environment(\.dynamicTypeSize, dynamicTypeSizeOverride ?? inheritedDynamicTypeSize)
         .respectsAppleMotionPreference()
@@ -391,7 +403,7 @@ public struct AppleFoundationMobileRootView: View {
 
     private func sidebarButton(_ item: ClinicalWorkspaceSection) -> some View {
         Button {
-            section = item
+            selectSection(item)
             #if os(iOS)
             // @Codex #142: preserve the patient list/detail width after a destination change.
             projectColumnVisibility = .detailOnly
@@ -408,18 +420,42 @@ public struct AppleFoundationMobileRootView: View {
     }
 
     private var projectSurfaceSheet: some View {
-        NavigationStack {
+        NavigationStack(path: Binding(
+            get: { projectNavigationPath },
+            set: { navigationRouter.cancel(); projectNavigationPath = $0 }
+        )) {
             List(ClinicalWorkspaceSection.projectSections) { item in
-                NavigationLink {
-                    detailView(for: item)
-                        .navigationTitle(item.title)
-                } label: {
+                NavigationLink(value: item) {
                     Label(item.title, systemImage: item.symbolName)
                 }
                 .accessibilityIdentifier("clinical-workspace-section-\(item.rawValue)-button")
             }
+            .navigationDestination(for: ClinicalWorkspaceSection.self) { item in
+                detailView(for: item).navigationTitle(item.title)
+            }
             .navigationTitle("Progetto")
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Chiudi") { showsProjectSurfaces = false } } }
+        }
+    }
+
+    // @Codex: Manual navigation cancels an in-flight link. Programmatic navigation
+    // uses the same section values, without replacing the workspace or its drafts.
+    private func selectSection(_ item: ClinicalWorkspaceSection) {
+        navigationRouter.cancel()
+        section = item
+    }
+
+    private func navigateFromLink(_ area: ClinicalNavigationArea) {
+        guard let target = ClinicalWorkspaceSection(rawValue: area.rawValue) else { return }
+        if !usesSplitLayout && ClinicalWorkspaceSection.projectSections.contains(target) {
+            projectNavigationPath = [target]
+            showsProjectSurfaces = true
+        } else {
+            showsProjectSurfaces = false
+            section = target
+            #if os(iOS)
+            projectColumnVisibility = .detailOnly
+            #endif
         }
     }
 
