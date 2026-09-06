@@ -55,8 +55,6 @@ struct PairedPatientDetailSection: View {
             #if os(macOS)
             macPatientFacts
             #else
-            patientSignals(detail, exemptionsCount: exemptions.count)
-
             // Four groups, not one list of nine rows.
             //
             // Every identity field sat in a single stack four points apart, so
@@ -94,6 +92,14 @@ struct PairedPatientDetailSection: View {
                     ForEach(care, id: \.0) { InfoRow($0.0, $0.1) }
                 }
             }
+            // @Codex: Keep the existing bounded counts available after patient
+            // facts, instead of starting every chart with six equally weighted tiles.
+            DisclosureGroup("Riepilogo della cartella") {
+                patientSignals(detail, exemptionsCount: exemptions.count)
+                    .padding(.top, 12)
+            }
+            .padding(.vertical, 12)
+            .accessibilityIdentifier("patient-clinical-signals-disclosure")
             #endif
 
             if !exemptions.isEmpty {
@@ -107,10 +113,11 @@ struct PairedPatientDetailSection: View {
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityLabel("Esenzioni: \(exemptions.joined(separator: ", "))")
                     #else
-                    HStack(spacing: 6) {
-                        ForEach(exemptions, id: \.self) { ClinicalCodePill($0) }
-                    }
-                    .accessibilityElement(children: .combine)
+                    // @Codex: Codes wrap as text rather than overflowing a row of chips.
+                    Text(exemptions.joined(separator: ", "))
+                    .font(.body)
+                    .registro()
+                    .fixedSize(horizontal: false, vertical: true)
                     .accessibilityLabel("Esenzioni: \(exemptions.joined(separator: ", "))")
                     #endif
                 }
@@ -283,6 +290,12 @@ struct PairedPatientDetailSection: View {
             model.startEditingPatient()
         } label: {
             Label("Modifica", systemImage: "pencil")
+                #if os(iOS)
+                .font(.body)
+                .padding(.horizontal, 12)
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
+                #endif
         }
         .font(.caption)
         .labelStyle(.titleAndIcon)
@@ -341,6 +354,10 @@ struct PairedPatientDetailSection: View {
         } label: {
             Label("Altre azioni", systemImage: "ellipsis.circle")
                 .font(.caption)
+                #if os(iOS)
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
+                #endif
         }
         .labelStyle(.iconOnly)
         .accessibilityLabel("Altre azioni sul paziente")

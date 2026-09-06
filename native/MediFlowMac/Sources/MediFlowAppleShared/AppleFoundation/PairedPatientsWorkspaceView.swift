@@ -389,8 +389,6 @@ struct PairedPatientsWorkspaceView: View {
                         mobilePairedStatus
                         workspaceFeedbackLine
                         patientsListContent
-                            .padding(16)
-                            .lumeSurface(zone: .field)
                     }
                     .padding(20)
                 }
@@ -398,37 +396,36 @@ struct PairedPatientsWorkspaceView: View {
 
                 Divider()
 
-                ScrollView {
-                    Group {
-                        patientDetailContent
+                // @Codex: Identity and navigation stay outside the scrolling
+                // plane. Section changes reset the scroll without replacing it.
+                VStack(spacing: 0) {
+                    if let detail = model.selectedPatient {
+                        mobileWidePatientHeader(detail)
+                        MobilePatientSectionNavigation(
+                            selection: $model.activePatientSection,
+                            showsAllSections: true
+                        )
+                        .padding(.horizontal, 12)
+                        Divider()
                     }
-                    .padding(20)
-                    // The chart is sized to the column it was given, not to
-                    // `.infinity`. An unbounded proposal here let the chart claim
-                    // the whole window: on iPad it rendered a column-wide card
-                    // offset to the right and clipped at the screen edge, taking
-                    // the address, the FHIR action and the AI summary off screen.
-                    .frame(
-                        width: PatientsWorkspaceLayout.detailWidth(forContainerWidth: containerWidth),
-                        alignment: .topLeading
-                    )
+                    ScrollViewReader { scroll in
+                        ScrollView {
+                            patientDetailContent
+                                .padding(24)
+                                .frame(
+                                    width: PatientsWorkspaceLayout.detailWidth(forContainerWidth: containerWidth),
+                                    alignment: .topLeading
+                                )
+                                .id("mobile-patient-chart-top")
+                        }
+                        .onChange(of: model.activePatientSection) { _ in
+                            scroll.scrollTo("mobile-patient-chart-top", anchor: .top)
+                        }
+                    }
                 }
                 .frame(width: PatientsWorkspaceLayout.detailWidth(forContainerWidth: containerWidth))
-                // The open chart keeps its identity in the split arrangement too,
-                // not only when the columns collapse.
-                .safeAreaInset(edge: .top, spacing: 0) {
-                    if let detail = model.selectedPatient {
-                        VStack(spacing: 0) {
-                            compactPatientHeader(detail, matchesContainerWidth: false)
-                            patientSectionPicker
-                        }
-                        .frame(
-                            width: PatientsWorkspaceLayout.detailWidth(forContainerWidth: containerWidth),
-                            alignment: .leading
-                        )
-                    }
-                }
-                .id(model.activePatientSection)
+                .background(PlatformColors.chartCardSurface)
+                .accessibilityIdentifier("patient-workspace-detail")
             }
         } else {
             ScrollView {
@@ -491,23 +488,27 @@ struct PairedPatientsWorkspaceView: View {
 
     /* @Codex */
     private var compactPatientDestination: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: ClinicalChartMetrics.sectionSpacing) {
-                workspaceFeedbackLine
-                if let detail = model.selectedPatient, detail.id == compactPatientID {
-                    selectedPatientSections(detail)
-                } else if let patientID = compactPatientID {
-                    pendingPatientDetail(patientID: patientID)
+        ScrollViewReader { scroll in
+            ScrollView {
+                VStack(alignment: .leading, spacing: ClinicalChartMetrics.sectionSpacing) {
+                    workspaceFeedbackLine
+                    if let detail = model.selectedPatient, detail.id == compactPatientID {
+                        selectedPatientSections(detail)
+                    } else if let patientID = compactPatientID {
+                        pendingPatientDetail(patientID: patientID)
+                    }
                 }
+                .padding(20)
+                .compactContainerWidth()
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("patient-compact-detail-destination")
+                .id("mobile-patient-chart-top")
             }
-            .padding(20)
-            .compactContainerWidth()
-            // @Codex: Group clinical content without wrapping UIKit's scroll
-            // container and its navigation/keyboard accessibility elements.
-            .accessibilityElement(children: .contain)
-            .accessibilityIdentifier("patient-compact-detail-destination")
+            .onChange(of: model.activePatientSection) { _ in
+                scroll.scrollTo("mobile-patient-chart-top", anchor: .top)
+            }
         }
-        .background(mobileCanvasColor)
+        .background(PlatformColors.chartCardSurface)
         .navigationTitle(model.activePatientSection.title)
         .navigationBarTitleDisplayMode(.inline)
         .safeAreaInset(edge: .top, spacing: 0) {
@@ -515,10 +516,41 @@ struct PairedPatientsWorkspaceView: View {
                 VStack(spacing: 0) {
                     compactPatientHeader(detail)
                     patientSectionPicker
+                    Divider()
                 }
+                .background(PlatformColors.chartCardSurface)
             }
         }
-        .id(model.activePatientSection)
+    }
+
+    /* @Codex: The wide chart always states identity and recency. */
+    private func mobileWidePatientHeader(_ detail: HomeBasePatientDetail) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("\(detail.lastName) \(detail.firstName)")
+                .font(.title2.weight(.semibold))
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityHeading(.h1)
+            Text(PairedPatientsWorkspaceSupport.compactTaxCode(detail.taxCode))
+                .font(.subheadline)
+                .registro()
+                .foregroundStyle(.secondary)
+            if let birth = detail.birthDate {
+                Text("Nato il \(PairedPatientsWorkspaceSupport.birthDateFormatter.string(from: birth))")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            if let updated = detail.updatedAt {
+                Text("Aggiornato \(PairedPatientsWorkspaceSupport.relativeUpdated(updated))")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.horizontal, 24)
+        .padding(.top, 20)
+        .padding(.bottom, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("patient-workspace-header")
     }
 
     /* @Codex */
@@ -999,15 +1031,8 @@ struct PairedPatientsWorkspaceView: View {
         .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
-        // Liquid Glass, not an opaque band. The old header was a paper-coloured
-        // rectangle with square corners welded across the full width: it read as
-        // something stuck on top of the app rather than part of it, and it hid
-        // the content passing underneath instead of letting it show through.
-        // Floating and inset, the glass refracts the chart as it scrolls, which
-        // is what tells you the header is above the content and not in it.
-        .lumeGlass(in: .rect(cornerRadius: 22))
-        .padding(.horizontal, 12)
-        .padding(.bottom, 6)
+        // @Codex: Identity is an opaque part of the clinical document.
+        .background(PlatformColors.chartCardSurface)
         // No accessibility label override here on purpose: an explicit label on
         // the group merges it into one element and hides the native disclosure
         // control. DisclosureGroup already announces its label and its
@@ -1157,6 +1182,11 @@ struct PairedPatientsWorkspaceView: View {
 
     /* @Codex */
     private var patientSectionPicker: some View {
+        #if os(iOS)
+        MobilePatientSectionNavigation(selection: $model.activePatientSection)
+            .padding(.horizontal, 12)
+            .background(PlatformColors.chartCardSurface)
+        #else
         Menu {
             Picker("Sezione clinica", selection: $model.activePatientSection) {
                 ForEach(PatientWorkspaceSection.allCases) { section in
@@ -1183,6 +1213,7 @@ struct PairedPatientsWorkspaceView: View {
         .accessibilityValue(model.activePatientSection.title)
         .accessibilityHint("Scegli la sezione della cartella da consultare.")
         .accessibilityIdentifier("patient-section-picker")
+        #endif
     }
 
     /* @Codex */
@@ -1259,9 +1290,6 @@ struct PairedPatientsWorkspaceView: View {
             // Drafts and existing action bindings remain owned by the workspace/model.
             switch model.activePatientSection {
             case .overview:
-            #if !os(macOS)
-            patientContents
-            #endif
             PairedPatientDetailSection(
                 model: model,
                 detail: detail,
@@ -1270,6 +1298,19 @@ struct PairedPatientsWorkspaceView: View {
                 confirmsFHIRExport: $confirmsFHIRExport
             )
             .chartCard()
+            #if !os(macOS)
+            // @Codex: Patient facts precede optional collection summaries.
+            if !populatedPatientSections.isEmpty ||
+                (capabilities.hasCapability("network.replica.readonly-documents") &&
+                 (model.attachmentsLoadState != .loaded || !model.attachments.isEmpty)) {
+                DisclosureGroup("Contenuti della cartella") {
+                    patientContents.padding(.top, 12)
+                }
+                .font(.body)
+                .padding(.vertical, 12)
+                .accessibilityIdentifier("patient-chart-contents-disclosure")
+            }
+            #endif
             case .diary:
             PairedPatientDiarySection(
                 model: model,
@@ -1361,15 +1402,8 @@ private extension View {
         // hierarchy and spacing, not a second full-width rounded envelope.
         frame(maxWidth: .infinity, alignment: .leading)
         #else
-        padding(ClinicalChartMetrics.cardPadding)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                PlatformColors.chartCardSurface,
-                in: RoundedRectangle(
-                    cornerRadius: ClinicalChartMetrics.cardRadius,
-                    style: .continuous
-                )
-            )
+        // @Codex: The reading pane owns its padding and opaque surface.
+        frame(maxWidth: .infinity, alignment: .leading)
         #endif
     }
 }

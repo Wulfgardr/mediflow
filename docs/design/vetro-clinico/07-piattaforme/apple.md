@@ -26,6 +26,72 @@ La legge dei materiali vale identica: le card che contengono dati clinici sono c
 
 ## 2. Consolidamento
 
+### Contratto mobile 0.8.6: armonizzazione del 6 settembre 2026
+
+La slice mobile applica la gerarchia documentale del
+[candidato Mac](../../2026-09-06-086-macos-redesign.md) e i criteri della
+[raccolta illustrata Breccia](../../2026-09-06-breccia-apple-reference.md).
+Le catture sintetiche Mac mostrano una testata continua e sezioni testuali.
+I fotogrammi pubblici sostengono vicinanza, orientamento e profondità
+progressiva; la loro traduzione in questo layout è una decisione di MediFlow,
+non una prescrizione del video o una prova di usabilità.
+
+- **iPhone e larghezze compatte:** lista → cartella con ritorno nativo.
+  La testata paziente è opaca e mantiene la disclosure degli identificatori.
+  Scheda, Diario e Documenti hanno accessi testuali da almeno 44 pt quando
+  entrano nello spazio disponibile; il menu completo rimane raggiungibile.
+  In poco spazio o con testo accessibile si mostra il nome della sezione
+  corrente con il menu completo, senza ridurre il carattere.
+- **iPad con spazio sufficiente:** worklist e cartella restano affiancate.
+  Nome, identificatori, data disponibile e navigazione delle sette sezioni
+  sono fuori dal contenuto scorrevole. L'indice testuale passa da una a più
+  righe; rimangono i limiti di larghezza e il percorso compatto esistenti.
+- **Contenuto:** superficie clinica continua, margine di lettura di 20 pt
+  in compatto e 24 pt nel dettaglio affiancato. L'anagrafica precede i
+  riepiloghi di conteggio, che restano disponibili mediante disclosure.
+  Le esenzioni vanno a capo; le voci diario hanno data con mese e anno,
+  padding proprio e separatori. Gli input mobili hanno almeno 44 pt e
+  padding interno; i comandi del compositore restano controlli nativi.
+- **Stato:** la sezione attiva resetta soltanto lo scroll del contenitore.
+  Le view di sezione conservano il ciclo precedente; bozze, currentness,
+  selezione, task, capability e writer restano nei proprietari esistenti.
+  Il recorder Mac e il suo arresto quando nascosto non sono modificati.
+  Il presenter allegati rimane unico nel Workspace. Nessuna nuova coda offline.
+- **Confini:** root e resa Mac, API, permessi, autenticazione, pairing e
+  accesso alla persistenza non cambiano. Il form di collegamento conserva
+  campi, ID e handler. Le azioni legittime restano soggette ai gate esistenti.
+
+Contratto per la verifica UI separata:
+
+| Percorso | Identificatori |
+| --- | --- |
+| Sezioni visibili | `patient-section-navigation`, `patient-section-<rawValue>` |
+| Tutte le sezioni in compatto | `patient-section-picker`, con valore accessibile della sezione corrente |
+| Contesto iPad | `patient-workspace-header`, `patient-workspace-detail` |
+| Contesto compatto | `patient-compact-header-disclosure`, `patient-compact-detail-destination` invariati |
+| Riepiloghi progressivi | `patient-clinical-signals-disclosure`, `patient-chart-contents-disclosure` |
+| Date delle voci | `entry-date-<id>`; righe e comandi diario mantengono gli ID precedenti |
+
+Build e test unitari sono prove distinte dalla verifica UI di Ohm e dal
+pairing reale tra processi. La demo e i transport sintetici non attestano
+onboarding, scritture persistite, interoperabilità con host Mac/Windows/Linux
+o recupero delle sessioni. Questi restano gate dell'integrazione coordinata.
+
+Verifica locale della slice (Xcode 26.6, 17F113): build Debug dello schema
+`MediFlowMobileApp` per destinazione generica iOS Simulator riuscita;
+33 test SwiftPM superati nei gruppi `PatientsWorkspaceLayoutTests`,
+`PairedPatientsWorkspaceSelectionTests`,
+`PairedPatientsWorkspaceModelDocumentsTests` e `ClinicalContentRenderingTests`.
+Build e test hanno usato cache dedicate e `MEDIFLOW_DATA_DIR` sintetica in
+una nuova directory temporanea marcata. La compilazione SwiftPM copre anche
+il ramo condiviso Mac; la UI Mac non è stata eseguita in questa lane.
+`git diff --check` superato. Nessun simulatore avviato né XCUITest eseguito:
+geometria, tastiera, Dynamic Type e resa visiva restano alla verifica separata.
+Rimangono avvisi di deprecazione `onChange(of:perform:)`, inclusi i due
+reset dello scroll; la build non li tratta come errori.
+
+### Baseline e consolidamento precedente
+
 1. **Un solo sistema di card**: `VetroClinico.swift` assorbe `CardStyleModifier` (`AppleFoundationStyle.swift`); i call-site di `.cardStyle()` migrano; il file legacy si ritira.
 2. **`NavigationSplitView` per il workspace pazienti**: sostituisce il master-detail manuale di `PairedPatientsWorkspaceView` (HStack + colonna fissa 360pt). Con `List` nativa nella colonna si recuperano gratis selezione, swipe actions, pull-to-refresh, e la colonna diventa ridimensionabile su macOS.
 3. **Spacchettare `PairedPatientsWorkspaceView`** (3365 righe al controllo corrente) in viste per dominio (lista, quadro paziente, diario, terapie, osservazioni): prerequisito per qualsiasi lavoro di design fine.

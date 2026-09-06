@@ -38,6 +38,11 @@ struct PairedDiaryComposerView: View {
         }
         .font(.body)
         .frame(maxWidth: .infinity, alignment: .leading)
+        #if os(iOS)
+        // @Codex: Separate writing from the chronology without changing draft ownership.
+        .padding(.vertical, 12)
+        .buttonStyle(.bordered)
+        #endif
         // Keep the opened form mounted through save/error and while reading.
         // The workspace retains finalized recording review; hidden capture stops.
     }
@@ -210,8 +215,9 @@ struct PairedDiaryControlLabel: ViewModifier {
     func body(content: Content) -> some View {
         #if os(iOS)
         content
-            .font(.subheadline)
+            .font(.body)
             .fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal, 8)
             .frame(minWidth: 44, minHeight: 44, alignment: .leading)
             .contentShape(Rectangle())
         #else
