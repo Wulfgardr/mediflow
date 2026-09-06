@@ -28,6 +28,10 @@ Ultimo aggiornamento: 2026-09-06
 
 ## Sviluppo 0.8.6
 
+[Promozione della UI web](./adr/0123-official-web-ui-navigation-compositions.md):
+contratto accettato per B predefinita e A selezionabile, con confronto sintetico
+separato. La verifica del candidato integrato resta distinta dalla scelta.
+
 [Candidato funzionale locale](./analysis/2026-09-06-086-functional-closeout.md):
 modifiche, verifiche e decisioni ancora aperte; prevale per il delta 0.8.6 sulle
 fotografie 0.8.5 sotto. Il design resta in revisione su un branch separato.

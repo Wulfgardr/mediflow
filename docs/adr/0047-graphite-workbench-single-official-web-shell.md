@@ -3,6 +3,10 @@
 Date: 2026-04-22  
 Status: Accepted
 
+> Aggiornamento 0.8.6: [ADR 0123](./0123-official-web-ui-navigation-compositions.md)
+> ammette due disposizioni della stessa UI ufficiale, con B predefinita e A
+> selezionabile. Non reintroduce shell estetiche concorrenti.
+
 > Root-entry update: [ADR 0060](./0060-kree8-cockpit-live-root-entry.md)
 > supersedes this decision for the `/` web entrypoint. The no-selector rule
 > remains valid.
