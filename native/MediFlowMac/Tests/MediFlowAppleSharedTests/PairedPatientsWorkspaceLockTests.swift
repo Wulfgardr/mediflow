@@ -254,6 +254,8 @@ final class LockReadTransport: @unchecked Sendable {
     private let lock = NSLock()
     private var held: [String: LockReadURLProtocol] = [:]
     private var expectations: [String: XCTestExpectation] = [:]
+    private var paths: [String] = [] // @Codex: request metadata only, never headers or bodies.
+    var requestPaths: [String] { lock.withLock { paths } }
     private var patientsFail = false
     var failPatients: Bool {
         get { lock.withLock { patientsFail } }
@@ -267,6 +269,7 @@ final class LockReadTransport: @unchecked Sendable {
     func start(_ request: LockReadURLProtocol) {
         let path = request.route
         let started = lock.withLock {
+            paths.append(path)
             let value = expectations.removeValue(forKey: path)
             if value != nil { held[path] = request }
             return value
