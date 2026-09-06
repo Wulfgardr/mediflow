@@ -305,10 +305,10 @@ function validatePinRetirementAuditOrder(sourceFile, owner, writerCall) {
             ? declaration.initializer ?? null
             : null;
     };
-    const identifierCalls = (root, callee, argument = null) => {
+    const identifierCalls = (root, callee, argument = null, includeNested = false) => {
         const calls = [];
         const visit = (node) => {
-            if (node !== root && ts.isFunctionLike(node)) return;
+            if (!includeNested && node !== root && ts.isFunctionLike(node)) return;
             if (ts.isCallExpression(node) && !node.questionDotToken) {
                 const expression = unwrap(node.expression);
                 const exactArgument = argument === null
@@ -326,6 +326,26 @@ function validatePinRetirementAuditOrder(sourceFile, owner, writerCall) {
         const calls = identifierCalls(root, callee, argument);
         return calls.length === 1 && isReachableStandaloneCall(calls[0], root);
     };
+    // @Codex: both native admission checks must return before preparing/mutating
+    // credentials; the second check also burns the two prepared capabilities.
+    const nativeCurrentGuard = (statement, abortPrepared = false) => {
+        if (!statement || !ts.isIfStatement(statement) || statement.elseStatement
+            || compact(statement.expression) !== 'nativeSession && await readNativeSession(input.request) !== nativeSession') return false;
+        const body = ts.isBlock(statement.thenStatement)
+            ? [...statement.thenStatement.statements] : [statement.thenStatement];
+        return body.length === (abortPrepared ? 2 : 1)
+            && (!abortPrepared || exactReachableCall(body[0], 'abortPreparedRetirements'))
+            && ts.isReturnStatement(body.at(-1))
+            && compact(body.at(-1).expression) === "{ kind: 'unauthorized' }";
+    };
+    // @Codex: inspect executable statements, so comments cannot impersonate a
+    // commit. A failed post-CAS commit retains its fence and never calls abort.
+    const retirementCommit = (outcome, commit, capability) => findIndex((statement) =>
+        ts.isTryStatement(statement) && !statement.finallyBlock && statement.catchClause
+        && statement.tryBlock.statements.length === 1
+        && compact(statement.tryBlock.statements[0]) === `${outcome} = ${commit}(${capability}).outcome;`
+        && statement.catchClause.block.statements.length === 1
+        && compact(statement.catchClause.block.statements[0]) === `${outcome} = 'failed';`);
 
     const prepareNativeAlias = findIndex((_statement, text) => text
         === 'const prepareNativeRetirement = dependencies.prepareNativeSessionsForUserRetirement ?? prepareNativeLegacyUserRetirement;');
@@ -339,12 +359,17 @@ function validatePinRetirementAuditOrder(sourceFile, owner, writerCall) {
         === 'const commitWebRetirement = dependencies.commitWebSessionsForUserRetirement ?? commitUserRetirement;');
     const abortWebAlias = findIndex((_statement, text) => text
         === 'const abortWebRetirement = dependencies.abortWebSessionsForUserRetirement ?? abortUserRetirement;');
+    const nativeSession = findIndex((_statement, text) => text
+        === "const nativeSession = input.session.authChannel === 'native' ? input.session : null;");
+    const readNativeAlias = findIndex((_statement, text) => text
+        === 'const readNativeSession = dependencies.readPairedNativeSession ?? requirePairedNativeSession;');
+    const nativeAdmission = findIndex((statement) => nativeCurrentGuard(statement));
     const nativeCapability = findIndex((_statement, text) => text
-        === 'const nativeRetirement = prepareNativeRetirement(user.id);');
+        === 'const nativeRetirement = nativeSession ? preparePairedNativePinRetirement(nativeSession) : prepareNativeRetirement(user.id);');
     const nativeCapabilityGuard = findIndex((statement) => ts.isIfStatement(statement)
         && compact(statement.expression) === '!nativeRetirement' && alwaysTerminates(statement.thenStatement));
     const webCapability = findIndex((_statement, text) => text
-        === 'const webRetirement = prepareWebRetirement(input.session);');
+        === 'const webRetirement = nativeSession ? prepareNativeUserRetirement(nativeRetirement) : prepareWebRetirement(input.session);');
     const webCapabilityGuard = findIndex((statement) => ts.isIfStatement(statement)
         && compact(statement.expression) === '!webRetirement'
         && exactReachableCall(statement.thenStatement, 'abortNativeRetirement', 'nativeRetirement')
@@ -368,6 +393,7 @@ function validatePinRetirementAuditOrder(sourceFile, owner, writerCall) {
     const updateDeclaration = findIndex((_statement, text) => text === 'let updateResult: { changes: number };');
     const transaction = findIndex((statement, text) => ts.isTryStatement(statement)
         && text.includes('updateResult = db.transaction(')
+        && nativeCurrentGuard(statement.tryBlock.statements[0], true)
         && statement.catchClause
         && exactReachableCall(statement.catchClause.block, 'abortPreparedRetirements')
         && alwaysTerminates(statement.catchClause.block));
@@ -377,15 +403,10 @@ function validatePinRetirementAuditOrder(sourceFile, owner, writerCall) {
         && alwaysTerminates(statement.thenStatement));
     const webOutcome = findIndex((_statement, text) => text
         === "let webRetirementOutcome: 'completed' | 'failed' | 'denied' = 'failed';");
-    const webCommit = findIndex((statement, text) => ts.isTryStatement(statement)
-        && text.includes('webRetirementOutcome = commitWebRetirement(webRetirement).outcome;')
-        && text.includes("webRetirementOutcome = 'failed';"));
+    const webCommit = retirementCommit('webRetirementOutcome', 'commitWebRetirement', 'webRetirement');
     const nativeOutcome = findIndex((_statement, text) => text
         === "let nativeRetirementOutcome: 'completed' | 'failed' | 'denied' = 'failed';");
-    const nativeCommit = findIndex((statement, text) => ts.isTryStatement(statement)
-        && text.includes('nativeRetirementOutcome = commitNativeRetirement(nativeRetirement).outcome;')
-        && text.includes('abortNativeRetirement(nativeRetirement)')
-        && text.endsWith("nativeRetirementOutcome = 'failed'; }"));
+    const nativeCommit = retirementCommit('nativeRetirementOutcome', 'commitNativeRetirement', 'nativeRetirement');
     const completedGuard = findIndex((statement) => ts.isIfStatement(statement)
         && compact(statement.expression)
         === "webRetirementOutcome !== 'completed' || nativeRetirementOutcome !== 'completed'"
@@ -395,6 +416,7 @@ function validatePinRetirementAuditOrder(sourceFile, owner, writerCall) {
     const ordered = [
         prepareNativeAlias, commitNativeAlias, abortNativeAlias,
         prepareWebAlias, commitWebAlias, abortWebAlias,
+        nativeSession, readNativeAlias, nativeAdmission,
         nativeCapability, nativeCapabilityGuard, webCapability, webCapabilityGuard, abortPrepared,
         hashDeclaration, hash, updateDeclaration, transaction, casGuard,
         webOutcome, webCommit, nativeOutcome, nativeCommit, completedGuard, audit,
@@ -410,8 +432,22 @@ function validatePinRetirementAuditOrder(sourceFile, owner, writerCall) {
         || importedName(sourceFile, '@/lib/security/server-session', 'commitNativeLegacyUserRetirement')
             !== 'commitNativeLegacyUserRetirement'
         || importedName(sourceFile, '@/lib/security/server-session', 'abortNativeLegacyUserRetirement')
-            !== 'abortNativeLegacyUserRetirement') {
+            !== 'abortNativeLegacyUserRetirement'
+        || importedName(sourceFile, '@/lib/security/server-session', 'preparePairedNativePinRetirement')
+            !== 'preparePairedNativePinRetirement'
+        || importedName(sourceFile, '@/lib/security/web-auth-lifecycle-owner-adapter', 'prepareNativeUserRetirement')
+            !== 'prepareNativeUserRetirement'
+        || importedName(sourceFile, '@/lib/security/paired-native-session', 'requirePairedNativeSession')
+            !== 'requirePairedNativeSession'
+        || ['preparePairedNativePinRetirement', 'prepareNativeUserRetirement', 'requirePairedNativeSession']
+            .some((name) => localBindingExists(owner, name))) {
         problems.push('PIN audit must retain the exact Web and native retirement owner imports');
+    }
+    if (casGuard >= 0 && statements.slice(casGuard + 1).some((statement) =>
+        ['abortPreparedRetirements', 'abortWebRetirement', 'abortNativeRetirement',
+            'abortUserRetirement', 'abortNativeLegacyUserRetirement']
+            .some((callee) => identifierCalls(statement, callee, null, true).length > 0))) {
+        problems.push('PIN audit must not abort retirement fences after a successful credential CAS');
     }
     if (ordered.some((index) => index < 0)
         || ordered.some((index, position) => position > 0 && index <= ordered[position - 1])) {
