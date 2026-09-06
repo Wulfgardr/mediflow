@@ -220,18 +220,29 @@ enum LockReadFixture {
             date: Date(timeIntervalSince1970: 1), content: "<p>Testo sintetico</p>", setting: nil,
             metadata: nil, attachments: nil, deletedAt: nil, deletionReason: nil, version: 1, createdAt: nil, updatedAt: nil)
     }
+    static var therapy: HomeBaseTherapySummary {
+        HomeBaseTherapySummary(id: "therapy-fixture", patientId: "p1", drugName: "Terapia sintetica", aic: nil, atc: nil,
+            activePrinciple: nil, dosage: "Sintetico", motivation: nil, diagnosisCode: nil, diagnosisName: nil,
+            status: "active", startDate: Date(timeIntervalSince1970: 1), endDate: nil, version: 1,
+            createdAt: nil, updatedAt: nil, deletedAt: nil, deletionReason: nil)
+    }
     static func data(for path: String) throws -> Data {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         switch path {
+        case "/api/v1/network/fse/validate-document":
+            return try encoder.encode(HomeBaseFseDocumentValidationResponse(ok: true, profile: "therapy-medication", errors: [], warnings: []))
+        case patient + "/therapies": return try encoder.encode([therapy])
         case patients: return try encoder.encode([OfflineCacheFixture.summary()])
         case patient: return try encoder.encode(OfflineCacheFixture.detail(notes: "Nota sintetica"))
         case patient + "/entries", "/api/v1/network/entries": return try encoder.encode([entry])
         case logout: return Data("{\"success\":true}".utf8)
         case "/api/auth/native/login": return Data("{\"id\":\"new-operator-fixture\"}".utf8)
-        case "/api/v1/network/ambulatories", patient + "/therapies", patient + "/checkups",
-             patient + "/observations", patient + "/service-prescriptions", patient + "/service-prescription-items",
-             patient + "/prosthetic-prescriptions", patient + "/attachments", "/api/v1/network/checkups":
+        case patient + "/checkups", "/api/v1/network/checkups":
+            return try encoder.encode([HomeBaseCheckupSummary(id: "checkup-fixture", patientId: "p1", date: Date(), title: "Controllo sintetico", notes: nil, status: "pending", source: "manual", version: 1, createdAt: nil, updatedAt: nil, deletedAt: nil, deletionReason: nil)])
+        case "/api/v1/network/ambulatories",
+             patient + "/observations", "/api/v1/network/service-prescriptions", "/api/v1/network/service-prescription-items",
+             "/api/v1/network/prosthetic-prescriptions", patient + "/attachments":
             return Data("[]".utf8)
         default: throw URLError(.unsupportedURL)
         }
