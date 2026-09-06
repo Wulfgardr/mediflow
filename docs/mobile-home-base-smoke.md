@@ -2,9 +2,18 @@
 # Home-Base Verify Loop And Mobile Paired Smoke
 
 Stato documento: SECONDARY (runbook operativo)
-Ultimo aggiornamento: 2026-07-05
+Ultimo aggiornamento: 2026-09-06 (distinzione dal runner mobile reale)
 
 ---
+
+## Ambito del percorso mobile
+
+Per la matrice reale iPhone/iPad × macOS/Windows/Linux 0.8.6, il percorso
+canonico è [Interoperabilità mobile con host reali](./native-testing.md#interoperabilita-mobile-con-host-reali).
+Il vecchio smoke descritto qui usa snapshot/restore SQLite, bypass TLS nel setup
+e autologin: attesta solo le verifiche che esegue, non il normale login UI,
+la persistenza offline o l'interoperabilità completa. Le regressioni headless
+seguenti restano prove separate dei rispettivi contratti API.
 
 ## Obiettivo
 

@@ -67,66 +67,34 @@ those require source and consumer evidence.
 
 ## Prioritized findings
 
-### F1 — REMOVE: retired macOS builder stub (lowest risk)
+### F1 — RESOLVED: retired macOS builder removed
 
-Evidence:
+At the inventory baseline, `scripts/build-native-app.sh` was a nine-line
+retirement stub that always exited `2`. Commit `1b55676b1e55f956ab42f309e38182e954b231d5`
+removed it after checking repository-local callers. The maintained entrypoint is
+[`scripts/build-apple-macos-app.sh`](../../scripts/build-apple-macos-app.sh).
+The historical inventory counts above have not been recomputed for this update.
 
-- [`scripts/build-native-app.sh:3-9`](../../scripts/build-native-app.sh) labels
-  the old SPM app retired, names
-  `scripts/build-apple-macos-app.sh` as the replacement, and exits `2` without
-  building anything.
-- A repository-wide reference search found no first-party caller other than the
-  file's own diagnostic text.
-- [`native/README.md:44-48`](../../native/README.md) documents the Xcode app
-  project as the current macOS/iOS build surface; the canonical macOS packaging
-  entrypoint exists at `scripts/build-apple-macos-app.sh`.
+### F2 — RESOLVED tooling; interoperability verification remains separate
 
-Impact: the nine-line stub is dead executable surface and can mislead local
-automation or users into a guaranteed failure.
+The same commit replaced the retired simulator builder with the tracked Xcode
+project build in
+[`scripts/build-mobile-sim-app.sh`](../../scripts/build-mobile-sim-app.sh).
+The wrapper validates the SDK, bundle and executable; installation is explicit
+and targets an already booted simulator. The original delivery recorded 21
+synthetic tooling tests, Bash syntax and Apple structure/network guards. It did
+not claim a real build when the simulator SDK was unavailable.
 
-Proposal: remove the retired stub after confirming the repository-local search
-still has no caller. Keep the Xcode/macOS builder and the structure guard.
+The legacy `mobile-home-base-paired-smoke.sh` now reaches that builder, but its
+SQLite settings snapshot/restore, setup TLS bypass and injected app login make
+it unsuitable as evidence of an ordinary mobile workflow. It was not run or
+promoted for the 0.8.6 interoperability matrix.
 
-Risk: low for repository-local callers; external scripts that still invoke the
-old filename are not observable from this checkout.
-
-Verification: rerun `git grep -n 'build-native-app.sh'`, run
-`bash scripts/check-apple-structure.sh`, and run the native build/check path
-that owns the replacement before promoting the removal.
-
-Classification: `REMOVE`.
-
-### F2 — CONSOLIDATE: mobile smoke calls a retired builder (high-value stale path)
-
-Evidence:
-
-- [`scripts/build-mobile-sim-app.sh:3-12`](../../scripts/build-mobile-sim-app.sh)
-  states that the SPM executable no longer exists and exits `2` unconditionally.
-- [`scripts/mobile-home-base-paired-smoke.sh:172-173`](../../scripts/mobile-home-base-paired-smoke.sh)
-  still invokes that script unconditionally before minting paired credentials.
-- [`native/README.md:44-52`](../../native/README.md) documents the current
-  `MediFlowAppleApp.xcodeproj`/`MediFlowMobileApp` `xcodebuild` path, while
-  [`docs/native-testing.md:106-109`](../native-testing.md) still advertises the
-  paired smoke as the standard mobile verification path.
-
-Impact: the documented paired smoke cannot reach its network/pairing assertions
-on this source tree; it stops at the stale builder call.
-
-Proposal: choose one owner for simulator build/install: update the smoke to use
-the canonical Xcode project command and deterministic derived-data/app path,
-then retire the obsolete wrapper; or explicitly retire the smoke and its
-runbook entry until a replacement exists. Do not simply delete the wrapper
-while leaving line 173 in place.
-
-Risk: medium/high because simulator installation, Xcode availability, pairing,
-and synthetic database setup are coupled. No live or real database was used in
-this inventory.
-
-Verification: shell syntax checks, canonical simulator build with
-`CODE_SIGNING_ALLOWED=NO`, then the paired smoke against its synthetic/local
-test setup and the native structure/network guards.
-
-Classification: `CONSOLIDATE`.
+The dedicated `scripts/mobile-home-base-interop*` harness instead consumes a
+private synthetic host descriptor, validates HTTPS/SAN/pin, separates Web and
+native operator sessions and drives login through the app UI. API receipts,
+fixture UI tests and real app/host runs remain distinct. See
+[the native testing runbook](../native-testing.md#interoperabilita-mobile-con-host-reali).
 
 ### F3 — DEFER, then REMOVE if the contract is closed: orphan patient clipboard
 
