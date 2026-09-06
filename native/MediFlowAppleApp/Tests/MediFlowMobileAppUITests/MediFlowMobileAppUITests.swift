@@ -1407,6 +1407,31 @@ final class MediFlowMobileAppUITests: XCTestCase {
         let draftBody = "Testo sintetico da conservare nel diario"
         let draftTranscript = "Trascrizione sintetica ancora da rivedere"
 
+        // @Codex: a device-orientation event alone does not prove that the
+        // app window rotated. Record and await its geometry before reading the draft.
+        func waitForDiaryOrientation(isLandscape: Bool) {
+            let window = app.windows.firstMatch
+            let orientationCompleted = XCTNSPredicateExpectation(
+                predicate: NSPredicate { object, _ in
+                    guard let element = object as? XCUIElement else { return false }
+                    let frame = element.frame
+                    return isLandscape ? frame.width > frame.height : frame.height > frame.width
+                },
+                object: window
+            )
+            let result = XCTWaiter.wait(for: [orientationCompleted], timeout: 10)
+            let requested = isLandscape ? "landscape" : "portrait"
+            let geometry = XCTAttachment(string: "requested: \(requested)\nwindow: \(window.frame)")
+            geometry.name = "draft-\(requested)-window-geometry"
+            geometry.lifetime = .keepAlways
+            add(geometry)
+            if result != .completed {
+                attachScreenshot(named: "draft-\(requested)-rotation-incomplete")
+            }
+            XCTAssertEqual(result, .completed,
+                           "The app window must complete the \(requested) transition before checking the draft")
+        }
+
         // @Codex: ScrollView's AX frame extends behind the keyboard. Derive each
         // gesture from the visible diary gutter, so scrolling cannot type keys
         // or drag inside the nested text editor. Preserve focus and both directions.
@@ -1479,6 +1504,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         // @Codex: cross the actual adaptive layout with a populated draft. A
         // reconstructed progressive shell may require resuming, but cannot lose data.
         XCUIDevice.shared.orientation = .landscapeLeft
+        waitForDiaryOrientation(isLandscape: true)
         openPatientSection(.diary)
         if !title.exists {
             XCTAssertTrue(revealDiaryControl(openEntry))
@@ -1491,6 +1517,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertEqual(paragraphs.count, 1)
         attachScreenshot(named: "mobile-harmonization-draft-keyboard-landscape")
         XCUIDevice.shared.orientation = .portrait
+        waitForDiaryOrientation(isLandscape: false)
         openPatientSection(.diary)
         if !title.exists {
             XCTAssertTrue(revealDiaryControl(openEntry))
@@ -1886,11 +1913,13 @@ final class MediFlowMobileAppUITests: XCTestCase {
         let client: Client
         let expectedAddress: String?
         let expectedDiaryTitle: String?
+        let expectedDiaryID: String?
+        let expectedPopulationInRange: Int?
         let previousPairings: [PreviousPairing]?
 
         enum CodingKeys: String, CodingKey {
             case schemaVersion, synthetic, fixtureId, runID, clientPlatform, host, patient, client
-            case expectedAddress, expectedDiaryTitle, previousPairings
+            case expectedAddress, expectedDiaryTitle, expectedDiaryID, expectedPopulationInRange, previousPairings
             case operatorInfo = "operator"
         }
         var writeAddress: String { "Via Interop \(runID) \(clientPlatform)" }
@@ -1909,6 +1938,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertTrue(input.host.httpsURL.hasPrefix("https://"))
         XCTAssertEqual(input.host.sourceCommit.count, 40)
         XCTAssertEqual(input.host.tlsPinSHA256.count, 64)
+        XCTAssertNotNil(input.runID.range(of: "^[A-Za-z0-9._-]{1,100}$", options: .regularExpression))
         return input
     }
 
@@ -1918,15 +1948,39 @@ final class MediFlowMobileAppUITests: XCTestCase {
         guard element.waitForExistence(timeout: 15) else { return false }
         for _ in 0..<16 {
             if element.isHittable { return true }
-            let containers = app.scrollViews.containing(.any, identifier: element.identifier)
+            let target = element.identifier.isEmpty ? element.label : element.identifier
+            let containers = app.scrollViews.containing(element.elementType, identifier: target)
                 .allElementsBoundByIndex.filter { $0.exists && $0.frame.height > 0 }
             guard let scroll = containers.min(by: { $0.frame.width * $0.frame.height < $1.frame.width * $1.frame.height }) else {
                 return false
             }
+            // @Codex: use the same measured gutter as the verified draft helper;
+            // a generic swipe can hit the keyboard accessory or nested editor.
+            let scrollFrame = scroll.frame
+            let viewport = scrollFrame.intersection(app.frame)
             let navigation = sectionView("patient-section-navigation")
-            let top = navigation.exists ? max(scroll.frame.minY, navigation.frame.maxY) : scroll.frame.minY
-            if element.frame.midY <= top { scroll.swipeDown(velocity: .slow) }
-            else { scroll.swipeUp(velocity: .slow) }
+            var top = viewport.minY
+            if navigation.exists && navigation.isHittable && navigation.frame.intersects(viewport) {
+                top = max(top, navigation.frame.maxY)
+            }
+            let navigationBar = app.navigationBars.firstMatch
+            if navigationBar.exists && navigationBar.frame.intersects(viewport) {
+                top = max(top, navigationBar.frame.maxY)
+            }
+            var bottom = viewport.maxY
+            for overlay in [app.keyboards.firstMatch, app.otherElements["SystemInputAssistantView"], app.tabBars.firstMatch] where overlay.exists {
+                if overlay.frame.intersects(viewport) { bottom = min(bottom, overlay.frame.minY) }
+            }
+            guard viewport.width > 0, bottom > top else { return false }
+            let inset = min(12, (bottom - top) / 4)
+            let x = viewport.minX + min(12, viewport.width / 4) - scrollFrame.minX
+            let upper = top + inset - scrollFrame.minY
+            let lower = bottom - inset - scrollFrame.minY
+            let movingDown = element.frame.midY <= top
+            let origin = scroll.coordinate(withNormalizedOffset: .zero)
+            let start = origin.withOffset(CGVector(dx: x, dy: movingDown ? upper : lower))
+            let end = origin.withOffset(CGVector(dx: x, dy: movingDown ? lower : upper))
+            start.press(forDuration: 0.05, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 0)
         }
         return element.isHittable
     }
@@ -1951,6 +2005,12 @@ final class MediFlowMobileAppUITests: XCTestCase {
             "MEDIFLOW_HOMEBASE_AUTODISCOVER": "false",
         ]
         app.launch()
+        loginInteropFromSettings(input, useSavedPairing: useSavedPairing)
+    }
+
+    // @Codex: Local-lock recovery must reuse the running app. Launching again
+    // would clear memory independently and conceal retained clinical drafts.
+    private func loginInteropFromSettings(_ input: InteropInput, useSavedPairing: Bool, verifyClearBeforeRead: Bool = false) {
         XCTAssertTrue(sectionView("clinical-workspace-settings-view").waitForExistence(timeout: 20))
         let connection = app.buttons["settings-mediflow-connection-button"]
         XCTAssertTrue(revealInteropControl(connection))
@@ -1987,6 +2047,20 @@ final class MediFlowMobileAppUITests: XCTestCase {
         )
         XCTAssertEqual(XCTWaiter.wait(for: [activeSession], timeout: 30), .completed,
                        "Real operator login must also unlock field encryption")
+        if verifyClearBeforeRead {
+            app.buttons["homebase-configuration-close-button"].tap()
+            XCTAssertTrue(openSection("Pazienti"))
+            XCTAssertTrue(sectionView("clinical-workspace-patients-view").waitForExistence(timeout: 5))
+            XCTAssertFalse(app.buttons["patient-cell-\(input.patient.id)"].exists,
+                           "A new login must not restore the old patient list without a fresh read")
+            XCTAssertFalse(sectionView("patient-detail-name").exists)
+            XCTAssertFalse(sectionView("patient-cached-profile").exists)
+            XCTAssertFalse(sectionView("homebase-new-entry-content-field").exists)
+            XCTAssertFalse(sectionView("homebase-edit-entry-content-field").exists)
+            XCTAssertTrue(openSection("Impostazioni"))
+            XCTAssertTrue(revealInteropControl(connection))
+            connection.tap()
+        }
         let load = app.buttons["homebase-load-patients-button"]
         XCTAssertTrue(revealInteropControl(load))
         load.tap()
@@ -2088,6 +2162,735 @@ final class MediFlowMobileAppUITests: XCTestCase {
         launchAndLoginInterop(input, useSavedPairing: true)
         assertInteropReread(input, address: address, title: title)
     }
+
+    /* @Codex: This barrier lives in the test runner's own temporary directory.
+       Only the fixture owner may produce the HTTP receipts. Neither the app
+       nor its credentials, storage, API or clock acquire a test seam. */
+    private struct InteropLockBarrier {
+        struct Event: Decodable {
+            let schemaVersion: Int
+            let runId: String
+            let fixtureId: String
+            let event: String
+            let requestID: String?
+            let method: String?
+            let path: String?
+            let httpStatus: Int?
+            let upstreamHttpStatus: Int?
+            let serverLogoutCompleted: Bool?
+            let responseForwarded: Bool?
+            let heldUntilClientClearVerified: Bool?
+            let clientDisconnectedBeforeRelease: Bool?
+        }
+
+        let directory: URL
+        let runID: String
+        let fixtureID: String
+
+        init(runID: String, fixtureID: String) throws {
+            self.runID = runID
+            self.fixtureID = fixtureID
+            directory = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+                .appendingPathComponent("mediflow-interop-\(runID)", isDirectory: true)
+            XCTAssertFalse(FileManager.default.fileExists(atPath: directory.path),
+                           "A lock run must never reuse stale barrier receipts")
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false,
+                                                    attributes: [.posixPermissions: 0o700])
+        }
+
+        func emit(_ event: String, requestID: String? = nil) throws {
+            var value: [String: Any] = [
+                "schemaVersion": 1, "runId": runID, "fixtureId": fixtureID, "event": event,
+                "method": "POST", "path": "/api/auth/native/logout",
+            ]
+            if let requestID { value["requestID"] = requestID }
+            let data = try JSONSerialization.data(withJSONObject: value, options: [.sortedKeys])
+            let path = directory.appendingPathComponent("\(event).json").path
+            XCTAssertFalse(FileManager.default.fileExists(atPath: path))
+            let temporaryPath = directory.appendingPathComponent(".\(event)-\(UUID().uuidString).json").path
+            XCTAssertTrue(FileManager.default.createFile(atPath: temporaryPath, contents: data,
+                                                         attributes: [.posixPermissions: 0o600]))
+            try FileManager.default.moveItem(atPath: temporaryPath, toPath: path)
+        }
+
+        func waitFor(_ name: String) throws -> Event {
+            let url = directory.appendingPathComponent("\(name).json")
+            let receipt = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                FileManager.default.fileExists(atPath: url.path)
+            }, object: nil)
+            XCTAssertEqual(XCTWaiter.wait(for: [receipt], timeout: 30), .completed,
+                           "Missing actual fixture HTTP receipt: \(name)")
+            let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+            XCTAssertEqual(attributes[.type] as? FileAttributeType, .typeRegular)
+            let permissions = try XCTUnwrap(attributes[.posixPermissions] as? NSNumber)
+            XCTAssertEqual(permissions.intValue & 0o777, 0o600)
+            let event = try JSONDecoder().decode(Event.self, from: Data(contentsOf: url))
+            XCTAssertEqual(event.schemaVersion, 1)
+            XCTAssertEqual(event.runId, runID)
+            XCTAssertEqual(event.fixtureId, fixtureID)
+            XCTAssertEqual(event.event, name)
+            XCTAssertEqual(event.method, "POST")
+            XCTAssertEqual(event.path, "/api/auth/native/logout")
+            return event
+        }
+
+        func assertStillHeld() {
+            for name in ["logout-released", "logout-aborted"] {
+                XCTAssertFalse(FileManager.default.fileExists(atPath: directory.appendingPathComponent("\(name).json").path),
+                               "The clear must be observed before response release or client timeout")
+            }
+        }
+    }
+
+    /* @Codex: Positive data assertions precede the negative lock assertions.
+       A fresh process or an already-empty fixture cannot satisfy this proof. */
+    func testRealPairedLockClearsClinicalPresentationBeforeLogoutCompletes() throws {
+        let input = try interopInput()
+        let address = try XCTUnwrap(input.expectedAddress)
+        let savedTitle = try XCTUnwrap(input.expectedDiaryTitle)
+        let entryID = try XCTUnwrap(input.expectedDiaryID)
+        let population = try XCTUnwrap(input.expectedPopulationInRange)
+        XCTAssertFalse(address.isEmpty)
+        XCTAssertFalse(savedTitle.isEmpty)
+        XCTAssertFalse(entryID.isEmpty)
+        XCTAssertGreaterThan(population, 0, "The analytics fixture must contain an in-range patient")
+        let barrier = try InteropLockBarrier(runID: input.runID, fixtureID: input.fixtureId)
+        addTeardownBlock { try? barrier.emit("test-finished") }
+        defer { app.terminate() }
+        let location = XCTAttachment(string: barrier.directory.path)
+        location.name = "interop-lock-owner-barrier-directory"
+        location.lifetime = .keepAlways
+        add(location)
+        launchAndLoginInterop(input)
+        assertInteropReread(input, address: address, title: savedTitle)
+        XCTAssertTrue(sectionView("entry-row-\(entryID)").exists)
+
+        let analyticsFooter = "Le percentuali sono sui \(population) pazienti in fascia. Chi non ha una data di nascita resta fuori dalla fascia e non entra in quel conteggio."
+        XCTAssertTrue(openSection("Diario"))
+        XCTAssertTrue(sectionView("clinical-workspace-diary-view").waitForExistence(timeout: 10))
+        let globalRow = sectionView("clinical-workspace-diary-row-\(entryID)")
+        XCTAssertTrue(globalRow.waitForExistence(timeout: 20))
+        XCTAssertTrue(globalRow.staticTexts[savedTitle].exists)
+        XCTAssertTrue(globalRow.staticTexts[input.writeBody].exists, "The global diary must first expose the persisted body")
+        attachScreenshot(named: "interop-lock-global-diary-populated")
+        XCTAssertTrue(openSection("Analytics"))
+        XCTAssertTrue(sectionView("clinical-workspace-analytics-view").waitForExistence(timeout: 10))
+        let analyticsSummary = sectionView("clinical-workspace-analytics-summary")
+        XCTAssertTrue(analyticsSummary.waitForExistence(timeout: 20))
+        XCTAssertTrue(analyticsSummary.staticTexts["Pazienti in fascia"].exists)
+        XCTAssertTrue(analyticsSummary.staticTexts.matching(NSPredicate(format: "label == %@", String(population))).firstMatch.exists)
+        XCTAssertTrue(app.staticTexts[analyticsFooter].waitForExistence(timeout: 20),
+                      "Expected host-derived population data must be present before lock")
+        attachScreenshot(named: "interop-lock-analytics-populated")
+
+        XCTAssertTrue(openSection("Pazienti"))
+        if !sectionView("patient-section-navigation").exists {
+            let patient = app.buttons["patient-cell-\(input.patient.id)"]
+            XCTAssertTrue(revealInteropControl(patient))
+            patient.tap()
+        }
+        openPatientSection(.diary)
+        let newTitle = "Bozza nuova \(input.runID)"
+        let newBody = "Corpo non salvato \(input.runID)"
+        let editTitle = "Modifica non salvata \(input.runID)"
+        let editBody = "Revisione non salvata \(input.runID)"
+        let openEntry = app.buttons["homebase-open-new-entry-button"]
+        XCTAssertTrue(revealInteropControl(openEntry))
+        XCTAssertEqual(openEntry.label, "Nuova voce")
+        openEntry.tap()
+        fillInteropField("homebase-new-entry-title-field", value: newTitle)
+        let add = app.buttons["homebase-new-entry-content-add-paragraph"]
+        XCTAssertTrue(revealInteropControl(add))
+        add.tap()
+        let newParagraphs = app.textViews.matching(NSPredicate(format: "identifier BEGINSWITH %@", "homebase-new-entry-content-text-"))
+        XCTAssertTrue(newParagraphs.element.waitForExistence(timeout: 10))
+        XCTAssertEqual(newParagraphs.count, 1)
+        let newParagraph = newParagraphs.element
+        XCTAssertTrue(revealInteropControl(newParagraph))
+        newParagraph.tap()
+        newParagraph.typeText(newBody)
+        XCTAssertEqual(newParagraph.value as? String, newBody)
+        XCTAssertTrue(app.buttons["homebase-create-entry-button"].isEnabled)
+
+        let edit = app.buttons["homebase-edit-entry-button-\(entryID)"]
+        XCTAssertTrue(revealInteropControl(edit))
+        edit.tap()
+        fillInteropField("homebase-edit-entry-title-field", value: editTitle)
+        let editParagraphs = app.textViews.matching(NSPredicate(format: "identifier BEGINSWITH %@", "homebase-edit-entry-content-text-"))
+        XCTAssertTrue(editParagraphs.element.waitForExistence(timeout: 10))
+        XCTAssertEqual(editParagraphs.count, 1, "Use the prior one-paragraph actual workflow entry")
+        let originalEditBlockID = editParagraphs.element.identifier
+        XCTAssertEqual(editParagraphs.element.value as? String, input.writeBody)
+        let addEditParagraph = app.buttons["homebase-edit-entry-content-add-paragraph"]
+        XCTAssertTrue(revealInteropControl(addEditParagraph))
+        addEditParagraph.tap()
+        XCTAssertEqual(editParagraphs.count, 2)
+        let appended = editParagraphs.allElementsBoundByIndex.filter { $0.identifier != originalEditBlockID }
+        XCTAssertEqual(appended.count, 1)
+        let editParagraph = try XCTUnwrap(appended.first)
+        XCTAssertTrue(revealInteropControl(editParagraph))
+        editParagraph.tap()
+        editParagraph.typeText(editBody)
+        XCTAssertEqual(editParagraph.value as? String, editBody)
+        XCTAssertTrue(app.buttons["homebase-update-entry-button"].isEnabled)
+        XCTAssertEqual(app.textFields["homebase-new-entry-title-field"].value as? String, newTitle)
+        XCTAssertEqual(newParagraph.value as? String, newBody)
+        attachScreenshot(named: "interop-lock-both-drafts-populated")
+
+        XCTAssertTrue(openSection("Impostazioni"))
+        let locks = app.buttons.matching(NSPredicate(format: "label == %@", "Blocca sessione adesso"))
+        XCTAssertTrue(locks.element.waitForExistence(timeout: 10))
+        XCTAssertEqual(locks.count, 1)
+        XCTAssertTrue(revealInteropControl(locks.element))
+        XCTAssertTrue(locks.element.isEnabled)
+        try barrier.emit("populated-ready")
+        _ = try barrier.waitFor("logout-armed")
+        locks.element.tap()
+        let held = try barrier.waitFor("logout-held")
+        let requestID = try XCTUnwrap(held.requestID)
+        XCTAssertFalse(requestID.isEmpty)
+        // The genuine host route has returned; only delivery to the client is
+        // delayed. This does not claim that server session retirement is pending.
+        XCTAssertEqual(held.upstreamHttpStatus, 204)
+        XCTAssertEqual(held.serverLogoutCompleted, true)
+        XCTAssertEqual(held.responseForwarded, false)
+
+        func assertClinicalContentAbsent() {
+            for identifier in ["patient-detail-name", "patient-detail-diagnoses", "patient-detail-ai-summary",
+                               "patient-detail-document-insights", "patient-cached-profile", "patient-cell-\(input.patient.id)",
+                               "entry-row-\(entryID)", "homebase-new-entry-title-field", "homebase-new-entry-content-field",
+                               "homebase-edit-entry-title-field", "homebase-edit-entry-content-field"] {
+                XCTAssertFalse(sectionView(identifier).exists, "Locked clinical presentation retained: \(identifier)")
+            }
+            for text in [input.patient.lastName, address, savedTitle, input.writeBody, newTitle, newBody, editTitle, editBody] {
+                XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", text)).firstMatch.exists,
+                               "A previously observed synthetic clinical value remains after local lock")
+            }
+            for identifier in ["homebase-open-new-entry-button", "homebase-create-entry-button", "homebase-update-entry-button"] {
+                for control in app.buttons.matching(identifier: identifier).allElementsBoundByIndex {
+                    XCTAssertFalse(control.isEnabled, "A clinical writer remains available after local lock")
+                }
+            }
+        }
+
+        func assertLockedSurfaces() {
+            XCTAssertTrue(openSection("Pazienti"))
+            XCTAssertTrue(sectionView("clinical-workspace-patients-view").waitForExistence(timeout: 5))
+            assertClinicalContentAbsent()
+            attachScreenshot(named: "interop-lock-patients-cleared")
+            XCTAssertTrue(openSection("Diario"))
+            XCTAssertTrue(sectionView("clinical-workspace-diary-view").waitForExistence(timeout: 5))
+            XCTAssertFalse(globalRow.exists)
+            assertClinicalContentAbsent()
+            attachScreenshot(named: "interop-lock-global-diary-cleared")
+            XCTAssertTrue(openSection("Analytics"))
+            XCTAssertTrue(sectionView("clinical-workspace-analytics-view").waitForExistence(timeout: 5))
+            XCTAssertFalse(analyticsSummary.exists)
+            XCTAssertFalse(app.staticTexts[analyticsFooter].exists)
+            XCTAssertFalse(app.staticTexts["Pazienti in fascia"].exists)
+            XCTAssertFalse(app.staticTexts["Senza data di nascita"].exists)
+            assertClinicalContentAbsent()
+            attachScreenshot(named: "interop-lock-analytics-cleared")
+        }
+
+        barrier.assertStillHeld()
+        assertLockedSurfaces()
+        barrier.assertStillHeld()
+        try barrier.emit("client-clear-verified", requestID: requestID)
+        let released = try barrier.waitFor("logout-released")
+        XCTAssertEqual(released.requestID, requestID)
+        XCTAssertEqual(released.httpStatus, 204)
+        XCTAssertEqual(released.upstreamHttpStatus, 204)
+        XCTAssertEqual(released.serverLogoutCompleted, true)
+        XCTAssertEqual(released.responseForwarded, true)
+        XCTAssertEqual(released.heldUntilClientClearVerified, true)
+        XCTAssertEqual(released.clientDisconnectedBeforeRelease, false,
+                       "A timed-out request cannot prove clear while logout was pending")
+        assertLockedSurfaces()
+
+        XCTAssertTrue(openSection("Impostazioni"))
+        // No terminate/launch here: the same process must require ordinary PIN
+        // entry and a fresh host read without recovering either unsaved draft.
+        loginInteropFromSettings(input, useSavedPairing: true, verifyClearBeforeRead: true)
+        assertInteropReread(input, address: address, title: savedTitle)
+        XCTAssertTrue(sectionView("entry-row-\(entryID)").exists)
+        XCTAssertFalse(sectionView("homebase-edit-entry-content-field").exists)
+        XCTAssertTrue(revealInteropControl(openEntry))
+        XCTAssertEqual(openEntry.label, "Nuova voce", "Local lock must discard the previous unsaved new draft")
+        openEntry.tap()
+        let freshTitle = app.textFields["homebase-new-entry-title-field"]
+        XCTAssertTrue(freshTitle.waitForExistence(timeout: 5))
+        XCTAssertTrue((freshTitle.value as? String ?? "").isEmpty || freshTitle.value as? String == freshTitle.placeholderValue)
+        XCTAssertEqual(newParagraphs.count, 0)
+        XCTAssertFalse(app.buttons["homebase-create-entry-button"].isEnabled)
+        try barrier.emit("same-process-relogin-verified", requestID: requestID)
+        attachScreenshot(named: "interop-lock-fresh-read-without-unsaved-drafts")
+    }
+
+    /* @Codex: Per-mutation checkpoints stop the UI until an independent normal
+       HTTPS reader has checked the exact record/version. These are distinct
+       from the fixture tests and from the other native app's later reread. */
+    private final class InteropModuleProbe {
+        let directory: URL
+        let input: InteropInput
+        private var stepCount = 0
+
+        init(_ input: InteropInput) throws {
+            self.input = input
+            directory = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+                .appendingPathComponent("mediflow-interop-modules-\(input.runID)", isDirectory: true)
+            XCTAssertFalse(FileManager.default.fileExists(atPath: directory.path))
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false,
+                                                    attributes: [.posixPermissions: 0o700])
+        }
+
+        func write(_ name: String, values: [String: Any]) throws {
+            let common: [String: Any] = ["schemaVersion": 1, "synthetic": true, "runID": input.runID,
+                                         "fixtureId": input.fixtureId, "clientPlatform": input.clientPlatform]
+            let data = try JSONSerialization.data(withJSONObject: common.merging(values) { _, new in new }, options: [.sortedKeys])
+            let temporary = directory.appendingPathComponent(".\(UUID().uuidString).json")
+            XCTAssertTrue(FileManager.default.createFile(atPath: temporary.path, contents: data,
+                                                         attributes: [.posixPermissions: 0o600]))
+            try FileManager.default.moveItem(at: temporary, to: directory.appendingPathComponent("\(name).json"))
+        }
+
+        func checkpoint(module: String, recordID: String, version: Int, expected: [String: String], deleted: Bool = false,
+                        patientID: String? = nil, lifecycleStage: String? = nil,
+                        expectedFlags: [String: Bool] = [:], expectedNulls: [String] = []) throws {
+            stepCount += 1
+            let stepID = String(format: "step-%03d", stepCount)
+            var values: [String: Any] = ["stepID": stepID, "module": module, "recordId": recordID,
+                                        "patientId": patientID ?? input.patient.id, "version": version,
+                                        "expected": expected, "deleted": deleted]
+            if let lifecycleStage {
+                values["lifecycleStage"] = lifecycleStage
+                values["expectedFlags"] = expectedFlags
+                values["expectedNulls"] = expectedNulls
+            }
+            try write(stepID, values: values)
+            let receiptURL = directory.appendingPathComponent("\(stepID)-receipt.json")
+            let receiptArrived = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                FileManager.default.fileExists(atPath: receiptURL.path)
+            }, object: nil)
+            XCTAssertEqual(XCTWaiter.wait(for: [receiptArrived], timeout: 30), .completed,
+                           "No independent HTTPS receipt for \(module) \(stepID)")
+            let attributes = try FileManager.default.attributesOfItem(atPath: receiptURL.path)
+            XCTAssertEqual(attributes[.type] as? FileAttributeType, .typeRegular)
+            XCTAssertEqual((attributes[.posixPermissions] as? NSNumber)?.intValue, 0o600)
+            let receipt = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: receiptURL)) as? [String: Any])
+            XCTAssertEqual(receipt["schemaVersion"] as? Int, 1)
+            XCTAssertEqual(receipt["runID"] as? String, input.runID)
+            XCTAssertEqual(receipt["fixtureId"] as? String, input.fixtureId)
+            XCTAssertEqual(receipt["stepID"] as? String, stepID)
+            XCTAssertEqual(receipt["module"] as? String, module)
+            XCTAssertEqual(receipt["recordId"] as? String, recordID)
+            XCTAssertEqual(receipt["hostSourceCommit"] as? String, input.host.sourceCommit)
+            XCTAssertEqual(receipt["writerClientPlatform"] as? String, input.clientPlatform)
+            XCTAssertEqual(receipt["status"] as? String, "pass", "Actual UI must not continue past a failed host reread")
+            let comparison = try XCTUnwrap(receipt["comparison"] as? [String: Any])
+            XCTAssertEqual(comparison["version"] as? Int, version)
+            XCTAssertEqual(comparison["deleted"] as? Bool, deleted)
+            if let lifecycleStage { XCTAssertEqual(receipt["lifecycleStage"] as? String, lifecycleStage) }
+        }
+
+        func complete() throws { try write("ui-complete", values: ["stepCount": stepCount]) }
+    }
+
+    private func makeInteropModuleProbe(_ input: InteropInput) throws -> InteropModuleProbe {
+        let probe = try InteropModuleProbe(input)
+        let location = XCTAttachment(string: probe.directory.path)
+        location.name = "interop-module-verifier-directory"
+        location.lifetime = .keepAlways
+        add(location)
+        addTeardownBlock { try? probe.write("ui-finished", values: [:]) }
+        return probe
+    }
+
+    private func tapInteropButton(_ identifier: String) {
+        let buttons = app.buttons.matching(identifier: identifier)
+        XCTAssertTrue(buttons.element.waitForExistence(timeout: 15))
+        XCTAssertEqual(buttons.count, 1, "The intended operation must have one exact action")
+        XCTAssertTrue(revealInteropControl(buttons.element))
+        XCTAssertTrue(buttons.element.isEnabled, "The actual session and declared capability must allow this operation")
+        buttons.element.tap()
+    }
+
+    private func interopRecordIDs(actionPrefix: String) -> Set<String> {
+        Set(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", actionPrefix))
+            .allElementsBoundByIndex.map { String($0.identifier.dropFirst(actionPrefix.count)) })
+    }
+
+    private func newInteropRecordID(actionPrefix: String, excluding existing: Set<String>, title: String) throws -> String {
+        XCTAssertTrue(app.staticTexts[title].waitForExistence(timeout: 20), "The saved synthetic content must render")
+        let created = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            self.interopRecordIDs(actionPrefix: actionPrefix).subtracting(existing).count == 1
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [created], timeout: 10), .completed,
+                       "One save must expose exactly one newly identified record")
+        return try XCTUnwrap(interopRecordIDs(actionPrefix: actionPrefix).subtracting(existing).first)
+    }
+
+    // @Codex: Return through the actual navigation destination, on either idiom.
+    private func returnToInteropWorklist() {
+        let destination = sectionView("patient-compact-detail-destination")
+        if destination.exists {
+            let back = app.navigationBars.buttons.element(boundBy: 0)
+            XCTAssertTrue(back.isHittable, "The compact patient destination needs its native back action")
+            back.tap()
+            XCTAssertTrue(destination.waitForNonExistence(timeout: 5))
+        }
+        XCTAssertTrue(sectionView("clinical-workspace-patients-view").waitForExistence(timeout: 5))
+        XCTAssertTrue(sectionView("patient-view-mode").exists)
+    }
+
+    private func selectInteropPatientScope(_ title: String) {
+        // Actual runs use the ordinary default text size. Do not replace a
+        // missing segmented control with an unscoped label or injected filter.
+        let control = app.segmentedControls["patient-view-mode"]
+        XCTAssertTrue(revealInteropControl(control))
+        let option = control.buttons.matching(NSPredicate(format: "label == %@", title))
+        XCTAssertEqual(option.count, 1)
+        XCTAssertTrue(option.element.isHittable)
+        option.element.tap()
+        let selected = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in option.element.isSelected }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [selected], timeout: 5), .completed)
+    }
+
+    /* @Codex: All seven checkpoints concern a newly UI-created auxiliary
+       patient. The descriptor patient remains available to the other phases. */
+    func testRealPairedNewPatientLifecycleWithIndependentRereads() throws {
+        let input = try interopInput()
+        let probe = try makeInteropModuleProbe(input)
+        defer { app.terminate() }
+        launchAndLoginInterop(input)
+        returnToInteropWorklist()
+        selectInteropPatientScope("Attivi")
+        let firstName = "Sintetico"
+        let lastName = "Interop \(input.runID) \(input.clientPlatform)"
+        // The canonical manual create contract requires a nonempty code; this
+        // explicit synthetic marker is intentionally not a person's tax code.
+        let taxCode = "SYN-\(input.runID)-\(input.clientPlatform)"
+        let identity = ["firstName": firstName, "lastName": lastName, "taxCode": taxCode]
+        let candidateRows = app.buttons.matching(NSPredicate(
+            format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "patient-cell-", lastName))
+        XCTAssertEqual(candidateRows.count, 0, "A unique run must not adopt a pre-existing patient")
+        tapInteropButton("new-patient-button")
+        XCTAssertFalse(app.buttons["create-patient-button"].isEnabled)
+        fillInteropField("new-patient-first-name", value: firstName)
+        fillInteropField("new-patient-last-name", value: lastName)
+        XCTAssertFalse(app.buttons["create-patient-button"].isEnabled, "The required code cannot be omitted")
+        fillInteropField("new-patient-tax-code", value: taxCode)
+        XCTAssertFalse(app.datePickers["new-patient-birth-date"].exists, "No invented birth date for this fixture")
+        var expected = identity
+        expected["address"] = "Via sintetica \(input.runID)"
+        expected["phone"] = "0000000000"
+        expected["caregiver"] = "Referente sintetico \(input.runID)"
+        for field in ["address", "phone", "caregiver"] {
+            fillInteropField("new-patient-\(field)", value: try XCTUnwrap(expected[field]))
+        }
+        tapInteropButton("create-patient-button")
+        XCTAssertTrue(app.textFields["new-patient-first-name"].waitForNonExistence(timeout: 20))
+        XCTAssertTrue(candidateRows.element.waitForExistence(timeout: 20))
+        XCTAssertEqual(candidateRows.count, 1, "The exact synthetic identity must map to one saved row")
+        let patientID = String(candidateRows.element.identifier.dropFirst("patient-cell-".count))
+        XCTAssertFalse(patientID.isEmpty)
+        XCTAssertNotEqual(patientID, input.patient.id)
+
+        func openCreatedPatient() {
+            let row = app.buttons["patient-cell-\(patientID)"]
+            XCTAssertTrue(row.waitForExistence(timeout: 20))
+            XCTAssertTrue(row.label.contains(lastName))
+            XCTAssertTrue(revealInteropControl(row))
+            row.tap()
+            openPatientSection(.overview)
+            XCTAssertTrue(sectionView("patient-detail-name").label.contains(lastName))
+        }
+        func checkpoint(_ stage: String, version: Int, deleted: Bool = false, archived: Bool = false) throws {
+            var values = expected
+            if deleted {
+                values = identity
+                values["deletionReason"] = "Eliminazione sintetica \(input.runID)"
+            }
+            try probe.checkpoint(module: "patient", recordID: patientID, version: version, expected: values,
+                                 deleted: deleted, patientID: patientID, lifecycleStage: stage,
+                                 expectedFlags: ["isArchived": archived, "isAdi": false],
+                                 expectedNulls: deleted ? ["birthDate"] : ["birthDate", "deletionReason"])
+            attachScreenshot(named: "interop-new-patient-\(stage)")
+        }
+        openCreatedPatient()
+        XCTAssertTrue(app.staticTexts[taxCode].exists)
+        XCTAssertTrue(revealInteropControl(app.staticTexts[try XCTUnwrap(expected["address"])]))
+        try checkpoint("created", version: 1)
+
+        tapInteropButton("edit-patient-button")
+        expected["address"] = "Via aggiornata sintetica \(input.runID)"
+        expected["notes"] = "Nota sintetica conservata \(input.runID)"
+        fillInteropField("edit-patient-address", value: try XCTUnwrap(expected["address"]))
+        fillInteropField("edit-patient-notes", value: try XCTUnwrap(expected["notes"]))
+        tapInteropButton("save-patient-button")
+        XCTAssertTrue(app.textFields["edit-patient-address"].waitForNonExistence(timeout: 20))
+        XCTAssertTrue(revealInteropControl(app.staticTexts[try XCTUnwrap(expected["address"])]))
+        try checkpoint("profile-updated", version: 2)
+
+        tapInteropButton("archive-patient-button")
+        XCTAssertTrue(app.staticTexts["\(lastName) \(firstName)"].exists)
+        tapInteropButton("patient-archive-confirm-button")
+        XCTAssertTrue(app.buttons["patient-archive-confirm-button"].waitForNonExistence(timeout: 20))
+        returnToInteropWorklist()
+        XCTAssertFalse(app.buttons["patient-cell-\(patientID)"].exists, "Archived patient must leave the active list")
+        selectInteropPatientScope("Archiviati")
+        openCreatedPatient()
+        XCTAssertTrue(app.buttons["unarchive-patient-button"].exists)
+        try checkpoint("archived", version: 3, archived: true)
+
+        tapInteropButton("unarchive-patient-button")
+        tapInteropButton("patient-unarchive-confirm-button")
+        XCTAssertTrue(app.buttons["patient-unarchive-confirm-button"].waitForNonExistence(timeout: 20))
+        returnToInteropWorklist()
+        XCTAssertFalse(app.buttons["patient-cell-\(patientID)"].exists, "Reactivated patient must leave the archived list")
+        selectInteropPatientScope("Attivi")
+        openCreatedPatient()
+        try checkpoint("reactivated", version: 4)
+
+        tapInteropButton("soft-delete-patient-button")
+        XCTAssertTrue(app.staticTexts["\(lastName) \(firstName)"].exists)
+        fillInteropField("patient-delete-reason-field", value: "Eliminazione sintetica \(input.runID)")
+        tapInteropButton("patient-delete-confirm-button")
+        XCTAssertTrue(app.buttons["patient-delete-confirm-button"].waitForNonExistence(timeout: 20))
+        XCTAssertTrue(sectionView("patient-detail-name").waitForNonExistence(timeout: 5))
+        returnToInteropWorklist()
+        XCTAssertFalse(app.buttons["patient-cell-\(patientID)"].exists)
+        selectInteropPatientScope("Cestino")
+        let trashRow = sectionView("patient-trash-row-\(patientID)")
+        XCTAssertTrue(trashRow.waitForExistence(timeout: 20))
+        XCTAssertTrue(revealInteropControl(trashRow))
+        try checkpoint("trashed", version: 5, deleted: true)
+
+        tapInteropButton("restore-patient-button-\(patientID)")
+        XCTAssertTrue(trashRow.waitForNonExistence(timeout: 20))
+        selectInteropPatientScope("Attivi")
+        openCreatedPatient()
+        XCTAssertTrue(revealInteropControl(app.staticTexts[try XCTUnwrap(expected["address"])]))
+        try checkpoint("restored", version: 6)
+
+        app.terminate()
+        launchAndLoginInterop(input, useSavedPairing: true)
+        returnToInteropWorklist()
+        selectInteropPatientScope("Attivi")
+        openCreatedPatient()
+        XCTAssertTrue(revealInteropControl(app.staticTexts[try XCTUnwrap(expected["address"])]))
+        try checkpoint("restored-reread", version: 6)
+        try probe.complete()
+    }
+
+    private func exerciseInteropClinicalCRUD(
+        _ input: InteropInput, module: String, section: PatientSection,
+        createFields: [(suffix: String, value: String)], expected: [String: String],
+        updateSuffix: String, updateValue: String, updateField: String,
+        statusLabel: String? = nil, statusValue: String? = nil,
+        cancelledLabel: String, confirmation: String
+    ) throws {
+        let probe = try makeInteropModuleProbe(input)
+        defer { app.terminate() }
+        launchAndLoginInterop(input)
+        openPatientSection(section)
+        let createID = "homebase-create-\(module)-button"
+        let updateID = "homebase-update-\(module)-button"
+        let editPrefix = "homebase-edit-\(module)-button-"
+        let prior = interopRecordIDs(actionPrefix: editPrefix)
+        for field in createFields { fillInteropField("\(createID)-\(field.suffix)", value: field.value) }
+        tapInteropButton(createID)
+        let recordID = try newInteropRecordID(actionPrefix: editPrefix, excluding: prior, title: createFields[0].value)
+        try probe.checkpoint(module: module, recordID: recordID, version: 1, expected: expected)
+        attachScreenshot(named: "interop-\(module)-created")
+
+        tapInteropButton("\(editPrefix)\(recordID)")
+        fillInteropField("\(updateID)-\(updateSuffix)", value: updateValue)
+        var updated = expected
+        updated[updateField] = updateValue
+        if let statusLabel, let statusValue {
+            let status = app.segmentedControls["\(updateID)-status"]
+            XCTAssertTrue(revealInteropControl(status))
+            let choices = status.buttons.matching(NSPredicate(format: "label == %@", statusLabel))
+            XCTAssertEqual(choices.count, 1)
+            choices.element.tap()
+            XCTAssertTrue(choices.element.isSelected)
+            updated["status"] = statusValue
+        }
+        tapInteropButton(updateID)
+        XCTAssertTrue(app.staticTexts[updateValue].waitForExistence(timeout: 20))
+        try probe.checkpoint(module: module, recordID: recordID, version: 2, expected: updated)
+        attachScreenshot(named: "interop-\(module)-updated")
+
+        tapInteropButton("homebase-delete-\(module)-button-\(recordID)")
+        let confirm = app.buttons.matching(NSPredicate(format: "label == %@", confirmation))
+        XCTAssertTrue(confirm.element.waitForExistence(timeout: 5))
+        XCTAssertEqual(confirm.count, 1)
+        confirm.element.tap()
+        XCTAssertTrue(app.staticTexts[cancelledLabel].waitForExistence(timeout: 20))
+        XCTAssertFalse(app.buttons["\(editPrefix)\(recordID)"].exists)
+        try probe.checkpoint(module: module, recordID: recordID, version: 3, expected: updated, deleted: true)
+        attachScreenshot(named: "interop-\(module)-historical-soft-delete")
+        try probe.complete()
+    }
+
+    func testRealPairedTherapyCRUDWithIndependentRereads() throws {
+        let input = try interopInput()
+        let name = "Terapia sintetica \(input.runID)"
+        try exerciseInteropClinicalCRUD(input, module: "therapy", section: .therapies,
+            createFields: [("drug-name", name), ("dosage", "Posologia solo fixture"), ("motivation", "Verifica manuale sintetica")],
+            expected: ["drugName": name, "dosage": "Posologia solo fixture", "motivation": "Verifica manuale sintetica", "status": "active"],
+            updateSuffix: "dosage", updateValue: "Posologia aggiornata solo fixture", updateField: "dosage",
+            statusLabel: "Sospesa", statusValue: "suspended", cancelledLabel: "Terapia annullata", confirmation: "Annulla terapia")
+    }
+
+    func testRealPairedCheckupCRUDWithIndependentRereads() throws {
+        let input = try interopInput()
+        let title = "Controllo sintetico \(input.runID)"
+        try exerciseInteropClinicalCRUD(input, module: "checkup", section: .clinical,
+            createFields: [("title", title), ("notes", "Nota controllo solo fixture")],
+            expected: ["title": title, "notes": "Nota controllo solo fixture", "status": "pending"],
+            updateSuffix: "notes", updateValue: "Nota controllo aggiornata", updateField: "notes",
+            statusLabel: "Completato", statusValue: "completed", cancelledLabel: "Controllo annullato", confirmation: "Annulla controllo")
+    }
+
+    func testRealPairedObservationCRUDWithIndependentRereads() throws {
+        let input = try interopInput()
+        let display = "Peso sintetico \(input.runID)"
+        try exerciseInteropClinicalCRUD(input, module: "observation", section: .clinical,
+            createFields: [("display", display), ("code", "29463-7"), ("value", "73"), ("unit-code", "kg"), ("notes", "Rilevazione sintetica")],
+            expected: ["display": display, "code": "29463-7", "value": "73", "unitCode": "kg", "notes": "Rilevazione sintetica"],
+            updateSuffix: "value", updateValue: "74", updateField: "value",
+            cancelledLabel: "Osservazione annullata", confirmation: "Annulla osservazione")
+    }
+
+    func testRealPairedServiceAndItemLifecycleWithIndependentRereads() throws {
+        let input = try interopInput()
+        let probe = try makeInteropModuleProbe(input)
+        defer { app.terminate() }
+        launchAndLoginInterop(input)
+        openPatientSection(.prescriptions)
+        let title = "Prestazione sintetica \(input.runID)"
+        let itemNames = ["Voce A \(input.runID)", "Voce B \(input.runID)"]
+        let prior = interopRecordIDs(actionPrefix: "service-prescription-book-")
+        fillInteropField("new-service-name", value: title)
+        fillInteropField("new-service-clinical-question", value: "Quesito solo fixture")
+        fillInteropField("new-service-provider", value: "Erogatore sintetico")
+        fillInteropField("new-service-items", value: "SYN001 \(itemNames[0])\nSYN002 \(itemNames[1])")
+        tapInteropButton("create-service-prescription-button")
+        let recordID = try newInteropRecordID(actionPrefix: "service-prescription-book-", excluding: prior, title: title)
+        let row = sectionView("service-prescription-row-\(recordID)")
+        XCTAssertTrue(row.exists)
+        var itemIDs: [String] = []
+        for name in itemNames {
+            let items = row.descendants(matching: .any)
+                .matching(NSPredicate(format: "identifier BEGINSWITH %@", "service-prescription-item-row-"))
+                .containing(.staticText, identifier: name)
+            XCTAssertTrue(items.element.waitForExistence(timeout: 10))
+            XCTAssertEqual(items.count, 1, "Each requested line must produce one separate item")
+            itemIDs.append(String(items.element.identifier.dropFirst("service-prescription-item-row-".count)))
+        }
+        XCTAssertNotEqual(itemIDs[0], itemIDs[1])
+
+        func check(_ status: String, version: Int) throws {
+            try probe.checkpoint(module: "service", recordID: recordID, version: version,
+                expected: ["serviceName": title, "clinicalQuestion": "Quesito solo fixture", "provider": "Erogatore sintetico", "status": status])
+            for (index, itemID) in itemIDs.enumerated() {
+                try probe.checkpoint(module: "service-item", recordID: itemID, version: version,
+                    expected: ["prescriptionId": recordID, "serviceName": itemNames[index], "serviceCode": "SYN00\(index + 1)", "status": status])
+            }
+        }
+        try check("prescribed", version: 1)
+        for (index, transition) in [("book", "booked", "Prenotata"), ("perform", "performed", "Eseguita"),
+                                    ("report", "report_received", "Referto ricevuto")].enumerated() {
+            tapInteropButton("service-prescription-\(transition.0)-\(recordID)")
+            XCTAssertTrue(row.staticTexts[transition.2].waitForExistence(timeout: 20))
+            try check(transition.1, version: index + 2)
+            attachScreenshot(named: "interop-service-and-items-\(transition.1)")
+        }
+        XCTAssertFalse(app.buttons["service-prescription-book-\(recordID)"].isEnabled)
+        XCTAssertFalse(app.buttons["service-prescription-perform-\(recordID)"].isEnabled)
+        XCTAssertFalse(app.buttons["service-prescription-report-\(recordID)"].isEnabled)
+        XCTAssertFalse(app.buttons["service-prescription-cancel-\(recordID)"].isEnabled)
+        // Cancel a distinct still-prescribed record; never bypass a transition
+        // guard on the already performed/reported prescription above.
+        let cancellationTitle = "Prestazione da annullare \(input.runID)"
+        let beforeCancel = interopRecordIDs(actionPrefix: "service-prescription-book-")
+        fillInteropField("new-service-name", value: cancellationTitle)
+        tapInteropButton("create-service-prescription-button")
+        let cancelledID = try newInteropRecordID(actionPrefix: "service-prescription-book-", excluding: beforeCancel, title: cancellationTitle)
+        try probe.checkpoint(module: "service", recordID: cancelledID, version: 1,
+                             expected: ["serviceName": cancellationTitle, "status": "prescribed"])
+        tapInteropButton("service-prescription-cancel-\(cancelledID)")
+        XCTAssertTrue(sectionView("service-prescription-row-\(cancelledID)").staticTexts["Annullata"].waitForExistence(timeout: 20))
+        try probe.checkpoint(module: "service", recordID: cancelledID, version: 2,
+                             expected: ["serviceName": cancellationTitle, "status": "cancelled"])
+        try probe.complete()
+    }
+
+    func testRealPairedProstheticCreateAndTestWithIndependentRereads() throws {
+        let input = try interopInput()
+        let probe = try makeInteropModuleProbe(input)
+        defer { app.terminate() }
+        launchAndLoginInterop(input)
+        openPatientSection(.prescriptions)
+        let title = "Ausilio sintetico \(input.runID)"
+        let prior = interopRecordIDs(actionPrefix: "prosthetic-test-")
+        for (field, value) in [("description", title), ("measures", "Misure solo fixture"),
+                               ("clinical-reason", "Motivo sintetico"), ("supplier", "Fornitore sintetico")] {
+            fillInteropField("new-prosthetic-\(field)", value: value)
+        }
+        tapInteropButton("create-prosthetic-prescription-button")
+        let recordID = try newInteropRecordID(actionPrefix: "prosthetic-test-", excluding: prior, title: title)
+        var expected = ["description": title, "measures": "Misure solo fixture", "clinicalReason": "Motivo sintetico",
+                        "supplier": "Fornitore sintetico", "status": "prescribed"]
+        try probe.checkpoint(module: "prosthetic", recordID: recordID, version: 1, expected: expected)
+        tapInteropButton("prosthetic-test-\(recordID)")
+        let row = sectionView("prosthetic-prescription-row-\(recordID)")
+        XCTAssertTrue(row.staticTexts["Collaudo registrato in MediFlow."].waitForExistence(timeout: 20))
+        XCTAssertFalse(app.buttons["prosthetic-test-\(recordID)"].isEnabled)
+        expected["status"] = "tested"
+        expected["collaudoOutcome"] = "Collaudo registrato in MediFlow."
+        try probe.checkpoint(module: "prosthetic", recordID: recordID, version: 2, expected: expected)
+        attachScreenshot(named: "interop-prosthetic-tested")
+        try probe.complete()
+    }
+
+    func testRealPairedScaleSubmissionWithIndependentReread() throws {
+        let input = try interopInput()
+        let probe = try makeInteropModuleProbe(input)
+        defer { app.terminate() }
+        launchAndLoginInterop(input)
+        openPatientSection(.diary)
+        let prior = interopRecordIDs(actionPrefix: "homebase-edit-entry-button-")
+        tapInteropButton("new-scale-button")
+        tapInteropButton("new-scale-option-adl")
+        XCTAssertTrue(app.staticTexts["scale-incomplete"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["scale-score"].exists)
+        XCTAssertFalse(app.buttons["submit-scale-button"].isEnabled)
+        for (index, question) in ["bath", "dress", "toilet", "transfer", "cont", "feed"].enumerated() {
+            tapInteropButton("scale-question-\(question)")
+            let answer = app.buttons.matching(NSPredicate(format: "label == %@", "Dipendente"))
+            XCTAssertEqual(answer.count, 1)
+            answer.element.tap()
+            if index < 5 { XCTAssertFalse(app.buttons["submit-scale-button"].isEnabled) }
+        }
+        XCTAssertEqual(app.staticTexts["scale-score"].label, "Punteggio: 0/6")
+        attachScreenshot(named: "interop-scale-complete-explicit-zero")
+        tapInteropButton("submit-scale-button")
+        let recordID = try newInteropRecordID(actionPrefix: "homebase-edit-entry-button-", excluding: prior, title: "ADL (Indice di Katz)")
+        try probe.checkpoint(module: "entry", recordID: recordID, version: 1,
+                             expected: ["title": "ADL (Indice di Katz)", "type": "scale"])
+        openPatientSection(.scales)
+        let history = sectionView("scale-history-row-\(recordID)")
+        XCTAssertTrue(revealInteropControl(history), "The newly persisted scale must be reachable in its own history row")
+        XCTAssertTrue(history.staticTexts["ADL (Indice di Katz)"].exists)
+        XCTAssertTrue(history.staticTexts["0/6"].exists)
+        attachScreenshot(named: "interop-scale-history")
+        try probe.complete()
+    }
+
+    /// Swipes the detail scroll view up until `element` is in the accessibility
 
     /// Swipes the detail scroll view up until `element` is in the accessibility
     /// tree (or a swipe budget is exhausted). Returns whether it became present.

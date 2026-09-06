@@ -14,6 +14,36 @@ import re
 import stat
 
 
+PHASE_METHODS = {
+    'workflow': 'testRealPairedHostWorkflow',
+    'reread': 'testRealPairedOtherClientReread',
+    'lock': 'testRealPairedLockClearsClinicalPresentationBeforeLogoutCompletes',
+    'therapy': 'testRealPairedTherapyCRUDWithIndependentRereads',
+    'checkup': 'testRealPairedCheckupCRUDWithIndependentRereads',
+    'observation': 'testRealPairedObservationCRUDWithIndependentRereads',
+    'services': 'testRealPairedServiceAndItemLifecycleWithIndependentRereads',
+    'prosthetic': 'testRealPairedProstheticCreateAndTestWithIndependentRereads',
+    'scale': 'testRealPairedScaleSubmissionWithIndependentReread',
+    'patient': 'testRealPairedNewPatientLifecycleWithIndependentRereads',
+}
+
+
+def phase_input(phase, address=None, title=None, entry_id=None, population=None):
+    """Bind a lock proof to positive prior HTTP/UI fixture evidence."""
+    if phase not in PHASE_METHODS:
+        raise ValueError('Unknown interoperability phase.')
+    if phase in ('reread', 'lock') and not (address and title):
+        raise ValueError('Reread/lock requires the prior exact address and diary title.')
+    if phase == 'lock' and (not entry_id or type(population) is not int or population < 1):
+        raise ValueError('Lock requires a persisted diary ID and a positive in-range population count.')
+    if phase != 'lock' and (entry_id is not None or population is not None):
+        raise ValueError('Lock-only expectations must select the lock phase explicitly.')
+    return {key: value for key, value in (
+        ('expectedAddress', address), ('expectedDiaryTitle', title),
+        ('expectedDiaryID', entry_id), ('expectedPopulationInRange', population),
+    ) if value is not None}
+
+
 def rebase(value, test_root):
     if isinstance(value, str):
         return value.replace('__TESTROOT__', str(test_root))
@@ -56,9 +86,11 @@ def main():
     parser.add_argument('--descriptor', required=True, type=Path)
     parser.add_argument('--client', choices=['ios', 'ipados'], required=True)
     parser.add_argument('--run-id', required=True)
-    parser.add_argument('--phase', choices=['workflow', 'reread'], default='workflow')
+    parser.add_argument('--phase', choices=list(PHASE_METHODS), default='workflow')
     parser.add_argument('--expected-address')
     parser.add_argument('--expected-diary-title')
+    parser.add_argument('--expected-diary-id')
+    parser.add_argument('--expected-population-in-range', type=int)
     parser.add_argument('--previous-descriptor', action='append', type=Path, default=[])
     parser.add_argument('--output', required=True, type=Path)
     args = parser.parse_args()
@@ -73,17 +105,18 @@ def main():
         parser.error('An explicit synthetic v1 descriptor is required.')
     if not re.fullmatch(r'[A-Za-z0-9._-]{1,100}', args.run_id):
         parser.error('Run ID must be a bounded artifact-safe marker.')
-    if args.phase == 'reread' and not (args.expected_address and args.expected_diary_title):
-        parser.error('Reread requires the prior client address and diary title.')
+    try:
+        expectations = phase_input(args.phase, args.expected_address, args.expected_diary_title,
+                                   args.expected_diary_id, args.expected_population_in_range)
+    except ValueError as error:
+        parser.error(str(error))
     payload = {
         'schemaVersion': 1, 'synthetic': True, 'fixtureId': descriptor['fixtureId'],
         'runID': args.run_id, 'clientPlatform': args.client,
         'host': descriptor['host'], 'operator': descriptor['operator'], 'patient': descriptor['patient'],
         'client': descriptor['clients'][args.client],
     }
-    for key, value in [('expectedAddress', args.expected_address), ('expectedDiaryTitle', args.expected_diary_title)]:
-        if value is not None:
-            payload[key] = value
+    payload.update(expectations)
     payload['previousPairings'] = []
     for previous_path in args.previous_descriptor:
         previous_info = previous_path.lstat()
@@ -98,7 +131,7 @@ def main():
         payload['previousPairings'].append({
             'serverURL': previous['host']['httpsURL'], 'id': previous['clients'][args.client]['id'],
         })
-    method = 'testRealPairedHostWorkflow' if args.phase == 'workflow' else 'testRealPairedOtherClientReread'
+    method = PHASE_METHODS[args.phase]
     with args.source.open('rb') as source:
         original = plistlib.load(source)
     configured = configure_run(original, args.source.resolve().parent, payload, method)
