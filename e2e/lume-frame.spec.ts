@@ -1,5 +1,5 @@
 /* @Codex */
-import { expect, test, type Locator, type Page } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import {
   assertKeyboardFocusProgresses,
   assertNoHorizontalOverflow,
@@ -40,20 +40,9 @@ async function resolveColorVariable(page: Page, variable: string): Promise<strin
   }, variable);
 }
 
-async function resolveBoxShadow(locator: Locator, value: string): Promise<string> {
-  return locator.evaluate((element, shadow) => {
-    const probe = document.createElement('span');
-    probe.style.boxShadow = shadow;
-    element.appendChild(probe);
-    const resolved = getComputedStyle(probe).boxShadow;
-    probe.remove();
-    return resolved;
-  }, value);
-}
-
 async function openSyntheticFrame(page: Page, register: FrameCase['register']): Promise<void> {
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
-  await page.goto('/mockups/kree8');
+  await page.goto('/?area=turno');
   await page.waitForLoadState('domcontentloaded');
   await setRegister(page, register);
   await expect(page.getByTestId('lume-frame')).toBeVisible();
@@ -64,45 +53,35 @@ for (const frameCase of FRAME_CASES) {
     await page.setViewportSize({ width: frameCase.width, height: frameCase.height });
     await openSyntheticFrame(page, frameCase.register);
 
-    const patientsNav = page.getByRole('button', { name: /Pazienti/ });
+    // @Codex ADR 0123: ordinary navigation owns links; the review mockup has no app rail.
+    const navigation = page.getByRole('navigation', { name: 'Navigazione principale' });
+    const patientsNav = navigation.getByRole('link', { name: 'Pazienti', exact: true });
     await patientsNav.focus();
     await page.keyboard.press('Enter');
     await expect(patientsNav).toHaveAttribute('aria-current', 'page');
+    await expect(page.getByRole('heading', { name: /Pazienti in carico/, level: 1 })).toBeVisible();
+    await expect(navigation.locator('[aria-current="page"]')).toHaveCount(1);
 
-    const rail = page.getByTestId('lume-frame-rail');
+    const rail = page.getByRole('complementary', { name: 'MediFlow', exact: true });
     const canvas = page.getByTestId('lume-frame-canvas');
     const panel = page.getByTestId('lume-frame-panel');
     const focus = page.getByTestId('lume-frame-focus');
     const expected = {
       chrome: await resolveColorVariable(page, '--lume-surface-chrome'),
-      canvas: await resolveColorVariable(page, '--lume-surface-canvas'),
-      field: await resolveColorVariable(page, '--lume-surface-field'),
       focal: await resolveColorVariable(page, '--lume-surface-focal'),
     };
 
     await expect(rail).toHaveCSS('background-color', expected.chrome);
-    await expect(canvas).toHaveCSS('background-color', expected.canvas);
-    if (frameCase.width <= 480) {
-      /* @Codex The compact frame deliberately removes one nested surface.
-         The focal surface still carries grouping while the outer panel
-         contributes no decorative border at reflow-proxy widths. */
-      await expect(panel).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-      await expect(panel).toHaveCSS('border-top-width', '0px');
-    } else {
-      await expect(panel).toHaveCSS('background-color', expected.field);
-      await expect(panel).toHaveCSS('border-top-width', '1px');
+    await expect(canvas).toHaveCSS('background-color', expected.focal);
+    // The selected redesign removes decorative nested sheets at every width.
+    // Keep the depth check on the rendered surfaces, including the outer rail.
+    for (const layer of [panel, focus]) {
+      await expect(layer).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      await expect(layer).toHaveCSS('border-top-width', '0px');
     }
-    await expect(focus).toHaveCSS('background-color', expected.focal);
-    await expect(focus).toHaveCSS('border-top-width', '1px');
-    // Gli alias locali sono validati dal token checker e risolvono solo da
-    // --lume-*; il probe eredita qui la derivazione specifica del registro.
-    const expectedFocalShadow = await resolveBoxShadow(
-      focus,
-      '0 2px 8px color-mix(in srgb, var(--k8-shadow-source) var(--k8-shadow-strength), transparent)',
-    );
-    await expect(focus).toHaveCSS('box-shadow', expectedFocalShadow);
+    for (const layer of [rail, canvas, panel, focus]) await expect(layer).toHaveCSS('box-shadow', 'none');
 
-    const turnNav = page.getByRole('button', { name: /Agenda/ });
+    const turnNav = navigation.getByRole('link', { name: 'Agenda', exact: true });
     const weights = await Promise.all([
       patientsNav.evaluate((element) => Number(getComputedStyle(element).fontWeight)),
       turnNav.evaluate((element) => Number(getComputedStyle(element).fontWeight)),
@@ -124,10 +103,11 @@ for (const frameCase of FRAME_CASES) {
       return family;
     });
     expect(registerProbeFamily.toLowerCase()).toContain('registro');
-    const countFamilies = await page.locator('[data-lume-frame-nav] .lume-registro').evaluateAll((elements) =>
+    // Counts moved from the navigation into the directory they describe.
+    const countFamilies = await page.getByTestId('lume-worklist').locator('.lume-registro').evaluateAll((elements) =>
       elements.map((element) => getComputedStyle(element).fontFamily),
     );
-    expect(countFamilies.length).toBeGreaterThan(1);
+    expect(countFamilies.length).toBeGreaterThan(0);
     expect(countFamilies.every((family) => family === registerProbeFamily)).toBe(true);
 
     const semanticColors = await Promise.all([
@@ -137,7 +117,7 @@ for (const frameCase of FRAME_CASES) {
       resolveColorVariable(page, '--lume-signal-success'),
       resolveColorVariable(page, '--lume-signal-plum'),
     ]);
-    const coloredSideBorders = await page.locator('[data-lume-frame-element]').evaluateAll((elements, colors) =>
+    const coloredSideBorders = await page.locator('[data-twin-workspace] > aside, nav[aria-label="Navigazione principale"] a, [data-lume-frame-element]').evaluateAll((elements, colors) =>
       elements.flatMap((element) => {
         const style = getComputedStyle(element);
         const width = Number.parseFloat(style.borderLeftWidth);
@@ -157,6 +137,11 @@ for (const frameCase of FRAME_CASES) {
     ]);
     await assertNotClippedInViewport(patientsNav, 'navigazione Pazienti');
     await assertKeyboardFocusProgresses(page, patientsNav, 'navigazione frame');
+    await expect(turnNav).toBeFocused();
+    for (const link of await navigation.getByRole('link').all()) {
+      await assertNotClippedInViewport(link, `destinazione ${await link.getAttribute('aria-label')}`);
+    }
+    await page.screenshot({ path: test.info().outputPath('frame.png'), animations: 'disabled' });
   });
 }
 
@@ -165,9 +150,10 @@ test.describe('frame Lume con movimento ridotto', () => {
     await page.setViewportSize({ width: 1440, height: 960 });
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await openSyntheticFrame(page, 'giorno');
-    await page.getByRole('button', { name: /Pazienti/ }).click();
+    await page.getByRole('navigation', { name: 'Navigazione principale' })
+      .getByRole('link', { name: 'Pazienti', exact: true }).click();
 
-    const motion = await page.getByTestId('lume-frame').evaluate((frame) => {
+    const motion = await page.locator('[data-twin-workspace]').evaluate((frame) => {
       const parseDurations = (value: string) => value.split(',').map((duration) => {
         const trimmed = duration.trim();
         return trimmed.endsWith('ms') ? Number.parseFloat(trimmed) : Number.parseFloat(trimmed) * 1000;

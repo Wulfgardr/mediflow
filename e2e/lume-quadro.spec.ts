@@ -5,6 +5,7 @@ import {
   assertNoHorizontalOverflow,
   assertNotClippedInViewport,
   bootstrapUnlockedSession,
+  openPatientSection,
   REFLOW_PROXY_VIEWPORTS,
   type ReflowProxyViewport,
 } from './utils';
@@ -23,7 +24,7 @@ const QUADRO_CASES: QuadroCase[] = (['giorno', 'grafite'] as const).flatMap((reg
 type LivePatientFixture = { id: string; name: string };
 
 async function createLivePatientFixture(page: Page): Promise<LivePatientFixture> {
-  const marker = Date.now().toString().slice(-8);
+  const marker = Date.now().toString().slice(-8) + Math.random().toString(36).slice(2, 6);
   const firstName = `Quadro${marker}`;
   const lastName = `Live${marker}`;
 
@@ -38,6 +39,7 @@ async function createLivePatientFixture(page: Page): Promise<LivePatientFixture>
         birthDate: '1980-01-01T00:00:00.000Z',
         address: 'Indirizzo sintetico Quadro',
         phone: '0000000098',
+        notes: 'Voce dimostrativa della cartella. Nessun dato reale.',
         diagnoses: [{
           system: 'ICD-11',
           code: 'QC00',
@@ -48,6 +50,14 @@ async function createLivePatientFixture(page: Page): Promise<LivePatientFixture>
     });
     if (!response.ok) throw new Error(`Failed to create Quadro fixture: ${response.status}`);
     const data = await response.json() as { id: string };
+    for (const [path, body] of [
+      ['/api/therapies', { patientId: data.id, drugName: 'Ramipril sintetico', dosage: '5 mg · 1-0-0', status: 'active', startDate: '2026-07-01T08:00:00.000Z' }],
+      ['/api/observations', { patientId: data.id, codeSystem: 'LOINC', code: '8480-6', display: 'Pressione sistolica', unitSystem: 'UCUM', unitCode: 'mm[Hg]', value: 160, refHigh: '140', observedAt: '2026-09-01T08:00:00.000Z', source: 'manual' }],
+      ['/api/checkups', { patientId: data.id, title: 'Controllo sintetico programmato', date: '2027-01-10T09:00:00.000Z', status: 'pending', source: 'manual' }],
+    ] as const) {
+      const created = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      if (!created.ok) throw new Error(`Fixture Quadro ${path}: HTTP ${created.status}`);
+    }
     return { id: data.id, name: `${fixtureLastName} ${fixtureFirstName}` };
   }, { firstName, lastName, marker });
 }
@@ -61,26 +71,19 @@ async function setRegister(page: Page, register: QuadroCase['register']): Promis
   }, register);
 }
 
-async function openPatientActionsMenu(lens: Locator): Promise<Locator> {
-  await lens.getByRole('button', { name: 'Altre azioni paziente', exact: true }).click();
-  const menu = lens.page().getByRole('menu', { name: 'Azioni paziente', exact: true });
-  await expect(menu).toBeVisible();
-  return menu;
-}
-
-async function openSyntheticQuadro(page: Page, quadroCase: QuadroCase): Promise<Locator> {
+/* @Codex ADR 0123: the real synoptic reader replaces the four static mockup
+   metric cards. Clinical numbers below come from API-created records. */
+async function openSyntheticQuadro(page: Page, quadroCase: QuadroCase): Promise<{ quadro: Locator; patient: LivePatientFixture }> {
   await page.setViewportSize({ width: quadroCase.width, height: quadroCase.height });
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
-  await page.goto('/mockups/kree8');
-  await page.waitForLoadState('domcontentloaded');
+  const patient = await createLivePatientFixture(page);
+  await page.goto(`/patients/${patient.id}/modules#quadro`);
   await setRegister(page, quadroCase.register);
-  await page.getByRole('button', { name: /Pazienti/ }).click();
-  const lens = page.getByTestId('lume-patient-lens');
-  await expect(lens).toBeVisible();
-  await (await openPatientActionsMenu(lens)).getByRole('menuitem', { name: 'Quadro', exact: true }).click();
-  const quadro = page.getByTestId('lume-quadro');
+  const quadro = page.getByRole('region', { name: 'Riepilogo clinico', exact: true });
   await expect(quadro).toBeVisible();
-  return quadro;
+  await expect(quadro.getByText('Ramipril sintetico', { exact: true })).toBeVisible();
+  await expect(quadro.getByText('Controllo sintetico programmato', { exact: true })).toBeVisible();
+  return { quadro, patient };
 }
 
 async function resolveColor(page: Page, variable: string): Promise<string> {
@@ -94,134 +97,97 @@ async function resolveColor(page: Page, variable: string): Promise<string> {
   }, variable);
 }
 
-async function assertIbmPlexMono(locator: Locator, label: string): Promise<void> {
-  const families = await locator.evaluateAll((elements) =>
-    elements.map((element) => getComputedStyle(element).fontFamily),
-  );
-  expect(families.length, `${label}: nessun elemento osservabile`).toBeGreaterThan(0);
-  for (const family of families) {
-    expect(family, `${label}: famiglia tipografica risolta`).toContain('IBM Plex Mono');
-  }
-}
-
-async function assertSingleFocalShadow(page: Page): Promise<void> {
-  const frameFocus = page.locator(
-    '[data-testid="lume-frame-focus"][data-lume-focus="true"][data-lume-frame-element="focus"]',
-  );
-  await expect(frameFocus).toHaveCount(1);
-
-  const shadowOwners = await frameFocus.evaluate((root) =>
-    [root, ...root.querySelectorAll('*')]
-      .filter((element) => getComputedStyle(element).boxShadow !== 'none')
-      .map((element) => ({
-        isFrameFocus: element === root,
-        testId: element.getAttribute('data-testid'),
-        frameElement: element.getAttribute('data-lume-frame-element'),
-        lumeFocus: element.getAttribute('data-lume-focus'),
-      })),
-  );
-  expect(shadowOwners).toEqual([{
-    isFrameFocus: true,
-    testId: 'lume-frame-focus',
-    frameElement: 'focus',
-    lumeFocus: 'true',
-  }]);
-}
-
-async function assertQuadroContract(page: Page, quadro: Locator): Promise<void> {
-  await expect(quadro.getByRole('heading', { name: 'M. R.', level: 1 })).toBeVisible();
+async function assertQuadroContract(page: Page, quadro: Locator, patient: LivePatientFixture): Promise<void> {
+  await expect(page.getByRole('heading', { name: patient.name, level: 1 })).toHaveCount(1);
+  await expect(quadro.getByRole('heading', { name: 'Quadro clinico', exact: true })).toBeVisible();
+  await expect(quadro.getByText('Controllo sintetico del Quadro', { exact: true })).toBeVisible();
+  await expect(quadro.getByText('5 mg · 1-0-0', { exact: true })).toBeVisible();
   await expect(quadro.locator('[aria-pressed]')).toHaveCount(0);
+  // A reader remains a flat surface: no second focal card or decorative shadow.
+  const elevations = await quadro.evaluate((element) => [element, ...element.querySelectorAll('*')]
+    .filter(node => (node as HTMLElement).offsetParent !== null && getComputedStyle(node).boxShadow !== 'none')
+    .map(node => node.tagName));
+  expect(elevations).toEqual([]);
+  await expect(page.getByTestId('lume-scheda-surface')).toHaveCSS('box-shadow', 'none');
 
-  await assertSingleFocalShadow(page);
-  await expect(quadro.locator('[data-lume-surface="focal"]')).toHaveCount(0);
-  await expect(quadro.locator('[data-lume-surface="field"]')).toHaveCount(4);
+  const measure = quadro.getByRole('heading', { name: 'Ultima misura', exact: true }).locator('../..');
+  const value = measure.locator(':scope > strong');
+  await expect(value).toContainText('160 mm[Hg]');
+  await expect(value).toHaveCSS('color', await resolveColor(page, '--lume-signal-critical'));
+  await expect(value).toHaveCSS('font-variant-numeric', 'tabular-nums');
+  await expect(value).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  await expect(value).toHaveCSS('border-left-width', '0px');
+  await expect(value).toHaveCSS('border-radius', '0px');
+  await expect(quadro.getByText('Ramipril sintetico', { exact: true }))
+    .toHaveCSS('color', await resolveColor(page, '--lume-ink'));
 
-  const muted = await resolveColor(page, '--lume-ink-muted');
-  const labelColors = await quadro.getByTestId('lume-quadro-metric-label').evaluateAll((elements) =>
-    elements.map((element) => getComputedStyle(element).color),
-  );
-  expect(new Set(labelColors)).toEqual(new Set([muted]));
-
-  await assertIbmPlexMono(quadro.getByTestId('lume-quadro-metric-value'), 'Valori metrici');
-  await assertIbmPlexMono(quadro.getByTestId('lume-quadro-atom'), 'Atomi della testata');
-
-  const warningValues = quadro.locator('[data-testid="lume-quadro-metric-value"][data-lume-signal="warning"]');
-  await expect(warningValues).toHaveCount(1);
-  await expect(warningValues).toHaveAttribute('data-lume-clinical-state', 'warning');
-  await expect(quadro.locator('[data-testid="lume-quadro-metric-value"][data-lume-clinical-state]:not([data-lume-signal])')).toHaveCount(0);
-
-  const neutralValue = quadro
-    .locator('[data-lume-surface="field"]', { hasText: 'Pressione' })
-    .getByTestId('lume-quadro-metric-value');
-  await expect(neutralValue).toHaveCount(1);
-  expect(await neutralValue.evaluate((element) => ({
-    hasSignal: element.hasAttribute('data-lume-signal'),
-    hasClinicalState: element.hasAttribute('data-lume-clinical-state'),
-    color: getComputedStyle(element).color,
-  }))).toEqual({
-    hasSignal: false,
-    hasClinicalState: false,
-    color: await resolveColor(page, '--lume-ink'),
+  const hierarchy = await measure.evaluate(element => {
+    const heading = element.querySelector('h3')!;
+    const number = element.querySelector(':scope > strong')!;
+    const date = element.querySelector(':scope > span')!;
+    return { heading: parseFloat(getComputedStyle(heading).fontSize), number: parseFloat(getComputedStyle(number).fontSize), date: parseFloat(getComputedStyle(date).fontSize) };
   });
-  expect(await warningValues.evaluate((element) => getComputedStyle(element).color))
-    .not.toBe(await neutralValue.evaluate((element) => getComputedStyle(element).color));
+  expect(hierarchy.heading).toBeGreaterThan(hierarchy.date);
+  expect(hierarchy.number).toBeGreaterThan(hierarchy.heading);
 
-  const primary = quadro.locator('[data-lume-action="primary"]');
-  const quiet = quadro.locator('[data-lume-action="quiet"]');
+  const primary = page.getByTestId('lume-scheda-header').getByRole('link', { name: 'Nuova voce', exact: true });
   await expect(primary).toHaveCount(1);
-  await expect(quiet).toHaveCount(7);
+  await expect(primary).toHaveAttribute('href', `/patients/${patient.id}/entries/new`);
   await expect(primary).toHaveCSS('background-color', await resolveColor(page, '--lume-ink'));
-  await expect(primary).toHaveCSS('color', await resolveColor(page, '--lume-surface-focal'));
-
-  await primary.focus();
-  await page.keyboard.press('Tab');
-  await expect(quiet.first()).toBeFocused();
+  await assertNotClippedInViewport(primary, 'azione primaria quadro');
+  await assertKeyboardFocusProgresses(page, primary, 'azione primaria quadro');
+  for (const link of await quadro.getByRole('link').all()) await assertNotClippedInViewport(link, await link.innerText());
 }
 
 async function assertReflowStack(quadro: Locator): Promise<void> {
-  const sections = await quadro.getByTestId('lume-quadro-section').evaluateAll((elements) =>
-    elements.map((element) => {
-      const box = element.getBoundingClientRect();
-      return { top: box.top, bottom: box.bottom };
-    }),
-  );
-  expect(sections[1].top).toBeGreaterThanOrEqual(sections[0].bottom - 1);
-  expect(sections[3].top).toBeGreaterThanOrEqual(sections[2].bottom - 1);
+  const geometry = await quadro.evaluate(element => {
+    const box = (node: Element) => {
+      const rect = node.getBoundingClientRect();
+      return { top: rect.top, bottom: rect.bottom, left: rect.left };
+    };
+    const main = box(element.querySelector(':scope > div')!);
+    const context = box(element.querySelector(':scope > aside')!);
+    const measure = box(element.querySelector('aside > div:has(h3)')!);
+    const followup = box([...element.querySelectorAll('aside > div:has(h3)')][1]);
+    return { main, context, measure, followup };
+  });
+  expect(geometry.context.top).toBeGreaterThanOrEqual(geometry.main.bottom);
+  expect(geometry.followup.top).toBeGreaterThanOrEqual(geometry.measure.bottom);
+  expect(Math.abs(geometry.followup.left - geometry.measure.left)).toBeLessThanOrEqual(1);
 }
 
 test('la navigazione Quadro del paziente selezionato converge sulla Scheda', async ({ page }) => {
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
   const patient = await createLivePatientFixture(page);
-
   await page.goto(`/?area=incarico&paziente=${patient.id}`);
-  const lens = page.getByTestId('lume-patient-lens');
-  await expect(lens.getByRole('heading', { name: patient.name, level: 2 })).toBeVisible();
-  await (await openPatientActionsMenu(lens)).getByRole('menuitem', { name: 'Quadro', exact: true }).click();
-
+  const row = page.getByRole('option').filter({ has: page.getByText(patient.name, { exact: true }) });
+  await expect(row).toBeVisible();
+  await row.click();
   await expect(page).toHaveURL(new RegExp(`/patients/${patient.id}/modules$`));
+  await page.getByRole('navigation', { name: 'Sezioni della vista' }).getByRole('link', { name: 'Riepilogo', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'Riepilogo clinico', exact: true })).toBeVisible();
   await expect(page.getByTestId('lume-scheda-header')).toHaveCount(1);
   await expect(page.getByTestId('lume-quadro')).toHaveCount(0);
 });
 
 for (const quadroCase of QUADRO_CASES) {
   test(`quadro Lume ${quadroCase.register} ${quadroCase.viewport}`, async ({ page }) => {
-    const quadro = await openSyntheticQuadro(page, quadroCase);
+    const { quadro, patient } = await openSyntheticQuadro(page, quadroCase);
     await expect(page.locator('html')).toHaveClass(quadroCase.register === 'grafite' ? /dark/ : /light/);
-    await assertQuadroContract(page, quadro);
+    await assertQuadroContract(page, quadro, patient);
     await assertNoHorizontalOverflow(page, [
       { label: 'documento quadro', selector: 'document' },
-      { label: 'quadro', selector: '[data-testid="lume-quadro"]' },
+      { label: 'quadro', selector: '#quadro' },
     ]);
     if (quadroCase.width <= 390) await assertReflowStack(quadro);
-    const primary = quadro.locator('[data-lume-action="primary"]');
-    await assertNotClippedInViewport(primary, 'azione primaria quadro');
-    await assertKeyboardFocusProgresses(page, primary, 'azione primaria quadro');
-    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
-    await quadro.evaluate((element) => element.scrollIntoView({ block: 'start' }));
-    await page.screenshot({
-      path: `/tmp/lume-quadro-${quadroCase.register}-${quadroCase.viewport}.png`,
-      fullPage: true,
-      animations: 'disabled',
-    });
+    await page.screenshot({ path: test.info().outputPath('quadro.png'), fullPage: true, animations: 'disabled' });
+    // Values lead to the same patient and the underlying working modules.
+    await quadro.getByRole('link', { name: 'Gestisci', exact: true }).click();
+    await expect(page.locator('#terapie')).toHaveAttribute('data-folder-active', 'true');
+    await expect(page.locator('#terapie')).toContainText('Ramipril sintetico');
+    await openPatientSection(page, 'parametri');
+    await expect(page.locator('#parametri')).toContainText('160');
+    await openPatientSection(page, 'follow-up');
+    await expect(page.locator('#follow-up')).toContainText('Controllo sintetico programmato');
   });
 }

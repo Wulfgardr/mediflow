@@ -1,15 +1,8 @@
 /* @Codex LUME-104/68 */
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { bootstrapUnlockedSession } from './utils';
+import { bootstrapUnlockedSession, openPatientSection, assertNoHorizontalOverflow, assertNotClippedInViewport } from './utils';
 
 type SchedaCase = { register: 'giorno' | 'grafite'; viewport: 'wide' | 'narrow'; width: number; height: number };
-type ElevatedSurface = {
-  background: string;
-  expected: boolean;
-  shadow: string;
-  tag: string;
-  testId: string | null;
-};
 const CASES: SchedaCase[] = [
   { register: 'giorno', viewport: 'wide', width: 1440, height: 960 },
   { register: 'grafite', viewport: 'wide', width: 1440, height: 960 },
@@ -28,6 +21,7 @@ async function createFixture(page: Page): Promise<{ id: string; name: string }> 
       body: JSON.stringify({
         firstName, lastName, taxCode: `SCH${suffix}`, birthDate: '1972-04-12T00:00:00.000Z',
         address: 'Indirizzo sintetico Scheda', phone: '0000000104',
+        notes: Array.from({ length: 40 }, (_, index) => `Nota sintetica ${index + 1}. Voce dimostrativa della cartella, nessun dato reale.`).join('\n'),
         diagnoses: [{ system: 'ICD-11', code: 'SC00', description: 'Controllo sintetico della Scheda', date: '2026-07-16T08:00:00.000Z' }],
       }),
     });
@@ -54,11 +48,11 @@ async function setRegister(page: Page, register: SchedaCase['register']): Promis
 
 async function prepareStableInsightHydration(page: Page): Promise<{ loaded: Promise<void> }> {
   await page.evaluate(async () => {
-    for (const key of ['aiDocumentSynthesisKillSwitch', 'aiPatientInsightKillSwitch']) {
+    for (const [key, value] of [['aiDocumentSynthesisKillSwitch', 'enabled'], ['aiPatientInsightKillSwitch', 'enabled'], ['aiSmartImportKillSwitch', 'disabled']]) {
       const response = await fetch('/api/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key, value: 'enabled' }),
+        body: JSON.stringify({ key, value }),
       });
       if (!response.ok) throw new Error(`Fixture impostazione ${key}: HTTP ${response.status}`);
     }
@@ -77,210 +71,117 @@ async function prepareStableInsightHydration(page: Page): Promise<{ loaded: Prom
   return { loaded: patientInsightLoaded.then(() => undefined) };
 }
 
-async function readElevatedSurfaces(scroll: Locator): Promise<ElevatedSurface[]> {
-  return scroll.evaluate((context) => {
-    const expected = context.querySelector('[data-testid="lume-scheda-surface"]');
-    return [context, ...context.querySelectorAll<HTMLElement>('*')]
-      .filter((element) => {
-        const style = getComputedStyle(element);
-        const hasSurfaceBackground = style.backgroundColor !== 'rgba(0, 0, 0, 0)'
-          && style.backgroundColor !== 'transparent';
-        return style.boxShadow !== 'none' && hasSurfaceBackground;
-      })
-      .map((element) => {
-        const style = getComputedStyle(element);
-        return {
-          background: style.backgroundColor,
-          expected: element === expected,
-          shadow: style.boxShadow,
-          tag: element.tagName.toLowerCase(),
-          testId: element.getAttribute('data-testid'),
-        };
-      });
-  });
-}
-
+/* @Codex ADR 0123: the canonical folder owns thirteen destinations. The
+   record tab preserves identity while the reading pane scrolls. */
 async function expectInViewport(locator: Locator): Promise<void> {
-  expect(await locator.evaluate((element) => {
+  await expect(locator).toBeVisible();
+  expect(await locator.evaluate(element => {
     const box = element.getBoundingClientRect();
-    return box.top >= 0 && box.bottom <= window.innerHeight;
+    return box.top >= 0 && box.bottom <= innerHeight && box.left >= 0 && box.right <= innerWidth;
   })).toBe(true);
 }
 
-async function expectRegisterFont(locator: Locator, label: string, minimum: number): Promise<void> {
-  const evidence = await locator.evaluateAll(async (elements) => {
-    await document.fonts.ready;
-    return elements
-      .filter((element) => (element as HTMLElement).offsetParent !== null)
-      .map((element) => {
-        const style = getComputedStyle(element);
-        const query = `${style.fontWeight} ${style.fontSize} "IBM Plex Mono"`;
-        return { available: document.fonts.check(query), family: style.fontFamily, query };
-      });
+async function expectSurfaceHierarchyAndNeutralChrome(page: Page, header: Locator, minimum: number): Promise<void> {
+  const evidence = await header.evaluate(element => {
+    const icons = [...element.querySelectorAll('svg')].filter(icon => icon.getBoundingClientRect().width > 0)
+      .map(icon => ({ color: getComputedStyle(icon).color, owner: getComputedStyle(icon.parentElement!).color }));
+    const targets = [...element.querySelectorAll<HTMLElement>('a, button')].filter(control => control.offsetParent !== null)
+      .map(control => ({ label: control.textContent?.trim(), width: control.getBoundingClientRect().width, height: control.getBoundingClientRect().height }));
+    const h1 = element.querySelector('h1')!;
+    const atoms = element.querySelector('p')!;
+    const style = getComputedStyle(element);
+    return { icons, targets, title: parseFloat(getComputedStyle(h1).fontSize), atoms: parseFloat(getComputedStyle(atoms).fontSize),
+      leftPadding: parseFloat(style.paddingLeft), rightPadding: parseFloat(style.paddingRight) };
   });
-  expect(evidence.length, label).toBeGreaterThanOrEqual(minimum);
-  for (const specimen of evidence) {
-    expect(specimen.family, `${label}: ${specimen.query}`).toContain('IBM Plex Mono');
-    expect(specimen.available, `${label}: ${specimen.query}`).toBe(true);
+  expect(evidence.icons.length).toBeGreaterThanOrEqual(2);
+  for (const icon of evidence.icons) expect(icon.color).toBe(icon.owner);
+  expect(evidence.targets.length).toBeGreaterThanOrEqual(2);
+  for (const target of evidence.targets) {
+    expect.soft(target.width, `${target.label}: larghezza target`).toBeGreaterThanOrEqual(minimum);
+    expect.soft(target.height, `${target.label}: altezza target`).toBeGreaterThanOrEqual(minimum);
+  }
+  expect(evidence.title).toBeGreaterThan(evidence.atoms);
+  expect(evidence.leftPadding).toBeGreaterThanOrEqual(16);
+  expect(evidence.rightPadding).toBeGreaterThanOrEqual(16);
+  const surface = page.getByTestId('lume-scheda-surface');
+  await expect(surface).toHaveCSS('box-shadow', 'none');
+  await expect(surface).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  await expect(header).toHaveCSS('box-shadow', 'none');
+  for (const control of await header.locator('a, button').all()) {
+    if (await control.isVisible()) await assertNotClippedInViewport(control, await control.innerText());
   }
 }
 
-// @Codex WUL-562 D2: prova computata dei quattro registri e delle icone neutre.
-async function expectSurfaceHierarchyAndNeutralChrome(
-  page: Page,
-  scroll: Locator,
-  header: Locator,
-  surface: Locator,
-  minimumHeaderTarget: number,
-): Promise<void> {
-  const action = header.getByRole('button', { name: 'Azioni', exact: true });
-  const evidence = await page.evaluate(() => {
-    const resolveSurface = (variable: string) => {
-      const probe = document.createElement('span');
-      probe.style.backgroundColor = `var(${variable})`;
-      document.body.appendChild(probe);
-      const color = getComputedStyle(probe).backgroundColor;
-      probe.remove();
-      return color;
-    };
-    const readColor = (selector: string) => {
-      const element = document.querySelector<HTMLElement>(selector);
-      if (!element) throw new Error(`Superficie Lume assente: ${selector}`);
-      return getComputedStyle(element).backgroundColor;
-    };
-    const headerElement = document.querySelector<HTMLElement>('[data-testid="lume-scheda-header"]');
-    if (!headerElement) throw new Error('Testata Scheda assente');
-    const icons = [...headerElement.querySelectorAll<SVGElement>('svg')]
-      .filter((icon) => icon.getBoundingClientRect().width > 0 && icon.getBoundingClientRect().height > 0)
-      .map((icon) => ({
-        color: getComputedStyle(icon).color,
-        ownerColor: getComputedStyle(icon.parentElement as Element).color,
-      }));
-
-    return {
-      expected: {
-        canvas: resolveSurface('--lume-surface-canvas'),
-        chrome: resolveSurface('--lume-surface-chrome'),
-        field: resolveSurface('--lume-surface-field'),
-        focal: resolveSurface('--lume-surface-focal'),
-      },
-      actual: {
-        canvas: readColor('[data-testid="lume-scheda-scroll"]'),
-        chrome: readColor('[data-testid="lume-scheda-header"]'),
-        field: readColor('[data-testid="lume-scheda-header"] button[aria-haspopup="true"]'),
-        focal: readColor('[data-testid="lume-scheda-surface"]'),
-      },
-      icons,
-    };
-  });
-
-  expect(evidence.actual).toEqual(evidence.expected);
-  expect(evidence.icons.length).toBeGreaterThanOrEqual(3);
-  for (const icon of evidence.icons) expect(icon.color).toBe(icon.ownerColor);
-  await expect(action).toBeVisible();
-  await expect(action).toHaveCSS('background-color', evidence.expected.field);
-  const headerTargets = await header.locator('a, button').evaluateAll((elements) => elements
-    .filter((element) => (element as HTMLElement).offsetParent !== null)
-    .map((element) => Math.min(element.getBoundingClientRect().width, element.getBoundingClientRect().height)));
-  for (const target of headerTargets) expect(target).toBeGreaterThanOrEqual(minimumHeaderTarget);
-  await expect(scroll).toBeVisible();
-  await expect(surface).toBeVisible();
-}
-
-async function expectNarrowContract(page: Page, surface: Locator, header: Locator): Promise<void> {
-  const overflow = await page.evaluate(() => ({
-    document: document.documentElement.scrollWidth - document.documentElement.clientWidth,
-    scroll: document.querySelector<HTMLElement>('[data-testid="lume-scheda-scroll"]')!.scrollWidth
-      - document.querySelector<HTMLElement>('[data-testid="lume-scheda-scroll"]')!.clientWidth,
-    surface: document.querySelector<HTMLElement>('[data-testid="lume-scheda-surface"]')!.scrollWidth
-      - document.querySelector<HTMLElement>('[data-testid="lume-scheda-surface"]')!.clientWidth,
-  }));
-  for (const [name, delta] of Object.entries(overflow)) expect(delta, `overflow ${name}`).toBeLessThanOrEqual(1);
-  const sections = await surface.locator(':scope > div > section').evaluateAll((elements) =>
-    elements.map((element) => element.getBoundingClientRect().top));
-  expect(sections.length).toBeGreaterThan(8);
-  expect(sections).toEqual([...sections].sort((left, right) => left - right));
-  await expectInViewport(header);
+async function expectCurrentSection(page: Page, id: string): Promise<void> {
+  const nav = page.getByRole('navigation', { name: 'Sezioni della vista' });
+  const link = nav.locator(`a[href="#${id}"]`);
+  await expect(link).toHaveAttribute('aria-current', 'location');
+  await expect(nav.locator('a[aria-current="location"]')).toHaveCount(1);
+  // A closed disclosure carries the location marker of its hidden active link.
+  await expect(nav.locator('[aria-current="location"]:visible')).toHaveCount(1);
+  await expect(page.locator(`#${id}`)).toBeVisible();
 }
 
 test('la route legacy paziente converge sulla sola Scheda', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
   const patient = await createFixture(page);
-
   await page.goto(`/patients/${patient.id}`);
-
   await expect(page).toHaveURL(new RegExp(`/patients/${patient.id}/modules$`));
   await expect(page.getByTestId('lume-scheda-header')).toHaveCount(1);
   await expect(page.getByRole('heading', { name: patient.name, level: 1 })).toHaveCount(1);
   await expect(page.getByTestId('lume-quadro')).toHaveCount(0);
 });
 
-// @Codex
 test('il controllo back della Scheda torna alla lista pazienti', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
   const patient = await createFixture(page);
-
   await page.goto(`/patients/${patient.id}/modules`);
-
-  const backControl = page.getByTestId('lume-scheda-header').getByRole('link', { name: 'Pazienti', exact: true });
+  const backControl = page.getByRole('navigation', { name: 'Cartelle aperte' })
+    .getByRole('link', { name: 'Pazienti', exact: true });
   await expect(backControl).toHaveAttribute('href', '/?area=incarico');
   await backControl.click();
   await expect(page).toHaveURL(/\?area=incarico(?:&paziente=[^&]+)?$/);
   await expect(page.getByTestId('lume-scheda-header')).toHaveCount(0);
+  await expect(page.getByTestId('lume-worklist')).toBeVisible();
 });
 
-// @Codex WUL-560 L7B: D-WebRail-01 binds every canonical destination once.
-test('la rail raggruppa le tredici sezioni e mantiene una sola destinazione corrente', async ({ page }) => {
+test('le tredici sezioni restano raggiungibili con una sola destinazione corrente', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
   const patient = await createFixture(page);
   await page.goto(`/patients/${patient.id}/modules`);
-
-  const rail = page.getByRole('navigation', { name: 'Sezioni della vista' });
-  await expect(rail).toHaveAttribute('data-rail-mode', 'grouped');
-  const disclosures = rail.getByRole('button');
-  await expect(disclosures).toHaveText([
-    'Quadro e decisioni', 'Terapie e prescrizioni', 'Documenti e prove', 'Diario e follow-up',
-  ]);
-  await expect(disclosures.nth(0)).toHaveAttribute('aria-expanded', 'true');
-  for (let index = 1; index < 4; index += 1) {
-    await expect(disclosures.nth(index)).toHaveAttribute('aria-expanded', 'false');
+  const nav = page.getByRole('navigation', { name: 'Sezioni della vista' });
+  const sections = ['quadro', 'attenzione', 'identita', 'parametri', 'terapie', 'prestazioni',
+    'protesica', 'scale', 'documenti', 'siss', 'timeline', 'diario', 'follow-up'];
+  await expect(nav.locator('a')).toHaveCount(13);
+  expect((await nav.locator('a').evaluateAll(links => links.map(link => link.getAttribute('href')))).sort())
+    .toEqual(sections.map(id => `#${id}`).sort());
+  await expectCurrentSection(page, 'diario');
+  const disclosure = nav.locator('summary');
+  const details = nav.locator('details');
+  await disclosure.focus();
+  await disclosure.press('Space');
+  await expect(details).toHaveAttribute('open', '');
+  await disclosure.press('Enter');
+  await expect(details).not.toHaveAttribute('open');
+  await expectCurrentSection(page, 'diario');
+  for (const id of sections) {
+    const link = nav.locator(`a[href="#${id}"]`);
+    if (!(await link.isVisible())) {
+      await disclosure.focus();
+      await disclosure.press('Enter');
+    }
+    await link.focus();
+    await link.press('Enter');
+    await expect(page).toHaveURL(new RegExp(`#${id}$`));
+    await expectCurrentSection(page, id);
   }
-  expect(new Set(await disclosures.evaluateAll((buttons) => buttons.map((button) => button.getAttribute('aria-controls')))).size)
-    .toBe(4);
-
-  const links = rail.locator('a');
-  await expect(links).toHaveCount(13);
-  await expect(links).toHaveText([
-    /Quadro/, /Attenzione/, /Identità/, /Parametri/, /Terapie/, /Prestazioni/,
-    /Protesica/, /Scale/, /Documenti/, /SISS\/FSE/, /Timeline/, /Diario/, /Follow-up/,
-  ]);
-  expect(await links.evaluateAll((elements) => elements.map((element) => element.getAttribute('href')))).toEqual([
-    '#quadro', '#attenzione', '#identita', '#parametri', '#terapie', '#prestazioni',
-    '#protesica', '#scale', '#documenti', '#siss', '#timeline', '#diario', '#follow-up',
-  ]);
-
-  const current = page.locator('[aria-current="location"]');
-  await expect.poll(() => current.count()).toBe(1);
-  const currentHref = await current.getAttribute('href');
-  await disclosures.nth(0).focus();
-  await page.keyboard.press('Space');
-  await expect(disclosures.nth(0)).toHaveAttribute('aria-expanded', 'false');
-  await expect(current).toHaveCount(1);
-  await expect(current).toBeVisible();
-  await expect(current).toHaveAttribute('href', currentHref!);
-  await page.keyboard.press('Enter');
-  await expect(disclosures.nth(0)).toHaveAttribute('aria-expanded', 'true');
-  await expect(current).toHaveCount(1);
-
-  await disclosures.nth(1).focus();
-  await page.keyboard.press('Enter');
-  const therapies = rail.getByRole('link', { name: /Terapie/ });
-  await therapies.focus();
-  await page.keyboard.press('Enter');
-  await expect(page).toHaveURL(/#terapie$/);
+  await page.goBack();
+  await expectCurrentSection(page, 'diario');
+  await page.goForward();
+  await expectCurrentSection(page, 'follow-up');
 });
 
 for (const schedaCase of CASES) {
@@ -293,90 +194,84 @@ for (const schedaCase of CASES) {
     await insightHydration.loaded;
     await setRegister(page, schedaCase.register);
     await expect(page.locator('html')).toHaveClass(schedaCase.register === 'grafite' ? /dark/ : /light/);
-
-    const scroll = page.getByTestId('lume-scheda-scroll');
     const header = page.getByTestId('lume-scheda-header');
     const surface = page.getByTestId('lume-scheda-surface');
     await expect(header.getByRole('heading', { name: patient.name, level: 1 })).toBeVisible();
     await expect(page.getByRole('heading', { name: patient.name, level: 1 })).toHaveCount(1);
-    await expect(page.getByRole('button', { name: /Archivio documenti ed evidenze/ }))
-      .toHaveAttribute('aria-expanded', 'false');
-    await expectSurfaceHierarchyAndNeutralChrome(
-      page,
-      scroll,
-      header,
-      surface,
-      schedaCase.viewport === 'narrow' ? 44 : 28,
-    );
-    await expectInViewport(header);
-    expect(await scroll.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true);
-    await scroll.evaluate((element) => element.scrollTo(0, element.scrollHeight));
+    // Late settings must not steal the active folder section or reveal documents.
+    await expectCurrentSection(page, 'diario');
+    await expect(page.locator('#documenti')).toBeHidden();
+    await expectSurfaceHierarchyAndNeutralChrome(page, header, schedaCase.viewport === 'narrow' ? 44 : 28);
     await expectInViewport(header);
 
-    await expect(page.locator('[data-lume-elevation]')).toHaveCount(1);
-    await expect(surface).toHaveAttribute('data-lume-elevation', 'focal');
-    await expect.poll(
-      async () => (await readElevatedSurfaces(scroll)).length,
-      { message: 'la Scheda stabilizzata espone una sola ombra computata', timeout: 1_500 },
-    ).toBe(1);
-    const elevatedSurfaces = await readElevatedSurfaces(scroll);
-    expect(elevatedSurfaces).toHaveLength(1);
-    expect(elevatedSurfaces[0]).toMatchObject({
-      expected: true,
-      tag: 'article',
-      testId: 'lume-scheda-surface',
+    await page.getByRole('navigation', { name: 'Sezioni della vista' }).getByRole('link', { name: 'Riepilogo', exact: true }).click();
+    const note = page.getByText('Leggi la nota completa', { exact: true });
+    await note.focus();
+    await note.press('Space');
+    await expect(note.locator('..')).toHaveAttribute('open', '');
+    // Scroll the actual overflowing ancestor, not the former inert Scheda wrapper.
+    const scrollEvidence = await surface.evaluate(element => {
+      let owner = element.parentElement;
+      while (owner && !(owner.scrollHeight > owner.clientHeight && /auto|scroll/.test(getComputedStyle(owner).overflowY))) owner = owner.parentElement;
+      if (!owner) return null;
+      owner.scrollTo(0, owner.scrollHeight);
+      return { overflow: owner.scrollHeight - owner.clientHeight, offset: owner.scrollTop };
     });
-
-    await expectRegisterFont(header.getByTestId('lume-register-value'), 'atomi della testata', 3);
-    await expectRegisterFont(surface.getByTestId('lume-register-value'), 'valori metrici', 4);
-
+    expect(scrollEvidence).not.toBeNull();
+    expect(scrollEvidence!.overflow).toBeGreaterThan(100);
+    expect(scrollEvidence!.offset).toBeGreaterThan(100);
+    const records = page.getByRole('navigation', { name: 'Cartelle aperte' });
+    await expectInViewport(records.getByRole('link', { name: patient.name, exact: true }));
     await page.getByTestId('privacy-mode-header-toggle').click();
-    await expect(header.locator('.liquid-blur')).toHaveCount(4);
-
+    await expect(header.locator('.liquid-blur')).toHaveCount(3);
+    await expect(records.getByRole('link', { name: patient.name, exact: true }).locator('.liquid-blur')).toHaveCount(1);
     await page.goto(`/patients/${patient.id}/entries/new`);
-    const defaultPatientLabel = page.getByTestId('lume-workspace-patient-label');
-    await expect(defaultPatientLabel).toContainText(patient.name);
-    await expect(defaultPatientLabel.locator('.liquid-blur')).toHaveCount(1);
+    const label = page.getByTestId('progressive-entry-composer').locator('header p');
+    await expect(label).toContainText(patient.name);
+    await expect(label.locator('.liquid-blur')).toHaveCount(1);
     await page.goto(`/patients/${patient.id}/modules`);
-    await expect(page.getByTestId('lume-scheda-header').locator('.liquid-blur')).toHaveCount(4);
+    await expect(header.locator('.liquid-blur')).toHaveCount(3);
 
-    await scroll.evaluate((element) => element.scrollTo(0, 0));
-    const therapies = page.getByRole('button', { name: /Terapie farmacologiche/ });
+    const nav = page.getByRole('navigation', { name: 'Sezioni della vista' });
+    const therapies = nav.locator('a[href="#terapie"]');
     await therapies.focus();
-    await expect(therapies).toHaveAttribute('aria-expanded', 'false');
-    await page.keyboard.press('Enter');
-    await expect(therapies).toHaveAttribute('aria-expanded', 'true');
-    await page.keyboard.press('Space');
-    await expect(therapies).toHaveAttribute('aria-expanded', 'false');
+    await therapies.press('Enter');
+    await expectCurrentSection(page, 'terapie');
+    await expect(page.locator('#terapie')).toContainText('Ramipril sintetico');
+    await expect(page.locator('#diario')).toBeHidden();
+    await openPatientSection(page, 'documenti');
+    await expect(page.getByRole('heading', { name: /Archivio documenti ed evidenze/ })).toBeVisible();
+    await expect(page.locator('#terapie')).toBeHidden();
+    await openPatientSection(page, 'terapie');
+    await expect(page.locator('#terapie')).toContainText('5 mg');
 
-    const semanticStates = await surface.locator('[data-lume-clinical-state]').evaluateAll((elements) => elements
-      .filter((element) => (element as HTMLElement).offsetParent !== null)
-      .map((element) => {
+    await nav.locator('summary').click();
+    await nav.locator('a[href="#attenzione"]').click();
+    await expectCurrentSection(page, 'attenzione');
+    const states = surface.locator('[data-lume-clinical-state]:visible');
+    expect(await states.count()).toBeGreaterThan(0);
+    for (const state of await states.all()) {
+      const geometry = await state.evaluate(element => {
         const style = getComputedStyle(element);
         return { text: element.textContent?.trim(), left: style.borderLeftWidth, right: style.borderRightWidth,
           pill: parseFloat(style.borderRadius) >= element.getBoundingClientRect().height / 2 };
-      }));
-    for (const state of semanticStates) {
-      expect(state.text).toBeTruthy();
-      expect(state.left).toBe(state.right);
-      expect(state.pill).toBe(false);
+      });
+      expect(geometry.text).toBeTruthy();
+      expect(geometry.left).toBe(geometry.right);
+      expect(geometry.pill).toBe(false);
     }
-    const statusLabels = await surface.locator('[data-testid^="review-queue-row-"] [class*="rounded-full"]').evaluateAll((elements) =>
-      elements.filter((element) => (element as HTMLElement).offsetParent !== null).map((element) => ({
-        background: getComputedStyle(element).backgroundColor,
-        radius: parseFloat(getComputedStyle(element).borderRadius),
-        text: element.textContent?.trim(),
-      })));
-    expect(statusLabels.length).toBeGreaterThan(0);
-    for (const label of statusLabels) {
-      expect(label.text).toBeTruthy();
-      expect(label.background).toBe('rgba(0, 0, 0, 0)');
-      expect(label.radius).toBe(0);
+    const statusLabels = surface.locator('[data-testid^="review-queue-row-"] summary > span:nth-child(2):visible');
+    expect(await statusLabels.count()).toBeGreaterThan(0);
+    for (const status of await statusLabels.all()) {
+      await expect(status).toHaveText(/Bloccato|Da rivedere|Serve testo/);
+      await expect(status).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      await expect(status).toHaveCSS('border-radius', '0px');
     }
-    if (schedaCase.viewport === 'narrow') await expectNarrowContract(page, surface, header);
-
-    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
-    await scroll.evaluate((element) => element.scrollTo(0, 0));
-    await page.screenshot({ path: `/tmp/lume-scheda-${schedaCase.register}-${schedaCase.viewport}.png`, animations: 'disabled' });
+    await assertNoHorizontalOverflow(page, [
+      { label: 'documento scheda', selector: 'document' },
+      { label: 'scheda', selector: '[data-testid="lume-scheda-scroll"]' },
+      { label: 'lettura scheda', selector: '[data-testid="lume-scheda-surface"]' },
+    ]);
+    await page.screenshot({ path: test.info().outputPath('scheda.png'), animations: 'disabled' });
   });
 }
