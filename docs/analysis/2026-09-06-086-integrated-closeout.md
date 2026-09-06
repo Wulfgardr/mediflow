@@ -25,6 +25,7 @@ attesta merge, release o parità completa con host reali.
 | Windows, runtime `25e8f8708`, test `8aaf2e622` | 158 casi: 145 PASS, un FAIL, 12 skip espliciti, zero retry. Comprende 157 casi canonici e un primo avvio da directory vuota. Accesso, recovery, reset isolato e onboarding completo sono PASS. Il FAIL confronta due righe entrambe evidenziate: la prima per hover residuo, la seconda per selezione da tastiera. |
 | Diagnosi Windows dello stesso FAIL | Due contesti separati: il primo riproduce hover e colori uguali in tutte le 12 osservazioni; il secondo sposta solo il puntatore fuori dalla lista e supera l'intero caso con gli assert originali. `bbd4fcbfb` integra quella precondizione nel test. Il full originario conserva il suo FAIL. |
 | Headless Windows, stesso runtime | Import guard PASS su 44 file/quattro superfici; portable 239 PASS e nove FAIL per timeout/uscita senza codice su 248 casi. MCP separato 33/33, Mini separato 11/11 e Supervisor sul bundle compilato PASS. I successi separati non cancellano il fallimento del gruppo portable né ne dimostrano la causa. |
+| Controllo portable Windows in sequenza | Un solo controllo: 248 PASS, zero FAIL/skip, stessi 22 file e stessi titoli; 94,9 s. L'unica variazione è `--test-concurrency=1`, senza modificare scadenze, asserzioni, ambiente dei processi o autorità. `5c25d0968` rende canonico il runner byte-identico a quello eseguito; collector unitario e lint mirato PASS. Il riepilogo Node completo è verificato, ma il wrapper PowerShell non ha acquisito il codice d'uscita figlio. Non è una nuova esecuzione del comando canonico né una prova di contesa CPU. |
 | Linux, runtime `25e8f8708`, test `8aaf2e622` | Full di 187 casi: 138 PASS, 49 skip, zero FAIL/retry. Un secondo run su database creato dalla UI completa i sette casi opt-in: 145 PASS distinti e 42 esclusioni esplicite, 40 del prototipo e due Apple Vision. Import guard, portable 248/248, MCP 33/33, Mini 11/11 e Supervisor compilato PASS. |
 | iPhone e iPad, fixture `dc1fc05222e5e8db97119e69b29aa576555737ac` | Firma ordinaria del simulatore; sorgente `5ced` più il solo fix DEBUG `8fc`. iPhone 37 PASS e quattro skip; iPad 34 PASS e sette skip: zero FAIL nelle due suite da 41. Digest di app, test e xctestrun invariati prima/dopo. Comprende AX5, rotazione effettiva, bozza e rilettura del motivo d'archivio; non usa host reali. |
 
@@ -37,6 +38,14 @@ La ricevuta Linux distingue inoltre CRUD ed export dettagliati provati su
 `3c4863f13` dalle nuove esecuzioni `25e`: il totale dei test non prova ogni
 funzione sull'ultima build. Le sei combinazioni di UI mobile e host restano
 da eseguire. Nessuna richiesta clinica reale, pubblicazione o merge è attestata.
+
+La creazione paziente Apple ora verifica sessione, contesto e bozza prima di
+pubblicare risposte asincrone; conserva le modifiche introdotte durante il
+salvataggio. Sulla base precedente quattro dei cinque nuovi test falliscono;
+il candidato `4b2436319` supera 35 regressioni mirate con Xcode 26.6. La build
+firmata ordinariamente per il simulatore supera compilazione, verifica della
+firma e controllo dei payload entitlements; questo non attesta ancora il
+percorso di creazione attraverso un host reale.
 
 ### Ricevute precedenti conservate
 

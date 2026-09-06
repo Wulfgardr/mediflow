@@ -60,7 +60,12 @@ pairing distinti non sostituiscono le sei combinazioni app mobile/home-base.
 Sul runtime `25e8f8708`, il full Windows conta 145 PASS, un FAIL e 12 skip;
 il FAIL di confronto colori è riprodotto e risolto nel test separando hover
 e selezione da tastiera. Il gruppo portable Windows conserva nove timeout
-su 248 casi, mentre MCP, Mini e Supervisor separati sono PASS. Linux completa
+su 248 casi, mentre MCP, Mini e Supervisor separati sono PASS. Un controllo
+Windows con i soli file di test eseguiti in sequenza completa gli stessi 248
+casi senza errori; `5c25d0968` adotta quella sola opzione nel runner canonico.
+Il controllo non identifica la causa dei timeout e il wrapper non ha acquisito
+il codice d'uscita del processo figlio: il risultato viene dal riepilogo Node
+completo, distinto dal precedente run canonico fallito. Linux completa
 145 casi ordinari distinti fra full e opt-in, con 42 esclusioni esplicite e
 tutti i controlli headless PASS. Il verbale distingue sorgenti, fixture,
 simulazioni e precedenti prove CRUD/export.
