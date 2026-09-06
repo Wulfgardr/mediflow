@@ -68,20 +68,33 @@ La fonte canonica per questa decisione e
 
 ## Modello ed effort per funzione
 
-Quando si usano sub-agent, anche con un coordinatore Astra Ultra, comporre
-la squadra scegliendo modello, effort e strumenti per ciascun incarico.
-Non usare Astra o effort max/ultra per default, ne imporre quote di modelli.
+Ultra e la modalita di orchestrazione scelta esclusivamente dall'utente:
+l'agente non vi passa autonomamente. Solo il coordinatore in Ultra apre
+sub-agent, salvo richiesta esplicita dell'utente. Ultra abilita la delega,
+non la impone. Ai sub-agent assegnare esplicitamente un effort supportato
+non superiore a Max, senza ereditare Ultra o aprire ulteriori sub-agent.
 
-- **Astra**: coordinamento, sintesi e problemi complessi o ambigui.
-- **Sol**: incarichi sostanziali che richiedono capacita e autonomia elevate.
-- **Terra**: esecuzione delimitata con obiettivo e contratto chiari.
-- **Luna**: letture, ispezioni visive, seconde revisioni e compiti molto stretti.
-- Scegliere per ogni modello l'effort supportato adeguato a complessita,
-  rischio e incertezza; aumentarlo o cambiare modello quando le prove lo
-  richiedono. Il modello del coordinatore non determina quello delle lane.
-- Registrare modello, effort e motivo nella consegna della lane. Usare le
-  funzioni disponibili adatte al compito e verificare il risultato; se una
-  combinazione non e disponibile, dichiararlo senza sostituzioni silenziose.
+- **Astra**: priorita, confini, sintesi, problemi trasversali, verifica e
+  integrazione; implementazione diretta quando ne servono le capacita.
+- **Sol**: indagini e implementazioni sostanziali con autonomia nella scelta
+  dell'approccio e nella gestione dell'ambiguita.
+- **Terra**: funzionalita delimitate, bug e modifiche su piu file entro un
+  contratto chiaro.
+- **Luna**: interventi circoscritti completi, componenti semplici, correzioni
+  ripetibili, test mirati, revisione di testi e controlli visivi.
+- Considerare attivamente Terra e Luna per l'implementazione, senza limitarli
+  a ricerche o riassunti. Scegliere il modello meno oneroso adeguato al compito,
+  lasciandogli autonomia entro obiettivo, ownership e criteri di verifica.
+- Scegliere effort e strumenti per complessita, rischio e incertezza. Max
+  non e un default, in particolare per Sol e Terra: richiede una necessita
+  concreta. Aumentare l'effort o cambiare modello quando le prove lo richiedono;
+  non imporre quote di modelli.
+- Registrare modello, effort e motivo nella consegna della lane; distinguere
+  impostazioni richieste da quelle osservate. Dichiarare indisponibilita senza
+  sostituzioni silenziose.
+- Valutare il mix sul risultato verificato: consumo osservabile, tempo,
+  supervisione, rifacimenti e qualita finale. Non dedurre risparmio effettivo
+  dal solo prezzo per token; adeguare la distribuzione alle prove raccolte.
 
 ## Igiene documentale
 
