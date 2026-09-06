@@ -2240,7 +2240,7 @@ final class HomeBasePatientsClientTests: XCTestCase {
                 XCTAssertEqual(payload["encryptedMasterKey"] as? String, "v2:wrapped")
                 XCTAssertEqual(payload["salt"] as? String, "AAECAwQFBgcICQoLDA0ODw==")
                 return (response, Data(#"{"success":true,"message":"PIN aggiornato con successo."}"#.utf8))
-            case ("POST", "/api/auth/logout"):
+            case ("POST", "/api/auth/native/logout"):
                 XCTAssertEqual(request.value(forHTTPHeaderField: "Cookie"), self.cookie)
                 XCTAssertEqual(request.value(forHTTPHeaderField: "x-mediflow-paired-client-id"), "paired-client-1")
                 XCTAssertEqual(request.value(forHTTPHeaderField: "x-mediflow-paired-client-token"), "paired-token-1")
@@ -2419,7 +2419,7 @@ final class HomeBasePatientsClientTests: XCTestCase {
 
         XCTAssertEqual(requests, [
             "POST https://localhost:3443/api/auth/change-pin",
-            "POST https://localhost:3443/api/auth/logout",
+            "POST https://localhost:3443/api/auth/native/logout",
             "PUT https://localhost:3443/api/auth/profile",
             "POST https://localhost:3443/api/v1/network/ambulatories",
             "PUT https://localhost:3443/api/v1/network/ambulatories/amb-new",
@@ -2463,7 +2463,7 @@ final class HomeBasePatientsClientTests: XCTestCase {
 
     private func assertLogoutRequest(_ request: URLRequest) {
         XCTAssertEqual(request.httpMethod, "POST")
-        XCTAssertEqual(request.url?.absoluteString, "https://localhost:3443/api/auth/logout")
+        XCTAssertEqual(request.url?.absoluteString, "https://localhost:3443/api/auth/native/logout")
         XCTAssertEqual(request.value(forHTTPHeaderField: "X-MediFlow-Source-Surface"), "native")
         XCTAssertEqual(request.value(forHTTPHeaderField: "Cookie"), cookie)
         XCTAssertEqual(request.value(forHTTPHeaderField: "x-mediflow-paired-client-id"), "paired-client-1")

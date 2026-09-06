@@ -9,6 +9,7 @@ const resolver = require('./session-resolver.cjs');
 const resources = require('./session-resource.cjs');
 const retirement = require('./session-retirement.cjs');
 const { successorFence } = require('./support/successor-fence.cjs');
+const { createServerSessionOwner } = require('./native-session.cjs');
 
 const objectCreate = Object.create;
 const objectEntries = Object.entries;
@@ -101,6 +102,7 @@ function weakValue(registry, key) {
 }
 
 function createOwner() {
+    const nativeSessions = createServerSessionOwner();
     const cellState = cells.createSessionCellState();
     const activationState = activation.createSessionActivationState();
     const retirementState = retirement.createSessionRetirementState();
@@ -565,26 +567,40 @@ function createOwner() {
         finally { leave(); }
     }
 
+    // @Codex: private common preparation; no caller can supply its own subject here.
+    function prepareUserRetirementForSubject(userId) {
+        const nextEpoch = loginEpoch + 1;
+        if (typeof userId !== 'string' || userId.length === 0
+            || !numberIsSafeInteger(nextEpoch) || nextEpoch <= loginEpoch || operationPoisoned) return null;
+        loginEpoch = nextEpoch;
+        const capability = opaque();
+        const binding = { state: 'prepared', capability, userId };
+        reflectApply(weakMapSet, userRetirementCapabilities, [capability, binding]);
+        reflectApply(setAdd, userRetirements, [binding]);
+        if (operationPoisoned) {
+            binding.state = 'aborted';
+            reflectApply(weakMapDelete, userRetirementCapabilities, [capability]);
+            reflectApply(setDelete, userRetirements, [binding]);
+            return null;
+        }
+        return capability;
+    }
+
     function prepareUserRetirement(projection) {
         if (!enter()) return null;
         try {
             const authorityCell = resolver.authenticProjectionCell(resolverState, projection);
-            const userId = authorityCell?.session?.userId;
-            const nextEpoch = loginEpoch + 1;
-            if (!authorityCell || typeof userId !== 'string' || userId.length === 0
-                || !numberIsSafeInteger(nextEpoch) || nextEpoch <= loginEpoch || operationPoisoned) return null;
-            loginEpoch = nextEpoch;
-            const capability = opaque();
-            const binding = { state: 'prepared', capability, userId };
-            reflectApply(weakMapSet, userRetirementCapabilities, [capability, binding]);
-            reflectApply(setAdd, userRetirements, [binding]);
-            if (operationPoisoned) {
-                binding.state = 'aborted';
-                reflectApply(weakMapDelete, userRetirementCapabilities, [capability]);
-                reflectApply(setDelete, userRetirements, [binding]);
-                return null;
-            }
-            return capability;
+            return authorityCell ? prepareUserRetirementForSubject(authorityCell.session.userId) : null;
+        } catch { return null; }
+        finally { leave(); }
+    }
+
+    // @Codex: claim only an exact live native PIN preparation; never a session DTO or userId.
+    function prepareNativeUserRetirement(capability) {
+        if (!enter()) return null;
+        try {
+            const userId = nativeSessions.claimPreparedNativePinRetirement(capability);
+            return userId ? prepareUserRetirementForSubject(userId) : null;
         } catch { return null; }
         finally { leave(); }
     }
@@ -792,6 +808,7 @@ function createOwner() {
     }
 
     return objectFreeze({
+        serverSessions: nativeSessions.api, prepareNativeUserRetirement,
         bootstrapControl, begin, issue, abort, resolve, retire, retireForUser,
         prepareUserRetirement, commitUserRetirement, abortUserRetirement,
         prepareAdminReset, commitAdminReset, abortAdminReset,

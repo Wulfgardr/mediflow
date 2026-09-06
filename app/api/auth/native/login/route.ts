@@ -1,5 +1,5 @@
 /* @Codex */
-import { admitNativeBootstrap } from '@/lib/security/native-bootstrap-admission';
+import { admitNativeBootstrapRouteRequest } from '@/lib/security/native-bootstrap-request-adapter';
 import { nativeLoginDeniedResponse, nativeLoginHttp } from '@/lib/security/native-login-http';
 
 /** Native pairing admission precedes the only body fields this route accepts. */
@@ -7,7 +7,7 @@ import { nativeLoginDeniedResponse, nativeLoginHttp } from '@/lib/security/nativ
 export async function POST(request: Request) {
     let admission: object | null = null;
     try {
-        admission = await admitNativeBootstrap({ request });
+        admission = await admitNativeBootstrapRouteRequest(request);
         if (!admission) return nativeLoginDeniedResponse();
         const body = await request.json();
         const username = typeof body?.username === 'string' ? body.username.trim() : '';

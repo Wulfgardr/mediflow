@@ -89,6 +89,7 @@ public actor HomeBasePatientsClient {
         let url = try configuration.serverURL()
             .appendingPathComponent("api")
             .appendingPathComponent("auth")
+            .appendingPathComponent("native")
             .appendingPathComponent("logout")
         let (data, response) = try await send(
             to: url,
