@@ -15,6 +15,21 @@ export type ReflowProxyViewport = (typeof REFLOW_PROXY_VIEWPORTS)[number];
 
 type OverflowTarget = { label: string; selector: string };
 
+/* @Codex ADR 0123: reach a clinical pane through the ordinary section menu,
+   including sections disclosed under "Altre sezioni". */
+export async function openPatientSection(page: Page, id: string): Promise<void> {
+  const navigation = page.getByRole('navigation', { name: 'Sezioni della vista', exact: true });
+  const link = navigation.locator(`a[href="#${id}"]`);
+  await expect(navigation).toBeVisible();
+  await expect(link).toHaveCount(1);
+  if (!(await link.isVisible())) await navigation.locator('summary').click();
+  await link.click();
+  await expect(link).toHaveAttribute('aria-current', 'location');
+  const pane = page.locator(`#${id}`);
+  await expect(pane).toBeVisible();
+  await expect(pane).toHaveAttribute('data-folder-active', 'true');
+}
+
 /* @Codex */
 export async function assertNoHorizontalOverflow(page: Page, targets: readonly OverflowTarget[]): Promise<void> {
   const evidence = await page.evaluate((requestedTargets) => requestedTargets.map(({ label, selector }) => {
