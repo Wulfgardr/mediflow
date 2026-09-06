@@ -947,18 +947,24 @@ final class MediFlowMobileAppUITests: XCTestCase {
         launch()
         XCTAssertTrue(sectionView("clinical-workspace-patients-view").waitForExistence(timeout: 10))
 
-        XCTAssertTrue(
-            sectionView("homebase-connection-banner").waitForExistence(timeout: 10),
-            "A blocking connection state should use a concise recovery banner"
-        )
+        // @Codex: the mobile recovery surface owns its native Configura action.
+        let status = sectionView("mobile-paired-status")
+        XCTAssertTrue(status.waitForExistence(timeout: 10),
+                      "A blocking connection state should use a concise recovery banner")
+        XCTAssertTrue(status.staticTexts["Home-base non configurato"].exists)
         XCTAssertFalse(
             app.textFields["homebase-server-url-field"].exists,
             "Connection credentials must not occupy the initial patient viewport"
         )
         attachScreenshot(named: "issue-143-blocked-banner")
 
-        let setup = app.buttons["homebase-configuration-button"]
+        let setupQuery = status.buttons.matching(NSPredicate(format: "label == %@", "Configura"))
+        let setup = setupQuery.element
         XCTAssertTrue(setup.waitForExistence(timeout: 10))
+        XCTAssertEqual(setupQuery.count, 1, "The recovery surface must expose one configuration action")
+        XCTAssertTrue(setup.isHittable)
+        XCTAssertGreaterThanOrEqual(setup.frame.height, 44)
+        XCTAssertGreaterThanOrEqual(setup.frame.width, 44)
         setup.tap()
 
         XCTAssertTrue(
@@ -1320,7 +1326,10 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertTrue(patient.waitForExistence(timeout: 15))
         patient.tap()
 
-        let contents = sectionView("patient-chart-contents")
+        // @Codex: the expanded native disclosure exposes this Other container;
+        // its three section links retain their own identifiers inside it.
+        let contentsQuery = app.otherElements.matching(identifier: "patient-chart-contents-disclosure")
+        let contents = contentsQuery.element
         openPatientSection(.overview)
         XCTAssertFalse(contents.exists, "Optional collection summaries must start behind their disclosure")
         let contentsDisclosure = app.buttons.matching(identifier: "patient-chart-contents-disclosure")
@@ -1329,6 +1338,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertTrue(revealInteropControl(contentsDisclosure.element))
         contentsDisclosure.element.tap()
         XCTAssertTrue(contents.waitForExistence(timeout: 15))
+        XCTAssertEqual(contentsQuery.count, 1, "One expanded collection summary must contain the section links")
         for (raw, title) in [("diary", "Diario clinico"), ("therapies", "Terapie"), ("clinical", "Controlli e osservazioni")] {
             let links = app.buttons.matching(identifier: "patient-open-section-\(raw)")
             XCTAssertTrue(links.element.waitForExistence(timeout: 5))
@@ -1607,7 +1617,21 @@ final class MediFlowMobileAppUITests: XCTestCase {
         app.buttons["edit-patient-button"].tap()
         let archived = app.switches["edit-patient-archived"]
         XCTAssertTrue(archived.waitForExistence(timeout: 5))
+        // @Codex: verify the actual switch transition before relying on a saved flag.
+        XCTAssertTrue(revealInteropControl(archived))
+        func assertArchivedValue(_ expected: String) {
+            let actual = archived.value as? String
+            if actual != expected {
+                let evidence = XCTAttachment(string: app.debugDescription)
+                evidence.name = "archive-switch-expected-\(expected)"
+                evidence.lifetime = .keepAlways
+                add(evidence)
+            }
+            XCTAssertEqual(actual, expected, "Archiving must change the actual switch before saving")
+        }
+        assertArchivedValue("0")
         archived.tap()
+        assertArchivedValue("1")
 
         app.buttons["save-patient-button"].tap()
 
