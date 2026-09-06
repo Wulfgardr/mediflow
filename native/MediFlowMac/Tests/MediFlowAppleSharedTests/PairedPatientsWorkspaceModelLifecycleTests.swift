@@ -449,7 +449,8 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
             XCTAssertTrue(state.0)
             XCTAssertEqual(state.1, "Updated synthetic draft")
             XCTAssertEqual(state.2, ["created"])
-            XCTAssertTrue(state.3.contains("non sono state salvate"))
+            let message = try XCTUnwrap(state.3)
+            XCTAssertTrue(message.contains("non sono state salvate"))
             let payload = await source.lastCreate
             XCTAssertNil(payload?.phone, "later edit must not alter the submitted snapshot")
         }
