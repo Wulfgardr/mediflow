@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine // @Codex
 import CryptoKit
 import MediFlowCore  // CryptoService now lives in the platform-free core (ADR 0071)
 #if os(macOS)
@@ -319,6 +320,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     var cacheIsStale: Bool { cacheMetadata?.isStale == true || cachedProfileMetadata?.isStale == true }
     /* @Codex */
     private var loginGeneration: UInt = 0
+    private let clinicalSessionInvalidations = PassthroughSubject<Void, Never>() // @Codex
     private var newEntryDraftId = UUID().uuidString
     /* @Codex */
     private var newTherapyDrugCatalogTask: Task<Void, Never>?
@@ -3067,13 +3069,18 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
               let patient = selectedPatient,
               let sessionCookie,
               let credentials = pairedCredentials else { return }
+        let scope = ambulatoryId.trimmedOrNil // @Codex
         await runTask {
+            let validate = self.patientReadValidator(patientId: patient.id, credentials: credentials,
+                sessionCookie: sessionCookie, ambulatoryId: scope)
+            try validate()
             let validation = try await self.makeClient().fetchFseValidatePatient(
                 patientId: patient.id,
                 credentials: credentials,
                 sessionCookie: sessionCookie,
-                ambulatoryId: self.ambulatoryId.trimmedOrNil
+                ambulatoryId: scope
             )
+            try validate() // @Codex
             let errorCount = validation.totalErrorCount
             let warningCount = validation.totalWarningCount
             if validation.hasErrors {
@@ -3280,14 +3287,19 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         guard let patientId = selectedPatient?.id, let sessionCookie, let credentials = pairedCredentials else { return }
         guard summary.patientId == patientId else { return }
         attachmentShareURL = nil
+        let scope = ambulatoryId.trimmedOrNil // @Codex
         await runTask {
+            let validate = self.patientReadValidator(patientId: patientId, credentials: credentials,
+                sessionCookie: sessionCookie, ambulatoryId: scope)
+            try validate()
             let detail = try await self.makeClient().fetchAttachment(
                 patientId: patientId,
                 attachmentId: summary.id,
                 credentials: credentials,
                 sessionCookie: sessionCookie,
-                ambulatoryId: self.ambulatoryId.trimmedOrNil
+                ambulatoryId: scope
             )
+            try validate() // @Codex
             guard self.selectedPatient?.id == patientId else { return }
             self.selectedAttachmentDetail = ClinicalFieldCrypto.decryptAttachmentDetail(detail, masterKey: self.masterKey)
         }
@@ -3431,8 +3443,12 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     private func fetchDecryptedAttachments(
         patientId: String, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
     ) async throws -> [HomeBaseAttachmentSummary] {
-        try await makeClient().fetchAttachments(patientId: patientId, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
-            .map { ClinicalFieldCrypto.decryptAttachment($0, masterKey: masterKey) }
+        let validate = patientReadValidator(patientId: patientId, credentials: credentials,
+            sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        try validate()
+        let rows = try await makeClient().fetchAttachments(patientId: patientId, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        try validate()
+        return rows.map { ClinicalFieldCrypto.decryptAttachment($0, masterKey: masterKey) }
     }
 
     /// D15: single-record FSE validation for an already-loaded therapy or
@@ -3473,17 +3489,22 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     }
 
     private func validateFseDocument(profile: PairedFseDocumentValidationProfile, label: String, document: HomeBaseJSONValue) async {
-        guard let sessionCookie, let credentials = pairedCredentials, connectionState == .pairedOnline else {
+        guard let patientId = selectedPatient?.id, let sessionCookie, let credentials = pairedCredentials, connectionState == .pairedOnline else {
             errorMessage = "Apri prima un paziente con sessione paired online."
             return
         }
+        let scope = ambulatoryId.trimmedOrNil // @Codex
         await runTask {
+            let validate = self.patientReadValidator(patientId: patientId, credentials: credentials,
+                sessionCookie: sessionCookie, ambulatoryId: scope)
+            try validate()
             let response = try await self.makeClient().validateFseDocument(
                 payload: HomeBaseFseDocumentValidationPayload(profile: profile.rawValue, document: document),
                 credentials: credentials,
                 sessionCookie: sessionCookie,
-                ambulatoryId: self.ambulatoryId.trimmedOrNil
+                ambulatoryId: scope
             )
+            try validate() // @Codex
             self.fseDocumentValidationResult = response
             self.fseDocumentValidationTargetLabel = label
             self.statusMessage = response.ok
@@ -3576,13 +3597,14 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
 
     /* @Codex */
     private func beginLoginGeneration() -> UInt {
-        loginGeneration &+= 1
+        invalidateLoginGeneration() // @Codex
         return loginGeneration
     }
 
     /* @Codex */
     private func invalidateLoginGeneration() {
         loginGeneration &+= 1
+        clinicalSessionInvalidations.send() // @Codex: clear retained cross-patient models synchronously.
     }
 
     /* @Codex */
@@ -3593,6 +3615,16 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     }
 
     /* @Codex */
+    // @Codex: subscribers discard clinical projections on every context transition,
+    // including A -> B -> A in one actor turn. No patient payload travels here.
+    var clinicalWorkspaceInvalidations: AnyPublisher<Void, Never> {
+        Publishers.Merge3(
+            clinicalSessionInvalidations.eraseToAnyPublisher(),
+            $connectionState.removeDuplicates().dropFirst().map { _ in () }.eraseToAnyPublisher(),
+            $ambulatoryId.map { $0.trimmedOrNil }.removeDuplicates().dropFirst().map { _ in () }.eraseToAnyPublisher()
+        ).eraseToAnyPublisher()
+    }
+
     var clinicalWorkspaceConnection: ClinicalWorkspaceConnection? {
         guard connectionState == .pairedOnline,
               let sessionCookie,
@@ -3604,7 +3636,8 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             credentials: credentials,
             sessionCookie: sessionCookie,
             ambulatoryId: ambulatoryId.trimmedOrNil,
-            masterKey: masterKey
+            masterKey: masterKey,
+            serverURL: serverURL, tlsPin: tlsPin, sessionGeneration: loginGeneration
         )
     }
 
@@ -4158,48 +4191,95 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         return formatter.string(from: date)
     }
 
+    // @Codex: validate both before dispatch and after suspension. The epoch also
+    // rejects a scope/patient switch away and back to the same identifiers.
+    private func patientReadValidator(patientId: String, credentials: HomeBasePairedCredentials,
+                                      sessionCookie: String, ambulatoryId: String?) -> () throws -> Void {
+        let generation = loginGeneration
+        let readGeneration = workspaceGeneration
+        let server = serverURL
+        let pin = tlsPin
+        return {
+            guard !Task.isCancelled, self.loginGeneration == generation,
+                  self.workspaceGeneration == readGeneration,
+                  self.selectedPatient?.id == patientId, self.sessionCookie == sessionCookie,
+                  self.pairedCredentials == credentials, self.ambulatoryId.trimmedOrNil == ambulatoryId,
+                  self.serverURL == server, self.tlsPin == pin, self.connectionState == .pairedOnline else {
+                throw CancellationError()
+            }
+        }
+    }
+
     // Fetch + decrypt the clinical sub-resources so their encrypted fields display
     // as plaintext. Same signature as the client methods, so call sites swap the
     // client call for these verbatim.
     private func fetchDecryptedEntries(patientId: String, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?) async throws -> [HomeBaseEntrySummary] {
-        try await makeClient().fetchEntries(patientId: patientId, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
-            .map { ClinicalFieldCrypto.decryptEntry($0, masterKey: masterKey) }
+        let validate = patientReadValidator(patientId: patientId, credentials: credentials,
+            sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        try validate()
+        let rows = try await makeClient().fetchEntries(patientId: patientId, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        try validate()
+        return rows.map { ClinicalFieldCrypto.decryptEntry($0, masterKey: masterKey) }
     }
 
     private func fetchDecryptedTherapies(patientId: String, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?) async throws -> [HomeBaseTherapySummary] {
-        try await makeClient().fetchTherapies(patientId: patientId, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
-            .map { ClinicalFieldCrypto.decryptTherapy($0, masterKey: masterKey) }
+        let validate = patientReadValidator(patientId: patientId, credentials: credentials,
+            sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        try validate()
+        let rows = try await makeClient().fetchTherapies(patientId: patientId, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        try validate()
+        return rows.map { ClinicalFieldCrypto.decryptTherapy($0, masterKey: masterKey) }
     }
 
     private func fetchDecryptedCheckups(patientId: String, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?) async throws -> [HomeBaseCheckupSummary] {
-        try await makeClient().fetchCheckups(patientId: patientId, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
-            .map { ClinicalFieldCrypto.decryptCheckup($0, masterKey: masterKey) }
+        let validate = patientReadValidator(patientId: patientId, credentials: credentials,
+            sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        try validate()
+        let rows = try await makeClient().fetchCheckups(patientId: patientId, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        try validate()
+        return rows.map { ClinicalFieldCrypto.decryptCheckup($0, masterKey: masterKey) }
     }
 
     private func fetchDecryptedObservations(patientId: String, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?) async throws -> [HomeBaseObservationSummary] {
-        try await makeClient().fetchObservations(patientId: patientId, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
-            .map { ClinicalFieldCrypto.decryptObservation($0, masterKey: masterKey) }
+        let validate = patientReadValidator(patientId: patientId, credentials: credentials,
+            sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        try validate()
+        let rows = try await makeClient().fetchObservations(patientId: patientId, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        try validate()
+        return rows.map { ClinicalFieldCrypto.decryptObservation($0, masterKey: masterKey) }
     }
 
     /* @Codex */
     private func fetchServicePrescriptions(patientId: String, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?) async throws -> [HomeBaseServicePrescriptionSummary] {
+        let validate = patientReadValidator(patientId: patientId, credentials: credentials,
+            sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        try validate()
         let rows = try await makeClient().fetchServicePrescriptions(
             patientId: patientId, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        try validate()
         return ServicePrescriptionFiltering.sorted(rows)
     }
 
     /* @Codex */
     private func fetchServicePrescriptionItems(patientId: String, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?) async throws -> [HomeBaseServicePrescriptionItemSummary] {
+        let validate = patientReadValidator(patientId: patientId, credentials: credentials,
+            sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        try validate()
         let rows = try await makeClient().fetchServicePrescriptionItems(
             patientId: patientId, prescriptionId: nil,
             credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        try validate()
         return ServicePrescriptionFiltering.sortedItems(rows)
     }
 
     /* @Codex */
     private func fetchProstheticPrescriptions(patientId: String, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?) async throws -> [HomeBaseProstheticPrescriptionSummary] {
+        let validate = patientReadValidator(patientId: patientId, credentials: credentials,
+            sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        try validate()
         let rows = try await makeClient().fetchProstheticPrescriptions(
             patientId: patientId, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        try validate()
         return ProstheticPrescriptionFiltering.sorted(rows)
     }
 
@@ -4599,7 +4679,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             try await operation()
         } catch {
             // @Codex: old-session/scope failures cannot replace a lock or a new login.
-            guard loginGeneration == generation, workspaceGeneration == readGeneration,
+            guard !(error is CancellationError), loginGeneration == generation, workspaceGeneration == readGeneration,
                   canApplyFailure() else { return }
             if case HomeBaseClientError.httpStatus(let status, _) = error,
                status == 401 {
