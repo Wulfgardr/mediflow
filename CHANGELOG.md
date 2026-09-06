@@ -7,8 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.8.6] - Unreleased
 
-Local functional candidate. The alternative interface remains on its review
-branch; this entry does not imply its approval, a PR, tag or release.
+Local integrated candidate. This entry does not imply a PR, tag or release.
+
+- The ordinary web UI uses top navigation by default and offers sidebar navigation in Appearance. Patient records open with one click; sections, clinical entry, typography and sliders use the refined layout.
+- Apple patient workspaces show one clinical section at a time, preserve drafts during document consultation and keep finalized Mac transcripts separate until explicitly reviewed. The rich-text editor retains rapidly typed text.
+- WHO Search uses an opt-in local sidecar with bounded results, canonical URI provenance and audit receipts. Deployment artifacts and licensing remain to be configured; no live WHO installation is claimed.
 
 - Document extraction exposes AnyDoc/Apple Vision provenance and supports cancelling the wait, discarding late responses and retrying after errors.
 - Settings distinguish function configuration from observed execution, WHO live responses from cache, and configured Homebase from a probed connection.
@@ -17,7 +20,7 @@ branch; this entry does not imply its approval, a PR, tag or release.
 - Synthetic access checks cover login, application lock, logout and administrative recovery. Code and regulatory inventories record evidence and remaining decisions.
 - The simulator builder uses the existing Xcode project and installs only on explicit request; the paired smoke no longer calls a retired builder.
 - FHIR export retains the DTO generation timestamp. Coverage tests document existing FHIR/PDF exclusions without claiming a complete data-subject export.
-- [Local closeout](./docs/analysis/2026-09-06-086-functional-closeout.md) records actual checks and open WHO, design, regulatory and distribution boundaries.
+- [Integrated local closeout](./docs/analysis/2026-09-06-086-integrated-closeout.md) records checks, integration corrections and remaining WHO provisioning, regulatory and distribution boundaries.
 
 ## [0.8.5] - 2026-09-03
 

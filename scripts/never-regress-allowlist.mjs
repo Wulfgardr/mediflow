@@ -419,6 +419,11 @@ export const NEVER_REGRESS_ALLOWLIST = {
             reason: 'PRREG handoff tests assert the portal dashboard URL against a spy; no runtime egress.',
         },
         {
+            path: 'native/MediFlowMac/Tests/MediFlowAppleSharedTests/PairedPatientsWorkspaceSelectionTests.swift',
+            pattern: 'https://\\\\\\(host\\)',
+            reason: 'Selection tests use UUID-scoped reserved .invalid hosts; a private ephemeral URLProtocol intercepts every request and rejects unregistered hosts, with no network fallback.',
+        },
+        {
             path: 'native/MediFlowMac/Sources/MediFlowAppleShared/HomeBaseBonjourDiscovery.swift',
             pattern: 'https://\\\\\\(hostName\\):\\\\\\(port\\)',
             reason: 'Bonjour discovery assembles a paired local server URL from the discovered host and port at runtime; it is not a hardcoded external endpoint.',

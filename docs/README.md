@@ -42,9 +42,9 @@ build standalone e percorsi browser senza flag, con prove reali/simulate e limit
 build locali, bozze, navigazione e limiti delle prove su Mac e simulatori.
 
 [Candidato funzionale locale](./analysis/2026-09-06-086-functional-closeout.md):
-modifiche, verifiche e decisioni ancora aperte; prevale per il delta 0.8.6 sulle
-fotografie 0.8.5 sotto. Il verbale fotografa la base funzionale precedente alla
-promozione UI regolata da ADR 0123; non attesta le successive integrazioni.
+fotografia della base funzionale precedente alla promozione UI regolata da
+ADR 0123. Conserva le prove e l'incidente documentato; le successive integrazioni
+sono descritte nel verbale corrente, senza riscrivere le evidenze precedenti.
 [Stato funzioni](./adr/0121-function-status-projection.md) e
 [setup host Ollama](./adr/0122-local-provider-host-setup.md) distinguono
 configurazione, ammissione e singola esecuzione.
