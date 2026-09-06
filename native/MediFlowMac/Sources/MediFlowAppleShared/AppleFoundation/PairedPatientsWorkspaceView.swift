@@ -449,7 +449,9 @@ struct PairedPatientsWorkspaceView: View {
                     #endif
                 }
                 .padding(20)
-                .compactContainerWidth()
+                // @Codex: Use the workspace's offered width without asking the
+                // enclosing navigation container for another layout measurement.
+                .frame(width: containerWidth, alignment: .topLeading)
             }
             .safeAreaInset(edge: .top, spacing: 0) {
                 // @Codex: The chart header belongs to the chart destination.
