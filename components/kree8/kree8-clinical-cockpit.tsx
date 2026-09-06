@@ -238,14 +238,16 @@ export function Kree8ClinicalCockpit({
 
   /* @Codex: Next keeps the cockpit mounted when only the query changes. */
   useEffect(() => {
-    if (proposal && !isReview) {
-      setArea(initialArea);
-      if (previousRouteArea.current !== initialArea) {
+    if (proposal && !isReview && previousRouteArea.current !== initialArea) {
+      // @Codex: Our own URL reflection already changed area and placed focus.
+      // Only navigation to another area schedules a new heading focus request.
+      if (area !== initialArea) {
+        setArea(initialArea);
         setAreaFocusRequest((current) => current + 1);
       }
     }
     previousRouteArea.current = initialArea;
-  }, [initialArea, isReview, proposal]);
+  }, [area, initialArea, isReview, proposal]);
   useEffect(() => {
     if (proposal && !isReview && initialPatientId) setSelectedPatientId(initialPatientId);
   }, [initialPatientId, isReview, proposal]);
@@ -269,6 +271,12 @@ export function Kree8ClinicalCockpit({
   useEffect(() => {
     if (areaFocusRequest === 0) return;
     const animationFrame = window.requestAnimationFrame(() => {
+      // @Codex: A modal may open after navigation scheduled this frame. Its
+      // focus owns keyboard input until close, including Escape and Tab.
+      const visibleModal = Array.from(document.querySelectorAll<HTMLElement>(
+        '[role="dialog"][aria-modal="true"]',
+      )).some((dialog) => dialog.getClientRects().length > 0);
+      if (visibleModal) return;
       const focusSurface = focusSurfaceRef.current;
       if (!focusSurface) return;
       const focusTarget = focusSurface.querySelector<HTMLElement>(
