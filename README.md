@@ -28,8 +28,10 @@ Informazioni, fonti e prossimi passi. Un po’ più facili da ritrovare.
 <details>
 <summary><strong>Versione sorgente e stato della candidatura</strong></summary>
 
-> **Stato del ramo: candidato funzionale locale 0.8.6.** La proposta visiva è
-> separata e resta in revisione. Le schermate sotto documentano la base 0.8.5.
+> **Stato del ramo: candidato integrato locale 0.8.6.** La UI scelta è promossa
+> secondo [ADR 0123](./docs/adr/0123-official-web-ui-navigation-compositions.md):
+> B predefinita e A come disposizione alternativa della stessa navigazione.
+> Le schermate sotto documentano la base 0.8.5.
 > Controlli locali, decisione WHO, gate regolatori e distribuzione sono distinti.
 > [Verifiche e limiti del candidato](./docs/analysis/2026-09-06-086-functional-closeout.md).
 
