@@ -305,13 +305,13 @@ export const NEVER_REGRESS_ALLOWLIST = {
         },
         {
             path: 'lib/compliance-evidence-inventory.ts',
-            pattern: 'https://eur-lex\\.europa\\.eu/eli/(?:reg/2016/679/art_(?:25|32)|reg/2024/1689)/',
-            reason: 'Official EUR-Lex URLs are read-only legal provenance rendered for explicit user review; the inventory performs no fetch or background egress.',
+            pattern: '(?:https://eur-lex\\.europa\\.eu/legal-content/EN/TXT/\\?uri=CELEX:(?:02016R0679-20160504|02024R1689-20260727)|https://digital-strategy\\.ec\\.europa\\.eu/en/policies/regulatory-framework-ai)(?=[\'\"]|$)',
+            reason: 'The two consolidated EUR-Lex versions and the Commission overview consulted on 2026-09-06 are read-only legal provenance for explicit user review; the inventory performs no fetch or background egress.',
         },
         {
             path: 'lib/compliance-evidence-inventory.test.ts',
-            pattern: 'https://eur-lex\\.europa\\.eu/eli/(?:reg/2016/679/art_(?:25|32)|reg/2024/1689)/',
-            reason: 'Compliance inventory tests assert official EUR-Lex provenance strings without issuing network requests.',
+            pattern: '(?:https://eur-lex\\.europa\\.eu/legal-content/EN/TXT/\\?uri=CELEX:(?:02016R0679-20160504|02024R1689-20260727)|https://digital-strategy\\.ec\\.europa\\.eu/en/policies/regulatory-framework-ai)(?=[\'\"]|$)',
+            reason: 'Compliance inventory tests assert these exact official provenance strings and the bounded URL exceptions without issuing network requests.',
         },
         {
             path: 'lib/aifa-catalog.ts',
