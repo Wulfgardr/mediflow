@@ -1,6 +1,6 @@
 /* @Codex */
 import { expect, test, type Page } from '@playwright/test';
-import { bootstrapUnlockedSession, setAiLaneKillSwitch } from './utils';
+import { bootstrapUnlockedSession, openPatientSection, setAiLaneKillSwitch } from './utils';
 
 const HEX = Object.freeze({
   session: '1'.repeat(32),
@@ -128,9 +128,7 @@ test('Smart Import exposes only the Fabric review preview and never calls legacy
   const patientId = await createPatient(page);
   await page.goto(`/patients/${patientId}/modules#documenti`);
 
-  const documents = page.getByRole('button', { name: /Documenti Archivio documenti ed evidenze/u });
-  await expect(documents).toBeVisible({ timeout: 20_000 });
-  await expect(documents).toHaveAttribute('aria-expanded', 'true');
+  await openPatientSection(page, 'documenti');
 
   const card = page.getByTestId('fabric-preview-card');
   await expect(card).toContainText('Fabric · anteprima sola lettura');

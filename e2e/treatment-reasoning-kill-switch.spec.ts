@@ -1,6 +1,6 @@
 /* @Claude */
 import { expect, test } from '@playwright/test';
-import { bootstrapUnlockedSession, openAiFunzioniSettings, setAiLaneKillSwitch } from './utils';
+import { bootstrapUnlockedSession, openAiFunzioniSettings, openPatientSection, setAiLaneKillSwitch } from './utils';
 
 // This DB is shared across specs; leaving Treatment Reasoning disabled would break
 // specs that expect it enabled. Restore the switch after the test.
@@ -76,12 +76,10 @@ test('treatment reasoning kill switch blocks new drafts on the Scheda', async ({
     }
   }, patientId);
 
-  // The reasoning panel mounts on the primary Scheda route (/modules), inside the
-  // "Terapie farmacologiche" collapsible section, which starts collapsed: expand it
-  // first so visibility assertions observe the panel and not the keepMounted DOM.
+  // @Codex: select the ordinary therapy pane before inspecting its disabled state.
   await page.goto(`/patients/${patientId}/modules`);
   await expect(page).toHaveURL(new RegExp(`/patients/${patientId}/modules$`));
-  await page.getByRole('button', { name: /Terapie farmacologiche/ }).click();
+  await openPatientSection(page, 'terapie');
 
   const panel = page.getByTestId('treatment-reasoning-panel');
   await expect(panel).toBeVisible();

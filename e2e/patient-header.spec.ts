@@ -1,6 +1,6 @@
 /* @Codex */
 import { expect, test, type Page } from '@playwright/test';
-import { bootstrapUnlockedSession } from './utils';
+import { bootstrapUnlockedSession, openPatientSection } from './utils';
 
 async function createPatient(
   page: Page,
@@ -23,8 +23,8 @@ async function createPatient(
 }
 
 // WUL-560: the canonical patient view is /patients/:id/modules. Its Scheda semantics
-// expose the lead diagnosis separately in the Quadro region and the secondary coding
-// in the Identita region. Keep every code, description and system assertion scoped to
+// expose the lead diagnosis in Riepilogo clinico and the secondary coding in
+// Anagrafica. Keep every code, description and system assertion scoped to
 // the current region so a duplicated or stale aggregate string cannot satisfy the test.
 test('Scheda paziente renders coded diagnoses and an explicit no-diagnosis state', async ({ page }) => {
   const pin = process.env.E2E_PIN || '1234';
@@ -68,19 +68,23 @@ test('Scheda paziente renders coded diagnoses and an explicit no-diagnosis state
   });
 
   await page.goto(`/patients/${patientWithDiagnosisId}/modules`);
-  await expect(page.getByText('Scheda clinica', { exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: `Header${suffix} Icd${suffix}`, exact: true })).toBeVisible();
+  const summaryLink = page.getByRole('navigation', { name: 'Sezioni della vista', exact: true })
+    .getByRole('link', { name: 'Riepilogo', exact: true });
+  await summaryLink.click();
+  await expect(summaryLink).toHaveAttribute('aria-current', 'location');
 
   const quadro = page.getByRole('region', {
-    name: 'Baseline e dati verificabili',
+    name: 'Riepilogo clinico',
     exact: true,
   });
   await expect(quadro).toHaveCount(1);
-  await expect(quadro.getByText('Problema guida', { exact: true })).toBeVisible();
-  await expect(quadro.getByText('EF00', { exact: true })).toHaveCount(1);
+  await expect(quadro).toBeVisible();
+  await expect(quadro.getByRole('heading', { name: 'Quadro clinico', exact: true })).toBeVisible();
+  await expect(quadro.getByText('EF00 · ICD-11 · altre 1 diagnosi', { exact: true })).toHaveCount(1);
   await expect(quadro.getByText(diagnosisDescription, { exact: true })).toHaveCount(1);
-  await expect(quadro.getByText('ICD-11', { exact: true })).toHaveCount(1);
 
+  await openPatientSection(page, 'identita');
   const identitySection = page.locator('#identita');
   const leadDiagnosisCard = identitySection.locator('.patient-diagnosis-card');
   await expect(identitySection).toHaveCount(1);
@@ -107,12 +111,17 @@ test('Scheda paziente renders coded diagnoses and an explicit no-diagnosis state
   );
 
   await page.goto(`/patients/${patientWithoutDiagnosisId}/modules`);
+  await summaryLink.click();
+  await expect(summaryLink).toHaveAttribute('aria-current', 'location');
   const emptyQuadro = page.getByRole('region', {
-    name: 'Baseline e dati verificabili',
+    name: 'Riepilogo clinico',
     exact: true,
   });
   await expect(emptyQuadro).toHaveCount(1);
-  await expect(emptyQuadro.getByText('Problema guida', { exact: true })).toBeVisible();
-  await expect(emptyQuadro.getByText('Nessuna diagnosi codificata in scheda.', { exact: true })).toHaveCount(1);
-  await expect(emptyQuadro.getByText('EF00', { exact: true })).toHaveCount(0);
+  await expect(emptyQuadro).toBeVisible();
+  await expect(emptyQuadro.getByRole('heading', { name: 'Quadro clinico', exact: true })).toBeVisible();
+  await expect(emptyQuadro.getByText('Diagnosi non registrata. Completa la scheda', { exact: true })).toBeVisible();
+  await expect(emptyQuadro).not.toContainText('EF00');
+  await expect(emptyQuadro).not.toContainText(diagnosisDescription);
+  await expect(emptyQuadro).not.toContainText('ICD-11');
 });

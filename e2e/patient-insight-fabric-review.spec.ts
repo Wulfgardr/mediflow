@@ -5,7 +5,7 @@ import {
   parsePatientInsightPreviewRequest,
   type PatientInsightPreviewRequest,
 } from '../lib/ai-providers/fabric/patient-insight-preview-contract';
-import { bootstrapUnlockedSession, setAiLaneKillSwitch } from './utils';
+import { bootstrapUnlockedSession, openPatientSection, setAiLaneKillSwitch } from './utils';
 
 const MODEL = 'synthetic-patient-insight:latest';
 const REVIEW_REF = `review_${'b'.repeat(32)}`;
@@ -109,9 +109,7 @@ test('Patient Insight UI invia un payload strict e mostra una proposta review-on
 
   await page.goto(`/patients/${patientId}/modules#documenti`);
   await expect(page).toHaveURL(new RegExp(`/patients/${patientId}/modules#documenti$`));
-  const documents = page.getByRole('button', { name: /Documenti Archivio documenti ed evidenze/u });
-  await expect(documents).toBeVisible();
-  await expect(documents).toHaveAttribute('aria-expanded', 'true');
+  await openPatientSection(page, 'documenti');
   generationStarted = true;
   await page.getByRole('button', { name: 'Avvia supporto' }).click();
 
