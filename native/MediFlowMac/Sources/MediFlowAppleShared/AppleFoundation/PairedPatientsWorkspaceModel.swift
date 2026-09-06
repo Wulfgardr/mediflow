@@ -813,31 +813,74 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     }
 
     func lockSessionNow() async {
-        discardCachedPatientPresentation() // @Codex: hide the historical copy before awaiting remote logout.
+        // @Codex: capture only what the best-effort remote logout needs. Local
+        // revocation and presentation clearing must finish before the first await.
+        let logoutClient = makeClient()
+        let logoutCredentials = pairedCredentials
+        let logoutCookie = sessionCookie
         invalidateLoginGeneration()
+        let generation = loginGeneration
         let operationID = beginExclusiveOperation()
         errorMessage = nil
         pendingConflict = nil
         defer { finishExclusiveOperation(operationID) }
 
-        var remoteLogoutConfirmed = false
-        if let sessionCookie, let credentials = pairedCredentials {
-            do {
-                let acknowledgement = try await makeClient().logout(
-                    credentials: credentials,
-                    sessionCookie: sessionCookie
-                )
-                remoteLogoutConfirmed = acknowledgement.success
-            } catch {
-                // D10: remote logout is best-effort. Local key/session destruction
-                // below is unconditional and must never be skipped by transport errors.
-            }
-        }
-
         sessionCookie = nil
         masterKey = nil
         operatorIdentity = nil
+        password = ""
+        discardCachedPatientPresentation()
+        clearSelectedPatientWorkspace()
+        patients = []
+        availableAmbulatories = []
+        resetNewTherapyForm()
+        resetNewCheckupForm()
+        resetNewObservationForm()
+        resetNewServicePrescriptionForm()
+        resetNewProstheticPrescriptionForm()
+        cancelEditingPatient()
+        editPatientFirstName = ""
+        editPatientLastName = ""
+        editPatientTaxCode = ""
+        editPatientAddress = ""
+        editPatientPhone = ""
+        editPatientCaregiver = ""
+        editPatientNotes = ""
+        editPatientDiagnoses = []
+        editPatientExemptions = []
+        editPatientIsAdi = false
+        editPatientIsArchived = false
+        newDiagnosisCode = ""
+        newDiagnosisDescription = ""
+        newExemptionCode = ""
+        cancelCreatingPatient()
+        newPatientFirstName = ""
+        newPatientLastName = ""
+        newPatientTaxCode = ""
+        newPatientHasBirthDate = false
+        newPatientBirthDate = Date()
+        newPatientAddress = ""
+        newPatientPhone = ""
+        newPatientCaregiver = ""
         connectionState = .sessionExpired
+        reconciliationLine = "Sessione bloccata. Accedi di nuovo per leggere o scrivere."
+        statusMessage = "Sessione bloccata localmente. Logout remoto non confermato; accedi di nuovo per continuare."
+
+        var remoteLogoutConfirmed = false
+        if let logoutCookie, let logoutCredentials {
+            do {
+                let acknowledgement = try await logoutClient.logout(
+                    credentials: logoutCredentials,
+                    sessionCookie: logoutCookie
+                )
+                remoteLogoutConfirmed = acknowledgement.success
+            } catch {
+                // D10: transport failure cannot undo the already completed lock.
+            }
+        }
+
+        // A newer login/lock owns its state, even if this logout finishes last.
+        guard loginGeneration == generation, sessionCookie == nil else { return }
         statusMessage = remoteLogoutConfirmed
             ? "Sessione bloccata. Accedi di nuovo per continuare."
             : "Sessione bloccata localmente. Logout remoto non confermato; accedi di nuovo per continuare."
@@ -4547,13 +4590,17 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         canApplyFailure: @escaping () -> Bool = { true }
     ) async {
         let operationID = beginExclusiveOperation()
+        let generation = loginGeneration // @Codex
+        let readGeneration = workspaceGeneration // @Codex
         errorMessage = nil
         pendingConflict = nil
         defer { finishExclusiveOperation(operationID) }
         do {
             try await operation()
         } catch {
-            guard canApplyFailure() else { return }
+            // @Codex: old-session/scope failures cannot replace a lock or a new login.
+            guard loginGeneration == generation, workspaceGeneration == readGeneration,
+                  canApplyFailure() else { return }
             if case HomeBaseClientError.httpStatus(let status, _) = error,
                status == 401 {
                 invalidatePatientLoadContext()
