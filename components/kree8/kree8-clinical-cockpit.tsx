@@ -256,9 +256,10 @@ export function Kree8ClinicalCockpit({
   }, [initialPatientId, isReview, proposal]);
 
   /* @Codex: resolve the selected id after React batches row selection and
-     Apri quadro; the canonical route owns identity and open-record state. */
+     Apri quadro. The explicit summary intent must not inherit the generic
+     folder's default diary section. */
   useEffect(() => {
-    if (proposal && !isReview && area === 'scheda' && selectedPatientId) router.push(`/patients/${selectedPatientId}/modules`);
+    if (proposal && !isReview && area === 'scheda' && selectedPatientId) router.push(`/patients/${selectedPatientId}/modules#quadro`);
   }, [area, isReview, proposal, router, selectedPatientId]);
 
   /* @Codex: only an explicit command writes the URL. Deriving a default or
