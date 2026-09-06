@@ -191,6 +191,12 @@ function IncaricoArea({
   ] : [];
 
   const patientListParentRef = useRef<HTMLDivElement>(null);
+  const rowFocusRequest = useRef(0); // @Codex
+  const rowFocusFrame = useRef<number | null>(null); // @Codex
+  useEffect(() => () => {
+    rowFocusRequest.current += 1;
+    if (rowFocusFrame.current !== null) window.cancelAnimationFrame(rowFocusFrame.current);
+  }, []);
 
   const patientRowVirtualizer = useVirtualizer({
     count: visible.length,
@@ -208,10 +214,18 @@ function IncaricoArea({
     const index = Math.min(visible.length - 1, Math.max(0, requestedIndex));
     const patient = visible[index];
     if (!patient) return;
+    // @Codex: virtualisation may defer focus. A later key command, focus outside
+    // the list or unmount owns the destination before this frame can run.
+    const request = ++rowFocusRequest.current;
+    const origin = document.activeElement;
+    if (rowFocusFrame.current !== null) window.cancelAnimationFrame(rowFocusFrame.current);
     onSelectPatient(patient.id);
     patientRowVirtualizer.scrollToIndex(index, { align: 'auto' });
 
     const focusRenderedRow = (attempts: number) => {
+      rowFocusFrame.current = null;
+      const active = document.activeElement;
+      if (rowFocusRequest.current !== request || (active !== origin && active !== document.body)) return;
       const row = patientListParentRef.current?.querySelector<HTMLButtonElement>(
         `[data-patient-index="${index}"]`,
       );
@@ -219,9 +233,9 @@ function IncaricoArea({
         row.focus();
         return;
       }
-      if (attempts > 0) window.requestAnimationFrame(() => focusRenderedRow(attempts - 1));
+      if (attempts > 0) rowFocusFrame.current = window.requestAnimationFrame(() => focusRenderedRow(attempts - 1));
     };
-    window.requestAnimationFrame(() => focusRenderedRow(2));
+    rowFocusFrame.current = window.requestAnimationFrame(() => focusRenderedRow(2));
   }, [onSelectPatient, patientRowVirtualizer, visible]);
 
   const currentRowIndex = useCallback((target: EventTarget | null) => {
