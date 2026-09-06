@@ -31,6 +31,47 @@ function recorder() {
 }
 const newId = () => 'synthetic-schema-created';
 
+for (const emptySource of [{ reference: null }, { canonicalUri: null }, { canonicalUri: null, reference: null }]) {
+    for (const edit of ['none', 'name', 'diagnosis', 'append', 'remove']) {
+        test(`native null provenance round-trips through web editing (${JSON.stringify(emptySource)}, ${edit})`, async () => {
+            const record = fixture();
+            record.diagnoses = [{ ...record.diagnoses![0], ...emptySource }];
+            const session = new PatientEditSession(record); const memory = recorder();
+            const draft = session.getDefaultValues();
+            assert.deepEqual(Object.keys(draft.diagnoses[0]), ['code', 'description', 'system', 'date']);
+            if (edit === 'name') draft.firstName = 'Updated';
+            if (edit === 'diagnosis') draft.diagnoses[0].description = 'Updated synthetic diagnosis';
+            if (edit === 'append') draft.diagnoses.push({ ...draft.diagnoses[0], code: 'TEST-B' });
+            if (edit === 'remove') draft.diagnoses = [];
+            const parsed = patientSchema.parse(draft);
+            await session.submit(parsed, memory.port, newId);
+            assert.equal(memory.calls.length, edit === 'none' ? 0 : 1);
+            const changes = memory.calls[0]?.changes as Record<string, unknown> | undefined;
+            if (edit === 'name') assert.deepEqual(changes, { version: 3, firstName: 'Updated' });
+            let reread = structuredClone(record);
+            if (changes) {
+                const normalized = normalizePatientUpdateInput(changes, { expectedVersion: 3 });
+                assert.equal(normalized.ok, true);
+                if (!normalized.ok) throw new Error('fixture normalization failed');
+                // Drizzle treats undefined update fields as no-ops.
+                const written = Object.fromEntries(Object.entries(normalized.values).filter(([, value]) => value !== undefined));
+                reread = revivePatientStructuredFields({ ...record, ...written }) as unknown as PatientEditRecord;
+            }
+            if (['diagnosis', 'append', 'remove'].includes(edit)) {
+                assert.deepEqual(reread.diagnoses, parsed.diagnoses);
+                for (const row of reread.diagnoses!) {
+                    assert.equal(Object.hasOwn(row, 'canonicalUri'), false);
+                    assert.equal(Object.hasOwn(row, 'reference'), false);
+                }
+            }
+            const reopened = new PatientEditSession(reread); const unchanged = recorder();
+            assert.deepEqual(reopened.getDefaultValues().diagnoses, draft.diagnoses);
+            await reopened.submit(patientSchema.parse(reopened.getDefaultValues()), unchanged.port, newId);
+            assert.deepEqual(unchanged.calls, []);
+        });
+    }
+}
+
 test('selected WHO provenance survives schema, edit write normalization, read revival and unchanged reopen', async () => {
     const record = fixture(); const session = new PatientEditSession(record); const memory = recorder();
     const draft = session.getDefaultValues();
@@ -53,6 +94,8 @@ test('selected WHO provenance survives schema, edit write normalization, read re
     assert.deepEqual(reparsed.diagnoses[0].reference, reference);
     for (const row of [
         { ...draft.diagnoses[0], reference: undefined },
+        { ...draft.diagnoses[0], reference: null },
+        { ...draft.diagnoses[0], canonicalUri: null },
         { ...draft.diagnoses[0], canonicalUri: canonicalUri.replace('2026-01', '2025-01') },
         { ...draft.diagnoses[0], system: 'ICD-10' },
         { ...draft.diagnoses[0], reference: { ...reference, extra: true } },
