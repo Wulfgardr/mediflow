@@ -96,6 +96,90 @@ public enum ClinicalRichText {
         document.blocks.map(render(block:)).joined()
     }
 
+    /* @Codex: Editing projection only. The public lossless parser and sanitizer
+       contract stay unchanged. Accept exactly the editor's balanced grammar;
+       never recover malformed/nested unsupported HTML by dropping tokens. */
+    static func inlineEditorProjection(_ original: ClinicalRichTextBlock) -> ClinicalRichTextDocument? {
+        guard case .sanitizedFragment(let fragment) = original else { return nil }
+        let tokens = tokenize(fragment.html)
+        var validator = InlineEditorGrammar(tokens: tokens)
+        guard validator.document() else { return nil }
+        var parser = Parser(tokens: tokens)
+        return ClinicalRichTextDocument(blocks: parser.parseBlocks())
+    }
+
+    private struct InlineEditorGrammar {
+        let tokens: [Token]
+        var index = 0
+
+        mutating func document() -> Bool {
+            while index < tokens.count {
+                guard block() else { return false }
+            }
+            return true
+        }
+
+        mutating func block() -> Bool {
+            guard index < tokens.count else { return false }
+            switch tokens[index] {
+            case .opening(let tag) where [.paragraph, .heading2, .heading3].contains(tag):
+                index += 1
+                return inlines(until: tag) && close(tag)
+            case .opening(let tag) where tag == .unorderedList || tag == .orderedList:
+                index += 1
+                var count = 0
+                while opens(.listItem) {
+                    index += 1
+                    if opens(.paragraph) {
+                        index += 1
+                        guard inlines(until: .paragraph), close(.paragraph) else { return false }
+                    } else if !inlines(until: .listItem) { return false }
+                    guard close(.listItem) else { return false }
+                    count += 1
+                }
+                return count > 0 && close(tag)
+            case .opening(.blockquote):
+                index += 1
+                if opens(.paragraph) {
+                    index += 1
+                    guard inlines(until: .paragraph), close(.paragraph) else { return false }
+                } else if !inlines(until: .blockquote) { return false }
+                return close(.blockquote)
+            default:
+                let start = index
+                return inlines(until: nil) && index > start
+            }
+        }
+
+        mutating func inlines(until end: Tag?) -> Bool {
+            while index < tokens.count {
+                switch tokens[index] {
+                case .text, .lineBreak:
+                    index += 1
+                case .opening(let tag) where tag.isInlineStyle:
+                    index += 1
+                    guard inlines(until: tag), close(tag) else { return false }
+                case .closing(let tag):
+                    return tag == end
+                case .opening:
+                    return end == nil
+                }
+            }
+            return end == nil
+        }
+
+        func opens(_ tag: Tag) -> Bool {
+            guard index < tokens.count, case .opening(let actual) = tokens[index] else { return false }
+            return actual == tag
+        }
+
+        mutating func close(_ tag: Tag) -> Bool {
+            guard index < tokens.count, case .closing(let actual) = tokens[index], actual == tag else { return false }
+            index += 1
+            return true
+        }
+    }
+
     private enum Tag: String {
         case paragraph = "p"
         case lineBreak = "br"
