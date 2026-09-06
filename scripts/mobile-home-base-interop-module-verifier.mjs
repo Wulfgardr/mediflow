@@ -14,13 +14,19 @@ import { readDescriptor, pinnedFetch, unwrapLoginKey, openField, nativeSessionCo
 export const modules = {
     patient: { route: 'patients', fields: ['firstName', 'lastName', 'taxCode', 'address', 'phone', 'caregiver', 'notes', 'deletionReason'],
         encryptedFields: ['address', 'phone', 'caregiver', 'notes', 'deletionReason'] },
-    therapy: { route: 'therapies', nested: true, fields: ['drugName', 'dosage', 'motivation', 'activePrinciple', 'aic', 'atc', 'status'] },
-    checkup: { route: 'checkups', nested: true, fields: ['title', 'notes', 'status'] },
-    observation: { route: 'observations', nested: true, fields: ['display', 'code', 'value', 'unitCode', 'notes'] },
-    service: { route: 'service-prescriptions', fields: ['serviceName', 'clinicalQuestion', 'provider', 'status'] },
-    'service-item': { route: 'service-prescription-items', fields: ['prescriptionId', 'serviceName', 'serviceCode', 'status'] },
-    prosthetic: { route: 'prosthetic-prescriptions', fields: ['description', 'clinicalReason', 'measures', 'supplier', 'status', 'collaudoOutcome'] },
-    entry: { route: 'entries', nested: true, fields: ['title', 'content', 'type'] },
+    // Only the canonical lib/db.ts ENCRYPTED_FIELDS within each compared field
+    // set require a sealed value; drug names, codes, units and statuses stay plain.
+    therapy: { route: 'therapies', nested: true, fields: ['drugName', 'dosage', 'motivation', 'activePrinciple', 'aic', 'atc', 'status'],
+        encryptedFields: ['motivation'] },
+    checkup: { route: 'checkups', nested: true, fields: ['title', 'notes', 'status'], encryptedFields: ['notes'] },
+    observation: { route: 'observations', nested: true, fields: ['display', 'code', 'value', 'unitCode', 'notes'], encryptedFields: ['notes'] },
+    service: { route: 'service-prescriptions', fields: ['serviceName', 'clinicalQuestion', 'provider', 'status'],
+        encryptedFields: ['serviceName', 'clinicalQuestion', 'provider'] },
+    'service-item': { route: 'service-prescription-items', fields: ['prescriptionId', 'serviceName', 'serviceCode', 'status'],
+        encryptedFields: ['serviceName'] },
+    prosthetic: { route: 'prosthetic-prescriptions', fields: ['description', 'clinicalReason', 'measures', 'supplier', 'status', 'collaudoOutcome'],
+        encryptedFields: ['description', 'clinicalReason', 'measures', 'supplier', 'collaudoOutcome'] },
+    entry: { route: 'entries', nested: true, fields: ['title', 'content', 'type'], encryptedFields: ['title', 'content'] },
 };
 
 // @Codex: Only a newly UI-created auxiliary record may enter the lifecycle run.
@@ -112,12 +118,14 @@ export async function compareRecords(step, webRows, pairedRows, webKey, pairedKe
         assert.equal(web[0].deletedAt != null, step.deleted, 'Unexpected web deletion state');
     }
     for (const [field, expected] of Object.entries(step.expected)) {
-        if (modules[step.module].encryptedFields?.includes(field)) {
+        const encrypted = modules[step.module].encryptedFields.includes(field);
+        if (encrypted) {
             assert.ok(typeof peer[field] === 'string' && peer[field].startsWith('ENC:'), `Missing sealed field: ${field}`);
         }
-        assert.ok(await openField(peer[field], pairedKey) === expected, `Paired field mismatch: ${field}`);
+        assert.ok((encrypted ? await openField(peer[field], pairedKey) : peer[field]) === expected, `Paired field mismatch: ${field}`);
         if (!webActiveListOnly) {
-            assert.ok(await openField(web[0][field], webKey) === expected, `Web field mismatch: ${field}`);
+            if (encrypted) assert.ok(typeof web[0][field] === 'string' && web[0][field].startsWith('ENC:'), `Missing web sealed field: ${field}`);
+            assert.ok((encrypted ? await openField(web[0][field], webKey) : web[0][field]) === expected, `Web field mismatch: ${field}`);
             assert.ok(web[0][field] === peer[field], `Wire field mismatch: ${field}`);
         }
     }
