@@ -321,8 +321,12 @@ public struct AppleFoundationMobileRootView: View {
                     .navigationTitle("MediFlow")
                     .accessibilityIdentifier("clinical-workspace-project-sidebar")
                 } detail: {
-                    detailView(for: section)
-                        .navigationTitle(section.title)
+                    // @Codex: A narrow iPad workspace uses the same chart push
+                    // as iPhone while the project sidebar keeps its own selection.
+                    NavigationStack {
+                        detailView(for: section)
+                            .navigationTitle(section.title)
+                    }
                 }
                 .navigationSplitViewStyle(.prominentDetail)
                 #endif

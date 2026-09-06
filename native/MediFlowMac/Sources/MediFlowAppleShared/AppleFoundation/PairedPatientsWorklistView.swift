@@ -187,6 +187,8 @@ struct PairedPatientsWorklistView: View {
     @Binding var patientQuery: String
     @Binding var patientViewMode: PatientListViewMode
     @Binding var patientSortMode: PatientListSortMode
+    // @Codex: Compact navigation belongs to the workspace, not to a row.
+    var onOpenPatient: ((HomeBasePatientSummary) -> Void)? = nil
     #if os(macOS)
     @Namespace private var filterNamespace
     #endif
@@ -343,17 +345,23 @@ struct PairedPatientsWorklistView: View {
                             .modifier(WorklistRowHover())
                             .tag(patient.id)
                             .accessibilityElement(children: .combine)
-                            .accessibilityAddTraits(model.selectedPatient?.id == patient.id ? .isSelected : [])
+                            .accessibilityAddTraits(model.selectedPatientID == patient.id ? .isSelected : [])
                             .accessibilityIdentifier("patient-cell-\(patient.id)")
                         #else
                         Button {
-                            Task { await model.loadPatient(patient) }
+                            guard model.canChangePatientSelection else { return }
+                            if let onOpenPatient {
+                                onOpenPatient(patient)
+                            } else {
+                                Task { await model.loadPatient(patient) }
+                            }
                         } label: {
                             activePatientLabel(patient)
                         }
                         .buttonStyle(.plain)
-                        .modifier(LumeRigaListaModifier(isSelected: model.selectedPatient?.id == patient.id))
-                        .accessibilityAddTraits(model.selectedPatient?.id == patient.id ? .isSelected : [])
+                        .disabled(!model.canChangePatientSelection)
+                        .modifier(LumeRigaListaModifier(isSelected: model.selectedPatientID == patient.id))
+                        .accessibilityAddTraits(model.selectedPatientID == patient.id ? .isSelected : [])
                         .accessibilityIdentifier("patient-cell-\(patient.id)")
                         #endif
                     }
@@ -467,7 +475,7 @@ struct PairedPatientsWorklistView: View {
     private func patientMetadata(_ patient: HomeBasePatientSummary) -> some View {
         HStack(spacing: 6) {
             #if os(macOS)
-            let isSelectedRow = model.selectedPatient?.id == patient.id
+            let isSelectedRow = model.selectedPatientID == patient.id
             #else
             let isSelectedRow = false
             #endif
@@ -553,7 +561,7 @@ struct PairedPatientsWorklistView: View {
     /// over the pill's near-white fill, and the code disappears.
     private func diagnosisCodePill(_ code: String, patient: HomeBasePatientSummary) -> some View {
         #if os(macOS)
-        ClinicalCodePill(code, isOnProminentBackground: model.selectedPatient?.id == patient.id)
+        ClinicalCodePill(code, isOnProminentBackground: model.selectedPatientID == patient.id)
         #else
         ClinicalCodePill(code)
         #endif

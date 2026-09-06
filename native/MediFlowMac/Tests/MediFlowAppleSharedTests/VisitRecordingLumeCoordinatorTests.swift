@@ -72,12 +72,169 @@ final class VisitRecordingLumeCoordinatorTests: XCTestCase {
         XCTAssertEqual(coordinator.reviewText, "Trascrizione sintetica finale.")
 
         var destination = ""
-        await coordinator.transferTranscript(maxCharacters: 12_000) { destination = $0 }
+        await coordinator.transferTranscript(maxCharacters: 12_000, existingTranscript: destination) { destination = $0 }
 
         XCTAssertEqual(destination, "Trascrizione sintetica finale.")
         XCTAssertEqual(coordinator.state, .completed)
         XCTAssertEqual(coordinator.reviewText, "")
         XCTAssertEqual(assets.releaseCount, 1)
+    }
+
+    func testNavigationSuspensionPreservesEditedFinalReviewUntilExplicitTransfer() async {
+        let assets = LumeAssetSpy()
+        let runtime = LumeRuntimeSpy()
+        runtime.finalResults = [
+            VisitRecordingTranscriptResult(text: "Trascrizione sintetica finale.", isFinal: true),
+        ]
+        let coordinator = makeCoordinator(
+            preflight: VisitRecordingPreflight(permission: LumePermissionSpy(granted: true), assets: assets),
+            runtime: runtime
+        )
+        await coordinator.acceptDisclosure(for: binding, currentBinding: { self.binding })
+        await coordinator.start()
+        await coordinator.stop()
+        coordinator.reviewText = "Trascrizione sintetica corretta, ancora da trasferire."
+
+        await coordinator.suspendForNavigation()
+        await coordinator.suspendForNavigation()
+
+        XCTAssertEqual(coordinator.state, .transcriptReview)
+        XCTAssertEqual(coordinator.reviewText, "Trascrizione sintetica corretta, ancora da trasferire.")
+        XCTAssertTrue(coordinator.canTransferTranscript(maxCharacters: 12_000))
+        XCTAssertFalse(coordinator.beginNewSessionAfterExplicitRequest())
+        XCTAssertEqual(runtime.stopCount, 1)
+        XCTAssertEqual(assets.releaseCount, 1)
+
+        var transferred = ""
+        await coordinator.transferTranscript(maxCharacters: 12_000, existingTranscript: transferred) { transferred = $0 }
+        XCTAssertEqual(transferred, "Trascrizione sintetica corretta, ancora da trasferire.")
+        XCTAssertEqual(coordinator.state, .completed)
+    }
+
+    func testRetainedReviewRequiresConfirmationMatchingBothTextsBeforeReplacingManualDraft() async {
+        let runtime = LumeRuntimeSpy()
+        runtime.finalResults = [VisitRecordingTranscriptResult(text: "Finale sintetica.", isFinal: true)]
+        let coordinator = makeCoordinator(preflight: readyPreflight(), runtime: runtime)
+        await coordinator.acceptDisclosure(for: binding, currentBinding: { self.binding })
+        await coordinator.start()
+        await coordinator.stop()
+        await coordinator.suspendForNavigation()
+        var manualDraft = "Bozza manuale sintetica."
+
+        let unconfirmed = await coordinator.transferTranscript(
+            maxCharacters: 12_000, existingTranscript: manualDraft
+        ) { manualDraft = $0 }
+        XCTAssertFalse(unconfirmed)
+        XCTAssertEqual(manualDraft, "Bozza manuale sintetica.")
+        XCTAssertEqual(coordinator.state, .transcriptReview)
+        XCTAssertEqual(coordinator.reviewText, "Finale sintetica.")
+
+        let confirmation = VisitRecordingLumeCoordinator.TranscriptReplacement(
+            existingText: manualDraft, reviewText: coordinator.reviewText
+        )
+        manualDraft = "Bozza manuale aggiornata."
+        let changedManual = await coordinator.transferTranscript(
+            maxCharacters: 12_000, existingTranscript: manualDraft, confirmedReplacement: confirmation
+        ) { manualDraft = $0 }
+        XCTAssertFalse(changedManual)
+        XCTAssertEqual(manualDraft, "Bozza manuale aggiornata.")
+
+        manualDraft = confirmation.existingText
+        coordinator.reviewText = "Revisione sintetica aggiornata."
+        let changedReview = await coordinator.transferTranscript(
+            maxCharacters: 12_000, existingTranscript: manualDraft, confirmedReplacement: confirmation
+        ) { manualDraft = $0 }
+        XCTAssertFalse(changedReview)
+        XCTAssertEqual(manualDraft, confirmation.existingText)
+        XCTAssertTrue(coordinator.hasPendingReview)
+
+        let currentConfirmation = VisitRecordingLumeCoordinator.TranscriptReplacement(
+            existingText: manualDraft, reviewText: coordinator.reviewText
+        )
+        let confirmed = await coordinator.transferTranscript(
+            maxCharacters: 12_000, existingTranscript: manualDraft,
+            confirmedReplacement: currentConfirmation
+        ) { manualDraft = $0 }
+        XCTAssertTrue(confirmed)
+        XCTAssertEqual(manualDraft, "Revisione sintetica aggiornata.")
+        XCTAssertEqual(coordinator.state, .completed)
+        XCTAssertEqual(coordinator.reviewText, "")
+    }
+
+    func testTransferOfIdenticalTextDoesNotMutateExistingManualReview() async {
+        let runtime = LumeRuntimeSpy()
+        runtime.finalResults = [VisitRecordingTranscriptResult(text: "Finale sintetica.", isFinal: true)]
+        let coordinator = makeCoordinator(preflight: readyPreflight(), runtime: runtime)
+        await coordinator.acceptDisclosure(for: binding, currentBinding: { self.binding })
+        await coordinator.start()
+        await coordinator.stop()
+        var writes = 0
+
+        let transferred = await coordinator.transferTranscript(
+            maxCharacters: 12_000, existingTranscript: "Finale sintetica."
+        ) { _ in writes += 1 }
+
+        XCTAssertTrue(transferred)
+        XCTAssertEqual(writes, 0)
+        XCTAssertEqual(coordinator.state, .completed)
+    }
+
+    func testRetainedReviewIsPurgedWhenSessionReaderExpiresWithoutPatientChange() async {
+        let runtime = LumeRuntimeSpy()
+        runtime.finalResults = [VisitRecordingTranscriptResult(text: "Finale sintetica.", isFinal: true)]
+        var current: VisitRecordingOwnerBinding? = binding
+        let coordinator = makeCoordinator(preflight: readyPreflight(), runtime: runtime)
+        await coordinator.acceptDisclosure(for: binding, currentBinding: { current })
+        await coordinator.start()
+        await coordinator.stop()
+        await coordinator.suspendForNavigation()
+
+        current = nil // The workspace session has expired while this section is hidden.
+        await coordinator.ownerDidChange(to: binding)
+
+        XCTAssertEqual(coordinator.state, .denied(.staleBinding))
+        XCTAssertEqual(coordinator.reviewText, "")
+        XCTAssertFalse(coordinator.canTransferTranscript(maxCharacters: 12_000))
+    }
+
+    func testNavigationCancelsActiveCaptureWithoutPromotingPartialText() async {
+        let runtime = LumeRuntimeSpy()
+        runtime.finalResults = [VisitRecordingTranscriptResult(text: "Non ancora finalizzata.", isFinal: false)]
+        let coordinator = makeCoordinator(preflight: readyPreflight(), runtime: runtime)
+        await coordinator.acceptDisclosure(for: binding, currentBinding: { self.binding })
+        await coordinator.start()
+
+        await coordinator.suspendForNavigation()
+        await coordinator.suspendForNavigation()
+
+        XCTAssertEqual(coordinator.state, .denied(.cancelled))
+        XCTAssertEqual(coordinator.reviewText, "")
+        XCTAssertEqual(runtime.stopCount, 1)
+        XCTAssertEqual(runtime.cancelCount, 1)
+        XCTAssertEqual(runtime.startCount, 1)
+    }
+
+    func testStableCoordinatorNeedsExplicitNewSessionAndFreshGeneration() async {
+        let permission = LumePermissionSpy(granted: true)
+        let runtime = LumeRuntimeSpy()
+        let coordinator = makeCoordinator(
+            preflight: VisitRecordingPreflight(permission: permission, assets: LumeAssetSpy()),
+            runtime: runtime
+        )
+        await coordinator.acceptDisclosure(for: binding, currentBinding: { self.binding })
+        await coordinator.start()
+        await coordinator.suspendForNavigation()
+        let previousGeneration = coordinator.consumerGeneration
+
+        await coordinator.start()
+        XCTAssertEqual(coordinator.state, .denied(.cancelled))
+        XCTAssertEqual(runtime.startCount, 1)
+        XCTAssertTrue(coordinator.beginNewSessionAfterExplicitRequest())
+        XCTAssertNotEqual(coordinator.consumerGeneration, previousGeneration)
+        XCTAssertEqual(coordinator.state, .disclosure)
+        await coordinator.start()
+        XCTAssertEqual(runtime.startCount, 1)
+        XCTAssertEqual(permission.requestCount, 1)
     }
 
     func testPatientVersionAndAmbulatoryBindingChangesRetireTheConsumer() async {
@@ -156,7 +313,7 @@ final class VisitRecordingLumeCoordinatorTests: XCTestCase {
         await coordinator.stop()
 
         var destination = "unchanged"
-        await coordinator.transferTranscript(maxCharacters: 12_000) { destination = $0 }
+        await coordinator.transferTranscript(maxCharacters: 12_000, existingTranscript: destination) { destination = $0 }
 
         XCTAssertEqual(coordinator.state, .denied(.failed))
         XCTAssertEqual(coordinator.reviewText, "")
@@ -263,7 +420,7 @@ final class VisitRecordingLumeCoordinatorTests: XCTestCase {
 
         var destination = "unchanged"
         XCTAssertFalse(coordinator.canTransferTranscript(maxCharacters: 12_000))
-        await coordinator.transferTranscript(maxCharacters: 12_000) { destination = $0 }
+        await coordinator.transferTranscript(maxCharacters: 12_000, existingTranscript: destination) { destination = $0 }
 
         XCTAssertEqual(destination, "unchanged")
         await coordinator.cancelForLifecycle()
@@ -282,9 +439,12 @@ final class VisitRecordingLumeCoordinatorTests: XCTestCase {
             "Registrazione visita in corso",
             "clinical-workspace-visit-recording-stop",
             ".onDisappear",
-            "scenePhase != .active",
+            "phase != .active",
             "ownerDidChange",
             ".task(id: ownerBinding)",
+            "VisitRecordingWorkspaceScope",
+            "suspendForNavigation",
+            "clinical-workspace-visit-recording-confirm-replacement",
             "VisitRecordingCaptureController.liveIfAvailable",
         ] {
             XCTAssertTrue(sources.contains(required), "missing shell contract: \(required)")
@@ -392,6 +552,7 @@ private final class LumeRuntimeSpy: VisitRecordingRuntimePort {
     var finalResults: [VisitRecordingTranscriptResult] = []
     private(set) var prepareCount = 0
     private(set) var startCount = 0
+    private(set) var stopCount = 0
     private(set) var cancelCount = 0
     private var resultHandler: (@MainActor @Sendable (VisitRecordingTranscriptResult) -> Void)?
 
@@ -408,7 +569,7 @@ private final class LumeRuntimeSpy: VisitRecordingRuntimePort {
 
     func startCapture() throws { startCount += 1 }
     func consume(_ frame: VisitRecordingPCMFrame) async throws {}
-    func stopCapture() {}
+    func stopCapture() { stopCount += 1 }
 
     func finishAndFinalize() async throws {
         finalResults.forEach { resultHandler?($0) }

@@ -42,6 +42,8 @@ struct PairedPatientsWorkspaceView: View {
     @State private var selectedFseObservationId: String?
     @State private var expandedInsightId: String?
     @State private var isCompactPatientHeaderExpanded = false
+    // @Codex: A navigation destination, not authority to operate on this patient.
+    @State private var compactPatientID: String?
 
     init(model: PairedPatientsWorkspaceModel, capabilities: ClinicalWorkspaceCapabilitiesStore) {
         self.model = model
@@ -50,6 +52,9 @@ struct PairedPatientsWorkspaceView: View {
 
     var body: some View {
         deleteDialogWorkspace
+        #if os(macOS)
+            .modifier(VisitRecordingWorkspaceScope(model: model)) // @Codex
+        #endif
     }
 
     private var platformWorkspace: some View {
@@ -182,6 +187,13 @@ struct PairedPatientsWorkspaceView: View {
         .sheet(item: $entryDeletionCandidate) { entry in
             PairedDiaryDeleteSheet(entry: entry, model: model)
         }
+        // @Codex: The diary and documents share this presenter even when only
+        // one clinical section is mounted. Opening a document never saves a draft.
+        .sheet(item: $attachmentDetailCandidate, onDismiss: { model.dismissAttachmentDetail() }) { summary in
+            PairedAttachmentDetailView(model: model, summary: summary, onClose: {
+                attachmentDetailCandidate = nil
+            })
+        }
         .sheet(item: $patientLifecycleSheet) { sheet in
             switch sheet {
             case .archive:
@@ -196,6 +208,26 @@ struct PairedPatientsWorkspaceView: View {
 
     private var eventWorkspace: some View {
         sheetWorkspace
+        // @Codex: The archive summary remains available when Documents is not mounted.
+        .task(id: attachmentReadPatientID) {
+            guard attachmentReadPatientID != nil, model.attachmentsLoadState == .idle else { return }
+            // @Codex: This shared read belongs to the patient context. Leaving a
+            // section must not cancel it; the model rejects stale responses.
+            Task { await model.loadSelectedPatientAttachments(reportStatus: false) }
+        }
+        // @Codex: A presentation must not outlive its patient context.
+        .onChange(of: model.selectedPatient?.id) { patientID in
+            if attachmentDetailCandidate?.patientId != patientID {
+                attachmentDetailCandidate = nil
+            }
+        }
+        .onChange(of: model.selectedPatientID) { patientID in
+            if patientID == nil { compactPatientID = nil }
+            isCompactPatientHeaderExpanded = false
+        }
+        .onChange(of: model.isEditingPatient) { isEditing in
+            if isEditing { model.activePatientSection = .overview }
+        }
         .onChange(of: patientViewMode) { newValue in
             guard newValue == .trash else { return }
             Task { await model.loadPatientTrash() }
@@ -204,6 +236,15 @@ struct PairedPatientsWorkspaceView: View {
             guard newValue == .active else { return }
             Task { await model.checkNetworkRevisionOnForeground() }
         }
+    }
+
+    /* @Codex */
+    private var attachmentReadPatientID: String? {
+        guard capabilities.hasCapability("network.replica.readonly-documents") else { return nil }
+        #if DEBUG
+        if PairedPatientsWorkspaceModel.isUITestSeeded { return model.selectedPatient?.id }
+        #endif
+        return model.canLoadAttachments ? model.selectedPatient?.id : nil
     }
 
     private var exportDialogWorkspace: some View {
@@ -322,8 +363,7 @@ struct PairedPatientsWorkspaceView: View {
     }
     #endif
 
-    // Compact (iPhone): one column, list and selected-patient detail stacked.
-    // Regular (iPad/macOS): true master-detail, patient list beside the open patient.
+    // @Codex: Compact uses a destination; wide layouts retain list and chart together.
     @ViewBuilder
     private var layoutBody: some View {
         #if os(macOS)
@@ -331,6 +371,12 @@ struct PairedPatientsWorkspaceView: View {
         #else
         GeometryReader { proxy in
             mobileWorkspace(containerWidth: proxy.size.width)
+                .onChange(of: usesSplitLayout(containerWidth: proxy.size.width)) { isWide in
+                    compactPatientID = isWide ? nil : model.selectedPatientID
+                }
+        }
+        .navigationDestination(isPresented: compactDetailIsPresented) {
+            compactPatientDestination
         }
         #endif
     }
@@ -356,19 +402,7 @@ struct PairedPatientsWorkspaceView: View {
 
                 ScrollView {
                     Group {
-                        if let detail = model.selectedPatient {
-                            // No envelope around the sections. Each one is
-                            // already its own island on the field surface; a
-                            // focal wrapper behind them put a second card under
-                            // the cards and spread the warm focal ground across
-                            // a chart whose islands are cool — the corners went
-                            // round, then square, then round again down the
-                            // column. The ground is the ground now, and the only
-                            // surfaces on it are the sections.
-                            selectedPatientSections(detail)
-                        } else {
-                            emptyDetailState
-                        }
+                        patientDetailContent
                     }
                     .padding(20)
                     // The chart is sized to the column it was given, not to
@@ -386,13 +420,17 @@ struct PairedPatientsWorkspaceView: View {
                 // not only when the columns collapse.
                 .safeAreaInset(edge: .top, spacing: 0) {
                     if let detail = model.selectedPatient {
-                        compactPatientHeader(detail, matchesContainerWidth: false)
-                            .frame(
-                                width: PatientsWorkspaceLayout.detailWidth(forContainerWidth: containerWidth),
-                                alignment: .leading
-                            )
+                        VStack(spacing: 0) {
+                            compactPatientHeader(detail, matchesContainerWidth: false)
+                            patientSectionPicker
+                        }
+                        .frame(
+                            width: PatientsWorkspaceLayout.detailWidth(forContainerWidth: containerWidth),
+                            alignment: .leading
+                        )
                     }
                 }
+                .id(model.activePatientSection)
             }
         } else {
             ScrollView {
@@ -404,23 +442,85 @@ struct PairedPatientsWorkspaceView: View {
                     } else {
                         mobilePairedStatus
                         workspaceFeedbackLine
-                        patientsCard
+                        compactWorklist
                     }
                     #else
                     mobilePairedStatus
                     workspaceFeedbackLine
-                    patientsCard
+                    compactWorklist
                     #endif
                 }
                 .padding(20)
                 .compactContainerWidth()
             }
             .safeAreaInset(edge: .top, spacing: 0) {
-                if let detail = model.selectedPatient {
+                // @Codex: The chart header belongs to the chart destination.
+                #if DEBUG
+                if focusedDetailOnly, let detail = model.selectedPatient {
+                    VStack(spacing: 0) {
+                        compactPatientHeader(detail)
+                        patientSectionPicker
+                    }
+                }
+                #endif
+            }
+        }
+    }
+
+    /* @Codex */
+    private var compactDetailIsPresented: Binding<Bool> {
+        Binding(get: { compactPatientID != nil }, set: { if !$0 { compactPatientID = nil } })
+    }
+
+    /* @Codex */
+    private var compactWorklist: some View {
+        PairedPatientsWorklistView(
+            model: model,
+            patientQuery: $patientQuery,
+            patientViewMode: $patientViewMode,
+            patientSortMode: $patientSortMode,
+            onOpenPatient: { patient in
+                guard model.canChangePatientSelection else { return }
+                compactPatientID = patient.id
+                // Returning to the same chart must not discard its draft or refetch it.
+                if model.selectedPatient?.id != patient.id {
+                    Task { await model.loadPatient(patient) }
+                }
+            }
+        )
+        .chartCard()
+    }
+
+    /* @Codex */
+    private var compactPatientDestination: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: ClinicalChartMetrics.sectionSpacing) {
+                workspaceFeedbackLine
+                if let detail = model.selectedPatient, detail.id == compactPatientID {
+                    selectedPatientSections(detail)
+                } else if let patientID = compactPatientID {
+                    pendingPatientDetail(patientID: patientID)
+                }
+            }
+            .padding(20)
+            .compactContainerWidth()
+            // @Codex: Group clinical content without wrapping UIKit's scroll
+            // container and its navigation/keyboard accessibility elements.
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("patient-compact-detail-destination")
+        }
+        .background(mobileCanvasColor)
+        .navigationTitle(model.activePatientSection.title)
+        .navigationBarTitleDisplayMode(.inline)
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if let detail = model.selectedPatient, detail.id == compactPatientID {
+                VStack(spacing: 0) {
                     compactPatientHeader(detail)
+                    patientSectionPicker
                 }
             }
         }
+        .id(model.activePatientSection)
     }
 
     /* @Codex */
@@ -597,14 +697,20 @@ struct PairedPatientsWorkspaceView: View {
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("patient-workspace-sidebar")
 
-            ScrollView {
-                macOSDetailContent
-                    .padding(20)
-                    // A clinical chart is read, not scanned: past a comfortable
-                    // measure the label/value rows stretch into two disconnected
-                    // columns at opposite window edges.
-                    .frame(maxWidth: 1080, alignment: .leading)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+            // @Codex: Keep the split pane stable while resetting only its scroll
+            // position. Replacing the pane identity also moved AppKit's divider.
+            ScrollViewReader { scroll in
+                ScrollView {
+                    patientDetailContent
+                        .padding(20)
+                        // Keep clinical rows within a comfortable reading width.
+                        .frame(maxWidth: 1080, alignment: .leading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .id("patient-chart-scroll-top")
+                }
+                .onChange(of: model.activePatientSection) { _ in
+                    scroll.scrollTo("patient-chart-scroll-top", anchor: .top)
+                }
             }
             // One ground under both panes.
             //
@@ -618,7 +724,10 @@ struct PairedPatientsWorkspaceView: View {
             .background(PlatformColors.groupedBackground)
             .safeAreaInset(edge: .top, spacing: 0) {
                 if let detail = model.selectedPatient {
-                    patientWorkspaceHeader(detail)
+                    VStack(spacing: 0) {
+                        patientWorkspaceHeader(detail)
+                        patientSectionPicker
+                    }
                 }
             }
             .frame(minWidth: 360, maxWidth: .infinity, maxHeight: .infinity)
@@ -704,9 +813,11 @@ struct PairedPatientsWorkspaceView: View {
         return atoms.joined(separator: " · ")
     }
 
+    #endif
+
     /* @Codex */
     @ViewBuilder
-    private var macOSDetailContent: some View {
+    private var patientDetailContent: some View {
         if let detail = model.selectedPatient {
             // No card around the cards. Every section below already draws its own
             // surface, so wrapping the lot in one more produced a card inside a
@@ -762,8 +873,6 @@ struct PairedPatientsWorkspaceView: View {
         .disabled(!model.canChangePatientSelection)
         .accessibilityIdentifier("patient-detail-reload-button")
     }
-    #endif
-
     #if DEBUG
     // Screenshot/UI-test affordance: render only the open patient's clinical
     // sections (skip the pairing card) so the detail view can be captured from
@@ -839,23 +948,6 @@ struct PairedPatientsWorkspaceView: View {
             patientViewMode: $patientViewMode,
             patientSortMode: $patientSortMode
         )
-    }
-
-    /// The worklist and the open chart, as siblings.
-    ///
-    /// They used to share one surface with a Divider between them, which made
-    /// the whole column read as a single object: the chart's sections had no
-    /// boundary of their own, so a reader scanning for "Terapie" had nothing to
-    /// scan for. Each is now its own card, the same arrangement the Mac already
-    /// used, and the separation is done by the surface instead of by a rule.
-    private var patientsCard: some View {
-        VStack(alignment: .leading, spacing: ClinicalChartMetrics.sectionSpacing) {
-            patientsListContent
-                .chartCard()
-            if let detail = model.selectedPatient {
-                selectedPatientSections(detail)
-            }
-        }
     }
 
     private var emptyDetailState: some View {
@@ -1089,14 +1181,111 @@ struct PairedPatientsWorkspaceView: View {
 
 
 
-    /// One rhythm for the whole thread. 10pt read as sections crowding each other
-    /// once each one became a card in its own right; the gap between cards has to
-    /// be large enough to say "new section" without needing a rule to say it.
+    /* @Codex */
+    private var patientSectionPicker: some View {
+        Menu {
+            Picker("Sezione clinica", selection: $model.activePatientSection) {
+                ForEach(PatientWorkspaceSection.allCases) { section in
+                    Label(section.title, systemImage: section.symbolName).tag(section)
+                }
+            }
+        } label: {
+            HStack(spacing: 10) {
+                Label(model.activePatientSection.title, systemImage: model.activePatientSection.symbolName)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 8)
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.caption)
+            }
+            .font(.headline)
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .menuStyle(.borderlessButton)
+        .padding(.horizontal, 20)
+        .padding(.bottom, 8)
+        .background(PlatformColors.groupedBackground)
+        .accessibilityLabel("Sezione clinica")
+        .accessibilityValue(model.activePatientSection.title)
+        .accessibilityHint("Scegli la sezione della cartella da consultare.")
+        .accessibilityIdentifier("patient-section-picker")
+    }
+
+    /* @Codex */
+    private var populatedPatientSections: [(section: PatientWorkspaceSection, count: Int)] {
+        // These are loaded records, not totals: paired list routes can be bounded.
+        let sections: [(section: PatientWorkspaceSection, count: Int)] = [
+            (.diary, model.entries.count),
+            (.therapies, model.therapies.count),
+            (.clinical, model.checkups.count + model.observations.count),
+            (.prescriptions, model.servicePrescriptions.count + model.prostheticPrescriptions.count)
+        ]
+        return sections.filter { $0.count > 0 }
+    }
+
+    /* @Codex */
+    private var patientContents: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("In questa cartella")
+                .font(.headline)
+                .accessibilityHeading(.h2)
+            ForEach(populatedPatientSections, id: \.section) { item in
+                patientSectionLink(item.section, status: "\(item.count) caricati")
+            }
+            if capabilities.hasCapability("network.replica.readonly-documents"),
+               model.attachmentsLoadState != .loaded || !model.attachments.isEmpty {
+                patientSectionLink(.documents, status: attachmentContentsStatus)
+            }
+        }
+        .chartCard()
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("patient-chart-contents")
+    }
+
+    /* @Codex */
+    private var attachmentContentsStatus: String {
+        switch model.attachmentsLoadState {
+        case .loaded: return model.attachments.isEmpty ? "Nessun documento" : "\(model.attachments.count) caricati"
+        case .loading: return "Caricamento…"
+        case .idle: return "Da consultare"
+        case .failed: return "Lettura non riuscita"
+        case .unavailable: return "Non disponibili"
+        }
+    }
+
+    /* @Codex */
+    private func patientSectionLink(_ section: PatientWorkspaceSection, status: String) -> some View {
+        Button {
+            model.activePatientSection = section
+        } label: {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Label(section.title, systemImage: section.symbolName)
+                        .font(.subheadline.weight(.semibold))
+                    Text(status)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 8)
+                Image(systemName: "chevron.right").font(.caption)
+            }
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("patient-open-section-\(section.rawValue)")
+    }
+
     private static var sectionSpacing: CGFloat { ClinicalChartMetrics.sectionSpacing }
 
     @ViewBuilder
     private func selectedPatientSections(_ detail: HomeBasePatientDetail) -> some View {
         VStack(alignment: .leading, spacing: Self.sectionSpacing) {
+            // @Codex: Keep only the active clinical section in the reading pane.
+            // Drafts and existing action bindings remain owned by the workspace/model.
+            switch model.activePatientSection {
+            case .overview:
+            patientContents
             PairedPatientDetailSection(
                 model: model,
                 detail: detail,
@@ -1105,6 +1294,7 @@ struct PairedPatientsWorkspaceView: View {
                 confirmsFHIRExport: $confirmsFHIRExport
             )
             .chartCard()
+            case .diary:
             PairedPatientDiarySection(
                 model: model,
                 capabilities: capabilities,
@@ -1116,11 +1306,13 @@ struct PairedPatientsWorkspaceView: View {
                 attachmentDetailCandidate: $attachmentDetailCandidate
             )
             .chartCard()
+            case .scales:
             PairedPatientScalesSection(
                 model: model,
                 presentingScale: $presentingScale
             )
             .chartCard()
+            case .therapies:
             PairedPatientTherapiesSection(
                 model: model,
                 therapyStatusFilter: $therapyStatusFilter,
@@ -1128,6 +1320,7 @@ struct PairedPatientsWorkspaceView: View {
                 therapyDeletionCandidateId: $therapyDeletionCandidateId
             )
             .chartCard()
+            case .clinical:
             PairedPatientClinicalSections(
                 model: model,
                 checkupStatusFilter: $checkupStatusFilter,
@@ -1137,8 +1330,10 @@ struct PairedPatientsWorkspaceView: View {
                 observationDeletionCandidateId: $observationDeletionCandidateId
             )
             .chartCard()
+            case .prescriptions:
             PairedPatientPrescriptionSections(model: model)
                 .chartCard()
+            case .documents:
             PairedPatientDocumentsSection(
                 model: model,
                 capabilities: capabilities,
@@ -1152,7 +1347,9 @@ struct PairedPatientsWorkspaceView: View {
                 expandedInsightId: $expandedInsightId
             )
             .chartCard()
+            }
         }
+        .id(model.activePatientSection)
     }
 }
 

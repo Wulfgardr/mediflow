@@ -21,6 +21,7 @@ Ultimo aggiornamento: 2026-09-06
 | [release-085-readiness.md](./release-085-readiness.md) | Evidenze runtime, gate aperti, account Apple e promozione. | Prima di presentare o distribuire la 0.8.5. |
 | [getmediflow-editorial-proposal.md](./getmediflow-editorial-proposal.md) | Proposta sito e rinnovo progressivo della documentazione. | Revisione del racconto pubblico. |
 | [design/2026-09-05-086-runtime-twin.md](./design/2026-09-05-086-runtime-twin.md) | Gemello web sintetico 0.8.6, copertura, confronto visuale e launcher locale. | Esplorazione e verifica del candidato WUL-676. |
+| [design/2026-09-06-breccia-apple-reference.md](./design/2026-09-06-breccia-apple-reference.md) | Criteri ricavati da testo e fotogrammi Breccia, fonti e adattamenti Apple. | Prima di progettare o rifinire le app iPhone, iPad e Mac. |
 
 ## 📚 Come usare questo indice
 
@@ -33,6 +34,9 @@ Ultimo aggiornamento: 2026-09-06
 
 [Stato del candidato integrato](./analysis/2026-09-06-086-integrated-closeout.md):
 integrazione corrente, prove finali e limiti prima della PR.
+
+[Verifica della cartella Apple](./analysis/2026-09-06-086-apple-ui-verification.md):
+sorgenti, toolchain, prove delle bozze e limiti della lane nativa.
 
 | File | Scopo | Quando consultarlo |
 | --- | --- | --- |
