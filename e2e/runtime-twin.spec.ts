@@ -8,6 +8,7 @@ const enabled = process.env.MEDIFLOW_TEST_RUNTIME_TWIN === '1';
 test.skip(!enabled, 'Requires the marked synthetic runtime twin; never target a normal instance.');
 const patient = 'twin-086-01';
 const templates = fs.readdirSync(path.resolve('app'), { recursive: true })
+    .map(file => typeof file === 'string' ? file.replaceAll('\\', '/') : file) // @Codex: normalize Windows route separators.
     .filter((file): file is string => typeof file === 'string' && /(?:^|\/)page\.tsx$/.test(file) && !file.startsWith('mockups/'))
     .map(file => '/' + file.replace(/(?:^|\/)page\.tsx$/, ''))
     .sort();
