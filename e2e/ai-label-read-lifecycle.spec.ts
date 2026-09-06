@@ -12,11 +12,14 @@ test('locking retires the pending model footer read before its response or fallb
         taxCode: `LBL${marker.replaceAll('-', '').slice(0, 13).toUpperCase()}`,
     } });
     expect(created.status()).toBe(201);
-    const patient = await created.json() as { id: string; version: number };
+    const patient = await created.json() as { id: string };
+    const baseline = await page.request.get(`/api/patients/${patient.id}`);
+    expect(baseline.status()).toBe(200);
+    const { version } = await baseline.json() as { version: number };
     // @Codex: persisted insights belong to the versioned update contract;
     // patient creation intentionally does not accept this field.
     const updated = await page.request.put(`/api/patients/${patient.id}`, { data: {
-        version: patient.version, documentInsights: JSON.stringify([{
+        version, documentInsights: JSON.stringify([{
             id: marker, date: new Date().toISOString(), fileName: 'Evidenza sintetica',
             rawMarkdown: 'Test di cancellazione.', summary: 'Nessun dato reale.', extractedData: {},
         }]),
