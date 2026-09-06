@@ -2059,6 +2059,33 @@ final class MediFlowMobileAppUITests: XCTestCase {
         if !secure { XCTAssertEqual(field.value as? String, value) }
     }
 
+    // @Codex: The real first login showed this system alert over the loaded
+    // patient list. Dismiss only its observed Not Now action; never save the
+    // password or change AutoFill/Keychain preferences. Other alerts must fail.
+    private func dismissObservedPasswordSavePromptIfPresent() {
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        let alerts = app.alerts.allElementsBoundByIndex + springboard.alerts.allElementsBoundByIndex
+        guard !alerts.isEmpty else { return }
+        XCTAssertEqual(alerts.count, 1, "Only the single observed password-save alert may be handled")
+        let alert = alerts[0]
+        XCTAssertEqual(alert.label, "Save Password?", "An unrelated system prompt must stop this flow")
+        let notNow = alert.buttons.matching(NSPredicate(format: "label == %@", "Not Now"))
+        XCTAssertEqual(notNow.count, 1)
+        XCTAssertEqual(alert.buttons.matching(NSPredicate(format: "label == %@", "Save")).count, 1)
+        XCTAssertEqual(alert.buttons.count, 2)
+        XCTAssertTrue(notNow.element.isEnabled)
+        XCTAssertTrue(notNow.element.isHittable)
+        let tree = XCTAttachment(string: alert.debugDescription)
+        tree.name = "interop-observed-save-password-alert"
+        tree.lifetime = .keepAlways
+        add(tree)
+        attachScreenshot(named: "interop-observed-save-password-prompt")
+        notNow.element.tap()
+        XCTAssertTrue(alert.waitForNonExistence(timeout: 5))
+        XCTAssertEqual(app.alerts.count + springboard.alerts.count, 0,
+                       "An additional prompt must not be silently dismissed")
+    }
+
     private func launchAndLoginInterop(_ input: InteropInput, useSavedPairing: Bool = false, fromRoot: Bool = false) {
         app.launchArguments = []
         app.launchEnvironment = [:]
@@ -2149,6 +2176,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         let patient = app.buttons["patient-cell-\(input.patient.id)"]
         XCTAssertTrue(patient.waitForExistence(timeout: 20))
         XCTAssertTrue(patient.label.contains(input.patient.lastName))
+        dismissObservedPasswordSavePromptIfPresent()
         XCTAssertTrue(revealInteropControl(patient))
         patient.tap()
         openPatientSection(.overview)
