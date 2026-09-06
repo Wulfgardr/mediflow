@@ -19,7 +19,7 @@ export type FunctionStatusSources = Readonly<{
     ollamaLifecycle: string; athenaLifecycle: string;
     clinicalBinding: Readonly<{ state: 'configured' | 'invalid' | 'unavailable'; model: string | null }>;
     athenaArtifact: boolean;
-    who: 'disabled' | 'credentials_absent' | 'offline' | 'configured' | 'available' | 'unavailable';
+    who: 'disabled' | 'credentials_absent' | 'configuration_required' | 'offline' | 'configured' | 'available' | 'unavailable';
 }>;
 
 export const FUNCTION_META: Readonly<Record<FunctionId, Readonly<{ title: string; purpose: string; href: string; action: string }>>> = {
@@ -63,6 +63,7 @@ export function buildFunctionStatus(sources: FunctionStatusSources, checkedAt: s
     const who: Record<FunctionStatusSources['who'], [FunctionState, string]> = {
         disabled: ['off', 'Il servizio WHO è disattivato sul server.'],
         credentials_absent: ['needs_setup', 'Mancano le credenziali WHO sul server.'],
+        configuration_required: ['needs_setup', 'Completa il provisioning WHO locale e i riferimenti agli artifact.'],
         offline: ['blocked', 'Il collegamento di rete WHO non è abilitato.'],
         configured: ['unverified', 'Configurazione presente, ma nessuna ricerca riuscita osservata dal servizio.'],
         available: ['observed', 'Il servizio ha osservato una ricerca riuscita in questo processo. Verifica fonte e data sulla singola ricerca.'],

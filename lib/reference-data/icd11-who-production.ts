@@ -2,22 +2,19 @@
 import 'server-only';
 
 import { writeAuditEvent } from '@/lib/security/audit';
-import type { Icd11WhoSearchReceipt } from './icd11-who-service';
-import { icd11WhoServerOwner } from './icd11-who-server-owner';
-import {
-    createIcd11WhoProductionRuntime,
-    type Icd11WhoProductionRuntime,
-} from './icd11-who-production-runtime';
+import { createIcd11WhoLocalRuntime, type Icd11WhoLocalRuntime } from './icd11-who-local-runtime';
+import { createIcd11WhoLocalNodeTransport } from './icd11-who-local-node-transport';
+import type { WhoLocalReceipt } from './icd11-who-local-contract';
 
-let runtime: Icd11WhoProductionRuntime | null = null;
+let runtime: Icd11WhoLocalRuntime | null = null;
 
-export function getIcd11WhoProductionRuntime(): Icd11WhoProductionRuntime {
+export function getIcd11WhoProductionRuntime(): Icd11WhoLocalRuntime {
     if (runtime) return runtime;
-    runtime = createIcd11WhoProductionRuntime(Object.freeze({
-        owner: icd11WhoServerOwner,
+    runtime = createIcd11WhoLocalRuntime(Object.freeze({
+        transport: createIcd11WhoLocalNodeTransport(),
         now: () => Date.now(),
         readEnvironment: (name: string) => process.env[name],
-        audit: async (receipt: Icd11WhoSearchReceipt) => {
+        audit: async (receipt: WhoLocalReceipt) => {
             await writeAuditEvent({
                 eventType: 'reference_data.icd11.search',
                 outcome: 'success',
@@ -27,7 +24,7 @@ export function getIcd11WhoProductionRuntime(): Icd11WhoProductionRuntime {
                 sourceSurface: 'api',
                 redactedMetadata: {
                     counts: receipt.resultCount,
-                    flags: [`source:${receipt.source}`, `release:${receipt.releaseId}`, `language:${receipt.language}`],
+                    flags: [`deployment:${receipt.deployment}`, `source:${receipt.source}`, `release:${receipt.releaseId}`, `language:${receipt.language}`],
                 },
             });
         },

@@ -30,7 +30,7 @@ test('off overrides provider configuration; missing and revoked providers stay d
 test('OCR platform support and WHO configuration do not imply successful probes', () => {
     assert.equal(row({ ...sources, platform: 'linux' }, 'document_ocr').state, 'manual');
     assert.equal(row({ ...sources, platform: 'win32' }, 'document_ocr').state, 'manual');
-    const expected = { disabled: 'off', credentials_absent: 'needs_setup', offline: 'blocked', configured: 'unverified', available: 'observed', unavailable: 'blocked' };
+    const expected = { disabled: 'off', credentials_absent: 'needs_setup', configuration_required: 'needs_setup', offline: 'blocked', configured: 'unverified', available: 'observed', unavailable: 'blocked' };
     for (const [who, state] of Object.entries(expected)) {
         const result = row({ ...sources, who: who as FunctionStatusSources['who'] }, 'icd11');
         assert.equal(result.state, state);

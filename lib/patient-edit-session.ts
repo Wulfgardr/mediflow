@@ -1,10 +1,12 @@
 /* @Codex */
+import type { WhoLocalReference } from './reference-data/icd11-who-local-contract';
 /** The editable projection is also the form's default-value source. No I/O. */
 type DateInput = Date | string;
 type CheckupStatus = 'pending' | 'completed' | 'cancelled';
 type CheckupSource = 'manual' | 'ai_suggestion';
 
-type DiagnosisInput = { code: string; description: string; system: string; date: DateInput };
+type DiagnosisInput = { code: string; description: string; system: string; date: DateInput;
+    canonicalUri?: string; reference?: WhoLocalReference };
 export type CheckupFormInput = {
     id?: string;
     patientId?: string;
@@ -53,6 +55,10 @@ function diagnosisFormValue(diagnosis: DiagnosisInput) {
         description: diagnosis.description,
         system: diagnosis.system,
         date: isoDate(diagnosis.date),
+        ...(diagnosis.canonicalUri !== undefined ? { canonicalUri: diagnosis.canonicalUri } : {}),
+        ...(diagnosis.reference !== undefined ? { reference: { releaseId: diagnosis.reference.releaseId,
+            language: diagnosis.reference.language, bindingId: diagnosis.reference.bindingId,
+            imageDigest: diagnosis.reference.imageDigest, datasetSnapshotId: diagnosis.reference.datasetSnapshotId } } : {}),
     };
 }
 

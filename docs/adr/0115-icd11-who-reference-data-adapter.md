@@ -1,7 +1,130 @@
-# ADR 0115: adapter ICD-11 WHO governato senza Docker
+# ADR 0115: Application Service ICD-11 WHO e sidecar locale opt-in
 
 Date: 2026-09-01
 Status: Accepted
+
+Amendment: 2026-09-06, WUL-672, candidato locale da `07725c7`.
+
+## Decisione vigente per il candidato 0.8.6 — prima del codice
+
+L'utente ha scelto il **sidecar WHO locale** il 6 settembre, come registrato
+nel [packet WUL-672](../analysis/2026-09-05-086-who-decision.md#1-decisione-utente-catalogo-who-con-sidecar-locale).
+Questa revisione sostituisce il target online della decisione del 1 settembre
+per il production root del candidato. Le sezioni storiche sotto descrivono
+quel percorso precedente e i relativi packet, non autorizzano fallback online.
+Il vecchio container MediFlow, la porta 8888 e i suoi launcher restano ritirati.
+
+### Confine e contratto Search
+
+- La route autenticata `/api/icd/proxy` resta sottile: senza parametri legge
+  soltanto readiness, con il solo `q` esegue Search. Nessun nuovo endpoint,
+  lookup, cross-check, autocode o cambiamento alle altre API.
+- Un nuovo transport interno usa solo `http://127.0.0.1:8382` e il path
+  `/icd/release/11/2026-01/mms/search`. Il caller non sceglie URL, host, porta,
+  header, release, lingua o policy. Nessun redirect, proxy, OAuth, token,
+  risoluzione segreti o fallback remoto. Il listener deve essere confinato
+  al loopback in provisioning; questo non autentica altri processi dell'host.
+- Il production root seleziona esclusivamente il locale. I componenti online
+  precedenti possono restare come codice storico coperto da test, senza essere
+  composti nel percorso production. Non si simula una credenziale OAuth per
+  superare i vecchi gate.
+- Binding `v2 / 2026-01 / mms / en`; query massima 160 byte UTF-8, massimo 25
+  risultati, risposta upstream massima 64 KiB, deadline transport 5 secondi e
+  audit 1 secondo. Nessun retry o pubblicazione tardiva. La query contiene
+  soltanto termini, senza contesto paziente. Audit e receipt non includono
+  query, codice, titolo, URI, percorsi host o segreti.
+- Search locale pubblica un envelope `icd11-search-response.v2`, con voce
+  `code`, `description` (titolo WHO), `system` e `canonicalUri`, più `partial`
+  e receipt versionata. L'URI deve appartenere al namespace MMS/release fissato;
+  viene conservato come dato, mai dereferenziato. Il limite di 25 riguarda
+  l'output, non la cardinalita upstream: entro i 64 KiB si validano tutte le
+  voci a blocchi di 25 con il parser ufficiale esistente, si restituiscono le
+  prime 25 in ordine WHO e si imposta `partial=true` se altre sono omesse o WHO
+  dichiara `resultChopped`. Una voce malformata anche dopo la venticinquesima,
+  URI/codici duplicati o body oltre il limite negano la risposta. Nessuna
+  modifica al vecchio parser/trasporto online, paginazione remota o ordinamento.
+- Il client riconosce separatamente v1 e v2 a campi chiusi; non modifica
+  silenziosamente v1. Il risultato v2 conserva la provenienza nella ricerca
+  e nella selezione. La revisione parent del 6 settembre richiede che codice,
+  titolo e URI sopravvivano al salvataggio/rilettura effettivi del paziente,
+  coerentemente con il §1.2.3 dei termini WHO. Il campo JSON `diagnoses` gia
+  cifrato ammette i due campi opzionali `canonicalUri` e `reference` (binding,
+  lingua/release, immagine e dataset dichiarati da MediFlow, non WHO).
+  Modulo, schema client e proiezione della sessione di modifica li conservano;
+  nessuna nuova colonna, route o policy di cifratura. Record storici/manuali
+  senza metadati restano leggibili, senza ricostruire URI o certificare codici.
+  Il codice di una selezione WHO resta in sola lettura finche la selezione non
+  viene sostituita/cancellata; una nuova ricerca libera azzera codice e fonte.
+  La compatibilita del medesimo JSON include `MediFlowCore.DiagnosesCodec`:
+  `ClinicalDiagnosis` ed `Entry` conservano URI opzionale e `reference` come
+  valore JSON opaco nel decode/encode gia usato dall'editor nativo. Il codec
+  non interpreta o verifica la fonte, non ricostruisce URI e non avvia Search.
+  Campi assenti/null diventano opzionali nil e non aggiungono chiavi ai record
+  di forma precedente; sistemi sconosciuti e riferimenti JSON non WHO restano
+  leggibili. Solo codec Core e test di round-trip, nessuna modifica Shared/UI,
+  Search nativa, cifratura o FHIR.
+  Export e migrazione dei record storici restano un gate separato: il candidato
+  non attesta conformita dell'intero ciclo di utilizzo ICD.
+
+### Attivazione, stato e cache
+
+- `MEDIFLOW_ICD_WHO_ENABLED=1` e opt-in server esplicito; senza di esso zero
+  richieste e nessuna lettura delle credenziali. Il trasporto locale non legge
+  `MEDIFLOW_ICD_WHO_NETWORK` o le variabili OAuth precedenti.
+- L'attivazione richiede anche `MEDIFLOW_ICD_WHO_LOCAL_IMAGE_DIGEST` e
+  `MEDIFLOW_ICD_WHO_LOCAL_DATASET_ID`, entrambi `sha256:<64 hex>`, forniti
+  dall'inventario di provisioning. Valori assenti o invalidi bloccano Search.
+  Sono identificatori dichiarati dall'host, non attestazioni ottenute dall'API.
+- Readiness v2 distingue `disabled`, `configuration_required`, `configured`,
+  `available` e `unavailable`; indica deployment locale, binding e ultimo
+  successo diretto distinto dall'ultima restituzione cache. Leggere readiness
+  non interroga WHO. `available` descrive un successo recente osservato, non
+  prova integrita del dataset, licenze, installabilita o disponibilita futura.
+- Cache soltanto RAM, massimo 256 chiavi/4 MiB, TTL assoluto massimo 24 ore
+  dall'acquisizione, senza rinnovo su hit. Chiave legata a query normalizzata,
+  binding e identita immagine/dataset. Receipt distingue `deployment=local`,
+  `source=live|cache`, `fetchedAt`, `expiresAt` e `completedAt`.
+- I gate precedono la cache. Disable, cambio identita/configurazione, dispose
+  o clock regressivo invalidano cache e risultati pendenti. Configurazione
+  riletta al confine di ogni operazione e prima della pubblicazione; nessuna
+  promessa di osservare istantaneamente cambi esterni fra due letture.
+
+### Provisioning separato e prova ammessa
+
+Il candidato contiene soltanto manifesto e procedura reviewable. Nessun
+installer automatico, avvio WHO, download di immagini/dataset, accettazione
+licenze o modifica del runtime container dell'host. Il manifesto parte con
+digest/snapshot non valorizzati: un controllo locale deve negare la sua
+promozione a manifesto pronto finche mancano prove da registry primario,
+inventario dataset e accettazione esplicita dei termini da parte dell'operatore.
+Digest di fixture sono sintetici e non vengono proposti per installazione.
+
+Il percorso documentato fissa immagine e piattaforma, `include=2026-01_en`,
+`saveAnalytics=false`, DORIS/FHIR disabilitati, bind loopback, nessun mount
+clinico o socket Docker, avvio manuale, aggiornamento e rollback espliciti.
+Il primo provisioning richiede rete secondo WHO; offline dopo provisioning
+e ripristino del dataset richiedono prove future sul target.
+
+La verifica del candidato usa transport/clock/audit e risposte WHO sintetici:
+default OFF, nessun OAuth/remoto, target fisso, input/risposta bounded,
+provenienza, errori, timeout/abort, cache e lifecycle, compatibilita DTO e
+readiness passiva. Non serve un DB per questi test; eventuali check applicativi
+usano esclusivamente `MEDIFLOW_DATA_DIR` temporanea marcata. Test sintetici,
+build e manifesto valido non sono proof live o approvazione alla distribuzione.
+
+### Fonti primarie rilette il 2026-09-06
+
+- [WHO local deployment](https://icd.who.int/docs/icd-api/ICDAPI-LocalDeployment/):
+  API locale senza OAuth, path equivalenti, URI canonici WHO conservati.
+- [WHO Docker](https://icd.who.int/docs/icd-api/ICDAPI-DockerContainer/): supporto
+  ARM, provisioning iniziale con rete, `include`, consenso licenza e analytics.
+- [Release/lingue](https://icd.who.int/docs/icd-api/SupportedClassifications/):
+  MMS 2026-01 inglese disponibile; italiano non disponibile per questo binding.
+- [Termini WHO](https://icd.who.int/en/docs/icd11-license.pdf), §§1.2.3, 2:
+  codice/titolo/URI e licenza distinta del software. Nessuna accettazione o
+  certificazione legale e prodotta da questo ADR.
+
+## Decisione storica del 1 settembre — target online superato nel candidato
 
 Issue: [GitHub #306](https://github.com/Wulfgardr/mediflow/issues/306)
 

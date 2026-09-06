@@ -125,7 +125,8 @@ test('forwards only the PHI-safe receipt to the audit port', () => {
 test('production facade is server-only, singleton and audits without query or result content', () => {
     const source = readFileSync(new URL('./icd11-who-production.ts', import.meta.url), 'utf8');
     assert.match(source, /^\/\* @Codex \*\/\nimport 'server-only';/u);
-    assert.equal(source.match(/\bcreateIcd11WhoProductionRuntime\s*\(/gu)?.length, 1);
+    assert.equal(source.match(/\bcreateIcd11WhoLocalRuntime\s*\(/gu)?.length, 1);
+    assert.doesNotMatch(source, /icd11-who-server-owner|icd11-who-production-runtime|icd11-who-credential|createIcd11WhoNodeHttpsClient/u);
     assert.match(source, /reference_data\.icd11\.search/u);
     assert.doesNotMatch(source, /receipt\.(?:query|entries|description|code)|console\.|\bfetch\b/iu);
 });

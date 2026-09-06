@@ -50,9 +50,10 @@ AnyDoc e fallback PDF Apple Vision distinti dal catalogo Fabric.
 [Prima verifica OCR](./analysis/2026-09-05-086-ocr-verification.md): preview,
 matrice browser sintetica e gate ancora aperti.
 
-[Proposta WHO WUL-672](./analysis/2026-09-05-086-who-decision.md): opzioni
-online e catalogo locale, contratto del cross-check e prove richieste.
-Candidato in attesa della scelta utente; ADR e servizio attivi non cambiano.
+[Decisione WHO WUL-672](./analysis/2026-09-05-086-who-decision.md): sidecar locale
+scelto dall'utente. [ADR 0115](./adr/0115-icd11-who-reference-data-adapter.md) e
+[setup](./icd-who-setup.md) governano il candidato Search locale, opt-in e non
+provisionato; lookup/cross-check restano fuori dal candidato.
 
 [Baseline operativa WUL-670](./analysis/2026-09-05-mediflow-086-baseline.md):
 base corrente, prove sintetiche, recuperi prioritari e ordine di sviluppo.
@@ -125,7 +126,7 @@ Approfondimenti utili:
 - Provider v2, secret broker e adapter OpenAI/Anthropic: [ADR 0112](./adr/0112-provider-v2-secret-broker-and-official-cloud-adapters.md)
 - Recording visita e trascrizione locale Apple: [ADR 0113](./adr/0113-recording-visita-trascrizione-locale-085.md)
 - Isolamento Intelligent Host, AIP e MCP: [ADR 0114](./adr/0114-intelligent-host-aip-mcp-isolation.md)
-- Adapter ICD-11 verso API ufficiale WHO senza Docker: [ADR 0115](./adr/0115-icd11-who-reference-data-adapter.md)
+- Adapter ICD-11 verso sidecar WHO locale opt-in: [ADR 0115](./adr/0115-icd11-who-reference-data-adapter.md)
 - Configurazione ICD-11 WHO e readiness governata: [setup WHO](./icd-who-setup.md)
 - Transizione agentica governata dello stato checkup: [ADR 0116](./adr/0116-agentic-checkup-status-transition.md)
 - Headless portabile agent-first e Fabric capability-first: [ADR 0117](./adr/0117-headless-portable-agent-first-and-capability-first-fabric.md)
@@ -211,7 +212,7 @@ Approfondimenti utili:
 | Provider v2, secret broker e adapter cloud ufficiali | [docs/adr/0112-provider-v2-secret-broker-and-official-cloud-adapters.md](./adr/0112-provider-v2-secret-broker-and-official-cloud-adapters.md) | `CANONICAL / ACCEPTED` | Separa lifecycle, secret reference, policy e receipt. La 0.8.5 integra una probe amministrativa exact-intent OpenAI/Anthropic `default OFF`, verificata con transport fake e senza credenziali o rete live. |
 | Recording visita e trascrizione locale Apple | [docs/adr/0113-recording-visita-trascrizione-locale-085.md](./adr/0113-recording-visita-trascrizione-locale-085.md) | `CANONICAL / ACCEPTED` | La 0.8.5 integra il percorso macOS 26+ con consenso esplicito, raw audio bounded solo in RAM e transcript review-first senza writer clinico. Microfono reale e validazione clinica non sono provati. |
 | Isolamento Intelligent Host, AIP e MCP | [docs/adr/0114-intelligent-host-aip-mcp-isolation.md](./adr/0114-intelligent-host-aip-mcp-isolation.md) | `CANONICAL / ACCEPTED` | Resta autorevole per isolamento, AIP, lease, revoca e hardening del trasporto. Il runtime corrente usa il Supervisor Node portabile di ADR 0117; il packet macOS #330 non è un requisito aperto della 0.8.5. |
-| Adapter ICD-11 WHO senza Docker | [docs/adr/0115-icd11-who-reference-data-adapter.md](./adr/0115-icd11-who-reference-data-adapter.md) | `CANONICAL / ACCEPTED` | Fissa il target API WHO v2/MMS con release esplicita, Application Service riusabile, egress opt-in, credenziali host-owned e cache fail-closed. Route, client e UI usano ora il contratto MediFlow; la disponibilita live richiede configurazione WHO e resta distinta dai test sintetici. |
+| Adapter ICD-11 WHO locale | [docs/adr/0115-icd11-who-reference-data-adapter.md](./adr/0115-icd11-who-reference-data-adapter.md) | `CANONICAL / ACCEPTED` | Emendamento 2026-09-06: candidato Search su sidecar loopback fisso, opt-in server, senza OAuth o fallback remoto; DTO versionato e cache legata al dataset. Provisioning manuale e prova sul target restano distinti dai test sintetici. |
 | Transizione agentica governata dello stato checkup | [docs/adr/0116-agentic-checkup-status-transition.md](./adr/0116-agentic-checkup-status-transition.md) | `CANONICAL / ACCEPTED` | Limita il write alla transizione `pending -> completed|cancelled`. La 0.8.5 collega preview solo MCP e commit Web trusted con rilettura, step-up, gesto, CAS, idempotenza, audit e receipt; l'agente non riceve proof né esegue il commit. |
 | Headless portabile agent-first e Fabric capability-first | [docs/adr/0117-headless-portable-agent-first-and-capability-first-fabric.md](./adr/0117-headless-portable-agent-first-and-capability-first-fabric.md) | `CANONICAL / ACCEPTED` | La 0.8.5 integra il Supervisor Node con Web standalone e MCP figli su IPC ereditato e il planner read-only. Non dichiara installer, onboarding o compatibilità con host MCP esterni. |
 | Intelligence Fabric e controllo headless 0.8.5 | [docs/adr/0094-intelligence-fabric-headless-contract-085.md](./adr/0094-intelligence-fabric-headless-contract-085.md) | `CANONICAL / ACCEPTED` | Definisce Application Services, Fabric e AIP e registra la baseline Fabric `ocr=unavailable`. Il fallback Apple Vision appartiene alla composizione AnyDoc separata; nessuna fonte autorizza apply. |

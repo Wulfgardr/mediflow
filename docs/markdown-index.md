@@ -43,7 +43,7 @@ Ultimo aggiornamento: 2026-09-06
 | [ADR 0121](./adr/0121-function-status-projection.md) | Lettura autenticata dello stato delle funzioni. | Per modificare prerequisiti, errori e stati osservati. |
 | [ADR 0122](./adr/0122-local-provider-host-setup.md) | Ammissione esplicita Ollama nel processo host. | Per il setup locale senza controllo privilegiato nelle route. |
 | [docs/analysis/2026-09-05-mediflow-086-baseline.md](./analysis/2026-09-05-mediflow-086-baseline.md) | Baseline WUL-670, prove sintetiche e recuperi selettivi. | Prima delle tranche 0.8.6; limiti runtime espliciti. |
-| [docs/analysis/2026-09-05-086-who-decision.md](./analysis/2026-09-05-086-who-decision.md) | Proposta WHO online o locale, contratti e piano di verifica. | Prima della scelta WUL-672 e dell'implementazione WUL-673; non attiva il servizio. |
+| [docs/analysis/2026-09-05-086-who-decision.md](./analysis/2026-09-05-086-who-decision.md) | Decisione utente per il sidecar WHO locale e analisi storica delle alternative. | Contesto WUL-672; implementazione corrente governata da ADR 0115 e setup, non prova live. |
 | [docs/roadmap-086-consolidamento.md](./roadmap-086-consolidamento.md) | Piano e issue Linear per OCR, WHO, UI/design arena, onboarding, deslop, GDPR/AI Act e recupero branch. | Prima di avviare le tranche 0.8.6; non è evidenza runtime o attestazione di conformità. |
 
 ## Candidato Web 0.8.5
@@ -105,7 +105,7 @@ Ultimo aggiornamento: 2026-09-06
 | [docs/native-testing.md](./native-testing.md) | Strategia canonica test macOS (SwiftPM/XCTest/Xcode). | Per piani test e parity sweep. |
 | [docs/parity-click-map-macos.md](./parity-click-map-macos.md) | Runbook P6 del bundle macOS home-base: tooling di base consegnato da `WUL-401`/PR #21, prerequisiti operativi e verbale residui governati da `WUL-481`. | Per promuovere capability macOS da partial a full parity senza usare dati reali. |
 | [docs/mobile-home-base-smoke.md](./mobile-home-base-smoke.md) | Runbook del verify loop `home-base`: gate headless sintetici sul boundary di rete e smoke iPhone/iPad opzionale contro database reale. | Per modifiche a `/api/v1/network/*` o verifiche mobili `home-base` paired su simulatori Apple. |
-| [docs/icd-who-setup.md](./icd-who-setup.md) | Configurazione server-only dell'Application Service ICD-11 WHO, default sicuro e readiness governata. | Per abilitare o diagnosticare l'accesso WHO senza esporre credenziali al client. |
+| [docs/icd-who-setup.md](./icd-who-setup.md) | Candidato WHO locale: configurazione server, stato e provisioning manuale con manifesto bloccato. | Prerequisiti e limiti prima di attivare Search; nessun installer o prova sul target. |
 
 ## 🩺 Prodotto, compliance e contesto clinico
 
@@ -229,7 +229,7 @@ Ultimo aggiornamento: 2026-09-06
 | [docs/adr/0112-provider-v2-secret-broker-and-official-cloud-adapters.md](./adr/0112-provider-v2-secret-broker-and-official-cloud-adapters.md) | ADR accettato per provider v2, secret broker a lease effimero e trasporti ufficiali OpenAI/Anthropic; provider remoti disattivati per impostazione predefinita, nessun fallback e prima esecuzione limitata a dati sintetici non clinici. |
 | [docs/adr/0113-recording-visita-trascrizione-locale-085.md](./adr/0113-recording-visita-trascrizione-locale-085.md) | ADR accettato per recording e trascrizione Apple on-device nel target macOS, con consenso esplicito, raw audio bounded in RAM e transcript effimero separato dal writer clinico. |
 | [docs/adr/0114-intelligent-host-aip-mcp-isolation.md](./adr/0114-intelligent-host-aip-mcp-isolation.md) | ADR accettato per isolamento MCP `stdio` modern-only, broker AIP locale, lease/revoca/audit e import boundary; la prima slice resta non-PHI e senza sessione clinica. |
-| [docs/adr/0115-icd11-who-reference-data-adapter.md](./adr/0115-icd11-who-reference-data-adapter.md) | ADR accettato per sostituire il target Docker ICD-11 con un Application Service host-owned verso WHO API v2/MMS, egress opt-in, cache exact-binding e output MediFlow data-only; route, client e UI sono migrati, mentre la prova live richiede configurazione WHO. |
+| [docs/adr/0115-icd11-who-reference-data-adapter.md](./adr/0115-icd11-who-reference-data-adapter.md) | ADR con emendamento locale 2026-09-06: Search loopback fisso, opt-in, niente OAuth/remoto, DTO compatibili e cache legata agli artefatti; provisioning e prova sul target ancora da eseguire. |
 | [docs/adr/0116-agentic-checkup-status-transition.md](./adr/0116-agentic-checkup-status-transition.md) | ADR accettato per il primo write agentico non-SOAP: sola transizione `pending -> completed|cancelled`, proposta AIP, conferma UI operation-specific, CAS, idempotenza e receipt PHI-safe; nessun runtime nel packet. |
 | [docs/adr/0117-headless-portable-agent-first-and-capability-first-fabric.md](./adr/0117-headless-portable-agent-first-and-capability-first-fabric.md) | ADR accettato: rende Headless/CLI/MCP agent-first e OS-agnostico un requisito 0.8.5, impone una superficie utile governata e riclassifica OCR come capability model-agnostic con adapter DeepSeek opzionale. |
 | [docs/adr/0118-tinetti-poma28-source-bound-submission.md](./adr/0118-tinetti-poma28-source-bound-submission.md) | @Codex: ADR proposta per POMA-28 versionata e source-bound, storico non ricalcolato, completezza delle risposte e validazione dei writer Web/Swift; nessun claim di validazione clinica. |

@@ -224,6 +224,11 @@ export const NEVER_REGRESS_ALLOWLIST = {
     ],
     externalUrls: [
         {
+            path: 'native/MediFlowMac/Tests/MediFlowCoreTests/DiagnosesCodecProvenanceTests.swift',
+            pattern: 'http://id\\.who\\.int/icd/release/11/2026-01/mms/1000000001(?=["\\x27`])',
+            reason: 'One inert synthetic canonical URI is round-tripped as diagnosis data by the Core codec fixture; no transport or URI dereference occurs.',
+        },
+        {
             path: 'lib/ai-providers/v2/openai-responses-official-transport.ts',
             pattern: 'https://api\\.openai\\.com/v1/responses',
             reason: 'The provider-v2 transport pins the sole OpenAI Responses egress target; it is server-only, opt-in, policy-gated and cannot be replaced by caller input.',

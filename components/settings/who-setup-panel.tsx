@@ -1,6 +1,6 @@
 'use client';
 
-/* @Codex WUL-673: guides the existing disabled-by-default service; no credential entry in the browser. */
+/* @Codex WUL-672: local Search only; provisioning and activation are host-owned. */
 import { useEffect, useMemo, useState } from 'react';
 import { createICDReferenceDataClient, icdClientErrorMessage, icdReadinessMessage, type ICDReadiness, type ICDSearchReceipt } from '@/lib/icd-service';
 import { SETTINGS_CARD_CLASS, SETTINGS_SECONDARY_BUTTON_CLASS } from './settings-ui';
@@ -38,20 +38,25 @@ export function WhoSetupPanel() {
             <button type="button" className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={!canVerify || probe.kind === 'running'} onClick={() => void verify()}>{probe.kind === 'running' ? 'Verifica in corso…' : 'Verifica con termine di esempio'}</button>
         </div>
         <p className="mt-2 text-xs leading-5 text-[color:var(--lume-ink-muted)]">La verifica cerca il termine pubblico “cholera”. Non usa dati della cartella e non cambia la configurazione.</p>
-        {probe.kind === 'done' && <p className="mt-3 text-sm" role="status">{probe.receipt.source === 'live' ? 'Risposta WHO ricevuta' : 'Risposta dalla cache locale: non verifica la rete'} · {probe.receipt.resultCount} risultati · <time dateTime={probe.receipt.completedAt}>{new Date(probe.receipt.completedAt).toLocaleString('it-IT')}</time>.</p>}
+        {probe.kind === 'done' && <p className="mt-3 text-sm" role="status">{probe.receipt.source === 'live' ? ('deployment' in probe.receipt ? 'Risposta dal servizio WHO locale' : 'Risposta WHO ricevuta') : 'Risposta dalla cache: non verifica il servizio corrente'} · {probe.receipt.resultCount} risultati · <time dateTime={probe.receipt.completedAt}>{new Date(probe.receipt.completedAt).toLocaleString('it-IT')}</time>.</p>}
+        {state.kind === 'ready' && 'deployment' in state.readiness && <p className="mt-2 text-xs">
+            Modalità locale · {state.readiness.lastLiveObservedAt
+                ? <>Ultima risposta diretta: <time dateTime={state.readiness.lastLiveObservedAt}>{new Date(state.readiness.lastLiveObservedAt).toLocaleString('it-IT')}</time>.</>
+                : 'Nessuna risposta diretta ancora osservata.'}
+        </p>}
         {probe.kind === 'error' && <p className="mt-3 text-sm" role="alert">Verifica non riuscita: {probe.message} <time dateTime={probe.at}>{new Date(probe.at).toLocaleTimeString('it-IT')}</time></p>}
         <details className="mt-5 text-sm">
             <summary className="cursor-pointer font-medium">Configurazione sul server</summary>
             <ol className="mt-3 list-decimal space-y-2 pl-5 leading-6">
-                <li>Registra un client nell’<a href="https://icd.who.int/icdapi" target="_blank" rel="noopener noreferrer" className="underline">API ufficiale WHO</a>.</li>
-                <li>Configura client ID e secret nell’ambiente del processo server. Le credenziali non vanno inserite qui.</li>
-                <li>Abilita esplicitamente il servizio e il collegamento di rete, riavvia il server e rileggi la configurazione.</li>
-                <li>Esegui la verifica di esempio; una risposta dalla cache va distinta da una risposta WHO appena ricevuta.</li>
+                <li>Completa la procedura locale con termini WHO, artifact verificati e dataset inglese MMS 2026-01.</li>
+                <li>Avvia il sidecar sul solo loopback previsto e registra gli identificatori di immagine e dataset nell’ambiente server.</li>
+                <li>Abilita esplicitamente Search locale e rileggi la configurazione. Non occorre un client OAuth WHO.</li>
+                <li>Esegui la ricerca di esempio. Il suo esito non certifica installazione, contenuto del dataset o funzionamento offline.</li>
             </ol>
             <dl className="mt-4 space-y-2 break-words text-xs">
                 <div><dt><code>MEDIFLOW_ICD_WHO_ENABLED</code></dt><dd>1, soltanto quando vuoi abilitare il servizio.</dd></div>
-                <div><dt><code>MEDIFLOW_ICD_WHO_NETWORK</code></dt><dd>online, per consentire il collegamento WHO.</dd></div>
-                <div><dt><code>MEDIFLOW_ICD_WHO_CLIENT_ID</code> / <code>MEDIFLOW_ICD_WHO_CLIENT_SECRET</code></dt><dd>Credenziali ufficiali, conservate esclusivamente sul server.</dd></div>
+                <div><dt><code>MEDIFLOW_ICD_WHO_LOCAL_IMAGE_DIGEST</code></dt><dd>Digest verificato dell’immagine; non viene scaricata da questa pagina.</dd></div>
+                <div><dt><code>MEDIFLOW_ICD_WHO_LOCAL_DATASET_ID</code></dt><dd>Impronta dello snapshot installato; nessun valore è precompilato.</dd></div>
             </dl>
         </details>
     </section>;

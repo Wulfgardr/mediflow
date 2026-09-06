@@ -79,6 +79,7 @@ function DiagnosesFieldArray({ control, register, errors, setValue, watch }: { c
                                 <label className="mf-field-label">Codice</label>
                                 <input
                                     {...register(`diagnoses.${index}.code`)}
+                                    readOnly={!!watch(`diagnoses.${index}.canonicalUri`)}
                                     placeholder="Es. 8A80.0"
                                     className="mf-input mf-input-sm font-mono font-bold"
                                     aria-invalid={!!errors.diagnoses?.[index]?.code}
@@ -93,17 +94,28 @@ function DiagnosesFieldArray({ control, register, errors, setValue, watch }: { c
                                             code: watch(`diagnoses.${index}.code`) || "",
                                             description: watch(`diagnoses.${index}.description`) || "",
                                             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                            system: (watch(`diagnoses.${index}.system`) as any) || "ICD-11"
+                                            system: (watch(`diagnoses.${index}.system`) as any) || "ICD-11",
+                                            canonicalUri: watch(`diagnoses.${index}.canonicalUri`),
+                                            reference: watch(`diagnoses.${index}.reference`),
                                         }}
                                         onChange={(val) => {
                                             setValue(`diagnoses.${index}.code`, val.code);
                                             setValue(`diagnoses.${index}.description`, val.description);
                                             // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                             setValue(`diagnoses.${index}.system`, val.system as any);
+                                            // @Codex: replacement/free text also clears an old WHO association.
+                                            setValue(`diagnoses.${index}.canonicalUri`, val.canonicalUri);
+                                            setValue(`diagnoses.${index}.reference`, val.reference);
                                         }}
                                     />
                                     <input type="hidden" {...register(`diagnoses.${index}.description`)} />
                                 </div>
+                                {/* @Codex: persisted URI remains inspectable after a fresh read. */}
+                                {watch(`diagnoses.${index}.canonicalUri`) && <details className="mt-2 text-xs break-words">
+                                    <summary>Riferimento della selezione WHO</summary>
+                                    <p>{watch(`diagnoses.${index}.canonicalUri`)}</p>
+                                    <p>Per cambiare codice, sostituisci o cancella la selezione nella ricerca.</p>
+                                </details>}
                                 {errors.diagnoses?.[index]?.description && (
                                     <span className="mf-field-error block">Campo obbligatorio</span>
                                 )}
