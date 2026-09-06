@@ -60,10 +60,12 @@ struct MobilePairedStatusView: View {
                 // assistive technologies. Keeping only the state symbol and its
                 // action on screen preserves the first patient row at AX sizes.
                 statusSymbol
+                    .accessibilityHidden(true) // @Codex: Complete state is announced by the container.
                 Spacer(minLength: 8)
                 primaryActionButton(compact: true)
             } else {
                 statusSymbol
+                    .accessibilityHidden(true) // @Codex: Complete state is announced by the container.
                 VStack(alignment: .leading, spacing: 4) {
                     Text(presentation.title)
                         .font(.headline)
