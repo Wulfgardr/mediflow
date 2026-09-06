@@ -102,6 +102,8 @@ struct PairedPatientDetailSection: View {
             .accessibilityIdentifier("patient-clinical-signals-disclosure")
             #endif
 
+            patientReviewOverview
+
             if !exemptions.isEmpty {
                 ChartGroup("Esenzioni") {
                     #if os(macOS)
@@ -177,6 +179,70 @@ struct PairedPatientDetailSection: View {
                 Divider()
                 patientEditForm
             }
+        }
+    }
+
+    /* @Codex: Read-only review signals from this patient's decrypted snapshot.
+       Opening the existing Documents section leaves its loading, permissions
+       and explicit manual actions with the existing workspace/model. */
+    @ViewBuilder
+    private var patientReviewOverview: some View {
+        if model.selectedPatient?.id == detail.id {
+            let insights = DocumentInsightsCodec.decode(detail.documentInsights)
+            let summary = PatientReviewQueueProjection.project(
+                patientID: detail.id,
+                insights: insights,
+                followups: model.followupSuggestions,
+                followupsAtLimit: PatientFollowupProjection.project(insights).count >= PatientFollowupProjection.defaultMax,
+                documentReadState: reviewDocumentReadState,
+                documentsPatientID: model.attachmentsPatientId,
+                attachments: model.attachments
+            )
+            if !summary.rows.isEmpty {
+                ChartGroup("Da rivedere") {
+                    ForEach(summary.rows) { row in
+                        Button {
+                            model.activePatientSection = .documents
+                        } label: {
+                            HStack(alignment: .center, spacing: 12) {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(row.title).font(.subheadline.weight(.semibold))
+                                    Text(row.detail)
+                                        .font(.callout)
+                                        .foregroundStyle(.secondary)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                                Spacer(minLength: 0)
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .accessibilityHidden(true)
+                            }
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityElement(children: .combine)
+                        .accessibilityHint("Apre Documenti")
+                        .accessibilityIdentifier("patient-review-\(row.id.rawValue)")
+                    }
+                    if let note = summary.coverageNote {
+                        Text(note).chartMetadata()
+                    }
+                }
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("patient-review-queue")
+            }
+        }
+    }
+
+    /* @Codex */
+    private var reviewDocumentReadState: PatientReviewDocumentReadState {
+        switch model.attachmentsLoadState {
+        case .idle: .idle
+        case .loading: .loading
+        case .loaded: .loaded
+        case .failed: .failed
+        case .unavailable: .unavailable
         }
     }
 
