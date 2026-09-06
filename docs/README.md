@@ -25,7 +25,7 @@ Ultimo aggiornamento: 2026-09-06
 - **Valutazione della 0.8.5**: [readiness e canali Apple](./release-085-readiness.md); i gate aperti restano espliciti.
 - **Contributi tecnici**: [topologia repository](./repository-topology.md), [architettura](../ARCHITECTURE.md), quindi il contratto del componente.
 - **Presentazione del prodotto**: [Get MediFlow e linea editoriale](./getmediflow-editorial-proposal.md), distinta dai contratti runtime.
-- **Prototipo 0.8.6**: [gemello web navigabile e confronto visuale](./design/2026-09-05-086-runtime-twin.md), candidato sintetico locale WUL-676.
+- **Studio UI 0.8.6**: [gemello web navigabile e confronto visuale](./design/2026-09-05-086-runtime-twin.md), prove sintetiche WUL-676 precedenti alla promozione.
 
 ## Sviluppo 0.8.6
 
@@ -35,7 +35,8 @@ separato. La verifica del candidato integrato resta distinta dalla scelta.
 
 [Candidato funzionale locale](./analysis/2026-09-06-086-functional-closeout.md):
 modifiche, verifiche e decisioni ancora aperte; prevale per il delta 0.8.6 sulle
-fotografie 0.8.5 sotto. Il design resta in revisione su un branch separato.
+fotografie 0.8.5 sotto. Il verbale fotografa la base funzionale precedente alla
+promozione UI regolata da ADR 0123; non attesta le successive integrazioni.
 [Stato funzioni](./adr/0121-function-status-projection.md) e
 [setup host Ollama](./adr/0122-local-provider-host-setup.md) distinguono
 configurazione, ammissione e singola esecuzione.

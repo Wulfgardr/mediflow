@@ -1,5 +1,5 @@
 /* @Codex WUL-676: a workbench, with one application rail and one working plane. */
-.workspace { --twin-rail: 184px; --twin-border: color-mix(in srgb, var(--lume-ink) 13%, transparent); display: grid; grid-template-columns: var(--twin-rail) minmax(0, 1fr); position: fixed; inset: var(--runtime-twin-inset) 0 0; background: var(--lume-surface-focal); color: var(--lume-ink); font-family: var(--lume-font-sans); }
+.workspace { --twin-rail: 184px; --twin-border: color-mix(in srgb, var(--lume-ink) 13%, transparent); display: grid; grid-template-columns: var(--twin-rail) minmax(0, 1fr); position: fixed; inset: var(--runtime-twin-inset, 0px) 0 0; background: var(--lume-surface-focal); color: var(--lume-ink); font-family: var(--lume-font-sans); }
 .rail { display: flex; flex-direction: column; min-height: 0; padding: 22px 12px 14px; background: var(--lume-surface-chrome); border-right: 1px solid var(--twin-border); }
 .brand { display: flex; align-items: center; gap: 9px; padding: 0 9px 26px; font-size: 17px; letter-spacing: -.035em; }
 .brandMark { display: grid; place-items: center; width: 25px; height: 25px; border-radius: 7px; background: var(--lume-ink); color: var(--lume-surface-focal); }

@@ -34,8 +34,8 @@ export default function SettingsAppearancePage() {
                     <legend className="px-2 text-base font-semibold">Navigazione</legend>
                     <div className="grid gap-3 sm:grid-cols-2">
                         {([
-                            { value: 'stream', title: 'Barra superiore', detail: 'B · Diario', Icon: PanelTop },
-                            { value: 'workbench', title: 'Barra laterale', detail: 'A · Postazione', Icon: PanelLeft },
+                            { value: 'stream', title: 'Barra superiore', detail: 'Diario come ingresso della cartella', Icon: PanelTop },
+                            { value: 'workbench', title: 'Barra laterale', detail: 'Riepilogo come ingresso della cartella', Icon: PanelLeft },
                         ] as const).map(({ value, title, detail, Icon }) => (
                             <label key={value} className={cn(
                                 'flex min-w-0 cursor-pointer items-center gap-4 rounded-xl border p-5',

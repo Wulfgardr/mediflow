@@ -64,7 +64,7 @@
         border: 3px solid var(--lume-surface-focal);
         border-radius: 5px;
         background: var(--lume-accent);
-        box-shadow: 0 0 0 1px color-mix(in srgb, var(--lume-ink) 30%, transparent), 0 2px 4px #0002;
+        box-shadow: 0 0 0 1px color-mix(in srgb, var(--lume-ink) 30%, transparent), 0 2px 4px color-mix(in srgb, var(--lume-ink) 13%, transparent);
         transition: box-shadow 140ms ease, border-radius 140ms ease;
     }
     :global(html[data-runtime-twin-design='proposal']) .input::-moz-range-thumb {
@@ -74,7 +74,7 @@
         border: 3px solid var(--lume-surface-focal);
         border-radius: 5px;
         background: var(--lume-accent);
-        box-shadow: 0 0 0 1px color-mix(in srgb, var(--lume-ink) 30%, transparent), 0 2px 4px #0002;
+        box-shadow: 0 0 0 1px color-mix(in srgb, var(--lume-ink) 30%, transparent), 0 2px 4px color-mix(in srgb, var(--lume-ink) 13%, transparent);
         transition: box-shadow 140ms ease, border-radius 140ms ease;
     }
     :global(html[data-runtime-twin-design='proposal']) .input:is(:hover, :active, :focus-visible)::-webkit-slider-thumb {

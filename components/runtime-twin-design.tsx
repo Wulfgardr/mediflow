@@ -1,7 +1,7 @@
 'use client';
 
-/* @Codex WUL-676: presentation state only. The original clinical components
-   stay mounted while the comparison changes their layout. */
+/* @Codex ADR 0123: one official UI, two navigation arrangements. The isolated
+   comparison can still show Original without remounting clinical forms. */
 import { createContext, useCallback, useContext, useEffect, useId, useState, useSyncExternalStore, type ReactNode } from 'react';
 
 export type TwinComposition = 'workbench' | 'stream';
@@ -31,7 +31,6 @@ function subscribeComposition(notify: () => void) {
         window.removeEventListener(COMPOSITION_EVENT, notify);
     };
 }
-const noCompositionSubscription = () => () => {};
 export const RuntimeTwinFolderContext = createContext<string | null>(null);
 export const useRuntimeTwinDesign = () => useContext(DesignContext);
 export const useRuntimeTwinFolder = () => useContext(RuntimeTwinFolderContext);
@@ -47,18 +46,21 @@ export function useRuntimeTwinPendingForm(pending: boolean) {
     }, [enabled, id, pending, registerPending]);
 }
 
-export function RuntimeTwinDesignProvider({ enabled, children }: { enabled: boolean; children: ReactNode }) {
-    const [proposal, setProposal] = useState(enabled);
-    const composition = useSyncExternalStore(enabled ? subscribeComposition : noCompositionSubscription,
-        enabled ? readComposition : defaultComposition, defaultComposition);
+export function RuntimeTwinDesignProvider({ comparisonEnabled = false, children }: { comparisonEnabled?: boolean; children: ReactNode }) {
+    const [comparisonProposal, setComparisonProposal] = useState(true);
+    // Original is a temporary comparison only; ordinary settings cannot select it.
+    const proposal = !comparisonEnabled || comparisonProposal;
+    const setProposal = useCallback((value: boolean) => {
+        if (comparisonEnabled) setComparisonProposal(value);
+    }, [comparisonEnabled]);
+    const composition = useSyncExternalStore(subscribeComposition, readComposition, defaultComposition);
     const setComposition = useCallback((value: TwinComposition) => {
-        if (!enabled) return;
         try {
             window.localStorage.setItem(COMPOSITION_KEY, value);
             transientComposition = null;
         } catch { transientComposition = value; }
         window.dispatchEvent(new Event(COMPOSITION_EVENT));
-    }, [enabled]);
+    }, []);
     const [pendingIds, setPendingIds] = useState<Set<string>>(() => new Set());
     const registerPending = useCallback((id: string, pending: boolean) => {
         setPendingIds(current => {
@@ -68,10 +70,9 @@ export function RuntimeTwinDesignProvider({ enabled, children }: { enabled: bool
         });
     }, []);
     useEffect(() => {
-        if (enabled) {
-            document.documentElement.dataset.runtimeTwinDesign = proposal ? 'proposal' : 'original';
-            document.documentElement.dataset.twinComposition = composition;
-        }
-    }, [enabled, proposal, composition]);
-    return <DesignContext.Provider value={{ enabled, proposal: enabled && proposal, setProposal, composition, setComposition, pendingForms: pendingIds.size > 0, registerPending }}>{children}</DesignContext.Provider>;
+        document.documentElement.dataset.runtimeTwinDesign = proposal ? 'proposal' : 'original';
+        document.documentElement.dataset.twinComposition = composition;
+    }, [proposal, composition]);
+    // enabled denotes the shared presentation/unsaved-form boundary, never a capability.
+    return <DesignContext.Provider value={{ enabled: true, proposal, setProposal, composition, setComposition, pendingForms: pendingIds.size > 0, registerPending }}>{children}</DesignContext.Provider>;
 }
