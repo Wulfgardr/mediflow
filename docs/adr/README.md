@@ -6,6 +6,8 @@ Questa cartella contiene le decisioni di MediFlow (web + native).
 
 ## ADR piu recente
 
+- [0123-official-web-ui-navigation-compositions.md](./0123-official-web-ui-navigation-compositions.md): promozione della UI web con B predefinita, A selezionabile e confronto sintetico separato.
+
 - [0122-local-provider-host-setup.md](./0122-local-provider-host-setup.md): comando host esplicito per ammissione, recupero e revoca di Ollama, separato dai consumer.
 - [0121-function-status-projection.md](./0121-function-status-projection.md): stato readonly delle funzioni senza inferenza, credenziali o falsa disponibilità.
 - [0120-local-work-profile-onboarding.md](./0120-local-work-profile-onboarding.md): guida deterministica locale, anteprima e rollback del profilo della postazione.
