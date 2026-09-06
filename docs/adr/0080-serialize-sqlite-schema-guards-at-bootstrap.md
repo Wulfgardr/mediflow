@@ -17,6 +17,13 @@ le schema guard additive. I worker possono quindi eseguire contemporaneamente
 
 ## Contesto
 
+Emendamento 0.8.6, 6 settembre 2026: il primo controllo auth puo avviare il
+bootstrap quando mancano sia il database corrente sia quello legacy e la
+cartella dati e completamente vuota. La prima apertura di `/` deve raggiungere
+il setup senza una richiesta API preparatoria. Se nella cartella ci sono altri
+file, l'assenza di `medical.db` conserva invece la risposta `DB_MISSING` e il
+percorso di recupero esplicito; uno schema esistente sconosciuto resta negato.
+
 SQLite resta l'unico storage autorevole e le schema guard runtime restano il
 meccanismo operativo per aggiornare database esistenti. La soluzione deve
 funzionare per build, avvio e reopen dopo repair, senza leggere dati reali nei
