@@ -29,6 +29,10 @@ Ultimo aggiornamento: 2026-09-06
 
 ## Sviluppo 0.8.6
 
+[Candidato locale integrato](./analysis/2026-09-06-086-integrated-closeout.md):
+stato corrente della patch, integrazioni, prove e limiti di promozione.
+Prevale sulle fotografie precedenti per lo stato del programma 0.8.6.
+
 [Promozione della UI web](./adr/0123-official-web-ui-navigation-compositions.md):
 contratto accettato per B predefinita e A selezionabile, con confronto sintetico
 separato. [Verifica della UI integrata](./analysis/2026-09-06-086-integrated-ui-verification.md):
