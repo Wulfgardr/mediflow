@@ -38,7 +38,7 @@ export type Kree8WorkspaceNavGroups = readonly [
 ];
 
 type Kree8WorkspaceShellProps = {
-  variant?: 'default' | 'clinical';
+  variant?: 'default' | 'clinical' | 'overview';
   eyebrow: string;
   title: string;
   subtitle: string;
@@ -87,6 +87,8 @@ export function Kree8WorkspaceShell({
   const navKey = renderedNavItems.map((item) => item.href).join('|');
   const PrimaryActionIcon = primaryAction?.icon;
   const { proposal, composition } = useRuntimeTwinDesign();
+  /* @Codex: analysis/catalog navigation tracks position without reshaping data. */
+  const overviewMode = variant === 'overview' && proposal;
   const [folderSection, setFolderSection] = useState('quadro');
   const [folderNavOpen, setFolderNavOpen] = useState(false);
   const folderToggleRef = useRef<HTMLButtonElement>(null);
@@ -138,7 +140,7 @@ export function Kree8WorkspaceShell({
       /* La Scheda possiede già una sola superficie focale che contiene tutte le
          sezioni. Lo scrollspy aggiorna soltanto la posizione nella rail e non
          solleva una seconda superficie interna. */
-      const nextFocusEl = isClinical ? null : el;
+      const nextFocusEl = isClinical || overviewMode ? null : el;
       if (nextFocusEl !== focusEl) {
         if (focusEl) {
           focusEl.removeAttribute('data-lume-focus');
@@ -166,7 +168,7 @@ export function Kree8WorkspaceShell({
         .filter((entry): entry is { href: string; el: HTMLElement } => entry !== null);
 
     const isInWorkspaceViewport = (el: HTMLElement) => {
-      const chromeBottom = root.querySelector('header')?.getBoundingClientRect().bottom ?? 0;
+      const chromeBottom = root.querySelector(overviewMode ? 'nav' : 'header')?.getBoundingClientRect().bottom ?? 0;
       const rect = el.getBoundingClientRect();
       return rect.bottom > chromeBottom && rect.top < window.innerHeight;
     };
@@ -253,11 +255,11 @@ export function Kree8WorkspaceShell({
         focusEl.classList.remove('lume-focal');
       }
     };
-  }, [isClinical, navKey]);
+  }, [isClinical, overviewMode, navKey]);
 
   return (
     <RuntimeTwinFolderContext.Provider value={folderMode ? folderSection : null}>
-    <div className={folderMode ? twin.patientShell : `${styles.shell} ${isClinical ? styles.clinicalShell : ''}`} ref={rootRef}>
+    <div className={folderMode ? twin.patientShell : `${styles.shell} ${isClinical ? styles.clinicalShell : ''} ${overviewMode ? styles.overviewShell : ''}`} ref={rootRef}>
       <main className={folderMode ? twin.patientCanvas : `${styles.canvas} ${isClinical ? styles.clinicalCanvas : ''}`} data-folder-section={folderMode ? folderSection : undefined} data-testid={isClinical ? 'lume-scheda-scroll' : undefined}>
         <header
           className={folderMode ? twin.patientHeader : `${styles.chrome} ${isClinical ? styles.clinicalChrome : ''}`}
@@ -273,7 +275,7 @@ export function Kree8WorkspaceShell({
               {headerActions}
             </div>
           </> : <>
-          <div className={styles.chromeTopRow}>
+          {(!overviewMode || primaryAction || headerActions) && <div className={styles.chromeTopRow}>
             <Link href={backHref} className={styles.backButton} aria-label={backLabel} title={backLabel}>
               <ArrowLeft size={13} aria-hidden />
               <span className={styles.backButtonLabel}>{backLabel}</span>
@@ -289,7 +291,7 @@ export function Kree8WorkspaceShell({
               ) : null}
               {headerActions}
             </div>
-          </div>
+          </div>}
 
           {isClinical ? (
             <div className={styles.clinicalIdentity}>

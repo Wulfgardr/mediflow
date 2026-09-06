@@ -106,6 +106,7 @@ export default function ScalesLibraryPage() {
 
     return (
         <Kree8WorkspaceShell
+            variant="overview"
             eyebrow="Scale"
             title="Scale cliniche"
             subtitle="Il punteggio viene registrato nella cartella del paziente."
