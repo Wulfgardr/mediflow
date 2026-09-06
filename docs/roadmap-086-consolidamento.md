@@ -7,16 +7,17 @@ read_when:
 
 # MediFlow 0.8.6 — consolidamento funzionale e interfaccia
 
-Data: 6 settembre 2026. Stato: **tranche funzionale locale verificata; gate prodotto aperti**, con
+Data: 6 settembre 2026. Stato: **candidato locale integrato; gate prodotto aperti**, con
 [baseline WUL-670](./analysis/2026-09-05-mediflow-086-baseline.md) su `main`
 `b72ac713b`; la preparazione usava `6a5463e8d`. Nessuna release 0.8.6 consegnata.
 La [roadmap generale](./ROADMAP.md) resta la fonte prodotto;
 questo documento ne dettaglia il candidato 0.8.6.
 
-[Verbale di chiusura locale](./analysis/2026-09-06-086-functional-closeout.md):
-integrazione e verifiche della tranche funzionale. Le sezioni seguenti
-conservano i requisiti; non equivalgono a issue chiuse. Design, decisione WHO,
-account live, revisione regolatoria e distribuzione restano confini distinti.
+[Verbale corrente](./analysis/2026-09-06-086-integrated-closeout.md): integrazione
+della base funzionale, UI B/A, Search WHO locale e cartella Apple. Le sezioni
+seguenti conservano requisiti e osservazioni preparatorie, non attestano issue
+chiuse. Le scelte B/A e sidecar locale sono recepite; provisioning WHO, revisione
+regolatoria e distribuzione restano confini distinti.
 
 ## Risultato atteso
 
@@ -24,8 +25,9 @@ Rendere affidabili le funzioni già promesse e semplice capire come usarle.
 Le priorità indicate dall'utente sono OCR con fallback funzionante, ICD-11 WHO
 accessibile, impostazioni essenziali e informative, scheda paziente proporzionata
 e un miglioramento estetico concreto. La prima superficie è **localhost**.
-La compatibilità Apple va preservata; una riscrittura completa dei client non
-è implicita in questo aggiornamento.
+La successiva estensione Apple comprende navigazione della cartella, bozze e
+documenti su iPhone, iPad e Mac, guidata dai riferimenti illustrati richiesti.
+Non equivale a una riscrittura completa di tutte le superfici dei client.
 
 La release non coincide con l'integrazione di tutti i branch rimasti. Recuperiamo
 soltanto contributi che risolvono un problema attuale e superano le verifiche
@@ -92,11 +94,11 @@ profilo hardware. I risultati restano da rivedere prima dell'uso clinico.
 **Problema.** La ricerca e il cross-check terminologico devono essere utilizzabili
 senza una configurazione opaca del servizio indicato come “sidecar”.
 
-**Stato osservato.** [Setup WHO](./icd-who-setup.md) e ADR 0115 descrivono un
-Application Service server-side verso WHO, con credenziali OAuth e rete abilitate
-esplicitamente. Il vecchio container su porta 8888 è ritirato dal percorso
-applicativo. Il resoconto branch conferma che issuer WHO e retirement hanno già
-corrispondenti in main. Non è stato verificato un account WHO live.
+**Stato aggiornato.** [Setup WHO](./icd-who-setup.md) e ADR 0115 descrivono
+Search tramite sidecar locale, disattivato per default, con endpoint fisso
+loopback e provenienza degli artifact. Il vecchio container su porta 8888 resta
+ritirato. Non è stato provisionato o verificato un catalogo WHO locale; digest,
+snapshot, licenza e prove di riavvio/ripristino restano da registrare.
 
 **Risultato.** Da Impostazioni l'utente comprende cosa manca, completa il setup
 e verifica una ricerca; dalla scheda ottiene risultati con codice, descrizione,
