@@ -106,3 +106,29 @@ test('patient rereads distinguish complete active detail from permitted tombston
     assert.deepEqual(readRoutesForStep(trash), { web: '/api/patients/new-ui-patient',
         paired: '/api/v1/network/patients?includeDeleted=true', webStatus: 404 });
 });
+
+test('each clinical module requires authenticated sealed fields while canonical codes and statuses remain plain', async () => {
+    const key = await webcrypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
+    const cases = [
+        ['therapy', 'motivation', 'status', 'active'], ['checkup', 'notes', 'title', 'Synthetic title'],
+        ['observation', 'notes', 'code', '29463-7'], ['service', 'serviceName', 'status', 'prescribed'],
+        ['service-item', 'serviceName', 'serviceCode', 'SYN001'],
+        ['prosthetic', 'description', 'status', 'prescribed'], ['entry', 'content', 'type', 'visit'],
+    ];
+    for (const [module, encryptedField, plainField, plainValue] of cases) {
+        const expected = { [encryptedField]: 'Synthetic encrypted content', [plainField]: plainValue };
+        const candidate = { ...step(), module, expected };
+        const sealed = await sealField(expected[encryptedField], key);
+        const wire = { id: candidate.recordId, patientId: candidate.patientId, version: 1, deletedAt: null,
+            [encryptedField]: sealed, [plainField]: plainValue };
+        await compareRecords(candidate, [wire], [wire], key, key);
+        const plainClinical = { ...wire, [encryptedField]: expected[encryptedField] };
+        await assert.rejects(compareRecords(candidate, [plainClinical], [wire], key, key), module);
+        await assert.rejects(compareRecords(candidate, [wire], [plainClinical], key, key), module);
+        await assert.rejects(compareRecords(candidate, [plainClinical], [plainClinical], key, key), module);
+        const unauthenticated = { ...wire, [encryptedField]: 'ENC:invalid:invalid' };
+        await assert.rejects(compareRecords(candidate, [unauthenticated], [unauthenticated], key, key), module);
+        const encryptedCode = { ...wire, [plainField]: await sealField(plainValue, key) };
+        await assert.rejects(compareRecords(candidate, [encryptedCode], [encryptedCode], key, key), module);
+    }
+});
