@@ -117,6 +117,11 @@ fa parte dei materiali.
 
 ## Applicazione a MediFlow 0.8.6
 
+La prima applicazione descritta sotto è seguita dalla
+[proposta strutturale macOS](./2026-09-06-086-macos-redesign.md), con una sola
+lista laterale e una cartella documentale. Il relativo verbale distingue
+implementazione, osservazione visiva e accettazione ancora da parte dell'utente.
+
 Candidato locale nella lane `codex/WUL-676-086-apple-refinement`, derivata
 dal candidato funzionale `07725c7`. La prima applicazione riguarda la
 cartella paziente condivisa dalle app Apple:

@@ -85,14 +85,18 @@ selezione: host UUID su `.invalid`, sessione effimera e URLProtocol che intercet
 ogni richiesta, compresi gli host sconosciuti. L'eccezione è limitata a quel
 file e alla sola interpolazione; non abilita un endpoint dell'applicazione.
 
-## Revisione visiva macOS ancora aperta
+## Proposta visiva macOS successiva
 
 L'utente osserva che l'app Mac rimane sostanzialmente simile alla precedente.
 La rifinitura verificata qui cambia soprattutto navigazione interna e gestione
 delle bozze; non soddisfa ancora il redesign visivo complessivo richiesto.
-Restano da ripensare rapporto tra navigazione e lista pazienti, gerarchia
-della cartella, accesso alle sezioni e strumenti di scrittura. I test passati
-non costituiscono accettazione estetica e questa lane non viene dichiarata chiusa.
+La [proposta successiva](../design/2026-09-06-086-macos-redesign.md) ora cambia
+quel rapporto: aree in alto, una sola lista laterale, testata persistente,
+sette sezioni visibili e dati anagrafici disposti come un documento. Il suo
+verbale riporta nuove build Mac/iOS, 87 test mirati e osservazione della
+finestra reale; le prove precedenti di questa pagina restano riferite ai
+rispettivi commit. I test passati non costituiscono accettazione estetica
+o una revisione completa di ogni singolo form Apple.
 
 ## Limiti e promozione
 

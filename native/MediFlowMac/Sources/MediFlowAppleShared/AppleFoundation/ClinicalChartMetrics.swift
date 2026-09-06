@@ -78,7 +78,7 @@ extension View {
     /// size, so the eye can find the section boundaries by scanning alone.
     func chartCardTitle() -> some View {
         #if os(macOS)
-        font(.subheadline.weight(.semibold))
+        font(.title2.weight(.semibold)) // @Codex: Section title above row text.
         #else
         font(.headline)
         #endif
@@ -87,11 +87,18 @@ extension View {
     /// A group heading. Deliberately unlike a field label: a field label is
     /// quiet supporting text, a heading opens a section.
     func chartGroupHeading() -> some View {
+        #if os(macOS)
+        // @Codex: Desktop groups are readable signposts, not tiny overlines.
+        font(.headline)
+            .foregroundStyle(.primary)
+            .accessibilityAddTraits(.isHeader)
+        #else
         font(.caption.weight(.semibold))
             .textCase(.uppercase)
             .tracking(0.6)
             .foregroundStyle(.secondary)
             .accessibilityAddTraits(.isHeader)
+        #endif
     }
 
     /// The name of a thing in a list: a scale, a therapy, a document. This is
