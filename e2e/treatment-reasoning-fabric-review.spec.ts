@@ -5,7 +5,7 @@ import {
   snapshotTreatmentReasoningProjectionAttachment,
   type TreatmentReasoningProjectionAttachment,
 } from '../lib/ai-providers/fabric/treatment-reasoning-projection';
-import { bootstrapUnlockedSession, setAiLaneKillSwitch } from './utils';
+import { bootstrapUnlockedSession, openPatientSection, setAiLaneKillSwitch } from './utils';
 
 const HANDLE = `trp_${'a'.repeat(32)}`;
 const RECEIPT_REF = 'receipt_synthetic_01';
@@ -246,9 +246,7 @@ test('Treatment Reasoning UI invia payload strict e mostra una proposta source-b
   await page.goto(`/patients/${fixture.patientId}/modules`);
   await expect(page).toHaveURL(new RegExp(`/patients/${fixture.patientId}/modules$`));
 
-  const therapies = page.getByRole('button', { name: /Terapie farmacologiche/u });
-  await expect(therapies).toBeVisible();
-  if (await therapies.getAttribute('aria-expanded') !== 'true') await therapies.click();
+  await openPatientSection(page, 'terapie');
 
   const panel = page.getByTestId('treatment-reasoning-panel');
   const generate = panel.getByRole('button', { name: 'Genera bozza' });

@@ -1,6 +1,6 @@
 /* @Codex */
 import { expect, test } from '@playwright/test';
-import { bootstrapUnlockedSession, openAiFunzioniSettings, setAiLaneKillSwitch } from './utils';
+import { bootstrapUnlockedSession, openAiFunzioniSettings, openPatientSection, setAiLaneKillSwitch } from './utils';
 
 test('smart import kill switch disables analysis on patient detail', async ({ page }) => {
   const pin = process.env.E2E_PIN || '1234';
@@ -70,15 +70,19 @@ test('smart import kill switch disables analysis on patient detail', async ({ pa
 
     await page.goto(`/patients/${patientId}/modules`);
     await expect(page).toHaveURL(new RegExp(`/patients/${patientId}/modules$`));
-    const documents = page.getByRole('button', { name: /Documenti Archivio documenti ed evidenze/u });
-    await expect(documents).toBeVisible({ timeout: 20_000 });
-    if (await documents.getAttribute('aria-expanded') !== 'true') await documents.click();
-    await expect(documents).toHaveAttribute('aria-expanded', 'true');
-
+    // @Codex: the blocked reason is disclosed in Riepilogo; the disabled
+    // generation control is reached separately through Documenti.
+    const summaryLink = page.getByRole('navigation', { name: 'Sezioni della vista', exact: true })
+      .getByRole('link', { name: 'Riepilogo', exact: true });
+    await summaryLink.click();
+    await expect(summaryLink).toHaveAttribute('aria-current', 'location');
     const reviewRow = page.getByTestId('review-queue-row-smart-import');
+    await expect(reviewRow).toBeVisible();
     await expect(reviewRow).toContainText('Bloccato');
-    await expect(reviewRow).toContainText('Smart Import è disattivato localmente');
+    await reviewRow.locator('summary').click();
+    await expect(reviewRow.getByText('Smart Import è disattivato localmente', { exact: false })).toBeVisible();
 
+    await openPatientSection(page, 'documenti');
     const fabricCard = page.getByTestId('fabric-preview-card');
     await expect(fabricCard).toContainText('Fabric · anteprima sola lettura');
     await expect(fabricCard.getByRole('button', { name: 'Carica contesto' })).toBeDisabled();

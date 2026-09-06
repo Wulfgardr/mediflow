@@ -1,6 +1,6 @@
 /* @Codex */
 import { expect, test } from '@playwright/test';
-import { bootstrapUnlockedSession, openAiFunzioniSettings, setAiLaneKillSwitch } from './utils';
+import { bootstrapUnlockedSession, openAiFunzioniSettings, openPatientSection, setAiLaneKillSwitch } from './utils';
 
 // This DB is shared across specs; leaving Patient Insight disabled would break
 // specs that expect it enabled. Restore the switch after the test.
@@ -62,6 +62,7 @@ test('patient insight kill switch disables generation on patient detail', async 
   // route (/modules), not the cockpit "Quadro" landing at /patients/:id.
   await page.goto(`/patients/${patientId}/modules`);
   await expect(page).toHaveURL(new RegExp(`/patients/${patientId}/modules$`));
+  await openPatientSection(page, 'documenti');
 
   const disabledCard = page.getByTestId('patient-insight-disabled-card');
   await expect(disabledCard).toBeVisible();

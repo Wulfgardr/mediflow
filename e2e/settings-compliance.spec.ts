@@ -63,17 +63,23 @@ test('Compliance settings renders the technical evidence inventory without a leg
   await expect(legalApplicability).toContainText('Valutazione esterna necessaria');
   await expect(legalApplicability).toContainText('non produce una certificazione o un parere legale');
   await expect(legalApplicability.getByRole('link')).toHaveCount(3);
-  await expect(legalApplicability.getByRole('link', { name: 'GDPR, articolo 25' })).toHaveAttribute(
+  // @Codex: assert the versioned public references already adopted by the
+  // inventory; they do not change its explicit not-assessed claim ceiling.
+  await expect(legalApplicability.getByRole('link', {
+    name: 'GDPR, artt. 25 e 32 (consolidato 04/05/2016, rettifica 23/05/2018)', exact: true,
+  })).toHaveAttribute(
     'href',
-    'https://eur-lex.europa.eu/eli/reg/2016/679/art_25/oj/eng',
-  );
-  await expect(legalApplicability.getByRole('link', { name: 'GDPR, articolo 32' })).toHaveAttribute(
-    'href',
-    'https://eur-lex.europa.eu/eli/reg/2016/679/art_32/oj/eng',
+    'https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02016R0679-20160504',
   );
   await expect(legalApplicability.getByRole('link', {
-    name: 'Regolamento (UE) 2024/1689 (AI Act)',
-  })).toHaveAttribute('href', 'https://eur-lex.europa.eu/eli/reg/2024/1689/oj?locale=en');
+    name: 'AI Act (consolidato 27/07/2026)', exact: true,
+  })).toHaveAttribute(
+    'href',
+    'https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02024R1689-20260727',
+  );
+  await expect(legalApplicability.getByRole('link', {
+    name: 'Commissione europea: AI Act (pagina aggiornata 03/08/2026)', exact: true,
+  })).toHaveAttribute('href', 'https://digital-strategy.ec.europa.eu/en/policies/regulatory-framework-ai');
   await expect(legalApplicability.locator('a[target="_blank"][rel="noopener noreferrer"]')).toHaveCount(3);
 
   await expect(surface.locator('form, input, select, textarea, button, [role="switch"], [contenteditable="true"]')).toHaveCount(0);
