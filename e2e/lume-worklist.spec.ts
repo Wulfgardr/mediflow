@@ -29,12 +29,22 @@ const WORKLIST_CASES: WorklistCase[] = (['giorno', 'grafite'] as const).flatMap(
 
 const MENU_COLLISION_VIEWPORTS: Omit<WorklistCase, 'register'>[] = [{ viewport: 'compact-transition', width: 640, height: 1024 }, { viewport: 'rail-boundary', width: 701, height: 900 }];
 async function setRegister(page: Page, register: WorklistCase['register']): Promise<void> {
-  await page.evaluate((nextRegister) => {
-    const theme = nextRegister === 'grafite' ? 'dark' : 'light';
-    localStorage.setItem('mediflow-theme', theme);
-    document.documentElement.classList.remove('light', 'dark');
-    document.documentElement.classList.add(theme);
-  }, register);
+  // @Codex: the ordinary control updates both the provider and its persisted preference.
+  const returnUrl = page.url();
+  const theme = register === 'grafite' ? 'dark' : 'light';
+  await page.getByRole('navigation', { name: 'Navigazione principale', exact: true })
+    .getByRole('link', { name: 'Impostazioni', exact: true }).click();
+  await expect(page).toHaveURL(new URL('/settings', returnUrl).href);
+  await page.getByRole('link', { name: 'Apri aspetto', exact: true }).click();
+  await expect(page).toHaveURL(new URL('/settings/aspetto', returnUrl).href);
+  await page.getByTestId('settings-appearance-section')
+    .getByRole('button', { name: register === 'grafite' ? 'Tema Scuro' : 'Tema Chiaro', exact: true }).click();
+  await expect(page.locator('html')).toHaveClass(theme === 'dark' ? /dark/ : /light/);
+  await expect(page.locator('html')).toHaveCSS('color-scheme', theme);
+  await page.goto(returnUrl);
+  await expect(page).toHaveURL(returnUrl);
+  await expect(page.locator('html')).toHaveClass(theme === 'dark' ? /dark/ : /light/);
+  await expect(page.locator('html')).toHaveCSS('color-scheme', theme);
 }
 
 async function openSyntheticWorklist(page: Page, worklistCase: WorklistCase): Promise<string> {

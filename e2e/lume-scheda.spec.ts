@@ -205,8 +205,13 @@ for (const schedaCase of CASES) {
     await expectInViewport(header);
 
     await page.getByRole('navigation', { name: 'Sezioni della vista' }).getByRole('link', { name: 'Riepilogo', exact: true }).click();
+    // @Codex: the hash precedes the asynchronous folder visibility update.
+    await expect(page).toHaveURL(new URL(`/patients/${patient.id}/modules#quadro`, page.url()).href);
+    await expectCurrentSection(page, 'quadro');
     const note = page.getByText('Leggi la nota completa', { exact: true });
+    await expect(note).toBeVisible();
     await note.focus();
+    await expect(note).toBeFocused();
     await note.press('Space');
     await expect(note.locator('..')).toHaveAttribute('open', '');
     // Scroll the actual overflowing ancestor, not the former inert Scheda wrapper.
