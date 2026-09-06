@@ -61,6 +61,7 @@
   ],
   "exclude": [
     "node_modules",
+    "tmp-*/**/*",
     "scripts/**/*.ts",
     "scripts/**/*.mts",
     "lib/security/*-fixture.ts",
