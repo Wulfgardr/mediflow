@@ -214,6 +214,7 @@ export function Kree8ClinicalCockpit({
   const operatorName = operatorNameProp || (isReview ? 'Review design' : 'Sessione locale');
   const [area, setArea] = useState<AreaId>(() => (isReview ? 'turno' : initialArea));
   const [areaFocusRequest, setAreaFocusRequest] = useState(0);
+  const previousRouteArea = useRef(initialArea);
   const focusSurfaceRef = useRef<HTMLElement>(null);
   const [filter, setFilter] = useState<StatusFilter>('all');
   const [patientSearchFocusSignal, setPatientSearchFocusSignal] = useState(0);
@@ -237,7 +238,13 @@ export function Kree8ClinicalCockpit({
 
   /* @Codex: Next keeps the cockpit mounted when only the query changes. */
   useEffect(() => {
-    if (proposal && !isReview) setArea(initialArea);
+    if (proposal && !isReview) {
+      setArea(initialArea);
+      if (previousRouteArea.current !== initialArea) {
+        setAreaFocusRequest((current) => current + 1);
+      }
+    }
+    previousRouteArea.current = initialArea;
   }, [initialArea, isReview, proposal]);
   useEffect(() => {
     if (proposal && !isReview && initialPatientId) setSelectedPatientId(initialPatientId);
@@ -302,7 +309,8 @@ export function Kree8ClinicalCockpit({
   /* @Codex WUL-UIUX: riflette area e paziente selezionato nella query string di
      '/', cosi refresh e back del browser non perdono il punto di lavoro. Solo
      sulla home (le route dedicate come /diary restano canoniche) e solo in live.
-     replaceState conserva history.state per non disturbare il router Next. */
+     Next conserva il proprio stato quando riceve dati null; ripassare i suoi
+     marcatori privati salterebbe invece la sincronizzazione di useSearchParams. */
   useEffect(() => {
     if (isReview || typeof window === 'undefined') return;
     if (window.location.pathname !== '/') return;
@@ -313,7 +321,7 @@ export function Kree8ClinicalCockpit({
     } else {
       url.searchParams.delete('paziente');
     }
-    window.history.replaceState(window.history.state, '', url);
+    if (url.href !== window.location.href) window.history.replaceState(null, '', url);
     if (proposal) window.dispatchEvent(new Event('mediflow:twin-area'));
   }, [area, selectedPatientId, isReview, proposal]);
 
