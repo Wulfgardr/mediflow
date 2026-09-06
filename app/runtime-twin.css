@@ -5,3 +5,14 @@ html[data-runtime-twin='true'] { --runtime-twin-inset: 44px; }
 }
 /* @Codex: the study selector remains one compact row on phones. */
 @media (max-width: 540px) { html[data-runtime-twin='true'] { --runtime-twin-inset: 44px; } }
+
+/* @Codex WUL-676: semantic type roles shared by the two proposal layouts. */
+html[data-runtime-twin-design='proposal'] {
+    --twin-type-section: 1.25rem;
+    --twin-type-subsection: 1rem;
+    --twin-type-body: 0.875rem;
+    --twin-type-caption: 0.8125rem;
+    --twin-heading-weight: 600;
+    --twin-heading-leading: 1.35;
+    --twin-body-leading: 1.55;
+}

@@ -15,12 +15,12 @@
 .patientBody:not([data-folder-section='quadro']):not([data-folder-section='attenzione']) :global(#attenzione) { display: none; }
 .patientBody[data-folder-section='quadro'] :global(#attenzione[data-has-attention='false']) { display: none; }
 .patientBody :global(#attenzione) { order: 2; padding: 18px 0; border-radius: 0; border: 0; border-top: 1px solid color-mix(in srgb, var(--lume-ink) 13%, transparent); background: transparent; }
-.patientBody :global(#attenzione h2) { font-size: 16px; font-weight: 600; margin: 0 0 12px; }
+.patientBody :global(#attenzione h2) { font-size: var(--twin-type-section, 1.25rem); font-weight: 600; line-height: 1.35; margin: 0 0 12px; }
 .patientBody :global(#attenzione > div) { margin: 0; }
 .patientBody :global([data-folder-pane]) { padding: 0; border: 0; border-radius: 0; box-shadow: none; background: transparent; }
 .patientBody :global([data-folder-pane] > h3) { margin-bottom: 20px; }
 .patientBody :global([data-folder-pane] > h3 > div) { padding: 0; border: 0; }
-.patientBody :global([data-folder-pane] > h3 > div > span > span:first-child) { font-size: 21px; }
+.patientBody :global([data-folder-pane] > h3 > div > span > span:first-child) { font-size: var(--twin-type-section, 1.25rem); font-weight: 600; line-height: 1.35; }
 .patientBody :global([data-folder-pane] > h3 > div > span > span[class*='kicker']) { display: none; }
 :global(html[data-twin-composition='stream']) .patientBody { max-width: 1020px; margin: auto; }
 :global(html[data-twin-composition='stream']) .patientHeader { max-width: 1020px; margin: auto; }

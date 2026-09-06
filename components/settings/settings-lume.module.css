@@ -817,4 +817,5 @@
 :global(html[data-runtime-twin-design='proposal']) .navItem { min-height: 44px; }
 :global(html[data-runtime-twin-design='proposal']) .settingSurface { padding: 28px 0; border: 0; border-top: 1px solid color-mix(in srgb, var(--lume-ink) 12%, transparent); border-radius: 0; box-shadow: none; background: transparent; }
 :global(html[data-runtime-twin-design='proposal']) .settingSurface > div:first-child p:global(.section-kicker) { display: none; }
-:global(html[data-runtime-twin-design='proposal']) .sectionIntro h2 { font-size: 24px; font-weight: 550; letter-spacing: -0.025em; }
+:global(html[data-runtime-twin-design='proposal']) :is(.sectionIntro, .overviewFocus, .previewSection, .indexHeading) h2 { margin-top: 0; font-size: var(--twin-type-section); font-weight: var(--twin-heading-weight); line-height: var(--twin-heading-leading); letter-spacing: -0.02em; }
+:global(html[data-runtime-twin-design='proposal']) .sectionIntro p:last-child { font-size: var(--twin-type-body); line-height: var(--twin-body-leading); }

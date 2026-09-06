@@ -8,6 +8,8 @@ import {
 } from 'lucide-react';
 
 import { useLiveQuery } from '@/lib/live-query';
+/* @Codex */
+import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
 import {
   PillBadge,
   classNames,
@@ -153,6 +155,7 @@ function buildLiveCatalogState(
 /* ───────────────────────── Repertori ───────────────────────── */
 
 function RepertoriArea({ isReview }: { isReview: boolean }) {
+  const { proposal } = useRuntimeTwinDesign();
   const [selectedCatalogId, setSelectedCatalogId] = useState(REVIEW_CATALOGS[0]?.id ?? '');
   /* @Codex */
   const catalogState = useLiveQuery<Kree8CatalogClientState, Kree8CatalogClientState>(
@@ -236,7 +239,9 @@ function RepertoriArea({ isReview }: { isReview: boolean }) {
         <div className={freshnessClass}>
           <Database size={18} color="var(--ink-muted)" />
           <div className={repertoriStyles.freshnessLabel}>
-            <span className={repertoriStyles.freshnessTitle}>{freshnessTitle}</span>
+            {proposal
+              ? <h2 className={styles.panelTitle}>{freshnessTitle}</h2>
+              : <span className={repertoriStyles.freshnessTitle}>{freshnessTitle}</span>}
             <span className={repertoriStyles.freshnessSub}>
               {isLoading
                 ? 'lettura in corso'

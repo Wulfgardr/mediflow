@@ -1,0 +1,30 @@
+/* @Codex WUL-676: section titles and explanatory text use the shared proposal scale. */
+:global(html[data-runtime-twin-design='proposal']) .sectionHeading h2 {
+    margin: 0;
+    font-size: var(--twin-type-section);
+    font-weight: var(--twin-heading-weight);
+    line-height: var(--twin-heading-leading);
+    letter-spacing: -0.02em;
+}
+:global(html[data-runtime-twin-design='proposal']) .sectionHeading p {
+    margin: 6px 0 0;
+    color: var(--lume-ink-muted);
+    font-size: var(--twin-type-body);
+    line-height: var(--twin-body-leading);
+}
+:global(html[data-runtime-twin-design='proposal']) .categoryTitle {
+    padding: 0;
+    color: var(--lume-ink);
+    font-size: var(--twin-type-subsection);
+    font-weight: var(--twin-heading-weight);
+    line-height: var(--twin-heading-leading);
+    letter-spacing: -0.01em;
+    text-transform: none;
+}
+.catalogCount {
+    padding-top: 4px;
+    color: var(--lume-ink-muted);
+    font-size: var(--twin-type-caption);
+    line-height: var(--twin-body-leading);
+    font-variant-numeric: tabular-nums;
+}

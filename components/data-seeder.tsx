@@ -6,6 +6,8 @@ import { Database, Trash2, Plus, Settings2, FileText, Pill, Stethoscope } from '
 import { cn } from '@/lib/utils';
 import { useToast } from '@/components/ui/toast-provider';
 import { useConfirm } from '@/components/ui/confirm-dialog';
+/* @Codex */
+import { RangeInput } from '@/components/range-input';
 
 const PANEL_CLASS = 'seeder-panel p-5';
 const SUBSECTION_CLASS = 'seeder-subsection p-4';
@@ -138,10 +140,9 @@ export default function DataSeeder() {
                     <span>Numero Pazienti</span>
                     <span className="rounded-full border border-amber-200/70 bg-amber-50/85 px-3 py-1 font-mono text-xs font-semibold text-amber-700 dark:border-amber-500/20 dark:bg-amber-900/10 dark:text-amber-200">{patientCount}</span>
                 </label>
-                <input
-                    type="range"
-                    min="1"
-                    max="500"
+                <RangeInput
+                    min={1}
+                    max={500}
                     value={patientCount}
                     onChange={(e) => setPatientCount(Number(e.target.value))}
                     className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-amber-200 accent-amber-600 dark:bg-amber-950/40"

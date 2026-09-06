@@ -21,6 +21,23 @@
   font-size: 15px;
   font-weight: 620;
 }
+/* @Codex: a section heading stays distinct from each entry title. */
+:global(html[data-runtime-twin-design='proposal']) .sectionTitle {
+  font-size: var(--twin-type-section);
+  font-weight: var(--twin-heading-weight);
+  line-height: var(--twin-heading-leading);
+  letter-spacing: -0.02em;
+}
+:global(html[data-runtime-twin-design='proposal']) .sectionSubtitle { font-size: var(--twin-type-body); line-height: var(--twin-body-leading); }
+:global(html[data-runtime-twin-design='proposal']) .count { font-size: var(--twin-type-caption); }
+/* @Codex: dates orient the chronology; actions stay with their patient entry. */
+:global(html[data-runtime-twin-design='proposal']) .date {
+  font-size: var(--twin-type-body);
+  font-weight: 550;
+  line-height: var(--twin-body-leading);
+  color: var(--lume-ink);
+}
+:global(html[data-runtime-twin-design='proposal']) .sectionHeader { align-items: baseline; }
 
 .sectionSubtitle {
   max-width: 68ch;
