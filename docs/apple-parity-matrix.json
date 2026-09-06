@@ -247,11 +247,11 @@
       "area": "cockpit",
       "feature": "Foglio sinottico / Identity Lens / Review Queue (viste sintetiche cockpit)",
       "web": "synoptic sheet, identity lens, review queue summary, clinical river timeline (patient-synoptic-sheet.tsx; patient-identity-lens.tsx; clinical-river-timeline.tsx)",
-      "native": "partial: segnali clinici calcolati su liste piene fino al limite boundary (100, costante condivisa) con resa onesta N+ al cap (ClinicalSignalCount). Residuo: review queue e aggregati server-side (W2)",
-      "boundary": "partial: dati grezzi via boundary, ma nessun aggregate server-side dedicato",
+      "native": "partial: segnali clinici con conteggi N+ al limite di lettura; Da rivedere riunisce la qualità documentale non-green, gli spunti già proiettati e gli stati espliciti di revisione/fallimento degli allegati caricati per il paziente corrente. Apre Documenti senza nuovi writer; nessuno zero durante caricamento o lettura fallita. Gli spunti mantengono il limite dichiarato di quattro. La verifica UI della nuova sintesi resta aperta; gli stati host-only AI/Smart Import/currentness non sono inclusi.",
+      "boundary": "Lettura dei contratti paziente e allegati esistenti; nessun aggregate server-side aggiunto. Le classi C/D di ADR 0076 restano host/web.",
       "gap": "partial",
       "wave": "W1-mobile-core",
-      "evidence": "web-scheda.cockpit; web-scheda.timeline; native-ui.pazienti(segnali clinici) | wave1 slice6 commit 984f16474"
+      "evidence": "Segnali clinici: wave1 slice6 984f16474. Da rivedere: candidato 13da005e52b2769bc27de3b3afec913b87d746ca integrato in 8db0bd190; 10 Core test e build generiche macOS/iOS Xcode 27 PASS. Nessuna prova UI o del freeze finale combinato."
     },
     {
       "area": "scheda",
