@@ -141,7 +141,7 @@ deducono da questa matrice statica.
 | SISS / PRREG | `HOST-ONLY` per integrazione, utilità PRREG parziale | web con pannello/diario; Apple copia il CF e apre la dashboard PRREG dal paziente | FSE, stato sessione, diario handoff e canale regionale restano sul Mac o fuori scope |
 | Viste globali | `MIXED` | agenda, diario globale, analytics e interazione macOS reale | shell/deep-link e cockpit sintetico restano partial |
 | Documenti | `PARTIAL` e policy-limited | upload cifrato, archivio, insight, follow-up, allegati e stati web verificati | OCR e curation restano host per ADR 0076; questa divisione intenzionale non è equivalenza mancante |
-| Offline mobile | `PARTIAL` | cache cifrata derivata e stato degradato read-only | TTL/freschezza visibili e riconciliazione onesta (`WUL-403`) |
+| Offline mobile | `PARTIAL` | cache cifrata derivata, TTL/stale live e ultimo profilo read-only nel candidato WUL-676 | Montaggio renderer parent e verifica UI/device (`WUL-403`) |
 | AI generativa, Fabric e governance | `HOST-ONLY` | stato runtime/kill switch leggibile; registro Fabric read-only (16 capability, 4 venue, profili egress) e parliament/readiness del nodo host | ADR 0076 esclude l'invocazione AI paired; il registro e la governance descrivono il calcolo della macchina host, quindi non sono gap del client Apple |
 | Backup, diagnostica, repertori, update | `HOST-ONLY` | gestiti dal nodo Mac autorevole | non sono gap di parity client |
 
@@ -176,12 +176,17 @@ Owner: `WUL-403`.
 Rende visibili età/TTL della cache, stato stale, read-only e assenza di write
 queue. Non introduce sync multi-master né scritture offline.
 
-La candidata `WUL-556` aggiunge su iPhone e iPad un pannello nativo per gli
-stati `loading`, `error`, `online`, `cache`, `offline read-only` e
-`session-expired`. La preview e i test sintetici coprono anche la resa
-`stale`. Il runtime continua però a scartare lo snapshot oltre il TTL di 24
-ore: finché il contratto cache/headless non espone metadata separati, lo stato
-stale live resta `partial`, non `complete`.
+La candidata locale `WUL-676` (0.8.6) collega al pannello `WUL-556` metadata
+reali di acquisizione, scadenza e motivo. Il TTL massimo resta 24 ore; alla
+scadenza sono restituiti solo metadata non identificativi, senza dati paziente.
+ADR 0048 vincola la lettura alla stessa sessione operatore sbloccata, pairing,
+ambulatorio e pin TLS; 401/403, errori TLS e risposte non conformi non
+attivano il fallback. Lo store e il modello conservano anche l'ultimo profilo
+manuale entro TTL, con renderer read-only dedicato da montare nel layout del
+parent. Test sintetici e build Xcode iOS/macOS sono evidenza candidata locale;
+integrazione e verifica UI/device restano aperte, quindi la riga resta `partial`.
+Sotto-risorse, artifact AI/documentali, export e write queue sono esclusioni
+esplicite del contratto, non funzionalita mancanti da aggiungere implicitamente.
 
 Per decisione owner, Carta resta una grammatica del contenuto e non introduce
 una palette calda. Le superfici della slice usano canvas e field neutrali
@@ -201,7 +206,7 @@ sono `HOST_AUTHORITY_ONLY`, 38 `NOT_IN_MINI_PILOT` e 1
 | --- | --- | --- | --- |
 | 1 — anagrafica paziente | `available`: `patient search`, `patient show` | `partial` | Mini copre ricerca/dettaglio; la riga Apple resta più ampia e mancano assign/unassign/move/duplicate |
 | 39 — blocco/stato sessione | `available`: `whoami` | `full-parity` nella matrice Apple; stati visuali coperti dalla slice | `whoami`, pairing o token locale non sono un grant agentico |
-| 45 — cache offline | `manual_only`: `NOT_IN_MINI_PILOT` | `partial` | Lista cifrata read-only; metadata stale live, dettaglio offline e write queue assenti |
+| 45 — cache offline | `manual_only`: `NOT_IN_MINI_PILOT` | `partial` | Candidato WUL-676: metadata stale live e cache cifrata lista/ultimo profilo; montaggio renderer e verifica UI/device al parent. Write queue esclusa da ADR 0048 |
 | 63 — discovery capability | `available`: `capabilities` | `full-parity` per consumo API | Il manifest descrive capability; non autorizza operazioni cliniche |
 
 `open-loops` (riga 11) è la quarta riga Mini `available`, ma non appartiene alla
@@ -212,7 +217,7 @@ del manifest; le 23 `HOST_AUTHORITY_ONLY` restano host-only nella matrice Apple.
 | Superficie mobile | Stato candidata | Evidenza | Dipendenza host/headless |
 | --- | --- | --- | --- |
 | iPhone | `partial` | Test di presentazione, XCUITest e screenshot sintetico | Nessun grant nuovo; usa solo stato paired esistente |
-| iPadOS | `partial` | Stesso contratto, layout adattivo, `⌘R`, pointer, XCUITest e screenshot sintetico | Metadata TTL/stale live non esposti |
+| iPadOS | `partial` | Stesso contratto, layout adattivo, `⌘R`, pointer, XCUITest e screenshot sintetico | Metadata TTL/stale collegati nel candidato WUL-676; integrazione e verifica UI/device ancora aperte |
 | Capability AIP/Mini | Gap Apple e disposizione Mini restano assi separati | Manifest WUL-557: 4/66 disponibili | Le ragioni `partial`, host-only e `manual_only` restano esplicite; manifest e receipt non diventano autorità client; verifica manager e `WUL-564` bloccano la promozione |
 
 ### W6-C — decisione sul workflow documentale nativo

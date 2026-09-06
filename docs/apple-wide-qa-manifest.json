@@ -368,6 +368,18 @@
           "value": "swift test --package-path native/MediFlowMac --filter HomeBasePatientCacheStoreTests"
         },
         {
+          "type": "command",
+          "value": "swift test --package-path native/MediFlowMac --filter PairedPatientsWorkspaceOfflineCacheTests"
+        },
+        {
+          "type": "adr",
+          "value": "docs/adr/0048-apple-shared-client-architecture-and-home-base-runtime.md"
+        },
+        {
+          "type": "manual",
+          "value": "WUL-676 local candidate: live TTL/stale metadata, session-bound encrypted list/profile storage, and a dedicated profile renderer. Parent mounting and UI/device validation remain pending; no UI automation was performed by this lane."
+        },
+        {
           "type": "issue",
           "value": "WUL-403"
         }
