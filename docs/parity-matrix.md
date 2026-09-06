@@ -8,7 +8,7 @@ read_when:
 # Matrice parity localhost ↔ client Apple
 
 Stato documento: `CANONICAL`
-Ultimo aggiornamento: 2026-09-04 (`MediFlow 0.8.5`, closeout)
+Ultimo aggiornamento: 2026-09-06 (riconciliazione testuale della sorgente Apple 0.8.6; prove UI/interop separate e pending)
 
 ## Gate MediFlow 0.8
 
@@ -113,7 +113,9 @@ storica `0843726fe`. Restano valide soltanto per quel tree e non costituiscono
 evidenza implicita per una revisione successiva. La disponibilità di Xcode è
 una precondizione operativa della macchina, non uno stato persistente di questa
 matrice; le prove exact-SHA appartengono ai receipt del closeout e non si
-deducono da questa matrice statica.
+deducono da questa matrice statica. La riconciliazione della sorgente integrata
+separa i claim source-present dalle prove SPM/UI/interop: non promuove score,
+celle UI o stato di release.
 
 | Classe | Superficie | Prova | Stato |
 | --- | --- | --- | --- |
@@ -130,18 +132,18 @@ deducono da questa matrice statica.
 
 | Area | Stato | Cosa è già disponibile | Residuo reale |
 | --- | --- | --- | --- |
-| Pazienti | `PARTIAL` | lista, ricerca, dettaglio, create/update, archivio, cestino e ripristino | operazioni bulk non esposte |
-| Diario | `PARTIAL` | CRUD versionato, restore, filtri, S/O/A/P, rich text, allegati e bozza visita deterministica | equivalenza completa allegati/editor |
-| Terapie | `PARTIAL` | CRUD, stato, AIC/ATC/principio attivo, autocomplete AIFA e fallback manuale | collegamento diagnosi e flessibilità del form da verificare |
-| Checkup | `PARTIAL` | CRUD, status/source, conflitti versione | equivalenza campi e flussi |
-| Osservazioni | `PARTIAL` | CRUD LOINC/UCUM e trend | equivalenza visuale e flessibilità |
-| Cataloghi AIFA/esenzioni | `FULL` per lookup | ricerca AIFA ed esenzioni dal boundary paired | import/clear repertori resta host-only |
+| Pazienti | `PARTIAL` | lista, ricerca, dettaglio, create/update, DOB con patch `omit/value/null` in UTC, archivio con motivo/nota, cestino e ripristino | prove UI ordinarie e round-trip app/home-base ancora pending; assign/unassign/move/duplicate sono esplicitamente fuori dall'obbligo W2 |
+| Diario | `PARTIAL` | CRUD versionato, restore, filtri, S/O/A/P, rich text inline, allegati per-record e bozza visita deterministica | indent/outdent e strutture complesse; prove UI/interop dell'editor |
+| Terapie | `PARTIAL` | CRUD, soft-delete, stato, AIC/ATC/principio attivo, autocomplete AIFA, fallback manuale e collegamento diagnosi | prove finali del form e del round-trip |
+| Checkup | `PARTIAL` | CRUD, soft-delete, status/source, conflitti versione e prefill follow-up manuale deduplicato | equivalenza campi e flussi |
+| Osservazioni | `PARTIAL` | CRUD, soft-delete, LOINC/UCUM, trend e sparkline | equivalenza visuale e flessibilità |
+| Cataloghi AIFA/esenzioni | `FULL` per lookup | ricerca network di farmaci ed esenzioni dal boundary paired | import, refresh e stato/freschezza del repertorio restano host-only |
 | Prestazioni e protesica | `FULL` nel perimetro paired | read/write versionati e UI nativa | nessun invio regionale o generazione NRE |
 | Export FHIR/FSE pre-check | `FULL` nel perimetro locale | bundle on-device e validazione boundary | nessun writeback FSE |
 | SISS / PRREG | `HOST-ONLY` per integrazione, utilità PRREG parziale | web con pannello/diario; Apple copia il CF e apre la dashboard PRREG dal paziente | FSE, stato sessione, diario handoff e canale regionale restano sul Mac o fuori scope |
-| Viste globali | `MIXED` | agenda, diario globale, analytics e interazione macOS reale; row32 introduce il contratto di navigazione locale in `NATIVE.md` | deep-link Mac/iOS collegati a reader/sessione ordinari; apertura OS e UI dei link non ancora attestate, cockpit sintetico partial |
-| Documenti | `PARTIAL` e policy-limited | upload cifrato, archivio, insight, follow-up, allegati e stati web verificati | OCR e curation restano host per ADR 0076; questa divisione intenzionale non è equivalenza mancante |
-| Offline mobile | `PARTIAL` | cache cifrata derivata, TTL/stale live e ultimo profilo read-only nel candidato WUL-676 | Verifica UI/device del renderer integrato (`WUL-403`) |
+| Viste globali | `MIXED` | agenda, diario globale, analytics e interazione macOS reale; router/deep-link source-present per la sessione ordinaria | apertura OS, focus, resize, VoiceOver e app-freeze proof della slice restano pending; cockpit sintetico partial |
+| Documenti | `PARTIAL` e policy-limited | upload cifrato, picker nativo singolo, archivio read, insight read, follow-up, allegati e stati web verificati | multi-file è differenza operativa; OCR, sintesi, curation e delete insight restano host per ADR 0076; UI/interop nativa pending |
+| Offline mobile | `PARTIAL` | lista e ultimo profilo in cache cifrata, TTL massimo 24h e renderer read-only source-present nel candidato WUL-676 | workflow offline ordinario e verifica UI/device del renderer integrato (`WUL-403`) |
 | AI generativa, Fabric e governance | `HOST-ONLY` | stato runtime/kill switch leggibile; registro Fabric read-only (16 capability, 4 venue, profili egress) e parliament/readiness del nodo host | ADR 0076 esclude l'invocazione AI paired; il registro e la governance descrivono il calcolo della macchina host, quindi non sono gap del client Apple |
 | Backup, diagnostica, repertori, update | `HOST-ONLY` | gestiti dal nodo Mac autorevole | non sono gap di parity client |
 
@@ -182,8 +184,8 @@ scadenza sono restituiti solo metadata non identificativi, senza dati paziente.
 ADR 0048 vincola la lettura alla stessa sessione operatore sbloccata, pairing,
 ambulatorio e pin TLS; 401/403, errori TLS e risposte non conformi non
 attivano il fallback. Lo store e il modello conservano anche l'ultimo profilo
-manuale entro TTL, con renderer read-only dedicato nelle destinazioni compatta e affiancata. Test sintetici e build Xcode iOS/macOS sono evidenza candidata locale;
-integrazione e verifica UI/device restano aperte, quindi la riga resta `partial`.
+manuale entro TTL, con renderer read-only dedicato nelle destinazioni compatta e affiancata. Questa è evidenza source/candidate del percorso delimitato;
+workflow offline ordinario, integrazione e verifica UI/device restano aperti, quindi la riga resta `partial`.
 Sotto-risorse, artifact AI/documentali, export e write queue sono esclusioni
 esplicite del contratto, non funzionalita mancanti da aggiungere implicitamente.
 
@@ -203,9 +205,9 @@ sono `HOST_AUTHORITY_ONLY`, 38 `NOT_IN_MINI_PILOT` e 1
 
 | Riga web canonica | Contratto Mini esatto | Stato iPhone/iPadOS | Motivo residuo o confine |
 | --- | --- | --- | --- |
-| 1 — anagrafica paziente | `available`: `patient search`, `patient show` | `partial` | Mini copre ricerca/dettaglio; la riga Apple resta più ampia e mancano assign/unassign/move/duplicate |
+| 1 — anagrafica paziente | `available`: `patient search`, `patient show` | `partial` | Mini copre ricerca/dettaglio; la riga Apple include anche create/update, DOB e archivio; assign/unassign/move/duplicate sono esplicitamente fuori dall'obbligo W2 |
 | 39 — blocco/stato sessione | `available`: `whoami` | `full-parity` nella matrice Apple; stati visuali coperti dalla slice | `whoami`, pairing o token locale non sono un grant agentico |
-| 45 — cache offline | `manual_only`: `NOT_IN_MINI_PILOT` | `partial` | Candidato WUL-676: metadata stale live e cache cifrata lista/ultimo profilo; renderer integrato, verifica UI/device aperta. Write queue esclusa da ADR 0048 |
+| 45 — cache offline | `manual_only`: `NOT_IN_MINI_PILOT` | `partial` | Candidato WUL-676: metadata stale live e cache cifrata lista/ultimo profilo con renderer read-only source-present; workflow offline ordinario e verifica UI/device aperti. Write queue esclusa da ADR 0048 |
 | 63 — discovery capability | `available`: `capabilities` | `full-parity` per consumo API | Il manifest descrive capability; non autorizza operazioni cliniche |
 
 `open-loops` (riga 11) è la quarta riga Mini `available`, ma non appartiene alla
@@ -225,7 +227,8 @@ Dipendenze: `WUL-417` (OCR Apple on-device), `WUL-383` (degradazione OCR) e
 `WUL-409` (Smart Import review-first).
 
 Lo stack web popolato, la curation e gli stati loading/empty/error hanno prova
-E2E 2/2. I client Apple leggono insight e caricano documenti manuali.
+E2E 2/2. I client Apple leggono insight, caricano documenti manuali e mostrano
+la review overview con conteggi persistiti N+ e stati loading/error onesti.
 
 OCR, curation e scritture document-derived restano sul nodo host per ADR 0076.
 Questa divisione è `platform-specific-documented`, non un gap implicito.
@@ -259,7 +262,7 @@ La mappa registra i controlli esercitati nel closeout.
 | macOS | Agenda sidebar | `clinical-workspace-section-agenda-button` | Seleziona riga `List` | Click-map e probe AX PASS |
 | macOS | Riga paziente | `patient-cell-*` | Seleziona e carica dettaglio | Click-map e probe AX PASS |
 | macOS | Focus | focus system | Avanza con `Tab` e freccia | Interazione reale PASS |
-| macOS | Inspector paziente | `clinical-workspace-inspector-toggle` | Toolbar o `⌥⌘I` mostra/nasconde il contesto della finestra focalizzata | WUL-566/WUL-567: test focalizzati, 2 finestre simultanee osservate nello stesso PID, suite nativa, build Xcode e screenshot light/dark PASS; focus, resize e VoiceOver interattivi della slice `PARTIAL` per sessione bloccata. Il manifest Mini PR #184 mantiene `sourceRow: 32` a `manual_only`, senza comandi Mini. |
+| macOS | Inspector paziente | `clinical-workspace-inspector-toggle` | Toolbar o `⌥⌘I` mostra/nasconde il contesto della finestra focalizzata | WUL-566/WUL-567: test focalizzati, 2 finestre simultanee osservate nello stesso PID, suite nativa, build Xcode e screenshot light/dark PASS; apertura OS, focus, resize, VoiceOver e app-freeze proof della slice `PARTIAL` restano pending. Il manifest Mini PR #184 mantiene `sourceRow: 32` a `manual_only`, senza comandi Mini. |
 
 ### AXPress
 
