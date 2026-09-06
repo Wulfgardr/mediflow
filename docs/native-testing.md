@@ -1,7 +1,7 @@
 # Testing app macOS (Swift/Xcode)
 
 Stato documento: CANONICAL (testing nativo macOS)  
-Ultimo aggiornamento: 2026-02-20
+Ultimo aggiornamento: 2026-09-06 (tooling simulatore e interoperabilità mobile)
 
 ---
 
@@ -32,15 +32,16 @@ Riferimenti:
 
 - Runner: `swift test` oppure `xcodebuild test` su package.
 - Scopo: logica pura, trasformazioni, filtri, sorting, mapping payload.
-- Stato attuale:
-  - target test: `native/MediFlowMac/Tests/MediFlowMacTests`
-  - suite iniziale: `PatientsFilteringTests.swift`
+- Target correnti: `native/MediFlowMac/Tests/MediFlowCoreTests` e
+  `native/MediFlowMac/Tests/MediFlowAppleSharedTests`.
+- Le fixture del modello e del client non sostituiscono una sessione sul runtime reale.
 
 ### 2) Integration test locale (progressivo)
 
 - Runner: XCTest con dipendenze reali locali (API locale, token, TLS proxy) dove utile.
 - Scopo: validare percorsi endpoint principali (`/api/v1`) senza UI completa.
-- Nota: da aggiungere in step successivi, mantenendo diff piccoli.
+- Per il client paired, usa il preflight HTTPS descritto sotto e le regressioni
+  network del runbook dedicato, distinguendoli dai test con data source simulato.
 
 ### 3) UI automation macOS (roadmap)
 
@@ -118,6 +119,50 @@ La suite usa fixture temporanee sintetiche e comandi Apple/backend simulati.
 Questi test non attestano una build Xcode reale, un'installazione certificata
 o il completamento del paired smoke.
 
+### Interoperabilita mobile con host reali
+
+Per la matrice iPhone/iPad × macOS/Windows/Linux usa
+`scripts/mobile-home-base-interop.mjs` e
+`scripts/mobile-home-base-interop-xctestrun.py`. Ogni host termina TLS ed esegue
+il runtime sul proprio sistema, con un database sintetico distinto. Il descriptor
+JSON locale è un file privato `0600`: identifica SHA sorgente, URL HTTPS,
+certificato PEM e pin DER SHA-256, operatore sintetico, ambulatorio, paziente e
+due credenziali paired distinte. Il token API locale resta al proprietario
+host, che crea e conferma gli intent tramite le API supportate.
+
+Esegui prima le suite UI con fixture isolate. Per le prove reali, conserva una
+build `build-for-testing` identificata da SHA e digest e prepara una copia
+privata del suo `.xctestrun` con lo script Python (`--help` descrive i parametri).
+Il descriptor viene passato al test runner: l'app riceve le credenziali mediante
+il normale login UI. I metodi opt-in sono `testRealPairedHostWorkflow` e
+`testRealPairedOtherClientReread`. Le altre suite non devono essere lanciate con
+questo descriptor.
+
+Il controllo HTTPS indipendente precede il run UI:
+
+```bash
+node scripts/mobile-home-base-interop.mjs preflight \
+  --descriptor /percorso/privato/host.json --client ios \
+  --output /percorso/privato/preflight-ios.json
+```
+
+Ripeti per `ipados`. Il preflight separa la sessione Web dalla sessione nativa e
+confronta versione e dati decifrati del medesimo paziente; il successo non prova
+l'interazione nell'app. `native-boundary` esercita anche una scrittura versionata
+dell'indirizzo sintetico conservandone il valore: produce una nuova versione.
+Dopo l'uso dell'app, `reread` confronta i valori attesi con le riletture indipendenti.
+
+Le prove di persistenza e offline usano Keychain e cache ordinarie: non impostare
+`DEV_SKIP_KEYCHAIN`, autologin, pazienti/stati paired iniettati o trasporti finti.
+Un pairing preesistente inatteso interrompe quel flusso, senza cancellarlo. I
+cambiamenti di connettività riguardano solo il proxy/processo della fixture;
+revoca e scadenza passano da API e configurazioni supportate, senza alterare
+clock o database. Conserva log, descriptor e `.xctestrun` privati fuori da Git.
+
+Il vecchio `mobile-home-base-paired-smoke.sh` resta un precedente di avvio e
+lettura: usa snapshot SQLite, bypass TLS nel setup e autologin. Non è il runner
+della matrice reale 0.8.6 e non ne attesta login, scritture o persistenza.
+
 ### Xcode (workflow locale)
 
 1. Apri `native/MediFlowMac/Package.swift` in Xcode.
@@ -141,10 +186,10 @@ Per debugging test:
    - opzionale: esegui il probe AX read-only con `--app-path` come descritto nel runbook P6
    - esegui e verbalizza la P6 da `docs/parity-click-map-macos.md`
    - verifica i punti chiave parity da `docs/parity-matrix.md`
-4. Smoke mobile paired (quando tocchi `home-base` iPhone/iPad):
-   - esegui `bash scripts/mobile-home-base-paired-smoke.sh`
+4. Interoperabilità mobile paired (quando tocchi `home-base` iPhone/iPad):
+   - segui il [percorso con host reali](#interoperabilita-mobile-con-host-reali), registrando separatamente preflight e UI per ogni combinazione
    - per modifiche al boundary `/api/v1/network/*`, esegui anche `npm run test:network:home-base-readonly`, `npm run test:network:home-base-write` e, se tocchi il diario paired, `npm run test:network:home-base-diary-write`
-   - per prerequisiti, safety notes e artifact consulta `docs/mobile-home-base-smoke.md`
+   - `docs/mobile-home-base-smoke.md` conserva le regressioni headless e il precedente smoke mobile; non sostituisce i receipt della matrice reale
 5. Aggiorna esito in PR/notes:
    - cosa e stato verificato
    - cosa non e stato verificato e perche
