@@ -277,6 +277,13 @@ export function Kree8ClinicalCockpit({
         '[role="dialog"][aria-modal="true"]',
       )).some((dialog) => dialog.getClientRects().length > 0);
       if (visibleModal) return;
+      // @Codex: Typing or the search shortcut may take focus before this
+      // deferred navigation frame. Preserve that newer editing intent.
+      const active = document.activeElement;
+      if (active instanceof HTMLElement && (
+        active.matches('input, textarea, select, [role="textbox"], [role="combobox"]')
+        || active.isContentEditable
+      )) return;
       const focusSurface = focusSurfaceRef.current;
       if (!focusSurface) return;
       const focusTarget = focusSurface.querySelector<HTMLElement>(
