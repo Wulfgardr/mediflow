@@ -1972,6 +1972,8 @@ final class MediFlowMobileAppUITests: XCTestCase {
     private func revealInteropControl(_ element: XCUIElement) -> Bool {
         guard element.waitForExistence(timeout: 15) else { return false }
         for _ in 0..<16 {
+            // @Codex: a system Home gesture must fail, never count as revealing a control.
+            guard app.state == .runningForeground else { return false }
             if element.isHittable { return true }
             let target = element.identifier.isEmpty ? element.label : element.identifier
             let containers = app.scrollViews.containing(element.elementType, identifier: target)
@@ -1997,7 +1999,10 @@ final class MediFlowMobileAppUITests: XCTestCase {
                 if overlay.frame.intersects(viewport) { bottom = min(bottom, overlay.frame.minY) }
             }
             guard viewport.width > 0, bottom > top else { return false }
-            let inset = min(12, (bottom - top) / 4)
+            // @Codex: the iPad archive recording showed a 12pt bottom inset
+            // opening Dock/App Switcher. Keep both endpoints inside the measured
+            // unobscured viewport, including when the keyboard shortens it.
+            let inset = min((bottom - top) / 4, max(24, (bottom - top) * 0.15))
             let x = viewport.minX + min(12, viewport.width / 4) - scrollFrame.minX
             let upper = top + inset - scrollFrame.minY
             let lower = bottom - inset - scrollFrame.minY
@@ -2007,7 +2012,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
             let end = origin.withOffset(CGVector(dx: x, dy: movingDown ? lower : upper))
             start.press(forDuration: 0.05, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 0)
         }
-        return element.isHittable
+        return app.state == .runningForeground && element.isHittable
     }
 
     private func fillInteropField(_ identifier: String, value: String, secure: Bool = false) {
