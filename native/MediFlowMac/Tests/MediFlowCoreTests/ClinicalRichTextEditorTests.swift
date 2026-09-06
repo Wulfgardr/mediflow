@@ -28,45 +28,18 @@ final class ClinicalRichTextEditorTests: XCTestCase {
 
     // MARK: - Round trip over the S5 web-parity fixtures
 
-    /// Every fixture must EITHER round-trip byte-exact through
-    /// load(html:).renderedHTML, OR (for the small, known set of TOP-LEVEL
-    /// bare-fragment fixtures, which the editor legitimately normalizes into a
-    /// proper paragraph on resave, exactly like the web's own "editing
-    /// normalizes" posture) still land on a stable transcoder fixed point. This
-    /// is the "safe to resave without touching anything" guarantee the editor
-    /// needs for opening existing entries.
+    // @Codex: Opening an existing record and saving without edits preserves
+    // every sanitized byte, including the four formerly normalized fragments.
     func testEditorRoundTripsWebFixtures() throws {
         let fixtures = try loadFixtures()
         XCTAssertEqual(fixtures.count, 40)
-
-        // Bare, unwrapped fragment content (ClinicalRichText's `.fragment`: a
-        // top-level dialect the sanitizer accepts without inventing a
-        // paragraph wrapper, e.g. legacy entries saved before any block
-        // wrapper existed, or the same shape as a blockquote's direct text
-        // child). This editor works in terms of paragraphs, so on resave it
-        // normalizes such a fragment into a `<p>` -- a declared, benign
-        // normalization (the result stays valid, sanitizer-stable HTML), not a
-        // silent rewrite. Verified here rather than assumed.
-        let knownBareFragmentFixtures: Set<String> = [
-            "plain-text", "residual-less-than", "heading-h4-not-allowed", "blockquote",
-        ]
-
         for fixture in fixtures {
             let rebuilt = ClinicalRichTextEditorDocument.load(html: fixture.sanitized).renderedHTML
-
-            if knownBareFragmentFixtures.contains(fixture.name) {
-                XCTAssertNotEqual(rebuilt, fixture.sanitized, "Fixture \(fixture.name) round-tripped byte-exact: move it out of the known-normalization set")
-                // Still must be a valid, stable transcoder output: parsing and
-                // re-rendering it must not change it further.
-                let stabilized = ClinicalRichText.render(document: ClinicalRichText.parse(html: rebuilt))
-                XCTAssertEqual(stabilized, rebuilt, "Fixture \(fixture.name) editor output is not itself a transcoder fixed point")
-            } else {
-                XCTAssertEqual(rebuilt, fixture.sanitized, "Fixture \(fixture.name) did not round-trip byte-exact through the editor")
-            }
+            XCTAssertEqual(rebuilt, fixture.sanitized, "No-op save changed fixture \(fixture.name)")
         }
     }
 
-    /// Content the editor's simpler single-run-per-block model cannot
+    /// Unsupported structural content the inline editor cannot
     /// represent losslessly must degrade to an opaque, non-editable block
     /// rather than being silently rewritten, and that opaque block must still
     /// render back byte-identical to the original.
@@ -77,7 +50,6 @@ final class ClinicalRichTextEditorTests: XCTestCase {
             "malformed-crossed-nesting",
             "nested-lists",
             "nested-blockquotes",
-            "long-multi-block-content", // contains a mixed-style paragraph
         ]
         for name in preservedFixtureNames {
             guard let fixture = fixtures.first(where: { $0.name == name }) else {
