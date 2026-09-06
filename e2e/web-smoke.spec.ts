@@ -193,7 +193,8 @@ test('web smoke: live decision CTAs always open their declared patient context',
   await openQuadro.focus();
   await expect(openQuadro).toBeFocused();
   await page.keyboard.press('Enter');
-  await expect(page).toHaveURL(new RegExp(`/patients/${quadroPatient.id}/modules$`));
+  await expect(page).toHaveURL(new RegExp(`/patients/${quadroPatient.id}/modules#quadro$`));
+  await expect(page.locator('#quadro')).toHaveAttribute('data-folder-active', 'true');
   await expect(page.getByRole('heading', { name: quadroPatient.name, level: 1, exact: true })).toBeFocused();
   await expect(page.getByTestId('lume-scheda-header')).toContainText(quadroPatient.taxCode);
   await expect(page.getByRole('region', { name: 'Riepilogo clinico', exact: true })).toContainText('Contesto sintetico Quadro.');
