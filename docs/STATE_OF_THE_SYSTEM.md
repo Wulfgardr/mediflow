@@ -65,7 +65,10 @@ Windows con i soli file di test eseguiti in sequenza completa gli stessi 248
 casi senza errori; `5c25d0968` adotta quella sola opzione nel runner canonico.
 Il controllo non identifica la causa dei timeout e il wrapper non ha acquisito
 il codice d'uscita del processo figlio: il risultato viene dal riepilogo Node
-completo, distinto dal precedente run canonico fallito. Linux completa
+completo, distinto dal precedente run canonico fallito. Una successiva
+esecuzione canonica di `npm run test:headless-portable` con il runner `5c25`
+supera tutti i 248 casi, senza skip o retry, e acquisisce il codice d'uscita
+nativo 0. L'app del guest resta compilata da `25e`. Linux completa
 145 casi ordinari distinti fra full e opt-in, con 42 esclusioni esplicite e
 tutti i controlli headless PASS. Il verbale distingue sorgenti, fixture,
 simulazioni e precedenti prove CRUD/export.
