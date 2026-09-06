@@ -1687,10 +1687,17 @@ final class MediFlowMobileAppUITests: XCTestCase {
         archivedControl.tap()
         assertArchivedValue("1")
 
-        app.buttons["save-patient-button"].tap()
+        // @Codex: a new archive needs an explicit reason, including inline edits.
+        XCTAssertFalse(app.buttons["save-patient-button"].isEnabled)
+        XCTAssertTrue(sectionView("patient-archive-validation").exists)
+        selectInteropArchiveReason("Assegnato a MMG")
+        tapInteropButton("save-patient-button")
 
         // The form dismisses and the detail re-renders with the archived flag chip.
         XCTAssertTrue(app.staticTexts["Archiviato"].waitForExistence(timeout: 5))
+        tapInteropButton("edit-patient-button")
+        assertInteropArchiveReason("Assegnato a MMG")
+        tapInteropButton("cancel-patient-button")
     }
 
     func testObservationTrendIndicatorShowsForRepeatReading() {
@@ -2721,6 +2728,35 @@ final class MediFlowMobileAppUITests: XCTestCase {
         try probe.complete()
     }
 
+    // @Codex: exact source identifier and option labels; the selected native
+    // value may be announced as the picker value or included in its label.
+    private func assertInteropArchiveReason(_ title: String) {
+        let query = app.descendants(matching: .any).matching(identifier: "patient-archive-reason")
+        XCTAssertTrue(query.element.waitForExistence(timeout: 5))
+        XCTAssertEqual(query.count, 1, "The archive form must expose one reason picker")
+        XCTAssertTrue(revealInteropControl(query.element))
+        let selected = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            query.element.value as? String == title || query.element.label == "Motivo, \(title)"
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [selected], timeout: 5), .completed,
+                       "The reason picker must announce the exact selected reason: \(title)")
+    }
+
+    private func selectInteropArchiveReason(_ title: String) {
+        let query = app.descendants(matching: .any).matching(identifier: "patient-archive-reason")
+        XCTAssertTrue(query.element.waitForExistence(timeout: 5))
+        XCTAssertEqual(query.count, 1)
+        XCTAssertTrue(revealInteropControl(query.element))
+        XCTAssertTrue(query.element.isEnabled)
+        query.element.tap()
+        let options = app.buttons.matching(NSPredicate(format: "label == %@", title))
+        XCTAssertTrue(options.element.waitForExistence(timeout: 5))
+        XCTAssertEqual(options.count, 1, "Select one explicit archive reason")
+        XCTAssertTrue(options.element.isHittable)
+        options.element.tap()
+        assertInteropArchiveReason(title)
+    }
+
     private func tapInteropButton(_ identifier: String) {
         let buttons = app.buttons.matching(identifier: identifier)
         XCTAssertTrue(buttons.element.waitForExistence(timeout: 15))
@@ -2826,10 +2862,15 @@ final class MediFlowMobileAppUITests: XCTestCase {
                 values = identity
                 values["deletionReason"] = "Eliminazione sintetica \(input.runID)"
             }
+            if archived {
+                values["archiveReason"] = "other"
+                values["archiveNote"] = "Archiviazione sintetica \(input.runID)"
+            }
             try probe.checkpoint(module: "patient", recordID: patientID, version: version, expected: values,
                                  deleted: deleted, patientID: patientID, lifecycleStage: stage,
                                  expectedFlags: ["isArchived": archived, "isAdi": false],
-                                 expectedNulls: deleted ? ["birthDate"] : ["birthDate", "deletionReason"])
+                                 expectedNulls: deleted ? ["birthDate"] : archived ? ["birthDate", "deletionReason"]
+                                    : ["birthDate", "deletionReason", "archiveReason", "archiveNote"])
             attachScreenshot(named: "interop-new-patient-\(stage)")
         }
         openCreatedPatient()
@@ -2851,12 +2892,22 @@ final class MediFlowMobileAppUITests: XCTestCase {
         tapInteropButton("patient-actions-overflow")
         tapInteropButton("archive-patient-button")
         XCTAssertTrue(app.staticTexts["\(lastName) \(firstName)"].exists)
+        XCTAssertFalse(app.buttons["patient-archive-confirm-button"].isEnabled)
+        selectInteropArchiveReason("Altro")
+        XCTAssertFalse(app.buttons["patient-archive-confirm-button"].isEnabled, "Other requires a nonempty note")
+        fillInteropField("patient-archive-note", value: "Archiviazione sintetica \(input.runID)")
         tapInteropButton("patient-archive-confirm-button")
         XCTAssertTrue(app.buttons["patient-archive-confirm-button"].waitForNonExistence(timeout: 20))
         returnToInteropWorklist()
         XCTAssertFalse(app.buttons["patient-cell-\(patientID)"].exists, "Archived patient must leave the active list")
         selectInteropPatientScope("Archiviati")
         openCreatedPatient()
+        tapInteropButton("edit-patient-button")
+        assertInteropArchiveReason("Altro")
+        let archiveNote = app.textFields["patient-archive-note"]
+        XCTAssertTrue(revealInteropControl(archiveNote))
+        XCTAssertEqual(archiveNote.value as? String, "Archiviazione sintetica \(input.runID)")
+        tapInteropButton("cancel-patient-button")
         tapInteropButton("patient-actions-overflow")
         XCTAssertTrue(app.buttons["unarchive-patient-button"].exists)
         XCTAssertEqual(app.buttons.matching(identifier: "unarchive-patient-button").count, 1)
