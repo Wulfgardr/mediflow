@@ -227,20 +227,13 @@ struct PairedPatientsWorklistView: View {
         // the list as a stack of loose cards instead of one list.
         VStack(alignment: .leading, spacing: Self.mobileStackSpacing) {
             // @Codex: A named collection, followed directly by its filters and rows.
-            HStack(alignment: .firstTextBaseline) {
-                Text("Pazienti")
-                    .font(.title2.weight(.semibold))
-                    .accessibilityHeading(.h1)
-                Spacer(minLength: 8)
-                if !model.patients.isEmpty || model.connectionState == .pairedOnline {
-                    Text("\(filteredPatients.count)")
-                        .font(.headline)
-                        .monospacedDigit()
-                        .fixedSize()
-                        .padding(.vertical, 2)
-                        .foregroundStyle(.secondary)
-                        .accessibilityLabel("\(filteredPatients.count) pazienti visibili nell'elenco caricato")
-                        .accessibilityIdentifier("patient-worklist-count")
+            if verticalSizeClass != .compact {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("Pazienti")
+                        .font(.title2.weight(.semibold))
+                        .accessibilityHeading(.h1)
+                    Spacer(minLength: 8)
+                    mobileResultCount
                 }
             }
             worklistContent
@@ -255,6 +248,22 @@ struct PairedPatientsWorklistView: View {
     /// Spacing of the mobile worklist stack, shared by the outer stack and by
     /// the patient rows so the two cannot drift apart.
     private static let mobileStackSpacing: CGFloat = 16
+
+    /* @Codex: In a short viewport the navigation bar owns the title, while
+       the result count shares the filter row without reducing its touch area. */
+    @ViewBuilder
+    private var mobileResultCount: some View {
+        if !model.patients.isEmpty || model.connectionState == .pairedOnline {
+            Text("\(filteredPatients.count)")
+                .font(.headline)
+                .monospacedDigit()
+                .fixedSize()
+                .padding(.vertical, 2)
+                .foregroundStyle(.secondary)
+                .accessibilityLabel("\(filteredPatients.count) pazienti visibili nell'elenco caricato")
+                .accessibilityIdentifier("patient-worklist-count")
+        }
+    }
     #endif
 
     #if os(macOS)
@@ -675,8 +684,11 @@ struct PairedPatientsWorklistView: View {
         // Mobile keeps only the scope control in the scrolling content. Search is
         // a system search field in the navigation bar and sort is a toolbar menu,
         // so neither spends height above the first patient.
-        patientViewModePicker
-            .frame(maxWidth: .infinity, alignment: .leading)
+        HStack(spacing: 12) {
+            patientViewModePicker
+                .frame(maxWidth: .infinity, alignment: .leading)
+            if verticalSizeClass == .compact { mobileResultCount }
+        }
         #endif
     }
 
