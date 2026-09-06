@@ -497,6 +497,8 @@ struct PairedPatientsWorkspaceView: View {
                     workspaceFeedbackLine
                     if let detail = model.selectedPatient, detail.id == compactPatientID {
                         selectedPatientSections(detail)
+                    } else if let profile = model.cachedPatientProfile, profile.id == compactPatientID {
+                        cachedPatientProfile(profile)
                     } else if let patientID = compactPatientID {
                         pendingPatientDetail(patientID: patientID)
                     }
@@ -872,12 +874,23 @@ struct PairedPatientsWorkspaceView: View {
             // readable ones. The chart reads as a thread — you open a patient and
             // scroll their sections — and a thread has no outer envelope.
             selectedPatientSections(detail)
+        } else if let profile = model.cachedPatientProfile {
+            cachedPatientProfile(profile)
         } else if let patientID = model.selectedPatientID {
             pendingPatientDetail(patientID: patientID)
         } else {
             emptyDetailState
                 .accessibilityIdentifier("patient-detail-empty")
         }
+    }
+
+    /* @Codex: A historical profile never enters the editable online chart. */
+    private func cachedPatientProfile(_ profile: HomeBasePatientDetail) -> some View {
+        CachedPatientProfileView(
+            profile: profile,
+            metadata: model.cachedProfileMetadata,
+            lockedFields: model.cachedProfileLockedFields
+        )
     }
 
     /* @Codex */
@@ -895,6 +908,17 @@ struct PairedPatientsWorkspaceView: View {
                     .foregroundStyle(.secondary)
                     .accessibilityIdentifier("patient-detail-load-error")
                 retryPatientDetailButton(patientID: patientID)
+            } else if model.connectionState == .cached || model.connectionState == .pairedOfflineDegraded {
+                Label("Profilo non disponibile offline", systemImage: "wifi.slash")
+                    .font(.headline)
+                Text(model.reconciliationLine)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                Button("Ricollega home-base") {
+                    Task { await model.loadPatients() }
+                }
+                .frame(minHeight: 44)
+                .accessibilityIdentifier("patient-cache-reconnect-button")
             } else {
                 Label("Dettaglio da ricaricare", systemImage: "arrow.clockwise")
                     .font(.headline)
