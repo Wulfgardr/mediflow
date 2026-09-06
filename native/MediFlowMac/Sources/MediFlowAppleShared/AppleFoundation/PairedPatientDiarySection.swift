@@ -98,7 +98,9 @@ struct PairedPatientDiarySection: View {
                 .modifier(PairedDiaryControlLabel())
         }
         .font(.subheadline)
-        .disabled(model.isWorking || model.selectedPatient == nil)
+        // @Codex: The ordinary refresh closes the editor. Conflict recovery uses
+        // the dedicated comparison action in the composer, preserving its draft.
+        .disabled(model.isWorking || model.selectedPatient == nil || model.isEditingEntry)
         .accessibilityIdentifier("homebase-refresh-entries-button")
     }
 

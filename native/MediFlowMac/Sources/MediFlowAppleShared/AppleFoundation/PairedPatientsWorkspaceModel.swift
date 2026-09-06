@@ -117,6 +117,10 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     private var newEntryVisitDraftTranscriptDigest: Data?
     @Published private(set) var editingEntryId: String?
     @Published private(set) var editingEntryVersion: Int?
+    // @Codex: A conflict/reloaded version never silently rebases the local draft.
+    @Published private(set) var editingEntryRequiresReconciliation = false
+    @Published private(set) var editingEntryRemoteReview: HomeBaseEntrySummary?
+    private var editingEntryDraftID = UUID()
     @Published var editEntryTitle = ""
     @Published var editEntryType: PairedDiaryEntryType = .note
     @Published var editEntryEditorDocument = ClinicalRichTextEditorDocument()
@@ -1196,14 +1200,22 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             pendingConflict = nil
             return
         }
+        let editorID = editingEntryDraftID // @Codex
         guard let context = beginPatientLoad(patientID: current.id, clearingWorkspace: false) else { return }
         do {
             let payload = try await fetchPatientWorkspace(context)
             guard canPublishPatientLoad(context) else { return }
             publishPatientWorkspace(payload, context: context)
+            // @Codex: Refresh the comparison, never the operator's text or CAS
+            // version. Acceptance is a separate, local-only review action.
+            if editingEntryDraftID == editorID, editingEntryRequiresReconciliation {
+                prepareEditingEntryReview(from: payload.entries)
+            }
             pendingConflict = nil
             errorMessage = nil
-            statusMessage = "Dati aggiornati dall'home-base. Riapplica la modifica."
+            statusMessage = editingEntryRequiresReconciliation
+                ? "Dati aggiornati. Confronta la voce corrente con la bozza prima di salvare."
+                : "Dati aggiornati dall'home-base. Riapplica la modifica."
             finishCurrentPatientLoad()
         } catch {
             guard canPublishPatientLoad(context) else { return }
@@ -1261,15 +1273,22 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             errorMessage = "Apri prima un paziente con sessione paired online."
             return
         }
-        let title = newEntryTitle.trimmedOrNil
-        let type = newEntryType.rawValue
+        let submitted = newDiarySnapshot
+        let draftID = newEntryDraftId
+        let transcriptMutation = newEntryVisitTranscriptMutationReference
+        let scope = ambulatoryId.trimmedOrNil
+        let title = submitted.title.trimmedOrNil
+        let type = submitted.type.rawValue
         // Non-negotiable (D11): the sealed content is ALWAYS the transcoder's
         // render of the editor model, never raw operator input.
-        let content = newEntryEditorDocument.renderedHTML
-        let attachmentIds = Array(newEntryAttachmentIds)
+        let content = submitted.document.renderedHTML
+        let attachmentIds = Array(submitted.attachmentIDs)
         let patientAttachmentIds = Set(self.attachments.map(\.id))
         let attachmentCacheMatchesPatient = attachmentsPatientId == patientId
-        await runTask {
+        var isCurrent: () -> Bool = { false }
+        await runTask({
+            // Capture after runTask acquires its own workspace generation.
+            isCurrent = self.diaryWriteCurrentness(patientID: patientId, cookie: sessionCookie, credentials: credentials)
             guard let masterKey = self.masterKey else { throw PairedCryptoError.keyUnavailable }
             guard attachmentIds.isEmpty || attachmentCacheMatchesPatient else {
                 throw PairedCryptoError.attachmentCacheUnavailable
@@ -1282,7 +1301,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             _ = try await self.makeClient().createEntry(
                 patientId: patientId,
                 payload: HomeBaseEntryCreatePayload(
-                    id: self.newEntryDraftId,
+                    id: draftID,
                     type: type,
                     title: try self.sealField(title),
                     date: Date(),
@@ -1291,26 +1310,39 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
                 ),
                 credentials: credentials,
                 sessionCookie: sessionCookie,
-                ambulatoryId: self.ambulatoryId.trimmedOrNil
+                ambulatoryId: scope
             )
-            self.newEntryTitle = ""
-            self.newEntryType = .note
-            self.newEntryEditorDocument = ClinicalRichTextEditorDocument()
-            self.newEntryAttachmentIds = []
-            self.newEntryVisitDraftPatientId = nil
+            guard isCurrent(), self.newEntryDraftId == draftID else { return }
+            let unchanged = self.newDiarySnapshot == submitted
+                && self.newEntryVisitTranscriptMutationReference == transcriptMutation
+            if unchanged {
+                self.newEntryTitle = ""
+                self.newEntryType = .note
+                self.newEntryEditorDocument = ClinicalRichTextEditorDocument()
+                self.newEntryAttachmentIds = []
+                self.newEntryVisitDraftPatientId = nil
+            }
+            // The acknowledged ID belongs to the saved entry. Any later local
+            // text remains an explicitly unsaved new draft, never auto-submitted.
             self.newEntryDraftId = UUID().uuidString
-            self.statusMessage = "Voce diario inviata all'home-base."
+            self.statusMessage = unchanged ? "Voce diario inviata all'home-base."
+                : "Voce inviata. Le modifiche successive restano in una nuova bozza non salvata."
             do {
-                self.entries = try await self.fetchDecryptedEntries(
+                let entries = try await self.fetchDecryptedEntries(
                     patientId: patientId,
                     credentials: credentials,
                     sessionCookie: sessionCookie,
-                    ambulatoryId: self.ambulatoryId.trimmedOrNil
+                    ambulatoryId: scope
                 )
+                guard isCurrent() else { return }
+                self.entries = entries
             } catch {
+                guard isCurrent() else { return }
+                // @Codex: A confirmed save does not turn session expiry into a refresh-only warning.
+                if case HomeBaseClientError.httpStatus(401, _) = error { throw error }
                 self.errorMessage = "Voce inviata, ma aggiornamento diario non riuscito: \(error.localizedDescription)"
             }
-        }
+        }, canApplyFailure: { isCurrent() })
     }
 
     /// A10: submit a completed clinical scale as a `type:"scale"` diary entry whose
@@ -1377,6 +1409,11 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     /* @Codex */
     func startEditingEntry(_ entry: HomeBaseEntrySummary) {
         guard canMutateEntry(entry) else { return }
+        // @Codex: Reopening the same row is not consent to discard its draft.
+        guard editingEntryId != entry.id else { return }
+        editingEntryDraftID = UUID()
+        editingEntryRequiresReconciliation = false
+        editingEntryRemoteReview = nil
         editingEntryId = entry.id
         editingEntryVersion = entry.version
         editEntryTitle = entry.title
@@ -1396,6 +1433,10 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
 
     /* @Codex */
     func cancelEditingEntry() {
+        // Also used by privacy invalidation: never gate this clear on isWorking.
+        editingEntryDraftID = UUID() // @Codex
+        editingEntryRequiresReconciliation = false
+        editingEntryRemoteReview = nil
         editingEntryId = nil
         editingEntryVersion = nil
         editEntryTitle = ""
@@ -1408,6 +1449,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
 
     /* @Codex */
     func insertNewEntrySOAPTemplate() {
+        guard !isWorking else { return } // @Codex
         // Passes the template through the transcoder too (D11): parse it into
         // the same editor model as any other content, rather than assigning raw
         // HTML into what used to be a plain-text field.
@@ -1521,7 +1563,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     }
 
     var canInsertVisitDraftIntoNewEntry: Bool {
-        newEntryVisitDraftResponse != nil
+        !isWorking && newEntryVisitDraftResponse != nil
             && newEntryVisitDraftReviewed
             && newEntryVisitDraftPatientId == selectedPatient?.id
             && newEntryVisitDraftMutationReference == newEntryVisitTranscriptMutationReference
@@ -2026,6 +2068,70 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     #endif
 
     /* @Codex */
+    private struct DiaryEditorSnapshot: Equatable {
+        let title: String
+        let type: PairedDiaryEntryType
+        let document: ClinicalRichTextEditorDocument
+        let attachmentIDs: Set<String>
+    }
+
+    private var newDiarySnapshot: DiaryEditorSnapshot {
+        .init(title: newEntryTitle, type: newEntryType, document: newEntryEditorDocument, attachmentIDs: newEntryAttachmentIds)
+    }
+
+    private var editedDiarySnapshot: DiaryEditorSnapshot {
+        .init(title: editEntryTitle, type: editEntryType, document: editEntryEditorDocument, attachmentIDs: editEntryAttachmentIds)
+    }
+
+    /// Used only by these two diary writers, after their exclusive operation has
+    /// begun. The shared read/runTask invalidation policy remains unchanged.
+    private func diaryWriteCurrentness(
+        patientID: String, cookie: String, credentials: HomeBasePairedCredentials
+    ) -> () -> Bool {
+        let login = loginGeneration
+        let workspace = workspaceGeneration
+        let scope = ambulatoryId.trimmedOrNil
+        let server = serverURL
+        let pin = tlsPin
+        return { [weak self] in
+            guard let self else { return false }
+            return !Task.isCancelled && self.loginGeneration == login && self.workspaceGeneration == workspace
+                && self.selectedPatient?.id == patientID && self.selectedPatientID == patientID
+                && self.sessionCookie == cookie && self.pairedCredentials == credentials
+                && self.ambulatoryId.trimmedOrNil == scope && self.serverURL == server && self.tlsPin == pin
+                && self.connectionState == .pairedOnline
+        }
+    }
+
+    private func requireEditingEntryReconciliation() {
+        editingEntryRequiresReconciliation = true
+        editingEntryRemoteReview = nil
+    }
+
+    private func prepareEditingEntryReview(from entries: [HomeBaseEntrySummary]) {
+        guard editingEntryRequiresReconciliation, let entryID = editingEntryId else { return }
+        editingEntryRemoteReview = entries.first { $0.id == entryID && $0.patientId == selectedPatient?.id }
+    }
+
+    var canConfirmEditingEntryReconciliation: Bool {
+        guard editingEntryRequiresReconciliation, let latest = editingEntryRemoteReview,
+              latest.id == editingEntryId, latest.version > (editingEntryVersion ?? 0),
+              latest.lockedFields.isEmpty else { return false }
+        return canMutateEntry(latest)
+    }
+
+    /// A review gesture adopts a freshly read CAS version, not its clinical
+    /// contents. The following Save remains a distinct, ordinary versioned PUT.
+    func confirmEditingEntryReconciliation() {
+        guard canConfirmEditingEntryReconciliation, let latest = editingEntryRemoteReview else { return }
+        editingEntryVersion = latest.version
+        editingEntryOriginalContent = latest.content
+        editingEntryOriginalAttachmentIds = Set(HomeBaseEntryAttachmentReferencesCodec.decode(latest.attachments))
+        editingEntryRequiresReconciliation = false
+        editingEntryRemoteReview = nil
+        statusMessage = "Confronto confermato. Bozza conservata: Salva modifiche invia la tua versione."
+    }
+
     func updateEditingEntry() async {
         guard canUpdateEditingEntry else { return }
         guard let patientId = selectedPatient?.id,
@@ -2036,22 +2142,27 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             errorMessage = "Apri prima un paziente con sessione paired online."
             return
         }
-        let title = editEntryTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        let submitted = editedDiarySnapshot
+        let editorID = editingEntryDraftID
+        let scope = ambulatoryId.trimmedOrNil
+        let title = submitted.title.trimmingCharacters(in: .whitespacesAndNewlines)
         // Non-negotiable (D11): re-derive content from the transcoder's render
         // of the editor model, compared against the ORIGINAL decrypted HTML to
         // decide whether it actually changed (omit = untouched field).
-        let renderedContent = editEntryEditorDocument.renderedHTML
+        let renderedContent = submitted.document.renderedHTML
         let content = renderedContent == editingEntryOriginalContent ? nil : renderedContent
-        let type = editEntryType.rawValue
+        let type = submitted.type.rawValue
         // Only touch the sealed attachments field when the operator actually
         // changed the selection in this session (see
         // editingEntryOriginalAttachmentIds above): otherwise omit it so the
         // update never depends on model.attachments having been loaded.
-        let attachmentIdsChanged = editEntryAttachmentIds != (editingEntryOriginalAttachmentIds ?? [])
-        let attachmentIds = Array(editEntryAttachmentIds)
+        let attachmentIdsChanged = submitted.attachmentIDs != (editingEntryOriginalAttachmentIds ?? [])
+        let attachmentIds = Array(submitted.attachmentIDs)
         let patientAttachmentIds = Set(self.attachments.map(\.id))
         let attachmentCacheMatchesPatient = attachmentsPatientId == patientId
-        await runTask {
+        var isCurrent: () -> Bool = { false }
+        await runTask({
+            isCurrent = self.diaryWriteCurrentness(patientID: patientId, cookie: sessionCookie, credentials: credentials)
             let attachmentReferences: HomeBaseSealedEntryAttachmentReferences?
             if attachmentIdsChanged {
                 guard let masterKey = self.masterKey else { throw PairedCryptoError.keyUnavailable }
@@ -2066,30 +2177,57 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             } else {
                 attachmentReferences = nil
             }
-            let acknowledgement = try await self.makeClient().updateEntry(
-                patientId: patientId,
-                entryId: entryId,
-                payload: HomeBaseEntryUpdatePayload(
-                    version: version,
-                    type: type,
-                    title: try self.sealField(title),
-                    content: content == nil ? nil : try self.sealField(content),
-                    attachmentReferences: attachmentReferences
-                ),
-                credentials: credentials,
-                sessionCookie: sessionCookie,
-                ambulatoryId: self.ambulatoryId.trimmedOrNil
-            )
+            let acknowledgement: HomeBaseMutationAcknowledgement
+            do {
+                acknowledgement = try await self.makeClient().updateEntry(
+                    patientId: patientId,
+                    entryId: entryId,
+                    payload: HomeBaseEntryUpdatePayload(
+                        version: version,
+                        type: type,
+                        title: try self.sealField(title),
+                        content: content == nil ? nil : try self.sealField(content),
+                        attachmentReferences: attachmentReferences
+                    ),
+                    credentials: credentials,
+                    sessionCookie: sessionCookie,
+                    ambulatoryId: scope
+                )
+            } catch {
+                if isCurrent(), self.editingEntryDraftID == editorID {
+                    if case HomeBaseClientError.versionConflict = error {
+                        self.requireEditingEntryReconciliation()
+                    } else if case HomeBaseClientError.httpStatus(409, _) = error {
+                        self.requireEditingEntryReconciliation()
+                    }
+                }
+                throw error
+            }
+            guard isCurrent(), self.editingEntryDraftID == editorID else { return }
             guard acknowledgement.success else { throw HomeBaseClientError.contract }
-            self.cancelEditingEntry()
-            self.entries = try await self.fetchDecryptedEntries(
-                patientId: patientId,
-                credentials: credentials,
-                sessionCookie: sessionCookie,
-                ambulatoryId: self.ambulatoryId.trimmedOrNil
-            )
-            self.statusMessage = "Voce diario aggiornata sull'home-base."
-        }
+            let unchanged = self.editedDiarySnapshot == submitted
+            if unchanged {
+                self.cancelEditingEntry()
+            } else {
+                // The ACK has no version. Never guess version+1 or automatically
+                // rebase changes typed after the submitted snapshot.
+                self.requireEditingEntryReconciliation()
+            }
+            self.statusMessage = unchanged ? "Voce diario aggiornata sull'home-base."
+                : "Voce aggiornata. Le modifiche successive sono ancora nella bozza: confrontale prima di salvare."
+            do {
+                let entries = try await self.fetchDecryptedEntries(
+                    patientId: patientId, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: scope
+                )
+                guard isCurrent() else { return }
+                self.entries = entries
+                if self.editingEntryDraftID == editorID { self.prepareEditingEntryReview(from: entries) }
+            } catch {
+                guard isCurrent() else { return }
+                if case HomeBaseClientError.httpStatus(401, _) = error { throw error } // @Codex
+                self.errorMessage = "Voce aggiornata, ma rilettura diario non riuscita: \(error.localizedDescription)"
+            }
+        }, canApplyFailure: { isCurrent() })
     }
 
     /* @Codex */
@@ -4864,6 +5002,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     var canUpdateEditingEntry: Bool {
         editingEntryId != nil
             && editingEntryVersion != nil
+            && !editingEntryRequiresReconciliation // @Codex
             && selectedPatient != nil
             && sessionCookie != nil
             && pairedCredentials != nil

@@ -92,8 +92,10 @@ comandi e non concede capability. I controlli delle viste rimangono attivi.
 La navigazione appartiene alla singola finestra. Un nuovo link o una navigazione
 manuale nell'area globale invalida il precedente intento in corso. Prima di
 cambiare paziente, il raccordo del workspace controlla sessione/scope correnti,
-selezione e bozze; un blocco conserva la cartella e il testo presenti. Una
-risposta tardiva non puo riaprire una destinazione superata. Solo il successo
+selezione e bozze; un rifiuto della sola navigazione conserva la cartella e il
+testo presenti. Il blocco della sessione e invece un evento di privacy: rimuove
+subito presentazione clinica e bozze locali secondo il lifecycle della sessione.
+Una risposta tardiva non puo riaprire una destinazione superata. Solo il successo
 del reader e della selezione emette la presentazione del dettaglio compatto;
 nessuna ricostruzione dello split o sostituzione del modello e necessaria.
 
@@ -191,6 +193,24 @@ usano la `version` del record e mostrano il conflitto come richiesta di
 ricarica/confronto. Il client non gestisce un repertorio farmaci autonomo:
 interroga in sola lettura il catalogo dell'home-base. Non esistono prescrizione
 SISS nativa, AI/OCR paired, scritture offline o coda di merge.
+
+Durante il salvataggio Diario, i controlli che cambiano la voce restano
+disabilitati fino al termine dell'operazione. Il writer cattura titolo, tipo,
+documento e riferimenti: l'ACK azzera solo la bozza ancora identica a quella
+inviata e nello stesso contesto. Eventuali modifiche locali arrivate dopo lo
+snapshot non vengono perse o inviate automaticamente. Per un create confermato
+restano una nuova bozza non salvata; per un update restano nell'editor e
+richiedono confronto con la versione riletta, perche l'ACK non porta una nuova
+`version`. Un errore senza ACK conserva la bozza e, per create, il suo ID stabile.
+
+Un `409` sospende il successivo Save anche se si chiude il banner. La rilettura
+mostra la voce corrente senza sostituire testo, riferimenti o versione della
+bozza. Dopo confronto e revisione manuali, **Ho confrontato: mantieni la mia
+bozza** adotta la versione letta e conserva i contenuti locali. Solo un successivo
+**Salva modifiche** esegue il PUT ordinario con CAS; un ulteriore `409` richiede
+un nuovo confronto. Una voce assente dalla lettura, eliminata, non leggibile o
+letta in un contesto superato non autorizza la conferma. Nessun merge, retry o
+overwrite automatico.
 
 ---
 
