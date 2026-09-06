@@ -67,17 +67,18 @@ export default function ScaleRunnerPage() {
             <Kree8WorkspaceShell
                 eyebrow="Valutazioni"
                 title="Scala non disponibile"
-                subtitle={scaleId === 'tinetti'
-                    ? 'Versione Tinetti precedente ritirata. I risultati storici restano invariati; per una nuova valutazione scegliere POMA-28 v1.'
-                    : 'La scala richiesta non è presente nella libreria locale di MediFlow.'}
+                subtitle="Scegli una scala dalla libreria del paziente."
                 backHref={`/patients/${patientId}/scales`}
                 backLabel="Torna alle scale"
                 patientLabel={patient ? `${patient.lastName} ${patient.firstName}` : undefined}
                 statusLabel="Nessun dato è stato modificato."
                 navItems={[]}
             >
-                <div className={workspaceStyles.loadingCard}>
-                    Scegli una scala dalla libreria del paziente.
+                {/* @Codex: a retirement notice is clinical content, not optional header copy. */}
+                <div className={workspaceStyles.loadingCard} role="status">
+                    {scaleId === 'tinetti'
+                        ? 'Versione Tinetti precedente ritirata. I risultati storici restano invariati; per una nuova valutazione scegliere POMA-28 v1.'
+                        : 'La scala richiesta non è presente nella libreria locale di MediFlow.'}
                 </div>
             </Kree8WorkspaceShell>
         );
