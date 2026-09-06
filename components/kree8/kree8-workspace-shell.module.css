@@ -1063,7 +1063,7 @@
   flex-wrap: nowrap;
   gap: 0 20px;
   min-height: 44px;
-  padding: 0 var(--overview-inset);
+  padding: 4px var(--overview-inset);
   overflow-x: auto;
   scroll-snap-type: none;
   border-bottom: 1px solid var(--k8-line);
@@ -1090,7 +1090,7 @@
   padding: 24px var(--overview-inset) 50px;
 }
 :global(html[data-runtime-twin-design='proposal']) .overviewShell .workspaceBody :global(section[id]) {
-  scroll-margin-top: 52px;
+  scroll-margin-top: 60px;
 }
 @media (max-width: 700px) {
   :global(html[data-runtime-twin-design='proposal']) .overviewShell { --overview-inset: 20px; }
