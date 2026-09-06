@@ -32,7 +32,7 @@ async function setRegister(page: Page, register: WorklistCase['register']): Prom
   // @Codex: the ordinary control updates both the provider and its persisted preference.
   const returnUrl = page.url();
   const theme = register === 'grafite' ? 'dark' : 'light';
-  await page.getByRole('navigation', { name: 'Navigazione principale', exact: true })
+  await page.getByRole('complementary', { name: 'MediFlow', exact: true })
     .getByRole('link', { name: 'Impostazioni', exact: true }).click();
   await expect(page).toHaveURL(new URL('/settings', returnUrl).href);
   await page.getByRole('link', { name: 'Apri aspetto', exact: true }).click();
