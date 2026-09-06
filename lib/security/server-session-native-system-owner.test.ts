@@ -168,7 +168,9 @@ test('native/system reset remains terminal when cleanup reenters preparation', (
 });
 
 test('historical P3 activation is fail-closed and server-session has no P2 runtime import', () => {
-    const source = readFileSync(new URL('./server-session.ts', import.meta.url), 'utf8');
+    const adapter = readFileSync(new URL('./server-session.ts', import.meta.url), 'utf8');
+    assert.doesNotMatch(adapter, /new (?:Map|WeakMap|Set)|globalThis/u);
+    const source = readFileSync(new URL('../../packages/web-auth-lifecycle-owner/internal/native-session.cjs', import.meta.url), 'utf8');
     assert.doesNotMatch(source, /from ['"]\.\/web-auth-control-record['"]/u);
     assert.match(source, /function prepareAuthControlActivation[\s\S]*?return null;/u);
     assert.match(source, /function commitPreparedAuthControlActivation[\s\S]*?return 0;/u);
