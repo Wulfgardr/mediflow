@@ -9,7 +9,7 @@ import {
     toPatientInsightRenderContract,
 } from '@/lib/ai-task-contracts';
 import { db } from '@/lib/db';
-import { ensureTextModelDefaultsUpgraded, resolveTextModel } from '@/lib/ai-models';
+import { resolveTextModel } from '@/lib/ai-models';
 /* @Codex */
 import {
     sanitizeInsightMarkdown,
@@ -130,10 +130,13 @@ export function parsePatientInsight(content: string): ParsedPatientInsight {
 export { sanitizeInsightMarkdown } from '@/lib/patient-insight';
 
 /* @Codex */
-export async function getAiModelLabels() {
-    await ensureTextModelDefaultsUpgraded();
-    const modelClinical = await db.settings.get('aiModel_clinical');
-    const legacyModel = await db.settings.get('aiModel');
+export async function getAiModelLabels(signal: AbortSignal = db.getSessionReadSignal()) {
+    // @Codex: a footer reads the saved configuration; model migration belongs
+    // to the existing settings/generation owners, never to background rendering.
+    const modelClinical = await db.settings.get('aiModel_clinical', { signal });
+    signal.throwIfAborted();
+    const legacyModel = modelClinical?.value?.trim() ? undefined : await db.settings.get('aiModel', { signal });
+    signal.throwIfAborted();
 
     return {
         clinical: resolveTextModel(modelClinical?.value, legacyModel?.value),

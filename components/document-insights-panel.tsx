@@ -21,13 +21,11 @@ interface DocumentInsightsPanelProps {
 export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanelProps) {
     const [expandedId, setExpandedId] = useState<string | null>(null);
     const [busyAction, setBusyAction] = useState<string | 'all' | null>(null);
-    // Modelli reali dalla config invece di nomi hardcoded nel footer.
-    const modelLabels = useAiModelLabels();
+    const insights = parsePatientDatedRecords<DocumentInsight>(patient.documentInsights);
+    // @Codex: an empty archive has no model footer and needs no model reads.
+    const modelLabels = useAiModelLabels(Boolean(patient.id) && insights.length > 0);
     const { showToast } = useToast();
     const confirm = useConfirm();
-
-    // Parse insights from patient
-    const insights = parsePatientDatedRecords<DocumentInsight>(patient.documentInsights);
 
     if (!patient.id || insights.length === 0) {
         return null; // Don't render if no insights
