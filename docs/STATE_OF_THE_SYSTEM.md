@@ -47,8 +47,8 @@ Windows e Linux ora hanno prove locali su sistemi operativi reali: build del
 runtime Node, avvio da directory vuota, configurazione ordinaria e percorsi
 UI/headless. Runtime, TLS e database delle fixture risiedono nel rispettivo
 guest. Windows usa Node x64 emulato su ARM64 per il pacchetto AnyDoc disponibile;
-Apple Vision resta una funzione del Mac. Le suite complete dei guest e le
-prove UI Apple del candidato sono gate ancora aperti, non parità già attestata.
+Apple Vision resta una funzione del Mac. Le suite complete descritte sotto
+non attestano parità funzionale universale.
 
 La suite Node completa su `52ae794ab` conta 3.206 PASS e uno skip previsto;
 anche il lint completo è PASS. La ricevuta più
@@ -57,9 +57,19 @@ correzione del wrapper non ha rieseguito la suite. Le compilazioni generic macOS
 universale e iOS device sono PASS con `CODE_SIGNING_ALLOWED=NO`, senza avvio
 dell'app, Keychain o UI. Questi risultati e le dodici prove API HTTPS con
 pairing distinti non sostituiscono le sei combinazioni app mobile/home-base.
-Su Windows `25e8f8708` ha superato 17 controlli mirati, inclusi primo avvio,
-onboarding completo e accesso fra schede; su Linux le due suite aggiornate
-di cartella e lista hanno 25 PASS. Le suite complete dei guest sono in corso.
+Sul runtime `25e8f8708`, il full Windows conta 145 PASS, un FAIL e 12 skip;
+il FAIL di confronto colori è riprodotto e risolto nel test separando hover
+e selezione da tastiera. Il gruppo portable Windows conserva nove timeout
+su 248 casi, mentre MCP, Mini e Supervisor separati sono PASS. Linux completa
+145 casi ordinari distinti fra full e opt-in, con 42 esclusioni esplicite e
+tutti i controlli headless PASS. Il verbale distingue sorgenti, fixture,
+simulazioni e precedenti prove CRUD/export.
+
+Le due suite UI firmate normalmente per il simulatore su `dc1fc0522`
+(`5ced` più il solo fix demo `8fc`) hanno 71 PASS, 11 skip previsti e zero
+FAIL su 82 esecuzioni. Rotazione, accessibilità, bozza e archivio sono coperti
+con fixture sintetiche; le sei combinazioni di app e host reali sono ancora
+da verificare.
 Il candidato non è ancora stato pubblicato, unito a main o rilasciato.
 
 ## Aggiornamento di candidatura: 5 settembre 2026
