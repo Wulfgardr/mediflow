@@ -1902,6 +1902,29 @@ final class MediFlowMobileAppUITests: XCTestCase {
         struct Patient: Decodable { let id: String; let firstName: String; let lastName: String }
         struct Client: Decodable { let id: String; let token: String }
         struct PreviousPairing: Decodable { let serverURL: String; let id: String }
+        struct CASCase: Decodable {
+            let schemaVersion: Int
+            let synthetic: Bool
+            let fixtureId: String
+            let groupID: String
+            let patientId: String
+            let entryID: String
+            let baseVersion: Int
+            let baseTitle: String
+            let baseBody: String
+            let baseType: String
+
+            func title(_ role: String) -> String { "CAS \(role) \(groupID)" }
+            func body(_ role: String) -> String { "Paragrafo sintetico \(role) \(groupID)" }
+            func fields(_ role: String? = nil) -> [String: String] {
+                func paragraph(_ text: String) -> String {
+                    "<p>" + text.replacingOccurrences(of: "&", with: "&amp;")
+                        .replacingOccurrences(of: "<", with: "&lt;") + "</p>"
+                }
+                let content = paragraph(baseBody) + (role.map { paragraph(body($0)) } ?? "")
+                return ["title": role.map { title($0) } ?? baseTitle, "content": content, "type": baseType]
+            }
+        }
         let schemaVersion: Int
         let synthetic: Bool
         let fixtureId: String
@@ -1916,10 +1939,12 @@ final class MediFlowMobileAppUITests: XCTestCase {
         let expectedDiaryID: String?
         let expectedPopulationInRange: Int?
         let previousPairings: [PreviousPairing]?
+        let cas: CASCase?
 
         enum CodingKeys: String, CodingKey {
             case schemaVersion, synthetic, fixtureId, runID, clientPlatform, host, patient, client
             case expectedAddress, expectedDiaryTitle, expectedDiaryID, expectedPopulationInRange, previousPairings
+            case cas
             case operatorInfo = "operator"
         }
         var writeAddress: String { "Via Interop \(runID) \(clientPlatform)" }
@@ -2506,6 +2531,191 @@ final class MediFlowMobileAppUITests: XCTestCase {
         return probe
     }
 
+    // @Codex: The two live app processes exchange only test-run receipts through
+    // a controller-owned relay. Neither app receives a fake transport or write.
+    private func prepareInteropCAS(_ input: InteropInput, role: String) throws -> (InteropInput.CASCase, InteropModuleProbe) {
+        let cas = try XCTUnwrap(input.cas, "A prior actual UI-created diary entry is required")
+        XCTAssertEqual(cas.schemaVersion, 1)
+        XCTAssertTrue(cas.synthetic)
+        XCTAssertEqual(cas.fixtureId, input.fixtureId)
+        XCTAssertEqual(cas.patientId, input.patient.id)
+        XCTAssertGreaterThan(cas.baseVersion, 0)
+        XCTAssertFalse(cas.entryID.isEmpty)
+        XCTAssertFalse(cas.baseTitle.isEmpty)
+        XCTAssertFalse(cas.baseBody.isEmpty)
+        XCTAssertFalse(cas.baseBody.contains("\n"), "Use the observed one-paragraph workflow fixture")
+        XCTAssertFalse(cas.baseBody.contains("\r"))
+        XCTAssertTrue(["note", "visit", "phone", "other"].contains(cas.baseType))
+        XCTAssertNotNil(cas.groupID.range(of: "^[A-Za-z0-9._-]{1,100}$", options: .regularExpression))
+        let probe = try makeInteropModuleProbe(input)
+        try probe.write("cas-participant", values: ["casRole": role, "casGroupID": cas.groupID,
+                        "entryID": cas.entryID, "baseVersion": cas.baseVersion, "hostSourceCommit": input.host.sourceCommit])
+        return (cas, probe)
+    }
+
+    private func signalInteropCAS(_ event: String, checkpoint: String, cas: InteropInput.CASCase,
+                                  probe: InteropModuleProbe) throws {
+        try probe.write("cas-\(event)", values: ["event": event, "casGroupID": cas.groupID,
+                        "entryID": cas.entryID, "baseVersion": cas.baseVersion, "checkpointID": checkpoint])
+    }
+
+    private func waitForInteropCAS(_ event: String, cas: InteropInput.CASCase, probe: InteropModuleProbe) throws {
+        let file = probe.directory.appendingPathComponent("cas-relay-\(event).json")
+        let aborted = probe.directory.appendingPathComponent("cas-aborted.json")
+        let available = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            FileManager.default.fileExists(atPath: file.path) || FileManager.default.fileExists(atPath: aborted.path)
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [available], timeout: 300), .completed,
+                       "The other real UI writer did not produce its matching checkpoint")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: aborted.path), "The two-app run was aborted")
+        let attributes = try FileManager.default.attributesOfItem(atPath: file.path)
+        XCTAssertEqual(attributes[.type] as? FileAttributeType, .typeRegular)
+        XCTAssertEqual((attributes[.posixPermissions] as? NSNumber)?.intValue, 0o600)
+        let receipt = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: file)) as? [String: Any])
+        XCTAssertEqual(receipt["schemaVersion"] as? Int, 1)
+        XCTAssertEqual(receipt["synthetic"] as? Bool, true)
+        XCTAssertEqual(receipt["runID"] as? String, probe.input.runID)
+        XCTAssertEqual(receipt["fixtureId"] as? String, probe.input.fixtureId)
+        XCTAssertEqual(receipt["casGroupID"] as? String, cas.groupID)
+        XCTAssertEqual(receipt["entryID"] as? String, cas.entryID)
+        XCTAssertEqual(receipt["baseVersion"] as? Int, cas.baseVersion)
+        XCTAssertEqual(receipt["event"] as? String, event)
+        XCTAssertEqual(receipt["hostSourceCommit"] as? String, probe.input.host.sourceCommit)
+        XCTAssertEqual(receipt["sourceClientPlatform"] as? String, probe.input.clientPlatform == "ios" ? "ipados" : "ios")
+        let sourceRunID = try XCTUnwrap(receipt["sourceRunID"] as? String)
+        XCTAssertNotNil(sourceRunID.range(of: "^[A-Za-z0-9._-]{1,100}$", options: .regularExpression))
+        XCTAssertNotEqual(sourceRunID, probe.input.runID)
+        let digest = try XCTUnwrap(receipt["sourceReceiptSHA256"] as? String)
+        XCTAssertNotNil(digest.range(of: "^[a-f0-9]{64}$", options: .regularExpression))
+    }
+
+    private func prepareInteropCASDraft(_ cas: InteropInput.CASCase, role: String) throws -> [String: String] {
+        tapInteropButton("homebase-edit-entry-button-\(cas.entryID)")
+        XCTAssertEqual(app.textFields["homebase-edit-entry-title-field"].value as? String, cas.baseTitle)
+        fillInteropField("homebase-edit-entry-title-field", value: cas.title(role))
+        let paragraphs = app.textViews.matching(NSPredicate(format: "identifier BEGINSWITH %@", "homebase-edit-entry-content-text-"))
+        XCTAssertTrue(paragraphs.element.waitForExistence(timeout: 10))
+        XCTAssertEqual(paragraphs.count, 1)
+        let originalID = paragraphs.element.identifier
+        XCTAssertEqual(paragraphs.element.value as? String, cas.baseBody)
+        tapInteropButton("homebase-edit-entry-content-add-paragraph")
+        XCTAssertEqual(paragraphs.count, 2)
+        let added = paragraphs.allElementsBoundByIndex.filter { $0.identifier != originalID }
+        XCTAssertEqual(added.count, 1)
+        let paragraph = try XCTUnwrap(added.first)
+        XCTAssertTrue(revealInteropControl(paragraph))
+        paragraph.tap()
+        paragraph.typeText(cas.body(role))
+        XCTAssertEqual(paragraph.value as? String, cas.body(role))
+        return [originalID: cas.baseBody, paragraph.identifier: cas.body(role)]
+    }
+
+    private func assertInteropCASDraft(_ blocks: [String: String], title: String) {
+        XCTAssertEqual(app.textFields["homebase-edit-entry-title-field"].value as? String, title)
+        let paragraphs = app.textViews.matching(NSPredicate(format: "identifier BEGINSWITH %@", "homebase-edit-entry-content-text-"))
+        XCTAssertEqual(paragraphs.count, blocks.count)
+        for (identifier, text) in blocks {
+            XCTAssertTrue(app.textViews[identifier].exists, "Reload/reconciliation must preserve the actual block UUID")
+            XCTAssertEqual(app.textViews[identifier].value as? String, text)
+        }
+    }
+
+    private func assertInteropCASEntry(_ cas: InteropInput.CASCase, role: String? = nil) {
+        let row = sectionView("entry-row-\(cas.entryID)")
+        XCTAssertTrue(row.waitForExistence(timeout: 20))
+        XCTAssertTrue(revealInteropControl(row))
+        XCTAssertTrue(row.staticTexts[role.map { cas.title($0) } ?? cas.baseTitle].exists)
+        // The source renders all HTML paragraphs in one attributed Text.
+        let body = row.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", cas.baseBody))
+        XCTAssertEqual(body.count, 1)
+        let expectedParagraphs = [cas.baseBody] + (role.map { [cas.body($0)] } ?? [])
+        XCTAssertEqual(body.element.label.components(separatedBy: .newlines).filter { !$0.isEmpty }, expectedParagraphs)
+    }
+
+    /* @Codex: App A keeps its stale draft while app B commits through normal UI.
+       Reload and explicit local reconciliation must each leave B's data intact. */
+    func testRealPairedDiaryCASContenderPreservesDraftUntilExplicitSave() throws {
+        let input = try interopInput()
+        let (cas, probe) = try prepareInteropCAS(input, role: "contender")
+        defer { app.terminate() }
+        launchAndLoginInterop(input)
+        openPatientSection(.diary)
+        assertInteropCASEntry(cas)
+        try probe.checkpoint(module: "entry", recordID: cas.entryID, version: cas.baseVersion, expected: cas.fields())
+        let blocks = try prepareInteropCASDraft(cas, role: "contender")
+        assertInteropCASDraft(blocks, title: cas.title("contender"))
+        let reconciliation = sectionView("homebase-edit-entry-reconciliation")
+        XCTAssertFalse(reconciliation.exists)
+        try signalInteropCAS("contender-ready", checkpoint: "step-001", cas: cas, probe: probe)
+        try waitForInteropCAS("peer-saved", cas: cas, probe: probe)
+
+        tapInteropButton("homebase-update-entry-button")
+        // The inline conflict review is mounted on both idioms; the worklist
+        // banner belongs to the previous destination on a compact iPhone.
+        XCTAssertTrue(reconciliation.waitForExistence(timeout: 20))
+        XCTAssertTrue(revealInteropControl(reconciliation))
+        assertInteropCASDraft(blocks, title: cas.title("contender"))
+        XCTAssertFalse(app.buttons["homebase-update-entry-button"].isEnabled)
+        try probe.checkpoint(module: "entry", recordID: cas.entryID, version: cas.baseVersion + 1, expected: cas.fields("peer"))
+        attachScreenshot(named: "interop-cas-real-conflict-draft-preserved")
+
+        tapInteropButton("homebase-edit-entry-reload-for-review-button")
+        let version = sectionView("homebase-edit-entry-remote-version")
+        XCTAssertTrue(version.waitForExistence(timeout: 20))
+        XCTAssertEqual(version.label, "Voce corrente · versione \(cas.baseVersion + 1)")
+        let remote = sectionView("homebase-edit-entry-remote-content")
+        XCTAssertTrue(revealInteropControl(remote))
+        XCTAssertEqual(remote.elementType, .staticText, "The freshly read comparison must be read-only")
+        XCTAssertEqual(remote.label.components(separatedBy: .newlines).filter { !$0.isEmpty }, [cas.baseBody, cas.body("peer")])
+        assertInteropCASDraft(blocks, title: cas.title("contender"))
+        XCTAssertFalse(app.buttons["homebase-update-entry-button"].isEnabled)
+        try probe.checkpoint(module: "entry", recordID: cas.entryID, version: cas.baseVersion + 1, expected: cas.fields("peer"))
+
+        tapInteropButton("homebase-edit-entry-confirm-reconciliation-button")
+        assertInteropCASDraft(blocks, title: cas.title("contender"))
+        XCTAssertTrue(app.buttons["homebase-update-entry-button"].isEnabled)
+        // This HTTP reread occurs after the local review gesture but before Save.
+        try probe.checkpoint(module: "entry", recordID: cas.entryID, version: cas.baseVersion + 1, expected: cas.fields("peer"))
+        attachScreenshot(named: "interop-cas-confirmation-has-not-written")
+        tapInteropButton("homebase-update-entry-button")
+        XCTAssertTrue(app.textFields["homebase-edit-entry-title-field"].waitForNonExistence(timeout: 20))
+        assertInteropCASEntry(cas, role: "contender")
+        try probe.checkpoint(module: "entry", recordID: cas.entryID, version: cas.baseVersion + 2, expected: cas.fields("contender"))
+        try signalInteropCAS("contender-saved", checkpoint: "step-005", cas: cas, probe: probe)
+        try waitForInteropCAS("peer-reread", cas: cas, probe: probe)
+        try probe.complete()
+    }
+
+    /* @Codex: App B is an actual second UI writer, then independently relaunches,
+       logs in with its saved pairing and rereads A's reconciled final content. */
+    func testRealPairedDiaryCASPeerWritesAndRereadsReconciledEntry() throws {
+        let input = try interopInput()
+        let (cas, probe) = try prepareInteropCAS(input, role: "peer")
+        defer { app.terminate() }
+        launchAndLoginInterop(input)
+        openPatientSection(.diary)
+        assertInteropCASEntry(cas)
+        try probe.checkpoint(module: "entry", recordID: cas.entryID, version: cas.baseVersion, expected: cas.fields())
+        try waitForInteropCAS("contender-ready", cas: cas, probe: probe)
+        let blocks = try prepareInteropCASDraft(cas, role: "peer")
+        assertInteropCASDraft(blocks, title: cas.title("peer"))
+        tapInteropButton("homebase-update-entry-button")
+        XCTAssertTrue(app.textFields["homebase-edit-entry-title-field"].waitForNonExistence(timeout: 20))
+        assertInteropCASEntry(cas, role: "peer")
+        try probe.checkpoint(module: "entry", recordID: cas.entryID, version: cas.baseVersion + 1, expected: cas.fields("peer"))
+        try signalInteropCAS("peer-saved", checkpoint: "step-002", cas: cas, probe: probe)
+        attachScreenshot(named: "interop-cas-second-native-writer-saved")
+        try waitForInteropCAS("contender-saved", cas: cas, probe: probe)
+        app.terminate()
+        launchAndLoginInterop(input, useSavedPairing: true)
+        openPatientSection(.diary)
+        assertInteropCASEntry(cas, role: "contender")
+        try probe.checkpoint(module: "entry", recordID: cas.entryID, version: cas.baseVersion + 2, expected: cas.fields("contender"))
+        try signalInteropCAS("peer-reread", checkpoint: "step-003", cas: cas, probe: probe)
+        attachScreenshot(named: "interop-cas-other-app-fresh-reread")
+        try probe.complete()
+    }
+
     private func tapInteropButton(_ identifier: String) {
         let buttons = app.buttons.matching(identifier: identifier)
         XCTAssertTrue(buttons.element.waitForExistence(timeout: 15))
@@ -2632,6 +2842,8 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertTrue(revealInteropControl(app.staticTexts[try XCTUnwrap(expected["address"])]))
         try checkpoint("profile-updated", version: 2)
 
+        // @Codex: Lifecycle commands belong to the ordinary overflow menu.
+        tapInteropButton("patient-actions-overflow")
         tapInteropButton("archive-patient-button")
         XCTAssertTrue(app.staticTexts["\(lastName) \(firstName)"].exists)
         tapInteropButton("patient-archive-confirm-button")
@@ -2640,7 +2852,10 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertFalse(app.buttons["patient-cell-\(patientID)"].exists, "Archived patient must leave the active list")
         selectInteropPatientScope("Archiviati")
         openCreatedPatient()
+        tapInteropButton("patient-actions-overflow")
         XCTAssertTrue(app.buttons["unarchive-patient-button"].exists)
+        XCTAssertEqual(app.buttons.matching(identifier: "unarchive-patient-button").count, 1)
+        XCTAssertTrue(app.buttons["unarchive-patient-button"].isEnabled)
         try checkpoint("archived", version: 3, archived: true)
 
         tapInteropButton("unarchive-patient-button")
@@ -2652,6 +2867,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         openCreatedPatient()
         try checkpoint("reactivated", version: 4)
 
+        tapInteropButton("patient-actions-overflow")
         tapInteropButton("soft-delete-patient-button")
         XCTAssertTrue(app.staticTexts["\(lastName) \(firstName)"].exists)
         fillInteropField("patient-delete-reason-field", value: "Eliminazione sintetica \(input.runID)")

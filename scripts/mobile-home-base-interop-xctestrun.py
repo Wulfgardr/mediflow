@@ -25,11 +25,13 @@ PHASE_METHODS = {
     'prosthetic': 'testRealPairedProstheticCreateAndTestWithIndependentRereads',
     'scale': 'testRealPairedScaleSubmissionWithIndependentReread',
     'patient': 'testRealPairedNewPatientLifecycleWithIndependentRereads',
+    'cas-contender': 'testRealPairedDiaryCASContenderPreservesDraftUntilExplicitSave',
+    'cas-peer': 'testRealPairedDiaryCASPeerWritesAndRereadsReconciledEntry',
 }
 
 
-def phase_input(phase, address=None, title=None, entry_id=None, population=None):
-    """Bind a lock proof to positive prior HTTP/UI fixture evidence."""
+def phase_input(phase, address=None, title=None, entry_id=None, population=None, cas=None):
+    """Bind opt-in phases to positive prior HTTP/UI fixture evidence."""
     if phase not in PHASE_METHODS:
         raise ValueError('Unknown interoperability phase.')
     if phase in ('reread', 'lock') and not (address and title):
@@ -38,10 +40,28 @@ def phase_input(phase, address=None, title=None, entry_id=None, population=None)
         raise ValueError('Lock requires a persisted diary ID and a positive in-range population count.')
     if phase != 'lock' and (entry_id is not None or population is not None):
         raise ValueError('Lock-only expectations must select the lock phase explicitly.')
-    return {key: value for key, value in (
+    is_cas = phase in ('cas-contender', 'cas-peer')
+    if is_cas != (cas is not None):
+        raise ValueError('A CAS phase requires its explicit, previously observed case.')
+    if cas is not None:
+        if not isinstance(cas, dict) or cas.get('schemaVersion') != 1 or cas.get('synthetic') is not True:
+            raise ValueError('CAS case must be synthetic v1.')
+        for key in ['fixtureId', 'groupID', 'patientId', 'entryID', 'baseTitle', 'baseBody']:
+            if not isinstance(cas.get(key), str) or not cas[key].strip():
+                raise ValueError('CAS case needs exact positive prior UI/read values.')
+        if not re.fullmatch(r'[A-Za-z0-9._-]{1,100}', cas['groupID']):
+            raise ValueError('CAS group ID must be bounded and artifact safe.')
+        if type(cas.get('baseVersion')) is not int or cas['baseVersion'] < 1:
+            raise ValueError('CAS case requires its actual prior version.')
+        if cas.get('baseType') not in ['note', 'visit', 'phone', 'other'] or '\n' in cas['baseBody'] or '\r' in cas['baseBody']:
+            raise ValueError('CAS requires the observed one-paragraph manual entry fixture.')
+    result = {key: value for key, value in (
         ('expectedAddress', address), ('expectedDiaryTitle', title),
         ('expectedDiaryID', entry_id), ('expectedPopulationInRange', population),
     ) if value is not None}
+    if cas is not None:
+        result['cas'] = cas
+    return result
 
 
 def rebase(value, test_root):
@@ -91,6 +111,7 @@ def main():
     parser.add_argument('--expected-diary-title')
     parser.add_argument('--expected-diary-id')
     parser.add_argument('--expected-population-in-range', type=int)
+    parser.add_argument('--cas-case', type=Path)
     parser.add_argument('--previous-descriptor', action='append', type=Path, default=[])
     parser.add_argument('--output', required=True, type=Path)
     args = parser.parse_args()
@@ -105,9 +126,20 @@ def main():
         parser.error('An explicit synthetic v1 descriptor is required.')
     if not re.fullmatch(r'[A-Za-z0-9._-]{1,100}', args.run_id):
         parser.error('Run ID must be a bounded artifact-safe marker.')
+    cas = None
+    if args.cas_case:
+        case_info = args.cas_case.lstat()
+        if not stat.S_ISREG(case_info.st_mode) or case_info.st_mode & 0o077:
+            parser.error('CAS case must be a private regular file.')
+        try:
+            cas = json.loads(args.cas_case.read_text())
+        except (ValueError, OSError):
+            parser.error('CAS case could not be read as JSON.')
+        if not isinstance(cas, dict) or cas.get('fixtureId') != descriptor['fixtureId'] or cas.get('patientId') != descriptor['patient']['id']:
+            parser.error('CAS case belongs to another fixture or patient.')
     try:
         expectations = phase_input(args.phase, args.expected_address, args.expected_diary_title,
-                                   args.expected_diary_id, args.expected_population_in_range)
+                                   args.expected_diary_id, args.expected_population_in_range, cas)
     except ValueError as error:
         parser.error(str(error))
     payload = {
