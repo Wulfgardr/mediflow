@@ -14,9 +14,16 @@ import twin from './twin-diary.module.css';
 
 interface TimelineProps {
     entries: TimelineEntryData[];
+    // @Codex: Shared clinical history, named for the section that owns it.
+    label?: string;
+    emptyMessage?: string;
 }
 
-export default function Timeline({ entries }: TimelineProps) {
+export default function Timeline({
+    entries,
+    label = 'Diario clinico del paziente',
+    emptyMessage = 'Nessuna voce visibile nel diario clinico.',
+}: TimelineProps) {
     const { proposal } = useRuntimeTwinDesign();
     const [showDeleted, setShowDeleted] = useState(false);
     const [viewingFile, setViewingFile] = useState<Attachment | null>(null);
@@ -101,7 +108,7 @@ export default function Timeline({ entries }: TimelineProps) {
         return (
             <div className="space-y-4">
                 <div className="flex justify-end">{auditToggle}</div>
-                <div className="text-center py-10 italic text-[color:var(--lume-ink-muted)]">Nessuna voce visibile nel diario clinico.</div>
+                <div className="text-center py-10 italic text-[color:var(--lume-ink-muted)]">{emptyMessage}</div>
             </div>
         );
     }
@@ -113,7 +120,7 @@ export default function Timeline({ entries }: TimelineProps) {
             <div
                 className={proposal ? twin.diary : 'relative ml-3 space-y-3 pb-8'}
                 role="feed"
-                aria-label="Diario clinico del paziente"
+                aria-label={label}
             >
                 {!proposal && <LumeFilo
                     variant="spina"

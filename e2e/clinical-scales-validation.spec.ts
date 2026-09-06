@@ -35,7 +35,12 @@ test('Untouched/partial scales do not write; explicit zero and complete POMA-28 
         await next.click();
     }
     await expect.poll(() => writes).toBe(1);
-    await expect(page).not.toHaveURL(/\/scales\/adl$/);
+    await expect(page).toHaveURL(new RegExp(`/patients/${patientId}/modules#scale$`));
+    // @Codex: A successful write must be independently readable in the patient chart.
+    const history = page.getByRole('feed', { name: 'Storico delle scale del paziente', exact: true });
+    await expect(history.getByRole('article')).toHaveCount(1);
+    await expect(history.getByRole('article').first()).toContainText('ADL (Indice di Katz)');
+    await expect(history.getByRole('article').first()).toContainText('Punteggio: 0');
 
     await page.goto(`/patients/${patientId}/scales/tinetti`);
     await expect(page.getByText(/Versione Tinetti precedente ritirata/)).toBeVisible();
@@ -53,5 +58,14 @@ test('Untouched/partial scales do not write; explicit zero and complete POMA-28 
         await next.click();
     }
     await expect.poll(() => writes).toBe(2);
-    await expect(page).not.toHaveURL(/\/scales\/tinetti-poma28-v1$/);
+    await expect(page).toHaveURL(new RegExp(`/patients/${patientId}/modules#scale$`));
+    await page.reload();
+    const records = history.getByRole('article');
+    await expect(records).toHaveCount(2);
+    await expect(records.nth(0)).toContainText('Tinetti POMA-28 (v1)');
+    await expect(records.nth(0)).toContainText('Punteggio: 28');
+    await expect(records.nth(0).getByTestId('scale-provenance-notice')).toContainText('NHS FPS 006 V1 (2012)');
+    await expect(records.nth(1)).toContainText('ADL (Indice di Katz)');
+    await expect(records.nth(1)).toContainText('Punteggio: 0');
+    expect(writes).toBe(2);
 });
