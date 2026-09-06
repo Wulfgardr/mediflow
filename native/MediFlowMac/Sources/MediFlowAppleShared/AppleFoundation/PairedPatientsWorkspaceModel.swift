@@ -21,7 +21,9 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         let displayName: String?
         let ambulatoryName: String?
     }
-    @Published private(set) var operatorIdentity: OperatorIdentity?
+    @Published private(set) var operatorIdentity: OperatorIdentity? {
+        didSet { if oldValue?.userId != operatorIdentity?.userId { discardCachedPatientPresentation() } } // @Codex
+    }
     @Published var serverURL = HomeBasePairedSettings.defaultServerURL {
         didSet { invalidateLoginIfChanged(oldValue, serverURL) }
     }
@@ -39,6 +41,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     @Published var ambulatoryId = "" {
         didSet {
             guard oldValue.trimmedOrNil != ambulatoryId.trimmedOrNil else { return }
+            discardCachedPatientPresentation() // @Codex
             invalidatePatientLoadContext()
             clearSelectedPatientWorkspace()
         } // @Codex
@@ -302,7 +305,18 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     private let cacheStore: HomeBasePatientCacheStore
     private let automaticActions: AppleFoundationLaunchOverrides.AutomaticActions
     private var didPerformAutomaticActions = false
-    private var sessionCookie: String?
+    private var sessionCookie: String? {
+        didSet { if oldValue != sessionCookie { discardCachedPatientPresentation() } } // @Codex
+    }
+    /* @Codex */
+    @Published private(set) var cacheMetadata: HomeBasePatientCacheMetadata?
+    @Published private(set) var cachedPatientProfile: HomeBasePatientDetail?
+    @Published private(set) var cachedProfileMetadata: HomeBasePatientCacheMetadata?
+    @Published private(set) var cachedProfileLockedFields: Set<String> = []
+    private var cacheExpiryTask: Task<Void, Never>?
+    private var displayedCacheContext: HomeBasePatientCacheContext?
+    private var cacheReadsInvalidated = false
+    var cacheIsStale: Bool { cacheMetadata?.isStale == true || cachedProfileMetadata?.isStale == true }
     /* @Codex */
     private var loginGeneration: UInt = 0
     private var newEntryDraftId = UUID().uuidString
@@ -446,6 +460,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     func configurePairedOnlineForTests(
         credentials: HomeBasePairedCredentials = HomeBasePairedCredentials(clientId: "test-client", clientToken: "test-token"),
         sessionCookie: String = "sid=test",
+        operatorId: String? = nil,
         masterKey: SymmetricKey? = nil,
         patients: [HomeBasePatientSummary] = [],
         selectedPatient: HomeBasePatientDetail? = nil,
@@ -456,6 +471,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         self.pairedClientId = credentials.clientId
         self.pairedClientToken = credentials.clientToken
         self.sessionCookie = sessionCookie
+        self.operatorIdentity = operatorId.map { OperatorIdentity(userId: $0, displayName: nil, ambulatoryName: nil) }
         self.masterKey = masterKey
         self.patients = patients
         self.selectedPatient = selectedPatient
@@ -789,6 +805,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     }
 
     func lockSessionNow() async {
+        discardCachedPatientPresentation() // @Codex: hide the historical copy before awaiting remote logout.
         invalidateLoginGeneration()
         let operationID = beginExclusiveOperation()
         errorMessage = nil
@@ -841,6 +858,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         masterKey = CryptoService.unwrapMasterKeyVersioned(blob: wrapped, pin: pin, salt: salt)
     }
 
+    /* @Codex */
     func loadPatients(includeDeleted: Bool = false) async {
         guard let sessionCookie else {
             errorMessage = "Esegui prima la login operatore."
@@ -851,68 +869,77 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             return
         }
         let selectionBeforeRefresh = selectedPatientID
-        await runTask {
+        let scope = ambulatoryId.trimmedOrNil
+        let server = serverURL
+        let pin = tlsPin
+        let generation = loginGeneration
+        let cacheContext = patientCacheContext
+        let client = makeClient()
+        let requestIsCurrent = {
+            self.sessionCookie == sessionCookie && self.pairedCredentials == credentials
+                && self.ambulatoryId.trimmedOrNil == scope && self.serverURL == server
+                && self.tlsPin == pin && self.loginGeneration == generation
+                && self.patientCacheContext == cacheContext
+        }
+        await runTask({
+            let listGeneration = self.workspaceGeneration
+            let canPublishList = { requestIsCurrent() && self.workspaceGeneration == listGeneration }
+            let summaries: [HomeBasePatientSummary]
             do {
-                /* @Codex */
-                let summaries = if includeDeleted {
-                    try await self.makeClient().fetchPatients(
-                        credentials: credentials,
-                        sessionCookie: sessionCookie,
-                        ambulatoryId: self.ambulatoryId.trimmedOrNil,
-                        includeDeleted: true
-                    )
+                summaries = if includeDeleted {
+                    try await client.fetchPatients(credentials: credentials, sessionCookie: sessionCookie,
+                        ambulatoryId: scope, includeDeleted: true)
                 } else {
-                    try await self.makeClient().fetchPatients(
-                        credentials: credentials,
-                        sessionCookie: sessionCookie,
-                        ambulatoryId: self.ambulatoryId.trimmedOrNil,
-                        includeDiagnoses: true
-                    )
+                    try await client.fetchPatients(credentials: credentials, sessionCookie: sessionCookie,
+                        ambulatoryId: scope, includeDiagnoses: true)
                 }
-                self.patients = summaries
-                .map { PatientFieldCrypto.decryptSummary($0, masterKey: self.masterKey) }
             } catch {
-                if self.restoreCachedPatientList(markOffline: true) {
-                    self.errorMessage = error.localizedDescription
+                guard canPublishList() else { return }
+                if !includeDeleted, Self.permitsCacheFallback(for: error), self.restoreCachedPatientList(markOffline: true) {
+                    // The offline/stale banner carries the failure and freshness, instead of a generic error hiding it.
+                    self.errorMessage = nil
                     return
                 }
+                self.invalidateCacheAfterReadFailure(error)
                 throw error
             }
+            guard canPublishList() else { return }
+            self.discardCachedPatientPresentation()
+            self.patients = summaries.map { PatientFieldCrypto.decryptSummary($0, masterKey: self.masterKey) }
             self.reconcilePatientSelection(selectionBeforeRefresh, in: self.patients)
-            // Best-effort: populate the scope picker. A failure here must not
-            // break the patient load, so keep whatever list we already have.
-            self.availableAmbulatories = (try? await self.makeClient().fetchNetworkAmbulatories(
-                credentials: credentials,
-                sessionCookie: sessionCookie,
-                ambulatoryId: self.ambulatoryId.trimmedOrNil
-            )) ?? self.availableAmbulatories
+            do {
+                let ambulatories = try await client.fetchNetworkAmbulatories(
+                    credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: scope)
+                guard canPublishList() else { return }
+                self.availableAmbulatories = ambulatories
+            } catch {
+                guard canPublishList() else { return }
+                if case HomeBaseClientError.httpStatus(let status, _) = error, status == 401 || status == 403 {
+                    // A revoked session/scope cannot mint a fresh offline snapshot, even on this secondary read.
+                    self.invalidateCacheAfterReadFailure(error)
+                    self.patients = []
+                    self.clearSelectedPatientWorkspace()
+                    throw error
+                }
+                // Other picker failures do not change the completed patient read.
+            }
+            guard canPublishList() else { return }
             do {
                 try self.persistPairing()
-                #if DEBUG
-                if !AppleFoundationDemoMode.skipsStoredPairing {
-                    try self.cacheStore.savePatientList(
-                        self.patients,
-                        serverURL: self.serverURL,
-                        ambulatoryId: self.ambulatoryId.trimmedOrNil
-                    )
+                if !includeDeleted, let cacheContext, self.patientCacheStorageEnabled {
+                    try self.cacheStore.savePatientList(summaries, context: cacheContext)
+                    self.cacheReadsInvalidated = false
                 }
-                #else
-                try self.cacheStore.savePatientList(
-                    self.patients,
-                    serverURL: self.serverURL,
-                    ambulatoryId: self.ambulatoryId.trimmedOrNil
-                )
-                #endif
             } catch {
                 self.errorMessage = "Pazienti caricati, ma il salvataggio locale non e riuscito: \(error.localizedDescription)"
             }
             self.connectionState = .pairedOnline
-            self.reconciliationLine = "Snapshot locale aggiornato. Scritture online con sessione operatore."
+            self.reconciliationLine = "Lettura online completata. Scritture con sessione operatore."
             let visibleCount = includeDeleted ? self.patients.filter { $0.deletedAt != nil }.count : self.patients.count
             self.statusMessage = visibleCount == 0
                 ? (includeDeleted ? "Nessun paziente nel cestino." : "Nessun paziente nello scope corrente.")
                 : "\(visibleCount) pazienti caricati in lettura."
-        }
+        }, canApplyFailure: requestIsCurrent)
     }
 
     /* @Codex */
@@ -944,6 +971,11 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             return
         }
         #endif
+        // @Codex: Cached profiles use a separate read-only presentation, never the online workspace.
+        if connectionState == .cached || connectionState == .pairedOfflineDegraded {
+            restoreCachedPatientProfile(patientID: patient.id)
+            return
+        }
         guard let context = beginPatientLoad(patientID: patient.id, clearingWorkspace: true) else { return }
         errorMessage = nil
         pendingConflict = nil
@@ -956,6 +988,11 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         } catch {
             guard canPublishPatientLoad(context) else { return }
             finishCurrentPatientLoad()
+            if Self.permitsCacheFallback(for: error), restoreCachedPatientList(markOffline: true) {
+                restoreCachedPatientProfile(patientID: patient.id)
+                return
+            }
+            invalidateCacheAfterReadFailure(error)
             applyPatientLoadFailure(error)
         }
     }
@@ -1340,6 +1377,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     // network.replica.write-patient-lifecycle.
     var canCreatePatient: Bool {
         !isWorking
+        && connectionState != .cached && connectionState != .pairedOfflineDegraded // @Codex
         && !newPatientFirstName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         && !newPatientLastName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         && !newPatientTaxCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -3368,6 +3406,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     /* @Codex */
     private func invalidateLoginIfChanged(_ oldValue: String, _ newValue: String) {
         guard oldValue != newValue else { return }
+        discardCachedPatientPresentation() // @Codex
         invalidateLoginGeneration()
     }
 
@@ -3837,6 +3876,11 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     private func publishPatientWorkspace(
         _ payload: PatientWorkspacePayload, context: PatientLoadContext
     ) {
+        // @Codex: Only a current, fully completed read can refresh the bounded encrypted profile.
+        if let cacheContext = patientCacheContext, patientCacheStorageEnabled, !cacheReadsInvalidated {
+            do { try cacheStore.savePatientDetail(payload.detail, context: cacheContext) }
+            catch { errorMessage = "Profilo letto, ma cache locale non aggiornata: \(error.localizedDescription)" }
+        }
         setSelectedPatient(payload.detail, masterKey: context.masterKey)
         entries = payload.entries
         therapies = payload.therapies
@@ -4144,33 +4188,149 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         )
     }
 
-    @discardableResult
-    private func restoreCachedPatientList(markOffline: Bool = false) -> Bool {
+    /* @Codex */
+    private var patientCacheStorageEnabled: Bool {
         #if DEBUG
-        // The encrypted patient cache is a second Keychain item with its own
-        // authorization panel. A scratch session has nothing worth caching and no
-        // business reading a real one.
         if AppleFoundationDemoMode.skipsStoredPairing { return false }
         #endif
+        return !Self.localAuthorityEnabled
+    }
+
+    /* @Codex */
+    private var patientCacheContext: HomeBasePatientCacheContext? {
+        guard patientCacheStorageEnabled, masterKey != nil, let operatorIdentity,
+              let sessionCookie, let credentials = pairedCredentials else { return nil }
+        return HomeBasePatientCacheContext(serverURL: serverURL, ambulatoryId: ambulatoryId.trimmedOrNil,
+            tlsPin: tlsPin, credentials: credentials, operatorId: operatorIdentity.userId, sessionCookie: sessionCookie)
+    }
+
+    /* @Codex */
+    static func permitsCacheFallback(for error: Error) -> Bool {
+        switch error {
+        case HomeBaseClientError.transport(.unreachable), HomeBaseClientError.transport(.timeout): return true
+        default: return false
+        }
+    }
+
+    /* @Codex */
+    private func invalidateCacheAfterReadFailure(_ error: Error) {
+        if Self.permitsCacheFallback(for: error) {
+            discardCachedPatientPresentation()
+            clearSelectedPatientWorkspace()
+            patients = []
+            connectionState = .pairedOfflineDegraded
+            return
+        }
+        cacheReadsInvalidated = true
+        discardCachedPatientPresentation()
+        // Revocation, trust or contract failures must not revive an earlier grant on the next retry.
+        if patientCacheStorageEnabled { try? cacheStore.clear() }
+    }
+
+    /* @Codex */
+    private func discardCachedPatientPresentation() {
+        cacheExpiryTask?.cancel()
+        cacheExpiryTask = nil
+        if displayedCacheContext != nil {
+            patients = []
+            clearSelectedPatientWorkspace()
+        }
+        displayedCacheContext = nil
+        cacheMetadata = nil
+        cachedProfileMetadata = nil
+        cachedPatientProfile = nil
+    }
+
+    /* @Codex */
+    @discardableResult
+    private func restoreCachedPatientList(markOffline: Bool = false) -> Bool {
+        guard !cacheReadsInvalidated, let context = patientCacheContext else { return false }
         do {
-            guard let snapshot = try cacheStore.loadPatientList(
-                serverURL: serverURL,
-                ambulatoryId: ambulatoryId.trimmedOrNil
-            ) else {
-                return false
-            }
-            let selectionBeforeRefresh = selectedPatientID
-            patients = snapshot.patients
-            reconcilePatientSelection(selectionBeforeRefresh, in: patients)
+            guard let snapshot = try cacheStore.loadPatientList(context: context) else { return false }
+            let selection = selectedPatientID
+            clearSelectedPatientWorkspace()
+            displayedCacheContext = context
+            cacheMetadata = snapshot.metadata
+            patients = snapshot.patients.map { PatientFieldCrypto.decryptSummary($0, masterKey: masterKey) }
+            selectedPatientID = Self.reconciledPatientSelectionID(selection, in: patients)
             connectionState = markOffline ? .pairedOfflineDegraded : .cached
-            statusMessage = markOffline ? "\(snapshot.reviewLine) Home-base non raggiungibile." : snapshot.reviewLine
-            reconciliationLine = markOffline
-                ? "Offline degradato: sola consultazione locale. Nessuna scrittura mobile disponibile."
-                : "Snapshot locale pronto. Scritture online dopo accesso operatore."
+            statusMessage = markOffline ? "Home-base non raggiungibile. Copia locale in sola lettura." : "Copia locale in sola lettura."
+            reconciliationLine = snapshot.metadata.reviewLine
+            scheduleCacheExpiry()
             return true
         } catch {
             errorMessage = "Cache locale non leggibile: \(error.localizedDescription)"
             return false
+        }
+    }
+
+    /* @Codex */
+    private func restoreCachedPatientProfile(patientID: String) {
+        clearSelectedPatientWorkspace(preservingSelectionID: patientID)
+        errorMessage = nil
+        guard !cacheReadsInvalidated, let context = patientCacheContext, context == displayedCacheContext else {
+            discardCachedPatientPresentation()
+            return
+        }
+        do {
+            // Re-read TTL and membership on every selection; the displayed list is not a grant.
+            guard let list = try cacheStore.loadPatientList(context: context) else { return }
+            cacheMetadata = list.metadata
+            if list.metadata.isStale {
+                patients = []
+                selectedPatientID = nil
+                reconciliationLine = list.metadata.reviewLine
+                return
+            }
+            guard list.patients.contains(where: { $0.id == patientID }),
+                  let profile = try cacheStore.loadPatientDetail(patientID: patientID, context: context) else {
+                statusMessage = "Profilo non disponibile nella cache. Ricollega il Mac per aprirlo."
+                return
+            }
+            cachedProfileMetadata = profile.metadata
+            if let raw = profile.patient {
+                let fields = [("Indirizzo", raw.address), ("Telefono", raw.phone), ("Caregiver", raw.caregiver),
+                    ("Diagnosi", raw.diagnoses), ("Esenzioni", raw.exemptions), ("Note", raw.notes)]
+                cachedProfileLockedFields = Set(fields.compactMap { label, value in
+                    PatientFieldCrypto.isLocked(value, masterKey: masterKey) ? label : nil
+                })
+            }
+            cachedPatientProfile = profile.patient.map { PatientFieldCrypto.decryptDetail($0, masterKey: masterKey) }
+            reconciliationLine = profile.metadata.reviewLine
+            statusMessage = profile.patient == nil
+                ? "Profilo locale scaduto. Ricollega il Mac."
+                : "Profilo da cache, sola lettura. Le altre sezioni richiedono il Mac collegato."
+            scheduleCacheExpiry()
+        } catch {
+            errorMessage = "Profilo locale non leggibile: \(error.localizedDescription)"
+        }
+    }
+
+    /* @Codex */
+    func refreshOfflineCacheIfNeeded() {
+        guard let displayedCacheContext else { return }
+        guard displayedCacheContext == patientCacheContext else {
+            discardCachedPatientPresentation()
+            return
+        }
+        let profileID = cachedPatientProfile?.id ?? selectedPatientID
+        guard restoreCachedPatientList(markOffline: connectionState == .pairedOfflineDegraded) else {
+            discardCachedPatientPresentation()
+            return
+        }
+        if let profileID, cacheMetadata?.isStale == false { restoreCachedPatientProfile(patientID: profileID) }
+    }
+
+    /* @Codex */
+    private func scheduleCacheExpiry() {
+        cacheExpiryTask?.cancel()
+        let expiries = [cacheMetadata, cachedProfileMetadata].compactMap { $0 }.filter { !$0.isStale }.map(\.expiresAt)
+        guard let expiry = expiries.min() else { return }
+        let delay = max(1, expiry.timeIntervalSinceNow)
+        cacheExpiryTask = Task { [weak self] in
+            do { try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000)) }
+            catch { return }
+            self?.refreshOfflineCacheIfNeeded()
         }
     }
 
@@ -4206,6 +4366,9 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     private func clearSelectedPatientWorkspace(preservingSelectionID: String? = nil) {
         // @Codex: A refresh of the same chart keeps its section; a new context does not.
         if selectedPatientID != preservingSelectionID { activePatientSection = .overview }
+        cachedPatientProfile = nil // @Codex
+        cachedProfileLockedFields = [] // @Codex
+        cachedProfileMetadata = nil // @Codex
         let needsDirectPatientStateInvalidation = selectedPatient == nil
         selectedPatient = nil
         selectedPatientID = preservingSelectionID

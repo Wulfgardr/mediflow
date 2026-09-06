@@ -232,6 +232,7 @@ struct PairedPatientsWorkspaceView: View {
         }
         .onChange(of: scenePhase) { newValue in
             guard newValue == .active else { return }
+            model.refreshOfflineCacheIfNeeded() // @Codex
             Task { await model.checkNetworkRevisionOnForeground() }
         }
     }
@@ -618,7 +619,8 @@ struct PairedPatientsWorkspaceView: View {
                 connectionState: model.connectionState,
                 isWorking: model.isWorking,
                 errorMessage: model.errorMessage,
-                reconciliationLine: model.reconciliationLine
+                reconciliationLine: model.reconciliationLine,
+                cacheIsStale: model.cacheIsStale // @Codex
             )
         ) {
             switch model.connectionState {

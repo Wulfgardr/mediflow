@@ -127,6 +127,46 @@ Decisioni operative:
   - questa ADR non promuove ancora comandi AI remoti su mobile
   - eventuale consultazione di output gia persistiti non cambia questo boundary
 
+## Cache derivata read-only: precisazione 0.8.6 (WUL-676, 2026-09-06)
+
+La cache Apple non e una replica snapshot/mirror di ADR 0035. Il precedente
+limite alla sola lista era il perimetro implementato, non un divieto di
+consultare un profilo derivato. Questa slice consente lista e **ultimo profilo
+paziente letto online**, alle seguenti condizioni:
+
+- Storage locale AES-GCM con la chiave Portachiavi esistente. Il payload resta
+  cifrato integralmente; i campi clinici conservano inoltre il formato ricevuto
+  dall'host e vengono aperti con la master key solo in memoria.
+- Provenienza esatta: URL HTTPS, pin TLS, device paired, digest del token,
+  operatore autenticato, digest della sessione e scope ambulatoriale. Token,
+  cookie, PIN operatore e master key non sono persistiti nella cache.
+- La consultazione richiede la stessa sessione gia autenticata e sbloccata in
+  memoria. Nessun login offline, ripristino prima del login o nuova autorita
+  mobile; gli snapshot v1 privi di questa provenienza non sono riutilizzabili.
+- Il fallback riguarda esclusivamente indisponibilita o timeout di rete.
+  Errori HTTP (inclusi 401/403), trust TLS e risposte non conformi non
+  autorizzano il fallback. Lock, cambio operatore/sessione, pairing, pin o scope
+  rimuovono la presentazione derivata; una lettura negata la invalida.
+- Il TTL massimo resta 24 ore dalla lettura, separato per lista e profilo.
+  Alla scadenza, o se l'orologio precede l'acquisizione, non si espongono righe
+  o campi paziente. Restano metadata cifrati e non identificativi: acquisizione,
+  scadenza, conteggio dell'ultima lista e motivo di inutilizzabilita. Il timer
+  e il ritorno in foreground rivalutano la scadenza; un refresh della lista
+  non prolunga il TTL del profilo.
+- Il profilo e ammesso solo se appartiene alla lista fresca nello stesso
+  contesto, con identita/versione/aggiornamento coincidenti. Un refresh che
+  rimuove, cancella o cambia il paziente invalida il profilo conservato.
+- Il profilo contiene anagrafica e campi manuali; esclude `aiSummary`,
+  `documentInsights`, diario, terapie, controlli, osservazioni, prescrizioni,
+  allegati e artifact. La UI dedicata dichiara questi limiti e non presenta
+  collezioni non acquisite come collezioni vuote. Non abilita editor o export.
+
+Restano esclusi write queue, write offline (anche per ADR 0056), sync,
+riconciliazione automatica, accesso SQLite, nuovi endpoint e nuovi grant.
+La revoca remota non puo essere verificata durante un'interruzione di rete:
+la cache resta una lettura storica entro il TTL, mai prova di autorita corrente.
+Questa precisazione non attesta parity completa ne verifica UI/device.
+
 ## Conseguenze
 
 Positivo:

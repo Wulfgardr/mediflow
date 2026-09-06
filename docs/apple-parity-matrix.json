@@ -497,11 +497,11 @@
       "area": "cache-offline",
       "feature": "Cache pazienti cifrata offline (consultazione degradata)",
       "web": "n-a (web è online contro DB locale)",
-      "native": "partial: iPhone/iPad mostrano loading/error/online/cache/offline/sessione scaduta con azione accessibile e snapshot cifrato AES-GCM lista pazienti (Keychain, TTL 24h, scoping server+ambulatorio); restore offline-degraded in sola lettura. Lo stato visuale stale e coperto da preview/test sintetici, ma il runtime scarta ancora lo snapshot oltre TTL perche il contratto non espone metadata separati. SOLO lista, no dettaglio/sotto-risorse, NO write queue (MobilePairedStatusView.swift; HomeBasePatientCacheStore.swift)",
+      "native": "partial: candidato WUL-676 0.8.6 con lista AES-GCM/Keychain, metadata live di acquisizione/scadenza/motivo e TTL massimo 24h. Alla scadenza restano solo metadata non identificativi. Provenienza vincolata a sessione operatore sbloccata, pairing, scope e pin TLS; fallback solo per rete indisponibile/timeout. Store e modello coprono l’ultimo profilo manuale read-only entro TTL; CachedPatientProfileView e preparata ma il montaggio nelle destinazioni resta al parent. Sotto-risorse, AI/artifact, export e write queue esclusi per contratto (ADR 0048).",
       "boundary": "n-a: derivata dal boundary, mai autorevole (vincolo docs-plan: no seconda source of truth)",
       "gap": "partial",
       "wave": "W1-mobile-core",
-      "evidence": "WUL-556 candidate: MobilePairedStatusPresentationTests e XCUITest iPhone/iPad con fixture sintetiche; WUL-403 resta aperta per metadata stale live; nessuna offline write queue"
+      "evidence": "WUL-676 candidato locale: HomeBasePatientCacheStoreTests, PairedPatientsWorkspaceOfflineCacheTests, MobilePairedStatusPresentationTests e regressioni lifecycle/selection; build Xcode iOS/macOS. WUL-403 resta aperta per integrazione parent e verifica UI/device del candidato; nessuna automazione UI in questa lane."
     },
     {
       "area": "settings-host",
@@ -746,7 +746,7 @@
       "wul556Rows": [
         {"sourceRow": 1, "webCapabilityId": "web-01-anagrafica-paziente-lista-ricerca-view-create-update", "miniCommands": ["patient search", "patient show"], "miniDisposition": "available", "reason": null, "appleGap": "partial", "interpretation": "Mini covers search/show only; broader Apple row residues remain."},
         {"sourceRow": 39, "webCapabilityId": "web-39-blocco-sessione-immediato-stato-sessione", "miniCommands": ["whoami"], "miniDisposition": "available", "reason": null, "appleGap": "full-parity", "interpretation": "Session identity is observable; pairing and local tokens are not agentic grants."},
-        {"sourceRow": 45, "webCapabilityId": "web-45-cache-pazienti-cifrata-offline-consultazione-degradata", "miniCommands": [], "miniDisposition": "manual_only", "reason": "NOT_IN_MINI_PILOT", "appleGap": "partial", "interpretation": "Encrypted read-only list exists; live stale metadata, offline detail and write queue remain absent."},
+        {"sourceRow": 45, "webCapabilityId": "web-45-cache-pazienti-cifrata-offline-consultazione-degradata", "miniCommands": [], "miniDisposition": "manual_only", "reason": "NOT_IN_MINI_PILOT", "appleGap": "partial", "interpretation": "Bounded WUL-676 candidate exposes live freshness metadata and encrypted read-only list/profile storage. Profile renderer awaits parent mounting and UI/device verification. Offline write queue and sub-resources are intentionally excluded by ADR 0048, not parity defects."},
         {"sourceRow": 63, "webCapabilityId": "web-63-get-api-v1-network-capabilities-api-v1-network-identity-api-v1-n", "miniCommands": ["capabilities"], "miniDisposition": "available", "reason": null, "appleGap": "full-parity", "interpretation": "Capability discovery does not authorize clinical operations."}
       ],
       "excludedAvailableRow": {"sourceRow": 11, "miniCommands": ["open-loops"], "reason": "Outside WUL-556 slice."},
@@ -780,7 +780,7 @@
       "webScreenReader": "Current bounded evidence: PASS_BOUNDED on runtime 29b2c94b6a044b1639137403a2228ff172ea3d0f, tree 5706ade800d6a8caf2ab875882f61fe0881b3dd5. Chrome production was foreground, VoiceOver was active and native macOS keyboard input reached the declared focus targets with synthetic data. This does not test the native macOS app or iPhone/iPad VoiceOver; the documenting successor is docs-only.",
       "macOS": "Historical baseline: clipping code integrated; built Xcode 27 bundle PASS at 1100, 1300 and 1600 points; click-map, focus, arrow input and real VoiceOver active before and after",
       "axProbe": "corrected to select native List rows, bind patient-specific detail content and avoid terminating external MediFlow sessions; typecheck and 6/6 tests PASS",
-      "offline": "WUL-556 candidate makes loading/error/online/cache/offline/session-expired visible on iPhone/iPad and defines the stale presentation contract. WUL-403 remains open for live TTL metadata and stale-state wiring."
+      "offline": "WUL-676 candidate wires live TTL/stale metadata and session-bound encrypted cache. The read-only profile renderer awaits parent mounting; WUL-403 remains open for integration and UI/device verification. Offline writes and sub-resource caching remain excluded."
     },
     "controlToActionReference": {
       "canonicalDocument": "docs/parity-matrix.md#control-to-action-map",
@@ -793,7 +793,7 @@
     },
     "verdict": "PARTIAL / HOLD_PROMOTION"
   },
-  "updated": "2026-09-04: closed only the bounded web screen-reader gate on runtime 29b2c94b6a04/tree 5706ade800d6; macOS exact-SHA remains pending and the iPhone/iPad VoiceOver limitation remains accepted, not PASS. Previous: 2026-09-03 corrected the stale capability narrative to 66/30/13/23 and recorded that exact-SHA Xcode proof is release-boundary evidence outside this static manifest. Previous: 2026-08-22 consumed the byte-identical Mini parity manifest from PR #184 head 3fd988b and PR #190 head 1e35733 without changing Apple gap classifications.",
+  "updated": "2026-09-06: WUL-676 local native-cache candidate records live TTL/stale metadata and bounded encrypted profile storage; row 45 remains partial pending parent renderer mounting and UI/device validation. Previous: 2026-09-04: closed only the bounded web screen-reader gate on runtime 29b2c94b6a04/tree 5706ade800d6; macOS exact-SHA remains pending and the iPhone/iPad VoiceOver limitation remains accepted, not PASS. Previous: 2026-09-03 corrected the stale capability narrative to 66/30/13/23 and recorded that exact-SHA Xcode proof is release-boundary evidence outside this static manifest. Previous: 2026-08-22 consumed the byte-identical Mini parity manifest from PR #184 head 3fd988b and PR #190 head 1e35733 without changing Apple gap classifications.",
   "version": 2,
   "summary": {
     "total": 66,

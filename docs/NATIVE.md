@@ -120,11 +120,15 @@ npm run test:parity:smoke
 ```
 
 Nel percorso mobile paired corrente, il target condiviso include anche una cache
-locale derivata della lista pazienti: lo snapshot e cifrato con chiave locale da
-Portachiavi, e valido solo per il medesimo `home-base` / ambulatorio entro una
-soglia breve. Quando il Mac non e raggiungibile, l'app mobile puo mostrare lo
-stato `offline degradato` in sola consultazione; non esistono ancora scritture
-offline o coda di merge mobile.
+locale derivata della lista pazienti. Il candidato WUL-676 (0.8.6, ADR 0048)
+usa AES-GCM/Portachiavi, stessa sessione operatore sbloccata, pairing, scope e
+pin TLS, senza ripristino prima del login. Il TTL massimo e 24 ore: una copia
+scaduta restituisce solo timestamp, scadenza, conteggio e motivo, mai dati
+paziente. Il modello conserva anche l'ultimo profilo manuale letto online,
+con TTL separato e renderer read-only dedicato da montare a cura del parent.
+Sotto-risorse, artifact, export, scritture offline e coda di merge sono esclusi.
+Il fallback e limitato a indisponibilita/timeout di rete; 401/403 e problemi
+TLS non possono autorizzarlo.
 
 Le prime scritture mobile paired esposte nella shell condivisa coprono diario
 clinico, terapie, controlli e osservazioni. Dalla scheda paziente iPhone/iPad si
@@ -259,8 +263,8 @@ coprono esplicitamente iPhone light e iPad dark.
 
 Il pannello `mobile-paired-status` rende distinguibili caricamento, errore,
 online, cache locale, offline in sola lettura e sessione scaduta. La resa stale
-ha preview e test sintetici, ma non è ancora cablata a metadata live: la cache
-oltre il TTL viene scartata. L'azione primaria misura almeno 48 pt, espone label
+e collegata ai metadata live nel candidato WUL-676; oltre il TTL sono nascosti
+i dati paziente, mantenendo visibili acquisizione, scadenza e motivo. L'azione primaria misura almeno 48 pt, espone label
 VoiceOver e supporta `⌘R` e pointer su iPad.
 
 Questa superficie non concede capability. Il gate di consumo `WUL-557` usa il
@@ -276,7 +280,9 @@ Per la slice `WUL-556`, `patient search/show` (riga 1), `whoami` (riga 39) e
 `capabilities` (riga 63) sono disponibili in Mini, ma non colmano i residui
 nativi e non diventano grant. La cache offline (riga 45) resta `manual_only`
 con ragione `NOT_IN_MINI_PILOT`, mentre iPhone/iPadOS restano `partial` per
-metadata stale live, dettaglio offline e write queue assenti. Manifest, receipt,
+integrazione parent del renderer profilo e verifica UI/device ancora aperte.
+I metadata stale sono collegati nel candidato; write queue e sotto-risorse
+restano escluse dal contratto, non un difetto di parity. Manifest, receipt,
 stato paired e token locale non conferiscono autorità agentica. La parity resta
 incompleta fino alla verifica manager e a `WUL-564`.
 
