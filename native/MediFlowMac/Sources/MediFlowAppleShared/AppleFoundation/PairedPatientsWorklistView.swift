@@ -478,9 +478,19 @@ struct PairedPatientsWorklistView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
         #else
-        if dynamicTypeSize.isAccessibilitySize || verticalSizeClass == .compact {
-            // @Codex: Preserve readable identity in the first viewport. Clinical
-            // previews and recency remain available in the patient's chart.
+        if dynamicTypeSize.isAccessibilitySize {
+            // @Codex: Keep clinical context visible with scaled text. A single
+            // wrapping summary avoids separate code, description and count rows.
+            VStack(alignment: .leading, spacing: 6) {
+                patientName(patient)
+                patientMetadata(patient)
+                accessibilityPatientDiagnosis(patient)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+        } else if verticalSizeClass == .compact {
+            // @Codex: Ordinary text in a short viewport keeps the identity-only
+            // row; accessibility text retains its clinical summary above.
             VStack(alignment: .leading, spacing: 6) {
                 patientName(patient)
                 patientMetadata(patient)
@@ -572,6 +582,27 @@ struct PairedPatientsWorklistView: View {
         // @Codex
         .lumeInchiostro(bozza: true)
     }
+
+    #if os(iOS)
+    /* @Codex */
+    @ViewBuilder
+    private func accessibilityPatientDiagnosis(_ patient: HomeBasePatientSummary) -> some View {
+        if let summary = PatientWorklistDiagnosisSummary(rawDiagnoses: patient.diagnoses) {
+            Text(summary.additionalCount > 0
+                 ? "\(summary.displayText)  +\(summary.additionalCount)"
+                 : summary.displayText)
+                .font(.caption)
+                .lineLimit(2)
+                .truncationMode(.tail)
+                .fixedSize(horizontal: false, vertical: true)
+                .lumeInchiostro(bozza: true)
+                .accessibilityLabel(summary.additionalCount > 0
+                    ? "\(summary.displayText). \(summary.additionalAccessibilityLabel)"
+                    : summary.displayText)
+                .accessibilityIdentifier("patient-cell-diagnosis-\(patient.id)")
+        }
+    }
+    #endif
 
     /* @Codex */
     @ViewBuilder
