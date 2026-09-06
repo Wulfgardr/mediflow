@@ -113,6 +113,16 @@ Il setup separa il commit DB dall'autenticazione Web. Il commit puo persistere
 account e impostazioni prima del CAS P3. Solo dopo un CAS riuscito e il flip
 P3 a `ACTIVE` la route puo emettere il cookie bearer.
 
+Emendamento 0.8.6, 6 settembre 2026: quando il setup raccoglie il nome
+dell'ambulatorio e non esiste ancora alcuna sede, la stessa transazione crea
+la prima sede predefinita con quel nome. Il primo utilizzo paired ha cosi un
+ambulatorio reale da selezionare. Sedi gia presenti non vengono rinominate,
+sostituite o promosse; il setup senza nome conserva il comportamento precedente.
+Un errore annulla insieme account, impostazioni e nuova sede. Un diniego P3
+dopo il commit conserva tutti e tre per il recupero tramite login ordinario,
+senza creare duplicati al retry. Nessuna rete, pairing o capability viene
+abilitata da questa inizializzazione.
+
 La risposta di setup riuscita contiene l'UUID gia persistito e una projection
 canonica minima. Non restituisce capability interna, session cell, owner,
 server session o authority caller-owned.

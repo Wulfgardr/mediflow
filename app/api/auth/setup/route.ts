@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
-import { users, settings } from '@/lib/schema';
+import { users, settings, ambulatories } from '@/lib/schema';
 import { v4 as uuidv4 } from 'uuid';
 import bcrypt from 'bcryptjs';
 /* @Codex */
@@ -87,6 +87,15 @@ export async function POST(request: Request) {
             }
             if (ambulatoryName) {
                 tx.insert(settings).values({ key: 'clinicName', value: ambulatoryName }).onConflictDoUpdate({ target: settings.key, set: { value: ambulatoryName } }).run();
+                /* @Codex: first setup creates the named workspace atomically;
+                   existing ambulatory choices remain owned by their settings. */
+                const name = ambulatoryName.trim();
+                if (name && !tx.select({ id: ambulatories.id }).from(ambulatories).limit(1).get()) {
+                    tx.insert(ambulatories).values({
+                        id: uuidv4(), name, type: 'live', isDefault: true,
+                        version: 1, createdAt: new Date(),
+                    }).run();
+                }
             }
         });
 
