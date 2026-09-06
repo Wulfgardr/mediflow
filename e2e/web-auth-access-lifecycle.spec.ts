@@ -1,6 +1,7 @@
 /* @Codex */
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures/isolated-runtime';
 import { randomUUID } from 'node:crypto';
+import { bootstrapUnlockedSession } from './utils';
 
 const STRONG_AUTH_CONTROL_ETAG = /^"[A-Za-z0-9_-]{32,256}"$/u;
 
@@ -11,9 +12,22 @@ function mutationHeaders(etag: string): Record<string, string> {
   };
 }
 
-test('Web access recovers across application lock, logout, and synthetic admin reset', async ({ page }) => {
+test('Web access recovers across application lock, logout, and synthetic admin reset', async ({ page, browser, baseURL }) => {
   const pin = process.env.E2E_PIN || '1234';
   const request = page.request;
+
+  // Bootstrap this test's empty server via ordinary UI, with a real wrapped key.
+  // Close the UI before retiring its session, then exercise the original API lifecycle.
+  const setupContext = await browser.newContext({ baseURL });
+  try {
+    const setupPage = await setupContext.newPage();
+    await bootstrapUnlockedSession(setupPage, pin);
+    await expect(setupPage.getByRole('navigation', { name: 'Navigazione principale', exact: true })).toBeVisible();
+    await setupPage.close();
+    expect((await setupContext.request.post('/api/auth/logout')).status()).toBe(204);
+  } finally {
+    await setupContext.close();
+  }
 
   const bootstrap = await request.get('/api/auth/check', {
     headers: { 'Cache-Control': 'no-store' },
@@ -88,19 +102,22 @@ test('Web access recovers across application lock, logout, and synthetic admin r
   expect(setupCheck.status()).toBe(200);
   await expect(setupCheck.json()).resolves.toMatchObject({ isSetup: false, hasSession: false });
 
-  const setup = await request.post('/api/auth/setup', {
-    headers: mutationHeaders(setupCheck.headers().etag),
-    data: {
-      username: 'recovery-admin',
-      password: '5678',
-      encryptedMasterKey: 'synthetic-encrypted-master-key',
-      salt: 'synthetic-salt',
-      displayName: 'Synthetic Recovery Admin',
-      ambulatoryName: 'Synthetic Recovery Clinic',
-    },
-  });
-  expect(setup.status()).toBe(200);
+  // Re-onboard with a new PIN and ordinary key generation, never a fake crypto blob.
+  const setupResponse = page.waitForResponse(response => new URL(response.url()).pathname === '/api/auth/setup');
+  await bootstrapUnlockedSession(page, '5678');
+  expect((await setupResponse).status()).toBe(200);
+  await expect(page.getByRole('navigation', { name: 'Navigazione principale', exact: true })).toBeVisible();
 
   const afterSetup = await request.get('/api/patients');
   expect(afterSetup.status()).toBe(200);
+
+  // A new browser context must also unlock the newly configured account using its real key.
+  const recoveredContext = await browser.newContext({ baseURL });
+  try {
+    const recoveredPage = await recoveredContext.newPage();
+    await bootstrapUnlockedSession(recoveredPage, '5678');
+    await expect(recoveredPage.getByRole('navigation', { name: 'Navigazione principale', exact: true })).toBeVisible();
+  } finally {
+    await recoveredContext.close();
+  }
 });

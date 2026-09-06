@@ -2,6 +2,7 @@ name: E2E (Playwright)
 
 # Playwright end-to-end smoke for the local-first web app. Boots a seeded, ephemeral
 # Next.js dev server against a throwaway SQLite DB and runs the e2e/*.spec.ts suite.
+# The destructive auth lifecycle test starts its own production process and empty DB.
 #
 # Node 24: npm ci rebuilds the native better-sqlite3 binding against the Node 24 ABI,
 # so the server can open the SQLite database. The web-core.yml gate also runs on Node 24.
@@ -48,6 +49,34 @@ jobs:
 
       - name: Install Playwright chromium
         run: npx playwright install --with-deps chromium
+
+      # @Codex: build once, then keep an immutable copy outside the dev dist directory.
+      # The reset test must never reset the suite's shared account or database.
+      - name: Prepare standalone bundle for isolated auth lifecycle
+        run: |
+          test -z "$(git status --porcelain)"
+          export MEDIFLOW_APP_REVISION="$(git rev-parse --short=12 HEAD)"
+          export MEDIFLOW_APP_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+          export MEDIFLOW_APP_WORKTREE_HASH=clean
+          unset MEDIFLOW_APP_SOURCE_FINGERPRINT MEDIFLOW_APP_FINGERPRINT
+          unset E2E_BASE_URL E2E_PIN MEDIFLOW_RUNTIME_TWIN NEXT_PUBLIC_MEDIFLOW_RUNTIME_TWIN
+          # Build-time storage is separate from both runtime fixtures and never reused.
+          E2E_BUILD_DATA="$(mktemp -d "${RUNNER_TEMP}/mediflow-build-data.XXXXXX")"
+          export MEDIFLOW_DATA_DIR="${E2E_BUILD_DATA}"
+          export MEDIFLOW_E2E_DATA_DIR="${E2E_BUILD_DATA}"
+          export MEDIFLOW_E2E_DISABLE_LEGACY_COPY=1 E2E_DISABLE_LEGACY_COPY=1
+          npm run build
+          E2E_AUTH_RUNTIME="$(mktemp -d "${RUNNER_TEMP}/mediflow-auth-runtime.XXXXXX")"
+          cp -R "${MEDIFLOW_NEXT_DIST_DIR}/standalone/." "${E2E_AUTH_RUNTIME}/"
+          mkdir -p "${E2E_AUTH_RUNTIME}/public" "${E2E_AUTH_RUNTIME}/${MEDIFLOW_NEXT_DIST_DIR}/static"
+          cp -R public/. "${E2E_AUTH_RUNTIME}/public/"
+          cp -R "${MEDIFLOW_NEXT_DIST_DIR}/static/." "${E2E_AUTH_RUNTIME}/${MEDIFLOW_NEXT_DIST_DIR}/static/"
+          {
+            printf 'E2E_ISOLATED_STANDALONE_DIR=%s\n' "${E2E_AUTH_RUNTIME}"
+            printf 'MEDIFLOW_APP_REVISION=%s\n' "${MEDIFLOW_APP_REVISION}"
+            printf 'MEDIFLOW_APP_BRANCH=%s\n' "${MEDIFLOW_APP_BRANCH}"
+            printf 'MEDIFLOW_APP_WORKTREE_HASH=%s\n' "${MEDIFLOW_APP_WORKTREE_HASH}"
+          } >> "$GITHUB_ENV"
 
       - name: Seed ephemeral e2e database
         run: |
