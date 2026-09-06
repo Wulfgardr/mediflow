@@ -147,7 +147,8 @@ test('onboarding: persisted preview, resume, changed recommendation, manual entr
     await panel.getByRole('link', { name: 'Apri la cartella manualmente' }).click();
     await expect(page).toHaveURL(/[?&]area=turno/);
     await page.goto('/');
-    await expect(page).toHaveURL(/[?&]area=governance/);
+    await expect(page.getByRole('heading', { name: /Stato operativo/, level: 1 })).toBeVisible();
+    await expect(page.getByRole('complementary', { name: 'MediFlow', exact: true }).getByRole('link', { name: 'Impostazioni', exact: true })).toHaveAttribute('aria-current', 'page');
     await page.goto('/settings/profilo');
     await expect(panel.getByText(/Profilo salvato:/)).toContainText('Agent');
     await page.screenshot({ path: test.info().outputPath('saved-profile.png'), fullPage: true });
