@@ -5,6 +5,9 @@ struct PairedPatientsWorkspaceView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.clinicalPatientNavigation) private var linkedPatient // @Codex
+    @Environment(\.clinicalNavigationInteraction) private var navigationInteraction // @Codex
+    @State private var navigationInteractionID = UUID() // @Codex
     @ObservedObject private var model: PairedPatientsWorkspaceModel
     // S6 (D7-bis): gates the new document surfaces on the effective capability
     // matrix returned for this pairing. The server downgrades host-supported but
@@ -206,6 +209,18 @@ struct PairedPatientsWorkspaceView: View {
 
     private var eventWorkspace: some View {
         sheetWorkspace
+        // @Codex: A deep link must not replace the patient behind an existing
+        // scale, confirmation or document/setup sheet. Keep their state owners.
+        .onAppear {
+            navigationInteraction?.register(navigationInteractionID, { navigationPresentationIsOpen })
+        }
+        .onDisappear { navigationInteraction?.unregister(navigationInteractionID) }
+        #if os(macOS)
+        // @Codex: The split already shows the selected patient. Consume this
+        // one-shot intent so returning to the workspace cannot replay it.
+        .onAppear { revealLinkedPatient(isWide: true) }
+        .onChange(of: linkedPatient?.id) { _ in revealLinkedPatient(isWide: true) }
+        #endif
         // @Codex: The archive summary remains available when Documents is not mounted.
         .task(id: attachmentReadPatientID) {
             guard attachmentReadPatientID != nil, model.attachmentsLoadState == .idle else { return }
@@ -371,6 +386,12 @@ struct PairedPatientsWorkspaceView: View {
         #else
         GeometryReader { proxy in
             mobileWorkspace(containerWidth: proxy.size.width)
+                // @Codex: Reuse the existing width decision; this only opens
+                // the chart selected by a successfully completed navigation read.
+                .onAppear { revealLinkedPatient(isWide: usesSplitLayout(containerWidth: proxy.size.width)) }
+                .onChange(of: linkedPatient?.id) { _ in
+                    revealLinkedPatient(isWide: usesSplitLayout(containerWidth: proxy.size.width))
+                }
                 .onChange(of: usesSplitLayout(containerWidth: proxy.size.width)) { isWide in
                     compactPatientID = isWide ? nil : model.selectedPatientID
                 }
@@ -379,6 +400,23 @@ struct PairedPatientsWorkspaceView: View {
             compactPatientDestination
         }
         #endif
+    }
+
+    /* @Codex */
+    private func revealLinkedPatient(isWide: Bool) {
+        guard let linkedPatient else { return }
+        if model.selectedPatient?.id == linkedPatient.patientID {
+            compactPatientID = isWide ? nil : linkedPatient.patientID
+        }
+        linkedPatient.consume()
+    }
+
+    private var navigationPresentationIsOpen: Bool {
+        showsConnectionSetup || confirmsClearingPairing || presentingScale != nil
+            || entryDeletionCandidate != nil || patientLifecycleSheet != nil
+            || attachmentDetailCandidate != nil || isPickingAttachmentFile || pickedPhotoItem != nil
+            || confirmsDeletingTherapy || confirmsDeletingCheckup || confirmsDeletingObservation
+            || confirmsReplacingEntryTemplate || confirmsFHIRExport
     }
 
     #if !os(macOS)

@@ -102,6 +102,7 @@ public final class MediFlowMacSceneModel: ObservableObject {
 
     public func createPatient() {
         guard canCreatePatient else { return }
+        navigationRouter.cancel() // @Codex
         workspaceModel?.startCreatingPatient()
     }
 
@@ -112,12 +113,17 @@ public final class MediFlowMacSceneModel: ObservableObject {
 
     public func refresh() {
         guard section == .patients, canRefresh, let workspaceModel else { return }
+        navigationRouter.cancel() // @Codex
         Task { await workspaceModel.loadPatients() }
     }
 
     public func select(_ section: ClinicalWorkspaceSection) {
+        navigationRouter.cancel() // @Codex
         self.section = section
     }
+
+    // @Codex: Each scene owns its URL intent; no broadcast or persisted routing.
+    let navigationRouter = ClinicalNavigationRouter()
 }
 
 /// Root scene content of the macOS app.
@@ -178,6 +184,12 @@ public struct MediFlowMacRootView: View {
             isPresented: $isInspectorPresented
         ))
         .focusedSceneValue(\.clinicalWorkspaceNavigationAction, navigationAction)
+        .modifier(ClinicalNavigationReception(
+            router: scene.navigationRouter, platform: .macOS, workspace: scene.workspaceModel,
+            navigate: { area in
+                if let target = ClinicalWorkspaceSection(rawValue: area.rawValue) { scene.section = target }
+            }
+        ))
         .task {
             // Keeps the paired-snapshot read out of the scene initialiser, which
             // is the right place for it not to be: a scene initialiser should not
@@ -219,7 +231,7 @@ public struct MediFlowMacRootView: View {
     /* @Codex */
     private var workspaceNavigation: some View {
         HStack(spacing: 20) {
-            Picker("Area di lavoro", selection: $scene.section) {
+            Picker("Area di lavoro", selection: Binding(get: { scene.section }, set: scene.select)) {
                 ForEach(ClinicalWorkspaceSection.clinicalSections) { section in
                     Text(section.title)
                         .tag(section)

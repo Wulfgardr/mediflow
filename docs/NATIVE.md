@@ -62,6 +62,52 @@ La base corrente va letta cosi:
 
 ---
 
+## Deep link locali di navigazione (row32)
+
+Il contratto locale, entro ADR 0048, usa lo schema `mediflow` e il solo
+destinatario `navigate`. Non e un ingresso API o di pairing. Forme ammesse:
+
+```text
+mediflow://navigate?area=agenda
+mediflow://navigate?area=patients&paziente=patient-synthetic-01&section=diary
+```
+
+`area` nomina una destinazione gia presente: `patients`, `agenda`, `diary`,
+`analytics`, `scales`, `settings`, `runtime`, `overview`, `milestones`; su macOS
+anche `host` e `repertori`. `paziente` e ammesso solo con `area=patients` e indica
+un ID opaco da risolvere con il reader ordinario nello scope della sessione
+corrente, mai un record fornito dal link. L'ID contiene solo lettere ASCII,
+cifre, trattino, underscore o punto (1–512 byte; esclusi `.` e `..`).
+`section` richiede `paziente`: `overview` (default), `diary`, `scales`,
+`therapies`, `clinical`, `prescriptions`, `documents`.
+
+Il parser rifiuta chiavi sconosciute o ripetute, URL oltre 2048 byte, path,
+fragment, porta o credenziali. Token, PIN, dati clinici, configurazione host e
+URL esterni non appartengono al contratto. Il client non persiste il link ne lo
+registra nei propri log. Il custom scheme non autentica chi lo apre: l'app resta bloccata
+senza sessione ordinaria sbloccata e non riprende il link dopo il login; occorre
+riaprirlo esplicitamente. Non esegue login, salvataggi, export, upload o altri
+comandi e non concede capability. I controlli delle viste rimangono attivi.
+
+La navigazione appartiene alla singola finestra. Un nuovo link o una navigazione
+manuale nell'area globale invalida il precedente intento in corso. Prima di
+cambiare paziente, il raccordo del workspace controlla sessione/scope correnti,
+selezione e bozze; un blocco conserva la cartella e il testo presenti. Una
+risposta tardiva non puo riaprire una destinazione superata. Solo il successo
+del reader e della selezione emette la presentazione del dettaglio compatto;
+nessuna ricostruzione dello split o sostituzione del modello e necessaria.
+
+Parser/router e integrazione OS sono verifiche distinte: i test con un reader
+sostituito non attestano pairing reale, apertura del link dal sistema operativo
+o interazione su iPhone/iPad. La row32 resta `partial` finche i relativi percorsi
+interattivi non sono verificati; il confine Mini resta `manual_only`.
+
+Verifica locale della slice (2026-09-06): 84 test SwiftPM passano, comprendendo
+parser/router, selezione con reader ordinario e transport sostituito, lifecycle
+e cache. Le build Debug Mac e iOS Simulator generica passano con Xcode 26.6
+(17F113), senza signing; entrambi i bundle contengono la registrazione dello
+schema `mediflow`. Queste prove non attestano apertura OS o pairing reale.
+
 ## Requisiti e setup rapido
 
 1. **Xcode corrente compatibile con Swift 5.9**; per i gate locali viene usato
