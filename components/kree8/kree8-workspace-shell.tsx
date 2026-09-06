@@ -3,6 +3,7 @@
 /* @Codex */
 
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { ArrowLeft, ChevronRight, FolderOpen, type LucideIcon } from 'lucide-react';
 
@@ -79,6 +80,8 @@ export function Kree8WorkspaceShell({
      aria-current stantio invece di ereditarlo. */
   const activeHrefRef = useRef<string | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+  const patientTitleRef = useRef<HTMLHeadingElement>(null);
+  const pathname = usePathname();
   const railId = useId();
   const [openGroups, setOpenGroups] = useState<Partial<Record<Kree8ClinicalRailDefinition[number]['id'], boolean>>>({
     'quadro-decisioni': true,
@@ -93,6 +96,14 @@ export function Kree8WorkspaceShell({
   const [folderNavOpen, setFolderNavOpen] = useState(false);
   const folderToggleRef = useRef<HTMLButtonElement>(null);
   const folderMode = isClinical && proposal;
+
+  /* @Codex: the patient arrives after its asynchronous read, after Next's
+     route focus pass. Orient keyboard users when that destination mounts;
+     never replace a focus they have already placed on another control. */
+  useEffect(() => {
+    if (!isClinical || document.activeElement !== document.body) return;
+    patientTitleRef.current?.focus({ preventScroll: true });
+  }, [folderMode, isClinical, pathname]);
 
   /* @Codex: the existing anchors are the folder's navigation contract, including
      deep links and Back/Forward. A selection changes visibility, never data. */
@@ -267,7 +278,7 @@ export function Kree8WorkspaceShell({
         >
           {folderMode ? <>
             <div className={twin.identity}>
-              <h1><PrivacyBlur>{title}</PrivacyBlur></h1>
+              <h1 ref={patientTitleRef} tabIndex={-1}><PrivacyBlur>{title}</PrivacyBlur></h1>
               <p>{patientAtoms.slice(0, 2).map((atom, index) => <span key={atom}>{index > 0 ? ' · ' : ''}<PrivacyBlur>{atom}</PrivacyBlur></span>)}</p>
             </div>
             <div className={twin.actions}>
@@ -296,7 +307,7 @@ export function Kree8WorkspaceShell({
           {isClinical ? (
             <div className={styles.clinicalIdentity}>
               <p className={styles.clinicalLabel}>{eyebrow}</p>
-              <h1 className={styles.clinicalName}><PrivacyBlur>{title}</PrivacyBlur></h1>
+              <h1 ref={patientTitleRef} tabIndex={-1} className={styles.clinicalName}><PrivacyBlur>{title}</PrivacyBlur></h1>
               <p className={`${styles.clinicalAtoms} lume-registro`} data-testid="lume-scheda-atoms">
                 {patientAtoms.map((atom, index) => (
                   <span key={`${atom}-${index}`} className={styles.clinicalAtomGroup}>
