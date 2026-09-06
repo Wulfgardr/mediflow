@@ -7,7 +7,7 @@ read_when:
 
 # MediFlow 0.8.6 — consolidamento funzionale e interfaccia
 
-Data: 6 settembre 2026. Stato: **candidato funzionale locale in chiusura**, con
+Data: 6 settembre 2026. Stato: **tranche funzionale locale verificata; gate prodotto aperti**, con
 [baseline WUL-670](./analysis/2026-09-05-mediflow-086-baseline.md) su `main`
 `b72ac713b`; la preparazione usava `6a5463e8d`. Nessuna release 0.8.6 consegnata.
 La [roadmap generale](./ROADMAP.md) resta la fonte prodotto;
