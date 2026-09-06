@@ -118,6 +118,9 @@ async function assertWorklistContract(page: Page, marker: string): Promise<void>
   await expect(firstRow).toHaveAttribute('aria-selected', 'true');
   await expect(secondRow).toHaveAttribute('aria-selected', 'false');
   // Single click now opens the record. ArrowDown still changes the selection.
+  // @Codex: compare keyboard selection without a retained pointer hover.
+  await page.mouse.move(0, 0);
+  expect(await firstRow.evaluate((element) => element.matches(':hover'))).toBe(false);
   await firstRow.focus();
   await firstRow.press('ArrowDown');
   await expect(secondRow).toBeFocused();
