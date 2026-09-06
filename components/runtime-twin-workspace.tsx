@@ -4,7 +4,7 @@
    unlocked React session. The SecurityProvider unmounts this frame on lock. */
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { Activity, BookOpen, CalendarDays, ChevronDown, ClipboardList, FolderOpen, LockKeyhole, PanelLeftClose, PanelLeftOpen, Plus, Settings2, Users, X } from 'lucide-react';
 import { db } from '@/lib/db';
 import { useLiveQuery } from '@/lib/live-query';
@@ -24,6 +24,17 @@ const destinations = [
   { href: '/scales', label: 'Scale', icon: ClipboardList },
 ];
 
+/* @Codex: the mounted cockpit publishes its displayed area, including a
+   profile-derived default. This is presentation state, never a URL command. */
+const WorkspaceAreaContext = createContext<((area: string | null) => void) | null>(null);
+export function useRuntimeWorkspaceArea(area: string | null) {
+  const publish = useContext(WorkspaceAreaContext);
+  useEffect(() => {
+    publish?.(area);
+    return () => publish?.(null);
+  }, [area, publish]);
+}
+
 export function RuntimeTwinWorkspace({ children }: { children: ReactNode }) {
   const { enabled, proposal, composition, pendingForms } = useRuntimeTwinDesign();
   const confirm = useConfirm();
@@ -31,12 +42,7 @@ export function RuntimeTwinWorkspace({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const patientId = pathname.match(/^\/patients\/([^/]+)\//)?.[1] ?? null;
   const [opened, setOpened] = useState<string[]>([]);
-  const [area, setArea] = useState('incarico');
-  useEffect(() => {
-    const sync = () => setArea(new URLSearchParams(window.location.search).get('area') || 'incarico');
-    sync(); window.addEventListener('popstate', sync); window.addEventListener('mediflow:twin-area', sync);
-    return () => { window.removeEventListener('popstate', sync); window.removeEventListener('mediflow:twin-area', sync); };
-  }, [pathname]);
+  const [area, setArea] = useState<string | null>(null);
   const [railOpen, setRailOpen] = useState(true);
   /* @Codex: one confirmation boundary for the new route shortcuts. Replay the
      actual link once, so its close-tab action and Next navigation stay atomic.
@@ -76,14 +82,15 @@ export function RuntimeTwinWorkspace({ children }: { children: ReactNode }) {
   }, [key, proposal], [], ['patients']) ?? [];
 
   return (
+    <WorkspaceAreaContext.Provider value={setArea}>
     <div className={styles.workspace} data-twin-workspace data-active={proposal} data-composition={composition} data-rail-open={railOpen}>
       <aside className={styles.rail} aria-label="MediFlow">
         <Link href="/?area=incarico" className={styles.brand}><span className={styles.brandMark}><Plus size={17} aria-hidden /></span><strong>MediFlow</strong></Link>
         <nav aria-label="Navigazione principale" className={styles.navigation}>
-          {destinations.map(({ href, label, icon: Icon }) => <Link key={href} href={href} title={label} aria-label={label} aria-current={(href.includes('?area=') ? (pathname === '/' && href.endsWith(`=${area}`)) || (href.endsWith('=incarico') && pathname.startsWith('/patients/')) : pathname.startsWith(href)) ? 'page' : undefined} onClick={() => { if (href.includes('?area=')) setArea(href.split('=')[1]); }}><Icon size={17} aria-hidden /><span>{label}</span></Link>)}
+          {destinations.map(({ href, label, icon: Icon }) => <Link key={href} href={href} title={label} aria-label={label} aria-current={(href.includes('?area=') ? (pathname === '/' && href.endsWith(`=${area}`)) || (href.endsWith('=incarico') && pathname.startsWith('/patients/')) : pathname.startsWith(href)) ? 'page' : undefined}><Icon size={17} aria-hidden /><span>{label}</span></Link>)}
         </nav>
         <div className={styles.railBottom}>
-          <Link href="/settings" aria-label="Impostazioni" title="Impostazioni" aria-current={pathname.startsWith('/settings') ? 'page' : undefined}><Settings2 size={17} aria-hidden /><span>Impostazioni</span></Link>
+          <Link href="/settings" aria-label="Impostazioni" title="Impostazioni" aria-current={pathname.startsWith('/settings') || (pathname === '/' && area === 'governance') ? 'page' : undefined}><Settings2 size={17} aria-hidden /><span>Impostazioni</span></Link>
           <button type="button" onClick={lock} aria-label="Blocca" title="Blocca"><LockKeyhole size={17} aria-hidden /><span>Blocca</span></button>
         </div>
       </aside>
@@ -105,6 +112,7 @@ export function RuntimeTwinWorkspace({ children }: { children: ReactNode }) {
         <div className={styles.page}>{children}</div>
       </div>
     </div>
+    </WorkspaceAreaContext.Provider>
   );
 }
 

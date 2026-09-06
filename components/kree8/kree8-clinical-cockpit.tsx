@@ -10,6 +10,7 @@ import { type FocusEvent, useCallback, useEffect, useMemo, useRef, useState } fr
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
+import { useRuntimeWorkspaceArea } from '@/components/runtime-twin-workspace';
 import { X } from 'lucide-react';
 
 import {
@@ -216,6 +217,7 @@ export function Kree8ClinicalCockpit({
   const isReview = surface === 'review';
   const operatorName = operatorNameProp || (isReview ? 'Review design' : 'Sessione locale');
   const [area, setArea] = useState<AreaId>(() => (isReview ? 'turno' : initialArea));
+  useRuntimeWorkspaceArea(isReview ? null : area);
   const [areaFocusRequest, setAreaFocusRequest] = useState(0);
   const previousRouteArea = useRef(initialArea);
   const focusSurfaceRef = useRef<HTMLElement>(null);
@@ -264,8 +266,7 @@ export function Kree8ClinicalCockpit({
     if (change.area) url.searchParams.set('area', change.area);
     if (change.patientId) url.searchParams.set('paziente', change.patientId);
     if (url.href !== window.location.href) window.history.replaceState(null, '', url);
-    if (proposal) window.dispatchEvent(new Event('mediflow:twin-area'));
-  }, [isReview, proposal]);
+  }, [isReview]);
   const selectPatient = useCallback((patientId: string) => {
     setSelectedPatientId(patientId);
     updateLocation({ patientId });
@@ -335,12 +336,6 @@ export function Kree8ClinicalCockpit({
     window.addEventListener('keydown', handleGlobalCommand);
     return () => window.removeEventListener('keydown', handleGlobalCommand);
   }, []);
-
-  /* @Codex: the outer frame observes committed query navigation; background
-     data publications never write history or reset a newer route. */
-  useEffect(() => {
-    if (proposal && !isReview) window.dispatchEvent(new Event('mediflow:twin-area'));
-  }, [area, isReview, proposal]);
 
   const selectedPatient = useMemo(
     () => {
