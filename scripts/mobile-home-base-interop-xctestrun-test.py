@@ -1,5 +1,6 @@
 # @Codex
 import importlib.util
+import json
 from pathlib import Path
 import unittest
 
@@ -81,6 +82,36 @@ class PrivateXctestrunTests(unittest.TestCase):
                 target = result['TestConfigurations'][0]['TestTargets'][0]
                 self.assertEqual(target['OnlyTestIdentifiers'], [f'MediFlowMobileAppUITests/{module.PHASE_METHODS[phase]}'])
                 self.assertEqual(target['UITargetAppEnvironmentVariables'], {'OS_ACTIVITY_MODE': 'disable'})
+
+    # @Codex: A CAS case describes a previously observed UI-created entry; it
+    # cannot opt an ordinary run into pairing or alter the application's state.
+    def cas_case(self):
+        return {'schemaVersion': 1, 'synthetic': True, 'fixtureId': 'unit-fixture',
+                'groupID': 'unit-cas', 'patientId': 'unit-patient', 'entryID': 'unit-entry',
+                'baseVersion': 3, 'baseTitle': 'Voce sintetica', 'baseBody': 'Corpo sintetico', 'baseType': 'note'}
+
+    def test_cas_selects_one_explicit_writer_and_keeps_case_in_runner_only(self):
+        for phase in ['cas-contender', 'cas-peer']:
+            with self.subTest(phase=phase):
+                case = self.cas_case()
+                payload = module.phase_input(phase, cas=case)
+                result = module.configure_run(self.source(), Path('/own-build'), payload, module.PHASE_METHODS[phase])
+                target = result['TestConfigurations'][0]['TestTargets'][0]
+                self.assertEqual(target['OnlyTestIdentifiers'], [f'MediFlowMobileAppUITests/{module.PHASE_METHODS[phase]}'])
+                self.assertEqual(json.loads(target['EnvironmentVariables']['MEDIFLOW_INTEROP_INPUT'])['cas'], case)
+                self.assertEqual(target['UITargetAppEnvironmentVariables'], {'OS_ACTIVITY_MODE': 'disable'})
+
+    def test_cas_refuses_unbound_or_ambiguous_prior_values(self):
+        invalid = [None, [], {}, {**self.cas_case(), 'synthetic': False},
+                   {**self.cas_case(), 'groupID': '../another-run'},
+                   {**self.cas_case(), 'baseVersion': True}, {**self.cas_case(), 'baseVersion': 0},
+                   {**self.cas_case(), 'baseBody': 'two\nparagraphs'},
+                   {**self.cas_case(), 'baseType': 'unsupported'}, {**self.cas_case(), 'entryID': ''}]
+        for value in invalid:
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                module.phase_input('cas-contender', cas=value)
+        with self.assertRaises(ValueError):
+            module.phase_input('workflow', cas=self.cas_case())
 
 
 if __name__ == '__main__':
