@@ -18,20 +18,44 @@ read_when:
 > prevalgono [AGENTS.md](../AGENTS.md) e
 > [docs/repository-topology.md](./repository-topology.md).
 
-Ultimo aggiornamento: 2026-09-03 (contenuto sorgente v0.8.5)
+Ultimo aggiornamento: 2026-09-06 (candidato sorgente v0.8.6; promozione aperta)
 
 Nota candidato 0.8.6: [ADR 0119](./adr/0119-anydoc-apple-vision-current-source.md)
 chiarisce la precedenza del percorso AnyDoc + Apple Vision descritto qui.
-Questa fotografia 0.8.5 non è una verifica della release 0.8.6.
+Le osservazioni storiche 0.8.5 riportate sotto mantengono il proprio perimetro;
+non sono verifiche della release 0.8.6.
 
 
 > [!NOTE]
-> Questo documento descrive il contenuto sorgente della `0.8.5`. Check CI su
+> Questo documento distingue il candidato sorgente `0.8.6` dalle prove storiche.
+> Check CI su
 > exact SHA, artifact firmati, tag, GitHub Release e installazione esterna sono
 > evidenze di confine e non si deducono dal solo tree. Lo storico delle versioni
 > vive nel [CHANGELOG](../CHANGELOG.md).
 
 ---
+
+## Aggiornamento di candidatura: 6 settembre 2026
+
+Il [verbale integrato 0.8.6](./analysis/2026-09-06-086-integrated-closeout.md)
+raccoglie commit, toolchain, risultati e limiti delle verifiche successive.
+Il candidato cambia la navigazione web e Apple, rende progressivi i form e
+mantiene la scelta tra barra superiore e laterale sul web. Blocchi, rinnovo
+dell'accesso, letture tardive, bozze e conflitti sono verificati separatamente
+dalla resa grafica e dai flussi reali di pairing.
+
+Windows e Linux ora hanno prove locali su sistemi operativi reali: build del
+runtime Node, avvio da directory vuota, configurazione ordinaria e percorsi
+UI/headless. Runtime, TLS e database delle fixture risiedono nel rispettivo
+guest. Windows usa Node x64 emulato su ARM64 per il pacchetto AnyDoc disponibile;
+Apple Vision resta una funzione del Mac. Le suite complete dei guest e le
+prove UI Apple del candidato sono gate ancora aperti, non parità già attestata.
+
+La suite Node completa conta 3.198 PASS e uno skip previsto; SwiftPM conta
+805 PASS e uno skip previsto. Questi risultati, i dodici run API HTTPS con
+pairing distinti e i test browser descritti nel verbale non sostituiscono
+le sei combinazioni app mobile/home-base. Il candidato non è ancora stato
+pubblicato, unito a main o rilasciato.
 
 ## Aggiornamento di candidatura: 5 settembre 2026
 
@@ -45,14 +69,15 @@ sorgente e il canale binario Apple hanno condizioni di consegna diverse.
 
 MediFlow e una cartella clinica local-first per il lavoro territoriale quotidiano.
 Lo stato corrente non va letto come una semplice web app con AI aggiunta: e un
-sistema locale ibrido in cui il Mac resta il nodo autorevole, il database e
+sistema locale ibrido in cui la postazione home-base resta il nodo autorevole, il database e
 SQLite locale con campi clinici sensibili cifrati lato client, la web app e la
 superficie primaria, la family Apple/native cresce sopra contratti locali
 versionati e ogni integrazione esterna resta dentro boundary documentati.
 
 La fotografia corrente e questa:
 
-- **Superficie primaria**: web app Next.js locale, avviata sul Mac.
+- **Superficie primaria**: web app Next.js locale; il runtime Node è verificato
+  su Mac, Windows e Linux con i limiti di piattaforma riportati sopra.
 - **Principio prodotto**: serve l'informazione giusta nel momento giusto.
   MediFlow è information-first, question-first e convenience-first, non
   AI-first. Resta utile quando ogni provider AI è disabilitato.
@@ -72,9 +97,10 @@ La fotografia corrente e questa:
   artefatti sensibili restano fuori da Git.
 - **Contratto condiviso**: `/api/v1/*` per client native/locali; OpenAPI come
   riferimento anti-drift per la parte stabile.
-- **Home-base**: modalita opt-in in cui il Mac espone `/api/v1/network/*`
+- **Home-base**: modalita opt-in in cui la postazione espone `/api/v1/network/*`
   verso client paired su rete fidata: lettura pazienti e write versionati
-  limitati a profilo/status, diario, terapie, checkup e osservazioni. Quando la
+  limitati a profilo/status, diario, terapie, checkup, osservazioni e prescrizioni;
+  i documenti manuali seguono le classi dell'ADR 0076. Quando la
   modalita e disattivata i pairing restano salvati ma i token dei client paired
   diventano inerti: il data plane risponde `403 NETWORK_MODE_DISABLED` finche
   la modalita non viene riattivata.
@@ -82,8 +108,9 @@ La fotografia corrente e questa:
   apre la shell condivisa, mostra readiness runtime locale e puo gestire
   esplicitamente backend web production e proxy TLS con stop bounded/escalation.
   `MediFlowCore` concentra logica portabile, cifratura, contratti, filtri,
-  clinical scales e store SQLite locale; Linux e Windows oggi verificano la
-  portabilita del core in CI, non una parity applicativa completa.
+  clinical scales e store SQLite locale. Linux e Windows dispongono ora anche
+  delle prove runtime/UI/headless circoscritte nel verbale 0.8.6; non sono
+  front-end SwiftUI nativi né una dichiarazione di parità applicativa completa.
 - **Parity UI 0.8**: iPhone 2/2, iPad 7/7, build/probe macOS e localhost 82/82
   sono PASS della baseline storica `0843726fe`, non una prova implicita per una
   revisione successiva. La disponibilità di Xcode è un prerequisito operativo

@@ -10,7 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Local integrated candidate. This entry does not imply a PR, tag or release.
 
 - The ordinary web UI uses top navigation by default and offers sidebar navigation in Appearance. Patient records open with one click; sections, clinical entry, typography and sliders use the refined layout.
-- Apple patient workspaces show one clinical section at a time, preserve drafts during document consultation and keep finalized Mac transcripts separate until explicitly reviewed. The rich-text editor retains rapidly typed text.
+- Apple patient workspaces show one clinical section at a time, preserve drafts during document consultation and keep finalized Mac transcripts separate until explicitly reviewed. The rich-text editor supports selected inline styles and local undo; saves protect pending drafts, and conflicts require explicit review before another write.
+- Native lock and current-session expiry clear clinical presentation immediately and prevent stale reads from publishing into the next session. The encrypted offline cache remains limited to the patient list and last profile, with no offline write queue.
+- Native operator login and logout use their own session channel. Web access recovery waits for the lock receipt before accepting a new PIN; application lock remains immediate.
+- A first visit to an empty standalone runtime initializes storage and creates the default ambulatory through ordinary setup. Windows and Linux runtime, UI and headless evidence is recorded separately from Apple simulator and paired-client evidence.
 - WHO Search uses an opt-in local sidecar with bounded results, canonical URI provenance and audit receipts. Deployment artifacts and licensing remain to be configured; no live WHO installation is claimed.
 
 - Document extraction exposes AnyDoc/Apple Vision provenance and supports cancelling the wait, discarding late responses and retrying after errors.

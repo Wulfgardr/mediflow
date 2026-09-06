@@ -14,7 +14,59 @@ Questo verbale aggiorna lo stato del candidato. Le prove precedenti della
 il proprio commit e perimetro; non vengono attribuite retroattivamente al
 candidato finale. I contratti dei componenti restano negli ADR pertinenti.
 
-## Verifiche successive alla prima integrazione
+## Verifiche del candidato del 6 settembre, secondo lotto
+
+La build web pulita `868eb3ee6eef367c368a314f98bd15d60dd788b8` ha
+superato Turbopack, TypeScript, 112 route e il controllo del bundle standalone
+su macOS con Node 24.19.0 / ABI 137. La build Windows dello stesso commit
+ha superato webpack e il controllo standalone/AnyDoc con Node 24.19.0 x64
+su Windows 11 ARM64: questa prova usa l'emulazione x64, non un bundle AnyDoc
+nativo ARM64. Le copie compilate e i registri delle impronte sono conservati
+fuori Git; i test successivi non sovrascrivono i bundle dei servizi paired.
+
+| Confine verificato | Risultato e sorgente |
+| --- | --- |
+| Suite unitaria Node completa | `92c106950fd37246856b45cc0315d5ebb4fd8042`: 3.198 PASS, uno skip previsto, zero errori su 3.199 test; 71,1 s di esecuzione, directory sintetica dedicata. |
+| Suite SwiftPM completa | 805 PASS, uno skip previsto per benchmark senza manifest, zero errori su 806 test; 65,5 s. Package tree `a5f3452a9b8cfe39d2bc6472e9312fd8c5aff5a4`, identico al candidato `7d0c8240883e837b6e201c3d34f768ecda35f19b`. Include navigazione, diario, cache, blocco e scadenza della sessione. |
+| Navigazione web, focus e densità della lista | 34 PASS su build `27f3fe0b7f970f7defe703599f3df1b56f2f39df`: tastiera, cambi di paziente, viewport stretti, comandi di riga e lista virtualizzata. Nessun retry o skip. |
+| Percorso web ordinario completo | Tre PASS su build `868eb3ee6`, test `d09572293144ab157b8026370a1a862a00d68126`: impostazioni, agenda, destinazione del paziente e “Apri quadro”; URL, sezione visibile, focus, identità, contenuto, console e pulizia verificati. |
+| Recupero dell'accesso web | Build `3041f8ade`: due test mirati e sei casi originali PASS. Il rinnovo attende la risposta del blocco prima di accettare un nuovo PIN; nessun accesso automatico o allentamento del confine server. |
+| Reset web isolato | Un PASS su processo standalone e database temporaneo propri, con configurazione iniziale e riconfigurazione dalla UI; il test P3 invariato sul servizio separato conserva il PIN originale. Nessuna prova CI implicita. |
+| Linux, sorgente `3c4863f13ddf31a2b2d224bbdbcd06f8fdf99f1c` | Build, primo accesso da directory vuota, sei casi UI ufficiali e scale PASS. Import guard 44 file/quattro superfici, portable 248, MCP 33, Mini 11 e smoke del Supervisor compilato PASS; gruppi non sommabili come casi distinti. |
+
+I primi run falliti restano conservati. La prima suite Node su `868eb3ee6`
+aveva otto errori: sei controlli di inventario/loader e due aspettative AST
+del controllo PIN. Una copia di build inattiva è stata spostata fuori dal
+checkout, senza aggiungere esclusioni ai controlli; l'import webpack del test
+browser è stato reso statico. Il controllo PIN è stato riallineato alle
+preparazioni Web/native già previste dall'ADR 0106 e rifiuta 30 mutazioni
+di sorgente, incluso l'abbandono della barriera dopo il CAS. Nessuna modifica
+del servizio PIN è stata necessaria per questa correzione del controllo.
+La prima suite Swift aveva una sola aspettativa obsoleta sul percorso di
+logout; la ripetizione completa usa `/api/auth/native/logout`.
+
+“Apri quadro” ora apre esplicitamente `#quadro`; l'apertura generica della
+cartella conserva il Diario come vista iniziale del layout B. La prova
+intermedia richiedeva erroneamente sul riepilogo un attributo appartenente
+alle sezioni collassabili: il test finale controlla la visibilità e il link
+di navigazione corrente, mantenendo tutte le verifiche di contenuto e focus.
+
+I client Apple cancellano la presentazione clinica al blocco e al 401 della
+sessione corrente; una risposta tardiva non ripubblica le viste revocate.
+Il salvataggio del diario protegge la bozza durante la richiesta e il
+recupero di un conflitto richiede rilettura, revisione esplicita e un nuovo
+salvataggio. Queste sono verifiche del codice e del modello: non attestano
+la cancellazione fisica di ogni copia temporanea in memoria né sostituiscono
+le prove dell'applicazione con storage ordinario e host reali.
+
+Le suite browser complete dei guest, le 41 prove UI per ciascun simulatore
+e le sei combinazioni app/home-base sono ancora in corso o da eseguire.
+I dodici run HTTPS già riusciti sulle sei combinazioni usano client API
+indipendenti: non sono sei prove dell'interfaccia mobile. I vecchi badge
+della matrice di parità non costituiscono una nuova verifica delle funzioni.
+Non è ancora soddisfatto il gate finale di promozione.
+
+## Verifiche precedenti alla build 868
 
 La build web da worktree pulito
 `cf1a13c307b5a78d53b95ba6327437b0b250cb73` ha superato Turbopack,
