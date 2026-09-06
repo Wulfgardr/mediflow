@@ -45,7 +45,8 @@ export default function ScaleRunnerPage() {
                 attachments: []
             }));
 
-            router.push(`/patients/${patientId}`);
+            // @Codex: Land on the independent reread of the saved evaluation.
+            router.push(`/patients/${patientId}/modules#scale`);
         } catch (error) {
             console.error("Failed to save scale", error);
             showToast({ tone: 'error', title: 'Errore nel salvataggio della valutazione', description: 'Il punteggio non è stato registrato. Riprova.' });

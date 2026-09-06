@@ -364,6 +364,8 @@ export default function PatientDetailPage() {
     const activeEntries = (entries ?? []).filter((entry) => !entry.deletedAt);
     const nonScaleEntries = activeEntries.filter((entry) => entry.type !== 'scale');
     const scaleEntries = activeEntries.filter((entry) => entry.type === 'scale');
+    // @Codex: Keep deleted evaluations available to the existing audited restore flow.
+    const scaleHistoryEntries = (entries ?? []).filter((entry) => entry.type === 'scale');
     /* @Codex WUL-UIUX: il Diario non deve mostrare le compilazioni scala (hanno
        la loro sezione). Manteniamo le voci cancellate per il toggle audit interno
        di Timeline; filtriamo solo il tipo scala, cosi il conteggio del chip torna. */
@@ -908,9 +910,22 @@ export default function PatientDetailPage() {
                         title="Scale di valutazione"
                         icon={Activity}
                         surfaceClassName={workspaceStyles.clinicalSection}
-                        summary="Tinetti POMA-28 v1, MMSE, ADL (Katz), GDS e libreria completa."
+                        count={scaleEntries.length > 0 ? `${scaleEntries.length} registrate` : undefined}
+                        summary="Risultati registrati e nuove valutazioni."
                     >
+                        {/* @Codex: Read stored results without rescoring historical instruments. */}
+                        <div className="mb-8 space-y-4">
+                            <h4 className="text-base font-semibold text-[color:var(--lume-ink)]">Valutazioni registrate</h4>
+                            {entries ? (
+                                <Timeline
+                                    entries={scaleHistoryEntries}
+                                    label="Storico delle scale del paziente"
+                                    emptyMessage="Nessuna valutazione registrata."
+                                />
+                            ) : <p className={workspaceStyles.mutedText}>Valutazioni in caricamento.</p>}
+                        </div>
                         <div className="space-y-3">
+                            <h4 className="text-base font-semibold text-[color:var(--lume-ink)]">Nuova valutazione</h4>
                             {/* @Codex MF085-002: distinct new instrument, never a legacy alias. */}
                             <Link href={`/patients/${id}/scales/tinetti-poma28-v1`} className={workspaceStyles.rowLink}>
                                 <span>Tinetti POMA-28 (v1)</span>
