@@ -21,7 +21,7 @@ const { POST: setup } = await import('../../app/api/auth/setup/route.ts');
 const { POST: login } = await import('../../app/api/auth/login/route.ts');
 const { GET: check } = await import('../../app/api/auth/check/route.ts');
 const { dbServer } = await import('../db-server.ts');
-const { users } = await import('../schema.ts');
+const { users, ambulatories } = await import('../schema.ts');
 const { retire } = await import('./web-auth-lifecycle-owner-adapter.ts');
 const { completeExactWebP3Logout } = await import('./web-auth-logout-server.ts');
 
@@ -70,7 +70,10 @@ test('keeps the committed setup recoverable through ordinary login when final P3
     let failedCommit: Response;
     try {
         console.error = () => undefined;
-        dbServer.transaction = (() => { throw new Error('synthetic transaction failure'); }) as typeof dbServer.transaction;
+        dbServer.transaction = ((callback: Parameters<typeof dbServer.transaction>[0]) => transaction((tx) => {
+            callback(tx);
+            throw new Error('synthetic transaction failure after setup writes');
+        })) as typeof dbServer.transaction;
         failedCommit = await setup(request('/api/auth/setup', {
             username: USERNAME, password: PIN,
             encryptedMasterKey: 'synthetic-wrapped-key', salt: 'synthetic-salt',
@@ -83,6 +86,7 @@ test('keeps the committed setup recoverable through ordinary login when final P3
     assert.equal(failedCommit.status, 500);
     assert.equal(failedCommit.headers.get('set-cookie'), null);
     assert.deepEqual(await dbServer.select({ id: users.id }).from(users).limit(1), []);
+    assert.deepEqual(await dbServer.select().from(ambulatories), []);
 
     const setupControl = await bootstrapControl();
     let successorEtag: string | null = null;
@@ -114,6 +118,11 @@ test('keeps the committed setup recoverable through ordinary login when final P3
     assert.equal(setupResponse.headers.get('set-cookie'), null);
     const persisted = await dbServer.select({ id: users.id }).from(users).limit(1);
     assert.match(persisted[0]?.id ?? '', /^[0-9a-f-]{36}$/u);
+    const initialAmbulatories = await dbServer.select().from(ambulatories);
+    assert.equal(initialAmbulatories.length, 1);
+    assert.equal(initialAmbulatories[0]?.name, 'Synthetic Recovery Ambulatory');
+    assert.equal(initialAmbulatories[0]?.isDefault, true);
+    assert.equal(initialAmbulatories[0]?.version, 1);
 
     assert.ok(successorEtag);
     const retryControl = await bootstrapControl();
@@ -121,6 +130,7 @@ test('keeps the committed setup recoverable through ordinary login when final P3
     assert.equal(retrySetup.status, 409);
     assert.deepEqual(await retrySetup.json(), { error: 'Setup already completed', code: 'SETUP_ALREADY_COMPLETED' });
     assert.equal(retrySetup.headers.get('set-cookie'), null);
+    assert.deepEqual(await dbServer.select().from(ambulatories), initialAmbulatories);
 
     const loginControl = await bootstrapControl();
     const loginResponse = await login(request('/api/auth/login', { username: USERNAME, password: PIN }, loginControl));
