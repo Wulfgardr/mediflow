@@ -1027,6 +1027,7 @@ struct PairedPatientsWorkspaceView: View {
             Image(systemName: "person.text.rectangle")
                 .font(.largeTitle)
                 .foregroundStyle(.secondary)
+                .accessibilityHidden(true) // @Codex: The adjacent text states the empty selection.
             Text("Seleziona un paziente")
                 .font(.headline)
             Text("Scegli un paziente dall'elenco per vederne scheda, diario, terapie, controlli e osservazioni.")
@@ -1037,6 +1038,7 @@ struct PairedPatientsWorkspaceView: View {
         }
         .frame(maxWidth: 420)
         .frame(maxWidth: .infinity, minHeight: 320)
+        .accessibilityElement(children: .contain) // @Codex: Keep the container identifier off its children.
     }
 
     /// Native disclosure for the open patient's identity.
