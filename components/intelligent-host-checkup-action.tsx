@@ -19,7 +19,7 @@ type SelectedResource = Readonly<{ checkupId: string; title: string; revision: n
 type PopoverPosition = Readonly<{ top: number; left: number }>;
 const actionClass = `${workspaceStyles.headerActionButton} min-h-11 min-w-11 sm:min-w-0 disabled:cursor-not-allowed disabled:opacity-[0.55]`;
 const POPOVER_GUTTER = 8;
-const POPOVER_MAX_WIDTH = 22 * 16;
+const POPOVER_WIDTH_REM = 22;
 const POPOVER_MIN_HEIGHT = 160;
 function status(error: unknown): string {
   if (!(error instanceof IntelligentHostCheckupBrowserAdapterError)) return 'Operazione non verificabile.';
@@ -74,11 +74,12 @@ export function IntelligentHostCheckupAction({ patientId, ambulatoryId, checkups
       const rect = actionButton.getBoundingClientRect();
       const viewportWidth = document.documentElement.clientWidth || window.innerWidth;
       const viewportHeight = window.innerHeight;
-      const panelWidth = Math.min(POPOVER_MAX_WIDTH, viewportWidth - POPOVER_GUTTER * 2);
+      const rootFontSize = Number.parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+      const panelWidth = Math.min(POPOVER_WIDTH_REM * rootFontSize, viewportWidth - POPOVER_GUTTER * 2);
       const maxTop = Math.max(POPOVER_GUTTER, viewportHeight - POPOVER_MIN_HEIGHT - POPOVER_GUTTER);
       const maxLeft = Math.max(POPOVER_GUTTER, viewportWidth - panelWidth - POPOVER_GUTTER);
       setPopoverPosition({
-        top: Math.min(rect.bottom + 6, maxTop),
+        top: Math.max(POPOVER_GUTTER, Math.min(rect.bottom + 6, maxTop)),
         left: Math.min(Math.max(POPOVER_GUTTER, rect.left), maxLeft),
       });
     };
