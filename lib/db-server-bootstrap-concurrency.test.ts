@@ -7,9 +7,22 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import Database from 'better-sqlite3';
+import { bootstrapEmptySqliteDatabase } from './sqlite-new-database-bootstrap';
 
 const ROOT_DIR = process.cwd();
 const WORKER_COUNT = 13;
+const FRESH_BOOT_TABLES = [
+    'ambulatories',
+    'users',
+    'patients',
+    'patients_to_ambulatories',
+    'entries',
+    'therapies',
+    'checkups',
+    'attachments',
+    'headless_soap_active_role_attestations',
+    'headless_checkup_active_role_attestations',
+] as const;
 
 function applyBaseMigrations(dbPath: string): void {
     const db = new Database(dbPath);
@@ -52,6 +65,107 @@ function runBootstrapWorker(dataDir: string): Promise<{ code: number | null; out
         child.once('close', (code) => resolve({ code, output }));
     });
 }
+
+/* @Codex */
+test('new-database bootstrap refuses a non-empty unknown schema', () => {
+    const db = new Database(':memory:');
+    try {
+        db.exec('CREATE TABLE external_sentinel (id TEXT PRIMARY KEY NOT NULL)');
+        assert.equal(bootstrapEmptySqliteDatabase(db), false);
+        assert.equal(
+            db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'ambulatories'").get(),
+            undefined,
+        );
+    } finally {
+        db.close();
+    }
+});
+
+/* @Codex */
+test('new-database bootstrap preserves application tables with a sqlite-like prefix', () => {
+    const db = new Database(':memory:');
+    try {
+        db.exec('CREATE TABLE sqliteXsentinel (id TEXT PRIMARY KEY NOT NULL)');
+        assert.equal(bootstrapEmptySqliteDatabase(db), false);
+        assert.deepEqual(
+            db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all(),
+            [{ name: 'sqliteXsentinel' }],
+        );
+    } finally {
+        db.close();
+    }
+});
+
+/* @Codex */
+test('fresh data directory bootstraps the base schema before runtime guards', { timeout: 30_000 }, async () => {
+    const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-db-fresh-bootstrap-'));
+    const dbPath = path.join(dataDir, 'medical.db');
+
+    try {
+        const result = await runBootstrapWorker(dataDir);
+        assert.equal(result.code, 0, result.output);
+        assert.doesNotMatch(result.output, /no such table|schema is incompatible|schema is unavailable/i);
+
+        let firstSchema: unknown;
+        const db = new Database(dbPath, { readonly: true, fileMustExist: true });
+        try {
+            const tables = new Set(
+                (db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as Array<{ name: string }>)
+                    .map((row) => row.name),
+            );
+            for (const table of FRESH_BOOT_TABLES) {
+                assert.ok(tables.has(table), `missing fresh-boot table: ${table}`);
+                assert.deepEqual(db.prepare(`SELECT count(*) AS count FROM "${table}"`).get(), { count: 0 });
+            }
+            assert.deepEqual(db.pragma('foreign_key_check'), []);
+            firstSchema = db.prepare('SELECT type, name, sql FROM sqlite_master ORDER BY type, name').all();
+        } finally {
+            db.close();
+        }
+
+        const restarted = await runBootstrapWorker(dataDir);
+        assert.equal(restarted.code, 0, restarted.output);
+        const reopened = new Database(dbPath, { readonly: true, fileMustExist: true });
+        try {
+            assert.deepEqual(
+                reopened.prepare('SELECT type, name, sql FROM sqlite_master ORDER BY type, name').all(),
+                firstSchema,
+            );
+            for (const table of FRESH_BOOT_TABLES) {
+                assert.deepEqual(reopened.prepare(`SELECT count(*) AS count FROM "${table}"`).get(), { count: 0 });
+            }
+        } finally {
+            reopened.close();
+        }
+    } finally {
+        fs.rmSync(dataDir, { recursive: true, force: true });
+    }
+});
+
+/* @Codex */
+test('concurrent first starts serialize on a genuinely empty database', { timeout: 30_000 }, async () => {
+    const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-db-fresh-concurrent-'));
+    try {
+        const results = await Promise.all(
+            Array.from({ length: WORKER_COUNT }, () => runBootstrapWorker(dataDir)),
+        );
+        for (const [index, result] of results.entries()) {
+            assert.equal(result.code, 0, `fresh worker ${index} failed:\n${result.output}`);
+            assert.doesNotMatch(result.output, /SQLITE_BUSY|database is locked|duplicate column|no such table/i);
+        }
+        const db = new Database(path.join(dataDir, 'medical.db'), { readonly: true, fileMustExist: true });
+        try {
+            for (const table of FRESH_BOOT_TABLES) {
+                assert.deepEqual(db.prepare(`SELECT count(*) AS count FROM "${table}"`).get(), { count: 0 });
+            }
+            assert.deepEqual(db.pragma('foreign_key_check'), []);
+        } finally {
+            db.close();
+        }
+    } finally {
+        fs.rmSync(dataDir, { recursive: true, force: true });
+    }
+});
 
 test('schema guards serialize across Next-style build workers', { timeout: 30_000 }, async () => {
     const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-db-bootstrap-'));

@@ -7,6 +7,7 @@ import { normalizeAifaSearchText } from '@/lib/aifa-catalog';
 import { ensureAuditSqliteSchema } from '@/lib/security/audit-db';
 import { resolveDataPath } from '@/lib/data-dir';
 import { copySqliteDatabaseSync, replaceSqliteDatabase } from '@/lib/sqlite-repair';
+import { bootstrapEmptySqliteDatabase } from '@/lib/sqlite-new-database-bootstrap';
 import { initSqlitePragmas } from '@/lib/sqlite-pragmas';
 
 // Ensure the data directory exists in production or use project root for dev
@@ -1028,6 +1029,7 @@ function applySchemaGuardsSerially(): void {
     // workers wait under busy_timeout, preventing concurrent check-then-ALTER
     // races and duplicate-column warnings.
     sqlite.transaction(() => {
+        bootstrapEmptySqliteDatabase(sqlite);
         applySchemaGuards();
         upgradeLegacyAttachmentCurrentness();
     }).immediate();
