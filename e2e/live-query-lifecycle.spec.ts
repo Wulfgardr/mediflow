@@ -1,9 +1,9 @@
 /* @Codex */
 import { expect, test, type Page, type Route } from '@playwright/test';
-import { createRequire } from 'node:module';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import ts from 'typescript';
+import * as webpackRuntime from 'next/dist/compiled/webpack/webpack.js';
 
 /* @Codex: Exercise the actual hooks with React DOM, without a clinical server,
    database or mocked React effects. The installed Next compiler bundles only
@@ -50,8 +50,15 @@ test.beforeAll(async ({}, info) => {
     }
     createRoot(document.getElementById('root')).render(h(App));
   `);
-  const require = createRequire(path.resolve('package.json'));
-  const { webpack } = require('next/dist/compiled/webpack/webpack');
+  // Next's bundled declaration exposes types only; its installed CommonJS
+  // runtime exports the compiler. Keep that one dependency statically visible.
+  const { webpack } = webpackRuntime as unknown as {
+    webpack(options: unknown): {
+      run(callback: (error: Error | null, stats: { hasErrors(): boolean; toString(): string }) => void): void;
+      close(callback: () => void): void;
+    };
+  };
+  expect(typeof webpack).toBe('function');
   await new Promise<void>((resolve, reject) => {
     const compiler = webpack({
       mode: 'production', entry: path.join(directory, 'entry.js'),
