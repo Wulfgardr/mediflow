@@ -19,6 +19,10 @@ struct PairedDiaryComposerView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: ClinicalChartMetrics.groupSpacing) {
+            if model.isWorking {
+                ProgressView("Operazione in corso: attendi prima di modificare la voce.")
+                    .accessibilityIdentifier("homebase-diary-operation-progress")
+            }
             if model.isEditingEntry {
                 editingForm
                 Divider()
@@ -33,6 +37,7 @@ struct PairedDiaryComposerView: View {
                     Label(hasPendingNewEntry ? "Riprendi nuova voce" : "Nuova voce", systemImage: "square.and.pencil")
                         .modifier(PairedDiaryControlLabel())
                 }
+                .disabled(model.isWorking)
                 .accessibilityIdentifier("homebase-open-new-entry-button")
             }
         }
@@ -85,6 +90,9 @@ struct PairedDiaryComposerView: View {
                     accessibilityPrefix: "homebase-edit-entry-attachments"
                 )
             }
+            if model.editingEntryRequiresReconciliation {
+                reconciliationReview
+            }
             PairedDiaryActions {
                 Button {
                     model.cancelEditingEntry()
@@ -102,12 +110,79 @@ struct PairedDiaryComposerView: View {
                 .disabled(!model.canUpdateEditingEntry)
                 .accessibilityIdentifier("homebase-update-entry-button")
             }
-            Text("Disponibile solo online. Se la versione non coincide, ricarica il diario prima di riprovare.")
+            Text("Disponibile solo online. In caso di conflitto, ricarica e confronta la voce corrente prima di confermare la bozza e salvare.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
+        .disabled(model.isWorking)
         .onAppear { focusedTitle = .editedEntry }
+    }
+
+    // @Codex: The latest host entry is a read-only comparison; confirmation only
+    // adopts its version. The draft and the final Save stay under user control.
+    private var reconciliationReview: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label("Confronta prima di salvare", systemImage: "arrow.triangle.branch")
+                .font(.headline)
+                .accessibilityIdentifier("homebase-edit-entry-reconciliation")
+            Text("La tua bozza qui sopra e conservata. Rivedi la voce corrente e correggi la bozza, poi conferma il confronto. Nulla viene salvato da questa conferma.")
+                .font(.callout)
+                .fixedSize(horizontal: false, vertical: true)
+            if let latest = model.editingEntryRemoteReview {
+                Text("Voce corrente · versione \(latest.version)")
+                    .font(.subheadline.weight(.semibold))
+                    .accessibilityIdentifier("homebase-edit-entry-remote-version")
+                Text(latest.lockedFields.contains(.title) ? "Titolo non leggibile" : latest.title)
+                    .font(.subheadline.weight(.semibold))
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(latest.date, format: .dateTime.day().month(.abbreviated).year().hour().minute())
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                Text("Tipo: \(PairedDiaryEntryType(rawValue: latest.type)?.title ?? latest.type)")
+                    .font(.footnote)
+                if latest.lockedFields.contains(.content) {
+                    Text("Contenuto non leggibile con la chiave corrente.")
+                } else {
+                    Text(ClinicalContentRendering.attributedString(from: latest.content))
+                        .chartProse()
+                        .accessibilityIdentifier("homebase-edit-entry-remote-content")
+                }
+                if let references = latest.attachments {
+                    Text("Allegati nella voce corrente: \(HomeBaseEntryAttachmentReferencesCodec.decode(references).count)")
+                        .font(.footnote)
+                } else {
+                    Text("Riferimenti agli allegati non disponibili nella lettura corrente.")
+                        .font(.footnote)
+                }
+                if latest.deletedAt != nil {
+                    Text("La voce e stata eliminata. La bozza resta disponibile, ma non puo aggiornare questa voce.")
+                        .foregroundStyle(.secondary)
+                }
+                Button {
+                    model.confirmEditingEntryReconciliation()
+                } label: {
+                    Text("Ho confrontato: mantieni la mia bozza")
+                        .modifier(PairedDiaryControlLabel())
+                }
+                .disabled(!model.canConfirmEditingEntryReconciliation)
+                .accessibilityIdentifier("homebase-edit-entry-confirm-reconciliation-button")
+            } else {
+                Text("Ricarica la voce corrente per confrontarla. Se non e disponibile nella lettura, il salvataggio resta sospeso e la bozza rimane qui.")
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Button {
+                Task { await model.reloadAfterConflict() }
+            } label: {
+                Label("Ricarica per confrontare", systemImage: "arrow.clockwise")
+                    .modifier(PairedDiaryControlLabel())
+            }
+            .accessibilityIdentifier("homebase-edit-entry-reload-for-review-button")
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
     }
 
     private var newEntryForm: some View {
@@ -116,10 +191,12 @@ struct PairedDiaryComposerView: View {
                 .font(.headline)
                 .accessibilityAddTraits(.isHeader)
             TextField("Titolo (opzionale)", text: $model.newEntryTitle)
+                .disabled(model.isWorking)
                 .focused($focusedTitle, equals: .newEntry)
                 .accessibilityLabel("Titolo (opzionale)")
                 .accessibilityIdentifier("homebase-new-entry-title-field")
             entryTypePicker(selection: $model.newEntryType, identifier: "homebase-new-entry-type-picker")
+                .disabled(model.isWorking)
             Button {
                 if model.newEntryEditorDocument.isEffectivelyEmpty {
                     model.insertNewEntrySOAPTemplate()
@@ -138,12 +215,14 @@ struct PairedDiaryComposerView: View {
             )
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("homebase-new-entry-content-field")
+            .disabled(model.isWorking)
             if capabilities.hasCapability("network.replica.readonly-documents") {
                 Divider()
                 attachmentReferences(
                     selectedIds: $model.newEntryAttachmentIds,
                     accessibilityPrefix: "homebase-new-entry-attachments"
                 )
+                .disabled(model.isWorking)
             }
             if capabilities.hasCapability("network.compute.visit-draft") {
                 Divider()
@@ -158,6 +237,7 @@ struct PairedDiaryComposerView: View {
                         Label(hasPendingVisitDraft ? "Riprendi bozza da trascrizione" : "Bozza da trascrizione", systemImage: "waveform")
                             .modifier(PairedDiaryControlLabel())
                     }
+                    .disabled(model.isWorking)
                     .accessibilityIdentifier("homebase-open-visit-draft-button")
                 }
             } else if let message = capabilities.unavailableMessage(for: "network.compute.visit-draft") {
