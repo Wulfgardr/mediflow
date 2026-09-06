@@ -513,22 +513,18 @@ struct PairedPatientsWorkspaceView: View {
         .background(PlatformColors.chartCardSurface)
         .navigationTitle(model.activePatientSection.title)
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            // @Codex: On a short viewport the navigation bar carries context;
-            // stacking two more pinned rows would cover the editor above a keyboard.
-            if verticalSizeClass == .compact,
-               let detail = model.selectedPatient, detail.id == compactPatientID {
-                ToolbarItem(placement: .principal) {
-                    compactHeightPatientNavigation(detail)
-                }
-            }
-        }
         .safeAreaInset(edge: .top, spacing: 0) {
-            if verticalSizeClass != .compact,
-               let detail = model.selectedPatient, detail.id == compactPatientID {
+            if let detail = model.selectedPatient, detail.id == compactPatientID {
                 VStack(spacing: 0) {
-                    compactPatientHeader(detail)
-                    patientSectionPicker
+                    // @Codex: One 44pt context row leaves clinical space above
+                    // the keyboard. Native compact toolbars cap controls at 36pt.
+                    if verticalSizeClass == .compact {
+                        compactHeightPatientNavigation(detail)
+                            .padding(.horizontal, 20)
+                    } else {
+                        compactPatientHeader(detail)
+                        patientSectionPicker
+                    }
                     Divider()
                 }
                 .background(PlatformColors.chartCardSurface)
@@ -555,10 +551,12 @@ struct PairedPatientsWorkspaceView: View {
                     .font(.subheadline)
                     .frame(minWidth: 44, minHeight: 44)
             }
+            .buttonStyle(.plain)
             .accessibilityLabel("Sezione clinica")
             .accessibilityValue(model.activePatientSection.title)
             .accessibilityIdentifier("patient-section-picker")
         }
+        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("patient-section-navigation")
     }
