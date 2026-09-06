@@ -28,8 +28,14 @@ Le precedenti variabili di rete e credenziali OAuth non sono lette dal locale.
 
 Destinazione fissa `http://127.0.0.1:8382`, Search v2, release `2026-01`, MMS,
 inglese. Nessun URL fornito dal browser, proxy o redirect. Limiti: query 160
-byte UTF-8, 25 risultati restituiti, risposta 64 KiB, transport 5 s e audit 1 s. L'audit
-conserva solo la receipt, senza query, codici o descrizioni.
+byte UTF-8, 25 risultati restituiti, risposta 64 KiB, transport 5 s e audit 1 s.
+L'audit conserva una proiezione esplicita della receipt validata, senza query,
+codici, descrizioni o URI: `counts` contiene `resultCount`; i flag `schema`,
+`operation`, `deployment`, `source`, `release`, `language`, `binding`, `image`,
+`dataset`, `latencyMs`, `fetchedAt`, `expiresAt`, `completedAt` conservano i
+rispettivi valori. `binding/image/dataset` corrispondono a
+`bindingId/imageDigest/datasetSnapshotId`. I digest SHA-256 restano interi:
+le chiavi brevi rispettano il limite di 80 caratteri del sanitizer audit.
 
 Entro i 64 KiB il parser valida tutte le voci upstream, anche quelle oltre la
 venticinquesima, e conserva l'ordine WHO. Restituisce le prime 25 con
@@ -127,6 +133,9 @@ Il codec `MediFlowCore.DiagnosesCodec` conserva gli stessi campi opzionali nel
 decode/encode usato dall'editor nativo, senza Search o validazione WHO nativa.
 I riferimenti restano JSON opaco; campi nil non aggiungono chiavi ai record
 precedenti. I test Core verificano round-trip, forma storica e fonti sconosciute.
+Il modulo web tratta i due campi opzionali null come assenti, senza riscrivere
+diagnosi invariate; una modifica effettiva omette le chiavi vuote. Le prove di
+round-trip includono questi record, oltre alle selezioni WHO con fonte completa.
 Export, altri caller, migrazioni storiche, lookup/cross-check, certificazione
 e prova live WHO restano fuori da questa consegna; il §1.2.3 dei termini WHO
 resta un requisito da valutare anche per tali flussi prima della promozione.

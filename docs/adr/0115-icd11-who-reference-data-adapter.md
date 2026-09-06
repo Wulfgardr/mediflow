@@ -33,6 +33,11 @@ Il vecchio container MediFlow, la porta 8888 e i suoi launcher restano ritirati.
   audit 1 secondo. Nessun retry o pubblicazione tardiva. La query contiene
   soltanto termini, senza contesto paziente. Audit e receipt non includono
   query, codice, titolo, URI, percorsi host o segreti.
+  L'audit persistito usa la whitelist esistente: `counts=resultCount` e flag
+  espliciti per schema, operazione, deployment, fonte, release, lingua, binding,
+  immagine, dataset, latenza e i tre timestamp della receipt validata. Le chiavi
+  `image` e `dataset` mantengono i digest SHA-256 interi entro gli 80 caratteri
+  per token del sanitizer; nessuna estensione dello schema audit generale.
 - Search locale pubblica un envelope `icd11-search-response.v2`, con voce
   `code`, `description` (titolo WHO), `system` e `canonicalUri`, più `partial`
   e receipt versionata. L'URI deve appartenere al namespace MMS/release fissato;
@@ -63,6 +68,10 @@ Il vecchio container MediFlow, la porta 8888 e i suoi launcher restano ritirati.
   di forma precedente; sistemi sconosciuti e riferimenti JSON non WHO restano
   leggibili. Solo codec Core e test di round-trip, nessuna modifica Shared/UI,
   Search nativa, cifratura o FHIR.
+  Anche la proiezione del modulo web normalizza `canonicalUri/reference: null`
+  come assenza: apertura e salvataggio invariato non riscrivono diagnosi, e una
+  modifica effettiva omette tali chiavi vuote. I campi opachi estranei conservano
+  i vincoli esistenti contro la perdita o la riassociazione incerta dei metadati.
   Export e migrazione dei record storici restano un gate separato: il candidato
   non attesta conformita dell'intero ciclo di utilizzo ICD.
 
