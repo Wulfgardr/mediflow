@@ -66,7 +66,8 @@ test('onboarding: persisted preview, resume, changed recommendation, manual entr
     await expect(panel).toHaveAttribute('aria-busy', 'false');
     await panel.getByRole('button', { name: 'Conferma profilo di lavoro' }).click();
     await expect(panel).toHaveCount(0);
-    await expect(page).toHaveURL(/[?&]area=turno/);
+    await expect(page.getByRole('heading', { name: 'Agenda', level: 1, exact: true })).toBeVisible();
+    await expect(page.getByRole('navigation', { name: 'Navigazione principale', exact: true }).getByRole('link', { name: 'Agenda', exact: true })).toHaveAttribute('aria-current', 'page');
     expect((await read()).active.profile).toBe('both');
     await page.setViewportSize({ width: 1440, height: 960 });
 
@@ -92,7 +93,8 @@ test('onboarding: persisted preview, resume, changed recommendation, manual entr
     await panel.getByRole('button', { name: 'Conferma profilo di lavoro' }).click();
     await expect(panel.getByText(/Profilo salvato:/)).toContainText('Interactive');
     await page.goto('/');
-    await expect(page).toHaveURL(/[?&]area=incarico/);
+    await expect(page.getByRole('heading', { name: 'Pazienti', level: 1, exact: true })).toBeVisible();
+    await expect(page.getByRole('navigation', { name: 'Navigazione principale', exact: true }).getByRole('link', { name: 'Pazienti', exact: true })).toHaveAttribute('aria-current', 'page');
     await expect(page.getByRole('searchbox', { name: 'Cerca nella lista pazienti' })).toBeVisible();
     await page.goto('/settings/profilo');
     await panel.getByRole('button', { name: 'Ripristina la scelta precedente' }).click();
