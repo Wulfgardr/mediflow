@@ -3,6 +3,7 @@
 /* @Codex */
 import { useEffect, useState } from 'react';
 import { FabricCapabilityRegistry } from '@/components/settings/fabric-capability-registry';
+import { FunctionStatusPanel } from '@/components/settings/function-status-panel';
 import { FabricEgressSection } from '@/components/settings/fabric-egress-section';
 import { FabricErrorState, FabricLoadingState } from '@/components/settings/fabric-load-state';
 import { FabricVenueSection } from '@/components/settings/fabric-venue-section';
@@ -146,6 +147,11 @@ export default function SettingsAiFabricPage() {
                 description="Registro in sola lettura delle funzioni intelligenti, della sede di calcolo e dell’eventuale uscita dei dati."
             />
 
+            <FunctionStatusPanel />
+
+            <details className={SETTINGS_CARD_CLASS}>
+            <summary className="cursor-pointer text-sm font-semibold">Dettagli tecnici: provider, connessioni e registro</summary>
+
             {state.kind === 'loading' ? <FabricLoadingState /> : null}
             {state.kind === 'unauthorized' ? <FabricErrorState unauthorized /> : null}
             {state.kind === 'error' ? <FabricErrorState /> : null}
@@ -157,6 +163,7 @@ export default function SettingsAiFabricPage() {
                     <FabricCapabilityRegistry snapshot={state.status} />
                 </div>
             ) : null}
+            </details>
         </section>
     );
 }

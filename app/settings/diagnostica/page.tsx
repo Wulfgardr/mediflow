@@ -3,6 +3,7 @@
 // WUL-297 Diagnostica: moved from the monolithic settings page.
 
 import DiagnosticHub from '@/components/diagnostic-hub';
+import { WhoSetupPanel } from '@/components/settings/who-setup-panel';
 import ServiceArchitecturePanel from '@/components/service-architecture-panel';
 /* @Codex */
 import UpdateAwarenessPanel from '@/components/settings/update-awareness-panel';
@@ -18,6 +19,7 @@ export default function SettingsDiagnosticsPage() {
             />
 
             <div className="space-y-6">
+                <WhoSetupPanel />
                 <ServiceArchitecturePanel />
                 <DiagnosticHub />
                 <UpdateAwarenessPanel />

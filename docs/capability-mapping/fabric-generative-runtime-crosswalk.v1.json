@@ -1,6 +1,6 @@
 {
   "schema": "mediflow.ai.fabric-generative-runtime-crosswalk.v1",
-  "release": "0.8.5",
+  "release": "0.8.6",
   "integrationStatus": "local_source_integrated",
   "applyPolicy": "none",
   "claimCeiling": "local source runtime crosswalk for four review-only proposals; OCR unavailable; not release-ready, released, deployed, or authorized for clinical apply",

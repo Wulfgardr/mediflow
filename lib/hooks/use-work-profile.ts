@@ -29,6 +29,7 @@ async function read() {
 export function useWorkProfile() {
     const [state, setState] = useState<WorkProfileState | null>(null);
     const [busy, setBusy] = useState(true);
+    const [snapshotVersion, setSnapshotVersion] = useState(0);
     const [error, setError] = useState<string | null>(null);
     const inFlight = useRef(false);
     const generation = useRef(0);
@@ -40,7 +41,7 @@ export function useWorkProfile() {
         setBusy(true);
         try {
             const fresh = await read();
-            if (generation.current === current) { setState(fresh); setError(null); }
+            if (generation.current === current) { setState(fresh); setSnapshotVersion(value => value + 1); setError(null); }
         } catch (e) {
             if (generation.current === current) setError(message(e, 'Impossibile leggere il profilo. Verifica la sessione e riprova.'));
         } finally {
@@ -67,7 +68,7 @@ export function useWorkProfile() {
             const committed = parseWorkProfileState(value);
             const fresh = await read();
             if (fresh.revision !== committed.revision) throw new Error(ERRORS.conflict);
-            if (generation.current === current) { setState(fresh); setError(null); }
+            if (generation.current === current) { setState(fresh); setSnapshotVersion(value => value + 1); setError(null); }
         } catch (e) {
             if (generation.current === current) setError(message(e, 'Salvataggio non confermato. Rileggi lo stato prima di continuare.'));
         } finally {
@@ -76,6 +77,6 @@ export function useWorkProfile() {
         }
     }
 
-    return { state, busy, error, reload, change };
+    return { state, snapshotVersion, busy, error, reload, change };
 }
 export type WorkProfileController = ReturnType<typeof useWorkProfile>;

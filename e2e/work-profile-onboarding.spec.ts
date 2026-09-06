@@ -103,6 +103,24 @@ test('onboarding: persisted preview, resume, changed recommendation, manual entr
     await panel.getByRole('button', { name: 'Cambia profilo di lavoro' }).click();
     await panel.getByRole('button', { name: 'Scegli manualmente' }).click();
     await expect(panel.getByText(/Percorso manuale:/)).toBeVisible();
+    // @Codex: failure before persistence must discard the optimistic radio on reread,
+    // even when the server revision did not advance.
+    const beforeFailedSave = await read();
+    expectedLostResponse = true;
+    await page.route(`**${endpoint}`, async (route) => {
+        if (route.request().method() === 'PUT' && route.request().postDataJSON().action === 'save-draft') await route.abort('failed');
+        else await route.continue();
+    });
+    await panel.getByRole('radio', { name: 'Agent', exact: true }).check();
+    await expect(panel.getByRole('alert')).toBeVisible();
+    await expect(panel.getByRole('button', { name: 'Conferma profilo di lavoro' })).toBeDisabled();
+    expect(await read()).toEqual(beforeFailedSave);
+    await page.unroute(`**${endpoint}`);
+    await panel.getByRole('button', { name: 'Rileggi lo stato' }).click();
+    await expect(panel.getByRole('radio', { name: 'Interactive', exact: true })).toBeChecked();
+    await expect(panel.getByRole('radio', { name: 'Agent', exact: true })).not.toBeChecked();
+    await expect(panel.getByRole('button', { name: 'Conferma profilo di lavoro' })).toBeEnabled();
+    expectedLostResponse = false;
     await panel.getByRole('radio', { name: 'Agent', exact: true }).check();
     await expect(panel).toHaveAttribute('aria-busy', 'false');
     expectedLostResponse = true;

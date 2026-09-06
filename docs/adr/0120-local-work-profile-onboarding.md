@@ -56,7 +56,9 @@ una ripetizione piu vecchia incontra il conflitto di revisione. Riapplicare la
 stessa scelta non sostituisce lo storico utile per il rollback.
 
 Una risposta persa richiede rilettura prima di altre mutazioni. La UI conferma
-il salvataggio solo dopo la rilettura della revisione. Un record corrotto fallisce
+il salvataggio solo dopo la rilettura della revisione. Ogni rilettura riuscita
+riallinea anche la bozza locale, pur se la revisione server non cambia: una
+selezione ottimistica non salvata non può restare nell’anteprima confermabile. Un record corrotto fallisce
 con errore e lascia accessibile la cartella, senza cancellare configurazione.
 Il rollback ripristina una sola scelta precedente, anche l'assenza del profilo,
 senza toccare account, PIN, chiavi, app, dati clinici o impostazioni di sicurezza.

@@ -115,13 +115,21 @@ for (const failure of ['absent', 'crash', 'timeout'] as const) {
         const bytes = await scannedPdf(); const session = seed(bytes);
         const before = persistedSource();
         let failing = true;
-        const calls = substituteRecognition(() => !failing ? {} : failure === 'absent' ? { missing: true }
-            : { script: failure === 'crash'
+        let restoreRecognitionTimers: (() => void) | undefined;
+        const calls = substituteRecognition(() => {
+            if (!failing) return {};
+            if (failure === 'absent') return { missing: true };
+            // @Codex: accelerate only after entering recognition. Earlier 30-second
+            // PDF/AnyDoc timers must not expire under concurrent suite CPU load.
+            if (failure === 'timeout') {
+                const timerMock = mock.method(globalThis, 'setTimeout', (callback: () => void, delay: number) =>
+                    originalSetTimeout(callback, delay === 30_000 ? 250 : delay));
+                restoreRecognitionTimers = () => timerMock.mock.restore();
+            }
+            return { script: failure === 'crash'
                 ? `${engineSuccess} process.exitCode = 1;`
-                : "process.stdin.resume(); setInterval(() => {}, 1000);" });
-        // Accelerate only the two 30-second recognition timers, without changing production constants.
-        if (failure === 'timeout') mock.method(globalThis, 'setTimeout', (callback: () => void, delay: number) =>
-            originalSetTimeout(callback, delay === 30_000 ? 250 : delay));
+                : "process.stdin.resume(); setInterval(() => {}, 1000);" };
+        });
         const failed = await composeAnyDocCurrentSourceExtraction(session, { attachmentId: ATTACHMENT });
         noCandidate(failed); assert.equal(failed.status, 'review_required');
         if (failed.status === 'review_required') assert.equal(failed.detail, failure === 'timeout' ? 'resource_limit' : 'io_failure');
@@ -130,6 +138,8 @@ for (const failure of ['absent', 'crash', 'timeout'] as const) {
         if (failure === 'timeout') assert.equal(child.signalCode, 'SIGKILL');
         if (child.pid) assert.throws(() => process.kill(child.pid!, 0), { code: 'ESRCH' });
         assert.equal(fs.existsSync(temporaryRoots[0]), false);
+        // @Codex: the successful retry must use production deadlines, including under suite CPU load.
+        restoreRecognitionTimers?.();
         failing = false;
         const retry = await composeAnyDocCurrentSourceExtraction(session, { attachmentId: ATTACHMENT });
         assert.equal(retry.status, 'extracted'); assert.equal(calls(), 2);

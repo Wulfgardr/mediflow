@@ -81,7 +81,7 @@ export function FabricCapabilityRegistry({ snapshot }: { snapshot: FabricStatusS
 
                                     <div className={styles.fabricKillSwitch}>
                                         {availability.terminalUnavailable ? (
-                                            <span>Stato terminale: nessun interruttore può riattivarla</span>
+                                            <span>{capability.id === 'ocr' ? 'Il registro OCR Fabric e ritirato. La lettura PDF con AnyDoc e Apple Vision usa il percorso documentale separato.' : 'Stato terminale: nessun interruttore può riattivarla'}</span>
                                         ) : capability.killSwitch ? (
                                             <>
                                                 <Link href="/settings/ai/funzioni">Vai agli interruttori delle funzioni</Link>

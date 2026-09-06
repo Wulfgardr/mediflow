@@ -9,6 +9,7 @@ import {
 } from '@/lib/ai-providers/base-url';
 import {
     buildObservabilitySnapshot,
+    observeHomeBaseConfiguration,
     observeVenue,
     type VenueObservation,
 } from '@/lib/ai-providers/fabric/routing-observability';
@@ -61,14 +62,12 @@ export async function GET(req: NextRequest) {
     );
     const networkMode = snapshot.get(NETWORK_MODE_KEY);
     const localProcess = await observeLocalProcess(rawBaseUrl);
-    const homeBase = normalizeNetworkOperatingMode(networkMode) === 'network-home-base'
-        ? observeVenue('home_base', 'available', null)
-        : observeVenue('home_base', 'offline', 'mode_disabled');
+    const homeBase = observeHomeBaseConfiguration(normalizeNetworkOperatingMode(networkMode) === 'network-home-base');
 
     return NextResponse.json(buildObservabilitySnapshot([
         localProcess,
         homeBase,
         observeVenue('on_device', 'unknown', 'not_implemented'),
         observeVenue('cloud', 'offline', 'egress_profile_closed'),
-    ]));
+    ]), { headers: { 'Cache-Control': 'no-store' } });
 }

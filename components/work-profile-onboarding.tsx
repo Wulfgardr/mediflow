@@ -182,7 +182,7 @@ export function WorkProfileOnboarding({ controller }: { controller: WorkProfileC
                 <button type="button" disabled={busy} className={SETTINGS_SECONDARY_BUTTON_CLASS} onClick={() => void reload()}>Rileggi lo stato</button>
             </div>}
             {busy && <p role="status">Lettura o salvataggio del profilo…</p>}
-            {state && <ProfileEditor key={state.revision} controller={controller} />}
+            {state && <ProfileEditor key={`${state.revision}:${controller.snapshotVersion}`} controller={controller} />}
             <nav className="flex flex-wrap gap-4 text-sm" aria-label="Percorsi sempre disponibili">
                 <Link className="underline" href="/?area=turno">Apri la cartella manualmente</Link>
                 <Link className="underline" href="/settings/ai/fabric">Configurazione AI facoltativa</Link>

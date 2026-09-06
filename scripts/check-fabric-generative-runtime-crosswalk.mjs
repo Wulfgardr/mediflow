@@ -131,8 +131,8 @@ function validateHistoricalArtifacts(manifest, sources) {
 function validateRepositoryWiring(sources) {
   const packageJson = sources.json('package.json', 'package.json');
   const packageLock = sources.json('package-lock.json', 'package-lock.json');
-  if (packageJson.version !== '0.8.5' || packageLock.version !== '0.8.5'
-    || packageLock.packages?.['']?.version !== '0.8.5') fail('package version deve essere 0.8.5 in manifest e lockfile');
+  if (packageJson.version !== '0.8.6' || packageLock.version !== '0.8.6'
+    || packageLock.packages?.['']?.version !== '0.8.6') fail('package version deve essere 0.8.6 in manifest e lockfile');
   if (packageJson.scripts?.['check:fabric-generative-runtime-crosswalk'] !== 'node scripts/check-fabric-generative-runtime-crosswalk.mjs'
     || packageJson.scripts?.['test:fabric-generative-runtime-crosswalk'] !== 'node --test scripts/check-fabric-generative-runtime-crosswalk.test.mjs') fail('package scripts del crosswalk non cablati');
   const workflow = ensureFile(sources, '.github/workflows/openapi-contract-guard.yml', 'workflow guard');
@@ -204,7 +204,7 @@ export function validateFabricGenerativeRuntimeCrosswalk(manifest = loadFabricGe
   const sources = sourceAccess(overrides);
   exactKeys(manifest, TOP_LEVEL_KEYS, 'manifest');
   if (manifest.schema !== 'mediflow.ai.fabric-generative-runtime-crosswalk.v1'
-    || manifest.release !== '0.8.5'
+    || manifest.release !== '0.8.6'
     || manifest.integrationStatus !== 'local_source_integrated'
     || manifest.applyPolicy !== 'none'
     || manifest.claimCeiling !== CLAIM_CEILING
@@ -213,7 +213,7 @@ export function validateFabricGenerativeRuntimeCrosswalk(manifest = loadFabricGe
   validateRepositoryWiring(sources);
 
   if (!Array.isArray(manifest.capabilities) || manifest.capabilities.length !== EXPECTED_IDS.length
-    || JSON.stringify(manifest.capabilities.map(({ id }) => id)) !== JSON.stringify(EXPECTED_IDS)) fail('roster capability deve contenere esattamente le cinque identità 0.8.5');
+    || JSON.stringify(manifest.capabilities.map(({ id }) => id)) !== JSON.stringify(EXPECTED_IDS)) fail('roster capability deve contenere esattamente le cinque identità 0.8.6');
   for (const row of manifest.capabilities) exactKeys(row, CAPABILITY_KEYS, `capability ${row?.id ?? '<unknown>'}`);
   if (manifest.capabilities.filter(({ disposition }) => disposition === 'proposal_only').length !== 4) fail('quattro capability devono essere proposal_only');
 
@@ -226,7 +226,7 @@ export function validateFabricGenerativeRuntimeCrosswalk(manifest = loadFabricGe
     if (row.id === 'ocr') validateOcr(row, block, sources);
     else validateAvailableCapability(row, block, sources);
   });
-  return Object.freeze({ capabilities: 5, proposalOnly: 4, unavailable: 1, release: '0.8.5' });
+  return Object.freeze({ capabilities: 5, proposalOnly: 4, unavailable: 1, release: '0.8.6' });
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

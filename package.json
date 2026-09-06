@@ -1,6 +1,6 @@
 {
   "name": "medical-record-app",
-  "version": "0.8.5",
+  "version": "0.8.6",
   "private": false,
   "engines": {
     "node": ">=24 <25"
@@ -180,6 +180,8 @@
     "test:openmed-redaction": "bash scripts/openmed-redaction-test.sh",
     "test:pin-change": "bash scripts/pin-change-test.sh",
     "test:settings-navigation": "bash scripts/settings-navigation-test.sh",
+    "setup:local-provider": "node scripts/run-strip-types.mjs scripts/setup-local-provider.mjs",
+    "test:local-provider-setup": "node scripts/run-strip-types.mjs --test scripts/local-provider-setup.test.ts",
     "test:fabric-settings-view": "bash scripts/fabric-settings-view-test.sh",
     "test:server-auth-policy": "bash scripts/server-auth-policy-test.sh",
     "test:admin-auth-boundary": "node --test scripts/admin-route-auth-boundary.test.mjs",

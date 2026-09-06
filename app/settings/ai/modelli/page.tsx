@@ -42,6 +42,14 @@ export default function SettingsAiModelsPage() {
                 description="Profilo hardware e modelli Ollama per i ruoli generali. ATHENA mantiene una lane locale separata."
             />
 
+            {/* @Codex: documentation only; privileged lifecycle control remains on the host. */}
+            <details className={SETTINGS_CARD_CLASS} id="local-provider-admission">
+                <summary className="cursor-pointer text-sm font-semibold">Modello configurato, funzione ancora bloccata?</summary>
+                <p className="mt-3 text-sm leading-6">Il test connessione legge i modelli disponibili. Per ammettere Ollama, l’operatore del computer esegue il comando locale dalla cartella di MediFlow, indicando la directory dati corretta.</p>
+                <pre className="mt-3 overflow-x-auto rounded-lg bg-[var(--lume-surface-field)] p-4 text-xs leading-6"><code>{'npm run setup:local-provider -- inspect --data-dir /percorso/dati\nnpm run setup:local-provider -- admit --data-dir /percorso/dati --confirm-local-change'}</code></pre>
+                <p className="mt-3 text-sm leading-6">La verifica può caricare il modello già installato in memoria. Non scarica modelli, non genera testo e lascia le funzioni spente finché non le abiliti. ATHENA usa il proprio percorso separato.</p>
+            </details>
+
             <div className="space-y-6">
                 {/* Profilo hardware */}
                 <div className={SETTINGS_CARD_CLASS}>

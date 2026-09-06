@@ -1,6 +1,6 @@
 # Configurazione ICD-11 WHO
 
-MediFlow 0.8.5 consulta ICD-11 tramite un Application Service server-only verso
+MediFlow consulta ICD-11 tramite un Application Service server-only verso
 l'API ufficiale WHO v2/MMS. Il vecchio container locale e la porta `8888` non
 fanno piu parte del percorso applicativo.
 
@@ -43,15 +43,23 @@ Le credenziali devono essere iniettate dal supervisore del processo o dalla
 sessione amministrativa locale. Non inserirle nel repository, in file `.env`
 committati, nel browser, nelle impostazioni client o nei log.
 
-Il binding 0.8.5 e fisso a release `2026-01`, linearizzazione `mms`, lingua
+Il binding corrente e fisso a release `2026-01`, linearizzazione `mms`, lingua
 inglese e massimo 25 risultati. Query, risposta, timeout, cache e audit sono
 bounded. L'audit conserva solo la receipt PHI-safe, mai query o descrizioni.
 
 ## Verifica
 
 Accedi a MediFlow e apri **Impostazioni -> Diagnostica**. La superficie legge la
-readiness senza inviare diagnosi sintetiche. Una ricerca reale parte soltanto da
-un'azione esplicita dell'operatore nell'autocomplete ICD-11.
+readiness senza inviare ricerche. Il pulsante **Verifica con termine di esempio**
+esegue, solo al clic, una ricerca del termine pubblico `cholera` sul binding
+fissato. Il risultato distingue risposta WHO, cache e tentativo fallito; una
+risposta dalla cache non prova la connessione corrente. Il pulsante non modifica
+la configurazione, non raccoglie credenziali e non usa dati della cartella.
+L'autocomplete ICD-11 resta l'altro ingresso esplicito della ricerca.
+
+La preparazione del percorso online esistente non risolve la scelta 0.8.6 di
+un eventuale catalogo completamente offline o della verifica puntuale del
+codice: vedi [packet di decisione WHO](./analysis/2026-09-05-086-who-decision.md).
 
 I test di repository usano trasporti e credenziali sintetici. Non costituiscono
 una prova live dell'account WHO.
