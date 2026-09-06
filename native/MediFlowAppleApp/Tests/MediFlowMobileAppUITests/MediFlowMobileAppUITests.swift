@@ -26,6 +26,8 @@ final class MediFlowMobileAppUITests: XCTestCase {
         section: String? = nil,
         dynamicTypeSize: String? = nil
     ) {
+        // @Codex: Layout/setup fixtures must not inherit a real interoperability pairing or cache.
+        app.launchEnvironment["MEDIFLOW_APPLE_DEV_SKIP_KEYCHAIN"] = "1"
         if seedPatients { app.launchEnvironment["MEDIFLOW_APPLE_UITEST_PATIENTS"] = "1" }
         if singlePatient { app.launchEnvironment["MEDIFLOW_APPLE_UITEST_SINGLE_PATIENT"] = "1" }
         if lockedPatientFields { app.launchEnvironment["MEDIFLOW_APPLE_UITEST_LOCKED_PATIENT_FIELDS"] = "1" }
@@ -51,29 +53,55 @@ final class MediFlowMobileAppUITests: XCTestCase {
         case clinical = "Controlli e osservazioni"
         case prescriptions = "Prescrizioni"
         case documents = "Documenti"
+
+        var identifier: String {
+            switch self {
+            case .overview: "overview"
+            case .diary: "diary"
+            case .scales: "scales"
+            case .therapies: "therapies"
+            case .clinical: "clinical"
+            case .prescriptions: "prescriptions"
+            case .documents: "documents"
+            }
+        }
     }
 
     private func openPatientSection(_ section: PatientSection, file: StaticString = #filePath, line: UInt = #line) {
-        let query = app.buttons.matching(identifier: "patient-section-picker")
-        let picker = query.element
-        XCTAssertTrue(picker.waitForExistence(timeout: 15), "The selected chart must expose its section picker", file: file, line: line)
-        XCTAssertEqual(query.count, 1, "There must be one patient section picker", file: file, line: line)
-        if picker.value as? String != section.rawValue {
-            XCTAssertTrue(picker.isHittable, "The section picker must stay reachable", file: file, line: line)
-            picker.tap()
-            let options = app.buttons.matching(NSPredicate(format: "label == %@", section.rawValue))
-            XCTAssertTrue(options.element.waitForExistence(timeout: 5), "Missing section option: \(section.rawValue)", file: file, line: line)
-            XCTAssertEqual(options.count, 1, "The menu option must be unambiguous", file: file, line: line)
-            options.element.tap()
+        // @Codex: regular width has seven direct controls; compact/AX layouts
+        // keep an accessible picker for destinations without a direct control.
+        XCTAssertTrue(sectionView("patient-section-navigation").waitForExistence(timeout: 15), file: file, line: line)
+        let directQuery = app.buttons.matching(identifier: "patient-section-\(section.identifier)")
+        if directQuery.count > 0 {
+            XCTAssertEqual(directQuery.count, 1, file: file, line: line)
+            let direct = directQuery.element
+            XCTAssertEqual(direct.label, section.rawValue, file: file, line: line)
+            XCTAssertGreaterThanOrEqual(direct.frame.height, 44, file: file, line: line)
+            XCTAssertGreaterThanOrEqual(direct.frame.width, 44, file: file, line: line)
+            XCTAssertTrue(direct.isHittable, "The section action must stay reachable", file: file, line: line)
+            if !direct.isSelected { direct.tap() }
+            let selected = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in direct.isSelected }, object: direct)
+            XCTAssertEqual(XCTWaiter.wait(for: [selected], timeout: 5), .completed,
+                           "Direct navigation must announce the selected section", file: file, line: line)
+        } else {
+            let query = app.buttons.matching(identifier: "patient-section-picker")
+            let picker = query.element
+            XCTAssertTrue(picker.waitForExistence(timeout: 15), "The chart needs the compact section picker", file: file, line: line)
+            XCTAssertEqual(query.count, 1, "There must be one patient section picker", file: file, line: line)
+            XCTAssertGreaterThanOrEqual(picker.frame.height, 44, file: file, line: line)
+            if picker.value as? String != section.rawValue {
+                XCTAssertTrue(picker.isHittable, "The section picker must stay reachable", file: file, line: line)
+                picker.tap()
+                let options = app.buttons.matching(NSPredicate(format: "label == %@", section.rawValue))
+                XCTAssertTrue(options.element.waitForExistence(timeout: 5), "Missing section option: \(section.rawValue)", file: file, line: line)
+                XCTAssertEqual(options.count, 1, "The menu option must be unambiguous", file: file, line: line)
+                options.element.tap()
+            }
+            let selected = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", section.rawValue), object: picker)
+            XCTAssertEqual(XCTWaiter.wait(for: [selected], timeout: 5), .completed,
+                           "The picker must announce the selected section", file: file, line: line)
         }
-        let selected = XCTNSPredicateExpectation(
-            predicate: NSPredicate(format: "value == %@", section.rawValue),
-            object: picker
-        )
-        XCTAssertEqual(XCTWaiter.wait(for: [selected], timeout: 5), .completed,
-                       "The picker must announce the selected section", file: file, line: line)
         if section == .overview {
-            // The loaded-record index now precedes the identity card.
             XCTAssertTrue(scrollDown(to: sectionView("patient-detail-name")),
                           "The selected patient's identity must remain readable", file: file, line: line)
         }
@@ -1293,11 +1321,14 @@ final class MediFlowMobileAppUITests: XCTestCase {
         patient.tap()
 
         let contents = sectionView("patient-chart-contents")
+        openPatientSection(.overview)
+        XCTAssertFalse(contents.exists, "Optional collection summaries must start behind their disclosure")
+        let contentsDisclosure = app.buttons.matching(identifier: "patient-chart-contents-disclosure")
+        XCTAssertTrue(contentsDisclosure.element.waitForExistence(timeout: 10))
+        XCTAssertEqual(contentsDisclosure.count, 1, "The collection summary must have one interactive disclosure")
+        XCTAssertTrue(revealInteropControl(contentsDisclosure.element))
+        contentsDisclosure.element.tap()
         XCTAssertTrue(contents.waitForExistence(timeout: 15))
-        let picker = app.buttons["patient-section-picker"]
-        XCTAssertEqual(picker.label, "Sezione clinica")
-        XCTAssertEqual(picker.value as? String, PatientSection.overview.rawValue)
-        XCTAssertGreaterThanOrEqual(picker.frame.height, 44)
         for (raw, title) in [("diary", "Diario clinico"), ("therapies", "Terapie"), ("clinical", "Controlli e osservazioni")] {
             let links = app.buttons.matching(identifier: "patient-open-section-\(raw)")
             XCTAssertTrue(links.element.waitForExistence(timeout: 5))
@@ -1310,6 +1341,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         openPatientSection(.diary)
         XCTAssertTrue(sectionView("entry-row-entry-note").waitForExistence(timeout: 10))
         XCTAssertFalse(contents.exists)
+        attachScreenshot(named: "mobile-harmonization-diary-navigation")
 
         openPatientSection(.scales)
         XCTAssertTrue(app.buttons["scale-library-row-adl"].waitForExistence(timeout: 10))
@@ -1374,7 +1406,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
             guard scrollView.exists else { return false }
             for _ in 0..<12 {
                 if control.isHittable { return true }
-                let contentTop = app.buttons["patient-section-picker"].frame.maxY
+                let contentTop = sectionView("patient-section-navigation").frame.maxY
                 if control.frame.midY <= contentTop {
                     scrollView.swipeDown(velocity: .slow)
                 } else {
@@ -1411,6 +1443,30 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertTrue(revealDiaryControl(paragraph))
         paragraph.tap()
         paragraph.typeText(draftBody)
+        XCTAssertEqual(paragraph.value as? String, draftBody)
+        attachScreenshot(named: "mobile-harmonization-draft-keyboard-portrait")
+        // @Codex: cross the actual adaptive layout with a populated draft. A
+        // reconstructed progressive shell may require resuming, but cannot lose data.
+        XCUIDevice.shared.orientation = .landscapeLeft
+        openPatientSection(.diary)
+        if !title.exists {
+            XCTAssertTrue(revealDiaryControl(openEntry))
+            XCTAssertEqual(openEntry.label, "Riprendi nuova voce")
+            openEntry.tap()
+        }
+        XCTAssertEqual(title.value as? String, draftTitle)
+        XCTAssertTrue(revealDiaryControl(paragraph))
+        XCTAssertEqual(paragraph.value as? String, draftBody)
+        XCTAssertEqual(paragraphs.count, 1)
+        attachScreenshot(named: "mobile-harmonization-draft-keyboard-landscape")
+        XCUIDevice.shared.orientation = .portrait
+        openPatientSection(.diary)
+        if !title.exists {
+            XCTAssertTrue(revealDiaryControl(openEntry))
+            XCTAssertEqual(openEntry.label, "Riprendi nuova voce")
+            openEntry.tap()
+        }
+        XCTAssertTrue(revealDiaryControl(paragraph))
         XCTAssertEqual(paragraph.value as? String, draftBody)
 
         XCTAssertTrue(revealDiaryControl(attachments))
@@ -1755,6 +1811,231 @@ final class MediFlowMobileAppUITests: XCTestCase {
         // The coded diagnosis appears in the detail (existing one preserved).
         XCTAssertTrue(app.staticTexts["I10 - Ipertensione essenziale (primaria)"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["E11.9 - Diabete tipo 2"].waitForExistence(timeout: 5))
+    }
+
+    // MARK: - Actual paired client / host interoperability (opt-in, no demo)
+
+    /* @Codex: The descriptor is supplied to the test runner in a private xctestrun.
+       These tests are deliberately separate from launch(seedPatients:), because
+       ordinary pairing/cache and the real HTTPS transport are part of the proof. */
+    private struct InteropInput: Decodable {
+        struct Host: Decodable { let os: String; let sourceCommit: String; let httpsURL: String; let tlsPinSHA256: String }
+        struct Operator: Decodable { let username: String; let pin: String; let ambulatoryId: String }
+        struct Patient: Decodable { let id: String; let firstName: String; let lastName: String }
+        struct Client: Decodable { let id: String; let token: String }
+        struct PreviousPairing: Decodable { let serverURL: String; let id: String }
+        let schemaVersion: Int
+        let synthetic: Bool
+        let fixtureId: String
+        let runID: String
+        let clientPlatform: String
+        let host: Host
+        let operatorInfo: Operator
+        let patient: Patient
+        let client: Client
+        let expectedAddress: String?
+        let expectedDiaryTitle: String?
+        let previousPairings: [PreviousPairing]?
+
+        enum CodingKeys: String, CodingKey {
+            case schemaVersion, synthetic, fixtureId, runID, clientPlatform, host, patient, client
+            case expectedAddress, expectedDiaryTitle, previousPairings
+            case operatorInfo = "operator"
+        }
+        var writeAddress: String { "Via Interop \(runID) \(clientPlatform)" }
+        var writeTitle: String { "Interop \(runID) \(clientPlatform)" }
+        var writeBody: String { "Testo sintetico completo per la verifica tra client e host." }
+    }
+
+    private func interopInput() throws -> InteropInput {
+        guard let json = ProcessInfo.processInfo.environment["MEDIFLOW_INTEROP_INPUT"] else {
+            throw XCTSkip("Actual host interoperability requires its explicit private descriptor; fixture runs are not pairing proof.")
+        }
+        let input = try JSONDecoder().decode(InteropInput.self, from: Data(json.utf8))
+        XCTAssertEqual(input.schemaVersion, 1)
+        XCTAssertTrue(input.synthetic)
+        XCTAssertEqual(input.clientPlatform, UIDevice.current.userInterfaceIdiom == .pad ? "ipados" : "ios")
+        XCTAssertTrue(input.host.httpsURL.hasPrefix("https://"))
+        XCTAssertEqual(input.host.sourceCommit.count, 40)
+        XCTAssertEqual(input.host.tlsPinSHA256.count, 64)
+        return input
+    }
+
+    /// Uses the actual target frame and its enclosing scroll view, including
+    /// recovery after a keyboard-sized viewport has been scrolled past the target.
+    private func revealInteropControl(_ element: XCUIElement) -> Bool {
+        guard element.waitForExistence(timeout: 15) else { return false }
+        for _ in 0..<16 {
+            if element.isHittable { return true }
+            let containers = app.scrollViews.containing(.any, identifier: element.identifier)
+                .allElementsBoundByIndex.filter { $0.exists && $0.frame.height > 0 }
+            guard let scroll = containers.min(by: { $0.frame.width * $0.frame.height < $1.frame.width * $1.frame.height }) else {
+                return false
+            }
+            let navigation = sectionView("patient-section-navigation")
+            let top = navigation.exists ? max(scroll.frame.minY, navigation.frame.maxY) : scroll.frame.minY
+            if element.frame.midY <= top { scroll.swipeDown(velocity: .slow) }
+            else { scroll.swipeUp(velocity: .slow) }
+        }
+        return element.isHittable
+    }
+
+    private func fillInteropField(_ identifier: String, value: String, secure: Bool = false) {
+        let field = secure ? app.secureTextFields[identifier] : app.textFields[identifier]
+        XCTAssertTrue(revealInteropControl(field), "The connection/edit field must be reachable: \(identifier)")
+        field.tap()
+        if let existing = field.value as? String, existing != field.placeholderValue {
+            field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: existing.count))
+        }
+        field.typeText(value)
+        if !secure { XCTAssertEqual(field.value as? String, value) }
+    }
+
+    private func launchAndLoginInterop(_ input: InteropInput, useSavedPairing: Bool = false) {
+        app.launchEnvironment = [
+            "MEDIFLOW_APPLE_INITIAL_SECTION": "settings",
+            "MEDIFLOW_APPLE_DEMO": "0", "MEDIFLOW_APPLE_UITEST_PATIENTS": "0",
+            "MEDIFLOW_APPLE_DEV_SKIP_KEYCHAIN": "0",
+            "MEDIFLOW_HOMEBASE_AUTOLOGIN": "false", "MEDIFLOW_HOMEBASE_AUTOLOAD_PATIENTS": "false",
+            "MEDIFLOW_HOMEBASE_AUTODISCOVER": "false",
+        ]
+        app.launch()
+        XCTAssertTrue(sectionView("clinical-workspace-settings-view").waitForExistence(timeout: 20))
+        let connection = app.buttons["settings-mediflow-connection-button"]
+        XCTAssertTrue(revealInteropControl(connection))
+        connection.tap()
+        let idField = app.textFields["homebase-paired-client-id-field"]
+        XCTAssertTrue(idField.waitForExistence(timeout: 10))
+        let savedIDValue = idField.value as? String ?? ""
+        let savedID = savedIDValue == idField.placeholderValue ? "" : savedIDValue
+        let serverField = app.textFields["homebase-server-url-field"]
+        let savedServer = serverField.value as? String ?? ""
+        if useSavedPairing {
+            XCTAssertEqual(savedID, input.client.id, "The ordinary app must retain its own pairing across relaunch")
+            XCTAssertEqual(savedServer, input.host.httpsURL)
+            XCTAssertEqual(app.textFields["homebase-tls-pin-field"].value as? String, input.host.tlsPinSHA256)
+        } else {
+            let knownPairing = savedID == input.client.id && savedServer == input.host.httpsURL
+                || (input.previousPairings ?? []).contains { $0.id == savedID && $0.serverURL == savedServer }
+            XCTAssertTrue(savedID.isEmpty || knownPairing,
+                          "Unexpected stored pairing: preserve it and stop; only this lane's synthetic pairings may be replaced")
+            fillInteropField("homebase-server-url-field", value: input.host.httpsURL)
+            fillInteropField("homebase-tls-pin-field", value: input.host.tlsPinSHA256)
+            fillInteropField("homebase-paired-client-id-field", value: input.client.id)
+            fillInteropField("homebase-paired-client-token-field", value: input.client.token, secure: true)
+            fillInteropField("homebase-username-field", value: input.operatorInfo.username)
+            fillInteropField("homebase-ambulatory-field", value: input.operatorInfo.ambulatoryId)
+        }
+        fillInteropField("homebase-password-field", value: input.operatorInfo.pin, secure: true)
+        let login = app.buttons["homebase-login-button"]
+        XCTAssertTrue(revealInteropControl(login))
+        login.tap()
+        let activeSession = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label == %@", "Sessione operatore attiva."),
+            object: app.staticTexts["homebase-status-message"]
+        )
+        XCTAssertEqual(XCTWaiter.wait(for: [activeSession], timeout: 30), .completed,
+                       "Real operator login must also unlock field encryption")
+        let load = app.buttons["homebase-load-patients-button"]
+        XCTAssertTrue(revealInteropControl(load))
+        load.tap()
+        let online = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label CONTAINS %@", "pazienti caricati in lettura."),
+            object: app.staticTexts["homebase-status-message"]
+        )
+        XCTAssertEqual(XCTWaiter.wait(for: [online], timeout: 30), .completed, "The app must read the actual host")
+        app.buttons["homebase-configuration-close-button"].tap()
+        XCTAssertTrue(openSection("Pazienti"))
+        let patient = app.buttons["patient-cell-\(input.patient.id)"]
+        XCTAssertTrue(patient.waitForExistence(timeout: 20))
+        XCTAssertTrue(patient.label.contains(input.patient.lastName))
+        XCTAssertTrue(revealInteropControl(patient))
+        patient.tap()
+        openPatientSection(.overview)
+        XCTAssertTrue(sectionView("patient-detail-name").label.contains(input.patient.lastName))
+    }
+
+    private func assertInteropReread(_ input: InteropInput, address: String, title: String) {
+        openPatientSection(.overview)
+        XCTAssertTrue(app.staticTexts[address].waitForExistence(timeout: 15), "The real client must decrypt the persisted address")
+        openPatientSection(.diary)
+        let titleText = app.staticTexts.matching(NSPredicate(format: "label == %@", title))
+        XCTAssertTrue(titleText.element.waitForExistence(timeout: 20))
+        XCTAssertEqual(titleText.count, 1, "The saved entry must not be duplicated by refresh or relaunch")
+        let entry = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH %@", "entry-row-"))
+            .containing(.staticText, identifier: title)
+        XCTAssertEqual(entry.count, 1, "The title must identify one actual diary record")
+        XCTAssertTrue(entry.element.staticTexts[input.writeBody].waitForExistence(timeout: 10),
+                      "The selected persisted rich-text body must decrypt and render completely")
+        attachScreenshot(named: "interop-\(input.host.os)-\(input.clientPlatform)-persisted-diary")
+    }
+
+    /* @Codex: Run once per actual host and idiom, then independently reread via web API and the other app. */
+    func testRealPairedHostWorkflow() throws {
+        let input = try interopInput()
+        defer { app.terminate() }
+        launchAndLoginInterop(input)
+        if let address = input.expectedAddress, let title = input.expectedDiaryTitle {
+            assertInteropReread(input, address: address, title: title)
+            openPatientSection(.overview)
+        }
+        attachScreenshot(named: "interop-\(input.host.os)-\(input.clientPlatform)-host-patient")
+        let edit = app.buttons["edit-patient-button"]
+        XCTAssertTrue(revealInteropControl(edit))
+        edit.tap()
+        fillInteropField("edit-patient-address", value: input.writeAddress)
+        let savePatient = app.buttons["save-patient-button"]
+        XCTAssertTrue(revealInteropControl(savePatient))
+        XCTAssertTrue(savePatient.isEnabled)
+        savePatient.tap()
+        XCTAssertTrue(app.staticTexts[input.writeAddress].waitForExistence(timeout: 20))
+
+        openPatientSection(.diary)
+        let openEntry = app.buttons["homebase-open-new-entry-button"]
+        XCTAssertTrue(revealInteropControl(openEntry))
+        XCTAssertFalse(app.textFields["homebase-new-entry-title-field"].exists)
+        openEntry.tap()
+        fillInteropField("homebase-new-entry-title-field", value: input.writeTitle)
+        let addParagraph = app.buttons["homebase-new-entry-content-add-paragraph"]
+        XCTAssertTrue(revealInteropControl(addParagraph))
+        addParagraph.tap()
+        let paragraphs = app.textViews.matching(NSPredicate(format: "identifier BEGINSWITH %@", "homebase-new-entry-content-text-"))
+        XCTAssertTrue(paragraphs.element.waitForExistence(timeout: 10))
+        XCTAssertEqual(paragraphs.count, 1)
+        let paragraph = paragraphs.element
+        let blockID = paragraph.identifier
+        XCTAssertTrue(revealInteropControl(paragraph))
+        paragraph.tap()
+        paragraph.typeText(input.writeBody)
+        XCTAssertEqual(paragraph.value as? String, input.writeBody)
+        openPatientSection(.documents)
+        XCTAssertFalse(app.textFields["homebase-new-entry-title-field"].exists)
+        openPatientSection(.diary)
+        XCTAssertTrue(revealInteropControl(openEntry))
+        XCTAssertEqual(openEntry.label, "Riprendi nuova voce")
+        openEntry.tap()
+        XCTAssertEqual(app.textFields["homebase-new-entry-title-field"].value as? String, input.writeTitle)
+        XCTAssertTrue(revealInteropControl(app.textViews[blockID]))
+        XCTAssertEqual(app.textViews[blockID].value as? String, input.writeBody)
+        let saveEntry = app.buttons["homebase-create-entry-button"]
+        XCTAssertTrue(revealInteropControl(saveEntry))
+        XCTAssertTrue(saveEntry.isEnabled, "A real writer grant, active session and unlocked key are required")
+        saveEntry.tap()
+        XCTAssertTrue(app.staticTexts[input.writeTitle].waitForExistence(timeout: 20))
+        app.terminate()
+        launchAndLoginInterop(input, useSavedPairing: true)
+        assertInteropReread(input, address: input.writeAddress, title: input.writeTitle)
+    }
+
+    /* @Codex: Return the first client after the peer's write; no mutation in this phase. */
+    func testRealPairedOtherClientReread() throws {
+        let input = try interopInput()
+        let address = try XCTUnwrap(input.expectedAddress, "The peer's exact persisted address is required")
+        let title = try XCTUnwrap(input.expectedDiaryTitle, "The peer's exact persisted diary title is required")
+        defer { app.terminate() }
+        launchAndLoginInterop(input, useSavedPairing: true)
+        assertInteropReread(input, address: address, title: title)
     }
 
     /// Swipes the detail scroll view up until `element` is in the accessibility
