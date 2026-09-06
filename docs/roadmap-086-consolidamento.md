@@ -108,8 +108,9 @@ come confronto codice/descrizione contro la fonte WHO; non confonderlo con una
 validazione della diagnosi. Verificare se il servizio attuale copre anche il
 lookup puntuale necessario. Confrontare API online e deployment locale WHO
 soltanto rispetto a requisiti concreti di offline, manutenzione e distribuzione.
-Se è richiesto proprio un sidecar locale, registrare la decisione e aggiornare
-l'ADR prima di implementarlo: non è un semplice interruttore da riaccendere.
+Il 6 settembre l'utente ha scelto il **sidecar locale**: la proposta iniziale
+online è superata. Aggiornare l'ADR e implementare il nuovo servizio; non è
+un semplice interruttore da riaccendere.
 
 **Accettazione.** Setup da installazione pulita; ricerca sintetica riuscita;
 codice noto, query senza risultati, credenziali assenti/non valide, rete assente,
@@ -118,8 +119,8 @@ configurato, risposta live e cache. Credenziali solo sul server; nessun dato
 paziente nei test. Nessuna assegnazione diagnostica automatica. Release e lingua
 devono essere esplicite: il binding documentato è `2026-01`, MMS, inglese.
 
-**Dipendenze.** Scelta online/sidecar e disponibilità delle credenziali per la
-prova finale. La [documentazione WHO](https://icd.who.int/docs/icd-api/), consultata
+**Dipendenze.** Scelta sidecar risolta; restano contratto, provisioning locale
+e prova finale. La [documentazione WHO](https://icd.who.int/docs/icd-api/), consultata
 il 5 settembre, è la fonte upstream da verificare per il binding scelto.
 
 ## 3. Impostazioni semplici, navigabili e utili — essenziale
@@ -184,6 +185,11 @@ azioni tagliate o scorrimento orizzontale dell'intera pagina. Aprire una sezione
 e tornare indietro conserva il contesto; navigazione e modifiche non perdono
 dati. Approvazione visiva su impostazioni e paziente insieme, prima del redesign
 runtime esteso.
+
+Decisione del 6 settembre sul prototipo navigabile: **B con barra superiore
+predefinita, A con barra laterale selezionabile nelle Impostazioni**. Le lettere
+del prototipo indicano le due composizioni runtime, non le tre direzioni
+estetiche iniziali riportate sotto. La rifinitura delle Impostazioni continua.
 
 ### Tre direzioni da confrontare
 

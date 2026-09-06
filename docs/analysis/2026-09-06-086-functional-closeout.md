@@ -16,7 +16,7 @@ rilascio, aggiornamento tracker o attivazione su dati reali è stato eseguito.
 | --- | --- | --- |
 | OCR | AnyDoc e fallback PDF Apple Vision hanno provenienza visibile; interruzione dell'attesa, scarto delle risposte tardive e recupero dei controlli. | PDF supportati sul Mac provato; immagini singole manuali. L'interruzione client non garantisce l'arresto immediato del processo server. |
 | Stato funzioni | Sette funzioni con scopo, prerequisiti e azione; errore, spento, da configurare e da provare sono distinti. | Lettura configurazione; nessuna data di inferenza inventata e nessuna qualifica clinica. |
-| WHO | Setup del servizio corrente e verifica esplicita di un termine pubblico; risposta live, cache ed errore distinti. | Account live e decisione sul catalogo offline non verificati. Nessuna nuova lookup/codifica automatica. |
+| WHO | Setup del servizio corrente e verifica esplicita di un termine pubblico; risposta live, cache ed errore distinti. | Sidecar locale scelto il 6 settembre, ancora da implementare e provare. Il codice consegnato riguarda l'adapter precedente. Nessuna nuova lookup/codifica automatica. |
 | Ollama | Comando host esplicito per ispezione, ammissione, recupero e revoca, con attestazione locale e CAS. | Solo Ollama; ATHENA resta separata. Non accende le funzioni e non genera testo. |
 | Homebase | La modalità configurata produce stato `unknown/not_probed`, non disponibilità di rete presunta. | Non sostituisce una prova di collegamento paired. |
 | Onboarding | Guida locale con tre domande, scelta manuale, anteprima persistita, ripresa, cambio e rollback del profilo. | Nessun host agente collegato o privilegio concesso dalla preferenza; piattaforme non installate restano non provate. |
@@ -138,11 +138,26 @@ verbale e la roadmap, lasciando invariato il codice eseguibile provato.
 
 ## Decisioni e confini ancora aperti
 
-- Revisione della proposta visiva da parte dell'utente, prima della sua
-  integrazione. La demo resta separata dal candidato funzionale.
-- Scelta WHO online/offline e prova dell'account ufficiale; il servizio
-  esistente resta disattivato per default. Il nuovo pulsante non raccoglie o
-  sostituisce credenziali. [Decision packet](./2026-09-05-086-who-decision.md).
+Aggiornamento successivo alla prova del bundle sopra: aggiunto **Rinnova
+accesso** alla schermata d'errore del login. Il controllo richiama il blocco
+esistente, con la barriera delle richieste già presente; il nuovo accesso
+richiede ancora il PIN. Nel twin sintetico una seconda scheda senza sessione
+client ripristinata restituiva 503 con la prima sbloccata. Il percorso errore,
+rinnovo e nuovo PIN è riuscito senza riavvio. Il controllo chiude la sessione
+precedente condivisa; non modifica account o dati. Questa aggiunta non è
+coperta dalla precedente prova del bundle sul commit `75aed03fa10f`.
+Per l'aggiunta sono passati 15 test della barriera/blocco client, lint,
+typecheck, una nuova build webpack con postbuild, never-regress e claims.
+L'interazione è stata verificata nel twin con lo stesso componente; non è
+stata ripetuta l'intera matrice dei servizi o la suite sul bundle standalone.
+
+- L'utente preferisce B con barra superiore e chiede A selezionabile nelle
+  Impostazioni. Restano rifinitura delle Impostazioni e integrazione; la demo
+  resta separata dal candidato funzionale.
+- WHO: scelta risolta a favore del sidecar locale il 6 settembre. Restano
+  ADR, implementazione, setup e prove del nuovo servizio. Il servizio online
+  precedente resta disattivato per default; non vale come prova del sidecar.
+  [Decision packet](./2026-09-05-086-who-decision.md).
 - Revisione giuridico-regolatoria e adozione organizzativa del dossier;
   `legalVerdict: not_assessed`. [Matrice](./2026-09-06-086-regulatory-evidence.md).
 - Firmatura, notarizzazione, installazione esterna, CI remota e release non
