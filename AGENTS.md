@@ -66,25 +66,46 @@ La fonte canonica per questa decisione e
 - Prima del commit verificare branch corrente, scope del diff e stato del
   worktree.
 
-## Modello ed effort per funzione
+## Coordinamento e lane parallele
 
-Ultra e la modalita di orchestrazione scelta esclusivamente dall'utente:
-l'agente non vi passa autonomamente. Solo il coordinatore in Ultra apre
-sub-agent, salvo richiesta esplicita dell'utente. Ultra abilita la delega,
-non la impone. Ai sub-agent assegnare esplicitamente un effort supportato
-non superiore a Max, senza ereditare Ultra o aprire ulteriori sub-agent.
+Per MediFlow, la scelta tra lavoro singolo e sub-agent dipende dal compito;
+questa regola sostituisce il default globale "Work solo by default". Un avvio
+in solitaria puo servire a stabilire baseline e contratti. Rivalutare la
+parallelizzazione quando emergono risultati indipendenti: usarla quando il
+beneficio supera il costo di coordinamento, senza un numero prefissato di agenti.
 
-- **Astra**: priorita, confini, sintesi, problemi trasversali, verifica e
-  integrazione; implementazione diretta quando ne servono le capacita.
-- **Sol**: indagini e implementazioni sostanziali con autonomia nella scelta
-  dell'approccio e nella gestione dell'ambiguita.
-- **Terra**: funzionalita delimitate, bug e modifiche su piu file entro un
-  contratto chiaro.
-- **Luna**: interventi circoscritti completi, componenti semplici, correzioni
-  ripetibili, test mirati, revisione di testi e controlli visivi.
-- Considerare attivamente Terra e Luna per l'implementazione, senza limitarli
-  a ricerche o riassunti. Scegliere il modello meno oneroso adeguato al compito,
-  lasciandogli autonomia entro obiettivo, ownership e criteri di verifica.
+### Modello ed effort per funzione
+
+La modalita Ultra del coordinatore principale resta scelta dall'utente.
+Solo il coordinatore in Ultra apre sub-agent, salvo richiesta esplicita
+dell'utente. Ultra abilita la delega, non la impone.
+Ai sub-agent assegnare esplicitamente un effort supportato e proporzionato:
+Ultra e ammesso per incarichi sostanziali quando il coordinatore ne motiva
+il vantaggio atteso sui tempi del lavoro in corso rispetto al costo di
+coordinamento e verifica. Non ereditarlo per omissione o usarlo per default.
+Controllare le impostazioni effettive all'avvio e alla ripresa, quando esposte;
+se non osservabili, dichiararlo. Questo non autorizza spawn annidati.
+
+- **Astra**: dirige il programma, individua e ripartisce i compiti, stabilisce
+  contratti e criteri di accettazione, ricontrolla il lavoro e integra i risultati.
+- **Sol**: esecutore autonomo e creativo per indagini e implementazioni
+  sostanziali; sceglie l'approccio entro i criteri di Astra e gli risponde
+  del risultato, che resta soggetto alla verifica di Astra.
+- **Terra**: esegue compiti precisi e delimitati, anche su piu file, con
+  discrezione implementativa entro il contratto assegnato.
+- **Luna**: agente foglia per compiti stretti e codificati, implementazioni
+  circoscritte, test mirati, letture e controlli visivi; non coordina altre lane.
+- Prima di assegnare il lavoro, individuare attivamente piu compiti adatti
+  a Terra e Luna e preferire il modello meno oneroso capace di completarli.
+  Ripartire diversamente il lavoro quando permette questa delega senza perdere
+  coerenza. L'obiettivo e usarli di piu, non ampliarne l'autonomia o creare
+  frammentazioni artificiali. Non concentrare su Astra lavoro delegabile.
+- Astra puo organizzare gerarchie funzionali: Sol puo guidare tecnicamente
+  un gruppo di lane Terra/Luna gia aperte e assegnate da Astra. I sub-agent
+  possono comunicare direttamente, se gli strumenti lo consentono, per
+  chiarimenti, dipendenze e consegne entro i rispettivi incarichi. Astra resta
+  responsabile di assegnazioni, cambi di scope e accettazione finale; la
+  gerarchia non autorizza spawn annidati o modifiche fuori ownership.
 - Scegliere effort e strumenti per complessita, rischio e incertezza. Max
   non e un default, in particolare per Sol e Terra: richiede una necessita
   concreta. Aumentare l'effort o cambiare modello quando le prove lo richiedono;
@@ -95,6 +116,26 @@ non superiore a Max, senza ereditare Ultra o aprire ulteriori sub-agent.
 - Valutare il mix sul risultato verificato: consumo osservabile, tempo,
   supervisione, rifacimenti e qualita finale. Non dedurre risparmio effettivo
   dal solo prezzo per token; adeguare la distribuzione alle prove raccolte.
+
+### Responsabilita e ciclo delle lane
+
+- Il coordinatore mantiene un solo obiettivo di programma e decide quali lane
+  aprire, con una breve motivazione nel checkpoint esistente. Mantiene in
+  sequenza il lavoro accoppiato o con ownership in conflitto.
+- Prima di aprire una lane, definire scopo e fuori scope, contratto e dipendenze,
+  owner, file o contesto assegnati, autorita, output atteso, Definition of Done,
+  verifiche e condizione di arresto. Usare worktree separati per writer
+  concorrenti e rispettare modello, effort e modalita scelti dall'utente.
+- Ogni lane segue un ciclo esplicito: apertura, esecuzione, consegna candidata,
+  verifica del coordinatore, chiusura. Il coordinatore controlla output e prove;
+  il resoconto del sub-agent, da solo, non attesta integrazione o completamento.
+- Alla chiusura registrare esito, artefatti, verifiche, limiti e destinazione del
+  risultato; poi chiudere il sub-agent. In caso di blocco o annullamento,
+  conservare il lavoro e indicare motivo e prossimo passo, senza dichiarare Done.
+  Nessuna lane resta aperta senza un incarico attivo e un responsabile.
+- La delega resta entro l'autorita del task e non autorizza altre deleghe,
+  azioni esterne o modifiche fuori scope. Le scelte prodotto riservate
+  all'utente restano al coordinatore per la decisione pertinente.
 
 ## Igiene documentale
 
