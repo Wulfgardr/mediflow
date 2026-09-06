@@ -546,6 +546,9 @@ struct PairedPatientDetailSection: View {
             Text("Modifica anagrafica")
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
+            // @Codex: keep the submitted fields stable until acknowledgement;
+            // explicit cancellation and session lock retain their own controls.
+            Group {
             TextField("Nome", text: $model.editPatientFirstName)
                 .accessibilityIdentifier("edit-patient-firstName")
             TextField("Cognome", text: $model.editPatientLastName)
@@ -708,6 +711,8 @@ struct PairedPatientDetailSection: View {
             }
             /* @Codex */
             .disabled(model.isPatientFieldLocked(.exemptions))
+            }
+            .disabled(model.isWorking)
 
             HStack(spacing: 10) {
                 Button("Salva") {
