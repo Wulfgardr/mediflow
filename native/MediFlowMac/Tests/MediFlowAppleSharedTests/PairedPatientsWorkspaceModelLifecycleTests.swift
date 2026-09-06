@@ -23,6 +23,112 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
         let vectors: Vectors
     }
 
+    /* @Codex: DOB is a nullable civil day, not an implicit default date. */
+    func testPatientBirthDateUntouchedOmitsAbsentAndExistingValues() async throws {
+        for original in [nil, ISO8601DateFormatter().date(from: "1980-02-29T16:30:00Z")] {
+            let patient = detail(id: "p1", archived: false, version: 4, birthDate: original)
+            let source = LifecycleMockDataSource(details: ["p1": patient])
+            let model = await makeModel(source: source)
+            await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: patient)
+            await model.startEditingPatient()
+            let editorDate = await model.editPatientBirthDate
+            XCTAssertEqual(editorDate, original)
+            await model.savePatient()
+            let update = await source.lastUpdate
+            let json = try encodedPatientUpdate(XCTUnwrap(update?.payload))
+            XCTAssertNil(json["birthDate"])
+            let reread = await model.selectedPatient?.birthDate
+            XCTAssertEqual(reread, original)
+        }
+    }
+
+    func testPatientBirthDateSetAndCorrectionEncodeUTCCivilDay() async throws {
+        // Equivalent picker instants expressed in opposite offsets must keep
+        // leap day; the control uses the same explicit Gregorian/UTC calendar.
+        for picked in ["2000-02-29T14:00:00+14:00", "2000-02-28T12:00:00-12:00"] {
+            let patient = detail(id: "p1", archived: false, version: 4)
+            let source = LifecycleMockDataSource(details: ["p1": patient])
+            let model = await makeModel(source: source)
+            await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: patient)
+            await model.startEditingPatient()
+            await MainActor.run {
+                model.editPatientBirthDate = ISO8601DateFormatter().date(from: picked)
+            }
+            await model.savePatient()
+            var update = await source.lastUpdate
+            var json = try encodedPatientUpdate(XCTUnwrap(update?.payload))
+            XCTAssertEqual(json["birthDate"] as? String, "2000-02-29T00:00:00Z")
+            await model.startEditingPatient()
+            await MainActor.run {
+                model.editPatientBirthDate = ISO8601DateFormatter().date(from: "2001-03-01T09:00:00Z")
+            }
+            await model.savePatient()
+            update = await source.lastUpdate
+            json = try encodedPatientUpdate(XCTUnwrap(update?.payload))
+            XCTAssertEqual(json["birthDate"] as? String, "2001-03-01T00:00:00Z")
+            XCTAssertEqual(json["version"] as? Int, 5)
+        }
+    }
+
+    func testPatientBirthDateExplicitRemovalEncodesNull() async throws {
+        let patient = detail(id: "p1", archived: false, version: 4,
+            birthDate: ISO8601DateFormatter().date(from: "1980-02-29T00:00:00Z"))
+        let source = LifecycleMockDataSource(details: ["p1": patient])
+        let model = await makeModel(source: source)
+        await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: patient)
+        await model.startEditingPatient()
+        await model.setPatientBirthDatePresent(false)
+        await model.savePatient()
+        let update = await source.lastUpdate
+        let json = try encodedPatientUpdate(XCTUnwrap(update?.payload))
+        XCTAssertTrue(json["birthDate"] is NSNull)
+        let reread = await model.selectedPatient?.birthDate
+        XCTAssertNil(reread)
+    }
+
+    func testPatientBirthDateFailureKeepsEditorAndOriginalVersion() async throws {
+        let patient = detail(id: "p1", archived: false, version: 4)
+        let conflict = await PairedPatientsWorkspaceModel.uiTestSeededConflict()
+        let source = LifecycleMockDataSource(details: ["p1": patient], updateError: .versionConflict(conflict))
+        let model = await makeModel(source: source)
+        await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: patient)
+        await model.startEditingPatient()
+        let picked = ISO8601DateFormatter().date(from: "2000-02-29T00:00:00Z")
+        await MainActor.run { model.editPatientBirthDate = picked }
+        await model.savePatient()
+        let state = await MainActor.run { (model.editPatientBirthDate, model.isEditingPatient, model.pendingConflict) }
+        XCTAssertEqual(state.0, picked)
+        XCTAssertTrue(state.1)
+        XCTAssertEqual(state.2, conflict)
+        let update = await source.lastUpdate
+        XCTAssertEqual(update?.payload.version, 4)
+    }
+
+    func testPatientBirthDateLockClearsEditorAndRejectsLateSave() async throws {
+        let patient = detail(id: "p1", archived: false, version: 4)
+        let gate = LifecycleLoadGate(["update"])
+        let source = LifecycleMockDataSource(details: ["p1": patient], loadGate: gate)
+        let model = await makeModel(source: source)
+        await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: patient)
+        await model.startEditingPatient()
+        await MainActor.run { model.editPatientBirthDate = ISO8601DateFormatter().date(from: "2000-02-29T00:00:00Z") }
+        let save = Task { await model.savePatient() }
+        await gate.wait(for: "update")
+        await model.lockSessionNow()
+        await gate.release("update")
+        await save.value
+        let state = await MainActor.run { (model.editPatientBirthDate, model.selectedPatient, model.isEditingPatient) }
+        XCTAssertNil(state.0)
+        XCTAssertNil(state.1)
+        XCTAssertFalse(state.2)
+    }
+
+    private func encodedPatientUpdate(_ payload: HomeBasePatientUpdatePayload) throws -> [String: Any] {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        return try XCTUnwrap(JSONSerialization.jsonObject(with: encoder.encode(payload)) as? [String: Any])
+    }
+
     /* @Codex */
     func testActiveListLoadRequestsAndDecryptsDiagnosisProjection() async throws {
         let raw = #"[{"code":"E11.9","description":"Diabete tipo 2"},{"code":"I10","description":"Ipertensione"}]"#
@@ -793,13 +899,14 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
         archived: Bool,
         version: Int,
         deleted: Bool = false,
-        encryptedValue: String? = nil
+        encryptedValue: String? = nil,
+        birthDate: Date? = nil
     ) -> HomeBasePatientDetail {
         HomeBasePatientDetail(
             id: id,
             firstName: "Mario",
             lastName: "Rossi",
-            birthDate: nil,
+            birthDate: birthDate,
             taxCode: "RSSMRA80A01H501U",
             address: encryptedValue,
             phone: encryptedValue,
@@ -893,6 +1000,7 @@ private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
     private let pinChangeError: HomeBaseClientError?
     private let loginErrors: [HomeBaseClientError?]
     private let logoutError: HomeBaseClientError?
+    private let updateError: HomeBaseClientError? // @Codex
     private(set) var lastUpdate: UpdateCall?
     private(set) var lastCreate: HomeBasePatientCreatePayload?
     private(set) var lastSoftDelete: DeleteCall?
@@ -912,6 +1020,7 @@ private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
         loginErrors: [HomeBaseClientError?] = [],
         pinChangeError: HomeBaseClientError? = nil,
         logoutError: HomeBaseClientError? = nil,
+        updateError: HomeBaseClientError? = nil, // @Codex
         loadGate: LifecycleLoadGate? = nil,
         entriesByPatient: [String: [HomeBaseEntrySummary]] = [:],
         entryErrorsByPatient: [String: HomeBaseClientError] = [:],
@@ -925,6 +1034,7 @@ private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
         self.loginErrors = loginErrors
         self.pinChangeError = pinChangeError
         self.logoutError = logoutError
+        self.updateError = updateError // @Codex
         self.loadGate = loadGate
         self.entriesByPatient = entriesByPatient
         self.entryErrorsByPatient = entryErrorsByPatient
@@ -1117,12 +1227,20 @@ private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
         ambulatoryId: String?
     ) async throws -> HomeBaseMutationAcknowledgement {
         lastUpdate = UpdateCall(patientId: patientId, payload: payload)
+        await loadGate?.pause("update") // @Codex
+        if let updateError { throw updateError }
         guard let current = details[patientId] else { throw HomeBaseClientError.httpStatus(404, "Not found") }
+        let birthDate: Date? // @Codex
+        switch payload.birthDate {
+        case .omit: birthDate = current.birthDate
+        case .null: birthDate = nil
+        case .value(let value): birthDate = value
+        }
         let updated = HomeBasePatientDetail(
             id: current.id,
             firstName: current.firstName,
             lastName: current.lastName,
-            birthDate: current.birthDate,
+            birthDate: birthDate,
             taxCode: current.taxCode,
             address: current.address,
             phone: current.phone,
