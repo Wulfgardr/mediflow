@@ -1414,18 +1414,26 @@ final class MediFlowMobileAppUITests: XCTestCase {
             guard control.waitForExistence(timeout: 5) else { return false }
             let scrollView = app.scrollViews.containing(.button, identifier: "entry-type-filter").element
             guard scrollView.exists else { return false }
+            func unreachable() -> Bool {
+                let evidence = XCTAttachment(string: app.debugDescription)
+                evidence.name = "unreachable-diary-control-\(control.identifier)"
+                evidence.lifetime = .keepAlways
+                add(evidence)
+                return false
+            }
             for _ in 0..<12 {
                 if control.isHittable { return true }
                 let scrollFrame = scrollView.frame
                 let viewport = scrollFrame.intersection(app.frame)
                 let contentTop = max(viewport.minY, sectionView("patient-section-navigation").frame.maxY)
                 var contentBottom = viewport.maxY
-                for overlay in [app.keyboards.firstMatch, app.tabBars.firstMatch] where overlay.exists {
+                // Keyboard excludes its prediction/accessory row in the actual AX tree.
+                for overlay in [app.keyboards.firstMatch, app.otherElements["SystemInputAssistantView"], app.tabBars.firstMatch] where overlay.exists {
                     if overlay.frame.intersects(viewport) {
                         contentBottom = min(contentBottom, overlay.frame.minY)
                     }
                 }
-                guard viewport.width > 0, contentBottom > contentTop else { return false }
+                guard viewport.width > 0, contentBottom > contentTop else { return unreachable() }
                 let inset = min(12, (contentBottom - contentTop) / 4)
                 let x = viewport.minX + min(12, viewport.width / 4) - scrollFrame.minX
                 let upper = contentTop + inset - scrollFrame.minY
@@ -1436,13 +1444,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
                 let end = origin.withOffset(CGVector(dx: x, dy: movingDown ? lower : upper))
                 start.press(forDuration: 0.05, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 0)
             }
-            if !control.isHittable {
-                let evidence = XCTAttachment(string: app.debugDescription)
-                evidence.name = "unreachable-diary-control-\(control.identifier)"
-                evidence.lifetime = .keepAlways
-                add(evidence)
-            }
-            return control.isHittable
+            return control.isHittable || unreachable()
         }
 
         XCTAssertTrue(revealDiaryControl(openEntry))
