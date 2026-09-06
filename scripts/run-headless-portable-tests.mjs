@@ -43,7 +43,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
         process.exitCode = 1;
     } else {
         const runner = path.join(repoRoot, 'scripts/run-strip-types.mjs');
-        const result = spawnSync(process.execPath, [runner, '--test', ...tests], {
+        const result = spawnSync(process.execPath, [runner, '--test', '--test-concurrency=1', ...tests], {
             cwd: repoRoot,
             env: { ...process.env, MEDIFLOW_STRIP_TYPES_NODE: process.execPath },
             stdio: 'inherit',
