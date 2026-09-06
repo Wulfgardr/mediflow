@@ -371,17 +371,25 @@ class ApiTable<T> {
         return this;
     }
 
-    async get(id: string): Promise<T | undefined> {
-        const res = await fetch(`${this.endpoint}/${id}`, { cache: 'no-store' });
+    async get(id: string, options?: { signal?: AbortSignal }): Promise<T | undefined> {
+        // @Codex: opt-in readers can retire both the request and its continuation.
+        const signal = options?.signal;
+        signal?.throwIfAborted();
+        const res = await fetch(`${this.endpoint}/${id}`, { cache: 'no-store', ...(signal ? { signal } : {}) });
+        signal?.throwIfAborted();
         /* @Codex */
         if (isApiTableAuthUnavailableStatus(res.status)) {
             notifyApiAuthUnavailable(res.status);
+            signal?.throwIfAborted();
             return undefined;
         }
         if (isApiTableUnavailableStatus(res.status)) return undefined;
         if (!res.ok) throw new Error(buildApiTableFetchErrorMessage(this.endpoint, id, res.status, res.statusText));
-        const item = this.reviveDates(await res.json());
-        return await this.decryptItem(item);
+        const raw = await res.json();
+        signal?.throwIfAborted();
+        const item = await this.decryptItem(this.reviveDates(raw));
+        signal?.throwIfAborted();
+        return item;
     }
 
     /* @Codex */
@@ -754,6 +762,8 @@ class ApiTable<T> {
 
 class MedicalApiClient {
     private masterKey: CryptoKey | null = null;
+    // @Codex: cancellation only; this signal grants no server authority or key access.
+    private sessionReads: AbortController | null = null;
 
     patients: ApiTable<Patient>;
     ambulatories: ApiTable<Ambulatory>;
@@ -852,7 +862,16 @@ class MedicalApiClient {
 
     /* @Codex */
     setKey(key: CryptoKey | null) {
+        const previousReads = this.sessionReads;
         this.masterKey = key;
+        this.sessionReads = key ? new AbortController() : null;
+        // @Codex: runs synchronously before SecurityProvider sends the lock request.
+        previousReads?.abort();
+    }
+
+    /* @Codex: a reader created while locked cannot start an HTTP request. */
+    getSessionReadSignal(): AbortSignal {
+        return this.sessionReads?.signal ?? AbortSignal.abort();
     }
 
     isKeySet(): boolean {
