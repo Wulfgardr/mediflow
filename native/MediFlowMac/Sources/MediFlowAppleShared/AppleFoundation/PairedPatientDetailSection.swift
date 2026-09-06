@@ -52,6 +52,28 @@ struct PairedPatientDetailSection: View {
                     if detail.isArchived == true { PairedPatientFlagChip("Archiviato", tone: .neutral) }
                 }
             }
+            /* @Codex: archive provenance belongs with the archived state. */
+            if detail.isArchived == true {
+                ChartGroup("Archiviazione") {
+                    if model.isPatientFieldLocked(.archiveReason) || model.isPatientFieldLocked(.archiveNote) {
+                        Label("Alcuni dati di archiviazione sono protetti.", systemImage: "lock.fill")
+                            .font(.callout)
+                    }
+                    if let reason = cleanedPatientWorkspaceValue(detail.archiveReason) {
+                        Text(PairedPatientsWorkspaceModel.PatientArchiveReason(rawValue: reason)?.label ?? reason)
+                            .font(.body)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    if let note = cleanedPatientWorkspaceValue(detail.archiveNote) {
+                        Text(note).chartProse()
+                    }
+                    if detail.archiveReason == nil && detail.archiveNote == nil
+                        && !model.isPatientFieldLocked(.archiveReason) && !model.isPatientFieldLocked(.archiveNote) {
+                        Text("Motivazione non registrata.").chartMetadata()
+                    }
+                }
+                .accessibilityIdentifier("patient-archive-details")
+            }
             #if os(macOS)
             macPatientFacts
             #else
@@ -567,7 +589,11 @@ struct PairedPatientDetailSection: View {
                     .accessibilityIdentifier("edit-patient-locked-fields-message")
             }
             Toggle("Archiviato", isOn: $model.editPatientIsArchived)
+                .disabled(model.isWorking) // @Codex
                 .accessibilityIdentifier("edit-patient-archived")
+            if model.editPatientIsArchived {
+                PatientArchiveFields(model: model) // @Codex: same fields as the sheet.
+            }
             Toggle("ADI (assistenza domiciliare)", isOn: $model.editPatientIsAdi)
                 .accessibilityIdentifier("edit-patient-adi")
 
@@ -688,7 +714,7 @@ struct PairedPatientDetailSection: View {
                     Task { await model.savePatient() }
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(model.isWorking)
+                .disabled(model.isWorking || model.patientArchiveValidationMessage(isArchived: model.editPatientIsArchived) != nil)
                 .accessibilityIdentifier("save-patient-button")
                 Button("Annulla") {
                     model.cancelEditingPatient()

@@ -150,12 +150,35 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     @Published var editPatientCaregiver = ""
     @Published var editPatientNotes = ""
     @Published var editPatientIsArchived = false
+    /* @Codex: one archive draft/policy for the profile editor and archive sheet. */
+    enum PatientArchiveReason: String, CaseIterable {
+        case assignedMMG = "assigned_mmg", deceased, other
+        var label: String {
+            switch self {
+            case .assignedMMG: return "Assegnato a MMG"
+            case .deceased: return "Decesso"
+            case .other: return "Altro"
+            }
+        }
+    }
+    @Published var editPatientArchiveReason = ""
+    @Published var editPatientArchiveNote = ""
+    @Published private(set) var isEditingPatientArchive = false
+    private var patientArchiveGeneration = UUID()
+    private struct PatientArchiveBaseline {
+        let id: String
+        let version: Int
+        let isArchived: Bool
+        let reason: PatientFieldCrypto.EditableField
+        let note: PatientFieldCrypto.EditableField
+    }
+    private var patientArchiveBaseline: PatientArchiveBaseline?
     @Published private(set) var editPatientDiagnoses: [ClinicalDiagnosis] = []
     @Published var editPatientIsAdi = false
     @Published private(set) var editPatientExemptions: [String] = []
     /* @Codex */
     enum EncryptedPatientField: Hashable {
-        case address, phone, caregiver, notes, diagnoses, exemptions
+        case address, phone, caregiver, notes, diagnoses, exemptions, archiveReason, archiveNote
     }
     /* @Codex */
     @Published private(set) var lockedPatientFields: Set<EncryptedPatientField> = []
@@ -1162,7 +1185,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     /// Conservative navigation guard: an open editor, non-default choice,
     /// date-only change or any text/reference is a draft, even before it can save.
     private var hasNavigationBlockingDraft: Bool {
-        if isCreatingPatient || isEditingPatient || editingEntryId != nil || editingTherapyId != nil
+        if isCreatingPatient || isEditingPatient || isEditingPatientArchive || editingEntryId != nil || editingTherapyId != nil
             || editingCheckupId != nil || editingObservationId != nil || pendingFHIRWarningValidation != nil {
             return true
         }
@@ -1691,6 +1714,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     func startEditingPatient() {
         guard let patient = selectedPatient else { return }
         /* @Codex */
+        cancelPatientArchive()
         patientEditGeneration = UUID()
         editingPatientBaseline = (patient.id, patient.version, patient.birthDate)
         editPatientBirthDate = patient.birthDate
@@ -1702,6 +1726,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         editPatientCaregiver = patient.caregiver ?? ""
         editPatientNotes = patient.notes ?? ""
         editPatientIsArchived = patient.isArchived ?? false
+        preparePatientArchiveFields(patient) // @Codex
         editPatientIsAdi = patient.isAdi ?? false
         editPatientDiagnoses = DiagnosesCodec.decode(patient.diagnoses)
         editPatientExemptions = ExemptionCodesCodec.decode(patient.exemptions)
@@ -1784,6 +1809,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         patientEditGeneration = UUID()
         editingPatientBaseline = nil
         editPatientBirthDate = nil
+        cancelPatientArchive() // @Codex
         resetExemptionCatalogSearch(clearAvailability: false)
     }
 
@@ -1806,6 +1832,10 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         /* @Codex: hold the editor's CAS version and reject stale completion. */
         guard let current = selectedPatient, let baseline = editingPatientBaseline,
               baseline.id == current.id, isEditingPatient, !isWorking else { return }
+        if let validation = patientArchiveValidationMessage(isArchived: editPatientIsArchived) {
+            errorMessage = validation
+            return
+        }
 
         #if DEBUG
         if Self.isUITestSeeded {
@@ -1828,13 +1858,16 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             return
         }
         /* @Codex */
+        let archivePatch: (reason: PatchValue<String>, note: PatchValue<String>) // @Codex
+        do { archivePatch = try patientArchivePatch(isArchived: editPatientIsArchived) }
+        catch { errorMessage = error.localizedDescription; return }
         let payload = HomeBasePatientUpdatePayload(
             version: baseline.version,
             firstName: editPatientFirstName.trimmingCharacters(in: .whitespacesAndNewlines),
             lastName: editPatientLastName.trimmingCharacters(in: .whitespacesAndNewlines),
             taxCode: editPatientTaxCode.trimmingCharacters(in: .whitespacesAndNewlines),
             isAdi: editPatientIsAdi,
-            isArchived: editPatientIsArchived,
+            isArchived: patientArchiveBaseline?.isArchived == editPatientIsArchived ? nil : editPatientIsArchived,
             address: encryptedPatientPatchValue(editPatientAddress.trimmedOrNil, field: .address, masterKey: masterKey),
             phone: encryptedPatientPatchValue(editPatientPhone.trimmedOrNil, field: .phone, masterKey: masterKey),
             caregiver: encryptedPatientPatchValue(editPatientCaregiver.trimmedOrNil, field: .caregiver, masterKey: masterKey),
@@ -1845,7 +1878,9 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             exemptions: encryptedPatientPatchValue(
                 ExemptionCodesCodec.encode(editPatientExemptions),
                 field: .exemptions, masterKey: masterKey, structured: true),
-            birthDate: patientBirthDatePatch
+            birthDate: patientBirthDatePatch,
+            archiveReason: archivePatch.reason,
+            archiveNote: archivePatch.note
         )
         let patientId = current.id
         let editGeneration = patientEditGeneration
@@ -1896,6 +1931,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             && pairedCredentials != nil
             && connectionState == .pairedOnline
             && !isWorking
+            && !isEditingPatient // @Codex: finish the existing profile draft first.
             && permitsCapability(NetworkCapabilityKey.writePatientProfile)
     }
 
@@ -1908,6 +1944,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             && pairedCredentials != nil
             && connectionState == .pairedOnline
             && !isWorking
+            && !isEditingPatient // @Codex
             && permitsCapability(NetworkCapabilityKey.writePatientProfile)
     }
 
@@ -1932,41 +1969,138 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     }
 
     /* @Codex */
-    func setSelectedPatientArchived(_ isArchived: Bool) async {
-        guard let current = selectedPatient else { return }
-        guard (isArchived && canArchivePatient) || (!isArchived && canUnarchivePatient) else { return }
+    @discardableResult
+    func setSelectedPatientArchived(_ isArchived: Bool) async -> Bool {
+        guard let current = selectedPatient, let baseline = patientArchiveBaseline,
+              isEditingPatientArchive, baseline.id == current.id else { return false }
+        guard (isArchived && canArchivePatient) || (!isArchived && canUnarchivePatient) else { return false }
+        if let validation = patientArchiveValidationMessage(isArchived: isArchived) {
+            errorMessage = validation
+            return false
+        }
         guard let sessionCookie, let credentials = pairedCredentials else {
             errorMessage = "Apri prima un paziente con sessione paired online."
-            return
+            return false
         }
-        let payload = HomeBasePatientUpdatePayload(version: current.version, isArchived: isArchived)
-        await runTask {
-            let acknowledgement = try await self.makeClient().updatePatient(
+        let patch: (reason: PatchValue<String>, note: PatchValue<String>)
+        do { patch = try patientArchivePatch(isArchived: isArchived) }
+        catch { errorMessage = error.localizedDescription; return false }
+        let payload = HomeBasePatientUpdatePayload(version: baseline.version, isArchived: isArchived,
+            archiveReason: patch.reason, archiveNote: patch.note)
+        let generation = patientArchiveGeneration
+        let scope = ambulatoryId.trimmedOrNil
+        let client = makeClient()
+        var completed = false
+        var validateCurrent: () throws -> Void = { throw CancellationError() }
+        await runTask({
+            let validate = self.patientReadValidator(patientId: current.id, credentials: credentials,
+                sessionCookie: sessionCookie, ambulatoryId: scope)
+            validateCurrent = {
+                try validate()
+                guard self.patientArchiveGeneration == generation else { throw CancellationError() }
+            }
+            try validateCurrent()
+            let acknowledgement = try await client.updatePatient(
                 patientId: current.id,
                 payload: payload,
                 credentials: credentials,
                 sessionCookie: sessionCookie,
-                ambulatoryId: self.ambulatoryId.trimmedOrNil
+                ambulatoryId: scope
             )
+            try validateCurrent()
             guard acknowledgement.success else { throw HomeBaseClientError.contract }
-            let fetchedDetail = try await self.makeClient().fetchPatient(
+            let fetchedDetail = try await client.fetchPatient(
                 id: current.id,
                 credentials: credentials,
                 sessionCookie: sessionCookie,
-                ambulatoryId: self.ambulatoryId.trimmedOrNil
+                ambulatoryId: scope
             )
-            self.setSelectedPatient(fetchedDetail) // @Codex
-            self.patients = try await self.makeClient().fetchPatients(
+            try validateCurrent()
+            let fetchedPatients = try await client.fetchPatients(
                 credentials: credentials,
                 sessionCookie: sessionCookie,
-                ambulatoryId: self.ambulatoryId.trimmedOrNil,
+                ambulatoryId: scope,
                 includeDiagnoses: true
             )
-            .map { PatientFieldCrypto.decryptSummary($0, masterKey: self.masterKey) }
+            try validateCurrent()
+            self.setSelectedPatient(fetchedDetail)
+            self.patients = fetchedPatients.map { PatientFieldCrypto.decryptSummary($0, masterKey: self.masterKey) }
             self.statusMessage = isArchived
                 ? "Paziente archiviato sull'home-base."
                 : "Paziente riattivato sull'home-base."
+            completed = true
+            self.cancelPatientArchive()
+        }, canApplyFailure: { (try? validateCurrent()) != nil })
+        return completed
+    }
+
+    /* @Codex */
+    func startPatientArchive() {
+        guard let patient = selectedPatient, !isEditingPatient, !isWorking else { return }
+        // Reappearance (including rotation) must not replace an open draft.
+        guard !isEditingPatientArchive || patientArchiveBaseline?.id != patient.id else { return }
+        preparePatientArchiveFields(patient)
+        isEditingPatientArchive = true
+    }
+
+    func cancelPatientArchive() {
+        patientArchiveGeneration = UUID()
+        isEditingPatientArchive = false
+        patientArchiveBaseline = nil
+        editPatientArchiveReason = ""
+        editPatientArchiveNote = ""
+    }
+
+    private func preparePatientArchiveFields(_ patient: HomeBasePatientDetail) {
+        patientArchiveGeneration = UUID()
+        let reason = editablePatientFields[.archiveReason]
+            ?? PatientFieldCrypto.resolveStringField(patient.archiveReason, masterKey: masterKey)
+        let note = editablePatientFields[.archiveNote]
+            ?? PatientFieldCrypto.resolveStringField(patient.archiveNote, masterKey: masterKey)
+        patientArchiveBaseline = PatientArchiveBaseline(id: patient.id, version: patient.version,
+            isArchived: patient.isArchived == true, reason: reason, note: note)
+        editPatientArchiveReason = Self.archiveFieldText(reason)
+        editPatientArchiveNote = Self.archiveFieldText(note)
+    }
+
+    private static func archiveFieldText(_ field: PatientFieldCrypto.EditableField) -> String {
+        if case .plaintext(let text) = field { return text }
+        return ""
+    }
+
+    func patientArchiveValidationMessage(isArchived: Bool) -> String? {
+        guard let baseline = patientArchiveBaseline, baseline.id == selectedPatient?.id else {
+            return "Riapri il modulo del paziente prima di salvare."
         }
+        guard isArchived else { return nil }
+        let unchanged = editPatientArchiveReason == Self.archiveFieldText(baseline.reason)
+            && editPatientArchiveNote == Self.archiveFieldText(baseline.note)
+        // A DOB/contact edit must preserve historical, absent or unreadable
+        // archive provenance. Validation applies to a new/changed archive draft.
+        if baseline.isArchived && unchanged { return nil }
+        guard !baseline.reason.isLocked, !baseline.note.isLocked else {
+            return "I dati di archiviazione protetti non possono essere modificati."
+        }
+        guard let reason = PatientArchiveReason(rawValue: editPatientArchiveReason) else {
+            return "Scegli il motivo dell’archiviazione."
+        }
+        if reason == .other && editPatientArchiveNote.trimmedOrNil == nil {
+            return "Descrivi il motivo dell’archiviazione."
+        }
+        return nil
+    }
+
+    private func patientArchivePatch(isArchived: Bool) throws -> (reason: PatchValue<String>, note: PatchValue<String>) {
+        guard let baseline = patientArchiveBaseline else { throw HomeBaseClientError.contract }
+        guard isArchived else { return baseline.isArchived ? (.null, .null) : (.omit, .omit) }
+        func sealChanged(_ text: String, original: PatientFieldCrypto.EditableField) throws -> PatchValue<String> {
+            if original.isLocked || text == Self.archiveFieldText(original) { return .omit }
+            guard let value = text.trimmedOrNil else { return .null }
+            guard let sealed = try sealField(value) else { throw PairedCryptoError.sealFailed }
+            return .value(sealed)
+        }
+        return (try sealChanged(editPatientArchiveReason, original: baseline.reason),
+                try sealChanged(editPatientArchiveNote, original: baseline.note))
     }
 
     /* @Codex */
@@ -2084,6 +2218,8 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             .notes: PatientFieldCrypto.resolveStringField(raw.notes, masterKey: masterKey),
             .diagnoses: PatientFieldCrypto.resolveStructuredField(raw.diagnoses, masterKey: masterKey),
             .exemptions: PatientFieldCrypto.resolveStructuredField(raw.exemptions, masterKey: masterKey),
+            .archiveReason: PatientFieldCrypto.resolveStringField(raw.archiveReason, masterKey: masterKey),
+            .archiveNote: PatientFieldCrypto.resolveStringField(raw.archiveNote, masterKey: masterKey),
         ]
         selectedPatient = PatientFieldCrypto.decryptDetail(raw, masterKey: masterKey)
         editablePatientFields = fields
@@ -2130,7 +2266,9 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             version: current.version + 1,
             ambulatoryId: current.ambulatoryId,
             createdAt: current.createdAt,
-            updatedAt: current.updatedAt
+            updatedAt: current.updatedAt,
+            archiveReason: editPatientIsArchived ? editPatientArchiveReason.trimmedOrNil : nil,
+            archiveNote: editPatientIsArchived ? editPatientArchiveNote.trimmedOrNil : nil
         )
     }
     #endif

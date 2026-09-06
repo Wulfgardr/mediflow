@@ -150,24 +150,181 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
         XCTAssertEqual(projectionRequests, [true])
     }
 
-    func testPatientArchiveUsesMinimalUpdatePayload() async throws {
+    /* @Codex */
+    func testPatientArchiveUsesOneSealedVersionedProfileUpdate() async throws {
+        for reason in ["assigned_mmg", "deceased", "other"] {
+            let active = detail(id: "p1", archived: false, version: 4)
+            let source = LifecycleMockDataSource(details: ["p1": active])
+            let model = await makeModel(source: source)
+            await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: active)
+            await MainActor.run {
+                model.startPatientArchive()
+                model.editPatientArchiveReason = reason
+                model.editPatientArchiveNote = reason == "other" ? "Trasferimento sintetico" : ""
+            }
+            let saved = await model.setSelectedPatientArchived(true)
+            XCTAssertTrue(saved)
+            let update = await source.lastUpdate
+            let json = try encodedPatientUpdate(XCTUnwrap(update?.payload))
+            XCTAssertEqual(Set(json.keys), reason == "other"
+                ? ["version", "isArchived", "archiveReason", "archiveNote"]
+                : ["version", "isArchived", "archiveReason"])
+            XCTAssertEqual(json["version"] as? Int, 4)
+            let sealedReason = try XCTUnwrap(json["archiveReason"] as? String)
+            XCTAssertTrue(sealedReason.hasPrefix(CryptoService.encPrefix))
+            XCTAssertEqual(PatientFieldCrypto.decryptStringField(sealedReason, masterKey: masterKey), reason)
+            let reread = await model.selectedPatient
+            XCTAssertEqual(reread?.isArchived, true)
+            XCTAssertEqual(reread?.archiveReason, reason)
+            XCTAssertEqual(reread?.archiveNote, reason == "other" ? "Trasferimento sintetico" : nil)
+            let projectionRequests = await source.includeDiagnosesRequests
+            XCTAssertEqual(projectionRequests, [true])
+        }
+    }
+
+    func testArchiveSheetAndPatientEditorShareRequiredReasonAndOtherNotePolicy() async throws {
+        for usesSheet in [true, false] {
+            let active = detail(id: "p1", archived: false, version: 4)
+            let source = LifecycleMockDataSource(details: ["p1": active])
+            let model = await makeModel(source: source)
+            await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: active)
+            await MainActor.run {
+                if usesSheet { model.startPatientArchive() } else {
+                    model.startEditingPatient()
+                    model.editPatientIsArchived = true
+                }
+            }
+            for reason in ["", "future_reason", "other"] {
+                await MainActor.run { model.editPatientArchiveReason = reason; model.editPatientArchiveNote = "  " }
+                if usesSheet { await model.setSelectedPatientArchived(true) } else { await model.savePatient() }
+                let update = await source.lastUpdate
+                XCTAssertNil(update, "missing/unknown reason or missing other note must not write")
+            }
+            await MainActor.run { model.editPatientArchiveNote = "Motivazione sintetica" }
+            if usesSheet { await model.setSelectedPatientArchived(true) } else { await model.savePatient() }
+            let update = await source.lastUpdate
+            XCTAssertEqual(update?.payload.isArchived, true)
+            let json = try encodedPatientUpdate(XCTUnwrap(update?.payload))
+            XCTAssertEqual(PatientFieldCrypto.decryptStringField(json["archiveNote"] as? String, masterKey: masterKey), "Motivazione sintetica")
+        }
+    }
+
+    func testUnchangedUnknownOrUnreadableArchiveFieldsAreOmittedDuringProfileEdit() async throws {
+        let locked = try XCTUnwrap(CryptoService.encryptField(CryptoService.jsonEncode("other")!,
+            masterKey: SymmetricKey(data: Data(repeating: 9, count: 32))))
+        for reason in ["future_reason", locked] {
+            let archived = detail(id: "p1", archived: true, version: 4, archiveReason: reason, archiveNote: reason)
+            let source = LifecycleMockDataSource(details: ["p1": archived])
+            let model = await makeModel(source: source)
+            await model.configurePairedOnlineForTests(masterKey: masterKey)
+            await model.loadPatient(summary(id: "p1", archived: true, version: 4))
+            await model.startEditingPatient()
+            let lockedFields = await model.lockedPatientFields
+            XCTAssertEqual(lockedFields.contains(.archiveReason), reason == locked)
+            XCTAssertEqual(lockedFields.contains(.archiveNote), reason == locked)
+            await model.savePatient()
+            let update = await source.lastUpdate
+            let json = try encodedPatientUpdate(XCTUnwrap(update?.payload))
+            XCTAssertNil(json["archiveReason"])
+            XCTAssertNil(json["archiveNote"])
+            XCTAssertNil(json["isArchived"], "unrelated edit must not replay the archive transition")
+            let raw = await source.storedDetail("p1")
+            XCTAssertEqual(raw?.archiveReason, reason)
+            XCTAssertEqual(raw?.archiveNote, reason)
+        }
+    }
+
+    func testArchiveReappearanceRetainsDraftAndBlocksAnIncomingNavigationIntent() async {
         let active = detail(id: "p1", archived: false, version: 4)
-        let source = LifecycleMockDataSource(details: ["p1": active])
-        let model = await makeModel(source: source)
-        await model.configurePairedOnlineForTests(selectedPatient: active)
+        let model = await makeModel(source: LifecycleMockDataSource(details: ["p1": active]))
+        await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: active)
+        await MainActor.run {
+            model.startPatientArchive()
+            model.editPatientArchiveReason = "other"
+            model.editPatientArchiveNote = "Bozza conservata alla riapertura"
+            model.startPatientArchive()
+            XCTAssertEqual(model.editPatientArchiveReason, "other")
+            XCTAssertEqual(model.editPatientArchiveNote, "Bozza conservata alla riapertura")
+            XCTAssertEqual(model.navigationAvailability, .busy)
+            model.cancelPatientArchive()
+            XCTAssertEqual(model.editPatientArchiveNote, "")
+            XCTAssertFalse(model.isEditingPatientArchive)
+        }
+    }
 
-        let canArchive = await model.canArchivePatient
-        XCTAssertTrue(canArchive)
-        await model.setSelectedPatientArchived(true)
+    func testArchiveConflictAndTransportFailureKeepSheetDraftOpen() async throws {
+        let conflict = await PairedPatientsWorkspaceModel.uiTestSeededConflict()
+        for error in [HomeBaseClientError.versionConflict(conflict), .httpStatus(500, "Synthetic failure")] {
+            let active = detail(id: "p1", archived: false, version: 4)
+            let source = LifecycleMockDataSource(details: ["p1": active], updateError: error)
+            let model = await makeModel(source: source)
+            await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: active)
+            await MainActor.run {
+                model.startPatientArchive()
+                model.editPatientArchiveReason = "other"
+                model.editPatientArchiveNote = "Conserva questo input"
+            }
+            let saved = await model.setSelectedPatientArchived(true)
+            XCTAssertFalse(saved)
+            let state = await MainActor.run {
+                (model.isEditingPatientArchive, model.editPatientArchiveReason, model.editPatientArchiveNote, model.selectedPatient?.version)
+            }
+            XCTAssertTrue(state.0)
+            XCTAssertEqual(state.1, "other")
+            XCTAssertEqual(state.2, "Conserva questo input")
+            XCTAssertEqual(state.3, 4)
+        }
+    }
 
-        let update = await source.lastUpdate
-        XCTAssertEqual(update?.patientId, "p1")
-        XCTAssertEqual(update?.payload.version, 4)
-        XCTAssertEqual(update?.payload.isArchived, true)
-        let isArchived = await model.selectedPatient?.isArchived
-        XCTAssertEqual(isArchived, true)
-        let projectionRequests = await source.includeDiagnosesRequests
-        XCTAssertEqual(projectionRequests, [true])
+    func testArchiveLockRejectsLateAcknowledgementAndRereadWithoutRestoringFields() async throws {
+        for suspension in ["update", "patient:1"] {
+            let active = detail(id: "p1", archived: false, version: 4)
+            let gate = LifecycleLoadGate([suspension])
+            let source = LifecycleMockDataSource(details: ["p1": active], loadGate: gate)
+            let model = await makeModel(source: source)
+            await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: active)
+            await MainActor.run {
+                model.startPatientArchive()
+                model.editPatientArchiveReason = "other"
+                model.editPatientArchiveNote = "Nota sintetica"
+            }
+            let save = Task { await model.setSelectedPatientArchived(true) }
+            await gate.wait(for: suspension)
+            await model.lockSessionNow()
+            await gate.release(suspension)
+            let saved = await save.value
+            XCTAssertFalse(saved)
+            let state = await MainActor.run {
+                (model.selectedPatient, model.editPatientArchiveReason, model.editPatientArchiveNote, model.isEditingPatientArchive)
+            }
+            XCTAssertNil(state.0)
+            XCTAssertEqual(state.1, "")
+            XCTAssertEqual(state.2, "")
+            XCTAssertFalse(state.3)
+        }
+    }
+
+    func testArchiveRevocationClearsTheDraftAndUnarchiveUsesExistingClearSemantics() async throws {
+        for revoked in [true, false] {
+            let archived = detail(id: "p1", archived: true, version: 4, archiveReason: "other", archiveNote: "Nota sintetica")
+            let source = LifecycleMockDataSource(details: ["p1": archived], updateError: revoked ? .httpStatus(401, "Unauthorized") : nil)
+            let model = await makeModel(source: source)
+            await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: archived)
+            await model.startPatientArchive()
+            let saved = await model.setSelectedPatientArchived(false)
+            XCTAssertEqual(saved, !revoked)
+            let state = await MainActor.run {
+                (model.selectedPatient, model.editPatientArchiveReason, model.editPatientArchiveNote, model.isEditingPatientArchive)
+            }
+            if revoked { XCTAssertNil(state.0) } else {
+                XCTAssertEqual(state.0?.isArchived, false)
+                XCTAssertNil(state.0?.archiveReason)
+                XCTAssertNil(state.0?.archiveNote)
+            }
+            XCTAssertEqual(state.1, "")
+            XCTAssertEqual(state.2, "")
+            XCTAssertFalse(state.3)
+        }
     }
 
     func testPatientUnarchiveGuardRequiresArchivedActivePatient() async {
@@ -900,7 +1057,9 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
         version: Int,
         deleted: Bool = false,
         encryptedValue: String? = nil,
-        birthDate: Date? = nil
+        birthDate: Date? = nil,
+        archiveReason: String? = nil,
+        archiveNote: String? = nil
     ) -> HomeBasePatientDetail {
         HomeBasePatientDetail(
             id: id,
@@ -925,7 +1084,8 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
             createdAt: nil,
             updatedAt: Date(timeIntervalSince1970: 1_750_000_000),
             deletedAt: deleted ? Date(timeIntervalSince1970: 1_750_000_100) : nil,
-            deletionReason: deleted ? "web-delete" : nil
+            deletionReason: deleted ? "web-delete" : nil,
+            archiveReason: archiveReason, archiveNote: archiveNote
         )
     }
 
@@ -1218,6 +1378,7 @@ private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
     }
 
     func setDetail(_ detail: HomeBasePatientDetail) { details[detail.id] = detail }
+    func storedDetail(_ id: String) -> HomeBasePatientDetail? { details[id] } // @Codex
 
     func updatePatient(
         patientId: String,
@@ -1235,6 +1396,13 @@ private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
         case .omit: birthDate = current.birthDate
         case .null: birthDate = nil
         case .value(let value): birthDate = value
+        }
+        func applying(_ patch: PatchValue<String>, to original: String?) -> String? {
+            switch patch {
+            case .omit: return original
+            case .null: return nil
+            case .value(let value): return value
+            }
         }
         let updated = HomeBasePatientDetail(
             id: current.id,
@@ -1259,7 +1427,9 @@ private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
             createdAt: current.createdAt,
             updatedAt: Date(timeIntervalSince1970: 1_750_000_200),
             deletedAt: current.deletedAt,
-            deletionReason: current.deletionReason
+            deletionReason: current.deletionReason,
+            archiveReason: payload.isArchived == false ? nil : applying(payload.archiveReason, to: current.archiveReason),
+            archiveNote: payload.isArchived == false ? nil : applying(payload.archiveNote, to: current.archiveNote)
         )
         details[patientId] = updated
         summaries = summaries.map { summary in

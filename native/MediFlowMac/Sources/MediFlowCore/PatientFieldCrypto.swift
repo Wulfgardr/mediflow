@@ -108,7 +108,10 @@ public enum PatientFieldCrypto {
             createdAt: detail.createdAt,
             updatedAt: detail.updatedAt,
             deletedAt: detail.deletedAt,
-            deletionReason: decryptStringField(detail.deletionReason, masterKey: masterKey)
+            deletionReason: decryptStringField(detail.deletionReason, masterKey: masterKey),
+            // @Codex: archive provenance is sealed JSON-string data, like notes.
+            archiveReason: decryptStringField(detail.archiveReason, masterKey: masterKey),
+            archiveNote: decryptStringField(detail.archiveNote, masterKey: masterKey)
         )
     }
 
