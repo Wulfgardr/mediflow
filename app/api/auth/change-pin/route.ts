@@ -3,7 +3,8 @@ import { NextResponse } from 'next/server';
 /* @Codex */
 import { changePin } from '@/lib/security/pin-change-service';
 /* @Codex */
-import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
+import { unauthorizedResponse } from '@/lib/security/server-auth';
+import { requireAccountSession } from '@/lib/security/paired-native-session';
 
 /* @Codex */
 function failureResponse(status: number, code: string, message: string) {
@@ -13,7 +14,7 @@ function failureResponse(status: number, code: string, message: string) {
 }
 
 export async function POST(request: Request) {
-    const session = await requireSession();
+    const session = await requireAccountSession(request);
     if (!session) return unauthorizedResponse();
 
     try {

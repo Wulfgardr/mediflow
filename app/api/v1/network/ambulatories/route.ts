@@ -2,7 +2,9 @@
 import { NextResponse } from 'next/server';
 import { authenticateNetworkPairedClient } from '@/lib/network-home-base-server';
 import { getNetworkModeGateResponse } from '@/lib/network-write-context';
-import { forbiddenResponse, requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
+import { forbiddenResponse, unauthorizedResponse } from '@/lib/security/server-auth';
+/* @Codex */
+import { requireAccountSession } from '@/lib/security/paired-native-session';
 import { listAmbulatorySummaries } from '@/lib/ambulatory-read';
 import { createNetworkAmbulatory, NETWORK_AMBULATORY_WRITE_CAPABILITY } from '@/lib/network-ambulatory-write';
 import { requireNetworkWriteContext } from '@/lib/network-write-context';
@@ -24,7 +26,7 @@ export async function GET(request: Request) {
         return forbiddenResponse();
     }
 
-    const session = await requireSession();
+    const session = await requireAccountSession(request);
     if (!session) return unauthorizedResponse();
 
     try {

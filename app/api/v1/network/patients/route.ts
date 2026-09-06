@@ -16,7 +16,9 @@ import {
 import { listNetworkScopedPatients } from '@/lib/network-patient-read';
 import { getNetworkModeGateResponse, requireNetworkCapabilityContext } from '@/lib/network-write-context';
 /* @Codex */
-import { forbiddenResponse, requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
+import { forbiddenResponse, unauthorizedResponse } from '@/lib/security/server-auth';
+/* @Codex */
+import { requireAccountSession } from '@/lib/security/paired-native-session';
 
 /* @Codex */
 export async function GET(request: Request) {
@@ -37,7 +39,7 @@ export async function GET(request: Request) {
         return forbiddenResponse();
     }
 
-    const session = await requireSession();
+    const session = await requireAccountSession(request);
     if (!session) return unauthorizedResponse();
 
     try {

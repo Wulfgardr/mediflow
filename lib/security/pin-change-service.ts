@@ -28,12 +28,15 @@ import {
     abortNativeLegacyUserRetirement,
     commitNativeLegacyUserRetirement,
     prepareNativeLegacyUserRetirement,
+    preparePairedNativePinRetirement,
 } from '@/lib/security/server-session';
+import { requirePairedNativeSession, type PairedNativeSession } from '@/lib/security/paired-native-session';
 /* @Codex */
 import {
     abortUserRetirement,
     commitUserRetirement,
     prepareUserRetirement,
+    prepareNativeUserRetirement,
     type WebSessionProjection,
 } from '@/lib/security/web-auth-lifecycle-owner-adapter';
 
@@ -52,11 +55,12 @@ export type PinChangeServiceDependencies = {
     prepareNativeSessionsForUserRetirement?: typeof prepareNativeLegacyUserRetirement;
     commitNativeSessionsForUserRetirement?: typeof commitNativeLegacyUserRetirement;
     abortNativeSessionsForUserRetirement?: typeof abortNativeLegacyUserRetirement;
+    readPairedNativeSession?: typeof requirePairedNativeSession;
 };
 
 /* @Codex */
 export type PinChangeServiceInput = {
-    session: WebSessionProjection;
+    session: WebSessionProjection | PairedNativeSession;
     request: Request;
     currentPin: string;
     newPin: string;
@@ -131,7 +135,12 @@ export async function changePin(
         ?? commitUserRetirement;
     const abortWebRetirement = dependencies.abortWebSessionsForUserRetirement
         ?? abortUserRetirement;
-    const nativeRetirement = prepareNativeRetirement(user.id);
+    const nativeSession = input.session.authChannel === 'native' ? input.session : null;
+    const readNativeSession = dependencies.readPairedNativeSession ?? requirePairedNativeSession;
+    if (nativeSession && await readNativeSession(input.request) !== nativeSession) return { kind: 'unauthorized' };
+    const nativeRetirement = nativeSession
+        ? preparePairedNativePinRetirement(nativeSession)
+        : prepareNativeRetirement(user.id);
     if (!nativeRetirement) {
         return {
             kind: 'failure',
@@ -140,7 +149,9 @@ export async function changePin(
             message: 'La rotazione delle credenziali non può essere confermata. Riprova dopo un nuovo accesso.',
         };
     }
-    const webRetirement = prepareWebRetirement(input.session);
+    const webRetirement = nativeSession
+        ? prepareNativeUserRetirement(nativeRetirement)
+        : prepareWebRetirement(input.session);
     if (!webRetirement) {
         try { abortNativeRetirement(nativeRetirement); } catch { /* the credential mutation has not started */ }
         return {
@@ -166,6 +177,10 @@ export async function changePin(
 
     let updateResult: { changes: number };
     try {
+        if (nativeSession && await readNativeSession(input.request) !== nativeSession) {
+            abortPreparedRetirements();
+            return { kind: 'unauthorized' };
+        }
         updateResult = db.transaction((tx) => tx
             .update(users)
             .set({
@@ -204,7 +219,7 @@ export async function changePin(
     try {
         nativeRetirementOutcome = commitNativeRetirement(nativeRetirement).outcome;
     } catch {
-        try { abortNativeRetirement(nativeRetirement); } catch { /* fail-closed response below */ }
+        /* The credential CAS has committed: never abort its retirement fence. */
         nativeRetirementOutcome = 'failed';
     }
     if (webRetirementOutcome !== 'completed' || nativeRetirementOutcome !== 'completed') {

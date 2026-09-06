@@ -21,10 +21,12 @@ import {
 } from '@/lib/network-patient-write';
 import { getNetworkModeGateResponse, requireNetworkCapabilityContext } from '@/lib/network-write-context';
 /* @Codex */
-import { forbiddenResponse, requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
+import { forbiddenResponse, unauthorizedResponse } from '@/lib/security/server-auth';
+/* @Codex */
+import { requireAccountSession } from '@/lib/security/paired-native-session';
 
 /* @Codex */
-async function resolveNetworkScope(session: Awaited<ReturnType<typeof requireSession>>) {
+async function resolveNetworkScope(session: Awaited<ReturnType<typeof requireAccountSession>>) {
     const cookieStore = await cookies();
     const activeAmbulatoryId = cookieStore.get('ambulatory_id')?.value ?? null;
     const identity = await getNetworkIdentitySummary(session, activeAmbulatoryId);
@@ -50,7 +52,7 @@ async function requireNetworkPatientWriteContext(
         return { ok: false, response: forbiddenResponse() };
     }
 
-    const session = await requireSession();
+    const session = await requireAccountSession(request);
     if (!session) return { ok: false, response: unauthorizedResponse() };
 
     const scopeAmbulatoryId = await resolveNetworkScope(session);
@@ -86,7 +88,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         return forbiddenResponse();
     }
 
-    const session = await requireSession();
+    const session = await requireAccountSession(request);
     if (!session) return unauthorizedResponse();
 
     try {

@@ -23,6 +23,7 @@ import type { NetworkDiscoveryAuthContext } from './network-discovery-auth';
 import { resolveNetworkDiscoveryAuth } from './network-discovery-auth';
 /* @Codex */
 import { forbiddenResponse, requireSession, unauthorizedResponse } from './security/server-auth';
+import { requirePairedNativeSession } from './security/paired-native-session';
 /* @Codex */
 import type { ServerSession } from './security/server-session';
 
@@ -66,7 +67,7 @@ export async function requireNetworkCapabilityContext(
         return { ok: false, response: forbiddenResponse() };
     }
 
-    const session = await requireSession();
+    const session = await requireSession() ?? await requirePairedNativeSession(request);
     if (!session) return { ok: false, response: unauthorizedResponse() };
 
     const scopeAmbulatoryId = await resolveNetworkScope(session);

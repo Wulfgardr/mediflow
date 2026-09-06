@@ -15,6 +15,7 @@ export type NativeBootstrapAdmission = object;
 export type NativeBootstrapRouteBinding = Readonly<{
     clientId: string;
     clientPlatform: StoredNetworkPairedClient['clientPlatform'];
+    tokenHash: string;
 }>;
 
 type AdmissionEntry = NativeBootstrapRouteBinding & Readonly<{ tokenHash: string }>;
@@ -122,7 +123,7 @@ export async function consumeNativeBootstrapAdmission(value: unknown): Promise<N
             && client.clientPlatform === entry.clientPlatform
             && client.tokenHash === entry.tokenHash
         );
-        return current ? ObjectFreeze({ clientId: entry.clientId, clientPlatform: entry.clientPlatform }) : null;
+        return current ? ObjectFreeze({ clientId: entry.clientId, clientPlatform: entry.clientPlatform, tokenHash: entry.tokenHash }) : null;
     } catch {
         return null;
     }

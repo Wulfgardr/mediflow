@@ -24,34 +24,34 @@ import { gunzipSync } from 'node:zlib';
 const REPOSITORY_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const PACKAGE_DIRECTORY = join(REPOSITORY_ROOT, 'packages/web-auth-lifecycle-owner');
 const ARTIFACT_RELATIVE_PATH =
-    'packages/web-auth-lifecycle-owner/artifacts/mediflow-web-auth-lifecycle-owner-0.8.6.tgz';
+    'packages/web-auth-lifecycle-owner/artifacts/mediflow-web-auth-lifecycle-owner-0.8.7.tgz';
 const ARTIFACT_PATH = join(REPOSITORY_ROOT, ARTIFACT_RELATIVE_PATH);
 const PROVENANCE_PATH = join(
     REPOSITORY_ROOT,
-    'packages/web-auth-lifecycle-owner/artifacts/mediflow-web-auth-lifecycle-owner-0.8.6.provenance.json',
+    'packages/web-auth-lifecycle-owner/artifacts/mediflow-web-auth-lifecycle-owner-0.8.7.provenance.json',
 );
 const DEPENDENCY_SPECIFIER = `file:${ARTIFACT_RELATIVE_PATH}`;
-const ARTIFACT_SHA256 = '044dfb1a9aedfc52da181707ddab2c582c097909d2f54cff886f6f33273f2b45';
-const ARTIFACT_INTEGRITY =
-    'sha512-itcn0K8Ru1BHWcpd4sVOrzl0qMX4+8gZr+EX+JABsdOid0yYz2qgYJX5naSBPLp+6xkz7X/a5TieIJ25OKQlmw==';
-const PROVENANCE_SHA256 = '66c4e11cd29657fc824308a4ded5bfa6fe212fdc6ccef869dcddb6d86bddfca4';
-const ACCEPTED_BASE = '5fa27923613b1932993a57f46b06e51264193e01';
+const ARTIFACT_SHA256 = 'ed4f7fd68707a6e82e17150ffd89ad23f1090e7281bb84184bdb3d03f8985f88';
+const ARTIFACT_INTEGRITY = 'sha512-thrO0KKQrRls9ITV2kYpcnBmK9lQSgj/mmOO6mSfGlNUw/3zx0y8ECZdUtnxTSqmjHtdDeT7tkZVYgkeqSdfKw==';
+const PROVENANCE_SHA256 = '91153ec1f021a4c4fbdb8a4d47ef671e564b3781e7dacf6afdeb86e188753c35';
+const ACCEPTED_BASE = 'fdac252a52219ad4b60cc240b289c0ccb450d124';
 const PREDECESSOR_ARTIFACT_PATH = join(
     PACKAGE_DIRECTORY,
-    'artifacts/mediflow-web-auth-lifecycle-owner-0.8.5.tgz',
+    'artifacts/mediflow-web-auth-lifecycle-owner-0.8.6.tgz',
 );
 const PREDECESSOR_PROVENANCE_PATH = join(
     PACKAGE_DIRECTORY,
-    'artifacts/mediflow-web-auth-lifecycle-owner-0.8.5.provenance.json',
+    'artifacts/mediflow-web-auth-lifecycle-owner-0.8.6.provenance.json',
 );
-const PREDECESSOR_ARTIFACT_SHA256 = 'c9e64cd0857a8c9e0e869857af9f023654e79ac2959d630dd2eff14fc90bcf2c';
-const PREDECESSOR_PROVENANCE_SHA256 = '1d745decc7676c7ef11d0837e7300e8da5159785b10e7a79ef581ddd050696f3';
+const PREDECESSOR_ARTIFACT_SHA256 = '044dfb1a9aedfc52da181707ddab2c582c097909d2f54cff886f6f33273f2b45';
+const PREDECESSOR_PROVENANCE_SHA256 = '66c4e11cd29657fc824308a4ded5bfa6fe212fdc6ccef869dcddb6d86bddfca4';
 
 const EXPECTED_INPUTS = [
     ['index.js', 116, '1abc52ee8abe9fd25b28046f1f00ecc2f09d699ba220c61e6222730c22ca44c5'],
-    ['index.d.ts', 3529, '647385b9d57d2bd2309f70de08866d326736c200f2fce201e54857ec63da3987'],
+    ['index.d.ts', 13705, 'ba5a3501d7e421b7ab309ffd6853df6659c8508e766f1d26ddd7b21139788dc9'],
     ['internal/control-record.cjs', 19478, '3d443096679799ffde96e744060de5be59c9a86ddb383bdd975de75c913b9aa4'],
-    ['internal/owner.cjs', 37866, 'f9d5e54e89a41788ecdf228841473a7210616fc054d9b3e3ded6316a91c94d2d'],
+    ['internal/native-session.cjs', 105609, 'a63184325d6e880ce7bb5b062a41536455c005ad722a14842f03850f6c365c75'],
+    ['internal/owner.cjs', 38612, 'fa76bdc81e46c5fc3f3de2d54ad7f2d64041e63974f9d7a3354b122d8b668a10'],
     ['internal/session-activation.cjs', 6143, '5ed4c9543f8bc15903c0915a8565b997d697d004e9ccfaaa54a3da6236a2aa96'],
     ['internal/session-cell.cjs', 23897, '4cd0c2e9f8b40b346d43a93de561e20e85c5662fc8a2f9a0a170403fc80c2e31'],
     ['internal/session-resolver.cjs', 2965, '75409d670b8411dbadcc95e4bd9bfebeff47d2f687bde0d638809bb9114b5fa0'],
@@ -59,11 +59,12 @@ const EXPECTED_INPUTS = [
     ['internal/session-retirement.cjs', 5664, '8848c92cb88635c6c09baf685839e7c6f1aca40d667ea6580e84e275349f1516'],
     ['internal/support/successor-fence.cjs', 1172, '7e36178331d5f899d81d877603acb0100eef1436d1873287ad4b27ccc227e7ff'],
     ['internal/support/value.cjs', 47, '9f0968a0290c6184c898f06de2c408540d4eda1ecd0e3e80ae013bb37a782be1'],
-    ['package.json', 281, '06f785441953621ac6b2fd6f313471f8bbd33bd730d1e603de94b45da382f99d'],
+    ['package.json', 281, '9a45967edd1058ca75f06f2fa43026f658c41e674a360c1f756080f46671c00c'],
 ] as const;
 
 const EXPECTED_TAR_PATHS = [
     'internal/control-record.cjs',
+    'internal/native-session.cjs',
     'internal/owner.cjs',
     'internal/session-activation.cjs',
     'internal/session-cell.cjs',
@@ -78,6 +79,8 @@ const EXPECTED_TAR_PATHS = [
 ] as const;
 
 const ROOT_KEYS = [
+    'serverSessions',
+    'prepareNativeUserRetirement',
     'bootstrapControl',
     'begin',
     'issue',
@@ -168,7 +171,7 @@ function walkFiles(directory: string): string[] {
     return files;
 }
 
-test('preserves the accepted 0.8.5 artifact and provenance as immutable predecessor evidence', () => {
+test('preserves the accepted 0.8.6 artifact and provenance as immutable predecessor evidence', () => {
     assert.equal(sha256(readFileSync(PREDECESSOR_ARTIFACT_PATH)), PREDECESSOR_ARTIFACT_SHA256);
     assert.equal(sha256(readFileSync(PREDECESSOR_PROVENANCE_PATH)), PREDECESSOR_PROVENANCE_SHA256);
 });
@@ -177,7 +180,7 @@ test('pins the exact final source manifest and immutable input bytes', () => {
     const manifest = readJson(join(PACKAGE_DIRECTORY, 'package.json'));
     assert.deepEqual(manifest, {
         name: '@mediflow/web-auth-lifecycle-owner',
-        version: '0.8.6',
+        version: '0.8.7',
         private: true,
         type: 'commonjs',
         main: './index.js',
@@ -202,7 +205,7 @@ test('pins the exact final source manifest and immutable input bytes', () => {
 
 test('pins the final tarball and its normalized regular-file roster', () => {
     const archive = readFileSync(ARTIFACT_PATH);
-    assert.equal(archive.length, 19_785);
+    assert.equal(archive.length, 36557);
     assert.equal(sha256(archive), ARTIFACT_SHA256);
     assert.equal(`sha512-${createHash('sha512').update(archive).digest('base64')}`, ARTIFACT_INTEGRITY);
 
@@ -257,7 +260,7 @@ test('reproduces the tracked artifact byte-for-byte from two clean offline sourc
                 '--pack-destination', output,
             ], { cwd: REPOSITORY_ROOT, encoding: 'utf8' });
             assert.equal(packed.status, 0, `${packed.stdout}\n${packed.stderr}`);
-            artifacts.push(readFileSync(join(output, 'mediflow-web-auth-lifecycle-owner-0.8.6.tgz')));
+            artifacts.push(readFileSync(join(output, 'mediflow-web-auth-lifecycle-owner-0.8.7.tgz')));
         }
         assert.ok(artifacts[0]);
         assert.ok(artifacts[1]);
@@ -270,19 +273,19 @@ test('reproduces the tracked artifact byte-for-byte from two clean offline sourc
 
 test('binds provenance to the accepted base, predecessor, inputs, and tar roster', () => {
     const bytes = readFileSync(PROVENANCE_PATH);
-    assert.equal(bytes.length, 5_898);
+    assert.equal(bytes.length, 6280);
     assert.equal(sha256(bytes), PROVENANCE_SHA256);
     const provenance = JSON.parse(bytes.toString('utf8')) as JsonRecord;
     assert.equal(provenance.schemaVersion, 'mediflow.web-auth-lifecycle-owner.package-provenance.v1');
     assert.equal(provenance.acceptedBase, ACCEPTED_BASE);
     assert.deepEqual(provenance.predecessor, {
-        version: '0.8.5',
+        version: '0.8.6',
         tarSha256: PREDECESSOR_ARTIFACT_SHA256,
         provenanceSha256: PREDECESSOR_PROVENANCE_SHA256,
     });
     assert.deepEqual(provenance.package, {
         name: '@mediflow/web-auth-lifecycle-owner',
-        version: '0.8.6',
+        version: '0.8.7',
     });
     assert.deepEqual(provenance.pack, {
         command: 'npm pack <clean-temporary-copy> --ignore-scripts --offline --cache <empty-temporary-cache> --pack-destination <temporary-directory>',
@@ -302,7 +305,7 @@ test('binds provenance to the accepted base, predecessor, inputs, and tar roster
     });
     assert.deepEqual(provenance.artifact, {
         path: ARTIFACT_RELATIVE_PATH,
-        bytes: 19_785,
+        bytes: 36557,
         sha256: ARTIFACT_SHA256,
         integrity: ARTIFACT_INTEGRITY,
     });
@@ -333,7 +336,7 @@ test('installs exactly one physical package copy from the pinned artifact', () =
     assert.equal(dependencies['@mediflow/web-auth-lifecycle-owner'], DEPENDENCY_SPECIFIER);
     assert.equal(lockRootDependencies['@mediflow/web-auth-lifecycle-owner'], DEPENDENCY_SPECIFIER);
     assert.deepEqual(lockEntry, {
-        version: '0.8.6',
+        version: '0.8.7',
         resolved: DEPENDENCY_SPECIFIER,
         integrity: ARTIFACT_INTEGRITY,
         engines: { node: '>=24 <25' },
@@ -346,7 +349,7 @@ test('installs exactly one physical package copy from the pinned artifact', () =
     assert.equal(realpathSync(installedDirectory), installedDirectory);
     assert.notEqual(realpathSync(installedDirectory), realpathSync(PACKAGE_DIRECTORY));
     const installedManifest = readJson(join(installedDirectory, 'package.json'));
-    assert.equal(installedManifest.version, '0.8.6');
+    assert.equal(installedManifest.version, '0.8.7');
     for (const [path, bytes, expectedSha256] of EXPECTED_INPUTS) {
         const installedPath = join(installedDirectory, path);
         const installedLstat = lstatSync(installedPath);
@@ -413,9 +416,15 @@ test('exposes only the frozen final root and keeps the adapter package-only', ()
     assert.equal(Object.isFrozen(owner), true);
     assert.deepEqual(Object.keys(owner), ROOT_KEYS);
     for (const key of ROOT_KEYS) {
-        assert.equal(typeof owner[key], 'function', key);
+        assert.equal(typeof owner[key], key === 'serverSessions' ? 'object' : 'function', key);
     }
     assert.equal(Object.hasOwn(owner, 'createOwner'), false);
+    const native = owner.serverSessions as JsonRecord;
+    assert.equal(Object.isFrozen(native), true);
+    assert.equal(Object.hasOwn(native, 'claimPreparedNativePinRetirement'), false);
+    assert.equal(Object.hasOwn(native, 'createServerSessionOwner'), false);
+    const adapterSource = readFileSync(join(REPOSITORY_ROOT, 'lib/security/server-session.ts'), 'utf8');
+    assert.doesNotMatch(adapterSource, /globalThis|new (?:Map|WeakMap|Set)|createOwner/u);
 
     const adapter = readFileSync(join(REPOSITORY_ROOT, 'lib/security/web-auth-lifecycle-owner-adapter.ts'), 'utf8');
     const runtimeSpecifiers = [...adapter.matchAll(/^import\s+(?:[^'";]+\s+from\s+)?['"]([^'"]+)['"];?$/gmu)]

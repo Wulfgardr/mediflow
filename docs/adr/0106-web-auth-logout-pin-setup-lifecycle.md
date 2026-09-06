@@ -64,6 +64,23 @@ un'altra sessione.
 
 ### Modifica riuscita delle credenziali PIN
 
+Emendamento 0.8.6, 6 settembre 2026: il cambio PIN puo essere iniziato anche
+da una sessione paired native corrente. I due input autenticati restano una
+union esplicita: nessuna sessione native viene convertita in una projection
+Web. Dopo la verifica del PIN, l'owner native prepara un retirement legato
+all'esatto oggetto di sessione, utente e binding paired. Un ingresso separato
+dell'owner Web consuma una sola volta la prova di quella preparazione e ne
+deriva l'utente dal registro privato. Produce soltanto il normale ticket Web
+di retirement: non emette sessioni, control, cookie o grant Web.
+
+La claim della prova non consuma il ticket native necessario al commit/abort.
+Una copia, un ticket terminale, un ticket preparato soltanto per userId o una
+seconda claim negano. Le route account rileggono il pairing e la sessione
+prima della preparazione e prima del CAS; la rotazione del token paired non
+riassocia una sessione precedente. L'ordine prepare native, prepare Web, CAS,
+commit Web, commit native resta identico per entrambi i canali. Dopo un CAS
+riuscito non si esegue abort per nascondere una failure di finalizzazione.
+
 Dopo aver verificato il PIN corrente e prima di calcolare il nuovo hash o
 avviare il CAS, l'host prepara sia il retirement native sia una capability Web
 opaca, esatta e monouso. La capability Web lega l'owner e l'utente alla

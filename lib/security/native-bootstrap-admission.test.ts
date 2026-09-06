@@ -6,6 +6,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3';
+import { NextRequest } from 'next/server.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-native-bootstrap-'));
@@ -24,6 +25,7 @@ const { dbServer } = await import('../db-server.ts');
 const { settings } = await import('../schema.ts');
 const { NETWORK_PAIRING_STATE_KEY, hashNetworkPairedClientToken, serializeNetworkPairingState } = await import('../network-pairing-model.ts');
 const { admitNativeBootstrap, consumeNativeBootstrapAdmission } = await import('./native-bootstrap-admission.ts');
+const { admitNativeBootstrapRouteRequest } = await import('./native-bootstrap-request-adapter.ts');
 
 const clientId = 'synthetic-native-bootstrap-client';
 const token = 'synthetic-native-bootstrap-token';
@@ -56,8 +58,8 @@ test('native bootstrap trusts the persisted paired client, not source-surface me
     assert.ok(webMarked);
     assert.ok(nativeMarked);
     assert.equal(sourceOnly, null);
-    assert.deepEqual(await consumeNativeBootstrapAdmission(webMarked), { clientId, clientPlatform: 'ipados' });
-    assert.deepEqual(await consumeNativeBootstrapAdmission(nativeMarked), { clientId, clientPlatform: 'ipados' });
+    assert.deepEqual(await consumeNativeBootstrapAdmission(webMarked), { clientId, clientPlatform: 'ipados', tokenHash: hashNetworkPairedClientToken(token) });
+    assert.deepEqual(await consumeNativeBootstrapAdmission(nativeMarked), { clientId, clientPlatform: 'ipados', tokenHash: hashNetworkPairedClientToken(token) });
 });
 
 test('native bootstrap artifacts are process-local, opaque, and one-use', async () => {
@@ -66,8 +68,18 @@ test('native bootstrap artifacts are process-local, opaque, and one-use', async 
     assert.equal(Object.getPrototypeOf(admission), null);
     assert.equal(await consumeNativeBootstrapAdmission({}), null);
     assert.equal(await consumeNativeBootstrapAdmission({ ...admission }), null);
-    assert.deepEqual(await consumeNativeBootstrapAdmission(admission), { clientId, clientPlatform: 'ipados' });
+    assert.deepEqual(await consumeNativeBootstrapAdmission(admission), { clientId, clientPlatform: 'ipados', tokenHash: hashNetworkPairedClientToken(token) });
     assert.equal(await consumeNativeBootstrapAdmission(admission), null);
+});
+
+test('the route adapts NextRequest transport without relaxing canonical admission', async () => {
+    const request = new NextRequest(pairedRequest('web'));
+    assert.equal(await admitNativeBootstrap({ request }), null);
+    const admission = await admitNativeBootstrapRouteRequest(request);
+    assert.ok(admission);
+    assert.deepEqual(await consumeNativeBootstrapAdmission(admission), { clientId, clientPlatform: 'ipados', tokenHash: hashNetworkPairedClientToken(token) });
+    assert.equal(await consumeNativeBootstrapAdmission(admission), null);
+    assert.equal(await admitNativeBootstrapRouteRequest(new NextRequest('https://127.0.0.1/login')), null);
 });
 
 test('native bootstrap denies hostile or expanded caller envelopes before reading them', async () => {
