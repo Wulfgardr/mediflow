@@ -2,13 +2,13 @@
 .sheet { display: grid; grid-template-columns: minmax(0, 1fr) 250px; gap: 50px; color: var(--lume-ink); }
 .main { min-width: 0; }
 .sectionHead { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
-.sectionHead h2 { font-size: 15px; font-weight: 600; }
-.sectionHead :is(a, h2 > span) { font-size: 12px; color: var(--lume-ink-muted); font-weight: 450; }
+.sectionHead h2 { margin: 0; font-size: var(--twin-type-section, 1.25rem); font-weight: 600; line-height: 1.35; letter-spacing: -0.02em; }
+.sectionHead :is(a, h2 > span) { font-size: var(--twin-type-caption, 0.8125rem); color: var(--lume-ink-muted); font-weight: 450; letter-spacing: 0; }
 .sectionHead a:hover, .more:hover { color: var(--lume-ink); text-decoration: underline; text-underline-offset: 4px; }
 .diagnosis { font-size: 22px; line-height: 1.4; letter-spacing: -.025em; max-width: 36ch; }
 .meta { font-size: 12px; color: var(--lume-ink-muted); margin-top: 6px; }
 .notes { margin-top: 24px; }
-.notes h3, .context h3 { font-size: 13px; font-weight: 600; margin-bottom: 9px; }
+.notes h3, .context h3 { font-size: var(--twin-type-subsection, 1rem); font-weight: 600; line-height: 1.35; margin-bottom: 9px; }
 .notes p { font-size: 14px; line-height: 1.7; max-width: 70ch; white-space: pre-line; }
 .notes details { margin-top: 8px; font-size: 12px; }
 .notes summary { cursor: pointer; color: var(--lume-ink-muted); padding-block: 4px; }

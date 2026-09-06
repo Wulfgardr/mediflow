@@ -1,0 +1,95 @@
+/* @Codex WUL-676: square segments are visual references, not discrete steps. */
+.track { display: none; }
+:global(html[data-runtime-twin-design='proposal']) .root {
+    position: relative;
+    display: block;
+    grid-column: 1 / -1;
+    width: 100%;
+    min-width: 0;
+}
+:global(html[data-runtime-twin-design='proposal']) .input {
+    position: relative;
+    display: block;
+    width: 100%;
+    min-width: 0;
+    height: 44px;
+    margin: 0;
+    padding: 0;
+    cursor: pointer;
+    background: transparent;
+    accent-color: var(--lume-accent);
+    border-radius: 5px;
+}
+:global(html[data-runtime-twin-design='proposal']) .input:focus-visible {
+    outline: 2px solid var(--lume-accent);
+    outline-offset: 3px;
+}
+:global(html[data-runtime-twin-design='proposal']) .input:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+@media (forced-colors: none) {
+    :global(html[data-runtime-twin-design='proposal']) .input {
+        appearance: none;
+    }
+    :global(html[data-runtime-twin-design='proposal']) .track {
+        display: block;
+        position: absolute;
+        pointer-events: none;
+        top: 18px;
+        left: 11px;
+        right: 11px;
+        height: 8px;
+        --range-rest: color-mix(in srgb, var(--lume-ink) 17%, var(--lume-surface-focal));
+        background: linear-gradient(to right, var(--lume-accent) 0 var(--range-progress), var(--range-rest) var(--range-progress) 100%);
+        mask-image: repeating-linear-gradient(to right, #000 0 8px, transparent 8px 11px);
+    }
+    :global(html[data-runtime-twin-design='proposal']) .input::-webkit-slider-runnable-track {
+        height: 8px;
+        border: 0;
+        border-radius: 2px;
+        background: transparent;
+    }
+    :global(html[data-runtime-twin-design='proposal']) .input::-moz-range-track {
+        height: 8px;
+        border: 0;
+        border-radius: 2px;
+        background: transparent;
+    }
+    :global(html[data-runtime-twin-design='proposal']) .input::-webkit-slider-thumb {
+        appearance: none;
+        width: 22px;
+        height: 22px;
+        margin-top: -7px;
+        border: 3px solid var(--lume-surface-focal);
+        border-radius: 5px;
+        background: var(--lume-accent);
+        box-shadow: 0 0 0 1px color-mix(in srgb, var(--lume-ink) 30%, transparent), 0 2px 4px #0002;
+        transition: box-shadow 140ms ease, border-radius 140ms ease;
+    }
+    :global(html[data-runtime-twin-design='proposal']) .input::-moz-range-thumb {
+        box-sizing: border-box;
+        width: 22px;
+        height: 22px;
+        border: 3px solid var(--lume-surface-focal);
+        border-radius: 5px;
+        background: var(--lume-accent);
+        box-shadow: 0 0 0 1px color-mix(in srgb, var(--lume-ink) 30%, transparent), 0 2px 4px #0002;
+        transition: box-shadow 140ms ease, border-radius 140ms ease;
+    }
+    :global(html[data-runtime-twin-design='proposal']) .input:is(:hover, :active, :focus-visible)::-webkit-slider-thumb {
+        border-radius: 3px;
+        box-shadow: 0 0 0 4px color-mix(in srgb, var(--lume-accent) 14%, transparent);
+    }
+    :global(html[data-runtime-twin-design='proposal']) .input:is(:hover, :active, :focus-visible)::-moz-range-thumb {
+        border-radius: 3px;
+        box-shadow: 0 0 0 4px color-mix(in srgb, var(--lume-accent) 14%, transparent);
+    }
+}
+@media (forced-colors: active) {
+    :global(html[data-runtime-twin-design='proposal']) .input { appearance: auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+    :global(html[data-runtime-twin-design='proposal']) .input::-webkit-slider-thumb { transition: none; }
+    :global(html[data-runtime-twin-design='proposal']) .input::-moz-range-thumb { transition: none; }
+}

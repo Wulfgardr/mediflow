@@ -17,9 +17,11 @@ import {
 import { useRouter } from 'next/navigation';
 
 import { Kree8WorkspaceShell } from '@/components/kree8/kree8-workspace-shell';
+import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
 import { useLiveQuery } from '@/lib/live-query';
 import { db } from '@/lib/db';
 import { SCALES } from '@/lib/scale-definitions';
+import styles from './scales.module.css';
 
 type ScaleCatalogItem = {
     id: string;
@@ -47,6 +49,7 @@ const GROUPED_SCALE_CATALOG = Array.from(
 
 export default function ScalesLibraryPage() {
     const router = useRouter();
+    const { proposal } = useRuntimeTwinDesign();
     const [selectedScale, setSelectedScale] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const catalogSectionRef = useRef<HTMLElement | null>(null);
@@ -55,9 +58,10 @@ export default function ScalesLibraryPage() {
 
     const normalizedSearchTerm = searchTerm.trim().toLowerCase();
     const selectedScaleDefinition = selectedScale ? SCALES[selectedScale] : null;
-    const navItems = selectedScaleDefinition
+    const originalNavItems = selectedScaleDefinition
         ? [...SCALE_NAV_BASE, { href: '#paziente', label: 'Paziente', meta: 'avvio scala' }]
         : SCALE_NAV_BASE;
+    const navItems = proposal ? originalNavItems.map(({ href, label }) => ({ href, label })) : originalNavItems;
 
     /* @Codex */
     const patients = useLiveQuery(
@@ -119,19 +123,20 @@ export default function ScalesLibraryPage() {
         >
             <section id="catalogo" ref={catalogSectionRef} className="mf-section lume-focal space-y-6 p-6 md:p-8 scroll-mt-40">
                 <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                    <div className="space-y-1">
-                        <p className="mf-eyebrow">Catalogo scale</p>
+                    <div className={`space-y-1 ${styles.sectionHeading}`}>
+                        {!proposal && <p className="mf-eyebrow">Catalogo scale</p>}
                         <h2 className="text-xl font-semibold tracking-tight" style={{ color: 'var(--lume-ink)' }}>
-                            Scale pronte alla somministrazione
+                            {proposal ? 'Scegli una scala' : 'Scale pronte alla somministrazione'}
                         </h2>
+                        {proposal && <p>Il punteggio verrà registrato nella cartella del paziente.</p>}
                     </div>
-                    <span className="lume-registro mf-btn-secondary w-fit">{SCALE_CATALOG.length} scale attive</span>
+                    <span className={proposal ? styles.catalogCount : 'lume-registro mf-btn-secondary w-fit'}>{SCALE_CATALOG.length} scale {proposal ? 'disponibili' : 'attive'}</span>
                 </div>
 
                 <div className="space-y-6">
                     {GROUPED_SCALE_CATALOG.map(([category, items]) => (
                         <div key={category} className="space-y-3">
-                            <h3 className="section-kicker px-1">{category}</h3>
+                            <h3 className={proposal ? styles.categoryTitle : 'section-kicker px-1'}>{category}</h3>
                             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                                 {items.map((item) => {
                                     const scale = SCALES[item.id];
@@ -144,7 +149,7 @@ export default function ScalesLibraryPage() {
                                             type="button"
                                             onClick={() => handleScaleChoice(item.id)}
                                             aria-pressed={isSelected}
-                                            className={`lume-press group flex min-h-[170px] flex-col justify-between rounded-[var(--lume-radius-card)] border p-5 text-left transition-[border-color,background-color] ${
+                                            className={`lume-press group flex min-h-[170px] flex-col ${proposal ? 'justify-start gap-4' : 'justify-between'} rounded-[var(--lume-radius-card)] border p-5 text-left transition-[border-color,background-color] ${
                                                 isSelected
                                                     ? 'border-[color:var(--lume-accent)] bg-[color:var(--lume-surface-focal)] shadow-[0_2px_8px_color-mix(in_srgb,var(--lume-ink)_10%,transparent)]'
                                                     : 'border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] hover:border-[color:color-mix(in_srgb,var(--lume-ink)_22%,transparent)]'
@@ -175,8 +180,8 @@ export default function ScalesLibraryPage() {
             {selectedScaleDefinition && (
                 <section id="paziente" ref={patientSectionRef} className="mf-section lume-focal space-y-5 p-6 md:p-8 scroll-mt-40">
                     <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                        <div className="space-y-1">
-                            <p className="mf-eyebrow">Avvio scala</p>
+                        <div className={`space-y-1 ${styles.sectionHeading}`}>
+                            {!proposal && <p className="mf-eyebrow">Avvio scala</p>}
                             <h2 className="text-xl font-semibold tracking-tight" style={{ color: 'var(--lume-ink)' }}>
                                 Scegli il paziente
                             </h2>
