@@ -10,13 +10,21 @@ test('locking retires the pending model footer read before its response or fallb
     const created = await page.request.post('/api/patients', { data: {
         firstName: 'Lettura footer', lastName: `Sintetico ${marker.slice(0, 8)}`,
         taxCode: `LBL${marker.replaceAll('-', '').slice(0, 13).toUpperCase()}`,
-        documentInsights: JSON.stringify([{
+    } });
+    expect(created.status()).toBe(201);
+    const patient = await created.json() as { id: string; version: number };
+    // @Codex: persisted insights belong to the versioned update contract;
+    // patient creation intentionally does not accept this field.
+    const updated = await page.request.put(`/api/patients/${patient.id}`, { data: {
+        version: patient.version, documentInsights: JSON.stringify([{
             id: marker, date: new Date().toISOString(), fileName: 'Evidenza sintetica',
             rawMarkdown: 'Test di cancellazione.', summary: 'Nessun dato reale.', extractedData: {},
         }]),
     } });
-    expect(created.status()).toBe(201);
-    const patient = await created.json() as { id: string };
+    expect(updated.status()).toBe(200);
+    const reread = await page.request.get(`/api/patients/${patient.id}`);
+    expect(reread.status()).toBe(200);
+    expect((await reread.json()).documentInsights).toContain(marker);
     let received = () => {};
     const arrival = new Promise<void>(resolve => { received = resolve; });
     let release = () => {};
