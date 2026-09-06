@@ -255,13 +255,6 @@ export function Kree8ClinicalCockpit({
     if (!isReview && initialPatientId) setSelectedPatientId(initialPatientId);
   }, [initialPatientId, isReview, proposal]);
 
-  /* @Codex: resolve the selected id after React batches row selection and
-     Apri quadro. The explicit summary intent must not inherit the generic
-     folder's default diary section. */
-  useEffect(() => {
-    if (proposal && !isReview && area === 'scheda' && selectedPatientId) router.push(`/patients/${selectedPatientId}/modules#quadro`);
-  }, [area, isReview, proposal, router, selectedPatientId]);
-
   /* @Codex: only an explicit command writes the URL. Deriving a default or
      filtered selection from a late read must not cancel a pending Next link.
      Patch only the command's field so batched selection + navigation compose. */
@@ -282,9 +275,10 @@ export function Kree8ClinicalCockpit({
      La ricerca conserva invece il proprio target di focus dedicato. */
   const openArea = useCallback((nextArea: AreaId, focusDestination = true) => {
     setArea(nextArea);
-    updateLocation({ area: nextArea });
+    // @Codex: preserve the originating area for Back from the patient folder.
+    if (!(proposal && !isReview && nextArea === 'scheda')) updateLocation({ area: nextArea });
     if (focusDestination) setAreaFocusRequest((current) => current + 1);
-  }, [updateLocation]);
+  }, [isReview, proposal, updateLocation]);
 
   /* @Codex: il contatore rende osservabile anche una richiesta verso l'area
      gia attiva; requestAnimationFrame lascia completare render e cleanup di
@@ -357,6 +351,19 @@ export function Kree8ClinicalCockpit({
     },
     [initialPatientId, isReview, patientState.patients, selectedPatientId],
   );
+
+  /* @Codex: a single owner resolves batched patient selection + Apri quadro.
+     A child redirect must not replace the explicit hash with a generic folder.
+     The original comparison keeps its existing replace navigation. */
+  const folderPatientId = selectedPatientId ?? selectedPatient?.id;
+  const liveSchedaHref = isReview || area !== 'scheda' ? null
+    : proposal && folderPatientId ? `/patients/${folderPatientId}/modules#quadro`
+      : selectedPatient?.modulesHref ?? null;
+  useEffect(() => {
+    if (!liveSchedaHref) return;
+    if (proposal) router.push(liveSchedaHref);
+    else router.replace(liveSchedaHref);
+  }, [liveSchedaHref, proposal, router]);
 
   /* @Codex */
   const {
