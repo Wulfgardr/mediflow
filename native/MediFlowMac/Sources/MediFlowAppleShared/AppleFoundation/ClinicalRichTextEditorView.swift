@@ -81,6 +81,7 @@ struct ClinicalRichTextEditorView: View {
         }
         .padding(8)
         .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 6))
+        .accessibilityElement(children: .contain) // @Codex
         .accessibilityIdentifier("\(accessibilityPrefix)-preserved-block")
     }
 
@@ -117,10 +118,7 @@ struct ClinicalRichTextEditorView: View {
                 }
                 .transition(.opacity)
             }
-            TextEditor(text: Binding(
-                get: { span.text },
-                set: { document.updateText(id: block.id, text: $0) }
-            ))
+            TextEditor(text: textBinding(for: block.id))
             // TextEditor has no per-character rich rendering: bold/italic are
             // reflected via the block's font, underline/strikethrough only via
             // the toggle buttons' highlighted state above (this editor styles a
@@ -144,7 +142,21 @@ struct ClinicalRichTextEditorView: View {
                 )
         )
         .animation(.easeInOut(duration: 0.15), value: isFocused)
+        .accessibilityElement(children: .contain) // @Codex
         .accessibilityIdentifier("\(accessibilityPrefix)-block-\(block.id.uuidString)")
+    }
+
+    // @Codex: Read the current document on each keystroke. A captured span is a
+    // render-time snapshot and can overwrite newer input before the next render.
+    func textBinding(for blockID: UUID) -> Binding<String> {
+        Binding(
+            get: {
+                guard let block = document.blocks.first(where: { $0.id == blockID }),
+                      case .editable(_, let currentSpan) = block.storage else { return "" }
+                return currentSpan.text
+            },
+            set: { document.updateText(id: blockID, text: $0) }
+        )
     }
 
     private func kindMenu(block: ClinicalRichTextEditorBlock, currentKind: ClinicalRichTextEditorBlock.EditableKind) -> some View {
