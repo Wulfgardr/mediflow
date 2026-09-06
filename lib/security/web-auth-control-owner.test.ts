@@ -16,7 +16,11 @@ async function freshStack(label: string) {
         .replace("from './server-session';", "from './server-session.ts';");
     const sessionSource = readFileSync(new URL('./server-session.ts', import.meta.url), 'utf8')
         .replace("import 'server-only';", '')
-        .replace("from './web-auth-control-record';", "from './web-auth-control-record.ts';");
+        .replaceAll("from './web-auth-lifecycle-owner-adapter';", "from './native-test-owner.mjs';");
+    // @Codex: each historical test stack owns an isolated native/system closure.
+    const implementation = fileURLToPath(new URL('../../packages/web-auth-lifecycle-owner/internal/native-session.cjs', import.meta.url));
+    writeFileSync(join(directory, 'native-test-owner.mjs'),
+        `import owner from ${JSON.stringify(pathToFileURL(implementation).href)}; export const serverSessions = owner.createServerSessionOwner().api;`);
     writeFileSync(join(directory, 'web-auth-control-owner.ts'), ownerSource);
     writeFileSync(join(directory, 'server-session.ts'), sessionSource);
     writeFileSync(join(directory, 'web-auth-control-record.ts'), readFileSync(new URL('./web-auth-control-record.ts', import.meta.url)));
