@@ -1,7 +1,5 @@
 'use client';
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import {
   CalendarClock,
   FileSignature,
@@ -63,7 +61,8 @@ function SchedaArea({
   onOpenArea,
 }: { patient?: Kree8Patient | null; isReview: boolean; onOpenArea: (area: AreaId) => void }) {
   if (!isReview && patient) {
-    return <LiveSchedaRedirect href={patient.modulesHref} />;
+    // @Codex: the cockpit owns this navigation, including its summary intent.
+    return null;
   }
 
   if (!isReview && !patient) {
@@ -124,17 +123,6 @@ function SchedaArea({
       />
     </div>
   );
-}
-
-/* @Codex WUL-562: Quadro nel cockpit e solo navigazione verso la Scheda. */
-function LiveSchedaRedirect({ href }: { href: string }) {
-  const router = useRouter();
-
-  useEffect(() => {
-    router.replace(href);
-  }, [href, router]);
-
-  return null;
 }
 
 export { SchedaArea };
