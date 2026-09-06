@@ -58,7 +58,7 @@ public struct SQLitePatientStore {
         "address", "phone", "caregiver", "exemptions", "diagnoses", "updated_at",
         "notes", "monitoring_profile", "status_reason", "is_adi", "is_archived",
         "ambulatory_id", "created_at", "birth_date", "ai_summary",
-        "document_insights", "deletion_reason",
+        "document_insights", "deletion_reason", "archive_reason", "archive_note", // @Codex
     ]
 
     private let path: String
@@ -137,7 +137,8 @@ public struct SQLitePatientStore {
         let sql = """
         SELECT id, first_name, last_name, tax_code, birth_date, address, phone, caregiver, notes,
                ai_summary, is_adi, is_archived, ambulatory_id, created_at, updated_at, document_insights,
-               exemptions, diagnoses, monitoring_profile, status_reason, version, deleted_at, deletion_reason
+               exemptions, diagnoses, monitoring_profile, status_reason, version, deleted_at, deletion_reason,
+               archive_reason, archive_note
         FROM patients WHERE id = ? AND deleted_at IS NULL \(scopeClause)
         """
         var binds: [SQLiteBind] = [.text(id)]
@@ -154,7 +155,8 @@ public struct SQLitePatientStore {
                 documentInsights: row.text(15), isAdi: row.bool(10), isArchived: row.bool(11),
                 version: row.int(20) ?? 1, ambulatoryId: row.text(12),
                 createdAt: row.date(13), updatedAt: row.date(14),
-                deletedAt: row.date(21), deletionReason: row.text(22))
+                deletedAt: row.date(21), deletionReason: row.text(22),
+                archiveReason: row.text(23), archiveNote: row.text(24)) // @Codex
         }
         return rows.first
     }
@@ -484,6 +486,7 @@ public struct SQLitePatientStore {
             ("notes", p.notes), ("monitoringProfile", p.monitoringProfile),
             ("statusReason", p.statusReason), ("diagnoses", p.diagnoses),
             ("exemptions", p.exemptions),
+            ("archiveReason", p.archiveReason), ("archiveNote", p.archiveNote), // @Codex
         ]
         for (name, value) in patches {
             if case .omit = value { continue }
@@ -515,6 +518,14 @@ public struct SQLitePatientStore {
               appendSealedString(&out, "notes", p.notes, masterKey),
               appendSealedString(&out, "status_reason", p.statusReason, masterKey)
         else { return nil }
+        /* @Codex: same unarchive precedence as normalizePatientUpdateInput. */
+        if p.isArchived == false {
+            out.append(("archive_reason", .null))
+            out.append(("archive_note", .null))
+        } else {
+            guard appendSealedString(&out, "archive_reason", p.archiveReason, masterKey),
+                  appendSealedString(&out, "archive_note", p.archiveNote, masterKey) else { return nil }
+        }
         // diagnoses + exemptions are STRUCTURED ENCRYPTED fields: the plaintext is the
         // array JSON itself (NOT JSON.stringify'd again, unlike a string field), so the
         // array JSON string is encrypted directly. See PatientFieldCrypto.decryptStructuredField.
