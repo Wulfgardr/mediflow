@@ -66,6 +66,23 @@ La fonte canonica per questa decisione e
 - Prima del commit verificare branch corrente, scope del diff e stato del
   worktree.
 
+## Modello ed effort per funzione
+
+Quando si usano sub-agent, anche con un coordinatore Astra Ultra, comporre
+la squadra scegliendo modello, effort e strumenti per ciascun incarico.
+Non usare Astra o effort max/ultra per default, ne imporre quote di modelli.
+
+- **Astra**: coordinamento, sintesi e problemi complessi o ambigui.
+- **Sol**: incarichi sostanziali che richiedono capacita e autonomia elevate.
+- **Terra**: esecuzione delimitata con obiettivo e contratto chiari.
+- **Luna**: letture, ispezioni visive, seconde revisioni e compiti molto stretti.
+- Scegliere per ogni modello l'effort supportato adeguato a complessita,
+  rischio e incertezza; aumentarlo o cambiare modello quando le prove lo
+  richiedono. Il modello del coordinatore non determina quello delle lane.
+- Registrare modello, effort e motivo nella consegna della lane. Usare le
+  funzioni disponibili adatte al compito e verificare il risultato; se una
+  combinazione non e disponibile, dichiararlo senza sostituzioni silenziose.
+
 ## Igiene documentale
 
 - Se un file Markdown viene aggiunto, rimosso o rinominato, aggiornare
