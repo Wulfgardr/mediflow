@@ -26,9 +26,15 @@ const getDbHealth = () => {
     const dbExists = fs.existsSync(dbPath);
     const legacyExists = fs.existsSync(legacyDbPath);
 
+    // @Codex: a genuinely empty data directory is a first installation. A
+    // missing database beside existing files still requires explicit recovery.
+    const firstInstallation = !dbExists && !legacyExists
+        && fs.readdirSync(path.dirname(dbPath)).length === 0;
+
     return {
         dbExists,
-        legacyExists
+        legacyExists,
+        firstInstallation,
     };
 };
 
@@ -110,7 +116,7 @@ export async function GET(request: Request) {
     }
 
     /* @Codex */
-    if (!dbHealth.dbExists && !dbHealth.legacyExists) {
+    if (!dbHealth.dbExists && !dbHealth.legacyExists && !dbHealth.firstInstallation) {
         const response = NextResponse.json({
             status: 'error',
             isSetup: false,
