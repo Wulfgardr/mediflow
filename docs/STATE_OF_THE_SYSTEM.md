@@ -38,11 +38,10 @@ non sono verifiche della release 0.8.6.
 ## Aggiornamento di candidatura: 6 settembre 2026
 
 Il [verbale integrato 0.8.6](./analysis/2026-09-06-086-integrated-closeout.md)
-raccoglie commit, toolchain, risultati e limiti delle verifiche successive.
-Il candidato cambia la navigazione web e Apple, rende progressivi i form e
-mantiene la scelta tra barra superiore e laterale sul web. Blocchi, rinnovo
-dell'accesso, letture tardive, bozze e conflitti sono verificati separatamente
-dalla resa grafica e dai flussi reali di pairing.
+conserva le prove storiche e registra i controlli sul candidato corrente.
+La navigazione web e Apple, i form progressivi e la scelta web tra barra
+superiore e laterale sono integrati. Restano aperte le prove complete delle
+app con i tre host reali.
 
 Windows e Linux ora hanno prove locali su sistemi operativi reali: build del
 runtime Node, avvio da directory vuota, configurazione ordinaria e percorsi
@@ -51,11 +50,17 @@ guest. Windows usa Node x64 emulato su ARM64 per il pacchetto AnyDoc disponibile
 Apple Vision resta una funzione del Mac. Le suite complete dei guest e le
 prove UI Apple del candidato sono gate ancora aperti, non parità già attestata.
 
-La suite Node completa conta 3.198 PASS e uno skip previsto; SwiftPM conta
-805 PASS e uno skip previsto. Questi risultati, i dodici run API HTTPS con
-pairing distinti e i test browser descritti nel verbale non sostituiscono
-le sei combinazioni app mobile/home-base. Il candidato non è ancora stato
-pubblicato, unito a main o rilasciato.
+La suite Node completa su `52ae794ab` conta 3.206 PASS e uno skip previsto;
+anche il lint completo è PASS. La ricevuta più
+recente SwiftPM su `af139` conta 822 PASS e uno skip canonico su 823 test; la
+correzione del wrapper non ha rieseguito la suite. Le compilazioni generic macOS
+universale e iOS device sono PASS con `CODE_SIGNING_ALLOWED=NO`, senza avvio
+dell'app, Keychain o UI. Questi risultati e le dodici prove API HTTPS con
+pairing distinti non sostituiscono le sei combinazioni app mobile/home-base.
+Su Windows `25e8f8708` ha superato 17 controlli mirati, inclusi primo avvio,
+onboarding completo e accesso fra schede; su Linux le due suite aggiornate
+di cartella e lista hanno 25 PASS. Le suite complete dei guest sono in corso.
+Il candidato non è ancora stato pubblicato, unito a main o rilasciato.
 
 ## Aggiornamento di candidatura: 5 settembre 2026
 

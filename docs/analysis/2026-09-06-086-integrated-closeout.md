@@ -14,6 +14,29 @@ Questo verbale aggiorna lo stato del candidato. Le prove precedenti della
 il proprio commit e perimetro; non vengono attribuite retroattivamente al
 candidato finale. I contratti dei componenti restano negli ADR pertinenti.
 
+## Milestone di chiusura documentale
+
+Questa milestone aggiunge ricevute recenti senza sostituire le sezioni storiche
+che seguono. Il candidato resta aperto alla review; nessun esito qui sotto
+attesta merge, release, parità o UI mobile integrata.
+
+| Sorgente | Verifica | Limite |
+| --- | --- | --- |
+| Node, `52ae794ab2411e3c7d438db34b36114187bb4418` | Suite completa: 3.206 PASS, uno skip canonico, zero FAIL su 3.207 casi; lint completo PASS. Node 24.19.0 e directory sintetica privata. | Le modifiche successive solo documentali, ai test browser e al builder del simulatore hanno verifiche distinte. |
+| Windows 11 ARM64, Node 24 x64 emulato, `25e8f8708f47a51c45f2bdfd64a8caa5e422d45b` | Focused run `16/16` PASS: `15` test canonici e first root da directory vuota. | Non è il full finale né un bundle AnyDoc ARM64 nativo. |
+| Windows, stesso runtime `25e8f8708` | Onboarding completo canonico PASS su un secondo database nuovo: configurazione UI, ripresa, CAS, rollback, risposta persa e idempotenza. I due lotti mirati sommano 17 PASS senza retry o skip. | Il collector completo successivo rimane una prova separata. |
+| Windows 11 ARM64, Node 24 x64 emulato, `868eb3ee6eef367c368a314f98bd15d60dd788b8` | Full: `142` PASS, `12` skip espliciti e `2` FAIL, senza retry. Un FAIL è `official-ui`; l'altro è onboarding. | I due FAIL restano distinti; il run non promuove il target finale. |
+| Linux ARM, `3c4863f13ddf31a2b2d224bbdbcd06f8fdf99f1c` | Storico: `122` PASS, `9` flaky, `5` FAIL e `49` skip, con un retry storico. Il target `800` ha `24` PASS e un FAIL background one-shot. | Il full sul target `25e` è pendente. |
+| Linux ARM, runtime `25e8f8708`, due file di test integrati in `8aaf2e622` | Cartella e lista: 25 PASS, zero skip o retry. Il tema viene scelto dalle Impostazioni ordinarie; focus, sezione visibile e stile attendono le condizioni effettive entro il budget esistente. | Le prove storiche fallite restano conservate; il run non dimostra assenza statistica di intermittenza. |
+| SwiftPM, `af1391e67846b1cc9848ce8f8b3dd1bd7f7a9f22` | `823` totali: `822` PASS, `0` FAIL, `1` skip canonico. La correzione riguarda l'errore del wrapper; non riesegue i test. | Non è build o UI iOS/iPadOS integrata. |
+| Generic Apple, `f512643eebe9c50a95fad9fce3e69fc9ce8954ba` con solo delta `5ced` | Compilazioni generiche macOS `arm64+x86_64` e iOS device `arm64` PASS con Xcode 26.6 (`17F113`); il native tree `f4dff69dc421d01888d8d609ce9911e026ad0d19` coincide con il parent `5ced`. I digest della sintesi e dei receipt sono verificati. | `CODE_SIGNING_ALLOWED=NO`; app non avviate. Nessuna prova UI, Keychain, host paired, firma di produzione o distribuzione. |
+| Apple UI, `7d0c8240883e837b6e201c3d34f768ecda35f19b` | Phone: `36` PASS, `4` skip, `1` FAIL. iPad: `30` PASS, `7` skip, `4` FAIL. | `41` è un conteggio target, non una fonte; AX5, rotazione e gesto Home restano aperti. |
+| Simulatori con firma ordinaria, `5ced339e9` | Build-for-testing PASS. Quattro target PASS: AX5 iPhone e iPad, rotazione effettiva iPad e bozza completa dopo rotazione. Due target archivio falliscono alla rilettura del motivo dopo il salvataggio. | Il ramo demo aggiornava il record senza rinnovare la mappa dei campi editabili; `8fc772e6a` corregge quel solo ramo DEBUG. La nuova prova UI è ancora da eseguire. Nessun difetto del salvataggio HTTP è attestato da questa fixture. |
+
+Full SwiftPM e compilazioni generic Apple hanno ricevute legate alla sorgente;
+le UI `41`, le sei combinazioni app/home-base e il refresh finale dei pairing
+non sono conclusi.
+
 ## Verifiche del candidato del 6 settembre, secondo lotto
 
 La build web pulita `868eb3ee6eef367c368a314f98bd15d60dd788b8` ha
