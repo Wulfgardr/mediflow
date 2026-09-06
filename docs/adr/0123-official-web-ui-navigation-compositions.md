@@ -1,6 +1,6 @@
 # ADR 0123: UI web ufficiale con due disposizioni di navigazione
 
-Date: 2026-09-06  
+Date: 2026-09-06
 Status: Accepted
 
 ## Problema

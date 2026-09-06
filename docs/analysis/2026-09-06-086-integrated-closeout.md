@@ -2,15 +2,51 @@
 
 Data: 6 settembre 2026. Branch `codex/WUL-669-086-integrated-candidate`.
 Base del programma: `b72ac713b624e7d771262e4e01c5c5e1f56f9ae2`.
-Stato: candidato funzionale locale integrato e verificato; redesign visivo
-macOS ancora aperto dopo la revisione dell'utente. Fermo prima della PR.
-Nessun push, PR, tag o release.
+Stato: integrazione e verifica multipiattaforma in corso. Le prove storiche
+riportate sotto non attestano il completamento della patch corrente.
+Il perimetro ora comprende Apple, Windows e Linux, UI e headless; la consegna
+richiesta arriva al merge su main dopo i controlli. Nessun push, PR, merge,
+tag o release è ancora avvenuto.
 
 Questo verbale aggiorna lo stato del candidato. Le prove precedenti della
 [base funzionale](./2026-09-06-086-functional-closeout.md) e della
 [promozione web](./2026-09-06-086-integrated-ui-verification.md) mantengono
 il proprio commit e perimetro; non vengono attribuite retroattivamente al
 candidato finale. I contratti dei componenti restano negli ADR pertinenti.
+
+## Verifiche successive alla prima integrazione
+
+La build web da worktree pulito
+`cf1a13c307b5a78d53b95ba6327437b0b250cb73` ha superato Turbopack,
+TypeScript e il controllo del bundle standalone con Node 24.19.0 / ABI 137.
+La copia compilata è conservata fuori Git con gli asset e le impronte dei
+file. Su questa copia `/api/system/revision` restituisce `unknown` senza gli
+override di provenienza: lo SHA è attestato dal registro della build e dai
+digest, non da quella risposta HTTP.
+
+| Prova | Evidenza circoscritta |
+| --- | --- |
+| Tastiera K4 e navigazione L9, senza modificare i test | Quattro PASS, due ripetizioni per scenario, 24,6 s; nessun errore console. |
+| Header e CSP sulle sei superfici principali | Due PASS, senza allentare la policy. |
+| Query ReactDOM: navigazione, errore, retry, supersessione, ripristino e smontaggio | Sette PASS; letture ritardate e fallite sono fixture dichiarate, non traffico clinico reale. |
+| Editor inline, transcoder, binding e flussi S7 integrati | 55 test Swift PASS. La prova UI della nuova versione resta separata. |
+| Home-base Mac `27775bdde96aef5697341e8f22ae142e1f1dc5ec` | Due pairing distinti: accesso nativo, lettura, scrittura, rilettura cifrata indipendente e logout via HTTPS. Quattro run API riusciti; non prova dell'interfaccia mobile. |
+
+L'editor nativo ora conserva gli stili su intervalli selezionati; il nuovo
+percorso di autenticazione nativa mantiene distinta la sessione Web. Le query
+ritirate quando il documento viene abbandonato non pubblicano errori tardivi;
+gli errori di richieste ancora attive restano visibili. La selezione rapida
+della ricerca non viene più sostituita dal focus differito del titolo.
+
+Windows e Linux usano runtime e TLS nei rispettivi guest, database sintetici
+separati e avvio ordinario da directory vuota. La prima matrice completa
+Windows su `d402479cd2ff575f2a37ae177a2cc42574a1b8fd` ha prodotto
+55 PASS, 68 fallimenti, 12 skip espliciti e 8 test non eseguiti su 143 casi.
+I nuovi run mirati e gli adattamenti dei test alla UI ordinaria non sostituiscono
+questo risultato. Il nuovo run completo, le prove finali Apple e le sei
+combinazioni app mobile/home-base restano aperti. Gli errori HTTP 401 delle
+impostazioni richiedono una verifica distinta dagli errori delle query
+interrotte durante la navigazione.
 
 ## Comportamento consegnato nel candidato
 
@@ -37,7 +73,7 @@ candidato finale. I contratti dei componenti restano negli ADR pertinenti.
   conferma, l'annullamento conserva la compilazione e non effettua scritture.
   Il reset della provenienza quando si torna al testo libero rimane esplicito.
 
-## Verifica finale
+## Verifica storica della prima integrazione
 
 Ambiente web: Node 24.19.0, ABI 137, dipendenze fisiche nel worktree,
 `env -i`, `MEDIFLOW_DATA_DIR` esplicita e fixture sintetiche. La suite unitaria
@@ -45,11 +81,11 @@ crea la propria directory temporanea; `MEDIFLOW_E2E_DISABLE_LEGACY_COPY=1`
 impedisce al preparatore di copiare il database legacy. Nessun servizio WHO
 viene abilitato per queste prove.
 
-Sorgenti eseguibili finali: `a3e402f825dd778115fddb83cd789757e359a770`, worktree
+Sorgenti eseguibili della prima integrazione: `a3e402f825dd778115fddb83cd789757e359a770`, worktree
 pulito all'avvio della build. Il server standalone ha restituito
 `codex/WUL-669-086-integrated-candidate@a3e402f825dd:clean` da
-`/api/system/revision`. Le successive correzioni del verbale sono documentali.
-Log finali: `/tmp/mf086-final-c6f84emr/logs/`; indice e ricevuta locali in
+`/api/system/revision`. Questa prova precede le modifiche successive elencate sopra.
+Log di quel lotto: `/tmp/mf086-final-c6f84emr/logs/`; indice e ricevuta locali in
 `tmp-086-integrated/`.
 
 | Verifica sul candidato unificato | Risultato |
@@ -115,5 +151,7 @@ o una revisione completa di ogni singolo form Apple.
   Non esiste una fotografia precedente sufficiente e non è stato tentato
   un ripristino. Il reader iniettato ora evita quell'import del database.
 
-La consegna richiesta si ferma alla patch locale revisionabile. Le issue
-non sono dichiarate chiuse e non sono state modificate su GitHub o Linear.
+La promozione richiede ancora il completamento delle prove, la revisione del
+diff e i controlli remoti. Le issue non sono dichiarate chiuse e non sono
+state modificate su GitHub o Linear. Firma, notarizzazione e release restano
+distinte dal merge richiesto.
