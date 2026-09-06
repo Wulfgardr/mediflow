@@ -6,7 +6,7 @@ import { AlertCircle, Loader2, Unlock } from 'lucide-react';
 import styles from './kree8/kree8-lock-screen.module.css';
 
 export function LockScreen() {
-    const { isLocked, requiresSetup, authErrorMessage, login, setupPin } = useSecurity();
+    const { isLocked, requiresSetup, authErrorMessage, login, setupPin, lock } = useSecurity();
     const [pin, setPin] = useState('');
     const [confirmPin, setConfirmPin] = useState('');
     const [error, setError] = useState('');
@@ -168,6 +168,23 @@ export function LockScreen() {
                             </>
                         )}
                     </button>
+                    {/* @Codex: explicit recovery uses the existing server lock and its
+                        network barrier; the next unlock still requires the PIN. */}
+                    {!requiresSetup && visibleError && (
+                        <div className="text-center text-sm">
+                            <button type="button" disabled={loading}
+                                className="min-h-11 px-4 py-2 underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2"
+                                onClick={() => {
+                                    setPin('');
+                                    setError('');
+                                    lock();
+                                    setFailedAttempt((n) => n + 1);
+                                }}>
+                                Rinnova accesso
+                            </button>
+                            <p className="px-2 text-xs leading-5">Chiude la sessione precedente. Poi inserisci di nuovo il PIN.</p>
+                        </div>
+                    )}
                 </form>
             </section>
         </div>
