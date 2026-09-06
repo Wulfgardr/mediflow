@@ -54,9 +54,11 @@ function patientStep(stage = 'created') {
         stepID: `step-${String(index + 1).padStart(3, '0')}`, lifecycleStage: stage,
         version: Math.min(index + 1, 6), deleted: stage === 'trashed',
         expected: stage === 'trashed' ? { ...identity, deletionReason: 'Eliminazione sintetica test-run' }
-            : { ...identity, address: 'Synthetic address', phone: '0000000000', caregiver: 'Synthetic contact' },
+            : { ...identity, address: 'Synthetic address', phone: '0000000000', caregiver: 'Synthetic contact',
+                ...(stage === 'archived' ? { archiveReason: 'other', archiveNote: 'Archiviazione sintetica test-run' } : {}) },
         expectedFlags: { isArchived: stage === 'archived', isAdi: false },
-        expectedNulls: stage === 'trashed' ? ['birthDate'] : ['birthDate', 'deletionReason'] };
+        expectedNulls: stage === 'trashed' ? ['birthDate'] : stage === 'archived' ? ['birthDate', 'deletionReason']
+            : ['birthDate', 'deletionReason', 'archiveReason', 'archiveNote'] };
 }
 
 test('patient lifecycle binds one newly UI-created identity and advances only after verified checkpoints', () => {
@@ -85,11 +87,12 @@ test('patient rereads distinguish complete active detail from permitted tombston
     const key = await webcrypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
     const created = patientStep();
     const full = { id: created.recordId, version: 1, deletedAt: null, birthDate: null, deletionReason: null,
+        archiveReason: null, archiveNote: null,
         ...created.expectedFlags, ...created.expected };
     for (const field of ['address', 'phone', 'caregiver']) full[field] = await sealField(full[field], key);
     const comparison = await compareRecords(created, [full], [full], key, key);
     assert.equal(comparison.webObservation, 'exact-record-fields-and-version');
-    assert.deepEqual(comparison.comparedNulls, ['birthDate', 'deletionReason']);
+    assert.deepEqual(comparison.comparedNulls, ['birthDate', 'deletionReason', 'archiveReason', 'archiveNote']);
     for (const changed of [{ ...full, isArchived: true }, { ...full, birthDate: '2000-01-01' },
         { ...full, deletionReason: '' }, { ...full, address: created.expected.address }]) {
         await assert.rejects(compareRecords(created, [changed], [changed], key, key));
@@ -105,6 +108,43 @@ test('patient rereads distinguish complete active detail from permitted tombston
         paired: '/api/v1/network/patients/new-ui-patient', webStatus: 200 });
     assert.deepEqual(readRoutesForStep(trash), { web: '/api/patients/new-ui-patient',
         paired: '/api/v1/network/patients?includeDeleted=true', webStatus: 404 });
+});
+
+test('archive UI checkpoints require explicit reason and note, sealed on both readers, then cleared on reactivation', async () => {
+    const key = await webcrypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
+    const history = new Map();
+    for (const stage of ['created', 'profile-updated']) acceptVerifiedStep(patientStep(stage), history);
+    const archived = patientStep('archived');
+    validateStep(archived, descriptor, 'test-run', 'ios', history);
+    for (const patch of [{ archiveReason: undefined }, { archiveReason: 'assigned_mmg' },
+        { archiveNote: undefined }, { archiveNote: '' }]) {
+        const expected = { ...archived.expected, ...patch };
+        for (const field of Object.keys(expected)) if (expected[field] === undefined) delete expected[field];
+        assert.throws(() => validateStep({ ...archived, expected }, descriptor, 'test-run', 'ios', history));
+    }
+    const wire = { id: archived.recordId, version: 3, deletedAt: null, birthDate: null, deletionReason: null,
+        ...archived.expectedFlags, ...archived.expected };
+    for (const field of ['address', 'phone', 'caregiver', 'archiveReason', 'archiveNote']) {
+        wire[field] = await sealField(archived.expected[field], key);
+    }
+    const receipt = await compareRecords(archived, [wire], [wire], key, key);
+    assert.ok(receipt.comparedFields.includes('archiveReason'));
+    assert.ok(receipt.comparedFields.includes('archiveNote'));
+    for (const field of ['archiveReason', 'archiveNote']) {
+        for (const value of [archived.expected[field], null, 'ENC:invalid:invalid', await sealField('stale', key)]) {
+            const changed = { ...wire, [field]: value };
+            await assert.rejects(compareRecords(archived, [changed], [wire], key, key));
+            await assert.rejects(compareRecords(archived, [wire], [changed], key, key));
+        }
+    }
+    const reactivated = patientStep('reactivated');
+    const active = { ...wire, version: 4, isArchived: false, archiveReason: null, archiveNote: null };
+    await compareRecords(reactivated, [active], [active], key, key);
+    for (const field of ['archiveReason', 'archiveNote']) {
+        const stale = { ...active, [field]: wire[field] };
+        await assert.rejects(compareRecords(reactivated, [stale], [active], key, key));
+        await assert.rejects(compareRecords(reactivated, [active], [stale], key, key));
+    }
 });
 
 test('each clinical module requires authenticated sealed fields while canonical codes and statuses remain plain', async () => {

@@ -12,8 +12,8 @@ import { loginWithWebAuthControl } from './web-auth-control-test-client.mjs';
 import { readDescriptor, pinnedFetch, unwrapLoginKey, openField, nativeSessionCookie } from './mobile-home-base-interop.mjs';
 
 export const modules = {
-    patient: { route: 'patients', fields: ['firstName', 'lastName', 'taxCode', 'address', 'phone', 'caregiver', 'notes', 'deletionReason'],
-        encryptedFields: ['address', 'phone', 'caregiver', 'notes', 'deletionReason'] },
+    patient: { route: 'patients', fields: ['firstName', 'lastName', 'taxCode', 'address', 'phone', 'caregiver', 'notes', 'deletionReason', 'archiveReason', 'archiveNote'],
+        encryptedFields: ['address', 'phone', 'caregiver', 'notes', 'deletionReason', 'archiveReason', 'archiveNote'] },
     // Only the canonical lib/db.ts ENCRYPTED_FIELDS within each compared field
     // set require a sealed value; drug names, codes, units and statuses stay plain.
     therapy: { route: 'therapies', nested: true, fields: ['drugName', 'dosage', 'motivation', 'activePrinciple', 'aic', 'atc', 'status'],
@@ -57,7 +57,18 @@ export function validateStep(step, descriptor, runID, clientPlatform, history = 
         assert.equal(step.expected?.lastName, `Interop ${runID} ${clientPlatform}`);
         assert.equal(step.expected?.taxCode, `SYN-${runID}-${clientPlatform}`);
         assert.deepEqual(step.expectedFlags, { isArchived: step.lifecycleStage === 'archived', isAdi: false });
-        assert.deepEqual(step.expectedNulls, step.deleted ? ['birthDate'] : ['birthDate', 'deletionReason']);
+        const archived = step.lifecycleStage === 'archived';
+        assert.deepEqual(step.expectedNulls, step.deleted ? ['birthDate'] : archived ? ['birthDate', 'deletionReason']
+            : ['birthDate', 'deletionReason', 'archiveReason', 'archiveNote']);
+        // The actual UI deliberately selects Other and enters this exact note.
+        // Both fields are canonical encrypted patient columns, including reason.
+        if (archived) {
+            assert.equal(step.expected.archiveReason, 'other');
+            assert.equal(step.expected.archiveNote, `Archiviazione sintetica ${runID}`);
+        } else {
+            assert.equal(step.expected.archiveReason, undefined);
+            assert.equal(step.expected.archiveNote, undefined);
+        }
         if (step.deleted) {
             assert.deepEqual(Object.keys(step.expected).sort(), ['deletionReason', 'firstName', 'lastName', 'taxCode']);
             assert.equal(step.expected.deletionReason, `Eliminazione sintetica ${runID}`);
