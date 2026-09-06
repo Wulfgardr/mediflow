@@ -64,6 +64,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             }
             guard previousID != currentID else { return }
             /* @Codex */
+            cancelEditingPatient()
             editablePatientFields = [:]
             lockedPatientFields = []
             invalidateAttachmentPatientState()
@@ -135,6 +136,15 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     @Published var editPatientFirstName = ""
     @Published var editPatientLastName = ""
     @Published var editPatientTaxCode = ""
+    /* @Codex: the wire day is Gregorian UTC, matching the web date-only editor. */
+    @Published var editPatientBirthDate: Date?
+    private var editingPatientBaseline: (id: String, version: Int, birthDate: Date?)?
+    private var patientEditGeneration = UUID()
+    static var patientBirthDateCalendar: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        return calendar
+    }
     @Published var editPatientAddress = ""
     @Published var editPatientPhone = ""
     @Published var editPatientCaregiver = ""
@@ -1680,6 +1690,10 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     // A4: edit patient anagrafica.
     func startEditingPatient() {
         guard let patient = selectedPatient else { return }
+        /* @Codex */
+        patientEditGeneration = UUID()
+        editingPatientBaseline = (patient.id, patient.version, patient.birthDate)
+        editPatientBirthDate = patient.birthDate
         editPatientFirstName = patient.firstName
         editPatientLastName = patient.lastName
         editPatientTaxCode = patient.taxCode
@@ -1766,16 +1780,37 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
 
     func cancelEditingPatient() {
         isEditingPatient = false
+        /* @Codex */
+        patientEditGeneration = UUID()
+        editingPatientBaseline = nil
+        editPatientBirthDate = nil
         resetExemptionCatalogSearch(clearAvailability: false)
     }
 
+    /* @Codex */
+    func setPatientBirthDatePresent(_ present: Bool) {
+        editPatientBirthDate = present
+            ? (editingPatientBaseline?.birthDate ?? Self.patientBirthDateCalendar.startOfDay(for: Date()))
+            : nil
+    }
+
+    private var patientBirthDatePatch: PatchValue<Date> {
+        let original = editingPatientBaseline?.birthDate
+        guard let edited = editPatientBirthDate else { return original == nil ? .omit : .null }
+        let calendar = Self.patientBirthDateCalendar
+        if let original, calendar.isDate(original, inSameDayAs: edited) { return .omit }
+        return .value(calendar.startOfDay(for: edited))
+    }
+
     func savePatient() async {
-        guard let current = selectedPatient else { return }
+        /* @Codex: hold the editor's CAS version and reject stale completion. */
+        guard let current = selectedPatient, let baseline = editingPatientBaseline,
+              baseline.id == current.id, isEditingPatient, !isWorking else { return }
 
         #if DEBUG
         if Self.isUITestSeeded {
             selectedPatient = editedPatientDetail(from: current)
-            isEditingPatient = false
+            cancelEditingPatient()
             statusMessage = "Anagrafica aggiornata."
             return
         }
@@ -1794,7 +1829,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         }
         /* @Codex */
         let payload = HomeBasePatientUpdatePayload(
-            version: current.version,
+            version: baseline.version,
             firstName: editPatientFirstName.trimmingCharacters(in: .whitespacesAndNewlines),
             lastName: editPatientLastName.trimmingCharacters(in: .whitespacesAndNewlines),
             taxCode: editPatientTaxCode.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -1809,28 +1844,42 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
                 field: .diagnoses, masterKey: masterKey, structured: true),
             exemptions: encryptedPatientPatchValue(
                 ExemptionCodesCodec.encode(editPatientExemptions),
-                field: .exemptions, masterKey: masterKey, structured: true)
+                field: .exemptions, masterKey: masterKey, structured: true),
+            birthDate: patientBirthDatePatch
         )
         let patientId = current.id
-        await runTask {
-            let acknowledgement = try await self.makeClient().updatePatient(
+        let editGeneration = patientEditGeneration
+        let scope = ambulatoryId.trimmedOrNil
+        let client = makeClient()
+        var validateCurrent: () throws -> Void = { throw CancellationError() }
+        await runTask({
+            let validate = self.patientReadValidator(patientId: patientId, credentials: credentials,
+                sessionCookie: sessionCookie, ambulatoryId: scope)
+            validateCurrent = {
+                try validate()
+                guard self.patientEditGeneration == editGeneration else { throw CancellationError() }
+            }
+            try validateCurrent()
+            let acknowledgement = try await client.updatePatient(
                 patientId: patientId,
                 payload: payload,
                 credentials: credentials,
                 sessionCookie: sessionCookie,
-                ambulatoryId: self.ambulatoryId.trimmedOrNil
+                ambulatoryId: scope
             )
+            try validateCurrent()
             guard acknowledgement.success else { throw HomeBaseClientError.contract }
-            self.isEditingPatient = false
-            let fetchedDetail = try await self.makeClient().fetchPatient(
+            let fetchedDetail = try await client.fetchPatient(
                 id: patientId,
                 credentials: credentials,
                 sessionCookie: sessionCookie,
-                ambulatoryId: self.ambulatoryId.trimmedOrNil
+                ambulatoryId: scope
             )
+            try validateCurrent()
             self.setSelectedPatient(fetchedDetail) // @Codex
+            self.cancelEditingPatient()
             self.statusMessage = "Anagrafica aggiornata sull'home-base."
-        }
+        }, canApplyFailure: { (try? validateCurrent()) != nil })
     }
 
     /* @Codex */
@@ -2054,11 +2103,17 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     }
 
     private func editedPatientDetail(from current: HomeBasePatientDetail) -> HomeBasePatientDetail {
-        HomeBasePatientDetail(
+        let birthDate: Date? // @Codex: fixture follows the same nullable patch.
+        switch patientBirthDatePatch {
+        case .omit: birthDate = current.birthDate
+        case .null: birthDate = nil
+        case .value(let value): birthDate = value
+        }
+        return HomeBasePatientDetail(
             id: current.id,
             firstName: editPatientFirstName.trimmingCharacters(in: .whitespacesAndNewlines),
             lastName: editPatientLastName.trimmingCharacters(in: .whitespacesAndNewlines),
-            birthDate: current.birthDate,
+            birthDate: birthDate,
             taxCode: editPatientTaxCode.trimmingCharacters(in: .whitespacesAndNewlines),
             address: editPatientAddress.trimmedOrNil,
             phone: editPatientPhone.trimmedOrNil,

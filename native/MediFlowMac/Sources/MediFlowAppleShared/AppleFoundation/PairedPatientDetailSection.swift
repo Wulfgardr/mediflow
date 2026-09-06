@@ -68,7 +68,7 @@ struct PairedPatientDetailSection: View {
             ChartGroup("Identità") {
                 InfoRow("Codice fiscale", detail.taxCode)
                 if let birth = detail.birthDate {
-                    InfoRow("Data di nascita", PairedPatientsWorkspaceSupport.birthDateFormatter.string(from: birth))
+                    InfoRow("Data di nascita", birthDateText(birth)) // @Codex
                 }
             }
 
@@ -270,7 +270,7 @@ struct PairedPatientDetailSection: View {
             ChartGroup("Identità") {
                 macPatientFact("Codice fiscale", detail.taxCode, isCode: true)
                 if let birth = detail.birthDate {
-                    macPatientFact("Data di nascita", PairedPatientsWorkspaceSupport.birthDateFormatter.string(from: birth), isCode: true)
+                    macPatientFact("Data di nascita", birthDateText(birth), isCode: true) // @Codex
                 }
             }
             if !contacts.isEmpty {
@@ -508,6 +508,17 @@ struct PairedPatientDetailSection: View {
             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
     }
 
+    /* @Codex: DOB preserves its stored civil day in every device time zone. */
+    private func birthDateText(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "it_IT")
+        formatter.calendar = PairedPatientsWorkspaceModel.patientBirthDateCalendar
+        formatter.timeZone = formatter.calendar.timeZone
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .none
+        return formatter.string(from: date)
+    }
+
     private var patientEditForm: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Modifica anagrafica")
@@ -519,6 +530,23 @@ struct PairedPatientDetailSection: View {
                 .accessibilityIdentifier("edit-patient-lastName")
             TextField("Codice fiscale", text: $model.editPatientTaxCode)
                 .accessibilityIdentifier("edit-patient-taxCode")
+            /* @Codex */
+            Toggle("Data di nascita presente", isOn: Binding(
+                get: { model.editPatientBirthDate != nil },
+                set: { model.setPatientBirthDatePresent($0) }
+            ))
+            .disabled(model.isWorking)
+            .accessibilityIdentifier("edit-patient-has-birthDate")
+            if let birthDate = model.editPatientBirthDate {
+                DatePicker("Data di nascita", selection: Binding(
+                    get: { model.editPatientBirthDate ?? birthDate },
+                    set: { model.editPatientBirthDate = $0 }
+                ), displayedComponents: .date)
+                .environment(\.calendar, PairedPatientsWorkspaceModel.patientBirthDateCalendar)
+                .environment(\.timeZone, PairedPatientsWorkspaceModel.patientBirthDateCalendar.timeZone)
+                .disabled(model.isWorking)
+                .accessibilityIdentifier("edit-patient-birthDate")
+            }
             /* @Codex */
             TextField("Indirizzo", text: $model.editPatientAddress)
                 .accessibilityIdentifier("edit-patient-address")
