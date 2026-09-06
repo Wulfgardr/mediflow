@@ -9,7 +9,7 @@ read_when:
 
 Questo file è il punto di ingresso unico: dove leggere, cosa aggiornare e quale documento prevale.
 
-Ultimo aggiornamento: 2026-09-05
+Ultimo aggiornamento: 2026-09-06
 
 > [!NOTE]
 > Questa documentazione descrive il contenuto sorgente della `0.8.5`.
@@ -27,6 +27,16 @@ Ultimo aggiornamento: 2026-09-05
 - **Presentazione del prodotto**: [Get MediFlow e linea editoriale](./getmediflow-editorial-proposal.md), distinta dai contratti runtime.
 
 ## Sviluppo 0.8.6
+
+[Candidato funzionale locale](./analysis/2026-09-06-086-functional-closeout.md):
+modifiche, verifiche e decisioni ancora aperte; prevale per il delta 0.8.6 sulle
+fotografie 0.8.5 sotto. Il design resta in revisione su un branch separato.
+[Stato funzioni](./adr/0121-function-status-projection.md) e
+[setup host Ollama](./adr/0122-local-provider-host-setup.md) distinguono
+configurazione, ammissione e singola esecuzione.
+[Inventario codice](./analysis/2026-09-06-086-code-inventory.md) e
+[matrice regolatoria](./analysis/2026-09-06-086-regulatory-evidence.md) raccolgono
+copertura, controlli e gap; non attestano conformità o adozione organizzativa.
 
 Contratto estrazione documentale: [ADR 0119](./adr/0119-anydoc-apple-vision-current-source.md),
 AnyDoc e fallback PDF Apple Vision distinti dal catalogo Fabric.

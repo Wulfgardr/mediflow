@@ -11,7 +11,7 @@ read_when:
 > GitHub mostra in alto solo alcuni file speciali (`README`, `CONTRIBUTING`, `SECURITY`, ecc.).
 > Questo file elenca invece **tutti** i `.md` tracciati nella repository con una sintesi rapida d'uso.
 
-Ultimo aggiornamento: 2026-09-05
+Ultimo aggiornamento: 2026-09-06
 
 ## Ingresso progressivo e candidatura
 
@@ -32,6 +32,13 @@ Ultimo aggiornamento: 2026-09-05
 
 | File | Scopo | Quando consultarlo |
 | --- | --- | --- |
+| [Chiusura funzionale locale 0.8.6](./analysis/2026-09-06-086-functional-closeout.md) | Candidate, controlli e limiti della tranche funzionale. | Prima della revisione finale e di ogni promozione. |
+| [Inventario first-party](./analysis/2026-09-06-086-code-inventory.md) | Copertura ripetibile e debito classificato. | Per scegliere tranche deslop motivate. |
+| [Matrice regolatoria 0.8.6](./analysis/2026-09-06-086-regulatory-evidence.md) | Fonti correnti, applicabilità condizionale, controlli e gap. | Revisione competente GDPR/AI Act; non certificazione. |
+| [ADR 0120](./adr/0120-local-work-profile-onboarding.md) | Raccomandazione locale e cambio reversibile del profilo. | Per onboarding, persistenza e rollback. |
+| [Verifica accesso](./analysis/2026-09-06-086-access-verification.md) | Matrice sintetica auth, lock, logout e recovery. | Per valutare copertura e limiti WUL-675. |
+| [ADR 0121](./adr/0121-function-status-projection.md) | Lettura autenticata dello stato delle funzioni. | Per modificare prerequisiti, errori e stati osservati. |
+| [ADR 0122](./adr/0122-local-provider-host-setup.md) | Ammissione esplicita Ollama nel processo host. | Per il setup locale senza controllo privilegiato nelle route. |
 | [docs/analysis/2026-09-05-mediflow-086-baseline.md](./analysis/2026-09-05-mediflow-086-baseline.md) | Baseline WUL-670, prove sintetiche e recuperi selettivi. | Prima delle tranche 0.8.6; limiti runtime espliciti. |
 | [docs/analysis/2026-09-05-086-who-decision.md](./analysis/2026-09-05-086-who-decision.md) | Proposta WHO online o locale, contratti e piano di verifica. | Prima della scelta WUL-672 e dell'implementazione WUL-673; non attiva il servizio. |
 | [docs/roadmap-086-consolidamento.md](./roadmap-086-consolidamento.md) | Piano e issue Linear per OCR, WHO, UI/design arena, onboarding, deslop, GDPR/AI Act e recupero branch. | Prima di avviare le tranche 0.8.6; non è evidenza runtime o attestazione di conformità. |

@@ -180,9 +180,9 @@ export default function SettingsAiFunctionsPage() {
                         >
                             <div className="flex items-start justify-between gap-3">
                                 <div>
-                                    <p className="text-sm font-semibold" style={{ color: 'var(--lume-ink)' }}>OCR non disponibile</p>
+                                    <p className="text-sm font-semibold" style={{ color: 'var(--lume-ink)' }}>Lettura locale degli allegati</p>
                                     <p className="mt-1 text-[11px] leading-5" style={{ color: 'var(--lume-ink-muted)' }}>
-                                        Immagini e scansioni richiedono revisione. AnyDoc resta l&apos;unica estrazione automatica locale e non viene usato come fallback invisibile.
+                                        AnyDoc estrae il testo; sui PDF supportati il percorso locale puo usare Apple Vision per le pagine scansionate. Le immagini singole restano da rivedere manualmente. Questo percorso e separato dal registro OCR di Fabric.
                                     </p>
                                 </div>
                                 <span className="rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em]" style={{ borderColor: 'color-mix(in srgb, var(--lume-signal-critical) 32%, transparent)', background: 'var(--lume-surface-focal)', color: 'var(--lume-signal-critical)' }}>

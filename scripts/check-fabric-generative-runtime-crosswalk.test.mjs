@@ -22,7 +22,7 @@ function repositorySources(overrides = {}) {
   };
 }
 
-test('accepts the integrated local 0.8.5 runtime crosswalk', () => {
+test('accepts the integrated local 0.8.6 runtime crosswalk', () => {
   const manifest = loadFabricGenerativeRuntimeCrosswalk();
   assert.doesNotThrow(() => validateFabricGenerativeRuntimeCrosswalk(manifest));
   assert.deepEqual(manifest.capabilities.map(({ id }) => id), [
@@ -96,9 +96,9 @@ test('pins the historical semantic receipt without relabeling it', () => {
   );
 });
 
-test('pins package release identity to 0.8.5', () => {
+test('pins package release identity to 0.8.6', () => {
   const manifest = loadFabricGenerativeRuntimeCrosswalk();
-  const stalePackage = readFileSync('package.json', 'utf8').replace('"version": "0.8.5"', '"version": "0.8.4"');
+  const stalePackage = readFileSync('package.json', 'utf8').replace('"version": "0.8.6"', '"version": "0.8.4"');
   assert.throws(
     () => validateFabricGenerativeRuntimeCrosswalk(manifest, repositorySources({ 'package.json': stalePackage })),
     /package version/u,
@@ -108,7 +108,7 @@ test('pins package release identity to 0.8.5', () => {
 test('manifest remains a new runtime artifact, separate from the historical receipt', () => {
   const manifest = JSON.parse(readFileSync(MANIFEST_PATH, 'utf8'));
   assert.equal(manifest.schema, 'mediflow.ai.fabric-generative-runtime-crosswalk.v1');
-  assert.equal(manifest.release, '0.8.5');
+  assert.equal(manifest.release, '0.8.6');
   assert.equal(manifest.integrationStatus, 'local_source_integrated');
   assert.equal(manifest.applyPolicy, 'none');
   assert.notEqual(MANIFEST_PATH, manifest.historicalArtifacts[0].path);

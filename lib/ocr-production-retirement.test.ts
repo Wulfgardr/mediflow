@@ -22,7 +22,7 @@ test('production document surfaces leave automatic extraction to persisted-sourc
     for (const activeSource of [upload, importer, context]) {
         assert.doesNotMatch(activeSource, /extractPatientDataSmart|extractDocumentTextForSummary|extractTextFromPdf|\/api\/ocr\/extract/u);
     }
-    assert.match(upload, /requestAnyDocLocalExtractionPreview\(file\.id\)/u);
+    assert.match(upload, /requestAnyDocLocalExtractionPreview\(file\.id,/u);
     assert.match(upload, /db\.attachments\.add[\s\S]*requestAnyDocLocalExtractionPreview/u);
 });
 
@@ -55,7 +55,8 @@ test('AI settings and model labels have no writable or selectable OCR model', ()
     }
     assert.doesNotMatch(modelSelector, /selectorId:[^;]*['"]ocr['"]/u);
     assert.doesNotMatch(functionsPage, /aiOcrKillSwitch|ocr-kill-switch-card|aria-label="OCR documentale locale"/u);
-    assert.match(functionsPage, /OCR non disponibile/u);
+    assert.match(functionsPage, /Apple Vision/u);
+    assert.doesNotMatch(functionsPage, /OCR non disponibile/u);
 });
 
 test('the active AI service task catalog cannot route OCR', () => {
