@@ -5,18 +5,9 @@ import SwiftUI
 import XCTest
 @testable import MediFlowAppleShared
 
-/// The macOS "one ground" arrangement, asserted without a screenshot.
-///
-/// The handover left this unverified because it expected to need Screen
-/// Recording permission. Most of what "one ground" claims is decidable without
-/// it: the panes resolve to one colour, the sections sit on that colour as
-/// distinguishable islands, and nothing paints a third surface between them.
-///
-/// What this cannot decide is stated plainly, because the gap matters:
-/// `ImageRenderer` does not reproduce `NSVisualEffectView`, so these tests prove
-/// the ground is one *colour*. If "one ground" is also meant to mean one
-/// *material* — the sidebar's blur showing through — that part is still only
-/// observable on screen or by interrogating the live AppKit hierarchy.
+/// Palette and surface rendering checks. These swatches do not mount the
+/// macOS workspace and cannot prove its current layout, spacing or materials.
+/// The 0.8.6 document pane is verified in the running app separately.
 @MainActor
 final class MacSingleGroundTests: XCTestCase {
     /// The proposition the whole arrangement rests on: a section has to be
@@ -83,22 +74,6 @@ final class MacSingleGroundTests: XCTestCase {
         LumePalette.palette(for: scheme, isGuardia: false).surface(for: zone)
     }
 
-    /// The two panes take their ground from one expression, so the risk is not
-    /// that they disagree today but that a later edit gives one of them its own
-    /// fill. Rendering both and comparing pins the property rather than the
-    /// spelling.
-    func testBothPanesResolveToTheSameGround() throws {
-        for scheme in [ColorScheme.light, .dark] {
-            let listPane = try centerPixel(worklistGround(), colorScheme: scheme)
-            let detailPane = try centerPixel(detailGround(), colorScheme: scheme)
-            XCTAssertEqual(
-                listPane.rgb, detailPane.rgb,
-                "Nel registro \(scheme) i due pannelli hanno terreni diversi: la divisione si legge come due applicazioni cucite insieme"
-            )
-            XCTAssertEqual(listPane.alpha, 255)
-        }
-    }
-
     /// The ground must actually differ between light and dark, which is the
     /// cheapest way to catch a hard-coded colour smuggled in behind the token.
     func testTheGroundFollowsTheRegister() throws {
@@ -119,17 +94,6 @@ final class MacSingleGroundTests: XCTestCase {
 
     private func swatch(_ color: Color) -> some View {
         Color.clear.frame(width: 48, height: 24).background(color)
-    }
-
-    /// The detail pane's ground, as `macOSWorkspace` composes it.
-    private func detailGround() -> some View {
-        swatch(PlatformColors.groupedBackground)
-    }
-
-    /// The list pane's ground. The worklist hides the List's own fill and then
-    /// paints the same recessive colour, so what reaches the eye is this.
-    private func worklistGround() -> some View {
-        swatch(PlatformColors.groupedBackground)
     }
 
     private func centerPixel<Content: View>(

@@ -189,44 +189,28 @@ struct PairedPatientsWorklistView: View {
     @Binding var patientSortMode: PatientListSortMode
     // @Codex: Compact navigation belongs to the workspace, not to a row.
     var onOpenPatient: ((HomeBasePatientSummary) -> Void)? = nil
-    #if os(macOS)
-    @Namespace private var filterNamespace
-    #endif
 
     @ViewBuilder
     var body: some View {
         #if os(macOS)
-        // One container, for the same reason as the mobile branch: returned as a
-        // bare ViewBuilder sequence, the caller's `.frame(maxHeight: .infinity)`
-        // was applied to every top-level element, so the heading, the action and
-        // the list each claimed an equal share of the column height and the
-        // patients ended up pinned to the bottom behind two empty gaps.
-        // Column order follows the Mac list pattern: filters on top, the list
-        // taking the free height, the primary action in a bottom bar.
+        // @Codex: Keep the heading and filters fixed above the native list.
+        // Creation belongs to the workspace toolbar, which owns its capability gate.
         VStack(alignment: .leading, spacing: 0) {
+            macOSWorklistHeader
+                .padding(.horizontal, 12)
+                .padding(.top, 8)
+                .padding(.bottom, 12)
             if let presentation = model.conflictPresentation {
                 conflictBanner(presentation)
                     .padding(.horizontal, 12)
                     .padding(.bottom, 10)
             }
-            if !model.patients.isEmpty {
-                patientSearchControls
-                    .padding(.horizontal, 12)
-                    .padding(.bottom, 10)
-            }
+            patientSearchControls
+                .padding(.horizontal, 12)
+                .padding(.bottom, 12)
+            Divider()
             macOSPatientList
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-            Divider()
-            Button {
-                model.startCreatingPatient()
-            } label: {
-                Label("Nuovo paziente", systemImage: "person.badge.plus")
-            }
-            .modifier(WorklistPrimaryActionStyle())
-            .disabled(model.isWorking)
-            .accessibilityIdentifier("new-patient-button")
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Elenco pazienti")
@@ -251,8 +235,30 @@ struct PairedPatientsWorklistView: View {
     #endif
 
     #if os(macOS)
+    /* @Codex */
+    private var macOSWorklistHeader: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text("Pazienti")
+                .font(.title2.weight(.semibold))
+                .accessibilityHeading(.h1)
+                .accessibilityIdentifier("patient-worklist-title")
+            Spacer(minLength: 8)
+            // A count describes the loaded, filtered rows, never the host total.
+            // An unread empty array must not announce an empty patient archive.
+            if !model.patients.isEmpty || model.connectionState == .pairedOnline {
+                Text("\(filteredPatients.count)")
+                    .font(.headline)
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+                    .accessibilityLabel("\(filteredPatients.count) pazienti visibili nell'elenco caricato")
+                    .help("Risultati nell'elenco caricato, dopo ricerca e filtro di stato.")
+                    .accessibilityIdentifier("patient-worklist-count")
+            }
+        }
+    }
+
     /// The list portion of the Mac column: everything the banner, the filters and
-    /// the bottom action already own is deliberately absent here.
+    /// the heading already own is deliberately absent here.
     @ViewBuilder
     private var macOSPatientList: some View {
         worklistContent
@@ -343,6 +349,7 @@ struct PairedPatientsWorklistView: View {
                         // was stated on iOS but missing here.
                         activePatientLabel(patient)
                             .modifier(WorklistRowHover())
+                            .listRowInsets(EdgeInsets(top: 0, leading: 8, bottom: 0, trailing: 8))
                             .tag(patient.id)
                             .accessibilityElement(children: .combine)
                             .accessibilityAddTraits(model.selectedPatientID == patient.id ? .isSelected : [])
@@ -405,6 +412,27 @@ struct PairedPatientsWorklistView: View {
 
     @ViewBuilder
     private func activePatientLabel(_ patient: HomeBasePatientSummary) -> some View {
+        #if os(macOS)
+        // @Codex: Give identity the full first line in a 280–340 pt sidebar.
+        // Recency shares the metadata line, leaving diagnosis its own third line.
+        VStack(alignment: .leading, spacing: 5) {
+            patientName(patient)
+            if dynamicTypeSize.isAccessibilitySize {
+                patientMetadata(patient)
+                patientUpdate(patient, alignment: .leading)
+            } else {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    patientMetadata(patient)
+                        .layoutPriority(1)
+                    Spacer(minLength: 4)
+                    patientUpdate(patient, alignment: .trailing)
+                }
+            }
+            patientDiagnosis(patient)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+        #else
         if dynamicTypeSize >= .accessibility1 {
             VStack(alignment: .leading, spacing: 6) {
                 patientName(patient)
@@ -444,6 +472,7 @@ struct PairedPatientsWorklistView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
         }
+        #endif
     }
 
     /// The name alone. It wraps rather than truncates — a patient's name is not
@@ -556,12 +585,15 @@ struct PairedPatientsWorklistView: View {
         }
     }
 
-    /// The pill has to know when it is sitting on the list's selection tint:
-    /// left to `.primary` on a selected row the system paints its text white
-    /// over the pill's near-white fill, and the code disappears.
+    /// @Codex: Native selection owns both ink and background on the Mac row.
+    /// A separate light chip made the dark-mode code disappear when selected.
     private func diagnosisCodePill(_ code: String, patient: HomeBasePatientSummary) -> some View {
         #if os(macOS)
-        ClinicalCodePill(code, isOnProminentBackground: model.selectedPatientID == patient.id)
+        Text(code)
+            .font(.caption.weight(.semibold))
+            .registro()
+            .foregroundStyle(.primary)
+            .fixedSize()
         #else
         ClinicalCodePill(code)
         #endif
@@ -600,13 +632,8 @@ struct PairedPatientsWorklistView: View {
 
     private var patientSearchControls: some View {
         #if os(macOS)
-        // Search is the system field in the toolbar now, so the column keeps only
-        // the scope and the order — as a control bar riding above the list.
-        //
-        // This is the one place glass belongs in this column: Apple reserves
-        // Liquid Glass for the navigation and control layer floating over
-        // content, and explicitly not for lists and scrolling content. The rows
-        // below stay opaque, because they are the clinical content.
+        // @Codex: Search stays in the workspace toolbar; local controls use
+        // standard native styles without an additional material container.
         macOSFilterCluster
         #else
         // Mobile keeps only the scope control in the scrolling content. Search is
@@ -618,78 +645,48 @@ struct PairedPatientsWorklistView: View {
     }
 
     #if os(macOS)
-    /// Scope and order as one Liquid Glass control bar, with the active-filter
-    /// chip morphing in and out of the same glass rather than appearing beside
-    /// it. Both live in one `GlassEffectContainer` so they share a sampling
-    /// region and read as a single piece of material, which is what the
-    /// container is for: glass cannot sample other glass.
-    @ViewBuilder
+    /* @Codex */
     private var macOSFilterCluster: some View {
-        if #available(macOS 26.0, *) {
-            GlassEffectContainer(spacing: 10) {
-                HStack(spacing: 10) {
-                    filterControls
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 7)
-                        .glassEffect(.regular, in: .capsule)
-                        .glassEffectID("worklist-filters", in: filterNamespace)
-
-                    if isFilteringActive {
-                        Button {
-                            withAnimation(.bouncy) {
-                                patientQuery = ""
-                                patientViewMode = .active
-                                patientSortMode = .recent
-                            }
-                        } label: {
-                            Label("Azzera", systemImage: "line.3.horizontal.decrease.circle.fill")
-                                .labelStyle(.titleAndIcon)
-                                .font(.caption.weight(.semibold))
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 7)
-                        }
-                        .buttonStyle(.plain)
-                        .glassEffect(.regular.tint(.accentColor), in: .capsule)
-                        .glassEffectID("worklist-filters-reset", in: filterNamespace)
-                        .help("Azzera ricerca, stato e ordine")
-                        .accessibilityIdentifier("patient-filters-reset")
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .animation(.bouncy, value: isFilteringActive)
-        } else {
-            filterControls
-        }
-    }
-
-    /// Drives the morph. Deliberately not "the query is non-empty": a scope or an
-    /// order left on something other than the default is just as easy to forget,
-    /// and just as capable of hiding a patient the user is looking for.
-    private var isFilteringActive: Bool {
-        !patientQuery.isEmpty || patientViewMode != .active || patientSortMode != .recent
-    }
-
-    /// The scope filter and the sort control share a row only while both fit.
-    /// A segmented control divides its width equally and truncates rather than
-    /// wrapping, so in a narrow list column the row has to stack instead.
-    @ViewBuilder
-    private var filterControls: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: 10) {
-                patientViewModePicker
-                patientSortMenu
-            }
-            stackedFilterControls
-        }
-    }
-
-    private var stackedFilterControls: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
             patientViewModePicker
-            patientSortMenu
+                .controlSize(.regular)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            // The scope gets a whole row; sort and reset share the second only
+            // while both fit, so neither compresses the segmented control.
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    patientSortMenu
+                    Spacer(minLength: 8)
+                    resetFiltersButton
+                }
+                VStack(alignment: .leading, spacing: 8) {
+                    patientSortMenu
+                    resetFiltersButton
+                }
+            }
+            .controlSize(.small)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /* @Codex */
+    @ViewBuilder
+    private var resetFiltersButton: some View {
+        if isFilteringActive {
+            Button("Azzera") {
+                patientQuery = ""
+                patientViewMode = .active
+                patientSortMode = .recent
+            }
+            .buttonStyle(.bordered)
+            .fixedSize()
+            .help("Azzera ricerca, stato e ordine")
+            .accessibilityIdentifier("patient-filters-reset")
+        }
+    }
+
+    private var isFilteringActive: Bool {
+        !patientQuery.isEmpty || patientViewMode != .active || patientSortMode != .recent
     }
     #endif
 
@@ -866,8 +863,9 @@ private struct WorklistRowHover: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .padding(.vertical, 3)
-            .padding(.horizontal, 6)
+            // @Codex: Separate adjacent records without adding another card.
+            .padding(.vertical, 8)
+            .padding(.horizontal, 4)
             .background(
                 RoundedRectangle(cornerRadius: ClinicalChartMetrics.rowRadius, style: .continuous)
                     .fill(Color.secondary.opacity(isHovering ? 0.10 : 0))

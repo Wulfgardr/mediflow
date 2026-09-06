@@ -66,7 +66,6 @@ extension FocusedValues {
 @MainActor
 public final class MediFlowMacSceneModel: ObservableObject {
     @Published public var section: ClinicalWorkspaceSection = .patients
-    @Published public var columnVisibility: NavigationSplitViewVisibility = .all
 
     /// Built after the first frame, never during scene construction.
     ///
@@ -124,9 +123,8 @@ public final class MediFlowMacSceneModel: ObservableObject {
 /// Root scene content of the macOS app.
 ///
 /// This is a Mac window, not an iPad layout in a resizable frame: a
-/// `List(selection:)` sidebar with the system's own selection chrome, a detail
-/// column that carries the window title and the live connection state, and no
-/// custom background competing with the sidebar material.
+/// horizontal area selector, one patient sidebar with native selection, and a
+/// document pane. The window title and contextual toolbar follow the active area.
 public struct MediFlowMacRootView: View {
     private let snapshot: AppleFoundationSnapshot
     @ObservedObject private var scene: MediFlowMacSceneModel
@@ -145,29 +143,34 @@ public struct MediFlowMacRootView: View {
     }
 
     public var body: some View {
-        NavigationSplitView(columnVisibility: $scene.columnVisibility) {
-            sidebar
-        } detail: {
-            Group {
-                if let workspaceModel = scene.workspaceModel {
-                    // The chrome observes the workspace, so the window subtitle
-                    // tracks it. Read straight from this view the subtitle went
-                    // stale: this view observes the scene, not the workspace, so
-                    // twenty loaded patients still read "Non caricato".
-                    MacInspectorCommandBridge(
-                        workspaceModel: workspaceModel,
-                        section: scene.section,
-                        isPresented: $isInspectorPresented
-                    ) {
-                        MacDetailChrome(workspaceModel: workspaceModel, section: scene.section) {
-                            detailView(for: scene.section, workspaceModel: workspaceModel)
+        // @Codex: App destinations occupy one horizontal control layer. The
+        // patients workspace owns the only sidebar and its native selection.
+        NavigationStack {
+            VStack(spacing: 0) {
+                workspaceNavigation
+                Divider()
+                Group {
+                    if let workspaceModel = scene.workspaceModel {
+                        // The chrome observes the workspace, so the window subtitle
+                        // tracks it. Read straight from this view the subtitle went
+                        // stale: this view observes the scene, not the workspace, so
+                        // twenty loaded patients still read "Non caricato".
+                        MacInspectorCommandBridge(
+                            workspaceModel: workspaceModel,
+                            section: scene.section,
+                            isPresented: $isInspectorPresented
+                        ) {
+                            MacDetailChrome(workspaceModel: workspaceModel, section: scene.section) {
+                                detailView(for: scene.section, workspaceModel: workspaceModel)
+                            }
                         }
+                    } else {
+                        startupState
+                            .navigationTitle(scene.section.title)
+                            .navigationSubtitle("Avvio in corso")
                     }
-                } else {
-                    startupState
-                        .navigationTitle(scene.section.title)
-                        .navigationSubtitle("Avvio in corso")
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .modifier(MacPatientInspectorPresentationModifier(
@@ -211,30 +214,45 @@ public struct MediFlowMacRootView: View {
         )
     }
 
-    // MARK: - Sidebar
+    // MARK: - Workspace navigation
 
-    private var sidebar: some View {
-        // `List(selection:)` with plain rows, not buttons: the system draws the
-        // selection, keyboard arrows move it, and VoiceOver reads it as a list.
-        // The previous plain-button rows rendered no visible label at all.
-        List(selection: $scene.section) {
-            Section("Clinica") {
-                ForEach(ClinicalWorkspaceSection.clinicalSections) { sidebarRow($0) }
+    /* @Codex */
+    private var workspaceNavigation: some View {
+        HStack(spacing: 20) {
+            Picker("Area di lavoro", selection: $scene.section) {
+                ForEach(ClinicalWorkspaceSection.clinicalSections) { section in
+                    Text(section.title)
+                        .tag(section)
+                        .accessibilityIdentifier("clinical-workspace-section-\(section.rawValue)-button")
+                }
             }
-            Section("Consultazione") {
-                ForEach(MediFlowMacRootView.referenceSections) { sidebarRow($0) }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .fixedSize(horizontal: true, vertical: false)
+            .accessibilityIdentifier("clinical-workspace-navigation")
+
+            Spacer(minLength: 0)
+            Menu {
+                Section("Consultazione") {
+                    ForEach(Self.referenceSections) { destinationButton($0) }
+                }
+                Section("Sistema") {
+                    ForEach(Self.systemSections) { destinationButton($0) }
+                }
+                Section("Progetto") {
+                    ForEach(Self.projectSections) { destinationButton($0) }
+                }
+            } label: {
+                Label(
+                    ClinicalWorkspaceSection.clinicalSections.contains(scene.section) ? "Altre aree" : scene.section.title,
+                    systemImage: "square.grid.2x2"
+                )
             }
-            Section("Sistema") {
-                ForEach(MediFlowMacRootView.systemSections) { sidebarRow($0) }
-            }
-            Section("Progetto") {
-                ForEach(MediFlowMacRootView.projectSections) { sidebarRow($0) }
-            }
+            .fixedSize()
+            .accessibilityIdentifier("clinical-workspace-other-areas")
         }
-        .listStyle(.sidebar)
-        .navigationSplitViewColumnWidth(min: 196, ideal: 228, max: 320)
-        .navigationTitle("MediFlow")
-        .accessibilityIdentifier("clinical-workspace-project-sidebar")
+        .padding(.horizontal, 20)
+        .padding(.vertical, 10)
     }
 
     /// Runtime is the home-base status of this very Mac, so it belongs with the
@@ -244,10 +262,12 @@ public struct MediFlowMacRootView: View {
     static let systemSections: [ClinicalWorkspaceSection] = [.settings, .host, .runtime]
     static let projectSections: [ClinicalWorkspaceSection] = [.overview, .milestones]
 
-    private func sidebarRow(_ item: ClinicalWorkspaceSection) -> some View {
-        Label(item.title, systemImage: item.symbolName)
-            .tag(item)
-            .accessibilityIdentifier("clinical-workspace-section-\(item.rawValue)-button")
+    /* @Codex */
+    private func destinationButton(_ item: ClinicalWorkspaceSection) -> some View {
+        Button { scene.select(item) } label: {
+            Label(item.title, systemImage: item.symbolName)
+        }
+        .accessibilityIdentifier("clinical-workspace-section-\(item.rawValue)-button")
     }
 
     // MARK: - Detail

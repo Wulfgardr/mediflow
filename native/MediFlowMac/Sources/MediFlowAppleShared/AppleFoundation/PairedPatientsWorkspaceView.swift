@@ -59,11 +59,8 @@ struct PairedPatientsWorkspaceView: View {
 
     private var platformWorkspace: some View {
         layoutBody
-        // Applied once, at the root: a `TextFieldStyle` travels through the
-        // environment, so every field in every section of the chart takes the
-        // same pill shape and none of them can disagree. There are several dozen.
-        .clinicalFieldShape()
         #if os(macOS)
+        .textFieldStyle(.roundedBorder) // @Codex: Native desktop field geometry.
         // No window-wide background fill: the sidebar material, the toolbar and
         // the scroll-edge effect are drawn by the system, and an opaque
         // windowBackgroundColor painted over the whole workspace is exactly what
@@ -81,6 +78,7 @@ struct PairedPatientsWorkspaceView: View {
         )
         .modifier(MinimizedSearchToolbarBehavior())
         #else
+        .clinicalFieldShape()
         .background(mobileCanvasColor)
         // Creating a patient is the home's primary action, so it belongs in the
         // navigation bar. Inline it consumed the first viewport at accessibility
@@ -667,11 +665,9 @@ struct PairedPatientsWorkspaceView: View {
         }
     }
 
-    // The workspace is the detail of the app's NavigationSplitView, so its own
-    // list/chart division is an HSplitView, not a second NavigationSplitView.
-    // Nested, the inner split never re-proposed a width when the window shrank:
-    // the chart kept the width it had been laid out at, overflowed the window
-    // edge and pushed the app sidebar out of view.
+    // @Codex: A single desktop split below the app navigation. A nested
+    // NavigationSplitView extends its toolbar material over the patient header;
+    // HSplitView leaves that chrome to the root NavigationStack.
     private var macOSWorkspace: some View {
         HSplitView {
             VStack(alignment: .leading, spacing: 0) {
@@ -688,48 +684,36 @@ struct PairedPatientsWorkspaceView: View {
                 // elements got the frame and spread across the column.
                 patientsListContent
             }
-            // @Codex: The outer NavigationSplitView needs room for its native
-            // sidebar at the documented 1100 pt window width. These are the
-            // actual lower bounds of the inner HSplitView, so keep their sum
-            // below the available detail width instead of letting AppKit shift
-            // the entire outer split left and clip its section headings.
-            .frame(minWidth: 220, idealWidth: 300, maxWidth: 440, maxHeight: .infinity)
+            .frame(minWidth: 260, idealWidth: 300, maxWidth: 340, maxHeight: .infinity)
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("patient-workspace-sidebar")
-
-            // @Codex: Keep the split pane stable while resetting only its scroll
-            // position. Replacing the pane identity also moved AppKit's divider.
-            ScrollViewReader { scroll in
-                ScrollView {
-                    patientDetailContent
-                        .padding(20)
-                        // Keep clinical rows within a comfortable reading width.
-                        .frame(maxWidth: 1080, alignment: .leading)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .id("patient-chart-scroll-top")
-                }
-                .onChange(of: model.activePatientSection) { _ in
-                    scroll.scrollTo("patient-chart-scroll-top", anchor: .top)
-                }
-            }
-            // One ground under both panes.
-            //
-            // The list drew the sidebar's grey and the chart drew the window's
-            // white, so the split read as two applications stitched together —
-            // and on white the section cards, which are themselves near-white,
-            // had nothing to stand out from. Giving both panes the same recessive
-            // ground is what turns the cards back into islands, and it is the
-            // same arrangement iOS uses: grey underneath, lighter surfaces on
-            // top.
-            .background(PlatformColors.groupedBackground)
-            .safeAreaInset(edge: .top, spacing: 0) {
+            // @Codex: The identity is outside the scrolling plane, including
+            // its system edge effect; it must remain readable during a scroll.
+            VStack(spacing: 0) {
                 if let detail = model.selectedPatient {
-                    VStack(spacing: 0) {
-                        patientWorkspaceHeader(detail)
-                        patientSectionPicker
+                    patientWorkspaceHeader(detail)
+                    MacPatientSectionNavigation(selection: $model.activePatientSection)
+                        .padding(.horizontal, 28)
+                        .padding(.bottom, 12)
+                    Divider()
+                }
+                // @Codex: Keep the split pane stable while resetting only its scroll
+                // position. Replacing the pane identity also moved AppKit's divider.
+                ScrollViewReader { scroll in
+                    ScrollView {
+                        patientDetailContent
+                            .padding(28)
+                            // Keep clinical rows within a comfortable reading width.
+                            .frame(maxWidth: 1000, alignment: .leading)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .id("patient-chart-scroll-top")
+                    }
+                    .onChange(of: model.activePatientSection) { _ in
+                        scroll.scrollTo("patient-chart-scroll-top", anchor: .top)
                     }
                 }
             }
+            .background(PlatformColors.chartCardSurface)
             .frame(minWidth: 360, maxWidth: .infinity, maxHeight: .infinity)
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("patient-workspace-detail")
@@ -755,20 +739,10 @@ struct PairedPatientsWorkspaceView: View {
                 }
             }
         }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 12)
+        .padding(.horizontal, 28)
+        .padding(.top, 24)
+        .padding(.bottom, 20)
         .frame(maxWidth: .infinity, alignment: .leading)
-        // The same floating glass the phone and the tablet use.
-        //
-        // This was an opaque bar with square corners and a rule underneath,
-        // welded across the full width of the chart: a rectangle in an interface
-        // whose every other surface is a rounded island, and the one piece of
-        // chrome that hid the content passing beneath it instead of letting it
-        // show through. One header, three platforms, one shape.
-        .lumeGlass(in: .rect(cornerRadius: 22))
-        .padding(.horizontal, 16)
-        .padding(.top, 10)
-        .padding(.bottom, 8)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(name). \(metadata)")
         .accessibilityHeading(.h1)
@@ -786,14 +760,14 @@ struct PairedPatientsWorkspaceView: View {
     /* @Codex */
     private func patientWorkspaceHeaderName(_ name: String) -> some View {
         Text(name)
-            .font(.title2.weight(.semibold))
+            .font(.largeTitle.weight(.semibold))
             .fixedSize(horizontal: false, vertical: true)
     }
 
     /* @Codex */
     private func patientWorkspaceHeaderAtoms(_ metadata: String) -> some View {
         Text(metadata)
-            .font(.caption)
+            .font(.subheadline)
             .registro()
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
@@ -1285,7 +1259,9 @@ struct PairedPatientsWorkspaceView: View {
             // Drafts and existing action bindings remain owned by the workspace/model.
             switch model.activePatientSection {
             case .overview:
+            #if !os(macOS)
             patientContents
+            #endif
             PairedPatientDetailSection(
                 model: model,
                 detail: detail,
@@ -1378,7 +1354,13 @@ private extension View {
     /// is no longer load-bearing. It is kept because the semantic colour still
     /// buys Increase Contrast for free on iOS; moving it to Lume `field` is now
     /// a free choice rather than a repair.
+    @ViewBuilder
     func chartCard() -> some View {
+        #if os(macOS)
+        // @Codex: The reading pane is the clinical surface. A section needs
+        // hierarchy and spacing, not a second full-width rounded envelope.
+        frame(maxWidth: .infinity, alignment: .leading)
+        #else
         padding(ClinicalChartMetrics.cardPadding)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
@@ -1388,8 +1370,63 @@ private extension View {
                     style: .continuous
                 )
             )
+        #endif
     }
 }
+
+#if os(macOS)
+/* @Codex */
+private struct MacPatientSectionNavigation: View {
+    @Binding var selection: PatientWorkspaceSection
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            sectionRow(PatientWorkspaceSection.allCases)
+            VStack(alignment: .leading, spacing: 8) {
+                sectionRow([.overview, .diary, .therapies, .documents])
+                sectionRow([.scales, .clinical, .prescriptions])
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Sezione clinica")
+        .accessibilityIdentifier("patient-section-navigation")
+    }
+
+    private func sectionRow(_ sections: [PatientWorkspaceSection]) -> some View {
+        HStack(spacing: 18) {
+            ForEach(sections) { section in
+                Button { selection = section } label: {
+                    Text(shortTitle(section))
+                        .font(.body.weight(selection == section ? .semibold : .regular))
+                        .foregroundStyle(selection == section ? .primary : .secondary)
+                        .padding(.vertical, 8)
+                        .overlay(alignment: .bottom) {
+                            Rectangle()
+                                .fill(selection == section ? Color.accentColor : Color.clear)
+                                .frame(height: 2)
+                        }
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(section.title)
+                .accessibilityAddTraits(selection == section ? .isSelected : [])
+                .accessibilityIdentifier("patient-section-\(section.rawValue)")
+            }
+        }
+        .fixedSize(horizontal: true, vertical: false)
+    }
+
+    private func shortTitle(_ section: PatientWorkspaceSection) -> String {
+        switch section {
+        case .diary: "Diario"
+        case .scales: "Scale"
+        case .clinical: "Controlli"
+        default: section.title
+        }
+    }
+}
+#endif
 
 /// Collapses the search field into a toolbar control where the system supports
 /// it. `.minimize` is an iOS behaviour and is unavailable on macOS, where the

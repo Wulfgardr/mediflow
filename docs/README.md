@@ -41,6 +41,10 @@ build standalone e percorsi browser senza flag, con prove reali/simulate e limit
 [Verifica della cartella Apple](./analysis/2026-09-06-086-apple-ui-verification.md):
 build locali, bozze, navigazione e limiti delle prove su Mac e simulatori.
 
+[Nuova proposta macOS](./design/2026-09-06-086-macos-redesign.md):
+barra delle aree, una sola lista laterale, cartella documentale e prove del
+redesign successivo alla rifinitura Apple. Accettazione estetica distinta.
+
 [Candidato funzionale locale](./analysis/2026-09-06-086-functional-closeout.md):
 fotografia della base funzionale precedente alla promozione UI regolata da
 ADR 0123. Conserva le prove e l'incidente documentato; le successive integrazioni

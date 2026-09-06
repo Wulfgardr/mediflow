@@ -52,6 +52,9 @@ struct PairedPatientDetailSection: View {
                     if detail.isArchived == true { PairedPatientFlagChip("Archiviato", tone: .neutral) }
                 }
             }
+            #if os(macOS)
+            macPatientFacts
+            #else
             patientSignals(detail, exemptionsCount: exemptions.count)
 
             // Four groups, not one list of nine rows.
@@ -91,14 +94,25 @@ struct PairedPatientDetailSection: View {
                     ForEach(care, id: \.0) { InfoRow($0.0, $0.1) }
                 }
             }
+            #endif
 
             if !exemptions.isEmpty {
                 ChartGroup("Esenzioni") {
+                    #if os(macOS)
+                    // @Codex: Keep every code readable when the document narrows.
+                    Text(exemptions.joined(separator: ", "))
+                        .font(.body)
+                        .registro()
+                        .textSelection(.enabled)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityLabel("Esenzioni: \(exemptions.joined(separator: ", "))")
+                    #else
                     HStack(spacing: 6) {
                         ForEach(exemptions, id: \.self) { ClinicalCodePill($0) }
                     }
                     .accessibilityElement(children: .combine)
                     .accessibilityLabel("Esenzioni: \(exemptions.joined(separator: ", "))")
+                    #endif
                 }
                 .accessibilityIdentifier("patient-detail-exemptions")
             }
@@ -158,6 +172,83 @@ struct PairedPatientDetailSection: View {
             }
         }
     }
+
+    #if os(macOS)
+    /* @Codex: Read the patient facts as a document. Collection counts are not
+       load states; the workspace continues to own loading and error feedback. */
+    private var macPatientFacts: some View {
+        let contacts: [(label: String, value: String, isCode: Bool)] = [
+            ("Indirizzo", cleanedPatientWorkspaceValue(detail.address), false),
+            ("Telefono", cleanedPatientWorkspaceValue(detail.phone), true),
+        ].compactMap { label, value, isCode in value.map { (label, $0, isCode) } }
+        let care: [(label: String, value: String, isCode: Bool)] = [
+            ("Caregiver", cleanedPatientWorkspaceValue(detail.caregiver), false),
+            ("Ambulatorio", cleanedPatientWorkspaceValue(detail.ambulatoryId), true),
+            ("Monitoraggio", cleanedPatientWorkspaceValue(detail.monitoringProfile), false),
+        ].compactMap { label, value, isCode in value.map { (label, $0, isCode) } }
+        let nextCheckup = model.checkups
+            .filter { $0.deletedAt == nil && $0.status == "pending" && $0.date >= Date() }
+            .min(by: { $0.date < $1.date })
+        let columns = dynamicTypeSize >= .accessibility1
+            ? [GridItem(.flexible(), alignment: .topLeading)]
+            : [GridItem(.adaptive(minimum: 240), spacing: 24, alignment: .topLeading)]
+
+        return LazyVGrid(columns: columns, alignment: .leading, spacing: ClinicalChartMetrics.groupSpacing) {
+            ChartGroup("Identità") {
+                macPatientFact("Codice fiscale", detail.taxCode, isCode: true)
+                if let birth = detail.birthDate {
+                    macPatientFact("Data di nascita", PairedPatientsWorkspaceSupport.birthDateFormatter.string(from: birth), isCode: true)
+                }
+            }
+            if !contacts.isEmpty {
+                ChartGroup("Contatti") {
+                    ForEach(contacts, id: \.label) { field in
+                        macPatientFact(field.label, field.value, isCode: field.isCode)
+                    }
+                }
+            }
+            if !care.isEmpty || nextCheckup != nil {
+                ChartGroup("Presa in carico") {
+                    ForEach(care, id: \.label) { field in
+                        macPatientFact(field.label, field.value, isCode: field.isCode)
+                    }
+                    if let next = nextCheckup {
+                        VStack(alignment: .leading, spacing: 3) {
+                            macPatientFact("Prossimo follow-up", PairedPatientsWorkspaceSupport.birthDateFormatter.string(from: next.date), isCode: true)
+                            Text(next.title)
+                                .font(.body)
+                                .textSelection(.enabled)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel("Prossimo follow-up: \(PairedPatientsWorkspaceSupport.birthDateFormatter.string(from: next.date)) · \(next.title)")
+                        .accessibilityIdentifier("patient-next-followup")
+                    }
+                }
+            }
+        }
+    }
+
+    private func macPatientFact(_ label: String, _ value: String, isCode: Bool = false) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(label)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+            Group {
+                if isCode {
+                    Text(value).registro()
+                } else {
+                    Text(value)
+                }
+            }
+            .font(.body)
+            .textSelection(.enabled)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+    }
+    #endif
 
     private var patientHeaderTitle: some View {
         // Names the card. It used to share the row with the chart actions, which
