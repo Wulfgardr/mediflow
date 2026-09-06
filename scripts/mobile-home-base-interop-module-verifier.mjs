@@ -85,7 +85,7 @@ export function acceptVerifiedStep(step, history) {
 }
 
 export function readRoutesForStep(step) {
-    const module = modules[step.module];
+    const definition = modules[step.module];
     if (step.module === 'patient') {
         return { web: `/api/patients/${encodeURIComponent(step.recordId)}`,
             paired: step.deleted ? '/api/v1/network/patients?includeDeleted=true'
@@ -93,9 +93,9 @@ export function readRoutesForStep(step) {
             webStatus: step.deleted ? 404 : 200 };
     }
     const query = `?patientId=${encodeURIComponent(step.patientId)}&includeDeleted=true&limit=100`;
-    return { web: `/api/${module.route}${query}`, paired: module.nested
-        ? `/api/v1/network/patients/${encodeURIComponent(step.patientId)}/${module.route}?limit=100`
-        : `/api/v1/network/${module.route}${query}`, webStatus: 200 };
+    return { web: `/api/${definition.route}${query}`, paired: definition.nested
+        ? `/api/v1/network/patients/${encodeURIComponent(step.patientId)}/${definition.route}?limit=100`
+        : `/api/v1/network/${definition.route}${query}`, webStatus: 200 };
 }
 
 export async function compareRecords(step, webRows, pairedRows, webKey, pairedKey) {
