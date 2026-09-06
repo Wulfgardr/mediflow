@@ -99,13 +99,14 @@ function DiagnosesFieldArray({ control, register, errors, setValue, watch }: { c
                                             reference: watch(`diagnoses.${index}.reference`),
                                         }}
                                         onChange={(val) => {
-                                            setValue(`diagnoses.${index}.code`, val.code);
-                                            setValue(`diagnoses.${index}.description`, val.description);
+                                            // @Codex: user edits must update the unsaved-navigation guard.
+                                            setValue(`diagnoses.${index}.code`, val.code, { shouldDirty: true });
+                                            setValue(`diagnoses.${index}.description`, val.description, { shouldDirty: true });
                                             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                            setValue(`diagnoses.${index}.system`, val.system as any);
+                                            setValue(`diagnoses.${index}.system`, val.system as any, { shouldDirty: true });
                                             // @Codex: replacement/free text also clears an old WHO association.
-                                            setValue(`diagnoses.${index}.canonicalUri`, val.canonicalUri);
-                                            setValue(`diagnoses.${index}.reference`, val.reference);
+                                            setValue(`diagnoses.${index}.canonicalUri`, val.canonicalUri, { shouldDirty: true });
+                                            setValue(`diagnoses.${index}.reference`, val.reference, { shouldDirty: true });
                                         }}
                                     />
                                     <input type="hidden" {...register(`diagnoses.${index}.description`)} />

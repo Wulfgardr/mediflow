@@ -132,6 +132,88 @@ test('one click opens the correct record and all thirteen progressive sections r
   await page.getByRole('button', { name: 'Chiudi scheda terapia', exact: true }).click();
 });
 
+test('diagnosis-only edit guards navigation and retains the draft after cancellation', async () => {
+  // Synthetic persisted association only; no WHO service is enabled or contacted.
+  const originalDiagnosis = {
+    code: '1A00', description: 'Diagnosi sintetica iniziale', system: 'ICD-11',
+    date: '2026-09-06T00:00:00.000Z',
+    canonicalUri: 'http://id.who.int/icd/release/11/2026-01/mms/257068234',
+    reference: { releaseId: '2026-01', language: 'en', bindingId: 'who.icd11.v2.2026-01.mms.en.local.v1',
+      imageDigest: `sha256:${'a'.repeat(64)}`, datasetSnapshotId: `sha256:${'b'.repeat(64)}` },
+  };
+  const fixture = { ...patients[0], id: randomUUID(), taxCode: `UI086${randomUUID().replaceAll('-', '').slice(0, 11).toUpperCase()}`,
+    diagnoses: [originalDiagnosis] };
+  const status = await page.evaluate(async patient => (await fetch('/api/patients', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patient),
+  })).status, fixture);
+  expect(status).toBe(201);
+  await page.waitForLoadState('networkidle');
+  await page.route('**/api/icd/proxy*', route => route.fulfill({ status: 503, json: { code: 'disabled' } }));
+  const diagnosticStart = consoleErrors.length;
+  let patientWrites = 0;
+  const observeWrite = (request: import('@playwright/test').Request) => {
+    if (new URL(request.url()).pathname.startsWith('/api/patients') && request.method() !== 'GET') patientWrites++;
+  };
+  page.on('request', observeWrite);
+  try {
+    const editPath = `/patients/${fixture.id}/edit`;
+    const diagnosis = page.getByPlaceholder('Cerca diagnosi (ICD-11 Official - English)');
+    const code = page.locator('input[name="diagnoses.0.code"]');
+    const reference = page.locator('summary').filter({ hasText: 'Riferimento della selezione WHO' });
+    const leave = page.getByRole('dialog', { name: 'Lasciare la compilazione?' });
+    await page.goto(editPath);
+    await expect(diagnosis).toHaveValue(`${originalDiagnosis.code} - ${originalDiagnosis.description}`);
+    await expect(code).toHaveAttribute('readonly', '');
+    await expect(reference).toBeVisible();
+    // Loading defaults alone must not mark the editor dirty.
+    await nav().getByRole('link', { name: 'Pazienti', exact: true }).click();
+    await expect(page).toHaveURL(/[?&]area=incarico/);
+    await expect(leave).toHaveCount(0);
+    await page.waitForLoadState('networkidle');
+    await page.goto(editPath);
+    await expect(diagnosis).toHaveValue(`${originalDiagnosis.code} - ${originalDiagnosis.description}`);
+    const updatedDiagnosis = 'Diagnosi sintetica modificata senza cambiare altri campi';
+    const disabledSearch = page.waitForResponse(response => new URL(response.url()).pathname === '/api/icd/proxy' && response.status() === 503);
+    await diagnosis.fill(updatedDiagnosis);
+    await disabledSearch;
+    await expect(code).toHaveValue('');
+    await expect(code).not.toHaveAttribute('readonly');
+    await expect(reference).toHaveCount(0);
+    await nav().getByRole('link', { name: 'Pazienti', exact: true }).click();
+    await expect(leave).toBeVisible();
+    await leave.getByRole('button', { name: 'Continua a scrivere', exact: true }).click();
+    await expect(page).toHaveURL(new RegExp(`${editPath}$`));
+    await expect(diagnosis).toHaveValue(updatedDiagnosis);
+    await expect(page.locator('input[name="diagnoses.0.description"]')).toHaveValue(updatedDiagnosis);
+    await expect(reference).toHaveCount(0);
+    expect(patientWrites).toBe(0);
+    await page.screenshot({ path: test.info().outputPath('diagnosis-draft-retained.png') });
+    // Explicit discard restores navigation and leaves the saved association intact.
+    await nav().getByRole('link', { name: 'Pazienti', exact: true }).click();
+    await leave.getByRole('button', { name: 'Esci senza salvare', exact: true }).click();
+    await expect(page).toHaveURL(/[?&]area=incarico/);
+    await page.waitForLoadState('networkidle');
+    await page.goto(editPath);
+    await expect(diagnosis).toHaveValue(`${originalDiagnosis.code} - ${originalDiagnosis.description}`);
+    await expect(reference).toBeVisible();
+    expect(patientWrites).toBe(0);
+  } finally {
+    page.off('request', observeWrite);
+    await page.unroute('**/api/icd/proxy*');
+    // Keep only this test's deliberately injected transport failure out of the
+    // suite-wide console check; retain every unexpected diagnostic.
+    const diagnostics = consoleErrors.splice(diagnosticStart);
+    const isExpected = ({ text, url }: { text: string; url: string }) =>
+      url.startsWith(new URL('/api/icd/proxy?', page.url()).href) && text.includes('503 (Service Unavailable)');
+    const unexpected = diagnostics.filter(item => !isExpected(item));
+    consoleErrors.push(...unexpected);
+    await test.info().attach('expected-who-disabled-console.json', {
+      body: JSON.stringify(diagnostics.filter(isExpected)), contentType: 'application/json',
+    });
+    expect(unexpected).toEqual([]);
+  }
+});
+
 test('entry survives disclosure, cross-tab layout change and cancelled navigation before encrypted save', async () => {
   test.setTimeout(90_000);
   await page.goto(`/patients/${patients[0].id}/entries/new`);
