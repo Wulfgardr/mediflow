@@ -1839,7 +1839,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
 
         #if DEBUG
         if Self.isUITestSeeded {
-            selectedPatient = editedPatientDetail(from: current)
+            setSelectedPatient(editedPatientDetail(from: current)) // @Codex: refresh the fixture's editable-field baseline too.
             cancelEditingPatient()
             statusMessage = "Anagrafica aggiornata."
             return
