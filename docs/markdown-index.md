@@ -31,6 +31,9 @@ Ultimo aggiornamento: 2026-09-06
 <!-- @Codex -->
 ## Preparazione 0.8.6
 
+[Stato del candidato integrato](./analysis/2026-09-06-086-integrated-closeout.md):
+integrazione corrente, prove finali e limiti prima della PR.
+
 | File | Scopo | Quando consultarlo |
 | --- | --- | --- |
 | [ADR 0123](./adr/0123-official-web-ui-navigation-compositions.md) | UI web ufficiale B/A con confronto sintetico separato. | Per promuovere il design scelto senza flag di anteprima nel prodotto. |
