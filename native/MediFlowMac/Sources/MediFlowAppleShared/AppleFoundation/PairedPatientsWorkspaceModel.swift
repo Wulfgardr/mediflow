@@ -4324,7 +4324,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     private func applyPatientLoadFailure(_ error: Error) {
         if case HomeBaseClientError.httpStatus(let status, _) = error, status == 401 {
             clearOperatorSessionPresentation() // @Codex
-            statusMessage = "Sessione operatore scaduta. Accedi di nuovo per scrivere sul Mac."
+            statusMessage = "Sessione operatore scaduta. Accedi di nuovo per continuare."
         } else if case HomeBaseClientError.httpStatus(let status, _) = error, status == 403 {
             statusMessage = "Operazione non autorizzata nello scope paired corrente."
         }
