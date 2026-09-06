@@ -1,6 +1,6 @@
 /* @Codex */
 import { expect, test, type Page } from '@playwright/test';
-import { bootstrapUnlockedSession } from './utils';
+import { bootstrapUnlockedSession, openPatientSection } from './utils';
 
 async function createPatient(
   page: Page,
@@ -93,10 +93,7 @@ test('patient insight renders stored markdown as read-only history without fallb
   // /patients/:id lands on the cockpit "Quadro" which does not host the insight card.
   await page.goto(`/patients/${patientId}/modules`);
   await expect(page).toHaveURL(new RegExp(`/patients/${patientId}/modules$`));
-  const documents = page.getByRole('button', { name: /Documenti Archivio documenti ed evidenze/u });
-  await expect(documents).toBeVisible({ timeout: 20_000 });
-  if (await documents.getAttribute('aria-expanded') !== 'true') await documents.click();
-  await expect(documents).toHaveAttribute('aria-expanded', 'true');
+  await openPatientSection(page, 'documenti');
 
   // Saved summaries are historical Markdown in read-only mode. New structured
   // proposals have their own review-only surface and are covered separately.
