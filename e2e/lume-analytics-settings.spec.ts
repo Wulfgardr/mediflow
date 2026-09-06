@@ -237,12 +237,14 @@ async function verifySettings(page: Page, viewCase: ViewCase): Promise<void> {
   const networkValue = page.getByTestId('settings-network-mode-value');
   const networkAction = page.getByTestId('settings-network-mode-action');
   expect((await networkAction.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
-  await expect(networkValue).toHaveText('Locale');
+  // @Codex: innerText excludes the hidden legacy label; keep the visible
+  // status exact and verify each mode transition through the ordinary action.
+  await expect(networkValue).toHaveText('Stato Locale', { useInnerText: true });
   await networkAction.click();
-  await expect(networkValue).toHaveText('Rete disponibile');
+  await expect(networkValue).toHaveText('Stato Home-base', { useInnerText: true });
   await expect(networkAction).toHaveText('Disattiva home-base');
   await networkAction.click();
-  await expect(networkValue).toHaveText('Locale');
+  await expect(networkValue).toHaveText('Stato Locale', { useInnerText: true });
 
   const preview = page.getByTestId('settings-preview-section');
   const initialBackground = await preview.evaluate((element) => getComputedStyle(element).backgroundColor);
