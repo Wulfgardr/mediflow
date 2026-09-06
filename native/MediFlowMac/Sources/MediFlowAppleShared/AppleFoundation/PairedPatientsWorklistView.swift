@@ -2,6 +2,9 @@ import SwiftUI
 
 /* @Codex */
 struct PairedHomeBaseCredentialsView: View {
+    #if os(iOS)
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+    #endif
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @ObservedObject var model: PairedPatientsWorkspaceModel
     @Binding var confirmsClearingPairing: Bool
@@ -182,6 +185,9 @@ private struct WorklistPrimaryActionStyle: ViewModifier {
 
 /* @Codex */
 struct PairedPatientsWorklistView: View {
+    #if os(iOS)
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+    #endif
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @ObservedObject var model: PairedPatientsWorkspaceModel
     @Binding var patientQuery: String
@@ -230,6 +236,8 @@ struct PairedPatientsWorklistView: View {
                     Text("\(filteredPatients.count)")
                         .font(.headline)
                         .monospacedDigit()
+                        .fixedSize()
+                        .padding(.vertical, 2)
                         .foregroundStyle(.secondary)
                         .accessibilityLabel("\(filteredPatients.count) pazienti visibili nell'elenco caricato")
                         .accessibilityIdentifier("patient-worklist-count")
@@ -461,12 +469,12 @@ struct PairedPatientsWorklistView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
         #else
-        if dynamicTypeSize >= .accessibility1 {
+        if dynamicTypeSize.isAccessibilitySize || verticalSizeClass == .compact {
+            // @Codex: Preserve readable identity in the first viewport. Clinical
+            // previews and recency remain available in the patient's chart.
             VStack(alignment: .leading, spacing: 6) {
                 patientName(patient)
                 patientMetadata(patient)
-                patientDiagnosis(patient)
-                patientUpdate(patient, alignment: .leading)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
