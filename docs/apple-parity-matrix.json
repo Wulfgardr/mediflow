@@ -77,17 +77,17 @@
       "area": "diario",
       "feature": "Diario clinico: view/list, create, update, soft-delete+restore, filtri",
       "web": "list+add+soft-delete con motivazione+restore da cestino+toggle eliminati+view allegati+metadata scala (components/timeline.tsx; entries/new/page.tsx)",
-      "native": "partial(quasi-piena): list+create+update+soft-delete con motivazione libera+restore+toggle mostra eliminate+filtro tipo (PairedDiaryDeleteSheet.swift; PairedPatientsWorkspaceModel.restoreEntry; EntryFiltering includeDeleted). Residuo: view allegati (W5)",
+      "native": "partial: list+create+update+soft-delete con motivazione+restore+toggle eliminate+filtro tipo. PairedPatientDiarySection mostra anche gli allegati referenziati di ciascuna voce, risolti dal modello per il paziente corrente. Restano da completare le prove UI/interop sul candidato 0.8.6; AI e document-derived write restano fuori dal writer manuale.",
       "boundary": "partial: GET/POST/PUT su .../entries; manca DELETE paired (capability write-clinical-diary esclude hard delete/AI/document-derived) (app/api/v1/network/patients/[id]/entries)",
       "gap": "partial",
       "wave": "W1-mobile-core",
-      "evidence": "web-scheda.diario; native-ui.diario; api-boundary.entries | wave1 slice1 commit 984f16474; residuo allegati -> W5"
+      "evidence": "web-scheda.diario; native-ui.diario; api-boundary.entries | wave1 slice1 commit 984f16474. Sorgente 0.8.6: PairedPatientDiarySection entry-row-attachments e PairedPatientsWorkspaceModel.referencedAttachments; disponibilita sorgente distinta dalla prova interop finale."
     },
     {
       "area": "diario",
       "feature": "Nuova voce clinica avanzata (S/O/A/P, allegati OCR, sessione visita, elabora bozza AI)",
       "web": "editor rich-text S/O/A/P, upload allegati con OCR+sintesi, transcript dettato, POST /api/visit-session/draft per ripulire+estrarre farmaci (entries/new/page.tsx)",
-      "native": "partial: editor WYSIWYG a blocchi bindato al transcoder ClinicalRichText (grassetto/corsivo/sottolineato/barrato, heading, liste, blockquote, template S/O/A/P), content sigillato = render del transcoder (parita byte-esatta col sanitizer web su 40 fixture); allegati referenziati in voce con validazione ownership client-side prima del sigillo; flusso bozza visita (dettatura, compute deterministico, revisione obbligatoria). Residuo: OCR/sintesi inline degli allegati resta host (Classe C); stile misto inline non creabile (fallback a blocchi)",
+      "native": "partial: editor a blocchi e stili misti inline su selezione, bindato al transcoder ClinicalRichText (grassetto/corsivo/sottolineato/barrato, heading, liste, blockquote, template S/O/A/P). Sigillo sul render del transcoder; 40 fixture web conservate byte per byte senza edit. Allegati referenziati con controllo ownership e bozza visita deterministica con revisione obbligatoria. OCR/sintesi inline resta host (Classe C); la nuova resa inline attende verifica UI sul candidato finale.",
       "boundary": "partial: POST /api/v1/network/visit-draft compute-only (capability network.compute.visit-draft, lib condivisa con la route web); entries.attachments accetta valori sigillati ENC (guardia sigillo al posto del 403). OCR/sintesi document-derived restano host (ADR 0076 Classe C)",
       "gap": "partial",
       "wave": "W5-ai-avanzate",
@@ -97,11 +97,11 @@
       "area": "diario",
       "feature": "Editor rich-text clinico (formattazione S/O/A/P)",
       "web": "toolbar contentEditable completa (grassetto/liste/indent/paste sanitize) (components/clinical-rich-text-editor.tsx)",
-      "native": "partial: resa formattata HTML in lettura (ClinicalContentRendering, fallback testo piano) + template S/O/A/P identico allo skeleton web alla creazione. Residuo: editing WYSIWYG (in modifica il contenuto resta testo grezzo, markup mai degradato)",
+      "native": "partial: lettura formattata e modifica WYSIWYG a blocchi con quattro stili inline, selezione UTF-16 rispettosa dei grafemi, typing, undo locale e incolla testo semplice. Strutture HTML non rappresentabili restano opache; nessuna riscrittura senza edit. Il candidato 8f4dec590 integra ClinicalInlineTextEditor/ClinicalInlineEditorSession; la verifica UI e interop completa resta aperta.",
       "boundary": "n-a: contenuto è testo già supportato dal boundary entries",
       "gap": "partial",
       "wave": "W1-mobile-core",
-      "evidence": "web-scheda.diario(editor); native-ui.diario | wave1 slice2 commit 984f16474"
+      "evidence": "web-scheda.diario(editor); native-ui.diario. Candidato richtext 9b2804735 integrato 8f4dec590; parent cf1a13c30: 55 test Swift transcoder/inline/binding/S7 PASS. Questo conteggio non attesta interazione UI, tastiera o pairing reale."
     },
     {
       "area": "scale",
@@ -127,7 +127,7 @@
       "area": "terapie",
       "feature": "Gestione terapie farmacologiche (CRUD + stato + collegamento diagnosi)",
       "web": "add/edit/soft-delete/status transition, autocomplete AIFA, principio attivo, posologia, collegamento diagnosi, campi AIC/ATC (components/therapy-manager.tsx)",
-      "native": "partial: CRUD+soft-delete+stato+campi AIC/ATC/principio attivo, autocomplete AIFA e fallback manuale onesto. Residuo: equivalenza completa del collegamento diagnosi e validazione manuale P6 della flessibilita del form",
+      "native": "partial: CRUD+soft-delete+stato+AIC/ATC/principio attivo, autocomplete AIFA e fallback manuale. Collegamento diagnosi presente in creazione e modifica (newTherapyDiagnosisCode/editTherapyDiagnosisCode e payload diagnosisCode). Restano le prove finali del form e del round-trip app/home-base; hard delete e derivazione AI non fanno parte del writer manuale.",
       "boundary": "partial: GET/POST/PUT therapies; manca DELETE (write-therapies esclude hard delete/AI/document-derived)",
       "gap": "partial",
       "wave": "W1-mobile-core",
@@ -147,7 +147,7 @@
       "area": "controlli",
       "feature": "Controlli/checkup follow-up (CRUD + stato)",
       "web": "view lista pending, gestione via edit form (date/title/notes/status/source) + suggerimenti follow-up da documenti (modules/page.tsx:727-769; followup-suggestions.tsx)",
-      "native": "partial(più ricca su CRUD): list+create+update+soft-delete+filtro stato+note operative; no suggerimenti da documenti (PairedPatientsWorkspaceView.swift:1349-1429)",
+      "native": "partial: list+create+update+soft-delete+filtro stato+note operative. I suggerimenti gia persistiti nei documenti sono proiettati, deduplicati rispetto ai controlli e aprono una precompilazione manuale (PairedPatientDocumentsSection; prefillNewCheckupFromFollowup). La conferma resta esplicita, senza generazione nativa o salvataggio automatico; prove finali UI/interop ancora aperte.",
       "boundary": "partial: GET/POST/PUT checkups; manca DELETE (write-checkups esclude hard delete/AI/document-derived)",
       "gap": "partial",
       "wave": "W1-mobile-core",
