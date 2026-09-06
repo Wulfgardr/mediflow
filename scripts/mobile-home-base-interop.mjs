@@ -274,7 +274,7 @@ export async function inspectHost(descriptor, clientPlatform, expectations = {},
             try {
                 // This deliberately exercises the actual app's current route.
                 // An unconfirmed logout remains a gap, never a fabricated pass.
-                const response = await fetchHost('/api/auth/logout', { method: 'POST', headers: pairedHeaders });
+                const response = await fetchHost('/api/auth/native/logout', { method: 'POST', headers: pairedHeaders });
                 checks.push({ operation: 'Native session logout', httpStatus: response.status });
                 nativeLogoutConfirmed = [200, 204].includes(response.status);
             } catch {
