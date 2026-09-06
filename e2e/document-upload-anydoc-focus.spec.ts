@@ -1,7 +1,7 @@
 /* @Codex */
 import { expect, test, type Page } from '@playwright/test';
 
-import { assertNoHorizontalOverflow, bootstrapUnlockedSession } from './utils';
+import { assertNoHorizontalOverflow, bootstrapUnlockedSession, openPatientSection } from './utils';
 
 const SYNTHETIC_ATTACHMENT_NAME = 'allegato-anydoc-focus-sintetico.pdf';
 const SYNTHETIC_RTF_TEXT = 'Synthetic AnyDoc browser route evidence.';
@@ -76,12 +76,8 @@ async function establishSyntheticSession(page: Page): Promise<void> {
 
 async function openDocumentArchive(page: Page, patientId: string): Promise<void> {
   await page.goto(`/patients/${patientId}/modules`);
-  const toggle = page.getByRole('button', { name: /Archivio documenti ed evidenze/ });
-  await expect(toggle).toBeVisible();
-  await expect(async () => {
-    if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
-    expect(await toggle.getAttribute('aria-expanded')).toBe('true');
-  }).toPass();
+  await openPatientSection(page, 'documenti');
+  await expect(page.locator('#documenti').getByRole('heading', { name: /Archivio documenti ed evidenze/ })).toBeVisible();
 }
 
 test.describe.configure({ retries: 0 });
@@ -119,7 +115,9 @@ test('AnyDoc: le azioni allegato restano visibili al focus e sui viewport strett
   ]);
 
   await page.setViewportSize({ width: 390, height: 844 });
-  await openDocumentArchive(page, patientId);
+  // @Codex: resize the same open document pane, as the user does; reloading
+  // would replace the UI whose responsive focus controls are being verified.
+  await openPatientSection(page, 'documenti');
   extractButton = page.getByRole('button', { name: `Estrai testo localmente da ${SYNTHETIC_ATTACHMENT_NAME}` });
   actionGroup = extractButton.locator('..');
   await page.mouse.move(0, 0);

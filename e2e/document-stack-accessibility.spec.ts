@@ -1,6 +1,6 @@
 /* @Codex */
 import { expect, test, type Page } from '@playwright/test';
-import { assertKeyboardFocusProgresses, assertNoHorizontalOverflow, bootstrapUnlockedSession } from './utils';
+import { assertKeyboardFocusProgresses, assertNoHorizontalOverflow, bootstrapUnlockedSession, openPatientSection } from './utils';
 
 type SyntheticDocumentInsight = {
   id: string;
@@ -86,17 +86,8 @@ async function seedSyntheticInsights(page: Page, patientId: string, insights: Sy
 
 async function openDocumentSection(page: Page, patientId: string): Promise<void> {
   await page.goto(`/patients/${patientId}/modules`);
-  const toggle = page.getByRole('button', { name: /Archivio documenti ed evidenze/ });
-  await expect(toggle).toBeVisible();
-  await expect(toggle).toHaveAttribute('aria-expanded', /^(true|false)$/);
-  // Le fixture con insight auto-aprono la sezione quando le query kill switch
-  // completano: un read-then-click singolo puo' incrociare l'auto-apertura e
-  // richiudere la sezione (race TOCTOU). Il blocco ritentato converge in ogni
-  // ordine di scheduling e resta valido anche per fixture senza auto-apertura.
-  await expect(async () => {
-    if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
-    expect(await toggle.getAttribute('aria-expanded')).toBe('true');
-  }).toPass();
+  await openPatientSection(page, 'documenti');
+  await expect(page.locator('#documenti').getByRole('heading', { name: /Archivio documenti ed evidenze/ })).toBeVisible();
 }
 
 test.describe.configure({ retries: 0 });
@@ -172,16 +163,8 @@ test('Evidence Stack web: loading ed empty hanno segnali distinti', async ({ pag
   await expect(page.getByText('Caricamento scheda paziente...', { exact: true })).toBeVisible();
   await navigation;
 
-  const toggle = page.getByRole('button', { name: /Archivio documenti ed evidenze/ });
-  await expect(toggle).toHaveAttribute('aria-expanded', /^(true|false)$/);
-  // Le fixture con insight auto-aprono la sezione quando le query kill switch
-  // completano: un read-then-click singolo puo' incrociare l'auto-apertura e
-  // richiudere la sezione (race TOCTOU). Il blocco ritentato converge in ogni
-  // ordine di scheduling e resta valido anche per fixture senza auto-apertura.
-  await expect(async () => {
-    if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
-    expect(await toggle.getAttribute('aria-expanded')).toBe('true');
-  }).toPass();
+  await openPatientSection(page, 'documenti');
+  await expect(page.locator('#documenti').getByRole('heading', { name: /Archivio documenti ed evidenze/ })).toBeVisible();
   await expect(page.getByText('Nessuna evidenza documentale in primo piano.', { exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Archivio Intelligente', exact: true })).toHaveCount(0);
 });

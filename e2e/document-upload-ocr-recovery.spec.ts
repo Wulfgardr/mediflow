@@ -3,7 +3,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { createHash, randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { mapAnyDocLocalFailure } from '../lib/domain/documents/anydoc-local-extraction-contract';
-import { bootstrapUnlockedSession } from './utils';
+import { bootstrapUnlockedSession, openPatientSection } from './utils';
 
 const TEXT = 'DOCUMENTO SINTETICO PER RECUPERO';
 const RTF = Buffer.from(`{\\rtf1\\ansi ${TEXT}}`);
@@ -32,12 +32,8 @@ async function fixture(page: Page, bytes = RTF, extension = 'rtf') {
 
 async function openArchive(page: Page, url: string) {
   await page.goto(url);
-  const archive = page.getByRole('button', { name: /Archivio documenti ed evidenze/ });
-  await expect(archive).toBeVisible();
-  await expect(async () => {
-    if (await archive.getAttribute('aria-expanded') !== 'true') await archive.click();
-    expect(await archive.getAttribute('aria-expanded')).toBe('true');
-  }).toPass();
+  await openPatientSection(page, 'documenti');
+  await expect(page.locator('#documenti').getByRole('heading', { name: /Archivio documenti ed evidenze/ })).toBeVisible();
 }
 
 for (const failure of ['engine_absent', 'timeout', 'crash', 'transport_interrupted', 'stale'] as const) {

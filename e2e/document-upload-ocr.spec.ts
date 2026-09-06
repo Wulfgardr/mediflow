@@ -3,7 +3,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { createCanvas } from '@napi-rs/canvas';
 import { createHash, randomUUID } from 'node:crypto';
 import { PDFDocument, StandardFonts } from 'pdf-lib';
-import { bootstrapUnlockedSession } from './utils';
+import { bootstrapUnlockedSession, openPatientSection } from './utils';
 
 const NATIVE_TEXT = 'PRIMA PAGINA TESTUALE - DOCUMENTO SINTETICO';
 const SCANNED_TEXT = 'ULTIMA PAGINA SCANSIONATA';
@@ -58,12 +58,8 @@ async function openSyntheticAttachment(page: Page, scenario: Scenario, bytes: Bu
   });
   expect(attachmentResponse.ok()).toBe(true);
   await page.goto(`/patients/${patientId}/modules`);
-  const archive = page.getByRole('button', { name: /Archivio documenti ed evidenze/ });
-  await expect(archive).toBeVisible();
-  await expect(async () => {
-    if (await archive.getAttribute('aria-expanded') !== 'true') await archive.click();
-    expect(await archive.getAttribute('aria-expanded')).toBe('true');
-  }).toPass();
+  await openPatientSection(page, 'documenti');
+  await expect(page.locator('#documenti').getByRole('heading', { name: /Archivio documenti ed evidenze/ })).toBeVisible();
   return { id, name };
 }
 

@@ -4,6 +4,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 import {
   isVisible,
+  openPatientSection,
   setAiLaneKillSwitch,
   setupPinLegacyIfNeeded,
   unlockIfNeeded,
@@ -154,12 +155,8 @@ async function createFixture(page: Page): Promise<{ patientId: string; attachmen
 
 async function openDocumentArchive(page: Page, patientId: string): Promise<void> {
   await page.goto(`/patients/${patientId}/modules`);
-  const toggle = page.getByRole('button', { name: /Archivio documenti ed evidenze/ });
-  await expect(toggle).toBeVisible();
-  await expect(async () => {
-    if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
-    expect(await toggle.getAttribute('aria-expanded')).toBe('true');
-  }).toPass();
+  await openPatientSection(page, 'documenti');
+  await expect(page.locator('#documenti').getByRole('heading', { name: /Archivio documenti ed evidenze/ })).toBeVisible();
 }
 
 async function bootstrapFabricSession(page: Page, pin: string): Promise<void> {
