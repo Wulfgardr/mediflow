@@ -18,7 +18,27 @@ candidato finale. I contratti dei componenti restano negli ADR pertinenti.
 
 Questa milestone aggiunge ricevute recenti senza sostituire le sezioni storiche
 che seguono. Il candidato resta aperto alla review; nessun esito qui sotto
-attesta merge, release, parità o UI mobile integrata.
+attesta merge, release o parità completa con host reali.
+
+| Suite completa successiva | Risultato e confine |
+| --- | --- |
+| Windows, runtime `25e8f8708`, test `8aaf2e622` | 158 casi: 145 PASS, un FAIL, 12 skip espliciti, zero retry. Comprende 157 casi canonici e un primo avvio da directory vuota. Accesso, recovery, reset isolato e onboarding completo sono PASS. Il FAIL confronta due righe entrambe evidenziate: la prima per hover residuo, la seconda per selezione da tastiera. |
+| Diagnosi Windows dello stesso FAIL | Due contesti separati: il primo riproduce hover e colori uguali in tutte le 12 osservazioni; il secondo sposta solo il puntatore fuori dalla lista e supera l'intero caso con gli assert originali. `bbd4fcbfb` integra quella precondizione nel test. Il full originario conserva il suo FAIL. |
+| Headless Windows, stesso runtime | Import guard PASS su 44 file/quattro superfici; portable 239 PASS e nove FAIL per timeout/uscita senza codice su 248 casi. MCP separato 33/33, Mini separato 11/11 e Supervisor sul bundle compilato PASS. I successi separati non cancellano il fallimento del gruppo portable né ne dimostrano la causa. |
+| Linux, runtime `25e8f8708`, test `8aaf2e622` | Full di 187 casi: 138 PASS, 49 skip, zero FAIL/retry. Un secondo run su database creato dalla UI completa i sette casi opt-in: 145 PASS distinti e 42 esclusioni esplicite, 40 del prototipo e due Apple Vision. Import guard, portable 248/248, MCP 33/33, Mini 11/11 e Supervisor compilato PASS. |
+| iPhone e iPad, fixture `dc1fc05222e5e8db97119e69b29aa576555737ac` | Firma ordinaria del simulatore; sorgente `5ced` più il solo fix DEBUG `8fc`. iPhone 37 PASS e quattro skip; iPad 34 PASS e sette skip: zero FAIL nelle due suite da 41. Digest di app, test e xctestrun invariati prima/dopo. Comprende AX5, rotazione effettiva, bozza e rilettura del motivo d'archivio; non usa host reali. |
+
+Il confronto dei 147 titoli ordinari, comprese le due esclusioni Apple, coincide
+fra i guest. I 30 casi di differenza nei collector riguardano le route del
+prototipo: il separatore Windows impediva di enumerarle. `e9716d741` corregge
+l'enumerazione con prova locale sullo stesso elenco; non è applicato ai full
+riportati sopra e non modifica retroattivamente i loro conteggi.
+La ricevuta Linux distingue inoltre CRUD ed export dettagliati provati su
+`3c4863f13` dalle nuove esecuzioni `25e`: il totale dei test non prova ogni
+funzione sull'ultima build. Le sei combinazioni di UI mobile e host restano
+da eseguire. Nessuna richiesta clinica reale, pubblicazione o merge è attestata.
+
+### Ricevute precedenti conservate
 
 | Sorgente | Verifica | Limite |
 | --- | --- | --- |
@@ -33,9 +53,10 @@ attesta merge, release, parità o UI mobile integrata.
 | Apple UI, `7d0c8240883e837b6e201c3d34f768ecda35f19b` | Phone: `36` PASS, `4` skip, `1` FAIL. iPad: `30` PASS, `7` skip, `4` FAIL. | `41` è un conteggio target, non una fonte; AX5, rotazione e gesto Home restano aperti. |
 | Simulatori con firma ordinaria, `5ced339e9` | Build-for-testing PASS. Quattro target PASS: AX5 iPhone e iPad, rotazione effettiva iPad e bozza completa dopo rotazione. Due target archivio falliscono alla rilettura del motivo dopo il salvataggio. | Il ramo demo aggiornava il record senza rinnovare la mappa dei campi editabili; `8fc772e6a` corregge quel solo ramo DEBUG. La nuova prova UI è ancora da eseguire. Nessun difetto del salvataggio HTTP è attestato da questa fixture. |
 
-Full SwiftPM e compilazioni generic Apple hanno ricevute legate alla sorgente;
-le UI `41`, le sei combinazioni app/home-base e il refresh finale dei pairing
-non sono conclusi.
+Le attese descritte nella tabella precedente fotografano quella milestone.
+Le due suite UI da 41 sono ora concluse come riportato sopra; full SwiftPM e
+compilazioni generic Apple conservano la propria sorgente. Il refresh dei tre
+host a `25e` non sostituisce le prove delle sei combinazioni app/home-base.
 
 ## Verifiche del candidato del 6 settembre, secondo lotto
 
@@ -75,7 +96,8 @@ alle sezioni collassabili: il test finale controlla la visibilità e il link
 di navigazione corrente, mantenendo tutte le verifiche di contenuto e focus.
 
 I client Apple cancellano la presentazione clinica al blocco e al 401 della
-sessione corrente; una risposta tardiva non ripubblica le viste revocate.
+sessione corrente; le guardie di generazione proteggono dalla ripubblicazione
+tardiva nei percorsi coperti dalle regressioni citate.
 Il salvataggio del diario protegge la bozza durante la richiesta e il
 recupero di un conflitto richiede rilettura, revisione esplicita e un nuovo
 salvataggio. Queste sono verifiche del codice e del modello: non attestano
