@@ -114,6 +114,28 @@ ora `unavailable` dal dato mancante e ricrea l’editor a ogni rilettura riuscit
 Le regressioni coprono separatamente risposta persa dopo commit e fallimento
 prima del commit, impedendo di confermare una scelta diversa da quella vista.
 
+## Prova del bundle sul commit verificato
+
+Commit runtime verificato: **`75aed03fa10f203d0faf005dcb9fa40f1e7a2867`**.
+La build webpack e il postbuild hanno completato sul worktree pulito; la route
+`/api/system/revision` del server standalone ha restituito
+`codex/WUL-669-086-local-closeout@75aed03fa10f:clean`.
+
+Il bundle con asset propri e SQLite sintetico separato ha superato **9 test
+browser in 52,9 secondi**, senza retry o skip: AnyDoc, scansione Apple Vision
+reale, PDF misto, immagine manuale, focus e viewport stretti, stato funzioni,
+WHO con trasporto simulato e onboarding con recupero prima/dopo commit.
+Il percorso auth lock/logout/reset/setup è passato sullo stesso bundle. Il
+login P3 è passato su un secondo database sintetico fresco: il tentativo di
+eseguire i due spec nella stessa fixture aveva fatto fallire il login perché
+il test di reset aveva sostituito l'account. Non è un errore del login; i due
+scenari vanno eseguiti su fixture separate. Totale bundle: **11 scenari riusciti
+su ambienti isolati**, oltre al tentativo combinato fallito documentato.
+
+La prova è locale sul Mac corrente; non è un pacchetto firmato o una prova su
+un altro dispositivo. Il successivo commit di chiusura aggiorna solo questo
+verbale e la roadmap, lasciando invariato il codice eseguibile provato.
+
 ## Decisioni e confini ancora aperti
 
 - Revisione della proposta visiva da parte dell'utente, prima della sua
