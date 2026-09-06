@@ -111,12 +111,23 @@ parity Apple-wide.
 
 ### Prerequisiti Mobile
 
+- Xcode completo selezionato (oppure `DEVELOPER_DIR` esplicito), SDK iOS
+  Simulator 26+ e Node 24 su PATH; stesso ambiente per builder e smoke
 - backend MediFlow raggiungibile su `http://127.0.0.1:3000`
 - TLS proxy locale raggiungibile su `https://127.0.0.1:3443`
   - se assente, lo script tenta `scripts/native-setup.sh`
-- database reale disponibile in `~/Library/Application Support/MediFlow/medical.db`
-- almeno un simulatore iPhone o iPad booted
+- database coerente con il backend selezionato; il default e
+  `~/Library/Application Support/MediFlow/medical.db`
+- almeno un simulatore iPhone o iPad disponibile e booted
 - `MEDIFLOW_MOBILE_SMOKE_OPERATOR_PIN` valorizzato
+
+Per verifiche isolate usa un backend con dati sintetici, `MEDIFLOW_DATA_DIR`
+dedicata, le URL `MEDIFLOW_MOBILE_SMOKE_HTTP_URL`/`MEDIFLOW_MOBILE_SMOKE_HTTPS_URL`
+coerenti e il PIN della fixture. Il default punta ai dati locali dell'utente:
+l'esecuzione completa richiede un target e un'autorizzazione coerenti.
+Per la sola compilazione, senza accesso a dati o pairing, usa
+`bash scripts/build-mobile-sim-app.sh` come descritto in
+[native/README.md](../native/README.md).
 
 ### Comando Base
 
@@ -164,6 +175,12 @@ ripristinato.
 
 ## Cosa Fa Il Gate Mobile
 
+Prima di accedere al backend, seleziona un simulatore iOS gia booted e invoca
+`scripts/build-mobile-sim-app.sh --install`: compila il progetto Xcode canonico,
+verifica il bundle e lo installa sullo stesso UDID. Un errore di build/install
+interrompe lo smoke prima dello snapshot o di modifiche al pairing. Il builder
+non rigenera il progetto e non avvia simulatori.
+
 1. valida backend HTTP, proxy TLS e certificato locale
 2. salva snapshot di `network.mode`, `network.nodeId`, `network.pairing.state`
 3. abilita temporaneamente il nodo `network-home-base`
@@ -172,7 +189,7 @@ ripristinato.
    poi verifica una read reale su `/api/v1/network/patients`
 6. opzionalmente pubblica un servizio Bonjour temporaneo `_mediflow-homebase._tcp`
    con metadata PHI-safe (`node`, `proto`, `mode`, `pin`)
-7. lancia `MediFlowMobile` sul simulatore con env `SIMCTL_CHILD_*`
+7. lancia l'app Xcode `MediFlowMobileApp` sul simulatore con env `SIMCTL_CHILD_*`
 8. cattura uno screenshot e ripristina lo stato `network.*`
 
 ---

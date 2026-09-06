@@ -80,6 +80,44 @@ Variabili utili:
 - `MEDIFLOW_XCODE_DESTINATION` (default: `platform=macOS,arch=arm64`)
 - `MEDIFLOW_DERIVED_DATA_DIR` (default: `./tmp-native-derived-data`)
 
+### Build/install simulatore iPhone e iPad
+
+Contratto tooling aggiornato il 2026-09-06. Con Xcode completo selezionato e SDK
+iOS Simulator 26+, usa il progetto Xcode canonico attraverso:
+
+```bash
+bash scripts/build-mobile-sim-app.sh
+```
+
+Compila `MediFlowMobileApp` in Debug senza firma e restituisce su stdout il path
+assoluto dell'app verificata. I log vanno su stderr; output predefinito:
+`tmp-ios-sim-dd/Build/Products/Debug-iphonesimulator/MediFlow.app`.
+Per una directory dedicata imposta `MEDIFLOW_IOS_DERIVED_DATA`. Non rigenera il
+progetto e non richiede backend, dati o un simulatore avviato.
+
+L'installazione e esplicita, richiede Node 24 e un UDID iOS gia booted:
+
+```bash
+MEDIFLOW_IOS_SIMULATOR_ID=<UDID> bash scripts/build-mobile-sim-app.sh --install
+```
+
+Il builder non avvia simulatori o app. Il paired smoke usa questo contratto
+prima di accedere al backend o modificare il pairing. Se `xcode-select` indica
+Command Line Tools, imposta `DEVELOPER_DIR` verso Xcode completo per entrambi
+gli script; vedi [native/README.md](../native/README.md).
+
+Per verificare il solo tooling su macOS, senza simulatori o backend reali:
+
+```bash
+node --test scripts/build-mobile-sim-app.test.mjs
+bash scripts/check-apple-structure.sh
+bash scripts/check-apple-network-entitlements.sh
+```
+
+La suite usa fixture temporanee sintetiche e comandi Apple/backend simulati.
+Questi test non attestano una build Xcode reale, un'installazione certificata
+o il completamento del paired smoke.
+
 ### Xcode (workflow locale)
 
 1. Apri `native/MediFlowMac/Package.swift` in Xcode.
