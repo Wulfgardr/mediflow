@@ -1407,21 +1407,40 @@ final class MediFlowMobileAppUITests: XCTestCase {
         let draftBody = "Testo sintetico da conservare nel diario"
         let draftTranscript = "Trascrizione sintetica ancora da rivedere"
 
-        // @Codex: A full-speed fling can skip the short viewport between the
-        // pinned section picker and the iPhone keyboard. Keep gestures scoped
-        // to the diary and recover in either direction without changing focus.
+        // @Codex: ScrollView's AX frame extends behind the keyboard. Derive each
+        // gesture from the visible diary gutter, so scrolling cannot type keys
+        // or drag inside the nested text editor. Preserve focus and both directions.
         func revealDiaryControl(_ control: XCUIElement) -> Bool {
             guard control.waitForExistence(timeout: 5) else { return false }
             let scrollView = app.scrollViews.containing(.button, identifier: "entry-type-filter").element
             guard scrollView.exists else { return false }
             for _ in 0..<12 {
                 if control.isHittable { return true }
-                let contentTop = sectionView("patient-section-navigation").frame.maxY
-                if control.frame.midY <= contentTop {
-                    scrollView.swipeDown(velocity: .slow)
-                } else {
-                    scrollView.swipeUp(velocity: .slow)
+                let scrollFrame = scrollView.frame
+                let viewport = scrollFrame.intersection(app.frame)
+                let contentTop = max(viewport.minY, sectionView("patient-section-navigation").frame.maxY)
+                var contentBottom = viewport.maxY
+                for overlay in [app.keyboards.firstMatch, app.tabBars.firstMatch] where overlay.exists {
+                    if overlay.frame.intersects(viewport) {
+                        contentBottom = min(contentBottom, overlay.frame.minY)
+                    }
                 }
+                guard viewport.width > 0, contentBottom > contentTop else { return false }
+                let inset = min(12, (contentBottom - contentTop) / 4)
+                let x = viewport.minX + min(12, viewport.width / 4) - scrollFrame.minX
+                let upper = contentTop + inset - scrollFrame.minY
+                let lower = contentBottom - inset - scrollFrame.minY
+                let movingDown = control.frame.midY <= contentTop
+                let origin = scrollView.coordinate(withNormalizedOffset: .zero)
+                let start = origin.withOffset(CGVector(dx: x, dy: movingDown ? upper : lower))
+                let end = origin.withOffset(CGVector(dx: x, dy: movingDown ? lower : upper))
+                start.press(forDuration: 0.05, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 0)
+            }
+            if !control.isHittable {
+                let evidence = XCTAttachment(string: app.debugDescription)
+                evidence.name = "unreachable-diary-control-\(control.identifier)"
+                evidence.lifetime = .keepAlways
+                add(evidence)
             }
             return control.isHittable
         }
@@ -1619,18 +1638,24 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertTrue(archived.waitForExistence(timeout: 5))
         // @Codex: verify the actual switch transition before relying on a saved flag.
         XCTAssertTrue(revealInteropControl(archived))
+        let archivedControls = archived.children(matching: .switch)
+        XCTAssertEqual(archivedControls.count, 1, "The archived row must expose one native switch")
+        let archivedControl = archivedControls.element
+        XCTAssertTrue(archivedControl.isHittable)
         func assertArchivedValue(_ expected: String) {
             let actual = archived.value as? String
-            if actual != expected {
+            let controlValue = archivedControl.value as? String
+            if actual != expected || controlValue != expected {
                 let evidence = XCTAttachment(string: app.debugDescription)
                 evidence.name = "archive-switch-expected-\(expected)"
                 evidence.lifetime = .keepAlways
                 add(evidence)
             }
             XCTAssertEqual(actual, expected, "Archiving must change the actual switch before saving")
+            XCTAssertEqual(controlValue, expected, "The native switch and its labelled row must agree")
         }
         assertArchivedValue("0")
-        archived.tap()
+        archivedControl.tap()
         assertArchivedValue("1")
 
         app.buttons["save-patient-button"].tap()
