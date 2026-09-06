@@ -1656,7 +1656,29 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         && permitsCapability(NetworkCapabilityKey.writePatientLifecycle)
     }
 
+    /* @Codex: lifecycle and exact manual draft of this create flow only. */
+    private var patientCreateGeneration = UUID()
+
+    private struct PatientCreateDraft: Equatable {
+        let firstName: String
+        let lastName: String
+        let taxCode: String
+        let hasBirthDate: Bool
+        let birthDate: Date
+        let address: String
+        let phone: String
+        let caregiver: String
+    }
+
+    private var patientCreateDraft: PatientCreateDraft {
+        PatientCreateDraft(firstName: newPatientFirstName, lastName: newPatientLastName,
+            taxCode: newPatientTaxCode, hasBirthDate: newPatientHasBirthDate,
+            birthDate: newPatientBirthDate, address: newPatientAddress,
+            phone: newPatientPhone, caregiver: newPatientCaregiver)
+    }
+
     func startCreatingPatient() {
+        patientCreateGeneration = UUID() // @Codex
         newPatientFirstName = ""
         newPatientLastName = ""
         newPatientTaxCode = ""
@@ -1670,6 +1692,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     }
 
     func cancelCreatingPatient() {
+        patientCreateGeneration = UUID() // @Codex
         isCreatingPatient = false
     }
 
@@ -1687,27 +1710,65 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             errorMessage = "Cifratura non disponibile: riaccedi con il PIN operatore prima di creare."
             return
         }
-        await runTask {
+        /* @Codex */
+        let draft = patientCreateDraft
+        let createGeneration = patientCreateGeneration
+        var formWasPresented = isCreatingPatient
+        let scope = ambulatoryId.trimmedOrNil
+        let client = makeClient()
+        var validateCurrent: () throws -> Void = { throw CancellationError() }
+        await runTask({
+            // Capture after runTask advances the exclusive-operation epoch.
+            let login = self.loginGeneration
+            let workspace = self.workspaceGeneration
+            let server = self.serverURL
+            let pin = self.tlsPin
+            validateCurrent = {
+                guard !Task.isCancelled, self.loginGeneration == login,
+                      self.workspaceGeneration == workspace,
+                      self.patientCreateGeneration == createGeneration,
+                      self.isCreatingPatient == formWasPresented,
+                      self.sessionCookie == sessionCookie, self.pairedCredentials == credentials,
+                      self.ambulatoryId.trimmedOrNil == scope,
+                      self.serverURL == server, self.tlsPin == pin,
+                      self.connectionState == .pairedOnline else { throw CancellationError() }
+            }
+            try validateCurrent()
             let payload = HomeBasePatientCreatePayload(
-                firstName: self.newPatientFirstName.trimmingCharacters(in: .whitespacesAndNewlines),
-                lastName: self.newPatientLastName.trimmingCharacters(in: .whitespacesAndNewlines),
-                taxCode: self.newPatientTaxCode.trimmingCharacters(in: .whitespacesAndNewlines),
-                birthDate: self.newPatientHasBirthDate ? self.newPatientBirthDate : nil,
-                address: try self.sealField(self.newPatientAddress.trimmedOrNil),
-                phone: try self.sealField(self.newPatientPhone.trimmedOrNil),
-                caregiver: try self.sealField(self.newPatientCaregiver.trimmedOrNil)
+                firstName: draft.firstName.trimmingCharacters(in: .whitespacesAndNewlines),
+                lastName: draft.lastName.trimmingCharacters(in: .whitespacesAndNewlines),
+                taxCode: draft.taxCode.trimmingCharacters(in: .whitespacesAndNewlines),
+                birthDate: draft.hasBirthDate ? draft.birthDate : nil,
+                address: try self.sealField(draft.address.trimmedOrNil),
+                phone: try self.sealField(draft.phone.trimmedOrNil),
+                caregiver: try self.sealField(draft.caregiver.trimmedOrNil)
             )
-            let created = try await self.makeClient().createPatient(
+            let created = try await client.createPatient(
                 payload: payload, credentials: credentials, sessionCookie: sessionCookie,
-                ambulatoryId: self.ambulatoryId.trimmedOrNil)
-            self.isCreatingPatient = false
-            /* @Codex */
-            self.patients = try await self.makeClient().fetchPatients(
-                credentials: credentials, sessionCookie: sessionCookie,
-                ambulatoryId: self.ambulatoryId.trimmedOrNil, includeDiagnoses: true)
-            .map { PatientFieldCrypto.decryptSummary($0, masterKey: self.masterKey) }
+                ambulatoryId: scope)
+            try validateCurrent()
+            let patients: [HomeBasePatientSummary]
+            do {
+                patients = try await client.fetchPatients(
+                    credentials: credentials, sessionCookie: sessionCookie,
+                    ambulatoryId: scope, includeDiagnoses: true)
+            } catch {
+                try validateCurrent()
+                // The POST succeeded: preserve the existing close-on-refresh-failure
+                // behavior, unless the operator has since changed the manual draft.
+                if self.patientCreateDraft == draft {
+                    self.isCreatingPatient = false
+                    formWasPresented = false // This operation owns the close; retain its failure report.
+                }
+                throw error
+            }
+            try validateCurrent()
+            self.patients = patients.map { PatientFieldCrypto.decryptSummary($0, masterKey: self.masterKey) }
+            let draftUnchanged = self.patientCreateDraft == draft
+            if draftUnchanged { self.cancelCreatingPatient() }
             self.statusMessage = "Paziente creato sull'home-base (id \(created.id))."
-        }
+                + (draftUnchanged ? "" : " Le modifiche successive nel modulo non sono state salvate.")
+        }, canApplyFailure: { (try? validateCurrent()) != nil })
     }
 
     // A4: edit patient anagrafica.

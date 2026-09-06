@@ -382,6 +382,140 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
         XCTAssertEqual(patients.first?.deletionReason, "doppione")
     }
 
+    /* @Codex: non-cooperative completions at both create suspension points. */
+    func testCreatePatientRejectsLatePublicationAfterLifecycleChanges() async throws {
+        for stage in ["create", "create-list"] {
+            for transition in ["lock", "relogin", "cancel", "reopen", "dismiss", "task-cancel"] {
+                let gate = LifecycleLoadGate([stage])
+                let source = LifecycleMockDataSource(
+                    summaries: [summary(id: "stale-created", archived: false, version: 1)], loadGate: gate)
+                let model = await makeModel(source: source)
+                await model.configurePairedOnlineForTests(masterKey: masterKey)
+                await prepareCreateDraft(model)
+                let save = Task { await model.createPatient() }
+                await gate.wait(for: stage)
+                switch transition {
+                case "lock": await model.lockSessionNow()
+                case "relogin":
+                    await model.lockSessionNow()
+                    // Same credentials/cookie still constitute a new session epoch.
+                    await model.configurePairedOnlineForTests(masterKey: masterKey)
+                    await prepareCreateDraft(model)
+                case "cancel": await model.cancelCreatingPatient()
+                case "dismiss": await MainActor.run { model.isCreatingPatient = false }
+                case "reopen":
+                    await model.cancelCreatingPatient()
+                    await prepareCreateDraft(model)
+                default: save.cancel()
+                }
+                let before = await MainActor.run {
+                    (model.patients.map(\.id), model.isCreatingPatient,
+                     model.newPatientFirstName, model.statusMessage, model.errorMessage)
+                }
+                await gate.release(stage)
+                await save.value
+                let after = await MainActor.run {
+                    (model.patients.map(\.id), model.isCreatingPatient,
+                     model.newPatientFirstName, model.statusMessage, model.errorMessage)
+                }
+                let context = "\(stage): \(transition)"
+                XCTAssertEqual(after.0, before.0, context)
+                XCTAssertEqual(after.1, before.1, context)
+                XCTAssertEqual(after.2, before.2, context)
+                XCTAssertEqual(after.3, before.3, context)
+                XCTAssertEqual(after.4, before.4, context)
+                let reads = await source.includeDiagnosesRequests
+                XCTAssertEqual(reads.count, stage == "create" ? 0 : 1, context)
+            }
+        }
+    }
+
+    func testCreatePatientKeepsLaterManualDraftEditsAtBothSuspensions() async throws {
+        for stage in ["create", "create-list"] {
+            let gate = LifecycleLoadGate([stage])
+            let source = LifecycleMockDataSource(
+                summaries: [summary(id: "created", archived: false, version: 1)], loadGate: gate)
+            let model = await makeModel(source: source)
+            await model.configurePairedOnlineForTests(masterKey: masterKey)
+            await prepareCreateDraft(model)
+            let save = Task { await model.createPatient() }
+            await gate.wait(for: stage)
+            await MainActor.run { model.newPatientPhone = "Updated synthetic draft" }
+            await gate.release(stage)
+            await save.value
+            let state = await MainActor.run {
+                (model.isCreatingPatient, model.newPatientPhone, model.patients.map(\.id), model.statusMessage)
+            }
+            XCTAssertTrue(state.0)
+            XCTAssertEqual(state.1, "Updated synthetic draft")
+            XCTAssertEqual(state.2, ["created"])
+            XCTAssertTrue(state.3.contains("non sono state salvate"))
+            let payload = await source.lastCreate
+            XCTAssertNil(payload?.phone, "later edit must not alter the submitted snapshot")
+        }
+    }
+
+    func testCreatePatientLateFailureDoesNotOverwriteReopenedForm() async throws {
+        let gate = LifecycleLoadGate(["create"])
+        let source = LifecycleMockDataSource(createError: .httpStatus(500, "Synthetic failure"), loadGate: gate)
+        let model = await makeModel(source: source)
+        await model.configurePairedOnlineForTests(masterKey: masterKey)
+        await prepareCreateDraft(model)
+        let save = Task { await model.createPatient() }
+        await gate.wait(for: "create")
+        await model.cancelCreatingPatient()
+        await prepareCreateDraft(model)
+        let status = await model.statusMessage
+        await gate.release("create")
+        await save.value
+        let state = await MainActor.run { (model.isCreatingPatient, model.statusMessage, model.errorMessage) }
+        XCTAssertTrue(state.0)
+        XCTAssertEqual(state.1, status)
+        XCTAssertNil(state.2)
+    }
+
+    func testCreatePatientCurrentFailureRetainsManualDraft() async throws {
+        let source = LifecycleMockDataSource(createError: .httpStatus(500, "Synthetic failure"))
+        let model = await makeModel(source: source)
+        await model.configurePairedOnlineForTests(masterKey: masterKey)
+        await prepareCreateDraft(model)
+        await model.createPatient()
+        let state = await MainActor.run { (model.isCreatingPatient, model.newPatientFirstName, model.errorMessage) }
+        XCTAssertTrue(state.0)
+        XCTAssertEqual(state.1, "Synthetic")
+        XCTAssertNotNil(state.2)
+    }
+
+    /* @Codex */
+    func testCreatePatientRefreshFailureClosesOnlyTheSavedDraft() async throws {
+        for editDuringRefresh in [false, true] {
+            let gate = LifecycleLoadGate(["create-list"])
+            let source = LifecycleMockDataSource(createListError: .httpStatus(500, "Synthetic refresh failure"), loadGate: gate)
+            let model = await makeModel(source: source)
+            await model.configurePairedOnlineForTests(masterKey: masterKey)
+            await prepareCreateDraft(model)
+            let save = Task { await model.createPatient() }
+            await gate.wait(for: "create-list")
+            if editDuringRefresh {
+                await MainActor.run { model.newPatientPhone = "Later draft" }
+            }
+            await gate.release("create-list")
+            await save.value
+            let state = await MainActor.run { (model.isCreatingPatient, model.errorMessage, model.newPatientPhone) }
+            XCTAssertEqual(state.0, editDuringRefresh)
+            XCTAssertNotNil(state.1)
+            XCTAssertEqual(state.2, editDuringRefresh ? "Later draft" : "")
+        }
+    }
+
+    @MainActor
+    private func prepareCreateDraft(_ model: PairedPatientsWorkspaceModel) {
+        model.startCreatingPatient()
+        model.newPatientFirstName = "Synthetic"
+        model.newPatientLastName = "Create fixture"
+        model.newPatientTaxCode = "SYNTHETIC-CREATE"
+    }
+
     func testCreatePatientSealsSensitiveFieldsBeforeLeavingTheModel() async throws {
         // Regressione review Wave 2b: il boundary rifiuta con 400 i campi sensibili
         // non ENC:, quindi il model deve sigillarli prima di costruire il payload.
@@ -400,6 +534,10 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
 
         await model.createPatient()
 
+        let success = await MainActor.run { (model.isCreatingPatient, model.statusMessage, model.errorMessage) }
+        XCTAssertFalse(success.0)
+        XCTAssertEqual(success.1, "Paziente creato sull'home-base (id created).")
+        XCTAssertNil(success.2)
         let capturedCreate = await source.lastCreate
         let payload = try XCTUnwrap(capturedCreate)
         XCTAssertEqual(payload.firstName, "Ada")
@@ -1161,6 +1299,8 @@ private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
     private let loginErrors: [HomeBaseClientError?]
     private let logoutError: HomeBaseClientError?
     private let updateError: HomeBaseClientError? // @Codex
+    private let createError: HomeBaseClientError? // @Codex
+    private let createListError: HomeBaseClientError? // @Codex
     private(set) var lastUpdate: UpdateCall?
     private(set) var lastCreate: HomeBasePatientCreatePayload?
     private(set) var lastSoftDelete: DeleteCall?
@@ -1181,6 +1321,8 @@ private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
         pinChangeError: HomeBaseClientError? = nil,
         logoutError: HomeBaseClientError? = nil,
         updateError: HomeBaseClientError? = nil, // @Codex
+        createError: HomeBaseClientError? = nil, // @Codex
+        createListError: HomeBaseClientError? = nil, // @Codex
         loadGate: LifecycleLoadGate? = nil,
         entriesByPatient: [String: [HomeBaseEntrySummary]] = [:],
         entryErrorsByPatient: [String: HomeBaseClientError] = [:],
@@ -1195,6 +1337,8 @@ private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
         self.pinChangeError = pinChangeError
         self.logoutError = logoutError
         self.updateError = updateError // @Codex
+        self.createError = createError // @Codex
+        self.createListError = createListError // @Codex
         self.loadGate = loadGate
         self.entriesByPatient = entriesByPatient
         self.entryErrorsByPatient = entryErrorsByPatient
@@ -1302,6 +1446,8 @@ private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
         includeDiagnoses: Bool
     ) async throws -> [HomeBasePatientSummary] {
         includeDiagnosesRequests.append(includeDiagnoses)
+        await loadGate?.pause("create-list") // @Codex
+        if let createListError { throw createListError } // @Codex
         return try await fetchPatients(
             credentials: credentials, sessionCookie: sessionCookie,
             ambulatoryId: ambulatoryId, includeDeleted: false)
@@ -1459,6 +1605,8 @@ private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
         ambulatoryId: String?
     ) async throws -> HomeBaseCreatedResource {
         lastCreate = payload
+        await loadGate?.pause("create") // @Codex
+        if let createError { throw createError } // @Codex
         return HomeBaseCreatedResource(id: "created", version: 1)
     }
 
