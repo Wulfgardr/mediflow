@@ -290,7 +290,7 @@ function IncaricoArea({
 
   return (
     <div className={styles.areaShell} data-patient-directory={proposal ? 'proposal' : undefined}>
-      <header className={styles.areaHeader}>
+      <header className={classNames(styles.areaHeader, patientStyles.directoryHeader)}>
         <div>
           <p className={styles.areaCaption}>Ambulatorio e rete locale</p>
           <h1 className={styles.areaTitle}>
@@ -398,7 +398,8 @@ function IncaricoArea({
 
           <header className={classNames(styles.panelHeader, patientStyles.worklistPanelHeader)}>
             <h2 className={styles.panelTitle}>
-              {list === 'attivi' ? 'Pazienti in carico' : 'Archivio pazienti'}
+              {/* @Codex: the page already names the patient directory. */}
+              {list === 'attivi' ? 'Elenco' : 'Archivio'}
             </h2>
             <span className={classNames(patientStyles.resultCount, 'lume-registro')}>
               {/* @Codex */}

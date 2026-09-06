@@ -746,13 +746,28 @@
   :global(html[data-runtime-twin-design='proposal']) .caseLensActions { grid-column: 1 / -1; grid-row: auto; }
 }
 @media (max-width: 640px) {
-  .recordContent { grid-template-columns: minmax(0, 1fr); gap: 12px; }
-  .recordIdentity strong { font-size: 16px; }
-  :global(html[data-runtime-twin-design='proposal']) .patientRow { padding: 18px 12px; gap: 12px; align-items: start; }
-  :global(html[data-runtime-twin-design='proposal']) .patientSide { padding-top: 3px; }
+  /* @Codex: keep the closed directory row compact; the selected record still
+     reveals its full context and the ordinary click opens the patient chart. */
+  .patientSearchRow { flex-direction: row; }
+  .patientSearchClear { min-width: 44px; min-height: 44px; flex-shrink: 0; }
+  :global(html[data-runtime-twin-design='proposal']) [data-patient-directory] > .directoryHeader { padding: 0 0 12px; }
+  .recordContent { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .recordIdentity { gap: 2px; }
+  .recordIdentity strong { font-size: 16px; line-height: 1.3; }
+  .recordDiagnosis { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .recordDiagnosis small { margin-left: 6px; }
+  :global(html[data-runtime-twin-design='proposal']) .patientRow:is(:hover, :focus-visible, [aria-selected='true']) .recordDiagnosis { overflow: visible; white-space: normal; }
+  :global(html[data-runtime-twin-design='proposal']) .patientRow { grid-template-columns: minmax(0, 1fr) auto; padding: 12px; gap: 12px; align-items: center; }
+  :global(html[data-runtime-twin-design='proposal']) .patientSide { flex-direction: column; align-items: flex-end; gap: 4px; padding-top: 0; }
   :global(html[data-runtime-twin-design='proposal']) .patientListViewport { max-height: 58vh; }
   :global(html[data-runtime-twin-design='proposal']) .caseLens { display: flex; padding: 20px; gap: 16px; }
   :global(html[data-runtime-twin-design='proposal']) .scopeChip { min-height: 44px; }
+}
+/* @Codex: keep the result count and creation action together when they fit;
+   narrower reflow retains the existing two-row header and full touch targets. */
+@media (min-width: 360px) and (max-width: 480px) {
+  .worklistPanelHeader { grid-template-columns: auto minmax(0, 1fr) auto; }
+  .worklistPanelHeader > span:last-child { grid-column: auto; width: auto; }
 }
 @media (prefers-reduced-motion: reduce) { .recordDisclosure { transition: none; } }
 :global(html[data-motion='reduced']) .recordDisclosure { transition: none; }

@@ -205,6 +205,10 @@ async function assertCompactWorklistGeometry(page: Page, width: number): Promise
         (titleBox.top + titleBox.height / 2) - (countBox.top + countBox.height / 2),
       ) <= 2,
       actionFollowsHeading: actionBox.top >= Math.max(titleBox.bottom, countBox.bottom),
+      // @Codex: at phone width the action shares the result row, with no overlap.
+      actionBesideHeading: actionBox.left >= Math.max(titleBox.right, countBox.right)
+        && Math.abs((actionBox.top + actionBox.height / 2)
+          - (titleBox.top + titleBox.height / 2)) <= 2,
       actionHeight: actionBox.height,
       // The selected row deliberately reveals notes; compact density applies to closed rows.
       rowHeights: rows.filter(row => row.getAttribute('aria-selected') !== 'true').map(row => row.getBoundingClientRect().height),
@@ -217,7 +221,7 @@ async function assertCompactWorklistGeometry(page: Page, width: number): Promise
   expect(geometry?.worklistInnerWidth).toBeGreaterThanOrEqual(240);
   expect(geometry?.titleHeight).toBeLessThanOrEqual(27);
   expect(geometry?.titleAndCountShareLine).toBe(true);
-  expect(geometry?.actionFollowsHeading).toBe(true);
+  expect(width >= 360 ? geometry?.actionBesideHeading : geometry?.actionFollowsHeading).toBe(true);
   expect(geometry?.actionHeight).toBeGreaterThanOrEqual(44);
   for (const rowHeight of geometry?.rowHeights ?? []) {
     expect.soft(rowHeight, 'densità della riga chiusa').toBeLessThanOrEqual(100);
