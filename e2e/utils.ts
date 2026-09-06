@@ -123,6 +123,11 @@ export async function unlockIfNeeded(page: Page, pin: string): Promise<void> {
   const pinInput = page.getByLabel('PIN operatore').first();
   const unlockButton = page.getByRole('button', { name: /Sblocca/ }).first();
 
+  /* @Codex: a tab without its local key first offers explicit session renewal.
+     Observe that real UI state and its receipt before entering the PIN. */
+  const renew = page.getByRole('button', { name: 'Rinnova accesso', exact: true });
+  if (await renew.isVisible() && await renew.isEnabled()) await renew.click();
+  await expect(pinInput).toBeEnabled();
   await pinInput.fill(pin);
   await expect(pinInput).toHaveValue(pin);
   await expect(unlockButton).toBeEnabled({ timeout: 5_000 });
