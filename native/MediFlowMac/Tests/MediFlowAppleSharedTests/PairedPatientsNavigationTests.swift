@@ -179,7 +179,8 @@ final class PairedPatientsNavigationTests: XCTestCase {
         transport.releasePatient()
         let outcome = await read.value
         XCTAssertEqual(outcome, .superseded)
-        assertOriginalChart(model)
+        XCTAssertNil(model.selectedPatient)
+        XCTAssertTrue(model.entries.isEmpty)
         XCTAssertEqual(model.connectionState, .sessionExpired)
         XCTAssertEqual(transport.requests.filter { $0.httpMethod == "GET" }.count, 1)
     }
@@ -228,7 +229,8 @@ final class PairedPatientsNavigationTests: XCTestCase {
         XCTAssertEqual(result, .failed)
         XCTAssertEqual(model.navigationAvailability, .locked)
         XCTAssertEqual(model.connectionState, .sessionExpired)
-        XCTAssertEqual(model.selectedPatient?.id, "patient-a")
+        XCTAssertNil(model.selectedPatient)
+        XCTAssertTrue(model.entries.isEmpty)
         let count = transport.requests.count
         let retry = await model.openNavigationPatient(id: "patient-b", section: .documents, isCurrent: { true })
         XCTAssertEqual(retry, .blocked)
@@ -282,15 +284,14 @@ final class PairedPatientsNavigationTests: XCTestCase {
     @MainActor
     private func harness() throws -> (PairedPatientsWorkspaceModel, NavigationTransport) {
         let id = UUID().uuidString.lowercased()
-        let host = "navigation-\(id).invalid"
         let transport = NavigationTransport()
-        NavigationURLProtocol.register(transport, host: host)
+        let endpoint = NavigationURLProtocol.register(transport)
         let configuration = URLSessionConfiguration.ephemeral
         configuration.httpShouldSetCookies = false
         configuration.protocolClasses = [NavigationURLProtocol.self]
         let session = URLSession(configuration: configuration)
         let source = HomeBasePatientsClient(
-            configuration: HomeBaseConnectionConfiguration(serverURLString: "https://\(host)"), session: session)
+            configuration: HomeBaseConnectionConfiguration(serverURLString: endpoint.absoluteString), session: session)
         let defaults = try XCTUnwrap(UserDefaults(suiteName: "NavigationTests.\(id)"))
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("NavigationTests-\(id)")
         let store = HomeBasePairedStore(userDefaults: defaults,
@@ -298,7 +299,7 @@ final class PairedPatientsNavigationTests: XCTestCase {
             keychainDeleter: { _, _ in .success(()) })
         let cache = HomeBasePatientCacheStore(cacheDirectory: directory, keyProvider: { NavigationFixture.key })
         let model = PairedPatientsWorkspaceModel(pairedStore: store, cacheStore: cache, dataSourceFactory: { _ in source })
-        model.serverURL = "https://\(host)"
+        model.serverURL = endpoint.absoluteString
         model.ambulatoryId = "scope-a"
         model.configurePairedOnlineForTests(
             credentials: HomeBasePairedCredentials(clientId: "nav-fixture", clientToken: "nav-fixture-token"),
@@ -309,7 +310,7 @@ final class PairedPatientsNavigationTests: XCTestCase {
         model.updateAvailableCapabilities(["network.replica.write-clinical-diary", "network.replica.readonly-documents"])
         addTeardownBlock {
             session.invalidateAndCancel()
-            NavigationURLProtocol.remove(host: host)
+            NavigationURLProtocol.remove(endpoint: endpoint)
             defaults.removePersistentDomain(forName: "NavigationTests.\(id)")
             if FileManager.default.fileExists(atPath: directory.path) { try FileManager.default.removeItem(at: directory) }
         }
@@ -413,13 +414,31 @@ private final class NavigationTransport: @unchecked Sendable {
 
 private final class NavigationURLProtocol: URLProtocol, @unchecked Sendable {
     private static let lock = NSLock()
-    private static var transports: [String: NavigationTransport] = [:]
-    static func register(_ transport: NavigationTransport, host: String) { lock.withLock { transports[host] = transport } }
-    static func remove(host: String) { _ = lock.withLock { transports.removeValue(forKey: host) } }
+    private static var transports: [Int: NavigationTransport] = [:]
+    private static var nextPort = 46000
+    /* @Codex */
+    static func register(_ transport: NavigationTransport) -> URL {
+        lock.withLock {
+            let port = nextPort
+            nextPort += 1
+            transports[port] = transport
+            var endpoint = URLComponents()
+            endpoint.scheme = "https"
+            endpoint.host = "127.0.0.1"
+            endpoint.port = port
+            return endpoint.url!
+        }
+    }
+    static func remove(endpoint: URL) { _ = lock.withLock { transports.removeValue(forKey: endpoint.port!) } }
+    // @Codex Every request stays in this protocol, including unknown fixture endpoints; no socket is opened.
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
     override func startLoading() {
-        let transport = Self.lock.withLock { Self.transports[request.url?.host ?? ""] }
+        let transport = Self.lock.withLock {
+            guard request.url?.scheme == "https", request.url?.host == "127.0.0.1",
+                  let port = request.url?.port else { return nil as NavigationTransport? }
+            return Self.transports[port]
+        }
         guard let transport else {
             client?.urlProtocol(self, didFailWithError: URLError(.unsupportedURL))
             return
