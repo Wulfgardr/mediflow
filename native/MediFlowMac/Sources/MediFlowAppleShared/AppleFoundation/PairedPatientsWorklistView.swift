@@ -220,6 +220,21 @@ struct PairedPatientsWorklistView: View {
         // received the caller's padding and background separately, which drew
         // the list as a stack of loose cards instead of one list.
         VStack(alignment: .leading, spacing: Self.mobileStackSpacing) {
+            // @Codex: A named collection, followed directly by its filters and rows.
+            HStack(alignment: .firstTextBaseline) {
+                Text("Pazienti")
+                    .font(.title2.weight(.semibold))
+                    .accessibilityHeading(.h1)
+                Spacer(minLength: 8)
+                if !model.patients.isEmpty || model.connectionState == .pairedOnline {
+                    Text("\(filteredPatients.count)")
+                        .font(.headline)
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                        .accessibilityLabel("\(filteredPatients.count) pazienti visibili nell'elenco caricato")
+                        .accessibilityIdentifier("patient-worklist-count")
+                }
+            }
             worklistContent
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -231,7 +246,7 @@ struct PairedPatientsWorklistView: View {
     #if !os(macOS)
     /// Spacing of the mobile worklist stack, shared by the outer stack and by
     /// the patient rows so the two cannot drift apart.
-    private static let mobileStackSpacing: CGFloat = 10
+    private static let mobileStackSpacing: CGFloat = 16
     #endif
 
     #if os(macOS)
@@ -363,11 +378,24 @@ struct PairedPatientsWorklistView: View {
                                 Task { await model.loadPatient(patient) }
                             }
                         } label: {
-                            activePatientLabel(patient)
+                            HStack(alignment: .top, spacing: 12) {
+                                activePatientLabel(patient)
+                                Image(systemName: "chevron.right")
+                                    .font(.footnote.weight(.semibold))
+                                    .foregroundStyle(.secondary)
+                                    .padding(.top, 4)
+                                    .accessibilityHidden(true)
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 14)
+                            .frame(minHeight: 44)
+                            .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
                         .disabled(!model.canChangePatientSelection)
-                        .modifier(LumeRigaListaModifier(isSelected: model.selectedPatientID == patient.id))
+                        // @Codex: Flat, separated records; selection is still model-owned.
+                        .background(model.selectedPatientID == patient.id ? Color.accentColor.opacity(0.10) : .clear)
+                        .overlay(alignment: .bottom) { Divider() }
                         .accessibilityAddTraits(model.selectedPatientID == patient.id ? .isSelected : [])
                         .accessibilityIdentifier("patient-cell-\(patient.id)")
                         #endif
@@ -385,7 +413,7 @@ struct PairedPatientsWorklistView: View {
                 // The rows own their own spacing, so row-to-row separation stays
                 // fixed regardless of what the outer worklist stack does with the
                 // controls above it.
-                VStack(alignment: .leading, spacing: Self.mobileStackSpacing) {
+                VStack(alignment: .leading, spacing: 0) {
                     rows
                 }
                 #endif

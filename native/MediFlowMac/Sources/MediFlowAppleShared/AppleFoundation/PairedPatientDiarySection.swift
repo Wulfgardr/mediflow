@@ -170,10 +170,19 @@ struct PairedPatientDiarySection: View {
                     ForEach(filteredDiaryEntries) { entry in
                     VStack(alignment: .leading, spacing: 8) {
                         /* @Codex: give chronology its own line, preserving the native Registro. */
+                        #if os(iOS)
+                        // @Codex: A full year and named month make chronology readable.
+                        Text(entry.date, format: .dateTime.day().month(.abbreviated).year().hour().minute())
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("entry-date-\(entry.id)")
+                        #else
                         Text(PairedPatientsWorkspaceSupport.entryDateFormatter.string(from: entry.date))
                             .font(.subheadline.weight(.medium))
                             .registro()
                             .fixedSize(horizontal: false, vertical: true)
+                        #endif
                         VStack(alignment: .leading, spacing: 6) {
                             if entry.lockedFields.contains(.title) {
                                 Label("Titolo non leggibile", systemImage: "lock")
@@ -281,6 +290,14 @@ struct PairedPatientDiarySection: View {
                             }
                         }
                     }
+                        #if os(iOS)
+                        // @Codex: Each dated entry is a readable document block.
+                        .padding(.vertical, 20)
+                        .padding(.horizontal, 16)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .overlay(alignment: .bottom) { Divider() }
+                        .padding(.leading, 14)
+                        #else
                         .padding(.vertical, 10)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .modifier(LumeRigaListaModifier(isSelected: false))
@@ -290,6 +307,7 @@ struct PairedPatientDiarySection: View {
                         // left it showing only in the gaps — a continuous
                         // connector rendered as a column of stubs.
                         .padding(.leading, 14)
+                        #endif
                         .accessibilityIdentifier("entry-row-\(entry.id)")
                     }
                 }
