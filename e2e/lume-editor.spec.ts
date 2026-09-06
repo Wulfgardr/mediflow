@@ -110,7 +110,7 @@ async function assertEditorComposition(page: Page, viewCase: ViewCase): Promise<
   expect(adjacency.rightGap).toBeLessThanOrEqual(1);
 
   const draftState = page.getByTestId('lume-entry-draft-state');
-  await expect(draftState).toContainText('Bozza clinica');
+  await expect(draftState).toHaveText('Vuoto');
   const draftInk = await draftState.evaluate((element) => getComputedStyle(element).color);
   const mutedInk = await page.evaluate(() => {
     const probe = document.createElement('span');
@@ -123,6 +123,7 @@ async function assertEditorComposition(page: Page, viewCase: ViewCase): Promise<
   expect(draftInk).toBe(mutedInk);
 
   await field.fill('Voce sintetica in bozza, senza dati clinici reali.');
+  await expect(draftState).toHaveText('Da registrare');
   await field.focus();
   await expect(field).toBeFocused();
   await expect(canvas).not.toHaveCSS('box-shadow', 'none');
