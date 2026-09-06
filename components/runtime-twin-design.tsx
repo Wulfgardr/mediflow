@@ -2,10 +2,36 @@
 
 /* @Codex WUL-676: presentation state only. The original clinical components
    stay mounted while the comparison changes their layout. */
-import { createContext, useCallback, useContext, useEffect, useId, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useId, useState, useSyncExternalStore, type ReactNode } from 'react';
 
 export type TwinComposition = 'workbench' | 'stream';
-const DesignContext = createContext({ enabled: false, proposal: false, setProposal: (_value: boolean) => {}, composition: 'workbench' as TwinComposition, setComposition: (_value: TwinComposition) => {}, pendingForms: false, registerPending: (_id: string, _pending: boolean) => {} });
+const DesignContext = createContext({ enabled: false, proposal: false, setProposal: (_value: boolean) => {}, composition: 'stream' as TwinComposition, setComposition: (_value: TwinComposition) => {}, pendingForms: false, registerPending: (_id: string, _pending: boolean) => {} });
+// @Codex: browser-local presentation preference only; no record identifiers.
+const COMPOSITION_KEY = 'mediflow.runtime-twin.composition';
+const COMPOSITION_EVENT = 'mediflow:twin-composition';
+const defaultComposition = (): TwinComposition => 'stream';
+let transientComposition: TwinComposition | null = null;
+function readComposition(): TwinComposition {
+    if (transientComposition) return transientComposition;
+    try {
+        return window.localStorage.getItem(COMPOSITION_KEY) === 'workbench' ? 'workbench' : 'stream';
+    } catch { return defaultComposition(); }
+}
+function subscribeComposition(notify: () => void) {
+    const onStorage = (event: StorageEvent) => {
+        if (event.key === COMPOSITION_KEY || event.key === null) {
+            transientComposition = null;
+            notify();
+        }
+    };
+    window.addEventListener('storage', onStorage);
+    window.addEventListener(COMPOSITION_EVENT, notify);
+    return () => {
+        window.removeEventListener('storage', onStorage);
+        window.removeEventListener(COMPOSITION_EVENT, notify);
+    };
+}
+const noCompositionSubscription = () => () => {};
 export const RuntimeTwinFolderContext = createContext<string | null>(null);
 export const useRuntimeTwinDesign = () => useContext(DesignContext);
 export const useRuntimeTwinFolder = () => useContext(RuntimeTwinFolderContext);
@@ -23,7 +49,16 @@ export function useRuntimeTwinPendingForm(pending: boolean) {
 
 export function RuntimeTwinDesignProvider({ enabled, children }: { enabled: boolean; children: ReactNode }) {
     const [proposal, setProposal] = useState(enabled);
-    const [composition, setComposition] = useState<TwinComposition>('workbench');
+    const composition = useSyncExternalStore(enabled ? subscribeComposition : noCompositionSubscription,
+        enabled ? readComposition : defaultComposition, defaultComposition);
+    const setComposition = useCallback((value: TwinComposition) => {
+        if (!enabled) return;
+        try {
+            window.localStorage.setItem(COMPOSITION_KEY, value);
+            transientComposition = null;
+        } catch { transientComposition = value; }
+        window.dispatchEvent(new Event(COMPOSITION_EVENT));
+    }, [enabled]);
     const [pendingIds, setPendingIds] = useState<Set<string>>(() => new Set());
     const registerPending = useCallback((id: string, pending: boolean) => {
         setPendingIds(current => {
