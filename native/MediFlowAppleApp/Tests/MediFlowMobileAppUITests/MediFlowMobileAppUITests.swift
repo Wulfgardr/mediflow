@@ -1898,6 +1898,32 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["E11.9 - Diabete tipo 2"].waitForExistence(timeout: 5))
     }
 
+    // @Codex: Observation only. Capture the actual native picker before choosing
+    // its date-selection strategy; no save, production flags or guessed roles.
+    func testObservePatientBirthDatePickerAccessibility() {
+        launch(seedPatients: true, section: "modules")
+        defer { app.terminate() }
+        let patient = app.buttons["patient-cell-uitest-1"]
+        XCTAssertTrue(patient.waitForExistence(timeout: 20))
+        patient.tap()
+        openPatientSection(.overview)
+        tapInteropButton("edit-patient-button")
+        let controls = app.descendants(matching: .any).matching(identifier: "edit-patient-birthDate")
+        XCTAssertTrue(controls.element.waitForExistence(timeout: 10))
+        XCTAssertEqual(controls.count, 1)
+        XCTAssertTrue(revealInteropControl(controls.element))
+        func capture(_ stage: String) {
+            let tree = XCTAttachment(string: app.debugDescription)
+            tree.name = "dob-picker-\(stage)-accessibility"
+            tree.lifetime = .keepAlways
+            add(tree)
+            attachScreenshot(named: "dob-picker-\(stage)")
+        }
+        capture("before-open")
+        controls.element.tap()
+        capture("after-open")
+    }
+
     // MARK: - Actual paired client / host interoperability (opt-in, no demo)
 
     /* @Codex: The descriptor is supplied to the test runner in a private xctestrun.
@@ -2033,25 +2059,37 @@ final class MediFlowMobileAppUITests: XCTestCase {
         if !secure { XCTAssertEqual(field.value as? String, value) }
     }
 
-    private func launchAndLoginInterop(_ input: InteropInput, useSavedPairing: Bool = false) {
-        app.launchEnvironment = [
-            "MEDIFLOW_APPLE_INITIAL_SECTION": "settings",
-            "MEDIFLOW_APPLE_DEMO": "0", "MEDIFLOW_APPLE_UITEST_PATIENTS": "0",
-            "MEDIFLOW_APPLE_DEV_SKIP_KEYCHAIN": "0",
-            "MEDIFLOW_HOMEBASE_AUTOLOGIN": "false", "MEDIFLOW_HOMEBASE_AUTOLOAD_PATIENTS": "false",
-            "MEDIFLOW_HOMEBASE_AUTODISCOVER": "false",
-        ]
+    private func launchAndLoginInterop(_ input: InteropInput, useSavedPairing: Bool = false, fromRoot: Bool = false) {
+        app.launchArguments = []
+        app.launchEnvironment = [:]
         app.launch()
-        loginInteropFromSettings(input, useSavedPairing: useSavedPairing)
+        if fromRoot {
+            // @Codex: prove the ordinary first-open Configura path, without an
+            // initial-section shortcut or an injected operator session.
+            XCTAssertTrue(openSection("Pazienti"))
+            let status = sectionView("mobile-paired-status")
+            XCTAssertTrue(status.waitForExistence(timeout: 20))
+            let configure = status.buttons.matching(NSPredicate(format: "label == %@", "Configura"))
+            XCTAssertEqual(configure.count, 1)
+            XCTAssertTrue(revealInteropControl(configure.element))
+            configure.element.tap()
+            loginInteropFromSettings(input, useSavedPairing: useSavedPairing, connectionAlreadyOpen: true)
+        } else {
+            XCTAssertTrue(openSection("Impostazioni"))
+            loginInteropFromSettings(input, useSavedPairing: useSavedPairing)
+        }
     }
 
     // @Codex: Local-lock recovery must reuse the running app. Launching again
     // would clear memory independently and conceal retained clinical drafts.
-    private func loginInteropFromSettings(_ input: InteropInput, useSavedPairing: Bool, verifyClearBeforeRead: Bool = false) {
-        XCTAssertTrue(sectionView("clinical-workspace-settings-view").waitForExistence(timeout: 20))
+    private func loginInteropFromSettings(_ input: InteropInput, useSavedPairing: Bool, verifyClearBeforeRead: Bool = false,
+                                         connectionAlreadyOpen: Bool = false) {
         let connection = app.buttons["settings-mediflow-connection-button"]
-        XCTAssertTrue(revealInteropControl(connection))
-        connection.tap()
+        if !connectionAlreadyOpen {
+            XCTAssertTrue(sectionView("clinical-workspace-settings-view").waitForExistence(timeout: 20))
+            XCTAssertTrue(revealInteropControl(connection))
+            connection.tap()
+        }
         let idField = app.textFields["homebase-paired-client-id-field"]
         XCTAssertTrue(idField.waitForExistence(timeout: 10))
         let savedIDValue = idField.value as? String ?? ""
@@ -2137,7 +2175,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
     func testRealPairedHostWorkflow() throws {
         let input = try interopInput()
         defer { app.terminate() }
-        launchAndLoginInterop(input)
+        launchAndLoginInterop(input, fromRoot: true)
         if let address = input.expectedAddress, let title = input.expectedDiaryTitle {
             assertInteropReread(input, address: address, title: title)
             openPatientSection(.overview)
