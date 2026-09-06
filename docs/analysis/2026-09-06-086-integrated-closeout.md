@@ -1,6 +1,6 @@
 # MediFlow 0.8.6: candidato locale integrato
 
-Data: 6 settembre 2026. Branch `codex/WUL-669-086-integrated-candidate`.
+Aggiornamento: 7 settembre 2026. Branch `codex/WUL-669-086-integrated-candidate`.
 Base del programma: `b72ac713b624e7d771262e4e01c5c5e1f56f9ae2`.
 Stato: integrazione e verifica multipiattaforma in corso. Le prove storiche
 riportate sotto non attestano il completamento della patch corrente.
@@ -35,6 +35,10 @@ fra i guest. I 30 casi di differenza nei collector riguardano le route del
 prototipo: il separatore Windows impediva di enumerarle. `e9716d741` corregge
 l'enumerazione con prova locale sullo stesso elenco; non è applicato ai full
 riportati sopra e non modifica retroattivamente i loro conteggi.
+Una successiva raccolta `--list` su Windows con `e971` e `bbd` verifica 48 file
+e 187 casi canonici, coincidenti per file e titolo completo con Linux: 147
+ordinari e 40 del prototipo. L'elenco non esegue test; tutti i 30 casi aggiunti
+appartengono al prototipo e i risultati dei full precedenti restano invariati.
 La ricevuta Linux distingue inoltre CRUD ed export dettagliati provati su
 `3c4863f13` dalle nuove esecuzioni `25e`: il totale dei test non prova ogni
 funzione sull'ultima build. Le sei combinazioni di UI mobile e host restano
@@ -53,6 +57,14 @@ accesso nativo e caricamento del paziente sintetico. Si ferma prima di aprire
 la scheda: il dialogo di sistema per salvare la password copre la lista.
 Nessuna modifica clinica viene eseguita da quel percorso. Il video conserva
 il blocco; il tentativo non completa una delle sei combinazioni richieste.
+Il successivo candidato di test `8957fbec7`, con firma ordinaria verificata,
+gestisce soltanto quel dialogo e l'azione “Not Now”. Il nuovo tentativo si
+ferma ancora prima dell'accesso: il helper di riempimento lascia un suffisso
+nel campo dell'identificativo perché cancella dal cursore centrale. Non prova
+quindi la gestione del dialogo o il percorso clinico. Occorre osservare la
+selezione dell'intero contenuto prima di correggere il helper; la sessione di
+verifica è sospesa perché il controller Mac è bloccato e richiede lo sblocco
+manuale. I due tentativi e i prodotti compilati restano conservati.
 
 ### Ricevute precedenti conservate
 

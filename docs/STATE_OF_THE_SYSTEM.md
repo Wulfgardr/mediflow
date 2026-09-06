@@ -18,7 +18,7 @@ read_when:
 > prevalgono [AGENTS.md](../AGENTS.md) e
 > [docs/repository-topology.md](./repository-topology.md).
 
-Ultimo aggiornamento: 2026-09-06 (candidato sorgente v0.8.6; promozione aperta)
+Ultimo aggiornamento: 2026-09-07 (candidato sorgente v0.8.6; promozione aperta)
 
 Nota candidato 0.8.6: [ADR 0119](./adr/0119-anydoc-apple-vision-current-source.md)
 chiarisce la precedenza del percorso AnyDoc + Apple Vision descritto qui.
@@ -35,7 +35,7 @@ non sono verifiche della release 0.8.6.
 
 ---
 
-## Aggiornamento di candidatura: 6 settembre 2026
+## Aggiornamento di candidatura: 6–7 settembre 2026
 
 Il [verbale integrato 0.8.6](./analysis/2026-09-06-086-integrated-closeout.md)
 conserva le prove storiche e registra i controlli sul candidato corrente.
