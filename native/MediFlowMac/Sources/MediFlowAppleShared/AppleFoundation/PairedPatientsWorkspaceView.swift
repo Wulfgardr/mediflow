@@ -343,20 +343,21 @@ struct PairedPatientsWorkspaceView: View {
     }
 
     #if os(iOS)
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     #endif
 
     #if !os(macOS)
     /// Whether the container that was actually handed to the workspace can host
-    /// list and chart side by side. The size class is not consulted: it reports
-    /// "not a phone", not how much width this workspace received, and on iPad the
-    /// same app is resized continuously.
+    /// list and chart side by side. Width follows the actual container; compact
+    /// vertical size class additionally preserves room for the clinical content
+    /// when a wide phone rotates. Keyboard changes do not remount the editor.
     private func usesSplitLayout(containerWidth: CGFloat) -> Bool {
         // Before the first measurement lands, stay in the single column: it is
         // the arrangement that is correct at every width.
         PatientsWorkspaceLayout.usesSideBySide(
             containerWidth: containerWidth,
-            isAccessibilitySize: dynamicTypeSize.isAccessibilitySize
+            isAccessibilitySize: dynamicTypeSize.isAccessibilitySize,
+            isCompactHeight: verticalSizeClass == .compact
         )
     }
     #endif
@@ -425,6 +426,7 @@ struct PairedPatientsWorkspaceView: View {
                 }
                 .frame(width: PatientsWorkspaceLayout.detailWidth(forContainerWidth: containerWidth))
                 .background(PlatformColors.chartCardSurface)
+                .accessibilityElement(children: .contain) // @Codex: Preserve child navigation identifiers.
                 .accessibilityIdentifier("patient-workspace-detail")
             }
         } else {
@@ -511,8 +513,19 @@ struct PairedPatientsWorkspaceView: View {
         .background(PlatformColors.chartCardSurface)
         .navigationTitle(model.activePatientSection.title)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            // @Codex: On a short viewport the navigation bar carries context;
+            // stacking two more pinned rows would cover the editor above a keyboard.
+            if verticalSizeClass == .compact,
+               let detail = model.selectedPatient, detail.id == compactPatientID {
+                ToolbarItem(placement: .principal) {
+                    compactHeightPatientNavigation(detail)
+                }
+            }
+        }
         .safeAreaInset(edge: .top, spacing: 0) {
-            if let detail = model.selectedPatient, detail.id == compactPatientID {
+            if verticalSizeClass != .compact,
+               let detail = model.selectedPatient, detail.id == compactPatientID {
                 VStack(spacing: 0) {
                     compactPatientHeader(detail)
                     patientSectionPicker
@@ -521,6 +534,33 @@ struct PairedPatientsWorkspaceView: View {
                 .background(PlatformColors.chartCardSurface)
             }
         }
+    }
+
+    /* @Codex */
+    private func compactHeightPatientNavigation(_ detail: HomeBasePatientDetail) -> some View {
+        HStack(spacing: 12) {
+            Text("\(detail.lastName) \(detail.firstName)")
+                .font(.headline)
+                .lineLimit(1)
+                .accessibilityAddTraits(.isHeader)
+                .accessibilityIdentifier("patient-workspace-header")
+            Menu {
+                Picker("Sezione clinica", selection: $model.activePatientSection) {
+                    ForEach(PatientWorkspaceSection.allCases) { section in
+                        Label(section.title, systemImage: section.symbolName).tag(section)
+                    }
+                }
+            } label: {
+                Label(model.activePatientSection.title, systemImage: "chevron.down")
+                    .font(.subheadline)
+                    .frame(minWidth: 44, minHeight: 44)
+            }
+            .accessibilityLabel("Sezione clinica")
+            .accessibilityValue(model.activePatientSection.title)
+            .accessibilityIdentifier("patient-section-picker")
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("patient-section-navigation")
     }
 
     /* @Codex: The wide chart always states identity and recency. */

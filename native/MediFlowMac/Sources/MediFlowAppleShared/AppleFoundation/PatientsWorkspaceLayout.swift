@@ -70,8 +70,14 @@ enum PatientsWorkspaceLayout {
     ///
     /// Accessibility text sizes always collapse to one column: two columns of
     /// accessibility-sized clinical text are two truncated columns.
-    static func usesSideBySide(containerWidth: CGFloat, isAccessibilitySize: Bool) -> Bool {
-        guard !isAccessibilitySize else { return false }
+    static func usesSideBySide(
+        containerWidth: CGFloat,
+        isAccessibilitySize: Bool,
+        isCompactHeight: Bool = false
+    ) -> Bool {
+        // @Codex: A wide, short viewport still needs one full clinical column.
+        // Size class describes available height here, never device identity.
+        guard !isAccessibilitySize, !isCompactHeight else { return false }
         guard containerWidth.isFinite, containerWidth > 0 else { return false }
         return detailWidth(forContainerWidth: containerWidth) >= minimumDetailWidth
     }
