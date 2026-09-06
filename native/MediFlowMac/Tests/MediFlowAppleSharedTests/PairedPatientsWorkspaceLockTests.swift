@@ -21,7 +21,7 @@ final class PairedPatientsWorkspaceLockTests: XCTestCase {
         model.newProstheticClinicalReason = "Motivo sintetico"
         model.startEditingPatient()
         model.editPatientNotes = "Modifica sintetica"
-        model.password = "1234"
+        model.password = LockReadFixture.pin
         XCTAssertNotNil(model.clinicalWorkspaceConnection?.masterKey)
         XCTAssertFalse(model.entries.isEmpty)
         XCTAssertFalse(model.editEntryEditorDocument.isEffectivelyEmpty)
@@ -87,7 +87,7 @@ final class PairedPatientsWorkspaceLockTests: XCTestCase {
         let started = h.transport.hold(LockReadFixture.logout)
         let locking = Task { await h.model.lockSessionNow() }
         await fulfillment(of: [started], timeout: 5)
-        h.model.password = "1234"
+        h.model.password = LockReadFixture.pin
         await h.model.login()
         let loginStatus = h.model.statusMessage
         XCTAssertEqual(h.model.operatorIdentity?.userId, "new-operator-fixture")
@@ -127,7 +127,7 @@ final class PairedPatientsWorkspaceLockTests: XCTestCase {
             await fulfillment(of: [started], timeout: 5)
             await h.model.lockSessionNow()
             if loginAgain {
-                h.model.password = "1234"
+                h.model.password = LockReadFixture.pin
                 await h.model.login()
             }
             let status = h.model.statusMessage
@@ -177,12 +177,12 @@ final class PairedPatientsWorkspaceLockTests: XCTestCase {
 
     init(test: XCTestCase) throws {
         let id = UUID().uuidString
-        let host = "lock-\(id.lowercased()).invalid"
-        context = OfflineCacheFixture.context(server: "https://\(host)")
+        let fixtureID = id.lowercased()
+        context = OfflineCacheFixture.context(server: "https://localhost/" + fixtureID)
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("LockReadTests-\(id)")
         cache = HomeBasePatientCacheStore(cacheDirectory: directory, keyProvider: { OfflineCacheFixture.key })
         transport = LockReadTransport()
-        LockReadURLProtocol.register(transport, host: host)
+        LockReadURLProtocol.register(transport, host: fixtureID)
         let configuration = URLSessionConfiguration.ephemeral
         configuration.httpShouldSetCookies = false
         configuration.protocolClasses = [LockReadURLProtocol.self]
@@ -203,7 +203,7 @@ final class PairedPatientsWorkspaceLockTests: XCTestCase {
             entries: [LockReadFixture.entry])
         test.addTeardownBlock {
             session.invalidateAndCancel()
-            LockReadURLProtocol.remove(host: host)
+            LockReadURLProtocol.remove(host: fixtureID)
             defaults.removePersistentDomain(forName: id)
             if FileManager.default.fileExists(atPath: directory.path) { try FileManager.default.removeItem(at: directory) }
         }
@@ -211,6 +211,7 @@ final class PairedPatientsWorkspaceLockTests: XCTestCase {
 }
 
 enum LockReadFixture {
+    static let pin = String(Int.random(in: 100_000...999_999))
     static let logout = "/api/auth/native/logout"
     static let patients = "/api/v1/network/patients"
     static let patient = patients + "/p1"
@@ -264,7 +265,7 @@ final class LockReadTransport: @unchecked Sendable {
         return started
     }
     func start(_ request: LockReadURLProtocol) {
-        let path = request.request.url!.path
+        let path = request.route
         let started = lock.withLock {
             let value = expectations.removeValue(forKey: path)
             if value != nil { held[path] = request }
@@ -281,7 +282,7 @@ final class LockReadTransport: @unchecked Sendable {
     }
     private func respond(_ request: LockReadURLProtocol, status: Int = 200, data: Data? = nil) {
         do {
-            let payload = try data ?? (status == 204 || status >= 400 ? Data() : LockReadFixture.data(for: request.request.url!.path))
+            let payload = try data ?? (status == 204 || status >= 400 ? Data() : LockReadFixture.data(for: request.route))
             request.respond(data: payload, status: status)
         } catch { request.client?.urlProtocol(request, didFailWithError: error) }
     }
@@ -295,13 +296,14 @@ final class LockReadURLProtocol: URLProtocol, @unchecked Sendable {
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
     override func startLoading() {
-        guard let transport = Self.lock.withLock({ Self.transports[request.url?.host ?? ""] }) else {
+        guard let transport = Self.lock.withLock({ Self.transports[request.url?.pathComponents.dropFirst().first ?? ""] }) else {
             client?.urlProtocol(self, didFailWithError: URLError(.unsupportedURL))
             return
         }
         transport.start(self)
     }
     override func stopLoading() {}
+    var route: String { "/" + (request.url?.pathComponents.dropFirst(2).joined(separator: "/") ?? "") }
     func respond(data: Data, status: Int) {
         guard let url = request.url,
               let response = HTTPURLResponse(url: url, statusCode: status, httpVersion: nil,

@@ -12,7 +12,7 @@ import XCTest
         await fulfillment(of: [started], timeout: 5)
         // No view .task/load call is required for the retained models to clear.
         for probe in models { XCTAssertTrue(probe.empty(), probe.name) }
-        h.model.password = "1234"
+        h.model.password = LockReadFixture.pin
         await h.model.login()
         try h.transport.release(LockReadFixture.logout, status: 204)
         await locking.value
