@@ -127,7 +127,6 @@ async function assertWorklistContract(page: Page, marker: string): Promise<void>
   const rowSurfaces = await Promise.all([firstRow, secondRow].map((row) => row.evaluate((element) => {
     const style = getComputedStyle(element);
     return {
-      background: style.backgroundColor,
       boxShadow: style.boxShadow,
       borderLeftWidth: style.borderLeftWidth,
       borderTopWidth: style.borderTopWidth,
@@ -137,7 +136,13 @@ async function assertWorklistContract(page: Page, marker: string): Promise<void>
       borderTopStyle: style.borderTopStyle,
     };
   })));
-  expect(rowSurfaces[1].background).not.toBe(rowSurfaces[0].background);
+  // @Codex: selection attributes can update before the background transition.
+  await expect.poll(async () => {
+    const backgrounds = await Promise.all([firstRow, secondRow].map((row) =>
+      row.evaluate((element) => getComputedStyle(element).backgroundColor),
+    ));
+    return backgrounds[1] !== backgrounds[0];
+  }).toBe(true);
   expect(rowSurfaces[1].boxShadow).not.toBe(rowSurfaces[0].boxShadow);
   expect(rowSurfaces[1].borderLeftWidth).toBe(rowSurfaces[1].borderTopWidth);
   expect(rowSurfaces[1].borderLeftColor).toBe(rowSurfaces[1].borderTopColor);
