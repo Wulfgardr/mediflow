@@ -1,0 +1,29 @@
+/* @Codex WUL-684: keep the checkup panel anchored on wide layouts while the
+   narrow layout uses the trigger's viewport coordinates to stay reachable. */
+.popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 40;
+  width: 22rem;
+  max-width: calc(100vw - 1rem);
+  min-width: 190px;
+  box-sizing: border-box;
+  padding: 1rem;
+}
+
+@media (max-width: 760px) {
+  .popover {
+    position: fixed;
+    top: var(--checkup-popover-top, 0.5rem);
+    left: var(--checkup-popover-left, 0.5rem);
+    right: auto;
+    width: min(22rem, calc(100vw - 1rem));
+    min-width: 0;
+    max-width: calc(100vw - 1rem);
+    max-height: calc(100dvh - var(--checkup-popover-top, 0.5rem) - 0.5rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+}

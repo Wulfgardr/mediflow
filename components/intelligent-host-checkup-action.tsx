@@ -3,18 +3,24 @@
 /* @Codex */
 
 import { Clipboard, ShieldCheck } from 'lucide-react';
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type CSSProperties } from 'react';
 
 import workspaceStyles from '@/components/kree8/kree8-workspace-shell.module.css';
 import { notifyDbChange } from '@/lib/live-query';
 import { IntelligentHostCheckupBrowserAdapterError,
   createIntelligentHostCheckupBrowserAdapter } from '@/lib/security/intelligent-host-checkup-browser-adapter';
 
+import popoverStyles from './intelligent-host-checkup-action.module.css';
+
 type Checkup = Readonly<{ id: string; title: string; status?: string; version?: number }>;
 type Proposal = Readonly<{ proposalRef: string; targetStatus: 'completed' | 'cancelled';
   expectedRevision: number; expiresAt: number; resourceTitle: string; resourceRevision: number }>;
 type SelectedResource = Readonly<{ checkupId: string; title: string; revision: number }>;
+type PopoverPosition = Readonly<{ top: number; left: number }>;
 const actionClass = `${workspaceStyles.headerActionButton} min-h-11 min-w-11 sm:min-w-0 disabled:cursor-not-allowed disabled:opacity-[0.55]`;
+const POPOVER_GUTTER = 8;
+const POPOVER_MAX_WIDTH = 22 * 16;
+const POPOVER_MIN_HEIGHT = 160;
 function status(error: unknown): string {
   if (!(error instanceof IntelligentHostCheckupBrowserAdapterError)) return 'Operazione non verificabile.';
   if (error.code === 'session_unavailable') return 'Sessione non disponibile.';
@@ -41,6 +47,8 @@ export function IntelligentHostCheckupAction({ patientId, ambulatoryId, checkups
   const [selectedResource, setSelectedResource] = useState<SelectedResource | null>(null);
   const [committed, setCommitted] = useState(false);
   const [message, setMessage] = useState('Attiva prima l’Host intelligente, poi abilita il ruolo checkup.');
+  const actionButtonRef = useRef<HTMLButtonElement>(null);
+  const [popoverPosition, setPopoverPosition] = useState<PopoverPosition | null>(null);
   const mounted = useRef(true), statusId = useId(), pinId = useId(), proposalId = useId();
   useEffect(() => {
     mounted.current = true; client.reset(); setSelectedId('');
@@ -55,6 +63,33 @@ export function IntelligentHostCheckupAction({ patientId, ambulatoryId, checkups
     setSelectedId((current) => checkupRef || pendingCheckups.some((item) => item.id === current)
       ? current : firstPendingCheckupId);
   }, [checkupRef, firstPendingCheckupId, pendingCheckupKey, pendingCheckups]);
+  useEffect(() => {
+    if (!open) {
+      setPopoverPosition(null);
+      return;
+    }
+    const updatePopoverPosition = () => {
+      const actionButton = actionButtonRef.current;
+      if (!actionButton) return;
+      const rect = actionButton.getBoundingClientRect();
+      const viewportWidth = document.documentElement.clientWidth || window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const panelWidth = Math.min(POPOVER_MAX_WIDTH, viewportWidth - POPOVER_GUTTER * 2);
+      const maxTop = Math.max(POPOVER_GUTTER, viewportHeight - POPOVER_MIN_HEIGHT - POPOVER_GUTTER);
+      const maxLeft = Math.max(POPOVER_GUTTER, viewportWidth - panelWidth - POPOVER_GUTTER);
+      setPopoverPosition({
+        top: Math.min(rect.bottom + 6, maxTop),
+        left: Math.min(Math.max(POPOVER_GUTTER, rect.left), maxLeft),
+      });
+    };
+    updatePopoverPosition();
+    window.addEventListener('resize', updatePopoverPosition);
+    window.addEventListener('scroll', updatePopoverPosition, true);
+    return () => {
+      window.removeEventListener('resize', updatePopoverPosition);
+      window.removeEventListener('scroll', updatePopoverPosition, true);
+    };
+  }, [open]);
   const run = async (operation: (candidatePin: string) => Promise<void>, needsPin = false) => {
     if (busy || (needsPin && pin.length < 4)) return;
     const candidatePin = pin; if (needsPin) setPin(''); setBusy(true);
@@ -106,16 +141,20 @@ export function IntelligentHostCheckupAction({ patientId, ambulatoryId, checkups
       if (mounted.current) setMessage('Riferimento opaco copiato.'); }
     catch { if (mounted.current) setMessage('Copia non disponibile: seleziona il riferimento mostrato.'); }
   };
+  const popoverStyle = popoverPosition ? {
+    '--checkup-popover-top': `${popoverPosition.top}px`,
+    '--checkup-popover-left': `${popoverPosition.left}px`,
+  } as CSSProperties : undefined;
 
   return (
     <div className={workspaceStyles.headerActionsMenu} data-testid="intelligent-host-checkup-action">
-      <button type="button" className={actionClass} data-lume-action="quiet" aria-expanded={open}
+      <button ref={actionButtonRef} type="button" className={actionClass} data-lume-action="quiet" aria-expanded={open}
         aria-controls={statusId} aria-label="Checkup host" title="Checkup host"
         onClick={() => setOpen((value) => !value)}>
         <ShieldCheck size={14} aria-hidden="true" /><span className="hidden sm:inline">Checkup host</span>
       </button>
       {open ? (
-        <div id={statusId} className={`mf-popover ${workspaceStyles.headerActionsPopover} w-[22rem] max-w-[calc(100vw-2rem)] space-y-3 p-4 text-xs`}>
+        <div id={statusId} style={popoverStyle} className={`mf-popover ${popoverStyles.popover} space-y-3 text-xs`}>
           <p className="font-semibold">Transizione checkup controllata</p>
           <p role="status" aria-live="polite" aria-atomic="true">{message}</p>
           <label htmlFor={pinId} className="mf-field-label">PIN fresco</label>
