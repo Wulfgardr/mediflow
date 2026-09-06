@@ -19,6 +19,7 @@ export function buildFhirBundleFromRecords(input: FhirBundleInput): Bundle {
     const bundle: Bundle = {
         resourceType: "Bundle",
         type: "collection",
+        timestamp: new Date(input.generatedAt).toISOString(),
         entry: []
     };
 

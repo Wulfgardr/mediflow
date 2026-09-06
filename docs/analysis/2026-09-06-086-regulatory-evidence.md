@@ -3,6 +3,8 @@
 Data di ricerca: **2026-09-06**, Europe/Rome. Lane **WUL-685 / WUL-688**.
 Baseline esaminata: **`c160bdce250c0120682f45e3dd1a9d587f7b9935`**,
 branch `codex/WUL-685-086-compliance`, worktree `mediflow-086-compliance`.
+Seguito tecnico **WUL-686/687**, stesso giorno, da `c10b21a24c3763ea9b58b47ff224b9fdc506b94b`:
+delta P2/P9 e verifiche locali nelle sezioni 6.1 e 7.
 
 **Esito: matrice candidata per revisione; gate giuridico-regolatorio aperto.**
 La ricerca documenta requisiti, condizioni ed evidenze nel sorgente pubblico.
@@ -19,7 +21,7 @@ ARCHITECTURE, la guida [privacy e AI](../privacy-and-ai-governance.md),
 README e STATE_OF_THE_SYSTEM descrivono ancora una fotografia sorgente 0.8.5;
 le loro vecchie verifiche non sono prove sul candidato 0.8.6.
 
-L'ispezione è statica: file pubblicabili della repository, senza database,
+La prima fase è un'ispezione statica: file pubblicabili della repository, senza database,
 configurazioni effettive, credenziali, dati clinici, servizi avviati o contatti
 esterni. Le fonti normative sono state rilette online; la data di consultazione
 non coincide con la data di pubblicazione o di applicazione della norma.
@@ -94,11 +96,11 @@ non eseguito in questa lane è soltanto una possibile superficie di verifica.
 | E1 | [ADR 0065](../adr/0065-intended-purpose-and-claims-guard.md), [privacy e AI](../privacy-and-ai-governance.md), [COMPLIANCE](../COMPLIANCE.md) | Finalità assistiva e claim ammessi. ADR 0065 è `Accepted`, 24/05/2026; non è una decisione MDR o una nomina privacy. |
 | E2 | [SECURITY](../../SECURITY.md), [ARCHITECTURE](../../ARCHITECTURE.md), [campi cifrati](../../lib/db.ts), [primitive crittografiche](../../lib/security/security.ts) | `ENCRYPTED_FIELDS`, cifratura per campo, confini auth e topologia dichiarati. Non cifratura integrale né prova della macchina dell'operatore. |
 | E3 | [cascade paziente](../../lib/patient-cascade.ts), [purge admin](../../app/api/system/purge-patient/route.ts), SECURITY | Distinzione tombstone/purge, conteggi dry-run e sessione admin. La purge del database live non raggiunge copie esportate. |
-| E4 | [mapper FHIR](../../lib/fhir/bundle-mapper.ts), COMPLIANCE | Mappatura di Patient, Condition, Encounter, MedicationStatement e Observation; non un export completo di tutti i dati personali e degli allegati. |
+| E4 | [mapper FHIR](../../lib/fhir/bundle-mapper.ts), [test mapper](../../lib/fhir/bundle-mapper.test.ts), [test report PDF](../../lib/report-service.test.ts), COMPLIANCE | Mappatura di Patient, Condition, Encounter, MedicationStatement e Observation; copertura per categoria in §6.1. Non un export completo di tutti i dati personali e degli allegati. |
 | E5 | [ADR retention](../adr/0023-backup-retention-policy-keep-last-n.md), [preflight](../../lib/backup-restore-preflight.ts), [formato backup](../../lib/backup-artifact.ts), [drill](../../scripts/backup-restore-drill.mjs) | Contratti e strumenti presenti. `keep-last-N` copre file dello scheduler; nessun drill eseguito qui né periodo legale di conservazione determinato. |
 | E6 | [matrice runtime](../ai-runtime-serving-matrix.md), [gate egress](../../lib/ai-egress-gate.ts), [stato Fabric](../../lib/ai-providers/fabric/status.ts) | Quattro percorsi generativi `proposal_only`; `available_unqualified`; gate narrativo chiuso. Le classi Fabric `deterministic/generative` non sono qualificazioni giuridiche. |
 | E7 | [contratto Treatment Reasoning](../../lib/treatment-reasoning-contract.ts), [contratto output ATHENA v2](../../lib/ai-providers/fabric/treatment-reasoning-athena-output-contract-v2.ts) | `recommendation`, `safetyFlags`, azioni di review/prefill; output v2 con `writesPerformed: 0` e `applyPolicy: none`. Motivo concreto per lo screening MDR per funzione. |
-| E8 | [inventario compliance](../../lib/compliance-evidence-inventory.ts), [test inventario](../../lib/compliance-evidence-inventory.test.ts), [E2E compliance](../../e2e/settings-compliance.spec.ts) | Inventario statico `mediflow.compliance-evidence.v1`, `technical_evidence_inventory_only`, `legalVerdict: not_assessed`. I test non sono eseguiti qui. |
+| E8 | [inventario compliance](../../lib/compliance-evidence-inventory.ts), [test inventario](../../lib/compliance-evidence-inventory.test.ts), [E2E compliance](../../e2e/settings-compliance.spec.ts) | Inventario statico `mediflow.compliance-evidence.v1`, `technical_evidence_inventory_only`, `legalVerdict: not_assessed`. Riferimenti versionati aggiornati in P9; test unitari eseguiti nel seguito tecnico, E2E non eseguito. |
 | E9 | [claims guard](../../scripts/check-claims-guard.mjs), [ADR 0092](../adr/0092-limite-digest-bound-readiness-ai-locale.md), SECURITY | Guard testuale e limiti di readiness. Non audit legale, qualifica clinica o prova di assenza di egress del processo reale. |
 
 Le policy tecniche e gli ADR accettati sono **documenti adottati nel progetto**.
@@ -207,8 +209,8 @@ contesto sanitario. Il rinvio AI non sospende eventuali obblighi MDR.
 
 ## 6. Delta che il parent può preparare senza inventare autorità
 
-Gli interventi runtime seguenti sono proposte per le lane autorizzate del
-parent, non modifiche eseguite qui. Nessun gap legale diventa chiuso solo perché
+Gli interventi seguenti sono proposte per le lane autorizzate del parent;
+il seguito tecnico locale su P2/P9 è descritto in §6.1. Nessun gap legale diventa chiuso solo perché
 è stato scritto un template o perché un test è verde.
 
 | Delta / collegamento | Risultato preparabile | Verifica di accettazione proposta | Decisione o prova che resta esterna |
@@ -226,6 +228,46 @@ parent, non modifiche eseguite qui. Nessun gap legale diventa chiuso solo perch�
 Questo file e i piccoli raccordi in COMPLIANCE/privacy sono documentazione
 candidata. Gli indici globali restano al parent per espressa delimitazione
 della lane; nessun loro aggiornamento è incluso nella patch.
+
+### 6.1. Seguito tecnico P2/P9: copertura osservata e correzione circoscritta
+
+**P9:** E8 ora rinvia ai consolidati G1/A1 tramite CELEX versionato e a C1;
+le etichette distinguono data del testo e consultazione del 06/09/2026.
+Restano `not_assessed`, schema v1 e inventario statico. Le due eccezioni URL
+già dedicate all'inventario nel [guard](../../scripts/never-regress-allowlist.mjs)
+sono limitate ai tre riferimenti; il test verifica anche il rifiuto di URL o
+file diversi. Nessuna richiesta di rete è introdotta nell'inventario.
+
+**P2:** confronto fra [ADR 0081](../adr/0081-fhir-r4-export-v0-contract.md),
+mapper/generator FHIR e [report PDF](../../lib/report-service.ts).
+I test riusano in sola lettura il [golden sintetico v1](../../native/contracts/fhir-golden-input.v1.json)
+e la fixture PDF esistente. Quest'ultima ora contiene 31 voci per verificare
+il limite di 30. Le assenze fuori DTO/argomenti derivano dalla lettura del
+contratto e dei consumer, senza inventare fixture per categorie non accettate.
+
+| Categoria | FHIR v0 effettivo | PDF effettivo | Evidenza / limite |
+| --- | --- | --- | --- |
+| Identità, codice fiscale, nascita, indirizzo, telefono | Campi selezionati di `Patient` | Anagrafica della scheda | Golden/test mapper; fixture/test PDF e sorgente. Nessun dossier anagrafico completo. |
+| Caregiver, profilo e note globali | Il mapper legacy include caregiver; profilo/note assenti | Caregiver, profilo e note presenti | Sorgenti; test PDF sui campi e sulla sezione note. ADR v2 esclude caregiver: debito già dichiarato, non nuova copertura. |
+| Diagnosi | `Condition`: codice/testo, con semantica temporale legacy | Sistema, codice, descrizione, data | Test mapper/PDF; `onsetDateTime` e stato implicito restano debito ADR v2. |
+| Diario: date/tipo e testo | `Encounter` per voce non eliminata; testo/titolo ordinari assenti | Testo semplice delle prime 30 voci ricevute, escluse scale e voci eliminate | Test mapper sulle omissioni e tombstone; test PDF confronta tutte le 30 righe. Il limite PDF non viene rimosso. |
+| Terapie | Farmaco testuale, stato, dose, periodo, motivazione; fixture attiva/sospesa conservata | Solo terapie attive, dose, principio attivo e motivazione | Test mapper/PDF; completate escluse dal PDF. Nessuna nuova storia terapeutica PDF. |
+| Scale | `Observation` con punteggio numerico, data e nota | Scale ricevute dal chiamante, punteggio e interpretazione | Test mapper/adapter/PDF, incluso zero. Encounter aggiuntivo legacy e validazione int32 restano debito v2. |
+| Osservazioni strutturate | Codice, valore numerico, unità e nota; il sorgente legacy ammette anche `valueString` | Codice, valore, unità, data e nota | Test mapper/PDF sui valori; `valueString` e validazione terminologica restano debito v2. |
+| Checkup, esenzioni | Assenti dal Bundle; il generator legge ancora checkup | Assenti | Test mapper e lettura dei consumer. Esclusi dall'ADR v0; rimuovere la lettura checkup appartiene alla migrazione. |
+| Allegati, documenti, derivati AI, audit | Nessun mapping nel DTO v1 | Nessun parametro/sezione dedicata | Solo evidenza statica. Il testo già salvato nel diario può comparire nel PDF, senza provenienza AI strutturata. Non aggiungere risorse o sezioni senza decisione di contratto. |
+| Copie e backup | Non coperti dal Bundle paziente | Non coperti dalla scheda PDF | P3 resta separato; nessun drill o prova di completezza delle copie in questo seguito. |
+| Istante di generazione | **Corretto:** `Bundle.timestamp` usa `generatedAt` già disponibile | Data/ora di generazione già renderizzate | Test di regressione FHIR fallito prima del fix, passato con stringa con offset e oggetto `Date`, anche dopo serializzazione JSON. |
+
+Il fix runtime è una sola proprietà del Bundle, prevista da ADR 0081: non
+cambia DTO, route o categorie. Il golden v1 resta storico e invariato; nessuna
+parità Apple/v2 è attestata. `Patient.meta.lastUpdated` usa ancora l'istante
+di export: non è prova dell'ultimo aggiornamento clinico. Restano inoltre
+UUID/ordinamento, filtri lifecycle di paziente/terapie/osservazioni e controlli
+semantici della migrazione v2. Questi debiti non sono risolti dal timestamp.
+GT3 (rettifica e derivati) e la completezza della risposta ex GT4/GO7 restano
+aperti; le esclusioni dei due export non autorizzano a escludere le stesse
+categorie dalla valutazione di una richiesta concreta.
 
 ## 7. Gate di revisione competente e consegna
 
@@ -246,7 +288,7 @@ Il dossier tecnico può avanzare con P1–P9 mentre queste decisioni restano
 aperte. **Il gate di conformità della sezione 7 della roadmap resta aperto**;
 una PR o un commit della documentazione non lo chiuderebbero.
 
-### Verifiche della lane
+### Verifiche della prima fase documentale
 
 Ispezioni eseguite: `git status --short`, `git branch --show-current`,
 `git rev-parse HEAD`, letture mirate con `sed`/`rg` e ricerca Markdown tracciata
@@ -266,10 +308,45 @@ Controlli documentali eseguiti:
   verso file tracciati o verso la nuova analisi; numero di colonne coerente
   in tutte le tabelle. Nessuna dipendenza aggiunta o connessione dal controllo.
 
-Il commit e l'esito finale del controllo staged sono registrati nel resoconto
-di consegna. I test runtime, i drill, la UI, le chiamate ai provider e la CI
-remota **non sono eseguiti in questa lane**. Nessuna pubblicazione, push, PR,
-modifica Linear, messaggio, nomina o modifica runtime è autorizzata o eseguita.
+Il commit documentale è `c10b21a24c3763ea9b58b47ff224b9fdc506b94b`.
+In questa prima fase non sono stati eseguiti test runtime, drill, UI, chiamate
+ai provider o CI remota. Il seguito tecnico autorizzato aggiunge i controlli
+seguenti e i soli messaggi di coordinamento al parent sui file e sulla consegna.
+
+### Verifiche del seguito tecnico WUL-686/687
+
+Node **24.19.0**, dipendenze clonate in modo indipendente con `cp -cR` dalla
+checkout primaria; SHA-256 del lockfile identico:
+`f4ae5e9e1bc78b74f7856f2a8e701d6d327c8c44ada729b738c7e55f983e4b93`.
+Baseline: 34/34 test (inventario, FHIR, report e suite PDF-service esistente).
+Prima dei fix: falliscono il controllo dei vecchi URL e quello del timestamp
+assente; dopo i fix la suite mirata passa **18/18**, senza skip.
+
+Comandi eseguiti nel worktree, con Node 24 nel `PATH`:
+
+```bash
+export PATH="/Users/leonardopegollo/.nvm/versions/node/v24.19.0/bin:$PATH"
+node scripts/run-strip-types.mjs --test lib/compliance-evidence-inventory.test.ts lib/fhir/bundle-mapper.test.ts lib/fhir/clinical-adapter.test.ts lib/fhir/id.test.ts lib/report-service.test.ts
+npm run lint
+npm run typecheck
+npm run check:claims
+npm run check:never-regress
+export NEXT_TELEMETRY_DISABLED=1
+export MEDIFLOW_DATA_DIR="$(mktemp -d /tmp/mediflow-wul686-build.XXXXXX)"
+npm run build
+git diff --check
+```
+
+Lint, typecheck, claims e never-regress passano. Build e postbuild passano
+(111 pagine statiche; controllo standalone Node 24.19.0/ABI 137), con cinque
+warning Turbopack di tracing del filesystem, fuori dai file runtime modificati.
+L'export PDF è verificato tramite il recorder jsPDF già nei test, non con un
+file PDF renderizzato. Nessun server clinico avviato, E2E/UI, gate HL7, prova
+di parità native, drill, provider o CI remota in questo seguito. I risultati
+sono locali e non attestano integrazione, chiusura dei ticket o conformità.
+Controllo documentale Python: 34 collegamenti locali risolti e 102 righe di
+tabella con colonne coerenti; inventario di 212 Markdown. Il diff comprende
+solo i sette file comunicati al parent, senza nuovi Markdown o indici globali.
 
 Per identificare il commit del documento senza inserirvi uno SHA autoreferenziale:
 
