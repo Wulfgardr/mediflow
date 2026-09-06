@@ -27,6 +27,33 @@
 .answer {
     min-width: 0;
 }
+/* @Codex WUL-676: one stable summary, with filters aligned to its first line. */
+:global(html[data-runtime-twin-design='proposal']) .focusSurface {
+    align-items: start;
+    grid-template-columns: minmax(0, 1.2fr) minmax(17rem, 0.8fr);
+    border-radius: 12px;
+    background: transparent;
+    padding: 24px;
+}
+:global(html[data-runtime-twin-design='proposal']) .filterField {
+    align-self: start;
+    border-left: 1px solid color-mix(in srgb, var(--lume-ink) 12%, transparent);
+    border-radius: 0;
+    background: transparent;
+    padding: 0 0 0 24px;
+}
+@media (max-width: 700px) {
+    :global(html[data-runtime-twin-design='proposal']) .focusSurface {
+        grid-template-columns: minmax(0, 1fr);
+        padding: 20px;
+        gap: 24px;
+    }
+    :global(html[data-runtime-twin-design='proposal']) .filterField {
+        border-left: 0;
+        border-top: 1px solid color-mix(in srgb, var(--lume-ink) 12%, transparent);
+        padding: 20px 0 0;
+    }
+}
 .answer h2 {
     max-width: 32ch;
     margin: 0.5rem 0 0;

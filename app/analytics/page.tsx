@@ -5,6 +5,8 @@ import { AlertTriangle, ShieldCheck } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 import { Kree8WorkspaceShell } from '@/components/kree8/kree8-workspace-shell';
+/* @Codex */
+import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
 import { db } from '@/lib/db';
 /* @Codex */
 import { buildAnalyticsStats, isAnalyticsPatient, normalizeAgeRange } from '@/lib/patient-analytics';
@@ -62,6 +64,8 @@ function SectionHeading({ label, title, description }: { label: string; title: s
 
 export default function AnalyticsPage() {
     /* @Codex */
+    const { proposal } = useRuntimeTwinDesign();
+    const navItems = proposal ? ANALYTICS_NAV_ITEMS.map(({ href, label }) => ({ href, label })) : ANALYTICS_NAV_ITEMS;
     const patients = useLiveQuery(async () => db.patients
         .filter(isAnalyticsPatient)
         .toArray(), [], undefined, ['patients', 'patients_to_ambulatories']);
@@ -114,13 +118,14 @@ export default function AnalyticsPage() {
     if (!patients || !stats) {
         return (
             <Kree8WorkspaceShell
+                variant="overview"
                 eyebrow="Analisi"
                 title="Cruscotto locale"
                 subtitle="Popolazione registrata e audit operativo, senza dati fuori dal dispositivo."
                 backHref="/?area=incarico"
                 backLabel="Torna ai pazienti"
                 statusLabel="Sto leggendo dal Mac..."
-                navItems={ANALYTICS_NAV_ITEMS}
+                navItems={navItems}
             >
                 <p className={styles.loadingState} role="status">Sto preparando l’analisi locale.</p>
             </Kree8WorkspaceShell>
@@ -129,13 +134,14 @@ export default function AnalyticsPage() {
 
     return (
         <Kree8WorkspaceShell
+            variant="overview"
             eyebrow="Analisi"
             title="Cruscotto locale"
             subtitle="Una domanda alla volta sui dati già registrati in questa postazione."
             backHref="/?area=incarico"
             backLabel="Torna ai pazienti"
             statusLabel={`${stats.totalInRange} schede tra ${normalizedAgeRange[0]} e ${normalizedAgeRange[1]} anni`}
-            navItems={ANALYTICS_NAV_ITEMS}
+            navItems={navItems}
         >
             <section
                 id="domanda"
@@ -161,7 +167,7 @@ export default function AnalyticsPage() {
                 </div>
 
                 <div className={styles.filterField} data-testid="analytics-filter-field">
-                    <p className={styles.sectionLabel}>Filtro quieto</p>
+                    <p className={styles.sectionLabel}>{proposal ? 'Fascia d’età' : 'Filtro quieto'}</p>
                     <label>
                         <span>Età minima</span>
                         <strong className="lume-registro">{ageRange[0]} anni</strong>
