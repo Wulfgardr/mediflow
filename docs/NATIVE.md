@@ -125,7 +125,7 @@ usa AES-GCM/Portachiavi, stessa sessione operatore sbloccata, pairing, scope e
 pin TLS, senza ripristino prima del login. Il TTL massimo e 24 ore: una copia
 scaduta restituisce solo timestamp, scadenza, conteggio e motivo, mai dati
 paziente. Il modello conserva anche l'ultimo profilo manuale letto online,
-con TTL separato e renderer read-only dedicato da montare a cura del parent.
+con TTL separato e renderer read-only dedicato nelle destinazioni compatta e affiancata.
 Sotto-risorse, artifact, export, scritture offline e coda di merge sono esclusi.
 Il fallback e limitato a indisponibilita/timeout di rete; 401/403 e problemi
 TLS non possono autorizzarlo.
@@ -280,7 +280,7 @@ Per la slice `WUL-556`, `patient search/show` (riga 1), `whoami` (riga 39) e
 `capabilities` (riga 63) sono disponibili in Mini, ma non colmano i residui
 nativi e non diventano grant. La cache offline (riga 45) resta `manual_only`
 con ragione `NOT_IN_MINI_PILOT`, mentre iPhone/iPadOS restano `partial` per
-integrazione parent del renderer profilo e verifica UI/device ancora aperte.
+renderer profilo integrato; verifica UI/device ancora aperta.
 I metadata stale sono collegati nel candidato; write queue e sotto-risorse
 restano escluse dal contratto, non un difetto di parity. Manifest, receipt,
 stato paired e token locale non conferiscono autorità agentica. La parity resta

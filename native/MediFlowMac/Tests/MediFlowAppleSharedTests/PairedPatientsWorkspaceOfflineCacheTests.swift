@@ -277,7 +277,7 @@ private final class OfflineCacheTransport: @unchecked Sendable {
         if !shouldHold { respond(request) }
     }
     private func respond(_ request: OfflineCacheURLProtocol) {
-        let mode = lock.withLock { mode }
+        let mode = lock.withLock { self.mode } // @Codex: Explicit property avoids initializer shadowing.
         switch mode {
         case .unreachable: request.client?.urlProtocol(request, didFailWithError: URLError(.notConnectedToInternet))
         case .status(let status): request.complete(status: status, data: Data())

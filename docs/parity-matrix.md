@@ -141,7 +141,7 @@ deducono da questa matrice statica.
 | SISS / PRREG | `HOST-ONLY` per integrazione, utilità PRREG parziale | web con pannello/diario; Apple copia il CF e apre la dashboard PRREG dal paziente | FSE, stato sessione, diario handoff e canale regionale restano sul Mac o fuori scope |
 | Viste globali | `MIXED` | agenda, diario globale, analytics e interazione macOS reale | shell/deep-link e cockpit sintetico restano partial |
 | Documenti | `PARTIAL` e policy-limited | upload cifrato, archivio, insight, follow-up, allegati e stati web verificati | OCR e curation restano host per ADR 0076; questa divisione intenzionale non è equivalenza mancante |
-| Offline mobile | `PARTIAL` | cache cifrata derivata, TTL/stale live e ultimo profilo read-only nel candidato WUL-676 | Montaggio renderer parent e verifica UI/device (`WUL-403`) |
+| Offline mobile | `PARTIAL` | cache cifrata derivata, TTL/stale live e ultimo profilo read-only nel candidato WUL-676 | Verifica UI/device del renderer integrato (`WUL-403`) |
 | AI generativa, Fabric e governance | `HOST-ONLY` | stato runtime/kill switch leggibile; registro Fabric read-only (16 capability, 4 venue, profili egress) e parliament/readiness del nodo host | ADR 0076 esclude l'invocazione AI paired; il registro e la governance descrivono il calcolo della macchina host, quindi non sono gap del client Apple |
 | Backup, diagnostica, repertori, update | `HOST-ONLY` | gestiti dal nodo Mac autorevole | non sono gap di parity client |
 
@@ -182,8 +182,7 @@ scadenza sono restituiti solo metadata non identificativi, senza dati paziente.
 ADR 0048 vincola la lettura alla stessa sessione operatore sbloccata, pairing,
 ambulatorio e pin TLS; 401/403, errori TLS e risposte non conformi non
 attivano il fallback. Lo store e il modello conservano anche l'ultimo profilo
-manuale entro TTL, con renderer read-only dedicato da montare nel layout del
-parent. Test sintetici e build Xcode iOS/macOS sono evidenza candidata locale;
+manuale entro TTL, con renderer read-only dedicato nelle destinazioni compatta e affiancata. Test sintetici e build Xcode iOS/macOS sono evidenza candidata locale;
 integrazione e verifica UI/device restano aperte, quindi la riga resta `partial`.
 Sotto-risorse, artifact AI/documentali, export e write queue sono esclusioni
 esplicite del contratto, non funzionalita mancanti da aggiungere implicitamente.
@@ -206,7 +205,7 @@ sono `HOST_AUTHORITY_ONLY`, 38 `NOT_IN_MINI_PILOT` e 1
 | --- | --- | --- | --- |
 | 1 — anagrafica paziente | `available`: `patient search`, `patient show` | `partial` | Mini copre ricerca/dettaglio; la riga Apple resta più ampia e mancano assign/unassign/move/duplicate |
 | 39 — blocco/stato sessione | `available`: `whoami` | `full-parity` nella matrice Apple; stati visuali coperti dalla slice | `whoami`, pairing o token locale non sono un grant agentico |
-| 45 — cache offline | `manual_only`: `NOT_IN_MINI_PILOT` | `partial` | Candidato WUL-676: metadata stale live e cache cifrata lista/ultimo profilo; montaggio renderer e verifica UI/device al parent. Write queue esclusa da ADR 0048 |
+| 45 — cache offline | `manual_only`: `NOT_IN_MINI_PILOT` | `partial` | Candidato WUL-676: metadata stale live e cache cifrata lista/ultimo profilo; renderer integrato, verifica UI/device aperta. Write queue esclusa da ADR 0048 |
 | 63 — discovery capability | `available`: `capabilities` | `full-parity` per consumo API | Il manifest descrive capability; non autorizza operazioni cliniche |
 
 `open-loops` (riga 11) è la quarta riga Mini `available`, ma non appartiene alla

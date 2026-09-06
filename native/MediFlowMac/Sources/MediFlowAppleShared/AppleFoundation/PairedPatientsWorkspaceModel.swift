@@ -4284,7 +4284,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             }
             guard list.patients.contains(where: { $0.id == patientID }),
                   let profile = try cacheStore.loadPatientDetail(patientID: patientID, context: context) else {
-                statusMessage = "Profilo non disponibile nella cache. Ricollega il Mac per aprirlo."
+                statusMessage = "Profilo non disponibile nella cache. Ricollega l’home-base per aprirlo."
                 return
             }
             cachedProfileMetadata = profile.metadata
@@ -4298,8 +4298,8 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             cachedPatientProfile = profile.patient.map { PatientFieldCrypto.decryptDetail($0, masterKey: masterKey) }
             reconciliationLine = profile.metadata.reviewLine
             statusMessage = profile.patient == nil
-                ? "Profilo locale scaduto. Ricollega il Mac."
-                : "Profilo da cache, sola lettura. Le altre sezioni richiedono il Mac collegato."
+                ? "Profilo locale scaduto. Ricollega l’home-base."
+                : "Profilo da cache, sola lettura. Le altre sezioni richiedono l’home-base collegato."
             scheduleCacheExpiry()
         } catch {
             errorMessage = "Profilo locale non leggibile: \(error.localizedDescription)"

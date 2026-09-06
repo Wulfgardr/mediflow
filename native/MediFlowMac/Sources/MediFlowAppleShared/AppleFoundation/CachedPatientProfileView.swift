@@ -13,10 +13,11 @@ struct CachedPatientProfileView: View {
                 .font(.headline)
             Text("\(profile.lastName) \(profile.firstName)")
                 .font(.title2.bold())
+                .accessibilityHeading(.h1)
             if let metadata {
                 Text(metadata.reviewLine).font(.subheadline).foregroundStyle(.secondary)
             }
-            Text("Ultimo profilo consultato sul Mac, versione \(profile.version). Diario, terapie, controlli, misure, prescrizioni e documenti richiedono il collegamento. Questa copia non consente modifiche o esportazioni.")
+            Text("Versione \(profile.version) acquisita dall’home-base. Le altre sezioni della cartella richiedono il collegamento.")
                 .font(.subheadline)
             Divider()
             field("Data di nascita", profile.birthDate?.formatted(date: .numeric, time: .omitted))
@@ -33,17 +34,19 @@ struct CachedPatientProfileView: View {
         .accessibilityIdentifier("patient-cached-profile")
     }
 
+    @ViewBuilder
     private func field(_ title: String, _ value: String?) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title).font(.subheadline.weight(.semibold))
-            if lockedFields.contains(title) {
-                Label("Dato cifrato non leggibile", systemImage: "lock.fill")
-            } else if let value, !value.isEmpty {
-                Text(value)
-            } else {
-                Text("Non presente nella copia")
+        // @Codex: Missing optional fields do not turn the historical profile into empty boxes.
+        if lockedFields.contains(title) || value?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title).font(.subheadline.weight(.semibold))
+                if lockedFields.contains(title) {
+                    Label("Dato cifrato non leggibile", systemImage: "lock.fill")
+                } else if let value {
+                    Text(value)
+                }
             }
+            .fixedSize(horizontal: false, vertical: true)
         }
-        .fixedSize(horizontal: false, vertical: true)
     }
 }
