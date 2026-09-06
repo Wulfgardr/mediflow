@@ -824,13 +824,40 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         let logoutClient = makeClient()
         let logoutCredentials = pairedCredentials
         let logoutCookie = sessionCookie
-        invalidateLoginGeneration()
-        let generation = loginGeneration
         let operationID = beginExclusiveOperation()
+        defer { finishExclusiveOperation(operationID) }
+        clearOperatorSessionPresentation() // @Codex
+        let generation = loginGeneration
+
+        statusMessage = "Sessione bloccata localmente. Logout remoto non confermato; accedi di nuovo per continuare."
+
+        var remoteLogoutConfirmed = false
+        if let logoutCookie, let logoutCredentials {
+            do {
+                let acknowledgement = try await logoutClient.logout(
+                    credentials: logoutCredentials,
+                    sessionCookie: logoutCookie
+                )
+                remoteLogoutConfirmed = acknowledgement.success
+            } catch {
+                // D10: transport failure cannot undo the already completed lock.
+            }
+        }
+
+        // A newer login/lock owns its state, even if this logout finishes last.
+        guard loginGeneration == generation, sessionCookie == nil else { return }
+        statusMessage = remoteLogoutConfirmed
+            ? "Sessione bloccata. Accedi di nuovo per continuare."
+            : "Sessione bloccata localmente. Logout remoto non confermato; accedi di nuovo per continuare."
+    }
+
+    // @Codex: explicit lock and a current 401 revoke the same local presentation.
+    // This synchronous helper never sends logout or changes device pairing/scope.
+    private func clearOperatorSessionPresentation() {
+        invalidateLoginGeneration()
+        invalidatePatientLoadContext()
         errorMessage = nil
         pendingConflict = nil
-        defer { finishExclusiveOperation(operationID) }
-
         sessionCookie = nil
         masterKey = nil
         operatorIdentity = nil
@@ -870,26 +897,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         newPatientCaregiver = ""
         connectionState = .sessionExpired
         reconciliationLine = "Sessione bloccata. Accedi di nuovo per leggere o scrivere."
-        statusMessage = "Sessione bloccata localmente. Logout remoto non confermato; accedi di nuovo per continuare."
-
-        var remoteLogoutConfirmed = false
-        if let logoutCookie, let logoutCredentials {
-            do {
-                let acknowledgement = try await logoutClient.logout(
-                    credentials: logoutCredentials,
-                    sessionCookie: logoutCookie
-                )
-                remoteLogoutConfirmed = acknowledgement.success
-            } catch {
-                // D10: transport failure cannot undo the already completed lock.
-            }
-        }
-
-        // A newer login/lock owns its state, even if this logout finishes last.
-        guard loginGeneration == generation, sessionCookie == nil else { return }
-        statusMessage = remoteLogoutConfirmed
-            ? "Sessione bloccata. Accedi di nuovo per continuare."
-            : "Sessione bloccata localmente. Logout remoto non confermato; accedi di nuovo per continuare."
     }
 
     /// Keeps the in-memory operator identity aligned after a successful
@@ -974,8 +981,14 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
                 if case HomeBaseClientError.httpStatus(let status, _) = error, status == 401 || status == 403 {
                     // A revoked session/scope cannot mint a fresh offline snapshot, even on this secondary read.
                     self.invalidateCacheAfterReadFailure(error)
-                    self.patients = []
-                    self.clearSelectedPatientWorkspace()
+                    if status == 401 {
+                        // @Codex: revoke while this read is known current. Clearing
+                        // the workspace invalidates runTask's later failure epoch.
+                        self.applyPatientLoadFailure(error)
+                    } else {
+                        self.patients = []
+                        self.clearSelectedPatientWorkspace()
+                    }
                     throw error
                 }
                 // Other picker failures do not change the completed patient read.
@@ -4310,11 +4323,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     /* @Codex */
     private func applyPatientLoadFailure(_ error: Error) {
         if case HomeBaseClientError.httpStatus(let status, _) = error, status == 401 {
-            invalidatePatientLoadContext()
-            connectionState = .sessionExpired
-            sessionCookie = nil
-            masterKey = nil
-            operatorIdentity = nil
+            clearOperatorSessionPresentation() // @Codex
             statusMessage = "Sessione operatore scaduta. Accedi di nuovo per scrivere sul Mac."
         } else if case HomeBaseClientError.httpStatus(let status, _) = error, status == 403 {
             statusMessage = "Operazione non autorizzata nello scope paired corrente."
@@ -4821,12 +4830,8 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
                   canApplyFailure() else { return }
             if case HomeBaseClientError.httpStatus(let status, _) = error,
                status == 401 {
-                invalidatePatientLoadContext()
-                connectionState = .sessionExpired
-                sessionCookie = nil
-                masterKey = nil
-                operatorIdentity = nil
-                statusMessage = "Sessione operatore scaduta. Accedi di nuovo per scrivere sul Mac."
+                applyPatientLoadFailure(error) // @Codex: reuse synchronous revocation and its error copy.
+                return
             } else if case HomeBaseClientError.httpStatus(let status, _) = error,
                       status == 403 {
                 statusMessage = "Operazione non autorizzata nello scope paired corrente."
