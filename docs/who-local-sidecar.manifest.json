@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "mediflow.who-local-sidecar.manifest.v1",
+  "image": {
+    "repository": "whoicd/icd-api",
+    "version": "2.6.0",
+    "platform": "linux/arm64",
+    "digest": null,
+    "registry": "registry-1.docker.io",
+    "registryVerifiedAt": null,
+    "registryEvidenceSha256": null
+  },
+  "dataset": {
+    "include": "2026-01_en",
+    "snapshotId": null,
+    "snapshotInventorySha256": null,
+    "offlineRestartVerified": false,
+    "restoreVerified": false
+  },
+  "license": {
+    "url": "https://icd.who.int/en/docs/icd11-license.pdf",
+    "acceptedAt": null,
+    "acceptanceRecordRef": null
+  },
+  "listener": { "host": "127.0.0.1", "hostPort": 8382, "containerPort": 80 },
+  "options": { "saveAnalytics": false, "enableDoris": false, "fhirSupport": false },
+  "mounts": [],
+  "automaticStart": false,
+  "automaticUpdate": false
+}

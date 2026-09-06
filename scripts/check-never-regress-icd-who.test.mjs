@@ -87,3 +87,14 @@ test('keeps external URL exceptions exact to their production or synthetic-test 
         "{ endpoint: 'https://caller.invalid.evil' }",
     ), false);
 });
+
+test('canonical URI data exception is confined to the exact native codec fixture', () => {
+    const fixture = 'native/MediFlowMac/Tests/MediFlowCoreTests/DiagnosesCodecProvenanceTests.swift';
+    const uri = 'http://id.who.int/icd/release/11/2026-01/mms/1000000001';
+    assert.equal(isExternalUrlLiteralAllowed(fixture, uri, `let uri = "${uri}"`), true);
+    assert.equal(isExternalUrlLiteralAllowed(fixture, uri + '?q=other', `let uri = "${uri}?q=other"`), false);
+    assert.equal(isExternalUrlLiteralAllowed(fixture, uri.replace('1000000001', '1000000002'),
+        `let uri = "${uri.replace('1000000001', '1000000002')}"`), false);
+    assert.equal(isExternalUrlLiteralAllowed('native/MediFlowMac/Sources/MediFlowCore/DiagnosesCodec.swift',
+        uri, `let uri = "${uri}"`), false);
+});

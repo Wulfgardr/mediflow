@@ -1,6 +1,10 @@
 /* @Codex */
 import { ICD11_WHO_BINDING, Icd11WhoServiceError } from './icd11-who-service.ts';
 import type { Icd11WhoProductionRuntime } from './icd11-who-production-runtime.ts';
+import type { Icd11WhoLocalRuntime } from './icd11-who-local-runtime.ts';
+import { parseWhoLocalReadiness } from './icd11-who-local-contract.ts';
+
+type Runtime = Icd11WhoProductionRuntime | Pick<Icd11WhoLocalRuntime, 'readiness' | 'search'>;
 
 const encoder = new TextEncoder();
 const READINESS_STATUSES = new Set([
@@ -14,7 +18,7 @@ const READINESS_STATUSES = new Set([
 
 type Dependencies = Readonly<{
     authorize(): Promise<boolean>;
-    getRuntime(): Icd11WhoProductionRuntime;
+    getRuntime(): Runtime;
 }>;
 
 type PublicErrorCode = 'request_invalid' | 'service_unavailable'
@@ -53,10 +57,14 @@ function mapFailure(error: unknown): Response {
     return errorResponse('service_unavailable', 503);
 }
 
-function readinessResponse(runtime: Icd11WhoProductionRuntime): Response {
-    let readiness: ReturnType<Icd11WhoProductionRuntime['readiness']>;
+function readinessResponse(runtime: Runtime): Response {
+    let readiness: ReturnType<Runtime['readiness']>;
     try { readiness = runtime.readiness(); }
     catch { return errorResponse('service_unavailable', 503); }
+    if (readiness.schemaVersion === 'mediflow.reference-data.icd11-who-readiness.v2') {
+        const parsed = parseWhoLocalReadiness(readiness);
+        return parsed ? json(parsed, parsed.status === 'available' ? 200 : 503) : errorResponse('service_unavailable', 503);
+    }
     if (readiness.schemaVersion !== 'mediflow.reference-data.icd11-who-readiness.v1'
         || !READINESS_STATUSES.has(readiness.status)
         || readiness.releaseId !== ICD11_WHO_BINDING.releaseId
@@ -81,13 +89,17 @@ export function createIcd11WhoHttpRoute(dependencies: Dependencies) {
         const query = isReadinessRequest ? null : normalizedQuery(url.searchParams);
         if (!isReadinessRequest && !query) return errorResponse('request_invalid', 400);
 
-        let runtime: Icd11WhoProductionRuntime;
+        let runtime: Runtime;
         try { runtime = dependencies.getRuntime(); }
         catch { return errorResponse('service_unavailable', 503); }
         if (isReadinessRequest) return readinessResponse(runtime);
 
         try {
             const result = await runtime.search(query!);
+            if ('partial' in result) return json(Object.freeze({
+                schemaVersion: 'mediflow.reference-data.icd11-search-response.v2' as const,
+                entries: result.entries, partial: result.partial, receipt: result.receipt,
+            }), 200);
             return json(Object.freeze({
                 schemaVersion: 'mediflow.reference-data.icd11-search-response.v1' as const,
                 entries: result.entries,

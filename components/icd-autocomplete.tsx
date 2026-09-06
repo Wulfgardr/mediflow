@@ -5,13 +5,18 @@ import { icdClientErrorMessage, searchICDHybrid } from '@/lib/icd-service';
 import type { ICDSearchResult } from '@/lib/icd-service';
 import { createLatestRequestGuard } from '@/lib/latest-request-guard'; // @Codex
 import { Search, X, Server } from 'lucide-react';
+import { WHO_LOCAL_ATTRIBUTION } from '@/lib/reference-data/icd11-who-local-contract'; // @Codex
+
+/* @Codex: optional provenance is additive at the selection callback boundary. */
+type ICDSelection = { code: string; description: string; system: string;
+    canonicalUri?: string; reference?: ICDSearchResult['reference'] };
 
 interface ICDAutocompleteProps {
-    value?: { code: string; description: string; system: string };
-    onChange?: (value: { code: string; description: string; system: string }) => void;
+    value?: ICDSelection;
+    onChange?: (value: ICDSelection) => void;
     // Alternative simple mode
     initialValue?: { code: string; title: string } | null;
-    onSelect?: (code: string, title: string) => void;
+    onSelect?: (code: string, title: string, provenance?: ICDSelection) => void;
 }
 
 export default function ICDAutocomplete({ value, onChange, initialValue, onSelect }: ICDAutocompleteProps) {
@@ -127,12 +132,14 @@ export default function ICDAutocomplete({ value, onChange, initialValue, onSelec
             onChange({
                 code: item.code,
                 description: item.description,
-                system: item.system as 'ICD-9' | 'ICD-10' | 'ICD-11'
+                system: item.system as 'ICD-9' | 'ICD-10' | 'ICD-11',
+                ...(item.canonicalUri ? { canonicalUri: item.canonicalUri, reference: item.reference } : {}), // @Codex
             });
         }
         // Mode 2: Simple onSelect
         if (onSelect) {
-            onSelect(item.code, item.description);
+            onSelect(item.code, item.description, { code: item.code, description: item.description,
+                system: item.system, canonicalUri: item.canonicalUri, reference: item.reference }); // @Codex
         }
 
         setQuery(`${item.code} - ${item.description}`);
@@ -216,6 +223,13 @@ export default function ICDAutocomplete({ value, onChange, initialValue, onSelec
                 )}
             </div>
 
+            {/* @Codex: source identifiers are text, never followed in the background. */}
+            {isOpen && results.some(item => item.canonicalUri) && <details className="mt-2 text-xs break-words">
+                <summary>Fonte e riferimenti WHO</summary>
+                <p>{WHO_LOCAL_ATTRIBUTION}</p>
+                {results.filter(item => item.canonicalUri).map(item => <p key={item.code}>{item.code} · {item.canonicalUri}</p>)}
+                {results.some(item => item.partial) && <p>Risultati parziali: affina il termine di ricerca.</p>}
+            </details>}
             {isOpen && results.length > 0 && (
                 <div className="absolute z-[100] mt-2 w-full max-h-64 overflow-y-auto rounded-[var(--lume-radius-card)] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] p-1 shadow-[0_2px_8px_color-mix(in_srgb,var(--lume-ink)_10%,transparent)]" role="listbox" id={listboxId} aria-label="Risultati diagnosi ICD">
                     {results.map((item, index) => (

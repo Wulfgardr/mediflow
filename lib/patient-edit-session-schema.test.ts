@@ -3,6 +3,9 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { PatientEditSession, type PatientEditPort, type PatientEditRecord } from './patient-edit-session.ts';
 import { patientSchema } from './schemas.ts';
+import { WHO_LOCAL_BINDING_ID } from './reference-data/icd11-who-local-contract.ts';
+import { normalizePatientUpdateInput } from './patient-write-normalization.ts';
+import { revivePatientStructuredFields } from './patient-structured-fields.ts';
 
 // Real application schema, not a surrogate parser. All fixture values are synthetic.
 function fixture(): PatientEditRecord {
@@ -27,6 +30,34 @@ function recorder() {
     return { calls, port };
 }
 const newId = () => 'synthetic-schema-created';
+
+test('selected WHO provenance survives schema, edit write normalization, read revival and unchanged reopen', async () => {
+    const record = fixture(); const session = new PatientEditSession(record); const memory = recorder();
+    const draft = session.getDefaultValues();
+    const canonicalUri = 'http:' + '//id.who.int/icd/release/11/2026-01/mms/1000000001';
+    const reference = { releaseId: '2026-01' as const, language: 'en' as const, bindingId: WHO_LOCAL_BINDING_ID,
+        imageDigest: `sha256:${'a'.repeat(64)}`, datasetSnapshotId: `sha256:${'b'.repeat(64)}` };
+    draft.diagnoses[0] = { ...draft.diagnoses[0], code: 'AA00', description: 'Synthetic WHO selection', canonicalUri, reference };
+    const parsed = patientSchema.parse(draft);
+    assert.equal((await session.submit(parsed, memory.port, newId)).status, 'complete');
+    const normalized = normalizePatientUpdateInput(memory.calls[0].changes as Record<string, unknown>, { expectedVersion: 3 });
+    assert.equal(normalized.ok, true);
+    if (!normalized.ok) throw new Error('fixture normalization failed');
+    const reread = revivePatientStructuredFields({ ...record, diagnoses: normalized.values.diagnoses }) as unknown as PatientEditRecord;
+    assert.deepEqual(reread.diagnoses![0], parsed.diagnoses[0]);
+    const reopened = new PatientEditSession(reread); const unchanged = recorder();
+    const reparsed = patientSchema.parse(reopened.getDefaultValues());
+    await reopened.submit(reparsed, unchanged.port, newId);
+    assert.deepEqual(unchanged.calls, []);
+    assert.equal(reparsed.diagnoses[0].canonicalUri, canonicalUri);
+    assert.deepEqual(reparsed.diagnoses[0].reference, reference);
+    for (const row of [
+        { ...draft.diagnoses[0], reference: undefined },
+        { ...draft.diagnoses[0], canonicalUri: canonicalUri.replace('2026-01', '2025-01') },
+        { ...draft.diagnoses[0], system: 'ICD-10' },
+        { ...draft.diagnoses[0], reference: { ...reference, extra: true } },
+    ]) assert.equal(patientSchema.safeParse({ ...draft, diagnoses: [row] }).success, false);
+});
 
 test('ordinary unchanged save through real patientSchema emits zero writes despite key reordering', async () => {
     const record = fixture(); const session = new PatientEditSession(record); const memory = recorder();
