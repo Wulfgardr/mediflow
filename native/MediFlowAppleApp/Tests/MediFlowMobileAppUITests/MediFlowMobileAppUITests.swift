@@ -42,6 +42,69 @@ final class MediFlowMobileAppUITests: XCTestCase {
         app.descendants(matching: .any).matching(identifier: identifier).firstMatch
     }
 
+    /* @Codex: titles and picker ID match PatientWorkspaceSection and Workspace. */
+    private enum PatientSection: String {
+        case overview = "Scheda"
+        case diary = "Diario clinico"
+        case scales = "Scale cliniche"
+        case therapies = "Terapie"
+        case clinical = "Controlli e osservazioni"
+        case prescriptions = "Prescrizioni"
+        case documents = "Documenti"
+    }
+
+    private func openPatientSection(_ section: PatientSection, file: StaticString = #filePath, line: UInt = #line) {
+        let query = app.buttons.matching(identifier: "patient-section-picker")
+        let picker = query.element
+        XCTAssertTrue(picker.waitForExistence(timeout: 15), "The selected chart must expose its section picker", file: file, line: line)
+        XCTAssertEqual(query.count, 1, "There must be one patient section picker", file: file, line: line)
+        if picker.value as? String != section.rawValue {
+            XCTAssertTrue(picker.isHittable, "The section picker must stay reachable", file: file, line: line)
+            picker.tap()
+            let options = app.buttons.matching(NSPredicate(format: "label == %@", section.rawValue))
+            XCTAssertTrue(options.element.waitForExistence(timeout: 5), "Missing section option: \(section.rawValue)", file: file, line: line)
+            XCTAssertEqual(options.count, 1, "The menu option must be unambiguous", file: file, line: line)
+            options.element.tap()
+        }
+        let selected = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "value == %@", section.rawValue),
+            object: picker
+        )
+        XCTAssertEqual(XCTWaiter.wait(for: [selected], timeout: 5), .completed,
+                       "The picker must announce the selected section", file: file, line: line)
+        if section == .overview {
+            // The loaded-record index now precedes the identity card.
+            XCTAssertTrue(scrollDown(to: sectionView("patient-detail-name")),
+                          "The selected patient's identity must remain readable", file: file, line: line)
+        }
+    }
+
+    /* @Codex: compact navigation hides the worklist; assert its selection on return. */
+    private func assertPatientRemainsSelected(_ row: XCUIElement, file: StaticString = #filePath, line: UInt = #line) {
+        let destination = sectionView("patient-compact-detail-destination")
+        if destination.exists {
+            let back = app.navigationBars.buttons.element(boundBy: 0)
+            XCTAssertTrue(back.isHittable, "The native chart destination needs a reachable back action", file: file, line: line)
+            back.tap()
+            XCTAssertTrue(destination.waitForNonExistence(timeout: 5), file: file, line: line)
+            XCTAssertTrue(row.waitForExistence(timeout: 5), file: file, line: line)
+            XCTAssertTrue(row.isSelected, "The patient must remain selected in the worklist", file: file, line: line)
+            row.tap()
+            openPatientSection(.overview, file: file, line: line)
+        } else {
+            XCTAssertTrue(row.isSelected, "The visible patient row must remain selected", file: file, line: line)
+        }
+    }
+
+    /* @Codex: the synthetic fixture is loaded-empty, not an unread/error fallback. */
+    private func assertLoadedEmptyDocuments(file: StaticString = #filePath, line: UInt = #line) {
+        let empty = sectionView("documents-empty-state")
+        XCTAssertTrue(scrollDown(to: empty), file: file, line: line)
+        XCTAssertEqual(empty.label, "Nessun documento caricato per questo paziente.", file: file, line: line)
+        XCTAssertFalse(sectionView("documents-loading-state").exists, file: file, line: line)
+        XCTAssertFalse(sectionView("documents-read-state").exists, file: file, line: line)
+    }
+
     /* @Codex */
     private func attachScreenshot(named name: String) {
         let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
@@ -345,6 +408,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         )
 
         firstRow.tap()
+        openPatientSection(.overview)
         XCTAssertTrue(sectionView("patient-detail-name").waitForExistence(timeout: 15))
         XCUIDevice.shared.orientation = .portrait
         XCTAssertTrue(
@@ -385,6 +449,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
             "The deterministic AX5 override must produce the accessibility row geometry"
         )
         patient.tap()
+        openPatientSection(.overview)
         XCTAssertTrue(sectionView("patient-detail-name").waitForExistence(timeout: 10))
 
         let detailEvidence = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
@@ -483,6 +548,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         let row = app.buttons["patient-cell-uitest-1"]
         XCTAssertTrue(row.waitForExistence(timeout: 10))
         row.tap()
+        openPatientSection(.overview)
         XCTAssertTrue(sectionView("patient-detail-name").waitForExistence(timeout: 15))
 
         XCUIDevice.shared.orientation = .landscapeLeft
@@ -1028,10 +1094,8 @@ final class MediFlowMobileAppUITests: XCTestCase {
         let rossi = app.buttons["patient-cell-uitest-1"]
         XCTAssertTrue(rossi.waitForExistence(timeout: 10))
         rossi.tap()
-        XCTAssertTrue(
-            rossi.isSelected,
-            "The selected patient row should expose its state without a decorative chevron"
-        )
+        openPatientSection(.overview)
+        assertPatientRemainsSelected(rossi)
         attachScreenshot(named: "issue-145-selected-patient")
 
         if UIDevice.current.userInterfaceIdiom == .phone {
@@ -1092,7 +1156,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
 
             // Continuity: operating the disclosure must not disturb the open
             // chart or the list selection behind it.
-            XCTAssertTrue(rossi.isSelected, "the patient must stay selected across disclosure use")
+            assertPatientRemainsSelected(rossi)
             XCTAssertTrue(
                 sectionView("patient-detail-name").exists,
                 "the open chart must survive expanding and collapsing the header"
@@ -1151,6 +1215,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         let rossi = app.buttons["patient-cell-uitest-1"]
         XCTAssertTrue(rossi.waitForExistence(timeout: 10))
         rossi.tap()
+        openPatientSection(.therapies)
 
         // Seeded therapies (one per status) render.
         XCTAssertTrue(sectionView("therapy-row-therapy-active").waitForExistence(timeout: 10))
@@ -1175,6 +1240,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         let rossi = app.buttons["patient-cell-uitest-1"]
         XCTAssertTrue(rossi.waitForExistence(timeout: 10))
         rossi.tap()
+        openPatientSection(.clinical)
 
         // Seeded checkups (one per status) render.
         XCTAssertTrue(sectionView("checkup-row-checkup-pending").waitForExistence(timeout: 10))
@@ -1201,6 +1267,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         let rossi = app.buttons["patient-cell-uitest-1"]
         XCTAssertTrue(rossi.waitForExistence(timeout: 10))
         rossi.tap()
+        openPatientSection(.diary)
 
         // Seeded diary entries (one per type) render.
         XCTAssertTrue(sectionView("entry-row-entry-note").waitForExistence(timeout: 10))
@@ -1216,6 +1283,196 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertTrue(sectionView("entry-row-entry-visit").waitForExistence(timeout: 5))
         XCTAssertTrue(sectionView("entry-row-entry-note").waitForNonExistence(timeout: 3))
         XCTAssertTrue(sectionView("entry-row-entry-phone").waitForNonExistence(timeout: 3))
+    }
+
+    /* @Codex: run unchanged on both iPhone and iPad; each section has its own content. */
+    func testPatientSectionsKeepNavigationAndContentDistinct() {
+        launch(seedPatients: true, section: "modules")
+        let patient = app.buttons["patient-cell-uitest-1"]
+        XCTAssertTrue(patient.waitForExistence(timeout: 15))
+        patient.tap()
+
+        let contents = sectionView("patient-chart-contents")
+        XCTAssertTrue(contents.waitForExistence(timeout: 15))
+        let picker = app.buttons["patient-section-picker"]
+        XCTAssertEqual(picker.label, "Sezione clinica")
+        XCTAssertEqual(picker.value as? String, PatientSection.overview.rawValue)
+        XCTAssertGreaterThanOrEqual(picker.frame.height, 44)
+        for (raw, title) in [("diary", "Diario clinico"), ("therapies", "Terapie"), ("clinical", "Controlli e osservazioni")] {
+            let links = app.buttons.matching(identifier: "patient-open-section-\(raw)")
+            XCTAssertTrue(links.element.waitForExistence(timeout: 5))
+            XCTAssertEqual(links.count, 1, "The overview container must preserve each link's identifier")
+            XCTAssertTrue(links.element.label.contains(title))
+        }
+        let diaryLink = app.buttons["patient-open-section-diary"]
+        XCTAssertTrue(scrollDown(to: diaryLink, requireHittable: true))
+        diaryLink.tap()
+        openPatientSection(.diary)
+        XCTAssertTrue(sectionView("entry-row-entry-note").waitForExistence(timeout: 10))
+        XCTAssertFalse(contents.exists)
+
+        openPatientSection(.scales)
+        XCTAssertTrue(app.buttons["scale-library-row-adl"].waitForExistence(timeout: 10))
+        XCTAssertFalse(sectionView("entry-row-entry-note").exists)
+
+        openPatientSection(.therapies)
+        XCTAssertTrue(sectionView("therapy-row-therapy-active").waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["scale-library-row-adl"].exists)
+
+        openPatientSection(.clinical)
+        XCTAssertTrue(sectionView("checkup-row-checkup-pending").waitForExistence(timeout: 10))
+        XCTAssertFalse(sectionView("therapy-row-therapy-active").exists)
+
+        openPatientSection(.prescriptions)
+        XCTAssertTrue(app.textFields["new-service-name"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Nessuna prestazione registrata."].exists)
+        XCTAssertFalse(sectionView("checkup-row-checkup-pending").exists)
+        let savePrescription = app.buttons["create-service-prescription-button"]
+        XCTAssertTrue(scrollDown(to: savePrescription))
+        XCTAssertFalse(savePrescription.isEnabled, "An empty prescription must not become writable after navigation")
+
+        openPatientSection(.documents)
+        assertLoadedEmptyDocuments()
+        XCTAssertFalse(app.textFields["new-service-name"].exists)
+
+        openPatientSection(.overview)
+        XCTAssertTrue(sectionView("patient-detail-name").label.contains("Rossi"))
+        XCTAssertTrue(sectionView("patient-detail-exemptions").exists)
+        XCTAssertFalse(sectionView("documents-empty-state").exists)
+    }
+
+    /* @Codex: synthetic draft only; no save, compute, recording or document import. */
+    func testDiaryDraftSurvivesDocumentsRoundTripWithProgressiveTools() {
+        launch(seedPatients: true, section: "modules")
+        let patient = app.buttons["patient-cell-uitest-1"]
+        XCTAssertTrue(patient.waitForExistence(timeout: 15))
+        patient.tap()
+        openPatientSection(.diary)
+
+        let openEntry = app.buttons["homebase-open-new-entry-button"]
+        let title = app.textFields["homebase-new-entry-title-field"]
+        let entryType = app.buttons["homebase-new-entry-type-picker"]
+        let addParagraph = app.buttons["homebase-new-entry-content-add-paragraph"]
+        // .contain exposes the disclosure ID on Other; its labelled child is the button.
+        let attachmentContainerID = "homebase-new-entry-attachments-disclosure"
+        let attachmentContainers = app.descendants(matching: .any).matching(identifier: attachmentContainerID)
+        let attachmentButtons = sectionView(attachmentContainerID).buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Allegati · "))
+        let attachments = attachmentButtons.element
+        let emptyAttachments = sectionView("homebase-new-entry-attachments-empty-state")
+        let openVisitDraft = app.buttons["homebase-open-visit-draft-button"]
+        let transcript = app.textViews["visit-draft-transcript-field"]
+        let draftTitle = "Bozza sintetica tra sezioni"
+        let draftBody = "Testo sintetico da conservare nel diario"
+        let draftTranscript = "Trascrizione sintetica ancora da rivedere"
+
+        // @Codex: A full-speed fling can skip the short viewport between the
+        // pinned section picker and the iPhone keyboard. Keep gestures scoped
+        // to the diary and recover in either direction without changing focus.
+        func revealDiaryControl(_ control: XCUIElement) -> Bool {
+            guard control.waitForExistence(timeout: 5) else { return false }
+            let scrollView = app.scrollViews.containing(.button, identifier: "entry-type-filter").element
+            guard scrollView.exists else { return false }
+            for _ in 0..<12 {
+                if control.isHittable { return true }
+                let contentTop = app.buttons["patient-section-picker"].frame.maxY
+                if control.frame.midY <= contentTop {
+                    scrollView.swipeDown(velocity: .slow)
+                } else {
+                    scrollView.swipeUp(velocity: .slow)
+                }
+            }
+            return control.isHittable
+        }
+
+        XCTAssertTrue(revealDiaryControl(openEntry))
+        XCTAssertEqual(openEntry.label, "Nuova voce")
+        XCTAssertFalse(title.exists, "The entry form starts closed")
+        XCTAssertFalse(addParagraph.exists)
+        XCTAssertFalse(transcript.exists)
+        openEntry.tap()
+
+        XCTAssertTrue(title.waitForExistence(timeout: 5))
+        title.tap()
+        title.typeText(draftTitle)
+        XCTAssertTrue(revealDiaryControl(entryType))
+        entryType.tap()
+        let visit = app.buttons["Visita"]
+        XCTAssertTrue(visit.waitForExistence(timeout: 5))
+        visit.tap()
+        XCTAssertEqual(entryType.label, "Tipo, Visita", "The native menu must announce the selected entry type")
+
+        XCTAssertTrue(revealDiaryControl(addParagraph))
+        addParagraph.tap()
+        let paragraphs = app.textViews.matching(NSPredicate(format: "identifier BEGINSWITH %@", "homebase-new-entry-content-text-"))
+        XCTAssertTrue(paragraphs.element.waitForExistence(timeout: 5))
+        XCTAssertEqual(paragraphs.count, 1)
+        let paragraphID = paragraphs.element.identifier
+        let paragraph = app.textViews[paragraphID]
+        XCTAssertTrue(revealDiaryControl(paragraph))
+        paragraph.tap()
+        paragraph.typeText(draftBody)
+        XCTAssertEqual(paragraph.value as? String, draftBody)
+
+        XCTAssertTrue(revealDiaryControl(attachments))
+        XCTAssertEqual(attachmentContainers.count, 1)
+        XCTAssertEqual(attachmentButtons.count, 1, "The disclosure must expose one interactive header")
+        XCTAssertTrue(attachments.label.contains("Allegati · 0 selezionati"))
+        XCTAssertFalse(emptyAttachments.exists, "Attachment references start collapsed")
+        attachments.tap()
+        XCTAssertTrue(scrollDown(to: emptyAttachments))
+        XCTAssertTrue(emptyAttachments.label.contains("Nessun documento caricato per questo paziente da referenziare."))
+        attachments.tap()
+        XCTAssertTrue(emptyAttachments.waitForNonExistence(timeout: 5))
+
+        XCTAssertTrue(revealDiaryControl(openVisitDraft))
+        XCTAssertEqual(openVisitDraft.label, "Bozza da trascrizione")
+        XCTAssertFalse(transcript.exists, "The transcript editor needs an explicit opening action")
+        openVisitDraft.tap()
+        XCTAssertTrue(revealDiaryControl(transcript))
+        XCTAssertFalse(openVisitDraft.exists, "The opened visit composer has no destructive collapse action")
+        transcript.tap()
+        transcript.typeText(draftTranscript)
+        XCTAssertEqual(transcript.value as? String, draftTranscript)
+
+        openPatientSection(.documents)
+        assertLoadedEmptyDocuments()
+        XCTAssertFalse(title.exists)
+        XCTAssertFalse(paragraph.exists)
+        XCTAssertFalse(transcript.exists)
+
+        openPatientSection(.diary)
+        XCTAssertTrue(revealDiaryControl(openEntry))
+        XCTAssertEqual(openEntry.label, "Riprendi nuova voce")
+        XCTAssertFalse(title.exists, "Returning keeps the draft behind its resume action")
+        XCTAssertFalse(transcript.exists)
+        for id in ["entry-note", "entry-visit", "entry-phone"] {
+            XCTAssertTrue(sectionView("entry-row-\(id)").exists, "Navigation must preserve the loaded diary records")
+        }
+        let diaryRowIDs = Set(app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH %@", "entry-row-"))
+            .allElementsBoundByIndex.map { $0.identifier })
+        XCTAssertEqual(diaryRowIDs, Set(["entry-row-entry-note", "entry-row-entry-visit", "entry-row-entry-phone"]),
+                       "The unsaved draft must not add a diary record")
+        openEntry.tap()
+        XCTAssertTrue(title.waitForExistence(timeout: 5))
+        XCTAssertEqual(title.value as? String, draftTitle)
+        XCTAssertTrue(entryType.waitForExistence(timeout: 5))
+        XCTAssertEqual(entryType.label, "Tipo, Visita", "The selected entry type must survive the documents round-trip")
+        XCTAssertTrue(revealDiaryControl(paragraph))
+        XCTAssertEqual(paragraphs.count, 1, "The same draft block must survive without duplication")
+        XCTAssertEqual(paragraph.value as? String, draftBody)
+        XCTAssertTrue(revealDiaryControl(attachments))
+        XCTAssertEqual(attachmentContainers.count, 1)
+        XCTAssertEqual(attachmentButtons.count, 1, "The resumed disclosure must expose one interactive header")
+        XCTAssertTrue(attachments.label.contains("Allegati · 0 selezionati"))
+        XCTAssertFalse(emptyAttachments.exists)
+        XCTAssertTrue(revealDiaryControl(openVisitDraft))
+        XCTAssertEqual(openVisitDraft.label, "Riprendi bozza da trascrizione")
+        XCTAssertFalse(transcript.exists)
+        openVisitDraft.tap()
+        XCTAssertTrue(revealDiaryControl(transcript))
+        XCTAssertEqual(transcript.value as? String, draftTranscript)
+        XCTAssertFalse(openVisitDraft.exists)
     }
 
     func testPrivacyShieldRedactsContentWhenForced() {
@@ -1236,6 +1493,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         let rossi = app.buttons["patient-cell-uitest-1"]
         XCTAssertTrue(rossi.waitForExistence(timeout: 10))
         rossi.tap()
+        openPatientSection(.overview)
 
         XCTAssertTrue(sectionView("patient-detail-name").waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["Via Roma 1, Milano"].waitForExistence(timeout: 5))
@@ -1262,6 +1520,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         launch(seedPatients: true, lockedPatientFields: true, section: "modules")
         XCTAssertTrue(sectionView("clinical-workspace-patients-view").waitForExistence(timeout: 20))
         app.buttons["patient-cell-uitest-1"].tap()
+        openPatientSection(.overview)
         XCTAssertTrue(sectionView("patient-detail-name").waitForExistence(timeout: 10))
 
         app.buttons["edit-patient-button"].tap()
@@ -1279,6 +1538,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         let rossi = app.buttons["patient-cell-uitest-1"]
         XCTAssertTrue(rossi.waitForExistence(timeout: 10))
         rossi.tap()
+        openPatientSection(.overview)
 
         // Generous timeout: alphabetically this is the first edit test to run, so it
         // pays the cold-launch tax for the detail navigation.
@@ -1306,11 +1566,11 @@ final class MediFlowMobileAppUITests: XCTestCase {
         let rossi = app.buttons["patient-cell-uitest-1"]
         XCTAssertTrue(rossi.waitForExistence(timeout: 10))
         rossi.tap()
+        openPatientSection(.overview)
         XCTAssertTrue(sectionView("patient-detail-name").waitForExistence(timeout: 20))
 
-        // The observations section sits near the bottom of the detail scroll view,
-        // and SwiftUI only surfaces on-screen rows in the accessibility tree, so each
-        // assertion scrolls its target into view first.
+        openPatientSection(.clinical)
+        // Observations follow checkups in their own section; reveal each target.
         let risingArrow = app.images["observation-trend-obs-weight-new"]
         XCTAssertTrue(scrollDown(to: risingArrow),
                       "The newer weight reading (82 after 80) should show a trend arrow")
@@ -1387,12 +1647,19 @@ final class MediFlowMobileAppUITests: XCTestCase {
         let rossi = app.buttons["patient-cell-uitest-1"]
         XCTAssertTrue(rossi.waitForExistence(timeout: 10))
         rossi.tap()
+        openPatientSection(.overview)
         XCTAssertTrue(sectionView("patient-detail-name").waitForExistence(timeout: 20))
 
         // #3: the document-insights read panel renders when the field is present.
         XCTAssertTrue(scrollDown(to: sectionView("patient-detail-document-insights")),
                       "The document insights panel should render")
 
+        openPatientSection(.therapies)
+        let overflow = app.buttons["therapy-actions-overflow"]
+        if overflow.exists {
+            XCTAssertTrue(scrollDown(to: overflow, requireHittable: true))
+            overflow.tap()
+        }
         // #5: the therapy-plan export (share) action is available with therapies.
         XCTAssertTrue(scrollDown(to: app.buttons["export-therapy-plan-button"]),
                       "The therapy plan export should be available")
@@ -1404,6 +1671,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         let rossi = app.buttons["patient-cell-uitest-1"]
         XCTAssertTrue(rossi.waitForExistence(timeout: 10))
         rossi.tap()
+        openPatientSection(.overview)
         XCTAssertTrue(sectionView("patient-detail-name").waitForExistence(timeout: 20))
 
         app.buttons["edit-patient-button"].tap()
@@ -1429,8 +1697,10 @@ final class MediFlowMobileAppUITests: XCTestCase {
         let rossi = app.buttons["patient-cell-uitest-1"]
         XCTAssertTrue(rossi.waitForExistence(timeout: 10))
         rossi.tap()
+        openPatientSection(.overview)
         XCTAssertTrue(sectionView("patient-detail-name").waitForExistence(timeout: 20))
 
+        openPatientSection(.diary)
         // Open the ADL scale form from the diary section header.
         let scaleButton = app.buttons["new-scale-button"]
         XCTAssertTrue(scrollDown(to: scaleButton), "The scale entry button should be available")
@@ -1467,6 +1737,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         let rossi = app.buttons["patient-cell-uitest-1"]
         XCTAssertTrue(rossi.waitForExistence(timeout: 10))
         rossi.tap()
+        openPatientSection(.overview)
         XCTAssertTrue(sectionView("patient-detail-name").waitForExistence(timeout: 20))
 
         app.buttons["edit-patient-button"].tap()
@@ -1488,12 +1759,13 @@ final class MediFlowMobileAppUITests: XCTestCase {
 
     /// Swipes the detail scroll view up until `element` is in the accessibility
     /// tree (or a swipe budget is exhausted). Returns whether it became present.
-    private func scrollDown(to element: XCUIElement, maxSwipes: Int = 12) -> Bool {
+    /// Interactive targets may also require a reachable hit point before tapping.
+    private func scrollDown(to element: XCUIElement, maxSwipes: Int = 12, requireHittable: Bool = false) -> Bool {
         var attempts = 0
-        while !element.exists && attempts < maxSwipes {
+        while (!element.exists || (requireHittable && !element.isHittable)) && attempts < maxSwipes {
             app.swipeUp()
             attempts += 1
         }
-        return element.waitForExistence(timeout: 5)
+        return element.waitForExistence(timeout: 5) && (!requireHittable || element.isHittable)
     }
 }

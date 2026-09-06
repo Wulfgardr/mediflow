@@ -20,14 +20,37 @@ struct PairedPatientDocumentsSection: View {
     @Binding var selectedFseObservationId: String?
     @Binding var expandedInsightId: String?
 
+    @State private var isShowingUpload = false
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: ClinicalChartMetrics.groupSpacing) {
             documentsSection
-            documentInsightsSection
+
+            Divider()
+            DisclosureGroup {
+                documentInsightsSection
+                    .padding(.top, 12)
+            } label: {
+                Text("Sintesi dei documenti")
+                    .font(.headline)
+            }
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("documents-insights-disclosure")
+
             followupSuggestionsSection
-            fseDocumentValidationSection
+
+            Divider()
+            DisclosureGroup {
+                fseDocumentValidationSection
+                    .padding(.top, 12)
+            } label: {
+                Text("Verifica FSE")
+                    .font(.headline)
+            }
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("documents-fse-disclosure")
         }
-        .padding(12)
+        .padding(ClinicalChartMetrics.cardPadding)
         .lumeSurface(zone: .field)
     }
 
@@ -56,37 +79,31 @@ struct PairedPatientDocumentsSection: View {
                 Task { await model.loadSelectedPatientAttachments() }
             }
 
-            if model.attachments.isEmpty {
-                Text("Nessun documento caricato per questo paziente.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .accessibilityIdentifier("documents-empty-state")
-            } else {
-                ForEach(model.attachments) { attachment in
-                    attachmentRow(attachment)
-                        .accessibilityIdentifier("attachment-row-\(attachment.id)")
-                }
-            }
+            attachmentList
 
             Divider()
 
             if capabilities.hasCapability("network.replica.write-documents") {
-                attachmentUploadControls
+                DisclosureGroup(isExpanded: $isShowingUpload) {
+                    attachmentUploadControls
+                        .padding(.top, 12)
+                } label: {
+                    Label("Aggiungi documento", systemImage: "plus")
+                        .font(.subheadline.weight(.semibold))
+                }
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("attachment-upload-disclosure")
             } else if let message = capabilities.unavailableMessage(for: "network.replica.write-documents") {
                 Text(message)
-                    .font(.caption2)
+                    .font(.caption)
                     .foregroundStyle(.secondary)
             }
 
             if let pickerError = attachmentPickerError {
                 Text(pickerError)
-                    .font(.caption2)
+                    .font(.caption)
                     .foregroundStyle(.red)
             }
-        }
-        .task(id: model.selectedPatient?.id) {
-            guard capabilities.hasCapability("network.replica.readonly-documents") else { return }
-            await model.loadSelectedPatientAttachments()
         }
         .fileImporter(isPresented: $isPickingAttachmentFile, allowedContentTypes: [.item], allowsMultipleSelection: false) { result in
             handlePickedAttachmentFile(result)
@@ -95,39 +112,67 @@ struct PairedPatientDocumentsSection: View {
             guard let newItem, let patientId = model.selectedPatient?.id else { return }
             Task { await handlePickedAttachmentPhoto(newItem, patientId: patientId) }
         }
-        .sheet(item: $attachmentDetailCandidate, onDismiss: { model.dismissAttachmentDetail() }) { summary in
-            attachmentDetailSheet(summary)
+    }
+
+    /* @Codex: reuse the shared distinction between unread and genuinely empty. */
+    @ViewBuilder
+    private var attachmentList: some View {
+        switch ClinicalWorkspaceSectionContent(
+            state: model.attachmentsLoadState,
+            isEmpty: model.attachments.isEmpty,
+            idleMessage: "Documenti non ancora letti.",
+            emptyMessage: "Nessun documento caricato per questo paziente."
+        ) {
+        case .progress:
+            ProgressView("Caricamento documenti…")
+                .accessibilityIdentifier("documents-loading-state")
+        case .message(let message):
+            Text(message)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier(model.attachmentsLoadState == .loaded ? "documents-empty-state" : "documents-read-state")
+        case .rows:
+            ForEach(model.attachments) { attachment in
+                attachmentRow(attachment)
+                    .accessibilityIdentifier("attachment-row-\(attachment.id)")
+            }
         }
     }
 
     private var attachmentUploadControls: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Carica documento")
-                .chartGroupHeading()
-            HStack(spacing: 10) {
-                Button {
-                    isPickingAttachmentFile = true
-                } label: {
-                    Label("Scegli file", systemImage: "folder")
-                }
-                .font(.caption)
-                .disabled(!model.canUploadAttachment)
-                .accessibilityIdentifier("attachment-upload-file-button")
-
-                PhotosPicker(selection: $pickedPhotoItem, matching: .images) {
-                    Label("Scegli foto", systemImage: "photo")
-                }
-                .font(.caption)
-                .disabled(!model.canUploadAttachment)
-                .accessibilityIdentifier("attachment-upload-photo-button")
+        VStack(alignment: .leading, spacing: 12) {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 12) { attachmentSourceButtons }
+                    .fixedSize(horizontal: true, vertical: false)
+                VStack(alignment: .leading, spacing: 12) { attachmentSourceButtons }
             }
-            Text("Solo caricamento manuale. AnyDoc è l'unica estrazione automatica locale; immagini e scansioni richiedono revisione.")
-                .font(.caption2)
+            Text("Caricamento manuale, disponibile online. Se il Mac non risponde, il documento non viene accodato.")
+                .font(.callout)
                 .foregroundStyle(.secondary)
-            Text("Disponibile solo online: se il Mac non risponde, il documento non viene accodato.")
-                .font(.caption2)
+            Text("AnyDoc estrae il testo sul Mac. Immagini e scansioni richiedono revisione.")
+                .font(.callout)
                 .foregroundStyle(.secondary)
         }
+    }
+
+    @ViewBuilder
+    private var attachmentSourceButtons: some View {
+        Button {
+            isPickingAttachmentFile = true
+        } label: {
+            Label("Scegli file", systemImage: "folder")
+                .frame(minHeight: 44)
+        }
+        .disabled(!model.canUploadAttachment)
+        .accessibilityIdentifier("attachment-upload-file-button")
+
+        PhotosPicker(selection: $pickedPhotoItem, matching: .images) {
+            Label("Scegli foto", systemImage: "photo")
+                .frame(minHeight: 44)
+        }
+        .disabled(!model.canUploadAttachment)
+        .accessibilityIdentifier("attachment-upload-photo-button")
     }
 
     private func handlePickedAttachmentFile(_ result: Result<[URL], Error>) {
@@ -189,94 +234,44 @@ struct PairedPatientDocumentsSection: View {
             attachmentDetailCandidate = attachment
             Task { await model.openAttachmentDetail(attachment) }
         } label: {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(alignment: .firstTextBaseline) {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 8) {
                     Text(attachment.name.isEmpty ? "Documento senza nome" : attachment.name)
                         .chartRowTitle()
-                        .lineLimit(1)
-                    Spacer(minLength: 8)
-                    Text(Self.byteCountFormatter.string(fromByteCount: Int64(attachment.size)))
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-                HStack(spacing: 6) {
-                    Text(attachment.type)
+                        .fixedSize(horizontal: false, vertical: true)
                     if let createdAt = attachment.createdAt {
                         Text(PairedPatientsWorkspaceSupport.entryDateFormatter.string(from: createdAt))
+                            .font(.subheadline)
+                            .registro()
                     }
+                    Text("\(attachment.type) · \(Self.byteCountFormatter.string(fromByteCount: Int64(attachment.size)))")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                     if let queueLabel = HomeBaseDocumentOcrQueuePresentation.describe(state: attachment.ocrQueueState, reason: attachment.ocrQueueReason) {
                         Text(queueLabel)
+                            .font(.caption)
                             .foregroundStyle(.orange)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
             }
+            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .modifier(LumeRigaListaModifier(isSelected: attachmentDetailCandidate?.id == attachment.id))
     }
 
-    private func attachmentDetailSheet(_ summary: HomeBaseAttachmentSummary) -> some View {
-        NavigationStack {
-            Group {
-                if let detail = model.selectedAttachmentDetail, detail.id == summary.id {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 12) {
-                            PairedAttachmentPreviewView(detail: detail)
-                            VStack(alignment: .leading, spacing: 4) {
-                                InfoRow("Nome", detail.name)
-                                InfoRow("Tipo", detail.type)
-                                InfoRow("Dimensione", Self.byteCountFormatter.string(fromByteCount: Int64(detail.size)))
-                                if let createdAt = detail.createdAt {
-                                    InfoRow("Caricato il", PairedPatientsWorkspaceSupport.entryDateFormatter.string(from: createdAt))
-                                }
-                                if let queueLabel = HomeBaseDocumentOcrQueuePresentation.describe(state: detail.ocrQueueState, reason: detail.ocrQueueReason) {
-                                    InfoRow("Stato revisione documento", queueLabel)
-                                }
-                                if let summarySnapshot = cleanedPatientWorkspaceValue(detail.summarySnapshot) {
-                                    InfoRow("Sintesi", summarySnapshot)
-                                }
-                            }
-                            if let shareURL = model.attachmentShareURL {
-                                ShareLink(item: shareURL) {
-                                    Label("Condividi", systemImage: "square.and.arrow.up")
-                                }
-                                .accessibilityIdentifier("attachment-share-link")
-                            } else {
-                                Button {
-                                    model.prepareAttachmentShareFile()
-                                } label: {
-                                    Label("Prepara condivisione", systemImage: "square.and.arrow.up")
-                                }
-                                .accessibilityIdentifier("attachment-prepare-share-button")
-                            }
-                        }
-                        .padding(20)
-                    }
-                } else if model.isWorking {
-                    ProgressView("Caricamento documento...")
-                        .padding(20)
-                } else {
-                    Text("Documento non disponibile.")
-                        .foregroundStyle(.secondary)
-                        .padding(20)
-                }
-            }
-            .navigationTitle(summary.name.isEmpty ? "Documento" : summary.name)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Chiudi") { attachmentDetailCandidate = nil }
-                }
-            }
-        }
-    }
-
     /* @Codex */
     private var documentInsightsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Label("Archivio Intelligente", systemImage: "text.magnifyingglass")
-                .font(.subheadline.weight(.semibold))
             if model.documentInsights.isEmpty {
                 Text("Nessun documento analizzato per questo paziente.")
                     .font(.caption)
@@ -284,7 +279,7 @@ struct PairedPatientDocumentsSection: View {
                     .accessibilityIdentifier("document-insights-empty-state")
             } else {
                 Text("Ultimi \(model.documentInsights.count) documenti analizzati")
-                    .font(.caption2)
+                    .font(.caption)
                     .foregroundStyle(.secondary)
                 ForEach(model.documentInsights) { insight in
                     documentInsightRow(insight)
@@ -302,8 +297,8 @@ struct PairedPatientDocumentsSection: View {
                 }
             }
 
-            Text("Sintesi generata da IA locale sull'host. Verificare sempre. Nessuna azione di scrittura disponibile da qui: curation e cancellazione restano sul web.")
-                .font(.caption2)
+            Text("Sintesi IA generata sul Mac, da verificare. Revisione e cancellazione sono disponibili nell’app web.")
+                .font(.callout)
                 .foregroundStyle(.secondary)
         }
     }
@@ -317,7 +312,7 @@ struct PairedPatientDocumentsSection: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(insight.fileName)
                             .chartRowTitle()
-                            .lineLimit(1)
+                            .fixedSize(horizontal: false, vertical: true)
                         HStack(spacing: 6) {
                             if let dateLabel = Self.insightDateLabel(insight) {
                                 Text(dateLabel)
@@ -326,7 +321,7 @@ struct PairedPatientDocumentsSection: View {
                                 Text(Self.documentQualityLabel(quality))
                             }
                         }
-                        .font(.caption2)
+                        .font(.caption)
                         .foregroundStyle(.secondary)
                     }
                     Spacer(minLength: 8)
@@ -351,20 +346,20 @@ struct PairedPatientDocumentsSection: View {
                         Text(insight.extractedDiagnoses
                             .map { "\($0.system.map { s in "\(s) " } ?? "")\($0.code) - \($0.description)" }
                             .joined(separator: " \u{00B7} "))
-                            .font(.caption2)
+                            .font(.caption)
                     }
                     if !insight.extractedMedications.isEmpty {
                         Text("Terapie: \(insight.extractedMedications.joined(separator: ", "))")
-                            .font(.caption2)
+                            .font(.caption)
                     }
                     if let reason = insight.qualityReason {
                         Text("Qualita documento: \(reason)")
-                            .font(.caption2)
+                            .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                     if !insight.appliedDiagnoses.isEmpty {
                         Text("Diagnosi aggiunte alla scheda: \(insight.appliedDiagnoses.joined(separator: ", "))")
-                            .font(.caption2.weight(.semibold))
+                            .font(.caption.weight(.semibold))
                             .foregroundStyle(.green)
                     }
                     if !insight.summary.isEmpty {
@@ -382,16 +377,16 @@ struct PairedPatientDocumentsSection: View {
             HStack(alignment: .firstTextBaseline) {
                 Text(insight.fileName)
                     .chartRowTitle()
-                    .lineLimit(1)
+                    .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 8)
                 if let quality = insight.qualityLevel {
                     Text(Self.documentQualityLabel(quality))
-                        .font(.caption2.weight(.semibold))
+                        .font(.caption.weight(.semibold))
                 }
             }
             if let dateLabel = Self.insightDateLabel(insight) {
                 Text(dateLabel)
-                    .font(.caption2)
+                    .font(.caption)
                     .foregroundStyle(.secondary)
             }
             Text(insight.summary.isEmpty ? "Documento acquisito e pronto per revisione contestuale." : insight.summary)
@@ -402,7 +397,7 @@ struct PairedPatientDocumentsSection: View {
                 Text("\(insight.extractedDiagnoses.count) diagnosi")
                 Text("\(insight.extractedMedications.count) terapie")
             }
-            .font(.caption2)
+            .font(.caption)
             .foregroundStyle(.secondary)
         }
         .padding(10)
@@ -431,12 +426,12 @@ struct PairedPatientDocumentsSection: View {
                 .chartRowTitle()
             if !suggestion.excerpt.isEmpty {
                 Text(suggestion.excerpt)
-                    .font(.caption2)
+                    .font(.caption)
                     .foregroundStyle(.secondary)
             }
             HStack {
                 Text("Trovato in \(suggestion.citation.fileName)")
-                    .font(.caption2)
+                    .font(.caption)
                     .foregroundStyle(.secondary)
                 Spacer(minLength: 8)
                 Button {
@@ -455,13 +450,8 @@ struct PairedPatientDocumentsSection: View {
     /* @Codex */
     private var fseDocumentValidationSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Label("Verifica FSE documento singolo", systemImage: "checkmark.seal")
-                .font(.subheadline.weight(.semibold))
-            Text("Controlla una terapia o un'osservazione gia caricata contro il profilo FSE corrispondente, prima dell'export completo.")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-            Text("Disponibile solo online.")
-                .font(.caption2)
+            Text("Controlla una terapia o un’osservazione rispetto al profilo FSE prima dell’export. Disponibile online.")
+                .font(.callout)
                 .foregroundStyle(.secondary)
 
             Picker("Tipo record", selection: $fseValidationKind) {
@@ -477,7 +467,7 @@ struct PairedPatientDocumentsSection: View {
             case .therapy:
                 if model.therapies.isEmpty {
                     Text("Nessuna terapia caricata da verificare.")
-                        .font(.caption2)
+                        .font(.caption)
                         .foregroundStyle(.secondary)
                 } else {
                     Picker("Terapia", selection: $selectedFseTherapyId) {
@@ -498,7 +488,7 @@ struct PairedPatientDocumentsSection: View {
             case .observation:
                 if model.observations.isEmpty {
                     Text("Nessuna osservazione caricata da verificare.")
-                        .font(.caption2)
+                        .font(.caption)
                         .foregroundStyle(.secondary)
                 } else {
                     Picker("Osservazione", selection: $selectedFseObservationId) {
@@ -534,17 +524,17 @@ struct PairedPatientDocumentsSection: View {
             }
             if result.errors.isEmpty && result.warnings.isEmpty {
                 Text("Nessun errore o avviso per il profilo \(result.profile).")
-                    .font(.caption2)
+                    .font(.caption)
                     .foregroundStyle(.secondary)
             } else {
                 ForEach(Array(result.errors.enumerated()), id: \.offset) { _, issue in
                     Text("Errore: \(issue.message)")
-                        .font(.caption2)
+                        .font(.caption)
                         .foregroundStyle(.red)
                 }
                 ForEach(Array(result.warnings.enumerated()), id: \.offset) { _, issue in
                     Text("Avviso: \(issue.message)")
-                        .font(.caption2)
+                        .font(.caption)
                         .foregroundStyle(.orange)
                 }
             }

@@ -47,6 +47,8 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     @Published private(set) var patients: [HomeBasePatientSummary] = []
     /* @Codex */
     @Published private(set) var selectedPatientID: String?
+    // @Codex: Per-workspace presentation state, never persisted or sent to the API.
+    @Published var activePatientSection: PatientWorkspaceSection = .overview
     @Published private(set) var selectedPatient: HomeBasePatientDetail? {
         didSet {
             let previousID = oldValue?.id
@@ -266,6 +268,10 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     // preview/share, upload with wire precheck, single-record FSE validation.
     @Published private(set) var attachments: [HomeBaseAttachmentSummary] = []
     @Published private(set) var attachmentsPatientId: String?
+    // @Codex: An empty array is not evidence that the archive has been read.
+    @Published private(set) var attachmentsLoadState: ClinicalWorkspaceLoadState = .idle
+    private var activeAttachmentsLoadID: UUID?
+    private var attachmentsLoadingPatientID: String?
     @Published private(set) var selectedAttachmentDetail: HomeBaseAttachmentDetail?
     @Published private(set) var attachmentShareURL: URL?
     @Published private(set) var fseDocumentValidationResult: HomeBaseFseDocumentValidationResponse?
@@ -457,6 +463,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         self.therapies = therapies
         self.attachments = attachments
         self.attachmentsPatientId = attachments.isEmpty ? nil : selectedPatient?.id
+        self.attachmentsLoadState = attachments.isEmpty ? .idle : .loaded // @Codex
         self.connectionState = .pairedOnline
     }
 
@@ -2955,6 +2962,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         newCheckupNotes = "\(suggestion.excerpt)\nSuggerito da \(suggestion.citation.fileName)"
         newCheckupStatus = .pending
         newCheckupSource = "ai_suggestion"
+        activePatientSection = .clinical // @Codex: reveal the existing form without submitting it.
         statusMessage = "Controllo precompilato dal follow-up: rivedi e salva per confermare."
     }
 
@@ -2967,7 +2975,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     }
 
     /* @Codex */
-    func loadSelectedPatientAttachments() async {
+    func loadSelectedPatientAttachments(reportStatus: Bool = true) async {
         #if DEBUG
         // The deterministic demo has no document binary fixtures. Keep the
         // selected patient bound to an explicit empty attachment set instead
@@ -2976,33 +2984,73 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             guard let patientId = selectedPatient?.id else { return }
             attachments = []
             attachmentsPatientId = patientId
+            attachmentsLoadState = .loaded // @Codex
             selectedAttachmentDetail = nil
             attachmentShareURL = nil
             errorMessage = nil
-            statusMessage = "Nessun documento caricato per questo paziente."
+            if reportStatus { statusMessage = "Nessun documento caricato per questo paziente." }
             return
         }
         #endif
         guard let patientId = selectedPatient?.id, let sessionCookie, let credentials = pairedCredentials else {
             errorMessage = "Apri prima un paziente con sessione paired online."
+            attachmentsLoadState = .unavailable("Documenti non ancora letti: apri una sessione paired online.") // @Codex
             return
         }
-        await runTask {
-            let fetchedAttachments = try await self.fetchDecryptedAttachments(
-                patientId: patientId,
-                credentials: credentials,
-                sessionCookie: sessionCookie,
-                ambulatoryId: self.ambulatoryId.trimmedOrNil
-            )
-            guard self.selectedPatient?.id == patientId else { return }
-            self.attachments = fetchedAttachments
-            self.attachmentsPatientId = patientId
-            self.selectedAttachmentDetail = nil
-            self.attachmentShareURL = nil
-            self.statusMessage = self.attachments.isEmpty
-                ? "Nessun documento caricato per questo paziente."
-                : "\(self.attachments.count) documenti caricati."
+        // @Codex: Diary, Documents and the workspace can request the same list.
+        // Coalesce only an in-flight read; explicit refresh still refetches.
+        guard attachmentsLoadingPatientID != patientId || activeAttachmentsLoadID == nil else { return }
+        let requestID = UUID()
+        // This read must survive runTask's own exclusive-operation generation.
+        // The request identity is invalidated on patient changes, including A → B → A.
+        let scope = ambulatoryId.trimmedOrNil
+        let requestedServerURL = serverURL
+        let requestedTLSPin = tlsPin
+        activeAttachmentsLoadID = requestID
+        attachmentsLoadingPatientID = patientId
+        attachmentsLoadState = .loading
+        let isCurrent = {
+            self.activeAttachmentsLoadID == requestID
+                && self.selectedPatient?.id == patientId
+                && self.pairedCredentials == credentials
+                && self.sessionCookie == sessionCookie
+                && self.ambulatoryId.trimmedOrNil == scope
+                && self.serverURL == requestedServerURL
+                && self.tlsPin == requestedTLSPin
         }
+        defer {
+            if activeAttachmentsLoadID == requestID {
+                activeAttachmentsLoadID = nil
+                attachmentsLoadingPatientID = nil
+                if attachmentsLoadState == .loading {
+                    attachmentsLoadState = .unavailable("Contesto cambiato: ricarica i documenti.")
+                }
+            }
+        }
+        await runTask({
+            do {
+                let fetchedAttachments = try await self.fetchDecryptedAttachments(
+                    patientId: patientId,
+                    credentials: credentials,
+                    sessionCookie: sessionCookie,
+                    ambulatoryId: scope
+                )
+                guard isCurrent() else { return }
+                self.attachments = fetchedAttachments
+                self.attachmentsPatientId = patientId
+                self.attachmentsLoadState = .loaded
+                self.selectedAttachmentDetail = nil
+                self.attachmentShareURL = nil
+                if reportStatus {
+                    self.statusMessage = self.attachments.isEmpty
+                        ? "Nessun documento caricato per questo paziente."
+                        : "\(self.attachments.count) documenti caricati."
+                }
+            } catch {
+                if isCurrent() { self.attachmentsLoadState = .failed(error.localizedDescription) }
+                throw error
+            }
+        }, canApplyFailure: isCurrent)
     }
 
     /// On-demand detail fetch (D1: the list route never returns `data`). Preview
@@ -3124,6 +3172,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             guard self.selectedPatient?.id == patientId else { return }
             self.attachments = fetchedAttachments
             self.attachmentsPatientId = patientId
+            self.attachmentsLoadState = .loaded // @Codex
             self.statusMessage = "Documento caricato: in coda per elaborazione sull'home-base."
         }
     }
@@ -3131,6 +3180,10 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     private func invalidateAttachmentPatientState() {
         attachments = []
         attachmentsPatientId = nil
+        // @Codex
+        activeAttachmentsLoadID = nil
+        attachmentsLoadingPatientID = nil
+        attachmentsLoadState = .idle
         newEntryAttachmentIds = []
         editEntryAttachmentIds = []
         editingEntryOriginalAttachmentIds = nil
@@ -4151,6 +4204,8 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
 
     /* @Codex */
     private func clearSelectedPatientWorkspace(preservingSelectionID: String? = nil) {
+        // @Codex: A refresh of the same chart keeps its section; a new context does not.
+        if selectedPatientID != preservingSelectionID { activePatientSection = .overview }
         let needsDirectPatientStateInvalidation = selectedPatient == nil
         selectedPatient = nil
         selectedPatientID = preservingSelectionID

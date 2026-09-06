@@ -3,16 +3,41 @@
 import MediFlowCore
 import SwiftUI
 
+/// The workspace mounts this once outside its patient-section identities.
+/// A hidden recorder can retain final review text, never running capture.
+@MainActor
+struct VisitRecordingWorkspaceScope: ViewModifier {
+    @ObservedObject var model: PairedPatientsWorkspaceModel
+    @StateObject private var coordinator = VisitRecordingLumeCoordinator()
+    @Environment(\.scenePhase) private var scenePhase
+
+    func body(content: Content) -> some View {
+        content
+            .environmentObject(coordinator)
+            .task(id: model.visitRecordingWorkspaceContext) {
+                await coordinator.ownerDidChange(to: model.visitRecordingWorkspaceContext?.binding)
+            }
+            .onChange(of: scenePhase) { phase in
+                guard phase != .active else { return }
+                Task { await coordinator.suspendForNavigation() }
+            }
+            .onDisappear {
+                Task { await coordinator.cancelForLifecycle() }
+            }
+    }
+}
+
 @MainActor
 struct VisitRecordingLumeShell: View {
     @ObservedObject var model: PairedPatientsWorkspaceModel
     let onTransferTranscript: @MainActor (String) -> Void
-    @StateObject private var coordinator = VisitRecordingLumeCoordinator()
+    @EnvironmentObject private var coordinator: VisitRecordingLumeCoordinator
     @Environment(\.openURL) private var openURL
-    @Environment(\.scenePhase) private var scenePhase
+    @State private var replacementCandidate: VisitRecordingLumeCoordinator.TranscriptReplacement?
+    @State private var transferNeedsReview = false
 
     private var ownerBinding: VisitRecordingOwnerBinding? {
-        model.visitRecordingOwnerBinding
+        model.visitRecordingWorkspaceContext?.binding
     }
 
     var body: some View {
@@ -27,16 +52,35 @@ struct VisitRecordingLumeShell: View {
         }
         .padding(12)
         .lumeSurface(zone: .field, cornerRadius: 12)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("clinical-workspace-visit-recording")
         .task(id: ownerBinding) {
             await coordinator.ownerDidChange(to: ownerBinding)
         }
-        .onChange(of: scenePhase) { _ in
-            guard scenePhase != .active else { return }
-            Task { await coordinator.cancelForLifecycle() }
+        .onChange(of: coordinator.state) { state in
+            if state != .transcriptReview { replacementCandidate = nil }
         }
         .onDisappear {
-            Task { await coordinator.cancelForLifecycle() }
+            replacementCandidate = nil
+            transferNeedsReview = false
+            Task { await coordinator.suspendForNavigation() }
+        }
+        .confirmationDialog(
+            "Sostituire il testo già presente?",
+            isPresented: Binding(
+                get: { replacementCandidate != nil },
+                set: { if !$0 { replacementCandidate = nil } }
+            ),
+            titleVisibility: .visible,
+            presenting: replacementCandidate
+        ) { candidate in
+            Button("Sostituisci il testo", role: .destructive) {
+                transferTranscript(confirmedReplacement: candidate)
+            }
+            .accessibilityIdentifier("clinical-workspace-visit-recording-confirm-replacement")
+            Button("Mantieni entrambi", role: .cancel) { }
+        } message: { _ in
+            Text("Il campo contiene già una trascrizione. Puoi mantenere entrambi i testi separati oppure sostituire il campo con questa registrazione. La bozza clinica richiederà ancora revisione e conferma.")
         }
     }
 
@@ -72,9 +116,17 @@ struct VisitRecordingLumeShell: View {
             case .permissionDenied:
                 permissionDeniedContent
             case .unavailable:
-                unavailableContent("Registrazione locale non disponibile. Chiudi e riapri la scheda per una nuova sessione.")
+                unavailableContent("Registrazione locale non disponibile.")
             case let .denied(denial):
                 unavailableContent(denialMessage(denial))
+            }
+
+            if coordinator.canBeginNewSession {
+                Button("Nuova registrazione") {
+                    coordinator.beginNewSessionAfterExplicitRequest()
+                }
+                .frame(minHeight: 44)
+                .accessibilityIdentifier("clinical-workspace-visit-recording-new-session")
             }
         }
     }
@@ -85,10 +137,11 @@ struct VisitRecordingLumeShell: View {
                 .font(.caption2)
                 .foregroundStyle(.secondary)
             Button {
-                let acceptedBinding = ownerBinding
+                let acceptedContext = model.visitRecordingWorkspaceContext
                 Task {
-                    await coordinator.acceptDisclosure(for: acceptedBinding) {
-                        model.visitRecordingOwnerBinding
+                    await coordinator.acceptDisclosure(for: acceptedContext?.binding) {
+                        guard model.visitRecordingWorkspaceContext == acceptedContext else { return nil }
+                        return model.visitRecordingWorkspaceContext?.binding
                     }
                 }
             } label: {
@@ -149,7 +202,7 @@ struct VisitRecordingLumeShell: View {
 
     private var transcriptReviewContent: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Rivedi la trascrizione finale. Nessuna bozza clinica viene generata automaticamente.")
+            Text("Rivedi la trascrizione finale. Cambiando sezione resta qui, separata dal campo trascrizione. Nessuna bozza clinica viene generata automaticamente.")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
             TextEditor(text: $coordinator.reviewText)
@@ -167,12 +220,14 @@ struct VisitRecordingLumeShell: View {
                     )
                 Spacer(minLength: 8)
                 Button {
-                    Task {
-                        await coordinator.transferTranscript(
-                            maxCharacters: PairedPatientsWorkspaceModel.maxVisitDraftTranscriptChars
-                        ) { transcript in
-                            onTransferTranscript(transcript)
-                        }
+                    transferNeedsReview = false
+                    let existingText = model.newEntryVisitTranscript
+                    if !existingText.isEmpty, existingText != coordinator.reviewText {
+                        replacementCandidate = VisitRecordingLumeCoordinator.TranscriptReplacement(
+                            existingText: existingText, reviewText: coordinator.reviewText
+                        )
+                    } else {
+                        transferTranscript()
                     }
                 } label: {
                     Label("Usa nel campo trascrizione", systemImage: "text.insert")
@@ -183,6 +238,31 @@ struct VisitRecordingLumeShell: View {
                 ))
                 .accessibilityIdentifier("clinical-workspace-visit-recording-transfer")
             }
+            if transferNeedsReview {
+                Text("Il testo o il contesto è cambiato. Rivedi la trascrizione e ripeti il trasferimento.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            Button("Scarta trascrizione", role: .destructive) {
+                Task { await coordinator.cancelForLifecycle() }
+            }
+            .frame(minHeight: 44)
+            .accessibilityIdentifier("clinical-workspace-visit-recording-discard")
+        }
+    }
+
+    private func transferTranscript(
+        confirmedReplacement: VisitRecordingLumeCoordinator.TranscriptReplacement? = nil
+    ) {
+        Task {
+            let transferred = await coordinator.transferTranscript(
+                maxCharacters: PairedPatientsWorkspaceModel.maxVisitDraftTranscriptChars,
+                existingTranscript: model.newEntryVisitTranscript,
+                confirmedReplacement: confirmedReplacement
+            ) { transcript in
+                onTransferTranscript(transcript)
+            }
+            transferNeedsReview = !transferred && coordinator.hasPendingReview
         }
     }
 
@@ -230,15 +310,28 @@ struct VisitRecordingLumeShell: View {
     }
 }
 
+private struct VisitRecordingWorkspaceContext: Equatable {
+    let binding: VisitRecordingOwnerBinding
+    let connection: ClinicalWorkspaceConnection.Identity
+    let serverURL: String
+    let tlsPin: String
+}
+
 private extension PairedPatientsWorkspaceModel {
-    var visitRecordingOwnerBinding: VisitRecordingOwnerBinding? {
-        guard let patient = selectedPatient else { return nil }
+    var visitRecordingWorkspaceContext: VisitRecordingWorkspaceContext? {
+        guard let connection = clinicalWorkspaceConnection, connection.masterKey != nil,
+              let patient = selectedPatient else { return nil }
         let ambulatoryID = ambulatoryId.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !patient.id.isEmpty, patient.version > 0, !ambulatoryID.isEmpty else { return nil }
-        return VisitRecordingOwnerBinding(
-            patientID: patient.id,
-            patientVersion: patient.version,
-            ambulatoryID: ambulatoryID
+        return VisitRecordingWorkspaceContext(
+            binding: VisitRecordingOwnerBinding(
+                patientID: patient.id,
+                patientVersion: patient.version,
+                ambulatoryID: ambulatoryID
+            ),
+            connection: connection.identity,
+            serverURL: serverURL,
+            tlsPin: tlsPin
         )
     }
 }

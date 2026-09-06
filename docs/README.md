@@ -38,6 +38,9 @@ contratto accettato per B predefinita e A selezionabile, con confronto sintetico
 separato. [Verifica della UI integrata](./analysis/2026-09-06-086-integrated-ui-verification.md):
 build standalone e percorsi browser senza flag, con prove reali/simulate e limiti distinti.
 
+[Verifica della cartella Apple](./analysis/2026-09-06-086-apple-ui-verification.md):
+build locali, bozze, navigazione e limiti delle prove su Mac e simulatori.
+
 [Candidato funzionale locale](./analysis/2026-09-06-086-functional-closeout.md):
 modifiche, verifiche e decisioni ancora aperte; prevale per il delta 0.8.6 sulle
 fotografie 0.8.5 sotto. Il verbale fotografa la base funzionale precedente alla
@@ -93,6 +96,7 @@ Approfondimenti utili:
 
 - Contratto prodotto: [PRODUCT.md](../PRODUCT.md)
 - Contratto design multipiattaforma: [DESIGN.md](../DESIGN.md)
+- Riferimenti per le proposte Apple: [Breccia, criteri e adattamenti](./design/2026-09-06-breccia-apple-reference.md), con fonti, copertura e limiti distinti dai contratti.
 - Mappa completa markdown: [docs/markdown-index.md](./markdown-index.md)
 - Governance repository e topologia runtime/publication: [docs/repository-topology.md](./repository-topology.md)
 - Vetro Clinico, baseline storica e transitoria di design: [docs/design/vetro-clinico/README.md](./design/vetro-clinico/README.md)

@@ -44,10 +44,16 @@ typealias VisitRecordingLumeCaptureFactory = @MainActor (
 
 @MainActor
 final class VisitRecordingLumeCoordinator: ObservableObject {
+    struct TranscriptReplacement: Equatable {
+        let existingText: String
+        let reviewText: String
+    }
+
     @Published private(set) var state: VisitRecordingLumeState = .disclosure
     @Published var reviewText = ""
 
-    let consumerGeneration: UInt64
+    private(set) var consumerGeneration: UInt64
+    @Published private(set) var isReleasingResources = false
 
     private static var nextConsumerGeneration: UInt64 = 0
     private static weak var processLeaseOwner: VisitRecordingLumeCoordinator?
@@ -149,13 +155,42 @@ final class VisitRecordingLumeCoordinator: ObservableObject {
     }
 
     func ownerDidChange(to binding: VisitRecordingOwnerBinding?) async {
-        guard let ownerBinding, binding != ownerBinding else { return }
+        guard let ownerBinding else { return }
+        guard binding != ownerBinding || !isCurrentOwner else { return }
         await retire(as: .staleBinding)
     }
 
     func cancelForLifecycle() async {
         guard ownerBinding != nil || capture != nil || preflight != nil else { return }
         await retire(as: .cancelled)
+    }
+
+    func suspendForNavigation() async {
+        guard !terminal, ownerBinding != nil else { return }
+        guard isCurrentOwner else { await retire(as: .staleBinding); return }
+        if state == .transcriptReview {
+            // Only a finalized review survives navigation. No destination is
+            // invoked, and preservation never marks the review completed.
+            await releaseOwnedResources(preservingReview: true)
+        } else {
+            await cancelForLifecycle()
+        }
+    }
+
+    var hasPendingReview: Bool { state == .transcriptReview && isCurrentOwner }
+
+    var canBeginNewSession: Bool { terminal && !isReleasingResources && !holdsProcessLease }
+
+    @discardableResult
+    func beginNewSessionAfterExplicitRequest() -> Bool {
+        guard canBeginNewSession else { return false }
+        let generation = Self.claimConsumerGeneration()
+        guard generation > 0 else { return false }
+        consumerGeneration = generation
+        terminal = false
+        reviewText = ""
+        state = .disclosure
+        return true
     }
 
     func canTransferTranscript(maxCharacters: Int) -> Bool {
@@ -167,18 +202,26 @@ final class VisitRecordingLumeCoordinator: ObservableObject {
 
     var reviewTextUTF8ByteCount: Int { reviewText.utf8.count }
 
+    @discardableResult
     func transferTranscript(
         maxCharacters: Int,
+        existingTranscript: String,
+        confirmedReplacement: TranscriptReplacement? = nil,
         into destination: (String) -> Void
-    ) async {
-        guard canTransferTranscript(maxCharacters: maxCharacters), !terminal else { return }
+    ) async -> Bool {
+        guard canTransferTranscript(maxCharacters: maxCharacters), !terminal else { return false }
         let text = reviewText
+        guard existingTranscript.isEmpty || existingTranscript == text
+            || confirmedReplacement == TranscriptReplacement(existingText: existingTranscript, reviewText: text)
+        else { return false }
         terminal = true
         state = .completed
         observationTask?.cancel()
-        destination(text)
+        // An identical value must not invalidate an existing manual review.
+        if existingTranscript != text { destination(text) }
         reviewText = ""
         await releaseOwnedResources()
+        return true
     }
 
     private var isCurrentOwner: Bool {
@@ -271,15 +314,22 @@ final class VisitRecordingLumeCoordinator: ObservableObject {
         await releaseOwnedResources()
     }
 
-    private func releaseOwnedResources() async {
+    private func releaseOwnedResources(preservingReview: Bool = false) async {
         let ownedCapture = capture
         let ownedPreflight = preflight
         capture = nil
         preflight = nil
-        ownerBinding = nil
-        currentOwner = nil
+        if !preservingReview {
+            ownerBinding = nil
+            currentOwner = nil
+        }
         observationTask?.cancel()
         observationTask = nil
+        // A second disappearance must not release the process lease while the
+        // first resource disposal is still in flight.
+        guard ownedCapture != nil || ownedPreflight != nil else { return }
+        isReleasingResources = true
+        defer { isReleasingResources = false }
         await ownedCapture?.dispose()
         await ownedPreflight?.releaseReservation()
         releaseProcessLease()
