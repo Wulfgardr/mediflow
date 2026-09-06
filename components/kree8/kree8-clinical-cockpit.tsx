@@ -112,6 +112,7 @@ function AreaContent({
   patientSearchFocusSignal,
   isReview,
   onSelectPatient,
+  onAlignPatient,
   onOpenArea,
   onRetryPatients,
 }: {
@@ -127,6 +128,7 @@ function AreaContent({
   patientSearchFocusSignal: number;
   isReview: boolean;
   onSelectPatient: (patientId: string) => void;
+  onAlignPatient: (patientId: string) => void;
   onOpenArea: (area: AreaId) => void;
   onRetryPatients: () => void;
 }) {
@@ -151,6 +153,7 @@ function AreaContent({
           selectedPatientId={selectedPatientId}
           searchFocusSignal={patientSearchFocusSignal}
           onSelectPatient={onSelectPatient}
+          onAlignPatient={onAlignPatient}
           onOpenArea={onOpenArea}
           onRetryPatients={onRetryPatients}
           isReview={isReview}
@@ -238,7 +241,7 @@ export function Kree8ClinicalCockpit({
 
   /* @Codex: Next keeps the cockpit mounted when only the query changes. */
   useEffect(() => {
-    if (proposal && !isReview && previousRouteArea.current !== initialArea) {
+    if (!isReview && previousRouteArea.current !== initialArea) {
       // @Codex: Our own URL reflection already changed area and placed focus.
       // Only navigation to another area schedules a new heading focus request.
       if (area !== initialArea) {
@@ -249,7 +252,7 @@ export function Kree8ClinicalCockpit({
     previousRouteArea.current = initialArea;
   }, [area, initialArea, isReview, proposal]);
   useEffect(() => {
-    if (proposal && !isReview && initialPatientId) setSelectedPatientId(initialPatientId);
+    if (!isReview && initialPatientId) setSelectedPatientId(initialPatientId);
   }, [initialPatientId, isReview, proposal]);
 
   /* @Codex: resolve the selected id after React batches row selection and
@@ -258,12 +261,29 @@ export function Kree8ClinicalCockpit({
     if (proposal && !isReview && area === 'scheda' && selectedPatientId) router.push(`/patients/${selectedPatientId}/modules`);
   }, [area, isReview, proposal, router, selectedPatientId]);
 
+  /* @Codex: only an explicit command writes the URL. Deriving a default or
+     filtered selection from a late read must not cancel a pending Next link.
+     Patch only the command's field so batched selection + navigation compose. */
+  const updateLocation = useCallback((change: { area?: AreaId; patientId?: string }) => {
+    if (isReview || window.location.pathname !== '/') return;
+    const url = new URL(window.location.href);
+    if (change.area) url.searchParams.set('area', change.area);
+    if (change.patientId) url.searchParams.set('paziente', change.patientId);
+    if (url.href !== window.location.href) window.history.replaceState(null, '', url);
+    if (proposal) window.dispatchEvent(new Event('mediflow:twin-area'));
+  }, [isReview, proposal]);
+  const selectPatient = useCallback((patientId: string) => {
+    setSelectedPatientId(patientId);
+    updateLocation({ patientId });
+  }, [updateLocation]);
+
   /* @Codex: ogni CTA interna termina sul titolo semantico della nuova area.
      La ricerca conserva invece il proprio target di focus dedicato. */
   const openArea = useCallback((nextArea: AreaId, focusDestination = true) => {
     setArea(nextArea);
+    updateLocation({ area: nextArea });
     if (focusDestination) setAreaFocusRequest((current) => current + 1);
-  }, []);
+  }, [updateLocation]);
 
   /* @Codex: il contatore rende osservabile anche una richiesta verso l'area
      gia attiva; requestAnimationFrame lascia completare render e cleanup di
@@ -321,24 +341,11 @@ export function Kree8ClinicalCockpit({
     return () => window.removeEventListener('keydown', handleGlobalCommand);
   }, []);
 
-  /* @Codex WUL-UIUX: riflette area e paziente selezionato nella query string di
-     '/', cosi refresh e back del browser non perdono il punto di lavoro. Solo
-     sulla home (le route dedicate come /diary restano canoniche) e solo in live.
-     Next conserva il proprio stato quando riceve dati null; ripassare i suoi
-     marcatori privati salterebbe invece la sincronizzazione di useSearchParams. */
+  /* @Codex: the outer frame observes committed query navigation; background
+     data publications never write history or reset a newer route. */
   useEffect(() => {
-    if (isReview || typeof window === 'undefined') return;
-    if (window.location.pathname !== '/') return;
-    const url = new URL(window.location.href);
-    url.searchParams.set('area', area);
-    if (selectedPatientId) {
-      url.searchParams.set('paziente', selectedPatientId);
-    } else {
-      url.searchParams.delete('paziente');
-    }
-    if (url.href !== window.location.href) window.history.replaceState(null, '', url);
-    if (proposal) window.dispatchEvent(new Event('mediflow:twin-area'));
-  }, [area, selectedPatientId, isReview, proposal]);
+    if (proposal && !isReview) window.dispatchEvent(new Event('mediflow:twin-area'));
+  }, [area, isReview, proposal]);
 
   const selectedPatient = useMemo(
     () => {
@@ -444,12 +451,6 @@ export function Kree8ClinicalCockpit({
 
     return () => controller.abort();
   }, [isReview]);
-
-  useEffect(() => {
-    if (isReview || !initialPatientId) return;
-    setSelectedPatientId(initialPatientId);
-    setArea(initialArea);
-  }, [initialArea, initialPatientId, isReview]);
 
   useEffect(() => {
     if (isReview) return;
@@ -645,7 +646,8 @@ export function Kree8ClinicalCockpit({
                 patientWorkspace={patientWorkspace}
                 patientSearchFocusSignal={patientSearchFocusSignal}
                 isReview={isReview}
-                onSelectPatient={setSelectedPatientId}
+                onSelectPatient={selectPatient}
+                onAlignPatient={setSelectedPatientId}
                 onOpenArea={openArea}
                 onRetryPatients={refreshPatients}
               />

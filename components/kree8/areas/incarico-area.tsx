@@ -54,6 +54,7 @@ function IncaricoArea({
   selectedPatientId,
   searchFocusSignal,
   onSelectPatient,
+  onAlignPatient,
   onOpenArea,
   onRetryPatients,
   isReview,
@@ -63,6 +64,7 @@ function IncaricoArea({
   selectedPatientId?: string;
   searchFocusSignal: number;
   onSelectPatient: (patientId: string) => void;
+  onAlignPatient: (patientId: string) => void;
   onOpenArea: (area: AreaId) => void;
   onRetryPatients?: () => void;
   isReview: boolean;
@@ -109,8 +111,8 @@ function IncaricoArea({
      the cockpit still retains an archived/nonmatching patient. Keep actions
      and the visible record aligned in the proposal. This changes view state. */
   useEffect(() => {
-    if (proposal && selected && selected.id !== selectedPatientId) onSelectPatient(selected.id);
-  }, [proposal, selected, selectedPatientId, onSelectPatient]);
+    if (proposal && selected && selected.id !== selectedPatientId) onAlignPatient(selected.id);
+  }, [proposal, selected, selectedPatientId, onAlignPatient]);
 
   /* @Codex WUL-560 L6A: the disclosure owns focus and closes when its patient
      context changes. The four existing actions keep their original handlers. */
