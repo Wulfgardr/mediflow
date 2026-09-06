@@ -99,7 +99,7 @@ if (tool === 'xcrun') {
   };
 }
 
-test('build uses the canonical project, returns only the app path and leaves simulators alone', (t) => {
+test('build uses SDK-default simulator signing, the canonical project, and leaves simulators alone', (t) => {
   const f = fixture(t);
   const result = f.run();
   assert.equal(result.status, 0, result.stderr);
@@ -108,7 +108,8 @@ test('build uses the canonical project, returns only the app path and leaves sim
   const build = f.calls().find(({ tool }) => tool === 'xcodebuild');
   assert.deepEqual(build.args, ['-project', f.project, '-scheme', 'MediFlowMobileApp', '-configuration', 'Debug',
     '-derivedDataPath', path.join(f.root, 'tmp-ios-sim-dd'), '-sdk', 'iphonesimulator',
-    '-destination', 'generic/platform=iOS Simulator', 'build', 'CODE_SIGNING_ALLOWED=NO']);
+    '-destination', 'generic/platform=iOS Simulator', 'build']);
+  assert.ok(!build.args.some((argument) => argument.startsWith('CODE_SIGNING_')));
   assert.ok(f.calls().every(({ developer }) => developer === f.env.DEVELOPER_DIR));
   assert.ok(!f.calls().some(({ args }) => args[0] === 'simctl'));
   assert.equal(fs.readFileSync(path.join(f.project, 'project.pbxproj'), 'utf8'), 'tracked project fixture');

@@ -17,7 +17,8 @@ usage() {
   cat <<'EOF'
 Usage: bash scripts/build-mobile-sim-app.sh [--install]
 
-Builds MediFlowMobileApp (Debug, iOS Simulator, signing disabled).
+Builds MediFlowMobileApp (Debug, iOS Simulator) with the selected Xcode SDK's
+default simulator signing. This ad-hoc simulator signature is not distribution signing.
 --install also installs onto MEDIFLOW_IOS_SIMULATOR_ID, an already-booted iOS
 simulator UDID. Never boots or launches a simulator/app. Installation needs Node 24.
 DEVELOPER_DIR selects Xcode; an explicit value is never replaced.
@@ -62,7 +63,7 @@ DERIVED="$(cd "$DERIVED" && pwd)"
 echo "Building MediFlowMobileApp (Debug, iOS Simulator SDK $SDK_VERSION)..." >&2
 xcodebuild -project "$PROJECT" -scheme MediFlowMobileApp -configuration Debug \
   -derivedDataPath "$DERIVED" -sdk iphonesimulator \
-  -destination 'generic/platform=iOS Simulator' build CODE_SIGNING_ALLOWED=NO >&2
+  -destination 'generic/platform=iOS Simulator' build >&2
 
 APP="$DERIVED/Build/Products/Debug-iphonesimulator/MediFlow.app"
 PLIST="$APP/Info.plist"

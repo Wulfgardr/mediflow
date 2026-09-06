@@ -90,8 +90,10 @@ iOS Simulator 26+, usa il progetto Xcode canonico attraverso:
 bash scripts/build-mobile-sim-app.sh
 ```
 
-Compila `MediFlowMobileApp` in Debug senza firma e restituisce su stdout il path
-assoluto dell'app verificata. I log vanno su stderr; output predefinito:
+Compila `MediFlowMobileApp` in Debug con la firma simulatore predefinita dell'SDK
+Xcode selezionato e restituisce su stdout il path assoluto dell'app verificata.
+La firma ad-hoc per simulatore non e una firma di distribuzione. I log vanno su
+stderr; output predefinito:
 `tmp-ios-sim-dd/Build/Products/Debug-iphonesimulator/MediFlow.app`.
 Per una directory dedicata imposta `MEDIFLOW_IOS_DERIVED_DATA`. Non rigenera il
 progetto e non richiede backend, dati o un simulatore avviato.
