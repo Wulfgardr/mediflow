@@ -17,7 +17,9 @@ const PRODUCER = 'lib/security/web-auth-next-producer-boundary.test.ts';
 const H1_MATRIX = 'lib/security/server-auth.test.ts';
 const GUARD_SCRIPT = `check:${OWNER_STEM}-boundary`;
 const GUARD_COMMAND = `node scripts/run-strip-types.mjs --test --test-concurrency=1 ${D1A} ${PRODUCER} ${D1B} ${H1_MATRIX}`;
-const NEXT_RESOLVER_AST_SHA256 = '1852702e0bc24c53ba93e92e3c91ec6a2726ed0f4452ed71f971b19868b86433';
+// @Codex ADR 0123: reviewed delta excludes only synthetic twin tools from tracing.
+// Resolver aliases and the owner delivery inclusion remain independently guarded.
+const NEXT_RESOLVER_AST_SHA256 = '5e1034f0edadfade2ad0d2369adb30178fbb3600c0e96f038cf657737cc12819';
 const OWNER_DELIVERY_GLOB = `./node_modules/${PACKAGE}/**/*`;
 const EXPECTED_TSCONFIG_RESOLVER = {
     extends: null, moduleResolution: 'bundler', baseUrl: null, paths: { '@/*': ['./*'] }, rootDirs: null,
