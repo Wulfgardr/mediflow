@@ -1,8 +1,11 @@
 'use client';
 
-/* WUL-297: moved verbatim from app/settings/page.tsx into the AI sub-route. */
+/* @Codex: installed inventory and explicit model choices for local settings. */
 
 import { useState, useEffect, useCallback, type ReactNode } from 'react';
+/* @Codex */
+import { isInstalledOllamaModel, parseInstalledOllamaModels } from '@/lib/installed-ollama-models';
+import styles from './guided-local-models.module.css';
 import { Check, Download, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 /* @Codex */
@@ -29,9 +32,13 @@ export interface ModelSelectorProps {
 }
 
 export function ModelSelector({ selectorId, label, description, icon, value, onChange, recommended, provider, targetUrl }: ModelSelectorProps) {
-    const [installedModels, setInstalledModels] = useState<string[]>([]);
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const [loading, setLoading] = useState(false);
+    /* @Codex */
+    const [inventory, setInventory] = useState<{ url: string; provider: string; models: string[]; error: string | null; loading: boolean } | null>(null);
+    const [refresh, setRefresh] = useState(0);
+    const currentInventory = inventory?.url === targetUrl && inventory?.provider === provider ? inventory : null;
+    const installedModels = currentInventory?.models ?? [];
+    const loading = Boolean(targetUrl) && (!currentInventory || currentInventory.loading);
+    const error = currentInventory?.error;
     const [isPulling, setIsPulling] = useState(false);
     const [pullProgress, setPullProgress] = useState(0);
     const [pullStatus, setPullStatus] = useState("");
@@ -40,32 +47,29 @@ export function ModelSelector({ selectorId, label, description, icon, value, onC
     const { showToast } = useToast();
     const confirm = useConfirm();
 
-    const checkInstalled = useCallback(async () => {
-        try {
-            setLoading(true);
-            const res = await fetch('/api/ai/models', {
-                headers: { 'x-target-url': targetUrl }
-            });
-            if (res.ok) {
-                const data = await res.json();
-                if (data.models) {
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    setInstalledModels(data.models.map((m: any) => m.name));
-                }
-            }
-        } catch (e) {
-            console.error("Failed to list models", e);
-        } finally {
-            setLoading(false);
-        }
-    }, [targetUrl]);
-
-    // Initial check
+    /* @Codex: each refresh owns an abort signal; ignored completions cannot replace a newer URL. */
+    const checkInstalled = useCallback(() => { setRefresh(previous => previous + 1); }, []);
     useEffect(() => {
-        if (provider === 'ollama') {
-            void checkInstalled();
-        }
-    }, [provider, checkInstalled]);
+        if (provider !== 'ollama' || !targetUrl) return;
+        const controller = new AbortController();
+        let current = true;
+        const timer = setTimeout(() => controller.abort(), 15000);
+        setInventory({ url: targetUrl, provider, models: [], error: null, loading: true });
+        void (async () => {
+            try {
+                const res = await fetch('/api/ai/models', {
+                    headers: { 'x-target-url': targetUrl }, signal: controller.signal,
+                });
+                if (!res.ok) throw new Error('Impossibile leggere i modelli. Verifica la connessione e riprova.');
+                const models = parseInstalledOllamaModels(await res.json());
+                if (current) setInventory({ url: targetUrl, provider, models, error: null, loading: false });
+            } catch {
+                if (current) setInventory({ url: targetUrl, provider, models: [],
+                    error: 'Impossibile leggere i modelli. Verifica la connessione e riprova.', loading: false });
+            } finally { clearTimeout(timer); }
+        })();
+        return () => { current = false; clearTimeout(timer); controller.abort(); };
+    }, [provider, targetUrl, refresh]);
 
     const handlePull = async (modelName: string) => {
         const { confirmed } = await confirm({
@@ -139,7 +143,8 @@ export function ModelSelector({ selectorId, label, description, icon, value, onC
         }
     };
 
-    const isInstalled = (name: string) => installedModels.some(m => m.startsWith(name) || name.startsWith(m));
+    const isInstalled = (name: string) => isInstalledOllamaModel(installedModels, name);
+    const installedSelection = installedModels.find(model => isInstalledOllamaModel([model], value));
 
     const modelSelectorTone = {
         iconStyle: { background: 'var(--lume-surface-focal)', color: 'var(--lume-ink)' },
@@ -154,16 +159,43 @@ export function ModelSelector({ selectorId, label, description, icon, value, onC
     const c = modelSelectorTone;
 
     return (
-        <div className="mf-section space-y-4" data-testid={`ai-model-selector-${selectorId}`}>
+        <div className={cn("mf-section space-y-4", styles.selector)} data-testid={`ai-model-selector-${selectorId}`}>
             {/* @Codex WUL-229: selector header now uses MediFlow icon disc + ink/muted typography */}
-            <div className="flex items-start gap-3">
-                <div className="rounded-2xl p-2.5" style={c.iconStyle}>
+            <div className="flex items-start gap-2">
+                <div className="rounded-xl p-2" style={c.iconStyle}>
                     {icon}
                 </div>
                 <div className="min-w-0">
                     <h4 className="text-sm font-semibold" style={c.titleStyle}>{label}</h4>
-                    <p className="mt-1 text-[11px] leading-5" style={c.descriptionStyle}>{description}</p>
+                    <p className="mt-1 text-[13px] leading-5" style={c.descriptionStyle}>{description}</p>
                 </div>
+            </div>
+
+            {/* @Codex: installed inventory is distinct from recommendations and saved selection. */}
+            <div className={styles.stack}>
+                <label htmlFor={`installed-model-${selectorId}`}>Modelli installati · {label}</label>
+                <select id={`installed-model-${selectorId}`} className={SETTINGS_INPUT_CLASS}
+                    value={installedSelection ?? ''} disabled={loading || Boolean(error) || installedModels.length === 0}
+                    onChange={event => { if (event.target.value) onChange(event.target.value); }}
+                    aria-describedby={`installed-status-${selectorId}`}>
+                    <option value="">{value && !installedSelection ? `Selezione attuale: ${value}` : 'Scegli un modello installato'}</option>
+                    {installedModels.map(model => <option key={model} value={model}>{model}</option>)}
+                </select>
+                <button type="button" onClick={checkInstalled} disabled={loading || !targetUrl}
+                    className={SETTINGS_SECONDARY_BUTTON_CLASS}>
+                    <RefreshCw aria-hidden="true" className="h-4 w-4" />
+                    {loading ? 'Lettura modelli…' : 'Aggiorna modelli installati'}
+                </button>
+                <p id={`installed-status-${selectorId}`} role="status" className={styles.status}>
+                    {!targetUrl ? 'Inserisci prima l’indirizzo di Ollama.' : loading ? 'Lettura da Ollama in corso…'
+                        : error ? error : installedModels.length === 0 ? 'Nessun modello installato in Ollama.'
+                            : `${installedModels.length} modelli presenti in Ollama.`}
+                </p>
+                {value && !loading && !error && currentInventory && !installedSelection && (
+                    <p className={styles.hint}>La selezione attuale «{value}» non è presente nell’elenco. Scegli un modello installato o consulta i consigli.</p>
+                )}
+                <p className={styles.hint}>La presenza in elenco non abilita le funzioni cliniche. I consigli non sono una verifica sul tuo computer.</p>
+                <h5 className="text-sm font-semibold">Modelli consigliati e scelta personalizzata</h5>
             </div>
 
             <div className="space-y-2">
@@ -171,17 +203,17 @@ export function ModelSelector({ selectorId, label, description, icon, value, onC
                     <div className="grid gap-2">
                         {recommended.map((model) => {
                             const installed = isInstalled(model.name);
-                            const selected = value === model.name;
+                            const selected = isInstalledOllamaModel([value], model.name);
 
                             return (
                                 // @Codex WUL-229: option card switches to mf-option-card primitive with style-driven selection accent
                                 <div
                                     key={model.name}
-                                    onClick={() => onChange(model.name)}
-                                    className={cn('mf-option-card relative flex items-center justify-between gap-3 !px-3.5 !py-3', selected && 'is-active z-10')}
+                                    className={cn('mf-option-card relative flex flex-wrap items-center justify-between gap-2 !p-4', selected && 'is-active z-10')}
                                     style={selected ? c.selectedCardStyle : undefined}
                                 >
-                                    <div className="flex min-w-0 items-center gap-3">
+                                    <button type="button" onClick={() => onChange(model.name)} aria-pressed={selected}
+                                        className={styles.recommendation}>
                                         <div
                                             className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border"
                                             style={selected
@@ -191,27 +223,28 @@ export function ModelSelector({ selectorId, label, description, icon, value, onC
                                             {selected && <div className={`h-1.5 w-1.5 rounded-full ${c.selectedDot}`} />}
                                         </div>
                                         <div className="min-w-0">
-                                            <span className="lume-registro block truncate text-xs font-semibold" style={{ color: 'var(--lume-ink)' }}>{model.name}</span>
-                                            <span className="mt-0.5 block text-[11px] leading-5" style={{ color: 'var(--lume-ink-muted)' }}>{model.desc}</span>
+                                            <span className="lume-registro block truncate text-sm font-semibold" style={{ color: 'var(--lume-ink)' }}>{model.name}</span>
+                                            <span className="mt-0.5 block text-[13px] leading-5" style={{ color: 'var(--lume-ink-muted)' }}>{model.desc}</span>
                                         </div>
-                                    </div>
+                                    </button>
 
                                     <div className="flex shrink-0 items-center gap-2">
                                         {installed ? (
                                             <span
-                                                className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-semibold"
+                                                className={styles.status}
                                                 style={c.installedBadgeStyle}
                                             >
                                                 <Check className="w-3 h-3" /> Installato
                                             </span>
                                         ) : (
-                                            <button
+                                            <button type="button"
                                                 onClick={(e) => {
                                                     e.stopPropagation();
                                                     handlePull(model.name);
                                                 }}
+                                                aria-label={`Scarica ${model.name}`}
                                                 disabled={isPulling}
-                                                className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-semibold transition-colors disabled:opacity-60"
+                                                className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[13px] font-semibold transition-colors disabled:opacity-60"
                                                 style={c.downloadBadgeStyle}
                                             >
                                                 {isPulling && pullingModel === model.name ? (
@@ -227,6 +260,7 @@ export function ModelSelector({ selectorId, label, description, icon, value, onC
 
                         {/* @Codex WUL-229: secondary toggles use mf-btn-secondary */}
                         <button
+                            type="button"
                             onClick={() => setShowCustom(true)}
                             className={cn(SETTINGS_SECONDARY_BUTTON_CLASS, 'justify-center border-dashed')}
                         >
@@ -240,10 +274,12 @@ export function ModelSelector({ selectorId, label, description, icon, value, onC
                             value={value}
                             onChange={(e) => onChange(e.target.value)}
                             className={SETTINGS_INPUT_CLASS}
+                            aria-label={`Modello personalizzato · ${label}`}
                             placeholder="es. llama3"
                             autoFocus
                         />
                         <button
+                            type="button"
                             onClick={() => setShowCustom(false)}
                             className={SETTINGS_SECONDARY_BUTTON_CLASS}
                         >
@@ -257,12 +293,12 @@ export function ModelSelector({ selectorId, label, description, icon, value, onC
             {isPulling && (
                 // @Codex WUL-229: pull status card now uses the shared liquid section primitive
                 <div className="mf-section mf-section-tight p-4">
-                    <div className="mb-2 flex items-center justify-between gap-3">
-                        <span className="flex items-center gap-2 text-xs font-semibold" style={{ color: 'var(--lume-ink)' }}>
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                        <span className="flex items-center gap-2 text-sm font-semibold" style={{ color: 'var(--lume-ink)' }}>
                             <RefreshCw className="w-3 h-3" />
                             Scaricamento {pullingModel ? `di ${pullingModel}` : 'in corso'}
                         </span>
-                        <span className="lume-registro text-xs" style={{ color: 'var(--lume-ink-muted)' }}>{pullProgress}%</span>
+                        <span className="lume-registro text-sm" style={{ color: 'var(--lume-ink-muted)' }}>{pullProgress}%</span>
                     </div>
                     <div className="h-2 w-full overflow-hidden rounded-full" style={{ background: 'color-mix(in srgb, var(--lume-ink) 12%, transparent)' }}>
                         <div
@@ -270,7 +306,7 @@ export function ModelSelector({ selectorId, label, description, icon, value, onC
                             style={{ width: `${pullProgress}%`, ...c.progressStyle }}
                         />
                     </div>
-                    <p className="mt-2 truncate text-[11px]" style={{ color: 'var(--lume-ink-muted)' }}>{pullStatus}</p>
+                    <p className="mt-2 truncate text-[13px]" style={{ color: 'var(--lume-ink-muted)' }}>{pullStatus}</p>
                 </div>
             )}
         </div>
