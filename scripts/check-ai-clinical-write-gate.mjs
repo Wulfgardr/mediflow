@@ -87,6 +87,15 @@ const CLINICAL_TABLES = new Set([
 
 // Ogni scrittura del percorso AI, dichiarata. `policy` decide che cosa viene verificato.
 const AI_PATH_WRITE_CONTRACTS = [
+    /* @Codex: named CAS owner, no patient or other clinical table. */
+    {
+        module: 'lib/ai-providers/fabric/function-model-preferences-production.ts',
+        lane: 'function-preferences',
+        policy: 'bounded-settings',
+        table: 'settings',
+        reason: 'Solo preferenze per esperienza e quattro kill switch esistenti, da comando Web autenticato con CAS; nessuna scrittura clinica o ammissione provider.',
+        reference: 'docs/adr/0129-function-model-catalog-preferences.md',
+    },
     {
         module: 'lib/ai-summary-service.ts',
         lane: 'patient-insight',
@@ -376,8 +385,8 @@ function checkDeclaredWrites(findings, files, tableSymbols) {
 // 3. Le proiezioni derivate scrivono solo i campi ammessi, e in forma analizzabile.
 function checkDerivedProjections(findings, observed) {
     for (const contract of AI_PATH_WRITE_CONTRACTS) {
-        if (contract.policy !== 'derived-projection') continue;
-        const allowed = new Set(contract.allowedFields);
+        if (contract.policy !== 'derived-projection' && contract.policy !== 'bounded-settings') continue;
+        const allowed = new Set(contract.allowedFields ?? []);
         for (const write of observed.get(contract.module) ?? []) {
             if (write.table !== contract.table) {
                 addFinding(findings, 'AI_WRITE_TABLE_NOT_ALLOWED',
@@ -385,6 +394,8 @@ function checkDerivedProjections(findings, observed) {
                     { module: contract.module, lane: contract.lane, table: write.table, line: write.line });
                 continue;
             }
+            // @Codex: settings has only key/value; the named owner validates the five writable keys.
+            if (contract.policy === 'bounded-settings') continue;
             if (write.keys === null) {
                 addFinding(findings, 'AI_WRITE_OPAQUE_PAYLOAD',
                     `${contract.module}:${write.line} scrive con spread o chiave calcolata: i campi non sono verificabili staticamente`,
@@ -629,6 +640,15 @@ function selfTest() {
     const widened = [];
     checkAllowlistIntegrity(widened, new Set([...DERIVED_PROJECTION_FIELDS.keys()]));
     check('allowlist reale già non conforme', widened.length === 0);
+
+    // @Codex: declaring the preferences writer cannot permit clinical writes.
+    const preferenceModule = 'lib/ai-providers/fabric/function-model-preferences-production.ts';
+    const preferenceFindings = [];
+    checkDerivedProjections(preferenceFindings, new Map([[preferenceModule, writesOf('db.insert(patients).values({ diagnoses: value }).run();')]]));
+    check('il contratto preferenze ammette una tabella clinica', preferenceFindings.some(item => item.code === 'AI_WRITE_TABLE_NOT_ALLOWED'));
+    const settingsFindings = [];
+    checkDerivedProjections(settingsFindings, new Map([[preferenceModule, writesOf('db.insert(settings).values({ key: key, value: value }).run();')]]));
+    check('il contratto preferenze rifiuta key/value', settingsFindings.length === 0);
 
     // Ogni contratto porta motivo e riferimento leggibili.
     for (const contract of AI_PATH_WRITE_CONTRACTS) {

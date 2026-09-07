@@ -310,6 +310,9 @@ flowchart TB
   corrente o il motore non è disponibile. DeepSeek-OCR 2/CUDA ha stato
   `OUT_OF_SCOPE_FOR_0.8.5_NON_BLOCKING`. Le route OCR legacy, dopo
   l'autenticazione, rispondono `410`.
+- Preferenze Fabric: [ADR 0129](./docs/adr/0129-function-model-catalog-preferences.md)
+  distingue default durevole e override di richiesta da catalogo host sigillato;
+  il servizio nominato non ammette provider e mantiene i binding fail-closed.
 - Boundary Fabric: le quattro capability generative restano
   `proposal_only`; receipt e provenienza non autorizzano apply.
 - Boundary Headless: nessun adapter accede direttamente a SQLite. MCP/Mini

@@ -181,6 +181,7 @@
     "test:pin-change": "bash scripts/pin-change-test.sh",
     "test:settings-navigation": "bash scripts/settings-navigation-test.sh",
     "setup:local-provider": "node scripts/run-strip-types.mjs scripts/setup-local-provider.mjs",
+    "test:function-models": "node scripts/run-strip-types.mjs --test lib/ai-providers/fabric/function-model-preferences.test.ts lib/ai-providers/fabric/function-model-preferences-production.test.ts lib/function-status.test.ts",
     "test:local-provider-setup": "node scripts/run-strip-types.mjs --test scripts/local-provider-setup.test.ts",
     "test:fabric-settings-view": "bash scripts/fabric-settings-view-test.sh",
     "test:server-auth-policy": "bash scripts/server-auth-policy-test.sh",

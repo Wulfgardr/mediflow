@@ -27,6 +27,12 @@ Ultimo aggiornamento: 2026-09-07
 - **Presentazione del prodotto**: [Get MediFlow e linea editoriale](./getmediflow-editorial-proposal.md), distinta dai contratti runtime.
 - **Studio UI 0.8.6**: [gemello web navigabile e confronto visuale](./design/2026-09-05-086-runtime-twin.md), prove sintetiche WUL-676 precedenti alla promozione.
 
+## Preferenze modello per esperienza
+
+[ADR 0129](./adr/0129-function-model-catalog-preferences.md) è la fonte del
+contratto WUL-691: catalogo host, preferenze/preset CAS e override per preview.
+La lane backend non attesta integrazione del picker, inferenza remota o release.
+
 ## Consegna 0.8.6
 
 [Verifica di rilascio 0.8.6](./analysis/2026-09-07-086-release-verification.md): fonte corrente

@@ -219,8 +219,11 @@ npm run test:fabric-generative-runtime-crosswalk
 ```
 
 I quattro path sono Patient Insight, Smart Import, Document Synthesis e
-Treatment Reasoning. Il caller non deve scegliere provider, modello, endpoint,
-venue, prompt, fallback o apply. I production root host-owned devono mantenere
+Treatment Reasoning. Il caller non deve scegliere provider, modello libero,
+endpoint, venue, prompt, fallback o apply. ADR 0129 ammette soltanto un
+`modelOptionId` opaco del catalogo host con `expectedCatalogRevision`, risolto
+nel servizio nominato `FunctionModelDispatch`. Preferenze e preset non ammettono
+provider; per questo confine eseguire anche `npm run test:function-models`. I production root host-owned devono mantenere
 lo stadio massimo `proposal_only`.
 
 ### Gate del modello provider F7

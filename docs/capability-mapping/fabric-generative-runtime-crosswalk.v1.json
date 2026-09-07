@@ -163,5 +163,17 @@
         ]
       }
     }
-  ]
+  ],
+  "functionModelChoice": {
+    "contract": "docs/adr/0129-function-model-catalog-preferences.md",
+    "owner": "FunctionModelDispatch",
+    "mode": "sealed_catalog_option_only",
+    "requestHeader": "x-mediflow-function-model",
+    "requiredFields": [
+      "modelOptionId",
+      "expectedCatalogRevision"
+    ],
+    "providerAdmission": "host_cli_only",
+    "apply": "denied"
+  }
 }

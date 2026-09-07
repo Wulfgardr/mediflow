@@ -58,3 +58,18 @@ test('read failures remain unavailable even when another prerequisite is missing
     const long = buildFunctionStatus({ ...sources, clinicalBinding: { state: 'configured', model: 'a'.repeat(674) } }, time);
     assert.doesNotThrow(() => parseFunctionStatus(long));
 });
+
+/* @Codex */
+test('status reports each persisted model default and denies stale preferences independently', () => {
+    const input: FunctionStatusSources = { ...sources, functionBindings: {
+        patient_insight: { state: 'configured', model: 'synthetic-alternative:1' },
+        document_synthesis: { state: 'invalid', model: null },
+        treatment_reasoning: { state: 'unavailable', model: null },
+    } };
+    assert.equal(row(input, 'patient_insight').model, 'synthetic-alternative:1');
+    assert.equal(row(input, 'patient_insight').state, 'unverified');
+    assert.equal(row(input, 'smart_import').model, 'synthetic-local:latest');
+    assert.equal(row(input, 'document_synthesis').state, 'needs_setup');
+    assert.equal(row(input, 'treatment_reasoning').state, 'unavailable');
+    assert.equal(row({ ...input, enabled: { ...input.enabled, document_synthesis: false } }, 'document_synthesis').state, 'off');
+});

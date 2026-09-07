@@ -25,6 +25,7 @@ const TOP_LEVEL_KEYS = Object.freeze([
   'catalogPath',
   'historicalArtifacts',
   'capabilities',
+  'functionModelChoice',
 ]);
 const CAPABILITY_KEYS = Object.freeze([
   'id',
@@ -165,6 +166,7 @@ function validateAvailableCapability(row, catalogBlock, sources) {
   }
 
   const entrySource = ensureFile(sources, descriptorEntryPoint, `${row.id}: descriptor route`);
+  requireLiteral(entrySource, `withFunctionModelDispatch('${row.id}',`, `${row.id}: sealed model dispatch`);
   const rootImport = `@/${productionRoot.replace(/\.ts$/u, '')}`;
   requireLiteral(entrySource, rootImport, `${row.id}: descriptor route -> production root`);
 
@@ -220,6 +222,13 @@ export function validateFabricGenerativeRuntimeCrosswalk(manifest = loadFabricGe
   const roots = manifest.capabilities.filter(({ disposition }) => disposition === 'proposal_only').map(({ productionRoot }) => productionRoot);
   if (roots.some((root) => typeof root !== 'string') || new Set(roots).size !== roots.length) fail('production root duplicata o non valida');
 
+  const choice = manifest.functionModelChoice;
+  exactKeys(choice, ['contract', 'owner', 'mode', 'requestHeader', 'requiredFields', 'providerAdmission', 'apply'], 'function model choice');
+  if (choice.contract !== 'docs/adr/0129-function-model-catalog-preferences.md' || choice.owner !== 'FunctionModelDispatch'
+    || choice.mode !== 'sealed_catalog_option_only' || choice.requestHeader !== 'x-mediflow-function-model'
+    || JSON.stringify(choice.requiredFields) !== JSON.stringify(['modelOptionId', 'expectedCatalogRevision'])
+    || choice.providerAdmission !== 'host_cli_only' || choice.apply !== 'denied') fail('function model choice broadens authority');
+  ensureFile(sources, choice.contract, 'function model contract');
   const catalog = ensureFile(sources, manifest.catalogPath, 'catalogo generativo');
   manifest.capabilities.forEach((row, index) => {
     const block = capabilityBlock(catalog, row.id, manifest.capabilities[index + 1]?.id);

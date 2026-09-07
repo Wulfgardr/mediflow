@@ -29,3 +29,11 @@ percorso e non riceve ammissione per analogia con Ollama.
 Verifica: fixture SQLite con sole impostazioni, denial senza rete/scritture,
 attestazione fallita, binding mutato, CAS concorrente, ripetizione idempotente,
 recupero e revoca terminale; boundary test contro import da UI/route.
+
+## Estensione WUL-691
+
+[ADR 0129](./0129-function-model-catalog-preferences.md) introduce il servizio
+nominato di preferenze e dispatch per ID opachi del catalogo host. Questa
+preferenza non è un'eccezione all'ammissione CLI: GET, salvataggio, preset e
+preview non invocano `control.admit`, `recover` o `revoke`. Il lifecycle resta
+prerequisito separato, ricontrollato prima e dopo il trasporto.
