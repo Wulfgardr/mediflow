@@ -330,3 +330,5 @@ Approfondimenti utili:
 4. Se un `.md` viene aggiunto/rimosso/rinominato, aggiorna [docs/markdown-index.md](./markdown-index.md).
 5. Se cambia la fonte autorevole di un tema, aggiorna questa mappa.
 6. Se due file dicono cose diverse, prevale la fonte canonica indicata sopra.
+
+- Controllo account ChatGPT, senza inferenza: [ADR 0126](./adr/0126-chatgpt-account-control-plane.md).

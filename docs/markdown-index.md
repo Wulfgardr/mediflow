@@ -55,6 +55,7 @@ sorgenti, toolchain, prove delle bozze e limiti della lane nativa.
 | --- | --- | --- |
 | [ADR 0123](./adr/0123-official-web-ui-navigation-compositions.md) | UI web ufficiale B/A con confronto sintetico separato. | Per promuovere il design scelto senza flag di anteprima nel prodotto. |
 | [ADR 0124](./adr/0124-bounded-native-network-json.md) | Limiti byte per JSON native/network e risposta 413. | Per valutare budget, compatibilità e confini del lettore. |
+| [ADR 0126](./adr/0126-chatgpt-account-control-plane.md) | Controllo account ChatGPT isolato, senza inferenza. | Contratti API, sessione, cleanup e limiti WUL-689. |
 | [ADR 0125](./adr/0125-explicit-aifa-catalog-download.md) | Proposta di aggiornamento esplicito dalla fonte ufficiale AIFA. | Per implementare download limitato, conflitti e sostituzione atomica. |
 | [Verifica UI integrata 0.8.6](./analysis/2026-09-06-086-integrated-ui-verification.md) | UI promossa senza flag: sorgenti, comandi e limiti. | Per distinguere la prova del candidato integrato dal confronto sintetico. |
 | [Chiusura funzionale locale 0.8.6](./analysis/2026-09-06-086-functional-closeout.md) | Candidate, controlli e limiti della tranche funzionale. | Prima della revisione finale e di ogni promozione. |
