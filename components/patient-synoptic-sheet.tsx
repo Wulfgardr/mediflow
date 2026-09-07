@@ -48,6 +48,8 @@ export interface SynopticSignal {
 }
 
 export interface PatientSynopticSheetProps {
+    /* @Codex WUL-678: clinical proposals live inside the actual summary destination. */
+    clinicalSupport?: ReactNode;
     notes?: string;
     leadDiagnosis?: Diagnosis;
     otherProblemsCount: number;
@@ -88,6 +90,7 @@ function MicroLabel({ children }: { children: ReactNode }) {
 }
 
 export function PatientSynopticSheet({
+    clinicalSupport,
     notes,
     leadDiagnosis,
     otherProblemsCount,
@@ -108,9 +111,9 @@ export function PatientSynopticSheet({
       <section id="quadro" aria-label="Riepilogo clinico" className={reading.sheet} data-layout={composition}>
         <div className={reading.main}>
           <div className={reading.problem}>
-            <div className={reading.sectionHead}><h2>Quadro clinico</h2><a href="#identita">Diagnosi e dati paziente</a></div>
+            <div className={reading.sectionHead}><h2>Quadro clinico</h2><a href="#clinica">Diagnosi</a></div>
             {leadDiagnosis ? <><p className={reading.diagnosis}>{leadDiagnosis.description || leadDiagnosis.code}</p><p className={reading.meta}>{[leadDiagnosis.code, leadDiagnosis.system, otherProblemsCount > 0 ? `altre ${otherProblemsCount} diagnosi` : null].filter(Boolean).join(' · ')}</p></>
-              : <p className={reading.muted}>Diagnosi non registrata. <a href="#identita">Completa la scheda</a></p>}
+              : <p className={reading.muted}>Diagnosi non registrata. <a href="#clinica">Consulta le diagnosi</a></p>}
             {notes?.trim() ? <div className={reading.notes}><h3>Note in cartella</h3><p>{notes.length > 320 ? `${notes.slice(0, 320).trimEnd()}…` : notes}</p>{notes.length > 320 ? <details><summary>Leggi la nota completa</summary><p>{notes}</p></details> : null}</div> : null}
           </div>
           {therapies === undefined || visibleTherapies.length > 0 ? <div className={reading.therapies}>
@@ -118,6 +121,7 @@ export function PatientSynopticSheet({
             {therapies === undefined ? <SkeletonLines rows={2} /> : <ul>{visibleTherapies.map(therapy => <li key={therapy.id}><strong>{therapy.drugName}</strong><span>{therapy.dosage || 'Posologia non registrata'}</span></li>)}</ul>}
             {extraTherapies > 0 ? <a href="#terapie" className={reading.more}>Vedi tutte le {therapiesTotal} terapie</a> : null}
           </div> : null}
+          {clinicalSupport}
         </div>
         <aside className={reading.context} aria-label="Contesto della cartella">
           {signals.filter(signal => Number(signal.value) !== 0 && signal.label !== 'Da rivedere').map(signal => <div className={reading.fact} key={signal.label}><span>{signal.label}</span>{signal.href ? <a href={signal.href} className={SIGNAL_TONE[signal.tone ?? 'neutral']}>{signal.value}</a> : <strong>{signal.value}</strong>}</div>)}
@@ -272,6 +276,7 @@ export function PatientSynopticSheet({
                     </div>
                 </div>
             </div>
+            {clinicalSupport}
         </section>
     );
 }

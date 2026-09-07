@@ -31,3 +31,8 @@
 .records strong { font-size: 1rem; font-weight: 550; }
 .records span { font-size: 0.875rem; color: var(--lume-ink-muted); }
 @media (max-width: 600px) { .facts { grid-template-columns: minmax(0, 1fr); } .documentActions { flex-basis: 100%; } }
+
+/* @Codex WUL-678: spacing belongs to composition; AI card internals retain their owner. */
+.clinicalSupport { margin-top: 24px; min-width: 0; }
+/* @Codex WUL-678: readable domain headings in both themes, scoped to these destinations. */
+.domainSection > h3 :global(.text-ink) { color: var(--lume-ink); }

@@ -6,7 +6,7 @@ import { useParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { Accessibility, Activity, ChevronRight, FileText, Pill, Plus, ShieldCheck, Stethoscope } from 'lucide-react';
 
-import AIPatientInsight from '@/components/ai-patient-insight';
+import { PatientClinicalSupport } from '@/components/patient-clinical-support';
 import { AttentionGroup } from '@/components/attention-group';
 import { ClinicalRiverTimeline } from '@/components/clinical-river-timeline';
 import { PatientSynopticSheet, type SynopticMeasure, type SynopticSignal, type SynopticTherapyLine } from '@/components/patient-synoptic-sheet';
@@ -420,16 +420,6 @@ export default function PatientDetailPage() {
         setObservationPrefill(prefill);
         navigateToObservationForm();
     };
-    const summaryText = leadDiagnosis
-        ? `${leadDiagnosis.code} · ${leadDiagnosis.description}${patient.isAdi ? ' con continuita territoriale attiva.' : '.'}`
-        : 'Nessuna diagnosi codificata nella scheda.';
-    const nextStepText = nextCheckup
-        ? `Preparare "${nextCheckup.title}" e riallineare il diario prima del ${new Date(nextCheckup.date).toLocaleDateString('it-IT')}.`
-        : documentInsights.length > 0
-            ? `Rivedere ${documentInsights[0].fileName} e verificare se va promosso nel quadro clinico.`
-            : patient.isArchived
-                ? 'Confermare chiusura o riaprire il percorso se torna attivo.'
-                : 'Aprire il diario clinico e fissare il prossimo passaggio operativo.';
     /* WUL-262: review-queue summary derived from the same data the panels
        below already receive: read-only aggregation, no automatic write. */
     const attachmentItems = attachments ?? [];
@@ -480,8 +470,10 @@ export default function PatientDetailPage() {
     const reviewQueueSummary = {
         ...reviewQueueProjection,
         rows: reviewQueueProjection.rows.map((row) => row.anchor && (row.id === 'insight' || row.id === 'smart-import')
-            ? { ...row, anchor: '#identita' }
-            : row),
+            ? { ...row, anchor: row.id === 'insight' ? '#patient-insight' : '#smart-import' }
+            : row.anchor && row.id === 'evidence' && documentInsights.length > 0
+                ? { ...row, anchor: '#document-insights' }
+                : row),
     };
     const reviewQueueAttentionRows = reviewQueueSummary.rows.filter((row) =>
         ['da-rivedere', 'bloccato', 'serve-testo'].includes(row.state),
@@ -542,7 +534,9 @@ export default function PatientDetailPage() {
     const workspaceNavItems: Kree8WorkspaceNavItem[] = [
         { href: '#quadro', label: 'Quadro' },
         { href: '#attenzione', label: 'Attenzione', meta: String(reviewQueueSummary.attentionCount + openLoopCount) },
-        { href: '#identita', label: 'Identità' },
+        { href: '#identita', label: 'Anagrafica' },
+        { href: '#clinica', label: 'Diagnosi' },
+        { href: '#amministrazione', label: 'Amministrazione' },
         { href: '#parametri', label: 'Parametri', meta: workspace ? String(workspace.observationsCount) : undefined },
         { href: '#terapie', label: 'Terapie', meta: workspace ? String(workspace.activeTherapiesCount) : undefined },
         { href: '#prestazioni', label: 'Prestazioni', meta: prestazioniCount !== undefined ? String(prestazioniCount) : undefined },
@@ -734,6 +728,12 @@ export default function PatientDetailPage() {
                 </section>
 
                 <PatientSynopticSheet
+                    clinicalSupport={<PatientClinicalSupport patient={patient} stale={insightStale}
+                        smartImport={smartImportSourceCount > 0 && smartImportFabricCaptureInput ? (
+                            <PatientSmartImportFabricPreviewCard patientId={patient.id}
+                                captureInput={smartImportFabricCaptureInput}
+                                enabled={isAiSmartImportEnabledValue(smartImportKillSwitch?.value)} />
+                        ) : null} />}
                     notes={patient.notes}
                     leadDiagnosis={leadDiagnosis}
                     otherProblemsCount={otherProblemsCount}
@@ -745,34 +745,16 @@ export default function PatientDetailPage() {
                     nextCheckupTitle={nextCheckup?.title}
                 />
 
-                <CollapsibleSection id="identita" kicker="Identità" title="Anagrafica, clinica e amministrazione" surfaceClassName={workspaceStyles.clinicalSection} defaultOpen>
-                    <PatientIdentityLens
-                        variant="reader"
-                        patient={patient}
-                        ageLabel={ageLabel}
-                        birthDateLabel={birthDateLabel}
-                        diagnoses={diagnosisItems}
-                        exemptions={exemptionCodes}
-                        exemptionDetails={exemptionDetails ?? []}
-                        summary={summaryText}
-                        nextStep={nextStepText}
-                    />
-                    {/* @Codex WUL-678: clinical support is distinct from the document archive. */}
-                    <details className={disclosure.disclosure}>
-                        <summary>Supporto clinico · Patient Insight</summary>
-                        <AIPatientInsight patient={patient} stale={insightStale} />
-                    </details>
-                    {smartImportSourceCount > 0 && smartImportFabricCaptureInput ? (
-                        <details className={disclosure.disclosure}>
-                            <summary>Importazione assistita · proposta da rivedere</summary>
-                            <PatientSmartImportFabricPreviewCard
-                                patientId={patient.id}
-                                captureInput={smartImportFabricCaptureInput}
-                                enabled={isAiSmartImportEnabledValue(smartImportKillSwitch?.value)}
-                            />
-                        </details>
-                    ) : null}
-                </CollapsibleSection>
+                {/* @Codex WUL-678: three actual folder destinations; #identita remains an identity-only alias. */}
+                {(['anagrafica', 'clinica', 'amministrazione'] as const).map((domain) => (
+                    <CollapsibleSection key={domain} id={domain === 'anagrafica' ? 'identita' : domain}
+                        title={domain === 'anagrafica' ? 'Anagrafica' : domain === 'clinica' ? 'Clinica' : 'Amministrazione'}
+                        surfaceClassName={`${workspaceStyles.clinicalSection} ${disclosure.domainSection}`} defaultOpen={domain === 'anagrafica'}>
+                        <PatientIdentityLens variant="reader" domain={domain} patient={patient}
+                            ageLabel={ageLabel} birthDateLabel={birthDateLabel} diagnoses={diagnosisItems}
+                            exemptions={exemptionCodes} exemptionDetails={exemptionDetails ?? []} />
+                    </CollapsibleSection>
+                ))}
 
                 <CollapsibleSection
                     id="timeline"
@@ -879,6 +861,7 @@ export default function PatientDetailPage() {
                     </CollapsibleSection>
                 <CollapsibleSection
                     id="documenti"
+                    keepMounted
                     kicker="Documenti"
                     title="Archivio documenti ed evidenze"
                     count={attachmentItems.length > 0 ? `${attachmentItems.length} file` : undefined}
@@ -894,7 +877,7 @@ export default function PatientDetailPage() {
                     {/* @Codex WUL-678: upload, source list, then review; no duplicated evidence tiles. */}
                     <DocumentUpload patientId={id}>
                         {documentInsights.length > 0 ? (
-                            <details className={disclosure.disclosure}>
+                            <details id="document-insights" className={disclosure.disclosure}>
                                 <summary>Sintesi archiviate · {documentInsights.length}</summary>
                                 <DocumentInsightsPanel patient={patient} />
                             </details>

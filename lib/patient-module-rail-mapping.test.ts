@@ -11,7 +11,10 @@ import {
 const canonicalItems = () => [
     { href: '#quadro', label: 'Quadro', meta: 'q' },
     { href: '#attenzione', label: 'Attenzione', meta: 'a' },
-    { href: '#identita', label: 'Identità' },
+    // @Codex WUL-678: each domain has a real menu target.
+    { href: '#identita', label: 'Anagrafica' },
+    { href: '#clinica', label: 'Diagnosi' },
+    { href: '#amministrazione', label: 'Amministrazione' },
     { href: '#parametri', label: 'Parametri', meta: 'p' },
     { href: '#terapie', label: 'Terapie', meta: 't' },
     { href: '#prestazioni', label: 'Prestazioni' },
@@ -35,7 +38,7 @@ test('builds the four D-WebRail-01 groups without cloning caller items', () => {
         { id: 'diario-follow-up', label: 'Diario e follow-up' },
     ]);
     assert.deepEqual(groups.map((group) => group.items.map((item) => item.href)), [
-        ['#quadro', '#attenzione', '#identita', '#parametri'],
+        ['#quadro', '#attenzione', '#identita', '#clinica', '#amministrazione', '#parametri'],
         ['#terapie', '#prestazioni', '#protesica', '#scale'],
         ['#documenti', '#siss'],
         ['#timeline', '#diario', '#follow-up'],
