@@ -2,6 +2,11 @@
 export const NEVER_REGRESS_ALLOWLIST = {
     credentialLiterals: [
         {
+            path: 'lib/ai-providers/fabric/chatgpt-synthetic-synthesis-binding.test.ts',
+            pattern: "username:\\s*'synthetic'",
+            reason: 'ADR 0134 owner-binding tests use only the synthetic Web session fixture; no live credential or runtime default.',
+        },
+        {
             path: 'lib/ai-providers/fabric/function-model-preferences.test.ts',
             pattern: "username:\\s*'synthetic'",
             reason: 'Function-preferences HTTP tests use process-local synthetic Web sessions for cancellation and retirement; no live credential is used.',
@@ -238,6 +243,16 @@ export const NEVER_REGRESS_ALLOWLIST = {
         },
     ],
     externalUrls: [
+        {
+            path: 'lib/chatgpt-execution/execution-egress-proxy.test.ts',
+            pattern: "^\\s*'(?:GET http://auth\\.openai\\.com:443/|CONNECT https://auth\\.openai\\.com:443/) HTTP/1\\.1",
+            reason: 'ADR 0134 negative CONNECT tests submit these invalid request targets only to an owned loopback listener and assert no DNS or upstream connection.',
+        },
+        {
+            path: 'lib/chatgpt-execution/execution-transport.test.ts',
+            pattern: "if \\(mode === 'diagnostic'\\) return send.*https://auth\\.openai\\.com/private\\?token=PRIVATE_PROVIDER_SENTINEL",
+            reason: 'ADR 0134 fake child emits a synthetic error URL to verify diagnostic minimization; no URL is fetched and no token is real.',
+        },
         {
             path: 'lib/reference-data/icd11-who-code-check-contract.ts',
             pattern: 'http://id\\.who\\.int/icd/release/11/2026-01/mms/(?=["\\x27`])',

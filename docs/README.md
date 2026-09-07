@@ -343,6 +343,8 @@ Approfondimenti utili:
 6. Se due file dicono cose diverse, prevale la fonte canonica indicata sopra.
 
 - Controllo account ChatGPT, senza inferenza: [ADR 0126](./adr/0126-chatgpt-account-control-plane.md).
+- Esecuzione di sintesi con abbonamento ChatGPT, confine proposto e gate aperto:
+  [ADR 0134](./adr/0134-chatgpt-subscription-synthesis-execution.md).
 
 - Configurazione AI nativa e grant host: [ADR 0135](./adr/0135-native-ai-configuration-authority.md).
 
