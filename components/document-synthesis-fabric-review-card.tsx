@@ -102,7 +102,7 @@ function DocumentSynthesisFabricReviewCardSession({
 
     return (
         <section
-            className="mt-3 rounded-2xl border border-[color:color-mix(in_srgb,var(--lume-accent)_22%,transparent)] bg-[color:var(--lume-surface-field)] p-3 text-xs"
+            className="mt-4 rounded-[var(--lume-control-radius)] border border-[color:color-mix(in_srgb,var(--lume-accent)_22%,transparent)] bg-[color:var(--lume-surface-field)] p-4 text-sm leading-relaxed"
             data-testid={`document-synthesis-fabric-review-${attachmentId}`}
         >
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -112,7 +112,7 @@ function DocumentSynthesisFabricReviewCardSession({
                         Sintesi Fabric · sola proposta
                     </p>
                     <p className="mt-1 text-[color:var(--lume-ink-muted)]">
-                        Azione manuale, sorgente corrente dell&apos;host, nessuna persistenza clinica automatica.
+                        Un riepilogo da confrontare con il documento. La cartella rimane invariata.
                     </p>
                 </div>
                 {phase === 'idle' ? (
@@ -142,7 +142,7 @@ function DocumentSynthesisFabricReviewCardSession({
                         data-lume-action="quiet"
                     >
                         <RotateCcw className="h-3.5 w-3.5" />
-                        Reset proposta
+                        Chiudi proposta
                     </button>
                 )}
             </div>
@@ -195,48 +195,55 @@ function DocumentSynthesisFabricReviewCardSession({
             )}
 
             {phase === 'terminal' && publication && providerBindingReceipt && (
-                <div className="mt-3 space-y-3" data-testid="document-synthesis-fabric-result">
-                    <div className="rounded-xl border border-[color:color-mix(in_srgb,var(--lume-signal-success)_25%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-success)_8%,var(--lume-surface-field))] p-2">
-                        <p className="font-bold text-[color:color-mix(in_srgb,var(--lume-signal-success)_65%,var(--lume-ink))]">
-                            0 scritture · applicazione non consentita
-                        </p>
-                        <p className="mt-2 leading-5 text-[color:var(--lume-ink)]">
+                <div className="mt-4 grid min-w-0 gap-4" data-testid="document-synthesis-fabric-result">
+                    <div className="rounded-[var(--lume-control-radius)] border border-[color:color-mix(in_srgb,var(--lume-ink)_16%,transparent)] bg-[color:var(--lume-surface-focal)] p-4">
+                        <p className="font-semibold text-[color:var(--lume-ink)]">Riepilogo da rivedere</p>
+                        <p className="mt-2 break-words text-[color:var(--lume-ink)]">
                             <PrivacyBlur intensity="sm">{publication.output.summary}</PrivacyBlur>
                         </p>
-                        <p className="mt-1 text-[color:var(--lume-ink-muted)]">Qualità dichiarata: {publication.output.qualityLevel}</p>
+                        <p className="mt-3 text-[color:var(--lume-ink-muted)]">Questa proposta non aggiunge né modifica informazioni nella cartella.</p>
                     </div>
 
-                    <div>
-                        <p className="font-bold text-[color:var(--lume-ink)]">Receipt</p>
-                        <dl className="mt-1 grid gap-x-3 gap-y-1 text-[color:var(--lume-ink-muted)] sm:grid-cols-[auto_1fr]">
-                            <dt>Binding</dt><dd>{providerBindingReceipt.provider} · {providerBindingReceipt.model}</dd>
-                            <dt>Esecuzione</dt><dd>{providerBindingReceipt.venue} · egress {providerBindingReceipt.egress} · fallback {providerBindingReceipt.fallback}</dd>
-                            <dt>Output</dt><dd className="break-all font-mono text-[10px]">{publication.receipt.outputSha256}</dd>
+                    <div className="rounded-[var(--lume-control-radius)] border border-[color:color-mix(in_srgb,var(--lume-ink)_16%,transparent)] p-4">
+                        <p className="font-semibold text-[color:var(--lume-ink)]">Elaborato sul computer</p>
+                        <dl className="mt-2 grid min-w-0 gap-x-4 gap-y-2 sm:grid-cols-[auto_minmax(0,1fr)]">
+                            <dt className="text-[color:var(--lume-ink-muted)]">Servizio</dt><dd className="text-[color:var(--lume-ink)]">Ollama · locale</dd>
+                            <dt className="text-[color:var(--lume-ink-muted)]">Modello usato</dt><dd className="break-words text-[color:var(--lume-ink)]">{providerBindingReceipt.model}</dd>
                         </dl>
+                        <p className="mt-3 text-[color:var(--lume-ink-muted)]">Nessun invio a provider esterni e nessun passaggio a un altro modello.</p>
                     </div>
 
                     <div>
-                        <p className="font-bold text-[color:var(--lume-ink)]">Provenienza</p>
-                        <p className="mt-1 text-[color:var(--lume-ink-muted)]">
-                            Autorità: {publication.provenance.sourceSetAuthority} · supporto: {publication.provenance.citationSupport} · causalità modello: {modelCausality}
-                        </p>
-                    </div>
-
-                    <div>
-                        <p className="font-bold text-[color:var(--lume-ink)]">Citazioni</p>
-                        <ol className="mt-1 space-y-1.5">
+                        <p className="font-semibold text-[color:var(--lume-ink)]">Citazioni dal documento</p>
+                        <p className="mt-1 text-[color:var(--lume-ink-muted)]">I passaggi citati sono stati riscontrati nel testo estratto. Confrontali con il riepilogo.</p>
+                        <ol className="mt-3 grid gap-3">
                             {publication.citations.map((citation) => (
                                 <li
                                     key={`${citation.label}-${citation.quoteSha256}`}
-                                    className="rounded-lg border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] p-2 text-[color:var(--lume-ink-muted)]"
+                                    className="min-w-0 rounded-[var(--lume-control-radius)] border border-[color:color-mix(in_srgb,var(--lume-ink)_16%,transparent)] p-4 text-[color:var(--lume-ink)]"
                                 >
-                                    <span className="font-mono font-bold text-[color:var(--lume-ink)]">{citation.label}</span>
-                                    {' · '}
-                                    <PrivacyBlur intensity="sm">{citation.quote}</PrivacyBlur>
+                                    <p className="font-semibold">{citation.label} · <PrivacyBlur intensity="sm">{attachmentName}</PrivacyBlur></p>
+                                    <blockquote className="mt-2 whitespace-pre-wrap break-words"><PrivacyBlur intensity="sm">{citation.quote}</PrivacyBlur></blockquote>
                                 </li>
                             ))}
                         </ol>
                     </div>
+
+                    <details className="min-w-0 rounded-[var(--lume-control-radius)] border border-[color:color-mix(in_srgb,var(--lume-ink)_16%,transparent)]">
+                        <summary className="min-h-[var(--lume-control-height)] cursor-pointer rounded-[var(--lume-control-radius)] px-4 py-3 font-semibold text-[color:var(--lume-ink)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--lume-accent)]">Dettagli di verifica</summary>
+                        <div className="grid min-w-0 gap-3 px-4 pb-4 text-xs leading-relaxed text-[color:var(--lume-ink-muted)]">
+                            <p>0 scritture · applicazione non consentita</p>
+                            <p>Qualità dichiarata dal modello: {publication.output.qualityLevel}. È una sua valutazione, non una verifica clinica indipendente.</p>
+                            <p>Le citazioni documentano i riferimenti restituiti; non ricostruiscono il ragionamento interno del modello.</p>
+                            <dl className="grid min-w-0 gap-x-4 gap-y-2 sm:grid-cols-[auto_minmax(0,1fr)]">
+                                <dt>Binding</dt><dd className="break-words">{providerBindingReceipt.provider} · {providerBindingReceipt.model}</dd>
+                                <dt>Esecuzione</dt><dd className="break-words">{providerBindingReceipt.venue} · egress {providerBindingReceipt.egress} · fallback {providerBindingReceipt.fallback}</dd>
+                                <dt>Output SHA-256</dt><dd className="break-all font-mono">{publication.receipt.outputSha256}</dd>
+                                <dt>Provenienza</dt><dd className="break-all">{publication.provenance.sourceSetAuthority} · {publication.provenance.citationSupport}</dd>
+                                <dt>Causalità del modello</dt><dd>{modelCausality}</dd>
+                            </dl>
+                        </div>
+                    </details>
                 </div>
             )}
         </section>
