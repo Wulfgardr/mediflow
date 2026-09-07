@@ -127,17 +127,15 @@ test('clinical content and existing transcript allowance fit without truncation'
     assert.deepEqual(await readNativeNetworkJson(fixture([encoder.encode(escaped)]).request), body);
 });
 
-test('attachment budget reuses configured ciphertext allowance including JSON escape expansion', () => {
+test('attachment budget reuses configured ciphertext allowance for canonical JSON', () => {
     const previous = process.env.MEDIFLOW_ATTACHMENT_MAX_BYTES;
     try {
         delete process.env.MEDIFLOW_ATTACHMENT_MAX_BYTES;
-        assert.equal(networkAttachmentJsonMaxBytes(), 161_480_704);
+        assert.equal(networkAttachmentJsonMaxBytes(), 30_408_704);
         process.env.MEDIFLOW_ATTACHMENT_MAX_BYTES = '32';
-        assert.equal(networkAttachmentJsonMaxBytes(), 6 * 32 + NETWORK_JSON_MAX_BYTES);
+        assert.equal(networkAttachmentJsonMaxBytes(), 32 + NETWORK_JSON_MAX_BYTES);
         const sealed = 'ENC:aQ==:ZGF0YQ==';
-        const encoded = [...sealed].map(c => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`).join('');
-        assert.equal(encoded.length, sealed.length * 6);
-        assert.ok(encoder.encode(`{"data":"${encoded}"}`).length < networkAttachmentJsonMaxBytes());
+        assert.ok(encoder.encode(JSON.stringify({ data: sealed })).length < networkAttachmentJsonMaxBytes());
         process.env.MEDIFLOW_ATTACHMENT_MAX_BYTES = String(Number.MAX_SAFE_INTEGER);
         assert.throws(networkAttachmentJsonMaxBytes, RangeError);
     } finally {

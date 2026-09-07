@@ -1,5 +1,5 @@
 /* @Codex */
-import { readNativeNetworkJson, jsonBodyTooLargeResponse, networkAttachmentJsonMaxBytes } from '@/lib/native-network-json-body';
+import { withNetworkAttachmentJson, jsonBodyTooLargeResponse } from '@/lib/native-network-json-body';
 /* @Codex */
 import { NextResponse } from 'next/server';
 /* @Codex */
@@ -37,12 +37,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         const resolved = await requireNetworkWriteContext(request, NETWORK_ATTACHMENT_WRITE_CAPABILITY);
         if (!resolved.ok) return resolved.response;
 
-        const body = await readNativeNetworkJson(request, networkAttachmentJsonMaxBytes()) as Record<string, unknown>;
-        const result = await createNetworkScopedAttachment(
-            { ...resolved.context, patientId: id },
-            body,
-        );
-        return NextResponse.json(result.value, { status: result.status });
+        return await withNetworkAttachmentJson(request, async (body) => {
+            const result = await createNetworkScopedAttachment(
+                { ...resolved.context, patientId: id },
+                body as Record<string, unknown>,
+            );
+            return NextResponse.json(result.value, { status: result.status });
+        });
     } catch (error) {
         /* @Codex */
         const sizeError = jsonBodyTooLargeResponse(error);

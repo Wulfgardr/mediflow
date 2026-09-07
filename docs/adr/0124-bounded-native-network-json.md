@@ -24,19 +24,40 @@ Limiti inclusivi del corpo JSON serializzato, contati in byte UTF-8:
 | POST `/api/auth/native/login` | 65.536 byte (64 KiB) |
 | POST `/api/v1/network/pairing-intents` | 65.536 byte (64 KiB) |
 | Altre operazioni network che consumano JSON, eccetto allegati | 4.194.304 byte (4 MiB) |
-| POST `/api/v1/network/patients/{id}/attachments` | `6 * resolveMaxAttachmentBytes() + 4.194.304` byte |
+| POST `/api/v1/network/patients/{id}/attachments` | `resolveMaxAttachmentBytes() + 4.194.304` byte |
 
 Il cap allegati usa il limite wire ciphertext gia canonico (25 MiB di default,
-override host `MEDIFLOW_ATTACHMENT_MAX_BYTES`); il fattore 6 ammette anche la
-rappresentazione JSON completamente escaped degli ASCII del ciphertext. Il cap
-totale di default e 161.480.704 byte (154 MiB). I 4 MiB aggiuntivi coprono
-involucro, metadati e whitespace; la validazione separata di `data` conserva il
-limite originale e la sua risposta `Attachment payload too large`. Il vecchio
-precheck Content-Length della route, che applicava il solo cap `data` anche
-all'involucro, e sostituito dal medesimo budget totale usato per i chunk.
-Nessun limite multipart o globale del proxy viene introdotto.
+override host `MEDIFLOW_ATTACHMENT_MAX_BYTES`) piu 4 MiB per involucro e
+metadati: 30.408.704 byte (29 MiB) di default. Conserva il ciphertext al limite
+con la serializzazione canonica del client (`JSON.stringify` e
+`HomeBaseAttachmentWireUtilities.encodedBody`, senza escape degli slash),
+purche il resto della busta rientri nei 4 MiB. Non garantisce whitespace o
+escape arbitrari; nessun valore viene normalizzato o troncato. La validazione
+separata di `data` conserva i 25 MiB wire e `Attachment payload too large`.
 Una configurazione non rappresentabile come cap intero sicuro fallisce prima
 di leggere il body; non viene interpretata come unlimited.
+
+Solo il POST allegati prenota uno slot, dopo auth/modalita/capability/sessione
+e risoluzione dello scope, prima di leggere header o body. Una sola operazione
+puo essere attiva per istanza del modulo server; non esiste coda. Un secondo
+POST ammesso dai gate riceve 503 `ATTACHMENT_OPERATION_BUSY` con `Retry-After: 1`,
+senza leggere il body. Lo slot copre accumulo, materializzazione, validazione,
+servizio asincrono e costruzione della risposta JSON; il `finally` lo libera
+solo quando queste operazioni terminano o falliscono. Abort del client durante
+il servizio non interrompe il servizio e non libera anticipatamente lo slot.
+Un servizio che non termina mantiene lo slot: non introdurre una race che
+consenta altre operazioni mentre il lavoro precedente continua.
+
+Solo la lettura allegati ha una scadenza totale di 30 secondi, non rinnovata dai
+chunk: timer piu controllo del tempo monotono prima e dopo ogni read. Scadenza
+e abort cancellano il reader best-effort, fermano il ciclo prima della
+materializzazione e restituiscono rispettivamente 408
+`ATTACHMENT_BODY_READ_TIMEOUT` e 400 `ATTACHMENT_BODY_READ_ABORTED`. Timer e
+listener sono rimossi al termine della lettura; lo slot si libera dopo l'uscita
+del lettore. Non si attende una eventuale cleanup asincrona del trasporto in
+`cancel()`: non contiene il ciclo di accumulo o il servizio applicativo.
+Gli altri consumer conservano il comportamento precedente, incluso il default
+strict. La scadenza e cooperativa con l'event loop, non interrompe lavoro sincrono.
 
 I 4 MiB clinici includono testo, ciphertext, campi strutturati e documento di
 validazione FSE. Il transcript gia limitato a 12.000 caratteri entra anche con
@@ -52,7 +73,8 @@ validi oltre cap. Header assente, mendace o non valido non evita il contatore
 sui chunk. Il chunk che oltrepassa il budget non viene accumulato o decodificato;
 il reader viene cancellato best-effort e rilasciato. Il trasporto puo aver gia
 allocato/consegnato quel chunk: questo non e un limite alla memoria di Next,
-proxy o socket, ne un limite globale di concorrenza o tempo.
+proxy o socket. Lo slot allegati non coordina processi, worker o copie del modulo
+e non limita RSS, memoria del trasporto o altri endpoint.
 
 Il superamento restituisce HTTP 413 e JSON stabile
 `{"error":"JSON payload too large","code":"JSON_BODY_TOO_LARGE"}` prima dei
@@ -69,9 +91,12 @@ modalita nel servizio, dopo la lettura bounded; non viene aggiunta authority.
 Un solo Content-Length non copre i byte effettivi; un cap globale del proxy
 coinvolgerebbe upload estranei; un nuovo parser duplicato creerebbe drift.
 Il riuso mantiene una sola implementazione del contatore. Il budget allegati
-e volutamente maggiore per conservare il wire cap esistente e gli escape.
+conserva il wire cap nella busta canonica; lo slot limita le operazioni
+applicative simultanee senza promettere una misura o un limite RSS globale.
 
-Impatto contrattuale: nuovi cap e 413 sulle operazioni elencate. OpenAPI 1.24.0 e gli indici documentano le 26 operazioni JSON network.
+Impatto contrattuale: cap e 413 sulle operazioni elencate; per il POST allegati
+anche cap ridotto, 503 di ammissione e 408/400 di lettura interrotta.
+Allineamento OpenAPI e indici nella lane del parent prima della promozione.
 Il login native resta fuori dalla slice `/api/v1` ed è descritto qui.
 Non dichiarare `no contract impact`.
 
