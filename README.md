@@ -11,7 +11,7 @@ Informazioni, fonti e prossimi passi. Un po’ più facili da ritrovare.
 <a href="https://claude.com/claude-code"><img src="https://img.shields.io/badge/built%20with-Claude%20Code-D97757?style=flat&amp;logo=claudecode&amp;logoColor=white" alt="Built with Claude Code"></a>
 <a href="https://openai.com/codex"><img src="https://img.shields.io/badge/built%20with-Codex-1f2937?style=flat" alt="Built with Codex"></a>
 
-[![Versione sorgente](https://img.shields.io/badge/candidato-0.8.6-33506b?style=flat)](./docs/analysis/2026-09-06-086-integrated-closeout.md)
+[![Versione sorgente](https://img.shields.io/badge/sorgente-0.8.6-33506b?style=flat)](./docs/analysis/2026-09-07-086-release-verification.md)
 [![Release pubblica](https://img.shields.io/github/v/release/Wulfgardr/mediflow?label=release&style=flat)](https://github.com/Wulfgardr/mediflow/releases/latest)
 [![Licenza](https://img.shields.io/badge/license-MIT-2ea043?style=flat)](./LICENSE)
 [![Local-first](https://img.shields.io/badge/data-local--first-8957e5?style=flat)](#dove-stanno-i-dati)
@@ -26,11 +26,12 @@ Informazioni, fonti e prossimi passi. Un po’ più facili da ritrovare.
 *Interfaccia web 0.8.6 con soli dati sintetici; acquisizione del candidato `e7f8a555a`.*
 
 <details>
-<summary><strong>Versione sorgente e stato della candidatura</strong></summary>
+<summary><strong>Versione sorgente, verifiche e distribuzione</strong></summary>
 
-> **0.8.6: correzioni sorgente verificate; rilascio in attesa di CI verde.**
+> **0.8.6: navigazione rinnovata e correzioni guidate dalla review di sicurezza.**
 > Gli addenda indipendenti chiudono il difetto PIN e il finding LOW sugli allegati
-> nel perimetro revisionato. PR, merge e tag restano pendenti.
+> nel perimetro revisionato. La [release GitHub](https://github.com/Wulfgardr/mediflow/releases/tag/v0.8.6)
+> identifica il sorgente distribuito e riporta le prove di promozione.
 > La UI segue [ADR 0123](./docs/adr/0123-official-web-ui-navigation-compositions.md):
 > B predefinita e A alternativa. Le immagini 0.8.6 usano soltanto dati sintetici.
 > La verifica UI iPhone–Mac/Home Base resta differita al post-release;
