@@ -18,7 +18,7 @@ read_when:
 > prevalgono [AGENTS.md](../AGENTS.md) e
 > [docs/repository-topology.md](./repository-topology.md).
 
-Ultimo aggiornamento: 2026-09-07 (v0.8.6: sviluppo concluso, consegna in preparazione)
+Ultimo aggiornamento: 2026-09-07 (v0.8.6: promozione bloccata dal contratto PIN)
 
 Nota candidato 0.8.6: [ADR 0119](./adr/0119-anydoc-apple-vision-current-source.md)
 chiarisce la precedenza del percorso AnyDoc + Apple Vision descritto qui.
@@ -40,12 +40,17 @@ non sono verifiche della release 0.8.6.
 Il [verbale integrato 0.8.6](./analysis/2026-09-06-086-integrated-closeout.md)
 conserva le prove storiche e registra i controlli sul candidato corrente.
 La navigazione web e Apple, i form progressivi e la scelta web tra barra
-superiore e laterale sono integrati. Per decisione dell'utente, il candidato
-`c320694c3` è **feature-complete e development-complete** e resta congelato.
-La verifica UI mirata iPhone ↔ Mac/Home Base è un **DEFERRED VALIDATION ITEM /
-POST-RELEASE VERIFICATION GATE**; non riapre lo sviluppo salvo un difetto reale
-emerso dalla prova futura. Non è attestata una validazione completa
-multipiattaforma.
+superiore e laterale sono integrati. La decisione di sviluppo concluso su
+`c320694c3` resta storica: la [review Daybreak](./analysis/2026-09-07-086-daybreak-security-review.md)
+su `1d633d98d0a0` mantiene la promozione **bloccata (`BLOCK`)** per il contratto
+del cambio PIN nativo. Sei ambiti e 298/298 elementi esaminati, 13 test Node
+PASS e zero vulnerabilità reportabili non attestano il rispetto di quel
+contratto. Correzione e prove pertinenti restano aperte, come le tre domande
+di approfondimento della review.
+La verifica UI mirata iPhone ↔ Mac/Home Base resta un **DEFERRED VALIDATION
+ITEM / POST-RELEASE VERIFICATION GATE**, distinto dal blocco PIN. Non sono
+attestati una validazione completa multipiattaforma o un installer firmato
+di produzione.
 
 Windows e Linux ora hanno prove locali su sistemi operativi reali: build del
 runtime Node, avvio da directory vuota, configurazione ordinaria e percorsi

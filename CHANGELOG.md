@@ -7,8 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.8.6] - Unreleased
 
-Feature-complete and development-complete by user decision; functional source
-frozen at `c320694c3`. This entry does not imply a PR, tag or release.
+The feature-complete decision at `c320694c3` is retained as history. The
+[Daybreak security review](./docs/analysis/2026-09-07-086-daybreak-security-review.md)
+of `1d633d98d0a0` records 298/298 review items closed, 13 Node tests PASS and
+zero reportable vulnerabilities, but **promotion is BLOCKED** by the native
+PIN-change contract defect. Correction and relevant verification remain open.
+This entry does not imply a PR, tag, release or production-signed installer.
 Targeted iPhone–Mac/Home Base UI interoperability remains a **DEFERRED VALIDATION
 ITEM / POST-RELEASE VERIFICATION GATE**. Existing platform evidence is retained;
 the release must not be described as fully validated cross-platform.
