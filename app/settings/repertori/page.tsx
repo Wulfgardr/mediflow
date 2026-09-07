@@ -12,12 +12,16 @@ import {
     type AifaCatalogClientStatus,
 } from '@/lib/aifa-importer';
 import { AIFA_CATALOG_DEFAULT_SOURCE_URL } from '@/lib/aifa-catalog';
+import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast-provider';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { semanticSignalSurfaceClass } from '@/components/ui/semantic-signal';
 /* @Codex */
 import ExemptionDbManager from '@/components/settings/exemption-db-manager';
 import { SETTINGS_CARD_CLASS, SettingsSectionIntro } from '@/components/settings/settings-ui';
+
+/* @Codex Canonical command component with the required control geometry. */
+const AIFA_COMMAND_STYLE = { minHeight: 44, minWidth: 44, borderRadius: 12, fontWeight: 600, gap: 8 };
 
 export default function SettingsRepertoriPage() {
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -172,10 +176,10 @@ export default function SettingsRepertoriPage() {
 
                         {/* @Codex Explicit acquisition; opening this page only reads local status. */}
                         <div className="space-y-2">
-                            <button onClick={handleAifaUpdate} disabled={importing}
-                                className="w-full rounded-[var(--lume-radius-control)] bg-slate-900 px-4 py-3 font-medium text-white disabled:cursor-not-allowed disabled:opacity-50 dark:bg-slate-100 dark:text-slate-900">
+                            <Button onClick={handleAifaUpdate} disabled={importing}
+                                className="w-full" style={AIFA_COMMAND_STYLE}>
                                 Aggiorna da AIFA
-                            </button>
+                            </Button>
                             <p className="text-xs leading-5 text-[color:var(--lume-ink-muted)]">
                                 Scarica il feed ufficiale via Internet e sostituisce il catalogo locale. Nessun dato clinico viene inviato.
                                 {' '}<a className="underline" href="https://drive.aifa.gov.it/farmaci/confezioni_fornitura.csv" target="_blank" rel="noopener noreferrer">Fonte: confezioni AIFA</a>.
@@ -186,8 +190,10 @@ export default function SettingsRepertoriPage() {
                                 {updatePhase === 'download' ? 'Scaricamento e importazione in corso…'
                                     : updatePhase === 'verify' ? 'Verifica del catalogo: rilettura in corso…' : updateMessage}
                             </p>
-                            {updatePhase === 'download' && <button className="underline text-sm" onClick={() => updateController.current?.abort()}>Annulla</button>}
-                            <button className="underline text-sm" disabled={importing} onClick={() => void loadStatus()}>Rileggi stato</button>
+                            <div className="flex flex-wrap gap-2">
+                                {updatePhase === 'download' && <Button variant="secondary" style={AIFA_COMMAND_STYLE} onClick={() => updateController.current?.abort()}>Annulla</Button>}
+                                <Button variant="secondary" style={AIFA_COMMAND_STYLE} disabled={importing} onClick={() => void loadStatus()}>Rileggi stato</Button>
+                            </div>
                         </div>
 
                         <div className="space-y-3 rounded-[var(--lume-radius-card)] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] p-4">
@@ -258,12 +264,15 @@ export default function SettingsRepertoriPage() {
                             <div className={`rounded-[var(--lume-radius-control)] border p-3 text-xs ${semanticSignalSurfaceClass('success')}`}>
                                 <p className="font-semibold">Manifest di provenienza registrato</p>
                                 <p className="mt-1 break-words">
-                                    {drugCatalog.manifest.version} · scaricato il {drugCatalog.manifest.downloadedAt} · SHA-256 {drugCatalog.manifest.sha256}
+                                    Scaricato il {drugCatalog.manifest.downloadedAt} · {drugCatalog.manifest.rowCount.toLocaleString('it-IT')} confezioni
                                 </p>
                                 <p className="mt-1 break-all">Fonte: {drugCatalog.manifest.sourceUrl} · importato il {drugCatalog.manifest.importedAt}</p>
-                                <p className="mt-1">
-                                    Il manifest identifica il file importato; non certifica autenticità o licenza dello specifico dataset.
-                                </p>
+                                <details className="mt-2">
+                                    <summary className="cursor-pointer font-semibold">Dettagli provenienza</summary>
+                                    <p className="mt-1 break-words">{drugCatalog.manifest.version}</p>
+                                    <p className="mt-1 break-all">SHA-256 {drugCatalog.manifest.sha256}</p>
+                                    <p className="mt-1">Il manifest identifica il file importato; non certifica autenticità o licenza dello specifico dataset.</p>
+                                </details>
                             </div>
                         ) : drugCatalog?.state === 'unverified' ? (
                             <div className={`rounded-[var(--lume-radius-control)] border p-3 text-xs ${semanticSignalSurfaceClass('warning')}`}>
