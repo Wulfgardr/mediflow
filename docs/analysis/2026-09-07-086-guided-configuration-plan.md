@@ -173,3 +173,27 @@ La prova reale riguarda downloader e writer: il percorso HTTP/UI nella build
 integrata, il riavvio dell'app e gli altri sistemi operativi restano da provare.
 Un errore diagnostico successivo all'importazione è conservato; la verifica è
 stata completata con sole letture, senza ripetere acquisizione o scrittura.
+
+
+### Aggiornamento AIFA dal percorso ordinario
+
+La build `30143ca333af403ad7ab5ab6a758c5a05a66f53a` ha completato il percorso
+UI su un database fittizio separato: accesso ordinario, un clic su «Aggiorna da
+AIFA», POST `200` in 16,50 secondi e rilettura automatica GET `200`. Risultato:
+159.929 confezioni, zero righe rifiutate; impronta del file
+`24112417b204b9cb76a40437c6d226c19a1a3092325b7e99e538cdbe205a4c0d`.
+Una lettura SQLite indipendente conferma conteggio, integrità e chiavi esterne;
+conteggi e impronte delle quattro tabelle cliniche presenti restano invariati.
+
+È conservato il precedente errore `400` della build `b96507d9e30b`: la route
+confondeva uno stream vuoto con un payload. La correzione verifica EOF senza
+contenuti, con lettura limitata e cancellabile; qualsiasi byte resta rifiutato.
+Il coordinatore ha rieseguito gli 11 test mirati, tutti passati. La prova UI
+copre l'host macOS; non chiude i gate Windows/Linux o il riavvio applicativo.
+
+La sintesi documentale sulla build `b96507d9e30b` resta non riuscita:
+selezione, cattura ed estrazione `200`, proposta `503`. Una diagnostica separata
+con modello locale ha osservato una versione obbligatoria dell'output omessa.
+Questo non attribuisce retroattivamente la causa del `503` ordinario. Il
+formato di generazione vincolato allo schema, documentato in ADR0102, deve
+ancora completare implementazione e verifica reale.
