@@ -1,12 +1,14 @@
-# MediFlow 0.8.6: chiusura dello sviluppo e consegna
+# MediFlow 0.8.6: candidato, review e blocchi di consegna
 
 Aggiornamento: 7 settembre 2026. Branch `codex/WUL-669-086-integrated-candidate`.
 Base del programma: `b72ac713b624e7d771262e4e01c5c5e1f56f9ae2`.
-Stato deciso dall'utente: **feature-complete e development-complete** sul
-candidato `c320694c33d0d55848d6f721f176a2e22e221620`. Sorgente funzionale
-congelato; i successivi aggiornamenti di consegna riguardano documenti e
-artefatti, non funzionalità o correzioni. Nessun push, PR, merge, tag o release
-è attestato da questo verbale.
+La decisione di sviluppo concluso sul candidato
+`c320694c33d0d55848d6f721f176a2e22e221620` resta una fotografia storica.
+La successiva [review Daybreak](./2026-09-07-086-daybreak-security-review.md)
+su `1d633d98d0a093623c8c4f488815af804c769a6e` mantiene la promozione
+**bloccata (`BLOCK`) per il contratto del cambio PIN nativo**. La correzione
+è in corso in un'attività separata; nessuna prova ricevuta in questo verbale
+ne attesta la chiusura. Nessun push, PR, merge, tag o release è attestato qui.
 
 Questo verbale aggiorna lo stato del candidato. Le prove precedenti della
 [base funzionale](./2026-09-06-086-functional-closeout.md) e della
@@ -14,31 +16,42 @@ Questo verbale aggiorna lo stato del candidato. Le prove precedenti della
 il proprio commit e perimetro; non vengono attribuite retroattivamente al
 candidato finale. I contratti dei componenti restano negli ADR pertinenti.
 
-## Decisione di closeout
+## Decisione di closeout e aggiornamento della review
 
-L'utente considera concluso lo sviluppo della 0.8.6 e richiede la consegna
-del candidato congelato. Le prove Windows/Linux e Apple fixture/simulator
-già acquisite restano valide nel proprio perimetro. I volumi Xcode e delle
-VM non sono collegati: questa indisponibilità non impone di ripetere le prove
-e non riapre lo sviluppo. Il precedente limite d'uso del 20% è revocato.
+La decisione precedente considerava concluso lo sviluppo della 0.8.6.
+La review successiva rileva però un difetto rispetto a
+[ADR 0106](../adr/0106-web-auth-logout-pin-setup-lifecycle.md): dopo il cambio
+PIN riuscito, o una risposta non osservabile dopo l'invio, il client Apple
+conserva autorità e presentazione locali. La correzione richiesta riguarda
+questo contratto; non estende le funzionalità del candidato.
+
+La review registra sei ambiti, **298/298 elementi esaminati**, **13 test Node
+PASS** e **zero vulnerabilità reportabili** nel modello di minaccia adottato.
+Il difetto PIN è escluso dalla reportabilità perché l'abuso dimostrato richiede
+lo stesso utente o accesso fisico mirato con app sbloccata. Resta tuttavia
+incompatibile con il contratto obbligatorio e impedisce la promozione.
+Il [report pubblico derivato](./2026-09-07-086-daybreak-security-review.md)
+conserva il testo completo, gli hash originali, le esclusioni e i test non eseguiti.
 
 | Residuo di accettazione | Disposizione |
 | --- | --- |
-| Interoperabilità UI mirata iPhone ↔ Mac/Home Base, bloccata sul riempimento deterministico del campo nel test | **DEFERRED VALIDATION ITEM / POST-RELEASE VERIFICATION GATE** |
+| Ritiro dell'autorità locale dopo cambio PIN nativo | **BLOCK aperto**: occorrono commit della correzione e prove pertinenti prima di rimuoverlo. |
+| Limiti del corpo delle richieste, Keychain di produzione, futuro modello multioperatore | Tre domande aperte, in analisi separata; nessuna risposta presunta. |
+| Interoperabilità UI mirata iPhone ↔ Mac/Home Base | **DEFERRED VALIDATION ITEM / POST-RELEASE VERIFICATION GATE**, distinto dal blocco PIN. |
 
-La verifica differita richiede il percorso ordinario, assert invariati e
+Le prove Windows/Linux e Apple fixture/simulator già acquisite mantengono
+commit e perimetro originari. I volumi Xcode e delle VM non sono collegati;
+questa indisponibilità non impone di ripetere le prove. Il precedente limite
+d'uso del 20% è revocato.
+
+La verifica UI differita richiede il percorso ordinario, assert invariati e
 rilettura indipendente dei dati sintetici, quando gli ambienti saranno
-disponibili e la sua esecuzione sarà autorizzata. Nessun workaround per
-ottenere un falso verde. Salvo un difetto reale emerso da quella verifica,
-il residuo non riapre lo sviluppo della 0.8.6; nessuna nuova feature o
-correzione entra nel candidato congelato.
-
-La decisione modifica l'accettazione della consegna, non gli esiti registrati:
-non attesta le combinazioni mobile/host non eseguite e non autorizza il claim
-**fully validated cross-platform**. Provisioning WHO, responsabilità
-regolatorie, firma e distribuzione mantengono i rispettivi confini documentati.
-Pubblicazione e merge restano operazioni distinte, con autorizzazione e prove
-proprie; non seguono automaticamente dal congelamento.
+disponibili e l'esecuzione sarà autorizzata. Il differimento non attesta le
+combinazioni mobile/host non eseguite e non autorizza il claim
+**fully validated cross-platform**. Nessun installer firmato di produzione è
+attestato. Provisioning WHO e responsabilità regolatorie restano nei propri
+confini. Pubblicazione, merge e release richiedono autorizzazione e prove
+distinte; non seguono automaticamente dalla chiusura della review.
 
 ## Milestone di chiusura documentale
 
@@ -245,8 +258,8 @@ Sorgenti eseguibili della prima integrazione: `a3e402f825dd778115fddb83cd789757e
 pulito all'avvio della build. Il server standalone ha restituito
 `codex/WUL-669-086-integrated-candidate@a3e402f825dd:clean` da
 `/api/system/revision`. Questa prova precede le modifiche successive elencate sopra.
-Log di quel lotto: `/tmp/mf086-final-c6f84emr/logs/`; indice e ricevuta locali in
-`tmp-086-integrated/`.
+Log, indice e ricevuta del lotto sono conservati separatamente fra le
+evidenze locali; i percorsi privati non sono pubblicati in questo verbale.
 
 | Verifica sul candidato unificato | Risultato |
 | --- | --- |
@@ -296,6 +309,8 @@ o una revisione completa di ogni singolo form Apple.
 
 ## Limiti e promozione
 
+- Il blocco contrattuale PIN resta aperto: zero vulnerabilità reportabili
+  non autorizzano la promozione. Occorrono correzione e prove sul relativo SHA.
 - WHO non è provisionato: digest immagine, snapshot, accettazione della
   licenza, riavvio offline e ripristino restano da registrare. Nessuna prova
   contro un catalogo installato; lookup e cross-check puntuali sono fuori
@@ -311,7 +326,8 @@ o una revisione completa di ogni singolo form Apple.
   Non esiste una fotografia precedente sufficiente e non è stato tentato
   un ripristino. Il reader iniettato ora evita quell'import del database.
 
-La promozione richiede ancora il completamento delle prove, la revisione del
-diff e i controlli remoti. Le issue non sono dichiarate chiuse e non sono
-state modificate su GitHub o Linear. Firma, notarizzazione e release restano
+La promozione richiede ancora la chiusura del blocco PIN, la disposizione
+delle domande aperte della review, la revisione del diff e i controlli remoti.
+La verifica UI mobile resta differita come dichiarato sopra. Le issue non
+sono dichiarate chiuse e non sono state modificate su GitHub o Linear. Firma, notarizzazione e release restano
 distinte dal merge richiesto.

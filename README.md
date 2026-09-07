@@ -28,7 +28,10 @@ Informazioni, fonti e prossimi passi. Un po’ più facili da ritrovare.
 <details>
 <summary><strong>Versione sorgente e stato della candidatura</strong></summary>
 
-> **0.8.6: sviluppo concluso, candidato congelato.** La UI scelta è promossa
+> **0.8.6: candidato in revisione, promozione bloccata dal contratto PIN.**
+> La [review Daybreak](./docs/analysis/2026-09-07-086-daybreak-security-review.md) riporta
+> zero vulnerabilità reportabili, ma richiede la correzione del cambio PIN nativo
+> e le relative prove prima di rimuovere il blocco. La UI scelta è promossa
 > secondo [ADR 0123](./docs/adr/0123-official-web-ui-navigation-compositions.md):
 > B predefinita e A come disposizione alternativa della stessa navigazione.
 > Le schermate sotto documentano la base 0.8.5.

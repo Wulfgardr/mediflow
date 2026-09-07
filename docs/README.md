@@ -9,7 +9,7 @@ read_when:
 
 Questo file è il punto di ingresso unico: dove leggere, cosa aggiornare e quale documento prevale.
 
-Ultimo aggiornamento: 2026-09-06
+Ultimo aggiornamento: 2026-09-07
 
 > [!NOTE]
 > Questa documentazione descrive il contenuto sorgente della `0.8.5`.
@@ -30,9 +30,16 @@ Ultimo aggiornamento: 2026-09-06
 ## Consegna 0.8.6
 
 [Candidato locale integrato](./analysis/2026-09-06-086-integrated-closeout.md):
-decisione di sviluppo concluso e congelamento, prove conservate e verifica
-iPhone–Mac/Home Base differita al post-release.
-Prevale sulle fotografie precedenti per lo stato del programma 0.8.6.
+decisione storica di congelamento, prove conservate e verifica
+iPhone–Mac/Home Base differita al post-release. La promozione resta **bloccata
+dal contratto PIN**. Prevale sulle fotografie precedenti per lo stato del
+programma 0.8.6.
+
+[Review di sicurezza Daybreak](./analysis/2026-09-07-086-daybreak-security-review.md):
+fonte pubblica della review sullo SHA `1d633d98d0a0`, con sintesi italiana e
+report completo derivato. Sei ambiti, 298/298 elementi esaminati, 13 test Node
+PASS e zero vulnerabilità reportabili non rimuovono il blocco PIN. Correzione,
+prove e tre domande di approfondimento restano aperte.
 
 [Promozione della UI web](./adr/0123-official-web-ui-navigation-compositions.md):
 contratto accettato per B predefinita e A selezionabile, con confronto sintetico

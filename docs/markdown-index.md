@@ -11,7 +11,7 @@ read_when:
 > GitHub mostra in alto solo alcuni file speciali (`README`, `CONTRIBUTING`, `SECURITY`, ecc.).
 > Questo file elenca invece **tutti** i `.md` tracciati nella repository con una sintesi rapida d'uso.
 
-Ultimo aggiornamento: 2026-09-06
+Ultimo aggiornamento: 2026-09-07
 
 ## Ingresso progressivo e candidatura
 
@@ -34,8 +34,13 @@ Ultimo aggiornamento: 2026-09-06
 ## Consegna 0.8.6
 
 [Stato del candidato integrato](./analysis/2026-09-06-086-integrated-closeout.md):
-congelamento funzionale, prove conservate, verifica mobile differita e limiti
-di pubblicazione.
+decisione storica di congelamento, blocco PIN aperto, prove conservate e
+verifica mobile differita.
+
+[Review di sicurezza Daybreak](./analysis/2026-09-07-086-daybreak-security-review.md):
+report completo derivato, provenienza e sintesi dei sei ambiti; 298/298 elementi,
+13 test Node PASS, zero vulnerabilità reportabili e promozione bloccata dal
+contratto PIN. Da consultare prima della promozione della 0.8.6.
 
 [Verifica della cartella Apple](./analysis/2026-09-06-086-apple-ui-verification.md):
 sorgenti, toolchain, prove delle bozze e limiti della lane nativa.
