@@ -14,16 +14,24 @@ const publication = {
 };
 
 
+const PATIENT = 'synthetic-patient';
+const ATTACHMENT = 'synthetic-document';
 function fixture(pause?: string, status = 200) {
+    const state = { version: 1, name: 'Ambulatorio Centro' };
     const calls: Array<{ url: string; body: unknown; signal?: AbortSignal | null }> = [];
-    let resume: (() => void) | undefined;
-    let entered!: () => void;
+    let resume: (() => void) | undefined; let entered!: () => void;
     const paused = new Promise<void>((resolve) => { entered = resolve; });
     const controller = createDocumentSynthesisReviewBrowserController({ fetch: async (input, init) => {
         const url = String(input); const body = init?.body ? JSON.parse(String(init.body)) : null;
         calls.push({ url, body, signal: init?.signal });
         if (url.endsWith(pause ?? 'never')) { entered(); await new Promise<void>((resolve) => { resume = resolve; }); }
-        if (url === '/api/context') return Response.json({ ambulatoryId: 'synthetic-ambulatory' });
+        // The ordinary session has no ambulatory cookie; this route must not be needed.
+        if (url === '/api/context') return Response.json({ ambulatoryId: null });
+        if (url === `/api/patients/${PATIENT}`) return Response.json({ id: PATIENT, firstName: 'Alice', lastName: 'Esempio', version: state.version });
+        if (url === '/api/ambulatories') return Response.json([
+            { id: 'synthetic-centro', name: state.name, address: 'Via Centrale', version: 1, isDefault: true },
+            { id: 'synthetic-nord', name: 'Ambulatorio Nord', address: null, version: 1 },
+        ]);
         if (url.endsWith('/selection')) return init?.method === 'GET'
             ? Response.json({ selectionEpoch: 0 })
             : Response.json({ selection: { sessionRef: `ssr_${'1'.repeat(32)}`, selectionEpoch: 1,
@@ -34,49 +42,81 @@ function fixture(pause?: string, status = 200) {
         if (url.endsWith('/preview')) return Response.json(serializeDocumentSynthesisPreviewWire(publication));
         throw new Error('Unexpected request');
     } });
-    return { controller, calls, paused, resume: () => resume?.() };
+    return { controller, calls, state, paused, resume: () => resume?.() };
 }
-const intent = { patientId: 'synthetic-patient', attachmentId: 'synthetic-attachment' };
+const intent = { patientId: PATIENT, attachmentId: ATTACHMENT };
 
-test('confirms a single context then selects before DS capture without Smart Import generation', async () => {
-    const f = fixture(); const proposal = await f.controller.readProposal();
-    assert.equal(f.calls.length, 1);
-    await assert.rejects(f.controller.run({ ...intent, proposal }, false as true), { code: 'confirmation_required' });
-    await assert.rejects(f.controller.run({ ...intent, proposal: { ...proposal } }, true), { code: 'proposal_stale' });
-    const result = await f.controller.run({ ...intent, proposal }, true);
+test('missing cookie still offers named choices; only the explicit non-default selection reaches DS', async () => {
+    const f = fixture(); const proposal = await f.controller.readProposal(PATIENT);
+    assert.equal(proposal.patientName, 'Alice Esempio');
+    assert.deepEqual(proposal.ambulatories.map((a) => a.name), ['Ambulatorio Centro', 'Ambulatorio Nord']);
+    assert.equal(f.calls.some(({ url }) => url === '/api/context' || url.includes('/api/ai/')), false);
+    const ambulatory = proposal.ambulatories[1];
+    await assert.rejects(f.controller.run({ ...intent, proposal, ambulatory }, false as true), { code: 'confirmation_required' });
+    await assert.rejects(f.controller.run({ ...intent, proposal, ambulatory: null }, true), { code: 'choice_required' });
+    await assert.rejects(f.controller.run({ ...intent, proposal, ambulatory: { ...ambulatory } }, true), { code: 'choice_required' });
+    const result = await f.controller.run({ ...intent, proposal, ambulatory }, true);
     assert.equal(result.publication.receipt.writesPerformed, 0);
-    assert.deepEqual(f.calls.map(({ url, body }) => ({ url, body })), [
-        { url: '/api/context', body: null },
-        { url: '/api/ai/smart-import/selection', body: null },
-        { url: '/api/ai/smart-import/selection', body: { expectedEpoch: 0, patientId: intent.patientId, ambulatoryId: proposal.ambulatoryId } },
-        { url: '/api/ai/document-synthesis/capture', body: { attachmentId: intent.attachmentId } },
+    const mutations = f.calls.filter(({ body }) => body !== null);
+    assert.deepEqual(mutations.map(({ url, body }) => ({ url, body })), [
+        { url: '/api/ai/smart-import/selection', body: { expectedEpoch: 0, patientId: PATIENT, ambulatoryId: 'synthetic-nord' } },
+        { url: '/api/ai/document-synthesis/capture', body: { attachmentId: ATTACHMENT } },
         { url: '/api/ai/document-synthesis/ingest', body: { captureHandle: `dsc_${'5'.repeat(32)}` } },
         { url: '/api/ai/document-synthesis/preview', body: { previewHandle: `dsp_${'6'.repeat(32)}` } },
     ]);
-    await assert.rejects(f.controller.run({ ...intent, proposal }, true), { code: 'proposal_stale' });
+    await assert.rejects(f.controller.run({ ...intent, proposal, ambulatory }, true), { code: 'proposal_stale' });
     f.controller.reset();
 });
 
-test('selection denial and conflict stop before capture and require fresh confirmation', async () => {
+test('membership denial and epoch conflict stop before capture without retrying selection', async () => {
     for (const status of [401, 409, 503]) {
-        const f = fixture(undefined, status); const proposal = await f.controller.readProposal();
-        await assert.rejects(f.controller.run({ ...intent, proposal }, true));
+        const f = fixture(undefined, status); const proposal = await f.controller.readProposal(PATIENT);
+        await assert.rejects(f.controller.run({ ...intent, proposal, ambulatory: proposal.ambulatories[0] }, true));
         assert.equal(f.calls.some(({ url }) => url.endsWith('/capture')), false);
-        await assert.rejects(f.controller.run({ ...intent, proposal }, true), { code: 'proposal_stale' });
+        assert.equal(f.calls.filter(({ body }) => body !== null).length, 1);
         f.controller.reset();
     }
 });
 
-test('reset aborts transport and suppresses late results at every asynchronous boundary', async () => {
-    for (const pause of ['/context', '/selection', '/capture', '/ingest', '/preview']) {
+test('stale patient, renamed ambulatory, and a different patient invalidate confirmation before selection', async () => {
+    for (const drift of ['version', 'name', 'patient'] as const) {
+        const f = fixture(); const proposal = await f.controller.readProposal(PATIENT);
+        if (drift === 'version') f.state.version++;
+        if (drift === 'name') f.state.name = 'Ambulatorio Rinominato';
+        await assert.rejects(f.controller.run({ ...intent, patientId: drift === 'patient' ? 'other' : PATIENT,
+            proposal, ambulatory: proposal.ambulatories[0] }, true), { code: 'proposal_stale' });
+        assert.equal(f.calls.some(({ body }) => body !== null), false);
+        f.controller.reset();
+    }
+});
+
+test('reset aborts context reads and suppresses late selection, capture, ingest and preview', async () => {
+    for (const pause of [`/patients/${PATIENT}`, '/ambulatories', '/selection', '/capture', '/ingest', '/preview']) {
         const f = fixture(pause);
-        const pending = pause === '/context' ? f.controller.readProposal()
-            : f.controller.run({ ...intent, proposal: await f.controller.readProposal() }, true);
+        const pending = pause === '/ambulatories' || pause.includes('/patients/') ? f.controller.readProposal(PATIENT)
+            : (async () => { const proposal = await f.controller.readProposal(PATIENT);
+                return f.controller.run({ ...intent, proposal, ambulatory: proposal.ambulatories[0] }, true); })();
         await f.paused;
         const count = f.calls.length; f.controller.reset();
         assert.equal(f.calls.at(-1)?.signal?.aborted, true);
-        f.resume();
-        await assert.rejects(pending, { code: 'operation_superseded' });
+        f.resume(); await assert.rejects(pending, { code: 'operation_superseded' });
         assert.equal(f.calls.length, count);
+    }
+});
+
+/* @Codex */
+test('missing patient or empty ambulatory catalog never produces a confirmable context', async () => {
+    for (const unavailable of ['patient', 'ambulatories', 'session'] as const) {
+        const calls: string[] = [];
+        const controller = createDocumentSynthesisReviewBrowserController({ fetch: async (url) => {
+            calls.push(String(url));
+            if (unavailable === 'session') return Response.json({}, { status: 401 });
+            if (String(url).includes('/patients/')) return unavailable === 'patient' ? Response.json({}, { status: 404 })
+                : Response.json({ id: PATIENT, firstName: 'Alice', lastName: 'Esempio', version: 1 });
+            return Response.json([]);
+        } });
+        await assert.rejects(controller.readProposal(PATIENT), { code: unavailable === 'session' ? 'session_unavailable' : 'context_unavailable' });
+        assert.equal(calls.some((url) => url.includes('/api/ai/')), false);
+        controller.reset();
     }
 });
