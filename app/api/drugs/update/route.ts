@@ -7,11 +7,42 @@ import { AifaUpdateError, withAifaDownload } from '@/lib/aifa-catalog-download';
 
 export const runtime = 'nodejs';
 
+// Inspect without buffering: cap empty chunks and time, and never await stream cancellation.
+async function assertEmptyBody(request: Request, signal: AbortSignal): Promise<void> {
+    signal.throwIfAborted();
+    if (!request.body) return;
+    const reader = request.body.getReader();
+    const invalid = () => new AifaUpdateError('La richiesta AIFA non accetta parametri o contenuti', 400);
+    let rejectRead!: (reason: unknown) => void;
+    const stopped = new Promise<never>((_resolve, reject) => { rejectRead = reject; });
+    const cancel = () => rejectRead(signal.reason);
+    signal.addEventListener('abort', cancel, { once: true });
+    const deadline = Date.now() + 1_000;
+    const timer = setTimeout(() => rejectRead(invalid()), 1_000);
+    try {
+        for (let reads = 0; reads < 32; reads++) {
+            signal.throwIfAborted();
+            if (Date.now() >= deadline) throw invalid();
+            const chunk = await Promise.race([reader.read(), stopped]);
+            signal.throwIfAborted();
+            if (Date.now() >= deadline) throw invalid();
+            if (chunk.done) return;
+            if (chunk.value.byteLength !== 0) throw invalid();
+        }
+        throw invalid();
+    } finally {
+        clearTimeout(timer);
+        signal.removeEventListener('abort', cancel);
+        void reader.cancel().catch(() => undefined);
+        reader.releaseLock();
+    }
+}
+
 export async function POST(request: Request) {
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
     // No caller-supplied download configuration or payload is accepted.
-    if (new URL(request.url).search || request.body !== null) {
+    if (new URL(request.url).search) {
         return Response.json({ error: 'La richiesta AIFA non accetta parametri o contenuti' }, { status: 400 });
     }
     const port = mintResourcePort(session);
@@ -31,6 +62,8 @@ export async function POST(request: Request) {
             const use = beginResourceUse(port);
             if (!use || !commitResourceUse(use)) throw new AifaUpdateError('Sessione non più valida', 401);
         };
+        assertSession();
+        await assertEmptyBody(request, controller.signal);
         assertSession();
         const snapshot = getAifaCatalogSnapshot();
         assertSession();
