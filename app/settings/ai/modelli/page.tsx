@@ -31,7 +31,7 @@ export default function SettingsAiModelsPage() {
             {/* @Codex: presets remain explicit draft changes through the existing controller. */}
             <div className={`${SETTINGS_CARD_CLASS} ${styles.card} ${styles.stack}`}>
                 <h3 className="text-base font-semibold">Configurazioni consigliate</h3>
-                <p>Scegli un punto di partenza in base alla memoria del computer, oppure mantieni i modelli già selezionati.</p>
+                <p>Parti dalla memoria del computer, poi scegli i modelli per le tue attività.</p>
                 <div className={styles.presets}>
                     {([
                         ['low', 'Leggero · meno di 16 GB', 'Qwen 2.5 7B'],
@@ -42,11 +42,13 @@ export default function SettingsAiModelsPage() {
                             aria-pressed={hardwareProfile === profile} onClick={() => applyHardwareProfile(profile)}>
                             <span className="block font-semibold">{label}</span>
                             <span className={styles.hint}>{model}</span>
-                            <span className={styles.presetAction}>Usa questa configurazione nella bozza</span>
+                            <span className={styles.presetAction}>Applica alla bozza</span>
                         </button>
                     ))}
                 </div>
-                <p className={styles.hint}>Il preset sostituisce le selezioni dei due ruoli con lo stesso modello. La modifica resta in bozza: verifica i modelli installati e premi «Salva Configurazione». Nessun download o salvataggio automatico.</p>
+                <p className={styles.hint}>Il preset aggiorna la bozza. Verifica i modelli installati e salva per applicarlo.</p>
+                <details>
+                <summary>Cosa cambia con un preset</summary>
                 <dl className={styles.roles}>
                     <div>
                         <dt className="font-semibold">Sintesi e organizzazione</dt>
@@ -57,12 +59,13 @@ export default function SettingsAiModelsPage() {
                         <dd className={styles.hint}>Modello per elaborare e confrontare informazioni testuali. Puoi sceglierne uno diverso nel passo 2.</dd>
                     </div>
                 </dl>
-                <p className={styles.hint}>La memoria è un’indicazione orientativa, non una verifica di compatibilità o qualità. Questi preset riguardano il testo; non configurano l’estrazione OCR o la revisione terapeutica ATHENA.</p>
+                <p className={styles.hint}>Il preset sceglie lo stesso modello per i due ruoli, senza scaricarlo o salvarlo. La memoria è un’indicazione orientativa: compatibilità e qualità vanno verificate. OCR e revisione terapeutica ATHENA hanno una configurazione separata.</p>
+                </details>
             </div>
 
             <div className={`${SETTINGS_CARD_CLASS} ${styles.card} ${styles.stack}`}>
                 <h3 className="text-base font-semibold">1. Verifica la connessione</h3>
-                <p>Ollama per i ruoli generali. Treatment Reasoning usa la lane locale ATHENA separata.</p>
+                <p>Collega i modelli che lavorano sul tuo computer.</p>
                 <label htmlFor="ollama-url">Indirizzo di Ollama sul computer</label>
                 <input id="ollama-url" type="text" value={aiConfig.url}
                     onChange={event => setAiConfig(previous => ({ ...previous, url: event.target.value }))}
