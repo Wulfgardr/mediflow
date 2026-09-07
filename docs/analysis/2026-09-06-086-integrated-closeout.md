@@ -62,9 +62,18 @@ gestisce soltanto quel dialogo e l'azione “Not Now”. Il nuovo tentativo si
 ferma ancora prima dell'accesso: il helper di riempimento lascia un suffisso
 nel campo dell'identificativo perché cancella dal cursore centrale. Non prova
 quindi la gestione del dialogo o il percorso clinico. Occorre osservare la
-selezione dell'intero contenuto prima di correggere il helper; la sessione di
-verifica è sospesa perché il controller Mac è bloccato e richiede lo sblocco
-manuale. I due tentativi e i prodotti compilati restano conservati.
+selezione dell'intero contenuto prima di correggere il helper. I due tentativi
+e i prodotti compilati restano conservati.
+
+Dopo lo sblocco manuale del Mac, il controllo diretto del simulatore non riesce
+ad azionare Configura. Una prova XCTest separata, `cff1bbf45`, raggiunge invece
+il campo e ne conferma il valore invariato prima e dopo una pressione lunga.
+Build con firma ordinaria e singola osservazione sono PASS; AX e screenshot
+non mostrano però un menu di selezione. Questo PASS non prova “Select All”,
+sostituzione del testo o completamento del percorso reale. Il candidato di
+sola osservazione resta nel worktree di verifica, separato dal branch integrato;
+il helper precedente è invariato. Raggiunto il limite concordato del 20% della
+quota settimanale, la sessione entra in chiusura ordinata senza un nuovo P1.
 
 ### Ricevute precedenti conservate
 
