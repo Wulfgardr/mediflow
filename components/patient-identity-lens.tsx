@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react';
 import { Calendar, MapPin, Phone } from 'lucide-react';
 
+import disclosure from '@/components/patient-disclosure.module.css';
 import PrivacyBlur from '@/components/privacy-blur';
 import { StatusGlyph } from '@/components/status-glyph';
 import type { Diagnosis, Patient } from '@/lib/db';
@@ -32,10 +33,6 @@ interface PatientIdentityLensProps {
     exemptionDetails?: PatientExemptionLensItem[];
 }
 
-function isCodedDiagnosis(diagnosis: Diagnosis) {
-    return Boolean(diagnosis.code?.trim());
-}
-
 function diagnosisSystemLabel(system?: string) {
     const normalized = system?.trim().toUpperCase();
     if (!normalized) return 'Codice';
@@ -43,28 +40,6 @@ function diagnosisSystemLabel(system?: string) {
     if (normalized.startsWith('ICD-10') || normalized === 'ICD10') return 'ICD-10';
     if (normalized.startsWith('ICD-9') || normalized === 'ICD9' || normalized === 'ICD-9-CM') return 'ICD-9';
     return normalized;
-}
-
-function getFeaturedDiagnoses(diagnoses: Diagnosis[]) {
-    return diagnoses.filter(isCodedDiagnosis).slice(0, 4);
-}
-
-/* @Codex */
-function getFeaturedExemptions(exemptions: string[], exemptionDetails: PatientExemptionLensItem[]) {
-    const detailByCode = new Map(
-        exemptionDetails.map((item) => [item.code.trim().toUpperCase(), item]),
-    );
-
-    return exemptions
-        .map((code) => {
-            const normalizedCode = code.trim().toUpperCase();
-            const detail = detailByCode.get(normalizedCode);
-            return {
-                code: normalizedCode,
-                description: detail?.description?.trim() || '',
-            };
-        })
-        .slice(0, 4);
 }
 
 export function PatientIdentityLens({
@@ -75,152 +50,49 @@ export function PatientIdentityLens({
     diagnoses,
     exemptions,
     actions,
-    summary,
-    nextStep,
     exemptionDetails = [],
 }: PatientIdentityLensProps) {
-    /* @Codex */
-    const featuredDiagnoses = getFeaturedDiagnoses(diagnoses);
-    /* @Codex */
-    const featuredExemptions = getFeaturedExemptions(exemptions, exemptionDetails);
-    const codedDiagnosisCount = diagnoses.filter(isCodedDiagnosis).length;
-    /* @Codex */
-    const leadDiagnosis = featuredDiagnoses[0];
-    /* @Codex */
-    const secondaryDiagnoses = featuredDiagnoses.slice(1);
-    const remainingCodedCount = Math.max(codedDiagnosisCount - featuredDiagnoses.length, 0);
-    /* @Codex */
-    const remainingExemptionCount = Math.max(exemptions.length - featuredExemptions.length, 0);
-
+    /* @Codex WUL-678: domain groups keep identity, clinical facts and exemptions separate. */
     if (variant === 'reader') {
         return (
-            <section className="patient-identity-lens patient-identity-lens-reader lume-panel relative overflow-hidden p-5 md:p-6">
-                <div className="relative z-10 grid gap-5 xl:grid-cols-[minmax(0,1.38fr)_320px] xl:items-start">
-                    <div className="min-w-0 space-y-5">
-                        <div className="border-t border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] pt-5">
-                            <div className="flex flex-wrap items-baseline justify-between gap-3">
-                                <h2 className="text-sm font-medium uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
-                                    Quadro clinico
-                                </h2>
-                                <div className="flex flex-wrap gap-2 text-[11px] text-[color:var(--lume-ink-muted)]">
-                                    <span>{codedDiagnosisCount} diagnosi</span>
-                                    <span aria-hidden>·</span>
-                                    <span>{exemptions.length} esenzioni</span>
-                                </div>
-                            </div>
-
-                            <div className="mt-3 grid gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] lg:gap-6">
-                                <div className="min-w-0">
-                                    <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
-                                        Diagnosi codificate
-                                    </p>
-                                    {leadDiagnosis ? (
-                                        <div className="patient-diagnosis-card mt-2 rounded-[var(--lume-radius-control)] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] p-3">
-                                            <div className="flex flex-wrap items-start gap-3">
-                                                <span className="patient-code-pill patient-code-pill-primary lume-registro">
-                                                    {leadDiagnosis.code}
-                                                </span>
-                                                <div className="min-w-0 flex-1">
-                                                    <p className="text-[15px] font-semibold leading-6 text-[color:var(--lume-ink)]">
-                                                        {leadDiagnosis.description}
-                                                    </p>
-                                                    <p className="mt-0.5 text-[11px] font-medium uppercase tracking-[0.06em] text-[color:var(--lume-ink-muted)]">
-                                                        {diagnosisSystemLabel(leadDiagnosis.system)}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <p className="mt-2 text-sm leading-6 text-[color:var(--lume-ink-muted)]">
-                                            Nessuna diagnosi codificata in primo piano.
-                                        </p>
-                                    )}
-
-                                    {secondaryDiagnoses.length > 0 ? (
-                                        /* @Codex: le diagnosi secondarie sono una lista informativa;
-                                           la semantica nativa rende verificabile il nome accessibile dei chip. */
-                                        <ul
-                                            aria-label="Diagnosi codificate secondarie"
-                                            className="mt-2 flex flex-wrap gap-1.5"
-                                        >
-                                            {secondaryDiagnoses.map((diagnosis) => (
-                                                <li
-                                                    key={`${diagnosis.system}-${diagnosis.code}`}
-                                                    className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] px-2.5 py-1 text-xs text-[color:var(--lume-ink)]"
-                                                >
-                                                    <span className="lume-registro font-semibold">{diagnosis.code}</span>
-                                                    <span className="truncate" title={diagnosis.description}>{diagnosis.description}</span>
-                                                    <span className="shrink-0 text-[10px] uppercase tracking-[0.04em] text-[color:var(--lume-ink-muted)]">
-                                                        {diagnosisSystemLabel(diagnosis.system)}
-                                                    </span>
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    ) : null}
-
-                                    {remainingCodedCount > 0 ? (
-                                        <p className="mt-2 text-xs text-[color:var(--lume-ink-muted)]">
-                                            +{remainingCodedCount} altre diagnosi codificate presenti in scheda.
-                                        </p>
-                                    ) : null}
-                                </div>
-
-                                <div className="min-w-0 lg:border-l lg:border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] lg:pl-6">
-                                    <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
-                                        Esenzioni
-                                    </p>
-                                    {featuredExemptions.length > 0 ? (
-                                        <ul className="mt-2 space-y-1.5">
-                                            {featuredExemptions.map((exemption) => (
-                                                <li
-                                                    key={exemption.code}
-                                                    className="flex flex-wrap items-baseline gap-2 text-sm leading-6 text-[color:var(--lume-ink)]"
-                                                >
-                                                    <span className="patient-code-pill patient-code-pill-primary">
-                                                        {exemption.code}
-                                                    </span>
-                                                    <span className="min-w-0 flex-1">
-                                                        {exemption.description || 'Esenzione registrata nel profilo paziente.'}
-                                                    </span>
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    ) : (
-                                        <p className="mt-2 text-sm leading-6 text-[color:var(--lume-ink-muted)]">
-                                            Nessuna esenzione strutturata registrata.
-                                        </p>
-                                    )}
-
-                                    {remainingExemptionCount > 0 ? (
-                                        <p className="mt-2 text-xs text-[color:var(--lume-ink-muted)]">
-                                            +{remainingExemptionCount} altre esenzioni registrate in scheda.
-                                        </p>
-                                    ) : null}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="space-y-3">
-                        <div className="patient-quick-context-card rounded-[var(--lume-radius-control)] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] px-4 py-3">
-                            <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
-                                Contesto rapido
-                            </p>
-                            <div className="mt-2 space-y-1.5 text-sm text-[color:var(--lume-ink)]">
-                                <p className="inline-flex items-center gap-1.5">
-                                    <Phone className="h-3.5 w-3.5 text-[color:var(--lume-ink-muted)]" />
-                                    <PrivacyBlur intensity="sm">{patient.phone || 'Telefono non disponibile'}</PrivacyBlur>
-                                </p>
-                                <p className="inline-flex items-center gap-1.5">
-                                    <MapPin className="h-3.5 w-3.5 text-[color:var(--lume-ink-muted)]" />
-                                    <PrivacyBlur intensity="sm">{patient.address || 'Indirizzo non disponibile'}</PrivacyBlur>
-                                </p>
-                            </div>
-                        </div>
-                        {actions}
-                    </div>
-                </div>
-            </section>
+            <div className={disclosure.identity}>
+                <section aria-labelledby="patient-demographics-title">
+                    <h2 id="patient-demographics-title">Anagrafica</h2>
+                    <dl className={disclosure.facts}>
+                        <div><dt>Nome e cognome</dt><dd><PrivacyBlur>{patient.firstName} {patient.lastName}</PrivacyBlur></dd></div>
+                        <div><dt>Codice fiscale</dt><dd><PrivacyBlur intensity="sm">{patient.taxCode || 'Non registrato'}</PrivacyBlur></dd></div>
+                        <div><dt>Data di nascita</dt><dd>{birthDateLabel} · {ageLabel}</dd></div>
+                        <div><dt>Telefono</dt><dd><PrivacyBlur intensity="sm">{patient.phone || 'Non registrato'}</PrivacyBlur></dd></div>
+                        <div><dt>Indirizzo</dt><dd><PrivacyBlur intensity="sm">{patient.address || 'Non registrato'}</PrivacyBlur></dd></div>
+                    </dl>
+                </section>
+                <section id="clinica" aria-labelledby="patient-clinical-title">
+                    <h2 id="patient-clinical-title">Clinica <span className={disclosure.count}>{diagnoses.length}</span></h2>
+                    <h3>Diagnosi</h3>
+                    {diagnoses.length > 0 ? (
+                        <ul className={disclosure.records} aria-label="Diagnosi registrate">
+                            {diagnoses.map((diagnosis, index) => (
+                                <li key={`${diagnosis.system}-${diagnosis.code}-${index}`}>
+                                    <strong>{diagnosis.description || diagnosis.code}</strong>
+                                    {diagnosis.code ? <span>{diagnosis.code} · {diagnosisSystemLabel(diagnosis.system)}</span> : <span>Diagnosi non codificata</span>}
+                                </li>
+                            ))}
+                        </ul>
+                    ) : <p>Nessuna diagnosi registrata.</p>}
+                </section>
+                <section aria-labelledby="patient-administration-title">
+                    <h2 id="patient-administration-title">Amministrazione <span className={disclosure.count}>{exemptions.length}</span></h2>
+                    <h3>Esenzioni</h3>
+                    {exemptions.length > 0 ? (
+                        <ul className={disclosure.records} aria-label="Esenzioni registrate">
+                            {exemptions.map((code) => (
+                                <li key={code}><strong>{code}</strong><span>{exemptionDetails.find((item) => item.code === code)?.description || 'Esenzione registrata nel profilo paziente.'}</span></li>
+                            ))}
+                        </ul>
+                    ) : <p>Nessuna esenzione registrata.</p>}
+                </section>
+                {actions}
+            </div>
         );
     }
 

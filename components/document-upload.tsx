@@ -1,12 +1,13 @@
 /* @Codex */
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useDropzone, type FileRejection } from 'react-dropzone';
 import { Eye, FileText, Loader2, RefreshCw, Upload, X } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 
 import DocumentSynthesisFabricReviewCard from '@/components/document-synthesis-fabric-review-card';
+import disclosure from '@/components/patient-disclosure.module.css';
 import DocumentViewer from '@/components/document-viewer';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { semanticSignalSurfaceClass } from '@/components/ui/semantic-signal';
@@ -23,6 +24,8 @@ import { cn } from '@/lib/utils';
 
 interface DocumentUploadProps {
     patientId: string;
+    /* @Codex WUL-678: saved summaries share the review area without duplicate source lists. */
+    children?: ReactNode;
 }
 
 type LocalExtractionState = (Readonly<{ attachmentId: string }> & AnyDocLocalExtractionPreview)
@@ -37,7 +40,7 @@ function fileAsDataUrl(file: File): Promise<string> {
     });
 }
 
-export default function DocumentUpload({ patientId }: DocumentUploadProps) {
+export default function DocumentUpload({ patientId, children }: DocumentUploadProps) {
     const { showToast } = useToast();
     const confirm = useConfirm();
     const [isProcessing, setIsProcessing] = useState(false);
@@ -169,63 +172,54 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
     };
 
     return (
-        <div className="space-y-6">
-            <div
-                {...getRootProps()}
-                className={cn(
-                    'flex cursor-pointer flex-col items-center justify-center rounded-[var(--lume-radius-card)] border p-6 transition-[border-color,background-color] duration-[var(--lume-dur-fuoco)] ease-[var(--lume-ease)]',
-                    isDragActive
-                        ? 'lume-focal border-[color:color-mix(in_srgb,var(--lume-ink)_24%,transparent)] bg-[color:var(--lume-surface-focal)]'
-                        : 'border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] hover:bg-[color:color-mix(in_srgb,var(--lume-ink)_5%,var(--lume-surface-field))]',
-                )}
-            >
-                <input {...getInputProps()} aria-label="Carica documenti" />
-                <div className="mb-3 rounded-full bg-[color:color-mix(in_srgb,var(--lume-accent)_11%,var(--lume-surface-field))] p-3 text-[color:var(--lume-accent)]">
-                    {isProcessing ? <Loader2 className="h-6 w-6 animate-spin" /> : <Upload className="h-6 w-6" />}
-                </div>
-                <p className="text-sm font-medium text-[color:var(--lume-ink)]">Carica documenti</p>
-                <p className="mt-1 text-center text-xs text-[color:var(--lume-ink-muted)]">
-                    Prima viene registrato l&apos;allegato; estrazione locale e sintesi partono solo su azione manuale (max 10 file, 25 MB ciascuno).
-                </p>
-            </div>
-
-            {fileRejections.length > 0 && (
-                <ul className="space-y-1 rounded-xl border border-[color:color-mix(in_srgb,var(--lume-signal-critical)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-critical)_11%,var(--lume-surface-field))] px-3 py-2 text-xs text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]">
-                    {fileRejections.map((message) => <li key={message}>{message}</li>)}
-                </ul>
-            )}
-
-            {!documentSynthesisEnabled && (
+        <div className={disclosure.documents} data-testid="patient-documents">
+            <section aria-label="Caricamento documenti" data-document-area="upload">
+                {attachments?.length === 0 ? <p className={disclosure.empty}>Nessun documento caricato.</p> : null}
                 <div
+                    {...getRootProps({ role: 'button', 'aria-label': 'Carica documenti' })}
                     className={cn(
-                        'rounded-2xl border p-3 text-xs leading-5',
-                        semanticSignalSurfaceClass(sharedKillSwitchSignal(documentSynthesisEnabled)),
+                        disclosure.upload,
+                        isDragActive
+                            ? 'lume-focal border-[color:color-mix(in_srgb,var(--lume-ink)_24%,transparent)] bg-[color:var(--lume-surface-focal)]'
+                            : 'border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] hover:bg-[color:color-mix(in_srgb,var(--lume-ink)_5%,var(--lume-surface-field))]',
                     )}
-                    data-testid="document-upload-synthesis-disabled-note"
                 >
-                    La sintesi Fabric è disabilitata localmente. Upload, anteprima AnyDoc e revisione manuale restano disponibili; nessuna proposta viene generata.
+                    <input {...getInputProps()} aria-label="Carica documenti" />
+                    <div className={disclosure.uploadIcon}>
+                        {isProcessing ? <Loader2 className="h-6 w-6 animate-spin" /> : <Upload className="h-6 w-6" />}
+                    </div>
+                    <p className="text-sm font-medium text-[color:var(--lume-ink)]">Carica documenti</p>
+                    <p className={disclosure.hint}>
+                        Fino a 10 file, 25 MB ciascuno. Estrazione e sintesi si avviano manualmente dopo il caricamento.
+                    </p>
                 </div>
-            )}
 
-            <div className="flex flex-col gap-3">
+                {fileRejections.length > 0 && (
+                    <ul className="space-y-1 rounded-xl border border-[color:color-mix(in_srgb,var(--lume-signal-critical)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-critical)_11%,var(--lume-surface-field))] px-3 py-2 text-xs text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]">
+                        {fileRejections.map((message) => <li key={message}>{message}</li>)}
+                    </ul>
+                )}
+            </section>
+
+            <section aria-label="Documenti caricati" data-document-area="list" className={disclosure.documentList}>
                 {attachments?.map((file) => (
-                    <article key={file.id} className="lume-card group p-3 transition-colors hover:border-[color:color-mix(in_srgb,var(--lume-ink)_24%,transparent)]">
-                        <div className="flex items-center gap-3">
+                    <article key={file.id} className={disclosure.documentRow}>
+                        <div className={disclosure.documentHead}>
                             <div className="rounded-lg border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-ink)_6%,var(--lume-surface-field))] p-2 text-[color:var(--lume-ink-muted)]">
                                 <FileText className="h-5 w-5" />
                             </div>
                             <div className="min-w-0 flex-1">
-                                <h4 className="truncate text-sm font-bold text-[color:var(--lume-ink)]">{file.name}</h4>
-                                <p className="text-[10px] uppercase tracking-wider text-[color:var(--lume-ink-muted)]">
-                                    {new Date(file.createdAt).toLocaleDateString()}
+                                <h4 className={disclosure.documentTitle}>{file.name}</h4>
+                                <p className={disclosure.hint}>
+                                    {new Date(file.createdAt).toLocaleDateString('it-IT')} · {Math.max(1, Math.ceil(file.size / 1024))} KB
                                 </p>
                             </div>
-                            <div className="flex items-center gap-1 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100">
+                            <div className={disclosure.documentActions}>
                                 <button
                                     type="button"
                                     onClick={() => handleLocalExtractionPreview(file)}
                                     disabled={extractingId !== null}
-                                    className="rounded-lg p-2 text-[color:var(--lume-accent)] transition-colors hover:bg-[color:color-mix(in_srgb,var(--lume-accent)_9%,var(--lume-surface-field))] disabled:opacity-50"
+                                    className="min-h-11 min-w-11 rounded-[var(--lume-radius-control)] p-2 text-[color:var(--lume-accent)] transition-colors hover:bg-[color:color-mix(in_srgb,var(--lume-accent)_9%,var(--lume-surface-field))] disabled:opacity-50"
                                     title="Estrai testo localmente"
                                     aria-label={`Estrai testo localmente da ${file.name}`}
                                 >
@@ -234,7 +228,7 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
                                 <button
                                     type="button"
                                     onClick={() => setViewingFile(file)}
-                                    className="rounded-lg p-2 text-[color:var(--lume-ink-muted)] transition-colors hover:bg-[color:color-mix(in_srgb,var(--lume-ink)_6%,var(--lume-surface-field))] hover:text-[color:var(--lume-ink)]"
+                                    className="min-h-11 min-w-11 rounded-[var(--lume-radius-control)] p-2 text-[color:var(--lume-ink-muted)] transition-colors hover:bg-[color:color-mix(in_srgb,var(--lume-ink)_6%,var(--lume-surface-field))] hover:text-[color:var(--lume-ink)]"
                                     title="Visualizza"
                                     aria-label={`Visualizza ${file.name}`}
                                 >
@@ -243,7 +237,7 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
                                 <button
                                     type="button"
                                     onClick={() => handleDelete(file.id)}
-                                    className="rounded-lg p-2 text-[color:var(--lume-ink-muted)] transition-colors hover:bg-[color:color-mix(in_srgb,var(--lume-signal-critical)_11%,var(--lume-surface-field))] hover:text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]"
+                                    className="min-h-11 min-w-11 rounded-[var(--lume-radius-control)] p-2 text-[color:var(--lume-ink-muted)] transition-colors hover:bg-[color:color-mix(in_srgb,var(--lume-signal-critical)_11%,var(--lume-surface-field))] hover:text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]"
                                     title="Elimina"
                                     aria-label={`Elimina ${file.name}`}
                                 >
@@ -267,7 +261,7 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
                                 </p>
                                 {localExtraction.ocr && (
                                     <p className="mt-1 text-xs text-[color:var(--lume-ink-muted)]">
-                                        OCR completato su questo Mac · {localExtraction.ocr.ocrPageCount} {localExtraction.ocr.ocrPageCount === 1 ? 'pagina' : 'pagine'} su {localExtraction.ocr.pageCount}. Rivedi il testo prima di usarlo.
+                                        OCR completato su questo dispositivo · {localExtraction.ocr.ocrPageCount} {localExtraction.ocr.ocrPageCount === 1 ? 'pagina' : 'pagine'} su {localExtraction.ocr.pageCount}. Rivedi il testo prima di usarlo.
                                     </p>
                                 )}
                                 <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap text-xs text-[color:var(--lume-ink)]">{localExtraction.markdown}</pre>
@@ -281,15 +275,42 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
                             </p>
                         )}
 
-                        <DocumentSynthesisFabricReviewCard
-                            patientId={patientId}
-                            attachmentId={file.id}
-                            attachmentName={file.name}
-                            enabled={documentSynthesisEnabled}
-                        />
                     </article>
                 ))}
-            </div>
+                {attachments === undefined ? <p role="status">Caricamento documenti…</p> : null}
+            </section>
+
+            {/* @Codex WUL-678: reviews stay mounted when folded, preserving proposal and currentness. */}
+            {Boolean(attachments?.length) || children ? (
+                <section aria-label="Sintesi documentali" data-document-area="summary" className={disclosure.summaries}>
+                    <h3>Sintesi documentali</h3>
+                    <p className={disclosure.hint}>Proposte da confrontare con le fonti. Nessun aggiornamento automatico della cartella.</p>
+                    {Boolean(attachments?.length) && !documentSynthesisEnabled && (
+                        <div
+                            className={cn(
+                                'rounded-2xl border p-3 text-xs leading-5',
+                                semanticSignalSurfaceClass(sharedKillSwitchSignal(documentSynthesisEnabled)),
+                            )}
+                            data-testid="document-upload-synthesis-disabled-note"
+                        >
+                            La sintesi Fabric è disabilitata localmente. Upload, anteprima AnyDoc e revisione manuale restano disponibili; nessuna proposta viene generata.
+                        </div>
+                    )}
+
+                    {attachments?.map((file) => (
+                        <details key={file.id} className={disclosure.disclosure}>
+                            <summary>Sintesi · {file.name}</summary>
+                            <DocumentSynthesisFabricReviewCard
+                                patientId={patientId}
+                                attachmentId={file.id}
+                                attachmentName={file.name}
+                                enabled={documentSynthesisEnabled}
+                            />
+                        </details>
+                    ))}
+                    {children}
+                </section>
+            ) : null}
 
             {viewingFile?.data && (
                 <DocumentViewer

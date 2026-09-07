@@ -13,7 +13,7 @@ import { PatientSynopticSheet, type SynopticMeasure, type SynopticSignal, type S
 import { CollapsibleSection } from '@/components/kree8/collapsible-section';
 import DocumentInsightsPanel from '@/components/document-insights-panel';
 import DocumentUpload from '@/components/document-upload';
-import { EvidenceStackTile } from '@/components/evidence-stack-tile';
+import disclosure from '@/components/patient-disclosure.module.css';
 import ObservationManager from '@/components/observation-manager';
 import type { ObservationPrefill } from '@/lib/observation-prefill';
 import PatientActionModal from '@/components/patient-action-modal';
@@ -82,7 +82,6 @@ export default function PatientDetailPage() {
         const probe = new File(['{}'], 'probe.json', { type: 'application/json' });
         setCanShareFhirFile(navigator.canShare({ files: [probe] }));
     }, []);
-    const [isDocumentUploadOpen, setIsDocumentUploadOpen] = useState(false);
     const [observationPrefill, setObservationPrefill] = useState<ObservationPrefill | undefined>();
     /* @Codex One stable clock sample is sufficient for this read-only staleness
        projection; it must not change as a side effect of an unrelated render. */
@@ -370,7 +369,6 @@ export default function PatientDetailPage() {
        la loro sezione). Manteniamo le voci cancellate per il toggle audit interno
        di Timeline; filtriamo solo il tipo scala, cosi il conteggio del chip torna. */
     const timelineEntries = (entries ?? []).filter((entry) => entry.type !== 'scale');
-    const recentEvidence = documentInsights.slice(0, 4);
     const leadDiagnosis = diagnosisItems[0];
     const nextCheckup = (checkups ?? [])[0];
     // Proiezione read-only dei follow-up suggeriti dai documenti (nessun auto-write).
@@ -458,7 +456,7 @@ export default function PatientDetailPage() {
     const insightStale = Boolean(patient.aiSummary?.trim())
         && insightGeneratedAt !== null
         && maxClinicalTimestamp > insightGeneratedAt + 5000;
-    const reviewQueueSummary = buildPatientReviewQueueSummary({
+    const reviewQueueProjection = buildPatientReviewQueueSummary({
         insight: {
             enabled: isAiPatientInsightEnabledValue(patientInsightKillSwitch?.value),
             hasSummary: Boolean(patient.aiSummary?.trim()),
@@ -478,6 +476,13 @@ export default function PatientDetailPage() {
             missingTextCount: attachmentItems.length - attachmentsWithTextCount,
         },
     });
+    /* @Codex WUL-678: route existing review actions to their presented domain, without changing queue state. */
+    const reviewQueueSummary = {
+        ...reviewQueueProjection,
+        rows: reviewQueueProjection.rows.map((row) => row.anchor && (row.id === 'insight' || row.id === 'smart-import')
+            ? { ...row, anchor: '#identita' }
+            : row),
+    };
     const reviewQueueAttentionRows = reviewQueueSummary.rows.filter((row) =>
         ['da-rivedere', 'bloccato', 'serve-testo'].includes(row.state),
     );
@@ -740,7 +745,7 @@ export default function PatientDetailPage() {
                     nextCheckupTitle={nextCheckup?.title}
                 />
 
-                <CollapsibleSection id="identita" kicker="Identità" title="Identità, diagnosi ed esenzioni" surfaceClassName={workspaceStyles.clinicalSection} defaultOpen>
+                <CollapsibleSection id="identita" kicker="Identità" title="Anagrafica, clinica e amministrazione" surfaceClassName={workspaceStyles.clinicalSection} defaultOpen>
                     <PatientIdentityLens
                         variant="reader"
                         patient={patient}
@@ -752,6 +757,21 @@ export default function PatientDetailPage() {
                         summary={summaryText}
                         nextStep={nextStepText}
                     />
+                    {/* @Codex WUL-678: clinical support is distinct from the document archive. */}
+                    <details className={disclosure.disclosure}>
+                        <summary>Supporto clinico · Patient Insight</summary>
+                        <AIPatientInsight patient={patient} stale={insightStale} />
+                    </details>
+                    {smartImportSourceCount > 0 && smartImportFabricCaptureInput ? (
+                        <details className={disclosure.disclosure}>
+                            <summary>Importazione assistita · proposta da rivedere</summary>
+                            <PatientSmartImportFabricPreviewCard
+                                patientId={patient.id}
+                                captureInput={smartImportFabricCaptureInput}
+                                enabled={isAiSmartImportEnabledValue(smartImportKillSwitch?.value)}
+                            />
+                        </details>
+                    ) : null}
                 </CollapsibleSection>
 
                 <CollapsibleSection
@@ -862,7 +882,7 @@ export default function PatientDetailPage() {
                     kicker="Documenti"
                     title="Archivio documenti ed evidenze"
                     count={attachmentItems.length > 0 ? `${attachmentItems.length} file` : undefined}
-                    summary={attachmentItems.length > 0 ? 'Apri evidenze, insight e archivio.' : 'Nessun documento ancora caricato.'}
+                    summary={attachmentItems.length > 0 ? 'Carica, consulta e rivedi i documenti.' : 'Nessun documento ancora caricato.'}
                     surfaceClassName={workspaceStyles.clinicalSection}
                     defaultOpen={!documentSynthesisKillSwitchLoading
                         && !patientInsightKillSwitchLoading
@@ -871,37 +891,15 @@ export default function PatientDetailPage() {
                             || smartImportSourceCount > 0
                             || reviewQueueSummary.rows.some((row) => row.id === 'insight' && row.state === 'bloccato'))}
                 >
-                    <div className="space-y-5">
-                        <AIPatientInsight patient={patient} stale={insightStale} />
-                        <div>
-                            <p className={workspaceStyles.sectionLabel}>Referti recenti</p>
-                        {recentEvidence.length > 0 ? (
-                            <div className={workspaceStyles.evidenceList}>
-                                {recentEvidence.map((insight) => (
-                                    <EvidenceStackTile key={insight.id} insight={insight} />
-                                ))}
-                            </div>
-                        ) : (
-                            <p className={workspaceStyles.emptyState}>Nessuna evidenza documentale in primo piano.</p>
-                        )}
-                        </div>
-                        {smartImportSourceCount > 0 && smartImportFabricCaptureInput ? (
-                            <PatientSmartImportFabricPreviewCard
-                                patientId={patient.id}
-                                captureInput={smartImportFabricCaptureInput}
-                                enabled={isAiSmartImportEnabledValue(smartImportKillSwitch?.value)}
-                            />
+                    {/* @Codex WUL-678: upload, source list, then review; no duplicated evidence tiles. */}
+                    <DocumentUpload patientId={id}>
+                        {documentInsights.length > 0 ? (
+                            <details className={disclosure.disclosure}>
+                                <summary>Sintesi archiviate · {documentInsights.length}</summary>
+                                <DocumentInsightsPanel patient={patient} />
+                            </details>
                         ) : null}
-                        <DocumentInsightsPanel patient={patient} />
-                        <div>
-                            <p className={workspaceStyles.sectionLabel}>Archivio</p>
-                            {patient.aiSummary?.trim() && !isDocumentUploadOpen ? (
-                                <button type="button" className={workspaceStyles.rowLink} onClick={() => setIsDocumentUploadOpen(true)}>
-                                    Apri caricamento documenti
-                                </button>
-                            ) : <DocumentUpload patientId={id} />}
-                        </div>
-                    </div>
+                    </DocumentUpload>
                 </CollapsibleSection>
 
                     <CollapsibleSection
