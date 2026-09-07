@@ -8,6 +8,7 @@ import { AlertTriangle, RefreshCw, ShieldCheck, Sparkles } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
 import PrivacyBlur from '@/components/privacy-blur';
+import disclosure from '@/components/patient-disclosure.module.css';
 import {
     AI_PATIENT_INSIGHT_KILL_SWITCH_KEY,
     isAiPatientInsightEnabledValue,
@@ -27,6 +28,9 @@ interface AIPatientInsightProps {
 
 type AvailablePreview = Extract<PatientInsightPreviewWire, { status: 'available' }>;
 
+/* @Codex: scoped control geometry overrides the legacy shared button chrome. */
+const actionStyle = { borderRadius: 'var(--lume-control-radius, 12px)', fontSize: '0.875rem', minHeight: 44 };
+
 function safeError(preview: Exclude<PatientInsightPreviewWire, { status: 'available' }>): string {
     if (preview.code === 'kill_switch_disabled') {
         return 'Patient Insight è disabilitata localmente. Riattivala in Impostazioni per generare una nuova bozza.';
@@ -45,11 +49,11 @@ function safeError(preview: Exclude<PatientInsightPreviewWire, { status: 'availa
 function InsightList({ items, warning = false }: Readonly<{ items: readonly string[]; warning?: boolean }>) {
     if (items.length === 0) return null;
     return (
-        <ul className="mt-3 space-y-2 text-sm text-slate-700 dark:text-slate-200">
+        <ul className="mt-3 space-y-2 text-sm leading-relaxed text-[color:var(--lume-ink)]">
             {items.map((item, index) => (
                 <li key={`${index}-${item}`} className="flex gap-2">
-                    {warning ? <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
-                        : <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-slate-400" />}
+                    {warning ? <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[color:var(--lume-signal-warning)]" aria-hidden="true" />
+                        : <span className="mt-0.5 shrink-0 text-[color:var(--lume-ink-muted)]" aria-hidden="true">·</span>}
                     <PrivacyBlur intensity="sm">{item}</PrivacyBlur>
                 </li>
             ))}
@@ -136,69 +140,96 @@ export default function AIPatientInsight({ patient, stale = false }: AIPatientIn
 
     if (!patient.aiSummary && !preview && !isGenerating && !enabled) {
         return (
-            <div className="patient-ai-insight-panel lume-panel overflow-hidden border-red-200/70 p-6 dark:border-red-500/20" data-testid="patient-insight-disabled-card">
-                <div className="flex flex-col items-center space-y-5 text-center">
-                    <div className="flex h-16 w-16 items-center justify-center rounded-[24px] bg-red-100 text-red-600 dark:bg-red-500/10 dark:text-red-300"><AlertTriangle className="h-8 w-8" /></div>
-                    <div><p className="text-[10px] font-bold uppercase tracking-[0.2em] text-red-500">Funzione AI disattivata</p><h3 className="mt-2 text-xl font-bold text-slate-900 dark:text-white">Patient Insight disabilitata</h3>
-                        <p className="mt-2 max-w-sm text-sm leading-relaxed text-slate-500 dark:text-slate-400">La scheda resta consultabile, ma nessuna nuova proposta viene generata finché l&apos;interruttore non viene riattivato.</p></div>
-                    <Link href="/settings/ai/funzioni" className="lume-press rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white dark:bg-white dark:text-slate-900">Apri Impostazioni AI</Link>
-                </div>
-            </div>
+            /* @Codex: a disabled function is a compact state with an explicit recovery action. */
+            <section className="min-w-0 space-y-4 py-3 text-sm leading-relaxed text-[color:var(--lume-ink)]" data-testid="patient-insight-disabled-card">
+                <h3 className="text-base font-semibold">Patient Insight disabilitata</h3>
+                <p className="text-[color:var(--lume-ink-muted)]">La scheda resta consultabile. Riattiva la funzione per generare una nuova bozza.</p>
+                <Link href="/settings/ai/funzioni" className="ui-btn-secondary" style={actionStyle}>Apri Impostazioni AI</Link>
+            </section>
         );
     }
 
     if (!patient.aiSummary && !preview && !isGenerating) {
         return (
-            <div className="patient-ai-insight-panel lume-panel overflow-hidden p-6">
-                <div className="flex flex-col items-center space-y-5 text-center">
-                    <div className="flex h-16 w-16 items-center justify-center rounded-[24px] bg-slate-900 text-white dark:bg-white dark:text-slate-900"><Sparkles className="h-8 w-8" /></div>
-                    <div><p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">Supporto clinico locale</p><h3 className="mt-2 text-xl font-bold text-slate-900 dark:text-white">Genera una proposta da revisionare</h3>
-                        <p className="mt-2 max-w-sm text-sm leading-relaxed text-slate-500 dark:text-slate-400">La proposta resta temporanea: non aggiorna la scheda e non può essere applicata automaticamente.</p></div>
-                    {error && <div className="max-w-sm rounded-[20px] border border-red-100 bg-red-50 p-3 text-xs text-red-600">{error}</div>}
-                    <FunctionModelPicker picker={picker} />
-                    <button type="button" onClick={generateInsight} disabled={!picker.canGenerate} className="lume-press inline-flex items-center gap-2 rounded-full bg-slate-900 px-8 py-3 text-sm font-semibold text-white dark:bg-white dark:text-slate-900"><Sparkles className="h-4 w-4" />Avvia supporto</button>
+            <section className="min-w-0 space-y-4 py-3 text-sm leading-relaxed text-[color:var(--lume-ink)]">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1 basis-64">
+                        <h3 className="text-base font-semibold">Genera una proposta da revisionare</h3>
+                        <p className="mt-1 text-[color:var(--lume-ink-muted)]">Un riepilogo temporaneo da confrontare con i dati in cartella. Nessun aggiornamento automatico.</p>
+                    </div>
+                    <button type="button" onClick={generateInsight} disabled={!picker.canGenerate} className="ui-btn-primary" style={actionStyle}><Sparkles className="h-4 w-4" aria-hidden="true" />Avvia supporto</button>
                 </div>
-            </div>
+                {error && <p role="alert" className="text-[color:var(--lume-signal-critical)]">{error}</p>}
+                <FunctionModelPicker picker={picker} />
+            </section>
         );
     }
 
     return (
-        <div className="patient-ai-insight-panel lume-panel overflow-hidden p-0">
-            <div className="border-b border-slate-200/50 p-5 dark:border-white/5">
-                <div className="flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-[18px] bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-slate-200"><Sparkles className="h-5 w-5" /></div>
-                        <div><h3 className="text-base font-bold text-slate-900 dark:text-white">Supporto al ragionamento clinico</h3><p className="text-[10px] font-medium uppercase tracking-tight text-slate-400">Generazione manuale · proposta locale</p></div></div>
-                    <button type="button" onClick={generateInsight} disabled={isGenerating || !enabled || !picker.canGenerate} className="flex min-h-11 items-center gap-2 rounded-full border border-slate-200/80 bg-white/80 px-4 text-xs font-semibold text-slate-700 disabled:opacity-50 dark:border-white/10 dark:bg-white/10 dark:text-slate-200"><RefreshCw className="h-3.5 w-3.5" />{isGenerating ? 'Analisi…' : enabled ? 'Nuova bozza' : 'Disabilitata'}</button>
+        /* @Codex: one reading plane, visible clinical content and collapsed technical evidence. */
+        <section className="min-w-0 space-y-5 py-3 text-sm leading-relaxed text-[color:var(--lume-ink)] [overflow-wrap:anywhere]">
+            <header className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0 flex-1 basis-64">
+                    <h3 className="text-base font-semibold">Supporto al ragionamento clinico</h3>
+                    <p className="mt-1 text-[color:var(--lume-ink-muted)]">Generazione manuale · proposta locale</p>
                 </div>
-            </div>
-            <div className="px-5"><FunctionModelPicker picker={picker} /></div>
-            <div className="space-y-5 p-5">
-                {error && <div className="flex items-center gap-2 rounded-[20px] border border-red-200 bg-red-50 p-3 text-xs text-red-600"><AlertTriangle className="h-4 w-4 shrink-0" />{error}</div>}
-                {!enabled && <div data-testid="patient-insight-disabled-banner" className="rounded-[20px] border border-red-200 bg-red-50 p-3 text-xs text-red-700">La consultazione resta disponibile; nuove generazioni bloccate dal kill switch locale.</div>}
-                {isGenerating && <div className="space-y-4 py-10 text-center"><Sparkles className="mx-auto h-7 w-7 text-slate-500" /><p className="text-sm font-bold text-slate-700">Analisi in corso</p><p className="text-[10px] font-medium uppercase tracking-widest text-slate-500">{progress}</p><button type="button" onClick={stopGeneration} className="text-[10px] font-bold uppercase tracking-wider text-red-500">Interrompi</button></div>}
+                <button type="button" onClick={generateInsight} disabled={isGenerating || !enabled || !picker.canGenerate} className="ui-btn-secondary" style={actionStyle}><RefreshCw className="h-4 w-4" aria-hidden="true" />{isGenerating ? 'Analisi…' : enabled ? 'Nuova bozza' : 'Disabilitata'}</button>
+            </header>
+            <FunctionModelPicker picker={picker} />
+            {error && <p role="alert" className="flex items-start gap-2 text-[color:var(--lume-signal-critical)]"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />{error}</p>}
+            {!enabled && <p data-testid="patient-insight-disabled-banner" className="text-[color:var(--lume-ink-muted)]">La consultazione resta disponibile. La funzione è disabilitata per le nuove generazioni.</p>}
+            {isGenerating && (
+                <div className="flex flex-wrap items-center justify-between gap-3 py-4" role="status">
+                    <div><p className="font-semibold">Analisi in corso</p><p className="mt-1 text-[color:var(--lume-ink-muted)]">{progress}</p></div>
+                    <button type="button" onClick={stopGeneration} className="ui-btn-secondary" style={actionStyle}>Interrompi</button>
+                </div>
+            )}
 
-                {!isGenerating && preview && (
-                    <section className="space-y-5" data-testid="patient-insight-review-proposal">
-                        <div className="flex flex-wrap gap-2"><span className="rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-bold uppercase text-amber-800">Bozza da revisionare</span><span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-bold uppercase text-emerald-800">0 scritture</span><span className="rounded-full bg-sky-100 px-2.5 py-1 text-[10px] font-bold uppercase text-sky-900">Applicazione non consentita</span></div>
-                        {preview.proposal.summary && <div><p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Sintesi proposta</p><p className="mt-3 text-sm leading-7 text-slate-700 dark:text-slate-200"><PrivacyBlur intensity="sm">{preview.proposal.summary}</PrivacyBlur></p></div>}
-                        {preview.proposal.currentState.length > 0 && <div><p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Quadro attuale</p><InsightList items={preview.proposal.currentState} /></div>}
-                        {preview.proposal.alerts.length > 0 && <div className="rounded-[22px] border border-amber-200 bg-amber-50/70 p-4 dark:border-amber-500/20 dark:bg-amber-950/10"><p className="text-[10px] font-bold uppercase tracking-widest text-amber-700">Attenzioni proposte</p><InsightList items={preview.proposal.alerts} warning /></div>}
-                        {preview.proposal.nextSteps.length > 0 && <div><p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Follow-up proposto</p><InsightList items={preview.proposal.nextSteps} /></div>}
-                        {preview.proposal.gaps.length > 0 && <div><p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Dati mancanti</p><InsightList items={preview.proposal.gaps} /></div>}
-                        <div className="rounded-[22px] border border-slate-200 bg-slate-50/70 p-4 text-[11px] text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
-                            <div className="mb-3 flex items-center gap-2 font-semibold"><ShieldCheck className="h-4 w-4" />Receipt, provenance e currentness</div>
-                            <dl className="grid gap-x-4 gap-y-2 sm:grid-cols-2"><div><dt className="text-slate-400">Esecuzione</dt><dd>{preview.receipt.provider} · {preview.receipt.model} · {preview.receipt.venue} · egress {preview.receipt.egress}</dd></div><div><dt className="text-slate-400">Provenance</dt><dd>{preview.provenance.preprocessing.join(' → ')}</dd></div><div><dt className="text-slate-400">Currentness</dt><dd>epoch {preview.proposal.currentness.selectionEpoch} · revisione {preview.proposal.currentness.patientRevision}</dd></div><div><dt className="text-slate-400">Cattura / verifica</dt><dd>{new Date(preview.proposal.currentness.capturedAt).toLocaleString('it-IT')} · {new Date(preview.proposal.currentness.verifiedAt).toLocaleString('it-IT')}</dd></div></dl>
+            {!isGenerating && preview && (
+                <section className="min-w-0 space-y-5" data-testid="patient-insight-review-proposal">
+                    <div>
+                        <h4 className="text-base font-semibold">Bozza da revisionare</h4>
+                        <p className="mt-1 text-[color:var(--lume-ink-muted)]">La cartella resta invariata.</p>
+                        <p className="mt-2"><span className="text-[color:var(--lume-ink-muted)]">Modello usato: </span>{preview.receipt.model} · {preview.receipt.provider}</p>
+                    </div>
+                    {preview.proposal.summary && <div><h4 className="font-semibold">Sintesi proposta</h4><p className="mt-2"><PrivacyBlur intensity="sm">{preview.proposal.summary}</PrivacyBlur></p></div>}
+                    {preview.proposal.currentState.length > 0 && <div><h4 className="font-semibold">Quadro attuale</h4><InsightList items={preview.proposal.currentState} /></div>}
+                    {preview.proposal.alerts.length > 0 && <div className="border-l-2 border-[color:var(--lume-signal-warning)] pl-4"><h4 className="font-semibold">Attenzioni proposte</h4><InsightList items={preview.proposal.alerts} warning /></div>}
+                    {preview.proposal.nextSteps.length > 0 && <div><h4 className="font-semibold">Follow-up proposto</h4><InsightList items={preview.proposal.nextSteps} /></div>}
+                    {preview.proposal.gaps.length > 0 && <div><h4 className="font-semibold">Dati mancanti</h4><InsightList items={preview.proposal.gaps} /></div>}
+                    <div>
+                        <h4 className="font-semibold">Dati di riferimento</h4>
+                        <p className="mt-1 text-[color:var(--lume-ink-muted)]">Confronta i riferimenti della bozza con le informazioni in cartella.</p>
+                        <nav aria-label="Dati in cartella per la revisione" className="mt-2 flex flex-wrap gap-2">
+                            <Link href={`/patients/${patient.id}/modules#quadro`} className="ui-btn-secondary" style={actionStyle}>Quadro clinico</Link>
+                            <Link href={`/patients/${patient.id}/modules#terapie`} className="ui-btn-secondary" style={actionStyle}>Terapie</Link>
+                            <Link href={`/patients/${patient.id}/modules#diario`} className="ui-btn-secondary" style={actionStyle}>Diario</Link>
+                        </nav>
+                    </div>
+                    <details className={disclosure.disclosure}>
+                        <summary>Dettagli di verifica</summary>
+                        <div className="space-y-3 pb-4 text-sm text-[color:var(--lume-ink-muted)]">
+                            <p className="flex items-center gap-2 font-semibold"><ShieldCheck className="h-4 w-4" aria-hidden="true" />Receipt, provenance e currentness</p>
+                            <p>0 scritture · Applicazione non consentita</p>
+                            <dl className="grid min-w-0 gap-3 sm:grid-cols-2">
+                                <div><dt>Esecuzione</dt><dd className="text-[color:var(--lume-ink)]">{preview.receipt.provider} · {preview.receipt.model} · {preview.receipt.venue} · egress {preview.receipt.egress}</dd></div>
+                                <div><dt>Provenance</dt><dd className="text-[color:var(--lume-ink)]">{preview.provenance.preprocessing.join(' → ')}</dd></div>
+                                <div><dt>Currentness</dt><dd className="text-[color:var(--lume-ink)]">epoch {preview.proposal.currentness.selectionEpoch} · revisione {preview.proposal.currentness.patientRevision}</dd></div>
+                                <div><dt>Cattura / verifica</dt><dd className="text-[color:var(--lume-ink)]">{new Date(preview.proposal.currentness.capturedAt).toLocaleString('it-IT')} · {new Date(preview.proposal.currentness.verifiedAt).toLocaleString('it-IT')}</dd></div>
+                            </dl>
                         </div>
-                    </section>
-                )}
+                    </details>
+                </section>
+            )}
 
-                {!isGenerating && !preview && patient.aiSummary && (
-                    <section className="space-y-3" data-testid="patient-insight-historical-summary"><div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-sky-100 px-2 py-1 text-[10px] font-bold uppercase text-sky-900">Riepilogo storico salvato · sola lettura</span>{stale && <span className="rounded-full bg-amber-100 px-2 py-1 text-[10px] font-bold uppercase text-amber-700">Dati modificati dopo la generazione</span>}</div>
-                        <div className="prose prose-sm max-w-none text-slate-700 dark:prose-invert"><PrivacyBlur intensity="sm"><ReactMarkdown>{patient.aiSummary}</ReactMarkdown></PrivacyBlur></div>
-                        <p className="text-[10px] text-slate-400">Le nuove generazioni non sostituiscono né aggiornano automaticamente questo contenuto.</p>
-                    </section>
-                )}
-            </div>
-        </div>
+            {!isGenerating && !preview && patient.aiSummary && (
+                <section className="space-y-3" data-testid="patient-insight-historical-summary">
+                    <h4 className="font-semibold">Riepilogo storico salvato · sola lettura</h4>
+                    {stale && <p className="text-[color:var(--lume-ink-muted)]">Dati modificati dopo la generazione</p>}
+                    <div className="prose prose-sm max-w-none text-[color:var(--lume-ink)] prose-headings:text-[color:var(--lume-ink)] prose-strong:text-[color:var(--lume-ink)]"><PrivacyBlur intensity="sm"><ReactMarkdown>{patient.aiSummary}</ReactMarkdown></PrivacyBlur></div>
+                    <p className="text-[color:var(--lume-ink-muted)]">Le nuove generazioni non sostituiscono né aggiornano automaticamente questo contenuto.</p>
+                </section>
+            )}
+        </section>
     );
 }
