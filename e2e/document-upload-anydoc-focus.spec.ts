@@ -97,12 +97,24 @@ test('AnyDoc: le azioni allegato restano visibili al focus e sui viewport strett
   const patientId = await createSyntheticFixture(page);
   await openDocumentArchive(page, patientId);
 
+  // @Codex: one accessible chooser opens the native picker and one Tab reaches the first file action.
+  const chooser = page.getByRole('button', { name: 'Carica documenti', exact: true });
+  await expect(chooser).toHaveCount(1);
+  await chooser.focus();
+  const nativeChooser = page.waitForEvent('filechooser');
+  await page.keyboard.press('Enter');
+  await (await nativeChooser).setFiles([]);
+  await chooser.focus();
+  await page.keyboard.press('Tab');
+
   let extractButton = page.getByRole('button', { name: `Estrai testo localmente da ${SYNTHETIC_ATTACHMENT_NAME}` });
+  await expect(extractButton).toBeFocused();
   await expect(extractButton).toBeVisible();
   await expect(extractButton).toHaveAccessibleName(`Estrai testo localmente da ${SYNTHETIC_ATTACHMENT_NAME}`);
   let actionGroup = extractButton.locator('..');
   await page.mouse.move(0, 0);
-  await expect(actionGroup).toHaveCSS('opacity', '0');
+  // @Codex: named document actions remain visible before pointer or keyboard focus.
+  await expect(actionGroup).toHaveCSS('opacity', '1');
 
   await extractButton.focus();
   await page.keyboard.press('Tab');
@@ -111,7 +123,7 @@ test('AnyDoc: le azioni allegato restano visibili al focus e sui viewport strett
   await expect(actionGroup).toHaveCSS('opacity', '1');
   await assertNoHorizontalOverflow(page, [
     { label: 'documento AnyDoc desktop', selector: 'document' },
-    { label: 'card allegato AnyDoc desktop', selector: '.lume-card:has(button[aria-label^="Estrai testo localmente da"])' },
+    { label: 'card allegato AnyDoc desktop', selector: '[data-document-area="list"]' },
   ]);
 
   await page.setViewportSize({ width: 390, height: 844 });
@@ -125,7 +137,7 @@ test('AnyDoc: le azioni allegato restano visibili al focus e sui viewport strett
   await expect(extractButton).toHaveAccessibleName(`Estrai testo localmente da ${SYNTHETIC_ATTACHMENT_NAME}`);
   await assertNoHorizontalOverflow(page, [
     { label: 'documento AnyDoc mobile', selector: 'document' },
-    { label: 'card allegato AnyDoc mobile', selector: '.lume-card:has(button[aria-label^="Estrai testo localmente da"])' },
+    { label: 'card allegato AnyDoc mobile', selector: '[data-document-area="list"]' },
   ]);
   expect(consoleErrors).toEqual([]);
 });
