@@ -23,9 +23,10 @@ process.env.MEDIFLOW_DATA_DIR = dataDir;
 const compositionModule = await import('./anydoc-current-source-composition.ts');
 const productionOwnerModule = await import('../../security/server-session-projection-owner-production.ts');
 const webFixtureModule = await import('../../security/web-auth-lifecycle-owner-test-fixture.ts');
-const { composeAnyDocCurrentSourceExtraction } = compositionModule;
+const { composeAnyDocCurrentSourceExtraction, composeAnyDocCurrentSelectionExtraction } = compositionModule;
 const { serverSessionProjectionOwnerRegistry } = productionOwnerModule;
-const { issueSyntheticWebSession, retireSyntheticWebSession } = webFixtureModule;
+const { issueSyntheticWebSession, issueSyntheticWebSessionContext, retireSyntheticWebSession } = webFixtureModule;
+const { retire } = await import('../../security/web-auth-lifecycle-owner-adapter.ts');
 const PATIENT = 'patient.synthetic.p1d';
 const ATTACHMENT = 'attachment.synthetic.p1d';
 const AMBULATORY = 'ambulatory.synthetic.p1d';
@@ -83,6 +84,95 @@ test('reveals real AnyDoc Markdown and evidence only after a current host source
     assert.equal(result.writes, 0); assert.equal(result.apply, 'none'); assert.equal(Object.isFrozen(result), true);
     const owner = serverSessionProjectionOwnerRegistry.lookup(activeSession.id); assert.ok(owner);
     assert.deepEqual(owner.withLeaseCriticalSection(activeSession, (selection) => selection), { patientId: PATIENT, ambulatoryId: AMBULATORY });
+});
+
+test('current-selection extraction preserves a confirmed lease with multiple valid memberships', async () => {
+    seed(); const activeSession = session();
+    const db = new Database(dbPath);
+    db.prepare('INSERT INTO patients_to_ambulatories (patient_id, ambulatory_id) VALUES (?, ?)').run(PATIENT, OTHER_AMBULATORY);
+    db.close();
+    const owner = serverSessionProjectionOwnerRegistry.acquire(activeSession);
+    const selection = owner.issueSelection({ expectedEpoch: 0, patientId: PATIENT, ambulatoryId: OTHER_AMBULATORY });
+    const result = await composeAnyDocCurrentSelectionExtraction(activeSession, { attachmentId: ATTACHMENT });
+    assert.equal(result.status, 'extracted');
+    if (result.status !== 'extracted') return;
+    assert.equal(result.markdown, 'Synthetic current source note.');
+    assert.deepEqual([owner.snapshotSelectionEpoch(activeSession), owner.snapshotReviewContextEpoch(activeSession)], [1, 1]);
+    const { expiresAt, ...tuple } = selection;
+    assert.equal(expiresAt, activeSession.expiresAt);
+    assert.deepEqual(owner.dereferenceSelection(activeSession, tuple), { patientId: PATIENT, ambulatoryId: OTHER_AMBULATORY });
+});
+
+test('current-selection extraction denies missing, foreign and stale selections without selecting', async () => {
+    for (const state of ['missing', 'foreign', 'version', 'membership'] as const) {
+        seed(); const activeSession = session();
+        const owner = serverSessionProjectionOwnerRegistry.acquire(activeSession);
+        const db = new Database(dbPath);
+        try {
+            if (state === 'foreign') {
+                db.prepare('INSERT INTO patients (id, first_name, last_name, tax_code) VALUES (?, ?, ?, ?)')
+                    .run('patient.synthetic.foreign', 'Altra', 'Sintetica', 'SYNTHETIC00000003');
+                db.prepare('INSERT INTO patients_to_ambulatories (patient_id, ambulatory_id) VALUES (?, ?)')
+                    .run('patient.synthetic.foreign', AMBULATORY);
+            }
+            if (state !== 'missing') owner.issueSelection({ expectedEpoch: 0,
+                patientId: state === 'foreign' ? 'patient.synthetic.foreign' : PATIENT, ambulatoryId: AMBULATORY });
+            if (state === 'version') db.prepare('UPDATE patients SET version = version + 1 WHERE id = ?').run(PATIENT);
+            if (state === 'membership') db.prepare('DELETE FROM patients_to_ambulatories WHERE patient_id = ?').run(PATIENT);
+        } finally { db.close(); }
+        const result = await composeAnyDocCurrentSelectionExtraction(activeSession, { attachmentId: ATTACHMENT });
+        assert.equal(result.status, 'denied', state);
+        assert.equal('markdown' in result, false); assert.equal('receipt' in result, false);
+        if (state === 'missing' || state === 'foreign') {
+            const expected = state === 'missing' ? 0 : 1;
+            assert.deepEqual([owner.snapshotSelectionEpoch(activeSession), owner.snapshotReviewContextEpoch(activeSession)], [expected, expected]);
+        }
+    }
+});
+
+test('current-selection extraction discards source, version and membership changes while the real worker runs', async () => {
+    for (const changed of ['source', 'version', 'membership'] as const) {
+        seed(); const activeSession = session();
+        serverSessionProjectionOwnerRegistry.acquire(activeSession)
+            .issueSelection({ expectedEpoch: 0, patientId: PATIENT, ambulatoryId: AMBULATORY });
+        const pending = composeAnyDocCurrentSelectionExtraction(activeSession, { attachmentId: ATTACHMENT });
+        const db = new Database(dbPath);
+        try {
+            if (changed === 'source') db.prepare('UPDATE attachments SET document_revision = 2, document_freshness_epoch = 2 WHERE id = ?').run(ATTACHMENT);
+            if (changed === 'version') db.prepare('UPDATE patients SET version = version + 1 WHERE id = ?').run(PATIENT);
+            if (changed === 'membership') db.prepare('DELETE FROM patients_to_ambulatories WHERE patient_id = ?').run(PATIENT);
+        } finally { db.close(); }
+        const result = await pending;
+        assert.equal(result.status, 'denied', changed);
+        assert.equal('markdown' in result, false); assert.equal('receipt' in result, false);
+    }
+});
+
+test('current-selection extraction denies a real reselection in flight', async () => {
+    seed(); const activeSession = session();
+    const owner = serverSessionProjectionOwnerRegistry.acquire(activeSession);
+    owner.issueSelection({ expectedEpoch: 0, patientId: PATIENT, ambulatoryId: AMBULATORY });
+    const pending = composeAnyDocCurrentSelectionExtraction(activeSession, { attachmentId: ATTACHMENT });
+    assert.deepEqual([owner.snapshotSelectionEpoch(activeSession), owner.snapshotReviewContextEpoch(activeSession)], [1, 1]);
+    owner.issueSelection({ expectedEpoch: 1, patientId: PATIENT, ambulatoryId: AMBULATORY });
+    const result = await pending;
+    assert.equal(result.status, 'denied');
+    assert.equal('markdown' in result, false); assert.equal('receipt' in result, false);
+});
+
+test('current-selection extraction denies a confirmed Web lock in flight', async () => {
+    seed();
+    const web = issueSyntheticWebSessionContext({ id: 'user.synthetic.lock', username: 'synthetic', role: 'clinician' },
+        `anydoc-current-selection-lock-${sessionSequence += 1}`);
+    finalSessions.push(web.session);
+    serverSessionProjectionOwnerRegistry.acquire(web.session)
+        .issueSelection({ expectedEpoch: 0, patientId: PATIENT, ambulatoryId: AMBULATORY });
+    const pending = composeAnyDocCurrentSelectionExtraction(web.session, { attachmentId: ATTACHMENT });
+    assert.equal(retire(web.session, 'lock', { controlId: web.controlId, ifMatch: web.etag,
+        idempotencyKey: 'synthetic-anydoc-current-selection-lock' }).outcome, 'completed');
+    const result = await pending;
+    assert.equal(result.status, 'denied');
+    assert.equal('markdown' in result, false); assert.equal('receipt' in result, false);
 });
 
 test('continues a real AnyDoc image_or_scan result through offline Apple Vision', {

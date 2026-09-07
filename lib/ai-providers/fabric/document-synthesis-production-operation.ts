@@ -11,7 +11,7 @@ import { acquireAuthenticatedWebSessionProjectionOwnerContext, type Authenticate
 import { isServerSessionProjectionOwner } from '@/lib/security/server-session-projection-owner';
 import { mintResourcePort, registerPrivateResource, unregisterPrivateResource, releaseResourcePort } from '@/lib/security/web-auth-lifecycle-owner-adapter';
 import type { ServerSession } from '@/lib/security/server-session';
-import { composeAnyDocCurrentSourceExtraction } from '@/lib/domain/documents/anydoc-current-source-composition';
+import { composeAnyDocCurrentSelectionExtraction } from '@/lib/domain/documents/anydoc-current-source-composition';
 import {
     ANYDOC_LOCAL_OCR_PROVENANCE_SCHEMA_VERSION,
     type LocalExtractionReceipt,
@@ -281,7 +281,7 @@ const production = factory(Object.freeze({
     acquireContext: acquireAuthenticatedWebSessionProjectionOwnerContext,
     readCurrentness: readProductionCurrentness,
     readLaneEnabled: readProductionLaneEnabled,
-    extract: (session: ServerSession, attachmentId: string) => composeAnyDocCurrentSourceExtraction(session, { attachmentId }),
+    extract: (session: ServerSession, attachmentId: string) => composeAnyDocCurrentSelectionExtraction(session, { attachmentId }),
     async execute(configuration: unknown) { return (await createDocumentSynthesisFabricProductionComposition(configuration)?.execute()) ?? null; },
     entropy: () => randomBytes(16),
     registerResource: registerProductionResource,
