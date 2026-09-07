@@ -783,6 +783,9 @@
 :global(html[data-runtime-twin-design='proposal']) .caseLens { display: none; }
 :global(html[data-runtime-twin-design='proposal']) .inboxLayout { display: block; }
 :global(html[data-runtime-twin-design='proposal']) .worklistPanel { padding: 0; border: 0; border-radius: 0; background: transparent; }
-:global(html[data-runtime-twin-design='proposal']) .patientSearchField { max-width: 560px; min-height: 42px; }
+:global(html[data-runtime-twin-design='proposal']) .patientSearchField { max-width: 560px; min-height: var(--lume-control-height); border-radius: var(--lume-control-radius); }
+/* @Codex: separate the search field, list heading and patient rows. */
+:global(html[data-runtime-twin-design='proposal']) .worklistPanelHeader { margin-top: 16px; margin-bottom: 4px; column-gap: 12px; }
+:global(html[data-runtime-twin-design='proposal']) .worklistPanelHeader > h2 { margin: 0; }
 :global(html[data-runtime-twin-design='proposal']) .recordIdentity strong { font-size: 16px; }
 :global(html[data-runtime-twin-design='proposal']) .patientRow { border-radius: 0; }

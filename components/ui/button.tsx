@@ -47,7 +47,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
         <button
             ref={ref}
             type={type}
-            className={cn(VARIANT_CLASSES[variant], 'lume-press', className)}
+            className={cn(VARIANT_CLASSES[variant], 'lume-press mf-action', className)}
             style={destructiveStyle}
             onPointerDown={handlePointerDown}
             {...rest}
