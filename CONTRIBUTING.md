@@ -36,6 +36,14 @@ destinazione di export. Dati e artifact sensibili restano fuori da Git secondo
 - Apple Silicon, artifact locale ATHENA e toolchain MLX (opzionali, solo per
   Treatment Reasoning)
 
+Per `scripts/run-strip-types.mjs --test` (anche tramite npm) impostare
+`MEDIFLOW_DATA_DIR` su una directory sintetica posseduta dal run e pulirla
+dopo la fine dei processi figli. Se assente o vuoto il launcher termina prima
+del target con `MEDIFLOW_TEST_DATA_DIR_REQUIRED` (ADR 0130). Non usare il
+data-dir applicativo reale: un import statico può aprire il DB prima dei hook
+della fixture. Il launcher preserva il percorso esplicito senza gestirne il
+cleanup.
+
 Nota documentale 0.8.5: AnyDoc resta il primo passaggio automatico locale. Il
 tree include routing, manifest, materializzazione e rendering delle sole pagine
 `needsOcr`, quindi usa Apple Vision localmente sul Mac e ricompone il risultato

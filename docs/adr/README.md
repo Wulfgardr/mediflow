@@ -103,3 +103,5 @@ Mantieni gli ADR brevi e ordinati:
 4. Se sostituito, marca **Superseded** e linka il nuovo ADR
 
 - [0129-function-model-catalog-preferences.md](./0129-function-model-catalog-preferences.md): catalogo host, default per esperienza e override occasionale senza ammissione UI.
+
+- [0130-node-test-data-dir-preflight.md](./0130-node-test-data-dir-preflight.md): preflight fail-closed del data-dir per il launcher dei test Node.
