@@ -24,8 +24,7 @@ import PatientReviewQueueSummaryPanel from '@/components/patient-review-queue-su
 import { PatientSmartImportFabricPreviewCard } from '@/components/patient-smart-import-fabric-preview-card';
 import ProstheticPrescriptionManager from '@/components/prosthetic-prescription-manager';
 import ServicePrescriptionManager from '@/components/service-prescription-manager';
-import SissHandoffDiary from '@/components/siss-handoff-diary';
-import SissPatientContextPanel from '@/components/siss-patient-context-panel';
+import SissWorkspace from '@/components/siss-workspace';
 import TherapyManager from '@/components/therapy-manager';
 import TreatmentReasoningPanel from '@/components/treatment-reasoning-panel';
 import Timeline from '@/components/timeline';
@@ -852,14 +851,14 @@ export default function PatientDetailPage() {
                         summary="Apertura assistita dei portali regionali e diario dei passaggi."
                         surfaceClassName={workspaceStyles.clinicalSection}
                     >
-                        <div className="space-y-4">
-                            <SissPatientContextPanel
-                                patientId={id}
-                                patientTaxCode={patient.taxCode}
-                                embedded
-                            />
-                            <SissHandoffDiary patientId={id} embedded />
-                        </div>
+                        {/* @Codex: SISS presentation reuses the existing export/share gates. */}
+                        <SissWorkspace
+                            patientId={id}
+                            patientTaxCode={patient.taxCode}
+                            canShareFhirFile={canShareFhirFile}
+                            onExportFhir={() => setIsExportModalOpen(true)}
+                            onShareFhir={handleShareFhir}
+                        />
                     </CollapsibleSection>
                 <CollapsibleSection
                     id="documenti"
