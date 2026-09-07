@@ -32,8 +32,6 @@ const FUNCTION_COLOR = /\b(?:rgba?|hsla?)\((?:[^()]*)\)/gi;
 export const PALETTE_ALLOWLIST = [
   {"path":"app/mockups/scheda/page.tsx","reason":"Debito storico su superficie non clinica: migrazione Lume da completare.","occurrences":10,"fingerprint":"0b532d8493c010f98eba790c6cca032e0c871be43eccd5bb743d13b514892219"},
   {"path":"app/patients/[id]/edit/page.tsx","reason":"Debito storico su superficie clinica: migrazione Lume da completare.","occurrences":2,"fingerprint":"c465f2f78534069d2c5091795196bb3c49d4428b0c2aaa3a488617f7bc16d9a4"},
-  {"path":"app/patients/[id]/scales/[scaleId]/page.tsx","reason":"Debito storico su superficie clinica: migrazione Lume da completare.","occurrences":8,"fingerprint":"2aa3c828cc9648c78578de11157a552e6a94dd15d7437c7e8b86d847a1024582"},
-  {"path":"app/patients/[id]/scales/page.tsx","reason":"Debito storico su superficie clinica: migrazione Lume da completare.","occurrences":3,"fingerprint":"d5ff14dc1c75592ec7919d22cb7374120b0c3834bea183ea6fffd36e2e4fa75b"},
   {"path":"app/patients/new/page.tsx","reason":"Debito storico su superficie clinica: migrazione Lume da completare.","occurrences":4,"fingerprint":"0aa269a73f2eb260a9c4dbd49759a327de47595518ab671274424fe5aeb2af8d"},
   {"path":"app/settings/ai/funzioni/page.tsx","reason":"Debito storico su superficie non clinica: migrazione Lume da completare.","occurrences":4,"fingerprint":"934aee8fb872405ba8881d7d426263093cedcf990382747355165ffa13a0bea4"},
   {"path":"app/settings/ai/modelli/page.tsx","reason":"Debito storico su superficie non clinica: migrazione Lume da completare.","occurrences":61,"fingerprint":"493965ddbed94b495df6516fd0f8c6949a4ec0bdd9bb5fddacad59acf71acc5f"},
@@ -54,7 +52,6 @@ export const PALETTE_ALLOWLIST = [
   {"path":"components/patient-clinical-signals.tsx","reason":"Debito storico su superficie clinica: migrazione Lume da completare.","occurrences":7,"fingerprint":"16ced9b1b6a637581983755058a65c6dd29d74703fb442d488e1b88f01bbb2c7"},
   {"path":"components/patient-document-import-review.tsx","reason":"Debito storico su superficie clinica: migrazione Lume da completare.","occurrences":4,"fingerprint":"dde9d41cdd6acf1b150e71385a5734c7892bf07682c496287eb136aaf3feb179"},
   {"path":"components/patient-form.tsx","reason":"Debito storico su superficie clinica: migrazione Lume da completare.","occurrences":6,"fingerprint":"d951c75dec7e4f2efc7a68b2c81e7b9a472660d00422e24dbc9c7012f696d22e"},
-  {"path":"components/scale-engine.tsx","reason":"Debito storico su superficie clinica: migrazione Lume da completare.","occurrences":3,"fingerprint":"81a39fe2423dffcee6aef072f8ad23aa371607578aeab5d494686b8363031e1a"},
   {"path":"components/service-architecture-panel.tsx","reason":"Debito storico su superficie non clinica: migrazione Lume da completare.","occurrences":51,"fingerprint":"7a444360312e9b6c10c636bd45e88495c2946580c57c85d7ea2db3405334448b"},
   {"path":"components/settings/ai-model-parliament-panel.tsx","reason":"Debito storico su superficie non clinica: migrazione Lume da completare.","occurrences":142,"fingerprint":"418913b2d5d845cf4298742a705d626c3b756b37ad6a31fc55051abb995ba1ab"},
   {"path":"components/settings/ai-model-selector.tsx","reason":"Debito storico su superficie non clinica: migrazione Lume da completare.","occurrences":1,"fingerprint":"df13a493dbddcbcc063e8c184254da292afd6f96485dc9ecfd49b7dd53ad05a1"},
