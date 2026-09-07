@@ -52,6 +52,27 @@ test('real desktop OCR prerequisites are explicitly required for qualification r
     assert.equal(inspectAnyDocDesktopOcrCapability().qualification, 'pending_target_benchmark');
 });
 
+/* @Codex */
+test('desktop preflight requires real AnyDoc and detects its missing binding before recovery', realOptions, () => {
+    const cli = () => spawnSync(process.execPath,
+        ['scripts/run-strip-types.mjs', 'scripts/check-anydoc-desktop-ocr.ts'], { encoding: 'utf8' });
+    const before = cli();
+    assert.equal(before.status, 0, before.stdout);
+    assert.equal(JSON.parse(before.stdout).anydocFirstPass, 'verified');
+    const bindingLoader = path.resolve('node_modules/@firecrawl/anydoc/index.js');
+    renameSync(bindingLoader, `${bindingLoader}.test-held`);
+    try {
+        const missing = cli();
+        assert.equal(missing.status, 1);
+        const result = JSON.parse(missing.stdout);
+        assert.equal(result.status, 'unavailable');
+        assert.equal(result.reason, 'anydoc_unavailable');
+        assert.equal(result.anydocFirstPass, 'failed');
+        assert.match(result.guidance, /binding locale.*Visual C\+\+ x64/u);
+    } finally { renameSync(`${bindingLoader}.test-held`, bindingLoader); }
+    assert.equal(cli().status, 0);
+});
+
 test('real WASM recognizes Italian raster with digest-bound non-Apple provenance', realOptions, async () => {
     const png = image(); const before = sha256(png);
     const result = await runAnyDocTesseractDocument([png, png]);
