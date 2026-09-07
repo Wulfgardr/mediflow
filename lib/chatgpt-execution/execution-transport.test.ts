@@ -1,7 +1,9 @@
 /* @Codex */
 import assert from 'node:assert/strict';
 import { test, type TestContext } from 'node:test';
-import { spawn } from 'node:child_process';
+import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import { PassThrough } from 'node:stream';
+import { EventEmitter } from 'node:events';
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { isAbsolute, join } from 'node:path';
 import { once } from 'node:events';
@@ -53,7 +55,9 @@ function fixture(t: TestContext, options: TransportOptions = {}) {
         cwd: directory, env: { HOME: directory, CODEX_HOME: directory, MEDIFLOW_DATA_DIR: directory, NODE_ENV: 'test' }, stdio: ['pipe', 'pipe', 'pipe'],
     });
     let cleanupCount = 0;
-    const transport = createStdioExecutionTransport(child, { requestTimeoutMs: 1500, killGraceMs: 100, ...options,
+    const transport = createStdioExecutionTransport(child, { requestTimeoutMs: 1500, killGraceMs: 100,
+        // This controlled fake server never forks; its exit is the entire fake group.
+        waitForOwnedGroupExit: async () => child.exitCode !== null || child.signalCode !== null, ...options,
         onClosed: async () => {
             assert.ok(child.exitCode !== null || child.signalCode !== null, 'Cleanup requires exit evidence');
             cleanupCount++;
@@ -174,4 +178,64 @@ test('unallowlisted method is rejected locally', async t => {
     const { transport } = fixture(t);
     await assert.rejects(transport.request('turn/steer' as ExecutionMethod), codeIs('invalid_request'));
     assert.deepEqual(await transport.request('initialize'), { ok: true });
+});
+
+/* @Codex: in-memory ChildProcess double; these cases spawn/probe no OS processes. */
+function groupFixture(options: TransportOptions = {}, leaderAlreadyExited = false) {
+    const emitter = new EventEmitter();
+    const rawChild = Object.assign(emitter, { pid: 4242, exitCode: leaderAlreadyExited ? 0 : null as number | null,
+        signalCode: null as NodeJS.Signals | null, stdin: new PassThrough(), stdout: new PassThrough(), stderr: new PassThrough(),
+        kill(signal: NodeJS.Signals) { this.signalCode = signal; emitter.emit('exit', null, signal); return true; },
+    });
+    const child = rawChild as unknown as ChildProcessWithoutNullStreams;
+    const signals: NodeJS.Signals[] = [];
+    let cleanup = 0;
+    let networkRevoked = false;
+    const transport = createStdioExecutionTransport(child, { killGraceMs: 5, groupDrainMs: 20, ...options,
+        onClosing() { networkRevoked = true; options.onClosing?.(); },
+        terminate(signal) { signals.push(signal); child.kill(signal); },
+        async onClosed() { cleanup++; await options.onClosed?.(); },
+    });
+    return { child, transport, signals, exitLeader() { rawChild.exitCode = 0; emitter.emit('exit', 0, null); }, cleanup: () => cleanup, networkRevoked: () => networkRevoked };
+}
+
+test('owned-group: exited leader still requires group evidence before cleanup', async () => {
+    let resolveGroup!: (value: boolean) => void;
+    const group = new Promise<boolean>(resolve => { resolveGroup = resolve; });
+    const f = groupFixture({ waitForOwnedGroupExit: () => group }, true);
+    const closed = f.transport.close();
+    assert.equal(f.networkRevoked(), true); assert.equal(f.cleanup(), 0);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(f.cleanup(), 0); assert.deepEqual(f.signals, []);
+    resolveGroup(true);
+    assert.equal(await closed, true); assert.equal(f.cleanup(), 1);
+});
+
+test('owned-group: leader termination never substitutes for group drain', async () => {
+    const f = groupFixture({ waitForOwnedGroupExit: async () => false });
+    assert.equal(await f.transport.close(), false);
+    assert.equal(f.networkRevoked(), true); assert.deepEqual(f.signals, ['SIGTERM']);
+    assert.equal(f.cleanup(), 0);
+});
+
+for (const mode of ['missing', 'false', 'throw', 'hang', 'late'] as const) test(`owned-group: ${mode} evidence cannot confirm cleanup`, async () => {
+    let resolveLate: ((result: boolean) => void) | undefined;
+    const waitForOwnedGroupExit = mode === 'missing' ? undefined : mode === 'false' ? async () => false
+        : mode === 'throw' ? async () => { throw new Error('private detail'); }
+            : () => new Promise<boolean>(resolve => { resolveLate = resolve; });
+    const f = groupFixture({ waitForOwnedGroupExit }, true);
+    const started = performance.now();
+    assert.equal(await f.transport.close(), false);
+    assert.ok(performance.now() - started < 500);
+    if (mode === 'late') { resolveLate!(true); await new Promise(resolve => setImmediate(resolve)); }
+    assert.equal(f.networkRevoked(), true); assert.equal(f.cleanup(), 0); assert.deepEqual(f.signals, []);
+    assert.equal(await f.transport.close(), false);
+});
+
+test('owned-group: spontaneous leader exit still drains before cleanup', async () => {
+    let observed = 0;
+    const f = groupFixture({ waitForOwnedGroupExit: async () => { observed++; return true; } });
+    f.exitLeader();
+    assert.equal(await f.transport.close(), true);
+    assert.equal(observed, 1); assert.equal(f.cleanup(), 1); assert.deepEqual(f.signals, []);
 });

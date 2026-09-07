@@ -13,6 +13,7 @@ type ExecutionNotification = (method: string, params: unknown) => void;
 export type ExecutionDiagnostic = Readonly<{ method: ExecutionMethod; rpcCode: number | null; httpStatus: number | null;
     tls: boolean; network: boolean; device: boolean; experimental: boolean; permission: boolean }>;
 type Options = { requestTimeoutMs?: number; killGraceMs?: number; maxFrameBytes?: number; onClosing?: () => void; onClosed?: () => Promise<void>;
+    waitForOwnedGroupExit?: (timeoutMs: number) => Promise<boolean>; groupDrainMs?: number;
     terminate?: (signal: NodeJS.Signals) => void; diagnostic?: (event: ExecutionDiagnostic) => void };
 export function createStdioExecutionTransport(child: ChildProcessWithoutNullStreams, options: Options = {}): ExecutionTransport {
     const pending = new Map<number, { method: ExecutionMethod; resolve(value: unknown): void; reject(error: ExecutionError): void; timer: ReturnType<typeof setTimeout> }>();
@@ -103,6 +104,20 @@ export function createStdioExecutionTransport(child: ChildProcessWithoutNullStre
         if (timer) clearTimeout(timer);
         return exited;
     }
+    async function waitOwnedGroup(): Promise<boolean> {
+        if (!options.waitForOwnedGroupExit) return false;
+        const ms = options.groupDrainMs ?? 500;
+        if (!Number.isFinite(ms) || ms < 1 || ms > 1000) return false;
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const deadline = performance.now() + ms;
+        try {
+            return await Promise.race([
+                Promise.resolve().then(() => options.waitForOwnedGroupExit!(ms)).then(result => result === true && performance.now() < deadline),
+                new Promise<boolean>(resolve => { timer = setTimeout(() => resolve(false), ms); }),
+            ]);
+        } catch { return false; }
+        finally { clearTimeout(timer); }
+    }
     function close(): Promise<boolean> {
         if (closePromise) return closePromise;
         closed = true; rejectPending('process_exited'); listeners.clear(); buffer = '';
@@ -116,6 +131,7 @@ export function createStdioExecutionTransport(child: ChildProcessWithoutNullStre
                 if (!await waitExit(options.killGraceMs ?? 500)) return false;
             }
             child.stdout.destroy(); child.stderr.destroy();
+            if (!await waitOwnedGroup()) return false;
             try { await options.onClosed?.(); return closingSucceeded; } catch { return false; }
         })();
         return closePromise;

@@ -43,6 +43,15 @@ scadenza e logout invalidano immediatamente autorità e risposte tardive; la
 chiusura del processo e la cancellazione dei temporanei hanno receipt separata.
 Un aborto locale non è una revoca remota globale né prova rimborso della quota.
 
+La ricevuta di chiusura distingue l'uscita del leader dalla cessazione osservata
+del gruppo posseduto. La revoca del proxy è immediata; il cleanup attende entrambe
+le prove attraverso un'interfaccia bounded. Un gruppo ancora presente, un errore
+o una deadline non attestano il dreno: la directory resta conservata e il cleanup
+non è confermato. Non si inviano segnali distruttivi a un group ID dopo l'uscita
+del leader; l'osservazione del gruppo non autorizza a terminarne membri di identità
+incerta. La cessazione del gruppo non prova quella di discendenti che ne siano
+usciti; questa ulteriore qualifica OS resta aperta e non ammette il runtime.
+
 ## Ammissione e prova
 
 La prima qualifica usa esclusivamente fixture sintetiche fissate dall'host.

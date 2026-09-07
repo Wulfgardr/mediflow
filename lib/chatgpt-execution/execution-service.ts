@@ -158,7 +158,10 @@ export function createSynthesisExecutionService(options: {
             if (response.account === null || response.account === undefined) throw new ExecutionError('not_connected');
             const value = record(response.account);
             if (value.type !== 'chatgpt' || (value.planType !== 'plus' && value.planType !== 'pro')) throw new ExecutionError('unsupported_account');
-            const fingerprint = boundedText(value.email, 320) ? hash(value.email) : undefined;
+            // Codex 0.153.4 Account.chatgpt exposes email: string | null.
+            // Null is protocol-valid but cannot qualify this identity-bound execution.
+            if (!boundedText(value.email, 320) || !/^[^\s@]+@[^\s@]+$/u.test(value.email)) throw new ExecutionError(accountFingerprint ? 'revoked' : 'unsupported_account');
+            const fingerprint = hash(value.email);
             if (accountFingerprint && fingerprint !== accountFingerprint) throw new ExecutionError('revoked');
             accountFingerprint = fingerprint;
             verifiedAccountRevision = revision;
