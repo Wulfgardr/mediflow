@@ -101,3 +101,10 @@ test('catalog timeout fails closed before selection or preview', async t => {
     client.reset(true); const pending = client.begin(); timeout.abort(); await assert.rejects(pending);
     assert.equal(client.getSnapshot().blocked, true); assert.equal(client.getSnapshot().choice, null);
 });
+test('a successful reread after failure still requires a new explicit model decision', async () => {
+    let healthy = true;
+    const client = createModelPreviewClient('patient_insight', (async () => healthy ? Response.json(dto()) : new Response('', { status: 503 })) as typeof fetch);
+    client.reset(true); await client.read(); client.choose(optionId('b')); healthy = false; await client.read();
+    healthy = true; await client.read(); assert.equal(client.getSnapshot().blocked, true); assert.equal(client.getSnapshot().choice, null);
+    await assert.rejects(client.begin()); client.choose(''); assert.equal(client.getSnapshot().blocked, false); await client.begin();
+});

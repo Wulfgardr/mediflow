@@ -13,7 +13,7 @@ export function createModelPreviewClient(functionId: FunctionModelId, request: t
         const signal = AbortSignal.any([transport.signal, AbortSignal.timeout(15000)]);
         try { const dto = parsePreferences(await api(request, signal)); current(token);
             const changed = previous && (previous.catalogRevision !== dto.catalogRevision || previous.revision !== dto.revision);
-            emit({ dto, choice: changed || view.consumed ? null : view.choice, loading: false, blocked: !!changed || view.consumed, consumed: false, error: changed ? errorText(new ModelUiError('stale')) : null });
+            emit({ dto, choice: changed || view.consumed ? null : view.choice, loading: false, blocked: view.blocked || !!changed || view.consumed, consumed: false, error: changed ? errorText(new ModelUiError('stale')) : null });
         } catch (error) { if (token === generation) emit({ dto: null, choice: null, loading: false, blocked: true, error: errorText(error) }); }
     };
     return {
