@@ -6,9 +6,11 @@ Il vecchio container MediFlow e la porta `8888` restano ritirati. Non esiste fal
 ICD-9, a JSON WHO grezzo o al servizio WHO remoto. Non sono richieste credenziali
 OAuth. Il candidato comprende Search, stato e configurazione: non un installer.
 
-Il [manifesto](./who-local-sidecar.manifest.json) ha lock obbligatori non
-valorizzati; provisioning e attivazione sono bloccati. Questa consegna non
-installa servizi, non scarica immagini/dataset e non accetta termini.
+Il [manifesto](./who-local-sidecar.manifest.json) distribuito ha lock obbligatori
+non valorizzati: ogni installazione deve registrarli fuori Git. Il 7 settembre
+2026 un deployment ARM64 di prova ha completato acquisizione, Search, riavvio
+offline e ripristino dopo l'accettazione esplicita dell'operatore. Questa prova
+non accetta i termini per altri utenti e non attiva servizi nelle installazioni.
 
 ## Configurazione server e stato
 
@@ -41,6 +43,11 @@ Entro i 64 KiB il parser valida tutte le voci upstream, anche quelle oltre la
 venticinquesima, e conserva l'ordine WHO. Restituisce le prime 25 con
 `partial=true` se altre sono omesse o WHO segnala `resultChopped`. Una voce
 malformata, codici/URI duplicati o un body oltre 64 KiB negano la risposta.
+Le combinazioni di codici conservano il codice completo e un riferimento
+ufficiale CodeInfo, dopo la verifica dei componenti restituiti da Search.
+Questo riferimento non attesta una verifica clinica o una chiamata CodeInfo
+per ciascun risultato. Search cerca termini: l'inserimento di un codice non
+equivale al lookup del codice, che resta un percorso da completare.
 
 - `disabled`: opt-in assente;
 - `configuration_required`: identificatori assenti o invalidi;
@@ -59,7 +66,7 @@ Binding, immagine e dataset separano le chiavi. Disable, cambio configurazione,
 dispose o clock regressivo invalidano cache e risultati pendenti. Il listener
 loopback non autentica gli altri processi locali dell'host.
 
-## Provisioning manuale, in una futura sessione autorizzata
+## Provisioning manuale sul target autorizzato
 
 1. Copiare il manifesto fuori Git e verificare target, risorse, disponibilita
    della porta e runtime container. Il candidato fissa `linux/arm64`; non prova
@@ -108,6 +115,42 @@ loopback non autentica gli altri processi locali dell'host.
 Il manifesto distribuito fallisce intenzionalmente entrambi i gate finche le
 registrazioni obbligatorie sono assenti. Non esiste avvio automatico da MediFlow.
 
+## Prova locale del 7 settembre 2026
+
+La prova usa l'immagine ufficiale `whoicd/icd-api:2.6.0`, piattaforma
+`linux/arm64`, verificata nel registry e bloccata al digest
+`sha256:7555e43478202d3f9a25eeb2914cc5053414c9464ec6a9a7628c01375d5b0a5e`.
+Il runtime Colima dedicato usa 2 CPU e 3 GiB di RAM assegnati, senza mount
+utente, analytics o cambio del contesto Docker predefinito. Queste sono risorse
+assegnate alla prova, non requisiti minimi misurati per ogni target.
+
+- Search locale: `cholera` restituisce 16 risultati, incluse combinazioni.
+- Riavvio senza route di rete esterna: nuova ricerca `measles` riuscita.
+- Ripristino su un nuovo container della stessa immagine: nuova ricerca
+  `rubella` riuscita senza route esterna; cinque hash del dataset corrispondono.
+- Application Service MediFlow: risposta diretta, nessun risultato e cache
+  verificati, con DTO validato e audit raccolto dal probe. Questa prova non
+  attraversa ancora la route HTTP autenticata o l'interfaccia del paziente.
+
+Le due prove offline interrogano il loopback **dentro il container**: il network
+Docker interno non esponeva la porta al Mac. Dopo il ripristino, il binding
+host `127.0.0.1:8382` e stato verificato separatamente con il bridge ripristinato.
+Non si deduce da queste prove un isolamento generale da ogni possibile egress.
+
+Lo snapshot inventaria i soli cinque file del dataset osservati sotto `/tmp`
+nel container fermo: 493.455.110 byte totali, identita
+`sha256:ecf3b894425d5cfb7514868d554eb086a7b5e7284ef212d2bb230a84b523b825`.
+Non include l'intera directory temporanea o lo stato del servizio. Le copie
+di archivio restano private; nel container vanno ripristinati proprietario
+`root:root` e permessi originali `0644`. Un primo tentativo con file `0600`
+falliva durante la riscrittura dell'indice; ripristinare i metadati originali
+ha consentito avvio e ricerca. Nessuna modifica al software o all'immagine WHO.
+
+Inventario, hash, accettazione, fallimento iniziale e verifiche di recupero sono
+conservati nel packet locale dell'operatore, fuori Git. Questo metodo e stato
+osservato su quel target e quella immagine: non costituisce un installer
+qualificato per Windows, Linux o per futuri aggiornamenti WHO.
+
 ## Verifica del candidato e limite di consegna
 
 Le fixture coprono Search locale, route autenticata, client, stato passivo,
@@ -137,7 +180,7 @@ Il modulo web tratta i due campi opzionali null come assenti, senza riscrivere
 diagnosi invariate; una modifica effettiva omette le chiavi vuote. Le prove di
 round-trip includono questi record, oltre alle selezioni WHO con fonte completa.
 Export, altri caller, migrazioni storiche, lookup/cross-check, certificazione
-e prova live WHO restano fuori da questa consegna; il §1.2.3 dei termini WHO
+e prova UI autenticata WHO restano da completare; il §1.2.3 dei termini WHO
 resta un requisito da valutare anche per tali flussi prima della promozione.
 
 Fonti primarie WHO consultate il 2026-09-06:

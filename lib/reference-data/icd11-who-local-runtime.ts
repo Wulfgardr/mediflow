@@ -1,7 +1,7 @@
 /* @Codex */
 import { ICD11_WHO_BINDING, Icd11WhoServiceError, type Icd11WhoServiceErrorCode } from './icd11-who-service.ts';
 import { parseIcd11WhoOfficialSearchBody } from './icd11-who-official-search-parser.ts';
-import { isWhoArtifactDigest, isWhoCanonicalMmsUri, WHO_LOCAL_BINDING_ID, WHO_LOCAL_TTL_MS,
+import { isWhoArtifactDigest, resolveWhoSearchReference, WHO_LOCAL_BINDING_ID, WHO_LOCAL_TTL_MS,
     type WhoLocalEntry, type WhoLocalReceipt, type WhoLocalReadiness, type WhoLocalSearchResult } from './icd11-who-local-contract.ts';
 
 export type WhoLocalTransport = (query: string, signal: AbortSignal) => Promise<Readonly<{ status: number; body: string }>>;
@@ -51,8 +51,8 @@ function parseResponse(response: Awaited<ReturnType<WhoLocalTransport>>) {
         const checked = parseIcd11WhoOfficialSearchBody(JSON.stringify({ ...raw, destinationEntities: batch }));
         if (!checked) throw new Icd11WhoServiceError('response_invalid');
         for (const [index, entry] of checked.entries.entries()) {
-            const uri = batch[index]?.id;
-            if (!isWhoCanonicalMmsUri(uri) || uris.has(uri) || codes.has(entry.code)
+            const uri = resolveWhoSearchReference(batch[index]?.id, entry.code);
+            if (!uri || uris.has(uri) || codes.has(entry.code)
                 || entry.description.length > 4096 || entry.code === 'N/A') throw new Icd11WhoServiceError('response_invalid');
             uris.add(uri); codes.add(entry.code);
             if (entries.length < ICD11_WHO_BINDING.resultLimit) entries.push(Object.freeze({ ...entry, system: 'ICD-11', canonicalUri: uri }));
