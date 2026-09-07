@@ -1,7 +1,7 @@
 # ADR 0127: Import locale atomico del catalogo esenzioni
 
 Date: 2026-09-07
-Status: Proposed
+Status: Accepted (contratto locale; gate di distribuzione aperti)
 Issue: WUL-690
 
 ## Problema e contesto
@@ -86,7 +86,9 @@ anteprima, consenso al subset, commit esplicito, rilettura e conflitto visibile.
 La scelta conservativa di rifiutare duplicati o encoding non UTF-8 limita i file
 accettabili; supportare fonti diverse richiede un contratto esplicito successivo.
 Build integrata, uso con fonte reale e validazione normativa non sono attestati
-da questa candidatura locale. ADR resta Proposed fino alla review del programma.
+da questa candidatura locale. Review del coordinatore completata il 7 settembre:
+contratto accettato e 66 test integrati superati, inclusi backup, revoca e UI
+del componente. La build e la prova del pacchetto completo restano distinte.
 
 ## Comandi di verifica della slice
 
