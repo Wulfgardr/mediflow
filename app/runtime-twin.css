@@ -11,6 +11,9 @@ html[data-runtime-twin-design='proposal'] {
     --lume-control-radius: 12px;
     --lume-radius-control: var(--lume-control-radius);
     --lume-control-height: 44px;
+    --lume-control-gap: 8px;
+    --lume-group-gap: 16px;
+    --lume-status-height: 32px;
     --twin-type-section: 1.25rem;
     --twin-type-subsection: 1rem;
     --twin-type-body: 0.875rem;
@@ -31,7 +34,29 @@ html[data-runtime-twin-design='proposal'] :is(.ui-btn-primary, .ui-btn-secondary
     font-size: 14px;
     font-weight: 600;
     line-height: 22px;
-    gap: 8px;
+    gap: var(--lume-control-gap);
+}
+
+/* @Codex: status text shares the control corners and stays readable when it wraps. */
+:root[data-runtime-twin-design='proposal'] body :is([data-lume-status], .apple-chip, .graphite-chip, .patient-code-pill, .mf-step-pill) {
+    box-sizing: border-box;
+    min-width: 0;
+    max-width: 100%;
+    min-height: var(--lume-status-height);
+    height: auto;
+    padding: 5px 10px;
+    border-radius: var(--lume-control-radius);
+    gap: var(--lume-control-gap);
+    font-size: 13px;
+    line-height: 20px;
+    font-weight: 600;
+    letter-spacing: normal;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+:root[data-runtime-twin-design='proposal'] body [data-lume-status] > svg {
+    flex-shrink: 0;
 }
 
 html[data-runtime-twin-design='proposal'] [data-lume-control='theme'] {

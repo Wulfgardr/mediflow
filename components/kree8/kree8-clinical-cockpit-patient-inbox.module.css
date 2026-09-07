@@ -731,7 +731,19 @@
 :global(html[data-runtime-twin-design='proposal']) .patientRow:is(:hover, :focus-visible) { background: var(--lume-surface-field); }
 :global(html[data-runtime-twin-design='proposal']) .patientRowSelected { background: var(--lume-surface-field); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--lume-ink) 16%, transparent); }
 :global(html[data-runtime-twin-design='proposal']) .patientSearchField { background: var(--lume-surface-field); min-height: 46px; border: 1px solid var(--lume-ink-muted); border-radius: 8px; }
-:global(html[data-runtime-twin-design='proposal']) .scopeChip { min-height: 40px; border-radius: 7px; }
+/* @Codex: filters and commands use the same touch target and corner token. */
+:global(html[data-runtime-twin-design='proposal']) :is(.scopeChip, .patientSearchClear) {
+  box-sizing: border-box;
+  min-height: var(--lume-control-height);
+  border-radius: var(--lume-control-radius);
+  padding: 10px 14px;
+  gap: var(--lume-control-gap);
+  font-size: 14px;
+  line-height: 22px;
+  font-weight: 600;
+  justify-content: center;
+}
+:global(html[data-runtime-twin-design='proposal']) .scopeChip svg { width: 16px; height: 16px; flex-shrink: 0; }
 :global(html[data-runtime-twin-design='proposal']) .scopeChipActive { background: var(--lume-ink); color: var(--lume-surface-focal); border-color: var(--lume-ink); }
 :global(html[data-runtime-twin-design='proposal']) .caseLens { display: grid; grid-template-columns: minmax(220px, 0.8fr) minmax(0, 1.2fr) auto; gap: 12px 28px; position: relative; padding: 28px; border: 0; border-radius: 14px; background: var(--lume-surface-field); box-shadow: none; }
 :global(html[data-runtime-twin-design='proposal']) .caseLensHeader { grid-column: 1; grid-row: 1 / 3; }
@@ -785,7 +797,10 @@
 :global(html[data-runtime-twin-design='proposal']) .worklistPanel { padding: 0; border: 0; border-radius: 0; background: transparent; }
 :global(html[data-runtime-twin-design='proposal']) .patientSearchField { max-width: 560px; min-height: var(--lume-control-height); border-radius: var(--lume-control-radius); }
 /* @Codex: separate the search field, list heading and patient rows. */
-:global(html[data-runtime-twin-design='proposal']) .worklistPanelHeader { margin-top: 16px; margin-bottom: 4px; column-gap: 12px; }
+:global(html[data-runtime-twin-design='proposal']) :is(.inboxScope, .patientScopeActions) { gap: var(--lume-control-gap); }
+:global(html[data-runtime-twin-design='proposal']) .patientSearchRow { margin-top: var(--lume-group-gap); gap: var(--lume-control-gap); }
+:global(html[data-runtime-twin-design='proposal']) .worklistPanelHeader { margin-top: var(--lume-group-gap); margin-bottom: 8px; column-gap: var(--lume-control-gap); row-gap: var(--lume-control-gap); }
+:global(html[data-runtime-twin-design='proposal']) .resultCount { font-size: 13px; line-height: 20px; }
 :global(html[data-runtime-twin-design='proposal']) .worklistPanelHeader > h2 { margin: 0; }
 :global(html[data-runtime-twin-design='proposal']) .recordIdentity strong { font-size: 16px; }
 :global(html[data-runtime-twin-design='proposal']) .patientRow { border-radius: 0; }
