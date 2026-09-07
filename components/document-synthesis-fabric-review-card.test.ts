@@ -49,11 +49,28 @@ test('the three production routes bind only the authenticated host operation', a
 test('DS confirmation binds patient identity and invalidates the controller on lock or identity changes', async () => {
     const card = await readFile(CARD, 'utf8'); const upload = await readFile(UPLOAD, 'utf8');
     assert.match(upload, /DocumentSynthesisFabricReviewCard\s+patientId=\{patientId\}/u);
-    assert.match(card, /controller\.run\(\{ patientId, attachmentId, proposal \}, true\)/u);
+    assert.match(card, /controller\.run\(\{ patientId, attachmentId, proposal, ambulatory \}, true\)/u);
     assert.match(card, /!confirmed \|\| !proposal/u);
     assert.match(card, /Conferma e genera proposta/u);
     assert.match(card, /senza scritture cliniche/u);
     assert.match(card, /if \(isLocked\) return null/u);
-    assert.match(card, /key=\{JSON\.stringify\(\[props.patientId, props.attachmentId, props.enabled\]\)\}/u);
+    assert.match(card, /key=\{JSON\.stringify\(\[props.patientId, props.attachmentId, props.attachmentName, props.enabled\]\)\}/u);
     assert.match(card, /useEffect\(\(\) => \(\) => \{[\s\S]*?controller.reset\(\)/u);
+});
+
+/* @Codex */
+test('DS ordinary confirmation shows human names, requires an explicit choice and uses shared action geometry', async () => {
+    const card = await readFile(CARD, 'utf8'); const upload = await readFile(UPLOAD, 'utf8');
+    assert.match(upload, /attachmentName=\{file.name\}/u);
+    assert.match(card, /Paziente: \{proposal.patientName\}/u);
+    assert.match(card, /Documento: \{attachmentName\}/u);
+    assert.match(card, /\{choice.name\}/u);
+    assert.doesNotMatch(card, /Paziente: \{patientId\}|Ambulatorio: \{proposal.ambulatoryId\}/u);
+    assert.match(card, /<option value="">Scegli l’ambulatorio/u);
+    assert.match(card, /disabled=\{!enabled \|\| !confirmed \|\| !ambulatory\}/u);
+    assert.match(card, /setAmbulatory[\s\S]*?setConfirmed\(false\)/u);
+    const buttons = card.match(/<button\b[^>]*>/gu) ?? [];
+    assert.equal(buttons.length, 5);
+    for (const button of buttons) assert.match(button, /data-lume-action=/u);
+    assert.doesNotMatch(card, /px-2.5 py-1.5/u);
 });
