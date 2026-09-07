@@ -148,12 +148,14 @@ function DocumentSynthesisFabricReviewCardSession({
             </div>
 
             {phase === 'confirm' && proposal && (
-                <div>
-                    <p><PrivacyBlur>Paziente: {proposal.patientName}</PrivacyBlur></p>
-                    <p><PrivacyBlur>Documento: {attachmentName}</PrivacyBlur></p>
-                    <label>
+                <div className="mt-4 grid gap-4 text-sm leading-relaxed">
+                    <div className="grid min-w-0 gap-1 break-words">
+                        <p><PrivacyBlur>Paziente: {proposal.patientName}</PrivacyBlur></p>
+                        <p><PrivacyBlur>Documento: {attachmentName}</PrivacyBlur></p>
+                    </div>
+                    <label className="grid min-w-0 gap-2 font-medium">
                         Ambulatorio per questa proposta
-                        <select value={ambulatory?.ambulatoryId ?? ''} onChange={(event) => {
+                        <select className="min-h-[var(--lume-control-height)] w-full min-w-0 rounded-[var(--lume-control-radius)] border border-[color:var(--lume-ink-muted)] bg-[color:var(--lume-surface-focal)] px-3 py-2 text-[color:var(--lume-ink)]" value={ambulatory?.ambulatoryId ?? ''} onChange={(event) => {
                             setAmbulatory(proposal.ambulatories.find((choice) => choice.ambulatoryId === event.target.value) ?? null);
                             setConfirmed(false);
                         }}>
@@ -165,13 +167,15 @@ function DocumentSynthesisFabricReviewCardSession({
                             ))}
                         </select>
                     </label>
-                    <p>Scegli l’ambulatorio in cui segui questo paziente. L’applicazione verificherà l’associazione prima di procedere.</p>
-                    <label>
-                        <input type="checkbox" disabled={!ambulatory} checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} />
-                        {' '}Confermo paziente, documento e ambulatorio per una proposta in sola lettura, senza scritture cliniche.
+                    <p className="text-[color:var(--lume-ink-muted)]">Scegli l’ambulatorio in cui segui questo paziente. L’applicazione verificherà l’associazione prima di procedere.</p>
+                    <label className="flex min-h-[var(--lume-control-height)] items-start gap-3">
+                        <input className="mt-1 h-4 w-4 shrink-0 accent-[var(--lume-accent)]" type="checkbox" disabled={!ambulatory} checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} />
+                        <span>Confermo paziente, documento e ambulatorio per una proposta in sola lettura, senza scritture cliniche.</span>
                     </label>
-                    <button type="button" className="ui-btn-primary" data-lume-action="primary" disabled={!enabled || !confirmed || !ambulatory} onClick={run}>Conferma e genera proposta</button>
-                    <button type="button" className="ui-btn-secondary" data-lume-action="quiet" onClick={reset}>Annulla</button>
+                    <div className="flex flex-wrap items-center gap-3">
+                        <button type="button" className="ui-btn-primary" data-lume-action="primary" disabled={!enabled || !confirmed || !ambulatory} onClick={run}>Conferma e genera proposta</button>
+                        <button type="button" className="ui-btn-secondary" data-lume-action="quiet" onClick={reset}>Annulla</button>
+                    </div>
                 </div>
             )}
 

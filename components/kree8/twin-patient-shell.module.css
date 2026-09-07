@@ -6,7 +6,7 @@
 .identity p { margin-top: 6px; font-size: 12px; color: var(--lume-ink-muted); }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; align-items: center; }
 /* @Codex: same command geometry for every action in the patient header. */
-.actions > :is(a, button) { box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: var(--lume-control-height, 44px); padding: 10px 14px; border-radius: var(--lume-control-radius, 12px); font-size: 14px; line-height: 22px; }
+.actions > :is(a, button) { box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: var(--lume-control-height, 44px); padding: 10px 14px; border-radius: var(--lume-control-radius, 12px); font-size: 14px; font-weight: 600; line-height: 22px; }
 .primary { padding: 9px 13px; background: var(--lume-ink); color: var(--lume-surface-focal); }
 .patientBody { padding: 30px 32px 60px; }
 .readingPane { max-width: 1160px; margin: 0 auto; }

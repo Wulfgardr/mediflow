@@ -29,6 +29,7 @@ html[data-runtime-twin-design='proposal'] :is(.ui-btn-primary, .ui-btn-secondary
     padding: 10px 14px;
     border-radius: var(--lume-control-radius);
     font-size: 14px;
+    font-weight: 600;
     line-height: 22px;
     gap: 8px;
 }
