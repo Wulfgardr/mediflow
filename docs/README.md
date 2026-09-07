@@ -29,20 +29,16 @@ Ultimo aggiornamento: 2026-09-07
 
 ## Consegna 0.8.6
 
-[Candidato locale integrato](./analysis/2026-09-06-086-integrated-closeout.md):
-decisione storica di congelamento, prove conservate e verifica
-iPhone–Mac/Home Base differita al post-release. La promozione resta **bloccata
-dal contratto PIN**. Prevale sulle fotografie precedenti per lo stato del
-programma 0.8.6.
+[Verifica di rilascio 0.8.6](./analysis/2026-09-07-086-release-verification.md): fonte corrente
+per SHA, ricevute, correzioni PIN/allegati, test e limiti. Nessun finding
+reportabile residuo nel perimetro sorgente; pacchetto sorgente autorizzato,
+CI verde e pubblicazione pendenti. Suite completa con un fallimento conservato.
 
-[Review di sicurezza Daybreak](./analysis/2026-09-07-086-daybreak-security-review.md):
-fonte pubblica della review sullo SHA `1d633d98d0a0`, con sintesi italiana e
-report completo derivato. Sei ambiti, 298/298 elementi esaminati, 13 test Node
-PASS e zero vulnerabilità reportabili non rimuovono il blocco PIN. Correzione,
-prove PIN restano aperte. L’approfondimento distingue la lacuna sui limiti del
-corpo delle richieste, assegnata a una lane di hardening, dalla firma di
-produzione non attestata e dal non-goal della membership per operatore.
-ThisDeviceOnly riguarda il nuovo inserimento della chiave cache, non il token paired.
+[Verbale integrato](./analysis/2026-09-06-086-integrated-closeout.md):
+prove e decisioni storiche, con disposizione aggiornata.
+[Review Daybreak](./analysis/2026-09-07-086-daybreak-security-review.md):
+report inglese storico intatto e addenda sanitizzati; firma di produzione
+non attestata e RBAC per operatore esplicitamente fuori scope.
 
 [Promozione della UI web](./adr/0123-official-web-ui-navigation-compositions.md):
 contratto accettato per B predefinita e A selezionabile, con confronto sintetico

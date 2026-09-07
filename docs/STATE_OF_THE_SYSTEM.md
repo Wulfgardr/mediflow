@@ -18,7 +18,7 @@ read_when:
 > prevalgono [AGENTS.md](../AGENTS.md) e
 > [docs/repository-topology.md](./repository-topology.md).
 
-Ultimo aggiornamento: 2026-09-07 (v0.8.6: promozione bloccata dal contratto PIN)
+Ultimo aggiornamento: 2026-09-07 (v0.8.6: correzioni sorgente verificate, CI e rilascio pendenti)
 
 Nota candidato 0.8.6: [ADR 0119](./adr/0119-anydoc-apple-vision-current-source.md)
 chiarisce la precedenza del percorso AnyDoc + Apple Vision descritto qui.
@@ -41,21 +41,21 @@ Il [verbale integrato 0.8.6](./analysis/2026-09-06-086-integrated-closeout.md)
 conserva le prove storiche e registra i controlli sul candidato corrente.
 La navigazione web e Apple, i form progressivi e la scelta web tra barra
 superiore e laterale sono integrati. La decisione di sviluppo concluso su
-`c320694c3` resta storica: la [review Daybreak](./analysis/2026-09-07-086-daybreak-security-review.md)
-su `1d633d98d0a0` mantiene la promozione **bloccata (`BLOCK`)** per il contratto
-del cambio PIN nativo. Sei ambiti e 298/298 elementi esaminati, 13 test Node
-PASS e zero vulnerabilità reportabili non attestano il rispetto di quel
-contratto. Correzione e prove PIN restano aperte, incluso il `409` ambiguo
-dopo il CAS. L’approfondimento rileva una lacuna sui limiti del corpo delle
-richieste, assegnata a una lane di hardening; non attesta firma o entitlements
-di produzione. ThisDeviceOnly è esplicito per il nuovo inserimento della
-chiave cache, non per il token paired. La membership operatore–ambulatorio
-resta un non-goal secondo ADR 0036, senza introdurre RBAC nella 0.8.6.
+`c320694c3` resta storica. Gli addenda indipendenti chiudono il contratto PIN
+su `cefa5c78` e verificano il fix allegati su `be923328`, integrati in `11a42f68`.
+Non restano finding reportabili nel perimetro sorgente revisionato.
+La [verifica di rilascio](./analysis/2026-09-07-086-release-verification.md)
+separa build `e7f8a555a`, smoke MCP, suite completa con un fallimento e prove
+focalizzate. Il pacchetto sorgente è autorizzato, in attesa di CI verde;
+CI finale, PR, merge e tag non sono ancora attestati.
+Firma ed entitlements di produzione restano non verificati. ThisDeviceOnly
+riguarda il nuovo inserimento della chiave cache, non il token paired.
+La membership operatore–ambulatorio è un non-goal ADR 0036, non un finding aperto.
 
-La verifica UI mirata iPhone ↔ Mac/Home Base resta un **DEFERRED VALIDATION
-ITEM / POST-RELEASE VERIFICATION GATE**, distinto dal blocco PIN. Non sono
-attestati una validazione completa multipiattaforma o un installer firmato
-di produzione.
+La verifica UI iPhone ↔ Mac/Home Base resta **DEFERRED VALIDATION ITEM /
+POST-RELEASE VERIFICATION GATE**. Volumi Xcode/VM indisponibili: nessuna nuova
+prova locale Swift XCTest, firma o UI nativa. Non sono attestati validazione
+completa multipiattaforma o installer firmati di produzione.
 
 Windows e Linux ora hanno prove locali su sistemi operativi reali: build del
 runtime Node, avvio da directory vuota, configurazione ordinaria e percorsi

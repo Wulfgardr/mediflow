@@ -2,17 +2,23 @@
 
 Aggiornamento: 7 settembre 2026. Programma WUL-669.
 
-**Promozione bloccata (`BLOCK`) per il contratto del cambio PIN nativo.**
-La review riporta **zero vulnerabilità reportabili** nel modello di minaccia
-adottato. Questo esito non è un via libera: il client Apple non rispetta il
-ritiro dell'autorità locale richiesto da
-[ADR 0106](../adr/0106-web-auth-logout-pin-setup-lifecycle.md).
-La correzione è in corso in un'attività separata; questa pagina mantiene il
-blocco aperto finché non sono disponibili il commit corretto e le prove pertinenti.
-Il coordinatore include nella correzione anche la risposta `409` con ritiro
-della sessione non confermato: dopo il CAS, cioè il confronto e aggiornamento
-atomico delle credenziali, questo esito resta ambiguo. La pulizia locale
-prevista non è ancora attestata da prove ricevute.
+**7 settembre 2026 — correzioni sorgente verificate; CI e pubblicazione pendenti.**
+Il blocco contrattuale PIN è chiuso a livello sorgente dall'addendum indipendente
+`SOURCE_REVIEW_PASS` su `cefa5c78f43ada28e9d74f2d65e5f2173b15edb8`.
+Il finding LOW `csf_e6ea8156c1fde74d61ebf750`, emerso nel primo addendum JSON,
+ha esito `FIX_VERIFIED` su `be9233282c0ab18759b0e679b877d9dc30af5a99`.
+I due file PIN e i sette file della correzione allegati sono identici nel
+candidato integrato `11a42f68effbdc11cd6371bf050a6e2e074de5b3`.
+Non restano finding reportabili nel sorgente revisionato; questo non certifica
+la sicurezza generale. Il rilascio del pacchetto sorgente è autorizzato ma
+attende CI verde. CI finale, PR, merge e tag non sono ancora attestati.
+
+[Verifiche, SHA, ricevute e limiti](./2026-09-07-086-release-verification.md).
+
+## Fotografia storica precedente alle correzioni
+
+Le sintesi seguenti descrivono `1d633d98d0a0`: i blocchi e le azioni allora
+aperti sono superati dalle disposizioni sopra. Il report inglese resta intatto.
 
 ## Sintesi dei sei ambiti
 

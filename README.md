@@ -21,30 +21,28 @@ Informazioni, fonti e prossimi passi. Un po’ più facili da ritrovare.
 
 </div>
 
-![MediFlow: pazienti e anteprima della cartella](./docs/images/getmediflow-085/worklist.png)
+![MediFlow: pazienti e anteprima della cartella](./docs/images/getmediflow-086/worklist.png)
 
-*Schermata reale della candidatura 0.8.5, con soli dati sintetici.*
+*Interfaccia web 0.8.6 con soli dati sintetici; acquisizione del candidato `e7f8a555a`.*
 
 <details>
 <summary><strong>Versione sorgente e stato della candidatura</strong></summary>
 
-> **0.8.6: candidato in revisione, promozione bloccata dal contratto PIN.**
-> La [review Daybreak](./docs/analysis/2026-09-07-086-daybreak-security-review.md) riporta
-> zero vulnerabilità reportabili, ma richiede la correzione del cambio PIN nativo
-> e le relative prove prima di rimuovere il blocco. La UI scelta è promossa
-> secondo [ADR 0123](./docs/adr/0123-official-web-ui-navigation-compositions.md):
-> B predefinita e A come disposizione alternativa della stessa navigazione.
-> Le schermate sotto documentano la base 0.8.5.
+> **0.8.6: correzioni sorgente verificate; rilascio in attesa di CI verde.**
+> Gli addenda indipendenti chiudono il difetto PIN e il finding LOW sugli allegati
+> nel perimetro revisionato. PR, merge e tag restano pendenti.
+> La UI segue [ADR 0123](./docs/adr/0123-official-web-ui-navigation-compositions.md):
+> B predefinita e A alternativa. Le immagini 0.8.6 usano soltanto dati sintetici.
 > La verifica UI iPhone–Mac/Home Base resta differita al post-release;
-> non è attestata la validazione completa multipiattaforma.
-> [Decisione di consegna, verifiche e limiti](./docs/analysis/2026-09-06-086-integrated-closeout.md).
+> non è attestata una validazione completa multipiattaforma.
+> [Verifiche e limiti](./docs/analysis/2026-09-07-086-release-verification.md).
 
 </details>
 
 <details>
 <summary><strong>La scheda clinica, da vicino</strong></summary>
 
-![Scheda clinica: terapie con posologia, ultima misura e prossimo follow-up](./docs/images/getmediflow-085/record.png)
+![Scheda clinica con dati sintetici](./docs/images/getmediflow-086/record.png)
 
 Schermata reale con dati interamente sintetici.
 
@@ -93,10 +91,10 @@ La parità FHIRv2 resta da verificare.
 <details>
 <summary><strong>Guarda la revisione documentale</strong></summary>
 
-![Documenti, provenienza e passaggi da rivedere](./docs/images/getmediflow-085/documents.png)
+![Documenti, provenienza e passaggi da rivedere](./docs/images/getmediflow-086/documents.png)
 
-Schermata reale con fixture sintetiche. Le sintesi mostrate sono contenuti
-preparati per la dimostrazione, non risultati di una generazione AI live.
+Interfaccia documentale con dati sintetici. La schermata non attesta
+un’esecuzione AI, un’estrazione AnyDoc o un passaggio OCR.
 
 </details>
 
@@ -246,7 +244,7 @@ MCP usa stdio. Per una capacità riferita al paziente servono autenticazione,
 selezione e attivazione esplicita nell'interfaccia fidata. Revoca, logout,
 cambio di selezione o scadenza chiudono il grant.
 
-Mini condivide catalogo tipizzato e fondazione CLI; nella 0.8.5 non ha un
+Mini condivide catalogo tipizzato e fondazione CLI; nella 0.8.6 non ha un
 binding Supervisor di produzione e richiede un canale AIP genitore.
 Questi comandi non concedono accesso generale al database né autorizzano
 scritture cliniche. Il planner semantico resta limitato a strumenti approvati.
