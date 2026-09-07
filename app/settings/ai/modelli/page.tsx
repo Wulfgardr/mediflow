@@ -28,6 +28,38 @@ export default function SettingsAiModelsPage() {
             <SettingsSectionIntro kicker="Intelligenza locale" title="Modelli e hardware"
                 description="Collega Ollama, scegli i modelli installati e salva. Le funzioni cliniche richiedono un’abilitazione separata e revisione delle proposte." />
 
+            {/* @Codex: presets remain explicit draft changes through the existing controller. */}
+            <div className={`${SETTINGS_CARD_CLASS} ${styles.card} ${styles.stack}`}>
+                <h3 className="text-base font-semibold">Configurazioni consigliate</h3>
+                <p>Scegli un punto di partenza in base alla memoria del computer, oppure mantieni i modelli già selezionati.</p>
+                <div className={styles.presets}>
+                    {([
+                        ['low', 'Leggero · meno di 16 GB', 'Qwen 2.5 7B'],
+                        ['medium', 'Bilanciato · 16–32 GB', 'Qwen 2.5 14B'],
+                        ['high', 'Avanzato · oltre 32 GB', 'Qwen 3.5 35B A3B'],
+                    ] as const).map(([profile, label, model]) => (
+                        <button type="button" key={profile} className={styles.preset}
+                            aria-pressed={hardwareProfile === profile} onClick={() => applyHardwareProfile(profile)}>
+                            <span className="block font-semibold">{label}</span>
+                            <span className={styles.hint}>{model}</span>
+                            <span className={styles.presetAction}>Usa questa configurazione nella bozza</span>
+                        </button>
+                    ))}
+                </div>
+                <p className={styles.hint}>Il preset sostituisce le selezioni dei due ruoli con lo stesso modello. La modifica resta in bozza: verifica i modelli installati e premi «Salva Configurazione». Nessun download o salvataggio automatico.</p>
+                <dl className={styles.roles}>
+                    <div>
+                        <dt className="font-semibold">Sintesi e organizzazione</dt>
+                        <dd className={styles.hint}>Modello di testo generale per riassumere e organizzare le informazioni estratte dai documenti.</dd>
+                    </div>
+                    <div>
+                        <dt className="font-semibold">Ragionamento testuale</dt>
+                        <dd className={styles.hint}>Modello per elaborare e confrontare informazioni testuali. Puoi sceglierne uno diverso nel passo 2.</dd>
+                    </div>
+                </dl>
+                <p className={styles.hint}>La memoria è un’indicazione orientativa, non una verifica di compatibilità o qualità. Questi preset riguardano il testo; non configurano l’estrazione OCR o la revisione terapeutica ATHENA.</p>
+            </div>
+
             <div className={`${SETTINGS_CARD_CLASS} ${styles.card} ${styles.stack}`}>
                 <h3 className="text-base font-semibold">1. Verifica la connessione</h3>
                 <p>Ollama per i ruoli generali. Treatment Reasoning usa la lane locale ATHENA separata.</p>
@@ -69,26 +101,6 @@ export default function SettingsAiModelsPage() {
                     { roleId: 'clinical', roleLabel: 'Sintesi e organizzazione', model: aiConfig.model_clinical },
                     { roleId: 'reasoning', roleLabel: 'Ragionamento testuale', model: aiConfig.model_reasoning },
                 ]} />
-                <details>
-                    <summary>Opzionale: preset in base alla memoria</summary>
-                    <div className={styles.stack}>
-                        <p className={styles.hint}>Un preset sostituisce entrambe le selezioni qui sopra. Non scarica modelli e non salva: controlla che siano installati prima di salvare.</p>
-                        <div className={styles.presets}>
-                            {([
-                                ['low', 'Leggero · meno di 16 GB', 'Qwen 2.5 7B'],
-                                ['medium', 'Bilanciato · 16–32 GB', 'Qwen 2.5 14B'],
-                                ['high', 'Avanzato · oltre 32 GB', 'Qwen 3.5 35B A3B'],
-                            ] as const).map(([profile, label, model]) => (
-                                <button type="button" key={profile} className={styles.preset}
-                                    aria-pressed={hardwareProfile === profile} onClick={() => applyHardwareProfile(profile)}>
-                                    <span className="block font-semibold">{label}</span>
-                                    <span className={styles.hint}>{model}</span>
-                                </button>
-                            ))}
-                        </div>
-                        <p className={styles.hint}>La memoria è un’indicazione orientativa, non una verifica di compatibilità o qualità.</p>
-                    </div>
-                </details>
             </div>
 
             <div className={`${SETTINGS_CARD_CLASS} ${styles.card} ${styles.stack}`}>
