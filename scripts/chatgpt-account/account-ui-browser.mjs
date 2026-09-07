@@ -79,7 +79,7 @@ try {
             return { documentWidth:document.documentElement.scrollWidth, viewport:innerWidth, panelWidth:element.getBoundingClientRect().width, overlaps, controls:rectangles };
         });
         assert.ok(metrics.documentWidth <= width, `${name}: horizontal overflow`); assert.deepEqual(metrics.overlaps, []);
-        assert.ok(metrics.controls.filter(item => !['Modelli e utilizzo dell’account','Come predisporre il collegamento'].includes(item.text)).every(item => item.height >= 43));
+        assert.ok(metrics.controls.every(item => item.height >= 44));
         evidence.viewports.push({ width, state:name, ...metrics });
         await panel.screenshot({ path:join(output,`${name}-${width}.png`) });
     }

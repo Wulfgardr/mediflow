@@ -9,7 +9,7 @@
 .actions { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; }
 .actions > * { max-width: 100%; white-space: normal; text-align: center; }
 .disclosure { border-top: 1px solid var(--lume-border-color); padding-top: 1rem; min-width: 0; }
-.disclosure summary { cursor: pointer; font-size: .875rem; font-weight: 600; padding: .375rem 0; }
+.disclosure summary { min-height: var(--lume-control-height, 44px); box-sizing: border-box; align-content: center; cursor: pointer; font-size: .875rem; font-weight: 600; padding: .375rem 0; }
 .disclosure summary:focus-visible { outline: 2px solid var(--lume-accent); outline-offset: 3px; border-radius: var(--lume-radius-control); }
 .detailBody { display: grid; gap: 1rem; padding-top: .75rem; }
 .detailBody h4 { margin: 0 0 .5rem; font-size: .875rem; }
