@@ -1,5 +1,6 @@
 /* @Codex */
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
@@ -71,6 +72,27 @@ test('preserves an explicit caller-owned data-dir and leaves its cleanup to the 
         assert.equal(observed, explicit);
         assert.equal(existsSync(explicit), true);
     } finally { await rm(explicit, { recursive: true, force: true }); }
+});
+
+test('the CLI reports failure when its test process cannot start', async () => {
+    const dataDir = await mkdtemp(path.join(os.tmpdir(), 'mediflow-headless-launch-failure-'));
+    const injection = `import childProcess from 'node:child_process';
+        import { syncBuiltinESMExports } from 'node:module';
+        childProcess.spawnSync = () => ({ error: new Error('synthetic child launch failure') });
+        syncBuiltinESMExports();`;
+    try {
+        const result = spawnSync(process.execPath, [
+            `--import=data:text/javascript,${encodeURIComponent(injection)}`,
+            path.join(import.meta.dirname, 'run-headless-portable-tests.mjs'),
+        ], {
+            encoding: 'utf8',
+            env: { ...process.env, MEDIFLOW_DATA_DIR: dataDir },
+            timeout: 10000,
+        });
+        assert.equal(result.status, 1, result.stderr);
+        assert.match(result.stderr, /synthetic child launch failure/u);
+        assert.equal(existsSync(dataDir), true);
+    } finally { await rm(dataDir, { recursive: true, force: true }); }
 });
 
 test('keeps the direct CI caller and npm entrypoint wired to explicit test fixtures', async () => {
