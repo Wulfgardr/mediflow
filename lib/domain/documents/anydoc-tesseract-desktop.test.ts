@@ -18,6 +18,10 @@ import { extractAnyDocLocalBytes, extractAnyDocPageRoutingBytes } from './anydoc
 const real = process.env.MEDIFLOW_TEST_TESSERACT_REAL === '1';
 const realOptions = { skip: real ? false : 'Provision pinned artifacts and set MEDIFLOW_TEST_TESSERACT_REAL=1; this is not OCR proof.' };
 const sha256 = (bytes: Uint8Array | string) => createHash('sha256').update(bytes).digest('hex');
+// @Codex: Mac tests explicitly probe development artifacts; production remains Vision.
+const inspectCapability = () => inspectAnyDocDesktopOcrCapability({ developmentSmoke: process.platform === 'darwin' });
+const preflightArgs = ['scripts/run-strip-types.mjs', 'scripts/check-anydoc-desktop-ocr.ts',
+    ...(process.platform === 'darwin' ? ['--development-tesseract-smoke'] : [])];
 function image(blank = false) {
     const canvas = createCanvas(1600, 600); const context = canvas.getContext('2d');
     context.fillStyle = 'white'; context.fillRect(0, 0, 1600, 600);
@@ -48,14 +52,14 @@ test('desktop OCR rejects malformed raster and over-limit document before recogn
 });
 
 test('real desktop OCR prerequisites are explicitly required for qualification runs', realOptions, () => {
-    assert.equal(inspectAnyDocDesktopOcrCapability().status, 'artifacts_verified');
-    assert.equal(inspectAnyDocDesktopOcrCapability().qualification, 'pending_target_benchmark');
+    assert.equal(inspectCapability().status, 'artifacts_verified');
+    assert.equal(inspectCapability().qualification, 'pending_target_benchmark');
 });
 
 /* @Codex */
 test('desktop preflight requires real AnyDoc and detects its missing binding before recovery', realOptions, () => {
     const cli = () => spawnSync(process.execPath,
-        ['scripts/run-strip-types.mjs', 'scripts/check-anydoc-desktop-ocr.ts'], { encoding: 'utf8' });
+        preflightArgs, { encoding: 'utf8' });
     const before = cli();
     assert.equal(before.status, 0, before.stdout);
     assert.equal(JSON.parse(before.stdout).anydocFirstPass, 'verified');
@@ -104,19 +108,19 @@ test('missing and altered engine fail closed with actionable preflight and recov
     const saved = readFileSync(artifact);
     renameSync(artifact, `${artifact}.test-held`);
     try {
-        const capability = inspectAnyDocDesktopOcrCapability();
+        const capability = inspectCapability();
         assert.equal(capability.status, 'unavailable'); assert.equal(capability.reason, 'artifact_missing');
         assert.match(capability.guidance, /Provisionare localmente/);
-        const cli = spawnSync(process.execPath, ['scripts/run-strip-types.mjs', 'scripts/check-anydoc-desktop-ocr.ts'], { encoding: 'utf8' });
+        const cli = spawnSync(process.execPath, preflightArgs, { encoding: 'utf8' });
         assert.equal(cli.status, 1); assert.match(cli.stdout, /artifact_missing/);
         assert.equal((await runAnyDocTesseractDocument([image()])).status, 'failed');
         const altered = Buffer.from(saved); altered[0] ^= 1; writeFileSync(artifact, altered);
-        assert.equal(inspectAnyDocDesktopOcrCapability().reason, 'artifact_invalid');
+        assert.equal(inspectCapability().reason, 'artifact_invalid');
         assert.equal((await runAnyDocTesseractDocument([image()])).status, 'failed');
     } finally {
         renameSync(`${artifact}.test-held`, artifact);
     }
-    assert.equal(inspectAnyDocDesktopOcrCapability().status, 'artifacts_verified');
+    assert.equal(inspectCapability().status, 'artifacts_verified');
     assert.equal((await runAnyDocTesseractDocument([image()])).status, 'recognized');
 });
 
@@ -157,11 +161,13 @@ test('preflight detects missing and altered native renderer payload before OCR a
     const bytes = readFileSync(file);
     renameSync(file, `${file}.test-held`);
     try {
-        assert.equal(inspectAnyDocDesktopOcrCapability().reason, 'renderer_unavailable');
+        assert.equal(inspectCapability().reason, 'renderer_unavailable');
+        if (process.platform === 'darwin') assert.equal(inspectAnyDocDesktopOcrCapability().status, 'not_applicable');
         const changed = Buffer.from(bytes); changed[0] ^= 1; writeFileSync(file, changed);
-        assert.equal(inspectAnyDocDesktopOcrCapability().reason, 'renderer_unavailable');
+        assert.equal(inspectCapability().reason, 'renderer_unavailable');
+        if (process.platform === 'darwin') assert.equal(inspectAnyDocDesktopOcrCapability().status, 'not_applicable');
     } finally { renameSync(`${file}.test-held`, file); }
-    assert.equal(inspectAnyDocDesktopOcrCapability().status, 'artifacts_verified');
+    assert.equal(inspectCapability().status, 'artifacts_verified');
 });
 
 /* @Codex */
@@ -173,3 +179,17 @@ test('real WASM shares immediate child admission and permits retry after process
     assert.equal((await first).status, 'recognized');
     assert.equal((await runAnyDocTesseractDocument([image()])).status, 'recognized');
 });
+
+/* @Codex */
+test('Mac production preflight is not a Vision capability or a raw binary signature check',
+    { skip: process.platform !== 'darwin' }, () => {
+        const capability = inspectAnyDocDesktopOcrCapability();
+        assert.equal(capability.status, 'not_applicable');
+        assert.equal(capability.qualification, 'not_checked');
+        assert.equal(capability.reason, 'macos_uses_apple_vision');
+        const cli = spawnSync(process.execPath,
+            ['scripts/run-strip-types.mjs', 'scripts/check-anydoc-desktop-ocr.ts'], { encoding: 'utf8' });
+        assert.equal(cli.status, 2);
+        assert.equal(JSON.parse(cli.stdout).status, 'not_applicable');
+        assert.equal(JSON.parse(cli.stdout).anydocFirstPass, 'not_checked');
+    });

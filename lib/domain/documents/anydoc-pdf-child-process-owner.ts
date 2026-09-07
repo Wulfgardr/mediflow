@@ -449,8 +449,16 @@ function inspectTesseractArtifacts() {
 }
 
 /* @Codex: checks pinned OCR artifacts and renderer prerequisites without loading native code. */
-export function inspectAnyDocDesktopOcrCapability() {
-    const artifacts = inspectTesseractArtifacts();
+export function inspectAnyDocDesktopOcrCapability(options: Readonly<{ developmentSmoke?: boolean }> = {}) {
+    // @Codex: the signed/relocated macOS product uses Vision, never this raw-artifact probe.
+    if (process.platform === 'darwin' && !options.developmentSmoke) {
+        return Object.freeze({ engine: 'tesseract_wasm' as const, status: 'not_applicable' as const,
+            reason: 'macos_uses_apple_vision', selectedHostEngine: 'apple_vision' as const,
+            qualification: 'not_checked' as const, checkScope: 'not_applicable' as const,
+            guidance: 'macOS usa Apple Vision: questo controllo non ne verifica la disponibilita. Solo per sviluppo Tesseract su artifact npm grezzi usare --development-tesseract-smoke; non usarlo sul pacchetto Mac firmato.' });
+    }
+    const artifacts = { ...inspectTesseractArtifacts(),
+        checkScope: process.platform === 'darwin' ? 'development_smoke' as const : 'desktop_target' as const };
     if (artifacts.status !== 'artifacts_verified') return artifacts;
     const profile = rendererProfiles.find((entry) => entry.platform === process.platform && entry.arch === process.arch);
     const report = process.report?.getReport() as { header?: { glibcVersionRuntime?: string } } | undefined;
