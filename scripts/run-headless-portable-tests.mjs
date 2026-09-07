@@ -64,11 +64,10 @@ export async function runHeadlessPortableTests({
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
     const result = await runHeadlessPortableTests();
+    process.exitCode = result.status;
     if (result.empty) {
         process.stderr.write('No Headless portable tests found.\n');
-        process.exitCode = result.status;
     }
     else if (result.error) process.stderr.write(`${result.error.message}\n`);
     else if (result.signal) process.kill(process.pid, result.signal);
-    else process.exitCode = result.status;
 }
