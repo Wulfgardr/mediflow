@@ -124,21 +124,24 @@ test('Smart Import exposes only the Fabric review preview and never calls legacy
   });
 
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+  await page.route('**/api/ambulatories', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([{ id: 'ambulatory.synthetic', name: 'Ambulatorio di prova', address: '', version: 1 }]) }));
   await setAiLaneKillSwitch(page, 'aiSmartImportKillSwitch', 'enabled');
   const patientId = await createPatient(page);
-  await page.goto(`/patients/${patientId}/modules#documenti`);
+  await page.goto(`/patients/${patientId}/modules#quadro`);
 
-  await openPatientSection(page, 'documenti');
+  await openPatientSection(page, 'quadro');
+  await page.getByText('Proposte dalle fonti cliniche · Smart Import', { exact: true }).click();
 
   const card = page.getByTestId('fabric-preview-card');
-  await expect(card).toContainText('Fabric · anteprima sola lettura');
-  await card.getByRole('button', { name: 'Carica contesto' }).click();
-  await expect(card).toContainText('ID ambulatorio:');
+  await expect(card).toContainText('Raccogli dalle fonti della cartella');
+  await card.getByRole('button', { name: 'Prepara proposta' }).click();
+  await expect(card.getByRole('checkbox')).toBeDisabled();
+  await card.getByRole('combobox', { name: 'Ambulatorio per questa proposta' }).selectOption('ambulatory.synthetic');
   await card.getByRole('checkbox').check();
-  await card.getByRole('button', { name: 'Genera anteprima (sola lettura)' }).click();
+  await card.getByRole('button', { name: 'Conferma e genera proposta' }).click();
 
   await expect(card).toContainText('0 scritture · applicazione non consentita');
   await expect(card).toContainText('Proposta sintetica da rivedere.');
   await expect(card).toContainText('1 diagnosi · 0 terapie · 0 prestazioni');
-  expect(calls).toEqual({ context: 1, selectionGet: 1, selectionPost: 1, ingest: 1, preview: 1, legacyApply: 0 });
+  expect(calls).toEqual({ context: 0, selectionGet: 1, selectionPost: 1, ingest: 1, preview: 1, legacyApply: 0 });
 });
