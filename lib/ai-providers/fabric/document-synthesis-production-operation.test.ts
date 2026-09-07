@@ -7,8 +7,8 @@ import path from 'node:path';
 import { after, afterEach, test } from 'node:test';
 import Database from 'better-sqlite3';
 
-import { createServerSessionProjectionOwnerRegistry } from '../../security/server-session-projection-owner.ts';
-import { clearAllSessions, createSession } from '../../security/server-session.ts';
+import { createFullPortProjectionOwnerFactory } from '../../security/server-session-projection-owner.ts';
+import { clearAllSessions } from '../../security/server-session.ts';
 
 const DATA_DIRECTORY = mkdtempSync(path.join(os.tmpdir(), 'mediflow-ds-operation-'));
 process.env.MEDIFLOW_DATA_DIR = DATA_DIRECTORY;
@@ -21,6 +21,10 @@ const {
     createDocumentSynthesisProductionOperationForTest,
     resolveDocumentSynthesisAnyDocProjection,
 } = await import('./document-synthesis-production-operation.ts');
+
+import { issueSyntheticWebSession, issueSyntheticWebSessionContext, retireSyntheticWebSession } from '../../security/web-auth-lifecycle-owner-test-fixture.ts';
+import { retire } from '../../security/web-auth-lifecycle-owner-adapter.ts';
+const webSessions: ReturnType<typeof issueSyntheticWebSession>[] = [];
 
 const USER = Object.freeze({ id: 'user.synthetic.document.synthesis', username: 'clinician.synthetic', role: 'clinician' as const });
 const PAIR = Object.freeze({ patientId: 'patient.synthetic.document.synthesis', ambulatoryId: 'ambulatory.synthetic.document.synthesis' });
@@ -75,19 +79,21 @@ function extractedWithAppleVision(attachmentId: string, markdown = 'Fonte sintet
     });
 }
 
-afterEach(() => clearAllSessions());
+afterEach(() => { for (const session of webSessions.splice(0)) retireSyntheticWebSession(session); clearAllSessions(); });
 after(() => rmSync(DATA_DIRECTORY, { recursive: true, force: true }));
 
 function context() {
-    const registry = createServerSessionProjectionOwnerRegistry({
-        clock: () => 1_000,
+    const registry = createFullPortProjectionOwnerFactory({
+        clock: () => Date.now(),
         entropy: () => Uint8Array.from({ length: 16 }, (_, index) => index + 1),
         resolve: (_session, pair) => Object.freeze({ ...pair, patientVersion: 1 }),
     });
-    const session = createSession(USER, 'web');
+    const web = issueSyntheticWebSessionContext(USER, `document-synthesis-${webSessions.length}`);
+    const session = web.session;
+    webSessions.push(session);
     const owner = registry.acquire(session);
     owner.issueSelection({ expectedEpoch: 0, ...PAIR });
-    return Object.freeze({ session, owner });
+    return Object.freeze({ session, owner, web });
 }
 
 test('classifies Apple Vision AnyDoc evidence as OCR text and keeps native extraction distinct', () => {
@@ -157,4 +163,27 @@ test('suppresses drift and denies caller source injection, unsupported extractio
     const third = await operation.capture({ attachmentId: 'attachment.synthetic.document' });
     assert.equal(third.code, 'lane_disabled');
     assert.equal(executions, 1);
+});
+
+/* @Codex */
+test('production registration acquires an authentic Web owner and disposes DS handles on retirement', async () => {
+    for (const reason of ['dispose', 'lock', 'delete'] as const) {
+        const selected = context(); let entropy = 0; let extractions = 0;
+        const factory = createDocumentSynthesisProductionOperationForTest({
+            acquireContext: async () => selected,
+            readCurrentness: () => CURRENT,
+            readLaneEnabled: () => true,
+            extract: async (_session, attachmentId) => { extractions++; return extracted(attachmentId); },
+            execute: async () => null,
+            entropy: () => Uint8Array.from({ length: 16 }, () => ++entropy),
+        });
+        const operation = await factory.acquire();
+        assert.ok(operation, 'production DS registration must accept the authentic Web projection');
+        const captured = await operation.capture({ attachmentId: 'attachment.synthetic.document' });
+        assert.equal(captured.status, 'available');
+        retire(selected.session, reason, reason === 'lock' ? { controlId: selected.web.controlId, ifMatch: selected.web.etag, idempotencyKey: 'synthetic-ds-lock' } : undefined);
+        assert.equal((await operation.ingest({ captureHandle: captured.captureHandle })).code, 'capture_consumed');
+        assert.equal(extractions, 0);
+        assert.equal(await factory.acquire(), null);
+    }
 });
