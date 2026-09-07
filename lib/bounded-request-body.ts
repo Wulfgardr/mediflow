@@ -93,6 +93,12 @@ function duplicateObjectKey(source: string): boolean {
     try { return value(); } catch { return false; }
 }
 
+/** @Codex: canonical synchronous strict JSON parsing for bounded body and file callers. */
+export function parseStrictJson(source: string): unknown {
+    if (duplicateObjectKey(source)) throw new SyntaxError('Duplicate JSON object key');
+    return jsonParse(source);
+}
+
 /** Accumulates at most the budget; rejects the crossing chunk before decoding/parsing. */
 export async function readBoundedJsonBody(
     request: Request,
@@ -149,8 +155,8 @@ export async function readBoundedJsonBody(
             bytes.set(chunk, offset); offset += chunk.byteLength;
         }
         const source = semantics === 'request-json' ? decodeRequestUtf8(bytes) : decodeUtf8(bytes);
-        if (semantics === 'strict' && duplicateObjectKey(source)) return objectFreeze({ ok: false, status: 400 });
-        return objectFreeze({ ok: true, value: jsonParse(source), byteLength });
+        const value = semantics === 'strict' ? parseStrictJson(source) : jsonParse(source);
+        return objectFreeze({ ok: true, value, byteLength });
     } catch {
         return objectFreeze({ ok: false, status: 400 });
     }

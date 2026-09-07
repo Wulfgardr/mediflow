@@ -1,7 +1,7 @@
 /* @Codex */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { readBoundedJsonBody, utf8ByteLength } from './bounded-request-body';
+import { readBoundedJsonBody, utf8ByteLength, parseStrictJson } from './bounded-request-body';
 import {
     readNativeNetworkJson, JsonBodyTooLargeError, jsonBodyTooLargeResponse,
     NATIVE_BOOTSTRAP_JSON_MAX_BYTES, NETWORK_JSON_MAX_BYTES, networkAttachmentJsonMaxBytes,
@@ -142,4 +142,12 @@ test('attachment budget reuses configured ciphertext allowance for canonical JSO
         if (previous === undefined) delete process.env.MEDIFLOW_ATTACHMENT_MAX_BYTES;
         else process.env.MEDIFLOW_ATTACHMENT_MAX_BYTES = previous;
     }
+});
+
+// @Codex: the synchronous export preserves the canonical body parser semantics.
+test('canonical synchronous strict parser validates keys at each object level', () => {
+    assert.deepEqual(parseStrictJson('{"a":1,"nested":{"a":2}}'), { a: 1, nested: { a: 2 } });
+    assert.throws(() => parseStrictJson('{"a":1,"a":2}'), SyntaxError);
+    assert.throws(() => parseStrictJson('{"nested":{"a":1,"\\u0061":2}}'), SyntaxError);
+    assert.throws(() => parseStrictJson('{"a":}'), SyntaxError);
 });
