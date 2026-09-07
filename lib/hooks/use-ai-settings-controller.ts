@@ -1,6 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+/* @Codex */
+import { isInstalledOllamaModel } from '@/lib/installed-ollama-models';
 import { db } from '@/lib/db';
 import { useToast } from '@/components/ui/toast-provider';
 import {
@@ -86,14 +88,15 @@ export function useAiSettingsController() {
         DEFAULT_DOCUMENT_ROUTER_CONTROL_FLOW_MODE,
     );
 
-    useEffect(() => {
-        const checkOllama = async () => {
-            try {
-                // Placeholder for future lightweight health check
-            } catch { }
-        };
-        void checkOllama();
-    }, []);
+    // @Codex: connection observations belong to one configuration and mounted instance.
+    const connectionGeneration = useRef({ value: 0 });
+    useLayoutEffect(() => {
+        const generation = connectionGeneration.current;
+        generation.value++;
+        setAiTestStatus('idle');
+        setAiHealth(null);
+        return () => { generation.value++; };
+    }, [aiConfig]);
 
     async function loadAiConfig() {
         try {
@@ -222,10 +225,14 @@ export function useAiSettingsController() {
     };
 
     const testAiConnection = async () => {
+        const generation = ++connectionGeneration.current.value;
+        const isCurrent = () => generation === connectionGeneration.current.value;
+        let timer: ReturnType<typeof setTimeout> | undefined;
         setAiTestStatus('testing');
         setAiHealth(null);
         try {
             const { AIService } = await import('@/lib/ai-service');
+            if (!isCurrent()) return;
             const service = AIService.fromLocalTaskConfig(
                 'clinical',
                 aiConfig.url,
@@ -234,7 +241,7 @@ export function useAiSettingsController() {
             );
 
             const timeoutPromise = new Promise<{ status: string; message?: string; models?: unknown[] }>((_, reject) =>
-                setTimeout(() => reject(new Error('Timeout connessione (60s) - Il modello potrebbe richiedere tempo per caricarsi')), 60000),
+                timer = setTimeout(() => reject(new Error('Ollama non ha risposto entro 60 secondi. Riprova il test.')), 60000),
             );
 
             const health = await Promise.race([
@@ -242,21 +249,22 @@ export function useAiSettingsController() {
                 timeoutPromise,
             ]);
 
+            if (!isCurrent()) return;
             const installedModels = (health.models as string[]) || [];
             const missingModels: string[] = [];
 
             const isMissing = (target: string) => {
                 if (!target) return false;
-                return !installedModels.some((model) => model === target || model.startsWith(`${target}:`));
+                return !isInstalledOllamaModel(installedModels, target);
             };
 
             if (isMissing(aiConfig.model_clinical)) missingModels.push(aiConfig.model_clinical);
             if (isMissing(aiConfig.model_reasoning)) missingModels.push(aiConfig.model_reasoning);
 
-            if (missingModels.length > 0) {
+            if (health.status === 'ok' && missingModels.length > 0) {
                 setAiHealth({
                     status: 'error',
-                    message: `Ollama è attivo, ma mancano i modelli configurati: ${missingModels.join(', ')}. Scaricali utilizzando i pulsanti sopra.`,
+                    message: `Ollama è attivo, ma mancano i modelli configurati: ${missingModels.join(', ')}. Scegli un modello installato o consulta i consigli qui sotto.`,
                     models: installedModels,
                 });
                 setAiTestStatus('error');
@@ -265,19 +273,25 @@ export function useAiSettingsController() {
 
             setAiHealth({
                 ...health,
-                status: health.status as 'ok' | 'error',
-                message: health.message || '',
+                status: health.status === 'ok' && installedModels.length > 0 ? 'ok' : 'error',
+                message: health.status === 'ok'
+                    ? installedModels.length > 0
+                        ? `Ollama è raggiungibile: ${installedModels.length} modelli presenti. Questo test non abilita le funzioni cliniche.`
+                        : 'Ollama è raggiungibile, ma non contiene modelli. Consulta i consigli qui sotto.'
+                    : 'Ollama non è raggiungibile. Controlla indirizzo e servizio locale, poi riprova.',
                 models: installedModels,
             });
-            setAiTestStatus(health.status === 'ok' ? 'success' : 'error');
+            setAiTestStatus(health.status === 'ok' && installedModels.length > 0 ? 'success' : 'error');
         } catch (e) {
-            console.error(e);
+            if (!isCurrent()) return;
             setAiTestStatus('error');
             setAiHealth({
                 status: 'error',
                 message: e instanceof Error ? e.message : 'Errore imprevisto',
                 models: [],
             });
+        } finally {
+            if (timer) clearTimeout(timer);
         }
     };
 
