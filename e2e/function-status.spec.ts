@@ -2,6 +2,7 @@
 import { expect, test } from '@playwright/test';
 import { bootstrapUnlockedSession } from './utils';
 import { WHO_LOCAL_BINDING_ID } from '../lib/reference-data/icd11-who-local-contract';
+import { FUNCTION_IDS } from '../lib/function-status';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -17,7 +18,11 @@ test('function configuration is authenticated, complete and distinguishes failed
     await page.unroute('**/api/system/function-status');
     await panel.getByRole('button', { name: 'Rileggi stato', exact: true }).click();
     await expect(panel).toContainText('Configurazione letta il');
-    await expect(panel.locator('[data-testid^="function-state-"]')).toHaveCount(7);
+    await expect(panel.locator('[data-testid^="function-state-"]')).toHaveCount(6);
+    await expect(panel.getByTestId('function-state-icd11')).toHaveCount(0);
+    const completeStatus = await page.request.get('/api/system/function-status');
+    expect(completeStatus.status()).toBe(200);
+    expect((await completeStatus.json()).functions.map((row: { id: string }) => row.id)).toEqual(FUNCTION_IDS);
     await expect(panel.getByTestId('function-state-patient_insight')).toContainText('Spenta');
     await expect(panel.getByTestId('function-state-document_ocr')).toContainText('Apple Vision');
     await expect(panel).toContainText('Nessun modello eseguito');
@@ -53,7 +58,7 @@ test('WHO local verification is explicit and separates direct response, cache an
                 fetchedAt: '2026-09-06T01:00:00.000Z', expiresAt: '2026-09-07T01:00:00.000Z', completedAt: '2026-09-06T01:00:00.000Z' },
         } });
     });
-    await page.goto('/settings/diagnostica');
+    await page.goto('/settings/repertori#who-setup');
     const panel = page.getByTestId('who-setup-panel');
     await expect(panel).toContainText('Servizio WHO ICD-11 disattivato');
     const verify = panel.getByRole('button', { name: 'Verifica con termine di esempio', exact: true });

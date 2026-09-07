@@ -55,6 +55,13 @@ test('searching "backup" surfaces backup & restore first', () => {
 });
 
 /* @Codex */
+test('terminology and catalog searches lead to Repertori rather than Fabric', () => {
+    for (const query of ['AIFA', 'esenzioni', 'WHO', 'OMS', 'ICD-11', 'codifiche']) {
+        assert.equal(searchSettingsNav(query)[0]?.item.href, '/settings/repertori', query);
+    }
+});
+
+/* @Codex */
 test('searching "conformita" surfaces the evidence inventory first', () => {
     const matches = searchSettingsNav('conformita');
     assert.ok(matches.length > 0);

@@ -19,7 +19,7 @@ const PROPOSAL_INTRO_COPY: Record<string, string> = {
     Accesso: 'PIN e sessione.',
     'Backup e ripristino': 'Pianificazione e ripristino dei backup locali.',
     'Evidenze e conformità': 'Evidenze tecniche, non una certificazione.',
-    Repertori: 'AIFA ed esenzioni, in locale.',
+    Repertori: 'Farmaci AIFA, esenzioni e WHO ICD-11.',
     'Intelligence Fabric': 'Modelli, funzioni e stato dei collegamenti.',
     'Modelli e hardware': 'Collega Ollama, scegli i modelli installati e salva.',
     'Funzioni cliniche': 'Scegli quali funzioni usare nella cartella.',

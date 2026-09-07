@@ -7,11 +7,11 @@ import { FUNCTION_META, FUNCTION_STATE_LABELS, parseFunctionStatus, type Functio
 import { SETTINGS_SECONDARY_BUTTON_CLASS } from './settings-ui';
 import styles from './function-status-panel.module.css';
 
-/* @Codex: presentation groups preserve all seven canonical status rows. */
+/* @Codex: Fabric presents intelligent functions; ICD-11 belongs to Repertori.
+   The complete seven-row API snapshot is still validated without modification. */
 const FUNCTION_GROUPS: readonly { id: string; title: string; functions: readonly FunctionId[] }[] = [
     { id: 'summaries', title: 'Sintesi e importazione assistita', functions: ['patient_insight', 'smart_import', 'document_synthesis', 'treatment_reasoning'] },
     { id: 'reading', title: 'Lettura dei documenti', functions: ['document_text', 'document_ocr'] },
-    { id: 'catalogs', title: 'Cataloghi e codifiche', functions: ['icd11'] },
 ];
 
 function FunctionCard({ row }: { row: FunctionStatusRow }) {
