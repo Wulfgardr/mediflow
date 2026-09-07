@@ -33,7 +33,7 @@ function PreferenceCard({ row, disabled, account, preview }: { row: FunctionRow;
         <details><summary>Stato e dettagli</summary><Description row={row} /><p className={styles.hint}>OpenAI · ChatGPT {account?.state === 'connected' ? 'collegato' : account?.state === 'awaiting_login' || account?.state === 'verifying' ? 'accesso in corso' : account?.state === 'starting' ? 'avvio accesso' : account?.state === 'disconnected' ? 'non collegato' : account?.state === 'error' ? 'errore nel collegamento' : 'stato non disponibile'}. Nessuna opzione di esecuzione ChatGPT abilitata.</p></details>
     </article>;
 }
-export function FunctionPreferencesContent({ active, onRead }: { active: boolean; onRead?: (dto: FunctionModelPreferences) => void }) {
+export function FunctionPreferencesContent({ active, onRead, session }: { active: boolean; session?: unknown; onRead?: (dto: FunctionModelPreferences) => void }) {
     const [client] = useState(() => createPreferencesClient());
     const view = useSyncExternalStore(client.subscribe, client.getSnapshot, client.getSnapshot);
     const proposalRef = useRef<HTMLDivElement>(null);
@@ -48,7 +48,7 @@ export function FunctionPreferencesContent({ active, onRead }: { active: boolean
         else if (hadProposal.current) headingRef.current?.focus();
         hadProposal.current = !!view.proposed;
     }, [view.proposed, view.busy, view.error]);
-    useLayoutEffect(() => { client.reset(); if (active) void client.read(); return client.reset; }, [client, active]);
+    useLayoutEffect(() => { client.reset(); if (active) void client.read(); return client.reset; }, [client, active, session]);
     useEffect(() => { if (view.saved) notifyDbChange('settings'); }, [view.saved]);
     useEffect(() => { if (view.dto) onRead?.(view.dto); }, [view.dto, onRead]);
     useEffect(() => {
@@ -59,7 +59,7 @@ export function FunctionPreferencesContent({ active, onRead }: { active: boolean
                 const status = response.ok ? parseAccountBrowserStatus(await response.json()) : null; if (alive) setAccount(status);
             } catch { if (alive) setAccount(null); } finally { if (alive) timer = setTimeout(read, 5000); }
         }; void read(); return () => { alive = false; clearTimeout(timer); controller?.abort(); };
-    }, [active]);
+    }, [active, session]);
     useEffect(() => { const hide = () => client.reset(); window.addEventListener('pagehide', hide); return () => window.removeEventListener('pagehide', hide); }, [client]);
     return <section className={styles.panel} aria-label="Modelli e preferenze per esperienza" data-testid="function-preferences">
         <div className={styles.card}>
@@ -83,6 +83,6 @@ export function FunctionPreferencesContent({ active, onRead }: { active: boolean
     </section>;
 }
 export function FunctionPreferencesPanel({ onRead }: { onRead?: (dto: FunctionModelPreferences) => void }) {
-    const { isAuthenticated, isLocked, authRecoveryState } = useSecurity();
-    return <FunctionPreferencesContent active={isAuthenticated && !isLocked && authRecoveryState === 'ready'} onRead={onRead} />;
+    const { isAuthenticated, isLocked, authRecoveryState, user } = useSecurity();
+    return <FunctionPreferencesContent session={user} active={isAuthenticated && !isLocked && authRecoveryState === 'ready'} onRead={onRead} />;
 }
