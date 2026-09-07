@@ -5,16 +5,17 @@ This file collects MediFlow's relevant changes.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.8.6] - Unreleased
+## [0.8.6] - 2026-09-07
 
 The feature-complete decision at `c320694c3` remains historical. Independent
 addenda close the native PIN source-contract defect (`cefa5c78`) and verify
 the attachment-budget fix (`be923328`, integrated at `11a42f68`). No reportable
-finding remains in the reviewed source. The source-package release is authorized
-but pending green CI; final CI, PR, merge and tag are not yet evidenced.
+finding remains in the reviewed source. This entry describes the source scope;
+the GitHub Release records the final CI, merge, tag and source-package identity.
 [Release verification](./docs/analysis/2026-09-07-086-release-verification.md)
-records exact sources, receipt hashes and limits. The full unit run remains
-3224 PASS / 1 FAIL / 1 SKIP; the separate 13/13 run does not make it all green.
+records exact sources, receipt hashes and limits. The final local unit run on
+`9be09c583` passed 3267 tests with one expected skip and no failures. Earlier
+failures and the separate 13/13 run remain historical evidence.
 Production signing/entitlements remain unverified. ThisDeviceOnly applies to
 new cache-key insertion, not the paired token. Operator-to-ambulatory RBAC is
 an explicit ADR 0036 non-goal, not an unfixed security finding.
