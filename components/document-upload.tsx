@@ -1,9 +1,9 @@
 /* @Codex */
 'use client';
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { useDropzone, type FileRejection } from 'react-dropzone';
-import { Eye, FileText, Loader2, RefreshCw, Upload, X } from 'lucide-react';
+import { Eye, FileText, Loader2, RefreshCw, Trash2, Upload } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 
 import DocumentSynthesisFabricReviewCard from '@/components/document-synthesis-fabric-review-card';
@@ -41,6 +41,7 @@ function fileAsDataUrl(file: File): Promise<string> {
 }
 
 export default function DocumentUpload({ patientId, children }: DocumentUploadProps) {
+    const uploadHintId = useId();
     const { showToast } = useToast();
     const confirm = useConfirm();
     const [isProcessing, setIsProcessing] = useState(false);
@@ -176,7 +177,7 @@ export default function DocumentUpload({ patientId, children }: DocumentUploadPr
             <section aria-label="Caricamento documenti" data-document-area="upload">
                 {attachments?.length === 0 ? <p className={disclosure.empty}>Nessun documento caricato.</p> : null}
                 <div
-                    {...getRootProps({ role: 'button', 'aria-label': 'Carica documenti' })}
+                    {...getRootProps({ role: 'button', 'aria-label': 'Carica documenti', 'aria-describedby': uploadHintId })}
                     className={cn(
                         disclosure.upload,
                         isDragActive
@@ -184,13 +185,14 @@ export default function DocumentUpload({ patientId, children }: DocumentUploadPr
                             : 'border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] hover:bg-[color:color-mix(in_srgb,var(--lume-ink)_5%,var(--lume-surface-field))]',
                     )}
                 >
-                    <input {...getInputProps()} aria-label="Carica documenti" />
-                    <div className={disclosure.uploadIcon}>
+                    {/* @Codex: the dropzone is the single accessible file chooser. */}
+                    <input {...getInputProps({ 'aria-hidden': true, tabIndex: -1 })} />
+                    <div className={disclosure.uploadIcon} aria-hidden="true">
                         {isProcessing ? <Loader2 className="h-6 w-6 animate-spin" /> : <Upload className="h-6 w-6" />}
                     </div>
                     <p className="text-sm font-medium text-[color:var(--lume-ink)]">Carica documenti</p>
-                    <p className={disclosure.hint}>
-                        Fino a 10 file, 25 MB ciascuno. Estrazione e sintesi si avviano manualmente dopo il caricamento.
+                    <p id={uploadHintId} className={disclosure.hint}>
+                        Scegli o trascina fino a 10 file, 25 MB ciascuno. Poi puoi estrarre il testo e richiedere una sintesi.
                     </p>
                 </div>
 
@@ -206,12 +208,12 @@ export default function DocumentUpload({ patientId, children }: DocumentUploadPr
                     <article key={file.id} className={disclosure.documentRow}>
                         <div className={disclosure.documentHead}>
                             <div className="rounded-lg border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-ink)_6%,var(--lume-surface-field))] p-2 text-[color:var(--lume-ink-muted)]">
-                                <FileText className="h-5 w-5" />
+                                <FileText className="h-5 w-5" aria-hidden="true" />
                             </div>
                             <div className="min-w-0 flex-1">
                                 <h4 className={disclosure.documentTitle}>{file.name}</h4>
                                 <p className={disclosure.hint}>
-                                    {new Date(file.createdAt).toLocaleDateString('it-IT')} · {Math.max(1, Math.ceil(file.size / 1024))} KB
+                                    Caricato il {new Date(file.createdAt).toLocaleDateString('it-IT')} · {Math.max(1, Math.ceil(file.size / 1024))} KB
                                 </p>
                             </div>
                             <div className={disclosure.documentActions}>
@@ -219,29 +221,32 @@ export default function DocumentUpload({ patientId, children }: DocumentUploadPr
                                     type="button"
                                     onClick={() => handleLocalExtractionPreview(file)}
                                     disabled={extractingId !== null}
-                                    className="min-h-11 min-w-11 rounded-[var(--lume-radius-control)] p-2 text-[color:var(--lume-accent)] transition-colors hover:bg-[color:color-mix(in_srgb,var(--lume-accent)_9%,var(--lume-surface-field))] disabled:opacity-50"
+                                    className={disclosure.documentAction}
                                     title="Estrai testo localmente"
                                     aria-label={`Estrai testo localmente da ${file.name}`}
                                 >
-                                    <RefreshCw className={cn('h-4 w-4', extractingId === file.id && 'animate-spin')} />
+                                    <RefreshCw className={cn('h-4 w-4', extractingId === file.id && 'animate-spin')} aria-hidden="true" />
+                                    Estrai testo
                                 </button>
                                 <button
                                     type="button"
                                     onClick={() => setViewingFile(file)}
-                                    className="min-h-11 min-w-11 rounded-[var(--lume-radius-control)] p-2 text-[color:var(--lume-ink-muted)] transition-colors hover:bg-[color:color-mix(in_srgb,var(--lume-ink)_6%,var(--lume-surface-field))] hover:text-[color:var(--lume-ink)]"
+                                    className={disclosure.documentAction}
                                     title="Visualizza"
                                     aria-label={`Visualizza ${file.name}`}
                                 >
-                                    <Eye className="h-4 w-4" />
+                                    <Eye className="h-4 w-4" aria-hidden="true" />
+                                    Apri
                                 </button>
                                 <button
                                     type="button"
                                     onClick={() => handleDelete(file.id)}
-                                    className="min-h-11 min-w-11 rounded-[var(--lume-radius-control)] p-2 text-[color:var(--lume-ink-muted)] transition-colors hover:bg-[color:color-mix(in_srgb,var(--lume-signal-critical)_11%,var(--lume-surface-field))] hover:text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]"
+                                    className={`${disclosure.documentAction} ${disclosure.removeAction}`}
                                     title="Elimina"
                                     aria-label={`Elimina ${file.name}`}
                                 >
-                                    <X className="h-4 w-4" />
+                                    <Trash2 className="h-4 w-4" aria-hidden="true" />
+                                    Elimina
                                 </button>
                             </div>
                         </div>

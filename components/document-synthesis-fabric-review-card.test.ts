@@ -10,7 +10,7 @@ const IMPORTER = 'components/pdf-importer.tsx';
 test('production document UI exposes a manual Fabric review with receipt, provenance, and citations', async () => {
     const card = await readFile(CARD, 'utf8');
     assert.match(card, /createDocumentSynthesisReviewBrowserController/u);
-    assert.match(card, /Sintesi Fabric · sola proposta/u);
+    assert.match(card, /Sintesi da rivedere/u);
     assert.match(card, /0 scritture/u);
     assert.match(card, /Provenienza/u);
     assert.match(card, /Citazioni/u);

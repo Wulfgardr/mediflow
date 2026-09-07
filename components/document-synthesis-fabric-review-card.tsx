@@ -6,6 +6,7 @@ import { FileSearch, Loader2, RotateCcw, ShieldCheck } from 'lucide-react';
 
 import { FunctionModelPicker, useFunctionModelPicker } from '@/components/function-models/function-model-picker';
 import PrivacyBlur from '@/components/privacy-blur';
+import disclosure from '@/components/patient-disclosure.module.css';
 import {
     DocumentSynthesisBrowserOrchestratorError,
 } from '@/lib/ai-providers/fabric/document-synthesis-browser-orchestrator';
@@ -112,15 +113,15 @@ function DocumentSynthesisFabricReviewCardSession({
 
     return (
         <section
-            className="mt-4 rounded-[var(--lume-control-radius)] border border-[color:color-mix(in_srgb,var(--lume-accent)_22%,transparent)] bg-[color:var(--lume-surface-field)] p-4 text-sm leading-relaxed"
+            className={disclosure.synthesis}
             data-testid={`document-synthesis-fabric-review-${attachmentId}`}
         >
             <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                    <p className="flex items-center gap-1.5 font-bold text-[color:var(--lume-ink)]">
-                        <ShieldCheck className="h-3.5 w-3.5 text-[color:var(--lume-accent)]" />
-                        Sintesi Fabric · sola proposta
-                    </p>
+                    <h4 className="flex items-center gap-2 font-semibold text-[color:var(--lume-ink)]">
+                        <ShieldCheck className="h-4 w-4 text-[color:var(--lume-accent)]" aria-hidden="true" />
+                        Sintesi da rivedere
+                    </h4>
                     <p className="mt-1 text-[color:var(--lume-ink-muted)]">
                         Un riepilogo da confrontare con il documento. La cartella rimane invariata.
                     </p>
@@ -216,7 +217,7 @@ function DocumentSynthesisFabricReviewCardSession({
                         <p className="mt-3 text-[color:var(--lume-ink-muted)]">Questa proposta non aggiunge né modifica informazioni nella cartella.</p>
                     </div>
 
-                    <div className="rounded-[var(--lume-control-radius)] border border-[color:color-mix(in_srgb,var(--lume-ink)_16%,transparent)] p-4">
+                    <div className={disclosure.synthesisSection}>
                         <p className="font-semibold text-[color:var(--lume-ink)]">Elaborato sul computer</p>
                         <dl className="mt-2 grid min-w-0 gap-x-4 gap-y-2 sm:grid-cols-[auto_minmax(0,1fr)]">
                             <dt className="text-[color:var(--lume-ink-muted)]">Servizio</dt><dd className="text-[color:var(--lume-ink)]">Ollama · locale</dd>
@@ -232,7 +233,7 @@ function DocumentSynthesisFabricReviewCardSession({
                             {publication.citations.map((citation) => (
                                 <li
                                     key={`${citation.label}-${citation.quoteSha256}`}
-                                    className="min-w-0 rounded-[var(--lume-control-radius)] border border-[color:color-mix(in_srgb,var(--lume-ink)_16%,transparent)] p-4 text-[color:var(--lume-ink)]"
+                                    className={`${disclosure.citation} text-[color:var(--lume-ink)]`}
                                 >
                                     <p className="font-semibold">{citation.label} · <PrivacyBlur intensity="sm">{attachmentName}</PrivacyBlur></p>
                                     <blockquote className="mt-2 whitespace-pre-wrap break-words"><PrivacyBlur intensity="sm">{citation.quote}</PrivacyBlur></blockquote>
@@ -241,9 +242,9 @@ function DocumentSynthesisFabricReviewCardSession({
                         </ol>
                     </div>
 
-                    <details className="min-w-0 rounded-[var(--lume-control-radius)] border border-[color:color-mix(in_srgb,var(--lume-ink)_16%,transparent)]">
-                        <summary className="min-h-[var(--lume-control-height)] cursor-pointer rounded-[var(--lume-control-radius)] px-4 py-3 font-semibold text-[color:var(--lume-ink)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--lume-accent)]">Dettagli di verifica</summary>
-                        <div className="grid min-w-0 gap-3 px-4 pb-4 text-xs leading-relaxed text-[color:var(--lume-ink-muted)]">
+                    <details className={disclosure.disclosure}>
+                        <summary>Dettagli di verifica</summary>
+                        <div className="grid min-w-0 gap-3 pb-4 text-sm leading-relaxed text-[color:var(--lume-ink-muted)]">
                             <p>0 scritture · applicazione non consentita</p>
                             <p>Qualità dichiarata dal modello: {publication.output.qualityLevel}. È una sua valutazione, non una verifica clinica indipendente.</p>
                             <p>Le citazioni documentano i riferimenti restituiti; non ricostruiscono il ragionamento interno del modello.</p>

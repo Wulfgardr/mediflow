@@ -225,7 +225,7 @@ test('Document Synthesis Fabric mostra una sola proposta con receipt, provenienz
   await openDocumentArchive(page, fixture.patientId);
 
   const card = page.getByTestId(`document-synthesis-fabric-review-${attachmentId}`);
-  await expect(card).toContainText('Sintesi Fabric · sola proposta');
+  await expect(card).toContainText('Sintesi da rivedere');
   previewStarted = true;
   await card.getByRole('button', { name: 'Genera proposta' }).click();
 
