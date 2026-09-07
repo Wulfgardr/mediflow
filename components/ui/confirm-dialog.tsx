@@ -83,7 +83,8 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
                         tabIndex={-1}
                         className="mf-modal-shell lume-overlay-shadow relative w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-[var(--lume-dur-fuoco)]"
                     >
-                        <div aria-hidden className="h-1.5 w-full" style={{ background: isDanger ? 'var(--lume-signal-critical)' : 'var(--lume-accent)' }} />
+                        {/* @Codex WUL-678: danger retains its signal; ordinary confirmations have no decorative stripe. */}
+                        {isDanger ? <div aria-hidden className="h-1.5 w-full" style={{ background: 'var(--lume-signal-critical)' }} /> : null}
                         <div className="p-6">
                             <div className="mb-4 flex items-start justify-between gap-4">
                                 <div className="flex items-center gap-3">
@@ -122,7 +123,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
                                 </div>
                             ) : null}
 
-                            <div className="mt-6 flex justify-end gap-3">
+                            <div className="mt-6 flex flex-wrap justify-end gap-3">
                                 <button type="button" onClick={() => close({ confirmed: false })} className="mf-btn-secondary">
                                     {options.cancelLabel ?? 'Annulla'}
                                 </button>

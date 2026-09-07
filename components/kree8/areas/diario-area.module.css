@@ -1,9 +1,8 @@
-/* @Codex issue 105, riferimento 68: il diario possiede una sola superficie e un solo Filo SVG. */
+/* @Codex WUL-678: recent work sits on the substrate; the Filo keeps one shared axis. */
 .timelineSection {
   min-width: 0;
-  padding: 16px;
-  border-radius: var(--lume-radius-panel);
-  background: var(--lume-surface-field);
+  padding: 0;
+  background: transparent;
   color: var(--lume-ink);
 }
 
@@ -29,7 +28,7 @@
   letter-spacing: -0.02em;
 }
 :global(html[data-runtime-twin-design='proposal']) .sectionSubtitle { font-size: var(--twin-type-body); line-height: var(--twin-body-leading); }
-:global(html[data-runtime-twin-design='proposal']) .count { font-size: var(--twin-type-caption); }
+:global(html[data-runtime-twin-design='proposal']) .count { font-size: 1rem; color: var(--lume-ink); }
 /* @Codex: dates orient the chronology; actions stay with their patient entry. */
 :global(html[data-runtime-twin-design='proposal']) .date {
   font-size: var(--twin-type-body);
@@ -50,7 +49,7 @@
 .count {
   flex: none;
   color: var(--lume-ink-muted);
-  font-size: 11px;
+  font-size: 1rem;
   font-variant-numeric: tabular-nums;
 }
 
@@ -87,9 +86,10 @@
   min-width: 0;
   padding: 13px 14px 12px;
   border: 0;
-  border-radius: var(--lume-radius-card);
+  border-radius: 0;
+  border-bottom: 1px solid var(--lume-border-color);
   outline: 0;
-  background: var(--lume-surface-field);
+  background: transparent;
   color: var(--lume-ink);
   transition:
     background-color var(--lume-dur-fuoco) var(--lume-ease),
@@ -97,8 +97,8 @@
 }
 
 .entry[data-active='true'] {
-  background: var(--lume-surface-focal);
-  box-shadow: var(--lume-shadow-focal);
+  background: color-mix(in srgb, var(--lume-ink) 3%, transparent);
+  box-shadow: none;
 }
 
 .entry:focus-visible {
@@ -108,7 +108,7 @@
 .node {
   position: absolute;
   top: 18px;
-  left: -22px;
+  left: -22px; /* center matches .filo left: 17px */
   width: 10px;
   height: 10px;
   overflow: visible;
@@ -243,7 +243,7 @@
   }
 
   .timelineSection {
-    padding: 13px 10px;
+    padding: 0;
   }
 
   .sectionHeader {

@@ -108,13 +108,13 @@ export function PatientSynopticSheet({
       <section id="quadro" aria-label="Riepilogo clinico" className={reading.sheet} data-layout={composition}>
         <div className={reading.main}>
           <div className={reading.problem}>
-            <div className={reading.sectionHead}><h2>Quadro clinico</h2><a href="#identita">Anagrafica e diagnosi</a></div>
+            <div className={reading.sectionHead}><h2>Quadro clinico</h2><a href="#identita">Diagnosi e dati paziente</a></div>
             {leadDiagnosis ? <><p className={reading.diagnosis}>{leadDiagnosis.description || leadDiagnosis.code}</p><p className={reading.meta}>{[leadDiagnosis.code, leadDiagnosis.system, otherProblemsCount > 0 ? `altre ${otherProblemsCount} diagnosi` : null].filter(Boolean).join(' · ')}</p></>
               : <p className={reading.muted}>Diagnosi non registrata. <a href="#identita">Completa la scheda</a></p>}
             {notes?.trim() ? <div className={reading.notes}><h3>Note in cartella</h3><p>{notes.length > 320 ? `${notes.slice(0, 320).trimEnd()}…` : notes}</p>{notes.length > 320 ? <details><summary>Leggi la nota completa</summary><p>{notes}</p></details> : null}</div> : null}
           </div>
           {therapies === undefined || visibleTherapies.length > 0 ? <div className={reading.therapies}>
-            <div className={reading.sectionHead}><h2>Terapie attive <span>{therapiesTotal ?? ''}</span></h2><a href="#terapie">Gestisci</a></div>
+            <div className={reading.sectionHead}><h2>Terapie attive <span className={reading.count}>{therapiesTotal ?? ''}</span></h2><a href="#terapie">Gestisci</a></div>
             {therapies === undefined ? <SkeletonLines rows={2} /> : <ul>{visibleTherapies.map(therapy => <li key={therapy.id}><strong>{therapy.drugName}</strong><span>{therapy.dosage || 'Posologia non registrata'}</span></li>)}</ul>}
             {extraTherapies > 0 ? <a href="#terapie" className={reading.more}>Vedi tutte le {therapiesTotal} terapie</a> : null}
           </div> : null}
