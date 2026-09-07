@@ -23,21 +23,37 @@ export function useFunctionModelPicker(functionId: FunctionModelId, context: unk
 export function FunctionModelPicker({ picker }: { picker: ReturnType<typeof useFunctionModelPicker> }) {
     const { client, view, active, functionId } = picker;
     const f = view.dto?.functions.find(f => f.id === functionId);
+    const defaultModel = f?.options.find(o => o.modelOptionId === f.defaultModelOptionId);
     const selected = f?.options.find(o => o.modelOptionId === (view.choice?.modelOptionId ?? f.defaultModelOptionId));
+    const blockingStatus = !active ? 'Sblocca MediFlow per scegliere il modello.' : f && !f.enabled ? 'Esperienza spenta nelle impostazioni.'
+        : f?.options.length === 0 ? 'Nessun modello configurato.' : f && f.bindingState !== 'current' && !view.choice ? 'Predefinito non attuale: scegli un modello disponibile.'
+        : f && selected?.state !== 'available_unqualified' ? 'Modello locale non disponibile.' : null;
+    const confirmDefault = (view.blocked || view.consumed) && !!f?.enabled && f.bindingState === 'current' && defaultModel?.state === 'available_unqualified';
+    const needsRefresh = !!view.error || (active && !!blockingStatus) || (view.blocked && !confirmDefault);
     return <div className={styles.picker} data-testid={`model-picker-${functionId}`}>
-        {!f ? <button type="button" className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={!active || view.loading} onClick={() => void client.read()}>{view.loading ? 'Lettura modelli…' : 'Modello per questa proposta'}</button> : <>
-            <label>Modello per questa proposta
-                <select aria-label="Modello per questa proposta" value={view.choice?.modelOptionId ?? ''} disabled={!active || view.loading || !f.enabled} onChange={e => client.choose(e.target.value)}>
-                    <option value="">Default impostazioni{f.options.find(o => o.modelOptionId === f.defaultModelOptionId) ? ` · ${f.options.find(o => o.modelOptionId === f.defaultModelOptionId)!.label}` : ' · non disponibile'}</option>
-                    {f.options.map(o => <option key={o.modelOptionId} value={o.modelOptionId} disabled={o.state !== 'available_unqualified'}>{o.label} · {providerName(o.provider)}{o.state === 'unavailable' ? ' · non disponibile' : ''}</option>)}
-                </select>
-            </label>
-            <p>{view.choice ? 'Solo questa proposta · non salvato' : 'Default delle impostazioni'}{selected ? ` · ${selected.label} · ${providerName(selected.provider)}` : ''}</p>
-            <p className={styles.hint}>{!f.enabled ? 'Esperienza spenta nelle impostazioni.' : f.options.length === 0 ? 'Nessun modello configurato.' : f.bindingState !== 'current' && !view.choice ? 'Default non attuale. Scegli un modello disponibile o aggiorna le impostazioni.' : selected?.state !== 'available_unqualified' ? 'Modello locale non disponibile.' : 'Configurazione locale; esecuzione da verificare.'}</p>
-            <div className={styles.actions}><button type="button" className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={view.loading || !active} onClick={() => void client.read()}>Rileggi modelli</button>
-                {(view.blocked || view.consumed) && <button type="button" className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={!active || view.loading || !f.enabled || f.bindingState !== 'current' || f.options.find(o => o.modelOptionId === f.defaultModelOptionId)?.state !== 'available_unqualified'} onClick={() => client.choose('')}>Conferma il default attuale</button>}</div>
-        </>}
-        {view.consumed && <p>Scelta usata per questa proposta. Scegli di nuovo o conferma il default prima di ripetere.</p>}
+        <div className={styles.pickerRow}>
+            <select title={selected?.label} aria-label="Modello per questa proposta" value={view.choice?.modelOptionId ?? ''}
+                disabled={!active || view.loading || (!!f && !f.enabled)}
+                onFocus={() => { if (!f && !view.loading && !view.error) void client.read(); }}
+                onChange={e => client.choose(e.target.value)}>
+                <option value="">{view.loading ? 'Lettura modelli…' : defaultModel ? `Predefinito · ${defaultModel.label}` : f ? 'Predefinito non disponibile' : 'Modello predefinito · scegli'}</option>
+                {f?.options.map(o => <option key={o.modelOptionId} value={o.modelOptionId} disabled={o.state !== 'available_unqualified'}>{o.label}{o.modelOptionId !== view.choice?.modelOptionId ? ` · ${providerName(o.provider)}` : ''}{o.state === 'unavailable' ? ' · non disponibile' : ''}</option>)}
+            </select>
+            {selected && <span className={styles.pickerProvider}>{providerName(selected.provider)}<small>{view.choice ? 'Solo questa proposta' : 'Predefinito'}</small></span>}
+            {needsRefresh && <button type="button" className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={!active || view.loading} onClick={() => void client.read()}>Rileggi modelli</button>}
+            {confirmDefault && <button type="button" className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={!active || view.loading} onClick={() => client.choose('')}>Riusa predefinito</button>}
+            <details className={styles.pickerDetails}>
+            <summary aria-label="Dettagli modello">Dettagli</summary>
+            <div className={styles.pickerDetailBody}>
+                <p>{selected ? `${selected.label} · ${providerName(selected.provider)}` : 'Il modello viene risolto dalle impostazioni correnti.'}</p>
+                <p>{view.choice ? 'Scelta per una sola proposta; non salvata.' : 'Usa il modello predefinito delle impostazioni.'} {view.consumed ? 'Per ripetere, scegli nuovamente o riusa il predefinito.' : ''}</p>
+                <p>La configurazione non prova la disponibilità del modello: viene verificata alla richiesta.</p>
+                {!needsRefresh && <button type="button" className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={!active || view.loading} onClick={() => void client.read()}>Rileggi modelli</button>}
+            </div>
+            </details>
+        </div>
+        {blockingStatus && <p role="status" className={styles.hint}>{blockingStatus}</p>}
         {view.error && <p role="alert" className={styles.error}>{view.error}</p>}
+
     </div>;
 }
