@@ -268,7 +268,7 @@ export default function SettingsRepertoriPage() {
                                 </p>
                                 <p className="mt-1 break-all">Fonte: {drugCatalog.manifest.sourceUrl} · importato il {drugCatalog.manifest.importedAt}</p>
                                 <details className="mt-2">
-                                    <summary className="cursor-pointer font-semibold">Dettagli provenienza</summary>
+                                    <summary className="min-h-11 cursor-pointer content-center text-sm font-semibold">Dettagli provenienza</summary>
                                     <p className="mt-1 break-words">{drugCatalog.manifest.version}</p>
                                     <p className="mt-1 break-all">SHA-256 {drugCatalog.manifest.sha256}</p>
                                     <p className="mt-1">Il manifest identifica il file importato; non certifica autenticità o licenza dello specifico dataset.</p>
