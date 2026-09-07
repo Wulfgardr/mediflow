@@ -37,6 +37,14 @@ export const SETTINGS_NAV_GROUPS: SettingsNavGroup[] = [
         id: 'generale',
         label: 'Generale',
         items: [
+            /* @Codex */
+            {
+                id: 'panoramica',
+                href: '/settings',
+                label: 'Panoramica',
+                description: 'Stato della postazione e accessi rapidi',
+                keywords: ['panoramica', 'postazione', 'stato locale', 'home-base'],
+            },
             {
                 id: 'profilo',
                 href: '/settings/profilo',
@@ -255,4 +263,9 @@ export function searchSettingsNav(query: string, limit = 8): SettingsSearchMatch
         matches.sort((a, b) => b.score - a.score || a.item.label.localeCompare(b.item.label));
     }
     return matches.slice(0, limit);
+}
+
+/* @Codex: aria-current identifies the exact page, including the overview. */
+export function isSettingsItemActive(item: SettingsNavItem, pathname: string): boolean {
+    return pathname === item.href;
 }

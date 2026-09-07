@@ -6,7 +6,7 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 
-import { SETTINGS_NAV_GROUPS, searchSettingsNav } from './settings-navigation';
+import { SETTINGS_NAV_GROUPS, searchSettingsNav, isSettingsItemActive } from './settings-navigation';
 
 test('every nav item lives under /settings and has searchable metadata', () => {
     const ids = new Set<string>();
@@ -82,4 +82,21 @@ test('empty query lists sections up to the limit, nonsense yields nothing', () =
     assert.equal(searchSettingsNav('').length, 8);
     assert.equal(searchSettingsNav('', 12).length, 12);
     assert.equal(searchSettingsNav('zzzqqqxxx').length, 0);
+});
+
+/* @Codex */
+test('overview is searchable and only the exact settings page is current', () => {
+    const items = SETTINGS_NAV_GROUPS.flatMap((group) => group.items);
+    assert.equal(searchSettingsNav('panoramica')[0].item.href, '/settings');
+    assert.equal(items[0].id, 'panoramica');
+    for (const target of items) {
+        assert.deepEqual(
+            items.filter((item) => isSettingsItemActive(item, target.href)).map((item) => item.id),
+            [target.id],
+            `only ${target.href} is current`,
+        );
+    }
+    for (const pathname of ['/settings/unknown', '/settings/backup/details', '/settings-other']) {
+        assert.equal(items.filter((item) => isSettingsItemActive(item, pathname)).length, 0);
+    }
 });
