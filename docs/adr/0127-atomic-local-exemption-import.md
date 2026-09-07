@@ -102,6 +102,30 @@ temporaneo; intercetta il trasporto senza aprire listener. Non verifica layout
 Next/Tailwind, autenticazione interattiva o pacchetto distribuito. `esbuild` è
 risolto dalle dipendenze di sviluppo già fissate dal lockfile.
 La UI non propone più lo svuotamento del repertorio come parte dell'import.
-Le ricevute sono persistite nel database locale; l'esportazione JSON di backup
-esistente non include la nuova tabella. L'estensione del backup e una prova di
-ripristino delle ricevute sono un follow-up esplicito, non attestato qui.
+Le ricevute sono persistite nel database locale e nel backup JSON secondo il
+raccordo descritto sotto.
+
+## Backup JSON e completamenti tardivi
+
+La collezione additiva `exemptionImportReceipts` entra nel backup JSON v1:
+righe `{id, operationKey, receiptJson}`, schema ricevuta identificato da
+`manifest.schemaVersion = 1`, parser/policy esatti e contatori coerenti. Export
+web e schedulato applicano la stessa validazione. Restore conserva id, chiave e
+JSON originali nella transazione del catalogo; i backup storici senza la
+collezione sono validati col checksum originale e normalizzati a lista vuota,
+svuotando eventuali ricevute del catalogo precedente. La ricevuta resta prova
+tecnica dell'import, non validazione normativa né nuova autorità di sessione.
+
+L'upload usa `readBoundedJsonBody` canonico in modalità strict, con massimo byte,
+deadline di 30 secondi e cancellazione su abort richiesta o ritiro della sessione.
+Un resource port dell'owner web verifica l'autorità dopo l'await del body, prima
+del commit sincrono, dentro la transazione prima di scrivere e prima di pubblicare l'anteprima; lock/logout revocano la
+risorsa e cancellano la lettura. Nessun completamento tardivo produce proof,
+ricevute o scritture. Il proof resta un vincolo sulla fonte; non sostituisce
+l'autorità attiva della richiesta corrente.
+
+Verifica callsite: i client Swift cercano il repertorio tramite GET; non è
+presente un import bulk nativo. Il seed first-party del test cataloghi paired
+inviava un array di un record: viene migrato al POST manuale singolo. L'import
+web usa già preview/commit; nessun caller runtime di `exemptions.bulkPut` o del
+vecchio `importExemptionFiles` rimane nel tree ispezionato.

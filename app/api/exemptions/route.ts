@@ -137,7 +137,7 @@ export async function POST(request: Request) {
         if (Array.isArray(body)) {
             return NextResponse.json({ error: 'EXEMPTION_IMPORT_PREVIEW_REQUIRED', message: 'Usa l’anteprima import in Repertori esenzioni.' }, { status: 400 });
         }
-        const items = Array.isArray(body) ? body : [body];
+        const items = [body];
 
         let imported = 0;
         for (const rawItem of items as ExemptionPayload[]) {

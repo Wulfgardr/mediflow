@@ -69,6 +69,7 @@ export function commitExemptionImport(
     connection: Database.Database,
     input: { bytes: Uint8Array; sourceName: string; proof: string; acceptSubset: boolean },
     actor: string,
+    assertCurrent?: () => void,
 ): { receipt: ExemptionImportReceipt; replayed: boolean } {
     if (input.acceptSubset !== true) throw new ExemptionImportError('SUBSET_CONFIRMATION_REQUIRED', 'Conferma il subset e le colonne escluse.');
     const parsed = parseExemptionImport(input.bytes, input.sourceName);
@@ -76,6 +77,7 @@ export function commitExemptionImport(
     const proof = verifyProof(input.proof, parsed.manifest, actor);
     const operationKey = hash({ manifest: parsed.manifest, previousRevision: proof.revision });
     return connection.transaction(() => {
+        assertCurrent?.();
         const previous = connection.prepare('SELECT receipt_json FROM exemption_import_receipts WHERE operation_key = ?').get(operationKey) as { receipt_json: string } | undefined;
         if (previous) return { receipt: JSON.parse(previous.receipt_json) as ExemptionImportReceipt, replayed: true };
         if (revision(connection) !== proof.revision) {
@@ -105,6 +107,7 @@ export function commitExemptionImport(
             revision: revision(connection, operationKey), applied: parsed.rows.length,
             inserted, updated: parsed.rows.length - inserted, committedAt,
         };
+        assertCurrent?.();
         connection.prepare('INSERT INTO exemption_import_receipts (operation_key, receipt_json) VALUES (?, ?)').run(operationKey, JSON.stringify(receipt));
         return { receipt, replayed: false };
     }).immediate();

@@ -190,17 +190,16 @@ async function seedCatalogs() {
 
     const exemptions = await request('POST', '/api/v1/exemptions', {
         headers: localApiHeaders(),
-        body: [
-            {
-                code: 'E01',
-                description: 'Esenzione catalog smoke',
-                type: 'chronic',
-                source: 'network-home-base-catalog-read-smoke',
-                isPharma: true,
-                isSpecialist: true,
-                isNational: true,
-            },
-        ],
+        // @Codex: single manual fixture; full imports require preview/commit.
+        body: {
+            code: 'E01',
+            description: 'Esenzione catalog smoke',
+            type: 'chronic',
+            source: 'network-home-base-catalog-read-smoke',
+            isPharma: true,
+            isSpecialist: true,
+            isNational: true,
+        },
     });
     assert.equal(exemptions.response.status, 200);
     assert.equal(exemptions.json?.success, true);

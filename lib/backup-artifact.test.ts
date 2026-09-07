@@ -72,6 +72,7 @@ const basePayload = {
         },
     ],
     exemptions: [],
+    exemptionImportReceipts: [],
     messages: [
         {
             id: 'msg-1',

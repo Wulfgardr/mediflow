@@ -1,5 +1,7 @@
 /* @Codex */
 import { eq } from 'drizzle-orm';
+/* @Codex */
+import { assertExemptionImportReceiptRows } from './exemption-import-receipt';
 import { dbServer, runDbServerImmediateTransaction } from './db-server';
 import {
     ambulatories,
@@ -16,6 +18,7 @@ import {
     drugs,
     entries,
     exemptions,
+    exemptionImportReceipts,
     headlessSoapActiveRoleAttestations,
     headlessSoapEntryCommits,
     messages,
@@ -59,6 +62,7 @@ const CLEAR_ORDER: BackupCollectionName[] = [
     'conversations',
     'drugs',
     'exemptions',
+    'exemptionImportReceipts',
     'ambulatories',
 ];
 
@@ -66,6 +70,7 @@ const INSERT_ORDER: BackupCollectionName[] = [
     'ambulatories',
     'drugs',
     'exemptions',
+    'exemptionImportReceipts',
     'conversations',
     'patients',
     'physicianReviewAttestations',
@@ -104,6 +109,7 @@ const TABLE_LOOKUP = {
     drugs,
     entries,
     exemptions,
+    exemptionImportReceipts,
     messages,
     observations,
     patients,
@@ -306,6 +312,7 @@ export function restoreBackupArtifact(
     artifact: BackupArtifact,
     beforeMutation: BackupRestoreMutationFence,
 ): void {
+    assertExemptionImportReceiptRows(artifact.payload.exemptionImportReceipts ?? []);
     revokeAttachmentExtractionLocatorGeneration();
     runDbServerImmediateTransaction(() => {
         assertCommandRecoveryIsRepresentable();

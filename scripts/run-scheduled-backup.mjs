@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+/* @Codex */
+import { assertExemptionImportReceiptRows } from '../lib/exemption-import-receipt.ts';
 
 import fs from 'fs';
 import os from 'os';
@@ -35,6 +37,7 @@ const BACKUP_TABLES = {
   drugs: 'drugs',
   entries: 'entries',
   exemptions: 'exemptions',
+  exemptionImportReceipts: 'exemption_import_receipts',
   messages: 'messages',
   observations: 'observations',
   patients: 'patients',
@@ -142,7 +145,12 @@ export function canonicalizeHeadlessSoapActiveRoleAttestations(payload) {
 }
 
 export async function serializeBackupArtifact(payload, createdAt = new Date()) {
-  const canonicalPayload = canonicalizeHeadlessSoapActiveRoleAttestations(payload);
+  /* @Codex Same receipt validation and ordering as the web export. */
+  assertExemptionImportReceiptRows(payload.exemptionImportReceipts ?? []);
+  const canonicalPayload = {
+    ...canonicalizeHeadlessSoapActiveRoleAttestations(payload),
+    exemptionImportReceipts: [...(payload.exemptionImportReceipts ?? [])].sort((a, b) => a.id - b.id),
+  };
   const payloadSnapshot = normalizeJson(canonicalPayload);
   const checksum = await sha256Hex(stableStringify(payloadSnapshot));
   const recordCounts = Object.fromEntries(
