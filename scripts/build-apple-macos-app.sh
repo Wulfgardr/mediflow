@@ -23,7 +23,8 @@ CONFIG="${MEDIFLOW_MAC_CONFIG:-Debug}"
 DERIVED="${MEDIFLOW_MAC_DERIVED_DATA:-$ROOT_DIR/tmp-mac-derived-data}"
 
 # xcodebuild needs a full Xcode (the Liquid Glass code needs the 26 SDK).
-if [[ "$(xcode-select -p 2>/dev/null)" == *CommandLineTools* ]] || ! command -v xcodebuild >/dev/null 2>&1; then
+# @Codex: an explicit per-command toolchain must win over global selection.
+if [[ -z "${DEVELOPER_DIR:-}" ]] && { [[ "$(xcode-select -p 2>/dev/null)" == *CommandLineTools* ]] || ! command -v xcodebuild >/dev/null 2>&1; }; then
   for dev in /Applications/Xcode.app/Contents/Developer /Applications/Xcode-beta.app/Contents/Developer; do
     [[ -d "$dev" ]] && export DEVELOPER_DIR="$dev" && break
   done
@@ -55,7 +56,8 @@ esac
 echo "Building $SCHEME ($CONFIG)..."
 xcodebuild -project "$PROJECT" -scheme "$SCHEME" -configuration "$CONFIG" \
   -derivedDataPath "$DERIVED" -destination "platform=macOS,arch=$XCODE_ARCH" \
-  build CODE_SIGNING_ALLOWED=NO ARCHS="$XCODE_ARCH" ONLY_ACTIVE_ARCH=YES
+  -jobs 2 build CODE_SIGNING_ALLOWED=NO ARCHS="$XCODE_ARCH" ONLY_ACTIVE_ARCH=YES \
+  'OTHER_SWIFT_FLAGS=$(inherited) -j2'
 
 APP="$DERIVED/Build/Products/$CONFIG/MediFlow.app"
 [[ -d "$APP" ]] || { echo "Build failed: $APP not found" >&2; exit 1; }
