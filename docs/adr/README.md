@@ -6,6 +6,8 @@ Questa cartella contiene le decisioni di MediFlow (web + native).
 
 ## ADR piu recente
 
+- [0125-explicit-aifa-catalog-download.md](./0125-explicit-aifa-catalog-download.md): proposta di aggiornamento AIFA esplicito dalla fonte ufficiale.
+
 - [0123-official-web-ui-navigation-compositions.md](./0123-official-web-ui-navigation-compositions.md): promozione della UI web con B predefinita, A selezionabile e confronto sintetico separato.
 
 - [0122-local-provider-host-setup.md](./0122-local-provider-host-setup.md): comando host esplicito per ammissione, recupero e revoca di Ollama, separato dai consumer.
