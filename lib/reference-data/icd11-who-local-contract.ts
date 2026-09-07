@@ -28,9 +28,36 @@ export function isWhoArtifactDigest(value: unknown): value is string {
     return typeof value === 'string' && /^sha256:[a-f0-9]{64}$/u.test(value);
 }
 
-export function isWhoCanonicalMmsUri(value: unknown): value is string {
+function isWhoEntityUri(value: unknown): value is string {
     return typeof value === 'string'
         && /^http:\/\/id\.who\.int\/icd\/release\/11\/2026-01\/mms\/[1-9][0-9]{0,19}(?:\/(?:other|unspecified))?$/u.test(value);
+}
+
+/* @Codex: WHO identifies a code combination through its official CodeInfo resource. */
+const CODEINFO_PREFIX = 'http:' + '//id.who.int/icd/release/11/2026-01/mms/codeinfo/';
+const isCombinationCode = (code: string) => code.length <= 32
+    && /^[A-Z0-9][A-Z0-9.-]*(?:[&/][A-Z0-9][A-Z0-9.-]*)+$/u.test(code) && code !== 'N/A';
+
+export function isWhoCanonicalMmsUri(value: unknown, code?: string): value is string {
+    if (isWhoEntityUri(value)) return code === undefined || !/[&/]/u.test(code);
+    if (typeof value !== 'string' || !value.startsWith(CODEINFO_PREFIX)) return false;
+    try {
+        const decoded = decodeURIComponent(value.slice(CODEINFO_PREFIX.length));
+        return isCombinationCode(decoded) && (code === undefined || decoded === code)
+            && value === CODEINFO_PREFIX + encodeURIComponent(decoded);
+    } catch { return false; }
+}
+
+export function resolveWhoSearchReference(value: unknown, code: string): string | null {
+    if (isWhoEntityUri(value)) return /[&/]/u.test(code) ? null : value;
+    if (typeof value !== 'string' || value.length > 4096 || !isCombinationCode(code)) return null;
+    const references = value.split(/ ([&/]) /u);
+    const codes = code.split(/([&/])/u);
+    if (references.length !== codes.length || references.length < 3) return null;
+    for (let index = 0; index < references.length; index += 1) {
+        if (index % 2 === 0 ? !isWhoEntityUri(references[index]) : references[index] !== codes[index]) return null;
+    }
+    return CODEINFO_PREFIX + encodeURIComponent(code);
 }
 
 export function whoExactRecord(value: unknown, keys: readonly string[]): Record<string, unknown> | null {
@@ -92,7 +119,7 @@ export function parseWhoLocalSearchResponse(value: unknown): WhoLocalSearchResul
             || typeof e.description !== 'string' || !e.description || e.description.length > 4096
             || e.description !== e.description.trim().replace(/\s+/gu, ' ')
             || /[\u0000-\u001f\u007f<>\u061c\u200e\u200f\ud800-\udfff\u202a-\u202e\u2066-\u2069]/u.test(e.description)
-            || !isWhoCanonicalMmsUri(e.canonicalUri)) return null;
+            || !isWhoCanonicalMmsUri(e.canonicalUri, e.code)) return null;
         seen.add(e.code); entries.push(Object.freeze(e) as WhoLocalEntry);
     }
     const receipt = parseWhoLocalReceipt(root.receipt, entries.length);

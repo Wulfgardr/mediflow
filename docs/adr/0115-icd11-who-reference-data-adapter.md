@@ -75,6 +75,31 @@ Il vecchio container MediFlow, la porta 8888 e i suoi launcher restano ritirati.
   Export e migrazione dei record storici restano un gate separato: il candidato
   non attesta conformita dell'intero ciclo di utilizzo ICD.
 
+### Compatibilita Search osservata il 7 settembre 2026 — WUL-673
+
+La prima prova locale reale della release WHO 2026-01 restituisce anche
+combinazioni di codici: `theCode` contiene i separatori ICD `&` o `/`, mentre
+`id` contiene i rispettivi URI MMS separati dallo stesso operatore. Non e un
+singolo URI. Rifiutare l'intera risposta per questo formato rende inutilizzabile
+anche una ricerca ordinaria come `cholera`.
+
+Per queste voci il lettore verifica ogni URI componente nel namespace fissato,
+numero e ordine dei separatori rispetto al codice ricevuto. Conserva codice e
+titolo WHO e usa come `canonicalUri` l'endpoint ufficiale
+`http://id.who.int/icd/release/11/2026-01/mms/codeinfo/<codice percent-encoded>`.
+E un riferimento formato secondo il contratto WHO, non l'URI di un solo
+componente: una chiamata locale di verifica ha confermato lo stesso `@id` per
+`1A00&XN8P1`. Non viene introdotta una chiamata CodeInfo per ogni risultato,
+ne dereferenziazione automatica, interpretazione o validazione clinica della
+combinazione. I riferimenti a entita singole e i record storici restano invariati.
+Il client verifica anche la corrispondenza tra codice e URI CodeInfo; la
+serializzazione percent-encoded deve essere canonica. Formati non riconosciuti
+continuano a negare l'intera risposta, senza scartare silenziosamente voci.
+
+Fonte: [WHO API v2, CodeInfo e combinazioni](https://icd.who.int/docs/icd-api/WhatsNewAPIVersion2/).
+Questa estensione del riferimento non abilita cross-check, autocode o export
+FHIR e non qualifica l'uso clinico della classificazione.
+
 ### Attivazione, stato e cache
 
 - `MEDIFLOW_ICD_WHO_ENABLED=1` e opt-in server esplicito; senza di esso zero

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createIcd11WhoLocalRuntime } from './icd11-who-local-runtime.ts';
 import { Icd11WhoServiceError } from './icd11-who-service.ts';
+import { parseWhoLocalSearchResponse } from './icd11-who-local-contract.ts';
 
 // Synthetic lock identifiers and terminology; never provisioning artifacts.
 const IMAGE = `sha256:${'a'.repeat(64)}`;
@@ -35,6 +36,33 @@ function fixture(options: { enabled?: boolean; transport?: (query: string, signa
 }
 
 const rejectsWith = (code: string) => (error: unknown) => error instanceof Icd11WhoServiceError && error.code === code;
+
+test('WHO code combinations preserve full code and an exact official CodeInfo reference', async () => {
+    for (const operator of ['&', '/']) {
+        const code = `AA00${operator}XA001`;
+        const combined = `${URI} ${operator} ${URI.slice(0, -1)}2`;
+        const f = fixture({ transport: async () => ({ status: 200, body: body({
+            destinationEntities: [{ theCode: code, title: 'Synthetic combination', id: combined }],
+        }) }) });
+        const result = await f.runtime.search('synthetic combination');
+        assert.equal(result.entries[0].code, code);
+        assert.equal(result.entries[0].canonicalUri, `${URI.slice(0, URI.lastIndexOf('/') + 1)}codeinfo/${encodeURIComponent(code)}`);
+        const envelope = { schemaVersion: 'mediflow.reference-data.icd11-search-response.v2', ...result };
+        assert.deepEqual(parseWhoLocalSearchResponse(envelope), result);
+        assert.equal(parseWhoLocalSearchResponse({ ...envelope, entries: [{ ...result.entries[0], code: 'AA01&XA001' }] }), null);
+        f.runtime.dispose();
+    }
+});
+
+test('WHO combination references reject inconsistent separators or component release', async () => {
+    for (const id of [`${URI} / ${URI.slice(0, -1)}2`, `${URI} & ${URI.replace('2026-01', '2025-01')}`, URI]) {
+        const f = fixture({ transport: async () => ({ status: 200, body: body({
+            destinationEntities: [{ theCode: 'AA00&XA001', title: 'Synthetic combination', id }],
+        }) }) });
+        await assert.rejects(f.runtime.search('synthetic combination'), rejectsWith('response_invalid'));
+        f.runtime.dispose();
+    }
+});
 
 test('default OFF: passive readiness and searches never read OAuth or contact a transport', async () => {
     const f = fixture({ enabled: false });
