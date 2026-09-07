@@ -69,6 +69,9 @@ const nextConfig: NextConfig = {
       "./package.json",
       "./scripts/anydoc-local-extraction-worker.mjs",
       "./scripts/anydoc-pdf-page-worker.mjs",
+      "./scripts/anydoc-tesseract-artifacts.json", // @Codex
+      "./scripts/anydoc-pdf-renderer-profiles.json", // @Codex
+      "./node_modules/mediflow-ocr-tesseract/**/*", // @Codex: optional offline artifacts
       "./scripts/apple-vision-ocr.swift",
       "./node_modules/pdf-lib/**/*",
       "./node_modules/@pdf-lib/**/*",

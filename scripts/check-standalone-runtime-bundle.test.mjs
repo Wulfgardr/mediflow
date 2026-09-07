@@ -92,6 +92,8 @@ test('digest-pinned text workers retain exact LF bytes on every checkout', () =>
   for (const worker of [
     'scripts/anydoc-local-extraction-worker.mjs',
     'scripts/anydoc-pdf-page-worker.mjs',
+    'scripts/anydoc-tesseract-artifacts.json', // @Codex
+    'scripts/anydoc-pdf-renderer-profiles.json', // @Codex
     'scripts/apple-vision-ocr.swift',
   ]) {
     assert.ok(
@@ -144,6 +146,8 @@ test('standalone config traces the isolated PDF worker dependency closure', () =
   assert.ok(externals, 'missing serverExternalPackages roster');
   for (const pattern of [
     anyDocPdfWorkerTracePattern,
+    "./scripts/anydoc-tesseract-artifacts.json", // @Codex
+    "./scripts/anydoc-pdf-renderer-profiles.json", // @Codex
     pdfLibTracePattern,
     pdfLibScopeTracePattern,
     pdfJsManifestTracePattern,

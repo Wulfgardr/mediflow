@@ -1,0 +1,35 @@
+{
+  "schemaVersion": "mediflow.tesseract_artifacts.v1",
+  "engine": "tesseract_wasm",
+  "coreVersion": "6.0.0",
+  "language": "ita",
+  "tessdataCommit": "87416418657359cb625c412a48b6e1d6d41c29bd",
+  "directory": "node_modules/mediflow-ocr-tesseract",
+  "files": [
+    {
+      "name": "tesseract-core-lstm.js",
+      "byteLength": 124747,
+      "sha256": "48a3ee8e00924cb8c7f0cc0d099b1318fea120af56b3ee8fb3a70dd2311806c2"
+    },
+    {
+      "name": "tesseract-core-lstm.wasm",
+      "byteLength": 2871085,
+      "sha256": "220e2e87551edccb85519796a170469f8ab2a8055216789e3b8b1ada18b7bc2b"
+    },
+    {
+      "name": "ita.traineddata",
+      "byteLength": 2701314,
+      "sha256": "b8f89e1e785118dac4d51ae042c029a64edb5c3ee42ef73027a6d412748d8827"
+    },
+    {
+      "name": "LICENSE",
+      "byteLength": 11358,
+      "sha256": "c6596eb7be8581c18be736c846fb9173b69eccf6ef94c5135893ec56bd92ba08"
+    },
+    {
+      "name": "tessdata-LICENSE",
+      "byteLength": 11358,
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    }
+  ]
+}

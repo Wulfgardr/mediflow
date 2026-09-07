@@ -10,7 +10,7 @@ import { assertNodeRuntime, readNodeContract, standaloneDirectory } from './node
 const ANYDOC_WORKER_FILE = 'anydoc-local-extraction-worker.mjs';
 const ANYDOC_WORKER_SHA256 = '5d6e2e60f1d71f3fd45065961258a7debe8a96e017abdcee92823986c8f08c67';
 const ANYDOC_PDF_PAGE_WORKER_FILE = 'anydoc-pdf-page-worker.mjs';
-const ANYDOC_PDF_PAGE_WORKER_SHA256 = 'b33e5363e25cfdb20a7cc6e852e38e2c331bdd54d86eed989a1d300fa92fc821';
+const ANYDOC_PDF_PAGE_WORKER_SHA256 = '31fce8c00c25edd20f7f4442edc9fe00d659599e436cc5166b4be4950f7f3a67';
 const ANYDOC_PDF_CHILD_SCHEMA_VERSION = 'mediflow.anydoc_pdf_child_protocol.v1';
 const ANYDOC_PDF_CHILD_MAX_OLD_SPACE_MB = 256;
 const ANYDOC_LOCAL_EXTRACTION_ROUTE_DIRECTORY = path.join(
@@ -137,6 +137,15 @@ function bundledPdfPageWorkerFailure(standaloneDir) {
     if (createHash('sha256').update(fs.readFileSync(worker)).digest('hex') !== ANYDOC_PDF_PAGE_WORKER_SHA256) {
       return 'Standalone PDF page worker digest does not match the pinned child.';
     }
+    const profileManifestPath = path.join(root, 'scripts', 'anydoc-pdf-renderer-profiles.json');
+    if (!fs.lstatSync(profileManifestPath).isFile()
+        || createHash('sha256').update(fs.readFileSync(profileManifestPath)).digest('hex')
+          !== '41355c1e4360acdc293aa383a07ba2c8216a8a018b0a38ac2a9ec5cc0fe37e41') return 'Standalone renderer manifest digest does not match the pinned child.';
+    // @Codex: required even when the optional OCR model is not provisioned.
+    const manifestPath = path.join(root, 'scripts', 'anydoc-tesseract-artifacts.json');
+    if (!fs.lstatSync(manifestPath).isFile()
+        || createHash('sha256').update(fs.readFileSync(manifestPath)).digest('hex')
+          !== '0fb4ed952127bafe84e97f3f3cb43f6f53d5d60984117eed6a550d73508c6978') return 'Standalone OCR artifact manifest digest does not match the pinned child.';
   } catch {
     return 'Standalone runtime does not contain the PDF page worker.';
   }
@@ -721,10 +730,20 @@ function runPdfPageWorkerSelfTest() {
     fs.mkdirSync(routeDirectory, { recursive: true });
     fs.writeFileSync(routePath, "'use strict';\n");
     fs.copyFileSync(sourceWorker, workerPath);
+    // @Codex
+    fs.copyFileSync(path.join(process.cwd(), 'scripts', 'anydoc-pdf-renderer-profiles.json'), path.join(scriptsDir, 'anydoc-pdf-renderer-profiles.json'));
+    const artifactManifestPath = path.join(scriptsDir, 'anydoc-tesseract-artifacts.json');
+    fs.copyFileSync(path.join(process.cwd(), 'scripts', 'anydoc-tesseract-artifacts.json'), artifactManifestPath);
     writeValidTrace();
     if (bundledPdfPageWorkerFailure(standaloneDir) !== null) {
       throw new Error('expected the pinned PDF page worker to pass');
     }
+    // @Codex
+    const artifactManifestBytes = fs.readFileSync(artifactManifestPath);
+    fs.appendFileSync(artifactManifestPath, ' ');
+    if (!bundledPdfPageWorkerFailure(standaloneDir)?.includes('manifest digest'))
+      throw new Error('tampered OCR artifact manifest passed');
+    fs.writeFileSync(artifactManifestPath, artifactManifestBytes);
     if (bundledPdfPageWorkerTraceFailure(standaloneDir) !== null) {
       throw new Error('expected the AnyDoc route trace to reference the PDF page worker');
     }

@@ -5,6 +5,10 @@ Status: Accepted
 Issue: [WUL-671](https://linear.app/wulfgardr/issue/WUL-671)
 Program line: candidato locale `0.8.6`
 
+Aggiornamento 7 settembre 2026: [ADR 0128](./0128-local-desktop-ocr.md)
+estende il candidato locale a Tesseract WASM e renderer Windows/Linux.
+Le prove qui descritte restano riferite al Mac e non attestano equivalenza.
+
 ## Problema e precedenza
 
 La composizione documentale già presente sulla base `b72ac713b` continua le

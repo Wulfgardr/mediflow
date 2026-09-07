@@ -212,6 +212,8 @@
     "e2e:fabric-settings": "E2E_SPECS='e2e/settings-fabric.spec.ts' E2E_BASE_URL='http://127.0.0.1:3189' bash scripts/e2e-smoke.sh",
     "e2e:smoke": "bash scripts/e2e-smoke.sh",
     "check:anydoc-local-only": "node scripts/check-anydoc-local-only.mjs",
+    "check:anydoc-desktop-ocr": "node scripts/run-strip-types.mjs scripts/check-anydoc-desktop-ocr.ts",
+    "test:anydoc-desktop-ocr": "node scripts/run-strip-types.mjs --test --test-concurrency=1 scripts/anydoc-desktop-ocr-real.test.ts",
     "test:anydoc-local-only": "node --test scripts/check-anydoc-local-only.test.mjs",
     "check:api-error-leak": "node scripts/check-api-error-leak.mjs",
     "test:api-error-leak": "node scripts/check-api-error-leak.mjs --self-test"

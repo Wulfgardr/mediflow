@@ -5,7 +5,7 @@ import { types } from 'node:util';
 import type { ServerSession } from '../../security/server-session';
 import { bindAttachmentExtractionSelection } from './attachment-extraction-selection-binding';
 import { createAttachmentExtractionSourceAuthority } from './attachment-extraction-source-authority';
-import { continueAnyDocImageOrScanWithAppleVision } from './anydoc-apple-vision-ocr-composition';
+import { continueAnyDocImageOrScanWithLocalOcr } from './anydoc-apple-vision-ocr-composition';
 import {
     buildAnyDocLocalExtraction,
     type LocalAttachmentByteSource,
@@ -115,7 +115,7 @@ async function extractSelectedSource(session: ServerSession, selector: unknown, 
         try {
             result = await extractAnyDocLocalBytes(id, begun.bytes);
             if (result.status === 'review_required' && result.detail === 'image_or_scan')
-                result = await continueAnyDocImageOrScanWithAppleVision(id, begun.bytes, result);
+                result = await continueAnyDocImageOrScanWithLocalOcr(id, begun.bytes, result);
         }
         catch { authority.abort(operation); operation = null; return denied(); }
         const final = authority.finalize(operation); operation = null;

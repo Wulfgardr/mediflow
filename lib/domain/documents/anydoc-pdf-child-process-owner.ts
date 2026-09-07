@@ -5,9 +5,11 @@ import { lstatSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { types } from 'node:util';
+import rendererProfiles from '../../../scripts/anydoc-pdf-renderer-profiles.json' with { type: 'json' };
+import tesseractArtifacts from '../../../scripts/anydoc-tesseract-artifacts.json' with { type: 'json' };
 
 export const ANYDOC_PDF_CHILD_PROTOCOL_SCHEMA_VERSION = 'mediflow.anydoc_pdf_child_protocol.v1' as const;
-export const ANYDOC_PDF_CHILD_WORKER_SHA256 = 'b33e5363e25cfdb20a7cc6e852e38e2c331bdd54d86eed989a1d300fa92fc821' as const;
+export const ANYDOC_PDF_CHILD_WORKER_SHA256 = '31fce8c00c25edd20f7f4442edc9fe00d659599e436cc5166b4be4950f7f3a67' as const;
 export const ANYDOC_PDF_CHILD_JOB_TIMEOUT_MS = 30_000;
 export const ANYDOC_PDF_CHILD_MAX_HEADER_BYTES = 64 * 1024;
 export const ANYDOC_PDF_CHILD_MAX_OLD_SPACE_MB = 256;
@@ -32,7 +34,7 @@ const MAX_ROOT_STEPS = 8;
 export type AnyDocPdfChildFailureReason =
     | 'busy' | 'timeout' | 'resource_limit' | 'worker_unavailable' | 'protocol_error'
     | 'invalid_request' | 'malformed_or_encrypted_pdf' | 'page_count_mismatch'
-    | 'engine_unavailable' | 'render_failed';
+    | 'engine_unavailable' | 'render_failed' | 'recognition_failed' | 'empty_output';
 
 export type AnyDocPdfChildFailure = Readonly<{
     status: 'failed';
@@ -64,6 +66,7 @@ type RunOptions = Readonly<{
     timeoutMs: number;
     maxOutputBytes: number;
     allowAddons: boolean;
+    wasmMemoryPages?: number;
 }>;
 const failure = (reason: AnyDocPdfChildFailureReason,
     terminationSignal: 'SIGKILL' | null = null): AnyDocPdfChildFailure =>
@@ -117,6 +120,14 @@ function resolveOwnedWorker(): { path: string; directory: string; root: string }
                 const worker = realpathSync(candidate);
                 if (!inside(root, worker) || !statSync(worker).isFile()) return null;
                 const digest = createHash('sha256').update(readFileSync(worker)).digest('hex');
+                const profileManifest = path.join(root, 'scripts', 'anydoc-pdf-renderer-profiles.json');
+                if (!lstatSync(profileManifest).isFile() || !inside(root, realpathSync(profileManifest))
+                    || createHash('sha256').update(readFileSync(profileManifest)).digest('hex')
+                    !== '41355c1e4360acdc293aa383a07ba2c8216a8a018b0a38ac2a9ec5cc0fe37e41') return null;
+                const artifactManifest = path.join(root, 'scripts', 'anydoc-tesseract-artifacts.json');
+                if (!lstatSync(artifactManifest).isFile() || !inside(root, realpathSync(artifactManifest))
+                    || createHash('sha256').update(readFileSync(artifactManifest)).digest('hex')
+                    !== '0fb4ed952127bafe84e97f3f3cb43f6f53d5d60984117eed6a550d73508c6978') return null;
                 return digest === ANYDOC_PDF_CHILD_WORKER_SHA256
                     ? { path: worker, directory: path.dirname(worker), root }
                     : null;
@@ -162,6 +173,7 @@ async function runOwnedWorker(input: Buffer, options: RunOptions): Promise<RawRu
             try {
                 const runtimeArguments = [
                     `--max-old-space-size=${ANYDOC_PDF_CHILD_MAX_OLD_SPACE_MB}`,
+                    ...(options.wasmMemoryPages ? [`--wasm-max-mem-pages=${options.wasmMemoryPages}`] : []),
                     '--permission',
                     '--disable-warning=SecurityWarning',
                     `--allow-fs-read=${worker.root}`,
@@ -269,7 +281,7 @@ function parseWorkerFailure(frame: DecodedFrame): AnyDocPdfChildFailure | null {
     const header = exact(frame.header, ['schemaVersion', 'status', 'reason', 'bodyByteLength']);
     const reasons: readonly AnyDocPdfChildFailureReason[] = [
         'invalid_request', 'malformed_or_encrypted_pdf', 'page_count_mismatch',
-        'resource_limit', 'engine_unavailable', 'render_failed', 'timeout',
+        'resource_limit', 'engine_unavailable', 'render_failed', 'timeout', 'recognition_failed', 'empty_output',
     ];
     return header && header.schemaVersion === ANYDOC_PDF_CHILD_PROTOCOL_SCHEMA_VERSION && header.status === 'error'
         && typeof header.reason === 'string' && reasons.includes(header.reason as AnyDocPdfChildFailureReason)
@@ -410,3 +422,109 @@ export const ANYDOC_PDF_CHILD_PROCESS_INTERNAL_TEST_SEAM = Object.freeze({
         return dimensions?.width === width && dimensions.height === height;
     },
 });
+
+/* @Codex */
+export const ANYDOC_TESSERACT_ARTIFACT_SET_SHA256 = '0fb4ed952127bafe84e97f3f3cb43f6f53d5d60984117eed6a550d73508c6978';
+function inspectTesseractArtifacts() {
+    const base = { engine: 'tesseract_wasm' as const, qualification: 'pending_target_benchmark' as const,
+        artifactSetSha256: ANYDOC_TESSERACT_ARTIFACT_SET_SHA256,
+        guidance: 'Provisionare localmente i cinque file di scripts/anydoc-tesseract-artifacts.json in node_modules/mediflow-ocr-tesseract; verificare digest e rieseguire il controllo. Nessun download automatico.' };
+    if (process.versions.node.split('.')[0] !== '24')
+        return Object.freeze({ ...base, status: 'unavailable' as const, reason: 'node24_required', guidance: 'Usare Node 24 e ripetere il controllo locale.' });
+    if (!['darwin', 'linux', 'win32'].includes(process.platform))
+        return Object.freeze({ ...base, status: 'unavailable' as const, reason: 'unsupported_platform' });
+    const worker = resolveOwnedWorker();
+    if (!worker) return Object.freeze({ ...base, status: 'unavailable' as const, reason: 'worker_unavailable' });
+    try {
+        for (const artifact of tesseractArtifacts.files) {
+            const file = path.join(worker.root, tesseractArtifacts.directory, artifact.name);
+            if (!lstatSync(file).isFile() || !inside(worker.root, realpathSync(file)))
+                return Object.freeze({ ...base, status: 'unavailable' as const, reason: 'artifact_invalid' });
+            const stat = statSync(file);
+            if (stat.size !== artifact.byteLength || createHash('sha256').update(readFileSync(file)).digest('hex') !== artifact.sha256)
+                return Object.freeze({ ...base, status: 'unavailable' as const, reason: 'artifact_invalid' });
+        }
+    } catch { return Object.freeze({ ...base, status: 'unavailable' as const, reason: 'artifact_missing' }); }
+    return Object.freeze({ ...base, status: 'artifacts_verified' as const, reason: null });
+}
+
+/* @Codex: checks pinned OCR artifacts and renderer prerequisites without loading native code. */
+export function inspectAnyDocDesktopOcrCapability() {
+    const artifacts = inspectTesseractArtifacts();
+    if (artifacts.status !== 'artifacts_verified') return artifacts;
+    const profile = rendererProfiles.find((entry) => entry.platform === process.platform && entry.arch === process.arch);
+    const report = process.report?.getReport() as { header?: { glibcVersionRuntime?: string } } | undefined;
+    const glibc = String(report?.header?.glibcVersionRuntime).split('.').map(Number);
+    if (!profile || (profile.libc === 'glibc' && !(glibc[0] > 2 || (glibc[0] === 2 && glibc[1] >= 18))))
+        return Object.freeze({ ...artifacts, status: 'unavailable' as const, reason: 'renderer_profile_unsupported' });
+    const worker = resolveOwnedWorker();
+    try {
+        if (!worker) throw new Error();
+        for (const [dependency, version] of [['pdfjs-dist', '4.10.38'], ['@napi-rs/canvas', '0.1.100'], [profile.package, profile.version]]) {
+            const packagePath = path.join(worker.root, 'node_modules', dependency, 'package.json');
+            if (!inside(worker.root, realpathSync(packagePath))
+                || JSON.parse(readFileSync(packagePath, 'utf8')).version !== version) throw new Error();
+        }
+        const binaryPath = path.join(worker.root, 'node_modules', profile.package, profile.binary);
+        if (!lstatSync(binaryPath).isFile() || !inside(worker.root, realpathSync(binaryPath))
+            || statSync(binaryPath).size !== profile.binaryByteLength
+            || createHash('sha256').update(readFileSync(binaryPath)).digest('hex') !== profile.binarySha256) throw new Error();
+        return Object.freeze({ ...artifacts, rendererProfile: profile.package });
+    } catch {
+        return Object.freeze({ ...artifacts, status: 'unavailable' as const, reason: 'renderer_unavailable',
+            guidance: `Ripristinare il pacchetto ${profile.package}@${profile.version} fissato dal lock e rieseguire il controllo; nessun download automatico.` });
+    }
+}
+
+export type AnyDocTesseractDocumentResult = AnyDocPdfChildFailure | Readonly<{
+    status: 'recognized'; pages: readonly Readonly<{ text: string; receipt: Readonly<{
+        engine: 'tesseract_wasm'; scriptSha256: string; artifactSetSha256: string;
+        inputSha256: string; inputByteLength: number; outputSha256: string;
+        outputByteLength: number; averageConfidence: number;
+    }> }>[];
+}>;
+
+/** Internal raster boundary: routing and currentness remain in the composition owner. */
+export async function runAnyDocTesseractDocument(input: unknown): Promise<AnyDocTesseractDocumentResult> {
+    const values = arrayValues(input, MAX_RENDER_PAGES);
+    if (!values || values.length < 1) return failure('invalid_request');
+    const images: Buffer[] = [];
+    let total = 0;
+    for (const value of values) {
+        if (types.isProxy(value) || !(value instanceof Uint8Array) || value.byteLength > MAX_RASTER_BYTES)
+            return failure('invalid_request');
+        const bytes = Buffer.from(value);
+        if (!pngDimensions(bytes)) return failure('invalid_request');
+        total += bytes.byteLength;
+        if (total > MAX_BODY_BYTES) return failure('resource_limit');
+        images.push(bytes);
+    }
+    if (inspectTesseractArtifacts().status !== 'artifacts_verified') return failure('engine_unavailable');
+    const payload = encodeFrame({ schemaVersion: ANYDOC_PDF_CHILD_PROTOCOL_SCHEMA_VERSION,
+        operation: 'recognize_tesseract', pages: images.map((page) => ({ byteLength: page.byteLength })), bodyByteLength: total }, images);
+    const value = completedFrame(await runOwnedWorker(payload, { args: [],
+        timeoutMs: ANYDOC_PDF_CHILD_JOB_TIMEOUT_MS, maxOutputBytes: 20 * 1024 * 1024, allowAddons: false, wasmMemoryPages: 8192 }));
+    if ('reason' in value) return value;
+    const failed = parseWorkerFailure(value); if (failed) return failed;
+    const header = exact(value.header, ['schemaVersion', 'status', 'bodyByteLength']);
+    if (!header || header.schemaVersion !== ANYDOC_PDF_CHILD_PROTOCOL_SCHEMA_VERSION || header.status !== 'recognized'
+        || header.bodyByteLength !== value.body.byteLength) return failure('protocol_error');
+    let parsed: unknown; try { parsed = JSON.parse(value.body.toString('utf8')); } catch { return failure('protocol_error'); }
+    const pages = arrayValues(parsed, MAX_RENDER_PAGES);
+    if (!pages || pages.length !== images.length) return failure('protocol_error');
+    const recognized = [];
+    for (let index = 0; index < pages.length; index += 1) {
+        const page = exact(pages[index], ['text', 'confidence']);
+        if (!page || typeof page.text !== 'string' || !page.text.trim()
+            || Buffer.byteLength(page.text) > 1024 * 1024 || typeof page.confidence !== 'number'
+            || !Number.isFinite(page.confidence) || page.confidence < 0 || page.confidence > 1) return failure('protocol_error');
+        recognized.push(Object.freeze({ text: page.text, receipt: Object.freeze({
+            engine: 'tesseract_wasm' as const, scriptSha256: ANYDOC_PDF_CHILD_WORKER_SHA256,
+            artifactSetSha256: ANYDOC_TESSERACT_ARTIFACT_SET_SHA256,
+            inputSha256: createHash('sha256').update(images[index]).digest('hex'), inputByteLength: images[index].byteLength,
+            outputSha256: createHash('sha256').update(page.text).digest('hex'), outputByteLength: Buffer.byteLength(page.text),
+            averageConfidence: page.confidence,
+        }) }));
+    }
+    return Object.freeze({ status: 'recognized', pages: Object.freeze(recognized) });
+}

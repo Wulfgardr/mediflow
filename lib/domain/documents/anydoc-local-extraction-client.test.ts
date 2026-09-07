@@ -126,3 +126,13 @@ test('interruption while reading the response body cannot publish the completed 
     controller.abort(); body.resolve(JSON.stringify(extracted()));
     assert.equal(await pending, null);
 });
+
+/* @Codex */
+test('accepts Tesseract provenance without treating an unknown engine as desktop OCR', async () => {
+    const valid = extracted('attachment.synthetic.desktop', 'Testo OCR sintetico.', true);
+    valid.receipt.ocrProvenance!.engine = 'tesseract_wasm';
+    const preview = await requestAnyDocLocalExtractionPreview('attachment.synthetic.desktop', async () => response(valid));
+    assert.deepEqual(preview?.ocr, { pageCount: 2, ocrPageCount: 1 });
+    valid.receipt.ocrProvenance!.engine = 'tesseract_native_unqualified';
+    assert.equal(await requestAnyDocLocalExtractionPreview('attachment.synthetic.desktop', async () => response(valid)), null);
+});
