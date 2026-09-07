@@ -198,6 +198,49 @@ I test usano Docker fake e fixture sintetiche, con directory dati temporanea
 esplicita. Il read-only sul deployment qualificato e la fixture UI sono prove
 separate da un'installazione nuova end-to-end. Nessuna modifica `/api/v1`.
 
+### Revisione del percorso ordinario — WUL-673, prima del codice
+
+La prima guida CLI richiedeva editing JSON, hash e qualifica manuale: non
+soddisfa il percorso ordinario richiesto e non viene promossa a onboarding
+completo. La revisione conserva la CLI tecnica per il gestore e aggiunge
+`Setup_WHO.command`, solo host macOS ARM64, senza endpoint Web privilegiati.
+
+- Un release-lock distribuito contiene soltanto metadati pubblici del registry
+  ufficiale verificato il 7 settembre: immagine 2.6.0/ARM64, digest e hash delle
+  evidenze primarie. Non include licenza dell'operatore, identita dataset o prove
+  di un deployment. La procedura prepara automaticamente il manifesto privato.
+- Il gesto interattivo di licenza riguarda esattamente software/versione/dataset
+  mostrati; e registrato localmente con data e identificatore dell'installazione.
+  Prima di rete o mutazioni Docker l'utente autorizza installazione e qualifica
+  del nuovo servizio. Nessuna accettazione implicita da copia del comando.
+- Rilevamento e scelta del contesto Docker locale non modificano VM o contesto
+  globale. Host diversi da macOS ARM64, runtime assente o porta occupata hanno
+  uno stato leggibile e negano l'installazione. Windows/Linux restano un gap.
+- La procedura possiede soltanto container/network creati con ID e label della
+  propria installazione. Non adotta servizi altrui tramite un nome o manifesto.
+  Qualifica e recupero verificano ownership prima delle mutazioni; nessun input
+  Web, shell o argomento Docker arbitrario. `Config.Env` e segreti non si leggono.
+- `qualify` calcola davvero inventario e hash dei cinque file dataset osservati
+  per questa release, copiati dal proprio container fermo in una directory
+  privata. Non copia l'intera `/tmp`. Le prove richiedono nuova Search pubblica
+  dopo riavvio su network Docker interno senza default route, quindi ripristino
+  dello snapshot in un secondo container della stessa immagine e nuova Search
+  senza route esterna. Hash e metadati 0:0/0644 vengono confrontati sul ripristino.
+- Gli esiti legano installazione, container originale e di ripristino, immagine,
+  network, inventario, timestamp e risposta bounded. Solo entrambe le prove
+  riuscite consentono di scrivere i gate di attivazione. Checkbox o dichiarazioni
+  dell'utente non sostituiscono prove e non si ereditano receipt altrui.
+- Un fallimento conserva snapshot e receipt incompleta, nega la configurazione
+  e tenta il recupero del solo container originale posseduto. Nessuna rimozione
+  automatica. La qualifica documenta un network Docker interno senza route
+  esterna, non un isolamento generale dell'host. Le prove sintetiche della CLI
+  non sono qualifica live del nuovo installer.
+- A qualifica completa viene generata la configurazione privata e un avvio host
+  nominato carica le tre variabili esistenti nel launcher MediFlow, senza editing
+  di ambiente o JSON. L'avvio dell'app richiede una scelta separata dell'utente;
+  la procedura non interrompe il server attivo. La UI ordinaria espone tre passi
+  brevi e stato del servizio; l'ispezione tecnica rimane in disclosure dedicata.
+
 ### Fonti primarie rilette il 2026-09-06
 
 - [WHO local deployment](https://icd.who.int/docs/icd-api/ICDAPI-LocalDeployment/):

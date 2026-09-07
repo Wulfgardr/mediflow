@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createICDReferenceDataClient, icdClientErrorMessage, icdReadinessMessage, type ICDReadiness, type ICDSearchReceipt } from '@/lib/icd-service';
 import { SETTINGS_CARD_CLASS, SETTINGS_SECONDARY_BUTTON_CLASS } from './settings-ui';
+import { WhoLocalSetupGuide } from './who-local-setup-guide';
 import { WhoCodeCheckForm } from '@/components/who-code-check';
 
 export function WhoSetupPanel() {
@@ -47,14 +48,12 @@ export function WhoSetupPanel() {
         </p>}
         {probe.kind === 'error' && <p className="mt-3 text-sm" role="alert">Verifica non riuscita: {probe.message} <time dateTime={probe.at}>{new Date(probe.at).toLocaleTimeString('it-IT')}</time></p>}
         <WhoCodeCheckForm />
+        <WhoLocalSetupGuide status={state.kind === 'ready' ? state.readiness.status : state.kind} onRefresh={() => { setState({ kind: 'loading' }); setRefresh(value => value + 1); }} />
         <details className="mt-5 text-sm">
-            <summary className="cursor-pointer font-medium">Configurazione sul server</summary>
-            <ol className="mt-3 list-decimal space-y-2 pl-5 leading-6">
-                <li>Completa la procedura locale con termini WHO, artifact verificati e dataset inglese MMS 2026-01.</li>
-                <li>Avvia il sidecar sul solo loopback previsto e registra gli identificatori di immagine e dataset nell’ambiente server.</li>
-                <li>Abilita esplicitamente Search locale e rileggi la configurazione. Non occorre un client OAuth WHO.</li>
-                <li>Esegui la ricerca di esempio. Il suo esito non certifica installazione, contenuto del dataset o funzionamento offline.</li>
-            </ol>
+            <summary className="cursor-pointer font-medium">Per chi gestisce il server</summary>
+            <p className="mt-3 leading-6">Il setup host conserva manifesto, consenso, snapshot e prove nella cartella privata MediFlow/WHO. Non espone Docker al Web. Per controllare o riprendere le verifiche del solo servizio creato dalla procedura:</p>
+            <pre className="mt-3 whitespace-pre-wrap break-all text-xs leading-5"><code>{'./Setup_WHO.command status\n./Setup_WHO.command qualify'}</code></pre>
+            <p className="mt-3 leading-6">La procedura completa è in docs/icd-who-setup.md. La CLI tecnica precedente resta disponibile per deployment gestiti separatamente; le prove di un altro deployment non si ereditano.</p>
             <dl className="mt-4 space-y-2 break-words text-xs">
                 <div><dt><code>MEDIFLOW_ICD_WHO_ENABLED</code></dt><dd>1, soltanto quando vuoi abilitare il servizio.</dd></div>
                 <div><dt><code>MEDIFLOW_ICD_WHO_LOCAL_IMAGE_DIGEST</code></dt><dd>Digest verificato dell’immagine; non viene scaricata da questa pagina.</dd></div>

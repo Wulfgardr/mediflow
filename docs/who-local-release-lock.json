@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "mediflow.who-release-lock.v1",
+  "repository": "whoicd/icd-api",
+  "version": "2.6.0",
+  "platform": "linux/arm64",
+  "include": "2026-01_en",
+  "imageDigest": "sha256:7555e43478202d3f9a25eeb2914cc5053414c9464ec6a9a7628c01375d5b0a5e",
+  "indexDigest": "sha256:1b77eb6dc43e0c65a12e9e9340ad178493c93488e728d0d936507cc57ada1b7c",
+  "registryEvidenceSha256": "sha256:f88419655c10f2e43061c282a79aebf32579f07a5a416b3f5be4fb3b0421ada3",
+  "registryVerifiedAt": "2026-09-07T20:07:46.987Z",
+  "datasetFiles": [
+    "icd11_2026-01-17_release-icf-mms_en.pbf.gz",
+    "ix_(2026-01-17)_foundation-icf-mms_en_v5.7.annex",
+    "ix_(2026-01-17)_foundation-icf-mms_en_v5.7.annexu",
+    "ix_(2026-01-17)_foundation-icf-mms_en_v5.7.pbf",
+    "ix_(2026-01-17)_foundation-icf-mms_en_v5.7.pbf.zip"
+  ]
+}
