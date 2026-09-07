@@ -581,8 +581,22 @@
   padding: 10px 14px;
   border-radius: var(--lume-control-radius);
   font-size: 14px;
+  font-weight: 600;
   line-height: 22px;
   gap: 8px;
+}
+
+/* @Codex: related actions and state controls follow the same spacing scale. */
+:global(html[data-runtime-twin-design='proposal']) :is(.headerActions, .panelActions, .identityChips, .dockActions, .segmented) {
+  gap: var(--lume-control-gap);
+}
+:global(html[data-runtime-twin-design='proposal']) .segItem {
+  min-height: var(--lume-control-height);
+  border-radius: var(--lume-control-radius);
+  padding: 10px 14px;
+  font-size: 14px;
+  line-height: 22px;
+  font-weight: 600;
 }
 
 /* ───────────── identity dock (patient detail) ───────────── */

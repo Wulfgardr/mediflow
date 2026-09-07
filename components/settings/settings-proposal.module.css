@@ -93,7 +93,7 @@
 :global(html[data-runtime-twin-design='proposal']) .proposalQuickLinks {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.65rem;
+    gap: var(--lume-control-gap);
     align-items: center;
 }
 
@@ -104,7 +104,7 @@
 
 :global(html[data-runtime-twin-design='proposal']) .proposalFocusActions {
     min-width: 9.5rem;
-    gap: 0.5rem;
+    gap: var(--lume-control-gap);
 }
 
 :global(html[data-runtime-twin-design='proposal']) .proposalAction {

@@ -803,7 +803,7 @@
 }
 
 /* @Codex WUL-676: the index is navigation, not a second stack of cards. */
-:global(html[data-runtime-twin-design='proposal']) .navItem { min-height: 40px; padding: 9px 12px; border: 0; border-radius: 7px; box-shadow: none; }
+:global(html[data-runtime-twin-design='proposal']) .navItem { min-height: var(--lume-control-height); padding: 9px 12px; border: 0; border-radius: var(--lume-control-radius); box-shadow: none; }
 :global(html[data-runtime-twin-design='proposal']) .navItemDescription { display: none; }
 :global(html[data-runtime-twin-design='proposal']) .navGroupLabel { font-family: var(--lume-font-sans); font-size: 11px; }
 :global(html[data-runtime-twin-design='proposal']) .navItemActive { background: var(--lume-ink); color: var(--lume-surface-focal); box-shadow: none; }

@@ -236,7 +236,7 @@
 .clinicalSection > button { padding: 0 !important; }
 .clinicalSection > div { padding: 16px 0 0 !important; }
 .clinicalShell .clinicalSurface :global(.apple-chip),
-.clinicalShell .clinicalSurface :global(.graphite-chip) { border: 0 !important; border-radius: 0 !important; background: transparent !important; font-family: var(--lume-scheda-registro-family); }
+.clinicalShell .clinicalSurface :global(.graphite-chip) { border: 0 !important; border-radius: var(--lume-control-radius, 0px) !important; background: transparent !important; font-family: var(--lume-scheda-registro-family); }
 .emptyState { margin: 10px 0 0; color: var(--lume-ink-muted); font-size: 12px; line-height: 1.55; }
 .evidenceList,
 .followupList { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
@@ -574,8 +574,9 @@
   letter-spacing: 0.12em !important;
 }
 
+/* @Codex: let the active control token override legacy chrome radii. */
 .shell :global(.ui-btn-primary) {
-  border-radius: 14px !important;
+  border-radius: var(--lume-control-radius, 14px) !important;
   background: var(--k8-primary-bg) !important;
   box-shadow: none !important;
   color: var(--k8-primary-fg) !important;
@@ -586,7 +587,7 @@
 .shell :global(.apple-chip),
 .shell :global(.graphite-chip) {
   border-color: var(--k8-line) !important;
-  border-radius: 999px !important;
+  border-radius: var(--lume-control-radius, 999px) !important;
   background: var(--k8-chip-bg) !important;
   color: var(--k8-muted) !important;
   box-shadow: none !important;
