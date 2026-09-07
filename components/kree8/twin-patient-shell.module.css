@@ -5,7 +5,8 @@
 .identity h1 { margin: 0; font-size: clamp(22px, 2vw, 28px); font-weight: 620; line-height: 1.25; letter-spacing: -.035em; }
 .identity p { margin-top: 6px; font-size: 12px; color: var(--lume-ink-muted); }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; align-items: center; }
-.actions > :is(a, button) { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 36px; border-radius: 7px; font-size: 12px; }
+/* @Codex: same command geometry for every action in the patient header. */
+.actions > :is(a, button) { box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: var(--lume-control-height, 44px); padding: 10px 14px; border-radius: var(--lume-control-radius, 12px); font-size: 14px; line-height: 22px; }
 .primary { padding: 9px 13px; background: var(--lume-ink); color: var(--lume-surface-focal); }
 .patientBody { padding: 30px 32px 60px; }
 .readingPane { max-width: 1160px; margin: 0 auto; }
