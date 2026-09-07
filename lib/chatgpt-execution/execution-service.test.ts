@@ -38,7 +38,7 @@ class FakeTransport implements ExecutionTransport {
         this.calls.push({ method, params });
         const custom = this.override?.(method, params);
         if (custom !== undefined) return custom;
-        if (method === 'account/read') return { account: { type: 'chatgpt', planType: 'plus' } };
+        if (method === 'account/read') return { account: { type: 'chatgpt', planType: 'plus', email: 'fixture-account@example.invalid' } };
         if (method === 'model/list') return { data: [model], nextCursor: null };
         if (method === 'account/rateLimits/read') return quota();
         if (method === 'thread/start') return this.thread(params);
@@ -309,7 +309,7 @@ test('account is re-read before generation and changed plan blocks the turn', as
 
 test('pro account preserves ultra without remapping', async () => {
     const { service, transport } = setup();
-    transport.override = method => method === 'account/read' ? { account: { type: 'chatgpt', planType: 'pro' } } : undefined;
+    transport.override = method => method === 'account/read' ? { account: { type: 'chatgpt', planType: 'pro', email: 'fixture-account@example.invalid' } } : undefined;
     const catalog = await service.readCatalog(); const choice = catalog.choices.find(choice => choice.effort === 'ultra')!;
     transport.onTurn = () => { transport.final(); transport.complete(); };
     const result = await service.generate({ modelOptionId: choice.optionId, expectedCatalogRevision: catalog.revision });
@@ -321,7 +321,7 @@ test('owner revoked inside an awaited RPC cannot cause another RPC', async () =>
     let current = true;
     const { service, transport } = setup({ isCurrent: () => current });
     transport.override = method => {
-        if (method === 'account/read') { current = false; return { account: { type: 'chatgpt', planType: 'plus' } }; }
+        if (method === 'account/read') { current = false; return { account: { type: 'chatgpt', planType: 'plus', email: 'fixture-account@example.invalid' } }; }
     };
     await assert.rejects(service.readCatalog(), errorCode('revoked'));
     assert.deepEqual(transport.calls.map(call => call.method), ['account/read']);
@@ -433,10 +433,11 @@ for (const scenario of ['same', 'changed', 'unknown', 'null-auth', 'external-aut
     assert.ok(transport.calls.filter(call => call.method === 'account/read').every(call => call.params.refreshToken === false));
 });
 
-test('benign-looking notice without an established identity still revokes', async () => {
+test('account notice with missing readback identity denies', async () => {
     const { service, transport } = setup(); const request = await selection(service);
     const pending = service.generate(request); const rejected = assert.rejects(pending, errorCode('revoked'));
     await started(transport);
+    transport.override = method => method === 'account/read' ? { account: { type: 'chatgpt', planType: 'plus', email: null } } : undefined;
     transport.listener('account/updated', { authMode: 'chatgpt', planType: 'plus' });
     await rejected;
 });
@@ -452,4 +453,21 @@ test('account change during readback is ambiguous and never retried', async () =
     };
     await assert.rejects(service.generate(request), errorCode('revoked'));
     assert.equal(transport.calls.filter(call => call.method === 'account/read').length, 2);
+});
+
+/* @Codex: ordinary malformed-readback regression, no real account or transport. */
+for (const email of [undefined, null, '', '   ', 12, 'not-an-address', 'a@b\n', 'a b@example.invalid', 'x'.repeat(321) + '@example.invalid']) test('initial identity must be valid before catalog or turn', async () => {
+    const { service, transport } = setup();
+    transport.override = method => method === 'account/read' ? { account: { type: 'chatgpt', planType: 'plus', email } } : undefined;
+    await assert.rejects(service.readCatalog(), errorCode('unsupported_account'));
+    assert.deepEqual(transport.calls.map(call => call.method), ['account/read']);
+    assert.equal(transport.closed, 1);
+});
+
+test('valid initial identity never appears in catalog or result', async () => {
+    const { service, transport } = setup();
+    const catalog = await service.readCatalog();
+    transport.onTurn = () => { transport.final(); transport.complete(); };
+    const result = await service.generate({ modelOptionId: catalog.choices[0].optionId, expectedCatalogRevision: catalog.revision });
+    assert.ok(!JSON.stringify({ catalog, result }).includes('fixture-account@example.invalid'));
 });

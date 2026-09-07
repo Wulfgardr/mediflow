@@ -16,11 +16,36 @@ function ownRoot(prefix: string) {
     chmodSync(root, PRIVATE_MODE);
     return root;
 }
-function killGroup(pid: number | undefined, signal: NodeJS.Signals) {
-    if (!pid) return false;
-    try { process.kill(-pid, signal); return true; } catch (error) {
-        return (error as NodeJS.ErrnoException).code === 'ESRCH';
-    }
+/** Signal only the owned ChildProcess while its leader has not exited. */
+export function terminateOwnedExecutionLeader(child: Pick<ReturnType<typeof spawn>, 'pid' | 'exitCode' | 'signalCode' | 'kill'> | undefined, signal: NodeJS.Signals): boolean {
+    if (!child?.pid || child.exitCode !== null || child.signalCode !== null) return false;
+    try { return child.kill(signal); } catch { return false; }
+}
+
+/** Passive group observation only; errors/permission failures are not exit evidence. */
+function groupAbsent(pid: number): boolean {
+    try { process.kill(-pid, 0); return false; }
+    catch (error) { return (error as NodeJS.ErrnoException).code === 'ESRCH'; }
+}
+
+/** @internal Bounded host seam; tests inject observations without probing OS processes. */
+export async function waitForOwnedExecutionGroupExit(pid: number | undefined, timeoutMs: number,
+    observeAbsent: (pid: number) => boolean = groupAbsent): Promise<boolean> {
+    // A failed spawn with no PID never created a group.
+    if (pid === undefined) return true;
+    if (!Number.isSafeInteger(pid) || pid <= 1 || !Number.isFinite(timeoutMs) || timeoutMs < 1 || timeoutMs > 1000) return false;
+    const deadline = performance.now() + timeoutMs;
+    do {
+        try {
+            const absent = observeAbsent(pid);
+            if (performance.now() >= deadline) return false;
+            if (absent === true) return true;
+        } catch { return false; }
+        const remaining = deadline - performance.now();
+        if (remaining <= 0) return false;
+        await new Promise(resolve => setTimeout(resolve, Math.min(20, remaining)));
+    } while (performance.now() < deadline);
+    return false;
 }
 
 /** Checks the same filesystem/network policy, with one extra trusted probe executable. */
@@ -52,11 +77,11 @@ const p=spawnSync('/bin/sh',['-c','exit 0']);r.shell=p.error?.code??p.status;con
         let output = '';
         child.stdout!.on('data', (chunk: Buffer) => {
             output += chunk.toString('utf8');
-            if (output.length > 4096 && !killGroup(child?.pid, 'SIGKILL')) child?.kill('SIGKILL');
+            if (output.length > 4096) terminateOwnedExecutionLeader(child, 'SIGKILL');
         });
         child.stderr!.resume();
         const status = await new Promise<number | null>((resolve, reject) => {
-            const timer = setTimeout(() => { if (!killGroup(child?.pid, 'SIGKILL')) child?.kill('SIGKILL'); reject(new ExecutionError('unqualified_boundary')); }, 5000);
+            const timer = setTimeout(() => { terminateOwnedExecutionLeader(child, 'SIGKILL'); reject(new ExecutionError('unqualified_boundary')); }, 5000);
             child!.once('error', () => { clearTimeout(timer); reject(new ExecutionError('unqualified_boundary')); });
             child!.once('exit', code => { clearTimeout(timer); resolve(code); });
         });
@@ -67,7 +92,7 @@ const p=spawnSync('/bin/sh',['-c','exit 0']);r.shell=p.error?.code??p.status;con
         rmSync(probe); rmSync(owned);
     } catch { throw new ExecutionError('unqualified_boundary'); }
     finally {
-        if (child && child.exitCode === null && child.signalCode === null && !killGroup(child.pid, 'SIGKILL')) child.kill('SIGKILL');
+        terminateOwnedExecutionLeader(child, 'SIGKILL');
         await new Promise<void>(resolve => blocked.close(() => resolve()));
         rmSync(external, { recursive: true, force: true });
     }
@@ -112,7 +137,8 @@ export async function createQualifiedExecutionHost(binaryPath: string, lifetimeM
         const child = spawn('/usr/bin/sandbox-exec', ['-f', join(root, 'profile.sb'), binary, 'app-server', '--strict-config', '--listen', 'stdio://'], {
             cwd: join(root, 'work'), env, shell: false, detached: true, stdio: ['pipe', 'pipe', 'pipe'],
         });
-        const exit = () => { if (!killGroup(child.pid, 'SIGKILL')) child.kill('SIGKILL'); };
+        const groupId = child.pid; // Capture only this detached launch; never retarget later.
+        const exit = () => { terminateOwnedExecutionLeader(child, 'SIGKILL'); };
         process.once('exit', exit);
         const expiry = setTimeout(() => { qualified = false; void transport?.close(); }, lifetimeMs);
         expiry.unref();
@@ -120,11 +146,12 @@ export async function createQualifiedExecutionHost(binaryPath: string, lifetimeM
             diagnostic,
             // Revoke the only network path even when process exit cannot be attested.
             onClosing() { void proxy!.close(); },
-            terminate(signal) { if (!killGroup(child.pid, signal)) child.kill(signal); },
+            terminate(signal) { terminateOwnedExecutionLeader(child, signal); },
+            waitForOwnedGroupExit: timeoutMs => waitForOwnedExecutionGroupExit(groupId, timeoutMs),
             async onClosed() {
                 clearTimeout(expiry); process.removeListener('exit', exit);
-                // Close the only reachable network destination even if a descendant
-                // survives process-group termination; no transport is reused.
+                // Called only after both leader exit and observed group cessation.
+                // Unconfirmed drain preserves the root and cannot attest cleanup.
                 await proxy!.close();
                 rmSync(root, { recursive: true, force: true }); cleanup = !existsSync(root);
             },
@@ -145,8 +172,9 @@ export async function createQualifiedExecutionHost(binaryPath: string, lifetimeM
         return Object.freeze({ transport, cwd: join(root, 'work'), boundaryQualified: () => qualified,
             close() { qualified = false; return transport!.close(); }, cleanupComplete: () => cleanup });
     } catch {
-        if (transport) await transport.close();
-        await proxy?.close(); rmSync(root, { recursive: true, force: true });
+        const drained = transport ? await transport.close() : true;
+        await proxy?.close();
+        if (drained) rmSync(root, { recursive: true, force: true });
         throw new ExecutionError('unqualified_boundary');
     }
 }
