@@ -25,6 +25,7 @@ le prove Ollama e MCP riportate qui non lo attestano.
 | Primo addendum JSON | `1d633d98d0a093623c8c4f488815af804c769a6e..61ca67191c7a78955dcc097254c7cc988f715242` | `SOURCE_REVIEW_HOLD`: LOW `csf_e6ea8156c1fde74d61ebf750`, disponibilità del processo. Digest 30/30 verificati; 68/68 test dichiarati dall’owner, non rieseguiti dal reviewer. Questo esito resta storico. |
 | Correzione allegati | `e7f8a555ac697c36adc60a36132a776e39d19a72..be9233282c0ab18759b0e679b877d9dc30af5a99` | `FIX_VERIFIED`: digest 7/7, test sintetici 63/63, typecheck focalizzato, ESLint e diff-check PASS nella verifica indipendente. |
 | Document Synthesis | `6d4b66f82c154045baf73ea62be7890417a90ed4..9fe74f2573c455ae2f8439f1b47adee767414f3c` | `SOURCE_REVIEW_PASS`: 15/15 test indipendenti, zero finding. Risorsa privata Web, selezione confermata e invalidazione asincrona; nessuna esecuzione browser da parte del reviewer. |
+| Continuità broker DS | `1377215d259106e4477ba4a35b4071393ee55ff7..d4c06f039e09f42a2d7275db7d7733628e2d239a`, integrato in `e49d87c0d085b740812a9581a051a698e73e45a8` | Zero finding nei due file; 33/33 test integrati e 8/8 crosswalk indipendenti PASS. Broker legato al canonical owner e cleanup senza rientro. Non prova la sintesi ordinaria. |
 
 La correzione allegati riduce il cap JSON a 30.408.704 byte, riserva uno slot
 per istanza modulo prima della lettura e applica una deadline di lettura di
@@ -91,6 +92,31 @@ a 600 e la stessa verifica passa. Le sei immagini pubbliche acquisite su
 `e7f8a555a` sono precedenti a questi ritocchi e devono essere sostituite prima
 del rilascio. Gli stati AI non vengono alterati nelle immagini.
 
+La successiva segnalazione visiva ha evidenziato filtri ancora a raggio 7 px:
+il controllo su `98fb` misurava i comandi elencati, non quei filtri.
+I commit `23beeda7d` e `ce9746954` uniformano selettori, comandi delle
+impostazioni e indicatori condivisi. Sul bundle `e49d87c0d` sono stati
+verificati **24 stati**: lista, impostazioni, repertori e prestazioni a
+1440, 965 e 390 px, in tema chiaro e scuro. Le 102 osservazioni dei comandi
+e 54 degli indicatori hanno raggio 12 px; i comandi hanno altezza minima
+44 px, gli indicatori 32 px e testo di almeno 13 px. La distanza tra i
+filtri è 8 px; tra filtri, ricerca e intestazione è 16 px. Nessuna
+sovrapposizione o eccedenza orizzontale rilevata; contrasto minimo
+misurato 5,07:1. I sei errori console corrispondono al servizio WHO 503
+già descritto. Ricevuta: `ui-controls-e49-02/receipt.json`.
+
+`b938fa4b717940859eea6f4468175ae6e6e2998b` corregge inoltre il conteggio:
+stesso carattere della UI, titolo 20 px e testo di supporto 14 px, con
+baseline condivisa. **8 stati** della lista a 1440, 965, 390 e 320 px,
+nei due temi, hanno superato i controlli di allineamento, ricerca con
+0/1/3 risultati, cancellazione e ritorno del focus, filtri attivi/archivio,
+assenza di overflow ed errori console. Ricevuta: `ui-heading-b938/receipt.json`.
+Build webpack, TypeScript e standalone/AnyDoc PASS su questo SHA; digest
+del bundle preservati. Dopo il riavvio con i metadati derivati dalla
+ricevuta, HTML e API espongono il fingerprint atteso. Non è una nuova
+esecuzione CI. Il lint mirato non rileva errori; resta il warning già
+presente sul consumer `useVirtualizer`, non modificato dal diff.
+
 La prima prova ordinaria Document Synthesis su `9fe74f257` si ferma con
 `context_missing` prima della conferma: il contesto dell'ambulatorio è assente
 nella sessione nuova. Nessuna richiesta alle route AI è stata osservata.
@@ -103,6 +129,17 @@ file non rileva finding: 28/28 test mirati e 8/8 test crosswalk PASS. La prova
 ordinaria successiva sul bundle `5e4a3aef6` supera scelta, conferma e capture,
 ma il primo ingest risponde **409 `capture_consumed`**. Non è stata prodotta
 una sintesi validata. Questa evidenza resta distinta dai test sorgente verdi.
+
+Il successivo fix del broker, integrato in `e49d87c0d`, supera la perdita
+di continuità fra projection autentiche. Il coordinatore ha rieseguito
+33 test PASS; la review indipendente non rileva finding. La nuova prova
+ordinaria osserva selection GET/POST 200 e capture 200, quindi il primo
+ingest termina **409 `selection_changed`**: nessuna preview o inferenza.
+La diagnosi sorgente individua la riemissione della selezione nel binder
+AnyDoc durante ingest, che cambia gli epoch controllati da DS. Il ramo
+live preciso non è distinguibile dalla sola risposta 409. Il nuovo
+intervento di composizione resta da implementare e verificare; non si
+allentano le fence e non si promuove il percorso documentale a funzionante.
 
 ## CI: risultati conservati e correzioni locali
 
@@ -181,3 +218,7 @@ provano identità del contenuto, non esecuzione indipendente di questa lane.
 | `daybreak-ds-addendum/review-receipt.json` | `995e5c6b555f850ceecbfbcf94462193a8fea995e3af52fbd932f92b28973d6f` |
 | `daybreak-ds-context-addendum/addendum.md` | `1305856b3bd8f7d49e9fd839aa9dbc138af05c417e29b9351bed27c0a04bb44b` |
 | `daybreak-ds-context-addendum/review-receipt.json` | `d496b96cf53aa6af8f11657a27d701afd35b88261673db2f7bb8c4a5fe4fe5e9` |
+| `daybreak-ds-owner-addendum/addendum.md` | `7d5d9cb85589060c0fb153fe750a35ad5ae7d250c7dc04b9e16b0ee5f3261afc` |
+| `daybreak-ds-owner-addendum/review-receipt.json` | `3a04232b3ed0148f4818e4ad8fec93271ab3a817529b5a34f6f7f4fa45407431` |
+| `ui-controls-e49-02/receipt.json` | `de4f26fbaaa9c07077f6adc00637a9779fddc200bdce9990e04e5cb5af36ca33` |
+| `ui-heading-b938/receipt.json` | `13c5160450cafdb9db2dc6d3b629d4152d981e60ff39b735cefc1e31a5caa9e3` |
