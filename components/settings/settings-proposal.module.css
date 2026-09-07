@@ -35,8 +35,8 @@
     width: fit-content;
     cursor: pointer;
     color: var(--lume-ink);
-    font-size: 0.75rem;
-    font-weight: 650;
+    font-size: 14px;
+    font-weight: 600;
 }
 
 .proposalDetail p {

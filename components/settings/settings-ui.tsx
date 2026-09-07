@@ -21,7 +21,7 @@ const PROPOSAL_INTRO_COPY: Record<string, string> = {
     'Evidenze e conformità': 'Evidenze tecniche, non una certificazione.',
     Repertori: 'AIFA ed esenzioni, in locale.',
     'Intelligence Fabric': 'Modelli, funzioni e stato dei collegamenti.',
-    'Modelli e hardware': 'Hardware e Ollama. ATHENA resta separata.',
+    'Modelli e hardware': 'Collega Ollama, scegli i modelli installati e salva.',
     'Funzioni cliniche': 'Interruttori e budget AI.',
     'Governance e rollout': 'Confronto modelli e stato di rilascio.',
     Diagnostica: 'Servizi, architettura e aggiornamenti.',
