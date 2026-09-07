@@ -44,7 +44,7 @@ export default function SettingsAiModelsPage() {
                         {aiTestStatus === 'testing' ? 'Verifica in corso…' : 'Test Connessione'}
                     </button>
                 </div>
-                <div role="status" className={styles.status}>
+                <div role="status" className={styles.notice}>
                     {aiTestStatus === 'testing' ? 'Lettura dei modelli da Ollama…'
                         : aiHealth ? aiHealth.message : 'Connessione non ancora verificata per questa configurazione.'}
                 </div>
