@@ -296,7 +296,7 @@ export default function SettingsRepertoriPage() {
                                 className="text-[color:var(--lume-signal-critical)]"
                             >
                                 <AlertTriangle className="w-3 h-3" />
-                                Svuota database farmaci
+                                Svuota catalogo
                             </Button>
                         )}
                     </div>
