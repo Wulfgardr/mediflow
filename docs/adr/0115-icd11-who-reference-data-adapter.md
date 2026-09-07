@@ -157,28 +157,46 @@ entita base con titolo inglese. Le prove HTTP/UI integrate restano gate separati
   riletta al confine di ogni operazione e prima della pubblicazione; nessuna
   promessa di osservare istantaneamente cambi esterni fra due letture.
 
-### Provisioning separato e prova ammessa
+### Setup guidato locale — WUL-673, 7 settembre 2026
 
-Il candidato contiene soltanto manifesto e procedura reviewable. Nessun
-installer automatico, avvio WHO, download di immagini/dataset, accettazione
-licenze o modifica del runtime container dell'host. Il manifesto parte con
-digest/snapshot non valorizzati: un controllo locale deve negare la sua
-promozione a manifesto pronto finche mancano prove da registry primario,
-inventario dataset e accettazione esplicita dei termini da parte dell'operatore.
-Digest di fixture sono sintetici e non vengono proposti per installazione.
+Il percorso guidato aggiunge una CLI locale a operazioni nominate e una guida
+interattiva nelle impostazioni. Non introduce API di provisioning, accesso Docker
+nel server Web, writer clinici o modifiche al contratto Search/CodeInfo.
 
-Il percorso documentato fissa immagine e piattaforma, `include=2026-01_en`,
-`saveAnalytics=false`, DORIS/FHIR disabilitati, bind loopback, nessun mount
-clinico o socket Docker, avvio manuale, aggiornamento e rollback espliciti.
-Il primo provisioning richiede rete secondo WHO; offline dopo provisioning
-e ripristino del dataset richiedono prove future sul target.
+- `init` prepara un manifesto privato incompleto; non accetta termini o inventa
+  evidenze. `plan` valida le registrazioni senza rete. `status` legge soltanto
+  metadati selezionati del contesto Docker locale e del container nominato;
+  non legge variabili d'ambiente del container o credenziali. Il contesto deve
+  usare un socket Unix locale; nessun cambio del contesto globale o gestione VM.
+- `install` richiede manifesto valido per provisioning e conferma esatta
+  `install-who-2.6.0-2026-01_en`. Solo questa azione puo scaricare l'immagine
+  ufficiale al digest registrato e avviare un nuovo container a nome fisso.
+  Binding loopback 8382:80, piattaforma ARM64, release/lingua fissate,
+  `acceptLicense=true` dopo registrazione dell'accettazione, analytics,
+  DORIS e FHIR disabilitati, zero mount, restart automatico disabilitato.
+  Nessuna shell, argomenti Docker liberi, esecuzione da query Web, sostituzione,
+  arresto o rimozione di container esistenti. Il manifesto per una nuova
+  installazione non puo ereditare snapshot/prove di un altro deployment.
+  Un fallimento conserva gli
+  artefatti creati e indica la fase da recuperare manualmente.
+- `configure` richiede manifesto valido per attivazione, container nominato
+  in esecuzione con immagine e listener coerenti, e conferma esatta
+  `enable-who-2026-01_en`. Scrive esclusivamente le tre variabili del contratto
+  server in un nuovo file privato, senza sovrascrivere file o ambiente esistenti.
+  Non avvia/riavvia MediFlow; l'operatore carica il file nel successivo avvio
+  autorizzato. Configurazione generata non significa processo gia configurato.
+- Inventario, snapshot, prove offline/ripristino e consenso restano dichiarazioni
+  host-owned da verificare sul target, non attestazioni della CLI. Il percorso
+  di qualifica esistente resta obbligatorio; nessun download, VM o nuova prova
+  distruttiva sul deployment gia qualificato per verificare il wizard.
+- La UI mostra prerequisiti, termini/versione, comandi fissi, blocchi e recupero;
+  nessuna chiave OAuth per il deployment locale. La verifica finale riusa la
+  ricerca esplicita di esempio gia presente, distinguendo cache e risposta live.
+  Un checkbox nella guida non concede autorita al server o prova un'installazione.
 
-La verifica del candidato usa transport/clock/audit e risposte WHO sintetici:
-default OFF, nessun OAuth/remoto, target fisso, input/risposta bounded,
-provenienza, errori, timeout/abort, cache e lifecycle, compatibilita DTO e
-readiness passiva. Non serve un DB per questi test; eventuali check applicativi
-usano esclusivamente `MEDIFLOW_DATA_DIR` temporanea marcata. Test sintetici,
-build e manifesto valido non sono proof live o approvazione alla distribuzione.
+I test usano Docker fake e fixture sintetiche, con directory dati temporanea
+esplicita. Il read-only sul deployment qualificato e la fixture UI sono prove
+separate da un'installazione nuova end-to-end. Nessuna modifica `/api/v1`.
 
 ### Fonti primarie rilette il 2026-09-06
 
