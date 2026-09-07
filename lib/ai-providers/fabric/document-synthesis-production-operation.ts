@@ -9,7 +9,7 @@ import { AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY, isAiDocumentSynthesisEnabledValu
 import { dbServer } from '@/lib/db-server';
 import { acquireAuthenticatedWebSessionProjectionOwnerContext, type AuthenticatedWebSessionProjectionOwnerContext } from '@/lib/security/server-auth';
 import { isServerSessionProjectionOwner } from '@/lib/security/server-session-projection-owner';
-import { registerServerSessionResource } from '@/lib/security/server-session';
+import { mintResourcePort, registerPrivateResource, unregisterPrivateResource, releaseResourcePort } from '@/lib/security/web-auth-lifecycle-owner-adapter';
 import type { ServerSession } from '@/lib/security/server-session';
 import { composeAnyDocCurrentSourceExtraction } from '@/lib/domain/documents/anydoc-current-source-composition';
 import {
@@ -138,11 +138,11 @@ function mint(prefix: 'dsc_' | 'dsp_', value: unknown): string | null {
 function brokerFor(context: AuthenticatedWebSessionProjectionOwnerContext, dependencies: Dependencies): Broker | null {
     let sessions = brokers.get(context.owner); if (!sessions) { sessions = new WeakMap<object, Broker>(); brokers.set(context.owner, sessions); }
     const existing = sessions.get(context.session); if (existing) return existing;
+    let unregister: (() => void) | null = null;
     const broker: Broker = {
         captures: new Map(), previews: new Map(), handles: new Set(), nextEpoch: BigInt(0),
-        dispose() { broker.captures.clear(); broker.previews.clear(); broker.handles.clear(); sessions!.delete(context.session); },
+        dispose() { broker.captures.clear(); broker.previews.clear(); broker.handles.clear(); sessions!.delete(context.session); const release = unregister; unregister = null; release?.(); },
     };
-    let unregister: (() => void) | null;
     try { unregister = dependencies.registerResource(context, broker.dispose); } catch { return null; }
     if (!unregister) return null;
     sessions.set(context.session, broker);
@@ -247,6 +247,22 @@ function factory(dependencies: Dependencies) {
     });
 }
 
+function registerProductionResource(context: AuthenticatedWebSessionProjectionOwnerContext, dispose: () => void): (() => void) | null {
+    const port = mintResourcePort(context.session);
+    if (!port) return null;
+    let registration;
+    try { registration = registerPrivateResource(port, dispose); }
+    catch { releaseResourcePort(port); return null; }
+    if (!registration) { releaseResourcePort(port); return null; }
+    let active = true;
+    return () => {
+        if (!active) return;
+        active = false;
+        try { unregisterPrivateResource(port, registration); }
+        finally { releaseResourcePort(port); }
+    };
+}
+
 function readProductionCurrentness(attachmentId: string, patientId: string, ambulatoryId: string): unknown {
     return dbServer.get(sql`SELECT a.document_source_ref AS documentSourceRef, a.document_revision AS documentRevision, a.document_freshness_epoch AS documentFreshnessEpoch FROM attachments AS a INNER JOIN patients_to_ambulatories AS pta ON pta.patient_id = a.patient_id WHERE a.id = ${attachmentId} AND a.patient_id = ${patientId} AND pta.ambulatory_id = ${ambulatoryId} LIMIT 1`);
 }
@@ -261,12 +277,12 @@ const production = factory(Object.freeze({
     extract: (session: ServerSession, attachmentId: string) => composeAnyDocCurrentSourceExtraction(session, { attachmentId }),
     async execute(configuration: unknown) { return (await createDocumentSynthesisFabricProductionComposition(configuration)?.execute()) ?? null; },
     entropy: () => randomBytes(16),
-    registerResource: (context: AuthenticatedWebSessionProjectionOwnerContext, dispose: () => void) => registerServerSessionResource(context.session.id, dispose),
+    registerResource: registerProductionResource,
 }));
 
 export const acquireDocumentSynthesisProductionOperation = (): Promise<DocumentSynthesisProductionOperation | null> => production.acquire();
 
-export function createDocumentSynthesisProductionOperationForTest(dependencies: Dependencies) {
+export function createDocumentSynthesisProductionOperationForTest(dependencies: Omit<Dependencies, 'registerResource'> & Partial<Pick<Dependencies, 'registerResource'>>) {
     if (!TEST_HARNESS) return Object.freeze({ acquire: async () => null });
-    return factory(dependencies);
+    return factory({ ...dependencies, registerResource: dependencies.registerResource ?? registerProductionResource });
 }
