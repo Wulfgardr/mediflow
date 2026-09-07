@@ -203,7 +203,7 @@ test('guarded replacement detects legacy changes and rolls back actual SQLite wr
 });
 
 /* @Codex Uses the actual lifecycle owner and SQLite; only the HTTP cookie reader and external transport are synthetic. */
-test('update route authenticates before network and cancels a stalled download on actual session retirement', async (t) => {
+test('update route guards streamed bodies and cancels on actual session retirement', { timeout: 10_000 }, async (t) => {
     await loadCatalogModules();
     const load = createRequire(import.meta.url);
     const auth = load('./security/server-auth.ts') as typeof import('./security/server-auth');
@@ -219,7 +219,8 @@ test('update route authenticates before network and cancels a stalled download o
     assert.equal(calls, 0);
     const control = owner.bootstrapControl()!;
     const attempt = owner.begin('login', { controlId: control.controlId, ifMatch: control.etag, idempotencyKey: 'synthetic-aifa-login-0001' });
-    const issued = owner.issue(attempt, { id: 'synthetic-aifa-user', username: 'synthetic-aifa', role: 'clinician' })!;
+    const principal = { id: 'synthetic-aifa-user', username: 'synthetic-aifa', role: 'clinician' };
+    const issued = owner.issue(attempt, principal)!;
     const resolved = owner.resolve(issued.sessionId, control.controlId);
     assert.equal(resolved.status, 'active');
     if (resolved.status !== 'active') throw new Error('synthetic session setup failed');
@@ -227,8 +228,65 @@ test('update route authenticates before network and cancels a stalled download o
     assert.equal((await POST(new Request('http://localhost/api/drugs/update?url=https://invalid.example', { method: 'POST' }))).status, 400);
     assert.equal((await POST(new Request('http://localhost/api/drugs/update', { method: 'POST', body: '{}' }))).status, 400);
     assert.equal(calls, 0);
+    /* @Codex Body guards run before transport and leave the catalog intact. */
+    const bodySnapshot = getAifaCatalogSnapshot();
+    const streamed = (body: ReadableStream<Uint8Array>, signal?: AbortSignal) => new Request('http://localhost/api/drugs/update', {
+        method: 'POST', body, signal, duplex: 'half',
+    } as RequestInit);
+    for (const bytes of [new Uint8Array([0]), new TextEncoder().encode(' '), new TextEncoder().encode('{}')]) {
+        let cancelled = false;
+        const response = await POST(streamed(new ReadableStream({
+            start(controller) { controller.enqueue(new Uint8Array(0)); controller.enqueue(bytes); },
+            cancel() { cancelled = true; return new Promise<void>(() => {}); },
+        })));
+        assert.equal(response.status, 400);
+        assert.equal(cancelled, true, 'nonempty stream cancellation must not block response');
+    }
+    let emptyReads = 0;
+    let floodCancelled = false;
+    assert.equal((await POST(streamed(new ReadableStream({
+        pull(controller) { emptyReads++; controller.enqueue(new Uint8Array(0)); },
+        cancel() { floodCancelled = true; },
+    })))).status, 400);
+    assert.ok(emptyReads <= 33, 'empty chunk processing must be bounded');
+    assert.equal(floodCancelled, true);
+    for (const alreadyAborted of [false, true]) {
+        const abort = new AbortController();
+        let cancelled = false;
+        let started!: () => void;
+        const reading = new Promise<void>((resolve) => { started = resolve; });
+        const body = new ReadableStream<Uint8Array>({
+            pull() { started(); },
+            cancel() { cancelled = true; return new Promise<void>(() => {}); },
+        });
+        if (alreadyAborted) abort.abort();
+        const pending = POST(streamed(body, abort.signal));
+        await reading;
+        abort.abort();
+        assert.equal((await pending).status, 499);
+        if (!alreadyAborted) assert.equal(cancelled, true);
+    }
+    let stalledCancelled = false;
+    assert.equal((await POST(streamed(new ReadableStream({
+        cancel() { stalledCancelled = true; return Promise.reject(new Error('synthetic cancellation failure')); },
+    })))).status, 400, 'stalled body must time out before transport');
+    assert.equal(stalledCancelled, true);
+    assert.equal((await POST(streamed(new ReadableStream({
+        start(controller) { controller.error(new Error('synthetic body read failure')); },
+    })))).status, 422);
+    assert.equal(calls, 0);
+    assert.equal(getAifaCatalogSnapshot(), bodySnapshot);
     const validCsv = 'CODICE_AIC;DENOMINAZIONE;CODICE_ATC;PA_ASSOCIATI\n000000401;TEST ROUTE;A01AA01;Principio route';
     t.mock.method(globalThis, 'fetch', async () => new Response(validCsv, { headers: { 'Content-Type': 'text/csv' } }));
+    /* @Codex Regression: a zero-byte POST can still expose a ReadableStream. */
+    for (const emptyChunks of [0, 1]) {
+        const streamedEmpty = streamed(new ReadableStream({ start(controller) {
+            if (emptyChunks) controller.enqueue(new Uint8Array(0));
+            controller.close();
+        } }));
+        assert.notEqual(streamedEmpty.body, null);
+        assert.equal((await POST(streamedEmpty)).status, 200, 'streamed empty POST must succeed');
+    }
     const success = await POST(request());
     assert.equal(success.status, 200);
     const payload = await success.json();
@@ -275,5 +333,27 @@ test('update route authenticates before network and cancels a stalled download o
     assert.equal(owner.retire(current, 'dispose').outcome, 'completed');
     assert.equal((transportSignal as AbortSignal | null)?.aborted, true);
     assert.equal((await pending).status, 401);
+    assert.equal(getAifaCatalogSnapshot(), before);
+
+    /* @Codex Session retirement must also interrupt body validation before network. */
+    const nextControl = owner.bootstrapControl()!;
+    const nextAttempt = owner.begin('login', { controlId: nextControl.controlId, ifMatch: nextControl.etag, idempotencyKey: 'synthetic-aifa-login-0002' });
+    const nextIssued = owner.issue(nextAttempt, principal)!;
+    const nextResolved = owner.resolve(nextIssued.sessionId, nextControl.controlId);
+    if (nextResolved.status !== 'active') throw new Error('synthetic session setup failed');
+    current = nextResolved.projection;
+    let bodyStarted!: () => void;
+    const bodyReading = new Promise<void>((resolve) => { bodyStarted = resolve; });
+    let bodyCancelled = false;
+    t.mock.method(globalThis, 'fetch', async () => { calls++; throw new Error('unexpected network'); });
+    const bodyPending = POST(streamed(new ReadableStream({
+        pull() { bodyStarted(); },
+        cancel() { bodyCancelled = true; },
+    }, { highWaterMark: 0 })));
+    await bodyReading;
+    assert.equal(owner.retire(current, 'dispose').outcome, 'completed');
+    assert.equal((await bodyPending).status, 401);
+    assert.equal(bodyCancelled, true);
+    assert.equal(calls, 0);
     assert.equal(getAifaCatalogSnapshot(), before);
 });
