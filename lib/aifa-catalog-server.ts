@@ -1,7 +1,8 @@
 /* @Codex */
 
 import { createHash } from 'node:crypto';
-import { asc, eq, sql } from 'drizzle-orm';
+import { AifaUpdateError } from './aifa-catalog-download';
+import { asc, eq, or, sql } from 'drizzle-orm';
 import {
     AIFA_CATALOG_MANIFEST_SETTING_KEY,
     buildAifaCatalogManifest,
@@ -52,9 +53,69 @@ export async function getAifaCatalogStatus(): Promise<AifaCatalogStatus> {
     };
 }
 
+/* @Codex Snapshot includes every stored drug field and the raw manifest, including legacy catalogs. */
+function catalogSnapshot(connection: Pick<typeof dbServer, 'select'>): string {
+    const hash = createHash('sha256');
+    for (const row of connection.select().from(drugs).orderBy(asc(drugs.aic)).all()) {
+        hash.update(JSON.stringify(row)).update('\n');
+    }
+    const manifest = connection.select({ value: settings.value }).from(settings)
+        .where(eq(settings.key, AIFA_CATALOG_MANIFEST_SETTING_KEY)).get();
+    return hash.update(JSON.stringify(manifest ?? null)).digest('hex');
+}
+
+export function getAifaCatalogSnapshot(): string {
+    return dbServer.transaction((transaction) => catalogSnapshot(transaction));
+}
+
+/* @Codex Strict structure check for automatic acquisition; manual parser behavior stays unchanged. */
+function assertCompleteCsv(text: string): void {
+    const delimiter = (text.split(/\r?\n/, 1)[0] || '').includes(';') ? ';' : ',';
+    let mode: 'start' | 'plain' | 'quoted' | 'closed' = 'start';
+    let fields = 1;
+    let expected = 0;
+    let populated = false;
+    const fail = () => { throw new AifaUpdateError('Struttura CSV AIFA non valida', 422); };
+    const endRecord = () => {
+        if (populated) {
+            if (!expected) expected = fields;
+            else if (fields !== expected) fail();
+        }
+        fields = 1; populated = false; mode = 'start';
+    };
+    for (const char of text.replace(/^\uFEFF/, '')) {
+        if (char === '\0') fail();
+        if (mode === 'quoted') {
+            if (char === '"') mode = 'closed';
+            continue;
+        }
+        if (char === '"') {
+            if (mode === 'closed') mode = 'quoted';
+            else if (mode === 'start') mode = 'quoted';
+            else fail();
+            populated = true;
+        } else if (char === delimiter) {
+            fields++; mode = 'start'; populated = true;
+        } else if (char === '\r' || char === '\n') {
+            endRecord();
+        } else {
+            if (mode === 'closed') fail();
+            mode = 'plain'; populated = true;
+        }
+    }
+    if (mode === 'quoted') fail();
+    endRecord();
+}
+
+export type AifaReplacementGuard = {
+    snapshot: string;
+    assertCurrent: () => void;
+};
+
 export async function replaceAifaCatalog(
     file: File,
     manifestInput: AifaCatalogManifestInput,
+    guard?: AifaReplacementGuard,
 ): Promise<AifaCatalogImportResult> {
     if (file.size < 1 || file.size > MAX_AIFA_CSV_BYTES) {
         throw new Error('File AIFA vuoto o superiore a 100 MB');
@@ -62,7 +123,11 @@ export async function replaceAifaCatalog(
     const validatedManifestInput = validateAifaManifestInput(manifestInput);
     const bytes = new Uint8Array(await file.arrayBuffer());
     const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+    if (guard) assertCompleteCsv(text);
     const parsed = parseAifaCsv(text);
+    if (guard && parsed.rejectedRecords > 0) {
+        throw new AifaUpdateError('CSV AIFA contiene righe invalide: catalogo conservato', 422);
+    }
     const manifest = buildAifaCatalogManifest(validatedManifestInput, {
         sha256: createHash('sha256').update(bytes).digest('hex'),
         fileName: file.name,
@@ -70,6 +135,12 @@ export async function replaceAifaCatalog(
     });
 
     dbServer.transaction((transaction) => {
+        if (guard) {
+            guard.assertCurrent();
+            if (catalogSnapshot(transaction) !== guard.snapshot) {
+                throw new AifaUpdateError('Catalogo modificato durante il download: rileggi lo stato', 409);
+            }
+        }
         transaction.delete(drugs).run();
         for (let offset = 0; offset < parsed.drugs.length; offset += INSERT_BATCH_SIZE) {
             transaction.insert(drugs).values(parsed.drugs.slice(offset, offset + INSERT_BATCH_SIZE)).run();
@@ -81,7 +152,8 @@ export async function replaceAifaCatalog(
                 set: { value: JSON.stringify(manifest) },
             })
             .run();
-    });
+        guard?.assertCurrent();
+    }, guard ? { behavior: 'immediate' } : undefined);
 
     return {
         count: parsed.drugs.length,
@@ -133,7 +205,7 @@ export async function searchAifaCatalog(
         .from(drugs)
         .where(isMultiToken
             ? buildDrugSearchPredicate(normalized)
-            : buildDrugPrefixSearchPredicate(normalized))
+            : or(buildDrugPrefixSearchPredicate(normalized), eq(drugs.atc, normalized.toUpperCase())))
         .orderBy(
             ...(isMultiToken ? [] : [buildDrugPrefixSearchOrder(normalized)]),
             asc(drugs.name),
