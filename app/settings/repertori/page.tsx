@@ -18,6 +18,8 @@ import { useConfirm } from '@/components/ui/confirm-dialog';
 import { semanticSignalSurfaceClass } from '@/components/ui/semantic-signal';
 /* @Codex */
 import ExemptionDbManager from '@/components/settings/exemption-db-manager';
+/* @Codex */
+import ProstheticsCatalogManager from '@/components/prosthetics-catalog-manager';
 import { WhoSetupPanel } from '@/components/settings/who-setup-panel';
 import { SETTINGS_CARD_CLASS, SettingsSectionIntro } from '@/components/settings/settings-ui';
 
@@ -304,6 +306,7 @@ export default function SettingsRepertoriPage() {
                 </div>
 
                 <ExemptionDbManager />
+                <ProstheticsCatalogManager />
                 <WhoSetupPanel />
             </div>
         </section>

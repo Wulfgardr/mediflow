@@ -136,6 +136,7 @@ Approfondimenti utili:
 - Limiti JSON native/network e risposta 413: [ADR 0124](./adr/0124-bounded-native-network-json.md).
 - Aggiornamento AIFA con un clic, proposta da implementare e verificare: [ADR 0125](./adr/0125-explicit-aifa-catalog-download.md).
 - Import locale esenzioni, contratto candidato WUL-690: [ADR 0127](./adr/0127-atomic-local-exemption-import.md).
+- Repertorio protesica locale, contratto candidato WUL-693: [ADR 0133](./adr/0133-local-prosthetics-catalog-import.md).
 - Corpus documentale SISS/FSE 2.0: [docs/siss-fse-docs-corpus.md](./siss-fse-docs-corpus.md)
 - Integrazione ATHENA-style Treatment Reasoning: [docs/treatment-reasoning-athena-integration.md](./treatment-reasoning-athena-integration.md), [docs/adr/0073-treatment-reasoning-athena-boundary.md](./adr/0073-treatment-reasoning-athena-boundary.md)
 - Astrazione provider AI e boundary egress: [ADR 0077](./adr/0077-ai-provider-abstraction-and-egress-anonymization-boundary.md)

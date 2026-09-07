@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 /* @Codex */
 import { assertExemptionImportReceiptRows } from '../lib/exemption-import-receipt.ts';
+/* @Codex */
+import { assertProstheticsCatalogBackup } from '../lib/reference-data/prosthetics-catalog-backup.ts';
 
 import fs from 'fs';
 import os from 'os';
@@ -38,6 +40,8 @@ const BACKUP_TABLES = {
   entries: 'entries',
   exemptions: 'exemptions',
   exemptionImportReceipts: 'exemption_import_receipts',
+  prostheticsCatalogEntries: 'prosthetics_catalog_entries',
+  prostheticsCatalogReceipts: 'prosthetics_catalog_receipts',
   messages: 'messages',
   observations: 'observations',
   patients: 'patients',
@@ -147,8 +151,11 @@ export function canonicalizeHeadlessSoapActiveRoleAttestations(payload) {
 export async function serializeBackupArtifact(payload, createdAt = new Date()) {
   /* @Codex Same receipt validation and ordering as the web export. */
   assertExemptionImportReceiptRows(payload.exemptionImportReceipts ?? []);
+  assertProstheticsCatalogBackup(payload.prostheticsCatalogEntries ?? [], payload.prostheticsCatalogReceipts ?? []);
   const canonicalPayload = {
     ...canonicalizeHeadlessSoapActiveRoleAttestations(payload),
+    prostheticsCatalogEntries: payload.prostheticsCatalogEntries ?? [],
+    prostheticsCatalogReceipts: payload.prostheticsCatalogReceipts ?? [],
     exemptionImportReceipts: [...(payload.exemptionImportReceipts ?? [])].sort((a, b) => a.id - b.id),
   };
   const payloadSnapshot = normalizeJson(canonicalPayload);

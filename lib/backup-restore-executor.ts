@@ -2,6 +2,8 @@
 import { eq } from 'drizzle-orm';
 /* @Codex */
 import { assertExemptionImportReceiptRows } from './exemption-import-receipt';
+/* @Codex */
+import { assertProstheticsCatalogBackup } from './reference-data/prosthetics-catalog-backup';
 import { dbServer, runDbServerImmediateTransaction } from './db-server';
 import {
     ambulatories,
@@ -19,6 +21,8 @@ import {
     entries,
     exemptions,
     exemptionImportReceipts,
+    prostheticsCatalogEntries,
+    prostheticsCatalogReceipts,
     headlessSoapActiveRoleAttestations,
     headlessSoapEntryCommits,
     messages,
@@ -63,6 +67,8 @@ const CLEAR_ORDER: BackupCollectionName[] = [
     'drugs',
     'exemptions',
     'exemptionImportReceipts',
+    'prostheticsCatalogEntries',
+    'prostheticsCatalogReceipts',
     'ambulatories',
 ];
 
@@ -71,6 +77,8 @@ const INSERT_ORDER: BackupCollectionName[] = [
     'drugs',
     'exemptions',
     'exemptionImportReceipts',
+    'prostheticsCatalogEntries',
+    'prostheticsCatalogReceipts',
     'conversations',
     'patients',
     'physicianReviewAttestations',
@@ -110,6 +118,8 @@ const TABLE_LOOKUP = {
     entries,
     exemptions,
     exemptionImportReceipts,
+    prostheticsCatalogEntries,
+    prostheticsCatalogReceipts,
     messages,
     observations,
     patients,
@@ -206,7 +216,8 @@ function insertRows<T extends Record<string, unknown>>(
 ): void {
     if (rows.length === 0) return;
     for (const group of chunk(rows, 250)) {
-        runner.insert(table).values(group.map(normalizeInsertRow)).run();
+        /* @Codex Repertory dates are declared source text, not clinical timestamp columns. */
+        runner.insert(table).values(table === prostheticsCatalogEntries ? group : group.map(normalizeInsertRow)).run();
     }
 }
 
@@ -313,6 +324,7 @@ export function restoreBackupArtifact(
     beforeMutation: BackupRestoreMutationFence,
 ): void {
     assertExemptionImportReceiptRows(artifact.payload.exemptionImportReceipts ?? []);
+    assertProstheticsCatalogBackup(artifact.payload.prostheticsCatalogEntries ?? [], artifact.payload.prostheticsCatalogReceipts ?? []);
     revokeAttachmentExtractionLocatorGeneration();
     runDbServerImmediateTransaction(() => {
         assertCommandRecoveryIsRepresentable();

@@ -11,6 +11,8 @@ import { bootstrapEmptySqliteDatabase } from '@/lib/sqlite-new-database-bootstra
 import { initSqlitePragmas } from '@/lib/sqlite-pragmas';
 /* @Codex */
 import { ensureExemptionImportSchema } from '@/lib/exemption-catalog-schema';
+/* @Codex */
+import { ensureProstheticsCatalogSchema } from '@/lib/reference-data/prosthetics-catalog-schema';
 
 // Ensure the data directory exists in production or use project root for dev
 /* @Codex */
@@ -681,6 +683,7 @@ function applySchemaGuards() {
     }
     /* @Codex: fail closed on an unsupported import-receipt schema. */
     ensureExemptionImportSchema(sqlite);
+    ensureProstheticsCatalogSchema(sqlite);
     /* @Codex */
     try {
         const therapyColumns = (sqlite.prepare("PRAGMA table_info(therapies)").all() as TableInfoRow[]).map((col) => col.name);
