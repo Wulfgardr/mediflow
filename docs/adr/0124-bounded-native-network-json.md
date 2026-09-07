@@ -1,7 +1,7 @@
 # ADR 0124: JSON bounded per login native e network
 
 Date: 2026-09-07
-Status: Accepted (candidato locale WUL-669; integrazione da verificare)
+Status: Accepted
 
 ## Problema e contesto
 
@@ -71,9 +71,9 @@ coinvolgerebbe upload estranei; un nuovo parser duplicato creerebbe drift.
 Il riuso mantiene una sola implementazione del contatore. Il budget allegati
 e volutamente maggiore per conservare il wire cap esistente e gli escape.
 
-Impatto contrattuale: nuovi cap e 413 sulle operazioni elencate. Il parent deve
-allineare OpenAPI e indici nella propria lane prima della promozione; questa
-lane non modifica quei file. Non dichiarare `no contract impact`.
+Impatto contrattuale: nuovi cap e 413 sulle operazioni elencate. OpenAPI 1.24.0 e gli indici documentano le 26 operazioni JSON network.
+Il login native resta fuori dalla slice `/api/v1` ed è descritto qui.
+Non dichiarare `no contract impact`.
 
 ## Verifica e limite della consegna
 
