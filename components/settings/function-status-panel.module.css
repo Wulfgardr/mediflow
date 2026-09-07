@@ -36,7 +36,7 @@ details[open] > .advancedSummary::before { content: '−'; }
 .functionSettings [data-testid$='-kill-switch-card'] > div > div:first-child { flex: 1 1 260px; }
 .functionSettings p { font-size: 14px; line-height: 1.6; }
 .functionSettings [data-testid$='-kill-switch-card'] label { font-size: 13px; line-height: 1.5; min-height: 32px; display: inline-flex; align-items: center; padding: 4px 10px; letter-spacing: normal; text-transform: none; border-radius: var(--lume-control-radius); }
-.functionSettings button[role='switch'] { min-width: 52px; min-height: 44px; border-radius: var(--lume-control-radius); }
+.functionSettings button[role='switch'] { min-width: 52px; min-height: 44px; border-radius: var(--lume-control-radius); font-weight: 600; }
 .functionSettings button[role='switch'] > span { top: 12px; left: 6px; border-radius: var(--lume-control-radius); }
 .functionSettings details > div { margin-top: 16px; }
 @media (max-width: 480px) {

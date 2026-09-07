@@ -6,6 +6,7 @@ import Link from 'next/link';
 import serviceStyles from '@/components/service-architecture-panel.module.css';
 import { FabricCapabilityRegistry } from '@/components/settings/fabric-capability-registry';
 import { FunctionStatusPanel } from '@/components/settings/function-status-panel';
+import functionStyles from '@/components/settings/function-status-panel.module.css';
 import { FabricEgressSection } from '@/components/settings/fabric-egress-section';
 import { FabricErrorState, FabricLoadingState } from '@/components/settings/fabric-load-state';
 import { FabricVenueSection } from '@/components/settings/fabric-venue-section';
@@ -158,7 +159,7 @@ export default function SettingsAiFabricPage() {
             <FunctionStatusPanel />
 
             <details className={SETTINGS_CARD_CLASS}>
-            <summary className="cursor-pointer text-sm font-semibold">Dettagli tecnici: provider, connessioni e registro</summary>
+            <summary className={functionStyles.advancedSummary}>Dettagli tecnici: provider, connessioni e registro</summary>
 
             {state.kind === 'loading' ? <FabricLoadingState /> : null}
             {state.kind === 'unauthorized' ? <FabricErrorState unauthorized /> : null}

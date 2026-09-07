@@ -33,10 +33,19 @@
 
 .proposalDetail summary {
     width: fit-content;
+    min-height: var(--lume-control-height);
+    padding: 12px 0;
     cursor: pointer;
     color: var(--lume-ink);
     font-size: 14px;
     font-weight: 600;
+    line-height: 20px;
+}
+
+.proposalDetail summary:focus-visible {
+    outline: 2px solid var(--lume-accent);
+    outline-offset: 3px;
+    border-radius: var(--lume-control-radius);
 }
 
 .proposalDetail p {
