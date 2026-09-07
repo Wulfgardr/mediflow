@@ -1,0 +1,15 @@
+{
+  "owner": "OpenAI",
+  "sourcePage": "https://help.openai.com/en/articles/7905742-what-does-the-official-chatgpt-ios-app-icon-look-like",
+  "brandGuidelines": "https://openai.com/brand/",
+  "assetUrl": "https://images.ctfassets.net/j22is2dtoxu1/intercom-img-d177d076c9a5453052925143/49d5d812b0a6fcc20a14faa8c629d9fb/icon-ios-1024_401x.png",
+  "retrievedAt": "2026-09-07T22:10:16.407132+00:00",
+  "sha256": "e799e2fa0d4149a2ec28fc595c8bfb4990bcbb478649791b42acff7cde6e805e",
+  "dimensions": {
+    "width": 1024,
+    "height": 1024
+  },
+  "modifications": "None. Original PNG bytes; no cropping, recoloring or tracing.",
+  "use": "Identify the ChatGPT account in MediFlow settings; not MediFlow branding, endorsement, or evidence of inference availability.",
+  "license": "OpenAI Marks usage terms; not licensed under the application source code license."
+}

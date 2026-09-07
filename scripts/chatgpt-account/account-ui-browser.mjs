@@ -1,5 +1,6 @@
 /* @Codex: isolated component fixture; no product server, account login, or remote requests. */
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { build } from 'esbuild';
 import { chromium } from '@playwright/test';
 import postcss from 'postcss';
@@ -9,6 +10,10 @@ import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 
 const root = process.cwd();
+if (!process.env.MEDIFLOW_DATA_DIR) throw new Error('Temporary MEDIFLOW_DATA_DIR required');
+const markPath = join(root, 'public/brand/openai/chatgpt-mark.png');
+const markProvenance = JSON.parse(await readFile(join(root, 'public/brand/openai/chatgpt-mark.provenance.json'), 'utf8'));
+assert.equal(createHash('sha256').update(await readFile(markPath)).digest('hex'), markProvenance.sha256);
 const output = resolve(process.argv[2] ?? '/private/tmp/mediflow-086-release-followup/WUL-689-account-ui');
 await mkdir(output, { recursive: true, mode: 0o700 });
 const entry = join(output, 'fixture.tsx');
@@ -20,13 +25,14 @@ function Fixture() { const [active, setActive] = useState(true); return <main><h
 createRoot(document.getElementById('root')!).render(<Fixture/>);
 `);
 await build({ entryPoints: [entry], bundle: true, outfile: join(output, 'fixture.js'), jsx: 'automatic', platform: 'browser',
-    nodePaths: [join(root, 'node_modules')], tsconfig: join(root, 'tsconfig.json'), loader: { '.module.css': 'local-css' }, define: { 'process.env.NODE_ENV': '"test"' } });
+    nodePaths: [join(root, 'node_modules')], tsconfig: join(root, 'tsconfig.json'), loader: { '.module.css': 'local-css' }, define: { 'process.env.NODE_ENV': '"test"', 'process.env': '{}' } });
 const utilities = await postcss([tailwind({ base: root })]).process(`@import "tailwindcss" source(none); @source "${root}/components/settings/settings-ui.tsx"; @source "${root}/components/settings/chatgpt-account-card.tsx";`, { from: join(root, 'app/account-fixture.css') });
 const tokens = (await Promise.all(['lume-tokens.css','lume-motion.css','runtime-twin.css'].map(file => readFile(join(root, 'app', file), 'utf8')))).join('\n');
 await writeFile(join(output, 'base.css'), utilities.css + '\n' + tokens + '\nbody{margin:0;background:var(--lume-surface-canvas);color:var(--lume-ink);font-family:system-ui}main{width:calc(100% - 32px);max-width:1080px;margin:32px auto}h1{font-size:20px;margin-bottom:24px}#lock-fixture{margin-top:32px}');
 await writeFile(join(output, 'index.html'), '<!doctype html><html lang="it" data-runtime-twin-design="proposal" data-ui-style="redesign" data-twin-composition="stream"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>ChatGPT account — fixture sintetica</title><link rel="stylesheet" href="/base.css"><link rel="stylesheet" href="/fixture.css"><div id="root"></div><script src="/fixture.js"></script></html>');
 const files = new Set(['index.html','base.css','fixture.css','fixture.js']);
 const server = createServer(async (req,res) => {
+    if (req.url === '/brand/openai/chatgpt-mark.png') { res.setHeader('Content-Type', 'image/png'); res.end(await readFile(markPath)); return; }
     const name = req.url === '/' ? 'index.html' : req.url?.slice(1);
     if (!files.has(name)) { res.writeHead(404).end(); return; }
     res.setHeader('Content-Type', name.endsWith('.css') ? 'text/css' : name.endsWith('.js') ? 'text/javascript' : 'text/html');
@@ -46,7 +52,7 @@ try {
     const page = await browser.newPage({ reducedMotion: 'reduce' });
     let state = 'disconnected'; let notice = null; let delayedStart = null;
     const calls = [];
-    page.on('pageerror', error => evidence.errors.push(error.message));
+    page.on('pageerror', error => { evidence.errors.push(error.message); process.stderr.write(error.message + '\n'); });
     await page.route('**/*', async route => {
         const request = route.request(); const url = new URL(request.url());
         if (url.origin !== origin) { evidence.errors.push('unexpected external request'); return route.abort(); }
@@ -115,8 +121,19 @@ try {
     await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })));
     await panel.getByText('Non collegato',{exact:true}).waitFor(); evidence.states.push('page_restore');
     await page.locator('#lock-fixture').click(); await panel.getByText('Sessione bloccata',{exact:true}).waitFor(); assert.equal(await panel.getByRole('button').count(),0); evidence.states.push('locked');
+    for (const theme of ['light', 'dark']) {
+        await page.evaluate(theme => document.documentElement.classList.toggle('dark', theme === 'dark'), theme);
+        for (const width of [390, 965, 1440]) {
+            await geometry(width, `brand-${theme}`);
+            const logo = panel.getByRole('img', { name: 'Logo OpenAI', exact: true });
+            await logo.evaluate(img => img.decode());
+            const metrics = await logo.evaluate(img => { const style = getComputedStyle(img); const box = img.getBoundingClientRect(); return { width: box.width, height: box.height, naturalWidth: img.naturalWidth, naturalHeight: img.naturalHeight, filter: style.filter, objectFit: style.objectFit, background: style.backgroundColor, src: new URL(img.currentSrc).pathname }; });
+            assert.deepEqual(metrics, { width: 40, height: 40, naturalWidth: 1024, naturalHeight: 1024, filter: 'none', objectFit: 'contain', background: 'rgb(255, 255, 255)', src: '/brand/openai/chatgpt-mark.png' });
+            assert.equal(await panel.getByRole('status').filter({ hasText: 'Sessione bloccata' }).count(), 1);
+        }
+    }
     assert.equal(await page.evaluate(()=>localStorage.length+sessionStorage.length),0);
-    evidence.checks.push('no overlap/overflow','shared action height >=44px','keyboard disclosure','no automatic model/quota read','no storage','no external request','cancel/lock remove URL','late reply ignored');
+    evidence.checks.push('no overlap/overflow','shared action height >=44px','keyboard disclosure','no automatic model/quota read','no storage','no external request','cancel/lock remove URL','late reply ignored','official logo SHA256','unaltered local asset in light/dark','accessible textual status with logo');
     assert.deepEqual(evidence.errors,[]);
     await writeFile(join(output,'browser-results.json'),JSON.stringify(evidence,null,2));
     process.stdout.write(JSON.stringify({ pass:true, states:evidence.states, geometry:evidence.viewports.length, output })+'\n');
