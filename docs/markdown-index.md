@@ -33,6 +33,10 @@ Ultimo aggiornamento: 2026-09-07
 <!-- @Codex -->
 ## Consegna 0.8.6
 
+[Piano operativo configurazione e parità desktop](./analysis/2026-09-07-086-guided-configuration-plan.md):
+sei fasi della richiesta del 7 settembre, impostazioni, ChatGPT, scelte per
+funzione, cataloghi e verifica dei target. Sviluppo in corso, non prova di rilascio.
+
 [Verifica di rilascio 0.8.6](./analysis/2026-09-07-086-release-verification.md): fonte corrente
 per SHA, ricevute, correzioni PIN/allegati, test e limiti. Nessun finding
 reportabile residuo nel perimetro sorgente; pacchetto sorgente autorizzato,

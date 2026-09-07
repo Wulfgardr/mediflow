@@ -37,6 +37,14 @@ non sono verifiche della release 0.8.6.
 
 ## Aggiornamento di candidatura: 6–7 settembre 2026
 
+La richiesta successiva del 7 settembre riapre lo sviluppo per impostazioni
+guidate, ChatGPT, scelta del modello per esperienza, cataloghi e parità
+desktop. Il [piano operativo](./analysis/2026-09-07-086-guided-configuration-plan.md)
+fissa fasi e prove; queste capacità non sono ancora tutte implementate.
+VM Windows/Linux e disco Xcode sono nuovamente disponibili secondo l'utente;
+il loro impiego richiede verifica della fonte e dell'ambiente al momento del
+test. Le indisponibilità descritte sotto appartengono alle prove precedenti.
+
 Il [verbale integrato 0.8.6](./analysis/2026-09-06-086-integrated-closeout.md)
 conserva le prove storiche e registra i controlli sul candidato corrente.
 La navigazione web e Apple, i form progressivi e la scelta web tra barra
