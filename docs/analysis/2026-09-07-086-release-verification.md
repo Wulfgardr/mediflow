@@ -27,8 +27,10 @@ per istanza modulo prima della lettura e applica una deadline di lettura di
 Slot e contatore non coordinano processi diversi né limitano memoria già
 allocata dal trasporto. La deadline non copre il servizio. Non sono state
 misurate RSS, OOM o prestazioni sotto carico. Questi limiti non riaprono il
-finding specifico verificato. OpenAPI è aggiornato in una lane separata e
-richiede verifica del parent prima della promozione.
+finding specifico verificato. OpenAPI 1.24.0 è allineato in `735f5cd85`:
+cap, risposte 400/408/413/503 e `Retry-After` sono documentati.
+Il guard OpenAPI è passato; i due script di regressione sono inclusi nella
+raccolta canonica `test:unit` per la CI.
 
 Il confronto Git dei due file PIN con `cefa5c78` e dei sette file del fix con
 `be923328` non mostra differenze su `11a42f68`. Questo verifica l’integrazione
@@ -64,11 +66,15 @@ senza parent AIP fallisce chiusa. Il PASS MCP non è una prova Mini end-to-end.
 
 I volumi Xcode e VM sono indisponibili. Nessuna nuova esecuzione locale Swift
 XCTest, firma, UI nativa o prova multipiattaforma è attestata qui. La verifica
-UI iPhone–Mac/Home Base resta differita al post-release. Il parent prepara
-schermate web sintetiche da `e7f8a555a`: `worklist`, `record`, `diary`, `documents`,
-`access`, `analytics` sotto `docs/images/getmediflow-086/`. La loro presenza e
-revisione spettano alla lane immagini; questa lane ammette link ancora pendenti.
-Le immagini non provano esecuzione AI, estrazione AnyDoc o OCR.
+UI iPhone–Mac/Home Base resta differita al post-release. Le sei schermate Web
+sono state acquisite sul runtime di produzione `e7f8a555a`, con login ordinario
+e cartelle inventate: `worklist`, `record`, `diary`, `documents`, `access`,
+`analytics`. Il [manifest delle immagini](../images/getmediflow-086/manifest.json)
+riporta SHA, dimensioni e provenienza. Nessun ritocco della UI nelle immagini.
+La timeline è stata acquisita dopo la verifica della continuità fra i nodi.
+La schermata documentale mostra l'anteprima AnyDoc ottenuta con l'azione manuale
+di estrazione di un PDF dimostrativo; non mostra OCR o sintesi AI.
+Questa acquisizione prova quelle schermate, non la validazione completa dei flussi.
 
 Manca l’artefatto firmato di produzione con digest e verifica degli entitlements
 effettivi. È un’assenza di prova di distribuzione, non un finding di isolamento.
