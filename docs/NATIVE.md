@@ -280,6 +280,21 @@ distinti; il dettaglio normativo resta negli ADR auth/crypto.
 
 ### 2. Workspace clinico condiviso
 
+La scheda macOS distingue **Anagrafica**, **Clinica** e **Amministrazione**
+senza cambiare paziente o writer. Clinica e la vista iniziale: diagnosi,
+terapie attive caricate, follow-up, note e risultati da rivedere. Anagrafica
+raccoglie identita e contatti; Amministrazione raccoglie ambulatorio, stato,
+esenzioni e provenienza dell'archiviazione. Il cambio di area conserva
+l'editor esistente; il cambio paziente riparte da Clinica. I contatori delle
+terapie mantengono il limite della lista caricata; diagnosi ed esenzioni
+protette non diventano conteggi zero.
+
+Nei documenti, il conteggio compare dopo la lettura completata. Un archivio
+vuoto mostra direttamente i comandi di caricamento, soggetti ai permessi e
+alla sessione ordinari; non mostra una sezione di sintesi vuota. Dettagli,
+follow-up documentali e verifica FSE restano sui percorsi esistenti.
+Queste modifiche non introducono API, scoring, inferenza o writer nuovi.
+
 La shell SwiftUI espone lista e dettaglio paziente, diario rich text, terapie,
 checkup, osservazioni, prestazioni, protesica, documenti e report entro le
 capability concesse dall'home-base. Le superfici AI, OCR e document-derived

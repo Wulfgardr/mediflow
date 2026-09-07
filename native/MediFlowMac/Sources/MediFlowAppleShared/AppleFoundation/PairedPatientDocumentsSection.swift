@@ -26,16 +26,19 @@ struct PairedPatientDocumentsSection: View {
         VStack(alignment: .leading, spacing: ClinicalChartMetrics.groupSpacing) {
             documentsSection
 
-            Divider()
-            DisclosureGroup {
-                documentInsightsSection
-                    .padding(.top, 12)
-            } label: {
-                Text("Sintesi dei documenti")
-                    .font(.headline)
+            // @Codex: the empty archive starts with upload, not empty analyses.
+            if !model.attachments.isEmpty || !model.documentInsights.isEmpty || !model.evidenceStackInsights.isEmpty {
+                Divider()
+                DisclosureGroup {
+                    documentInsightsSection
+                        .padding(.top, 12)
+                } label: {
+                    Text("Sintesi dei documenti")
+                        .font(.headline)
+                }
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("documents-insights-disclosure")
             }
-            .accessibilityElement(children: .contain)
-            .accessibilityIdentifier("documents-insights-disclosure")
 
             followupSuggestionsSection
 
@@ -71,9 +74,10 @@ struct PairedPatientDocumentsSection: View {
         VStack(alignment: .leading, spacing: 10) {
             PairedPatientSectionHeader(model: model,
                 title: "Documenti",
-                subtitle: "Archivio allegati del paziente",
+                subtitle: "",
                 systemImage: "doc.text",
                 refreshIdentifier: "homebase-refresh-attachments-button",
+                itemCount: model.attachmentsLoadState == .loaded ? model.attachments.count : nil,
                 accent: .documenti
             ) {
                 Task { await model.loadSelectedPatientAttachments() }
@@ -81,18 +85,20 @@ struct PairedPatientDocumentsSection: View {
 
             attachmentList
 
-            Divider()
-
             if capabilities.hasCapability("network.replica.write-documents") {
-                DisclosureGroup(isExpanded: $isShowingUpload) {
+                if model.attachmentsLoadState == .loaded && model.attachments.isEmpty {
                     attachmentUploadControls
-                        .padding(.top, 12)
-                } label: {
-                    Label("Aggiungi documento", systemImage: "plus")
-                        .font(.subheadline.weight(.semibold))
+                } else {
+                    DisclosureGroup(isExpanded: $isShowingUpload) {
+                        attachmentUploadControls
+                            .padding(.top, 12)
+                    } label: {
+                        Label("Aggiungi documento", systemImage: "plus")
+                            .font(.subheadline.weight(.semibold))
+                    }
+                    .accessibilityElement(children: .contain)
+                    .accessibilityIdentifier("attachment-upload-disclosure")
                 }
-                .accessibilityElement(children: .contain)
-                .accessibilityIdentifier("attachment-upload-disclosure")
             } else if let message = capabilities.unavailableMessage(for: "network.replica.write-documents") {
                 Text(message)
                     .font(.caption)
@@ -147,10 +153,10 @@ struct PairedPatientDocumentsSection: View {
                     .fixedSize(horizontal: true, vertical: false)
                 VStack(alignment: .leading, spacing: 12) { attachmentSourceButtons }
             }
-            Text("Caricamento manuale, disponibile online. Se il Mac non risponde, il documento non viene accodato.")
+            Text("Carica un file o una foto. Il collegamento al Mac deve essere attivo.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
-            Text("AnyDoc estrae il testo sul Mac. Immagini e scansioni richiedono revisione.")
+            Text("Testo estratto, immagini e scansioni richiedono revisione.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
         }
