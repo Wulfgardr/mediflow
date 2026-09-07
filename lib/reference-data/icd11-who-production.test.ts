@@ -19,7 +19,7 @@ try {
         bootstrap.exec(fs.readFileSync(path.join('drizzle', file), 'utf8').replace(/^-->\s+statement-breakpoint\s*$/gmu, ''));
     }
 } finally { bootstrap.close(); }
-const { writeWhoLocalReceiptAudit } = await import('./icd11-who-production.ts');
+const { writeWhoLocalReceiptAudit, writeWhoCodeCheckAudit } = await import('./icd11-who-production.ts');
 const { listAuditEvents } = await import('../security/audit.ts');
 const { dbServer } = await import('../db-server.ts');
 after(() => { dbServer.$client.close(); fs.rmSync(dataDir, { recursive: true, force: true }); });
@@ -87,4 +87,24 @@ test('production audit rejects extra data and invalid provenance before writing'
         await assert.rejects(writeWhoLocalReceiptAudit(input as WhoLocalReceipt), /^Error: Invalid WHO local audit receipt$/u);
     }
     assert.deepEqual(await listAuditEvents({ eventType: 'reference_data.icd11.search' }), baseline);
+});
+
+test('code-check audit persists only provenance and outcome, never code or title', async () => {
+    const input = {
+        schemaVersion: 'mediflow.reference-data.icd11-code-check-receipt.v1' as const,
+        operation: 'mediflow.reference_data.icd11.code_check.v1' as const,
+        releaseId: '2026-01' as const, language: 'en' as const, bindingId: WHO_LOCAL_BINDING_ID,
+        imageDigest: `sha256:${'a'.repeat(64)}`, datasetSnapshotId: `sha256:${'b'.repeat(64)}`,
+        source: 'live' as const, found: true, checkedAt: '2026-09-07T12:00:00.000Z', latencyMs: 24,
+    };
+    const id = await writeWhoCodeCheckAudit(input);
+    const events = await listAuditEvents({ eventType: 'reference_data.icd11.code_check' });
+    const saved = events.find(event => event.eventId === id);
+    assert.ok(saved);
+    assert.equal(saved.redactedMetadata?.counts, 1);
+    assert.ok(saved.redactedMetadata?.flags?.includes(`image:${input.imageDigest}`));
+    assert.ok(saved.redactedMetadata?.flags?.includes(`dataset:${input.datasetSnapshotId}`));
+    assert.equal(saved.subjectRef, null);
+    await assert.rejects(writeWhoCodeCheckAudit({ ...input, code: 'AA00' } as typeof input));
+    assert.deepEqual(await listAuditEvents({ eventType: 'reference_data.icd11.code_check' }), events);
 });

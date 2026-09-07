@@ -6,6 +6,7 @@ import { useForm, useFieldArray, Control, Controller, FieldErrors, UseFormRegist
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Save, User, Phone, MapPin, HeartHandshake, FileText, Activity, Plus, Trash2, AlertTriangle, Calendar, Ticket, ChevronDown } from 'lucide-react';
 import ICDAutocomplete from '@/components/icd-autocomplete';
+import { WhoCodeCheck } from '@/components/who-code-check';
 /* @Codex */
 import ExemptionSelector from '@/components/exemption-selector';
 import { estimateBirthYearFromTaxCode, calculateAge } from '@/lib/utils';
@@ -119,6 +120,13 @@ function DiagnosesFieldArray({ control, register, errors, setValue, watch }: { c
                                 </details>}
                                 {errors.diagnoses?.[index]?.description && (
                                     <span className="mf-field-error block">Campo obbligatorio</span>
+                                )}
+                                {(watch(`diagnoses.${index}.system`) || 'ICD-11') === 'ICD-11' && Boolean(watch(`diagnoses.${index}.code`)) && (
+                                    <WhoCodeCheck
+                                        key={`${watch(`diagnoses.${index}.code`)}-${watch(`diagnoses.${index}.reference`)?.releaseId ?? '2026-01'}`}
+                                        code={watch(`diagnoses.${index}.code`) || ''}
+                                        release={watch(`diagnoses.${index}.reference`)?.releaseId ?? '2026-01'}
+                                    />
                                 )}
                             </div>
                         </div>

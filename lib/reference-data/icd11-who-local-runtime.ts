@@ -3,11 +3,14 @@ import { ICD11_WHO_BINDING, Icd11WhoServiceError, type Icd11WhoServiceErrorCode 
 import { parseIcd11WhoOfficialSearchBody } from './icd11-who-official-search-parser.ts';
 import { isWhoArtifactDigest, resolveWhoSearchReference, WHO_LOCAL_BINDING_ID, WHO_LOCAL_TTL_MS,
     type WhoLocalEntry, type WhoLocalReceipt, type WhoLocalReadiness, type WhoLocalSearchResult } from './icd11-who-local-contract.ts';
+import { isWhoCheckCode, parseWhoCodeCheckResult, WHO_CODE_CHECK_SCHEMA, type WhoCodeCheckReceipt, type WhoCodeCheckResult } from './icd11-who-code-check-contract';
+import type { WhoCodeCheckTransport } from './icd11-who-local-node-transport';
 
 export type WhoLocalTransport = (query: string, signal: AbortSignal) => Promise<Readonly<{ status: number; body: string }>>;
 type Sources = Readonly<{
     readEnvironment(name: string): unknown; now(): number;
     transport: WhoLocalTransport; audit(receipt: WhoLocalReceipt): void | Promise<void>;
+    codeCheckTransport?: WhoCodeCheckTransport; auditCodeCheck?(receipt: WhoCodeCheckReceipt): void | Promise<void>;
 }>;
 type Config = Readonly<{ enabled: boolean; imageDigest: string | null; datasetSnapshotId: string | null }>;
 type Cached = Readonly<{ entries: readonly WhoLocalEntry[]; partial: boolean; fetchedAt: number; expiresAt: number; bytes: number }>;
@@ -183,7 +186,46 @@ export function createIcd11WhoLocalRuntime(sources: Sources) {
             throw error;
         } finally { active.delete(controller); }
     };
+    const checkCode = async (code: string, signal?: AbortSignal): Promise<WhoCodeCheckResult> => {
+        if (!isWhoCheckCode(code) || (signal !== undefined && !(signal instanceof AbortSignal))) throw new Icd11WhoServiceError('input_invalid');
+        gate();
+        if (!sources.codeCheckTransport || !sources.auditCodeCheck) throw new Icd11WhoServiceError('upstream_unavailable');
+        const started = clock(), revision = generation;
+        const controller = new AbortController();
+        const abort = () => controller.abort('request_cancelled');
+        if (signal?.aborted) throw new Icd11WhoServiceError('request_cancelled');
+        signal?.addEventListener('abort', abort, { once: true });
+        active.add(controller);
+        try {
+            const entry = await bounded(sources.codeCheckTransport(code, controller.signal), controller, ICD11_WHO_BINDING.timeoutMs, 'request_timeout');
+            current(revision, controller);
+            const checked = clock();
+            current(revision, controller);
+            const receipt: WhoCodeCheckReceipt = Object.freeze({
+                schemaVersion: 'mediflow.reference-data.icd11-code-check-receipt.v1',
+                operation: 'mediflow.reference_data.icd11.code_check.v1', source: 'live', found: entry !== null,
+                releaseId: '2026-01', language: 'en', bindingId: WHO_LOCAL_BINDING_ID,
+                imageDigest: config.imageDigest!, datasetSnapshotId: config.datasetSnapshotId!,
+                checkedAt: new Date(checked).toISOString(), latencyMs: checked - started,
+            });
+            const result = parseWhoCodeCheckResult({ schemaVersion: WHO_CODE_CHECK_SCHEMA, code,
+                status: entry === null ? 'not_found' : 'found', entry, receipt }, code);
+            if (!result) throw new Icd11WhoServiceError('response_invalid');
+            try { await bounded(Promise.resolve(sources.auditCodeCheck(receipt)), controller, ICD11_WHO_BINDING.auditTimeoutMs, 'audit_unavailable'); }
+            catch (error) {
+                if (error instanceof Icd11WhoServiceError && error.code === 'request_cancelled') throw error;
+                throw new Icd11WhoServiceError('audit_unavailable');
+            }
+            clock(); current(revision, controller);
+            lastLive = checked; observed = 'available'; lastResultSource = 'live';
+            return result;
+        } catch (error) {
+            if (revision === generation && !disposed) observed = 'unavailable';
+            if (error instanceof Icd11WhoServiceError) throw error;
+            throw new Icd11WhoServiceError('upstream_unavailable');
+        } finally { active.delete(controller); signal?.removeEventListener('abort', abort); }
+    };
     const dispose = () => { if (disposed) return false; disposed = true; invalidate(); return true; };
-    return Object.freeze({ readiness, search, dispose });
+    return Object.freeze({ readiness, search, checkCode, dispose });
 }
 export type Icd11WhoLocalRuntime = ReturnType<typeof createIcd11WhoLocalRuntime>;

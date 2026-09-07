@@ -100,7 +100,41 @@ Fonte: [WHO API v2, CodeInfo e combinazioni](https://icd.who.int/docs/icd-api/Wh
 Questa estensione del riferimento non abilita cross-check, autocode o export
 FHIR e non qualifica l'uso clinico della classificazione.
 
-### Attivazione, stato e cache
+### Verifica esplicita del codice — integrazione 0.8.6, WUL-673
+
+Search per termini e verifica del codice sono operazioni distinte. La nuova
+route autenticata `GET /api/icd/code-check?code=...&release=2026-01` usa soltanto
+il CodeInfo ufficiale sul medesimo sidecar e, per il codice trovato, legge il
+titolo dell'entita base indicata da WHO. La release richiesta e obbligatoria e
+deve coincidere con quella fissa; un'altra release viene rifiutata prima di
+contattare il servizio. Nessuna conversione a codici terminali o flexible mode.
+
+Il codice e ASCII maiuscolo, massimo 32 caratteri, con separatori `&` e `/`
+espliciti. Ogni path e costruito sul server: l'URI dell'entita base e prima
+validato nel namespace MMS/release fissati e non viene seguito come URL.
+Le due letture condividono il budget di 5 secondi, 64 KiB per risposta e la
+cancellazione; redirect, risposta incoerente e fallimento negano il risultato.
+Il 404 CodeInfo produce `not_found`, distinto da indisponibilita. Per una
+combinazione il titolo e dichiaratamente quello del codice base: non viene
+presentato come descrizione dell'intera combinazione.
+
+Il DTO conserva codice richiesto, esito, riferimento WHO, release, lingua e
+identita di immagine/dataset. La receipt dedicata riporta istante, latenza ed
+esito senza codice, titolo o query nell'audit. La verifica e sempre diretta:
+nessuna cache o validita futura implicita. Prima della risposta il server
+ricontrolla configurazione, generazione e autorita della sessione; disattivazione,
+lock o cambio binding non possono pubblicare un risultato tardivo.
+
+Il controllo non modifica la cartella, non attesta correttezza della diagnosi,
+eleggibilita o adeguatezza clinica, e non abilita automaticamente export/FHIR.
+I risultati con release storica non vengono riscritti. La nuova UI puo rendere
+visibile la verifica accanto al codice e offrire una scelta esplicita successiva.
+
+Contratto verificato su OpenAPI WHO `GetCodeInfo` e risposte locali del 7
+settembre 2026: codice singolo e combinazione 200, codice inesistente 404,
+entita base con titolo inglese. Le prove HTTP/UI integrate restano gate separati.
+
+### Attivazione del servizio
 
 - `MEDIFLOW_ICD_WHO_ENABLED=1` e opt-in server esplicito; senza di esso zero
   richieste e nessuna lettura delle credenziali. Il trasporto locale non legge

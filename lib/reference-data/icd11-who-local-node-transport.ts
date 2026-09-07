@@ -3,9 +3,63 @@ import http from 'node:http';
 import { Buffer } from 'node:buffer';
 import { ICD11_WHO_BINDING, Icd11WhoServiceError } from './icd11-who-service.ts';
 import type { WhoLocalTransport } from './icd11-who-local-runtime.ts';
+import { isWhoCheckCode, parseWhoCodeInfo, parseWhoStemTitle, type WhoCheckedCode } from './icd11-who-code-check-contract';
 
 const SEARCH_PATH = '/icd/release/11/2026-01/mms/search';
 const decoder = new TextDecoder('utf-8', { fatal: true });
+
+export type WhoCodeCheckTransport = (code: string, signal: AbortSignal) => Promise<WhoCheckedCode | null>;
+
+/** Fixed host only. Paths are constructed by the two factories below. */
+function readLocalJson(path: string, signal: AbortSignal, requestImpl: typeof http.request, allowNotFound = false): Promise<Readonly<{ status: number; body: string }>> {
+    return new Promise((resolve, reject) => {
+        let settled = false;
+        let request: http.ClientRequest | undefined;
+        const chunks: Buffer[] = [];
+        let bytes = 0;
+        const fail = (code: 'upstream_unavailable' | 'response_invalid' | 'request_cancelled') => {
+            if (settled) return;
+            settled = true; chunks.length = 0; signal.removeEventListener('abort', abort);
+            request?.destroy(); reject(new Icd11WhoServiceError(code));
+        };
+        const abort = () => fail('request_cancelled');
+        try {
+            if (signal.aborted) { abort(); return; }
+            request = requestImpl({
+                protocol: 'http:', hostname: '127.0.0.1', port: 8382,
+                path, method: 'GET', agent: false, signal,
+                headers: { 'API-Version': 'v2', Accept: 'application/json', 'Accept-Language': 'en' },
+            }, response => {
+                // 404 is meaningful only for CodeInfo; no redirects or remote recovery.
+                if (response.statusCode !== 200 && !(allowNotFound && response.statusCode === 404)) {
+                    response.destroy(); fail('upstream_unavailable'); return;
+                }
+                const status = response.statusCode!;
+                response.on('data', (chunk: unknown) => {
+                    if (settled) return;
+                    if (!Buffer.isBuffer(chunk) || bytes + chunk.byteLength > ICD11_WHO_BINDING.maxResponseBytes) {
+                        response.destroy(); fail('response_invalid'); return;
+                    }
+                    bytes += chunk.byteLength; chunks.push(chunk);
+                });
+                response.once('error', () => fail(signal.aborted ? 'request_cancelled' : 'upstream_unavailable'));
+                response.once('aborted', () => fail('upstream_unavailable'));
+                response.once('end', () => {
+                    if (settled) return;
+                    let body: string;
+                    try { body = decoder.decode(Buffer.concat(chunks, bytes)); }
+                    catch { fail('response_invalid'); return; }
+                    settled = true; chunks.length = 0; signal.removeEventListener('abort', abort);
+                    resolve(Object.freeze({ status, body }));
+                });
+            });
+            request.once('error', () => fail(signal.aborted ? 'request_cancelled' : 'upstream_unavailable'));
+            signal.addEventListener('abort', abort, { once: true });
+            if (signal.aborted) abort();
+            if (!settled) request.end();
+        } catch { fail('upstream_unavailable'); }
+    });
+}
 
 /** Factory is host-internal. No endpoint or request implementation comes from a Web caller. */
 export function createIcd11WhoLocalNodeTransport(requestImpl: typeof http.request = http.request): WhoLocalTransport {
@@ -17,48 +71,26 @@ export function createIcd11WhoLocalNodeTransport(requestImpl: typeof http.reques
         if (signal.aborted) throw new Icd11WhoServiceError('request_cancelled');
         const parameters = new URLSearchParams({ q: query, flatResults: 'true', highlightingEnabled: 'false',
             medicalCodingMode: 'true', includeKeywordResult: 'false' });
-        return new Promise((resolve, reject) => {
-            let settled = false;
-            let request: http.ClientRequest | undefined;
-            const chunks: Buffer[] = [];
-            let bytes = 0;
-            const fail = (code: 'upstream_unavailable' | 'response_invalid' | 'request_cancelled') => {
-                if (settled) return;
-                settled = true; chunks.length = 0; signal.removeEventListener('abort', abort);
-                request?.destroy(); reject(new Icd11WhoServiceError(code));
-            };
-            const abort = () => fail('request_cancelled');
-            try {
-                request = requestImpl({
-                    protocol: 'http:', hostname: '127.0.0.1', port: 8382,
-                    path: `${SEARCH_PATH}?${parameters}`, method: 'GET', agent: false, signal,
-                    headers: { 'API-Version': 'v2', Accept: 'application/json', 'Accept-Language': 'en' },
-                }, response => {
-                    // No redirect following, token request, DNS target or remote recovery branch.
-                    if (response.statusCode !== 200) { response.destroy(); fail('upstream_unavailable'); return; }
-                    response.on('data', (chunk: unknown) => {
-                        if (settled) return;
-                        if (!Buffer.isBuffer(chunk) || bytes + chunk.byteLength > ICD11_WHO_BINDING.maxResponseBytes) {
-                            response.destroy(); fail('response_invalid'); return;
-                        }
-                        bytes += chunk.byteLength; chunks.push(chunk);
-                    });
-                    response.once('error', () => fail(signal.aborted ? 'request_cancelled' : 'upstream_unavailable'));
-                    response.once('aborted', () => fail('upstream_unavailable'));
-                    response.once('end', () => {
-                        if (settled) return;
-                        let body: string;
-                        try { body = decoder.decode(Buffer.concat(chunks, bytes)); }
-                        catch { fail('response_invalid'); return; }
-                        settled = true; chunks.length = 0; signal.removeEventListener('abort', abort);
-                        resolve(Object.freeze({ status: 200, body }));
-                    });
-                });
-                request.once('error', () => fail(signal.aborted ? 'request_cancelled' : 'upstream_unavailable'));
-                signal.addEventListener('abort', abort, { once: true });
-                if (signal.aborted) abort();
-                if (!settled) request.end();
-            } catch { fail('upstream_unavailable'); }
-        });
+        return readLocalJson(`${SEARCH_PATH}?${parameters}`, signal, requestImpl);
+    };
+}
+
+export function createIcd11WhoCodeCheckTransport(requestImpl: typeof http.request = http.request): WhoCodeCheckTransport {
+    return async (code, signal) => {
+        if (!isWhoCheckCode(code) || !(signal instanceof AbortSignal)) throw new Icd11WhoServiceError('input_invalid');
+        const response = await readLocalJson(`/icd/release/11/2026-01/mms/codeinfo/${encodeURIComponent(code)}?flexiblemode=false&convertToTerminalCodes=false`, signal, requestImpl, true);
+        if (response.status === 404) return null;
+        let info: ReturnType<typeof parseWhoCodeInfo>;
+        try { info = parseWhoCodeInfo(JSON.parse(response.body), code); }
+        catch { throw new Icd11WhoServiceError('response_invalid'); }
+        if (!info) throw new Icd11WhoServiceError('response_invalid');
+        // The validated namespace is reduced to a path. The URI is never fetched as a URL.
+        const entityPath = info.stemUri.slice('http://id.who.int'.length);
+        const entity = await readLocalJson(entityPath, signal, requestImpl);
+        let title: string | null;
+        try { title = parseWhoStemTitle(JSON.parse(entity.body), info); }
+        catch { throw new Icd11WhoServiceError('response_invalid'); }
+        if (!title) throw new Icd11WhoServiceError('response_invalid');
+        return Object.freeze({ ...info, stemTitle: title });
     };
 }

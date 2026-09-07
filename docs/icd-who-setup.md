@@ -46,8 +46,13 @@ malformata, codici/URI duplicati o un body oltre 64 KiB negano la risposta.
 Le combinazioni di codici conservano il codice completo e un riferimento
 ufficiale CodeInfo, dopo la verifica dei componenti restituiti da Search.
 Questo riferimento non attesta una verifica clinica o una chiamata CodeInfo
-per ciascun risultato. Search cerca termini: l'inserimento di un codice non
-equivale al lookup del codice, che resta un percorso da completare.
+per ciascun risultato. Search cerca termini. **Verifica codice WHO**, nei
+Repertori o accanto a una diagnosi ICD-11, avvia invece CodeInfo e la lettura
+del titolo del codice base: codice riconosciuto, non trovato e servizio non
+disponibile sono esiti distinti. La cartella non viene modificata dal controllo.
+Una fonte che dichiara una release diversa viene segnalata, senza ricodifica.
+Per combinazioni, il titolo inglese mostrato riguarda esplicitamente il codice
+base, non l'intera combinazione.
 
 - `disabled`: opt-in assente;
 - `configuration_required`: identificatori assenti o invalidi;
@@ -131,6 +136,10 @@ assegnate alla prova, non requisiti minimi misurati per ogni target.
 - Application Service MediFlow: risposta diretta, nessun risultato e cache
   verificati, con DTO validato e audit raccolto dal probe. Questa prova non
   attraversa ancora la route HTTP autenticata o l'interfaccia del paziente.
+- CodeInfo attraverso l'Application Service e il sidecar reale: `1A00` e
+  `1A00&XN8P1` riconosciuti, titolo del codice base recuperato; `ZZ9999` non
+  trovato. Tre receipt dedicate validate dal client, senza uso del database
+  paziente. La verifica non usa cache e non converte codici o release.
 
 Le due prove offline interrogano il loopback **dentro il container**: il network
 Docker interno non esponeva la porta al Mac. Dopo il ripristino, il binding
@@ -158,6 +167,7 @@ limiti, cache, timeout e manifesto. Non usano un servizio WHO o un corpus reale.
 
 ```bash
 node scripts/run-strip-types.mjs --test lib/reference-data/icd11-who-local-*.test.ts
+node scripts/run-strip-types.mjs --test lib/reference-data/icd11-who-code-check.test.ts lib/reference-data/icd11-who-production.test.ts
 node --test scripts/check-who-local-sidecar-manifest.test.mjs
 ```
 
@@ -179,7 +189,7 @@ precedenti. I test Core verificano round-trip, forma storica e fonti sconosciute
 Il modulo web tratta i due campi opzionali null come assenti, senza riscrivere
 diagnosi invariate; una modifica effettiva omette le chiavi vuote. Le prove di
 round-trip includono questi record, oltre alle selezioni WHO con fonte completa.
-Export, altri caller, migrazioni storiche, lookup/cross-check, certificazione
+Export, altri caller, migrazioni storiche, certificazione
 e prova UI autenticata WHO restano da completare; il §1.2.3 dei termini WHO
 resta un requisito da valutare anche per tali flussi prima della promozione.
 

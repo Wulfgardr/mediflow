@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createICDReferenceDataClient, icdClientErrorMessage, icdReadinessMessage, type ICDReadiness, type ICDSearchReceipt } from '@/lib/icd-service';
 import { SETTINGS_CARD_CLASS, SETTINGS_SECONDARY_BUTTON_CLASS } from './settings-ui';
+import { WhoCodeCheckForm } from '@/components/who-code-check';
 
 export function WhoSetupPanel() {
     const [refresh, setRefresh] = useState(0);
@@ -45,6 +46,7 @@ export function WhoSetupPanel() {
                 : 'Nessuna risposta diretta ancora osservata.'}
         </p>}
         {probe.kind === 'error' && <p className="mt-3 text-sm" role="alert">Verifica non riuscita: {probe.message} <time dateTime={probe.at}>{new Date(probe.at).toLocaleTimeString('it-IT')}</time></p>}
+        <WhoCodeCheckForm />
         <details className="mt-5 text-sm">
             <summary className="cursor-pointer font-medium">Configurazione sul server</summary>
             <ol className="mt-3 list-decimal space-y-2 pl-5 leading-6">
