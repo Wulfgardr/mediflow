@@ -1,3 +1,5 @@
+/* @Codex */
+import { readNativeNetworkJson, jsonBodyTooLargeResponse } from '@/lib/native-network-json-body';
 /* @Codex baseline, Claude A18: paired ambulatory scope list */
 import { NextResponse } from 'next/server';
 import { authenticateNetworkPairedClient } from '@/lib/network-home-base-server';
@@ -41,9 +43,12 @@ export async function POST(request: Request) {
     try {
         const resolved = await requireNetworkWriteContext(request, NETWORK_AMBULATORY_WRITE_CAPABILITY);
         if (!resolved.ok) return resolved.response;
-        const result = await createNetworkAmbulatory(resolved.context, await request.json() as Record<string, unknown>);
+        const result = await createNetworkAmbulatory(resolved.context, await readNativeNetworkJson(request) as Record<string, unknown>);
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
+        /* @Codex */
+        const sizeError = jsonBodyTooLargeResponse(error);
+        if (sizeError) return sizeError;
         console.error('API POST /api/v1/network/ambulatories error:', error);
         return NextResponse.json({ error: 'Failed to create ambulatory' }, { status: 500 });
     }

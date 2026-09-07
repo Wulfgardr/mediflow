@@ -1,7 +1,7 @@
 /* @Codex */
-import { NextResponse } from 'next/server';
+import { readNativeNetworkJson, jsonBodyTooLargeResponse, networkAttachmentJsonMaxBytes } from '@/lib/native-network-json-body';
 /* @Codex */
-import { resolveMaxAttachmentBytes } from '@/lib/attachment-payload';
+import { NextResponse } from 'next/server';
 /* @Codex */
 import {
     NETWORK_ATTACHMENT_READ_CAPABILITY,
@@ -37,21 +37,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         const resolved = await requireNetworkWriteContext(request, NETWORK_ATTACHMENT_WRITE_CAPABILITY);
         if (!resolved.ok) return resolved.response;
 
-        // Same Content-Length precheck as the host attachment upload
-        // (app/api/attachments/route.ts): fail fast before parsing a body
-        // that is already known to exceed the shared wire size limit.
-        const contentLength = Number.parseInt(request.headers.get('content-length') ?? '', 10);
-        if (Number.isFinite(contentLength) && contentLength > resolveMaxAttachmentBytes()) {
-            return NextResponse.json({ error: 'Attachment payload too large' }, { status: 413 });
-        }
-
-        const body = await request.json() as Record<string, unknown>;
+        const body = await readNativeNetworkJson(request, networkAttachmentJsonMaxBytes()) as Record<string, unknown>;
         const result = await createNetworkScopedAttachment(
             { ...resolved.context, patientId: id },
             body,
         );
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
+        /* @Codex */
+        const sizeError = jsonBodyTooLargeResponse(error);
+        if (sizeError) return sizeError;
         console.error('API POST /api/v1/network/patients/[id]/attachments error:', error);
         return NextResponse.json({ error: 'Failed to create attachment' }, { status: 500 });
     }
