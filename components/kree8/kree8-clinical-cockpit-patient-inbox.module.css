@@ -799,8 +799,10 @@
 /* @Codex: separate the search field, list heading and patient rows. */
 :global(html[data-runtime-twin-design='proposal']) :is(.inboxScope, .patientScopeActions) { gap: var(--lume-control-gap); }
 :global(html[data-runtime-twin-design='proposal']) .patientSearchRow { margin-top: var(--lume-group-gap); gap: var(--lume-control-gap); }
-:global(html[data-runtime-twin-design='proposal']) .worklistPanelHeader { margin-top: var(--lume-group-gap); margin-bottom: 8px; column-gap: var(--lume-control-gap); row-gap: var(--lume-control-gap); }
-:global(html[data-runtime-twin-design='proposal']) .resultCount { font-size: 13px; line-height: 20px; }
-:global(html[data-runtime-twin-design='proposal']) .worklistPanelHeader > h2 { margin: 0; }
+:global(html[data-runtime-twin-design='proposal']) .worklistPanelHeader { margin-top: var(--lume-group-gap); margin-bottom: 8px; column-gap: var(--lume-control-gap); row-gap: var(--lume-control-gap); align-items: baseline; }
+/* @Codex: the count is supporting prose, aligned to the title's text baseline. */
+:global(html[data-runtime-twin-design='proposal']) .resultCount { font-family: inherit; font-size: 14px; line-height: 20px; letter-spacing: normal; }
+:global(html[data-runtime-twin-design='proposal']) .worklistPanelHeader > h2 { margin: 0; font-size: 20px; line-height: 28px; }
+:global(html[data-runtime-twin-design='proposal']) .worklistPanelHeader > span:last-child { align-self: center; }
 :global(html[data-runtime-twin-design='proposal']) .recordIdentity strong { font-size: 16px; }
 :global(html[data-runtime-twin-design='proposal']) .patientRow { border-radius: 0; }

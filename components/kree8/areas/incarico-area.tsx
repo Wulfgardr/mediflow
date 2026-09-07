@@ -417,7 +417,7 @@ function IncaricoArea({
               {/* @Codex: the page already names the patient directory. */}
               {list === 'attivi' ? 'Elenco' : 'Archivio'}
             </h2>
-            <span className={classNames(patientStyles.resultCount, 'lume-registro')}>
+            <span className={patientStyles.resultCount}>
               {/* @Codex */}
               {visible.length} {visible.length === 1 ? 'risultato' : 'risultati'}
             </span>
