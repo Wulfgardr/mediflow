@@ -8,7 +8,7 @@
 .actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .surface button, .surface select, .surface input[type='text'], .surface summary,
 .surface a, .selector button, .selector select, .selector input {
-    min-height: 44px; max-width: 100%; border-radius: 12px; font-size: 14px;
+    min-height: 44px; max-width: 100%; border-radius: 12px; font-size: 14px; font-weight: 600;
 }
 .surface select, .surface input[type='text'], .selector select, .selector input { width: 100%; min-width: 0; }
 .surface button, .selector button { white-space: normal; overflow-wrap: anywhere; }
@@ -19,7 +19,8 @@
     outline: 2px solid var(--lume-accent); outline-offset: 2px;
 }
 .hint { font-size: 13px; line-height: 1.5; color: var(--lume-ink-muted); }
-.status { display: flex; align-items: center; gap: 8px; min-height: 32px; font-size: 13px; }
+.status { display: inline-flex; align-items: center; gap: 8px; min-height: 32px; border: 1px solid color-mix(in srgb, var(--lume-ink) 18%, transparent); border-radius: 12px; padding: 4px 10px; font-size: 13px; font-weight: 600; }
+.notice { min-height: 32px; font-size: 14px; line-height: 1.6; }
 .presets { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr)); gap: 8px; }
 .preset { padding: 16px; text-align: left; border: 1px solid color-mix(in srgb, var(--lume-ink) 18%, transparent); }
 .preset[aria-pressed='true'] { outline: 2px solid var(--lume-accent); outline-offset: -2px; }

@@ -186,7 +186,7 @@ export function ModelSelector({ selectorId, label, description, icon, value, onC
                     <RefreshCw aria-hidden="true" className="h-4 w-4" />
                     {loading ? 'Lettura modelli…' : 'Aggiorna modelli installati'}
                 </button>
-                <p id={`installed-status-${selectorId}`} role="status" className={styles.status}>
+                <p id={`installed-status-${selectorId}`} role="status" className={styles.notice}>
                     {!targetUrl ? 'Inserisci prima l’indirizzo di Ollama.' : loading ? 'Lettura da Ollama in corso…'
                         : error ? error : installedModels.length === 0 ? 'Nessun modello installato in Ollama.'
                             : `${installedModels.length} modelli presenti in Ollama.`}
@@ -195,68 +195,72 @@ export function ModelSelector({ selectorId, label, description, icon, value, onC
                     <p className={styles.hint}>La selezione attuale «{value}» non è presente nell’elenco. Scegli un modello installato o consulta i consigli.</p>
                 )}
                 <p className={styles.hint}>La presenza in elenco non abilita le funzioni cliniche. I consigli non sono una verifica sul tuo computer.</p>
-                <h5 className="text-sm font-semibold">Modelli consigliati e scelta personalizzata</h5>
             </div>
 
             <div className="space-y-2">
                 {!showCustom ? (
                     <div className="grid gap-2">
-                        {recommended.map((model) => {
-                            const installed = isInstalled(model.name);
-                            const selected = isInstalledOllamaModel([value], model.name);
+                        <details>
+                            <summary>Altri modelli e download</summary>
+                            <div className="grid gap-2">
+                                {recommended.map((model) => {
+                                    const installed = isInstalled(model.name);
+                                    const selected = isInstalledOllamaModel([value], model.name);
 
-                            return (
-                                // @Codex WUL-229: option card switches to mf-option-card primitive with style-driven selection accent
-                                <div
-                                    key={model.name}
-                                    className={cn('mf-option-card relative flex flex-wrap items-center justify-between gap-2 !p-4', selected && 'is-active z-10')}
-                                    style={selected ? c.selectedCardStyle : undefined}
-                                >
-                                    <button type="button" onClick={() => onChange(model.name)} aria-pressed={selected}
-                                        className={styles.recommendation}>
+                                    return (
+                                        // @Codex WUL-229: option card switches to mf-option-card primitive with style-driven selection accent
                                         <div
-                                            className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border"
-                                            style={selected
-                                                ? { borderColor: 'var(--lume-ink)', background: 'var(--lume-ink)' }
-                                                : { borderColor: 'rgba(112,106,100,0.28)' }}
+                                            key={model.name}
+                                            className={cn('mf-option-card relative flex flex-wrap items-center justify-between gap-2 !p-4', selected && 'is-active z-10')}
+                                            style={selected ? c.selectedCardStyle : undefined}
                                         >
-                                            {selected && <div className={`h-1.5 w-1.5 rounded-full ${c.selectedDot}`} />}
-                                        </div>
-                                        <div className="min-w-0">
-                                            <span className="lume-registro block truncate text-sm font-semibold" style={{ color: 'var(--lume-ink)' }}>{model.name}</span>
-                                            <span className="mt-0.5 block text-[13px] leading-5" style={{ color: 'var(--lume-ink-muted)' }}>{model.desc}</span>
-                                        </div>
-                                    </button>
-
-                                    <div className="flex shrink-0 items-center gap-2">
-                                        {installed ? (
-                                            <span
-                                                className={styles.status}
-                                                style={c.installedBadgeStyle}
-                                            >
-                                                <Check className="w-3 h-3" /> Installato
-                                            </span>
-                                        ) : (
-                                            <button type="button"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handlePull(model.name);
-                                                }}
-                                                aria-label={`Scarica ${model.name}`}
-                                                disabled={isPulling}
-                                                className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[13px] font-semibold transition-colors disabled:opacity-60"
-                                                style={c.downloadBadgeStyle}
-                                            >
-                                                {isPulling && pullingModel === model.name ? (
-                                                    <RefreshCw className="w-3 h-3" />
-                                                ) : <Download className="w-3 h-3" />}
-                                                Scarica
+                                            <button type="button" onClick={() => onChange(model.name)} aria-pressed={selected}
+                                                className={styles.recommendation}>
+                                                <div
+                                                    className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border"
+                                                    style={selected
+                                                        ? { borderColor: 'var(--lume-ink)', background: 'var(--lume-ink)' }
+                                                        : { borderColor: 'rgba(112,106,100,0.28)' }}
+                                                >
+                                                    {selected && <div className={`h-1.5 w-1.5 rounded-full ${c.selectedDot}`} />}
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <span className="lume-registro block truncate text-sm font-semibold" style={{ color: 'var(--lume-ink)' }}>{model.name}</span>
+                                                    <span className="mt-0.5 block text-[13px] leading-5" style={{ color: 'var(--lume-ink-muted)' }}>{model.desc}</span>
+                                                </div>
                                             </button>
-                                        )}
-                                    </div>
-                                </div>
-                            );
-                        })}
+
+                                            <div className="flex shrink-0 items-center gap-2">
+                                                {installed ? (
+                                                    <span
+                                                        className={styles.status} data-lume-status
+                                                        style={c.installedBadgeStyle}
+                                                    >
+                                                        <Check className="w-3 h-3" /> Installato
+                                                    </span>
+                                                ) : (
+                                                    <button type="button"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handlePull(model.name);
+                                                        }}
+                                                        aria-label={`Scarica ${model.name}`}
+                                                        disabled={isPulling}
+                                                        className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[13px] font-semibold transition-colors disabled:opacity-60"
+                                                        style={c.downloadBadgeStyle}
+                                                    >
+                                                        {isPulling && pullingModel === model.name ? (
+                                                            <RefreshCw className="w-3 h-3" />
+                                                        ) : <Download className="w-3 h-3" />}
+                                                        Scarica
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </details>
 
                         {/* @Codex WUL-229: secondary toggles use mf-btn-secondary */}
                         <button
