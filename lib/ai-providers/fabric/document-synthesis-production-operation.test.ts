@@ -21,6 +21,8 @@ const {
     createDocumentSynthesisProductionOperationForTest,
     resolveDocumentSynthesisAnyDocProjection,
 } = await import('./document-synthesis-production-operation.ts');
+const { composeAnyDocCurrentSelectionExtraction } = await import('../../domain/documents/anydoc-current-source-composition.ts');
+const { serverSessionProjectionOwnerRegistry } = await import('../../security/server-session-projection-owner-production.ts');
 
 import { issueSyntheticWebSession, issueSyntheticWebSessionContext, retireSyntheticWebSession } from '../../security/web-auth-lifecycle-owner-test-fixture.ts';
 import { resolve, retire } from '../../security/web-auth-lifecycle-owner-adapter.ts';
@@ -82,12 +84,11 @@ function extractedWithAppleVision(attachmentId: string, markdown = 'Fonte sintet
 afterEach(() => { for (const session of webSessions.splice(0)) retireSyntheticWebSession(session); clearAllSessions(); });
 after(() => rmSync(DATA_DIRECTORY, { recursive: true, force: true }));
 
-function context() {
-    const registry = createFullPortProjectionOwnerFactory({
+function context(registry = createFullPortProjectionOwnerFactory({
         clock: () => Date.now(),
         entropy: () => Uint8Array.from({ length: 16 }, (_, index) => index + 1),
         resolve: (_session, pair) => Object.freeze({ ...pair, patientVersion: 1 }),
-    });
+    })) {
     const web = issueSyntheticWebSessionContext(USER, `document-synthesis-${webSessions.length}`);
     const session = web.session;
     webSessions.push(session);
@@ -108,6 +109,48 @@ function context() {
     };
     return Object.freeze({ session, owner, web, resolveContext });
 }
+
+test('preserves the confirmed selection through real AnyDoc composition and DS preview', async () => {
+    const attachmentId = 'attachment.synthetic.document';
+    const bytes = Buffer.from('{\\rtf1\\ansi Fonte sintetica da composizione reale.}');
+    const database = new Database(path.join(DATA_DIRECTORY, 'medical.db'));
+    try {
+        database.prepare('INSERT INTO ambulatories (id, name, type) VALUES (?, ?, ?)')
+            .run(PAIR.ambulatoryId, 'Ambulatorio sintetico', 'test');
+        database.prepare('INSERT INTO patients (id, first_name, last_name, tax_code, version) VALUES (?, ?, ?, ?, 1)')
+            .run(PAIR.patientId, 'Persona', 'Sintetica', 'SYNTHETICDS000001');
+        database.prepare('INSERT INTO patients_to_ambulatories (patient_id, ambulatory_id) VALUES (?, ?)')
+            .run(PAIR.patientId, PAIR.ambulatoryId);
+        database.prepare('INSERT INTO attachments (id, patient_id, name, type, size, path, data, document_source_ref, document_revision, document_freshness_epoch) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+            .run(attachmentId, PAIR.patientId, 'synthetic.rtf', 'application/rtf', bytes.length, 'synthetic.rtf', bytes.toString('base64'),
+                CURRENT.documentSourceRef, CURRENT.documentRevision, CURRENT.documentFreshnessEpoch);
+    } finally { database.close(); }
+    const selected = context(serverSessionProjectionOwnerRegistry);
+    const epochs = () => [selected.owner.snapshotSelectionEpoch(selected.session), selected.owner.snapshotReviewContextEpoch(selected.session)];
+    assert.deepEqual(epochs(), [1, 1]);
+    let entropy = 0; let executions = 0;
+    const factory = createDocumentSynthesisProductionOperationForTest({
+        acquireContext: async () => selected.resolveContext(),
+        readCurrentness: () => CURRENT,
+        readLaneEnabled: () => true,
+        extract: (session, id) => composeAnyDocCurrentSelectionExtraction(session, { attachmentId: id }),
+        execute: async () => { executions++; return Object.freeze({ publication: 'synthetic' }); },
+        entropy: () => Uint8Array.from({ length: 16 }, () => ++entropy),
+    });
+    const acquire = async () => { const operation = await factory.acquire(); assert.ok(operation); return operation; };
+    const captured = await (await acquire()).capture({ attachmentId });
+    assert.equal(captured.status, 'available');
+    const ingested = await (await acquire()).ingest({ captureHandle: captured.captureHandle });
+    assert.equal(ingested.code, null);
+    assert.equal(ingested.status, 'available');
+    assert.deepEqual(epochs(), [1, 1]);
+    assert.deepEqual(await (await acquire()).preview({ previewHandle: ingested.previewHandle }),
+        { status: 'available', code: null, publication: { publication: 'synthetic' } });
+    assert.deepEqual(epochs(), [1, 1]);
+    assert.equal((await (await acquire()).ingest({ captureHandle: captured.captureHandle })).code, 'capture_consumed');
+    assert.equal((await (await acquire()).preview({ previewHandle: ingested.previewHandle })).code, 'preview_consumed');
+    assert.equal(executions, 1);
+});
 
 test('shares DS handles across fresh authentic projections only within their canonical owner', async () => {
     const selected = context(); const other = context();

@@ -93,6 +93,16 @@ function denied(): LocalExtractionResult { return publishFinalizedResult(buildAn
 export async function composeAnyDocCurrentSourceExtraction(session: ServerSession, selector: unknown): Promise<LocalExtractionResult> {
     const id = attachmentId(selector); if (!id) return denied();
     if (!bindAttachmentExtractionSelection(session, id)) return denied();
+    return extractSelectedSource(session, selector, id);
+}
+
+/** Uses the active canonical selection; missing or stale authority remains denied. */
+export async function composeAnyDocCurrentSelectionExtraction(session: ServerSession, selector: unknown): Promise<LocalExtractionResult> {
+    const id = attachmentId(selector); if (!id) return denied();
+    return extractSelectedSource(session, selector, id);
+}
+
+async function extractSelectedSource(session: ServerSession, selector: unknown, id: string): Promise<LocalExtractionResult> {
     let authority: ReturnType<typeof createAttachmentExtractionSourceAuthority>;
     try { authority = createAttachmentExtractionSourceAuthority(session); }
     catch { return denied(); }

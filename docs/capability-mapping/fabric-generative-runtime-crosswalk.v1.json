@@ -90,7 +90,7 @@
       "productionRoot": "lib/ai-providers/fabric/document-synthesis-production-operation.ts",
       "productionRootLiterals": [
         "acquireDocumentSynthesisProductionOperation",
-        "composeAnyDocCurrentSourceExtraction",
+        "composeAnyDocCurrentSelectionExtraction",
         "createDocumentSynthesisFabricProductionComposition"
       ],
       "requestPath": {
