@@ -4,6 +4,8 @@ import { useState, useRef, useEffect } from 'react';
 import styles from '@/components/scales/scale-workspace.module.css';
 /* @Codex: keep answered scales within the prototype navigation guard. */
 import { useRuntimeTwinPendingForm } from '@/components/runtime-twin-design';
+/* @Codex: button-driven cancellation needs the same explicit draft decision as links. */
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 // @Codex MF085-003: neutral types keep validators executable without React.
 import { calculateScaleResult, isScaleAnswerValid, type ScaleDefinition } from '@/lib/scale-validation';
@@ -17,6 +19,7 @@ interface ScaleEngineProps {
 }
 
 export default function ScaleEngine({ scale, onComplete, onCancel, showHeading = true }: ScaleEngineProps) {
+    const confirm = useConfirm();
     const [answers, setAnswers] = useState<Record<string, string | number>>({});
     useRuntimeTwinPendingForm(Object.keys(answers).length > 0);
     const [currentStep, setCurrentStep] = useState(0);
@@ -32,6 +35,20 @@ export default function ScaleEngine({ scale, onComplete, onCancel, showHeading =
     const handleAnswer = (questionId: string, value: string | number) => {
         setValidationError(null);
         setAnswers(prev => ({ ...prev, [questionId]: value }));
+    };
+
+    /* @Codex: retaining a draft must leave answers, question and context mounted. */
+    const handleCancel = async () => {
+        if (Object.keys(answers).length > 0) {
+            const result = await confirm({
+                title: 'Lasciare la compilazione?',
+                message: 'È aperta una compilazione. Le modifiche non salvate andranno perse.',
+                confirmLabel: 'Esci senza salvare',
+                cancelLabel: 'Continua a scrivere',
+            });
+            if (!result.confirmed) return;
+        }
+        onCancel();
     };
 
     const handleNext = () => {
@@ -138,7 +155,7 @@ export default function ScaleEngine({ scale, onComplete, onCancel, showHeading =
 
             <div className={styles.actions}>
                 <button
-                    onClick={onCancel}
+                    onClick={() => { void handleCancel(); }}
                     className={styles.control}
                 >
                     Annulla
