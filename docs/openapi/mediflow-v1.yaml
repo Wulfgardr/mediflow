@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: MediFlow Local API v1
-  version: 1.23.0
+  version: 1.24.0
   summary: Stable patient contract plus executable home-base network slice with explicit pairing review, paired-client auth boundary, ambulatory scope options, scoped remote patient, cross-patient agenda and diary reads, therapy, checkup, observation, and catalog read boundaries, replica planning state, explicit identity summary, and declarative AI runtime summary for the local `/api/v1` surface.
   description: |
     OpenAPI contract for the client-facing local API defined by ADR 0010.
@@ -30,6 +30,12 @@ info:
     remote hard delete, remote attachment/document writes, remote inference
     routing, remote therapy/checkup/observation hard delete, and advanced
     identity scoping remain follow-up workstreams.
+    ADR 0124 bounds serialized network JSON bodies in UTF-8 bytes: 64 KiB for
+    pairing intents, 4 MiB for other JSON operations, and the attachment formula
+    declared on its operation (154 MiB by default). Oversize bodies return 413
+    JSON_BODY_TOO_LARGE. These are new input-size restrictions; fields are not
+    truncated. Existing admission/auth and separate field limits still apply.
+    The reader bounds consumed bytes, not global memory, concurrency or time.
 servers:
   - url: https://127.0.0.1:3443
     description: Local HTTPS endpoint for native clients via TLS proxy.
@@ -367,6 +373,7 @@ paths:
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/visit-draft:
     post:
+      x-mediflow-json-max-bytes: 4194304
       tags:
         - Network
       operationId: computeNetworkVisitDraft
@@ -439,6 +446,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
     post:
+      x-mediflow-json-max-bytes: 65536
       tags:
         - Network
       operationId: createNetworkPairingIntent
@@ -473,6 +481,8 @@ paths:
           $ref: '#/components/responses/InvalidNetworkPairingIntent'
         '409':
           $ref: '#/components/responses/NetworkModeDisabled'
+        '413':
+          $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/pairing-intents/{intentId}/confirm:
@@ -615,6 +625,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
     post:
+      x-mediflow-json-max-bytes: 4194304
       tags:
         - Network
       operationId: createNetworkAmbulatory
@@ -641,10 +652,13 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '409':
           $ref: '#/components/responses/VersionConflict'
+        '413':
+          $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/ambulatories/{id}:
     put:
+      x-mediflow-json-max-bytes: 4194304
       tags:
         - Network
       operationId: updateNetworkAmbulatory
@@ -675,9 +689,12 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/VersionConflict'
+        '413':
+          $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
           $ref: '#/components/responses/InternalServerError'
     delete:
+      x-mediflow-json-max-bytes: 4194304
       tags:
         - Network
       operationId: deleteNetworkAmbulatory
@@ -714,10 +731,13 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/VersionConflict'
+        '413':
+          $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/ambulatories/clear:
     post:
+      x-mediflow-json-max-bytes: 4194304
       tags:
         - Network
       operationId: clearNetworkTestAmbulatory
@@ -754,6 +774,8 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/VersionConflict'
+        '413':
+          $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/drugs:
@@ -1049,6 +1071,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
     post:
+      x-mediflow-json-max-bytes: 4194304
       tags:
         - Network
       operationId: createNetworkServicePrescription
@@ -1082,10 +1105,13 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '413':
+          $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/service-prescriptions/{id}:
     put:
+      x-mediflow-json-max-bytes: 4194304
       tags:
         - Network
       operationId: updateNetworkServicePrescription
@@ -1128,6 +1154,8 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/PrescriptionVersionConflict'
+        '413':
+          $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/service-prescription-items:
@@ -1177,6 +1205,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
     post:
+      x-mediflow-json-max-bytes: 4194304
       tags:
         - Network
       operationId: createNetworkServicePrescriptionItem
@@ -1210,10 +1239,13 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '413':
+          $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/service-prescription-items/{id}:
     put:
+      x-mediflow-json-max-bytes: 4194304
       tags:
         - Network
       operationId: updateNetworkServicePrescriptionItem
@@ -1257,6 +1289,8 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/PrescriptionVersionConflict'
+        '413':
+          $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/service-catalog:
@@ -1358,6 +1392,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
     post:
+      x-mediflow-json-max-bytes: 4194304
       tags:
         - Network
       operationId: createNetworkProstheticPrescription
@@ -1391,10 +1426,13 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '413':
+          $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/prosthetic-prescriptions/{id}:
     put:
+      x-mediflow-json-max-bytes: 4194304
       tags:
         - Network
       operationId: updateNetworkProstheticPrescription
@@ -1438,6 +1476,8 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/PrescriptionVersionConflict'
+        '413':
+          $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/patients:
@@ -1487,6 +1527,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
     post:
+      x-mediflow-json-max-bytes: 4194304
       tags:
         - Network
       operationId: createNetworkPatient
@@ -1531,6 +1572,8 @@ paths:
           $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '413':
+          $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/checkups:
@@ -1692,6 +1735,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
     put:
+      x-mediflow-json-max-bytes: 4194304
       tags:
         - Network
       operationId: updateNetworkPatient
@@ -1748,9 +1792,12 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/PatientVersionConflict'
+        '413':
+          $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
           $ref: '#/components/responses/InternalServerError'
     delete:
+      x-mediflow-json-max-bytes: 4194304
       tags:
         - Network
       operationId: deleteNetworkPatient
@@ -1799,10 +1846,13 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/PatientVersionConflict'
+        '413':
+          $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/patients/{id}/restore:
     post:
+      x-mediflow-json-max-bytes: 4194304
       tags:
         - Network
       operationId: restoreNetworkPatient
@@ -1850,6 +1900,8 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/PatientVersionConflict'
+        '413':
+          $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/patients/{id}/entries:
@@ -1914,6 +1966,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
     post:
+      x-mediflow-json-max-bytes: 4194304
       tags:
         - Network
       operationId: createNetworkPatientEntry
@@ -1964,6 +2017,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '413':
+          $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/patients/{id}/entries/{entryId}:
@@ -2009,6 +2064,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
     put:
+      x-mediflow-json-max-bytes: 4194304
       tags:
         - Network
       operationId: updateNetworkPatientEntry
@@ -2071,6 +2127,8 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/EntryVersionConflict'
+        '413':
+          $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/patients/{id}/therapies:
@@ -2135,6 +2193,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
     post:
+      x-mediflow-json-max-bytes: 4194304
       tags:
         - Network
       operationId: createNetworkPatientTherapy
@@ -2184,6 +2243,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '413':
+          $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/patients/{id}/therapies/{therapyId}:
@@ -2229,6 +2290,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
     put:
+      x-mediflow-json-max-bytes: 4194304
       tags:
         - Network
       operationId: updateNetworkPatientTherapy
@@ -2290,6 +2352,8 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/TherapyVersionConflict'
+        '413':
+          $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/patients/{id}/checkups:
@@ -2354,6 +2418,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
     post:
+      x-mediflow-json-max-bytes: 4194304
       tags:
         - Network
       operationId: createNetworkPatientCheckup
@@ -2403,6 +2468,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '413':
+          $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/patients/{id}/checkups/{checkupId}:
@@ -2448,6 +2515,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
     put:
+      x-mediflow-json-max-bytes: 4194304
       tags:
         - Network
       operationId: updateNetworkPatientCheckup
@@ -2509,6 +2577,8 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/CheckupVersionConflict'
+        '413':
+          $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/patients/{id}/observations:
@@ -2573,6 +2643,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
     post:
+      x-mediflow-json-max-bytes: 4194304
       tags:
         - Network
       operationId: createNetworkPatientObservation
@@ -2627,6 +2698,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '413':
+          $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/patients/{id}/observations/{observationId}:
@@ -2672,6 +2745,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
     put:
+      x-mediflow-json-max-bytes: 4194304
       tags:
         - Network
       operationId: updateNetworkPatientObservation
@@ -2733,6 +2807,8 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/ObservationVersionConflict'
+        '413':
+          $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/patients/{id}/attachments:
@@ -2775,6 +2851,8 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
     post:
+      x-mediflow-json-max-bytes: 161480704
+      x-mediflow-json-max-bytes-formula: "6 * MEDIFLOW_ATTACHMENT_MAX_BYTES + 4194304; default shown above"
       tags:
         - Network
       operationId: createNetworkPatientAttachment
@@ -2923,6 +3001,7 @@ paths:
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/fse/validate-document:
     post:
+      x-mediflow-json-max-bytes: 4194304
       tags:
         - Network
       operationId: validateNetworkFseDocument
@@ -2954,6 +3033,8 @@ paths:
           $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '413':
+          $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
           $ref: '#/components/responses/InternalServerError'
 components:
@@ -3052,7 +3133,7 @@ components:
               value:
                 error: Not found
     PayloadTooLarge:
-      description: Attachment payload exceeds the configured wire size limit shared with the host attachment upload.
+      description: The serialized JSON body or a separately bounded field exceeds its operation limit. Attachment data retains its configured wire size limit; visit transcripts retain their character limit.
       content:
         application/json:
           schema:
@@ -3061,6 +3142,21 @@ components:
             tooLarge:
               value:
                 error: Attachment payload too large
+            jsonBodyTooLarge:
+              value:
+                error: JSON payload too large
+                code: JSON_BODY_TOO_LARGE
+    NetworkJsonBodyTooLarge:
+      description: Serialized JSON body exceeds the inclusive UTF-8 byte limit declared by the operation (ADR 0124). No partial payload is applied.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            jsonBodyTooLarge:
+              value:
+                error: JSON payload too large
+                code: JSON_BODY_TOO_LARGE
     VersionConflict:
       description: Ambulatory compare-on-write conflict. Refresh the returned PHI-safe snapshot before retrying.
       content:
