@@ -30,8 +30,9 @@ Informazioni, fonti e prossimi passi. Un po’ più facili da ritrovare.
 
 > **0.8.6: navigazione rinnovata e correzioni guidate dalla review di sicurezza.**
 > Gli addenda indipendenti chiudono il difetto PIN e il finding LOW sugli allegati
-> nel perimetro revisionato. La [release GitHub](https://github.com/Wulfgardr/mediflow/releases/tag/v0.8.6)
-> identifica il sorgente distribuito e riporta le prove di promozione.
+> nel perimetro revisionato. La [PR 351](https://github.com/Wulfgardr/mediflow/pull/351)
+> è aperta; la release 0.8.6 non è ancora pubblicata. CI e qualificazione delle
+> nuove capacità restano necessarie prima della distribuzione.
 > La UI segue [ADR 0123](./docs/adr/0123-official-web-ui-navigation-compositions.md):
 > B predefinita e A alternativa. Le immagini 0.8.6 usano soltanto dati sintetici.
 > La verifica UI iPhone–Mac/Home Base resta differita al post-release;
