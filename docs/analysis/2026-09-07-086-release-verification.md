@@ -2,7 +2,7 @@
 
 Aggiornamento: 7 settembre 2026. Programma WUL-669.
 
-**7 settembre 2026 — correzioni sorgente verificate; CI e pubblicazione pendenti.**
+**7 settembre 2026 — candidato locale aggiornato; pubblicazione sospesa.**
 Il blocco contrattuale PIN è chiuso a livello sorgente dall'addendum indipendente
 `SOURCE_REVIEW_PASS` su `cefa5c78f43ada28e9d74f2d65e5f2173b15edb8`.
 Il finding LOW `csf_e6ea8156c1fde74d61ebf750`, emerso nel primo addendum JSON,
@@ -10,8 +10,12 @@ ha esito `FIX_VERIFIED` su `be9233282c0ab18759b0e679b877d9dc30af5a99`.
 I due file PIN e i sette file della correzione allegati sono identici nel
 candidato integrato `11a42f68effbdc11cd6371bf050a6e2e074de5b3`.
 Non restano finding reportabili nel sorgente revisionato; questo non certifica
-la sicurezza generale. Il rilascio del pacchetto sorgente è autorizzato ma
-attende CI verde. CI finale, PR, merge e tag non sono ancora attestati.
+la sicurezza generale. La [PR 351](https://github.com/Wulfgardr/mediflow/pull/351)
+è aperta su `c2db2521a28b0e98007a2b8702da076b8bc9a056`, senza merge.
+Le modifiche successive sono locali. Ulteriori push, merge, tag e release
+restano sospesi: oltre alla CI verde, è richiesta la qualificazione del nuovo
+percorso ChatGPT/Codex. Quel collegamento non è ancora implementato o verificato;
+le prove Ollama e MCP riportate qui non lo attestano.
 
 ## Disposizioni degli addenda indipendenti
 
@@ -20,6 +24,7 @@ attende CI verde. CI finale, PR, merge e tag non sono ancora attestati.
 | PIN | `1d633d98d0a093623c8c4f488815af804c769a6e..cefa5c78f43ada28e9d74f2d65e5f2173b15edb8` | `SOURCE_REVIEW_PASS`, zero finding. Successo ed esiti ambigui ritirano autorità e presentazione locali; il conflitto pre-CAS tipizzato mantiene l’autorità. Parse Swift e never-regress PASS nella ricevuta; nessun XCTest o runtime Apple eseguito dalla review. |
 | Primo addendum JSON | `1d633d98d0a093623c8c4f488815af804c769a6e..61ca67191c7a78955dcc097254c7cc988f715242` | `SOURCE_REVIEW_HOLD`: LOW `csf_e6ea8156c1fde74d61ebf750`, disponibilità del processo. Digest 30/30 verificati; 68/68 test dichiarati dall’owner, non rieseguiti dal reviewer. Questo esito resta storico. |
 | Correzione allegati | `e7f8a555ac697c36adc60a36132a776e39d19a72..be9233282c0ab18759b0e679b877d9dc30af5a99` | `FIX_VERIFIED`: digest 7/7, test sintetici 63/63, typecheck focalizzato, ESLint e diff-check PASS nella verifica indipendente. |
+| Document Synthesis | `6d4b66f82c154045baf73ea62be7890417a90ed4..9fe74f2573c455ae2f8439f1b47adee767414f3c` | `SOURCE_REVIEW_PASS`: 15/15 test indipendenti, zero finding. Risorsa privata Web, selezione confermata e invalidazione asincrona; nessuna esecuzione browser da parte del reviewer. |
 
 La correzione allegati riduce il cap JSON a 30.408.704 byte, riserva uno slot
 per istanza modulo prima della lettura e applica una deadline di lettura di
@@ -60,6 +65,54 @@ attribuisce una causa ai precedenti fallimenti. La CI remota resta distinta.
 I precedenti log falliti, inclusi tentativi in sandbox e prove Swift locali,
 restano evidenze storiche fuori Git. Nessun conteggio è stato riclassificato
 retroattivamente. Le prove piattaforma precedenti conservano i propri SHA.
+
+## Interfaccia e navigazione delle impostazioni
+
+Il runtime Web compilato da `9fe74f2573c455ae2f8439f1b47adee767414f3c`
+ha superato build webpack, TypeScript e controllo standalone/AnyDoc.
+Dodici stati sono stati osservati nel browser a 1440, 965 e 390 px, con
+login ordinario e soli dati inventati. La verifica usa Playwright locale;
+il plugin Browser non era disponibile.
+
+- Panoramica è presente nella navigazione interna: da Profilo, Aspetto e
+  Ambulatori si torna alla pagina iniziale senza usare il menu superiore.
+- I comandi misurati hanno altezza 44 px e raggio 12 px, inclusi Nuova voce,
+  Checkup host, Azioni, Nuova prestazione e Dettagli.
+- La ricerca è separata dal titolo dell'elenco; nei Repertori le etichette
+  complete non si sovrappongono al comando Dettagli.
+- Nei dodici stati non è stato rilevato overflow orizzontale. I tre errori
+  console corrispondono a GET `/api/icd/proxy` con risposta 503, nella demo
+  priva di servizio WHO configurato: non è una verifica con console pulita.
+
+Le immagini e le misure sono conservate nella ricevuta privata
+`ui-harmony-9fe/ui-harmony-qa.json`. Le sei immagini pubbliche acquisite su
+`e7f8a555a` sono precedenti a questi ritocchi e devono essere sostituite prima
+del rilascio. Gli stati AI non vengono alterati nelle immagini.
+
+La prima prova ordinaria Document Synthesis su `9fe74f257` si ferma con
+`context_missing` prima della conferma: il contesto dell'ambulatorio è assente
+nella sessione nuova. Nessuna richiesta alle route AI è stata osservata.
+Il riesame sorgente verde non chiude questo problema del percorso reale.
+
+## CI: risultati conservati e correzioni locali
+
+La CI E2E della PR su `c2db2521` ha raccolto 187 casi: **131 PASS, 5 FAIL,
+2 flaky e 49 SKIP**. Restano i fallimenti relativi alla lettura delle etichette
+AI, alla precondizione WHO e all'asserzione console dei tre web smoke;
+i due casi flaky riguardano la densità della lista. Nelle tracce esaminate i
+409 provengono da `/api/auth/lock`, non da scritture cliniche. La causa interna
+dell'invalidazione non confermata non è stata dimostrata dalle sole tracce.
+
+Il commit locale `d7d3271de` prepara la fixture E2E sotto `os.tmpdir()`, marca
+i dati sintetici e mantiene il divieto di copia legacy nei passi successivi.
+Parsing YAML, `bash -n`, seed reale su directory nuova e precondizioni WHO
+invariate sono passati con Node 24.19.0: un utente sintetico, zero pazienti,
+un ambulatorio predefinito. Non è una nuova esecuzione CI o browser.
+
+La compilazione Apple in CI ha inoltre rilevato un'assegnazione a una proprietà
+con setter privato nel nuovo test PIN. La correzione locale `2831cf427`
+mantiene l'asserzione sullo stato della nuova sessione; il parse è passato,
+ma la CI Apple sul nuovo commit resta da eseguire.
 
 ## MCP, Mini e limiti di distribuzione
 
@@ -114,3 +167,5 @@ provano identità del contenuto, non esecuzione indipendente di questa lane.
 | `unit-integrated-unsandboxed.log` | `a0fd4a3856f61dd5d3319385093ae4938743d4238c1dec8774bf0bde8375f001` |
 | `anydoc-composition-idle.log` | `8d17c1659eefbf487802610018d535e392667dadd9896bf0369f8407521d53c8` |
 | `attachment-budget-integrated.log` | `dacb6899a0843245e55a0d9f913fb7dbeaea65c71bc6bd650d78af86ae213427` |
+| `daybreak-ds-addendum/addendum.md` | `d4a2499d8078732f553751c97265a2271e037351b55ee0ed1da54e1d87ba5900` |
+| `daybreak-ds-addendum/review-receipt.json` | `995e5c6b555f850ceecbfbcf94462193a8fea995e3af52fbd932f92b28973d6f` |
