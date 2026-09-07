@@ -27,6 +27,7 @@ const webAuthOwnerRoster = [
   'index.d.ts',
   'index.js',
   'internal/control-record.cjs',
+  'internal/native-session.cjs', // @Codex: canonical owner 0.8.7 roster
   'internal/owner.cjs',
   'internal/session-activation.cjs',
   'internal/session-cell.cjs',
@@ -121,9 +122,13 @@ test('standalone checker proves web auth owner physical copy and restart denial'
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
 
   const source = fs.readFileSync(checker, 'utf8');
-  assert.match(source, /WEB_AUTH_OWNER_VERSION = '0\.8\.6'/);
+  assert.match(source, /WEB_AUTH_OWNER_VERSION = '0\.8\.7'/); // @Codex
   assert.match(source, /['"]withCurrentResourceBinding['"]/);
-  assert.match(source, /root is not the frozen exact 21-function API/);
+  assert.match(source, /root is not the frozen exact owner API with native session namespace/); // @Codex
+  // @Codex: 0.8.7 adds the native session surface; the runtime self-test validates its exact keys.
+  const frozenApi = source.match(/const WEB_AUTH_OWNER_KEYS = Object\.freeze\(\[([\s\S]*?)\]\)/)?.[1];
+  assert.ok(frozenApi);
+  assert.equal([...frozenApi.matchAll(/'[^']+'/g)].length, 23);
   assert.match(source, /does not match the exact final file roster/);
   assert.match(source, /process A emitted data other than exact synthetic locators/);
   assert.match(source, /process B did not deny process A authority as absent/);
