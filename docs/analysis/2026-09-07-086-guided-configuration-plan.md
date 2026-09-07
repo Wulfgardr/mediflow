@@ -191,9 +191,38 @@ contenuti, con lettura limitata e cancellabile; qualsiasi byte resta rifiutato.
 Il coordinatore ha rieseguito gli 11 test mirati, tutti passati. La prova UI
 copre l'host macOS; non chiude i gate Windows/Linux o il riavvio applicativo.
 
-La sintesi documentale sulla build `b96507d9e30b` resta non riuscita:
+La prova storica della sintesi documentale sulla build `b96507d9e30b` resta non riuscita:
 selezione, cattura ed estrazione `200`, proposta `503`. Una diagnostica separata
 con modello locale ha osservato una versione obbligatoria dell'output omessa.
 Questo non attribuisce retroattivamente la causa del `503` ordinario. Il
-formato di generazione vincolato allo schema, documentato in ADR0102, deve
-ancora completare implementazione e verifica reale.
+formato di generazione vincolato allo schema, documentato in ADR0102, è stato
+poi integrato e verificato come descritto sotto.
+
+### Sintesi ordinaria riuscita e revisione visiva
+
+La build `3a762bb30f086ea2d7fb0189ad258b509f4f22c9` ha completato una
+generazione ordinaria su un PDF fittizio: selezione esplicita dell'ambulatorio,
+conferma dell'utente, estrazione e proposta HTTP `200` in 29,67 secondi.
+Ollama `qwen3.5:35b-a3b` ha restituito riepilogo e citazione; il formato è
+vincolato allo schema interno fisso e i validatori host restano invariati.
+Il coordinatore ha rieseguito 22 test mirati prima della prova reale.
+
+La rilettura SQLite indipendente conferma integrità, assenza di violazioni FK
+e conteggi/digest invariati per pazienti, diario, allegati e terapie. La
+receipt mantiene `reviewOnly=true`, `applyPolicy=none`, `writesPerformed=0`.
+L'esito non attesta correttezza clinica, causalità del modello o assenza di
+scritture intermedie/alle altre tabelle; le precedenti prove fallite restano
+conservate.
+
+La revisione locale ora contiene sette screenshot originali, quindici
+annotazioni separate e il filmato di navigazione di 15 secondi. Le nuove
+catture mostrano AIFA e la proposta realmente ottenuta su `3a762`. Il filmato
+rimane quello della build `999ce`, senza generazioni; le fonti sono indicate
+separatamente. Non è la prova finale delle applicazioni desktop.
+
+Le rifiniture `782386a01` e `4c4f261d4` portano riepilogo, modello e citazioni
+prima dei dettagli tecnici e uniformano i comandi dei repertori. Sei test
+esistenti, lint mirato e build webpack/TypeScript/standalone sono riusciti.
+Il controllo visivo di questo ultimo delta e la nuova registrazione sono
+in attesa dello sblocco del Mac; gli screenshot precedenti non ne attestano
+il render. Il pacchetto conclusivo resta subordinato ai gate delle sei fasi.
