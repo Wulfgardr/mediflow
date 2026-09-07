@@ -40,7 +40,14 @@ report inglese, hash e conclusioni storiche senza riscrittura retroattiva.
 
 ## Verifiche locali già eseguite: lettura delle ricevute
 
-Questa lane documentale ha letto i log, senza rieseguire test, build o HTTP.
+La tabella distingue le esecuzioni; i tentativi precedenti restano conservati.
+
+Il coordinatore ha eseguito nuovamente `npm run test:unit` sul candidato
+`9be09c5837fba72eb83cf46fcd88ebdb1f569523`, dopo l'inclusione dei due script
+di regressione JSON: **3.267 PASS, 0 FAIL, 1 SKIP su 3.268**, uscita 0,
+63,956 secondi. Fixture temporanee isolate, Node 24.19.0, nessuna compilazione
+pesante concorrente. È una nuova esecuzione completa verde; non riscrive né
+attribuisce una causa ai precedenti fallimenti. La CI remota resta distinta.
 
 | Evidenza | Esito osservato | Confine sorgente e limiti |
 | --- | --- | --- |
