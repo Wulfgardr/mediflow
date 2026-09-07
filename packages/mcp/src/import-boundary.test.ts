@@ -14,7 +14,7 @@ const allowedExternal = new Set(['zod', '@modelcontextprotocol/server', '@modelc
   'node:process', 'node:util']);
 const allowedAip = new Set([resolve(root, 'packages/aip/src/child-ipc-contract.ts')]);
 const allowedMini = new Set([
-  resolve(root, 'packages/mini/src/request.ts'), resolve(root, 'packages/mini/src/session.ts'),
+  resolve(root, 'packages/mini/src/protocol.ts'), resolve(root, 'packages/mini/src/session.ts'),
 ]);
 
 test('keeps the exact MCP and Mini runtime graph on portable Application Service RPC only', async () => {

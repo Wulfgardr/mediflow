@@ -202,6 +202,47 @@ test('executes one strict semantic-query command with canonical allowlisted step
   assert.doesNotMatch(result.stdout, /patientId|ambulatoryId|authority|provider|venue|sql/iu);
 });
 
+test('NDJSON session preserves all existing operation DTOs and dispatches multiple commands in order', async () => {
+  const requests = [
+    { command: 'capabilities', args: {} },
+    { command: 'terminology search', args: { system: 'LOINC', query: '  synthetic   query ', limit: 3 } },
+    { command: 'open-loops', args: {} },
+    { command: 'follow-up-proposal', args: {} },
+    { command: 'semantic-query', args: semanticArgs },
+  ];
+  const result = await runBound(requests.map((request) => JSON.stringify(request)).join('\n') + '\n',
+    { args: ['--session'] });
+  assert.equal(result.code, 0); assert.equal(result.stderr, '');
+  const responses = result.stdout.trim().split('\n').map((line) => JSON.parse(line));
+  assert.deepEqual(responses.map((response) => response.result), [capabilityCatalog, terminology, loops, proposal, semantic]);
+  assert.ok(responses.every((response) => response.schemaVersion === 'mediflow.mini.session.v1' && response.ok === true));
+  assert.deepEqual(JSON.parse(JSON.stringify(result.observed)), [
+    { schemaVersion: 'mediflow.terminology.search.input.v1', operationId: 'mediflow.terminology.search.v1',
+      system: 'LOINC', query: 'synthetic query', limit: 3 },
+    { schemaVersion: 'mediflow.patient.open_loops.read.input.v1', operationId: 'mediflow.patient.open_loops.read.v1' },
+    { schemaVersion: 'mediflow.patient.open_loops.follow_up.propose.input.v1',
+      operationId: 'mediflow.patient.open_loops.follow_up.propose.v1' }, semanticInput,
+  ]);
+});
+
+test('NDJSON session preserves operation denial and stops queued commands after a denied service', async () => {
+  for (const [command, args, source] of [
+    ['terminology search', { system: 'LOINC', query: 'synthetic', limit: 1 }, 'terminology'],
+    ['open-loops', {}, 'openLoops'], ['follow-up-proposal', {}, 'proposal'],
+    ['semantic-query', semanticArgs, 'semantic'],
+  ] as const) {
+    const result = await runBound(JSON.stringify({ command, args }) + '\n'
+      + '{"command":"capabilities","args":{}}\n', {
+      args: ['--session'], [source]: () => { throw new Error('synthetic service unavailable'); },
+    });
+    assert.equal(result.code, 70); assert.equal(result.stderr, '');
+    const responses = result.stdout.trim().split('\n').map((line) => JSON.parse(line));
+    assert.equal(responses.length, 1); assert.equal(responses[0].error.code, 'OPERATION_DENIED');
+    assert.equal(responses[0].status.ready, false);
+    assert.doesNotMatch(result.stdout, /synthetic service unavailable/u);
+  }
+});
+
 test('fails all valid commands closed when inherited host IPC is absent', () => {
   const requests = [{ command: 'status', args: {} }, { command: 'capabilities', args: {} }, { command: 'terminology search',
     args: { system: 'LOINC', query: 'synthetic', limit: 1 } }, { command: 'open-loops', args: {} },

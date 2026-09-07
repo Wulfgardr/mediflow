@@ -111,7 +111,28 @@ async function until(predicate: () => boolean): Promise<void> {
   }
 }
 
-for (const ending of ['lock', 'reselection', 'eof', 'web_exit', 'currentness'] as const) {
+const operationRequests = [
+  { command: 'terminology search', args: { system: 'LOINC', query: 'emoglobina', limit: 2 } },
+  { command: 'open-loops', args: {} },
+  { command: 'follow-up-proposal', args: {} },
+  { command: 'semantic-query', args: {
+    budget: { maxSteps: 1, maxDurationMs: 250, maxOutputBytes: 32_768 },
+    explanation: 'Read the local terminology catalog.',
+    steps: [{ stepRef: 'step_terminology', operationId: 'mediflow.terminology.search.v1',
+      input: { system: 'LOINC', query: 'emoglobina', limit: 2 } }],
+  } },
+];
+const scenarios = [
+  ...['lock', 'reselection', 'eof', 'web_exit', 'currentness'].map(ending => ({ ending,
+    revokedRequest: { command: 'status', args: {} } })),
+  ...operationRequests.map(revokedRequest => ({ ending: `currentness:${revokedRequest.command}`, revokedRequest })),
+];
+function terminologyAudits() {
+  return (dbServer.$client.prepare('SELECT outcome, redacted_metadata FROM audit_events').all() as
+    Array<{ outcome: string; redacted_metadata: string }>).filter(row =>
+    JSON.parse(row.redacted_metadata).flags?.includes('family:terminology_search') && row.outcome === 'success');
+}
+for (const { ending, revokedRequest } of scenarios) {
   test(`production Mini uses genuine Web authority and terminates on ${ending}`, { timeout: 15_000 }, async (t) => {
     const children: ChildProcess[] = [];
     const exits: Promise<void>[] = [];
@@ -143,9 +164,9 @@ for (const ending of ['lock', 'reselection', 'eof', 'web_exit', 'currentness'] a
     });
     const mini = children[0]!, web = children[1]!;
     assert.notEqual(mini.pid, web.pid); assert.notEqual(mini.pid, process.pid);
-    const request = async (command: string) => {
+    const request = async (command: string, args: unknown = {}) => {
       const count = miniOutput.split('\n').filter(Boolean).length;
-      mini.stdin!.write(`${JSON.stringify({ command, args: {} })}\n`);
+      mini.stdin!.write(`${JSON.stringify({ command, args })}\n`);
       await until(() => miniOutput.split('\n').filter(Boolean).length > count);
       return JSON.parse(miniOutput.split('\n').filter(Boolean)[count]!);
     };
@@ -158,6 +179,9 @@ for (const ending of ['lock', 'reselection', 'eof', 'web_exit', 'currentness'] a
     assert.deepEqual(before.result.capabilities, []);
     assert.equal(before.result.nextStep.code, 'AUTHORIZE_IN_OWNED_WEB');
     assert.equal((await request('capabilities')).error.code, 'SESSION_NOT_UNLOCKED');
+    for (const operation of operationRequests) {
+      assert.equal((await request(operation.command, operation.args)).error.code, 'SESSION_NOT_UNLOCKED');
+    }
     web.send('fixture.authorize');
     await until(() => webOutput.includes('FIXTURE_ACTIVATED') || webOutput.includes('FIXTURE_DENIED')
       || children.some((child) => child.exitCode !== null || child.signalCode !== null));
@@ -172,12 +196,23 @@ for (const ending of ['lock', 'reselection', 'eof', 'web_exit', 'currentness'] a
       item.operationId === 'mediflow.terminology.search.v1'));
     assert.ok(catalog.result.operations.every((item: { maximumStage: string }) =>
       ['read_only', 'proposal_only'].includes(item.maximumStage)));
+    const auditCount = terminologyAudits().length;
+    const search = await request(operationRequests[0]!.command, operationRequests[0]!.args);
+    assert.equal(search.ok, true, JSON.stringify(search));
+    assert.equal(search.result.applicationServiceRef, 'AipTerminologySearchServiceV1');
+    assert.equal(search.result.outcome, 'read');
+    assert.equal(search.result.items[0]?.code, '718-7');
+    assert.equal(search.result.receipt.resultCount, search.result.items.length);
+    assert.equal(search.result.receipt.writesPerformed, 0);
+    assert.equal(search.result.receipt.egress, 'none');
+    assert.equal(terminologyAudits().length, auditCount + 1);
+    const responseCount = miniOutput.split('\n').filter(Boolean).length;
     if (ending === 'lock') web.send('fixture.lock');
     else if (ending === 'reselection') web.send('fixture.reselect');
     else if (ending === 'web_exit') web.kill();
-    else if (ending === 'currentness') {
+    else if (ending.startsWith('currentness')) {
       dbServer.$client.prepare('UPDATE patients SET version = 8 WHERE id = ?').run(PATIENT);
-      mini.stdin!.write('{"command":"status","args":{}}\n');
+      mini.stdin!.write(JSON.stringify(revokedRequest) + '\n');
     }
     else mini.stdin!.end();
     await until(() => children.every((child) => child.exitCode !== null || child.signalCode !== null));
@@ -186,10 +221,11 @@ for (const ending of ['lock', 'reselection', 'eof', 'web_exit', 'currentness'] a
     if (ending === 'lock') assert.match(webOutput, /FIXTURE_REVOKED/u);
     assert.doesNotMatch(miniOutput, /patient\.synthetic|ambulatory\.synthetic|synthetic-mini-user|FIXTURE_/u);
     const responses = miniOutput.split('\n').filter(Boolean).map(line => JSON.parse(line));
-    assert.ok(responses.length === 4 || (ending === 'currentness' && responses.length === 5));
-    if (responses.length === 5) {
-      assert.equal(responses[4].ok, false); assert.equal(responses[4].status.ready, false);
+    assert.ok(responses.length === responseCount || (ending.startsWith('currentness') && responses.length === responseCount + 1));
+    if (responses.length > responseCount) {
+      assert.equal(responses[responseCount].ok, false); assert.equal(responses[responseCount].status.ready, false);
     }
+    assert.equal(terminologyAudits().length, auditCount + 1, 'no publication after context revocation');
     dbServer.$client.prepare('UPDATE patients SET version = 7 WHERE id = ?').run(PATIENT);
     for (const line of miniOutput.split('\n').filter(Boolean)) assert.doesNotThrow(() => JSON.parse(line));
   });

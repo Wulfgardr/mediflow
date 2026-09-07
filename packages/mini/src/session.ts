@@ -1,15 +1,11 @@
 /* @Codex */
 import { stdin, stdout } from 'node:process';
-import { z } from 'zod';
 import { createOperationClient, OperationClientError } from '../../mcp/src/operation-client.ts';
-import { hasDuplicateKeys } from './request.ts';
+import { MINI_MAX_INPUT_BYTES, parseMiniRequest, executeMiniRequest, serializeMiniResponse,
+  type MiniRequest } from './protocol.ts';
 
 const SCHEMA = 'mediflow.mini.session.v1';
-const MAX_FRAME_BYTES = 16 * 1024;
 const MAX_REQUESTS = 64;
-const requestSchema = z.object({
-  command: z.enum(['status', 'capabilities']), args: z.object({}).strict(),
-}).strict();
 const authorizationStep = Object.freeze({
   code: 'AUTHORIZE_IN_OWNED_WEB',
   message: 'Apri il Web avviato dal Supervisor, accedi, seleziona il contesto e attiva Intelligent Host.',
@@ -17,7 +13,7 @@ const authorizationStep = Object.freeze({
 
 function write(value: unknown): Promise<void> {
   return new Promise((resolve, reject) => {
-    stdout.write(`${JSON.stringify(value)}\n`, (error) => error ? reject(error) : resolve());
+    stdout.write(serializeMiniResponse(value), (error) => error ? reject(error) : resolve());
   });
 }
 
@@ -37,22 +33,21 @@ export async function runMiniSession(): Promise<void> {
   }
   let authorized = false;
   const execute = async (frame: Buffer): Promise<boolean> => {
-    let request: z.infer<typeof requestSchema>;
+    let request: MiniRequest;
     try {
-      const source = new TextDecoder('utf-8', { fatal: true }).decode(frame);
-      if (hasDuplicateKeys(source)) throw new Error('duplicate');
-      request = requestSchema.parse(JSON.parse(source));
+      request = parseMiniRequest(frame);
     } catch {
       await write(unavailable('INVALID_REQUEST')); process.exitCode = 2; return false;
     }
     try {
-      // No cached/static catalog: every status and catalog request crosses the host gates.
-      const catalog = await client.publicCatalog();
+      // Only readiness has a transport-specific shape; all operation DTOs use the shared dispatch.
+      const result = request.command === 'status'
+        ? await client.publicCatalog().then((catalog) => ({ transport: 'connected', session: 'authorized',
+          ready: catalog.operations.length > 0, capabilities: catalog.operations, nextStep: null }))
+        : await executeMiniRequest(client, request);
       if (process.connected !== true) throw new OperationClientError('host_unbound');
       authorized = true;
-      await write({ schemaVersion: SCHEMA, ok: true, result: request.command === 'capabilities'
-        ? catalog : { transport: 'connected', session: 'authorized',
-          ready: catalog.operations.length > 0, capabilities: catalog.operations, nextStep: null } });
+      await write({ schemaVersion: SCHEMA, ok: true, result });
       return true;
     } catch (error) {
       if (!authorized && process.connected === true
@@ -77,7 +72,7 @@ export async function runMiniSession(): Promise<void> {
       while (offset < bytes.length) {
         const newline = bytes.indexOf(10, offset);
         const end = newline < 0 ? bytes.length : newline;
-        if (pending.length + end - offset > MAX_FRAME_BYTES) {
+        if (pending.length + end - offset > MINI_MAX_INPUT_BYTES) {
           await write(unavailable('INVALID_REQUEST')); process.exitCode = 2; return;
         }
         pending = Buffer.concat([pending, bytes.subarray(offset, end)]);
