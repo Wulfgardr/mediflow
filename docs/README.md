@@ -339,3 +339,9 @@ Approfondimenti utili:
 6. Se due file dicono cose diverse, prevale la fonte canonica indicata sopra.
 
 - Controllo account ChatGPT, senza inferenza: [ADR 0126](./adr/0126-chatgpt-account-control-plane.md).
+
+## Isolamento del launcher dei test Node
+
+[ADR 0130](./adr/0130-node-test-data-dir-preflight.md) definisce il preflight
+MEDIFLOW_DATA_DIR per scripts/run-strip-types.mjs --test e la proprietà del
+cleanup delle fixture.

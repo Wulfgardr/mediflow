@@ -7,6 +7,13 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
 
 const args = process.argv.slice(2);
+/* @Codex: run before runtime probes or target imports (ADR 0130). */
+const optionEnd = args.indexOf('--');
+const options = optionEnd === -1 ? args : args.slice(0, optionEnd);
+if (options.includes('--test') && !process.env.MEDIFLOW_DATA_DIR?.trim()) {
+  console.error('MEDIFLOW_TEST_DATA_DIR_REQUIRED: --test requires an explicit synthetic MEDIFLOW_DATA_DIR; the caller owns its cleanup.');
+  process.exit(2);
+}
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, '..');
