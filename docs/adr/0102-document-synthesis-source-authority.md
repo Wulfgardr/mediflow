@@ -499,3 +499,32 @@ output vuoti e claim incompleti ancora negati. La composizione con owner Web
 autentico deve raggiungere parse/bind/prepare/finalize/serialize, mantenendo
 negazione su cambio selezione, lock, cancel e consumo ripetuto. Una prova
 reale del provider segue i test e non li sostituisce.
+
+
+### Generazione vincolata allo schema locale
+
+La diagnostica sintetica del 7 settembre ha osservato una risposta con root
+v2 e citazione valide, ma senza `output.schemaVersion`. Il diniego resta
+corretto: questo risultato non viene riparato dopo la generazione.
+
+Per Document Synthesis, il binding locale seleziona un formato interno fisso
+che passa a Ollama il JSON Schema dell'envelope v2, inclusi i campi obbligatori
+e le costanti dell'output `mediflow.ai.extract.v1`. È un suggerimento
+strutturale durante la generazione, secondo il [contratto ufficiale
+Ollama](https://docs.ollama.com/capabilities/structured-outputs), seguito dagli
+stessi validatori host. Lo schema è compilato nel prodotto e non contiene
+fonti, identificativi o metadati di autorità. Nessuno schema arbitrario può
+arrivare dalla UI, dalle API o dal documento.
+
+La selezione del formato è un valore interno enumerato; non aggiunge un
+provider, un endpoint o un fallback. JSON mode degli altri percorsi, prompt,
+modello, temperatura, limite di 1400 token, timeout, cancellazione, lease e
+consumo singolo restano invariati. Schema non rispettato, risposta troncata,
+quote non verificabile o claim incoerenti continuano a impedire la proposta.
+La presenza dello schema non prova correttezza clinica o supporto delle
+citazioni: questi limiti rimangono distinti dalla validità strutturale.
+
+Verifiche: payload reale con schema fisso e nessuna derivazione da input;
+regressione dell'output privo di versione ancora negata; contratti di
+citazioni e lifecycle invariati; poi una generazione sintetica ordinaria.
+Stato di questa integrazione: da implementare e verificare.
