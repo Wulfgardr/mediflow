@@ -12,6 +12,7 @@ import { buildFunctionModelCatalog, createFunctionModelPreferencesService, FUNCT
     type FunctionModelCommand, type FunctionModelSources } from './function-model-preferences.ts';
 import { createFunctionModelDispatch, FUNCTION_MODEL_CHOICE_HEADER, functionModelBindingSettings,
     guardFunctionModelResolution, captureFunctionModelTransportGuard } from './function-model-dispatch.ts';
+import { issueSyntheticWebSession, retireSyntheticWebSession } from '../../security/web-auth-lifecycle-owner-test-fixture.ts';
 import { createFunctionModelPreferencesHttp } from './function-model-preferences-http.ts';
 import { localProviderRegistry } from '../registry.ts';
 import { evaluateSettingsWrite } from '../../security/settings-write-policy.ts';
@@ -190,12 +191,14 @@ test('unauthenticated, arbitrary query/header and unsupported requests never ent
     assert.equal(calls, 0);
 });
 
-test('authenticated settings HTTP is bounded, read-only on GET/preview, and rechecks lock before applying', async () => {
+test('authenticated settings HTTP is bounded, read-only on GET/preview, and rechecks lock before applying', async (t) => {
+    const session = issueSyntheticWebSession({ id: 'synthetic-preferences-user', username: 'synthetic', role: 'admin' }, randomUUID());
+    t.after(() => retireSyntheticWebSession(session));
     let sources = fixture(); let writes = 0; let authenticated = true;
     const service = createFunctionModelPreferencesService({ readSources: () => sources, immediate: cb => cb(), writeSettings(next) {
         writes += Object.keys(next).length; sources = { ...sources, settings: { ...sources.settings, ...next } };
     } });
-    const handlers = createFunctionModelPreferencesHttp({ authenticate: async () => authenticated, service });
+    const handlers = createFunctionModelPreferencesHttp({ authenticate: async () => authenticated ? session : null, service });
     const post = (body: unknown) => new Request('http://localhost/api/settings/ai/functions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     const command = preset(sources, 'all_off');
     assert.equal((await handlers.GET(new Request('http://localhost/api/settings/ai/functions'))).status, 200);
@@ -203,7 +206,7 @@ test('authenticated settings HTTP is bounded, read-only on GET/preview, and rech
     assert.equal((await handlers.POST(post({ ...command, arbitrary: true }))).status, 400); assert.equal(writes, 0);
     assert.equal((await handlers.POST(post('x'.repeat(5000)))).status, 400); assert.equal(writes, 0);
     let authCalls = 0;
-    const locked = createFunctionModelPreferencesHttp({ authenticate: async () => ++authCalls === 1, service });
+    const locked = createFunctionModelPreferencesHttp({ authenticate: async () => ++authCalls === 1 ? session : null, service });
     assert.equal((await locked.POST(post(command))).status, 401); assert.equal(writes, 0);
     assert.equal((await handlers.POST(post(command))).status, 200); assert.equal(writes, 5);
     const reread = await handlers.GET(new Request('http://localhost/api/settings/ai/functions'));
@@ -248,4 +251,90 @@ test('ATHENA named dispatch accepts only its dedicated binding and preserves ter
     });
     const result = await handler(request()); assert.equal(result.status, 200); assert.equal(calls, 1);
     assert.equal(result.headers.get('x-mediflow-model-source'), 'host_configuration');
+});
+
+/* @Codex: ordinary request streams; all session state is synthetic and process-local. */
+function httpFixture(t: { after(callback: () => void): void }) {
+    const session = issueSyntheticWebSession({ id: `synthetic-${randomUUID()}`, username: 'synthetic', role: 'admin' }, randomUUID());
+    t.after(() => retireSyntheticWebSession(session));
+    let sources = fixture(); let writes = 0;
+    const service = createFunctionModelPreferencesService({ readSources: () => sources, immediate: callback => callback(), writeSettings(next) {
+        writes++; sources = { ...sources, settings: { ...sources.settings, ...next } };
+    } });
+    return { session, service, command: preset(sources, 'all_off'), writes: () => writes };
+}
+
+function streamedRequest(signal?: AbortSignal) {
+    let cancelled = 0;
+    let opened!: () => void;
+    const reading = new Promise<void>(resolve => { opened = resolve; });
+    const stream = new ReadableStream<Uint8Array>({
+        pull() { opened(); return new Promise<void>(() => {}); },
+        cancel() { cancelled++; },
+    }, { highWaterMark: 0 });
+    const request = new Request('http://localhost/api/settings/ai/functions', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: stream, signal,
+        duplex: 'half',
+    } as RequestInit);
+    return { request, reading, cancelled: () => cancelled };
+}
+
+test('HTTP pending body times out, cancels the reader and never writes', async (t) => {
+    const f = httpFixture(t); const stream = streamedRequest();
+    const handlers = createFunctionModelPreferencesHttp({ authenticate: async () => f.session, service: f.service });
+    const response = await handlers.POST(stream.request);
+    assert.equal(response.status, 400);
+    assert.equal((await response.json()).code, 'input_invalid');
+    assert.equal(stream.cancelled(), 1); assert.equal(f.writes(), 0);
+    assert.equal(stream.request.body!.locked, false);
+});
+
+for (const interrupt of ['request', 'owner'] as const) {
+    test(`HTTP pending body cancels on ${interrupt} retirement without writes`, async (t) => {
+        const f = httpFixture(t); const controller = new AbortController(); const stream = streamedRequest(controller.signal);
+        const handlers = createFunctionModelPreferencesHttp({ authenticate: async () => f.session, service: f.service });
+        const pending = handlers.POST(stream.request);
+        await stream.reading;
+        if (interrupt === 'request') controller.abort(); else retireSyntheticWebSession(f.session);
+        const response = await pending;
+        assert.equal(response.status, 401); assert.equal((await response.json()).code, 'session_stale');
+        assert.equal(stream.cancelled(), 1); assert.equal(f.writes(), 0);
+        assert.equal(stream.request.body!.locked, false);
+    });
+}
+
+test('HTTP strict reader accepts 4096 bytes and rejects overflow and duplicate keys', async (t) => {
+    const f = httpFixture(t);
+    const handlers = createFunctionModelPreferencesHttp({ authenticate: async () => f.session, service: f.service });
+    const json = JSON.stringify(f.command);
+    const body = json + ' '.repeat(4096 - new TextEncoder().encode(json).byteLength);
+    const post = (text: string) => new Request('http://localhost/api/settings/ai/functions', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: text,
+    });
+    assert.equal((await handlers.PREVIEW(post(body))).status, 200);
+    assert.equal((await handlers.POST(post(body + ' '))).status, 400);
+    assert.equal((await handlers.POST(post('{"action":"set","action":"preset"}'))).status, 400);
+    assert.equal(f.writes(), 0);
+});
+
+test('HTTP owner retired while reauthentication resolves cannot apply or publish', async (t) => {
+    const f = httpFixture(t); let calls = 0;
+    const handlers = createFunctionModelPreferencesHttp({ authenticate: async () => {
+        if (++calls === 2) retireSyntheticWebSession(f.session);
+        return f.session;
+    }, service: f.service });
+    const response = await handlers.POST(new Request('http://localhost/api/settings/ai/functions', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(f.command),
+    }));
+    assert.equal(response.status, 401); assert.equal(f.writes(), 0);
+    assert.equal((await handlers.GET(new Request('http://localhost/api/settings/ai/functions'))).status, 401);
+});
+
+test('HTTP reread checks owner again before publishing the response', async (t) => {
+    const f = httpFixture(t);
+    const handlers = createFunctionModelPreferencesHttp({ authenticate: async () => f.session,
+        service: { ...f.service, read() { const view = f.service.read(); retireSyntheticWebSession(f.session); return view; } } });
+    const response = await handlers.GET(new Request('http://localhost/api/settings/ai/functions'));
+    assert.equal(response.status, 401); assert.equal((await response.json()).code, 'session_stale');
+    assert.equal(f.writes(), 0);
 });

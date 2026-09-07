@@ -86,3 +86,13 @@ Verifiche richieste: default/override, CAS/restart, catalogo stale/non catalogat
 funzione spenta, provider indisponibile/revocato, sessione/paziente mutati,
 no autoapply, preset preview/apply/reread e retry idempotente. Build e prova UI
 integrata restano gate del parent se non eseguite nella lane.
+
+## Lettura HTTP e continuità dell'owner
+
+Il modulo HTTP riusa readBoundedJsonBody in modalità strict, massimo 4096 byte
+e deadline di 1000 ms con cancellazione del reader. Abort della richiesta o
+revoca della risorsa privata Web cancellano la lettura. Dopo ogni await di
+autenticazione/lettura si verifica la sessione; l'owner esistente viene
+controllato sincronicamente prima del servizio e della pubblicazione. Nessuna
+nuova autorità di sessione o eccezione auth. Errori di body rimangono
+input_invalid; abort/revoca rimangono session_stale.

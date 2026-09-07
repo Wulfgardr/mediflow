@@ -2,6 +2,11 @@
 export const NEVER_REGRESS_ALLOWLIST = {
     credentialLiterals: [
         {
+            path: 'lib/ai-providers/fabric/function-model-preferences.test.ts',
+            pattern: "username:\\s*'synthetic'",
+            reason: 'Function-preferences HTTP tests use process-local synthetic Web sessions for cancellation and retirement; no live credential is used.',
+        },
+        {
             path: 'lib/aifa-catalog-server.test.ts',
             pattern: "username:\\s*'synthetic-aifa'",
             reason: 'AIFA route tests use a synthetic clinician session to verify authentication, cancellation and atomic replacement; no live credential is used.',
