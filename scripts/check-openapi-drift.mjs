@@ -64,7 +64,15 @@ function buildCurrentRoutes() {
             || source.includes('requireNetworkCapabilityContext(')
             || source.includes('requireNetworkWriteContext(')
             || source.includes('requireNetworkDiscoveryAuth(');
-        if (!hasLocalTokenGuard && !hasPairedClientGuard) {
+        // @Codex: ADR0135 delegates to one named native authority, not a Web adapter.
+        const nativeConfigurationRoutes = new Set([
+            'app/api/v1/network/ai/functions/route.ts',
+            'app/api/v1/network/ai/functions/preview/route.ts',
+        ]);
+        const hasNativeConfigurationGuard = nativeConfigurationRoutes.has(path.relative(ROOT, filePath))
+            && source.includes("import { nativeConfigurationHttp } from '@/lib/native-ai-configuration-production'")
+            && /return nativeConfigurationHttp\.(GET|POST|PREVIEW)\(request\)/u.test(source);
+        if (!hasLocalTokenGuard && !hasPairedClientGuard && !hasNativeConfigurationGuard) {
             throw new Error(
                 `${path.relative(ROOT, filePath)} is missing a recognized /api/v1 auth guard`
             );
