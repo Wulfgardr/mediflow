@@ -9,7 +9,7 @@ const IMPORTER = 'components/pdf-importer.tsx';
 
 test('production document UI exposes a manual Fabric review with receipt, provenance, and citations', async () => {
     const card = await readFile(CARD, 'utf8');
-    assert.match(card, /createDocumentSynthesisBrowserOrchestrator/u);
+    assert.match(card, /createDocumentSynthesisReviewBrowserController/u);
     assert.match(card, /Sintesi Fabric · sola proposta/u);
     assert.match(card, /0 scritture/u);
     assert.match(card, /Provenienza/u);
@@ -43,4 +43,17 @@ test('the three production routes bind only the authenticated host operation', a
         assert.match(source, /acquireDocumentSynthesisProductionOperation/u);
         assert.doesNotMatch(source, /request\.json|dbServer|provider\s*:|prompt|patientId|apply\s*\(/u);
     }
+});
+
+/* @Codex */
+test('DS confirmation binds patient identity and invalidates the controller on lock or identity changes', async () => {
+    const card = await readFile(CARD, 'utf8'); const upload = await readFile(UPLOAD, 'utf8');
+    assert.match(upload, /DocumentSynthesisFabricReviewCard\s+patientId=\{patientId\}/u);
+    assert.match(card, /controller\.run\(\{ patientId, attachmentId, proposal \}, true\)/u);
+    assert.match(card, /!confirmed \|\| !proposal/u);
+    assert.match(card, /Conferma e genera proposta/u);
+    assert.match(card, /senza scritture cliniche/u);
+    assert.match(card, /if \(isLocked\) return null/u);
+    assert.match(card, /key=\{JSON\.stringify\(\[props.patientId, props.attachmentId, props.enabled\]\)\}/u);
+    assert.match(card, /useEffect\(\(\) => \(\) => \{[\s\S]*?controller.reset\(\)/u);
 });

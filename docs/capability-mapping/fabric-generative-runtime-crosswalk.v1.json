@@ -110,7 +110,7 @@
       },
       "uiEvidence": {
         "path": "components/document-synthesis-fabric-review-card.tsx",
-        "requestBindingLiteral": "createDocumentSynthesisBrowserOrchestrator",
+        "requestBindingLiteral": "createDocumentSynthesisReviewBrowserController",
         "requiredLiterals": [
           "Receipt",
           "Provenienza",

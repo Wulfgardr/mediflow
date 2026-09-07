@@ -66,3 +66,13 @@ test('fails closed for unsupported extraction and never continues after reset', 
     pending.reset();
     await assert.rejects(run, (error: unknown) => error instanceof DocumentSynthesisBrowserOrchestratorError && error.code === 'operation_superseded');
 });
+
+/* @Codex */
+test('preserves session unavailability without continuing to ingest or inference', async () => {
+    let calls = 0;
+    const orchestrator = createDocumentSynthesisBrowserOrchestrator({ fetch: async () => {
+        calls++; return Response.json({ error: 'Document Synthesis non disponibile.', code: 'session_unavailable' }, { status: 401 });
+    } });
+    await assert.rejects(orchestrator.run('synthetic-attachment'), { code: 'session_unavailable' });
+    assert.equal(calls, 1);
+});
