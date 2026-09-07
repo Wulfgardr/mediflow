@@ -80,10 +80,19 @@ jobs:
 
       - name: Seed ephemeral e2e database
         run: |
-          E2E_DATA_DIR="$(mktemp -d "${RUNNER_TEMP}/mediflow-e2e.XXXXXX")"
-          echo "MEDIFLOW_DATA_DIR=${E2E_DATA_DIR}" >> "$GITHUB_ENV"
-          echo "MEDIFLOW_E2E_DATA_DIR=${E2E_DATA_DIR}" >> "$GITHUB_ENV"
-          MEDIFLOW_DATA_DIR="${E2E_DATA_DIR}" node scripts/prepare-e2e-db.mjs
+          # @Codex: satisfy the canonical synthetic-fixture preconditions before seeding.
+          E2E_DATA_DIR="$(node -e 'const fs = require("node:fs"), os = require("node:os"), path = require("node:path"); process.stdout.write(fs.mkdtempSync(path.join(os.tmpdir(), "mediflow-e2e-")))')"
+          export MEDIFLOW_DATA_DIR="${E2E_DATA_DIR}"
+          export MEDIFLOW_E2E_DATA_DIR="${E2E_DATA_DIR}"
+          export MEDIFLOW_E2E_DISABLE_LEGACY_COPY=1 E2E_DISABLE_LEGACY_COPY=1
+          printf '%s\n' 'Synthetic E2E fixture; WHO local sidecar transport is simulated.' > "${E2E_DATA_DIR}/SYNTHETIC_ONLY"
+          {
+            printf 'MEDIFLOW_DATA_DIR=%s\n' "${E2E_DATA_DIR}"
+            printf 'MEDIFLOW_E2E_DATA_DIR=%s\n' "${E2E_DATA_DIR}"
+            printf 'MEDIFLOW_E2E_DISABLE_LEGACY_COPY=1\n'
+            printf 'E2E_DISABLE_LEGACY_COPY=1\n'
+          } >> "$GITHUB_ENV"
+          node scripts/prepare-e2e-db.mjs
 
       - name: Start Next.js dev server
         run: |
