@@ -409,3 +409,23 @@ Se vuoi aggiungere una vista:
 3. Mantieni sigillo e decrittazione nel boundary client esistente: non creare
    scorciatoie dirette verso SQLite o nuove primitive crypto.
 4. Aggiorna matrice parity, capability manifest e test nello stesso slice.
+
+### Configurazione AI nativa — ADR0135 / WUL-694
+
+Su macOS, Impostazioni → Preferenze AI dell’host usa tre nuovi servizi
+`/api/v1/network/ai/functions` (GET/POST) e `/preview` (POST). Offre opzioni
+catalogate per le quattro esperienze e preset `host_defaults`/`all_off`, con
+anteprima, conferma e rilettura. Sono preferenze dell’intero host, non del
+paziente. CAS, catalogo e idempotenza sono del dominio parent 09ebe699b.
+
+Il pairing e la sessione PIN nativa esistenti sono necessari ma non sufficienti:
+serve il grant privato host per operatore admin e dispositivo descritto in
+[ADR0135](./adr/0135-native-ai-configuration-authority.md). Il file 0600 è
+indicato da `MEDIFLOW_NATIVE_AI_CONFIG_GRANTS_FILE`, ha scadenza e non viene
+mai creato da una sessione Web o dal Mac remoto. Revoca e lock invalidano le
+richieste; un esito ambiguo richiede rilettura, senza retry automatico.
+Non esiste ancora la UI host per concedere questo grant. Nessun account Web
+è proiettato nella sessione Mac: lo stato account resta esplicitamente non
+disponibile, in attesa di un owner distinto. Nessuna inferenza o data plane
+ADR0134 viene aggiunto. I test sintetici del servizio e del client non attestano
+parità totale, account live o una release distribuita.

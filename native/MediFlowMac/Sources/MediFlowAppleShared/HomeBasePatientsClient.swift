@@ -22,6 +22,28 @@ public actor HomeBasePatientsClient {
         self.session = URLSession(configuration: sessionConfiguration, delegate: delegate, delegateQueue: nil)
     }
 
+    /* @Codex: named ADR0135 configuration services, native credentials only. */
+    public func readNativeFunctionPreferences(credentials: HomeBasePairedCredentials, sessionCookie: String) async throws -> NativeAIFunctionPreferences {
+        let url = try configuration.apiBaseURL().appendingPathComponent("network/ai/functions")
+        let (data, _) = try await send(to: url, headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: nil).merging(["Cache-Control": "no-store"]) { _, new in new })
+        let value = try decode(NativeAIFunctionPreferences.self, from: data)
+        try value.validate(); return value
+    }
+
+    public func previewNativeFunctionPreferences(_ command: NativeAIFunctionCommand, credentials: HomeBasePairedCredentials, sessionCookie: String) async throws -> NativeAIFunctionPreview {
+        let url = try configuration.apiBaseURL().appendingPathComponent("network/ai/functions/preview")
+        let (data, _) = try await send(to: url, method: "POST", headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: nil), body: encode(command))
+        let value = try decode(NativeAIFunctionPreview.self, from: data)
+        try value.validate(command: command); return value
+    }
+
+    public func applyNativeFunctionPreferences(_ command: NativeAIFunctionCommand, credentials: HomeBasePairedCredentials, sessionCookie: String) async throws -> NativeAIFunctionPreferences {
+        let url = try configuration.apiBaseURL().appendingPathComponent("network/ai/functions")
+        let (data, _) = try await send(to: url, method: "POST", headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: nil), body: encode(command))
+        let value = try decode(NativeAIFunctionPreferences.self, from: data)
+        try value.validate(); return value
+    }
+
     /* @Codex */
     public func login(
         username: String?, password: String, credentials: HomeBasePairedCredentials

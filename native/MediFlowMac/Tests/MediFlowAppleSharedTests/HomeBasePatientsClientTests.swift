@@ -2473,6 +2473,43 @@ final class HomeBasePatientsClientTests: XCTestCase {
         XCTAssertNil(request.httpBodyStream)
     }
 
+    /* @Codex */
+    func testNativeConfigurationServicesUsePairedTransportAndExactCommand() async throws {
+        let ids = ["patient_insight", "smart_import", "document_synthesis", "treatment_reasoning"]
+        let object: [String: Any] = [
+            "schemaVersion": "mediflow.function-preferences.v1", "revision": "sha256_" + String(repeating: "a", count: 64),
+            "catalogRevision": "sha256_" + String(repeating: "b", count: 64), "check": "configuration_only", "apply": "denied",
+            "presets": ["host_defaults", "all_off"],
+            "functions": ids.map { ["id": $0, "enabled": false, "defaultModelOptionId": NSNull(), "defaultSource": "host_configuration", "bindingState": "unsupported", "options": []] as [String: Any] }
+        ]
+        let data = try JSONSerialization.data(withJSONObject: object)
+        let client = makeClient { request in
+            XCTAssertEqual(request.value(forHTTPHeaderField: "x-mediflow-paired-client-id"), "synthetic-mac")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "x-mediflow-paired-client-token"), "synthetic-token")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Cookie"), "mediflow_session=synthetic-native")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "X-MediFlow-Source-Surface"), "native")
+            XCTAssertNil(request.url?.query)
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+            if request.url?.path.hasSuffix("/preview") == true {
+                XCTAssertEqual(request.httpMethod, "POST")
+                let command = try self.requestObject(request)
+                XCTAssertTrue(command["defaultModelOptionId"] is NSNull)
+                XCTAssertNil(command["presetId"]); XCTAssertNil(command["provider"])
+                return (response, try JSONSerialization.data(withJSONObject: ["schemaVersion": "mediflow.function-preferences-preview.v1", "command": command, "proposed": object, "writesPerformed": 0]))
+            }
+            XCTAssertEqual(request.url?.path, "/api/v1/network/ai/functions")
+            return (response, data)
+        }
+        let credentials = HomeBasePairedCredentials(clientId: "synthetic-mac", clientToken: "synthetic-token")
+        let cookie = "mediflow_session=synthetic-native"
+        let snapshot = try await client.readNativeFunctionPreferences(credentials: credentials, sessionCookie: cookie)
+        let command = NativeAIFunctionCommand(snapshot: snapshot, functionId: "patient_insight", enabled: false, defaultModelOptionId: nil)
+        let preview = try await client.previewNativeFunctionPreferences(command, credentials: credentials, sessionCookie: cookie)
+        XCTAssertEqual(preview.command, command)
+        let applied = try await client.applyNativeFunctionPreferences(command, credentials: credentials, sessionCookie: cookie)
+        XCTAssertEqual(applied, snapshot)
+    }
+
     private func makeClient(
         handler: @escaping (URLRequest) throws -> (HTTPURLResponse, Data)
     ) -> HomeBasePatientsClient {
