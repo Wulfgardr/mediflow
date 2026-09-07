@@ -7,6 +7,7 @@ import { db, type ProstheticPrescription, type ProstheticPrescriptionCategory, t
 import { useLiveQuery } from '@/lib/live-query';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { DocumentReferenceChip } from '@/components/document-reference-chip';
+import { ProstheticsCatalogLookup } from '@/components/prosthetics-catalog-manager-lookup';
 import { Badge } from '@/components/ui/badge';
 import { useRuntimeTwinPendingForm } from '@/components/runtime-twin-design';
 import type { SemanticSignal } from '@/lib/ui-semantic-signal';
@@ -235,6 +236,17 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
                     </div>
                     <div className="flex flex-wrap gap-2">{headerActions}</div>
                 </div>
+            )}
+
+            {isFormOpen && (
+                <details className="mb-4 rounded-xl border border-[color:var(--lume-border-color)] px-4">
+                    <summary className="flex min-h-11 cursor-pointer items-center text-sm font-semibold">
+                        Cerca un ausilio nel repertorio
+                    </summary>
+                    <div className="pb-4">
+                        <ProstheticsCatalogLookup onCopyDescription={(description) => updateForm('description', description)} />
+                    </div>
+                </details>
             )}
 
             {isFormOpen && (
