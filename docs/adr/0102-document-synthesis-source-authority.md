@@ -438,3 +438,64 @@ Lo stato e `Accepted`. Un packet downstream delimitato richiede un gate
 precedente accettato e una base esatta; non richiede una nuova autorizzazione
 utente per ogni fase. Questa decisione non autorizza runtime, azioni remote,
 egress, persistenza o scritture cliniche.
+
+## Addendum 2026-09-07: citazione dichiarata e locator calcolato dall'host
+
+Stato dell'addendum: proposto per l'implementazione locale della 0.8.6, da
+verificare prima della pubblicazione. Il tentativo con il provider testuale
+ha evidenziato un contratto non autoesplicativo; inoltre un modello senza
+strumenti non deve calcolare SHA-256 o coordinate UTF-8. Si separano la scelta
+della citazione e il calcolo deterministico del suo locator.
+
+Il nuovo contratto interno è
+`mediflow.document-synthesis.provider-envelope.v2`. La root ha esattamente
+`schemaVersion`, `output`, `citations`, `claims`. Ogni citazione del provider
+ha esattamente `label` e `quote`. Versione assente o sconosciuta, vecchia root
+a tre campi e campi offset/hash aggiunti dal provider vengono rifiutati; non
+c'è rilevamento euristico del formato o fallback v1. Il prompt passa a
+`mediflow.document-synthesis.multi-source-prompt.v2` ed esplicita lo schema
+effettivo di output e claim. Non richiede hash o conteggi di byte al modello.
+
+La projection di input v1 resta limitata a etichetta e testo normalizzato
+della cattura autentica. Nessun riferimento canonico, digest o authority
+aggiuntivi vengono trasmessi. Output `mediflow.ai.extract.v1`, path dei claim,
+ordine numerico delle label, conteggio e ordine delle fonti restano invariati.
+
+Nel binding dell'envelope, dopo il resolve del token privato autentico,
+l'host deriva la projection dalla sola sourceSet trattenuta. Per ciascuna
+label cerca i byte esatti della quote nella sola fonte corrispondente. La
+quote deve essere non vuota, Unicode scalare valido e presente una sola volta,
+contando anche occorrenze sovrapposte. Non si applicano trim, normalizzazione
+aggiuntiva, correzioni, matching approssimato o ricerca in altre fonti.
+Assenza, ambiguità, label errata, duplicata o riordinata negano il risultato.
+
+Solo dopo tale verifica l'host calcola startByte/endByte half-open e
+quoteSha256 sugli esatti byte autentici. Il record canonico mantiene i cinque
+campi v1. Viene passato al binder esistente, che ricontrolla membership,
+unicità, offset e hash prima di validare output e claim. Non si costruisce
+direttamente una publication disponibile e non si riparano output o claim
+incompleti. Il parser JSON conserva limiti, chiavi duplicate/extra, scanner,
+snapshot inerte e token privati.
+
+Il calcolo è sincrono, prima di precompute/finalize, senza I/O, refresh di
+fonti o epoch, cambio di selezione, lease, revoca, deadline o consume-once.
+L'autenticità della sourceSet non sostituisce le verifiche di attualità.
+Validatore delle citazioni canoniche v1, codec U0 e digest, receipt,
+publication e wire HTTP mantengono i contratti precedenti.
+`provider_declared_host_membership_and_locator_validated` significa che il
+provider dichiara citazione e supporto, mentre il locator è derivato e
+validato dall'host. `modelCausality=not_established` resta invariato: non si
+attestano entailment o correttezza clinica.
+
+Il limite di 1400 token della risposta e la deadline restano invariati. Quote
+o claim troppo lunghi possono ancora rendere impossibile una risposta
+completa. Non si eliminano fonti, non si tronca una risposta e non si esegue
+un retry nascosto per dichiarare successo. Questo incremento corregge la
+responsabilità del calcolo, non garantisce ogni combinazione di 32 fonti.
+
+Verificare con fixture sintetiche accenti, emoji, LF e valori byte/hash
+indipendenti; quote assenti, ripetute, sovrapposte o alterate; vecchi formati,
+output vuoti e claim incompleti ancora negati. La composizione con owner Web
+autentico deve raggiungere parse/bind/prepare/finalize/serialize, mantenendo
+negazione su cambio selezione, lock, cancel e consumo ripetuto. Una prova
+reale del provider segue i test e non li sostituisce.
