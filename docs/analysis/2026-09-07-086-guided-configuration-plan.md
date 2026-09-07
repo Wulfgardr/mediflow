@@ -149,3 +149,27 @@ Per ogni consegna si registrano: requisito, owner, commit, ambiente, comando,
 input sintetico, esito, log privato e limite del claim. Gli esiti storici e i
 tentativi falliti restano conservati nella
 [verifica di rilascio](./2026-09-07-086-release-verification.md).
+
+### Prima revisione visiva e acquisizione AIFA, 7 settembre
+
+La build `999ce4546e946455d290d6e05ccd4c8c23d42663` porta preset in apertura,
+pannelli distinti, navigazione centrata e preferenze delle quattro funzioni
+prima dei dettagli tecnici. Le tre pagine AI sono state controllate in 24 stati:
+quattro larghezze, 320–1440 px, e due temi. Il controllo locale non ha rilevato
+sovrapposizioni, overflow orizzontale o errori console. Gli screenshot reali
+sono conservati con annotazioni separate nella revisione privata dell'utente.
+Una registrazione di 15 secondi mostra la connessione Ollama e la navigazione
+su un database fittizio indipendente; non contiene inferenze o scritture cliniche.
+Questa è un'anteprima, non il pacchetto conclusivo multipiattaforma.
+
+Il candidato AIFA `95904ea565a74135f63b14e014c82f4297166d56`, integrato nei
+commit `8c45f99b7` e `a353c9ee0`, ha acquisito una volta il feed ufficiale:
+82.431.762 byte, 159.929 confezioni, zero righe rifiutate, 17,97 secondi per
+download e importazione. La rilettura in un processo nuovo ha confermato il
+manifest, il conteggio e ricerche AIC/ATC/principio attivo; integrità SQLite
+`ok`, nessuna violazione delle chiavi esterne. Il coordinatore ha verificato
+il database isolato e rieseguito i 14 test sintetici, tutti riusciti.
+La prova reale riguarda downloader e writer: il percorso HTTP/UI nella build
+integrata, il riavvio dell'app e gli altri sistemi operativi restano da provare.
+Un errore diagnostico successivo all'importazione è conservato; la verifica è
+stata completata con sole letture, senza ripetere acquisizione o scrittura.
