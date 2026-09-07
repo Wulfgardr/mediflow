@@ -329,10 +329,27 @@ non condividono stdin/stdout e non sono avviati insieme. Nessun server
 preesistente viene adottato; non si aggiungono listener o broker residenti.
 
 Mini registra il client AIP prima di leggere stdin e mantiene il processo
-per più richieste NDJSON bounded, in sequenza. Questa slice production ammette
-soltanto `status` e `capabilities`, con argomenti vuoti. La CLI a richiesta
-singola conserva il contratto precedente. Il catalogo host non autorizza nuove
-operazioni Mini e non trasferisce proof, commit o apply clinico.
+per più richieste NDJSON bounded, in sequenza. Il primo incremento
+`703e3d49f` ammetteva soltanto `status` e `capabilities`: prova di composizione,
+non soddisfacimento della superficie minima utile di questa ADR.
+
+La revisione WUL-696 del 2026-09-07, prima del secondo incremento di codice,
+richiede parità con i comandi già contrattualizzati della CLI: `status`,
+`capabilities`, `terminology search`, `open-loops`, `follow-up-proposal` e
+`semantic-query`. CLI singola e sessione condividono schema strict, parsing,
+dispatch OperationClient e serializer isolato dai metodi `toJSON` ereditati.
+Solo lo status della sessione aggiunge la readiness osservata. Gli altri
+risultati mantengono gli stessi DTO; `open-loops` e proposta non ricevono scope
+dal caller, e il planner mantiene il contratto bounded esistente.
+
+La parità non aggiunge capability, servizi, SQL, policy o authority. Il catalogo
+host non trasferisce proof, commit o apply clinico. Ogni comando resta soggetto
+a binding Web, capability, purpose, lease, currentness e revoca esistenti;
+prima del binding viene negato, salvo lo status di connessione. Il gate del
+secondo incremento richiede una ricerca terminologica innocua attraverso
+l'Application Service production con fixture sintetiche, DTO identici alle
+operazioni già contrattualizzate e denial/revoca per gli altri comandi. Non
+riduce il DoD generale a status/catalogo o a un solo test terminologico.
 
 `status` separa trasporto connesso, autorizzazione non ancora sbloccata,
 capacità correntemente ammesse dal catalogo AIP e readiness. Prima del binding

@@ -247,7 +247,8 @@ selezione e attivazione esplicita nell'interfaccia fidata. Revoca, logout,
 cambio di selezione o scadenza chiudono il grant.
 
 Nella lane 0.8.6 WUL-696, `npm run mini:production` avvia Web e Mini con
-una sessione NDJSON per status e catalogo governati. Prima dell’attivazione
+una sessione NDJSON con i comandi governati già presenti nella CLI
+(stato, catalogo, letture, proposta follow-up e piano semantico read-only). Prima dell’attivazione
 Web indica sessione non sbloccata; senza parent AIP fallisce chiuso.
 [Contratto Mini e limiti delle prove](./docs/design/2026-08-21-mini-headless-agent-cli.md).
 Questi comandi non concedono accesso generale al database né autorizzano

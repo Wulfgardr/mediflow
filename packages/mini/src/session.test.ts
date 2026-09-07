@@ -51,7 +51,9 @@ test('invalid or incomplete session requests terminate without reflecting input'
   for (const input of ['{"command":"status","args":{"unexpected":true}}\n',
     '{"command":"status","command":"capabilities","args":{}}\n',
     '{"command":"status","args":{}}',
-    '{"command":"open-loops","args":{}}\n']) {
+    '{"command":"apply","args":{}}\n',
+    '{"command":"open-loops","args":{"patientId":"synthetic-unaccepted"}}\n',
+    '{"command":"follow-up-proposal","args":{"text":"synthetic-unaccepted"}}\n']) {
     const result = await connected(input);
     assert.equal(result.code, 2); assert.equal(result.stderr, '');
     assert.equal(result.lines.length, 1); assert.equal(result.lines[0].error.code, 'INVALID_REQUEST');
