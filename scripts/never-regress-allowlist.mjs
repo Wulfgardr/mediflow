@@ -2,6 +2,11 @@
 export const NEVER_REGRESS_ALLOWLIST = {
     credentialLiterals: [
         {
+            path: 'lib/aifa-catalog-server.test.ts',
+            pattern: "username:\\s*'synthetic-aifa'",
+            reason: 'AIFA route tests use a synthetic clinician session to verify authentication, cancellation and atomic replacement; no live credential is used.',
+        },
+        {
             path: 'lib/security/audit.test.ts',
             pattern: "username:\\s*'admin'",
             reason: 'Audit tests use a synthetic native admin actor to verify attribution without relying on live credentials.',
@@ -223,6 +228,16 @@ export const NEVER_REGRESS_ALLOWLIST = {
         },
     ],
     externalUrls: [
+        {
+            path: 'lib/aifa-catalog-download.ts',
+            pattern: 'https://drive\\.aifa\\.gov\\.it/farmaci/confezioni_fornitura\\.csv(?=["\\x27`])',
+            reason: 'ADR0125 fixes this official AIFA feed for an explicit authenticated update, without caller URL, redirects, cookies or clinical data; no automatic download on startup.',
+        },
+        {
+            path: 'lib/aifa-catalog-server.test.ts',
+            pattern: 'https://drive\\.aifa\\.gov\\.it/farmaci/confezioni_fornitura\\.csv(?=["\\x27`])',
+            reason: 'The AIFA route test verifies exact official-source provenance with a synthetic transport and no external download.',
+        },
         {
             path: 'native/MediFlowMac/Tests/MediFlowCoreTests/DiagnosesCodecProvenanceTests.swift',
             pattern: 'http://id\\.who\\.int/icd/release/11/2026-01/mms/1000000001(?=["\\x27`])',
