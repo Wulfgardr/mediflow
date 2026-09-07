@@ -101,3 +101,5 @@ Mantieni gli ADR brevi e ordinati:
 2. Discuti in PR/issue
 3. Al merge, aggiorna lo stato a **Accepted**
 4. Se sostituito, marca **Superseded** e linka il nuovo ADR
+
+- [0129-function-model-catalog-preferences.md](./0129-function-model-catalog-preferences.md): catalogo host, default per esperienza e override occasionale senza ammissione UI.

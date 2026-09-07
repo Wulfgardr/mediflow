@@ -113,3 +113,15 @@ test('manifest remains a new runtime artifact, separate from the historical rece
   assert.equal(manifest.applyPolicy, 'none');
   assert.notEqual(MANIFEST_PATH, manifest.historicalArtifacts[0].path);
 });
+
+/* @Codex */
+test('requires opaque catalog choice and preserves CLI admission and proposal-only authority', () => {
+  const manifest = loadFabricGenerativeRuntimeCrosswalk();
+  for (const [key, value] of [['mode', 'free_model_id'], ['providerAdmission', 'ui_query'], ['apply', 'allowed']]) {
+    const changed = clone(manifest); changed.functionModelChoice[key] = value;
+    assert.throws(() => validateFabricGenerativeRuntimeCrosswalk(changed), /broadens authority/u);
+  }
+  const patient = manifest.capabilities[0];
+  const route = readFileSync(patient.descriptorEntryPoint, 'utf8').replace("withFunctionModelDispatch('patient_insight',", "unscopedDispatch(");
+  assert.throws(() => validateFabricGenerativeRuntimeCrosswalk(manifest, repositorySources({ [patient.descriptorEntryPoint]: route })), /sealed model dispatch/u);
+});

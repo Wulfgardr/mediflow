@@ -27,6 +27,8 @@ export type SettingsKeyPolicy = {
 // Every key the app actually reads or writes today. Grep provenance is recorded
 // in the notes so the classification can be re-audited when a key moves.
 export const SETTINGS_WRITE_REGISTRY: Record<string, SettingsKeyPolicy> = {
+    /* @Codex: only the named preferences service owns revision CAS. */
+    'ai.fabric.functionPreferences': { write: [], note: 'ADR 0129 dedicated authenticated preference service' },
     // --- AI model / provider / endpoint config (written from the web settings
     // controller only; treated as operator config because it steers where PHI is
     // sent for inference). ---

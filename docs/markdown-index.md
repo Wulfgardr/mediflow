@@ -66,6 +66,7 @@ sorgenti, toolchain, prove delle bozze e limiti della lane nativa.
 | [Verifica accesso](./analysis/2026-09-06-086-access-verification.md) | Matrice sintetica auth, lock, logout e recovery. | Per valutare copertura e limiti WUL-675. |
 | [ADR 0121](./adr/0121-function-status-projection.md) | Lettura autenticata dello stato delle funzioni. | Per modificare prerequisiti, errori e stati osservati. |
 | [ADR 0122](./adr/0122-local-provider-host-setup.md) | Ammissione esplicita Ollama nel processo host. | Per il setup locale senza controllo privilegiato nelle route. |
+| [ADR 0129](./adr/0129-function-model-catalog-preferences.md) | Preferenze per esperienza e override da catalogo host sigillato. | Per CAS, preset e dispatch senza ammissione UI. |
 | [docs/analysis/2026-09-05-mediflow-086-baseline.md](./analysis/2026-09-05-mediflow-086-baseline.md) | Baseline WUL-670, prove sintetiche e recuperi selettivi. | Prima delle tranche 0.8.6; limiti runtime espliciti. |
 | [docs/analysis/2026-09-05-086-who-decision.md](./analysis/2026-09-05-086-who-decision.md) | Decisione utente per il sidecar WHO locale e analisi storica delle alternative. | Contesto WUL-672; implementazione corrente governata da ADR 0115 e setup, non prova live. |
 | [docs/roadmap-086-consolidamento.md](./roadmap-086-consolidamento.md) | Piano e issue Linear per OCR, WHO, UI/design arena, onboarding, deslop, GDPR/AI Act e recupero branch. | Prima di avviare le tranche 0.8.6; non è evidenza runtime o attestazione di conformità. |

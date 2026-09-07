@@ -18,6 +18,9 @@ export type FunctionStatusSources = Readonly<{
     enabled: Readonly<Record<'patient_insight' | 'smart_import' | 'document_synthesis' | 'treatment_reasoning', boolean>>;
     ollamaLifecycle: string; athenaLifecycle: string;
     clinicalBinding: Readonly<{ state: 'configured' | 'invalid' | 'unavailable'; model: string | null }>;
+    /* @Codex: per-experience preferences override the historical shared role projection. */
+    functionBindings?: Readonly<Partial<Record<'patient_insight' | 'smart_import' | 'document_synthesis' | 'treatment_reasoning',
+        Readonly<{ state: 'configured' | 'invalid' | 'unavailable'; model: string | null }>>>>;
     athenaArtifact: boolean;
     who: 'disabled' | 'credentials_absent' | 'configuration_required' | 'offline' | 'configured' | 'available' | 'unavailable';
 }>;
@@ -55,11 +58,13 @@ export function buildFunctionStatus(sources: FunctionStatusSources, checkedAt: s
             : 'Il fallback Apple Vision non è qualificato su questa piattaforma. Le scansioni richiedono revisione manuale.', 'Apple Vision'),
     ];
     for (const id of ['patient_insight', 'smart_import', 'document_synthesis'] as const) {
-        const result = generativeState(sources.enabled[id], sources.ollamaLifecycle, sources.clinicalBinding.state);
-        functions.push(row(id, result.state, result.reason, 'Ollama', sources.clinicalBinding.model));
+        const binding = sources.functionBindings?.[id] ?? sources.clinicalBinding;
+        const result = generativeState(sources.enabled[id], sources.ollamaLifecycle, binding.state);
+        functions.push(row(id, result.state, result.reason, 'Ollama', binding.model));
     }
-    const treatment = generativeState(sources.enabled.treatment_reasoning, sources.athenaLifecycle, sources.athenaArtifact ? 'configured' : 'invalid');
-    functions.push(row('treatment_reasoning', treatment.state, treatment.reason, 'ATHENA / MLX'));
+    const treatmentBinding = sources.functionBindings?.treatment_reasoning;
+    const treatment = generativeState(sources.enabled.treatment_reasoning, sources.athenaLifecycle, treatmentBinding?.state ?? (sources.athenaArtifact ? 'configured' : 'invalid'));
+    functions.push(row('treatment_reasoning', treatment.state, treatment.reason, 'ATHENA / MLX', treatmentBinding?.model ?? null));
     const who: Record<FunctionStatusSources['who'], [FunctionState, string]> = {
         disabled: ['off', 'Il servizio WHO è disattivato sul server.'],
         credentials_absent: ['needs_setup', 'Mancano le credenziali WHO sul server.'],

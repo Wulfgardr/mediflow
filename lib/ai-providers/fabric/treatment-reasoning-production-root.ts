@@ -1,4 +1,5 @@
 import 'server-only';
+import { captureFunctionModelTransportGuard } from './function-model-dispatch';
 
 /* @Codex */
 import { randomBytes } from 'node:crypto';
@@ -54,10 +55,13 @@ const killSwitch = Object.freeze({
 
 const runtime = Object.freeze({
     available: () => isAthenaMlxModelAvailable(),
-    invoke(input: Readonly<{ instruction: string; signal: Readonly<{ isAborted(): boolean }> }>) {
+    async invoke(input: Readonly<{ instruction: string; signal: Readonly<{ isAborted(): boolean }> }>) {
+        const verifyChoice = captureFunctionModelTransportGuard('athena_mlx');
+        await verifyChoice();
         if (input.signal.isAborted()) return Promise.reject(new Error('Treatment Reasoning execution cancelled.'));
         return generateWithAthenaMlx({ prompt: input.instruction, maxTokens: 1_600, timeoutMs: 420_000 })
-            .then((result) => {
+            .then(async (result) => {
+                await verifyChoice();
                 if (input.signal.isAborted()) throw new Error('Treatment Reasoning execution cancelled.');
                 return result.content;
             });

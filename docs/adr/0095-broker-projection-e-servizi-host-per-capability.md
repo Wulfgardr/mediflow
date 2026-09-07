@@ -241,3 +241,11 @@ modifica il proxy legacy e non esegue merge o promotion.
 
 Lo stato di delivery e `ADR0095_ACCEPTED_CI_PENDING_MANAGER_VERIFY`. Il primo
 packet runtime resta soggetto a una nuova autorizzazione manageriale.
+
+## Estensione WUL-691 (0.8.6)
+
+[ADR 0129](./0129-function-model-catalog-preferences.md) conserva lo snapshot
+unico del capability service per la decisione Fabric. Il nuovo owner nominato
+`FunctionModelDispatch` aggiunge controlli indipendenti di continuità del
+catalogo/lifecycle prima e dopo il trasporto: una revoca intervenuta durante
+l'operazione impedisce la pubblicazione, senza creare nuova ammissione.
