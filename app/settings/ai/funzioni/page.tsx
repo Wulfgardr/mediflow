@@ -1,5 +1,8 @@
 'use client';
 
+/* @Codex */
+import { ChatGptAccountPanel } from '@/components/settings/chatgpt-account-panel';
+
 // WUL-297 Funzioni cliniche AI: moved from the monolithic settings page.
 
 import { CheckCircle, Save, Shield, Sparkles } from 'lucide-react';
@@ -48,6 +51,9 @@ export default function SettingsAiFunctionsPage() {
                 title="Funzioni cliniche"
                 description="Scegli quali proposte usare. Puoi modificare ogni funzione e salvare le preferenze."
             />
+
+            {/* @Codex: account control is separate from function/model preferences. */}
+            <ChatGptAccountPanel />
 
             <div className="space-y-6">
                 {/* AI safety toggles */}
