@@ -41,7 +41,9 @@ test('unauthenticated requests deny every route before consuming the upload', as
     const before = nonCatalog();
     for (const action of ['preview', 'commit', 'status', 'search', 'template'] as const) {
         const req = request(body); req.headers.set('Authorization', 'Bearer synthetic-not-a-web-session');
-        assert.equal((await route(action, req)).status, 401); assert.equal(req.bodyUsed, false);
+        const response = await route(action, req);
+        assert.equal(response.status, 401); assert.equal(req.bodyUsed, false);
+        assert.equal(response.headers.get('Cache-Control'), 'no-store');
     }
     assert.deepEqual(nonCatalog(), before);
 });
@@ -80,6 +82,7 @@ test('owner retirement while reading cancels preview/commit, publishes no proof 
         const before = snapshot(), running = route(action, req);
         await new Promise(resolve => setTimeout(resolve, 10)); retireForUser(session);
         const result = await running; assert.equal(result.status, 401); assert.equal(cancelled, true);
+        assert.equal(result.headers.get('Cache-Control'), 'no-store');
         assert.doesNotMatch(await result.text(), /proof|sha256/u); assert.deepEqual(snapshot(), before);
     }
 });

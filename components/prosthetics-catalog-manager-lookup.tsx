@@ -31,12 +31,16 @@ export function ProstheticsCatalogLookup({ onCopyDescription }: {
         try {
             if (onCopyDescription) onCopyDescription(selection.description, selection);
             else await navigator.clipboard.writeText(selection.description);
-            if (mounted.current) setMessage('Sola descrizione copiata. Il codice non è stato applicato alla prescrizione.');
+            if (mounted.current) setMessage(onCopyDescription
+                ? 'Descrizione inserita nella bozza.'
+                : 'Sola descrizione copiata. Il codice non è stato applicato alla prescrizione.');
         } catch { if (mounted.current) setMessage('Copia non disponibile: seleziona la descrizione e copiala manualmente.'); }
     }
     return <section aria-label="Consulta repertorio protesica" className="space-y-3">
         <h3 className="font-semibold">Consulta il repertorio</h3>
-        <p className="text-sm leading-6">Il codice conserva la codifica dichiarata dalla fonte. Puoi copiare la sola descrizione; MediFlow non lo converte in codice ISO.</p>
+        <p className="text-sm leading-6">{onCopyDescription
+            ? 'Scegli la descrizione da usare nella bozza. Il codice ISO si compila separatamente.'
+            : 'Il codice conserva la codifica dichiarata dalla fonte. Puoi copiare la sola descrizione; MediFlow non lo converte in codice ISO.'}</p>
         <form className="flex flex-wrap gap-2" onSubmit={event => { event.preventDefault(); void search(); }}>
             <label className="min-w-0 flex-1 text-sm">Codice, descrizione o codifica
                 <input className="mf-input mt-1 w-full" style={control} maxLength={200} value={query}
@@ -54,7 +58,7 @@ export function ProstheticsCatalogLookup({ onCopyDescription }: {
                     <p>Fonte: {row.source} · Versione: {row.version} · Ambito: {row.scope}</p>
                     {(row.startDate || row.endDate) && <p>Date dichiarate: {row.startDate ?? 'inizio non indicato'} — {row.endDate ?? 'fine non indicata'}</p>}
                     <details><summary className="cursor-pointer" style={{ minHeight: 44, alignContent: 'center' }}>Provenienza del file</summary><p>Importato: {row.importedAt}</p><p className="break-all">SHA-256: {row.sourceSha256}</p></details>
-                    <button type="button" className="border px-4 font-semibold" style={control} onClick={() => void copy(row)}>Copia solo descrizione</button>
+                    <button type="button" className="border px-4 font-semibold" style={control} onClick={() => void copy(row)}>{onCopyDescription ? 'Usa descrizione nella bozza' : 'Copia solo descrizione'}</button>
                 </li>)}
             </ul>
         </>}

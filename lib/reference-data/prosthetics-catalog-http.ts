@@ -11,9 +11,14 @@ import { createProstheticsCatalog, ProstheticsCatalogError } from './prosthetics
 import { PROSTHETICS_TEMPLATE } from './prosthetics-catalog-contract';
 
 const headers = { 'Cache-Control': 'no-store' };
+function unauthorized() {
+    const response = unauthorizedResponse();
+    response.headers.set('Cache-Control', headers['Cache-Control']);
+    return response;
+}
 export async function prostheticsCatalogRequest(action: 'preview' | 'commit' | 'status' | 'search' | 'template', request?: Request) {
     const session = await requireSession();
-    if (!session) return unauthorizedResponse();
+    if (!session) return unauthorized();
     let authority: ReturnType<typeof acquireExemptionImportAuthority> | undefined;
     try {
         authority = acquireExemptionImportAuthority(session);
@@ -41,7 +46,7 @@ export async function prostheticsCatalogRequest(action: 'preview' | 'commit' | '
         assertCurrent();
         return Response.json(result, { headers });
     } catch (error) {
-        if (authority?.signal.aborted) return unauthorizedResponse();
+        if (authority?.signal.aborted) return unauthorized();
         if (error instanceof ProstheticsCatalogError || error instanceof ExemptionImportError) {
             return Response.json({ error: error.code.replace('EXEMPTION_IMPORT_', 'PROSTHETICS_CATALOG_'), message: error.message }, { status: error.status, headers });
         }
