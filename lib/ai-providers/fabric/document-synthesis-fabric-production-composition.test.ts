@@ -10,8 +10,11 @@ import { createDocumentSynthesisFabricProductionCompositionForTest } from './doc
 import { createDocumentSynthesisProviderBindingForTest } from './document-synthesis-provider-binding.ts';
 import { captureDocumentSynthesisSourceSet } from './document-synthesis-source-set-contract.ts';
 import { createDocumentSynthesisSourceSetCurrentnessOwner } from './document-synthesis-source-set-currentness-owner.ts';
-import { createServerSessionProjectionOwnerRegistry } from '../../security/server-session-projection-owner.ts';
+import { serializeDocumentSynthesisPreviewWire } from './document-synthesis-preview-wire.ts';
+import { createFullPortProjectionOwnerFactory, createServerSessionProjectionOwnerRegistry, isServerSessionProjectionOwner } from '../../security/server-session-projection-owner.ts';
 import { clearAllSessions, createSession } from '../../security/server-session.ts';
+import { resolve, retire } from '../../security/web-auth-lifecycle-owner-adapter.ts';
+import { issueSyntheticWebSessionContext, retireSyntheticWebSession } from '../../security/web-auth-lifecycle-owner-test-fixture.ts';
 
 const SETTINGS = Object.freeze({ aiProvider: 'ollama', aiModel_reasoning: 'reasoning-local', aiUrl: 'http://localhost:11434' }); const ATTESTATION = Object.freeze({ authorityPlane: 'clinical_application', provider: 'ollama', executionMode: 'local', endpointClass: 'loopback', requestedModel: 'reasoning-local', canonicalModel: 'reasoning-local:latest', digest: 'sha256:synthetic', serverVersion: '0.32.5', checkedAt: '2026-08-25T12:00:00.000Z' }); const USER = Object.freeze({ id: ['synthetic', 'ds', 'production', 'user'].join('.'), username: ['synthetic', 'ds', 'production', 'clinician'].join('.'), role: 'clinician' as const }); const PAIR = Object.freeze({ patientId: 'patient.synthetic.ds.production', ambulatoryId: 'ambulatory.synthetic.ds.production' });
 afterEach(() => clearAllSessions());
@@ -29,3 +32,138 @@ test('returns null for binding denial without exposing a receipt or terminal aut
 test('does not expose the test binder outside Node test before dependency observation', { concurrency: false }, () => { const inherited: string[] = []; for (let index = 0; index < process.execArgv.length; index += 1) { const argument = process.execArgv[index]!; if (argument === '--test' || argument.startsWith('--test=') || argument.startsWith('--test-')) continue; inherited.push(argument); } const moduleUrl = new URL('./document-synthesis-fabric-production-composition.ts', import.meta.url).href; const program = `import { createDocumentSynthesisFabricProductionCompositionForTest as create } from ${JSON.stringify(moduleUrl)}; let reads = 0; let traps = 0; let binds = 0; let unhandled = 0; process.on('unhandledRejection', () => { unhandled += 1; }); const getter = Object.freeze(Object.defineProperty({}, 'bind', { enumerable: true, get() { reads += 1; return () => { binds += 1; return null; }; } })); const proxy = new Proxy(Object.freeze({ bind() { binds += 1; return null; } }), { get() { traps += 1; throw new Error('trap'); } }); const first = create(Object.freeze({}), getter); const second = create(Object.freeze({}), proxy); await new Promise((resolve) => setImmediate(resolve)); if (process.execArgv.some((argument) => argument === '--test' || argument.startsWith('--test=') || argument.startsWith('--test-')) || first !== null || second !== null || reads !== 0 || traps !== 0 || binds !== 0 || unhandled !== 0) process.exitCode = 1;`; const result = spawnSync(process.execPath, [...inherited, '--input-type=module', '--eval', program], { encoding: 'utf8' }); assert.equal(result.signal, null, result.stderr); assert.equal(result.status, 0, `${result.stdout}${result.stderr}`); });
 
 test('keeps the production terminal path direct and excludes forbidden composition concerns', async () => { const source = await readFile('lib/ai-providers/fabric/document-synthesis-fabric-production-composition.ts', 'utf8'); assert.match(source, /const TEST_HARNESS = \(\(\) => \{ for \(let index = 0; index < ProcessExecArgvLength; index \+= 1\)[\s\S]*?if \(!TEST_HARNESS\) return null; const bind = testBinding\(dependencies\);/u); assert.match(source, /const prepared = await prepareDocumentSynthesisFabricExecution\(handoff\);[\s\S]*?state = 'terminal';\s*return finalizeDocumentSynthesisFabricPreparedExecution\(prepared\.preparedToken\);/u); assert.doesNotMatch(source, /\/api\/proxy\/ollama|legacy service|providerToken:.*input|prompt:.*input|route|database|persistence|apply|UI/u); const terminal = source.match(/state = 'terminal';\s*return finalizeDocumentSynthesisFabricPreparedExecution\(prepared\.preparedToken\);/u)?.[0] ?? ''; assert.doesNotMatch(terminal, /catch|finally|freeze|clone|dispose|serialize|lookup|Promise/u); });
+
+/* @Codex */
+const OTHER_PAIR = Object.freeze({ ...PAIR, patientId: 'patient.synthetic.ds.production.other' });
+let webFixtureSequence = 0;
+
+function authenticWebFixture(chat: OllamaProviderAdapter['chat']) {
+    const web = issueSyntheticWebSessionContext(USER, `ds-composition-${++webFixtureSequence}`);
+    try {
+        let entropy = 0;
+        const registry = createFullPortProjectionOwnerFactory({
+            clock: () => Date.now(),
+            entropy: () => Uint8Array.from({ length: 16 }, () => ++entropy),
+            resolve: (_session, pair) => [PAIR, OTHER_PAIR].some((allowed) =>
+                allowed.patientId === pair.patientId && allowed.ambulatoryId === pair.ambulatoryId)
+                ? Object.freeze({ ...pair, patientVersion: 1 }) : null,
+        });
+        const owner = registry.acquire(web.session);
+        assert.ok(isServerSessionProjectionOwner(owner));
+        owner.issueSelection({ expectedEpoch: 0, ...PAIR });
+        let previous = web.session;
+        const resolveSession = () => {
+            const resolution = resolve(web.session.id, web.controlId);
+            assert.equal(resolution.status, 'active');
+            if (resolution.status !== 'active') throw new Error('Synthetic Web projection unavailable');
+            const session = resolution.projection;
+            assert.notStrictEqual(session, previous);
+            assert.equal(session.id, web.session.id);
+            assert.strictEqual(registry.acquire(session), owner);
+            previous = session;
+            return session;
+        };
+        const session = resolveSession();
+        assert.equal(owner.snapshotSelectionEpoch(session), 1);
+        assert.equal(owner.snapshotReviewContextEpoch(session), 1);
+        assert.equal(owner.withLeaseCriticalSection(session, (selection) => selection.patientId), PAIR.patientId);
+        const captured = captureDocumentSynthesisSourceSet({
+            sourceSetEpoch: BigInt(1), revocationGeneration: BigInt(0),
+            sources: [{ documentSourceRef: 'document.synthetic.ds.production', documentRevision: BigInt(7),
+                documentFreshnessEpoch: BigInt(11), sourceText: 'Synthetic source.' }],
+        });
+        assert.equal(captured.status, 'available');
+        if (captured.status !== 'available') throw new Error('Synthetic source set unavailable');
+        const capsule = createDocumentSynthesisSourceSetCurrentnessOwner(Object.freeze({ owner, session, sourceSet: captured.sourceSet }));
+        const binding = createDocumentSynthesisProviderBindingForTest(Object.freeze({
+            readSettings: async () => SETTINGS, attest: async () => ATTESTATION,
+        }));
+        const composition = createDocumentSynthesisFabricProductionCompositionForTest(
+            Object.freeze({ owner, session, capsule }), Object.freeze({ bind: () => binding.bind() }));
+        const original = OllamaProviderAdapter.prototype.chat;
+        OllamaProviderAdapter.prototype.chat = chat;
+        return {
+            web, owner, resolveSession, composition,
+            restore() {
+                OllamaProviderAdapter.prototype.chat = original;
+                try { capsule.dispose(); } finally { retireSyntheticWebSession(web.session); }
+            },
+        };
+    } catch (error) { retireSyntheticWebSession(web.session); throw error; }
+}
+
+function pendingSyntheticProvider() {
+    const entered = Promise.withResolvers<void>();
+    const response = Promise.withResolvers<Awaited<ReturnType<OllamaProviderAdapter['chat']>>>();
+    let calls = 0;
+    return {
+        chat: async () => { calls += 1; entered.resolve(); return response.promise; },
+        async waitUntilInvoked(execution: Promise<unknown>) {
+            assert.equal(await Promise.race([
+                entered.promise.then(() => 'provider'), execution.then(() => 'terminal'),
+            ]), 'provider', 'composition must reach the synthetic provider before terminating');
+        },
+        complete() { response.resolve({ content: body(), stats: { latency: 0, tokensIn: 0, tokensOut: 0 } }); },
+        calls: () => calls,
+    };
+}
+
+test('authentic Web composition publishes serializable wire once across fresh projections', { concurrency: false }, async () => {
+    const provider = pendingSyntheticProvider();
+    const value = authenticWebFixture(provider.chat);
+    let execution: Promise<unknown> | undefined;
+    try {
+        assert.ok(value.composition, 'factory must accept the real Web owner, projection and capsule');
+        execution = value.composition.execute();
+        await provider.waitUntilInvoked(execution);
+        const fresh = value.resolveSession();
+        assert.equal(value.owner.snapshotSelectionEpoch(fresh), 1);
+        assert.equal(value.owner.snapshotReviewContextEpoch(fresh), 1);
+        provider.complete();
+        const publication = await execution;
+        assert.ok(publication, 'current Web selection must permit the real terminal publication');
+        const wire = serializeDocumentSynthesisPreviewWire(publication);
+        assert.ok(wire, 'the terminal publication must satisfy the production preview wire');
+        assert.equal(wire.status, 'available');
+        assert.equal(wire.publication.output.summary, 'Synthetic summary');
+        assert.equal(wire.publication.output.qualityLevel, 'green');
+        assert.equal(wire.publication.citations[0]?.quote, 'Synthetic source.');
+        assert.equal(wire.publication.receipt.providerBindingReceipt.model, 'reasoning-local');
+        assert.equal(wire.publication.receipt.reviewOnly, true);
+        assert.equal(wire.publication.receipt.applyPolicy, 'none');
+        assert.equal(wire.publication.receipt.writesPerformed, 0);
+        assert.equal(await value.composition.execute(), null);
+        assert.equal(provider.calls(), 1);
+    } finally { provider.complete(); await execution?.catch(() => undefined); value.restore(); }
+});
+
+for (const transition of ['selection change', 'lock'] as const) {
+    test(`authentic Web composition suppresses a pending result after ${transition}`, { concurrency: false }, async () => {
+        const provider = pendingSyntheticProvider();
+        const value = authenticWebFixture(provider.chat);
+        let execution: Promise<unknown> | undefined;
+        try {
+            assert.ok(value.composition);
+            execution = value.composition.execute();
+            await provider.waitUntilInvoked(execution);
+            const fresh = value.resolveSession();
+            if (transition === 'selection change') {
+                value.owner.issueSelection({ expectedEpoch: 1, ...OTHER_PAIR });
+                assert.equal(value.owner.snapshotSelectionEpoch(fresh), 2);
+                assert.equal(value.owner.withLeaseCriticalSection(fresh, (selection) => selection.patientId), OTHER_PAIR.patientId);
+            } else {
+                const retired = retire(fresh, 'lock', {
+                    controlId: value.web.controlId, ifMatch: value.web.etag, idempotencyKey: 'synthetic-ds-composition-lock',
+                });
+                assert.equal(retired.outcome, 'completed');
+                assert.notEqual(resolve(fresh.id, value.web.controlId).status, 'active');
+            }
+            provider.complete();
+            const publication = await execution;
+            assert.equal(publication, null);
+            assert.equal(serializeDocumentSynthesisPreviewWire(publication), null);
+            assert.equal(await value.composition.execute(), null);
+            assert.equal(provider.calls(), 1);
+        } finally { provider.complete(); await execution?.catch(() => undefined); value.restore(); }
+    });
+}
