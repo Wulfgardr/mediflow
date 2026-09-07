@@ -6,6 +6,7 @@ import { useCallback, useState, useEffect, useRef } from 'react';
 import { AlertTriangle, Database, Server, Upload } from 'lucide-react';
 import {
     importAifaCsv,
+    updateAifaCatalog,
     getDrugCatalogStatus,
     clearDrugDatabase,
     type AifaCatalogClientStatus,
@@ -26,6 +27,35 @@ export default function SettingsRepertoriPage() {
     // --- AIFA State ---
     const [drugCatalog, setDrugCatalog] = useState<AifaCatalogClientStatus | null>(null);
     const [importing, setImporting] = useState(false);
+    /* @Codex */
+    const updateController = useRef<AbortController | null>(null);
+    const [updatePhase, setUpdatePhase] = useState<'idle' | 'download' | 'verify'>('idle');
+    const [updateMessage, setUpdateMessage] = useState('');
+    useEffect(() => () => updateController.current?.abort(), []);
+    const handleAifaUpdate = async () => {
+        if (updateController.current || importing) return;
+        const controller = new AbortController();
+        updateController.current = controller;
+        setImporting(true);
+        setUpdatePhase('download');
+        setUpdateMessage('');
+        let imported = false;
+        try {
+            await updateAifaCatalog(controller.signal);
+            imported = true;
+            setUpdatePhase('verify');
+            setDrugCatalog(await getDrugCatalogStatus());
+            setUpdateMessage('Catalogo disponibile: stato riletto dal database.');
+        } catch (error) {
+            setUpdateMessage(imported ? 'Importazione completata; rilettura non riuscita. Rileggi lo stato.'
+                : controller.signal.aborted ? 'Richiesta interrotta. Rileggi lo stato del catalogo.'
+                : error instanceof Error ? error.message : 'Aggiornamento non riuscito.');
+        } finally {
+            updateController.current = null;
+            setUpdatePhase('idle');
+            setImporting(false);
+        }
+    };
     const [sourceUrl, setSourceUrl] = useState(AIFA_CATALOG_DEFAULT_SOURCE_URL);
     const [downloadedAt, setDownloadedAt] = useState(() => new Date().toISOString().slice(0, 10));
     const [datasetVersion, setDatasetVersion] = useState('');
@@ -34,8 +64,8 @@ export default function SettingsRepertoriPage() {
     const loadStatus = useCallback(async () => {
         try {
             setDrugCatalog(await getDrugCatalogStatus());
-        } catch (e) {
-            console.error(e);
+        } catch {
+            setUpdateMessage('Lettura del catalogo non riuscita. Riprova con Rileggi stato.');
         }
     }, []);
 
@@ -116,7 +146,7 @@ export default function SettingsRepertoriPage() {
                             <p className="section-kicker">Farmaci</p>
                             <h2 className="mt-1 text-base font-semibold text-slate-900 dark:text-white">Database AIFA offline</h2>
                             <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                                Elenco farmaci rimborsabili usato dal prescrittore.{' '}
+                                Confezioni con AIC, codici ATC e principi attivi del feed AIFA.{' '}
                                 <a
                                     href={AIFA_CATALOG_DEFAULT_SOURCE_URL}
                                     target="_blank"
@@ -132,7 +162,7 @@ export default function SettingsRepertoriPage() {
                     <div className="space-y-4">
                         <div className="flex items-center justify-between rounded-[22px] border border-slate-200 bg-slate-50/80 p-4 dark:border-white/10 dark:bg-white/5">
                             <div>
-                                <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-300">Farmaci indicizzati</p>
+                                <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-300">Confezioni indicizzate</p>
                                 <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">
                                     {drugCatalog !== null ? drugCatalog.count.toLocaleString('it-IT') : '-'}
                                 </p>
@@ -140,10 +170,30 @@ export default function SettingsRepertoriPage() {
                             <Server className="w-8 h-8 text-slate-300 dark:text-white/20" />
                         </div>
 
+                        {/* @Codex Explicit acquisition; opening this page only reads local status. */}
+                        <div className="space-y-2">
+                            <button onClick={handleAifaUpdate} disabled={importing}
+                                className="w-full rounded-[var(--lume-radius-control)] bg-slate-900 px-4 py-3 font-medium text-white disabled:cursor-not-allowed disabled:opacity-50 dark:bg-slate-100 dark:text-slate-900">
+                                Aggiorna da AIFA
+                            </button>
+                            <p className="text-xs leading-5 text-[color:var(--lume-ink-muted)]">
+                                Scarica il feed ufficiale via Internet e sostituisce il catalogo locale. Nessun dato clinico viene inviato.
+                                {' '}<a className="underline" href="https://drive.aifa.gov.it/farmaci/confezioni_fornitura.csv" target="_blank" rel="noopener noreferrer">Fonte: confezioni AIFA</a>.
+                                {' '}Dati descrittivi e provvisori: non certificano disponibilità, rimborsabilità o appropriatezza.
+                                {' '}<a className="underline" href="https://www.aifa.gov.it/copyright" target="_blank" rel="noopener noreferrer">Condizioni AIFA</a>.
+                            </p>
+                            <p role="status" aria-live="polite" className="text-sm">
+                                {updatePhase === 'download' ? 'Scaricamento e importazione in corso…'
+                                    : updatePhase === 'verify' ? 'Verifica del catalogo: rilettura in corso…' : updateMessage}
+                            </p>
+                            {updatePhase === 'download' && <button className="underline text-sm" onClick={() => updateController.current?.abort()}>Annulla</button>}
+                            <button className="underline text-sm" disabled={importing} onClick={() => void loadStatus()}>Rileggi stato</button>
+                        </div>
+
                         <div className="space-y-3 rounded-[var(--lume-radius-card)] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] p-4">
                             <div className="grid gap-3 sm:grid-cols-2">
                                 <label className="space-y-1 text-xs font-medium text-[color:var(--lume-ink)]">
-                                    Versione dataset
+                                    Versione dataset (caricamento manuale)
                                     <input
                                         value={datasetVersion}
                                         onChange={(event) => setDatasetVersion(event.target.value)}
@@ -197,19 +247,20 @@ export default function SettingsRepertoriPage() {
                                 <Upload className="w-5 h-5" />
                                 <span className="font-medium">Carica file AIFA (.csv)</span>
                             </button>
-                        ) : (
+                        ) : updatePhase === 'idle' ? (
                             <div role="status" className="space-y-2 text-center">
                                 <p className="text-sm font-medium text-[color:var(--lume-ink)]">Validazione e indicizzazione in corso</p>
                                 <p className="text-xs text-[color:var(--lume-ink-muted)]">Il catalogo precedente resta disponibile fino al completamento.</p>
                             </div>
-                        )}
+                        ) : null}
 
                         {drugCatalog?.manifest ? (
                             <div className={`rounded-[var(--lume-radius-control)] border p-3 text-xs ${semanticSignalSurfaceClass('success')}`}>
                                 <p className="font-semibold">Manifest di provenienza registrato</p>
                                 <p className="mt-1 break-words">
-                                    {drugCatalog.manifest.version} · scaricato il {drugCatalog.manifest.downloadedAt} · SHA-256 {drugCatalog.manifest.sha256.slice(0, 12)}…
+                                    {drugCatalog.manifest.version} · scaricato il {drugCatalog.manifest.downloadedAt} · SHA-256 {drugCatalog.manifest.sha256}
                                 </p>
+                                <p className="mt-1 break-all">Fonte: {drugCatalog.manifest.sourceUrl} · importato il {drugCatalog.manifest.importedAt}</p>
                                 <p className="mt-1">
                                     Il manifest identifica il file importato; non certifica autenticità o licenza dello specifico dataset.
                                 </p>
@@ -223,6 +274,7 @@ export default function SettingsRepertoriPage() {
                         {drugCatalog !== null && drugCatalog.count > 0 && (
                             <button
                                 onClick={handleClearDrugs}
+                                disabled={importing}
                                 className="text-xs text-red-500 hover:text-red-700 hover:underline flex items-center gap-1"
                             >
                                 <AlertTriangle className="w-3 h-3" />
