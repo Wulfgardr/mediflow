@@ -14,6 +14,7 @@ import { SETTINGS_NAV_GROUPS } from '@/lib/settings-navigation';
 
 import styles from '@/components/settings/settings-lume.module.css';
 import proposalStyles from '@/components/settings/settings-proposal.module.css';
+import overviewStyles from './overview.module.css';
 
 const LEGACY_ANCHOR_REDIRECTS: Record<string, string> = {
     '#account': '/settings/profilo',
@@ -140,9 +141,9 @@ export default function SettingsPage() {
             : 'Questa postazione non espone il canale dati ai dispositivi associati.';
 
     return (
-        <div className={styles.overview} data-testid="settings-overview-section">
+        <div className={`${styles.overview} ${overviewStyles.overview}`} data-testid="settings-overview-section">
             <section
-                className={`${styles.overviewFocus} ${proposalStyles.proposalOverviewFocus}`}
+                className={`${styles.overviewFocus} ${proposalStyles.proposalOverviewFocus} ${overviewStyles.section}`}
                 data-testid="settings-focus-section"
                 data-settings-section="system-status"
                 data-lume-elevation="focal"
@@ -159,7 +160,7 @@ export default function SettingsPage() {
                         <span className={proposalStyles.inlineProposal}>Postazione</span>
                     </h2>
                     <p
-                        className={`${styles.overviewValue} ${proposalStyles.proposalNetworkStatus} lume-registro`}
+                        className={`${styles.overviewValue} ${proposalStyles.proposalNetworkStatus} ${overviewStyles.status} lume-registro`}
                         data-lume-register-value="true"
                         data-testid="settings-network-mode-value"
                         aria-live="polite"
@@ -176,13 +177,13 @@ export default function SettingsPage() {
                         </span>
                         <span className={proposalStyles.inlineProposal}>{networkEffectForProposal}</span>
                     </p>
-                    <details className={proposalStyles.proposalDetail}>
-                        <summary>Dettagli stato</summary>
+                    <details className={`${proposalStyles.proposalDetail} ${overviewStyles.details}`}>
+                        <summary>Dettagli della connessione</summary>
                         <p>{networkDetailForProposal} Esportazione e backup restano percorsi separati ed espliciti.</p>
                     </details>
                     {networkError ? <p className={styles.errorNote} role="status">{networkError}</p> : null}
                 </div>
-                <div className={`${styles.focusActions} ${proposalStyles.proposalFocusActions}`}>
+                <div className={`${styles.focusActions} ${proposalStyles.proposalFocusActions} ${overviewStyles.actions}`}>
                     <button
                         type="button"
                         className={`${styles.primaryAction} ${proposalStyles.proposalAction}`}
@@ -207,7 +208,7 @@ export default function SettingsPage() {
             </section>
 
             <section
-                className={`${styles.previewSection} ${proposalStyles.previewSectionProposal}`}
+                className={`${styles.previewSection} ${proposalStyles.previewSectionProposal} ${overviewStyles.section}`}
                 data-testid="settings-preview-section"
                 data-settings-section="appearance-preview"
             >
@@ -221,7 +222,7 @@ export default function SettingsPage() {
                         <span className={proposalStyles.inlineOriginal}>
                             Il cambio di registro si vede subito su questa superficie ed è reversibile dallo stesso controllo.
                         </span>
-                        <span className={proposalStyles.inlineProposal}>Tema della postazione, subito reversibile.</span>
+                        <span className={proposalStyles.inlineProposal}>Scegli il tema chiaro, scuro o di sistema.</span>
                     </p>
                 </div>
                 <div className={`${styles.previewField} ${proposalStyles.originalOnly}`} aria-live="polite">
@@ -229,7 +230,7 @@ export default function SettingsPage() {
                     <strong className={`${proposalStyles.inlineOriginal} lume-registro`} data-lume-register-value="true">08:30</strong>
                     <span className={proposalStyles.inlineOriginal}>Testo operativo nella Voce</span>
                 </div>
-                <div className={styles.previewActions}>
+                <div className={`${styles.previewActions} ${overviewStyles.actions}`}>
                     <ThemeToggle />
                     <Link
                         href="/settings/aspetto"

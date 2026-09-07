@@ -1,0 +1,80 @@
+/* @Codex WUL-669: overview only; preserve the Original comparison. */
+:global(html[data-runtime-twin-design='proposal']) .overview {
+    gap: 0;
+    max-width: 64rem;
+    min-width: 0;
+}
+
+:global(html[data-runtime-twin-design='proposal']) .overview .section {
+    grid-template-columns: minmax(0, 1fr) minmax(10rem, 13rem);
+    align-items: start;
+    gap: 1rem 2rem;
+    margin: 0;
+    padding: 1.25rem 0;
+    border: 0;
+    border-bottom: 1px solid color-mix(in srgb, var(--lume-ink) 12%, transparent);
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+}
+
+:global(html[data-runtime-twin-design='proposal']) .overview .section:first-child {
+    padding-top: 0;
+}
+
+:global(html[data-runtime-twin-design='proposal']) .overview .section > * {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+:global(html[data-runtime-twin-design='proposal']) .overview .status {
+    flex-wrap: wrap;
+    gap: 0.25rem 0.5rem;
+    margin-top: 0.5rem;
+}
+
+:global(html[data-runtime-twin-design='proposal']) .overview .status span {
+    font-size: 0.875rem;
+    line-height: 1.5;
+    letter-spacing: normal;
+}
+
+:global(html[data-runtime-twin-design='proposal']) .overview .actions {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+    min-width: 0;
+}
+
+:global(html[data-runtime-twin-design='proposal']) .overview :is(button, a, summary) {
+    min-height: 44px;
+    min-width: 44px;
+}
+
+:global(html[data-runtime-twin-design='proposal']) .overview .details {
+    margin-top: 0.25rem;
+}
+
+:global(html[data-runtime-twin-design='proposal']) .overview .details summary {
+    align-content: center;
+    padding-block: 0.5rem;
+    font-size: 0.8125rem;
+}
+
+:global(html[data-runtime-twin-design='proposal']) .overview .details summary:focus-visible {
+    outline: 2px solid var(--lume-accent);
+    outline-offset: 2px;
+    border-radius: 2px;
+}
+
+:global(html[data-runtime-twin-design='proposal']) .overview > nav {
+    padding-top: 1rem;
+}
+
+@media (max-width: 767px) {
+    :global(html[data-runtime-twin-design='proposal']) .overview .section {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 0.75rem;
+    }
+}
