@@ -1064,10 +1064,8 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
             await model.configurePairedOnlineForTests(
                 sessionCookie: "sid=new", operatorId: "new-operator", masterKey: masterKey,
                 selectedPatient: detail(id: "new-patient", archived: false, version: 1))
-            await MainActor.run {
-                model.newEntryTitle = "New session draft"
-                model.statusMessage = "New session"
-            }
+            await MainActor.run { model.newEntryTitle = "New session draft" }
+            let newerSessionStatus = await model.statusMessage
             await gate.release("pin:1")
             await rotation.value
             await MainActor.run {
@@ -1076,7 +1074,7 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
                 XCTAssertEqual(model.operatorIdentity?.userId, "new-operator")
                 XCTAssertEqual(model.selectedPatient?.id, "new-patient")
                 XCTAssertEqual(model.newEntryTitle, "New session draft")
-                XCTAssertEqual(model.statusMessage, "New session")
+                XCTAssertEqual(model.statusMessage, newerSessionStatus)
                 XCTAssertNil(model.errorMessage)
             }
         }
