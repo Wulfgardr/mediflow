@@ -22,6 +22,7 @@ import { useLiveQuery } from '@/lib/live-query';
 import { db } from '@/lib/db';
 import { SCALES } from '@/lib/scale-definitions';
 import styles from './scales.module.css';
+import scaleStyles from '@/components/scales/scale-workspace.module.css';
 
 type ScaleCatalogItem = {
     id: string;
@@ -37,7 +38,7 @@ const SCALE_CATALOG: ScaleCatalogItem[] = [
     { id: 'iadl', category: 'Autonomia e mobilità', icon: ClipboardList },
 ].filter((item) => Boolean(SCALES[item.id]));
 
-const SCALE_NAV_BASE = [{ href: '#catalogo', label: 'Catalogo', meta: `${SCALE_CATALOG.length} attive` }];
+const SCALE_NAV_BASE: { href: string; label: string; meta?: string }[] = [];
 const GROUPED_SCALE_CATALOG = Array.from(
     SCALE_CATALOG.reduce((groups, item) => {
         const current = groups.get(item.category) ?? [];
@@ -84,7 +85,7 @@ export default function ScalesLibraryPage() {
     useEffect(() => {
         if (!selectedScaleDefinition) return;
         window.requestAnimationFrame(() => {
-            patientSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            patientSectionRef.current?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'start' });
             if (window.matchMedia('(pointer: fine)').matches) {
                 patientSearchRef.current?.focus({ preventScroll: true });
             }
@@ -96,10 +97,12 @@ export default function ScalesLibraryPage() {
     };
 
     const handleClearScale = () => {
+        const chosenButton = catalogSectionRef.current?.querySelector<HTMLButtonElement>('button[aria-pressed="true"]');
         setSelectedScale(null);
         setSearchTerm('');
         window.requestAnimationFrame(() => {
-            catalogSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            catalogSectionRef.current?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'start' });
+            chosenButton?.focus({ preventScroll: true });
         });
     };
 
@@ -121,7 +124,7 @@ export default function ScalesLibraryPage() {
                 : 'Sono elencate solo le scale già digitalizzate.'}
             navItems={navItems}
         >
-            <section id="catalogo" ref={catalogSectionRef} className="mf-section lume-focal space-y-6 p-6 md:p-8 scroll-mt-40">
+            <section id="catalogo" ref={catalogSectionRef} className={`${scaleStyles.workspace} ${styles.catalogSection}`}>
                 <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                     <div className={`space-y-1 ${styles.sectionHeading}`}>
                         {!proposal && <p className="mf-eyebrow">Catalogo scale</p>}
@@ -137,7 +140,7 @@ export default function ScalesLibraryPage() {
                     {GROUPED_SCALE_CATALOG.map(([category, items]) => (
                         <div key={category} className="space-y-3">
                             <h3 className={proposal ? styles.categoryTitle : 'section-kicker px-1'}>{category}</h3>
-                            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                            <div className={scaleStyles.catalog}>
                                 {items.map((item) => {
                                     const scale = SCALES[item.id];
                                     const Icon = item.icon;
@@ -149,25 +152,14 @@ export default function ScalesLibraryPage() {
                                             type="button"
                                             onClick={() => handleScaleChoice(item.id)}
                                             aria-pressed={isSelected}
-                                            className={`lume-press group flex min-h-[170px] flex-col ${proposal ? 'justify-start gap-4' : 'justify-between'} rounded-[var(--lume-radius-card)] border p-5 text-left transition-[border-color,background-color] ${
-                                                isSelected
-                                                    ? 'border-[color:var(--lume-accent)] bg-[color:var(--lume-surface-focal)] shadow-[0_2px_8px_color-mix(in_srgb,var(--lume-ink)_10%,transparent)]'
-                                                    : 'border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] hover:border-[color:color-mix(in_srgb,var(--lume-ink)_22%,transparent)]'
-                                            }`}
+                                            className={scaleStyles.catalogLink}
                                         >
-                                            <span className="flex items-start justify-between gap-3">
-                                                <span className="flex h-11 w-11 items-center justify-center rounded-[var(--lume-radius-control)] bg-[color:var(--lume-surface-focal)] text-[color:var(--lume-ink-muted)] transition-colors">
-                                                    <Icon className="h-5 w-5" />
-                                                </span>
+                                            <Icon size={20} aria-hidden="true" />
+                                            <span>
+                                                <strong className={scaleStyles.catalogTitle}>{scale.title}</strong>
+                                                <span className={scaleStyles.catalogDescription}>{scale.description}</span>
                                             </span>
-                                            <span className="space-y-2">
-                                                <strong className="block text-lg font-semibold leading-tight" style={{ color: 'var(--lume-ink)' }}>
-                                                    {scale.title}
-                                                </strong>
-                                                <span className="block text-sm leading-relaxed" style={{ color: 'var(--lume-ink-muted)' }}>
-                                                    {scale.description}
-                                                </span>
-                                            </span>
+                                            <ArrowRight size={18} aria-hidden="true" />
                                         </button>
                                     );
                                 })}
@@ -178,7 +170,7 @@ export default function ScalesLibraryPage() {
             </section>
 
             {selectedScaleDefinition && (
-                <section id="paziente" ref={patientSectionRef} className="mf-section lume-focal space-y-5 p-6 md:p-8 scroll-mt-40">
+                <section id="paziente" ref={patientSectionRef} className={`${scaleStyles.workspace} ${styles.patientSection}`}>
                     <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                         <div className={`space-y-1 ${styles.sectionHeading}`}>
                             {!proposal && <p className="mf-eyebrow">Avvio scala</p>}
@@ -192,7 +184,7 @@ export default function ScalesLibraryPage() {
                         <button
                             type="button"
                             onClick={handleClearScale}
-                            className="mf-btn-secondary w-fit"
+                            className={scaleStyles.control}
                         >
                             <ArrowLeft className="h-4 w-4" />
                             Cambia scala
@@ -205,6 +197,7 @@ export default function ScalesLibraryPage() {
                             ref={patientSearchRef}
                             value={searchTerm}
                             onChange={(event) => setSearchTerm(event.target.value)}
+                            aria-label="Cerca paziente per nome o codice fiscale"
                             placeholder="Cerca per nome o codice fiscale"
                             className="mf-input pl-11"
                         />
@@ -217,7 +210,7 @@ export default function ScalesLibraryPage() {
                                 type="button"
                                 onClick={() => handleSelectPatient(patient.id)}
                                 aria-label={`Avvia ${selectedScaleDefinition.title} per ${patient.lastName} ${patient.firstName}`}
-                                className="lume-press flex items-center justify-between gap-4 rounded-[var(--lume-radius-card)] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] p-4 text-left transition-[border-color,background-color] hover:border-[color:var(--lume-accent)]"
+                                className={scaleStyles.catalogLink}
                             >
                                 <span className="min-w-0">
                                     <strong className="block truncate text-sm font-semibold" style={{ color: 'var(--lume-ink)' }}>
@@ -233,13 +226,13 @@ export default function ScalesLibraryPage() {
                         ))}
 
                         {patients?.length === 0 && (
-                            <div className="rounded-[var(--lume-radius-card)] border border-dashed border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] p-5 text-sm" style={{ color: 'var(--lume-ink-muted)' }}>
+                            <div className="text-sm" role="status" style={{ color: 'var(--lume-ink-muted)' }}>
                                 Nessuna scheda corrisponde alla ricerca.
                             </div>
                         )}
 
                         {patients && patients.length >= 8 && (
-                            <div className="rounded-[var(--lume-radius-card)] border border-dashed border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] p-4 text-xs" style={{ color: 'var(--lume-ink-muted)' }}>
+                            <div className="text-sm" style={{ color: 'var(--lume-ink-muted)' }}>
                                 Affina la ricerca per vedere altre schede.
                             </div>
                         )}
@@ -249,7 +242,7 @@ export default function ScalesLibraryPage() {
                         <button
                             type="button"
                             onClick={() => router.push('/patients/new')}
-                            className="mf-btn-secondary"
+                            className={scaleStyles.control}
                         >
                             <UserPlus className="h-4 w-4" />
                             Crea nuova scheda
