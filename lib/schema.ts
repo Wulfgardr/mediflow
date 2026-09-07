@@ -582,3 +582,10 @@ export const exemptions = sqliteTable('exemptions', {
     isNational: integer('is_national', { mode: 'boolean' }),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
 });
+
+/* @Codex */
+export const exemptionImportReceipts = sqliteTable('exemption_import_receipts', {
+    id: integer('id').primaryKey({ autoIncrement: true }).notNull(),
+    operationKey: text('operation_key').notNull().unique(),
+    receiptJson: text('receipt_json').notNull(),
+});

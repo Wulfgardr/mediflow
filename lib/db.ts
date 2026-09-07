@@ -501,6 +501,10 @@ class ApiTable<T> {
 
     async bulkPut(items: T[]): Promise<void> {
         if (items.length === 0) return;
+        /* @Codex: never split a full exemption import into independent writes. */
+        if (this.tableName === 'exemptions') {
+            throw new Error('EXEMPTION_IMPORT_PREVIEW_REQUIRED');
+        }
 
         // Optimization: send as single batch only where backend supports it.
         if (this.tableName === 'drugs') {
