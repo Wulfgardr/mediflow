@@ -22,7 +22,7 @@ const PROPOSAL_INTRO_COPY: Record<string, string> = {
     Repertori: 'AIFA ed esenzioni, in locale.',
     'Intelligence Fabric': 'Modelli, funzioni e stato dei collegamenti.',
     'Modelli e hardware': 'Collega Ollama, scegli i modelli installati e salva.',
-    'Funzioni cliniche': 'Interruttori e budget AI.',
+    'Funzioni cliniche': 'Scegli quali funzioni usare nella cartella.',
     'Governance e rollout': 'Confronto modelli e stato di rilascio.',
     Diagnostica: 'Servizi, architettura e aggiornamenti.',
     Sviluppo: 'Dati demo e app nativa.',
