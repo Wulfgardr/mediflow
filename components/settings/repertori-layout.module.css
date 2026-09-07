@@ -1,6 +1,6 @@
 /* @Codex: keep the full catalog status clear of its detail action. */
 .row.row {
-    grid-template-columns: 24px minmax(0, 1fr) minmax(0, 0.5fr) minmax(0, 12rem) minmax(0, 6rem);
+    grid-template-columns: 24px minmax(0, 1fr) minmax(0, 0.5fr) minmax(0, 12rem) max-content;
     gap: 0.75rem;
 }
 
@@ -18,7 +18,8 @@
 .row > button {
     min-height: var(--lume-control-height, 44px);
     border-radius: var(--lume-control-radius, 12px);
-    white-space: normal;
+    white-space: nowrap;
+    overflow-wrap: normal;
 }
 
 .row > button svg {
@@ -27,7 +28,7 @@
 
 @media (max-width: 900px) {
     .row.row {
-        grid-template-columns: 24px minmax(0, 1fr) minmax(0, 6rem);
+        grid-template-columns: 24px minmax(0, 1fr) max-content;
     }
 
     .row > :nth-child(3) {
