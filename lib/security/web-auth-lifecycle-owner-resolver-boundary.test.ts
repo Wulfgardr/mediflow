@@ -17,9 +17,13 @@ const PRODUCER = 'lib/security/web-auth-next-producer-boundary.test.ts';
 const H1_MATRIX = 'lib/security/server-auth.test.ts';
 const GUARD_SCRIPT = `check:${OWNER_STEM}-boundary`;
 const GUARD_COMMAND = `node scripts/run-strip-types.mjs --test --test-concurrency=1 ${D1A} ${PRODUCER} ${D1B} ${H1_MATRIX}`;
-// @Codex ADR 0123: reviewed delta excludes only synthetic twin tools from tracing.
-// Resolver aliases and the owner delivery inclusion remain independently guarded.
-const NEXT_RESOLVER_AST_SHA256 = '5e1034f0edadfade2ad0d2369adb30178fbb3600c0e96f038cf657737cc12819';
+// @Codex ADR 0128 / 066dd104c: the only projected delta is the desktop trace import.
+// Freeze its complete local dependency closure; aliases and owner delivery stay guarded.
+const NEXT_RESOLVER_AST_SHA256 = 'a08b97b451d33e4cc5df39af6ed6d71e4cf617f9ad7407c214a4c45c64615a84';
+const REVIEWED_TRACE_FILES = {
+    'scripts/anydoc-desktop-renderer-trace.mjs': 'd1e117793f872ceae0eab22dcc7e222830dba6f44ffd3f5228f13095941c6b5f',
+    'scripts/anydoc-pdf-renderer-profiles.json': '41355c1e4360acdc293aa383a07ba2c8216a8a018b0a38ac2a9ec5cc0fe37e41',
+};
 const OWNER_DELIVERY_GLOB = `./node_modules/${PACKAGE}/**/*`;
 const EXPECTED_TSCONFIG_RESOLVER = {
     extends: null, moduleResolution: 'bundler', baseUrl: null, paths: { '@/*': ['./*'] }, rootDirs: null,
@@ -158,6 +162,10 @@ const livePackage = JSON.parse(readFileSync(path.join(ROOT, 'package.json'), 'ut
 const liveFiles = repositoryFiles(ROOT);
 
 test('freezes the sole comment-insensitive Next resolver surface', () => {
+    // @Codex: read source only; never execute the build helper while checking its closure.
+    for (const [file, expected] of Object.entries(REVIEWED_TRACE_FILES)) {
+        assert.equal(digest(readFileSync(path.join(ROOT, file), 'utf8')), expected, file);
+    }
     assert.deepEqual(nextConfigErrors(liveNext), []);
     assert.deepEqual(nextConfigErrors(`// synthetic comment\n${liveNext.replace('config.resolve.alias.canvas = false;',
         'config.resolve.alias.canvas = false; /* neutral existing alias */')}`), []);

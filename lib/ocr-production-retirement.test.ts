@@ -39,7 +39,8 @@ test('current review surfaces do not advertise an available OCR workflow', () =>
 
     assert.doesNotMatch(reviewArea, /Anteprima OCR/u);
     assert.doesNotMatch(nativeDocuments, /OCR e sintesi restano|Stato coda OCR/u);
-    assert.match(nativeDocuments, /AnyDoc/u);
+    // @Codex: simplified UI preserves review duty without exposing the engine name.
+    assert.match(nativeDocuments, /Testo estratto, immagini e scansioni richiedono revisione\./u);
     assert.doesNotMatch(reviewQueue, /OCR o sintesi da completare/u);
 });
 

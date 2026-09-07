@@ -262,12 +262,26 @@ test('publishes an exact deeply immutable non-authorizing graph', () => {
   assert.equal(visited.size > 250, true);
 });
 
-test('accounts for all 32 OpenAPI GETs as non-integrated evidence and preserves ambiguity', () => {
+test('classifies all 33 OpenAPI GETs without admitting native configuration to the 32 read candidates', () => {
+  // @Codex ADR 0135: host-wide configuration has separate native authority;
+  // its GET is inventory evidence, not admission to the canonical read plan.
+  const nativeConfiguration = {
+    route: '/api/v1/network/ai/functions',
+    openApiOperationId: 'ReadNativeFunctionPreferences',
+    runtimeRef: 'app/api/v1/network/ai/functions/route.ts',
+  };
   const observed = openApiNetworkGets();
-  assert.equal(observed.length, 32);
-  assert.deepEqual(candidates().map(({ route, openApiOperationId }) => [route, openApiOperationId]), observed);
+  assert.equal(observed.length, 33);
+  assert.deepEqual(observed.filter(([route]) => route === nativeConfiguration.route), [
+    [nativeConfiguration.route, nativeConfiguration.openApiOperationId],
+  ]);
+  assert.equal(candidates().some(({ route, openApiOperationId }) => route === nativeConfiguration.route
+    || openApiOperationId === nativeConfiguration.openApiOperationId), false);
+  assert.deepEqual(candidates().map(({ route, openApiOperationId }) => [route, openApiOperationId]),
+    observed.filter(([route]) => route !== nativeConfiguration.route));
   assert.deepEqual(
-    candidates().map(({ route, runtimeRef }) => [route, runtimeRef]).sort(([left], [right]) => left.localeCompare(right)),
+    [...candidates(), nativeConfiguration].map(({ route, runtimeRef }) => [route, runtimeRef])
+      .sort(([left], [right]) => left.localeCompare(right)),
     runtimeNetworkGets(),
   );
   assert.equal(new Set(candidates().map(({ route }) => route)).size, 32);
