@@ -669,6 +669,25 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
     }
 
     /* @Codex */
+    func testNativeConfigurationConnectionNeedsLoginButNotPatientReadAndClearsOnLock() async {
+        let source = LifecycleMockDataSource(loginResult: HomeBaseLoginResult(
+            sessionCookie: "mediflow_session=synthetic-native", encryptedMasterKey: nil, salt: nil, id: "synthetic-admin"))
+        let model = await makeModel(source: source)
+        await MainActor.run {
+            XCTAssertNil(model.nativeOperatorConnection)
+            model.password = String(repeating: "2", count: 4); model.pairedClientId = "synthetic-mac"; model.pairedClientToken = "synthetic-token"
+        }
+        await model.login()
+        await MainActor.run {
+            XCTAssertNotNil(model.nativeOperatorConnection)
+            XCTAssertNil(model.clinicalWorkspaceConnection, "Clinical writers retain their existing pairedOnline gate")
+            XCTAssertEqual(model.connectionState, .notLoaded)
+        }
+        await model.lockSessionNow()
+        await MainActor.run { XCTAssertNil(model.nativeOperatorConnection) }
+    }
+
+    /* @Codex */
     func testLateLoginAfterPairingClearCannotRestoreOperatorState() async {
         let gate = LifecycleLoadGate(["login:1"])
         let source = LifecycleMockDataSource(

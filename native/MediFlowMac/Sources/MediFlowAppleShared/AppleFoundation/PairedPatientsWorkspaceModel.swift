@@ -4052,11 +4052,14 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     }
 
     var clinicalWorkspaceConnection: ClinicalWorkspaceConnection? {
-        guard connectionState == .pairedOnline,
-              let sessionCookie,
-              let credentials = pairedCredentials else {
-            return nil
-        }
+        guard connectionState == .pairedOnline else { return nil }
+        return nativeOperatorConnection
+    }
+
+    // @Codex: host configuration requires native login, not a patient-list read.
+    // This carries transport identity only; ADR0135 authority is checked by the host.
+    var nativeOperatorConnection: ClinicalWorkspaceConnection? {
+        guard let sessionCookie, let credentials = pairedCredentials else { return nil }
         return ClinicalWorkspaceConnection(
             dataSource: makeClient(),
             credentials: credentials,
