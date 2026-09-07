@@ -1,6 +1,7 @@
 'use client';
 
 /* @Codex */
+import { FunctionModelPicker, useFunctionModelPicker } from '@/components/function-models/function-model-picker';
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { AlertTriangle, RefreshCw, ShieldCheck, Sparkles } from 'lucide-react';
@@ -58,6 +59,7 @@ function InsightList({ items, warning = false }: Readonly<{ items: readonly stri
 
 export default function AIPatientInsight({ patient, stale = false }: AIPatientInsightProps) {
     const patientKey = `${patient.id}:${patient.version ?? 'unknown'}`;
+    const picker = useFunctionModelPicker('patient_insight', patientKey, stale);
     const [storedPreview, setPreview] = useState<Readonly<{ patientKey: string; value: AvailablePreview }> | null>(null);
     const [storedError, setStoredError] = useState<Readonly<{ patientKey: string; value: string | null }> | null>(null);
     const [generation, setGeneration] = useState<Readonly<{ patientKey: string; active: boolean }>>({ patientKey, active: false });
@@ -68,14 +70,15 @@ export default function AIPatientInsight({ patient, stale = false }: AIPatientIn
         [], undefined, ['settings'],
     );
     const enabled = isAiPatientInsightEnabledValue(killSwitch?.value);
-    const preview = storedPreview?.patientKey === patientKey ? storedPreview.value : null;
+    const preview = picker.active && storedPreview?.patientKey === patientKey ? storedPreview.value : null;
     const error = storedError?.patientKey === patientKey ? storedError.value : null;
     const isGenerating = generation.patientKey === patientKey && generation.active;
     const setError = (value: string | null) => setStoredError({ patientKey, value });
 
     useEffect(() => {
+        abortControllerRef.current?.abort(); setPreview(null); setGeneration({ patientKey, active: false });
         return () => abortControllerRef.current?.abort();
-    }, [patientKey]);
+    }, [patientKey, picker.active, picker.view.choice, picker.view.blocked]);
 
     const generateInsight = async () => {
         if (!enabled) {
@@ -85,6 +88,7 @@ export default function AIPatientInsight({ patient, stale = false }: AIPatientIn
         const controller = new AbortController(); abortControllerRef.current = controller;
         setGeneration({ patientKey, active: true }); setPreview(null); setError(null); setProgress('Raccolta del contesto clinico minimo…');
         try {
+            const modelToken = await picker.client.begin();
             const [entries, therapies] = await Promise.all([
                 db.entries.query({ patientId: patient.id, orderBy: 'date', orderDir: 'desc', limit: 12 }).toArray(),
                 db.therapies.query({ patientId: patient.id, limit: 12 }).toArray(),
@@ -96,7 +100,7 @@ export default function AIPatientInsight({ patient, stale = false }: AIPatientIn
                 capturedAt: new Date().toISOString(),
             });
             setProgress('Verifica autenticata di selezione e currentness…');
-            const response = await fetch('/api/ai/patient-insight/preview', {
+            const response = await picker.client.fetch('/api/ai/patient-insight/preview', {
                 method: 'POST', credentials: 'same-origin', cache: 'no-store', signal: controller.signal,
                 headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(request),
             });
@@ -107,6 +111,7 @@ export default function AIPatientInsight({ patient, stale = false }: AIPatientIn
             }
             setProgress('Controllo della proposta clinica…');
             const root = parsePatientInsightPreviewWireRoot(await response.json());
+            if (controller.signal.aborted || !picker.client.isCurrent(modelToken)) return;
             if (!root) { setError('La risposta di Patient Insight non ha superato i controlli locali.'); return; }
             const result = root.preview;
             if (result.status !== 'available') { setError(safeError(result)); return; }
@@ -124,6 +129,7 @@ export default function AIPatientInsight({ patient, stale = false }: AIPatientIn
     };
 
     const stopGeneration = () => {
+        picker.client.reset(picker.active);
         abortControllerRef.current?.abort(); abortControllerRef.current = null;
         setGeneration({ patientKey, active: false }); setProgress(''); setError('Generazione interrotta. Nessuna modifica è stata applicata.');
     };
@@ -149,7 +155,8 @@ export default function AIPatientInsight({ patient, stale = false }: AIPatientIn
                     <div><p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">Supporto clinico locale</p><h3 className="mt-2 text-xl font-bold text-slate-900 dark:text-white">Genera una proposta da revisionare</h3>
                         <p className="mt-2 max-w-sm text-sm leading-relaxed text-slate-500 dark:text-slate-400">La proposta resta temporanea: non aggiorna la scheda e non può essere applicata automaticamente.</p></div>
                     {error && <div className="max-w-sm rounded-[20px] border border-red-100 bg-red-50 p-3 text-xs text-red-600">{error}</div>}
-                    <button type="button" onClick={generateInsight} className="lume-press inline-flex items-center gap-2 rounded-full bg-slate-900 px-8 py-3 text-sm font-semibold text-white dark:bg-white dark:text-slate-900"><Sparkles className="h-4 w-4" />Avvia supporto</button>
+                    <FunctionModelPicker picker={picker} />
+                    <button type="button" onClick={generateInsight} disabled={!picker.canGenerate} className="lume-press inline-flex items-center gap-2 rounded-full bg-slate-900 px-8 py-3 text-sm font-semibold text-white dark:bg-white dark:text-slate-900"><Sparkles className="h-4 w-4" />Avvia supporto</button>
                 </div>
             </div>
         );
@@ -161,9 +168,10 @@ export default function AIPatientInsight({ patient, stale = false }: AIPatientIn
                 <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-[18px] bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-slate-200"><Sparkles className="h-5 w-5" /></div>
                         <div><h3 className="text-base font-bold text-slate-900 dark:text-white">Supporto al ragionamento clinico</h3><p className="text-[10px] font-medium uppercase tracking-tight text-slate-400">Generazione manuale · proposta locale</p></div></div>
-                    <button type="button" onClick={generateInsight} disabled={isGenerating || !enabled} className="flex h-9 items-center gap-2 rounded-full border border-slate-200/80 bg-white/80 px-4 text-xs font-semibold text-slate-700 disabled:opacity-50 dark:border-white/10 dark:bg-white/10 dark:text-slate-200"><RefreshCw className="h-3.5 w-3.5" />{isGenerating ? 'Analisi…' : enabled ? 'Nuova bozza' : 'Disabilitata'}</button>
+                    <button type="button" onClick={generateInsight} disabled={isGenerating || !enabled || !picker.canGenerate} className="flex min-h-11 items-center gap-2 rounded-full border border-slate-200/80 bg-white/80 px-4 text-xs font-semibold text-slate-700 disabled:opacity-50 dark:border-white/10 dark:bg-white/10 dark:text-slate-200"><RefreshCw className="h-3.5 w-3.5" />{isGenerating ? 'Analisi…' : enabled ? 'Nuova bozza' : 'Disabilitata'}</button>
                 </div>
             </div>
+            <div className="px-5"><FunctionModelPicker picker={picker} /></div>
             <div className="space-y-5 p-5">
                 {error && <div className="flex items-center gap-2 rounded-[20px] border border-red-200 bg-red-50 p-3 text-xs text-red-600"><AlertTriangle className="h-4 w-4 shrink-0" />{error}</div>}
                 {!enabled && <div data-testid="patient-insight-disabled-banner" className="rounded-[20px] border border-red-200 bg-red-50 p-3 text-xs text-red-700">La consultazione resta disponibile; nuove generazioni bloccate dal kill switch locale.</div>}

@@ -21,7 +21,7 @@ test('roots the manual Treatment Reasoning consumer only in the browser controll
 
 test('keeps the preview ephemeral, supersession-safe, and review-only', () => {
     assert.match(source, /controller\.reset\(\)/u);
-    assert.match(source, /\[controller, patient\.id, patient\.version\]/u);
+    assert.match(source, /\[controller, patient\.id, patient\.version, picker\.active, picker\.view\.choice, picker\.view\.blocked\]/u);
     assert.match(source, /operation\.current/u);
     assert.match(source, /publication\.value/u);
     assert.match(source, /publication\.sourceBindings/u);

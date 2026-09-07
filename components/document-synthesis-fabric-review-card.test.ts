@@ -67,7 +67,7 @@ test('DS ordinary confirmation shows human names, requires an explicit choice an
     assert.match(card, /\{choice.name\}/u);
     assert.doesNotMatch(card, /Paziente: \{patientId\}|Ambulatorio: \{proposal.ambulatoryId\}/u);
     assert.match(card, /<option value="">Scegli l’ambulatorio/u);
-    assert.match(card, /disabled=\{!enabled \|\| !confirmed \|\| !ambulatory\}/u);
+    assert.match(card, /disabled=\{!enabled \|\| !confirmed \|\| !ambulatory \|\| !picker\.canGenerate\}/u);
     assert.match(card, /setAmbulatory[\s\S]*?setConfirmed\(false\)/u);
     const buttons = card.match(/<button\b[^>]*>/gu) ?? [];
     assert.equal(buttons.length, 5);

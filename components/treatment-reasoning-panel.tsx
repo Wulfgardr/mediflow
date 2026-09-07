@@ -1,6 +1,7 @@
 'use client';
 
 /* @Codex */
+import { FunctionModelPicker, useFunctionModelPicker } from '@/components/function-models/function-model-picker';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
@@ -90,7 +91,8 @@ export default function TreatmentReasoningPanel({
     observations = [],
     attachments = [],
 }: TreatmentReasoningPanelProps) {
-    const [controller] = useState(() => createTreatmentReasoningBrowserController());
+    const picker = useFunctionModelPicker('treatment_reasoning', `${patient.id}:${patient.version}`);
+    const [controller] = useState(() => createTreatmentReasoningBrowserController({ fetch: picker.client.fetch }));
     const operation = useRef(0);
     const contextRevision = `${patient.id}:${patient.version ?? 'unversioned'}`;
     const [publicationState, setPublicationState] = useState<ScopedValue<TreatmentReasoningPublication> | null>(null);
@@ -107,7 +109,7 @@ export default function TreatmentReasoningPanel({
         () => countTreatmentReasoningSources({ patient, entries, therapies, observations, attachments }),
         [patient, entries, therapies, observations, attachments],
     );
-    const publication = publicationState?.contextRevision === contextRevision ? publicationState.value : null;
+    const publication = picker.active && publicationState?.contextRevision === contextRevision ? publicationState.value : null;
     const error = errorState?.contextRevision === contextRevision ? errorState.value : null;
     const isGenerating = runningRevision === contextRevision;
     const sourceSummaryItems = [
@@ -117,16 +119,17 @@ export default function TreatmentReasoningPanel({
         ['Diario', sourceSummary.clinicalEntries],
         ['Evidenze', sourceSummary.documentInsights + sourceSummary.attachmentEvidence],
     ];
-    const canGenerate = treatmentReasoningEnabled && sourceSummary.total > 0 && !isGenerating;
+    const canGenerate = treatmentReasoningEnabled && sourceSummary.total > 0 && !isGenerating && picker.canGenerate;
 
     useEffect(() => {
         operation.current += 1;
         controller.reset();
+        setPublicationState(null); setRunningRevision(null);
         return () => {
             operation.current += 1;
             controller.reset();
         };
-    }, [controller, patient.id, patient.version]);
+    }, [controller, patient.id, patient.version, picker.active, picker.view.choice, picker.view.blocked]);
 
     if (sourceSummary.total === 0) {
         return null;
@@ -143,6 +146,7 @@ export default function TreatmentReasoningPanel({
         setErrorState(null);
 
         try {
+            const modelToken = await picker.client.begin();
             const proposal = await controller.readProposal();
             const nextPublication = await controller.run({
                 patientId: patient.id,
@@ -155,7 +159,7 @@ export default function TreatmentReasoningPanel({
                     attachments,
                 },
             }, true);
-            if (operation.current === token) {
+            if (operation.current === token && picker.client.isCurrent(modelToken)) {
                 setPublicationState({ contextRevision, value: nextPublication });
             }
         } catch {
@@ -190,12 +194,13 @@ export default function TreatmentReasoningPanel({
                         </div>
                     </div>
 
+                    <FunctionModelPicker picker={picker} />
                     <button
                         type="button"
                         onClick={generatePreview}
                         disabled={!canGenerate}
                         aria-describedby="treatment-reasoning-boundary-note"
-                        className="inline-flex h-10 items-center justify-center gap-2 rounded-[12px] bg-[color:var(--lume-ink)] px-4 text-xs font-bold text-[color:var(--lume-surface-focal)] shadow-[var(--lume-shadow-focal)] transition-[background-color,opacity,transform] hover:bg-[color:var(--lume-accent)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[12px] bg-[color:var(--lume-ink)] px-4 text-xs font-bold text-[color:var(--lume-surface-focal)] shadow-[var(--lume-shadow-focal)] transition-[background-color,opacity,transform] hover:bg-[color:var(--lume-accent)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                         {isGenerating ? <RefreshCw className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Sparkles className="h-4 w-4" aria-hidden="true" />}
                         {publication ? 'Aggiorna bozza' : 'Genera bozza'}
