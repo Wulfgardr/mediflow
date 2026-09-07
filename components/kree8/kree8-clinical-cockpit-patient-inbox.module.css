@@ -816,6 +816,8 @@
   border-radius: var(--lume-control-radius, 12px);
   padding: 18px 17px 19px;
 }
+/* @Codex: keep all four rounded focus edges inside the scrolling viewport. */
+:global(html[data-runtime-twin-design='proposal']) .patientRow:focus-visible { outline-offset: -3px; }
 @media (max-width: 640px) {
   :global(html[data-runtime-twin-design='proposal']) .patientRow { padding: 11px 11px 12px; }
 }
