@@ -162,7 +162,7 @@ test('current-selection extraction denies a real reselection in flight', async (
 
 test('current-selection extraction denies a confirmed Web lock in flight', async () => {
     seed();
-    const web = issueSyntheticWebSessionContext({ id: 'user.synthetic.lock', username: 'synthetic', role: 'clinician' },
+    const web = issueSyntheticWebSessionContext({ id: 'user.synthetic.lock', username: path.basename(dataDir), role: 'clinician' },
         `anydoc-current-selection-lock-${sessionSequence += 1}`);
     finalSessions.push(web.session);
     serverSessionProjectionOwnerRegistry.acquire(web.session)
