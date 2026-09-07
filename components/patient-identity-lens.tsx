@@ -17,6 +17,8 @@ interface PatientExemptionLensItem {
 interface PatientIdentityLensProps {
     /* @Codex */
     variant?: 'atlas' | 'reader';
+    /* @Codex WUL-678: a reader instance owns exactly one navigable domain. */
+    domain?: 'anagrafica' | 'clinica' | 'amministrazione';
     patient: Patient;
     ageLabel: string;
     birthDateLabel: string;
@@ -44,6 +46,7 @@ function diagnosisSystemLabel(system?: string) {
 
 export function PatientIdentityLens({
     variant = 'atlas',
+    domain = 'anagrafica',
     patient,
     ageLabel,
     birthDateLabel,
@@ -52,12 +55,13 @@ export function PatientIdentityLens({
     actions,
     exemptionDetails = [],
 }: PatientIdentityLensProps) {
-    /* @Codex WUL-678: domain groups keep identity, clinical facts and exemptions separate. */
+    /* @Codex WUL-678: normalize both lookup sides, preserving the original exemption contract. */
+    const detailByCode = new Map(exemptionDetails.map((item) => [item.code.trim().toUpperCase(), item.description?.trim()]));
+    /* @Codex WUL-678: only the requested domain is rendered in each destination. */
     if (variant === 'reader') {
         return (
             <div className={disclosure.identity}>
-                <section aria-labelledby="patient-demographics-title">
-                    <h2 id="patient-demographics-title">Anagrafica</h2>
+                {domain === 'anagrafica' ? <section aria-label="Dati anagrafici">
                     <dl className={disclosure.facts}>
                         <div><dt>Nome e cognome</dt><dd><PrivacyBlur>{patient.firstName} {patient.lastName}</PrivacyBlur></dd></div>
                         <div><dt>Codice fiscale</dt><dd><PrivacyBlur intensity="sm">{patient.taxCode || 'Non registrato'}</PrivacyBlur></dd></div>
@@ -65,10 +69,9 @@ export function PatientIdentityLens({
                         <div><dt>Telefono</dt><dd><PrivacyBlur intensity="sm">{patient.phone || 'Non registrato'}</PrivacyBlur></dd></div>
                         <div><dt>Indirizzo</dt><dd><PrivacyBlur intensity="sm">{patient.address || 'Non registrato'}</PrivacyBlur></dd></div>
                     </dl>
-                </section>
-                <section id="clinica" aria-labelledby="patient-clinical-title">
-                    <h2 id="patient-clinical-title">Clinica <span className={disclosure.count}>{diagnoses.length}</span></h2>
-                    <h3>Diagnosi</h3>
+                </section> : null}
+                {domain === 'clinica' ? <section aria-labelledby="patient-clinical-title">
+                    <h2 id="patient-clinical-title">Diagnosi <span className={disclosure.count}>{diagnoses.length}</span></h2>
                     {diagnoses.length > 0 ? (
                         <ul className={disclosure.records} aria-label="Diagnosi registrate">
                             {diagnoses.map((diagnosis, index) => (
@@ -79,18 +82,17 @@ export function PatientIdentityLens({
                             ))}
                         </ul>
                     ) : <p>Nessuna diagnosi registrata.</p>}
-                </section>
-                <section aria-labelledby="patient-administration-title">
-                    <h2 id="patient-administration-title">Amministrazione <span className={disclosure.count}>{exemptions.length}</span></h2>
-                    <h3>Esenzioni</h3>
+                </section> : null}
+                {domain === 'amministrazione' ? <section aria-labelledby="patient-administration-title">
+                    <h2 id="patient-administration-title">Esenzioni <span className={disclosure.count}>{exemptions.length}</span></h2>
                     {exemptions.length > 0 ? (
                         <ul className={disclosure.records} aria-label="Esenzioni registrate">
                             {exemptions.map((code) => (
-                                <li key={code}><strong>{code}</strong><span>{exemptionDetails.find((item) => item.code === code)?.description || 'Esenzione registrata nel profilo paziente.'}</span></li>
+                                <li key={code}><strong>{code.trim().toUpperCase()}</strong><span>{detailByCode.get(code.trim().toUpperCase()) || 'Esenzione registrata nel profilo paziente.'}</span></li>
                             ))}
                         </ul>
                     ) : <p>Nessuna esenzione registrata.</p>}
-                </section>
+                </section> : null}
                 {actions}
             </div>
         );

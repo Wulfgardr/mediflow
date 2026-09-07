@@ -105,20 +105,66 @@ export function Kree8WorkspaceShell({
     patientTitleRef.current?.focus({ preventScroll: true });
   }, [folderMode, isClinical, pathname]);
 
-  /* @Codex: the existing anchors are the folder's navigation contract, including
-     deep links and Back/Forward. A selection changes visibility, never data. */
+  /* @Codex WUL-678: resolve deep links within this patient, select their real
+     section, then reveal and focus the requested disclosure. Never run its action. */
   useEffect(() => {
-    if (!folderMode) return;
-    const selectFromHash = () => {
-      const href = window.location.hash;
-      const section = navKey.split('|').includes(href) ? href.slice(1) : composition === 'stream' ? 'diario' : 'quadro';
-      setFolderSection(section);
-      setFolderNavOpen(false);
+    const root = rootRef.current;
+    if (!isClinical || !root || !navKey) return;
+    const sections = navKey.split('|').filter(Boolean);
+    let frame = 0;
+    const select = (href: string) => {
+      cancelAnimationFrame(frame);
+      const target = href.startsWith('#') && href.length > 1 ? root.querySelector<HTMLElement>(`#${CSS.escape(href.slice(1))}`) : null;
+      const section = sections.includes(href) ? href.slice(1)
+        : target?.closest<HTMLElement>(sections.map((item) => `#${CSS.escape(item.slice(1))}`).join(','))?.id;
+      if (folderMode) {
+        setFolderSection(section ?? (composition === 'stream' ? 'diario' : 'quadro'));
+        setFolderNavOpen(false);
+      }
+      if (!target || !section) return;
+      const initiatingFocus = document.activeElement;
+      frame = requestAnimationFrame(() => {
+        if (!target.isConnected) return;
+        // In the original scrolling layout, a containing section may be folded.
+        const pane = target.closest<HTMLElement>('[data-folder-pane]');
+        const toggle = pane?.querySelector<HTMLButtonElement>(':scope > h3 > button[aria-expanded="false"]');
+        toggle?.click();
+        for (let node: HTMLElement | null = target; node && node !== root; node = node.parentElement) {
+          if (node instanceof HTMLDetailsElement) node.open = true;
+        }
+        frame = requestAnimationFrame(() => {
+          if (!target.isConnected) return;
+          // A later keyboard/pointer choice wins over this deferred focus pass.
+          const active = document.activeElement;
+          if (active !== initiatingFocus && active !== document.body) return;
+          const control = target instanceof HTMLDetailsElement
+            ? target.querySelector<HTMLElement>('button:not([disabled]), a[href], input:not([disabled])') ?? target.querySelector<HTMLElement>('summary')
+            : target.querySelector<HTMLElement>('h2, h3');
+          const focusTarget = control ?? target;
+          if (!focusTarget.matches('button, a, input, summary, [tabindex]')) focusTarget.tabIndex = -1;
+          focusTarget.focus({ preventScroll: true });
+          target.scrollIntoView({ block: 'nearest' });
+        });
+      });
+    };
+    const selectFromHash = () => select(window.location.hash);
+    // Reopening a closed disclosure must also work when the URL hash is unchanged.
+    const selectFromLink = (event: MouseEvent) => {
+      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      const link = event.target instanceof Element ? event.target.closest('a') : null;
+      if (!link || link.target === '_blank' || link.hasAttribute('download')) return;
+      const url = new URL(link.href, window.location.href);
+      if (url.origin === window.location.origin && url.pathname === window.location.pathname && url.search === window.location.search) select(url.hash);
     };
     selectFromHash();
     window.addEventListener('hashchange', selectFromHash);
-    return () => window.removeEventListener('hashchange', selectFromHash);
-  }, [folderMode, navKey, composition]);
+    root.addEventListener('click', selectFromLink);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener('hashchange', selectFromHash);
+      root.removeEventListener('click', selectFromLink);
+    };
+  }, [isClinical, folderMode, navKey, composition]);
 
   /* Lume focal locus + scrollspy (WUL-55, F2c). Un solo effetto governa la vita
      dei bersagli: li scopre nel DOM dentro QUESTO guscio (querySelector sul ref,
