@@ -805,4 +805,13 @@
 :global(html[data-runtime-twin-design='proposal']) .worklistPanelHeader > h2 { margin: 0; font-size: 20px; line-height: 28px; }
 :global(html[data-runtime-twin-design='proposal']) .worklistPanelHeader > span:last-child { align-self: center; }
 :global(html[data-runtime-twin-design='proposal']) .recordIdentity strong { font-size: 16px; }
-:global(html[data-runtime-twin-design='proposal']) .patientRow { border-radius: 0; }
+/* @Codex: shared corners and a complete row boundary; compensate the added
+   top/side borders so content width, row height and hit areas stay unchanged. */
+:global(html[data-runtime-twin-design='proposal']) .patientRow {
+  border: 1px solid var(--line-strong);
+  border-radius: var(--lume-control-radius, 12px);
+  padding: 18px 17px 19px;
+}
+@media (max-width: 640px) {
+  :global(html[data-runtime-twin-design='proposal']) .patientRow { padding: 11px 11px 12px; }
+}
