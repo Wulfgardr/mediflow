@@ -65,6 +65,7 @@ export const AUDIT_EVENT_TYPES = [
     'agent.operation.attempted',
     /* @Codex: PHI-safe receipt for the host-owned WHO reference-data boundary. */
     'reference_data.icd11.search',
+    'reference_data.icd11.code_check',
 ] as const;
 
 export type AuditEventType = (typeof AUDIT_EVENT_TYPES)[number];

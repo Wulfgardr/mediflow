@@ -229,6 +229,21 @@ export const NEVER_REGRESS_ALLOWLIST = {
     ],
     externalUrls: [
         {
+            path: 'lib/reference-data/icd11-who-code-check-contract.ts',
+            pattern: 'http://id\\.who\\.int/icd/release/11/2026-01/mms/(?=["\\x27`])',
+            reason: 'ADR0115: canonical WHO identifier namespace, compared as data only; CodeInfo transport always targets fixed loopback.',
+        },
+        {
+            path: 'lib/reference-data/icd11-who-code-check.test.ts',
+            pattern: 'http://id\\.who\\.int/icd/release/11/2026-01/mms/1000000001(?=["\\x27`])',
+            reason: 'Synthetic identifier in in-memory CodeInfo and entity response fixtures; no external request.',
+        },
+        {
+            path: 'lib/reference-data/icd11-who-local-node-transport.ts',
+            pattern: 'http://id\\.who\\.int(?=["\\x27`])',
+            reason: 'ADR0115: remove the already validated identifier prefix to construct a local path; never fetch this URI or its host.',
+        },
+        {
             path: 'lib/aifa-catalog-download.ts',
             pattern: 'https://drive\\.aifa\\.gov\\.it/farmaci/confezioni_fornitura\\.csv(?=["\\x27`])',
             reason: 'ADR0125 fixes this official AIFA feed for an explicit authenticated update, without caller URL, redirects, cookies or clinical data; no automatic download on startup.',
