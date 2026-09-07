@@ -807,6 +807,10 @@
 :global(html[data-runtime-twin-design='proposal']) .recordIdentity strong { font-size: 16px; }
 /* @Codex: shared corners and a complete row boundary; compensate the added
    top/side borders so content width, row height and hit areas stay unchanged. */
+:global(html[data-runtime-twin-design='proposal']) .patientListViewport { border-top: 0; }
+/* @Codex: the virtualizer measures this wrapper, including the space between
+   cards; the interactive row keeps its full height and content. */
+:global(html[data-runtime-twin-design='proposal']) .patientRowWrap { padding-bottom: var(--lume-control-gap); }
 :global(html[data-runtime-twin-design='proposal']) .patientRow {
   border: 1px solid var(--line-strong);
   border-radius: var(--lume-control-radius, 12px);
