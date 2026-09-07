@@ -68,7 +68,7 @@ retroattivamente. Le prove piattaforma precedenti conservano i propri SHA.
 
 ## Interfaccia e navigazione delle impostazioni
 
-Il runtime Web compilato da `9fe74f2573c455ae2f8439f1b47adee767414f3c`
+Il runtime Web compilato da `98fb036ec579b1bfe2ce947d7723fb7ca0eaabbe`
 ha superato build webpack, TypeScript e controllo standalone/AnyDoc.
 Dodici stati sono stati osservati nel browser a 1440, 965 e 390 px, con
 login ordinario e soli dati inventati. La verifica usa Playwright locale;
@@ -76,7 +76,7 @@ il plugin Browser non era disponibile.
 
 - Panoramica è presente nella navigazione interna: da Profilo, Aspetto e
   Ambulatori si torna alla pagina iniziale senza usare il menu superiore.
-- I comandi misurati hanno altezza 44 px e raggio 12 px, inclusi Nuova voce,
+- I comandi misurati hanno altezza 44 px, raggio 12 px e peso del testo 600, inclusi Nuova voce,
   Checkup host, Azioni, Nuova prestazione e Dettagli.
 - La ricerca è separata dal titolo dell'elenco; nei Repertori le etichette
   complete non si sovrappongono al comando Dettagli.
@@ -85,7 +85,9 @@ il plugin Browser non era disponibile.
   priva di servizio WHO configurato: non è una verifica con console pulita.
 
 Le immagini e le misure sono conservate nella ricevuta privata
-`ui-harmony-9fe/ui-harmony-qa.json`. Le sei immagini pubbliche acquisite su
+`ui-harmony-98fb/ui-harmony-qa.json`. La precedente prova su `5e4a3aef6`
+aveva rilevato il peso 650 nelle impostazioni; l'ultimo allineamento lo porta
+a 600 e la stessa verifica passa. Le sei immagini pubbliche acquisite su
 `e7f8a555a` sono precedenti a questi ritocchi e devono essere sostituite prima
 del rilascio. Gli stati AI non vengono alterati nelle immagini.
 
@@ -93,6 +95,14 @@ La prima prova ordinaria Document Synthesis su `9fe74f257` si ferma con
 `context_missing` prima della conferma: il contesto dell'ambulatorio è assente
 nella sessione nuova. Nessuna richiesta alle route AI è stata osservata.
 Il riesame sorgente verde non chiude questo problema del percorso reale.
+
+La correzione `bcbfb912e` aggiunge una scelta esplicita dell'ambulatorio,
+senza cookie o valori predefiniti, con nomi leggibili e nuova lettura prima
+della selezione confermata. L'addendum indipendente Daybreak sul delta a cinque
+file non rileva finding: 28/28 test mirati e 8/8 test crosswalk PASS. La prova
+ordinaria successiva sul bundle `5e4a3aef6` supera scelta, conferma e capture,
+ma il primo ingest risponde **409 `capture_consumed`**. Non è stata prodotta
+una sintesi validata. Questa evidenza resta distinta dai test sorgente verdi.
 
 ## CI: risultati conservati e correzioni locali
 
@@ -169,3 +179,5 @@ provano identità del contenuto, non esecuzione indipendente di questa lane.
 | `attachment-budget-integrated.log` | `dacb6899a0843245e55a0d9f913fb7dbeaea65c71bc6bd650d78af86ae213427` |
 | `daybreak-ds-addendum/addendum.md` | `d4a2499d8078732f553751c97265a2271e037351b55ee0ed1da54e1d87ba5900` |
 | `daybreak-ds-addendum/review-receipt.json` | `995e5c6b555f850ceecbfbcf94462193a8fea995e3af52fbd932f92b28973d6f` |
+| `daybreak-ds-context-addendum/addendum.md` | `1305856b3bd8f7d49e9fd839aa9dbc138af05c417e29b9351bed27c0a04bb44b` |
+| `daybreak-ds-context-addendum/review-receipt.json` | `d496b96cf53aa6af8f11657a27d701afd35b88261673db2f7bb8c4a5fe4fe5e9` |
