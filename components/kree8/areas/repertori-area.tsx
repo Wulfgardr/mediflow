@@ -26,6 +26,8 @@ import type { ICDReadiness } from '@/lib/icd-service';
 import styles from '../kree8-clinical-cockpit-foundation.module.css';
 import patientStyles from '../kree8-clinical-cockpit-patient-inbox.module.css';
 import repertoriStyles from '../kree8-clinical-cockpit-repertori.module.css';
+/* @Codex */
+import catalogLayout from '@/components/settings/repertori-layout.module.css';
 
 
 const REVIEW_CATALOGS: Kree8CatalogRow[] = [
@@ -275,7 +277,7 @@ function RepertoriArea({ isReview }: { isReview: boolean }) {
             }[c.freshness];
 
             return (
-              <div key={c.id} className={repertoriStyles.catalogRow}>
+              <div key={c.id} className={`${repertoriStyles.catalogRow} ${catalogLayout.row}`}>
                 <span className={repertoriStyles.catalogIcon}>
                   <Stethoscope size={13} />
                 </span>
@@ -286,7 +288,7 @@ function RepertoriArea({ isReview }: { isReview: boolean }) {
                 <span className={styles.rowSub} style={{ fontVariantNumeric: 'tabular-nums' }}>
                   {c.age}
                 </span>
-                <PillBadge variant={variant}>{labelText}</PillBadge>
+                <div className={catalogLayout.status}><PillBadge variant={variant}>{labelText}</PillBadge></div>
                 <button
                   type="button"
                   className={styles.ghostBtnSm}

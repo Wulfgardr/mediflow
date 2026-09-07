@@ -5,20 +5,16 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
-import { SETTINGS_NAV_GROUPS } from '@/lib/settings-navigation';
+import { SETTINGS_NAV_GROUPS, isSettingsItemActive } from '@/lib/settings-navigation';
 import type { SettingsNavGroup, SettingsNavItem } from '@/lib/settings-navigation';
 import { cn } from '@/lib/utils';
 
 import styles from './settings-lume.module.css';
 
-function isItemActive(item: SettingsNavItem, pathname: string): boolean {
-    return pathname === item.href || pathname.startsWith(`${item.href}/`);
-}
-
 function findActiveEntry(pathname: string): { group: SettingsNavGroup; item: SettingsNavItem } | null {
     for (const group of SETTINGS_NAV_GROUPS) {
         for (const item of group.items) {
-            if (isItemActive(item, pathname)) return { group, item };
+            if (isSettingsItemActive(item, pathname)) return { group, item };
         }
     }
     return null;
@@ -40,7 +36,7 @@ function NavGroups({
                     <p className={styles.navGroupLabel}>{group.label}</p>
                     <ul className={styles.navItems}>
                         {group.items.map((item) => {
-                            const isActive = isItemActive(item, pathname);
+                            const isActive = isSettingsItemActive(item, pathname);
                             return (
                                 <li key={item.id}>
                                     <Link
