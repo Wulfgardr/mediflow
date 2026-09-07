@@ -1,11 +1,14 @@
 'use client';
 
 /* @Codex */
+import { FunctionPreferencesPanel } from '@/components/function-models/function-preferences-panel';
+import { useCallback } from 'react';
+import type { FunctionModelPreferences } from '@/lib/function-models/browser';
 import { ChatGptAccountPanel } from '@/components/settings/chatgpt-account-panel';
 
 // WUL-297 Funzioni cliniche AI: moved from the monolithic settings page.
 
-import { CheckCircle, Save, Shield, Sparkles } from 'lucide-react';
+import { CheckCircle, Save, Sparkles } from 'lucide-react';
 /* @Codex */
 import functionStyles from '@/components/settings/function-status-panel.module.css';
 import {
@@ -28,13 +31,9 @@ export default function SettingsAiFunctionsPage() {
         aiInsightSettings,
         setAiInsightSettings,
         isSavingAi,
-        patientInsightEnabled,
         setPatientInsightEnabled,
-        documentSynthesisEnabled,
         setDocumentSynthesisEnabled,
-        smartImportEnabled,
         setSmartImportEnabled,
-        treatmentReasoningEnabled,
         setTreatmentReasoningEnabled,
         documentRouterControlFlowMode,
         setDocumentRouterControlFlowMode,
@@ -43,6 +42,16 @@ export default function SettingsAiFunctionsPage() {
         updateManualInsightConfig,
         saveAiConfig,
     } = useAiSettingsController();
+
+    /* @Codex: mirror confirmed switches into the existing shared configuration draft. */
+    const syncPreferences = useCallback((dto: FunctionModelPreferences) => {
+        for (const row of dto.functions) {
+            if (row.id === 'patient_insight') setPatientInsightEnabled(row.enabled);
+            if (row.id === 'smart_import') setSmartImportEnabled(row.enabled);
+            if (row.id === 'document_synthesis') setDocumentSynthesisEnabled(row.enabled);
+            if (row.id === 'treatment_reasoning') setTreatmentReasoningEnabled(row.enabled);
+        }
+    }, [setPatientInsightEnabled, setSmartImportEnabled, setDocumentSynthesisEnabled, setTreatmentReasoningEnabled]);
 
     return (
         <section className={`space-y-4 ${functionStyles.functionSettings}`} data-testid="settings-ai-functions-section">
@@ -54,197 +63,9 @@ export default function SettingsAiFunctionsPage() {
 
             {/* @Codex: account control is separate from function/model preferences. */}
             <ChatGptAccountPanel />
+            <FunctionPreferencesPanel onRead={syncPreferences} />
 
             <div className="space-y-6">
-                {/* AI safety toggles */}
-                <div className={SETTINGS_CARD_CLASS}>
-                    {/* @Codex WUL-273: active AI switches use neutral confirmation; red is reserved for off/blocked states. */}
-                    <div className="mb-5 flex items-start gap-3">
-                        <div className="rounded-2xl p-2" style={{ background: 'var(--lume-surface-field)', color: 'var(--lume-signal-critical)' }}>
-                            <Shield className="h-4 w-4" />
-                        </div>
-                        <div className="min-w-0">
-                            <p className="section-kicker">Preferenze</p>
-                            <h3 className="mt-1 text-base font-semibold" style={{ color: 'var(--lume-ink)' }}>Scegli le funzioni da usare</h3>
-                            <p className="mt-1 text-xs" style={{ color: 'var(--lume-ink-muted)' }}>Ogni funzione ha una preferenza indipendente. Le modifiche diventano effettive quando salvi.</p>
-                        </div>
-                    </div>
-
-                    <div className="space-y-3">
-                        <div
-                            className="rounded-[18px] border p-4"
-                            style={patientInsightEnabled
-                                ? { borderColor: 'color-mix(in srgb, var(--lume-ink) 18%, transparent)', background: 'var(--lume-surface-field)' }
-                                : { borderColor: 'color-mix(in srgb, var(--lume-signal-critical) 28%, transparent)', background: 'var(--lume-surface-field)' }}
-                            data-testid="patient-insight-kill-switch-card"
-                        >
-                            <div className="flex items-start justify-between gap-3">
-                                <div>
-                                    <p className="text-sm font-semibold" style={{ color: 'var(--lume-ink)' }}>Quadro paziente</p>
-                                    <p className="mt-1 text-[11px] leading-5" style={{ color: 'var(--lume-ink-muted)' }}>
-                                        Se spento, la scheda paziente non genera nuovi riepiloghi AI.
-                                    </p>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <label
-                                        htmlFor="patientInsightKillSwitch"
-                                        className="rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em]"
-                                        style={patientInsightEnabled
-                                            ? { borderColor: 'color-mix(in srgb, var(--lume-ink) 18%, transparent)', background: 'var(--lume-surface-focal)', color: 'var(--lume-ink)' }
-                                            : { borderColor: 'color-mix(in srgb, var(--lume-signal-critical) 32%, transparent)', background: 'var(--lume-surface-focal)', color: 'var(--lume-signal-critical)' }}
-                                    >
-                                        {patientInsightEnabled ? 'Attivo' : 'Spento'}
-                                    </label>
-                                    <button
-                                        id="patientInsightKillSwitch"
-                                        type="button"
-                                        role="switch"
-                                        aria-checked={patientInsightEnabled}
-                                        aria-label="Patient Insight locale"
-                                        onClick={() => setPatientInsightEnabled(!patientInsightEnabled)}
-                                        className="relative h-7 w-12 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[color:var(--lume-accent)]"
-                                        style={{ background: patientInsightEnabled ? 'var(--lume-ink)' : 'color-mix(in srgb, var(--lume-ink) 20%, transparent)' }}
-                                    >
-                                        <span
-                                            className="absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform"
-                                            style={{ transform: patientInsightEnabled ? 'translateX(20px)' : 'translateX(0)' }}
-                                        />
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div
-                            className="rounded-[18px] border p-4"
-                            style={documentSynthesisEnabled
-                                ? { borderColor: 'color-mix(in srgb, var(--lume-ink) 18%, transparent)', background: 'var(--lume-surface-field)' }
-                                : { borderColor: 'color-mix(in srgb, var(--lume-signal-critical) 28%, transparent)', background: 'var(--lume-surface-field)' }}
-                            data-testid="document-synthesis-kill-switch-card"
-                        >
-                            <div className="flex items-start justify-between gap-3">
-                                <div>
-                                    <p className="text-sm font-semibold" style={{ color: 'var(--lume-ink)' }}>Sintesi dei documenti</p>
-                                    <p className="mt-1 text-[11px] leading-5" style={{ color: 'var(--lume-ink-muted)' }}>
-                                        Se spento, estrazione locale e import base restano disponibili, ma non vengono prodotte sintesi cliniche automatiche.
-                                    </p>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <label
-                                        htmlFor="documentSynthesisKillSwitch"
-                                        className="rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em]"
-                                        style={documentSynthesisEnabled
-                                            ? { borderColor: 'color-mix(in srgb, var(--lume-ink) 18%, transparent)', background: 'var(--lume-surface-focal)', color: 'var(--lume-ink)' }
-                                            : { borderColor: 'color-mix(in srgb, var(--lume-signal-critical) 32%, transparent)', background: 'var(--lume-surface-focal)', color: 'var(--lume-signal-critical)' }}
-                                    >
-                                        {documentSynthesisEnabled ? 'Attivo' : 'Spento'}
-                                    </label>
-                                    <button
-                                        id="documentSynthesisKillSwitch"
-                                        type="button"
-                                        role="switch"
-                                        aria-checked={documentSynthesisEnabled}
-                                        aria-label="Document Synthesis locale"
-                                        onClick={() => setDocumentSynthesisEnabled(!documentSynthesisEnabled)}
-                                        className="relative h-7 w-12 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[color:var(--lume-accent)]"
-                                        style={{ background: documentSynthesisEnabled ? 'var(--lume-ink)' : 'color-mix(in srgb, var(--lume-ink) 20%, transparent)' }}
-                                    >
-                                        <span
-                                            className="absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform"
-                                            style={{ transform: documentSynthesisEnabled ? 'translateX(20px)' : 'translateX(0)' }}
-                                        />
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div
-                            className="rounded-[18px] border p-4"
-                            style={smartImportEnabled
-                                ? { borderColor: 'color-mix(in srgb, var(--lume-ink) 18%, transparent)', background: 'var(--lume-surface-field)' }
-                                : { borderColor: 'color-mix(in srgb, var(--lume-signal-critical) 28%, transparent)', background: 'var(--lume-surface-field)' }}
-                            data-testid="smart-import-kill-switch-card"
-                        >
-                            <div className="flex items-start justify-between gap-3">
-                                <div>
-                                    <p className="text-sm font-semibold" style={{ color: 'var(--lume-ink)' }}>Importazione assistita</p>
-                                    <p className="mt-1 text-[11px] leading-5" style={{ color: 'var(--lume-ink-muted)' }}>
-                                        Se spento, il pannello paziente non propone nuovi suggerimenti Smart Import e non applica quelli in sospeso.
-                                    </p>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <label
-                                        htmlFor="smartImportKillSwitch"
-                                        className="rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em]"
-                                        style={smartImportEnabled
-                                            ? { borderColor: 'color-mix(in srgb, var(--lume-ink) 18%, transparent)', background: 'var(--lume-surface-focal)', color: 'var(--lume-ink)' }
-                                            : { borderColor: 'color-mix(in srgb, var(--lume-signal-critical) 32%, transparent)', background: 'var(--lume-surface-focal)', color: 'var(--lume-signal-critical)' }}
-                                    >
-                                        {smartImportEnabled ? 'Attivo' : 'Spento'}
-                                    </label>
-                                    <button
-                                        id="smartImportKillSwitch"
-                                        type="button"
-                                        role="switch"
-                                        aria-checked={smartImportEnabled}
-                                        aria-label="Smart Import locale"
-                                        onClick={() => setSmartImportEnabled(!smartImportEnabled)}
-                                        className="relative h-7 w-12 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[color:var(--lume-accent)]"
-                                        style={{ background: smartImportEnabled ? 'var(--lume-ink)' : 'color-mix(in srgb, var(--lume-ink) 20%, transparent)' }}
-                                    >
-                                        <span
-                                            className="absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform"
-                                            style={{ transform: smartImportEnabled ? 'translateX(20px)' : 'translateX(0)' }}
-                                        />
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div
-                            className="rounded-[18px] border p-4"
-                            style={treatmentReasoningEnabled
-                                ? { borderColor: 'color-mix(in srgb, var(--lume-ink) 18%, transparent)', background: 'var(--lume-surface-field)' }
-                                : { borderColor: 'color-mix(in srgb, var(--lume-signal-critical) 28%, transparent)', background: 'var(--lume-surface-field)' }}
-                            data-testid="treatment-reasoning-kill-switch-card"
-                        >
-                            <div className="flex items-start justify-between gap-3">
-                                <div>
-                                    <p className="text-sm font-semibold" style={{ color: 'var(--lume-ink)' }}>Revisione del trattamento</p>
-                                    <p className="mt-1 text-[11px] leading-5" style={{ color: 'var(--lume-ink-muted)' }}>
-                                        Se spento, il pannello terapie non genera nuove bozze con ATHENA-R1-Qwen3-8B via MLX locale. Le bozze restano consultive, richiedono verifica clinica e non scrivono in scheda.
-                                    </p>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <label
-                                        htmlFor="treatmentReasoningKillSwitch"
-                                        className="rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em]"
-                                        style={treatmentReasoningEnabled
-                                            ? { borderColor: 'color-mix(in srgb, var(--lume-ink) 18%, transparent)', background: 'var(--lume-surface-focal)', color: 'var(--lume-ink)' }
-                                            : { borderColor: 'color-mix(in srgb, var(--lume-signal-critical) 32%, transparent)', background: 'var(--lume-surface-focal)', color: 'var(--lume-signal-critical)' }}
-                                    >
-                                        {treatmentReasoningEnabled ? 'Attivo' : 'Spento'}
-                                    </label>
-                                    <button
-                                        id="treatmentReasoningKillSwitch"
-                                        type="button"
-                                        role="switch"
-                                        aria-checked={treatmentReasoningEnabled}
-                                        aria-label="Treatment Reasoning locale"
-                                        onClick={() => setTreatmentReasoningEnabled(!treatmentReasoningEnabled)}
-                                        className="relative h-7 w-12 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[color:var(--lume-accent)]"
-                                        style={{ background: treatmentReasoningEnabled ? 'var(--lume-ink)' : 'color-mix(in srgb, var(--lume-ink) 20%, transparent)' }}
-                                    >
-                                        <span
-                                            className="absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform"
-                                            style={{ transform: treatmentReasoningEnabled ? 'translateX(20px)' : 'translateX(0)' }}
-                                        />
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
                 <details className={SETTINGS_CARD_CLASS}>
                     <summary className={functionStyles.advancedSummary}>Lettura e instradamento dei documenti</summary>
                         <div
@@ -425,7 +246,7 @@ export default function SettingsAiFunctionsPage() {
                 {isSavingAi ? 'Salvataggio...' : 'Salva Configurazione'}
                         </button>
                         <p className="text-xs" style={{ color: 'var(--lume-ink-muted)' }}>
-                Interruttori e budget hanno effetto dopo il salvataggio.
+                Salva i parametri avanzati. Le preferenze per esperienza si applicano dal pannello in alto.
                         </p>
                     </div>
                 </div>

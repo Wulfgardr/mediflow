@@ -1,9 +1,10 @@
 /* @Codex */
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import { FileSearch, Loader2, RotateCcw, ShieldCheck } from 'lucide-react';
 
+import { FunctionModelPicker, useFunctionModelPicker } from '@/components/function-models/function-model-picker';
 import PrivacyBlur from '@/components/privacy-blur';
 import {
     DocumentSynthesisBrowserOrchestratorError,
@@ -33,7 +34,8 @@ function DocumentSynthesisFabricReviewCardSession({
     attachmentName,
     enabled,
 }: DocumentSynthesisFabricReviewCardProps) {
-    const [controller] = useState(() => createDocumentSynthesisReviewBrowserController());
+    const picker = useFunctionModelPicker('document_synthesis', patientId, attachmentId, enabled);
+    const [controller] = useState(() => createDocumentSynthesisReviewBrowserController({ fetch: picker.client.fetch }));
     const [proposal, setProposal] = useState<DocumentSynthesisContextProposal | null>(null);
     const [ambulatory, setAmbulatory] = useState<DocumentSynthesisAmbulatoryChoice | null>(null);
     const [confirmed, setConfirmed] = useState(false);
@@ -60,6 +62,11 @@ function DocumentSynthesisFabricReviewCardSession({
         controller.reset();
     }, [controller]);
 
+    const resetFromContext = useEffectEvent(reset);
+    const resetFromChoice = useEffectEvent(() => { if (phase === 'running') reset(); else { setPreview(null); setConfirmed(false); } });
+    useEffect(() => { resetFromContext(); }, [picker.active, picker.view.blocked]);
+    useEffect(() => { resetFromChoice(); }, [picker.view.choice]);
+
     const load = async () => {
         if (!enabled || running.current || phase !== 'idle') return;
         running.current = true; const token = ++generation.current;
@@ -81,8 +88,10 @@ function DocumentSynthesisFabricReviewCardSession({
         setError(null);
         setPhase('running');
         try {
+            const modelToken = await picker.client.begin();
             const result = await controller.run({ patientId, attachmentId, proposal, ambulatory }, true);
             if (token !== generation.current) return;
+            if (!picker.client.isCurrent(modelToken)) return;
             setPreview(result);
         } catch (runError) {
             if (token !== generation.current) return;
@@ -96,7 +105,8 @@ function DocumentSynthesisFabricReviewCardSession({
         }
     };
 
-    const publication = preview?.publication;
+    const cancelPreview = () => { picker.client.reset(picker.active); reset(); };
+    const publication = picker.active ? preview?.publication : undefined;
     const providerBindingReceipt = publication?.receipt.providerBindingReceipt;
     const modelCausality = publication?.provenance.modelCausality;
 
@@ -119,7 +129,7 @@ function DocumentSynthesisFabricReviewCardSession({
                     <button
                         type="button"
                         onClick={load}
-                        disabled={!enabled}
+                        disabled={!enabled || !picker.active}
                         className="ui-btn-primary"
                         data-lume-action="primary"
                     >
@@ -132,12 +142,12 @@ function DocumentSynthesisFabricReviewCardSession({
                             <Loader2 className="h-3.5 w-3.5" aria-hidden="true" />
                             {phase === 'loading' ? 'Caricamento contesto…' : 'Generazione locale…'}
                         </span>
-                        <button type="button" className="ui-btn-secondary" data-lume-action="quiet" onClick={reset}>Annulla</button>
+                        <button type="button" className="ui-btn-secondary" data-lume-action="quiet" onClick={cancelPreview}>Annulla</button>
                     </>
                 ) : (
                     <button
                         type="button"
-                        onClick={reset}
+                        onClick={cancelPreview}
                         className="ui-btn-secondary"
                         data-lume-action="quiet"
                     >
@@ -147,6 +157,7 @@ function DocumentSynthesisFabricReviewCardSession({
                 )}
             </div>
 
+            <FunctionModelPicker picker={picker} />
             {phase === 'confirm' && proposal && (
                 <div className="mt-4 grid gap-4 text-sm leading-relaxed">
                     <div className="grid min-w-0 gap-1 break-words">
@@ -156,6 +167,7 @@ function DocumentSynthesisFabricReviewCardSession({
                     <label className="grid min-w-0 gap-2 font-medium">
                         Ambulatorio per questa proposta
                         <select className="min-h-[var(--lume-control-height)] w-full min-w-0 rounded-[var(--lume-control-radius)] border border-[color:var(--lume-ink-muted)] bg-[color:var(--lume-surface-focal)] px-3 py-2 text-[color:var(--lume-ink)]" value={ambulatory?.ambulatoryId ?? ''} onChange={(event) => {
+                            picker.client.reset(picker.active);
                             setAmbulatory(proposal.ambulatories.find((choice) => choice.ambulatoryId === event.target.value) ?? null);
                             setConfirmed(false);
                         }}>
@@ -173,8 +185,8 @@ function DocumentSynthesisFabricReviewCardSession({
                         <span>Confermo paziente, documento e ambulatorio per una proposta in sola lettura, senza scritture cliniche.</span>
                     </label>
                     <div className="flex flex-wrap items-center gap-3">
-                        <button type="button" className="ui-btn-primary" data-lume-action="primary" disabled={!enabled || !confirmed || !ambulatory} onClick={run}>Conferma e genera proposta</button>
-                        <button type="button" className="ui-btn-secondary" data-lume-action="quiet" onClick={reset}>Annulla</button>
+                        <button type="button" className="ui-btn-primary" data-lume-action="primary" disabled={!enabled || !confirmed || !ambulatory || !picker.canGenerate} onClick={run}>Conferma e genera proposta</button>
+                        <button type="button" className="ui-btn-secondary" data-lume-action="quiet" onClick={cancelPreview}>Annulla</button>
                     </div>
                 </div>
             )}
