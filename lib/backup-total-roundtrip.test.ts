@@ -8,6 +8,8 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import Database from 'better-sqlite3';
+import { commitExemptionImport, previewExemptionImport } from './exemption-catalog-import';
+import { EXEMPTION_COLUMNS } from './exemption-import-contract';
 import { BACKUP_COLLECTIONS, createEmptyDataset, parseBackupArtifact, serializeBackupArtifact, stableStringify } from './backup-artifact';
 import { ATTACHMENTS_ABSENT, frame, PAYLOAD_DIGEST_CODEC, SEAL_DIGEST_CODEC,
     SEAL_SCHEMA } from './headless/clinician-soap-entry-seal-codec-internal';
@@ -34,6 +36,7 @@ const BACKUP_TABLES = {
     drugs: 'drugs',
     entries: 'entries',
     exemptions: 'exemptions',
+    exemptionImportReceipts: 'exemption_import_receipts',
     messages: 'messages',
     observations: 'observations',
     patients: 'patients',
@@ -281,6 +284,11 @@ async function populateSyntheticClinicalFixture(db: Database.Database, actorRef:
     });
     insertRow(db, 'drugs', { aic: 'W7AIC', name: 'Farmaco sintetico', active_principle: 'Principio sintetico', company: 'Azienda sintetica', packaging: 'Fixture', packaging_search: 'fixture', class: 'A', price: 123, atc: 'W7ATC' });
     insertRow(db, 'exemptions', { code: 'W7EX', description: 'Esenzione sintetica', type: 'synthetic', source: 'fixture', start_date: now, end_date: now + 30, is_pharma: 1, is_specialist: 1, is_national: 0, updated_at: now + 25 });
+    /* @Codex Produce a real receipt using only an invented catalog row. */
+    const bytes = Buffer.from([EXEMPTION_COLUMNS.join('|'), ['ZZ_BACKUP', 'Esenzione inventata backup', '\\N', '\\N', '\\N', 'S', 'N', '\\N'].join('|')].join('\r\n') + '\r\n');
+    const preview = previewExemptionImport(db, bytes, 'inventato-backup.txt', 'synthetic-backup-operator');
+    assert.ok(preview.proof);
+    commitExemptionImport(db, { bytes, sourceName: 'inventato-backup.txt', proof: preview.proof, acceptSubset: true }, 'synthetic-backup-operator');
     return durableReviewCommand;
 }
 

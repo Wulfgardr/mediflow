@@ -3,13 +3,23 @@ import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth
 import { dbServer } from '@/lib/db-server';
 import { previewExemptionImport } from '@/lib/exemption-catalog-import';
 import { readExemptionImportRequest, exemptionImportErrorResponse } from '@/lib/exemption-import-http';
+import { acquireExemptionImportAuthority } from '@/lib/exemption-import-authority';
 
 export const runtime = 'nodejs';
 export async function POST(request: Request) {
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
+    let authority: ReturnType<typeof acquireExemptionImportAuthority> | undefined;
     try {
-        const input = await readExemptionImportRequest(request, false);
-        return Response.json(previewExemptionImport(dbServer.$client, input.bytes, input.sourceName, session.userId), { headers: { 'Cache-Control': 'no-store' } });
-    } catch (error) { return exemptionImportErrorResponse(error); }
+        authority = acquireExemptionImportAuthority(session);
+        authority.assertCurrent();
+        const input = await readExemptionImportRequest(request, false, authority.signal);
+        authority.assertCurrent();
+        const result = previewExemptionImport(dbServer.$client, input.bytes, input.sourceName, session.userId);
+        authority.assertCurrent();
+        return Response.json(result, { headers: { 'Cache-Control': 'no-store' } });
+    } catch (error) {
+        if (authority?.signal.aborted) return unauthorizedResponse();
+        return exemptionImportErrorResponse(error);
+    } finally { authority?.dispose(); }
 }

@@ -8,6 +8,8 @@ import test, { after } from 'node:test';
 import { chromium, expect } from '@playwright/test';
 import { build } from 'esbuild';
 import { EXEMPTION_COLUMNS } from './exemption-import-contract';
+import { syntheticExemptionSession } from '../scripts/fixtures/exemption-import-session';
+import { retireForUser } from './security/web-auth-lifecycle-owner-adapter';
 
 // Component + actual route/writer integration without a listener or user server.
 const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'mf-exemptions-ui-synthetic-'));
@@ -19,8 +21,9 @@ const statusRoute = await import('../app/api/exemptions/import/status/route.ts')
 const requireCurrent = createRequire(import.meta.url);
 const auth = requireCurrent('./security/server-auth') as { requireSession: () => Promise<unknown> };
 const original = auth.requireSession;
-auth.requireSession = async () => ({ userId: 'synthetic-ui-operator' });
-after(() => { auth.requireSession = original; dbServer.$client.close(); fs.rmSync(directory, { recursive: true, force: true }); });
+const session = syntheticExemptionSession();
+auth.requireSession = async () => session;
+after(() => { retireForUser(session); auth.requireSession = original; dbServer.$client.close(); fs.rmSync(directory, { recursive: true, force: true }); });
 
 const inventedFile = (codes: string[]) => ({ name: 'inventato-ui.txt', mimeType: 'text/plain', buffer: Buffer.from([
     EXEMPTION_COLUMNS.join('|'), ...codes.map((code) => [code, 'Descrizione interamente inventata', '\\N', '\\N', '\\N', 'S', 'N', '\\N'].join('|')),

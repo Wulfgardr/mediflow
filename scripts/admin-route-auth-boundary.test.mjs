@@ -66,7 +66,7 @@ test('backup restore rejects cross-port and text/plain transport before prefligh
             ['@/lib/schema', ${JSON.stringify(toDataModule(`export const ${[
                 'attachments', 'ambulatories', 'checkups', 'conversations', 'documentDiagnosisProposals',
                 'durableReviewOperations', 'durableReviewPatientLinks', 'durableReviewRecords', 'drugs', 'entries',
-                'exemptions', 'headlessSoapActiveRoleAttestations', 'headlessSoapEntryCommits', 'messages',
+                'exemptions', 'exemptionImportReceipts', 'headlessSoapActiveRoleAttestations', 'headlessSoapEntryCommits', 'messages',
                 'observations', 'patients', 'patientsToAmbulatories', 'physicianReviewAttestations',
                 'prostheticPrescriptions', 'serviceCatalogEntries', 'servicePrescriptionItems',
                 'servicePrescriptions', 'sissHandoffEvents', 'therapies',

@@ -2,31 +2,39 @@
 import 'server-only';
 import { EXEMPTION_MAX_BYTES } from './exemption-import-contract';
 import { ExemptionImportError } from './exemption-catalog-import';
+import { readBoundedJsonBody } from './bounded-request-body';
 
 const MAX_REQUEST_BYTES = Math.ceil(EXEMPTION_MAX_BYTES / 3) * 4 + 8192;
-export async function readExemptionImportRequest(request: Request, commit: boolean) {
+export async function readExemptionImportRequest(request: Request, commit: boolean, authoritySignal?: AbortSignal, timeoutMs = 30_000) {
     if (request.headers.get('content-type')?.split(';')[0].trim() !== 'application/json') {
         throw new ExemptionImportError('INVALID_CONTENT_TYPE', 'È richiesto application/json.', 415);
     }
-    const reader = request.body?.getReader();
-    if (!reader) throw new ExemptionImportError('INVALID_REQUEST', 'Richiesta vuota.');
-    const chunks: Uint8Array[] = [];
-    let size = 0;
+    if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 30_000) throw new RangeError('Invalid read deadline');
+    const controller = new AbortController();
+    const abort = () => controller.abort();
+    const signals = [request.signal, ...(authoritySignal ? [authoritySignal] : [])];
+    for (const signal of signals) {
+        if (signal.aborted) abort();
+        else signal.addEventListener('abort', abort, { once: true });
+    }
+    const deadline = performance.now() + timeoutMs;
+    const timer = setTimeout(abort, timeoutMs);
+    let value: unknown;
     try {
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            size += value.byteLength;
-            if (size > MAX_REQUEST_BYTES) {
-                await reader.cancel();
-                throw new ExemptionImportError('FILE_TOO_LARGE', 'File superiore a 2 MiB.', 413);
-            }
-            chunks.push(value);
+        const result = await readBoundedJsonBody(request, MAX_REQUEST_BYTES, 'strict', { signal: controller.signal, deadline });
+        if (controller.signal.aborted || performance.now() >= deadline) {
+            const cancelled = signals.some((signal) => signal.aborted);
+            throw new ExemptionImportError(cancelled ? 'IMPORT_BODY_ABORTED' : 'IMPORT_BODY_TIMEOUT',
+                cancelled ? 'Lettura interrotta.' : 'Tempo di lettura scaduto.', cancelled ? 400 : 408);
         }
-    } finally { reader.releaseLock(); }
-    let body: Record<string, unknown>;
-    try { body = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(Buffer.concat(chunks))); }
-    catch { throw new ExemptionImportError('INVALID_REQUEST', 'Richiesta JSON non valida.'); }
+        if (!result.ok) throw new ExemptionImportError(result.status === 413 ? 'FILE_TOO_LARGE' : 'INVALID_REQUEST',
+            result.status === 413 ? 'File superiore al limite consentito.' : 'Richiesta JSON non valida.', result.status);
+        value = result.value;
+    } finally {
+        clearTimeout(timer);
+        for (const signal of signals) signal.removeEventListener('abort', abort);
+    }
+    const body = value as Record<string, unknown>;
     const keys = commit ? ['sourceName', 'base64', 'proof', 'acceptSubset'] : ['sourceName', 'base64'];
     if (!body || Array.isArray(body) || typeof body !== 'object' || Object.keys(body).length !== keys.length
         || keys.some((key) => !Object.hasOwn(body, key)) || typeof body.sourceName !== 'string'
