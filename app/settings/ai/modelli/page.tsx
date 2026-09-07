@@ -5,6 +5,7 @@ import { ChatGptAccountPanel } from '@/components/settings/chatgpt-account-panel
 
 /* @Codex */
 import Link from 'next/link';
+import { LocalProviderOnboardingPanel } from '@/components/settings/local-provider-onboarding-panel';
 import { Bot, Cpu, RefreshCw, Save } from 'lucide-react';
 import { useAiSettingsController } from '@/lib/hooks/use-ai-settings-controller';
 import AiRolloutGuardNotice from '@/components/settings/ai-rollout-guard-notice';
@@ -126,15 +127,7 @@ export default function SettingsAiModelsPage() {
                 <p className={styles.hint}>I risultati restano proposte da rivedere prima dell’uso. Salvare il modello non equivale ad ammettere il provider o a verificare una funzione clinica.</p>
             </div>
 
-            {/* Documentation only: privileged lifecycle control remains on the host (ADR 0122). */}
-            <details className={`${SETTINGS_CARD_CLASS} ${styles.card}`} id="local-provider-admission">
-                <summary>Modello configurato, funzione ancora bloccata?</summary>
-                <div className={styles.stack}>
-                    <p>Il test connessione legge i modelli disponibili. Per ammettere Ollama, l’operatore del computer esegue il comando locale dalla cartella di MediFlow, indicando la directory dati corretta.</p>
-                    <pre className={styles.commands}><code>{'npm run setup:local-provider -- inspect --data-dir /percorso/dati\nnpm run setup:local-provider -- admit --data-dir /percorso/dati --confirm-local-change'}</code></pre>
-                    <p className={styles.hint}>La verifica può caricare il modello già installato in memoria. Non scarica modelli, non genera testo e lascia le funzioni spente finché non le abiliti. ATHENA usa il proprio percorso separato.</p>
-                </div>
-            </details>
+            <LocalProviderOnboardingPanel />
         </section>
     );
 }

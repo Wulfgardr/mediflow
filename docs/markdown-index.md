@@ -11,7 +11,7 @@ read_when:
 > GitHub mostra in alto solo alcuni file speciali (`README`, `CONTRIBUTING`, `SECURITY`, ecc.).
 > Questo file elenca invece **tutti** i `.md` tracciati nella repository con una sintesi rapida d'uso.
 
-Ultimo aggiornamento: 2026-09-07
+Ultimo aggiornamento: 2026-09-08
 
 ## Ingresso progressivo e candidatura
 
@@ -67,7 +67,8 @@ sorgenti, toolchain, prove delle bozze e limiti della lane nativa.
 | [ADR 0120](./adr/0120-local-work-profile-onboarding.md) | Raccomandazione locale e cambio reversibile del profilo. | Per onboarding, persistenza e rollback. |
 | [Verifica accesso](./analysis/2026-09-06-086-access-verification.md) | Matrice sintetica auth, lock, logout e recovery. | Per valutare copertura e limiti WUL-675. |
 | [ADR 0121](./adr/0121-function-status-projection.md) | Lettura autenticata dello stato delle funzioni. | Per modificare prerequisiti, errori e stati osservati. |
-| [ADR 0122](./adr/0122-local-provider-host-setup.md) | Ammissione esplicita Ollama nel processo host. | Per il setup locale senza controllo privilegiato nelle route. |
+| [ADR 0136](./adr/0136-explicit-web-local-provider-onboarding.md) | Verifica e attivazione Ollama con consenso Web esplicito e owner canonico. | Per onboarding locale, CAS, revoca e recupero. |
+| [ADR 0122](./adr/0122-local-provider-host-setup.md) | Ammissione esplicita Ollama nel processo host. | Per la CLI host; ADR 0136 governa il comando Web dedicato. |
 | [ADR 0129](./adr/0129-function-model-catalog-preferences.md) | Preferenze per esperienza e override da catalogo host sigillato. | Per CAS, preset e dispatch senza ammissione UI. |
 | [ADR 0130](./adr/0130-node-test-data-dir-preflight.md) | Data-dir esplicito per i test Node. | Per preflight, subprocess e cleanup delle fixture. |
 | [docs/analysis/2026-09-05-mediflow-086-baseline.md](./analysis/2026-09-05-mediflow-086-baseline.md) | Baseline WUL-670, prove sintetiche e recuperi selettivi. | Prima delle tranche 0.8.6; limiti runtime espliciti. |

@@ -37,3 +37,10 @@ nominato di preferenze e dispatch per ID opachi del catalogo host. Questa
 preferenza non è un'eccezione all'ammissione CLI: GET, salvataggio, preset e
 preview non invocano `control.admit`, `recover` o `revoke`. Il lifecycle resta
 prerequisito separato, ricontrollato prima e dopo il trasporto.
+
+## Estensione Web esplicita WUL-674 / WUL-691
+
+[ADR 0136](./0136-explicit-web-local-provider-onboarding.md) ammette una sola
+route autenticata verso il servizio host di onboarding locale. Sostituisce il
+vincolo CLI-only per quel comando esplicito; UI e route non ricevono il control
+e non importano o eseguono la CLI. I consumer clinici restano invariati.
