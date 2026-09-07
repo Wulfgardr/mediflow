@@ -1,5 +1,6 @@
 'use client';
 /* @Codex */
+import Image from 'next/image';
 import { useEffect, useId, useState } from 'react';
 import { createAccountBrowser, type AccountBrowserView } from '@/lib/chatgpt-account/account-browser';
 import type { AccountAction, AccountLimitWindow, AccountNotice, AccountOperation, AccountState } from '@/lib/chatgpt-account/account-contract';
@@ -53,7 +54,10 @@ export function ChatGptAccountCard({ active }: { active: boolean }) {
     const caption = locked ? 'Sessione bloccata' : operationCaption ? operationCaption : view.error ? 'Stato da rileggere' : status ? labels[status.state] : view.kind === 'error' ? 'Stato non disponibile' : 'Lettura dello stato…';
     return <section className={`${SETTINGS_CARD_CLASS} ${styles.card}`} aria-labelledby={`${id}-title`} data-testid="chatgpt-account-panel">
         <header className={styles.header}>
-            <div className={styles.identity}><h3 id={`${id}-title`}>ChatGPT</h3><p>Account personale · accesso ufficiale</p></div>
+            <div className={styles.identity}>
+                <Image className={styles.logo} src="/brand/openai/chatgpt-mark.png" alt="Logo OpenAI" width={40} height={40} unoptimized />
+                <div><h3 id={`${id}-title`}>ChatGPT</h3><p>Account personale · accesso ufficiale</p></div>
+            </div>
             <span className={styles.status} role="status">{caption}</span>
         </header>
         <p className={styles.hint}>Il collegamento dell’account non abilita le funzioni di MediFlow.</p>

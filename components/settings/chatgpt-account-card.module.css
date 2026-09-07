@@ -1,7 +1,9 @@
 /* @Codex: shared Lume surface, radius, spacing and action classes. */
 .card { display: grid; gap: 1rem; min-width: 0; color: var(--lume-ink); }
 .header { display: flex; justify-content: space-between; align-items: start; flex-wrap: wrap; gap: 1rem; }
-.identity { min-width: 0; }
+.identity { min-width: 0; display: flex; align-items: center; gap: .75rem; }
+.identity > div { min-width: 0; }
+.logo { display: block; flex: 0 0 40px; width: 40px; height: 40px; object-fit: contain; background: white; }
 .identity h3 { margin: 0; font-size: 1.125rem; line-height: 1.4; font-weight: 650; }
 .card p { margin: 0; font-size: .875rem; line-height: 1.55; }
 .identity p, .hint { color: var(--lume-ink-muted); }
