@@ -76,12 +76,15 @@ function harness(route, { deny = 0, cap, stage = null } = {}) {
         cache.set(relative, exports);
         const output = ts.transpileModule(source, { fileName: relative, compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
         function require(name) {
-            if (name === '@/lib/native-network-json-body') {
-                const actual = load('lib/native-network-json-body.ts');
-                return { ...actual, readNativeNetworkJson: (request, budget) => {
-                    events.push('parse'); budgets.push(budget ?? actual.NETWORK_JSON_MAX_BYTES);
-                    return actual.readNativeNetworkJson(request, cap ?? budget);
+            if (name === './bounded-request-body') {
+                const actual = load('lib/bounded-request-body.ts');
+                return { ...actual, readBoundedJsonBody: (request, budget, ...rest) => {
+                    events.push('parse'); budgets.push(budget);
+                    return actual.readBoundedJsonBody(request, cap ?? budget, ...rest);
                 } };
+            }
+            if (name === '@/lib/native-network-json-body') {
+                return load('lib/native-network-json-body.ts');
             }
             if (relative.startsWith('lib/') && name.startsWith('./')) return load(`lib/${name.slice(2)}.ts`);
             return new Proxy({}, { get(_target, key) {
@@ -113,6 +116,7 @@ function request(h, text = '{}', headers = {}) {
     }, { highWaterMark: 0 });
     // Observe even header access: denied routes must never enter the reader.
     const req = {
+        signal: new AbortController().signal,
         url: 'http://127.0.0.1/?patientId=synthetic-patient',
         get headers() { h.events.push('headers'); return new Headers(headers); },
         get body() { h.events.push('body'); return body; },
@@ -147,7 +151,7 @@ for (const [route, ...methods] of operations) {
                 if (!bootstrap) assert.ok(h.events.indexOf('auth') < h.events.indexOf('parse'));
                 assert.deepEqual(f.counts(), { pulls: mode === 'declared' ? 0 : 3, cancels: 1 });
                 assert.equal(f.body.locked, false);
-                const expectedCap = route === 'auth/native/login' || bootstrap ? 65_536 : route.endsWith('/attachments') ? 161_480_704 : 4_194_304;
+                const expectedCap = route === 'auth/native/login' || bootstrap ? 65_536 : route.endsWith('/attachments') ? 30_408_704 : 4_194_304;
                 assert.deepEqual(h.budgets, [expectedCap]);
             }
             const h = harness(route);
@@ -197,9 +201,9 @@ test('JSON route inventory stays bounded and has no alternate unbounded body rea
     for (const relative of network) {
         const source = fs.readFileSync(path.join(root, 'app/api/v1/network', relative), 'utf8');
         assert.doesNotMatch(source, /request\.(?:json|text|arrayBuffer|blob)\s*\(/);
-        if (source.includes('await readNativeNetworkJson(')) {
+        if (/await (?:readNativeNetworkJson|withNetworkAttachmentJson)\(/.test(source)) {
             assert.ok(inventory.has(`v1/network/${relative.replace(/\/route\.ts$/, '')}`));
-            readers += (source.match(/await readNativeNetworkJson\(/g) ?? []).length;
+            readers += (source.match(/await (?:readNativeNetworkJson|withNetworkAttachmentJson)\(/g) ?? []).length;
         }
     }
     assert.equal(readers, operations.reduce((sum, [, ...methods]) => sum + methods.length, 0) - 1);

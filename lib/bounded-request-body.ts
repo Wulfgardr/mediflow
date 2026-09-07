@@ -12,6 +12,8 @@ const Uint8ArrayConstructor = Uint8Array;
 const arrayPush = Function.call.bind(Array.prototype.push) as (target: Uint8Array[], value: Uint8Array) => number;
 const stringSlice = Function.call.bind(String.prototype.slice) as (value: string, start?: number, end?: number) => string;
 
+export type BoundedJsonReadControl = Readonly<{ signal: AbortSignal; deadline: number }>;
+
 export type BoundedJsonBody = Readonly<{ ok: true; value: unknown; byteLength: number }>
     | Readonly<{ ok: false; status: 400 | 413 }>;
 
@@ -96,8 +98,11 @@ export async function readBoundedJsonBody(
     request: Request,
     maximumBytes: number,
     semantics: 'strict' | 'request-json' = 'strict',
+    control?: BoundedJsonReadControl,
 ): Promise<BoundedJsonBody> {
     if (!Number.isSafeInteger(maximumBytes) || maximumBytes < 0) throw new RangeError('Invalid JSON byte budget');
+    const interrupted = () => control !== undefined && (control.signal.aborted || performance.now() >= control.deadline);
+    if (interrupted()) return objectFreeze({ ok: false, status: 400 });
     const declared = declaredLength(request);
     if (declared !== null && declared > maximumBytes) {
         cancelBody(request.body);
@@ -106,11 +111,16 @@ export async function readBoundedJsonBody(
     if (!request.body) return objectFreeze({ ok: false, status: 400 });
 
     const reader = request.body.getReader();
+    // Only attachment reads opt in. Cancel settles the pending read without racing the consumer.
+    const abort = () => cancel(reader);
+    control?.signal.addEventListener('abort', abort, { once: true });
     const chunks: Uint8Array[] = [];
     let byteLength = 0;
     try {
         while (true) {
+            if (interrupted()) { cancel(reader); return objectFreeze({ ok: false, status: 400 }); }
             const step = await reader.read();
+            if (interrupted()) { cancel(reader); return objectFreeze({ ok: false, status: 400 }); }
             if (step.done) break;
             if (!(step.value instanceof Uint8ArrayConstructor)) {
                 cancel(reader);
@@ -127,6 +137,7 @@ export async function readBoundedJsonBody(
         cancel(reader);
         return objectFreeze({ ok: false, status: 400 });
     } finally {
+        control?.signal.removeEventListener('abort', abort);
         try { reader.releaseLock(); } catch { /* reader is already closed */ }
     }
 
