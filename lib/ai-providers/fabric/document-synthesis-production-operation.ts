@@ -57,7 +57,8 @@ const SHA256 = /^[a-f0-9]{64}$/u;
 const MAX_U64 = BigInt('18446744073709551615');
 const MAX_SESSION_HANDLES = 256;
 const TEST_HARNESS = process.execArgv.some((argument) => argument === '--test' || argument.startsWith('--test=') || argument.startsWith('--test-'));
-const brokers = new WeakMap<object, WeakMap<object, Broker>>();
+// Authentic Web projections change per resolve; their canonical owner owns the lineage.
+const brokers = new WeakMap<AuthenticatedWebSessionProjectionOwnerContext['owner'], Broker>();
 
 function captureDenied(code: DenialCode): CaptureResult { return Object.freeze({ status: 'denied', code, captureHandle: null }); }
 function ingestDenied(code: DenialCode): IngestResult { return Object.freeze({ status: 'denied', code, previewHandle: null }); }
@@ -136,16 +137,15 @@ function mint(prefix: 'dsc_' | 'dsp_', value: unknown): string | null {
 }
 
 function brokerFor(context: AuthenticatedWebSessionProjectionOwnerContext, dependencies: Dependencies): Broker | null {
-    let sessions = brokers.get(context.owner); if (!sessions) { sessions = new WeakMap<object, Broker>(); brokers.set(context.owner, sessions); }
-    const existing = sessions.get(context.session); if (existing) return existing;
+    const existing = brokers.get(context.owner); if (existing) return existing;
     let unregister: (() => void) | null = null;
     const broker: Broker = {
         captures: new Map(), previews: new Map(), handles: new Set(), nextEpoch: BigInt(0),
-        dispose() { broker.captures.clear(); broker.previews.clear(); broker.handles.clear(); sessions!.delete(context.session); const release = unregister; unregister = null; release?.(); },
+        dispose() { broker.captures.clear(); broker.previews.clear(); broker.handles.clear(); brokers.delete(context.owner); const release = unregister; unregister = null; release?.(); },
     };
     try { unregister = dependencies.registerResource(context, broker.dispose); } catch { return null; }
     if (!unregister) return null;
-    sessions.set(context.session, broker);
+    brokers.set(context.owner, broker);
     return broker;
 }
 
@@ -251,10 +251,17 @@ function registerProductionResource(context: AuthenticatedWebSessionProjectionOw
     const port = mintResourcePort(context.session);
     if (!port) return null;
     let registration;
-    try { registration = registerPrivateResource(port, dispose); }
+    let active = true;
+    try {
+        registration = registerPrivateResource(port, () => {
+            if (!active) return;
+            // Retirement owns port cleanup; local disposal must not re-enter that owner.
+            active = false;
+            dispose();
+        });
+    }
     catch { releaseResourcePort(port); return null; }
     if (!registration) { releaseResourcePort(port); return null; }
-    let active = true;
     return () => {
         if (!active) return;
         active = false;

@@ -23,7 +23,7 @@ const {
 } = await import('./document-synthesis-production-operation.ts');
 
 import { issueSyntheticWebSession, issueSyntheticWebSessionContext, retireSyntheticWebSession } from '../../security/web-auth-lifecycle-owner-test-fixture.ts';
-import { retire } from '../../security/web-auth-lifecycle-owner-adapter.ts';
+import { resolve, retire } from '../../security/web-auth-lifecycle-owner-adapter.ts';
 const webSessions: ReturnType<typeof issueSyntheticWebSession>[] = [];
 
 const USER = Object.freeze({ id: 'user.synthetic.document.synthesis', username: 'clinician.synthetic', role: 'clinician' as const });
@@ -93,8 +93,61 @@ function context() {
     webSessions.push(session);
     const owner = registry.acquire(session);
     owner.issueSelection({ expectedEpoch: 0, ...PAIR });
-    return Object.freeze({ session, owner, web });
+    let previous = session;
+    const resolveContext = () => {
+        const resolution = resolve(session.id, web.controlId);
+        assert.equal(resolution.status, 'active');
+        if (resolution.status !== 'active') throw new Error('Synthetic Web projection unavailable');
+        const current = resolution.projection;
+        assert.notEqual(current, previous);
+        assert.equal(current.id, session.id);
+        previous = current;
+        const currentOwner = registry.acquire(current);
+        assert.equal(currentOwner, owner);
+        return Object.freeze({ session: current, owner: currentOwner });
+    };
+    return Object.freeze({ session, owner, web, resolveContext });
 }
+
+test('shares DS handles across fresh authentic projections only within their canonical owner', async () => {
+    const selected = context(); const other = context();
+    assert.notEqual(selected.owner, other.owner);
+    let active = selected; let entropy = 0; let extractions = 0; let executions = 0;
+    const factory = createDocumentSynthesisProductionOperationForTest({
+        acquireContext: async () => active.resolveContext(),
+        readCurrentness: () => CURRENT,
+        readLaneEnabled: () => true,
+        extract: async (session, attachmentId) => {
+            assert.notEqual(session, selected.session);
+            assert.equal(session.id, selected.session.id);
+            extractions++;
+            return extracted(attachmentId);
+        },
+        execute: async () => { executions++; return Object.freeze({ publication: 'synthetic' }); },
+        entropy: () => Uint8Array.from({ length: 16 }, () => ++entropy),
+    });
+    const acquire = async () => { const operation = await factory.acquire(); assert.ok(operation); return operation; };
+    const captureOperation = await acquire();
+    const captured = await captureOperation.capture({ attachmentId: 'attachment.synthetic.document' });
+    assert.equal(captured.status, 'available');
+
+    active = other;
+    assert.equal((await (await acquire()).ingest({ captureHandle: captured.captureHandle })).code, 'capture_consumed');
+    assert.equal(extractions, 0);
+    active = selected;
+    const ingested = await (await acquire()).ingest({ captureHandle: captured.captureHandle });
+    assert.equal(ingested.status, 'available');
+    assert.equal((await captureOperation.ingest({ captureHandle: captured.captureHandle })).code, 'capture_consumed');
+
+    active = other;
+    assert.equal((await (await acquire()).preview({ previewHandle: ingested.previewHandle })).code, 'preview_consumed');
+    assert.equal(executions, 0);
+    active = selected;
+    assert.deepEqual(await (await acquire()).preview({ previewHandle: ingested.previewHandle }),
+        { status: 'available', code: null, publication: { publication: 'synthetic' } });
+    assert.equal((await (await acquire()).preview({ previewHandle: ingested.previewHandle })).code, 'preview_consumed');
+    assert.equal(extractions, 1); assert.equal(executions, 1);
+});
 
 test('classifies Apple Vision AnyDoc evidence as OCR text and keeps native extraction distinct', () => {
     const native = resolveDocumentSynthesisAnyDocProjection(extracted('attachment.synthetic.document'),
@@ -166,11 +219,11 @@ test('suppresses drift and denies caller source injection, unsupported extractio
 });
 
 /* @Codex */
-test('production registration acquires an authentic Web owner and disposes DS handles on retirement', async () => {
+test('production registration completes Web retirement and disposes capture and preview handles', async () => {
     for (const reason of ['dispose', 'lock', 'delete'] as const) {
         const selected = context(); let entropy = 0; let extractions = 0;
         const factory = createDocumentSynthesisProductionOperationForTest({
-            acquireContext: async () => selected,
+            acquireContext: async () => selected.resolveContext(),
             readCurrentness: () => CURRENT,
             readLaneEnabled: () => true,
             extract: async (_session, attachmentId) => { extractions++; return extracted(attachmentId); },
@@ -181,9 +234,16 @@ test('production registration acquires an authentic Web owner and disposes DS ha
         assert.ok(operation, 'production DS registration must accept the authentic Web projection');
         const captured = await operation.capture({ attachmentId: 'attachment.synthetic.document' });
         assert.equal(captured.status, 'available');
-        retire(selected.session, reason, reason === 'lock' ? { controlId: selected.web.controlId, ifMatch: selected.web.etag, idempotencyKey: 'synthetic-ds-lock' } : undefined);
-        assert.equal((await operation.ingest({ captureHandle: captured.captureHandle })).code, 'capture_consumed');
-        assert.equal(extractions, 0);
+        const ingested = await operation.ingest({ captureHandle: captured.captureHandle });
+        assert.equal(ingested.status, 'available');
+        const pending = await operation.capture({ attachmentId: 'attachment.synthetic.document' });
+        assert.equal(pending.status, 'available');
+        const retired = retire(selected.resolveContext().session, reason,
+            reason === 'lock' ? { controlId: selected.web.controlId, ifMatch: selected.web.etag, idempotencyKey: 'synthetic-ds-lock' } : undefined);
+        assert.equal(retired.outcome, 'completed', reason);
+        assert.equal((await operation.ingest({ captureHandle: pending.captureHandle })).code, 'capture_consumed');
+        assert.equal((await operation.preview({ previewHandle: ingested.previewHandle })).code, 'preview_consumed');
+        assert.equal(extractions, 1);
         assert.equal(await factory.acquire(), null);
     }
 });
