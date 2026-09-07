@@ -54,7 +54,9 @@ const CATEGORY_OPTIONS: Array<{ value: ProstheticPrescriptionCategory; label: st
 ];
 
 function todayInputValue(): string {
-    return new Date().toISOString().slice(0, 10);
+    // @Codex: the form asks for the operator's calendar day, not the UTC day.
+    const today = new Date();
+    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 }
 
 function emptyForm(): FormState {
