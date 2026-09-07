@@ -1,5 +1,5 @@
 ---
-summary: "Mini roadmap preparatoria 0.8.6: OCR, ICD-11, impostazioni, scheda paziente e recupero selettivo dei branch locali."
+summary: "Roadmap 0.8.6: backend, configurazione intelligente, repertori, interfaccia progressiva e parità desktop; gate e prove distinti."
 read_when:
   - "Pianificando il consolidamento 0.8.6 o valutando i residui dei branch hold."
   - "Proponendo alternative visive per impostazioni e scheda paziente localhost."
@@ -16,6 +16,12 @@ funzionale già congelata. La preparazione conserva la
 `b72ac713b`; la preparazione usava `6a5463e8d`. Nessuna release 0.8.6 consegnata.
 La [roadmap generale](./ROADMAP.md) resta la fonte prodotto;
 questo documento conserva la preparazione del candidato 0.8.6.
+
+Il riallineamento serale comprende le issue WUL-669–696 e la nuova revisione
+di documenti, scale e gerarchia della cartella. Il
+[piano corrente](./analysis/2026-09-07-086-guided-configuration-plan.md#riallineamento-serale-requisiti-e-consegna)
+registra risultati aggiunti, contratti e Definition of Done comune. Il cambio
+di stato in Linear non chiude una funzione, una prova installata o la release.
 
 [Verbale corrente](./analysis/2026-09-06-086-integrated-closeout.md): integrazione
 della base funzionale, UI B/A, Search WHO locale e cartella Apple. Le sezioni
