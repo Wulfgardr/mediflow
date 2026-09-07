@@ -69,7 +69,7 @@ function buildCurrentRoutes() {
             'app/api/v1/network/ai/functions/route.ts',
             'app/api/v1/network/ai/functions/preview/route.ts',
         ]);
-        const hasNativeConfigurationGuard = nativeConfigurationRoutes.has(path.relative(ROOT, filePath))
+        const hasNativeConfigurationGuard = nativeConfigurationRoutes.has(path.relative(ROOT, filePath).split(path.sep).join('/'))
             && source.includes("import { nativeConfigurationHttp } from '@/lib/native-ai-configuration-production'")
             && /return nativeConfigurationHttp\.(GET|POST|PREVIEW)\(request\)/u.test(source);
         if (!hasLocalTokenGuard && !hasPairedClientGuard && !hasNativeConfigurationGuard) {

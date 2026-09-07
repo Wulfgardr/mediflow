@@ -1,6 +1,6 @@
 /* @Codex */
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, chmodSync, rmSync, symlinkSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, chmodSync, rmSync, symlinkSync, renameSync, utimesSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -33,6 +33,47 @@ test('explicit private grant: exact operator/device/admin, expiry, permissions, 
         const duplicate = grantValue(); duplicate.grants.push({ ...duplicate.grants[0], grantId: 'duplicate' });
         f.write(duplicate); assert.throws(() => readNativeConfigurationGrant(f.file, principal));
         writeFileSync(f.file, 'x'.repeat(16_385)); assert.throws(() => readNativeConfigurationGrant(f.file, principal));
+    } finally { f.cleanup(); }
+});
+// @Codex: malformed synthetic configuration is validation input, never installed on a host.
+test('grant strict JSON rejects duplicate root and record properties including escaped keys', () => {
+    const f = grantFixture();
+    try {
+        const raw = JSON.stringify(grantValue());
+        const samples = [
+            raw.replace('"schemaVersion":', '"schemaVersion":"mediflow.native-ai-grants.v1","schemaVersion":'),
+            raw.replace('"grants":', '"grants":[],"grants":'),
+            raw.replace('"userId":', '"userId":"synthetic-admin","userId":'),
+            raw.replace('"userId":', '"userId":"synthetic-admin","user\\u0049d":'),
+        ];
+        for (const sample of samples) {
+            writeFileSync(f.file, sample, { mode: 0o600 });
+            assert.throws(() => readNativeConfigurationGrant(f.file, principal), NativeConfigurationGrantError);
+        }
+        f.write();
+        assert.equal(readNativeConfigurationGrant(f.file, principal).length, 64);
+    } finally { f.cleanup(); }
+});
+// @Codex: normal host publication of a synthetic file preserves content but changes its version.
+test('grant currentness is stable for reads and changes on replacement or metadata update', () => {
+    const f = grantFixture();
+    try {
+        const now = Date.now();
+        const raw = JSON.stringify(grantValue(now + 60_000));
+        writeFileSync(f.file, raw, { mode: 0o600 });
+        const original = readNativeConfigurationGrant(f.file, principal, now);
+        assert.equal(readNativeConfigurationGrant(f.file, principal, now), original);
+        const replacement = join(f.dir, 'replacement.json');
+        writeFileSync(replacement, raw, { mode: 0o600 });
+        renameSync(replacement, f.file);
+        const replaced = readNativeConfigurationGrant(f.file, principal, now);
+        assert.notEqual(replaced, original);
+        assert.equal(readNativeConfigurationGrant(f.file, principal, now), replaced);
+        const modified = new Date(now - 10_000);
+        utimesSync(f.file, modified, modified);
+        const updated = readNativeConfigurationGrant(f.file, principal, now);
+        assert.notEqual(updated, replaced);
+        assert.equal(readNativeConfigurationGrant(f.file, principal, now), updated);
     } finally { f.cleanup(); }
 });
 function fixture() {

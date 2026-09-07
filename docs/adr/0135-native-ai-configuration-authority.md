@@ -26,7 +26,14 @@ all'avvio da `MEDIFLOW_NATIVE_AI_CONFIG_GRANTS_FILE`: percorso assoluto,
 file regolare senza symlink, proprietario uguale al processo e permessi 0600,
 limite 16 KiB e massimo 32 grant. Assenza, errore o record ambiguo nega l'accesso.
 Non viene creato o popolato automaticamente da un login o dal client Mac.
-Il grant non contiene token, PIN, session ID o altre credenziali.
+Il grant non contiene token, PIN, session ID o altre credenziali. Il parsing
+strict canonico rifiuta anche proprietà JSON duplicate, incluse chiavi
+equivalenti dopo decodifica degli escape.
+
+Questa implementazione del grant è Mac-only: richiede i controlli filesystem
+UID/0600 e identità/versione descritti qui. Non qualifica grant su host Windows.
+La normalizzazione dei percorsi nel gate documentale OpenAPI preserva la
+portabilità di quel controllo, senza estendere il supporto runtime del grant.
 
 Formato esatto:
 
@@ -37,8 +44,13 @@ Formato esatto:
 L'esempio è solo sintetico e non viene installato. Gli identificatori vanno
 forniti dall'amministratore sul computer host, ricavati dalla propria gestione
 operatori/pairing, mai da cookie o secret Web. Un grant può durare al massimo
-24 ore dalla rilettura; scadenze superiori sono negate. Rimozione, sostituzione,
-scadenza o variazione del file revocano le richieste ancora in attesa. Le
+24 ore dalla rilettura; scadenze superiori sono negate. Ogni rilettura verifica
+contenuto e identità/versione osservata del file (device, inode, dimensione,
+mtime e ctime a precisione nanosecondi). I metadati devono restare identici
+prima e dopo la lettura dal descriptor. Rimozione o scadenza osservata,
+sostituzione del file o variazione dei metadati/contenuto rilevata al recheck
+revocano la richiesta ancora in attesa, anche a contenuto invariato. Non si
+promette di catturare eventi transitori non osservati tra le verifiche. Le
 modifiche vanno pubblicate atomicamente mantenendo 0600. Non esiste endpoint
 remoto per auto-concedersi il grant. Una UI host per concederlo resta un gap.
 
