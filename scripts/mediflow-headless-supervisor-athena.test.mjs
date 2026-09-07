@@ -83,7 +83,8 @@ for (const [relative, name] of [
   ['portable-supervisor-semantic-audit-port.ts', 'createPortableSupervisorSemanticAuditPortV1'],
 ]) stub(`../lib/security/${relative}`, `export const ${name} = () => () => { throw new Error('synthetic DB port must not be used'); };`);
 stub('../lib/security/authenticated-headless-agent-launcher-production.ts',
-  "export const createProductionMcpAgentLauncherWithPreSpawnedChildV1 = () => { throw new Error('no authority in process-contract tests'); };");
+  "export const createProductionMcpAgentLauncherWithPreSpawnedChildV1 = () => { throw new Error('no authority in process-contract tests'); };"
+  + "export const createProductionMiniAgentLauncherWithPreSpawnedChildV1 = createProductionMcpAgentLauncherWithPreSpawnedChildV1;");
 const hooks = registerHooks({
   resolve(specifier, context, nextResolve) {
     if (specifier.startsWith('.') && context.parentURL?.startsWith('file:')) {
