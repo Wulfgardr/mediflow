@@ -64,9 +64,10 @@ export default function ProstheticsCatalogManager() {
     }
     return <section aria-label="Import repertorio protesica" className="mf-section lume-focal min-w-0 space-y-5 p-6 md:p-7" style={{ borderRadius: 12 }}>
         <div><p className="section-kicker">Repertorio locale</p><h2 className="text-lg font-bold">Protesica e ausili</h2>
-            <p className="text-sm">{status ? `${status.count.toLocaleString('it-IT')} voci nel repertorio protesica` : 'Conteggio non disponibile'}</p></div>
-        <p className="text-sm leading-6">Carica una fonte di cui hai verificato provenienza e ambito. Controlla l’anteprima e conferma l’import. MediFlow non attesta autorità normativa, validità prescrittiva o codifica ISO del contenuto. Conserva il file originale.</p>
+            <p className="text-sm">{status ? `${status.count.toLocaleString('it-IT')} ${status.count === 1 ? 'voce' : 'voci'} nel repertorio protesica` : 'Conteggio non disponibile'}</p></div>
+        <p className="text-sm leading-6">Carica il repertorio della tua fonte, controlla l’anteprima e conferma l’importazione.</p>
         <details className="text-sm leading-6"><summary className="cursor-pointer font-semibold" style={{ minHeight: 44, alignContent: 'center' }}>Formato CSV richiesto</summary>
+            <p>Verifica provenienza, ambito e validità della fonte e conserva il file originale. La codifica dichiarata nel file non viene convertita in ISO.</p>
             <p>UTF-8, virgola, LF o CRLF; virgolette doppie per celle con virgole. Nessun a capo nelle celle. Massimo 2 MiB e 20.000 righe. Campi obbligatori senza spazi esterni: codifica, codice, descrizione, versione, fonte e ambito. Le due date sono facoltative, in formato YYYY-MM-DD.</p>
             <p className="mt-2" style={{ overflowWrap: 'anywhere' }}>{PROSTHETICS_COLUMNS.join(',')}</p>
             <p className="mt-2">Un solo sistema di codifica, versione, fonte e ambito per file. Duplicati ed errori bloccano tutto l’import. I codici assenti restano; le prescrizioni salvate non cambiano.</p>
@@ -87,7 +88,7 @@ export default function ProstheticsCatalogManager() {
             {preview.changes && <p className="text-sm">Nuove: {preview.changes.inserted}. Aggiornate: {preview.changes.updated}. Contenuto invariato: {preview.changes.unchanged}. La provenienza sarà registrata per tutte le righe.</p>}
             {preview.diagnostics.length > 0 && <ul className="list-disc space-y-2 pl-5 text-sm">{preview.diagnostics.map((item, index) => <li key={index}>Riga {item.row}, {item.column}: {item.message}</li>)}</ul>}
             {preview.diagnosticsTruncated && <p className="text-sm">Mostrati i primi 200 errori. Correggi il file e ripeti l’anteprima.</p>}
-            {preview.sample.length > 0 && <details><summary className="cursor-pointer text-sm font-semibold" style={{ minHeight: 44, alignContent: 'center' }}>Campione: prime {preview.sample.length} voci</summary>
+            {preview.sample.length > 0 && <details><summary className="cursor-pointer text-sm font-semibold" style={{ minHeight: 44, alignContent: 'center' }}>{preview.sample.length === 1 ? 'Campione: una voce' : `Campione: prime ${preview.sample.length} voci`}</summary>
                 <ul className="space-y-2 text-sm leading-6" style={{ overflowWrap: 'anywhere' }}>{preview.sample.map((row, index) => <li key={index}><strong>{row.codeSystem} · {row.code}</strong>: {row.description}<br />Date dichiarate: {row.startDate ?? 'non indicata'} — {row.endDate ?? 'non indicata'}</li>)}</ul>
             </details>}
             {preview.valid && <><label className="flex items-start gap-3 py-3 text-sm leading-6" style={{ minHeight: 44 }}><input type="checkbox" checked={accepted} disabled={busy} onChange={event => setAccepted(event.target.checked)} style={{ minWidth: 24, height: 24 }} />Ho verificato fonte, versione, ambito e campi. Confermo l’aggiornamento del solo repertorio.</label>
@@ -96,7 +97,7 @@ export default function ProstheticsCatalogManager() {
         <div className="flex flex-wrap gap-2"><button type="button" disabled={busy} className="border px-4 text-sm font-semibold" style={control} onClick={() => void run(signal => reread(signal))}>Rileggi stato</button>
             {source && <button type="button" disabled={busy} className="border px-4 text-sm font-semibold" style={control} onClick={() => void run(signal => makePreview(source, signal))}>Genera nuova anteprima</button>}</div>
         {(receipt ?? status?.latestReceipt) && <div aria-label="Ricevuta protesica" className="space-y-2 border p-4 text-sm" style={{ borderRadius: 12 }}>
-            <h3 className="font-semibold">Import registrato</h3><p>{(receipt ?? status!.latestReceipt)!.committedAt} · {(receipt ?? status!.latestReceipt)!.applied} voci</p>
+            <h3 className="font-semibold">Import registrato</h3><p>{new Date((receipt ?? status!.latestReceipt)!.committedAt).toLocaleString('it-IT')} · {(receipt ?? status!.latestReceipt)!.applied} {(receipt ?? status!.latestReceipt)!.applied === 1 ? 'voce' : 'voci'}</p>
             <Provenance manifest={(receipt ?? status!.latestReceipt)!.manifest} />
             <p>La ricevuta documenta l’import locale, non la validità normativa della fonte.</p>
         </div>}

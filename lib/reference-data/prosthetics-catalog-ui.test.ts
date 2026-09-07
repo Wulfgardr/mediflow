@@ -57,7 +57,7 @@ test('real component and routes: preview, acceptance, invalid rows, CAS, lost re
         const confirm = page.getByRole('button', { name: 'Conferma importazione protesica', exact: true });
         await expect(confirm).toBeDisabled(); await page.getByRole('checkbox').check(); await confirm.click();
         await expect(page.getByText('Import registrato e stato del repertorio riletto.', { exact: true })).toBeVisible();
-        await expect(page.getByText('1 voci nel repertorio protesica', { exact: true })).toBeVisible();
+        await expect(page.getByText('1 voce nel repertorio protesica', { exact: true })).toBeVisible();
         assert.equal(commits, 1);
         await upload.setInputFiles(file(['DUP', 'DUP']));
         await expect(page.getByText('Import bloccato', { exact: true })).toBeVisible(); await expect(confirm).toHaveCount(0);
