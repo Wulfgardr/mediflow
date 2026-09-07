@@ -37,7 +37,7 @@ test('explicit private grant: exact operator/device/admin, expiry, permissions, 
 });
 function fixture() {
     const f = grantFixture();
-    const session = createNativeServerSession({ id: principal.userId, username: 'synthetic', role: 'admin' },
+    const session = createNativeServerSession({ id: principal.userId, username: principal.userId, role: 'admin' },
         { clientId: principal.clientId, clientPlatform: 'macos' });
     let settings: Record<string, string> = { aiProvider: 'ollama', aiModel: 'synthetic:1', ...Object.fromEntries(Object.values(FUNCTION_SWITCH_KEYS).map(k => [k, 'enabled'])) };
     let writes = 0; let auth = true; let channel: string = 'native'; let duringAuthentication: (() => void) | undefined;
@@ -56,7 +56,7 @@ function fixture() {
     } });
     const command = () => ({ schemaVersion: 'mediflow.function-preferences-command.v1', commandId: randomUUID(), expectedRevision: service.read().revision,
         expectedCatalogRevision: service.read().catalogRevision, action: 'preset', presetId: 'all_off' });
-    const request = (body: unknown) => new Request('https://synthetic.invalid/api/v1/network/ai/functions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const request = (body: unknown) => new Request('https://localhost/api/v1/network/ai/functions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     return { f, session, service, http, command, request, writes: () => writes, settings: () => settings,
         noAuth: () => { auth = false; }, web: () => { channel = 'web'; }, onAuth: (fn: () => void) => { duringAuthentication = fn; },
         cleanup: () => { deleteSession(session.id); f.cleanup(); } };
@@ -69,7 +69,7 @@ test('preview performs zero writes; apply rereads and exact replay performs no s
         const applied = await f.http.POST(f.request(command)); assert.equal(applied.status, 200);
         const view = await applied.json(); assert.ok(view.functions.every((v: { enabled: boolean }) => !v.enabled)); assert.equal(f.writes(), 1);
         assert.equal((await f.http.POST(f.request(command))).status, 200); assert.equal(f.writes(), 1);
-        const read = await f.http.GET(new Request('https://synthetic.invalid/api/v1/network/ai/functions'));
+        const read = await f.http.GET(new Request('https://localhost/api/v1/network/ai/functions'));
         assert.equal((await read.json()).revision, view.revision); assert.equal(read.headers.get('Cache-Control'), 'no-store');
         assert.equal((await f.http.POST(f.request({ ...command, presetId: 'host_defaults' }))).status, 409);
     } finally { f.cleanup(); }
@@ -78,20 +78,20 @@ test('CAS and catalog reject stale commands, arbitrary providers/extra keys reje
     const f = fixture(); try {
         const command = f.command();
         for (const field of ['expectedRevision', 'expectedCatalogRevision']) assert.equal((await f.http.POST(f.request({ ...command, [field]: 'sha256_' + '0'.repeat(64) }))).status, 409);
-        for (const extra of [{ provider: 'openai' }, { endpoint: 'https://synthetic.invalid' }]) assert.equal((await f.http.POST(f.request({ ...command, ...extra }))).status, 400);
+        for (const extra of [{ provider: 'openai' }, { endpoint: 'https://localhost' }]) assert.equal((await f.http.POST(f.request({ ...command, ...extra }))).status, 400);
         assert.equal(f.writes(), 0);
     } finally { f.cleanup(); }
 });
 test('missing native authority and Web session cannot read or write', async () => {
     const f = fixture(); try { f.web(); assert.equal((await f.http.POST(f.request(f.command()))).status, 401); f.noAuth();
-        assert.equal((await f.http.GET(new Request('https://synthetic.invalid'))).status, 401); assert.equal(f.writes(), 0);
+        assert.equal((await f.http.GET(new Request('https://localhost'))).status, 401); assert.equal(f.writes(), 0);
     } finally { f.cleanup(); }
 });
 for (const kind of ['lock', 'grant', 'pairing'] as const) test(`${kind} revocation during body denies writes`, async () => {
     const f = fixture(); try {
         let push: ReadableStreamDefaultController<Uint8Array>;
         const stream = new ReadableStream<Uint8Array>({ start(c) { push = c; } });
-        const request = new Request('https://synthetic.invalid', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: stream, duplex: 'half' } as RequestInit);
+        const request = new Request('https://localhost', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: stream, duplex: 'half' } as RequestInit);
         const pending = f.http.POST(request);
         await new Promise(resolve => setTimeout(resolve, 10));
         if (kind === 'lock') deleteSession(f.session.id);
@@ -104,13 +104,13 @@ for (const kind of ['lock', 'grant', 'pairing'] as const) test(`${kind} revocati
 test('body deadline, oversize, duplicate keys, content type and query fail closed', async () => {
     const f = fixture(); try {
         const stream = new ReadableStream<Uint8Array>();
-        const stalled = new Request('https://synthetic.invalid', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: stream, duplex: 'half' } as RequestInit);
+        const stalled = new Request('https://localhost', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: stream, duplex: 'half' } as RequestInit);
         assert.equal((await f.http.POST(stalled)).status, 400);
         for (const body of ['x'.repeat(4097), '{"action":"set","action":"preset"}']) {
-            const request = new Request('https://synthetic.invalid', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
+            const request = new Request('https://localhost', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
             assert.equal((await f.http.POST(request)).status, 400);
         }
-        assert.equal((await f.http.GET(new Request('https://synthetic.invalid?override=yes'))).status, 400);
+        assert.equal((await f.http.GET(new Request('https://localhost?override=yes'))).status, 400);
         assert.equal(f.writes(), 0);
     } finally { f.cleanup(); }
 });
