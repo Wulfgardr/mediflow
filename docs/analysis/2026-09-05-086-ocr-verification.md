@@ -204,6 +204,8 @@ Base `1672cb3cc27ee144539d068a435ca149b81bd208`, branch
 `codex/WUL-671-086-ocr-desktop`, worktree `mediflow-086-ocr-desktop`.
 [ADR 0128](../adr/0128-local-desktop-ocr.md) scritto prima del codice.
 Stato: **adapter candidato implementato; equivalenza Windows/Linux aperta**.
+Questa sezione registra la prima consegna `7f8441615`; le successive prove
+guest e la correzione del preflight sono riportate nella sezione finale.
 La candidatura originale e demo4390 non sono state modificate.
 
 ### Contratto consegnato
@@ -316,3 +318,192 @@ La suite standalone completa non e verde: restano due difetti baseline fuori
 ownership. Non sono stati eseguiti build completa, browser/standalone live,
 packaging o guest. I comandi Node usano 24.19.0; i test sono stati eseguiti in
 sequenza, con dati sintetici e senza server persistenti.
+
+## Qualifica guest del 7 settembre — WUL-671
+
+**Qualifica tecnica parziale; equivalenza desktop ancora aperta.** Linux
+supera 5/6 casi sintetici. Windows esegue il motore WASM sul raster italiano,
+ma la pipeline PDF e bloccata dal caricamento del binding AnyDoc. Nessuna
+prova clinica, comparazione con Apple Vision, build applicativa o qualifica
+del pacchetto deriva da questa esecuzione.
+
+Sorgente benchmark `7f84416154002dbc795cc9935a156480e14bcb0e`, trasferita con
+`git archive` e allowlist OCR: 87.657 byte compressi, SHA-256
+`4bb7a33016ac20fd325e68d362bd9161728743fae4c30407f8ad16fe4823d263`.
+Nessun DB, auth, corpus reale o progetto utente nel trasferimento. Dipendenze
+minime locali, Node 24.19.0; nessuna installazione globale. I cinque artefatti
+OCR gia fissati sono stati trasferiti e riverificati, senza nuovi modelli.
+Entrambe le VM risultavano gia RUNNING al primo inventario e sono lasciate
+all'utente. Target e test eseguiti in sequenza; nessuna build Next/app.
+
+### Target e provenienza
+
+| Target osservato | Runtime e renderer | Risorse guest osservate |
+| --- | --- | --- |
+| Omarchy, Arch Linux ARM, kernel `7.1.8-1-aarch64-ARCH`, glibc 2.43 | Node 24.19.0 arm64; `@napi-rs/canvas-linux-arm64-gnu` 0.1.100 | 8 vCPU, 12.516.647.488 byte RAM; modello CPU non esposto da Node (`unknown`). |
+| Windows 11 ARM64, build `10.0.26200.9168` | Node 24.19.0 **x64 emulato**; profilo `@napi-rs/canvas-win32-x64-msvc` 0.1.100 presente e digest verificato, rendering PDF non raggiunto | 8 vCPU, 19.320.733.696 byte RAM al primo inventario. |
+
+Non sono prove Windows ARM nativo, Windows su hardware x64, Linux x64/musl
+oppure equivalenza tra sistemi. Manifest core/modello SHA-256
+`0fb4ed952127bafe84e97f3f3cb43f6f53d5d60984117eed6a550d73508c6978`;
+manifest renderer
+`41355c1e4360acdc293aa383a07ba2c8216a8a018b0a38ac2a9ec5cc0fe37e41`.
+I report privati registrano anche hash di eseguibile Node, singoli artefatti,
+binario canvas, sorgenti trasferite, fixture, harness e output.
+
+### Corpus e soglie fissati prima del riconoscimento
+
+Il benchmark canonico `scripts/benchmark-document-router.ts` riguarda la
+classificazione documentale; non definisce soglie OCR CER/WER riutilizzabili.
+Sono state quindi fissate soglie **tecniche sintetiche**, non cliniche o
+causali, alle 20:33:24 UTC, prima delle prove target. Manifest privato
+`corpus/manifest.json`, SHA-256
+`8d28a283058fb0f0d3853f66d9ff07cdb95e90fe365ad4ae360994aae2e10b8d`.
+Non e stato modificato dopo i risultati.
+
+Sei PDF: nativo, scansione della fixture italiana fissa, misto con scansione
+solo a pagina 2, rotazioni raster di +5 e +90 gradi, tabella con 3.360 pixel di
+rumore grigio deterministico. Nessun font o documento del guest entra nel
+corpus; i raster sono generati prima del trasferimento. Il caso tabella
+verifica testo e ordine, non una ricostruzione strutturata delle celle.
+
+Normalizzazione NFC e spazi consecutivi; maiuscole, accenti e punteggiatura
+restano significativi. CER/WER del misto misurano soltanto la pagina OCR.
+CER/WER massimi: 0/0 nativo, 2%/5% scansione e misto, 8%/15% rotazioni,
+10%/20% tabella. Tutti i token dichiarati di accento, data e quantita devono
+corrispondere esattamente. Exact match dell'intera stringa viene registrato;
+fuori dal nativo non sostituisce le soglie CER/WER e i token obbligatori.
+
+Routing 100%, nessuna pagina nativa renderizzata, nessuna pagina omessa,
+testo nativo preservato esattamente. Massimo 90 s per caso e 30 s per child
+OCR, 1 GiB osservato per processo; concorrenza 1, una misura per caso.
+Gli osservatori intercettano passivamente il trasporto dei processi reali,
+conservando digest e inoltrando i byte immutati. Latenza comprensiva di
+osservatori e controllo di routing aggiuntivo: non e una stima statistica
+della latenza applicativa.
+
+### Risultati Linux sul commit 7f8441615
+
+| Caso | CER | WER | Exact match | Latenza caso | Massimo child residente osservato | Gate |
+| --- | ---: | ---: | --- | ---: | ---: | --- |
+| Nativo | 0% | 0% | Si | 48,4 ms | 49,5 MiB | Passa; nessun OCR |
+| Scansione IT | 0% | 0% | Si | 2.563,9 ms | 387,0 MiB | Passa |
+| Misto, scansione pagina 2 | 0% | 0% | Si | 771,6 ms | 385,7 MiB | Passa |
+| Rotazione +5 gradi | 0,9804% | 7,6923% | No | 891,3 ms | 420,1 MiB | **Fallisce token:** `quantità` diventa `Quantità` |
+| Rotazione +90 gradi | 0% | 0% | Si | 875,4 ms | 420,7 MiB | Passa |
+| Tabella con rumore | 0% | 0% | Si | 712,4 ms | 387,5 MiB | Passa |
+
+AnyDoc seleziona tutte e sole le 5 pagine da riconoscere; le 2 pagine native
+sono conservate. Ricomposizione completa in tutti i casi. Hash sorgente,
+raster resi/input OCR e receipt set finale verificati per i cinque casi OCR.
+La rotazione +5 conserva l'accento: il difetto e la maiuscola, non un accento
+perso. Nessuna soglia e stata allentata per far passare questo risultato.
+
+RSS Linux da `/proc` VmRSS/VmHWM, polling richiesto ogni 20 ms sui soli PID
+posseduti. Child OCR campionati 16–20 volte ciascuno, durata massima 444 ms;
+parent massimo 183,2 MiB. Il massimo di 420,7 MiB riguarda l'intera catena di
+child, compreso il renderer. Sono massimi **osservati**, non limiti RSS imposti
+ne prove dei picchi sotto stress. Tutti i child risultano chiusi.
+
+Il report grezzo segna erroneamente il routing nativo come fallito perche
+attendeva un envelope anche senza `needsOcr`. Il contratto restituisce `null`
+in quel caso. L'overview corregge questa interpretazione usando estrazione
+iniziale invariata e assenza di child OCR; il conteggio nell'envelope e non
+applicabile al nativo. Report grezzo, correzione e soglie restano conservati.
+
+### Risultati Windows e prerequisito non soddisfatto
+
+Sul commit 7f8441615 tutti i sei PDF terminano `review_required:io_failure`
+nel primo passaggio. Nessun rendering o OCR di quelle pagine viene eseguito.
+I valori CER/WER=1 ottenuti nel report grezzo confrontando output vuoto non
+sono misure di accuratezza OCR: l'overview li marca non applicabili.
+
+Il pacchetto `@firecrawl/anydoc-win32-x64-msvc@0.2.4` e presente; binario
+8.275.456 byte, SHA-256
+`2883dbec5426f5e438489fef6186e3ced2b6ee1cb5deeb6524342eaf57635d19`.
+Il loader fallisce anche con l'ambiente completo. L'inventario PE identifica
+la dipendenza `VCRUNTIME140.dll`, assente accanto al binding, a Node e nella
+directory di sistema controllata. E un prerequisito mancante da risolvere;
+non e stata verificata la ripresa dopo provisioning. I nomi API-set elencati
+nel PE non sono trattati come DLL necessariamente mancanti su disco.
+[Microsoft documenta le dipendenze e la distribuzione del runtime C++](https://learn.microsoft.com/en-us/cpp/windows/determining-which-dlls-to-redistribute?view=msvc-170).
+La scelta di provisioning e manutenzione spetta al coordinatore: nessun
+runtime Microsoft installato o copiato da progetti/sessioni utente.
+
+Una prova **separata del solo motore** usa il PNG italiano fissato, non la
+pipeline PDF: CER=0, WER=0, exact match e 5/5 token esatti, 1.734,1 ms.
+Provenienza Tesseract, digest input/output/core e binding verificati; exit 0,
+child chiuso. Working set massimo osservato Windows: child 118,8 MiB,
+parent 122,1 MiB; 46 campioni del child. Polling PowerShell richiesto 20 ms,
+intervallo effettivo mediano 33,3 ms, massimo 97,4 ms, con WorkingSet64 e
+PeakWorkingSet64. Nessuna misura di memoria del renderer Windows riuscito.
+
+### Correzione preflight e test effettivi
+
+Commit `b14f61a1d29df77457993ffd0e1c04cdc2ea3dc6`:
+`scripts/check-anydoc-desktop-ocr.ts` aggiunge un PDF nativo sintetico nel
+processo AnyDoc esistente. Artifact integri con AnyDoc non caricabile danno
+ora exit 1, `reason=anydoc_unavailable`, `anydocFirstPass=failed` e guida al
+binding/Visual C++ x64. Il test aggiunto verifica rimozione del loader e
+recupero in copia isolata. ADR 0128 chiarisce il controllo; nessun worker,
+digest del motore, routing, currentness o impostazione e cambiato.
+
+Il commit e stato archiviato e riverificato per ogni file su entrambi i guest
+prima dei nuovi test; archivio SHA-256
+`2d25ce79097c552bd2b52aa6f74c751d975de95137064a8f55af4e9269827c8d`.
+La funzione sincrona `inspectAnyDocDesktopOcrCapability` resta inventario
+artifact: il suo risultato non dimostra caricabilita AnyDoc o renderer.
+Il preflight CLI aggiunge la prova AnyDoc, ma resta
+`qualification=pending_target_benchmark` anche quando esce 0.
+
+| Verifica realmente eseguita | Mac di sviluppo | Linux guest | Windows guest |
+| --- | --- | --- | --- |
+| Suite desktop reale su 7f8441615 | Gia nella consegna precedente | 9/9, zero skip | 7/9, zero skip; falliscono misto e nativo AnyDoc |
+| Child owner su 7f8441615 | Gia nella consegna precedente | 6/6 | 6/6 |
+| Suite desktop reale su b14f61a1d | 10/10, zero skip | 10/10, zero skip | 7/10, zero skip; falliscono i due casi AnyDoc e il nuovo gate che richiede primo passaggio disponibile |
+| CLI b14f61a1d | Positivo nei test | Exit 0, primo passaggio verificato, anche dopo i test | Exit 1 e diagnosi AnyDoc attesi e verificati |
+| Typecheck dei due file TS modificati e import OCR; ESLint mirato | Passano, Node 24.19.0 | Non ripetuti | Non ripetuti |
+
+Comandi guest: `node scripts/run-strip-types.mjs --test --test-concurrency=1`
+con `scripts/anydoc-desktop-ocr-real.test.ts` e, separatamente,
+`lib/domain/documents/anydoc-pdf-child-process-owner.test.ts`; CLI con
+`node scripts/run-strip-types.mjs scripts/check-anydoc-desktop-ocr.ts`.
+Guard AnyDoc local-only, claims e never-regress passati sul Mac con Node 24;
+anche diff check, inventario Markdown e link relativi del report passano.
+
+I guasti reali benigni coprono pagina vuota senza successo parziale,
+core WASM o renderer mancanti/alterati, rifiuto concorrente e retry dopo
+chiusura. Timeout, stdout e rete sono verifiche del child owner con processi
+sintetici: non attestano un timeout provocato nel motore OCR reale.
+
+Il primo comando Windows lungo di `prlctl` non ha raggiunto il runner; il
+collegamento host posseduto e stato terminato e il retry tramite script
+locale ha eseguito il benchmark. Il primo sampler PowerShell ha conservato
+il report completo ma letto un ExitCode nullo: errore di orchestrazione
+registrato, non successo OCR. La prova separata del motore acquisisce
+l'handle prima dell'attesa e registra exit 0. Nessuna VM e stata arrestata.
+
+### Consegna, baseline fuori scope e limite di promozione
+
+Overview, sorgenti archiviate, roster, corpus congelato, generatori, harness,
+report grezzi/corretti e log restano privati fuori Git nella directory task
+`mediflow-WUL-671-086-ocr-desktop/artifacts/target-20260907` di
+ContextContinuity; copia di lavoro ignorata in `tmp-ocr-target/`.
+I report di provenienza verificano anche i sorgenti dopo i test. Nessun
+processo Node della lane rimane attivo nei guest all'inventario finale.
+
+Restano da coordinare prerequisito AnyDoc Windows e retry della pipeline,
+errore di maiuscola a +5 gradi, benchmark finale e packaging. Currentness
+DB, revoca/sessione, UI e auth standalone non sono stati provati nelle VM:
+la prova di binding dei byte non sostituisce l'authority finale.
+
+Al parent restano inoltre i due fallimenti auth baseline gia riprodotti
+prima di questa qualifica, in `scripts/check-standalone-runtime-bundle.test.mjs`:
+
+- riga 119: `standalone checker proves web auth owner physical copy and restart denial`;
+- riga 180: `standalone config externalizes and traces the exact web auth owner package roster`.
+
+Riguardano roster/restart dell'owner auth 0.8.7; log baseline conservati,
+nessuna modifica auth o nuova esecuzione standalone da questa qualifica.
+Nessuna build completa, push, PR, merge, tracker, tag o release. Candidatura
+originale, demo4390, sessioni utente e configurazioni VM preservate.
