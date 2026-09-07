@@ -73,6 +73,8 @@ const basePayload = {
     ],
     exemptions: [],
     exemptionImportReceipts: [],
+    prostheticsCatalogEntries: [], // @Codex Additive repertory generation.
+    prostheticsCatalogReceipts: [],
     messages: [
         {
             id: 'msg-1',

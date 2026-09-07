@@ -59,6 +59,7 @@ sorgenti, toolchain, prove delle bozze e limiti della lane nativa.
 | [ADR 0128](./adr/0128-local-desktop-ocr.md) | OCR locale desktop Tesseract WASM e renderer per piattaforma. | Per prerequisiti, digest e limiti della candidatura Windows/Linux. |
 | [ADR 0125](./adr/0125-explicit-aifa-catalog-download.md) | Proposta di aggiornamento esplicito dalla fonte ufficiale AIFA. | Per implementare download limitato, conflitti e sostituzione atomica. |
 | [ADR 0127](./adr/0127-atomic-local-exemption-import.md) | Import esenzioni locale con anteprima, subset esplicito, CAS e commit atomico. | Per implementare o verificare WUL-690. |
+| [ADR 0133](./adr/0133-local-prosthetics-catalog-import.md) | Contratto candidato WUL-693: CSV protesica, import atomico, provenienza e backup. | Per importare un repertorio locale dichiarato. |
 | [Verifica UI integrata 0.8.6](./analysis/2026-09-06-086-integrated-ui-verification.md) | UI promossa senza flag: sorgenti, comandi e limiti. | Per distinguere la prova del candidato integrato dal confronto sintetico. |
 | [Chiusura funzionale locale 0.8.6](./analysis/2026-09-06-086-functional-closeout.md) | Candidate, controlli e limiti della tranche funzionale. | Prima della revisione finale e di ogni promozione. |
 | [Inventario first-party](./analysis/2026-09-06-086-code-inventory.md) | Copertura ripetibile e debito classificato. | Per scegliere tranche deslop motivate. |

@@ -10,6 +10,9 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import Database from 'better-sqlite3';
 import { commitExemptionImport, previewExemptionImport } from './exemption-catalog-import';
 import { EXEMPTION_COLUMNS } from './exemption-import-contract';
+/* @Codex */
+import { createProstheticsCatalog } from './reference-data/prosthetics-catalog-service';
+import { PROSTHETICS_TEMPLATE } from './reference-data/prosthetics-catalog-contract';
 import { BACKUP_COLLECTIONS, createEmptyDataset, parseBackupArtifact, serializeBackupArtifact, stableStringify } from './backup-artifact';
 import { ATTACHMENTS_ABSENT, frame, PAYLOAD_DIGEST_CODEC, SEAL_DIGEST_CODEC,
     SEAL_SCHEMA } from './headless/clinician-soap-entry-seal-codec-internal';
@@ -37,6 +40,8 @@ const BACKUP_TABLES = {
     entries: 'entries',
     exemptions: 'exemptions',
     exemptionImportReceipts: 'exemption_import_receipts',
+    prostheticsCatalogEntries: 'prosthetics_catalog_entries',
+    prostheticsCatalogReceipts: 'prosthetics_catalog_receipts',
     messages: 'messages',
     observations: 'observations',
     patients: 'patients',
@@ -834,6 +839,10 @@ test('scheduled backup restores every clinical table and preserves ciphertext by
             clearBackupTables(sourceDb, clinicalTables);
             clearBackupTables(targetDb, clinicalTables);
             const durableReviewCommand = await populateSyntheticClinicalFixture(sourceDb, sourceActorRef);
+            /* @Codex Include nonempty synthetic repertory and receipt in the total round-trip gate. */
+            const prosthetics = createProstheticsCatalog(sourceDb), catalogBytes = Buffer.from(PROSTHETICS_TEMPLATE);
+            const catalogPreview = prosthetics.preview(catalogBytes, 'synthetic-roundtrip.csv', 'synthetic-backup');
+            prosthetics.commit({ bytes: catalogBytes, sourceName: 'synthetic-roundtrip.csv', proof: catalogPreview.proof!, acceptSubset: true }, 'synthetic-backup', () => {});
             const headlessSoapReplay = seedHeadlessSoapCommit(sourceDataDir);
 
             for (const table of clinicalTables) {

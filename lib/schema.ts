@@ -589,3 +589,19 @@ export const exemptionImportReceipts = sqliteTable('exemption_import_receipts', 
     operationKey: text('operation_key').notNull().unique(),
     receiptJson: text('receipt_json').notNull(),
 });
+
+/* @Codex */
+export const prostheticsCatalogEntries = sqliteTable('prosthetics_catalog_entries', {
+    id: text('id').primaryKey().notNull(),
+    codeSystem: text('code_system').notNull(), code: text('code').notNull(),
+    description: text('description').notNull(), version: text('version').notNull(),
+    source: text('source').notNull(), scope: text('scope').notNull(),
+    startDate: text('start_date'), endDate: text('end_date'),
+    sourceSha256: text('source_sha256').notNull(), operationKey: text('operation_key').notNull(),
+    importedAt: text('imported_at').notNull(),
+});
+/* @Codex */
+export const prostheticsCatalogReceipts = sqliteTable('prosthetics_catalog_receipts', {
+    id: integer('id').primaryKey({ autoIncrement: true }).notNull(),
+    operationKey: text('operation_key').notNull().unique(), receiptJson: text('receipt_json').notNull(),
+});
