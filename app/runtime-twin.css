@@ -62,3 +62,8 @@ html[data-runtime-twin-design='proposal'] :is(.ui-btn-primary, .ui-btn-secondary
 html[data-runtime-twin-design='proposal'] [data-lume-control='theme'] {
     border-radius: var(--lume-control-radius);
 }
+
+/* @Codex: theme options retain the same separation as neighbouring controls. */
+html[data-runtime-twin-design='proposal'] div[data-lume-control='theme'] {
+    gap: var(--lume-control-gap);
+}

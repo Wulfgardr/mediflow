@@ -108,9 +108,10 @@
 }
 
 :global(html[data-runtime-twin-design='proposal']) .proposalAction {
-    min-height: 44px;
-    padding: 0.55rem 0.8rem;
-    font-size: 0.76rem;
+    min-height: var(--lume-control-height);
+    padding: 10px 14px;
+    font-size: 14px;
+    line-height: 22px;
 }
 
 :global(html[data-runtime-twin-design='proposal']) .proposalNetworkStatus {
