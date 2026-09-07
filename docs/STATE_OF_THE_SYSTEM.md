@@ -78,6 +78,11 @@ Le due suite UI firmate normalmente per il simulatore su `dc1fc0522`
 FAIL su 82 esecuzioni. Rotazione, accessibilità, bozza e archivio sono coperti
 con fixture sintetiche; le sei combinazioni di app e host reali sono ancora
 da verificare.
+La ripresa dopo lo sblocco del Mac ha prodotto una sola osservazione XCTest
+aggiuntiva: apertura del campo di configurazione e valore invariato PASS,
+menu di selezione non osservato. Il riempimento del campo e il percorso reale
+iPhone/Mac restano incompleti. La verifica è sospesa al limite concordato
+del 20% della quota settimanale; i risultati precedenti restano conservati.
 Il candidato non è ancora stato pubblicato, unito a main o rilasciato.
 
 ## Aggiornamento di candidatura: 5 settembre 2026
