@@ -4,6 +4,8 @@ const jsonParse = JSON.parse;
 const SetConstructor = Set;
 const textDecoder = new TextDecoder('utf-8', { fatal: true });
 const decodeUtf8 = textDecoder.decode.bind(textDecoder) as (input: AllowSharedBufferSource) => string;
+const requestDecoder = new TextDecoder('utf-8');
+const decodeRequestUtf8 = requestDecoder.decode.bind(requestDecoder);
 const textEncoder = new TextEncoder();
 const encodeUtf8 = textEncoder.encode.bind(textEncoder) as (input?: string) => Uint8Array;
 const Uint8ArrayConstructor = Uint8Array;
@@ -13,20 +15,20 @@ const stringSlice = Function.call.bind(String.prototype.slice) as (value: string
 export type BoundedJsonBody = Readonly<{ ok: true; value: unknown; byteLength: number }>
     | Readonly<{ ok: false; status: 400 | 413 }>;
 
-async function cancel(reader: ReadableStreamDefaultReader<Uint8Array>) {
-    try { await reader.cancel(); } catch { /* cancellation is best effort after a stream failure */ }
+function cancel(reader: ReadableStreamDefaultReader<Uint8Array>) {
+    try { void reader.cancel().catch(() => {}); } catch { /* cancellation is best effort after a stream failure */ }
 }
 
-async function cancelBody(body: ReadableStream<Uint8Array> | null) {
+function cancelBody(body: ReadableStream<Uint8Array> | null) {
     if (!body) return;
-    try { await body.cancel(); } catch { /* cancellation is best effort after a stream failure */ }
+    try { void body.cancel().catch(() => {}); } catch { /* cancellation is best effort after a stream failure */ }
 }
 
 function declaredLength(request: Request): number | null {
     const raw = request.headers.get('content-length');
-    if (raw === null) return null;
+    if (raw === null || !/^[0-9]+$/.test(raw)) return null;
     const length = Number.parseInt(raw, 10);
-    return Number.isFinite(length) && length >= 0 ? length : null;
+    return length; // Very large decimal headers (including Infinity) still exceed a finite cap.
 }
 
 function duplicateObjectKey(source: string): boolean {
@@ -89,11 +91,16 @@ function duplicateObjectKey(source: string): boolean {
     try { return value(); } catch { return false; }
 }
 
-/** Reads at most the configured payload budget before decoding or parsing JSON. */
-export async function readBoundedJsonBody(request: Request, maximumBytes: number): Promise<BoundedJsonBody> {
+/** Accumulates at most the budget; rejects the crossing chunk before decoding/parsing. */
+export async function readBoundedJsonBody(
+    request: Request,
+    maximumBytes: number,
+    semantics: 'strict' | 'request-json' = 'strict',
+): Promise<BoundedJsonBody> {
+    if (!Number.isSafeInteger(maximumBytes) || maximumBytes < 0) throw new RangeError('Invalid JSON byte budget');
     const declared = declaredLength(request);
     if (declared !== null && declared > maximumBytes) {
-        await cancelBody(request.body);
+        cancelBody(request.body);
         return objectFreeze({ ok: false, status: 413 });
     }
     if (!request.body) return objectFreeze({ ok: false, status: 400 });
@@ -106,18 +113,18 @@ export async function readBoundedJsonBody(request: Request, maximumBytes: number
             const step = await reader.read();
             if (step.done) break;
             if (!(step.value instanceof Uint8ArrayConstructor)) {
-                await cancel(reader);
+                cancel(reader);
                 return objectFreeze({ ok: false, status: 400 });
             }
             byteLength += step.value.byteLength;
             if (byteLength > maximumBytes) {
-                await cancel(reader);
+                cancel(reader);
                 return objectFreeze({ ok: false, status: 413 });
             }
-            arrayPush(chunks, step.value);
+            if (step.value.byteLength > 0) arrayPush(chunks, step.value);
         }
     } catch {
-        await cancel(reader);
+        cancel(reader);
         return objectFreeze({ ok: false, status: 400 });
     } finally {
         try { reader.releaseLock(); } catch { /* reader is already closed */ }
@@ -130,8 +137,8 @@ export async function readBoundedJsonBody(request: Request, maximumBytes: number
             const chunk = chunks[index]!;
             bytes.set(chunk, offset); offset += chunk.byteLength;
         }
-        const source = decodeUtf8(bytes);
-        if (duplicateObjectKey(source)) return objectFreeze({ ok: false, status: 400 });
+        const source = semantics === 'request-json' ? decodeRequestUtf8(bytes) : decodeUtf8(bytes);
+        if (semantics === 'strict' && duplicateObjectKey(source)) return objectFreeze({ ok: false, status: 400 });
         return objectFreeze({ ok: true, value: jsonParse(source), byteLength });
     } catch {
         return objectFreeze({ ok: false, status: 400 });

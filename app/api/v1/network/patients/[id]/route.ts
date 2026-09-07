@@ -1,4 +1,6 @@
 /* @Codex */
+import { readNativeNetworkJson, jsonBodyTooLargeResponse } from '@/lib/native-network-json-body';
+/* @Codex */
 import { cookies } from 'next/headers';
 /* @Codex */
 import { NextResponse } from 'next/server';
@@ -117,10 +119,13 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         const resolved = await requireNetworkPatientWriteContext(request, id);
         if (!resolved.ok) return resolved.response;
 
-        const body = await request.json() as Record<string, unknown>;
+        const body = await readNativeNetworkJson(request) as Record<string, unknown>;
         const result = await updateNetworkScopedPatient(resolved.context, body);
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
+        /* @Codex */
+        const sizeError = jsonBodyTooLargeResponse(error);
+        if (sizeError) return sizeError;
         console.error('API PUT /api/v1/network/patients/[id] error:', error);
         return NextResponse.json({ error: 'Failed to update patient' }, { status: 500 });
     }
@@ -133,7 +138,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
         const resolved = await requireNetworkCapabilityContext(request, NETWORK_PATIENT_LIFECYCLE_CAPABILITY);
         if (!resolved.ok) return resolved.response;
 
-        const body = await request.json() as Record<string, unknown>;
+        const body = await readNativeNetworkJson(request) as Record<string, unknown>;
         const result = await deleteNetworkScopedPatient(
             {
                 ...resolved.context,
@@ -143,6 +148,9 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
         );
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
+        /* @Codex */
+        const sizeError = jsonBodyTooLargeResponse(error);
+        if (sizeError) return sizeError;
         console.error('API DELETE /api/v1/network/patients/[id] error:', error);
         return NextResponse.json({ error: 'Failed to delete patient' }, { status: 500 });
     }
