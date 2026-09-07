@@ -7,7 +7,8 @@ read_when:
 
 # MediFlow 0.8.6 — consolidamento funzionale e interfaccia
 
-Data: 6 settembre 2026. Stato: **candidato locale integrato; gate prodotto aperti**, con
+Aggiornamento: 7 settembre 2026. Stato: **feature-complete e development-complete;
+candidato congelato per decisione dell'utente**, con
 [baseline WUL-670](./analysis/2026-09-05-mediflow-086-baseline.md) su `main`
 `b72ac713b`; la preparazione usava `6a5463e8d`. Nessuna release 0.8.6 consegnata.
 La [roadmap generale](./ROADMAP.md) resta la fonte prodotto;
@@ -18,6 +19,12 @@ della base funzionale, UI B/A, Search WHO locale e cartella Apple. Le sezioni
 seguenti conservano requisiti e osservazioni preparatorie, non attestano issue
 chiuse. Le scelte B/A e sidecar locale sono recepite; provisioning WHO, revisione
 regolatoria e distribuzione restano confini distinti.
+
+La verifica UI mirata iPhone–Mac/Home Base è differita come
+**DEFERRED VALIDATION ITEM / POST-RELEASE VERIFICATION GATE**. Il suo mancato
+completamento non riapre lo sviluppo salvo un difetto reale nella prova futura.
+Le sezioni preparatorie sotto restano storiche; per l'accettazione corrente
+prevale la [decisione di closeout](./analysis/2026-09-06-086-integrated-closeout.md#decisione-di-closeout).
 
 ## Risultato atteso
 

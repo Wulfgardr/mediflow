@@ -11,7 +11,7 @@ Informazioni, fonti e prossimi passi. Un po’ più facili da ritrovare.
 <a href="https://claude.com/claude-code"><img src="https://img.shields.io/badge/built%20with-Claude%20Code-D97757?style=flat&amp;logo=claudecode&amp;logoColor=white" alt="Built with Claude Code"></a>
 <a href="https://openai.com/codex"><img src="https://img.shields.io/badge/built%20with-Codex-1f2937?style=flat" alt="Built with Codex"></a>
 
-[![Versione sorgente](https://img.shields.io/badge/candidato-0.8.6-33506b?style=flat)](./docs/analysis/2026-09-06-086-functional-closeout.md)
+[![Versione sorgente](https://img.shields.io/badge/candidato-0.8.6-33506b?style=flat)](./docs/analysis/2026-09-06-086-integrated-closeout.md)
 [![Release pubblica](https://img.shields.io/github/v/release/Wulfgardr/mediflow?label=release&style=flat)](https://github.com/Wulfgardr/mediflow/releases/latest)
 [![Licenza](https://img.shields.io/badge/license-MIT-2ea043?style=flat)](./LICENSE)
 [![Local-first](https://img.shields.io/badge/data-local--first-8957e5?style=flat)](#dove-stanno-i-dati)
@@ -28,12 +28,13 @@ Informazioni, fonti e prossimi passi. Un po’ più facili da ritrovare.
 <details>
 <summary><strong>Versione sorgente e stato della candidatura</strong></summary>
 
-> **Stato del ramo: candidato integrato locale 0.8.6.** La UI scelta è promossa
+> **0.8.6: sviluppo concluso, candidato congelato.** La UI scelta è promossa
 > secondo [ADR 0123](./docs/adr/0123-official-web-ui-navigation-compositions.md):
 > B predefinita e A come disposizione alternativa della stessa navigazione.
 > Le schermate sotto documentano la base 0.8.5.
-> Controlli locali, decisione WHO, gate regolatori e distribuzione sono distinti.
-> [Verifiche e limiti del candidato](./docs/analysis/2026-09-06-086-functional-closeout.md).
+> La verifica UI iPhone–Mac/Home Base resta differita al post-release;
+> non è attestata la validazione completa multipiattaforma.
+> [Decisione di consegna, verifiche e limiti](./docs/analysis/2026-09-06-086-integrated-closeout.md).
 
 </details>
 
