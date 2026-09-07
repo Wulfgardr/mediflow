@@ -50,7 +50,7 @@ export function ProstheticsCatalogLookup({ onCopyDescription }: {
         </form>
         <p role="status" className="text-sm">{message}</p>
         {result && <>
-            <p className="text-sm">{result.entries.length} risultati{result.truncated ? ' mostrati. Affina la ricerca per vedere gli altri.' : '.'}</p>
+            <p className="text-sm">{result.entries.length} {result.entries.length === 1 ? 'risultato' : 'risultati'}{result.truncated ? ' mostrati. Affina la ricerca per vedere gli altri.' : '.'}</p>
             <ul className="space-y-3">
                 {result.entries.map(row => <li key={row.id} className="space-y-2 border p-4 text-sm leading-6" style={{ borderRadius: 12, overflowWrap: 'anywhere' }}>
                     <p className="font-semibold">{row.description}</p>

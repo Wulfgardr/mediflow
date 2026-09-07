@@ -141,7 +141,7 @@ export default function SettingsRepertoriPage() {
             <SettingsSectionIntro
                 kicker="Dati e sicurezza"
                 title="Repertori"
-                description="Farmaci AIFA, esenzioni e terminologia WHO: fonti, aggiornamenti e configurazione dei repertori."
+                description="Farmaci AIFA, esenzioni, protesica e codici ICD-11: fonti e aggiornamenti dei repertori."
             />
 
             <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-2">
