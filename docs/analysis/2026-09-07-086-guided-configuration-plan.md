@@ -21,6 +21,90 @@ La pubblicazione resta subordinata alle verifiche del pacchetto finale, alla
 risoluzione dei rilievi di sicurezza, a CI verde e ai gate sotto. Non si
 trasferiscono le prove di una piattaforma o di un vecchio SHA alle altre.
 
+## Riallineamento serale: requisiti e consegna
+
+La ricognizione serale usa il candidato locale
+`1672cb3cc27ee144539d068a435ca149b81bd208`. Il progetto Linear è stato portato
+in lavorazione e le issue WUL-669–688 sono state aggiornate con avanzamenti e
+residui. Nessuna è stata chiusa durante il riallineamento. Il
+[contratto comune su Linear](https://linear.app/wulfgardr/document/mediflow-086-contratto-operativo-issue-e-definition-of-done-533669b0b37b)
+include anche gli ampliamenti della giornata:
+
+| Issue | Risultato da consegnare |
+| --- | --- |
+| [WUL-689](https://linear.app/wulfgardr/issue/WUL-689) | Account ChatGPT e connettore qualificato; accesso e catalogo non equivalgono a inferenza disponibile. |
+| [WUL-690](https://linear.app/wulfgardr/issue/WUL-690) | Anteprima e import atomico delle esenzioni, con errori, revisione e provenienza. |
+| [WUL-691](https://linear.app/wulfgardr/issue/WUL-691) | Preset, preferenze per esperienza e scelta occasionale del modello vicino a Genera. |
+| [WUL-692](https://linear.app/wulfgardr/issue/WUL-692) | Persistenza, recupero e verifica desktop dell'aggiornamento AIFA. |
+| [WUL-693](https://linear.app/wulfgardr/issue/WUL-693) | Fonte corretta, schema e import del repertorio di protesica. |
+| [WUL-694](https://linear.app/wulfgardr/issue/WUL-694) | App Mac, Windows e Linux installate e provate dalla stessa revisione. |
+| [WUL-695](https://linear.app/wulfgardr/issue/WUL-695) | Documentazione, screenshot, siti e release sorgente coerenti con il freeze. |
+| [WUL-696](https://linear.app/wulfgardr/issue/WUL-696) | Mini con trasporto Supervisor e stato operativo realmente osservato. |
+
+WUL-631 resta il distinto percorso degli adapter API nella roadmap 1.0.
+La nuova integrazione ChatGPT personale non ne dimostra la chiusura.
+
+### Gerarchia della cartella e delle scale
+
+Le nuove indicazioni si applicano dopo lo studio dei riferimenti pertinenti
+di Breccia e Personal Aesthetic Studio. Per ogni riferimento si distinguono
+ciò che è stato osservato, il principio ricavato e l'applicazione alla schermata;
+un titolo di video non prova che il contenuto sia stato esaminato.
+
+- **Documenti:** caricamento, lista con informazioni essenziali e sintesi
+  documentale. In assenza di file, spiegare che non ci sono documenti e offrire
+  il caricamento. Dopo l'importazione, mostrare cronologia e comandi utili.
+  Togliere dal primo livello hero Fabric, riquadri duplicati e avvisi ripetuti,
+  mantenendo conferme, currentness e informazioni necessarie per la scelta.
+- **Scale:** rendere leggibili catalogo, selezione rapida, compilazione MMSE/CFS
+  e ritorno alla lista. Eliminare cornici annidate, ombre e metadati duplicati;
+  distribuire i comandi in modo coerente. Questa revisione non cambia quesiti,
+  scoring, versioni, licenze o distinzione fra zero e risposta mancante.
+- **Organizzazione:** riepilogo con quadro clinico, terapie, timeline, elementi
+  da rivedere e spunti dai documenti. Anagrafica, clinica e amministrazione
+  devono essere riconoscibili e raggiungibili separatamente. Le esenzioni
+  appartengono all'amministrazione; il riferimento all'invalidità non introduce
+  da solo un nuovo workflow di pratiche.
+- **Leggibilità:** contatori visibili e allineati al titolo, geometria condivisa,
+  spaziature coerenti e testi lunghi senza sovrapposizioni. Conservare diario,
+  terapie e navigazione già apprezzati, correggendo i difetti puntuali.
+- **Superfici:** alleggerire ultime voci e timeline con separatori discreti;
+  linee e marcatori hanno senso soltanto se collegano elementi riconoscibili.
+  Il dialogo di uscita perde la fascia decorativa blu, non la protezione delle
+  modifiche non salvate.
+- **Follow-up e agenda:** rendere possibile l'aggiunta dal follow-up mediante
+  il writer previsto. L'agenda può essere contestuale; un eventuale opt-in deve
+  avere una scelta e un comportamento espliciti, senza nascondere impegni già
+  presenti.
+
+### Accettazione comune del pacchetto
+
+Ogni funzione e superficie richiesta deve avere una prova sullo SHA dichiarato
+oppure un blocco ancora aperto. La matrice distingue implementato, provato,
+manuale per contratto e bloccato; una funzione richiesta assente non diventa
+non applicabile per completare la tabella. Un browser nella VM collegato al
+server del Mac non è una prova dell'app installata nel guest.
+
+Prima della consegna: review del delta di sicurezza, regressioni pertinenti,
+percorsi ordinari e recupero, UI con stati vuoti/densi, luce/buio, tastiera,
+focus, reflow e zoom 200%. Devono restare consultabili fonti e modello effettivo
+dei risultati, senza promettere il ragionamento interno del modello.
+Il dossier GDPR/AI Act richiede aggiornamento dei flussi e revisione competente;
+non deriva da una suite verde. Il registro deslop distingue interventi,
+conservazioni e rinvii motivati, senza una quota arbitraria di cancellazioni.
+
+La revisione dell'utente comprende immagini annotate separatamente, breve
+registrazione con dati fittizi e app navigabili. Seguono documentazione e siti
+allineati, CI verde sull'esatto head da integrare, merge verificato e release
+sorgente `v0.8.6` come Latest. La GitHub Release osservata durante la ricognizione
+è `v0.8.2`: i sorgenti `0.8.5` non attestano una release pubblicata con quel tag.
+
+Restano decisioni e prove necessarie: termini e provisioning WHO; fonte del
+repertorio protesico; isolamento dell'esecuzione ChatGPT; equivalenti desktop
+per dipendenze Apple; condizioni e revisione del dossier applicabile.
+Le lane implementano risultati indipendenti; l'integrazione e le prove pesanti
+vengono coordinate. Nessuna scadenza operativa sostituisce questi gate.
+
 ## Fasi esecutive
 
 | Fase | Consegna concreta | Accettazione prima di passare oltre |
