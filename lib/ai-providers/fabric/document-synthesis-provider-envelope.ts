@@ -26,11 +26,12 @@ const SetAdd = Set.prototype.add;
 const SetHas = Set.prototype.has;
 const WeakMapGet = WeakMap.prototype.get;
 const WeakMapSet = WeakMap.prototype.set;
-const ROOT_KEYS = ObjectFreeze(['output', 'citations', 'claims'] as const);
+const SCHEMA_VERSION = 'mediflow.document-synthesis.provider-envelope.v2' as const;
+const ROOT_KEYS = ObjectFreeze(['schemaVersion', 'output', 'citations', 'claims'] as const);
 const privateSnapshots = new WeakMap<object, DocumentSynthesisProviderEnvelopeSnapshot>();
 
-type Root = Readonly<{ output: unknown; citations: unknown; claims: unknown }>;
-export type DocumentSynthesisProviderEnvelopeSnapshot = Readonly<{ output: unknown; citations: unknown; claims: unknown }>;
+type Root = Readonly<{ schemaVersion: typeof SCHEMA_VERSION; output: unknown; citations: unknown; claims: unknown }>;
+export type DocumentSynthesisProviderEnvelopeSnapshot = Root;
 export type DocumentSynthesisProviderEnvelopeResult =
     | Readonly<{ status: 'available'; code: null; token: object; reviewOnly: true; writesPerformed: 0; applyPolicy: 'none' }>
     | Readonly<{ status: 'denied'; code: 'response_invalid'; token: null; reviewOnly: true; writesPerformed: 0; applyPolicy: 'none' }>;
@@ -101,7 +102,7 @@ function rootFrom(text: string): Root | null {
         const value: unknown = JSONParse(text);
         if (!value || typeof value !== 'object' || ArrayIsArray(value) || ObjectGetPrototypeOf(value) !== OBJECT) return null;
         const keys = ReflectOwnKeys(value);
-        if (keys.length !== 3) return null;
+        if (keys.length !== 4) return null;
         const root = ObjectCreate(null) as Record<string, unknown>;
         for (let index = 0; index < ROOT_KEYS.length; index += 1) {
             const key = ROOT_KEYS[index]!;
@@ -109,7 +110,8 @@ function rootFrom(text: string): Root | null {
             if (!descriptor || !descriptor.enumerable || !ObjectHasOwn(descriptor, 'value')) return null;
             root[key] = descriptor.value;
         }
-        for (let index = 0; index < keys.length; index += 1) if (typeof keys[index] !== 'string' || (keys[index] !== 'output' && keys[index] !== 'citations' && keys[index] !== 'claims')) return null;
+        for (let index = 0; index < keys.length; index += 1) if (typeof keys[index] !== 'string' || (keys[index] !== 'schemaVersion' && keys[index] !== 'output' && keys[index] !== 'citations' && keys[index] !== 'claims')) return null;
+        if (root.schemaVersion !== SCHEMA_VERSION) return null;
         return root as Root;
     } catch { return null; }
 }
@@ -135,7 +137,7 @@ export function parseDocumentSynthesisProviderEnvelope(value: unknown): Document
     const content = contentFrom(value); const root = content === null ? null : rootFrom(content);
     if (!root) return denied();
     try {
-        const isolated = sealed({ output: snapshot(root.output), citations: snapshot(root.citations), claims: snapshot(root.claims) }) as DocumentSynthesisProviderEnvelopeSnapshot;
+        const isolated = sealed({ schemaVersion: root.schemaVersion, output: snapshot(root.output), citations: snapshot(root.citations), claims: snapshot(root.claims) }) as DocumentSynthesisProviderEnvelopeSnapshot;
         const token = ObjectFreeze(ObjectCreate(null)); ReflectApply(WeakMapSet, privateSnapshots, [token, isolated]);
         return sealed({ status: 'available' as const, code: null, token, reviewOnly: true as const, writesPerformed: 0 as const, applyPolicy: 'none' as const }) as DocumentSynthesisProviderEnvelopeResult;
     } catch { return denied(); }

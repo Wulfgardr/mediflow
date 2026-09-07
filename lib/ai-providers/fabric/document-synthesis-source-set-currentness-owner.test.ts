@@ -1,6 +1,5 @@
 /* @Codex */
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
 import { copyFileSync, unlinkSync } from 'node:fs';
 import { afterEach, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -22,7 +21,6 @@ import { clearAllSessions, createSession, deleteSession } from '../../security/s
 const USER = { id: ['synthetic', 'currentness', 'user'].join('-'), username: ['synthetic', 'currentness', 'clinician'].join('-'), role: 'clinician' };
 const PAIR = { patientId: 'patient.synthetic.currentness', ambulatoryId: 'ambulatory.synthetic.currentness' };
 const n = (value: number | string) => BigInt(value);
-const sha = (value: string) => createHash('sha256').update(new TextEncoder().encode(value)).digest('hex');
 
 afterEach(() => clearAllSessions());
 
@@ -45,8 +43,9 @@ function prompt(sourceSetValue: ReturnType<typeof sourceSet>): string {
 
 function envelope(sourceText: string) {
     const result = parseDocumentSynthesisProviderEnvelope({ content: JSON.stringify({
+        schemaVersion: 'mediflow.document-synthesis.provider-envelope.v2',
         output: { schemaVersion: 'mediflow.ai.extract.v1', task: 'document_synthesis', summary: 'Synthetic summary', data: { qualityLevel: 'green', medications: [], diagnoses: [], problemStatements: [], therapyCandidates: [], servicePrescriptions: [] } },
-        citations: [{ label: 'S1', quote: sourceText, startByte: 0, endByte: new TextEncoder().encode(sourceText).length, quoteSha256: sha(sourceText) }],
+        citations: [{ label: 'S1', quote: sourceText }],
         claims: [{ claimPath: 'summary', labels: ['S1'] }, { claimPath: 'data.qualityLevel', labels: ['S1'] }],
     }) });
     assert.equal(result.status, 'available');
