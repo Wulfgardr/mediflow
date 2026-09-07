@@ -49,6 +49,115 @@ tags:
   - name: Network
     description: Home-base network contract for explicit pairing, capability discovery, and PHI-safe session gating.
 paths:
+  /api/v1/network/ai/functions:
+    get:
+      operationId: ReadNativeFunctionPreferences
+      tags: [Native AI configuration]
+      summary: ReadNativeFunctionPreferences
+      description: >-
+        ADR0135. Host-wide configuration only. Requires current native operator
+        session bound to this paired device, home-base mode, current admin role
+        and explicit unexpired native.ai.configure host grant. No Web authority,
+        provider admission, inference or clinical apply. No query parameters.
+        Responses are no-store. Revalidate after ambiguous outcomes; no auto-retry.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      responses:
+        '200':
+          description: Configuration snapshot or read-only preview; never inference readiness.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NativeFunctionPreferences'
+        '400':
+          description: Invalid or bounded-body violation.
+        '401':
+          description: Pairing or native session missing, changed, expired or revoked.
+        '403':
+          description: Explicit host configuration grant absent or revoked, or role denied.
+        '409':
+          description: Catalog, preference revision, command or binding conflict. Reread before a new command.
+        '503':
+          description: Configuration unavailable or corrupt; no fallback.
+    post:
+      operationId: ApplyNativeFunctionPreferences
+      tags: [Native AI configuration]
+      summary: ApplyNativeFunctionPreferences
+      description: >-
+        ADR0135. Host-wide configuration only. Requires current native operator
+        session bound to this paired device, home-base mode, current admin role
+        and explicit unexpired native.ai.configure host grant. No Web authority,
+        provider admission, inference or clinical apply. No query parameters.
+        Responses are no-store. Revalidate after ambiguous outcomes; no auto-retry.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      requestBody:
+        required: true
+        description: Strict JSON, no extra keys, maximum 4096 bytes and one second body deadline.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NativeFunctionCommand'
+      responses:
+        '200':
+          description: Configuration snapshot or read-only preview; never inference readiness.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NativeFunctionPreferences'
+        '400':
+          description: Invalid or bounded-body violation.
+        '401':
+          description: Pairing or native session missing, changed, expired or revoked.
+        '403':
+          description: Explicit host configuration grant absent or revoked, or role denied.
+        '409':
+          description: Catalog, preference revision, command or binding conflict. Reread before a new command.
+        '503':
+          description: Configuration unavailable or corrupt; no fallback.
+  /api/v1/network/ai/functions/preview:
+    post:
+      operationId: PreviewNativeFunctionPreferences
+      tags: [Native AI configuration]
+      summary: PreviewNativeFunctionPreferences
+      description: >-
+        ADR0135. Host-wide configuration only. Requires current native operator
+        session bound to this paired device, home-base mode, current admin role
+        and explicit unexpired native.ai.configure host grant. No Web authority,
+        provider admission, inference or clinical apply. No query parameters.
+        Responses are no-store. Revalidate after ambiguous outcomes; no auto-retry.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      requestBody:
+        required: true
+        description: Strict JSON, no extra keys, maximum 4096 bytes and one second body deadline.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NativeFunctionCommand'
+      responses:
+        '200':
+          description: Configuration snapshot or read-only preview; never inference readiness.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NativeFunctionPreview'
+        '400':
+          description: Invalid or bounded-body violation.
+        '401':
+          description: Pairing or native session missing, changed, expired or revoked.
+        '403':
+          description: Explicit host configuration grant absent or revoked, or role denied.
+        '409':
+          description: Catalog, preference revision, command or binding conflict. Reread before a new command.
+        '503':
+          description: Configuration unavailable or corrupt; no fallback.
   /api/v1/patients:
     get:
       tags:
@@ -3482,6 +3591,87 @@ components:
               value:
                 error: Failed to fetch patient
   schemas:
+    NativeFunctionCommand:
+      oneOf:
+        - $ref: '#/components/schemas/NativeFunctionSetCommand'
+        - $ref: '#/components/schemas/NativeFunctionPresetCommand'
+    NativeFunctionSetCommand:
+      type: object
+      additionalProperties: false
+      required: [schemaVersion, commandId, expectedRevision, expectedCatalogRevision, action, functionId, enabled, defaultModelOptionId]
+      properties:
+        schemaVersion: {type: string, enum: [mediflow.function-preferences-command.v1]}
+        commandId: {type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]{15,95}$'}
+        expectedRevision: {type: string, pattern: '^sha256_[0-9a-f]{64}$'}
+        expectedCatalogRevision: {type: string, pattern: '^sha256_[0-9a-f]{64}$'}
+        action: {type: string, enum: [set]}
+        functionId: {type: string, enum: [patient_insight, smart_import, document_synthesis, treatment_reasoning]}
+        enabled: {type: boolean}
+        defaultModelOptionId: {type: string, nullable: true, pattern: '^model_option_[0-9a-f]{32}$'}
+    NativeFunctionPresetCommand:
+      type: object
+      additionalProperties: false
+      required: [schemaVersion, commandId, expectedRevision, expectedCatalogRevision, action, presetId]
+      properties:
+        schemaVersion: {type: string, enum: [mediflow.function-preferences-command.v1]}
+        commandId: {type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]{15,95}$'}
+        expectedRevision: {type: string, pattern: '^sha256_[0-9a-f]{64}$'}
+        expectedCatalogRevision: {type: string, pattern: '^sha256_[0-9a-f]{64}$'}
+        action: {type: string, enum: [preset]}
+        presetId: {type: string, enum: [host_defaults, all_off]}
+    NativeFunctionPreferences:
+      type: object
+      additionalProperties: false
+      required: [schemaVersion, revision, catalogRevision, check, functions, presets, apply]
+      properties:
+        schemaVersion: {type: string, enum: [mediflow.function-preferences.v1]}
+        revision: {type: string, pattern: '^sha256_[0-9a-f]{64}$'}
+        catalogRevision: {type: string, pattern: '^sha256_[0-9a-f]{64}$'}
+        check: {type: string, enum: [configuration_only]}
+        apply:
+          type: string
+          enum: [denied]
+          description: Clinical apply is denied; this is not the configuration grant.
+        presets:
+          type: array
+          minItems: 2
+          maxItems: 2
+          uniqueItems: true
+          items: {type: string, enum: [host_defaults, all_off]}
+        functions:
+          type: array
+          minItems: 4
+          maxItems: 4
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, enabled, defaultModelOptionId, defaultSource, bindingState, options]
+            properties:
+              id: {type: string, enum: [patient_insight, smart_import, document_synthesis, treatment_reasoning]}
+              enabled: {type: boolean}
+              defaultModelOptionId: {type: string, nullable: true}
+              defaultSource: {type: string, enum: [saved_preference, host_configuration]}
+              bindingState: {type: string, enum: [stale, unsupported, current]}
+              options:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: false
+                  required: [modelOptionId, label, provider, state]
+                  properties:
+                    modelOptionId: {type: string, pattern: '^model_option_[0-9a-f]{32}$'}
+                    label: {type: string}
+                    provider: {type: string, enum: [ollama, athena_mlx]}
+                    state: {type: string, enum: [available_unqualified, unavailable]}
+    NativeFunctionPreview:
+      type: object
+      additionalProperties: false
+      required: [schemaVersion, command, proposed, writesPerformed]
+      properties:
+        schemaVersion: {type: string, enum: [mediflow.function-preferences-preview.v1]}
+        command: {$ref: '#/components/schemas/NativeFunctionCommand'}
+        proposed: {$ref: '#/components/schemas/NativeFunctionPreferences'}
+        writesPerformed: {type: integer, enum: [0]}
     ErrorResponse:
       type: object
       additionalProperties: false

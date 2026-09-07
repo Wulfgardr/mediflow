@@ -331,3 +331,5 @@ sorgenti, toolchain, prove delle bozze e limiti della lane nativa.
 2. Assicurati che ogni file appaia in questo indice con una descrizione.
 3. Aggiorna data "Ultimo aggiornamento".
 4. Se cambiano priorità o fonti autorevoli, aggiorna anche [docs/README.md](./README.md).
+
+- [ADR 0135](./adr/0135-native-ai-configuration-authority.md): grant nativo esplicito, preferenze AI e preset; account distinto.
