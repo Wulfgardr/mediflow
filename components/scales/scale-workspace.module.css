@@ -1,0 +1,72 @@
+/* @Codex WUL-678: scale-only presentation, shared 44px targets and 12px controls. */
+.workspace {
+    --scale-control-radius: 12px;
+    width: 100%;
+    max-width: 56rem;
+    min-width: 0;
+    margin-inline: auto;
+    color: var(--lume-ink);
+    overflow-wrap: anywhere;
+}
+.engine { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+.progress { margin: 0; color: var(--lume-ink-muted); font-size: 0.9375rem; font-variant-numeric: tabular-nums; }
+.question { margin: 0 0 24px; font-size: clamp(1.25rem, 2.5vw, 1.5rem); font-weight: 600; line-height: 1.5; }
+.answers { display: grid; gap: 12px; }
+.control, .choice, .catalogLink {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    min-height: 44px;
+    min-width: 0;
+    padding: 10px 16px;
+    border: 1px solid color-mix(in srgb, var(--lume-ink) 25%, transparent);
+    border-radius: var(--scale-control-radius, 12px);
+    background: transparent;
+    color: var(--lume-ink);
+    font: inherit;
+    line-height: 1.5;
+    text-decoration: none;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    text-align: left;
+    cursor: pointer;
+    box-shadow: none;
+}
+.choice, .catalogLink { width: 100%; justify-content: space-between; }
+.choice { padding: 16px; }
+.choice[aria-pressed='true'], .catalogLink[aria-pressed='true'] {
+    border-color: var(--lume-accent);
+    background: color-mix(in srgb, var(--lume-accent) 12%, var(--lume-surface-field));
+}
+.choice > span[aria-hidden] { flex-shrink: 0; color: var(--lume-accent); }
+.control:hover:not(:disabled), .choice:hover:not(:disabled), .catalogLink:hover { background: var(--lume-surface-field); }
+.control:focus-visible, .choice:focus-visible, .catalogLink:focus-visible, .question:focus-visible, .details summary:focus-visible, .context select:focus-visible, .input:focus-visible {
+    outline: 2px solid var(--lume-accent); outline-offset: 3px;
+}
+.primary { background: var(--lume-accent); border-color: var(--lume-accent); color: var(--lume-surface-canvas); font-weight: 600; }
+.primary:hover:not(:disabled) { background: var(--lume-accent); }
+.control:disabled { opacity: .5; cursor: not-allowed; }
+.actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding-top: 24px; border-top: 1px solid color-mix(in srgb, var(--lume-ink) 16%, transparent); }
+.navigation { display: flex; flex-wrap: wrap; gap: 12px; }
+.context { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 16px; }
+.context select, .input { min-height: 44px; max-width: 100%; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--lume-ink) 25%, transparent); border-radius: var(--scale-control-radius, 12px); background: var(--lume-surface-field); color: var(--lume-ink); font: inherit; }
+.details { margin-bottom: 24px; color: var(--lume-ink-muted); line-height: 1.6; }
+.details summary { display: list-item; width: fit-content; min-height: 44px; padding-block: 10px; cursor: pointer; color: var(--lume-ink); }
+.details p { margin: 8px 0; }
+.catalog { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr)); }
+.catalogLink svg { flex-shrink: 0; }
+.catalogLink > span { flex: 1; min-width: 0; }
+.catalogTitle { display: block; font-weight: 600; }
+.catalogDescription { display: block; margin-top: 6px; color: var(--lume-ink-muted); font-size: .9375rem; line-height: 1.6; }
+.quickStart { display: grid; gap: 12px; }
+.quickStart h4 { margin: 0; }
+.back { margin-bottom: 16px; }
+@media (max-width: 390px) { .actions { align-items: stretch; } .navigation { flex: 1 1 100%; } .navigation .control { flex: 1; } }
+
+/* @Codex: keep the named return target readable within scale pages only. */
+.screen :global(header a[title="Torna alle scale"]),
+.screen :global(header a[title="Torna alla scheda paziente"]) {
+    min-height: 44px; border-radius: 12px; padding: 10px 12px;
+    color: var(--lume-ink); background: transparent; font-size: .9375rem;
+}

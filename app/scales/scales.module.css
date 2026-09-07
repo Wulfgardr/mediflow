@@ -28,3 +28,7 @@
     line-height: var(--twin-body-leading);
     font-variant-numeric: tabular-nums;
 }
+
+/* @Codex WUL-678: catalogue and patient choice share the workspace plane. */
+.catalogSection, .patientSection { display: grid; gap: 24px; scroll-margin-top: 10rem; }
+.patientSection { padding-top: 24px; border-top: 1px solid color-mix(in srgb, var(--lume-ink) 16%, transparent); }

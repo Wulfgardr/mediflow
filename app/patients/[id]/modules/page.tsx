@@ -31,6 +31,8 @@ import TreatmentReasoningPanel from '@/components/treatment-reasoning-panel';
 import Timeline from '@/components/timeline';
 import { Kree8WorkspaceShell, type Kree8WorkspaceNavItem } from '@/components/kree8/kree8-workspace-shell';
 import workspaceStyles from '@/components/kree8/kree8-workspace-shell.module.css';
+/* @Codex WUL-678: scoped to the new-scale targets below. */
+import scaleStyles from '@/components/scales/scale-workspace.module.css';
 import { AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY, isAiDocumentSynthesisEnabledValue } from '@/lib/ai-document-synthesis-kill-switch';
 import { AI_PATIENT_INSIGHT_KILL_SWITCH_KEY, isAiPatientInsightEnabledValue } from '@/lib/ai-patient-insight-kill-switch';
 import { AI_SMART_IMPORT_KILL_SWITCH_KEY, isAiSmartImportEnabledValue } from '@/lib/ai-smart-import-kill-switch';
@@ -905,26 +907,20 @@ export default function PatientDetailPage() {
                                 />
                             ) : <p className={workspaceStyles.mutedText}>Valutazioni in caricamento.</p>}
                         </div>
-                        <div className="space-y-3">
+                        {/* @Codex WUL-678: one target per scale, with explicit spacing. */}
+                        <div className={scaleStyles.quickStart}>
                             <h4 className="text-base font-semibold text-[color:var(--lume-ink)]">Nuova valutazione</h4>
-                            {/* @Codex MF085-002: distinct new instrument, never a legacy alias. */}
-                            <Link href={`/patients/${id}/scales/tinetti-poma28-v1`} className={workspaceStyles.rowLink}>
-                                <span>Tinetti POMA-28 (v1)</span>
-                                <Plus className="h-4 w-4 text-[color:var(--lume-ink-muted)]" />
-                            </Link>
-                            <Link href={`/patients/${id}/scales/mmse`} className={workspaceStyles.rowLink}>
-                                <span>MMSE</span>
-                                <Plus className="h-4 w-4 text-[color:var(--lume-ink-muted)]" />
-                            </Link>
-                            <Link href={`/patients/${id}/scales/adl`} className={workspaceStyles.rowLink}>
-                                <span>ADL (Katz)</span>
-                                <Plus className="h-4 w-4 text-[color:var(--lume-ink-muted)]" />
-                            </Link>
-                            <Link href={`/patients/${id}/scales/gds`} className={workspaceStyles.rowLink}>
-                                <span>GDS</span>
-                                <Plus className="h-4 w-4 text-[color:var(--lume-ink-muted)]" />
-                            </Link>
-                            <Link href={`/patients/${id}/scales`} className={workspaceStyles.rowLink}>
+                            <div className={scaleStyles.catalog}>
+                                {[
+                                    ['tinetti-poma28-v1', 'Tinetti POMA-28 (v1)'],
+                                    ['mmse', 'MMSE'], ['adl', 'ADL (Katz)'], ['gds', 'GDS'],
+                                ].map(([scaleId, label]) => (
+                                    <Link key={scaleId} href={`/patients/${id}/scales/${scaleId}`} className={scaleStyles.catalogLink}>
+                                        <span>{label}</span><Plus size={18} aria-hidden="true" />
+                                    </Link>
+                                ))}
+                            </div>
+                            <Link href={`/patients/${id}/scales`} className={scaleStyles.control}>
                                 Apri libreria scale
                             </Link>
                         </div>
