@@ -7,18 +7,20 @@ import {
     Stethoscope,
     RefreshCw,
     CheckCircle2,
-    XCircle,
+    CircleAlert,
+    CircleMinus,
     Loader2,
-    ExternalLink,
-    Copy,
-    Check
+    ArrowUpRight,
 } from 'lucide-react';
+import Link from 'next/link';
+import { SETTINGS_SECONDARY_BUTTON_CLASS } from '@/components/settings/settings-ui';
+import styles from './service-architecture-panel.module.css';
 import { getICDReadiness, icdClientErrorMessage, icdReadinessMessage } from '@/lib/icd-service';
 
 interface ServiceStatus {
     status: 'running' | 'stopped' | 'checking';
     port: string;
-    env: 'native' | 'host';
+    readiness?: string;
     detail?: string;
     lastCheck?: Date;
 }
@@ -31,15 +33,16 @@ interface Services {
 
 export default function ServiceArchitecturePanel() {
     const [services, setServices] = useState<Services>({
-        app: { status: 'running', port: '3000', env: 'native' },
-        ai: { status: 'checking', port: '11434', env: 'native' },
-        icd: { status: 'checking', port: '2026-01', env: 'host' }
+        app: { status: 'running', port: '' },
+        ai: { status: 'checking', port: '' },
+        icd: { status: 'checking', port: '2026-01' }
     });
     const [isRefreshing, setIsRefreshing] = useState(false);
-    const [copiedCommand, setCopiedCommand] = useState<string | null>(null);
 
     const checkServices = useCallback(async () => {
         setIsRefreshing(true);
+        // @Codex: show the address actually used by this browser, not a default port.
+        setServices(prev => ({ ...prev, app: { ...prev.app, port: window.location.origin } }));
 
         // Check AI (Ollama)
         try {
@@ -77,6 +80,7 @@ export default function ServiceArchitecturePanel() {
                     ...prev.icd,
                     status: readiness.status === 'available' ? 'running' : 'stopped',
                     port: readiness.releaseId,
+                    readiness: readiness.status,
                     detail: icdReadinessMessage(readiness.status),
                     lastCheck: new Date(),
                 }
@@ -88,6 +92,7 @@ export default function ServiceArchitecturePanel() {
                     ...prev.icd,
                     status: 'stopped',
                     detail: icdClientErrorMessage(error),
+                    readiness: undefined,
                     lastCheck: new Date(),
                 }
             }));
@@ -102,219 +107,73 @@ export default function ServiceArchitecturePanel() {
         return () => clearInterval(interval);
     }, [checkServices]);
 
-    const copyCommand = (command: string, id: string) => {
-        navigator.clipboard.writeText(command);
-        setCopiedCommand(id);
-        setTimeout(() => setCopiedCommand(null), 2000);
-    };
-
-    const getStatusIcon = (status: ServiceStatus['status']) => {
-        switch (status) {
-            case 'running':
-                return <CheckCircle2 className="w-4 h-4 text-emerald-500" />;
-            case 'stopped':
-                return <XCircle className="w-4 h-4 text-red-500" />;
-            case 'checking':
-                return <Loader2 className="w-4 h-4 text-amber-500" />;
-        }
-    };
-
-    const getStatusColor = (status: ServiceStatus['status']) => {
-        switch (status) {
-            case 'running':
-                return 'border-emerald-500/50 bg-emerald-500/5';
-            case 'stopped':
-                return 'border-red-500/50 bg-red-500/5';
-            case 'checking':
-                return 'border-amber-500/50 bg-amber-500/5';
-        }
-    };
-
-    const getStatusText = (status: ServiceStatus['status']) => {
-        switch (status) {
-            case 'running':
-                return 'Attivo';
-            case 'stopped':
-                return 'Spento';
-            case 'checking':
-                return 'Verifica...';
-        }
-    };
+    /* @Codex: connection checks do not establish model execution or Fabric readiness. */
+    const whoDisabled = services.icd.readiness === 'disabled';
+    const whoConfigured = services.icd.readiness === 'configured';
+    const rows = [
+        {
+            id: 'app', icon: Server, title: 'MediFlow',
+            description: 'La postazione a cui è collegato questo browser.',
+            detail: services.app.port || 'Lettura dell’indirizzo…',
+            label: 'Pagina aperta', tone: 'neutral', statusIcon: CheckCircle2,
+            href: '/settings', action: 'Panoramica',
+        },
+        {
+            id: 'ai', icon: Brain, title: 'Elaborazione locale',
+            description: 'Connessione a Ollama per i modelli configurati.',
+            detail: 'Il collegamento al servizio non verifica una generazione.',
+            label: services.ai.status === 'checking' ? 'In verifica' : services.ai.status === 'running' ? 'Raggiungibile' : 'Non raggiungibile',
+            tone: services.ai.status === 'running' ? 'ready' : services.ai.status === 'checking' ? 'neutral' : 'attention',
+            statusIcon: services.ai.status === 'checking' ? Loader2 : services.ai.status === 'running' ? CheckCircle2 : CircleAlert,
+            href: '/settings/ai/modelli', action: 'Modelli e hardware',
+        },
+        {
+            id: 'icd', icon: Stethoscope, title: 'Terminologia ICD-11',
+            description: `Catalogo WHO · release ${services.icd.port}`,
+            detail: services.icd.detail || 'Lettura della configurazione del servizio…',
+            label: services.icd.status === 'checking' ? 'In verifica' : whoDisabled ? 'Disattivato' : whoConfigured ? 'Da verificare' : services.icd.status === 'running' ? 'Disponibile' : 'Non disponibile',
+            tone: whoDisabled || services.icd.status === 'checking' ? 'neutral' : services.icd.status === 'running' ? 'ready' : 'attention',
+            statusIcon: services.icd.status === 'checking' ? Loader2 : whoDisabled ? CircleMinus : services.icd.status === 'running' ? CheckCircle2 : CircleAlert,
+            href: '/settings/diagnostica#who-setup', action: 'Configurazione WHO',
+        },
+    ];
 
     return (
-        <div className="mf-section lume-focal p-6 md:p-7">
-            <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-3">
-                    <div className="rounded-[var(--lume-radius-control)] bg-[color:var(--lume-surface-focal)] p-2 text-[color:var(--lume-accent)]">
-                        <Server className="w-5 h-5" />
-                    </div>
-                    <div>
-                        <p className="section-kicker">Topologia locale</p>
-                        <h2 className="text-lg font-bold" style={{ color: 'var(--lume-ink)' }}>Architettura Servizi</h2>
-                        <p className="text-xs" style={{ color: 'var(--lume-ink-muted)' }}>Visualizza lo stato dei componenti MediFlow</p>
-                    </div>
+        <section className={styles.panel} aria-labelledby="service-architecture-title" data-testid="service-architecture-panel">
+            <header className={styles.header}>
+                <div>
+                    <h2 id="service-architecture-title">Servizi della postazione</h2>
+                    <p>Controlla i collegamenti e apri le impostazioni del servizio.</p>
                 </div>
-                <button
-                    onClick={checkServices}
-                    disabled={isRefreshing}
-                    className="lume-press rounded-[var(--lume-radius-control)] p-2 transition-colors"
-                    style={{ color: 'var(--lume-ink-muted)' }}
-                    title="Aggiorna stato"
-                >
-                    <RefreshCw className="w-5 h-5" />
+                <button type="button" onClick={checkServices} disabled={isRefreshing}
+                    className={SETTINGS_SECONDARY_BUTTON_CLASS}>
+                    <RefreshCw aria-hidden="true" /> Aggiorna stato
                 </button>
-            </div>
-
-            {/* Visual Architecture */}
-            <div className="relative">
-                {/* Connection Lines (SVG) */}
-                <svg className="absolute inset-0 w-full h-full pointer-events-none z-0">
-                    {/* App (Center) to AI (Left) */}
-                    <line
-                        x1="50%" y1="50%" x2="16.666%" y2="50%"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeDasharray="4 4"
-                        className="text-[color:var(--lume-ink-muted)]"
-                    />
-                    {/* App (Center) to ICD (Right) */}
-                    <line
-                        x1="50%" y1="50%" x2="83.333%" y2="50%"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeDasharray="4 4"
-                        className="text-[color:var(--lume-ink-muted)]"
-                    />
-                </svg>
-
-                {/* Service Nodes */}
-                <div className="grid grid-cols-3 gap-4 relative z-10">
-
-                    {/* Nodo di elaborazione locale */}
-                    <div className={`rounded-[var(--lume-radius-card)] border bg-[color:var(--lume-surface-field)] p-4 transition-colors ${getStatusColor(services.ai.status)}`}>
-                        <div className="flex flex-col items-center text-center space-y-2">
-                            <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-xl">
-                                <Brain className="w-6 h-6 text-purple-600 dark:text-purple-400" />
-                            </div>
+            </header>
+            <ul className={styles.services}>
+                {rows.map(({ id, icon: Icon, statusIcon: StatusIcon, ...row }) => (
+                    <li key={id} className={styles.service} data-testid={`diagnostic-service-${id}`}>
+                        <div className={styles.identity}>
+                            <Icon aria-hidden="true" className={styles.icon} />
                             <div>
-                                <h3 className="font-bold" style={{ color: 'var(--lume-ink)' }}>Servizio di elaborazione locale</h3>
-                                <p className="text-xs" style={{ color: 'var(--lume-ink-muted)' }}>Modelli disponibili sul dispositivo</p>
+                                <h3>{row.title}</h3>
+                                <p>{row.description}</p>
+                                <p className={styles.detail}>{row.detail}</p>
                             </div>
-                            <div className="lume-registro text-xs" style={{ color: 'var(--lume-ink-muted)' }}>
-                                :{services.ai.port}
-                            </div>
-                            <div className="flex items-center gap-1.5">
-                                {getStatusIcon(services.ai.status)}
-                                <span className="text-xs font-medium">{getStatusText(services.ai.status)}</span>
-                            </div>
-                            <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 rounded-full">
-                                {services.ai.env}
-                            </span>
-
-                            {services.ai.status === 'stopped' && (
-                                <div className="mt-2 space-y-2 w-full">
-                                    <button
-                                        onClick={() => copyCommand('ollama serve', 'ai')}
-                                        className="w-full px-3 py-1.5 text-xs bg-purple-600 hover:bg-purple-700 text-white rounded-lg flex items-center justify-center gap-1.5 transition-colors"
-                                    >
-                                        {copiedCommand === 'ai' ? (
-                                            <><Check className="w-3 h-3" /> Copiato!</>
-                                        ) : (
-                                            <><Copy className="w-3 h-3" /> ollama serve</>
-                                        )}
-                                    </button>
-                                    <a
-                                        href="https://ollama.com"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="text-[10px] text-purple-600 hover:underline flex items-center justify-center gap-1"
-                                    >
-                                        <ExternalLink className="w-3 h-3" /> Configura il servizio locale
-                                    </a>
-                                </div>
-                            )}
                         </div>
-                    </div>
-
-                    {/* App Node (Moved to Center) */}
-                    <div className={`rounded-[var(--lume-radius-card)] border bg-[color:var(--lume-surface-field)] p-4 transition-colors ${getStatusColor(services.app.status)}`}>
-                        <div className="flex flex-col items-center text-center space-y-2">
-                            <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-xl">
-                                <Server className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-                            </div>
-                            <div>
-                                <h3 className="font-bold" style={{ color: 'var(--lume-ink)' }}>App</h3>
-                                <p className="text-xs" style={{ color: 'var(--lume-ink-muted)' }}>Next.js</p>
-                            </div>
-                            <div className="lume-registro text-xs" style={{ color: 'var(--lume-ink-muted)' }}>
-                                :{services.app.port}
-                            </div>
-                            <div className="flex items-center gap-1.5">
-                                {getStatusIcon(services.app.status)}
-                                <span className="text-xs font-medium">{getStatusText(services.app.status)}</span>
-                            </div>
-                            <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded-full">
-                                {services.app.env}
-                            </span>
-                        </div>
-                    </div>
-
-                    {/* ICD Node (Right) */}
-                    <div className={`rounded-[var(--lume-radius-card)] border bg-[color:var(--lume-surface-field)] p-4 transition-colors ${getStatusColor(services.icd.status)}`}>
-                        <div className="flex flex-col items-center text-center space-y-2">
-                            <div className="p-3 bg-emerald-100 dark:bg-emerald-900/30 rounded-xl">
-                                <Stethoscope className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
-                            </div>
-                            <div>
-                                <h3 className="font-bold" style={{ color: 'var(--lume-ink)' }}>ICD-11</h3>
-                                <p className="text-xs" style={{ color: 'var(--lume-ink-muted)' }}>WHO API</p>
-                            </div>
-                            <div className="lume-registro text-xs" style={{ color: 'var(--lume-ink-muted)' }}>
-                                release {services.icd.port}
-                            </div>
-                            <div className="flex items-center gap-1.5">
-                                {getStatusIcon(services.icd.status)}
-                                <span className="text-xs font-medium">{getStatusText(services.icd.status)}</span>
-                            </div>
-                            <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-sky-100 dark:bg-sky-900/50 text-sky-700 dark:text-sky-300 rounded-full">
-                                {services.icd.env}
-                            </span>
-
-                            {services.icd.detail && (
-                                <p className="mt-2 text-[10px] leading-4" style={{ color: 'var(--lume-ink-muted)' }}>
-                                    {services.icd.detail}
-                                </p>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Legend */}
-            <div className="mt-6 pt-4 border-t border-gray-200 dark:border-white/10">
-                <div className="flex flex-wrap items-center justify-center gap-4 text-xs text-gray-500">
-                    <div className="flex items-center gap-1.5">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                        <span>Attivo</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                        <XCircle className="w-3.5 h-3.5 text-red-500" />
-                        <span>Spento</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                        <Loader2 className="w-3.5 h-3.5 text-amber-500" />
-                        <span>Verifica...</span>
-                    </div>
-                    <div className="flex items-center gap-2 ml-4">
-                        <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded">NATIVO</span>
-                        <span>= Sul tuo computer</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase bg-sky-100 dark:bg-sky-900/50 text-sky-700 dark:text-sky-300 rounded">HOST</span>
-                        <span>= Confine governato</span>
-                    </div>
-                </div>
-            </div>
-        </div>
+                        <span className={styles.status} data-lume-status data-tone={row.tone}>
+                            <StatusIcon aria-hidden="true" /> {row.label}
+                        </span>
+                        <Link href={row.href} className={SETTINGS_SECONDARY_BUTTON_CLASS}>{row.action}</Link>
+                    </li>
+                ))}
+            </ul>
+            <footer className={styles.footer}>
+                <p>Per le funzioni intelligenti, verifica modello, interruttori e stato in Intelligence Fabric.</p>
+                <Link href="/settings/ai/fabric" className={SETTINGS_SECONDARY_BUTTON_CLASS}>
+                    Intelligence Fabric <ArrowUpRight aria-hidden="true" />
+                </Link>
+            </footer>
+        </section>
     );
 }

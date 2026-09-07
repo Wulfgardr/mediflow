@@ -1,0 +1,75 @@
+/* @Codex: service state stays next to its explanation and configuration action. */
+.panel {
+    container-type: inline-size;
+    padding: 24px;
+    border: 1px solid var(--lume-border);
+    border-radius: var(--lume-radius-card, 16px);
+    background: var(--lume-surface-field);
+    color: var(--lume-ink);
+    min-width: 0;
+}
+
+.header, .footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.header h2 { margin: 0; font-size: 20px; line-height: 28px; font-weight: 600; }
+.header p, .footer p { margin: 4px 0 0; font-size: 14px; line-height: 22px; color: var(--lume-ink-muted); }
+.footer p { flex: 1 1 280px; }
+.services { list-style: none; margin: 24px 0; padding: 0; }
+.service {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px 16px;
+    align-items: start;
+    padding: 20px 0;
+    border-top: 1px solid var(--lume-border);
+}
+.service > a { grid-column: 1 / -1; justify-self: start; }
+.service > * { min-width: 0; overflow-wrap: anywhere; }
+.identity { display: flex; gap: 12px; min-width: 0; }
+.identity > div { min-width: 0; }
+.icon { width: 24px; height: 24px; flex-shrink: 0; color: var(--lume-ink-muted); }
+.identity h3 { margin: 0; font-size: 16px; line-height: 24px; font-weight: 600; }
+.identity p { margin: 4px 0 0; font-size: 14px; line-height: 22px; }
+.detail { color: var(--lume-ink-muted); overflow-wrap: anywhere; }
+.status {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid var(--lume-border);
+    background: var(--lume-surface-focal);
+    color: var(--lume-ink);
+    padding: 5px 10px;
+    min-height: 32px;
+    border-radius: var(--lume-control-radius, 12px);
+    font-size: 13px;
+    line-height: 20px;
+    font-weight: 600;
+}
+.status svg { width: 16px; height: 16px; flex-shrink: 0; }
+.status[data-tone='attention'] { border-color: var(--lume-ink-muted); }
+.footer { border-top: 1px solid var(--lume-border); padding-top: 20px; }
+.fabricActions { display: flex; flex-wrap: wrap; gap: 8px; }
+.panel :is(button, a), .fabricActions a { min-height: 44px; border-radius: var(--lume-control-radius, 12px); }
+.panel :is(button, a) svg { width: 16px; height: 16px; flex-shrink: 0; }
+
+@container (min-width: 740px) {
+    .service { grid-template-columns: minmax(0, 1fr) 170px 200px; align-items: center; }
+    .service > a { grid-column: auto; justify-self: stretch; }
+}
+
+@container (max-width: 420px) {
+    .service { grid-template-columns: minmax(0, 1fr); }
+    .status { justify-self: start; margin-left: 36px; }
+    .service > a { justify-self: stretch; }
+}
+
+@media (max-width: 479px) {
+    .panel { padding: 16px; }
+    .fabricActions { flex-direction: column; }
+}

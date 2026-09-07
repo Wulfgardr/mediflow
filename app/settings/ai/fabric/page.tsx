@@ -2,13 +2,15 @@
 
 /* @Codex */
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import serviceStyles from '@/components/service-architecture-panel.module.css';
 import { FabricCapabilityRegistry } from '@/components/settings/fabric-capability-registry';
 import { FunctionStatusPanel } from '@/components/settings/function-status-panel';
 import { FabricEgressSection } from '@/components/settings/fabric-egress-section';
 import { FabricErrorState, FabricLoadingState } from '@/components/settings/fabric-load-state';
 import { FabricVenueSection } from '@/components/settings/fabric-venue-section';
 import styles from '@/components/settings/settings-lume.module.css';
-import { SETTINGS_CARD_CLASS, SettingsSectionIntro } from '@/components/settings/settings-ui';
+import { SETTINGS_CARD_CLASS, SETTINGS_SECONDARY_BUTTON_CLASS, SettingsSectionIntro } from '@/components/settings/settings-ui';
 import type { FabricObservabilitySnapshot } from '@/lib/ai-providers/fabric/routing-observability';
 import type { FabricStatusSnapshot } from '@/lib/ai-providers/fabric/status';
 import {
@@ -142,11 +144,17 @@ export default function SettingsAiFabricPage() {
     return (
         <section className="space-y-4" data-testid="settings-ai-fabric-section">
             <SettingsSectionIntro
-                kicker="Intelligenza locale"
-                title="Capacità e connessioni"
-                description="Registro in sola lettura delle funzioni intelligenti, della sede di calcolo e dell’eventuale uscita dei dati."
+                kicker="Funzioni intelligenti"
+                title="Intelligence Fabric"
+                description="Configura i modelli e le funzioni intelligenti. Qui trovi lo stato della postazione e i passaggi ancora necessari per usarle."
             />
 
+            {/* @Codex: expose the existing configuration routes alongside their status. */}
+            <nav aria-label="Configura Intelligence Fabric" className={serviceStyles.fabricActions}>
+                <Link href="/settings/ai/modelli" className={SETTINGS_SECONDARY_BUTTON_CLASS}>Modelli e hardware</Link>
+                <Link href="/settings/ai/funzioni" className={SETTINGS_SECONDARY_BUTTON_CLASS}>Funzioni cliniche</Link>
+                <Link href="/settings/ai/governance" className={SETTINGS_SECONDARY_BUTTON_CLASS}>Governance e rollout</Link>
+            </nav>
             <FunctionStatusPanel />
 
             <details className={SETTINGS_CARD_CLASS}>

@@ -20,7 +20,7 @@ const PROPOSAL_INTRO_COPY: Record<string, string> = {
     'Backup e ripristino': 'Pianificazione e ripristino dei backup locali.',
     'Evidenze e conformità': 'Evidenze tecniche, non una certificazione.',
     Repertori: 'AIFA ed esenzioni, in locale.',
-    'Capacità e connessioni': 'Funzioni, sede del calcolo e uscita dati.',
+    'Intelligence Fabric': 'Modelli, funzioni e stato dei collegamenti.',
     'Modelli e hardware': 'Hardware e Ollama. ATHENA resta separata.',
     'Funzioni cliniche': 'Interruttori e budget AI.',
     'Governance e rollout': 'Confronto modelli e stato di rilascio.',
