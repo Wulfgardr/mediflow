@@ -925,6 +925,7 @@ export default function PatientDetailPage() {
                         </div>
                     </CollapsibleSection>
 
+                {/* @Codex WUL-678: connect the folder follow-up action to the existing planner. */}
                 <CollapsibleSection
                     id="follow-up"
                     kicker="Pianificazione"
@@ -936,7 +937,8 @@ export default function PatientDetailPage() {
                         {!checkups || checkups.length === 0 ? (
                             <div>
                                 <p className={workspaceStyles.emptyState}>Nessun follow-up pianificato.</p>
-                                <Link href={`/patients/${id}/edit`} className={workspaceStyles.rowLink}>
+                                <Link href={`/patients/${id}/edit#pianificazione`} className={workspaceStyles.followupAction}>
+                                    <Plus className="h-4 w-4" aria-hidden="true" />
                                     Aggiungi follow-up
                                 </Link>
                             </div>
@@ -955,8 +957,9 @@ export default function PatientDetailPage() {
                                         </div>
                                     </div>
                                 ))}
-                                <Link href={`/patients/${id}/edit`} className={workspaceStyles.rowLink}>
-                                    Gestisci follow-up
+                                <Link href={`/patients/${id}/edit#pianificazione`} className={workspaceStyles.followupAction}>
+                                    <Plus className="h-4 w-4" aria-hidden="true" />
+                                    Aggiungi follow-up
                                 </Link>
                             </div>
                         )}
