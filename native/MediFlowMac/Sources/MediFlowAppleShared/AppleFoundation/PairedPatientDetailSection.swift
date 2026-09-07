@@ -10,6 +10,36 @@ struct PairedPatientDetailSection: View {
     @Binding var icdQuery: String
     @Binding var confirmsFHIRExport: Bool
 
+    // @Codex: navigation only; the patient editor and all writers keep their owners.
+    @State private var overviewArea: PatientOverviewArea = .clinical
+
+    private enum PatientOverviewArea: String, CaseIterable, Identifiable {
+        case identity = "Anagrafica", clinical = "Clinica", administration = "Amministrazione"
+        var id: String { rawValue }
+    }
+
+    private var showsIdentity: Bool {
+        #if os(macOS)
+        overviewArea == .identity
+        #else
+        true
+        #endif
+    }
+    private var showsClinical: Bool {
+        #if os(macOS)
+        overviewArea == .clinical
+        #else
+        true
+        #endif
+    }
+    private var showsAdministration: Bool {
+        #if os(macOS)
+        overviewArea == .administration
+        #else
+        true
+        #endif
+    }
+
     /// Groups now carry their own internal rhythm through `ChartGroup`, so the
     /// per-platform spacing constants this view used to keep are gone: 4 points
     /// on iOS against 8 on macOS was itself part of why the phone read as
@@ -20,9 +50,14 @@ struct PairedPatientDetailSection: View {
         let groupSpacing = ClinicalChartMetrics.groupSpacing
         return VStack(alignment: .leading, spacing: groupSpacing) {
             #if os(macOS)
-            // macOS states the patient in the window title bar and keeps the
-            // chart actions in the toolbar, so this card only needs its name.
-            patientHeaderTitle
+            // @Codex: each area keeps a distinct reading purpose within the same chart.
+            Picker("Dati della scheda", selection: $overviewArea) {
+                ForEach(PatientOverviewArea.allCases) { area in
+                    Text(area.rawValue).tag(area)
+                }
+            }
+            .pickerStyle(.segmented)
+            .accessibilityIdentifier("patient-overview-area-picker")
             #else
             // On iOS the card is titled by the patient, and the actions sit on
             // that line rather than above it.
@@ -53,7 +88,7 @@ struct PairedPatientDetailSection: View {
                 }
             }
             /* @Codex: archive provenance belongs with the archived state. */
-            if detail.isArchived == true {
+            if showsAdministration && detail.isArchived == true {
                 ChartGroup("Archiviazione") {
                     if model.isPatientFieldLocked(.archiveReason) || model.isPatientFieldLocked(.archiveNote) {
                         Label("Alcuni dati di archiviazione sono protetti.", systemImage: "lock.fill")
@@ -75,7 +110,19 @@ struct PairedPatientDetailSection: View {
                 .accessibilityIdentifier("patient-archive-details")
             }
             #if os(macOS)
-            macPatientFacts
+            if showsIdentity { macPatientFacts }
+            if showsAdministration {
+                ChartGroup("Amministrazione") {
+                    if let ambulatory = cleanedPatientWorkspaceValue(detail.ambulatoryId) {
+                        macPatientFact("Ambulatorio", ambulatory, isCode: true)
+                    }
+                    macPatientFact("Stato", detail.isArchived == true ? "Archiviato" : "Attivo")
+                }
+                .accessibilityIdentifier("patient-administration-facts")
+            }
+            if showsClinical, let monitoring = cleanedPatientWorkspaceValue(detail.monitoringProfile) {
+                ChartGroup("Monitoraggio") { Text(monitoring).chartProse() }
+            }
             #else
             // Four groups, not one list of nine rows.
             //
@@ -124,10 +171,13 @@ struct PairedPatientDetailSection: View {
             .accessibilityIdentifier("patient-clinical-signals-disclosure")
             #endif
 
-            patientReviewOverview
+            if showsClinical { patientReviewOverview }
 
-            if !exemptions.isEmpty {
-                ChartGroup("Esenzioni") {
+            if showsAdministration && model.isPatientFieldLocked(.exemptions) {
+                Label("Esenzioni protette. Sblocca la sessione per consultarle.", systemImage: "lock.fill")
+                    .accessibilityIdentifier("patient-exemptions-locked")
+            } else if showsAdministration && !exemptions.isEmpty {
+                ChartGroup("Esenzioni · \(exemptions.count)") {
                     #if os(macOS)
                     // @Codex: Keep every code readable when the document narrows.
                     Text(exemptions.joined(separator: ", "))
@@ -147,6 +197,12 @@ struct PairedPatientDetailSection: View {
                 }
                 .accessibilityIdentifier("patient-detail-exemptions")
             }
+            #if os(macOS)
+            if showsAdministration && exemptions.isEmpty && !model.isPatientFieldLocked(.exemptions) {
+                Text("Nessuna esenzione registrata.").chartMetadata()
+                    .accessibilityIdentifier("patient-exemptions-empty")
+            }
+            #endif
             // From here down the two platforms share one treatment. They used to
             // fork on every block — group heading and prose registers on macOS,
             // `.caption`/`.callout` inline on iOS — which is how iOS ended up
@@ -154,13 +210,16 @@ struct PairedPatientDetailSection: View {
             // like everything else. The registers are cross-platform now, so the
             // fork has nothing left to say.
             let diagnoses = DiagnosesCodec.decode(detail.diagnoses)
-            if !diagnoses.isEmpty {
+            if showsClinical && model.isPatientFieldLocked(.diagnoses) {
+                Label("Diagnosi protette. Sblocca la sessione per consultarle.", systemImage: "lock.fill")
+                    .accessibilityIdentifier("patient-diagnoses-locked")
+            } else if showsClinical && !diagnoses.isEmpty {
                 // The diagnoses are the clinical statement of who this patient
                 // is. Set at callout, in the same face and size as an address,
                 // they were the least prominent thing on a card that exists to
                 // carry them. Code and description are separated because they
                 // are read differently: the code is matched, the description read.
-                ChartGroup("Diagnosi") {
+                ChartGroup("Diagnosi · \(diagnoses.count)") {
                     ForEach(Array(diagnoses.enumerated()), id: \.offset) { _, diagnosis in
                         HStack(alignment: .firstTextBaseline, spacing: 8) {
                             if !diagnosis.code.isEmpty {
@@ -176,23 +235,32 @@ struct PairedPatientDetailSection: View {
                 }
                 .accessibilityIdentifier("patient-detail-diagnoses")
             }
-            if let aiSummary = cleanedPatientWorkspaceValue(detail.aiSummary) {
+            #if os(macOS)
+            if showsClinical && diagnoses.isEmpty && !model.isPatientFieldLocked(.diagnoses) {
+                Text("Nessuna diagnosi registrata.").chartMetadata()
+                    .accessibilityIdentifier("patient-diagnoses-empty")
+            }
+            #endif
+            #if os(macOS)
+            if showsClinical { macClinicalSummary }
+            #endif
+            if showsClinical, let aiSummary = cleanedPatientWorkspaceValue(detail.aiSummary) {
                 ChartGroup("Sintesi AI", systemImage: "sparkles") {
                     Text(aiSummary).chartProse()
                 }
                 .accessibilityIdentifier("patient-detail-ai-summary")
             }
-            if let documentInsights = cleanedPatientWorkspaceValue(detail.documentInsights) {
+            if showsClinical, let documentInsights = cleanedPatientWorkspaceValue(detail.documentInsights) {
                 ChartGroup("Analisi documenti", systemImage: "doc.text.magnifyingglass") {
                     Text(documentInsights).chartProse()
                 }
                 .accessibilityIdentifier("patient-detail-document-insights")
             }
-            if let statusReason = cleanedPatientWorkspaceValue(detail.statusReason) {
+            if showsAdministration, let statusReason = cleanedPatientWorkspaceValue(detail.statusReason) {
                 Text(statusReason)
                     .chartMetadata()
             }
-            if let notes = cleanedPatientWorkspaceValue(detail.notes) {
+            if showsClinical, let notes = cleanedPatientWorkspaceValue(detail.notes) {
                 ChartGroup("Note") {
                     Text(notes).chartProse()
                 }
@@ -202,6 +270,7 @@ struct PairedPatientDetailSection: View {
                 patientEditForm
             }
         }
+        .onChange(of: detail.id) { _ in overviewArea = .clinical }
     }
 
     /* @Codex: Read-only review signals from this patient's decrypted snapshot.
@@ -278,12 +347,7 @@ struct PairedPatientDetailSection: View {
         ].compactMap { label, value, isCode in value.map { (label, $0, isCode) } }
         let care: [(label: String, value: String, isCode: Bool)] = [
             ("Caregiver", cleanedPatientWorkspaceValue(detail.caregiver), false),
-            ("Ambulatorio", cleanedPatientWorkspaceValue(detail.ambulatoryId), true),
-            ("Monitoraggio", cleanedPatientWorkspaceValue(detail.monitoringProfile), false),
         ].compactMap { label, value, isCode in value.map { (label, $0, isCode) } }
-        let nextCheckup = model.checkups
-            .filter { $0.deletedAt == nil && $0.status == "pending" && $0.date >= Date() }
-            .min(by: { $0.date < $1.date })
         let columns = dynamicTypeSize >= .accessibility1
             ? [GridItem(.flexible(), alignment: .topLeading)]
             : [GridItem(.adaptive(minimum: 240), spacing: 24, alignment: .topLeading)]
@@ -302,25 +366,45 @@ struct PairedPatientDetailSection: View {
                     }
                 }
             }
-            if !care.isEmpty || nextCheckup != nil {
+            if !care.isEmpty {
                 ChartGroup("Presa in carico") {
                     ForEach(care, id: \.label) { field in
                         macPatientFact(field.label, field.value, isCode: field.isCode)
                     }
-                    if let next = nextCheckup {
-                        VStack(alignment: .leading, spacing: 3) {
-                            macPatientFact("Prossimo follow-up", PairedPatientsWorkspaceSupport.birthDateFormatter.string(from: next.date), isCode: true)
-                            Text(next.title)
-                                .font(.body)
-                                .textSelection(.enabled)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        .accessibilityElement(children: .combine)
-                        .accessibilityLabel("Prossimo follow-up: \(PairedPatientsWorkspaceSupport.birthDateFormatter.string(from: next.date)) · \(next.title)")
-                        .accessibilityIdentifier("patient-next-followup")
-                    }
+
                 }
             }
+        }
+    }
+
+    /* @Codex: read the existing bounded patient snapshot; links only navigate. */
+    @ViewBuilder
+    private var macClinicalSummary: some View {
+        let active = model.therapies.filter { $0.deletedAt == nil && $0.status == "active" }
+        if !active.isEmpty {
+            let count = ClinicalSignalCount.fromLoadedList(count: active.count,
+                loadedCount: model.therapies.count, limit: PairedPatientsWorkspaceSupport.clinicalPreviewCap)
+            ChartGroup("Terapie attive · \(count.displayText)") {
+                ForEach(Array(active.prefix(3))) { therapy in
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(therapy.drugName).font(.body.weight(.medium))
+                        Text(therapy.dosage).chartMetadata()
+                    }
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+                Button("Apri terapie") { model.activePatientSection = .therapies }
+                    .accessibilityIdentifier("patient-overview-open-therapies")
+            }
+            .accessibilityIdentifier("patient-overview-active-therapies")
+        }
+        if let next = model.checkups
+            .filter({ $0.deletedAt == nil && $0.status == "pending" && $0.date >= Date() })
+            .min(by: { $0.date < $1.date }) {
+            ChartGroup("Prossimo follow-up") {
+                nextFollowUpText(next)
+                Button("Apri controlli") { model.activePatientSection = .clinical }
+            }
+            .accessibilityIdentifier("patient-next-followup")
         }
     }
 
@@ -344,20 +428,6 @@ struct PairedPatientDetailSection: View {
         .accessibilityElement(children: .combine)
     }
     #endif
-
-    private var patientHeaderTitle: some View {
-        // Names the card. It used to share the row with the chart actions, which
-        // now live in the window toolbar, so it reads as the card's title and
-        // takes the heading register — leaving the field block below it
-        // unlabelled, because that block *is* the anagrafica this card is named
-        // for and a second "Dati anagrafici" only said it twice.
-        // Same treatment as "Diario clinico", "Controlli", "Terapie": these are
-        // peers, each the title of a card, so each carries the card-title
-        // register and its own section glyph. The platform fork that used to
-        // live here is gone: `ClinicalSectionTitle` resolves the register for
-        // both, which is the point of having named registers at all.
-        ClinicalSectionTitle("Anagrafica", systemImage: "person.text.rectangle", accent: .anagrafica)
-    }
 
     @ViewBuilder
     private var patientHeaderActions: some View {
