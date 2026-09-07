@@ -29,7 +29,7 @@ export const FUNCTION_META: Readonly<Record<FunctionId, Readonly<{ title: string
     smart_import: { title: 'Importazione assistita', purpose: 'Propone dati dai documenti prima della conferma.', href: '/settings/ai/modelli', action: 'Configura il modello' },
     document_synthesis: { title: 'Sintesi dei documenti', purpose: 'Prepara una sintesi delle fonti selezionate.', href: '/settings/ai/modelli', action: 'Configura il modello' },
     treatment_reasoning: { title: 'Revisione del trattamento', purpose: 'Prepara una proposta con il percorso locale ATHENA.', href: '/settings/ai/modelli', action: 'Configura ATHENA' },
-    icd11: { title: 'Terminologia WHO', purpose: 'Consulta ICD-11, release 2026-01 MMS in inglese.', href: '/settings/diagnostica#who-setup', action: 'Apri configurazione WHO' },
+    icd11: { title: 'Terminologia WHO', purpose: 'Consulta ICD-11, release 2026-01 MMS in inglese.', href: '/settings/repertori#who-setup', action: 'Apri configurazione WHO' },
 };
 export const FUNCTION_STATE_LABELS: Readonly<Record<FunctionState, string>> = {
     off: 'Spenta', needs_setup: 'Da configurare', blocked: 'Bloccata', unverified: 'Da provare', manual: 'Revisione manuale', observed: 'Risposta osservata', unavailable: 'Stato non disponibile',

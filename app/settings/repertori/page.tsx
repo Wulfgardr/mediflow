@@ -18,6 +18,7 @@ import { useConfirm } from '@/components/ui/confirm-dialog';
 import { semanticSignalSurfaceClass } from '@/components/ui/semantic-signal';
 /* @Codex */
 import ExemptionDbManager from '@/components/settings/exemption-db-manager';
+import { WhoSetupPanel } from '@/components/settings/who-setup-panel';
 import { SETTINGS_CARD_CLASS, SettingsSectionIntro } from '@/components/settings/settings-ui';
 
 /* @Codex Canonical command component with the required control geometry. */
@@ -138,7 +139,7 @@ export default function SettingsRepertoriPage() {
             <SettingsSectionIntro
                 kicker="Dati e sicurezza"
                 title="Repertori"
-                description="AIFA ed esenzioni consultabili localmente anche senza rete."
+                description="Farmaci AIFA, esenzioni e terminologia WHO: fonti, aggiornamenti e configurazione dei repertori."
             />
 
             <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-2">
@@ -303,6 +304,7 @@ export default function SettingsRepertoriPage() {
                 </div>
 
                 <ExemptionDbManager />
+                <WhoSetupPanel />
             </div>
         </section>
     );

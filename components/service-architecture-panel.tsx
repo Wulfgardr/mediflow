@@ -134,7 +134,7 @@ export default function ServiceArchitecturePanel() {
             label: services.icd.status === 'checking' ? 'In verifica' : whoDisabled ? 'Disattivato' : whoConfigured ? 'Da verificare' : services.icd.status === 'running' ? 'Disponibile' : 'Non disponibile',
             tone: whoDisabled || services.icd.status === 'checking' ? 'neutral' : services.icd.status === 'running' ? 'ready' : 'attention',
             statusIcon: services.icd.status === 'checking' ? Loader2 : whoDisabled ? CircleMinus : services.icd.status === 'running' ? CheckCircle2 : CircleAlert,
-            href: '/settings/diagnostica#who-setup', action: 'Configurazione WHO',
+            href: '/settings/repertori#who-setup', action: 'Configurazione WHO',
         },
     ];
 
