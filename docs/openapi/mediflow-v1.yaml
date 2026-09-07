@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: MediFlow Local API v1
-  version: 1.24.0
+  version: 1.25.0
   summary: Stable patient contract plus executable home-base network slice with explicit pairing review, paired-client auth boundary, ambulatory scope options, scoped remote patient, cross-patient agenda and diary reads, therapy, checkup, observation, and catalog read boundaries, replica planning state, explicit identity summary, and declarative AI runtime summary for the local `/api/v1` surface.
   description: |
     OpenAPI contract for the client-facing local API defined by ADR 0010.
@@ -3607,7 +3607,7 @@ components:
         action: {type: string, enum: [set]}
         functionId: {type: string, enum: [patient_insight, smart_import, document_synthesis, treatment_reasoning]}
         enabled: {type: boolean}
-        defaultModelOptionId: {type: string, nullable: true, pattern: '^model_option_[0-9a-f]{32}$'}
+        defaultModelOptionId: {type: [string, 'null'], pattern: '^model_option_[0-9a-f]{32}$'}
     NativeFunctionPresetCommand:
       type: object
       additionalProperties: false
@@ -3649,7 +3649,7 @@ components:
             properties:
               id: {type: string, enum: [patient_insight, smart_import, document_synthesis, treatment_reasoning]}
               enabled: {type: boolean}
-              defaultModelOptionId: {type: string, nullable: true}
+              defaultModelOptionId: {type: [string, 'null']}
               defaultSource: {type: string, enum: [saved_preference, host_configuration]}
               bindingState: {type: string, enum: [stale, unsupported, current]}
               options:
