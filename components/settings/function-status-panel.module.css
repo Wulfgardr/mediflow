@@ -5,15 +5,15 @@
 .header p, .checkedAt { margin: 4px 0 0; font-size: 14px; line-height: 1.5; color: var(--lume-ink-muted); }
 .group { display: grid; gap: 12px; min-width: 0; }
 .group > h3 { margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600; }
-.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 310px), 1fr)); gap: 16px; padding: 0; margin: 0; list-style: none; }
-.card { display: flex; flex-direction: column; gap: 16px; min-width: 0; padding: 20px; border: 1px solid var(--lume-border); border-radius: var(--lume-control-radius); background: var(--lume-surface-focal); }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 350px), 1fr)); gap: 16px; padding: 0; margin: 0; list-style: none; }
+.card { display: flex; flex-direction: column; gap: 16px; min-width: 0; padding: 20px; border: 1px solid var(--lume-border-color); border-radius: var(--lume-control-radius); background: var(--lume-surface-field); }
 .cardHeader { display: flex; align-items: start; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
 .card h4 { margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600; }
 .card p { margin: 0; font-size: 14px; line-height: 1.6; overflow-wrap: anywhere; }
 .purpose, .providerLabel { color: var(--lume-ink-muted); }
-.status { display: inline-flex; align-items: center; min-height: 32px; padding: 4px 10px; border: 1px solid var(--lume-border); border-radius: var(--lume-control-radius); background: var(--lume-surface-field); font-size: 13px; font-weight: 600; line-height: 1.5; }
+.status { display: inline-flex; align-items: center; min-height: 32px; padding: 4px 10px; border: 1px solid var(--lume-border-color); border-radius: var(--lume-control-radius); background: var(--lume-surface-focal); font-size: 13px; font-weight: 600; line-height: 1.5; }
 .status[data-state='blocked'], .status[data-state='unavailable'] { color: var(--lume-signal-critical); border-color: currentColor; }
-.provider { display: grid; gap: 4px; padding: 12px; border-radius: var(--lume-control-radius); background: var(--lume-surface-field); }
+.provider { display: grid; gap: 4px; padding: 12px; border-radius: var(--lume-control-radius); background: var(--lume-surface-focal); }
 .providerLabel { font-size: 13px; line-height: 1.5; }
 .provider strong { font-size: 14px; line-height: 1.5; font-weight: 600; overflow-wrap: anywhere; }
 .footer { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; margin-top: auto; }
