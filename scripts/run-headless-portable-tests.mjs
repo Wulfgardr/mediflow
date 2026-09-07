@@ -4,6 +4,7 @@ import { readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { acquireTestDataDir, cleanupTestDataDir } from './test-data-dir.mjs';
 
 const repoRoot = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
 const packageRoots = ['packages/aip', 'packages/mini', 'packages/mcp'];
@@ -36,21 +37,38 @@ export async function collectHeadlessPortableTests(root = repoRoot) {
     return [...new Set(tests)].sort();
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-    const tests = await collectHeadlessPortableTests();
-    if (tests.length === 0) {
-        process.stderr.write('No Headless portable tests found.\n');
-        process.exitCode = 1;
-    } else {
-        const runner = path.join(repoRoot, 'scripts/run-strip-types.mjs');
-        const result = spawnSync(process.execPath, [runner, '--test', '--test-concurrency=1', ...tests], {
-            cwd: repoRoot,
-            env: { ...process.env, MEDIFLOW_STRIP_TYPES_NODE: process.execPath },
+export async function runHeadlessPortableTests({
+    root = repoRoot,
+    parentEnv = process.env,
+    spawnSyncImpl = spawnSync,
+} = {}) {
+    const tests = await collectHeadlessPortableTests(root);
+    if (tests.length === 0) return { status: 1, signal: null, error: null, empty: true };
+
+    const runner = path.join(root, 'scripts/run-strip-types.mjs');
+    const { dataDir, owned } = acquireTestDataDir(parentEnv, 'mediflow-headless-portable-');
+    let result;
+    try {
+        result = spawnSyncImpl(process.execPath, [runner, '--test', '--test-concurrency=1', ...tests], {
+            cwd: root,
+            env: { ...parentEnv, MEDIFLOW_DATA_DIR: dataDir, MEDIFLOW_STRIP_TYPES_NODE: process.execPath },
             stdio: 'inherit',
         });
-        if (result.error) {
-            process.stderr.write(`${result.error.message}\n`);
-            process.exitCode = 1;
-        } else process.exitCode = result.status ?? 1;
+    } finally {
+        cleanupTestDataDir({ dataDir, owned });
     }
+
+    if (result.error) return { status: 1, signal: null, error: result.error };
+    return { status: result.status ?? 1, signal: result.signal ?? null, error: null };
+}
+
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+    const result = await runHeadlessPortableTests();
+    if (result.empty) {
+        process.stderr.write('No Headless portable tests found.\n');
+        process.exitCode = result.status;
+    }
+    else if (result.error) process.stderr.write(`${result.error.message}\n`);
+    else if (result.signal) process.kill(process.pid, result.signal);
+    else process.exitCode = result.status;
 }
