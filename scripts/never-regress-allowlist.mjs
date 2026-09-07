@@ -7,6 +7,11 @@ export const NEVER_REGRESS_ALLOWLIST = {
             reason: 'Function-preferences HTTP tests use process-local synthetic Web sessions for cancellation and retirement; no live credential is used.',
         },
         {
+            path: 'lib/security/portable-supervisor-mini-production.test.ts',
+            pattern: "username:\\s*'synthetic-mini-clinician'",
+            reason: 'Mini production composition uses only a synthetic Web lifecycle owner in a temporary fixture; no live credential or runtime default.',
+        },
+        {
             path: 'lib/aifa-catalog-server.test.ts',
             pattern: "username:\\s*'synthetic-aifa'",
             reason: 'AIFA route tests use a synthetic clinician session to verify authentication, cancellation and atomic replacement; no live credential is used.',

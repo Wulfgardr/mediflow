@@ -13,6 +13,7 @@ import type { LateBoundMcpChildPortV1 } from './authenticated-headless-agent-pre
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 const LOADER = path.join(ROOT, 'scripts', 'register-strip-types-loader.mjs');
+const MINI_TARGET = path.join(ROOT, 'packages', 'mini', 'src', 'cli.ts');
 const MCP_TARGET = path.join(ROOT, 'scripts', 'intelligent-host-mcp-stdio.mjs');
 const WEB_DIRECTORY = path.join(ROOT, '.next', 'standalone');
 const WEB_TARGET = path.join(WEB_DIRECTORY, 'server.js');
@@ -24,6 +25,7 @@ type SpawnChild = (command: string, args: readonly string[], options: SpawnOptio
 
 export type PortableSupervisorChildProcessesOptionsV1 = Readonly<{
   dataDir: string;
+  agentKind?: 'mcp' | 'mini';
   /** Explicit host-owned runner for Web only; no parent environment is inherited here. */
   athenaMlxGenerateBin?: string;
   spawnChild?: SpawnChild;
@@ -35,6 +37,7 @@ export type PortableSupervisorChildProcessesOptionsV1 = Readonly<{
 }>;
 
 export type PortableSupervisorProductionChildProcessesV1 = Readonly<{
+  /** Shared agent port; historical name retained for the MCP composition contract. */
   mcpPort: LateBoundMcpChildPortV1;
   subscribeWeb(listener: (frame: unknown) => void): () => void;
   sendWeb(frame: string, complete: (error: Error | null) => void): void;
@@ -80,12 +83,16 @@ function stop(child: ChildProcess): void {
 export function createPortableSupervisorProductionChildProcessesV1(
   options: PortableSupervisorChildProcessesOptionsV1,
 ): PortableSupervisorProductionChildProcessesV1 {
+  const agentKind = options.agentKind ?? 'mcp';
+  if (agentKind !== 'mcp' && agentKind !== 'mini') throw new Error('agent_kind_invalid');
   const athenaMlxGenerateBin = resolveAthenaMlxGenerateBin(options.athenaMlxGenerateBin);
   const nodePath = requireAbsoluteFile(options.nodePath ?? process.execPath, 'node');
   const loaderPath = requireAbsoluteFile(options.loaderPath ?? LOADER, 'loader', ROOT_REAL);
   // @Codex Node interprets Windows drive letters as URL schemes for --import unless encoded as file URLs.
   const loaderUrl = pathToFileURL(loaderPath).href;
-  const mcpTargetPath = requireAbsoluteFile(options.mcpTargetPath ?? MCP_TARGET, 'mcp', ROOT_REAL);
+  const mcpTargetPath = agentKind === 'mini'
+    ? requireAbsoluteFile(MINI_TARGET, 'mini', ROOT_REAL)
+    : requireAbsoluteFile(options.mcpTargetPath ?? MCP_TARGET, 'mcp', ROOT_REAL);
   const webDirectory = requireAbsoluteDirectory(options.webDirectory ?? WEB_DIRECTORY, 'web_directory');
   const webTargetPath = requireAbsoluteFile(options.webTargetPath ?? WEB_TARGET, 'web', webDirectory);
   const dataDir = requireAbsoluteDirectory(options.dataDir, 'data_directory');
@@ -105,7 +112,8 @@ export function createPortableSupervisorProductionChildProcessesV1(
   let mcp: ChildProcess;
   try {
     mcp = spawnChild(nodePath,
-      ['--experimental-strip-types', '--import', loaderUrl, mcpTargetPath], {
+      ['--experimental-strip-types', '--import', loaderUrl, mcpTargetPath,
+        ...(agentKind === 'mini' ? ['--session'] : [])], {
         cwd: ROOT_REAL,
         shell: false,
         env: mcpEnvironment,

@@ -28,16 +28,21 @@ function prepareDataDirectory() {
 }
 
 async function main() {
+  const args = process.argv.slice(2);
+  if (args.length > 0 && !(args.length === 1 && args[0] === '--mini')) {
+    throw new Error('supervisor_arguments_invalid');
+  }
+  const agentKind = args[0] === '--mini' ? 'mini' : 'mcp';
   assertNodeRuntime(readNodeContract(root));
   verifyNativeBinding(root);
   prepareDataDirectory();
 
-  // Any parent-process diagnostics must share stderr; stdout belongs exclusively to MCP JSON-RPC.
+  // Any parent-process diagnostics must share stderr; stdout belongs exclusively to the selected agent protocol.
   console.log = console.error.bind(console);
   console.info = console.error.bind(console);
   const { createPortableSupervisorProductionV1 } =
     await import('../lib/security/portable-supervisor-production.ts');
-  const supervisor = createPortableSupervisorProductionV1();
+  const supervisor = createPortableSupervisorProductionV1(agentKind);
   const onSignal = () => { supervisor.terminate('restart'); };
   for (const signal of ['SIGHUP', 'SIGINT', 'SIGTERM']) process.once(signal, onSignal);
   try { await supervisor.closed; }

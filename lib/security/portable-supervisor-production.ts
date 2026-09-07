@@ -15,11 +15,13 @@ import { getDataDir } from '../data-dir';
 import { resolveAthenaMlxGenerateBin } from '../athena-mlx-launcher-config.ts';
 import { createCheckupStatusTransitionSupervisorPortV1 } from
   './checkup-status-transition-supervisor-port.ts';
-import { createProductionMcpAgentLauncherWithPreSpawnedChildV1 } from
+import { createProductionMcpAgentLauncherWithPreSpawnedChildV1,
+  createProductionMiniAgentLauncherWithPreSpawnedChildV1 } from
   './authenticated-headless-agent-launcher-production.ts';
 import { createPortableSupervisorAipAuditPortV1 } from './portable-supervisor-aip-audit-port.ts';
 import {
   createPortableSupervisorProductionChildProcessesV1,
+  type PortableSupervisorChildProcessesOptionsV1,
   type PortableSupervisorProductionChildProcessesV1,
 } from './portable-supervisor-child-processes.ts';
 import { createPortableSupervisorPatientVersionProductionV1 } from
@@ -188,7 +190,13 @@ export function createPortableSupervisorProductionRuntimeV1(
 }
 
 /** Starts the production mirror, audit ports, launcher and exact child-process topology. */
-export function createPortableSupervisorProductionV1(): PortableSupervisorProductionRuntimeV1 {
+export function createPortableSupervisorProductionV1(
+  agentKind: 'mcp' | 'mini' = 'mcp',
+  // Trusted composition seam for synthetic cross-process tests, never exposed through CLI or IPC.
+  childOptions: Pick<PortableSupervisorChildProcessesOptionsV1,
+    'spawnChild' | 'webDirectory' | 'webTargetPath'> = {},
+): PortableSupervisorProductionRuntimeV1 {
+  if (agentKind !== 'mcp' && agentKind !== 'mini') throw new Error('agent_kind_invalid');
   const athenaMlxGenerateBin = resolveAthenaMlxGenerateBin(process.env.MEDIFLOW_ATHENA_MLX_GENERATE_BIN);
   const now = () => Date.now();
   const dataDir = getDataDir();
@@ -218,7 +226,9 @@ export function createPortableSupervisorProductionV1(): PortableSupervisorProduc
   const commitTerminalAudit = createPortableSupervisorSemanticAuditPortV1({
     now, readHostContext: context.readHostContext,
   });
-  const children = createPortableSupervisorProductionChildProcessesV1({ dataDir, athenaMlxGenerateBin });
+  const children = createPortableSupervisorProductionChildProcessesV1({
+    ...childOptions, dataDir, athenaMlxGenerateBin, agentKind,
+  });
   try {
     const checkup = createCheckupStatusTransitionSupervisorPortV1({
       randomBytes,
@@ -237,7 +247,9 @@ export function createPortableSupervisorProductionV1(): PortableSupervisorProduc
       mirror: context,
       checkup,
       children,
-      launchMcp: () => createProductionMcpAgentLauncherWithPreSpawnedChildV1({
+      launchMcp: () => (agentKind === 'mini'
+        ? createProductionMiniAgentLauncherWithPreSpawnedChildV1
+        : createProductionMcpAgentLauncherWithPreSpawnedChildV1)({
         readHostContext: context.readHostContext, writeAudit, commitTerminalAudit,
         previewCheckupStatus: checkup.preview,
       }, children.mcpPort).launch(),

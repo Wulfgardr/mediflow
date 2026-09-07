@@ -1,155 +1,102 @@
 ---
-summary: "Proposta «Mini»: la faccia headless di MediFlow per agenti autenticati — identità concessa dall'operatore, lease contestuale per paziente, stadi fail-closed ereditati dal manifest AIP, output a due registri e artefatti contestuali a scope chiuso."
+summary: "Mini: CLI AIP e sessione Supervisor 0.8.6 per stato e catalogo governati; authority Web, lease e revoca restano host-owned."
 read_when:
-  - "Progettando o implementando l'accesso headless per agenti (CLI, MCP, automazioni)."
-  - "Valutando come un agente deve autenticarsi, leggere, proporre e applicare informazioni cliniche."
+  - "Usando o modificando Mini e il suo launcher Supervisor."
 ---
 
-# Mini — la faccia headless di MediFlow
+# Mini — la superficie CLI di MediFlow
 
-## 0. Rapporto con l'esistente e stato di questo documento
+## Contratto corrente
 
-Su `main` non esiste alcuna superficie agent eseguibile. Il piano esiste ed è
-l'[ADR 0093](../adr/0093-agent-interface-plane-headless-capability-contract.md)
-(**Proposed**), implementato nei rami `codex/WUL-553` (manifest
-`mediflow.agent-interface.manifest.v1`), `codex/WUL-554` (proiezione
-`mediflow.agent.patient_open_loops.v1`), `codex/WUL-555`
-(sessione + context lease) e nel superset `codex/WUL-518-aip-authority-loop-2-pro`.
+La proposta del 21 agosto è sostituita, per il runtime descritto qui, da
+[ADR 0117](../adr/0117-headless-portable-agent-first-and-capability-first-fabric.md)
+e dai confini di isolamento di
+[ADR 0114](../adr/0114-intelligent-host-aip-mcp-isolation.md).
+I manifest dei vecchi rami WUL-553/554/555 e i comandi proposti `grant`, `login`,
+`whoami`, `patient show` e `apply` non descrivono il runtime attuale.
+WUL-557 e i crosswalk referenziali restano evidenza del loro perimetro storico:
+i loro conteggi non misurano le operazioni della sessione production.
 
-Questo documento definisce **la forma del prodotto** (identità, comandi,
-contratto d'output, artefatti), non autorizza implementazione: la modifica di
-confini di sicurezza richiede la promozione dell'ADR prima del codice
-([AGENTS.md](../../AGENTS.md)). Ogni nome di comando qui sotto è una proposta di
-interfaccia, verificabile contro il manifest una volta mergeato.
+La lane WUL-696 aggiunge un callsite production esplicito: il Supervisor
+Node 24 avvia Web standalone e Mini come figli distinti, con IPC privato
+ereditato. Il comando MCP predefinito continua ad avviare Web e MCP.
+Ogni avvio possiede la propria coppia; non adotta Web già in esecuzione.
 
-## 1. Il concetto
+## Avvio e autorizzazione
 
-Mini non è un client ridotto: è **il modo in cui un agente entra in MediFlow con
-le stesse regole di un medico** — identità propria, contesto dichiarato,
-permessi limitati, azioni visibili. La superficie è minimale per scelta: la
-ricchezza sta nel contratto, non nei bottoni.
+Prerequisiti: dipendenze Node 24 e artifact Web standalone già costruito dal
+checkout pertinente. Per la sessione Mini:
 
-Il nome è voluto: Mini è la versione dell'app che non occupa schermo. Dove il
-cockpit serve la domanda clinica di chi guarda, Mini serve la domanda clinica di
-chi opera per conto di qualcuno che guarda.
-
-## 2. Sette principi
-
-1. **Identità concessa, mai condivisa.** Un agente non usa né il
-   local-api-token (vincolato al data-plane read-only da ADR 0038) né la
-   sessione web dell'operatore. Riceve un'identità dedicata, revocabile, con
-   permessi propri.
-2. **Il contesto è un lease.** Nessun accesso trasversale: il lavoro agente vive
-   dentro un lease scaduto a tempo e ancorato a un `patientRef` (libreria
-   `lib/agent-interface/authority.ts` del ramo WUL-555). Fuori lease,
-   `outside_selected_patient_context`.
-3. **Fail-closed per costruzione.** Ciò che il manifest dichiara
-   `manual_only` risponde `denied_by_contract`. Oggi significa: tutto. Le
-   promozioni sono decisioni esplicite tracciate nel manifest, non flag.
-4. **Gli stadi si attraversano, non si saltano.**
-   `observe → read → compute → propose → preview → apply`. Un agente può
-   arrivare fino a `preview`; `apply` richiede autorità umana salvo policy di
-   grant esplicita (default: negato).
-5. **Zero PHI nel canale debole.** Argomenti, log, shell history e output di
-   default portano riferimenti (`patientRef`, id voce), mai nomi, codici
-   fiscali o free-text clinici. Il dato pieno viaggia solo nell'artefatto
-   richiesto esplicitamente.
-6. **Ogni risposta porta la sua provenienza.** Sorgente, freschezza, venue,
-   lease e timestamp sono parte del payload, non un arricchimento.
-7. **L'output parla Lume.** Voce per l'intestazione, Registro per i dati: la
-   resa terminale usa la stessa gerarchia tipografica dell'interfaccia grafica.
-
-## 3. Ciclo di vita dell'identità
-
-```
-operatore   $ mediflow mini grant <nome-agente> \
-              --stage preview --lease-ttl 30m --patients allowlist.json
-            → intent di pairing con TTL 10 min (pattern ADR 0036),
-              conferma esplicita sulla home-base
-
-agente      $ mf login --intent <id>          # scambia intent ↔ credenziale
-            $ mf whoami                       # identità, stadio massimo, lease attivo
-            … lavoro …
-operatore   $ mediflow mini revoke <nome-agente>   # effetto immediato
+```sh
+npm run mini:production
 ```
 
-- Credenziale breve, file `0600` sotto `<data>/agent-keys/`, mai variabile
-  d'ambiente globale, mai il token `/api/v1`.
-- Ogni comando rivalida sessione e lease prima di qualunque lettura
-  (`validateAgentSession`, `validateAgentContextLease`): un lease scaduto
-  produce esito chiuso con motivo tipizzato, non un errore generico.
-- Lockout e audit riusano le librerie esistenti (`auth-lockout`,
-  audit append-only locale: chi, cosa, quale lease, quale esito).
+Equivale al launcher `scripts/mediflow-headless-supervisor.mjs --mini`.
+Il processo rimane aperto e riceve una richiesta JSON per riga, per esempio:
 
-## 4. Superficie dei comandi v0
+```json
+{"command":"status","args":{}}
+{"command":"capabilities","args":{}}
+```
 
-| Area | Comando | Note |
-| --- | --- | --- |
-| Sessione | `mf whoami` | identità, stadio massimo concesso, lease attivo con scadenza |
-| Perimetro | `mf capabilities` | il manifest, letto dall'agente: cosa è lecito aspettarsi |
-| Retrieve | `mf patient search <query>` | restituisce riferimenti, non anagrafica piena |
-| Retrieve | `mf patient show <patientRef>` | quadro minimo scoped dal lease |
-| Retrieve | `mf open-loops <patientRef>` | proiezione deterministica WUL-554 |
-| Record | `mf draft create --from <payload>` | crea bozza: mai scrittura diretta |
-| Record | `mf draft preview <draftId>` | resoconto differenziale di ciò che verrebbe registrato |
-| Record | `mf apply <draftId>` | **negato di default**: richiede autorità umana o grant esplicito |
-| Prepare | `mf handoff preview <patientRef>` | preparazione passaggio di consegne, sola lettura |
+Prima dell'attivazione, status mostra `transport: connected`,
+`session: not_unlocked`, `ready: false`, capacità vuote e il passo
+`AUTHORIZE_IN_OWNED_WEB`. Il catalogo è negato con `SESSION_NOT_UNLOCKED`.
+L'operatore deve aprire il Web figlio su localhost:3000, autenticarsi, selezionare
+il contesto e usare il controllo Intelligent Host. Un login da solo non attiva
+AIP. Mini non accetta cookie, PIN, identità o selezione come argomenti.
 
-Banner costante su ogni invocazione: paziente del lease, scadenza, stadio
-massimo. Se il comando eccede il lease, il rifiuto nomina il motivo esatto.
+Dopo l'ACK Web e il bootstrap AIP monouso, ogni richiesta interroga il catalogo
+host; il launcher rilegge il mirror autoritativo anche per le richieste di
+metadati. Status mostra `session: authorized` e `ready: true` soltanto con un
+catalogo corrente non vuoto. `capabilities` restituisce il catalogo host e gli
+stadi massimi: non è un grant di esecuzione né abilita altri comandi in questa
+sessione. Il protocollo sessione ammette solo `status` e `capabilities`.
 
-## 5. Contratto d'output
+La connessione IPC da sola non prova l'autorizzazione. Senza parent valido,
+Mini restituisce `TRANSPORT_UNBOUND`, `ok: false`, `ready: false` ed exit 69.
+Un errore operativo restituisce un errore tipizzato, senza riusare il catalogo.
 
-- **Default umano**: intestazione in Voce, dati in Registro (tabular-nums),
-  stati onesti e azionabili (`negato: denied_by_contract — capability non
-  promossa; vedi mf capabilities`). Niente spinner decorativi.
-- **`--json`**: envelope macchina
-  `{ schema, lease, provenance, data }` — `schema` è il nome versione del
-  payload (`mediflow.agent.patient_open_loops.v1`, …), così gli agenti che
-  consumano hanno un contratto stabile.
-- **Exit code** documentati: `0` ok, `2` negato dal contratto, `3` lease
-  scaduto/assente, `4` input illeggibile. Il fallimento è distinguibile dal
-  diniego.
-- **Provenance block** invariabile: `source`, `freshness`, `venue`,
-  `lease`, `generatedAt`.
+## Output e limiti
 
-## 6. Artefatti contestuali e UI dinamica
+La sessione usa envelope `mediflow.mini.session.v1`: una risposta NDJSON per
+richiesta. `ok` indica l'esito della richiesta; per status occorre leggere anche
+`session` e `ready`. Nessun banner è scritto su stdout. La diagnostica Web e
+Supervisor va su stderr.
 
-È il contratto con cui un agente mostra qualcosa all'operatore:
+Limiti: 16 KiB per frame UTF-8, argomenti vuoti e schema chiuso, massimo 64
+richieste sequenziali per processo. Ogni riga deve terminare con newline.
+Input invalido o budget esaurito termina con exit 2. Un errore operativo termina
+con exit 70; perdita IPC o errore stream con exit 69. EOF ordinato termina con
+exit 0 dopo le risposte; chiude Mini e la coppia posseduta dal Supervisor.
+La terminazione imposta dal parent può essere osservata come segnale OS.
 
-- **`--artifact link`** → deep-link autenticato dentro la superficie localhost
-  esistente (`/patients/<id>?ctx=<leaseId>`): il browser dell'operatore ha già
-  la sua sessione, la superficie evidenzia il fuoco richiesto dal lease.
-  Nessun dato nuovo esce dall'app.
-- **`--artifact html`** → documento self-contained contenente **solo** i dati
-  nello scope del lease, marcato con id lease e timestamp, apribile offline.
-- **`--artifact json`** → per composizioni successive a monte.
+Lock, logout, reselection, expiry e perdita di Web o Mini revocano e chiudono
+il runtime. Non c'è rebind: serve un nuovo avvio e una nuova attivazione Web.
+Nessun broker residente, socket, listener Mini, accesso SQLite diretto,
+credenziale persistita o potere apply clinico viene aggiunto.
 
-Gli agenti che operano sopra Mini compongono queste primitive liberamente: il
-contratto garantisce scope, provenanza e privacy mode, non il layout. Chi
-vuole UI dinamica la costruisce dentro questi confini.
+## CLI a richiesta singola
 
-## 7. Invarianti di sicurezza non negoziabili
+`npm run mini` conserva l'envelope `mediflow.mini.transport.v1` e una sola
+richiesta su stdin fino a EOF. Gli adapter esistenti comprendono status,
+capabilities, terminology search, open-loops, follow-up-proposal e semantic-query;
+richiedono comunque il parent AIP. La nuova sessione production non promuove
+questi adapter clinici. Lo status storico della CLI singola non è lo status di
+readiness della sessione Supervisor.
 
-- Nessun accesso diretto al database: tutto passa dallo stesso servizio
-  dell'app.
-- Egress `none`: nessuna rete oltre la home-base locale.
-- Scritture solo tramite stadi; `apply` di default umano.
-- Audit append-only locale per ogni comando, incluso il negato.
-- Revoca immediata; credenziali non esportabili fuori da `<data>/`.
+## Punto d'innesto e prove
 
-## 8. Percorso di implementazione (dopo la promozione dell'ADR)
+Il coordinatore può collegare onboarding/UI al controller Web esistente
+`activateCurrentSelection` in
+`lib/security/portable-supervisor-web-session-controller.ts`, preservando
+H1a, capture owner, selezione e ACK. Nessuna UI o wizard è modificata qui.
 
-1. Promuovere ADR 0093 (decisione owner, già in coda Linear).
-2. Mergeare il superset `codex/WUL-518-aip-authority-loop-2-pro`
-   (manifest + authority + grant + proiezione, ~1463 righe, tutti push su origin).
-3. Adapter CLI (`packages/mini`, tsx) che consuma le librerie esistenti —
-   nessuna nuova logica di autorizzazione.
-4. Estendere il gate CI `check-agent-interface-manifest` ai comandi dichiarati.
-5. Adapter MCP come fase successiva e ADR separato.
-
-## 9. Non-goals v0
-
-Nessun cloud, nessun server MCP, nessuna scrittura oltre lo stadio concesso,
-nessun accesso SQLite diretto, nessuna TUI interattiva ricca: Mini è pipe-first
-per costruzione.
+`lib/security/portable-supervisor-mini-production.test.ts` compone il root
+production con Mini reale e una fixture Web benigna: usa projection autentiche
+del lifecycle owner, owner di selezione/capture, controller e bridge IPC reali.
+Il gesto browser e l'acquisizione H1a sono sorgenti di test; non prova il login
+HTTP o il server Next standalone costruito. Copre stato prima/dopo il binding,
+catalogo, lock, reselection, EOF, perdita Web e drift della versione sintetica.
+Le regressioni Mini/MCP/Headless sono gate separati. Smoke tri-OS, onboarding,
+integrazione nel candidato finale e release non sono attestati da queste prove.

@@ -212,8 +212,9 @@ La fotografia corrente e questa:
 - **Headless**: il Supervisor Node portabile avvia Web standalone e MCP
   `stdio` come figli distinti su IPC ereditato. MCP raggiunge catalogo,
   terminology search, Open Loops patient-scoped, proposta follow-up e query
-  semantica bounded read-only. Mini condivide catalogo e foundation CLI ma non
-  ha un binding production al Supervisor e fallisce chiuso senza parent AIP.
+  semantica bounded read-only. La lane WUL-696 aggiunge il callsite Supervisor Mini
+  per status/catalogo in sessione NDJSON, con attivazione Web e parent AIP
+  obbligatori; gli adapter clinici Mini non sono promossi dalla sessione.
   Contesto, lifecycle, revoca e audit restano host-owned; lo smoke standalone
   del tree finale è un gate separato.
 - **Write F10**: MCP produce soltanto la preview della transizione
@@ -221,7 +222,7 @@ La fotografia corrente e questa:
   ruolo medico attivo, step-up e gesto operation-specific; il commit Web usa
   CAS, idempotenza, audit e receipt atomici. Il proof non attraversa MCP.
 - **Planner candidato**: core, operazione read-only e adapter MCP/Mini sono
-  presenti; il binding production del Supervisor è soltanto MCP. Il piano usa
+  presenti; il planner production resta eseguibile soltanto via MCP. Il piano usa
   al massimo due operazioni allowlisted; SQL diretto e scritture restano
   vietati.
 - **Recording locale**: la shell macOS integra cattura e trascrizione italiana
@@ -390,9 +391,9 @@ Documenti/ADR principali:
 | ATHENA/MLX | Provider locale capability-specific | Solo Treatment Reasoning review-only | Nessuna prescrizione o apply clinico |
 | OpenAI / Anthropic | Adapter ufficiali `default OFF` | Probe amministrativa Document Synthesis review-only con policy e secret reference host-owned | Solo transport fake nel tree; nessuna credenziale, rete live o runtime readiness |
 | MCP | Superficie figlia locale | Catalogo, terminology search, Open Loops patient-scoped, proposta follow-up e query semantica bounded read-only | Usa il Supervisor locale della 0.8.5; nessuna authority caller-supplied |
-| Mini | Foundation CLI fail-closed | Catalogo e adapter tipizzati senza callsite production del Supervisor | Nessun grant senza parent AIP; nessun accesso SQLite diretto |
+| Mini | Lane WUL-696: callsite Supervisor | Sessione NDJSON production per stato e catalogo; CLI singola distinta | Attivazione Web e parent AIP obbligatori; nessun adapter clinico promosso dalla sessione |
 | Write checkup F10 | Integrata end-to-end | Preview MCP e commit Web con ruolo, step-up, gesto, CAS, idempotenza, audit e receipt | L'agente non riceve proof e non esegue il commit |
-| Semantic planner | Integrato, sola lettura | Core, validazione, esecutore e adapter MCP/Mini presenti; binding Supervisor production soltanto MCP | Massimo due operazioni allowlisted; nessun SQL libero o write |
+| Semantic planner | Integrato, sola lettura | Core, validazione, esecutore e adapter MCP/Mini presenti; planner eseguibile in production soltanto via MCP | Massimo due operazioni allowlisted; nessun SQL libero o write |
 | ICD-11 WHO | Application Service server-only, sidecar locale | Search con output MediFlow data-only e URI canonico | Candidato 0.8.6 disattivato per default; provisioning manuale e prova sul target non eseguiti |
 | OpenMed | Shadow/benchmark | Redaction lane locale non client-facing | Non runtime clinico |
 
@@ -564,9 +565,12 @@ Il Supervisor Node portabile è il trusted parent del runtime locale: avvia
 Web standalone e MCP come processi figli distinti su IPC ereditato e possiede
 contesto, lease, revoca e audit. MCP `stdio` pubblica catalogo, terminology
 search, Open Loops patient-scoped, proposta follow-up `proposal_only` e query
-semantica bounded read-only. Mini condivide catalogo e foundation CLI ma non ha
-un callsite production del Supervisor e fallisce chiuso senza parent AIP. Gli
-adapter non importano SQLite, non accettano authority caller-supplied e non
+semantica bounded read-only. La lane 0.8.6 WUL-696 aggiunge una sessione Mini
+production limitata a status e catalogo, con Web e Mini figli posseduti.
+Richiede attivazione Web e fallisce chiuso senza parent AIP. Le prove usano
+Mini reale e authority Web genuina su fixture: non attestano login HTTP,
+server Next standalone o onboarding. Gli adapter non importano SQLite,
+non accettano authority caller-supplied e non
 aprono listener.
 
 F10 espone via MCP soltanto la preview `pending -> completed|cancelled`. La UI

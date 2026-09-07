@@ -258,9 +258,10 @@ Mantieni inoltre separate le due modalità architetturali: un provider eseguito
 dentro MediFlow e MediFlow invocato come servizio governato da un host
 intelligente. Il Supervisor Node locale avvia Web standalone e MCP `stdio` come
 figli distinti su IPC ereditato. MCP usa soltanto RPC AIP e Application Services
-nominate, senza listener proprio o accesso diretto a SQLite. Mini condivide il
-catalogo e la foundation CLI ma, senza un callsite production del Supervisor,
-deve fallire chiuso in assenza del parent AIP. Mantieni
+nominate, senza listener proprio o accesso diretto a SQLite. La lane Mini
+WUL-696 aggiunge `mini:production`: Web e Mini figli, sessione
+NDJSON limitata a status/catalogo e attivazione Web obbligatoria. Mini deve
+fallire chiuso in assenza del parent AIP. Mantieni
 fuori dal claim installer, onboarding e compatibilità con host MCP esterni; non
 introdurre broker residente o UDS nella `0.8.5`.
 

@@ -116,3 +116,25 @@ export function createProductionMcpAgentLauncherWithPreSpawnedChildV1(
     return createLateBoundMcpChildPortV1(childPortValue, environment);
   });
 }
+
+/* @Codex Mini uses the same one-shot late binding and authority gates as MCP. */
+export function createProductionMiniAgentLauncherWithPreSpawnedChildV1(
+  sourcesValue: unknown, childPortValue: unknown,
+) {
+  const ports = sources(sourcesValue);
+  let claimed = false;
+  return createProductionLauncher('mini', sourcesValue, (environment) => {
+    if (claimed) throw new AuthenticatedAgentLauncherV1Error('child_unavailable');
+    claimed = true;
+    const port = createLateBoundMcpChildPortV1(childPortValue, environment);
+    return Object.freeze({ ...port,
+      subscribe: (listener: (frame: unknown) => void) => port.subscribe((frame: unknown) => {
+        // Catalog RPC is metadata-only: fence even these frames with the authoritative mirror.
+        // The production mirror revokes the whole topology on expiry or patient-version drift.
+        try { ports.readHostContext(); }
+        catch { port.terminate(); return; }
+        listener(frame);
+      }),
+    });
+  });
+}

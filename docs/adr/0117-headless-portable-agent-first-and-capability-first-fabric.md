@@ -319,6 +319,47 @@ prova di implementazione. Il gate production richiede test cross-process
 sintetici che dimostrino processi distinti, pre-attivazione `host_unbound`,
 attivazione utile, revoca, replay denial, stdout pulito e assenza di listener.
 
+### Addendum 0.8.6: callsite Supervisor per Mini (WUL-696)
+
+Decisione del 2026-09-07, precedente all'implementazione della lane. Il comando
+Supervisor ammette `--mini`: avvia il Web standalone e Mini come figli propri,
+al posto della coppia Web/MCP predefinita. Il target Mini è fisso nel tree,
+con `--session`, ambiente allowlisted e IPC privato ereditato. I due adapter
+non condividono stdin/stdout e non sono avviati insieme. Nessun server
+preesistente viene adottato; non si aggiungono listener o broker residenti.
+
+Mini registra il client AIP prima di leggere stdin e mantiene il processo
+per più richieste NDJSON bounded, in sequenza. Questa slice production ammette
+soltanto `status` e `capabilities`, con argomenti vuoti. La CLI a richiesta
+singola conserva il contratto precedente. Il catalogo host non autorizza nuove
+operazioni Mini e non trasferisce proof, commit o apply clinico.
+
+`status` separa trasporto connesso, autorizzazione non ancora sbloccata,
+capacità correntemente ammesse dal catalogo AIP e readiness. Prima del binding
+mostra `ready: false`, nessuna capacità e il passo richiesto: aprire il Web
+figlio, autenticarsi, selezionare il contesto e attivare Intelligent Host.
+L'assenza del parent restituisce un errore, mai successo o readiness fittizi.
+Dopo il binding, status e catalogo richiedono una risposta RPC corrente;
+errori o perdita del parent non riusano un catalogo memorizzato.
+
+Il bootstrap monouso, l'ACK Web dopo autenticazione, il mirror autoritativo,
+purpose, capability, lease, currentness e revoca riusano i contratti esistenti.
+Lock, logout, reselection, expiry o uscita di un figlio terminano la sessione;
+un nuovo contesto richiede un nuovo Supervisor. EOF chiude il figlio Mini e
+quindi la coppia posseduta. Stdout contiene solo risposte NDJSON; diagnostica
+Web e Supervisor resta su stderr.
+
+Il punto d'innesto UI è il controller Web patient-scoped già esistente
+`activateCurrentSelection`, con H1a genuino e capture owner; non un comando
+CLI che inventi sessione o selezione. UI e onboarding restano alla lane del
+coordinatore. Nessun cambiamento al contratto `/api/v1`.
+
+Il gate della lane richiede composizione production con Mini reale e authority
+Web genuina su fixture benigne, stato pre/post binding, catalogo governato e
+revoca, oltre alle regressioni Mini, Headless portable e MCP. Una fixture Web
+non è uno smoke del server Next standalone costruito né prova di onboarding,
+release o esecuzione live su Windows/Linux.
+
 ## Import e packaging guard
 
 Il grafo del core Headless e del Web localhost non può avere import obbligatori

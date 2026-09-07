@@ -1,6 +1,8 @@
 /* @Codex */
 import { argv, exit, stdin, stdout } from 'node:process';
 import { z } from 'zod';
+import { hasDuplicateKeys } from './request.ts';
+import { runMiniSession } from './session.ts';
 import {
   followUpProposalArgumentsSchema, openLoopsArgumentsSchema, semanticQueryArgumentsSchema,
   terminologyArgumentsSchema,
@@ -25,31 +27,6 @@ const requestSchema = z.discriminatedUnion('command', [
   z.object({ command: z.literal('follow-up-proposal'), args: followUpProposalArgumentsSchema }).strict(),
   z.object({ command: z.literal('semantic-query'), args: semanticQueryArgumentsSchema }).strict(),
 ]);
-
-function hasDuplicateKeys(source: string): boolean {
-  const stack: Array<Set<string> | null> = [];
-  for (let index = 0; index < source.length; index += 1) {
-    const character = source[index]!;
-    if (character === '{') { stack.push(new Set()); continue; }
-    if (character === '[') { stack.push(null); continue; }
-    if (character === '}' || character === ']') { stack.pop(); continue; }
-    if (character !== '"') continue;
-    const start = index;
-    for (index += 1; index < source.length; index += 1) {
-      if (source[index] === '\\') { index += 1; continue; }
-      if (source[index] === '"') break;
-    }
-    let next = index + 1;
-    while (/\s/u.test(source[next] ?? '')) next += 1;
-    if (source[next] !== ':') continue;
-    const objectKeys = stack[stack.length - 1];
-    if (!objectKeys) return true;
-    const key = PARSE(source.slice(start, index + 1)) as string;
-    if (objectKeys.has(key)) return true;
-    objectKeys.add(key);
-  }
-  return false;
-}
 
 function isolated(value: unknown): JsonValue {
   if (value === null || typeof value === 'boolean' || typeof value === 'number' || typeof value === 'string') {
@@ -82,7 +59,9 @@ function succeed(result: unknown): void {
   writeAndExit(0, { schemaVersion: SCHEMA_VERSION, ok: true, result });
 }
 
-if (argv.length === 3 && argv[2] === '--help') {
+if (argv.length === 3 && argv[2] === '--session') {
+  await runMiniSession();
+} else if (argv.length === 3 && argv[2] === '--help') {
   stdout.write('Usage: mediflow-mini [--format json|ndjson] < request.json\n', () => exit(0));
 } else {
   const validArguments = argv.length === 2 || (argv.length === 4 && argv[2] === '--format'
