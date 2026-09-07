@@ -25,6 +25,23 @@ test('Untouched/partial scales do not write; explicit zero and complete POMA-28 
     const form = page.locator('#scala');
     await expect(form.getByRole('button', { name: 'Avanti', exact: true })).toBeDisabled();
     expect(writes).toBe(0);
+    // @Codex: button cancellation must preserve a partial draft until the explicit leave decision.
+    const firstAnswer = form.getByRole('button', { name: /^0\./ });
+    await firstAnswer.click();
+    await form.getByLabel('Contesto').selectOption('home');
+    await form.getByRole('button', { name: 'Annulla', exact: true }).click();
+    const leaveDialog = page.getByRole('dialog', { name: 'Lasciare la compilazione?', exact: true });
+    await expect(leaveDialog).toBeVisible();
+    await expect(page.getByRole('dialog')).toHaveCount(1);
+    await leaveDialog.getByRole('button', { name: 'Continua a scrivere', exact: true }).click();
+    await expect(firstAnswer).toHaveAttribute('aria-pressed', 'true');
+    await expect(form.getByLabel('Contesto')).toHaveValue('home');
+    expect(writes).toBe(0);
+    await form.getByRole('button', { name: 'Annulla', exact: true }).click();
+    await leaveDialog.getByRole('button', { name: 'Esci senza salvare', exact: true }).click();
+    await expect(page).toHaveURL(new RegExp(`/patients/${patientId}/scales$`));
+    expect(writes).toBe(0);
+    await page.goto(`/patients/${patientId}/scales/adl`);
     for (let index = 0; index < 6; index++) {
         await expect(form.getByText(`Domanda ${index + 1} di 6`, { exact: true })).toBeVisible();
         const next = form.getByRole('button', { name: index === 5 ? 'Completa' : 'Avanti', exact: true });
