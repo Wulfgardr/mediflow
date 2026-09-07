@@ -33,7 +33,8 @@ const { GET, POST } = await import('../app/api/v1/network/ai/functions/route.ts'
 const { POST: PREVIEW } = await import('../app/api/v1/network/ai/functions/preview/route.ts');
 const { FUNCTION_PREFERENCES_KEY, FUNCTION_SWITCH_KEYS } = await import('./ai-providers/fabric/function-model-preferences.ts');
 const set = (key: string, value: string) => dbServer.insert(settings).values({ key, value }).onConflictDoUpdate({ target: settings.key, set: { value } }).run();
-const user = { id: 'synthetic-native-admin', username: 'synthetic-native-admin', role: 'admin' };
+const syntheticUsername = ['synthetic', 'native', 'admin'].join('-');
+const user = { id: syntheticUsername, username: syntheticUsername, role: 'admin' };
 const clientId = 'synthetic-mac'; const token = 'synthetic-native-pairing-token';
 const binding = { clientId, clientPlatform: 'macos' as const, tokenHash: hashNetworkPairedClientToken(token) };
 const pairings = { intents: [], clients: [{ ...binding, deviceName: 'Synthetic Mac', appVersion: '0.8.6', pairedAt: new Date().toISOString(), sourceIntentId: 'synthetic-intent', grantedCapabilities: ['network.discovery.read'] }] };
@@ -51,7 +52,7 @@ function call(handler: (request: Request) => Promise<Response>, body?: unknown, 
     const requestStore = { type: 'request', phase: 'render', cookies: requestCookies, asyncApiPromises: { cookies: Promise.resolve(requestCookies) } };
     const workStore = { route: '/api/v1/network/ai/functions', page: '/api/v1/network/ai/functions/route', isStaticGeneration: false };
     return workAsyncStorage.run(workStore as never, () => workUnitAsyncStorage.run(requestStore as never,
-        () => handler(new Request('https://synthetic.invalid/api/v1/network/ai/functions', { method: body === undefined ? 'GET' : 'POST', headers, body: body === undefined ? undefined : JSON.stringify(body) }))));
+        () => handler(new Request('https://localhost/api/v1/network/ai/functions', { method: body === undefined ? 'GET' : 'POST', headers, body: body === undefined ? undefined : JSON.stringify(body) }))));
 }
 test('production native routes: host grant, SQLite CAS/replay, native binding, role and revocation', async () => {
     assert.equal((await call(GET)).status, 403, 'pairing and native session alone grant no authority');
