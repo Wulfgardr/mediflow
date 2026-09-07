@@ -72,6 +72,10 @@ export async function POST(request: Request) {
 
     try {
         const body = await request.json();
+        /* @Codex: full imports must use the reviewed atomic protocol (ADR 0127). */
+        if (Array.isArray(body)) {
+            return NextResponse.json({ error: 'EXEMPTION_IMPORT_PREVIEW_REQUIRED', message: 'Usa l’anteprima import in Repertori esenzioni.' }, { status: 400 });
+        }
         const rawItems = Array.isArray(body) ? body : [body];
         const items = rawItems
             .map((item: ExemptionPayload) => normalizePayload(item))
