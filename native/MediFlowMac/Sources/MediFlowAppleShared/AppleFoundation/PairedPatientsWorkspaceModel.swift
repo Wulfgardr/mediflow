@@ -835,19 +835,40 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             return
         }
 
+        // @Codex: ADR 0106 retires local authority on success or an ambiguous
+        // result. A reply from a retired generation cannot clear a newer login.
+        let generation = loginGeneration
         await runTask {
-            let acknowledgement = try await self.makeClient().changePin(
-                currentPin: currentPin,
-                newPin: newPin,
-                encryptedMasterKey: wrappedMasterKey,
-                salt: salt.base64EncodedString(),
-                credentials: credentials,
-                sessionCookie: sessionCookie
-            )
-            guard acknowledgement.success else { throw HomeBaseClientError.contract }
-            // Deliberately keep the exact same masterKey instance in RAM. A PIN
-            // rotation changes only the KEK + salt + wrapped blob on the home-base.
-            self.statusMessage = "PIN aggiornato. La chiave clinica in memoria resta invariata."
+            do {
+                let acknowledgement = try await self.makeClient().changePin(
+                    currentPin: currentPin,
+                    newPin: newPin,
+                    encryptedMasterKey: wrappedMasterKey,
+                    salt: salt.base64EncodedString(),
+                    credentials: credentials,
+                    sessionCookie: sessionCookie
+                )
+                guard self.loginGeneration == generation else { return }
+                guard acknowledgement.success else { throw HomeBaseClientError.contract }
+                self.clearOperatorSessionPresentation()
+                self.statusMessage = "PIN aggiornato. Accedi di nuovo con il nuovo PIN."
+            } catch {
+                guard self.loginGeneration == generation else { return }
+                switch error {
+                case HomeBaseClientError.pinChangeConflict, HomeBaseClientError.versionConflict:
+                    // These typed conflicts confirm that this credential CAS lost.
+                    throw error
+                case HomeBaseClientError.httpStatus(let status, _) where [400, 401, 403, 429].contains(status):
+                    // Confirmed admission/input denials keep their existing flow;
+                    // a current 401 still revokes through runTask.
+                    throw error
+                default:
+                    // Transport/cancellation, malformed ACK and untyped 409/5xx
+                    // cannot exclude a committed CAS. Never infer a safe retry.
+                    self.clearOperatorSessionPresentation()
+                    self.statusMessage = "Esito del cambio PIN non confermato. Sessione bloccata: accedi di nuovo."
+                }
+            }
         }
     }
 
