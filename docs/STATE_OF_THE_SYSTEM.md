@@ -45,8 +45,13 @@ superiore e laterale sono integrati. La decisione di sviluppo concluso su
 su `1d633d98d0a0` mantiene la promozione **bloccata (`BLOCK`)** per il contratto
 del cambio PIN nativo. Sei ambiti e 298/298 elementi esaminati, 13 test Node
 PASS e zero vulnerabilità reportabili non attestano il rispetto di quel
-contratto. Correzione e prove pertinenti restano aperte, come le tre domande
-di approfondimento della review.
+contratto. Correzione e prove PIN restano aperte, incluso il `409` ambiguo
+dopo il CAS. L’approfondimento rileva una lacuna sui limiti del corpo delle
+richieste, assegnata a una lane di hardening; non attesta firma o entitlements
+di produzione. ThisDeviceOnly è esplicito per il nuovo inserimento della
+chiave cache, non per il token paired. La membership operatore–ambulatorio
+resta un non-goal secondo ADR 0036, senza introdurre RBAC nella 0.8.6.
+
 La verifica UI mirata iPhone ↔ Mac/Home Base resta un **DEFERRED VALIDATION
 ITEM / POST-RELEASE VERIFICATION GATE**, distinto dal blocco PIN. Non sono
 attestati una validazione completa multipiattaforma o un installer firmato

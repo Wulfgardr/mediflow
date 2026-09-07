@@ -40,7 +40,9 @@ verifica mobile differita.
 [Review di sicurezza Daybreak](./analysis/2026-09-07-086-daybreak-security-review.md):
 report completo derivato, provenienza e sintesi dei sei ambiti; 298/298 elementi,
 13 test Node PASS, zero vulnerabilità reportabili e promozione bloccata dal
-contratto PIN. Da consultare prima della promozione della 0.8.6.
+contratto PIN. Approfondimento: hardening dei limiti delle richieste assegnato,
+firma di produzione non attestata, membership per operatore fuori scope e
+ThisDeviceOnly limitato alla nuova chiave cache. Prima della promozione 0.8.6.
 
 [Verifica della cartella Apple](./analysis/2026-09-06-086-apple-ui-verification.md):
 sorgenti, toolchain, prove delle bozze e limiti della lane nativa.

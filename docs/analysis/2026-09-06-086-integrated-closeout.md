@@ -23,7 +23,9 @@ La review successiva rileva però un difetto rispetto a
 [ADR 0106](../adr/0106-web-auth-logout-pin-setup-lifecycle.md): dopo il cambio
 PIN riuscito, o una risposta non osservabile dopo l'invio, il client Apple
 conserva autorità e presentazione locali. La correzione richiesta riguarda
-questo contratto; non estende le funzionalità del candidato.
+questo contratto; non estende le funzionalità del candidato. Il coordinatore
+include anche il `409` con ritiro non confermato dopo il CAS fra gli esiti
+ambigui che richiedono pulizia locale. La correzione resta da provare.
 
 La review registra sei ambiti, **298/298 elementi esaminati**, **13 test Node
 PASS** e **zero vulnerabilità reportabili** nel modello di minaccia adottato.
@@ -36,7 +38,9 @@ conserva il testo completo, gli hash originali, le esclusioni e i test non esegu
 | Residuo di accettazione | Disposizione |
 | --- | --- |
 | Ritiro dell'autorità locale dopo cambio PIN nativo | **BLOCK aperto**: occorrono commit della correzione e prove pertinenti prima di rimuoverlo. |
-| Limiti del corpo delle richieste, Keychain di produzione, futuro modello multioperatore | Tre domande aperte, in analisi separata; nessuna risposta presunta. |
+| Limiti del corpo delle richieste | Lacuna di hardening nel proxy sorgente, assegnata a una lane separata; correzione e impatto runtime non attestati. |
+| Firma, entitlements e Keychain | Produzione non attestabile dal pacchetto sorgente senza artefatto firmato e con Xcode non disponibile. ThisDeviceOnly riguarda il nuovo inserimento della chiave cache, non il token paired. |
+| Appartenenza operatore–ambulatorio | Non-goal attuale secondo ADR 0036; nessun nuovo RBAC richiesto per la 0.8.6. |
 | Interoperabilità UI mirata iPhone ↔ Mac/Home Base | **DEFERRED VALIDATION ITEM / POST-RELEASE VERIFICATION GATE**, distinto dal blocco PIN. |
 
 Le prove Windows/Linux e Apple fixture/simulator già acquisite mantengono
@@ -326,8 +330,10 @@ o una revisione completa di ogni singolo form Apple.
   Non esiste una fotografia precedente sufficiente e non è stato tentato
   un ripristino. Il reader iniettato ora evita quell'import del database.
 
-La promozione richiede ancora la chiusura del blocco PIN, la disposizione
-delle domande aperte della review, la revisione del diff e i controlli remoti.
+La promozione richiede ancora la chiusura del blocco PIN, la verifica della
+correzione di hardening assegnata, la revisione del diff e i controlli remoti.
+La firma di produzione resta una prova di distribuzione separata; il non-goal
+RBAC non introduce un nuovo requisito di implementazione nella 0.8.6.
 La verifica UI mobile resta differita come dichiarato sopra. Le issue non
 sono dichiarate chiuse e non sono state modificate su GitHub o Linear. Firma, notarizzazione e release restano
 distinte dal merge richiesto.
