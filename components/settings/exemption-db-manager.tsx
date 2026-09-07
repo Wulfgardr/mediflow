@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from 'react';
 import { AlertTriangle, CheckCircle, Database, RefreshCw, Trash2, Upload } from 'lucide-react';
 import { clearExemptionDatabase, getExemptionStats, importExemptionFiles } from '@/lib/exemption-importer';
 import { useConfirm } from '@/components/ui/confirm-dialog';
-import styles from './settings-lume.module.css';
 
 type MessageState = {
     type: 'success' | 'error';
@@ -161,12 +160,14 @@ export default function ExemptionDbManager() {
                             <Upload className="w-6 h-6" />
                         </div>
                         <div>
-                            <p className="text-sm font-medium text-gray-700 dark:text-gray-200">Drag & drop file esenzioni</p>
+                            <p className="text-sm font-medium text-gray-700 dark:text-gray-200">Trascina qui i file delle esenzioni</p>
                             <p className="text-xs text-gray-500 mt-1">File delimitati da | (es. Esenzioni.txt, Invalidita.txt).</p>
                         </div>
                         <button
+                            type="button"
                             onClick={() => fileInputRef.current?.click()}
-                            className="inline-flex items-center gap-2 rounded-full border border-[color:color-mix(in_srgb,var(--lume-ink)_18%,transparent)] bg-[color:var(--lume-surface-field)] px-4 py-2 text-sm font-medium text-[color:var(--lume-ink)] transition-colors hover:bg-[color:color-mix(in_srgb,var(--lume-ink)_5%,var(--lume-surface-field))]"
+                            className="ui-btn-secondary"
+                            data-lume-action="quiet"
                         >
                             Seleziona file
                         </button>
@@ -200,17 +201,21 @@ export default function ExemptionDbManager() {
                 </div>
             )}
 
-            <div className="pt-2 border-t border-gray-100 dark:border-gray-700 flex items-center justify-between">
+            <div className="flex flex-wrap items-center gap-3 border-t border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] pt-4">
                 <button
+                    type="button"
                     onClick={refreshStats}
-                    className={`inline-flex items-center gap-1 rounded-full bg-white/75 px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700 dark:bg-white/5 dark:hover:text-gray-300 ${styles.quietShadow}`}
+                    className="ui-btn-secondary"
+                    data-lume-action="quiet"
                 >
                     <RefreshCw className="w-3 h-3" />
                     Aggiorna conteggio
                 </button>
                 <button
+                    type="button"
                     onClick={handleClear}
-                    className="inline-flex items-center gap-1 rounded-full bg-red-50 px-3 py-1.5 text-xs text-red-500 hover:text-red-700 dark:bg-red-900/10"
+                    className="ui-btn-secondary text-[color:var(--lume-signal-critical)]"
+                    data-lume-action="quiet"
                 >
                     <Trash2 className="w-3 h-3" />
                     Svuota repertorio
