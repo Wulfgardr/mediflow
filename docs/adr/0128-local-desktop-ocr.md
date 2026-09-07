@@ -59,6 +59,14 @@ qualifica. Restituisce una guida locale e non scarica nulla. Il risultato OCR
 riporta l'identita Tesseract, i digest di core/modello/worker e gli hash di
 input e output. Nessuna provenienza Apple Vision viene fabbricata.
 
+Precisazione del 7 settembre dopo la prova guest: il comando di preflight
+esegue anche un PDF nativo interamente sintetico attraverso l'owner AnyDoc
+esistente. Un binding AnyDoc non caricabile deve produrre exit 1 e guida ai
+prerequisiti locali, anche se gli artifact Tesseract sono integri. La funzione
+sincrona di inventario artifact non prova il caricamento dei binding nativi.
+Il controllo non installa runtime Microsoft, non avvia OCR e non qualifica
+renderer, pacchetto o accuratezza. Il confine di estrazione resta invariato.
+
 Currentness, revoca, sorgente host-owned e pubblicazione finale restano negli
 owner esistenti. Anteprima obbligatoriamente review-only, writes=0, apply=none.
 Nessun cambiamento a DB, Fabric, cataloghi, account, impostazioni o API v1;
