@@ -33,16 +33,16 @@ Ultimo aggiornamento: 2026-09-07
 <!-- @Codex -->
 ## Consegna 0.8.6
 
-[Stato del candidato integrato](./analysis/2026-09-06-086-integrated-closeout.md):
-decisione storica di congelamento, blocco PIN aperto, prove conservate e
-verifica mobile differita.
+[Verifica di rilascio 0.8.6](./analysis/2026-09-07-086-release-verification.md): fonte corrente
+per SHA, ricevute, correzioni PIN/allegati, test e limiti. Nessun finding
+reportabile residuo nel perimetro sorgente; pacchetto sorgente autorizzato,
+CI verde e pubblicazione pendenti. Suite completa con un fallimento conservato.
 
-[Review di sicurezza Daybreak](./analysis/2026-09-07-086-daybreak-security-review.md):
-report completo derivato, provenienza e sintesi dei sei ambiti; 298/298 elementi,
-13 test Node PASS, zero vulnerabilità reportabili e promozione bloccata dal
-contratto PIN. Approfondimento: hardening dei limiti delle richieste assegnato,
-firma di produzione non attestata, membership per operatore fuori scope e
-ThisDeviceOnly limitato alla nuova chiave cache. Prima della promozione 0.8.6.
+[Verbale integrato](./analysis/2026-09-06-086-integrated-closeout.md):
+prove e decisioni storiche, con disposizione aggiornata.
+[Review Daybreak](./analysis/2026-09-07-086-daybreak-security-review.md):
+report inglese storico intatto e addenda sanitizzati; firma di produzione
+non attestata e RBAC per operatore esplicitamente fuori scope.
 
 [Verifica della cartella Apple](./analysis/2026-09-06-086-apple-ui-verification.md):
 sorgenti, toolchain, prove delle bozze e limiti della lane nativa.

@@ -7,19 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.8.6] - Unreleased
 
-The feature-complete decision at `c320694c3` is retained as history. The
-[Daybreak security review](./docs/analysis/2026-09-07-086-daybreak-security-review.md)
-of `1d633d98d0a0` records 298/298 review items closed, 13 Node tests PASS and
-zero reportable vulnerabilities, but **promotion is BLOCKED** by the native
-PIN-change contract defect. Correction and relevant verification remain open.
-The follow-up identifies a request-body limit hardening gap assigned separately;
-production signing/entitlements remain unverified. ThisDeviceOnly applies to
-new cache-key insertion, not the paired token. Per-operator ambulatory membership
-remains an ADR 0036 non-goal; no new RBAC is claimed.
-This entry does not imply a PR, tag, release or production-signed installer.
+The feature-complete decision at `c320694c3` remains historical. Independent
+addenda close the native PIN source-contract defect (`cefa5c78`) and verify
+the attachment-budget fix (`be923328`, integrated at `11a42f68`). No reportable
+finding remains in the reviewed source. The source-package release is authorized
+but pending green CI; final CI, PR, merge and tag are not yet evidenced.
+[Release verification](./docs/analysis/2026-09-07-086-release-verification.md)
+records exact sources, receipt hashes and limits. The full unit run remains
+3224 PASS / 1 FAIL / 1 SKIP; the separate 13/13 run does not make it all green.
+Production signing/entitlements remain unverified. ThisDeviceOnly applies to
+new cache-key insertion, not the paired token. Operator-to-ambulatory RBAC is
+an explicit ADR 0036 non-goal, not an unfixed security finding.
 Targeted iPhone–Mac/Home Base UI interoperability remains a **DEFERRED VALIDATION
-ITEM / POST-RELEASE VERIFICATION GATE**. Existing platform evidence is retained;
-the release must not be described as fully validated cross-platform.
+ITEM / POST-RELEASE VERIFICATION GATE**; no fully validated cross-platform or
+production-signed installer claim is made.
 
 - The ordinary web UI uses top navigation by default and offers sidebar navigation in Appearance. Patient records open with one click; sections, clinical entry, typography and sliders use the refined layout.
 - Apple patient workspaces show one clinical section at a time, preserve drafts during document consultation and keep finalized Mac transcripts separate until explicitly reviewed. The rich-text editor supports selected inline styles and local undo; saves protect pending drafts, and conflicts require explicit review before another write.

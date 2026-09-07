@@ -1,5 +1,24 @@
 # MediFlow 0.8.6: candidato, review e blocchi di consegna
 
+**7 settembre 2026 — correzioni sorgente verificate; CI e pubblicazione pendenti.**
+Il blocco contrattuale PIN è chiuso a livello sorgente dall'addendum indipendente
+`SOURCE_REVIEW_PASS` su `cefa5c78f43ada28e9d74f2d65e5f2173b15edb8`.
+Il finding LOW `csf_e6ea8156c1fde74d61ebf750`, emerso nel primo addendum JSON,
+ha esito `FIX_VERIFIED` su `be9233282c0ab18759b0e679b877d9dc30af5a99`.
+I due file PIN e i sette file della correzione allegati sono identici nel
+candidato integrato `11a42f68effbdc11cd6371bf050a6e2e074de5b3`.
+Non restano finding reportabili nel sorgente revisionato; questo non certifica
+la sicurezza generale. Il rilascio del pacchetto sorgente è autorizzato ma
+attende CI verde. CI finale, PR, merge e tag non sono ancora attestati.
+
+La [verifica di rilascio](./2026-09-07-086-release-verification.md) prevale per lo stato corrente.
+
+## Fotografia storica prima degli addenda del 7 settembre
+
+Le affermazioni di blocco sotto descrivono la review iniziale, non lo stato
+attuale; prove, fallimenti e SHA storici sono conservati senza reinterpretazione.
+
+
 Aggiornamento: 7 settembre 2026. Branch `codex/WUL-669-086-integrated-candidate`.
 Base del programma: `b72ac713b624e7d771262e4e01c5c5e1f56f9ae2`.
 La decisione di sviluppo concluso sul candidato
