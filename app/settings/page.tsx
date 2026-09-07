@@ -283,6 +283,8 @@ export default function SettingsPage() {
                     <Link href="/settings/backup" className={styles.secondaryAction}>Backup</Link>
                     <Link href="/settings/profilo" className={styles.secondaryAction}>Profilo</Link>
                     <Link href="/settings/repertori" className={styles.secondaryAction}>Repertori</Link>
+                    {/* @Codex */}
+                    <Link href="/settings/ai/fabric" className={styles.secondaryAction}>Intelligence Fabric</Link>
                 </div>
             </nav>
         </div>

@@ -44,7 +44,7 @@ export function FunctionStatusPanel() {
                         return <li key={row.id} data-testid={`function-state-${row.id}`} className="py-4 first:pt-0 last:pb-0">
                             <div className="flex flex-wrap items-center justify-between gap-2">
                                 <h3 className="text-sm font-semibold">{meta.title}</h3>
-                                <span className="text-xs font-medium" data-state={row.state}>{FUNCTION_STATE_LABELS[row.state]}</span>
+                                <span className="inline-flex items-center border border-[color:var(--lume-border)] bg-[color:var(--lume-surface-field)]" data-lume-status data-state={row.state}>{FUNCTION_STATE_LABELS[row.state]}</span>
                             </div>
                             <p className="mt-1 text-sm text-[color:var(--lume-ink-muted)]">{meta.purpose}</p>
                             <p className="mt-2 text-sm leading-6">{row.reason}</p>
@@ -54,7 +54,7 @@ export function FunctionStatusPanel() {
                                     <p className="mt-2">{row.provider}{row.model ? ` · ${row.model}` : ''}</p>
                                     <p className="mt-1">Ultima esecuzione: non rilevata da questa vista.</p>
                                 </details>
-                                <Link className="text-sm underline underline-offset-4" href={action.href}>{action.action}</Link>
+                                <Link className={SETTINGS_SECONDARY_BUTTON_CLASS} href={action.href}>{action.action}</Link>
                             </div>
                         </li>;
                     })}

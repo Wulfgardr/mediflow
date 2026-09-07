@@ -5,8 +5,8 @@
 // Wave 0.8.1 — razionalizzazione dell'IA (WUL-522 fabric visibility):
 // - "Sicurezza e Dati" -> "Dati e sicurezza": l'accesso viene prima dei dati
 //   che protegge, e i Repertori restano qui perche' sono corpus locale.
-// - "Intelligenza Artificiale" -> "Intelligenza locale": il gruppo dichiara la
-//   promessa del prodotto invece della tecnologia.
+// @Codex: il nome Intelligence Fabric resta riconoscibile nella navigazione.
+// Il gruppo Funzioni intelligenti comprende stato, modelli e interruttori.
 // - Nuova voce `ai-fabric`: la Intelligence Fabric (ADR 0089/0090/0091) aveva
 //   contratto, status ed observability server-side ma nessuna superficie. E'
 //   la prima voce del gruppo perche' e' il registro che spiega tutte le altre.
@@ -105,13 +105,13 @@ export const SETTINGS_NAV_GROUPS: SettingsNavGroup[] = [
     },
     {
         id: 'ai',
-        label: 'Intelligenza locale',
+        label: 'Funzioni intelligenti',
         items: [
             {
                 id: 'ai-fabric',
                 href: '/settings/ai/fabric',
-                label: 'Capacità e connessioni',
-                description: 'Registro capability, dove gira il calcolo, egress',
+                label: 'Intelligence Fabric',
+                description: 'Stato delle funzioni, modelli e connessioni',
                 keywords: [
                     'fabric',
                     'intelligence fabric',
