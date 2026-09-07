@@ -72,93 +72,135 @@ Binding, immagine e dataset separano le chiavi. Disable, cambio configurazione,
 dispose o clock regressivo invalidano cache e risultati pendenti. Il listener
 loopback non autentica gli altri processi locali dell'host.
 
-## Percorso guidato locale
+## Percorso ordinario sul Mac: tre passi
 
-In **Impostazioni > Terminologia WHO > Configura WHO locale passo per passo**
-la guida accompagna prerequisiti, manifesto/termini, installazione/configurazione
-ed esempio Search. I comandi si eseguono sul computer del server, dalla cartella
-MediFlow, con Node.js 24. La pagina non legge file locali, esegue Docker o salva
-consensi. Le conferme della guida sbloccano soltanto la copia dei comandi; la CLI
-valida nuovamente il manifesto e la conferma esatta.
+La procedura ordinaria non richiede hash, editing JSON o configurazione di
+variabili. Il percorso supportato e **macOS Apple Silicon**, con Node 24 gia
+previsto da MediFlow e un motore Docker locale Linux ARM64. Windows e Linux
+non sono ancora supportati dal nuovo onboarding.
 
-Prerequisiti: motore Docker Linux ARM64 gia avviato, contesto esplicito con
-socket Unix locale, porta 8382 disponibile per nuove installazioni, spazio per
-immagine, dataset e snapshot. Il dataset osservato occupa 493.455.110 byte;
-questo non e una stima dello spazio totale o un requisito minimo universale.
-Con Colima scegliere il contesto del profilo locale previsto: la CLI non crea
-VM, cambia contesto globale o installa il runtime host. Se Docker non risponde,
-il risultato indica di avviare il runtime scelto e ripetere `status`.
+1. Sul Mac che ospita MediFlow, avvia Docker Desktop o il runtime locale scelto.
+   La procedura ne verifica la disponibilita; se esistono piu contesti locali,
+   propone una scelta numerata. Non installa o modifica VM e non cambia il
+   contesto Docker predefinito.
+2. Nella cartella MediFlow, apri **Setup_WHO.command**, oppure esegui:
 
-Creare una cartella privata fuori Git e sostituire i percorsi di esempio:
+   ```bash
+   ./Setup_WHO.command
+   ```
+
+   La procedura mostra versione, lingua, termini WHO e operazioni previste.
+   Scrivere `ACCETTO` registra il gesto locale per WHO ICD API 2.6.0 / ICD-11
+   MMS 2026-01 inglese e autorizza download e verifiche del solo nuovo servizio.
+   Non si richiedono credenziali WHO. Se Docker manca, la porta e occupata o il
+   servizio esistente non appartiene alla procedura, compare un blocco leggibile;
+   quel servizio non viene adottato, sostituito o interrotto.
+3. Attendi le verifiche e scegli l'avvio di MediFlow proposto al termine.
+   **Avvia MediFlow con WHO**, creato nella cartella privata del setup, carica
+   automaticamente la configurazione anche negli avvii successivi. Un server
+   gia attivo non viene interrotto: il collegamento si usa al prossimo avvio.
+   In MediFlow premi **Rileggi configurazione** e **Verifica con termine di
+   esempio**. Configurato, risposta diretta e cache restano stati distinti.
+
+La UI ordinaria espone solo questi tre passaggi. I dettagli sono nella
+sezione **Per chi gestisce il server**. Il comando e una procedura host: il
+browser non riceve autorita Docker e non esegue installazioni.
+
+### Cosa viene preparato automaticamente
+
+Il release-lock `who-local-release-lock.json` contiene metadati pubblici
+verificati nel registry ufficiale il 7 settembre 2026. La procedura verifica
+SHA-256 dell'indice OCI, del manifesto ARM64 e della receipt pubblica di
+acquisizione dei metadati prima di usarli. Docker acquisisce l'immagine al
+digest, non a `latest`. Questa e una verifica del lock distribuito, non una
+nuova osservazione del registry a ogni avvio. Le evidenze non contengono
+accettazione dell'operatore, snapshot, hash dataset o prove di altri deployment.
+
+Il setup conserva in `~/Library/Application Support/MediFlow/WHO/2026-01_en`
+una registrazione privata dell'installazione, il gesto di licenza, manifesto,
+configurazione, snapshot e receipt. Directory 0700, metadati/configurazione
+0600; i cinque file snapshot mantengono 0644 dentro la directory privata,
+per ripristinare i metadati 0:0/0644 verificati nel container. Il dataset
+osservato occupa 493.455.110 byte; immagine, copia locale e container di
+ripristino richiedono ulteriore spazio. Non e una stima del totale.
+
+Il consenso riguarda la specifica installazione, identificata con UUID e
+container ID. Il setup non riusa l'accettazione del deployment di prova.
+Container e network creati hanno una label di ownership controllata prima
+delle operazioni: nessuna adozione da un solo nome, nessun `Config.Env`,
+log generico, segreto, intera `/tmp` o database clinico.
+
+### Qualifica calcolata sul proprio deployment
+
+La procedura esegue automaticamente questi controlli, senza checkbox di prova:
+
+- verifica Search sul catalogo acquisito con un termine pubblico fissato;
+- ferma soltanto il proprio container e copia i cinque file previsti per
+  questa release, controllando tipo, dimensione e permessi; calcola SHA-256 e
+  inventario dai byte della nuova copia, senza hash del deployment precedente;
+- collega una rete Docker interna, scollega bridge a container in esecuzione
+  e riavvia senza rete esterna; verifica network interno senza IPv6/default
+  route prima e dopo una nuova Search;
+- crea un secondo container della stessa immagine sulla sola rete interna,
+  ripristina i cinque file e prova un altro termine pubblico; confronta byte,
+  hash e metadati dei file ripristinati;
+- ferma la copia di prova, riporta il proprio container su bridge e ne controlla
+  di nuovo ownership, file e hash. La copia e la rete vengono conservate,
+  senza rimozioni automatiche.
+
+La receipt lega ogni tentativo a installazione, container original/restored,
+immagine, network, inventario, esiti e timestamp. Solo tutti i controlli riusciti
+producono `offlineRestartVerified/restoreVerified` e configurazione abilitata.
+Un fallimento conserva receipt incompleta e snapshot, disabilita il file di
+configurazione per gli avvii successivi e tenta il recupero del solo servizio
+posseduto. Non modifica l'ambiente di un processo MediFlow gia in esecuzione.
+Se anche il recupero fallisce, segnala l'intervento necessario del gestore.
+
+Le prove attestano la topologia Docker interna osservata senza default route,
+non un isolamento generale da qualsiasi egress dell'host. I probe misurano
+risposte WHO bounded e non sostituiscono il parser/DTO runtime, la verifica
+applicativa autenticata o una valutazione clinica.
+
+La sequenza segue le semantiche documentate di
+[Docker network disconnect](https://docs.docker.com/reference/cli/docker/network/disconnect/)
+(container in esecuzione) e
+[Docker cp](https://docs.docker.com/reference/cli/docker/container/cp/)
+(copia anche da container fermo, proprietario destinazione e permessi conservati).
+
+### Per chi gestisce il server
 
 ```bash
-node scripts/who-local-setup.mjs init --manifest /percorso/privato/who-manifest.json
-node scripts/who-local-setup.mjs plan --manifest /percorso/privato/who-manifest.json
+./Setup_WHO.command status
+./Setup_WHO.command qualify
+./Setup_WHO.command start
 ```
 
-`init` crea il template con permessi 0600 senza sovrascritture. Compilare con un
-editor il lock del registry e l'accettazione esatta secondo i passi 2–3 della
-procedura sottostante. Nessun valore sintetico o consenso precompilato. `plan`
-mostra separatamente i campi mancanti per provisioning e attivazione; non usa
-Docker o rete e non verifica la veridicita delle registrazioni.
+`status` legge soltanto lo stato del servizio registrato e non lo qualifica.
+`qualify` richiede conferma interattiva e ripete prove sul solo deployment
+creato dalla procedura; non accetta receipt/booleani forniti dall'utente.
+`start` carica automaticamente le tre variabili WHO dal manifesto qualificato
+nel launcher MediFlow, preserva le altre impostazioni e nega l'avvio se il
+server e gia in esecuzione sulla porta prevista. Non apre una nuova API.
 
-**Deployment gia esistente:** usare il manifesto qualificato e il nome esatto
-del container. `status` legge solo contesto locale, architettura, digest, stato,
-porte, numero mount e policy runtime; non legge `.Config.Env`, log, segreti,
-dataset o DB. Non interroga WHO e non modifica il servizio.
+Una seconda esecuzione ordinaria riusa la propria installazione qualificata
+senza download o nuove prove. Un tentativo incompleto resta riprendibile;
+la concorrenza e bloccata da un lock privato. Dopo un'interruzione forzata il
+gestore deve verificare il processo e lo stato delle sole risorse registrate
+prima di rimuovere il lock: non viene cancellato automaticamente per eta.
 
-```bash
-node scripts/who-local-setup.mjs status --manifest /percorso/privato/who-manifest.json --context CONTESTO --container CONTAINER_WHO
-```
+La CLI tecnica `scripts/who-local-setup.mjs` resta disponibile per deployment
+preesistenti gestiti separatamente: `init`, `plan`, `status`, `install`,
+`configure` con le opzioni mostrate da `--help`. Non costituisce onboarding
+ordinario e non trasferisce prove o ownership alla nuova procedura.
 
-**Solo nuova installazione**, dopo licenza e registry lock: questa conferma
-abilita acquisizione dell'immagine fissata e avvio del solo nuovo container
-`mediflow-who-2026-01-guided`. L'acquisizione iniziale del dataset richiede rete. Il manifesto di una nuova
-installazione deve avere snapshot non valorizzati e prove offline/ripristino
-false: non puo ereditare la qualifica di un altro deployment.
+**Limite del candidato:** nuova orchestrazione, errori e recupero sono coperti
+con Docker sintetico e file temporanei reali; non e stata eseguita una nuova
+installazione live. Il deployment gia qualificato non e stato riprovato. Una
+prova live del nuovo installer su risorse/porta separate richiede ownership e
+autorizzazione del parent. Non chiamare il percorso live qualificato sulla sola
+base dei test o della fixture UI.
 
-```bash
-node scripts/who-local-setup.mjs install --manifest /percorso/privato/who-manifest.json --context CONTESTO --confirm install-who-2.6.0-2026-01_en
-```
-
-Nessun URL, immagine, comando shell o argomento Docker libero. Sono fissati
-versione/piattaforma, include, bind loopback, consenso gia registrato, analytics,
-DORIS e FHIR disabilitati, zero mount e nessun riavvio automatico. Container
-omonimo o porta occupata bloccano prima del download. Fallimenti di pull,
-creazione o avvio indicano la fase; nessun cleanup distruttivo o retry automatico.
-L'avvio non prova acquisizione completa, Search, offline o ripristino. Completare
-i passi 5–6 della qualifica; per il deployment gia qualificato riusare le prove
-pertinenti, senza ripetere download, riavvio o ripristino per il solo wizard.
-
-**Attivazione:** dopo manifesto valido per `activate` e metadati del container
-in esecuzione coerenti, il comando scrive un nuovo file 0600 con le sole tre
-variabili server. Per il container creato dalla guida omettere `--container`.
-
-```bash
-node scripts/who-local-setup.mjs configure --manifest /percorso/privato/who-manifest.json --context CONTESTO --container CONTAINER_WHO --output /percorso/privato/who.env --confirm enable-who-2026-01_en
-```
-
-Caricare `who.env` nel successivo avvio autorizzato del supervisore. Con Node 24
-si usa `node --env-file=/percorso/privato/who.env <entrypoint>`: conservare
-entrypoint, directory dati, porta e opzioni del deployment. Le variabili gia
-esportate hanno precedenza sul file. La CLI non avvia o riavvia MediFlow e non
-sostituisce `.env.local` o file esistenti. Per sviluppo, con directory dati
-esplicitamente scelta e server precedente gia arrestato dal suo gestore:
-
-```bash
-MEDIFLOW_DATA_DIR=/percorso/dati/mediflow node --env-file=/percorso/privato/who.env node_modules/next/dist/bin/next dev --hostname 127.0.0.1 --port 3000
-```
-
-Poi premere **Rileggi configurazione** e **Verifica con termine di esempio**:
-la risposta diretta e distinta dalla cache, dagli errori e dallo stato soltanto
-configurato. Per disabilitare al successivo avvio impostare
-`MEDIFLOW_ICD_WHO_ENABLED=0`, preservando manifesto/snapshot. Nessun OAuth WHO.
-
-Le prove sintetiche della CLI e del wizard non qualificano una nuova
-installazione end-to-end. Il riscontro metadata-only sul deployment esistente
-non riverifica dataset, opzioni d'ambiente, licenza o integrita del runtime.
-
-## Provisioning manuale sul target autorizzato
+## Procedura tecnica per deployment gestiti separatamente
 
 1. Copiare il manifesto fuori Git e verificare target, risorse, disponibilita
    della porta e runtime container. Il candidato fissa `linux/arm64`; non prova
@@ -255,7 +297,7 @@ limiti, cache, timeout e manifesto. Non usano un servizio WHO o un corpus reale.
 ```bash
 node scripts/run-strip-types.mjs --test lib/reference-data/icd11-who-local-*.test.ts
 node scripts/run-strip-types.mjs --test lib/reference-data/icd11-who-code-check.test.ts lib/reference-data/icd11-who-production.test.ts
-node --test scripts/check-who-local-sidecar-manifest.test.mjs scripts/who-local-setup.test.mjs
+node --test scripts/check-who-local-sidecar-manifest.test.mjs scripts/who-local-setup.test.mjs scripts/who-local-onboarding.test.mjs
 ```
 
 Il DTO v2 conserva codice, titolo, URI canonico, partial e identita della fonte;

@@ -83,8 +83,8 @@ test('WHO local verification is explicit and separates direct response, cache an
     await expect(panel.getByRole('alert')).toContainText('Verifica non riuscita');
     await expect(panel.getByRole('status')).toHaveCount(0);
     expect(searches).toBe(3);
-    await panel.getByText('Configurazione sul server', { exact: true }).click();
-    await expect(panel.locator('input, textarea')).toHaveCount(0);
+    await panel.getByText('Per chi gestisce il server', { exact: true }).click();
+    await expect(panel.getByTestId('who-local-setup-guide').locator('input, textarea')).toHaveCount(0);
     await expect(panel).toContainText('MEDIFLOW_ICD_WHO_LOCAL_IMAGE_DIGEST');
     await expect(panel).not.toContainText('MEDIFLOW_ICD_WHO_CLIENT_SECRET');
 });

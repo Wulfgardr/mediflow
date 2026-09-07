@@ -87,7 +87,7 @@ export function runDocker(args, timeout = 8000) {
     return result.stdout.trim();
 }
 const json = value => { try { return JSON.parse(value); } catch { fail('docker_unavailable'); } };
-function localEngine(context, run) {
+export function localEngine(context, run) {
     const endpoint = run(['context', 'inspect', context, '--format', '{{.Endpoints.docker.Host}}']);
     if (!/^unix:\/\/\//u.test(endpoint) || /[\r\n\0]/u.test(endpoint)) fail('local_context_required');
     const info = json(run(['--context', context, 'info', '--format', '{"os":{{json .OSType}},"arch":{{json .Architecture}}}']));
@@ -113,7 +113,7 @@ export function inspectStatus(manifest, context, container, run = runDocker) {
         && Object.entries(c.ports).every(([key, value]) => key === '80/tcp' || value === null);
     return { state: !matching ? 'container_binding_mismatch' : c.running === true ? 'running' : 'container_not_running', matching };
 }
-function checkPort() {
+export function checkPort() {
     return new Promise((resolve, reject) => {
         const server = net.createServer();
         server.once('error', () => reject(new SetupError('port_in_use')));
