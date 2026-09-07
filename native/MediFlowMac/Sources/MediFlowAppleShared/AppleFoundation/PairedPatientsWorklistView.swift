@@ -282,7 +282,10 @@ struct PairedPatientsWorklistView: View {
                     .font(.headline)
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
-                    .accessibilityLabel("\(filteredPatients.count) pazienti visibili nell'elenco caricato")
+                    // @Codex: the filtered result can contain exactly one patient.
+                    .accessibilityLabel(filteredPatients.count == 1
+                        ? "1 paziente visibile nell'elenco caricato"
+                        : "\(filteredPatients.count) pazienti visibili nell'elenco caricato")
                     .help("Risultati nell'elenco caricato, dopo ricerca e filtro di stato.")
                     .accessibilityIdentifier("patient-worklist-count")
             }
