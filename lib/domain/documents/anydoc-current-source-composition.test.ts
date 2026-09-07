@@ -335,11 +335,11 @@ test('keeps the composition callback-free and outside P4, routes, storage, and l
     assert.ok(finalizeAt > authorityAt); assert.ok(publishAt > finalizeAt);
 });
 
-test('admits the complete Apple Vision fallback before page work and releases it on every exit', () => {
+test('admits the complete local OCR continuation before page work and releases it on every exit', () => {
     const source = fs.readFileSync(new URL('./anydoc-apple-vision-ocr-composition.ts', import.meta.url), 'utf8');
-    const admissionAt = source.indexOf('if (activeAppleVisionDocument)');
+    const admissionAt = source.indexOf('if (activeLocalOcrDocument)');
     const routingAt = source.indexOf('await extractAnyDocPageRoutingBytes(bytes)');
     assert.ok(admissionAt >= 0); assert.ok(routingAt > admissionAt);
     assert.match(source, /return mapAnyDocLocalFailure\(source, 'resourceLimit'\)/u);
-    assert.match(source, /finally \{ activeAppleVisionDocument = false; \}/u);
+    assert.match(source, /finally \{ activeLocalOcrDocument = false; \}/u);
 });

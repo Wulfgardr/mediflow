@@ -61,7 +61,7 @@ async function parsePreview(raw: unknown, expectedAttachmentId: string): Promise
     let ocr: AnyDocLocalExtractionPreview['ocr'];
     if (Object.hasOwn(receipt, 'ocrProvenance')) {
         const provenance = exact(receipt.ocrProvenance, OCR_PROVENANCE_KEYS);
-        if (!provenance || provenance.schemaVersion !== OCR_PROVENANCE_SCHEMA || provenance.engine !== 'apple_vision'
+        if (!provenance || provenance.schemaVersion !== OCR_PROVENANCE_SCHEMA || (provenance.engine !== 'apple_vision' && provenance.engine !== 'tesseract_wasm')
             || !SHA256.test(provenance.scriptSha256 as string) || !SHA256.test(provenance.receiptSetSha256 as string)
             || !Number.isSafeInteger(provenance.pageCount) || (provenance.pageCount as number) < 1
             || (provenance.pageCount as number) > 500 || !Number.isSafeInteger(provenance.ocrPageCount)

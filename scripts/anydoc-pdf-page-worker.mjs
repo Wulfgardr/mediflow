@@ -2,7 +2,10 @@
 /* @Codex */
 import { createRequire, registerHooks } from 'node:module';
 import { performance } from 'node:perf_hooks';
-import { writeSync } from 'node:fs';
+import { writeSync, readFileSync, realpathSync, lstatSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const SCHEMA_VERSION = 'mediflow.anydoc_pdf_child_protocol.v1';
 const MAX_HEADER_BYTES = 64 * 1024;
@@ -18,7 +21,7 @@ const CLEANUP_OBSERVATION_MS = 250;
 const DPI = 144;
 const PDFJS_VERSION = '4.10.38';
 const CANVAS_VERSION = '0.1.100';
-const MAX_INPUT_BYTES = 4 + MAX_HEADER_BYTES + MAX_SOURCE_BYTES;
+const MAX_INPUT_BYTES = 4 + MAX_HEADER_BYTES + MAX_TOTAL_RASTER_BYTES;
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 const require = createRequire(import.meta.url);
 const NETWORK_MODULES = new Set([
@@ -191,15 +194,29 @@ async function materialize(request) {
 }
 
 async function loadRenderer() {
-    if (process.platform !== 'darwin' || process.arch !== 'arm64'
-        || process.versions.node.split('.')[0] !== '24') throw new EngineUnavailable();
+    if (process.versions.node.split('.')[0] !== '24') throw new EngineUnavailable();
+    const profiles = JSON.parse(readFileSync(new URL('./anydoc-pdf-renderer-profiles.json', import.meta.url), 'utf8'));
+    const profile = profiles.find((entry) => entry.platform === process.platform && entry.arch === process.arch);
+    const glibc = process.platform === 'linux' ? String(process.report.getReport().header.glibcVersionRuntime).split('.').map(Number) : [];
+    if (!profile || (profile.libc === 'glibc' && !(glibc[0] > 2 || (glibc[0] === 2 && glibc[1] >= 18))))
+        throw new EngineUnavailable();
     let installedPdfJs;
     let installedCanvas;
     let installedProfile;
     try {
         installedPdfJs = require('pdfjs-dist/package.json').version;
         installedCanvas = require('@napi-rs/canvas/package.json').version;
-        installedProfile = require('@napi-rs/canvas-darwin-arm64/package.json').version;
+        installedProfile = require(`${profile.package}/package.json`).version;
+        // @Codex: macOS packaging relocates and signs canvas; preserve its existing version gate.
+        if (process.platform !== 'darwin') {
+            const binaryPath = require.resolve(`${profile.package}/${profile.binary}`);
+            const root = realpathSync(fileURLToPath(new URL('..', import.meta.url)));
+            const relative = path.relative(root, realpathSync(binaryPath));
+            if (!lstatSync(binaryPath).isFile() || relative.startsWith('..') || path.isAbsolute(relative)) throw new EngineUnavailable();
+            const binary = readFileSync(binaryPath);
+            if (binary.byteLength !== profile.binaryByteLength
+                || createHash('sha256').update(binary).digest('hex') !== profile.binarySha256) throw new EngineUnavailable();
+        }
     } catch { throw new EngineUnavailable(); }
     if (installedPdfJs !== PDFJS_VERSION || installedCanvas !== CANVAS_VERSION
         || installedProfile !== CANVAS_VERSION) throw new EngineUnavailable();
@@ -339,6 +356,68 @@ function emitRendered(pages) {
     process.stdout.write(encodeFrame(header, pages.map((page) => page.pngBytes)));
 }
 
+/* @Codex: one LSTM core instance per bounded document, no nested worker or native addon. */
+async function recognizeTesseract(frame) {
+    const h = exact(frame?.header, ['schemaVersion', 'operation', 'pages', 'bodyByteLength']);
+    if (!h || h.schemaVersion !== SCHEMA_VERSION || h.operation !== 'recognize_tesseract'
+        || !Array.isArray(h.pages) || h.pages.length < 1 || h.pages.length > MAX_RENDER_PAGES
+        || h.bodyByteLength !== frame.body.byteLength || h.bodyByteLength > MAX_TOTAL_RASTER_BYTES)
+        return { failure: 'invalid_request' };
+    let offset = 0;
+    const inputs = [];
+    for (const entry of h.pages) {
+        if (!exact(entry, ['byteLength']) || !Number.isSafeInteger(entry.byteLength)
+            || entry.byteLength < 57 || entry.byteLength > MAX_RASTER_BYTES
+            || offset + entry.byteLength > frame.body.byteLength) return { failure: 'invalid_request' };
+        const png = frame.body.subarray(offset, offset + entry.byteLength);
+        if (!png.subarray(0, 8).equals(PNG_SIGNATURE) || png.toString('ascii', 12, 16) !== 'IHDR'
+            || png.readUInt32BE(16) < 1 || png.readUInt32BE(20) < 1
+            || png.readUInt32BE(16) > MAX_DIMENSION_PIXELS || png.readUInt32BE(20) > MAX_DIMENSION_PIXELS
+            || png.readUInt32BE(16) * png.readUInt32BE(20) > MAX_PIXELS) return { failure: 'resource_limit' };
+        inputs.push(png); offset += entry.byteLength;
+    }
+    if (offset !== frame.body.byteLength) return { failure: 'invalid_request' };
+    let core, model, createCore;
+    try {
+        const root = realpathSync(fileURLToPath(new URL('..', import.meta.url)));
+        const manifest = JSON.parse(readFileSync(new URL('./anydoc-tesseract-artifacts.json', import.meta.url), 'utf8'));
+        const directory = path.join(root, manifest.directory);
+        const artifacts = new Map();
+        for (const artifact of manifest.files) {
+            const file = path.join(directory, artifact.name);
+            const relative = path.relative(root, realpathSync(file));
+            if (!lstatSync(file).isFile() || relative.startsWith('..') || path.isAbsolute(relative)) throw new EngineUnavailable();
+            const bytes = readFileSync(file);
+            if (bytes.byteLength !== artifact.byteLength
+                || createHash('sha256').update(bytes).digest('hex') !== artifact.sha256) throw new EngineUnavailable();
+            artifacts.set(artifact.name, bytes);
+        }
+        core = artifacts.get('tesseract-core-lstm.wasm'); model = artifacts.get('ita.traineddata');
+        createCore = require(path.join(directory, 'tesseract-core-lstm.js'));
+    } catch { return { failure: 'engine_unavailable' }; }
+    let tessModule, api;
+    try {
+        tessModule = await createCore({ wasmBinary: core, print() {}, printErr() {} });
+        tessModule.FS.writeFile('/ita.traineddata', model);
+        api = new tessModule.TessBaseAPI();
+        if (api.Init('/', 'ita', 1) !== 0) return { failure: 'engine_unavailable' };
+        api.SetPageSegMode(3);
+        const pages = [];
+        for (const png of inputs) {
+            tessModule.FS.writeFile('/input', png);
+            if (api.SetImageFile(0, 0) !== 0 || api.Recognize(null) !== 0) return { failure: 'recognition_failed' };
+            const text = api.GetUTF8Text().trim();
+            const confidence = api.MeanTextConf() / 100;
+            if (!text) return { failure: 'empty_output' };
+            if (Buffer.byteLength(text) > 1024 * 1024 || !Number.isFinite(confidence)
+                || confidence < 0 || confidence > 1) return { failure: 'resource_limit' };
+            pages.push({ text, confidence }); api.Clear(); tessModule.FS.unlink('/input');
+        }
+        return { pages };
+    } catch { return { failure: 'recognition_failed' }; }
+    finally { if (api) { api.End(); tessModule.destroy(api); } }
+}
+
 const selfTest = process.argv[2];
 if (selfTest === '--self-test=sync-hang') {
     while (true) { /* hard-kill fixture: deliberately blocks the child event loop */ }
@@ -377,18 +456,27 @@ if (selfTest === '--self-test=sync-hang') {
 } else {
     try {
         const frame = decodeFrame(await readInput());
-        const materialization = materializeRequest(frame);
-        if (materialization) {
-            const result = await materialize(materialization);
+        if (frame?.header?.operation === 'recognize_tesseract') {
+            const result = await recognizeTesseract(frame);
             if (result.failure) emitFailure(result.failure);
-            else emitMaterialized(result.pages);
-        } else {
-            const pages = renderRequest(frame);
-            if (!pages) emitFailure('invalid_request');
             else {
-                const result = await render(pages);
+                const body = Buffer.from(JSON.stringify(result.pages));
+                process.stdout.write(encodeFrame({ schemaVersion: SCHEMA_VERSION, status: 'recognized', bodyByteLength: body.byteLength }, [body]));
+            }
+        } else {
+            const materialization = materializeRequest(frame);
+            if (materialization) {
+                const result = await materialize(materialization);
                 if (result.failure) emitFailure(result.failure);
-                else emitRendered(result.pages);
+                else emitMaterialized(result.pages);
+            } else {
+                const pages = renderRequest(frame);
+                if (!pages) emitFailure('invalid_request');
+                else {
+                    const result = await render(pages);
+                    if (result.failure) emitFailure(result.failure);
+                    else emitRendered(result.pages);
+                }
             }
         }
     } catch (error) {

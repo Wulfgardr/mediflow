@@ -56,6 +56,7 @@ sorgenti, toolchain, prove delle bozze e limiti della lane nativa.
 | [ADR 0123](./adr/0123-official-web-ui-navigation-compositions.md) | UI web ufficiale B/A con confronto sintetico separato. | Per promuovere il design scelto senza flag di anteprima nel prodotto. |
 | [ADR 0124](./adr/0124-bounded-native-network-json.md) | Limiti byte per JSON native/network e risposta 413. | Per valutare budget, compatibilità e confini del lettore. |
 | [ADR 0126](./adr/0126-chatgpt-account-control-plane.md) | Controllo account ChatGPT isolato, senza inferenza. | Contratti API, sessione, cleanup e limiti WUL-689. |
+| [ADR 0128](./adr/0128-local-desktop-ocr.md) | OCR locale desktop Tesseract WASM e renderer per piattaforma. | Per prerequisiti, digest e limiti della candidatura Windows/Linux. |
 | [ADR 0125](./adr/0125-explicit-aifa-catalog-download.md) | Proposta di aggiornamento esplicito dalla fonte ufficiale AIFA. | Per implementare download limitato, conflitti e sostituzione atomica. |
 | [ADR 0127](./adr/0127-atomic-local-exemption-import.md) | Import esenzioni locale con anteprima, subset esplicito, CAS e commit atomico. | Per implementare o verificare WUL-690. |
 | [Verifica UI integrata 0.8.6](./analysis/2026-09-06-086-integrated-ui-verification.md) | UI promossa senza flag: sorgenti, comandi e limiti. | Per distinguere la prova del candidato integrato dal confronto sintetico. |

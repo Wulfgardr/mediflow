@@ -196,3 +196,123 @@ file iniziale senza modifiche alle altre configurazioni.
 Non sono state ripetute build completa, matrice positiva o prova standalone:
 questa consegna attesta il delta locale; integrazione e packaging spettano
 al parent. Indici globali e ADR restano di competenza del parent.
+
+
+## Tranche desktop del 7 settembre — WUL-671
+
+Base `1672cb3cc27ee144539d068a435ca149b81bd208`, branch
+`codex/WUL-671-086-ocr-desktop`, worktree `mediflow-086-ocr-desktop`.
+[ADR 0128](../adr/0128-local-desktop-ocr.md) scritto prima del codice.
+Stato: **adapter candidato implementato; equivalenza Windows/Linux aperta**.
+La candidatura originale e demo4390 non sono state modificate.
+
+### Contratto consegnato
+
+AnyDoc resta il primo passaggio. La stessa composizione materializza e rende
+soltanto le pagine `needsOcr`; conserva le altre pagine con AnyDoc, ordine e
+controllo finale della sorgente/sessione. macOS conserva Apple Vision;
+Windows/Linux selezionano Tesseract WASM localmente. Nessuna route v1, schema,
+capability Fabric, account o impostazione viene cambiata. La provenienza
+aggiunge l'identita `tesseract_wasm`; la preview dice «su questo dispositivo».
+Il controllo delle impostazioni gestito da un'altra lane dovra consumare il
+nuovo preflight su Windows/Linux, senza dedurre disponibilita dal solo
+sistema operativo; su macOS resta il controllo Apple Vision esistente.
+Il preflight Tesseract sul Mac serve soltanto alla smoke di sviluppo.
+
+Il worker PDF esistente gestisce anche il riconoscimento: un processo Node 24,
+nessun addon per OCR, rete JavaScript negata, nessun subprocess/worker o
+scrittura filesystem. La memoria del core e in WASM/MEMFS. Deadline documento
+30 s, massimo 16 pagine, 16 MiB per PNG, 32 MiB per documento, 4096 pixel per
+lato e 12 milioni di pixel, 1 MiB di testo per pagina. Heap JS 256 MiB,
+memoria lineare WASM 512 MiB; RSS complessiva non limitata da questi due valori.
+Il parent attende `close` prima di rilasciare l'ammissione e scarta stdout
+parziale, errori, uscita non-zero e superamenti dei budget.
+
+Il renderer mantiene PDF.js 4.10.38 e canvas 0.1.100. Sono ammesse soltanto
+macOS arm64, Windows x64 MSVC, Linux glibc x64/arm64, con binari del manifest
+`scripts/anydoc-pdf-renderer-profiles.json`. Il worker controlla anche hash e
+posizione del binario sui nuovi profili Windows/Linux. macOS mantiene il
+controllo di versione preesistente e il packaging Mach-O separato: firma e
+normalizzazione cambiano i byte del binario rispetto al pacchetto npm. I pacchetti gia presenti nel lock hanno archivi da
+12,4–15,2 MB: sono stati letti e verificati per SHA-512 upstream e SHA-256,
+non installati su guest. Linux richiede glibc >=2.18 e, su arm64, CPU
+cortex-a57 o successiva secondo [upstream canvas](https://github.com/Brooooooklyn/canvas).
+Musl, Windows ARM nativo e Mac Intel restano fuori da questa tranche.
+
+### Provisioning esplicito e controlli
+
+Il runtime non scarica nulla. Il coordinatore puo provisionare in
+`node_modules/mediflow-ocr-tesseract/` soltanto i cinque file descritti da
+`scripts/anydoc-tesseract-artifacts.json` (nome, dimensione e SHA-256):
+
+- `tesseract-core-lstm.js`, `tesseract-core-lstm.wasm` e `LICENSE` da
+  `tesseract.js-core@6.0.0`, variante LSTM senza SIMD;
+- `ita.traineddata` e `tessdata-LICENSE` da
+  `tesseract-ocr/tessdata_fast` al commit
+  `87416418657359cb625c412a48b6e1d6d41c29bd` (`LICENSE` rinominata).
+
+Origini: [pacchetto del port WASM](https://github.com/naptha/tesseract.js-core)
+e [modello italiano](https://github.com/tesseract-ocr/tessdata_fast/tree/87416418657359cb625c412a48b6e1d6d41c29bd).
+Totale 5.72 MB circa. Core/modello Apache-2.0; conservare notice e licenze delle
+dipendenze durante packaging. Nessun artifact opzionale e aggiunto a Git.
+Gli artefatti mancanti/alterati danno errore e istruzioni locali:
+
+```bash
+npm run check:anydoc-desktop-ocr
+npm run test:anydoc-desktop-ocr
+```
+
+Entrambi i comandi funzionano anche da PowerShell, senza flag shell aggiuntivi.
+Il primo comando restituisce exit 1 se manca un prerequisito controllato;
+`artifacts_verified` attesta integrita, con `qualification=pending_target_benchmark`.
+Non e una prova di riconoscimento. Il secondo comando impone il motore reale e fallisce se manca. Nella suite
+unitaria generale i casi reali sono skip espliciti salvo il flag
+`MEDIFLOW_TEST_TESSERACT_REAL=1`; quegli skip non costituiscono qualifica. I test di assenza/alterazione richiedono una
+copia isolata degli artifact e vanno eseguiti senza altri consumer.
+
+`e2e/fixtures/ocr-desktop-synthetic.png` e interamente sintetica: canvas
+1600x600, sfondo bianco, Arial 48px nero, tre righe alle coordinate x=60,
+y=110/210/310: «DOCUMENTO INTERAMENTE SINTETICO», «Qualità locale, nessun dato
+personale.», «Data 12/03/2026 quantità 25 mg.». SHA-256
+`f597ffdd0516f173310febcae6e33e69f3d854f87f11717af46255b1d4d5962f`.
+La fixture fissa elimina la dipendenza dai font del guest nella smoke OCR.
+PDF misto e pagina bianca vengono costruiti nei test, senza dati reali.
+
+### Limite delle prove e seguito
+
+Le prove reali di questa tranche sono eseguite su macOS arm64 con Node 24.19.0:
+WASM riconosce accenti, data e quantita della fixture; il PDF misto mantiene
+la prima pagina nativa e riconosce soltanto l'ultima. Le prove di guasto con
+processi sintetici misurano soltanto negazione, deadline, cleanup e retry.
+Nessuna accuratezza clinica, superiorita rispetto ad Apple Vision o qualifica
+Windows/Linux deriva da questi risultati.
+
+Tracing e guard standalone includono worker e manifest fissati; gli artifact
+OCR restano opzionali. Build, pacchetto installato e UI desktop non sono stati
+eseguiti dalla lane. Per promuovere servono guest reali, allestimento isolato,
+profilo completo OS/arch/libc/Node/CPU/RAM, digest, prova positiva e negativa,
+currentness/revoca e UI sul pacchetto target. Il benchmark finale richiede
+corpus italiano e soglie fissati dal coordinatore prima della prova, compresi
+rotazioni, rumore, tabelle, CER/WER, exact match, latenza e memoria.
+Log e report della lane restano in `tmp-ocr-artifacts/`, escluso da Git.
+Nessuna delega, VM, push, PR, merge, tracker, tag o release da questa lane.
+
+
+### Verifiche della consegna desktop
+
+| Verifica | Esito osservato |
+| --- | --- |
+| Suite focalizzata: desktop reale, current-source, acceptance OCR, child owner, materializer, renderer, client e contratto | 74 passati, 1 skip su 75. Include 9 test desktop senza skip; lo skip e il caso renderer assente sul Mac dove il renderer e presente. |
+| `npm run test:anydoc-desktop-ocr` | 9 passati, nessuno skip; wrapper che richiede il motore reale. |
+| Guard standalone mirati (`--test-name-pattern='PDF\|AnyDoc\|LF'`) | 5 passati: worker, smoke, manifest, tracing e checkout LF. |
+| Suite standalone completa | 9 passati, 2 falliti sul roster/restart dell'owner auth 0.8.7. Entrambi riprodotti con checker e test da HEAD base; nessuna correzione auth in questa lane. |
+| `test:document-synthesis`, `test:ai-context`, `test:pdf-service` | 47, 72 e 20 passati. |
+| `check:anydoc-local-only`, `test:anydoc-local-only` | Guard passato, 8 test passati. |
+| `typecheck`, ESLint mirato sui file toccati | Passati. Le copie locali delle dipendenze usano l'archivio auth 0.8.7 fissato da questa branch. |
+| `check:never-regress`, `check:claims` | Passati. |
+| `git diff --check`, inventario Markdown e link relativi ADR | Passati. |
+
+La suite standalone completa non e verde: restano due difetti baseline fuori
+ownership. Non sono stati eseguiti build completa, browser/standalone live,
+packaging o guest. I comandi Node usano 24.19.0; i test sono stati eseguiti in
+sequenza, con dati sintetici e senza server persistenti.

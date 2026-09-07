@@ -71,6 +71,8 @@ copertura, controlli e gap; non attestano conformità o adozione organizzativa.
 
 Contratto estrazione documentale: [ADR 0119](./adr/0119-anydoc-apple-vision-current-source.md),
 AnyDoc e fallback PDF Apple Vision distinti dal catalogo Fabric.
+[ADR 0128](./adr/0128-local-desktop-ocr.md): adapter candidato OCR desktop
+Tesseract WASM e profili renderer Windows/Linux; qualifica target pendente.
 [Prima verifica OCR](./analysis/2026-09-05-086-ocr-verification.md): preview,
 matrice browser sintetica e gate ancora aperti.
 

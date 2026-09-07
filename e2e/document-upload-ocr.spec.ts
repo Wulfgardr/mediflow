@@ -104,7 +104,7 @@ for (const scenario of ['text', 'scan', 'mixed', 'image'] as const) {
           engine: 'apple_vision', pageCount: scenario === 'mixed' ? 2 : 1, ocrPageCount: 1,
         });
         expect(result.receipt.ocrProvenance.receiptSetSha256).toMatch(/^[a-f0-9]{64}$/);
-        await expect(preview).toContainText('OCR completato su questo Mac');
+        await expect(preview).toContainText('OCR completato su questo dispositivo');
         await expect(preview).toContainText(`1 pagina su ${scenario === 'mixed' ? 2 : 1}`);
       }
       if (scenario === 'mixed') {
