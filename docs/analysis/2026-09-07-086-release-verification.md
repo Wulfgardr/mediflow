@@ -14,8 +14,9 @@ la sicurezza generale. La [PR 351](https://github.com/Wulfgardr/mediflow/pull/35
 è aperta su `c2db2521a28b0e98007a2b8702da076b8bc9a056`, senza merge.
 Le modifiche successive sono locali. Ulteriori push, merge, tag e release
 restano sospesi: oltre alla CI verde, è richiesta la qualificazione del nuovo
-percorso ChatGPT/Codex. Quel collegamento non è ancora implementato o verificato;
-le prove Ollama e MCP riportate qui non lo attestano.
+percorso ChatGPT/Codex. Una prova dedicata ha verificato autenticazione e lettura
+del catalogo; integrazione nelle funzioni e inferenza restano da qualificare.
+Le prove Ollama e MCP riportate qui non le attestano.
 
 ## Disposizioni degli addenda indipendenti
 
@@ -26,6 +27,7 @@ le prove Ollama e MCP riportate qui non lo attestano.
 | Correzione allegati | `e7f8a555ac697c36adc60a36132a776e39d19a72..be9233282c0ab18759b0e679b877d9dc30af5a99` | `FIX_VERIFIED`: digest 7/7, test sintetici 63/63, typecheck focalizzato, ESLint e diff-check PASS nella verifica indipendente. |
 | Document Synthesis | `6d4b66f82c154045baf73ea62be7890417a90ed4..9fe74f2573c455ae2f8439f1b47adee767414f3c` | `SOURCE_REVIEW_PASS`: 15/15 test indipendenti, zero finding. Risorsa privata Web, selezione confermata e invalidazione asincrona; nessuna esecuzione browser da parte del reviewer. |
 | Continuità broker DS | `1377215d259106e4477ba4a35b4071393ee55ff7..d4c06f039e09f42a2d7275db7d7733628e2d239a`, integrato in `e49d87c0d085b740812a9581a051a698e73e45a8` | Zero finding nei due file; 33/33 test integrati e 8/8 crosswalk indipendenti PASS. Broker legato al canonical owner e cleanup senza rientro. Non prova la sintesi ordinaria. |
+| Selezione DS già confermata | `875c90ed95f04236ca06827160d5b0d749f91d41..45d14144a56c7a3456de78e0a33724c2f9970c3d`, integrato in `fd78248c3f407cc1d650643fad6b5e8527d5fffe` | Zero finding; 23 test DS/AnyDoc e 8 crosswalk indipendenti PASS. Il test Apple Vision è escluso con Xcode scollegato; il tentativo precedente non filtrato resta conservato. Cinque file, quattro artifact e identità del tree verificati dal coordinatore. Non prova una proposta generata nel browser. |
 
 La correzione allegati riduce il cap JSON a 30.408.704 byte, riserva uno slot
 per istanza modulo prima della lettura e applica una deadline di lettura di
@@ -141,6 +143,51 @@ live preciso non è distinguibile dalla sola risposta 409. Il nuovo
 intervento di composizione resta da implementare e verificare; non si
 allentano le fence e non si promuove il percorso documentale a funzionante.
 
+## Modelli locali e accesso ChatGPT: nuova verifica
+
+Il bundle `39d281eeda5a26625d1a9d85fe888f1cd5298674` include la configurazione
+Ollama in tre passaggi: connessione, modelli installati e salvataggio. I preset
+e i download sono separati dalla scelta corrente. Il catalogo proviene dal
+servizio locale: presenza e raggiungibilità non attestano qualità clinica.
+
+Build webpack, TypeScript e controllo standalone/AnyDoc PASS con Node 24.19.0.
+La prova browser ha verificato 12 viste a 1440, 965, 390 e 320 px, nei due temi,
+incluse sezioni espanse: comandi di almeno 44 px, raggio 12 px, testo 14 px/600,
+contrasto misurato almeno 4,5:1, nessuna sovrapposizione o eccedenza orizzontale.
+Console e page errors vuoti nella prova finale. Inventario di due modelli e
+test connessione sono reali; preset e testo personalizzato non salvano le
+selezioni e il ricaricamento ripristina quelle persistite. Il salvataggio della
+configurazione, il download e la generazione non sono verificati da questa prova.
+
+Due primi tentativi del test privato includevano nelle scritture della pagina
+la preferenza preesistente `uiReduceTransparency`, persistita dal componente
+di accessibilità al ricaricamento. Le prove fallite restano conservate. La
+verifica successiva registra quella chiave separatamente; non cambia runtime,
+API o asserzioni sui modelli. Un terzo tentativo ha rilevato il comando Dettagli
+con testo 12 px/650; la correzione `39d281eeda5a` è verificata dalla prova finale.
+
+Il 7 settembre, una prova separata con il client ufficiale Codex 0.153.4 ha
+completato il login ChatGPT di un account personale con abbonamento e letto
+otto modelli, con opzioni di ragionamento e quota. L’archivio dedicato era
+inizialmente vuoto; directory 0700 e file 0600, fuori Git. Nessun riuso delle
+credenziali di sviluppo, nessuna richiesta di generazione o dato clinico inviato.
+La prima finestra scaduta e il successivo accesso riuscito sono prove distinte.
+
+Questa autenticazione non è ancora un collegamento di prodotto disponibile
+nelle impostazioni. Restano da dimostrare l’isolamento da file e strumenti,
+la gestione di cancellazione/revoca e la risposta su fonti sintetiche. Il piano
+personale non viene equiparato a condizioni Enterprise, DPA o zero retention.
+Non è autorizzato l’uso di dati clinici reali da questa prova.
+
+La preview Document Synthesis ordinaria su `fd78248c3f40` ha raggiunto capture
+e ingest con risposta 200, poi preview 503 `operation_unavailable`. La causa
+interna non è ancora attribuita e non è provata l’assenza di inferenza.
+Sei test focalizzati della composition con Web owner autentico sono PASS su
+`5bc39d97b`: risposta sintetica controllata, publication fino al wire, secondo
+consumo negato e invalidazione dopo cambio selezione o lock. Non sostituiscono
+la prova con il provider reale. WHO locale resta in preparazione: immagine
+ARM64 individuata, nessun container, dataset o ricerca attivato da questa fase.
+
 ## CI: risultati conservati e correzioni locali
 
 La CI E2E della PR su `c2db2521` ha raccolto 187 casi: **131 PASS, 5 FAIL,
@@ -222,3 +269,9 @@ provano identità del contenuto, non esecuzione indipendente di questa lane.
 | `daybreak-ds-owner-addendum/review-receipt.json` | `3a04232b3ed0148f4818e4ad8fec93271ab3a817529b5a34f6f7f4fa45407431` |
 | `ui-controls-e49-02/receipt.json` | `de4f26fbaaa9c07077f6adc00637a9779fddc200bdce9990e04e5cb5af36ca33` |
 | `ui-heading-b938/receipt.json` | `13c5160450cafdb9db2dc6d3b629d4152d981e60ff39b735cefc1e31a5caa9e3` |
+| `daybreak-ds-selection-addendum/addendum.md` | `edb4a6259ec8574f14e85f3ec111b28e2895d8c72ad3c59d227a736d6372c0ca` |
+| `daybreak-ds-selection-addendum/review-receipt.json` | `1b8d30c6f9ed985e4522a46687e57efcea6e781e6324ed2b21405b977c25c3a3` |
+| `ui-guided-models-39d2-01/receipt.json` | `3c781180ec44448b6d06741d7417fdc05e5da21927f3b8b8cf8dbe3110973733` |
+| `ui-guided-models-39d2-01/runtime-receipt.json` | `a16cd365efcf33ab19a470fd02cfa99b0936f61372613c9889a1968795a25b88` |
+| `chatgpt-auth-1P4f1Y/receipt.json` | `20e9383fe8ada183721151424b81b2b11be0ca39ae153474451205257e1f4471` |
+| `ds-preview-composition-test/parent-focused.log` | `60477246875cd0bd813feea0215241ca9c08cb53c2e57c50e5aa808bdb53112a` |
