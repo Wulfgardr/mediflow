@@ -8,6 +8,9 @@ html[data-runtime-twin='true'] { --runtime-twin-inset: 44px; }
 
 /* @Codex WUL-676: semantic type roles shared by the two proposal layouts. */
 html[data-runtime-twin-design='proposal'] {
+    --lume-control-radius: 12px;
+    --lume-radius-control: var(--lume-control-radius);
+    --lume-control-height: 44px;
     --twin-type-section: 1.25rem;
     --twin-type-subsection: 1rem;
     --twin-type-body: 0.875rem;
@@ -15,4 +18,21 @@ html[data-runtime-twin-design='proposal'] {
     --twin-heading-weight: 600;
     --twin-heading-leading: 1.35;
     --twin-body-leading: 1.55;
+}
+
+/* @Codex: action geometry is shared; patient rows and navigation keep their layout. */
+html[data-runtime-twin-design='proposal'] :is(.ui-btn-primary, .ui-btn-secondary, .mf-btn-secondary, .mf-action, button.lume-press, a.lume-press, [data-lume-action]) {
+    box-sizing: border-box;
+    min-width: var(--lume-control-height);
+    min-height: var(--lume-control-height);
+    height: auto;
+    padding: 10px 14px;
+    border-radius: var(--lume-control-radius);
+    font-size: 14px;
+    line-height: 22px;
+    gap: 8px;
+}
+
+html[data-runtime-twin-design='proposal'] [data-lume-control='theme'] {
+    border-radius: var(--lume-control-radius);
 }

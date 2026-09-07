@@ -862,7 +862,7 @@
 :global(html[data-runtime-twin-design='proposal']) .eyebrow,
 :global(html[data-runtime-twin-design='proposal']) .clinicalSection > h3 :global(.section-kicker) { display: none; }
 :global(html[data-runtime-twin-design='proposal']) .headerPrimaryAction,
-:global(html[data-runtime-twin-design='proposal']) .headerActionButton { min-height: 40px; padding: 10px 14px; font-size: 12px; border-radius: 8px; }
+:global(html[data-runtime-twin-design='proposal']) .headerActionButton { box-sizing: border-box; min-height: var(--lume-control-height); padding: 10px 14px; font-size: 14px; line-height: 22px; gap: 8px; border-radius: var(--lume-control-radius); }
 :global(html[data-runtime-twin-design='proposal']) .headerPrimaryAction { background: var(--lume-accent); border-color: var(--lume-accent); }
 :global(html[data-runtime-twin-design='proposal']) .clinicalCanvas .sectionRail {
   grid-column: 1;
