@@ -770,8 +770,8 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
             await gate.wait(for: "login:1")
             await model.login()
             await gate.release("login:1"); await older.value
-            await model.changePin(currentPin: pin, newPin: "2222")
             let identity = await model.operatorIdentity?.userId
+            await model.changePin(currentPin: pin, newPin: "2222")
             let loginCalls = await source.loginCalls
             let logoutCalls = await source.logoutCalls
             let pinChangeCalls = await source.pinChangeCalls
@@ -956,6 +956,45 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
         try await assertGoldenFixtureUnlockAndRotation(version: 2)
     }
 
+    // @Codex: ADR 0106 retires local clinical authority after confirmed rotation.
+    func testChangePinSuccessClearsSessionPresentationAndRequiresExplicitLogin() async {
+        let source = LifecycleMockDataSource()
+        let patient = detail(id: "p1", archived: false, version: 4)
+        let model = await makeModel(source: source)
+        await model.configurePairedOnlineForTests(
+            operatorId: "synthetic-operator", masterKey: masterKey,
+            patients: [summary(id: "p1", archived: false, version: 4)], selectedPatient: patient)
+        await MainActor.run {
+            model.newEntryTitle = "Synthetic unsaved note"
+            model.newEntryVisitTranscript = "Synthetic transcript"
+            model.newTherapyDrugName = "Synthetic therapy"
+            model.password = String(repeating: "1", count: 4)
+        }
+        await model.changePin(currentPin: "1357", newPin: "2468")
+        await MainActor.run {
+            XCTAssertEqual(model.connectionState, .sessionExpired)
+            XCTAssertNil(model.clinicalWorkspaceConnection)
+            XCTAssertNil(model.operatorIdentity)
+            XCTAssertNil(model.selectedPatient)
+            XCTAssertTrue(model.patients.isEmpty)
+            XCTAssertTrue(model.newEntryTitle.isEmpty)
+            XCTAssertTrue(model.newEntryVisitTranscript.isEmpty)
+            XCTAssertTrue(model.newTherapyDrugName.isEmpty)
+            XCTAssertTrue(model.password.isEmpty)
+            XCTAssertEqual(model.statusMessage, "PIN aggiornato. Accedi di nuovo con il nuovo PIN.")
+            XCTAssertEqual(model.pairedClientId, "test-client")
+            XCTAssertEqual(model.pairedClientToken, "test-token")
+        }
+        // No implicit login/logout; the retired key cannot authorize another rotation.
+        await model.changePin(currentPin: "2468", newPin: "8642")
+        let calls = await source.pinChangeCalls
+        let logins = await source.loginCalls
+        let logouts = await source.logoutCalls
+        XCTAssertEqual(calls.count, 1)
+        XCTAssertEqual(logins, 0)
+        XCTAssertEqual(logouts, 0)
+    }
+
     func testChangePinFailsClosedWithoutMasterKey() async {
         let source = LifecycleMockDataSource()
         let model = await makeModel(source: source)
@@ -970,6 +1009,91 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
             errorMessage,
             "Cifratura non disponibile: riaccedi con il PIN operatore prima di cambiarlo."
         )
+    }
+
+    // @Codex: a 409 can follow the credential CAS when retirement is unconfirmed.
+    func testChangePinAmbiguousOutcomesClearSessionAndDraftsWithoutRetry() async {
+        let errors: [HomeBaseClientError] = [
+            .transport(.timeout), .transport(.unreachable), .contract,
+            .httpStatus(409, "Retirement unconfirmed"), .httpStatus(500, nil)
+        ]
+        for error in errors {
+            let source = LifecycleMockDataSource(pinChangeError: error)
+            let model = await makeModel(source: source)
+            await model.configurePairedOnlineForTests(
+                operatorId: "synthetic-operator", masterKey: masterKey,
+                selectedPatient: detail(id: "p1", archived: false, version: 4))
+            await MainActor.run { model.newEntryTitle = "Synthetic draft" }
+            await model.changePin(currentPin: "1357", newPin: "2468")
+            await MainActor.run {
+                XCTAssertEqual(model.connectionState, .sessionExpired, "\(error)")
+                XCTAssertNil(model.clinicalWorkspaceConnection)
+                XCTAssertNil(model.selectedPatient)
+                XCTAssertNil(model.operatorIdentity)
+                XCTAssertTrue(model.newEntryTitle.isEmpty)
+                XCTAssertEqual(model.statusMessage,
+                    "Esito del cambio PIN non confermato. Sessione bloccata: accedi di nuovo.")
+                XCTAssertNil(model.errorMessage)
+            }
+            await model.changePin(currentPin: "1357", newPin: "8642")
+            let calls = await source.pinChangeCalls
+            XCTAssertEqual(calls.count, 1)
+        }
+    }
+
+    func testChangePinCancellationAfterDispatchClearsLocalAuthority() async {
+        let source = LifecycleMockDataSource(pinChangeCancelled: true)
+        let model = await makeModel(source: source)
+        await model.configurePairedOnlineForTests(masterKey: masterKey)
+        await model.changePin(currentPin: "1357", newPin: "2468")
+        let state = await model.connectionState
+        let connection = await model.clinicalWorkspaceConnection
+        XCTAssertEqual(state, .sessionExpired)
+        XCTAssertNil(connection)
+    }
+
+    func testLatePinSuccessOrFailureCannotClearNewerSession() async {
+        for error: HomeBaseClientError? in [nil, .transport(.timeout), .httpStatus(401, "stale")] {
+            let gate = LifecycleLoadGate(["pin:1"])
+            let source = LifecycleMockDataSource(pinChangeError: error, loadGate: gate)
+            let model = await makeModel(source: source)
+            await model.configurePairedOnlineForTests(masterKey: masterKey)
+            let rotation = Task { await model.changePin(currentPin: "1357", newPin: "2468") }
+            await gate.wait(for: "pin:1")
+            await model.lockSessionNow()
+            await model.configurePairedOnlineForTests(
+                sessionCookie: "sid=new", operatorId: "new-operator", masterKey: masterKey,
+                selectedPatient: detail(id: "new-patient", archived: false, version: 1))
+            await MainActor.run {
+                model.newEntryTitle = "New session draft"
+                model.statusMessage = "New session"
+            }
+            await gate.release("pin:1")
+            await rotation.value
+            await MainActor.run {
+                XCTAssertEqual(model.connectionState, .pairedOnline)
+                XCTAssertNotNil(model.clinicalWorkspaceConnection)
+                XCTAssertEqual(model.operatorIdentity?.userId, "new-operator")
+                XCTAssertEqual(model.selectedPatient?.id, "new-patient")
+                XCTAssertEqual(model.newEntryTitle, "New session draft")
+                XCTAssertEqual(model.statusMessage, "New session")
+                XCTAssertNil(model.errorMessage)
+            }
+        }
+    }
+
+    func testPinValidationBeforeDispatchPreservesSessionAndDraft() async {
+        let source = LifecycleMockDataSource()
+        let model = await makeModel(source: source)
+        await model.configurePairedOnlineForTests(masterKey: masterKey)
+        await MainActor.run { model.newEntryTitle = "Synthetic draft" }
+        await model.changePin(currentPin: "1357", newPin: "1357")
+        let calls = await source.pinChangeCalls
+        let connection = await model.clinicalWorkspaceConnection
+        let title = await model.newEntryTitle
+        XCTAssertTrue(calls.isEmpty)
+        XCTAssertNotNil(connection)
+        XCTAssertEqual(title, "Synthetic draft")
     }
 
     func testChangePinSurfacesDedicatedConflictWithoutReplacingMasterKey() async throws {
@@ -1101,24 +1225,13 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
         XCTAssertEqual(rotatedSalt.count, 16)
         XCTAssertEqual(rotatedBytes, data(hex: fixture.inputs.rawMasterKeyHex))
 
-        if version == 1 {
-            // The first call returned success. A second rotation proves the model
-            // retained the same in-memory master key instead of re-deriving it.
-            await model.changePin(currentPin: "2468", newPin: "8642")
-            let callsAfterSuccess = await source.pinChangeCalls
-            let secondCall = try XCTUnwrap(callsAfterSuccess.last)
-            XCTAssertEqual(callsAfterSuccess.count, 2)
-            let secondSalt = try XCTUnwrap(Data(base64Encoded: secondCall.salt))
-            let secondMasterKey = try XCTUnwrap(CryptoService.unwrapMasterKeyVersioned(
-                blob: secondCall.encryptedMasterKey,
-                pin: secondCall.newPin,
-                salt: secondSalt
-            ))
-            XCTAssertEqual(
-                secondMasterKey.withUnsafeBytes { Data($0) },
-                data(hex: fixture.inputs.rawMasterKeyHex)
-            )
-        }
+        // @Codex: cryptographic bytes are preserved on the host; local access is
+        // retired and a second mutation requires a new explicit login (ADR 0106).
+        await model.changePin(currentPin: "2468", newPin: "8642")
+        let callsAfterSuccess = await source.pinChangeCalls
+        let connection = await model.clinicalWorkspaceConnection
+        XCTAssertEqual(callsAfterSuccess.count, 1)
+        XCTAssertNil(connection)
     }
 
     private func loadCryptoFixture(version: Int) throws -> CryptoFixture {
@@ -1297,6 +1410,7 @@ private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
     private var revisionFetchCount = 0
     private let loginResults: [HomeBaseLoginResult]
     private let pinChangeError: HomeBaseClientError?
+    private let pinChangeCancelled: Bool // @Codex
     private let loginErrors: [HomeBaseClientError?]
     private let logoutError: HomeBaseClientError?
     private let updateError: HomeBaseClientError? // @Codex
@@ -1320,6 +1434,7 @@ private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
         loginResults: [HomeBaseLoginResult] = [],
         loginErrors: [HomeBaseClientError?] = [],
         pinChangeError: HomeBaseClientError? = nil,
+        pinChangeCancelled: Bool = false, // @Codex
         logoutError: HomeBaseClientError? = nil,
         updateError: HomeBaseClientError? = nil, // @Codex
         createError: HomeBaseClientError? = nil, // @Codex
@@ -1336,6 +1451,7 @@ private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
         self.loginResults = loginResults.isEmpty ? [loginResult] : loginResults
         self.loginErrors = loginErrors
         self.pinChangeError = pinChangeError
+        self.pinChangeCancelled = pinChangeCancelled // @Codex
         self.logoutError = logoutError
         self.updateError = updateError // @Codex
         self.createError = createError // @Codex
@@ -1383,6 +1499,7 @@ private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
             salt: salt
         ))
         await loadGate?.pause("pin:\(pinChangeCalls.count)")
+        if pinChangeCancelled { throw CancellationError() } // @Codex
         if let pinChangeError { throw pinChangeError }
         return HomeBaseMutationAcknowledgement(success: true)
     }
