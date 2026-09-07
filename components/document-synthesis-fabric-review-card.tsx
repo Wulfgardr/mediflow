@@ -7,16 +7,23 @@ import { FileSearch, Loader2, RotateCcw, ShieldCheck } from 'lucide-react';
 import PrivacyBlur from '@/components/privacy-blur';
 import { cn } from '@/lib/utils';
 import {
-    createDocumentSynthesisBrowserOrchestrator,
     DocumentSynthesisBrowserOrchestratorError,
 } from '@/lib/ai-providers/fabric/document-synthesis-browser-orchestrator';
+import { useSecurity } from '@/components/security-provider';
+import { createDocumentSynthesisReviewBrowserController, DocumentSynthesisReviewBrowserControllerError } from '@/lib/ai-providers/fabric/document-synthesis-review-browser-controller';
+import { SmartImportSelectionBrowserAdapterError } from '@/lib/security/smart-import-selection-browser-adapter';
+import { SmartImportContextProposalBrowserAdapterError } from '@/lib/security/smart-import-context-proposal-browser-adapter';
+import type { SmartImportContextProposal } from '@/lib/security/smart-import-context-proposal-browser-adapter';
 import type { DocumentSynthesisPreviewWire } from '@/lib/ai-providers/fabric/document-synthesis-preview-wire';
 
-type Phase = 'idle' | 'running' | 'terminal';
-type DocumentSynthesisFabricReviewCardProps = Readonly<{ attachmentId: string; enabled: boolean }>;
+type Phase = 'idle' | 'loading' | 'confirm' | 'running' | 'terminal';
+type DocumentSynthesisFabricReviewCardProps = Readonly<{ patientId: string; attachmentId: string; enabled: boolean }>;
 
 function failureMessage(error: unknown): string {
-    if (error instanceof DocumentSynthesisBrowserOrchestratorError) {
+    if (error instanceof DocumentSynthesisBrowserOrchestratorError
+        || error instanceof DocumentSynthesisReviewBrowserControllerError
+        || error instanceof SmartImportSelectionBrowserAdapterError
+        || error instanceof SmartImportContextProposalBrowserAdapterError) {
         return error.code === 'unsupported_local_extraction'
             ? 'review_required · unsupported_local_extraction — testo locale non disponibile; revisione manuale necessaria.'
             : `unavailable · ${error.code} — la proposta non è utilizzabile.`;
@@ -25,10 +32,13 @@ function failureMessage(error: unknown): string {
 }
 
 function DocumentSynthesisFabricReviewCardSession({
+    patientId,
     attachmentId,
     enabled,
 }: DocumentSynthesisFabricReviewCardProps) {
-    const [orchestrator] = useState(() => createDocumentSynthesisBrowserOrchestrator());
+    const [controller] = useState(() => createDocumentSynthesisReviewBrowserController());
+    const [proposal, setProposal] = useState<SmartImportContextProposal | null>(null);
+    const [confirmed, setConfirmed] = useState(false);
     const generation = useRef(0);
     const running = useRef(false);
     const [phase, setPhase] = useState<Phase>('idle');
@@ -38,7 +48,9 @@ function DocumentSynthesisFabricReviewCardSession({
     const reset = () => {
         generation.current += 1;
         running.current = false;
-        orchestrator.reset();
+        controller.reset();
+        setProposal(null);
+        setConfirmed(false);
         setPreview(null);
         setError(null);
         setPhase('idle');
@@ -46,17 +58,31 @@ function DocumentSynthesisFabricReviewCardSession({
 
     useEffect(() => () => {
         generation.current += 1;
-        orchestrator.reset();
-    }, [orchestrator]);
+        controller.reset();
+    }, [controller]);
+
+    const load = async () => {
+        if (!enabled || running.current || phase !== 'idle') return;
+        running.current = true; const token = ++generation.current;
+        setPhase('loading'); setError(null);
+        try {
+            const value = await controller.readProposal();
+            if (token !== generation.current) return;
+            setProposal(value); setPhase('confirm');
+        } catch (loadError) {
+            if (token !== generation.current) return;
+            setError(failureMessage(loadError)); setPhase('terminal');
+        } finally { if (token === generation.current) running.current = false; }
+    };
 
     const run = async () => {
-        if (!enabled || running.current || phase !== 'idle') return;
+        if (!enabled || running.current || phase !== 'confirm' || !confirmed || !proposal) return;
         running.current = true;
         const token = ++generation.current;
         setError(null);
         setPhase('running');
         try {
-            const result = await orchestrator.run(attachmentId);
+            const result = await controller.run({ patientId, attachmentId, proposal }, true);
             if (token !== generation.current) return;
             setPreview(result);
         } catch (runError) {
@@ -65,6 +91,7 @@ function DocumentSynthesisFabricReviewCardSession({
         } finally {
             if (token === generation.current) {
                 running.current = false;
+                setProposal(null); setConfirmed(false);
                 setPhase('terminal');
             }
         }
@@ -92,7 +119,7 @@ function DocumentSynthesisFabricReviewCardSession({
                 {phase === 'idle' ? (
                     <button
                         type="button"
-                        onClick={run}
+                        onClick={load}
                         disabled={!enabled}
                         className={cn(
                             'inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 font-medium transition-colors',
@@ -104,11 +131,14 @@ function DocumentSynthesisFabricReviewCardSession({
                         <FileSearch className="h-3.5 w-3.5" />
                         Genera proposta
                     </button>
-                ) : phase === 'running' ? (
+                ) : phase === 'confirm' ? null : phase === 'running' || phase === 'loading' ? (
+                    <>
                     <span className="inline-flex items-center gap-1.5 text-[color:var(--lume-accent)]" role="status">
                         <Loader2 className="h-3.5 w-3.5" aria-hidden="true" />
-                        Generazione locale…
+                        {phase === 'loading' ? 'Caricamento contesto…' : 'Generazione locale…'}
                     </span>
+                    <button type="button" onClick={reset}>Annulla</button>
+                    </>
                 ) : (
                     <button
                         type="button"
@@ -120,6 +150,18 @@ function DocumentSynthesisFabricReviewCardSession({
                     </button>
                 )}
             </div>
+
+            {phase === 'confirm' && proposal && (
+                <div>
+                    <p><PrivacyBlur>Paziente: {patientId} · Ambulatorio: {proposal.ambulatoryId}</PrivacyBlur></p>
+                    <label>
+                        <input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} />
+                        {' '}Confermo questo contesto per una proposta in sola lettura, senza scritture cliniche.
+                    </label>
+                    <button type="button" disabled={!enabled || !confirmed} onClick={run}>Conferma e genera proposta</button>
+                    <button type="button" onClick={reset}>Annulla</button>
+                </div>
+            )}
 
             {!enabled && (
                 <p className="mt-3 text-[color:var(--lume-ink-muted)]" role="status">
@@ -186,5 +228,7 @@ function DocumentSynthesisFabricReviewCardSession({
 }
 
 export default function DocumentSynthesisFabricReviewCard(props: DocumentSynthesisFabricReviewCardProps) {
-    return <DocumentSynthesisFabricReviewCardSession key={props.attachmentId} {...props} />;
+    const { isLocked } = useSecurity();
+    if (isLocked) return null;
+    return <DocumentSynthesisFabricReviewCardSession key={JSON.stringify([props.patientId, props.attachmentId, props.enabled])} {...props} />;
 }

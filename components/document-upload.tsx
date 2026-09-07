@@ -282,6 +282,7 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
                         )}
 
                         <DocumentSynthesisFabricReviewCard
+                            patientId={patientId}
                             attachmentId={file.id}
                             enabled={documentSynthesisEnabled}
                         />

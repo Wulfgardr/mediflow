@@ -7,7 +7,7 @@ type Sources = Readonly<{
     fetch?: typeof fetch;
 }>;
 
-export type DocumentSynthesisBrowserOrchestratorErrorCode = 'input_invalid' | 'capture_unavailable'
+export type DocumentSynthesisBrowserOrchestratorErrorCode = 'input_invalid' | 'session_unavailable' | 'capture_unavailable'
     | 'capture_outcome_unknown' | 'unsupported_local_extraction' | 'ingest_unavailable'
     | 'ingest_outcome_unknown' | 'preview_unavailable' | 'preview_outcome_unknown'
     | 'response_invalid' | 'operation_superseded';
@@ -41,6 +41,7 @@ async function post(request: typeof fetch, url: string, body: unknown, unknownCo
     try {
         response = await request(url, { method: 'POST', cache: 'no-store', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
     } catch { return fail(unknownCode); }
+    if (response.status === 401) return fail('session_unavailable');
     if (!response.ok) {
         let unsupported = false;
         try {
