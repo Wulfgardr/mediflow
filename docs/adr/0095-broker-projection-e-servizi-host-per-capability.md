@@ -249,3 +249,15 @@ unico del capability service per la decisione Fabric. Il nuovo owner nominato
 `FunctionModelDispatch` aggiunge controlli indipendenti di continuità del
 catalogo/lifecycle prima e dopo il trasporto: una revoca intervenuta durante
 l'operazione impedisce la pubblicazione, senza creare nuova ammissione.
+
+
+## 0.8.6: scelta visibile dell’ambulatorio per Smart Import
+
+La proposta browser di Smart Import legge paziente e sedi dalle API autenticate
+esistenti, presenta nomi leggibili e richiede una scelta esplicita. Non usa il
+cookie di contesto come prerequisito e non seleziona la sede predefinita. Prima
+del comando rilegge nomi e versioni; un cambiamento richiede nuova conferma.
+Le letture producono soltanto candidati da mostrare: appartenenza del paziente,
+selezione e lease restano verificate dall’endpoint canonico di selezione. Non
+cambiano ingest, proiezione, preview, revoca o divieto di applicazione automatica.
+La lettura legacy del contesto usata da Treatment Reasoning resta separata.

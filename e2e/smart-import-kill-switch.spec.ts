@@ -71,7 +71,7 @@ test('smart import kill switch disables analysis on patient detail', async ({ pa
     await page.goto(`/patients/${patientId}/modules`);
     await expect(page).toHaveURL(new RegExp(`/patients/${patientId}/modules$`));
     // @Codex: the blocked reason is disclosed in Riepilogo; the disabled
-    // generation control is reached separately through Documenti.
+    // generation control remains in the assisted summary disclosure.
     const summaryLink = page.getByRole('navigation', { name: 'Sezioni della vista', exact: true })
       .getByRole('link', { name: 'Riepilogo', exact: true });
     await summaryLink.click();
@@ -82,10 +82,11 @@ test('smart import kill switch disables analysis on patient detail', async ({ pa
     await reviewRow.locator('summary').click();
     await expect(reviewRow.getByText('Smart Import è disattivato localmente', { exact: false })).toBeVisible();
 
-    await openPatientSection(page, 'documenti');
+    await openPatientSection(page, 'quadro');
+    await page.getByText('Proposte dalle fonti cliniche · Smart Import', { exact: true }).click();
     const fabricCard = page.getByTestId('fabric-preview-card');
-    await expect(fabricCard).toContainText('Fabric · anteprima sola lettura');
-    await expect(fabricCard.getByRole('button', { name: 'Carica contesto' })).toBeDisabled();
+    await expect(fabricCard).toContainText('Raccogli dalle fonti della cartella');
+    await expect(fabricCard.getByRole('button', { name: 'Prepara proposta' })).toBeDisabled();
   } finally {
     await restoreSmartImport();
   }
