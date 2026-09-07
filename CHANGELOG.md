@@ -7,7 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.8.6] - Unreleased
 
-Local integrated candidate. This entry does not imply a PR, tag or release.
+Feature-complete and development-complete by user decision; functional source
+frozen at `c320694c3`. This entry does not imply a PR, tag or release.
+Targeted iPhone–Mac/Home Base UI interoperability remains a **DEFERRED VALIDATION
+ITEM / POST-RELEASE VERIFICATION GATE**. Existing platform evidence is retained;
+the release must not be described as fully validated cross-platform.
 
 - The ordinary web UI uses top navigation by default and offers sidebar navigation in Appearance. Patient records open with one click; sections, clinical entry, typography and sliders use the refined layout.
 - Apple patient workspaces show one clinical section at a time, preserve drafts during document consultation and keep finalized Mac transcripts separate until explicitly reviewed. The rich-text editor supports selected inline styles and local undo; saves protect pending drafts, and conflicts require explicit review before another write.

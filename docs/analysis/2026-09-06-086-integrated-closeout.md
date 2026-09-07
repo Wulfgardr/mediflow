@@ -1,12 +1,12 @@
-# MediFlow 0.8.6: candidato locale integrato
+# MediFlow 0.8.6: chiusura dello sviluppo e consegna
 
 Aggiornamento: 7 settembre 2026. Branch `codex/WUL-669-086-integrated-candidate`.
 Base del programma: `b72ac713b624e7d771262e4e01c5c5e1f56f9ae2`.
-Stato: integrazione e verifica multipiattaforma in corso. Le prove storiche
-riportate sotto non attestano il completamento della patch corrente.
-Il perimetro ora comprende Apple, Windows e Linux, UI e headless; la consegna
-richiesta arriva al merge su main dopo i controlli. Nessun push, PR, merge,
-tag o release è ancora avvenuto.
+Stato deciso dall'utente: **feature-complete e development-complete** sul
+candidato `c320694c33d0d55848d6f721f176a2e22e221620`. Sorgente funzionale
+congelato; i successivi aggiornamenti di consegna riguardano documenti e
+artefatti, non funzionalità o correzioni. Nessun push, PR, merge, tag o release
+è attestato da questo verbale.
 
 Questo verbale aggiorna lo stato del candidato. Le prove precedenti della
 [base funzionale](./2026-09-06-086-functional-closeout.md) e della
@@ -14,10 +14,36 @@ Questo verbale aggiorna lo stato del candidato. Le prove precedenti della
 il proprio commit e perimetro; non vengono attribuite retroattivamente al
 candidato finale. I contratti dei componenti restano negli ADR pertinenti.
 
+## Decisione di closeout
+
+L'utente considera concluso lo sviluppo della 0.8.6 e richiede la consegna
+del candidato congelato. Le prove Windows/Linux e Apple fixture/simulator
+già acquisite restano valide nel proprio perimetro. I volumi Xcode e delle
+VM non sono collegati: questa indisponibilità non impone di ripetere le prove
+e non riapre lo sviluppo. Il precedente limite d'uso del 20% è revocato.
+
+| Residuo di accettazione | Disposizione |
+| --- | --- |
+| Interoperabilità UI mirata iPhone ↔ Mac/Home Base, bloccata sul riempimento deterministico del campo nel test | **DEFERRED VALIDATION ITEM / POST-RELEASE VERIFICATION GATE** |
+
+La verifica differita richiede il percorso ordinario, assert invariati e
+rilettura indipendente dei dati sintetici, quando gli ambienti saranno
+disponibili e la sua esecuzione sarà autorizzata. Nessun workaround per
+ottenere un falso verde. Salvo un difetto reale emerso da quella verifica,
+il residuo non riapre lo sviluppo della 0.8.6; nessuna nuova feature o
+correzione entra nel candidato congelato.
+
+La decisione modifica l'accettazione della consegna, non gli esiti registrati:
+non attesta le combinazioni mobile/host non eseguite e non autorizza il claim
+**fully validated cross-platform**. Provisioning WHO, responsabilità
+regolatorie, firma e distribuzione mantengono i rispettivi confini documentati.
+Pubblicazione e merge restano operazioni distinte, con autorizzazione e prove
+proprie; non seguono automaticamente dal congelamento.
+
 ## Milestone di chiusura documentale
 
 Questa milestone aggiunge ricevute recenti senza sostituire le sezioni storiche
-che seguono. Il candidato resta aperto alla review; nessun esito qui sotto
+che seguono. Nessun esito qui sotto
 attesta merge, release o parità completa con host reali.
 
 | Suite completa successiva | Risultato e confine |

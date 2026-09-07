@@ -27,10 +27,11 @@ Ultimo aggiornamento: 2026-09-06
 - **Presentazione del prodotto**: [Get MediFlow e linea editoriale](./getmediflow-editorial-proposal.md), distinta dai contratti runtime.
 - **Studio UI 0.8.6**: [gemello web navigabile e confronto visuale](./design/2026-09-05-086-runtime-twin.md), prove sintetiche WUL-676 precedenti alla promozione.
 
-## Sviluppo 0.8.6
+## Consegna 0.8.6
 
 [Candidato locale integrato](./analysis/2026-09-06-086-integrated-closeout.md):
-stato corrente della patch, integrazioni, prove e limiti di promozione.
+decisione di sviluppo concluso e congelamento, prove conservate e verifica
+iPhone–Mac/Home Base differita al post-release.
 Prevale sulle fotografie precedenti per lo stato del programma 0.8.6.
 
 [Promozione della UI web](./adr/0123-official-web-ui-navigation-compositions.md):

@@ -18,7 +18,7 @@ read_when:
 > prevalgono [AGENTS.md](../AGENTS.md) e
 > [docs/repository-topology.md](./repository-topology.md).
 
-Ultimo aggiornamento: 2026-09-07 (candidato sorgente v0.8.6; promozione aperta)
+Ultimo aggiornamento: 2026-09-07 (v0.8.6: sviluppo concluso, consegna in preparazione)
 
 Nota candidato 0.8.6: [ADR 0119](./adr/0119-anydoc-apple-vision-current-source.md)
 chiarisce la precedenza del percorso AnyDoc + Apple Vision descritto qui.
@@ -40,8 +40,12 @@ non sono verifiche della release 0.8.6.
 Il [verbale integrato 0.8.6](./analysis/2026-09-06-086-integrated-closeout.md)
 conserva le prove storiche e registra i controlli sul candidato corrente.
 La navigazione web e Apple, i form progressivi e la scelta web tra barra
-superiore e laterale sono integrati. Restano aperte le prove complete delle
-app con i tre host reali.
+superiore e laterale sono integrati. Per decisione dell'utente, il candidato
+`c320694c3` è **feature-complete e development-complete** e resta congelato.
+La verifica UI mirata iPhone ↔ Mac/Home Base è un **DEFERRED VALIDATION ITEM /
+POST-RELEASE VERIFICATION GATE**; non riapre lo sviluppo salvo un difetto reale
+emerso dalla prova futura. Non è attestata una validazione completa
+multipiattaforma.
 
 Windows e Linux ora hanno prove locali su sistemi operativi reali: build del
 runtime Node, avvio da directory vuota, configurazione ordinaria e percorsi
@@ -81,8 +85,10 @@ da verificare.
 La ripresa dopo lo sblocco del Mac ha prodotto una sola osservazione XCTest
 aggiuntiva: apertura del campo di configurazione e valore invariato PASS,
 menu di selezione non osservato. Il riempimento del campo e il percorso reale
-iPhone/Mac restano incompleti. La verifica è sospesa al limite concordato
-del 20% della quota settimanale; i risultati precedenti restano conservati.
+iPhone/Mac restano incompleti. Il limite d'uso del 20% è stato revocato;
+la prova resta differita per la decisione di closeout. I volumi Xcode e delle
+VM sono scollegati: le evidenze acquisite restano conservate e non vengono
+rieseguite per questa indisponibilità.
 Il candidato non è ancora stato pubblicato, unito a main o rilasciato.
 
 ## Aggiornamento di candidatura: 5 settembre 2026

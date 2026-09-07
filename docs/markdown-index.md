@@ -31,10 +31,11 @@ Ultimo aggiornamento: 2026-09-06
 - Se aggiungi/rimuovi/rinomini un `.md`, aggiorna subito questo file e [docs/README.md](./README.md).
 
 <!-- @Codex -->
-## Preparazione 0.8.6
+## Consegna 0.8.6
 
 [Stato del candidato integrato](./analysis/2026-09-06-086-integrated-closeout.md):
-integrazione corrente, prove finali e limiti prima della PR.
+congelamento funzionale, prove conservate, verifica mobile differita e limiti
+di pubblicazione.
 
 [Verifica della cartella Apple](./analysis/2026-09-06-086-apple-ui-verification.md):
 sorgenti, toolchain, prove delle bozze e limiti della lane nativa.
