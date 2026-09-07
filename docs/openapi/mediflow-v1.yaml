@@ -32,10 +32,12 @@ info:
     identity scoping remain follow-up workstreams.
     ADR 0124 bounds serialized network JSON bodies in UTF-8 bytes: 64 KiB for
     pairing intents, 4 MiB for other JSON operations, and the attachment formula
-    declared on its operation (154 MiB by default). Oversize bodies return 413
+    declared on its operation (29 MiB by default). Oversize bodies return 413
     JSON_BODY_TOO_LARGE. These are new input-size restrictions; fields are not
     truncated. Existing admission/auth and separate field limits still apply.
-    The reader bounds consumed bytes, not global memory, concurrency or time.
+    The reader bounds consumed bytes, not global memory. Only attachment POST
+    also limits admission to one operation per module instance and body reading
+    to a total 30-second deadline (ADR 0124).
 servers:
   - url: https://127.0.0.1:3443
     description: Local HTTPS endpoint for native clients via TLS proxy.
@@ -2851,8 +2853,8 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
     post:
-      x-mediflow-json-max-bytes: 161480704
-      x-mediflow-json-max-bytes-formula: "6 * MEDIFLOW_ATTACHMENT_MAX_BYTES + 4194304; default shown above"
+      x-mediflow-json-max-bytes: 30408704
+      x-mediflow-json-max-bytes-formula: "resolveMaxAttachmentBytes() + 4194304; default shown above"
       tags:
         - Network
       operationId: createNetworkPatientAttachment
@@ -2873,6 +2875,26 @@ paths:
         queues the created attachment with `ocrQueueState: pending` and
         `ocrQueueReason: paired_upload`. There is no paired update or delete
         for attachments.
+        The inclusive serialized JSON cap is the configured wire limit
+        (`resolveMaxAttachmentBytes()`, host override `MEDIFLOW_ATTACHMENT_MAX_BYTES`)
+        plus 4 MiB for the envelope and metadata: 29 MiB (30,408,704 bytes)
+        by default. Canonical client serialization leaves ENC ASCII and slashes
+        unescaped; arbitrary whitespace or escaping is not guaranteed to fit.
+        The separate attachment data wire limit remains 25 MiB by default.
+        After existing admission/auth, mode, capability, session and scope gates,
+        one operation per server module instance reserves a slot before reading
+        headers or body. There is no queue: another admitted POST returns
+        503 ATTACHMENT_OPERATION_BUSY with Retry-After: 1 without reading its body.
+        The slot covers reading, parsing, validation, asynchronous service and
+        response construction, and is released only when that work ends or fails.
+        The body read has a total 30-second deadline, not renewed by chunks:
+        expiry returns 408 ATTACHMENT_BODY_READ_TIMEOUT and client abort during
+        reading returns 400 ATTACHMENT_BODY_READ_ABORTED. Reader cancellation is
+        best-effort; an already determined 413 retains precedence. The deadline
+        is cooperative with the event loop and does not bound the service;
+        client abort during service does not release the slot early. A stalled
+        service retains it. Slots do not coordinate processes, workers or module
+        copies, and do not bound transport allocations or global memory.
       security:
         - pairedClientId: []
           pairedClientToken: []
@@ -2906,15 +2928,52 @@ paths:
               schema:
                 $ref: '#/components/schemas/AttachmentCreateResponse'
         '400':
-          $ref: '#/components/responses/BadRequest'
+          description: Invalid request, or client abort during attachment body reading.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                bodyReadAborted:
+                  value:
+                    error: Attachment body read aborted
+                    code: ATTACHMENT_BODY_READ_ABORTED
         '401':
           $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '408':
+          description: Total 30-second attachment body read deadline expired before materialization.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                bodyReadTimeout:
+                  value:
+                    error: Attachment body read timeout
+                    code: ATTACHMENT_BODY_READ_TIMEOUT
         '413':
           $ref: '#/components/responses/PayloadTooLarge'
+        '503':
+          description: An attachment operation already occupies this module instance; request body not read.
+          headers:
+            Retry-After:
+              description: Retry delay in seconds.
+              schema:
+                type: string
+                const: '1'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                operationBusy:
+                  value:
+                    error: Attachment operation busy
+                    code: ATTACHMENT_OPERATION_BUSY
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/patients/{id}/attachments/{attachmentId}:
