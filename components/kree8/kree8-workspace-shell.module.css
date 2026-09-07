@@ -245,6 +245,30 @@
 .followupHeader { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .followupDate { flex: none; color: var(--lume-ink-muted); font-size: 11px; }
 .rowLink { display: inline-block; margin-top: 8px; color: var(--lume-ink-muted); font-size: 12px; font-weight: 560; }
+/* @Codex WUL-678: expose the existing planner as a clear, keyboard and touch-sized action. */
+.followupAction {
+  box-sizing: border-box;
+  align-self: flex-start;
+  display: inline-flex;
+  min-width: 44px;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 10px 14px;
+  border: 1px solid var(--lume-ink-muted);
+  border-radius: 12px;
+  background: var(--lume-surface-field);
+  color: var(--lume-ink);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 22px;
+  text-decoration: none;
+  transition: background-color var(--lume-dur-riga) var(--lume-ease), border-color var(--lume-dur-riga) var(--lume-ease), color var(--lume-dur-riga) var(--lume-ease);
+}
+.followupAction:hover { border-color: var(--lume-ink); background: color-mix(in srgb, var(--lume-ink) 5%, var(--lume-surface-field)); }
+.followupAction:focus-visible { outline: 2px solid var(--k8-focus); outline-offset: 2px; }
 .synopticLink { border-radius: 8px; }
 .synopticLink:hover { background: color-mix(in srgb, var(--lume-accent) 5%, transparent); }
 .synopticCode { color: var(--lume-ink-muted); font-size: 12px; }

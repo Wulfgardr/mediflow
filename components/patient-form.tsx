@@ -389,7 +389,8 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
             </div>
 
             {/* Pianificazione operativa */}
-            <div className={FORM_SECTION_CLASS}>
+            {/* @Codex WUL-678: stable anchor for the existing follow-up planner. */}
+            <div id="pianificazione" className={FORM_SECTION_CLASS}>
                 <div className="flex items-center gap-4 graphite-divider pb-5 mb-2">
                     <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: 'color-mix(in srgb, var(--lume-accent) 10%, var(--lume-surface-field))' }}>
                         <Calendar className="w-5 h-5" style={{ color: 'var(--lume-accent)' }} />

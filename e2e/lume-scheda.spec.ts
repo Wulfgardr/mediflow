@@ -184,6 +184,40 @@ test('le tredici sezioni restano raggiungibili con una sola destinazione corrent
   await expectCurrentSection(page, 'follow-up');
 });
 
+/* @Codex WUL-678: prove the folder action reaches the existing planner. */
+test('il follow-up apre il pianificatore canonico dalla cartella', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+  const patient = await createFixture(page);
+  await page.goto(`/patients/${patient.id}/modules`);
+  await openPatientSection(page, 'follow-up');
+
+  const action = page.getByRole('link', { name: 'Aggiungi follow-up', exact: true });
+  await expect(action).toBeVisible();
+  await expect(action).toHaveAttribute('href', `/patients/${patient.id}/edit#pianificazione`);
+  const geometry = await action.evaluate((element) => {
+    const style = getComputedStyle(element);
+    const box = element.getBoundingClientRect();
+    return { width: box.width, height: box.height, radius: style.borderRadius };
+  });
+  expect(geometry.width).toBeGreaterThanOrEqual(44);
+  expect(geometry.height).toBeGreaterThanOrEqual(44);
+  expect(geometry.radius).toBe('12px');
+
+  await action.click();
+  await expect(page).toHaveURL(new RegExp(`/patients/${patient.id}/edit#pianificazione$`));
+  const planning = page.locator('#pianificazione');
+  await expect(planning).toBeVisible();
+  await expect(planning.getByRole('heading', { name: 'Prossimi passaggi', exact: true })).toBeVisible();
+  await planning.scrollIntoViewIfNeeded();
+  const addPassage = planning.getByRole('button', { name: 'Aggiungi passaggio', exact: true });
+  await expect(addPassage).toBeVisible();
+  await addPassage.click();
+  await expect(planning.locator('input[type="date"]')).toHaveCount(1);
+  await expect(planning.getByText('Data prevista', { exact: true })).toBeVisible();
+  await expect(planning.getByText('Prossimo passaggio', { exact: true })).toBeVisible();
+});
+
 for (const schedaCase of CASES) {
   test(`Scheda Lume ${schedaCase.register} ${schedaCase.viewport}`, async ({ page }) => {
     await page.setViewportSize({ width: schedaCase.width, height: schedaCase.height });
