@@ -76,6 +76,10 @@ provisionato; lookup/cross-check restano fuori dal candidato.
 [Baseline operativa WUL-670](./analysis/2026-09-05-mediflow-086-baseline.md):
 base corrente, prove sintetiche, recuperi prioritari e ordine di sviluppo.
 
+[Piano operativo configurazione e parità desktop](./analysis/2026-09-07-086-guided-configuration-plan.md):
+requisiti accolti il 7 settembre, sei fasi, contratti da completare e gate di
+consegna. È il dettaglio attuale della roadmap 0.8.6; non attesta completezza.
+
 [Mini roadmap di consolidamento](./roadmap-086-consolidamento.md): dettaglio
 preparatorio della roadmap prodotto per OCR, ICD-11, impostazioni e scheda
 paziente, onboarding assistito, deslop e GDPR/AI Act, con recupero selettivo

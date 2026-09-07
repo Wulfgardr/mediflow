@@ -15,7 +15,18 @@ read_when:
 
 > [!NOTE]
 
-## Proposta preparatoria 0.8.6 — consolidamento
+## 0.8.6 — configurazione guidata e parità desktop
+
+Il 7 settembre l'utente ha esteso il requisito di consegna: impostazioni
+guidate, connessione ChatGPT ufficiale, scelta locale/online per funzione,
+WHO operativo, aggiornamento AIFA, import esenzioni/protesica e parità
+funzionale desktop con i canali Mini/headless nei rispettivi confini.
+Il [piano operativo](./analysis/2026-09-07-086-guided-configuration-plan.md)
+divide il lavoro in sei fasi con dipendenze e prove di accettazione. Lo sviluppo
+è in corso; iOS/iPadOS sono separati da questa nuova tranche. La precedente
+dichiarazione di sviluppo concluso non copre questi nuovi requisiti.
+
+### Preparazione storica
 
 La [mini roadmap 0.8.6](./roadmap-086-consolidamento.md) raccoglie OCR con fallback
 locale funzionante, ICD-11 WHO accessibile, impostazioni più semplici, revisione

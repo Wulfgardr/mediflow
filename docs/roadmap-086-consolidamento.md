@@ -7,12 +7,15 @@ read_when:
 
 # MediFlow 0.8.6 — consolidamento funzionale e interfaccia
 
-Aggiornamento: 7 settembre 2026. Stato: **feature-complete e development-complete;
-candidato congelato per decisione dell'utente**, con
+Aggiornamento: 7 settembre 2026. Stato: **sviluppo riaperto sui nuovi requisiti
+di configurazione e parità desktop**. Il
+[piano operativo corrente](./analysis/2026-09-07-086-guided-configuration-plan.md)
+prevale sulle precedenti dichiarazioni di completezza, riferite alla base
+funzionale già congelata. La preparazione conserva la
 [baseline WUL-670](./analysis/2026-09-05-mediflow-086-baseline.md) su `main`
 `b72ac713b`; la preparazione usava `6a5463e8d`. Nessuna release 0.8.6 consegnata.
 La [roadmap generale](./ROADMAP.md) resta la fonte prodotto;
-questo documento ne dettaglia il candidato 0.8.6.
+questo documento conserva la preparazione del candidato 0.8.6.
 
 [Verbale corrente](./analysis/2026-09-06-086-integrated-closeout.md): integrazione
 della base funzionale, UI B/A, Search WHO locale e cartella Apple. Le sezioni
