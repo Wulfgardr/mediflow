@@ -33,6 +33,17 @@ packaging Mach-O, che modifica e ricolloca canvas in Contents/Frameworks:
 non confrontare quel binario firmato con il digest del pacchetto npm grezzo. La selezione dipende da OS/arch/libc dell'host, non dal
 caller. Binario assente, alterato o profilo non ammesso negano rendering e OCR.
 Linux musl, Windows ARM nativo e Mac Intel non sono qualificati qui.
+Il preflight Tesseract di produzione si applica soltanto a Windows/Linux.
+Su macOS restituisce `not_applicable` prima di ispezionare gli artifact;
+non verifica disponibilita o firma di Apple Vision. Il CLI usa exit 2 per
+questa selezione non applicabile. La smoke Tesseract sul Mac richiede
+`--development-tesseract-smoke` esplicito, e verifica i byte npm grezzi anche
+su Mac: non va usata per il pacchetto firmato/ricollocato. Il renderer Mac
+e i suoi guard di packaging/versione restano invariati.
+Il tracing Next seleziona dal manifest il profilo Windows/Linux del build
+host e include esplicitamente package.json, binario e README, senza wildcard
+su tutti i backend. La configurazione non prova la presenza nel bundle
+costruito: i controlli del pacchetto target restano necessari.
 Windows ARM con Node x64 emulato appartiene al profilo x64 e richiede prova
 nel guest. Il renderer continua a usare addon nativi nel proprio child: il
 guard JavaScript della rete non costituisce sandbox OS degli addon. OCR WASM

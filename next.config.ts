@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { anyDocDesktopRendererTrace } from './scripts/anydoc-desktop-renderer-trace.mjs'; // @Codex
 
 /* @Codex */
 const distDir = process.env.MEDIFLOW_NEXT_DIST_DIR || '.next';
@@ -85,6 +86,7 @@ const nextConfig: NextConfig = {
       "./node_modules/@mediflow/web-auth-lifecycle-owner/**/*",
       "./node_modules/@napi-rs/canvas/**/*",
       "./node_modules/@napi-rs/canvas-darwin-arm64/**/*",
+      ...anyDocDesktopRendererTrace(process.platform, process.arch), // @Codex: explicit target binding closure
     ],
   },
   /* @Codex */

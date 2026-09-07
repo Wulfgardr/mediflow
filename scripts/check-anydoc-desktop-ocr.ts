@@ -26,7 +26,9 @@ function syntheticNativePdf(): Buffer {
 }
 
 async function main() {
-    const capability = inspectAnyDocDesktopOcrCapability();
+    const capability = inspectAnyDocDesktopOcrCapability({
+        developmentSmoke: process.argv.includes('--development-tesseract-smoke'),
+    });
     if (capability.status !== 'artifacts_verified') return { ...capability, anydocFirstPass: 'not_checked' };
     const initial = await extractAnyDocLocalBytes('synthetic.desktop.preflight', syntheticNativePdf());
     // AnyDoc may represent the uppercase marker as a Markdown heading.
@@ -40,5 +42,5 @@ async function main() {
 void main().then((result) => {
     console.log(JSON.stringify(result, null, 2));
     // Exit zero attests artifact integrity and synthetic AnyDoc extraction, never OCR qualification.
-    process.exitCode = result.status === 'artifacts_verified' ? 0 : 1;
+    process.exitCode = result.status === 'not_applicable' ? 2 : result.status === 'artifacts_verified' ? 0 : 1;
 });

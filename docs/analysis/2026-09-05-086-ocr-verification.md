@@ -307,7 +307,7 @@ Nessuna delega, VM, push, PR, merge, tracker, tag o release da questa lane.
 | Suite focalizzata: desktop reale, current-source, acceptance OCR, child owner, materializer, renderer, client e contratto | 74 passati, 1 skip su 75. Include 9 test desktop senza skip; lo skip e il caso renderer assente sul Mac dove il renderer e presente. |
 | `npm run test:anydoc-desktop-ocr` | 9 passati, nessuno skip; wrapper che richiede il motore reale. |
 | Guard standalone mirati (`--test-name-pattern='PDF\|AnyDoc\|LF'`) | 5 passati: worker, smoke, manifest, tracing e checkout LF. |
-| Suite standalone completa | 9 passati, 2 falliti sul roster/restart dell'owner auth 0.8.7. Entrambi riprodotti con checker e test da HEAD base; nessuna correzione auth in questa lane. |
+| Suite standalone completa | 9 passati, 2 falliti sul roster/restart dell'owner auth 0.8.7. Due asserzioni obsolete; la receipt isolata del primo caso e rettificata nella sezione finale. Nessuna correzione auth in questa lane. |
 | `test:document-synthesis`, `test:ai-context`, `test:pdf-service` | 47, 72 e 20 passati. |
 | `check:anydoc-local-only`, `test:anydoc-local-only` | Guard passato, 8 test passati. |
 | `typecheck`, ESLint mirato sui file toccati | Passati. Le copie locali delle dipendenze usano l'archivio auth 0.8.7 fissato da questa branch. |
@@ -507,3 +507,77 @@ Riguardano roster/restart dell'owner auth 0.8.7; log baseline conservati,
 nessuna modifica auth o nuova esecuzione standalone da questa qualifica.
 Nessuna build completa, push, PR, merge, tracker, tag o release. Candidatura
 originale, demo4390, sessioni utente e configurazioni VM preservate.
+
+## Follow-up parent review: selezione Mac e tracing desktop
+
+Il preflight Tesseract originario controllava anche i byte grezzi canvas sul
+Mac: applicato al pacchetto firmato/ricollocato avrebbe potuto restituire
+`unavailable`, senza misurare Apple Vision. Ora
+`inspectAnyDocDesktopOcrCapability()` restituisce su macOS `not_applicable`,
+`qualification=not_checked`, prima di leggere gli artifact. Il CLI esce 2,
+non esegue AnyDoc e indica che il controllo non riguarda la disponibilita
+Vision. La selezione runtime Mac continua a usare Apple Vision.
+
+La smoke Tesseract su Mac e esplicita:
+`npm run check:anydoc-desktop-ocr -- --development-tesseract-smoke`.
+Solo questa modalita usa `checkScope=development_smoke` e conserva i controlli
+stretti sul binario npm grezzo. Non usarla sul pacchetto Mac firmato.
+I test reali Mac selezionano questa modalita; il comando di test resta uguale.
+Windows/Linux mantengono il preflight Tesseract con verifica AnyDoc.
+Nessun worker, digest o guard del renderer/packaging Mac e stato indebolito.
+
+`next.config.ts` usa `scripts/anydoc-desktop-renderer-trace.mjs` per aggiungere
+il solo profilo Windows/Linux corrispondente a OS/arch del build host,
+ricavato dal manifest fissato: `package.json`, il binario `.node` esatto e
+README. Nessuna wildcard su tutti i backend. Il roster Mac preesistente e
+invariato. La selezione Linux indica il pacchetto glibc, senza qualificare
+musl: l'ammissione runtime resta del renderer. Un cross-build con piattaforma
+diversa dal build host non e qualificato da questo helper.
+
+Verifiche Node 24.19.0: suite reale desktop e child owner 17/17, due test
+configurazione tracing 2/2, sette guard standalone PDF/AnyDoc/canvas/LF 7/7;
+typecheck mirato comprensivo di next.config ed ESLint mirato passano.
+I test provano anche che renderer mancante/alterato resta negato nella smoke
+Mac, mentre il preflight Mac di produzione rimane non applicabile. Non sono
+prove di firma o di un bundle Windows/Linux costruito. Nessuna build Next,
+Xcode o nuova esecuzione VM durante questo follow-up; qualifica VM gia
+registrata sopra e bundle target ancora aperti.
+
+### Rettifica precisa dei due guard auth
+
+Rieseguiti soltanto i due test con `--test-name-pattern='web auth owner'`,
+senza build: entrambi falliscono su asserzioni obsolete. Il comando
+`node scripts/check-standalone-runtime-bundle.mjs --self-test=web-auth-owner`
+esce **0**: non attribuire questi fallimenti a un restart effettivamente negato
+in modo errato.
+
+- `scripts/check-standalone-runtime-bundle.test.mjs:124` attende
+  `/WEB_AUTH_OWNER_VERSION = '0\.8\.6'/`; il checker a riga 36 dichiara
+  `0.8.7`. Anche il successivo assert a riga 126 attende
+  `/root is not the frozen exact 21-function API/`, mentre il checker a riga
+  599 usa `root is not the frozen exact owner API with native session namespace`
+  e il roster API contiene 23 chiavi. Quest'ultimo assert non viene raggiunto
+  nella prova corrente, che si arresta sulla versione.
+- `scripts/check-standalone-runtime-bundle.test.mjs:195` confronta il roster
+  installato con `webAuthOwnerRoster` definito a riga 26. Expected: 12 file;
+  actual: gli stessi 12 piu `internal/native-session.cjs` (13 file). Il checker
+  lo include gia nel roster fissato. Nessuna modifica a test o codice auth.
+
+Nella receipt precedente `baseline-standalone-auth.log`, la prima prova
+isolata falliva invece per `node-runtime-contract.mjs` non copiato: quella
+prova non dimostra il difetto auth e resta conservata come errore del harness.
+Il log della suite originale e la nuova prova mirata mostrano la versione
+obsoleta; `git show` sulla base `1672cb3c` conferma versione checker 0.8.7,
+assert 0.8.6 e roster test senza native-session gia presenti prima della lane.
+Le nuove prove sono in `auth-exact-review.log`, `auth-selftest-review.log` e
+`auth-exact-receipt.json` negli artefatti privati del follow-up.
+
+### Artifact per il provisioning del parent
+
+Manifest canonico `scripts/anydoc-tesseract-artifacts.json`, invariato;
+cinque sorgenti locali in `node_modules/mediflow-ocr-tesseract/`, 5.719.862 byte,
+nome/dimensione/SHA-256 riverificati. `parent-artifact-paths.json` privato
+riporta source assolute e destinazioni relative del manifest. Il parent ha
+comunicato copia completa con hash source/dest corrispondenti nella propria
+receipt `ocr-parent-artifact-copy.json`: questa lane non ne attesta il bundle
+integrato e non esegue ulteriori copie o redistribuzioni automatiche.
