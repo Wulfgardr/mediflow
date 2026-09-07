@@ -1,6 +1,9 @@
 'use client';
 
 /* @Codex */
+import { ChatGptAccountPanel } from '@/components/settings/chatgpt-account-panel';
+
+/* @Codex */
 import Link from 'next/link';
 import { Bot, Cpu, RefreshCw, Save } from 'lucide-react';
 import { useAiSettingsController } from '@/lib/hooks/use-ai-settings-controller';
@@ -27,6 +30,9 @@ export default function SettingsAiModelsPage() {
         <section className={styles.surface} data-testid="settings-ai-models-section">
             <SettingsSectionIntro kicker="Intelligenza locale" title="Modelli e hardware"
                 description="Collega Ollama, scegli i modelli installati e salva. Le funzioni cliniche richiedono un’abilitazione separata e revisione delle proposte." />
+
+            {/* @Codex: account control is separate from function/model preferences. */}
+            <ChatGptAccountPanel />
 
             {/* @Codex: presets remain explicit draft changes through the existing controller. */}
             <div className={`${SETTINGS_CARD_CLASS} ${styles.card} ${styles.stack}`}>

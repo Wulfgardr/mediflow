@@ -1,6 +1,9 @@
 'use client';
 
 /* @Codex */
+import { ChatGptAccountPanel } from '@/components/settings/chatgpt-account-panel';
+
+/* @Codex */
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import serviceStyles from '@/components/service-architecture-panel.module.css';
@@ -149,6 +152,9 @@ export default function SettingsAiFabricPage() {
                 title="Intelligence Fabric"
                 description="Configura i modelli e le funzioni intelligenti. Qui trovi lo stato della postazione e i passaggi ancora necessari per usarle."
             />
+
+            {/* @Codex: account control is separate from function/model preferences. */}
+            <ChatGptAccountPanel />
 
             {/* @Codex: expose the existing configuration routes alongside their status. */}
             <nav aria-label="Configura Intelligence Fabric" className={serviceStyles.fabricActions}>
