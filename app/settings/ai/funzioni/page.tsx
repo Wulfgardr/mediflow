@@ -3,6 +3,8 @@
 // WUL-297 Funzioni cliniche AI: moved from the monolithic settings page.
 
 import { CheckCircle, Save, Shield, Sparkles } from 'lucide-react';
+/* @Codex */
+import functionStyles from '@/components/settings/function-status-panel.module.css';
 import {
     AI_INSIGHT_MODE_OPTIONS,
 } from '@/lib/ai-insight-settings';
@@ -40,16 +42,263 @@ export default function SettingsAiFunctionsPage() {
     } = useAiSettingsController();
 
     return (
-        <section className="space-y-4" data-testid="settings-ai-functions-section">
+        <section className={`space-y-4 ${functionStyles.functionSettings}`} data-testid="settings-ai-functions-section">
             <SettingsSectionIntro
                 kicker="Intelligenza locale"
                 title="Funzioni cliniche"
-                description="Interruttori per funzione e budget insight."
+                description="Scegli quali proposte usare. Puoi modificare ogni funzione e salvare le preferenze."
             />
 
             <div className="space-y-6">
-                {/* Patient Insight runtime policy */}
+                {/* AI safety toggles */}
                 <div className={SETTINGS_CARD_CLASS}>
+                    {/* @Codex WUL-273: active AI switches use neutral confirmation; red is reserved for off/blocked states. */}
+                    <div className="mb-5 flex items-start gap-3">
+                        <div className="rounded-2xl p-2" style={{ background: 'var(--lume-surface-field)', color: 'var(--lume-signal-critical)' }}>
+                            <Shield className="h-4 w-4" />
+                        </div>
+                        <div className="min-w-0">
+                            <p className="section-kicker">Preferenze</p>
+                            <h3 className="mt-1 text-base font-semibold" style={{ color: 'var(--lume-ink)' }}>Scegli le funzioni da usare</h3>
+                            <p className="mt-1 text-xs" style={{ color: 'var(--lume-ink-muted)' }}>Ogni funzione ha una preferenza indipendente. Le modifiche diventano effettive quando salvi.</p>
+                        </div>
+                    </div>
+
+                    <div className="space-y-3">
+                        <div
+                            className="rounded-[18px] border p-4"
+                            style={patientInsightEnabled
+                                ? { borderColor: 'color-mix(in srgb, var(--lume-ink) 18%, transparent)', background: 'var(--lume-surface-field)' }
+                                : { borderColor: 'color-mix(in srgb, var(--lume-signal-critical) 28%, transparent)', background: 'var(--lume-surface-field)' }}
+                            data-testid="patient-insight-kill-switch-card"
+                        >
+                            <div className="flex items-start justify-between gap-3">
+                                <div>
+                                    <p className="text-sm font-semibold" style={{ color: 'var(--lume-ink)' }}>Quadro paziente</p>
+                                    <p className="mt-1 text-[11px] leading-5" style={{ color: 'var(--lume-ink-muted)' }}>
+                                        Se spento, la scheda paziente non genera nuovi riepiloghi AI.
+                                    </p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <label
+                                        htmlFor="patientInsightKillSwitch"
+                                        className="rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em]"
+                                        style={patientInsightEnabled
+                                            ? { borderColor: 'color-mix(in srgb, var(--lume-ink) 18%, transparent)', background: 'var(--lume-surface-focal)', color: 'var(--lume-ink)' }
+                                            : { borderColor: 'color-mix(in srgb, var(--lume-signal-critical) 32%, transparent)', background: 'var(--lume-surface-focal)', color: 'var(--lume-signal-critical)' }}
+                                    >
+                                        {patientInsightEnabled ? 'Attivo' : 'Spento'}
+                                    </label>
+                                    <button
+                                        id="patientInsightKillSwitch"
+                                        type="button"
+                                        role="switch"
+                                        aria-checked={patientInsightEnabled}
+                                        aria-label="Patient Insight locale"
+                                        onClick={() => setPatientInsightEnabled(!patientInsightEnabled)}
+                                        className="relative h-7 w-12 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[color:var(--lume-accent)]"
+                                        style={{ background: patientInsightEnabled ? 'var(--lume-ink)' : 'color-mix(in srgb, var(--lume-ink) 20%, transparent)' }}
+                                    >
+                                        <span
+                                            className="absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform"
+                                            style={{ transform: patientInsightEnabled ? 'translateX(20px)' : 'translateX(0)' }}
+                                        />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div
+                            className="rounded-[18px] border p-4"
+                            style={documentSynthesisEnabled
+                                ? { borderColor: 'color-mix(in srgb, var(--lume-ink) 18%, transparent)', background: 'var(--lume-surface-field)' }
+                                : { borderColor: 'color-mix(in srgb, var(--lume-signal-critical) 28%, transparent)', background: 'var(--lume-surface-field)' }}
+                            data-testid="document-synthesis-kill-switch-card"
+                        >
+                            <div className="flex items-start justify-between gap-3">
+                                <div>
+                                    <p className="text-sm font-semibold" style={{ color: 'var(--lume-ink)' }}>Sintesi dei documenti</p>
+                                    <p className="mt-1 text-[11px] leading-5" style={{ color: 'var(--lume-ink-muted)' }}>
+                                        Se spento, estrazione locale e import base restano disponibili, ma non vengono prodotte sintesi cliniche automatiche.
+                                    </p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <label
+                                        htmlFor="documentSynthesisKillSwitch"
+                                        className="rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em]"
+                                        style={documentSynthesisEnabled
+                                            ? { borderColor: 'color-mix(in srgb, var(--lume-ink) 18%, transparent)', background: 'var(--lume-surface-focal)', color: 'var(--lume-ink)' }
+                                            : { borderColor: 'color-mix(in srgb, var(--lume-signal-critical) 32%, transparent)', background: 'var(--lume-surface-focal)', color: 'var(--lume-signal-critical)' }}
+                                    >
+                                        {documentSynthesisEnabled ? 'Attivo' : 'Spento'}
+                                    </label>
+                                    <button
+                                        id="documentSynthesisKillSwitch"
+                                        type="button"
+                                        role="switch"
+                                        aria-checked={documentSynthesisEnabled}
+                                        aria-label="Document Synthesis locale"
+                                        onClick={() => setDocumentSynthesisEnabled(!documentSynthesisEnabled)}
+                                        className="relative h-7 w-12 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[color:var(--lume-accent)]"
+                                        style={{ background: documentSynthesisEnabled ? 'var(--lume-ink)' : 'color-mix(in srgb, var(--lume-ink) 20%, transparent)' }}
+                                    >
+                                        <span
+                                            className="absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform"
+                                            style={{ transform: documentSynthesisEnabled ? 'translateX(20px)' : 'translateX(0)' }}
+                                        />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div
+                            className="rounded-[18px] border p-4"
+                            style={smartImportEnabled
+                                ? { borderColor: 'color-mix(in srgb, var(--lume-ink) 18%, transparent)', background: 'var(--lume-surface-field)' }
+                                : { borderColor: 'color-mix(in srgb, var(--lume-signal-critical) 28%, transparent)', background: 'var(--lume-surface-field)' }}
+                            data-testid="smart-import-kill-switch-card"
+                        >
+                            <div className="flex items-start justify-between gap-3">
+                                <div>
+                                    <p className="text-sm font-semibold" style={{ color: 'var(--lume-ink)' }}>Importazione assistita</p>
+                                    <p className="mt-1 text-[11px] leading-5" style={{ color: 'var(--lume-ink-muted)' }}>
+                                        Se spento, il pannello paziente non propone nuovi suggerimenti Smart Import e non applica quelli in sospeso.
+                                    </p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <label
+                                        htmlFor="smartImportKillSwitch"
+                                        className="rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em]"
+                                        style={smartImportEnabled
+                                            ? { borderColor: 'color-mix(in srgb, var(--lume-ink) 18%, transparent)', background: 'var(--lume-surface-focal)', color: 'var(--lume-ink)' }
+                                            : { borderColor: 'color-mix(in srgb, var(--lume-signal-critical) 32%, transparent)', background: 'var(--lume-surface-focal)', color: 'var(--lume-signal-critical)' }}
+                                    >
+                                        {smartImportEnabled ? 'Attivo' : 'Spento'}
+                                    </label>
+                                    <button
+                                        id="smartImportKillSwitch"
+                                        type="button"
+                                        role="switch"
+                                        aria-checked={smartImportEnabled}
+                                        aria-label="Smart Import locale"
+                                        onClick={() => setSmartImportEnabled(!smartImportEnabled)}
+                                        className="relative h-7 w-12 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[color:var(--lume-accent)]"
+                                        style={{ background: smartImportEnabled ? 'var(--lume-ink)' : 'color-mix(in srgb, var(--lume-ink) 20%, transparent)' }}
+                                    >
+                                        <span
+                                            className="absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform"
+                                            style={{ transform: smartImportEnabled ? 'translateX(20px)' : 'translateX(0)' }}
+                                        />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div
+                            className="rounded-[18px] border p-4"
+                            style={treatmentReasoningEnabled
+                                ? { borderColor: 'color-mix(in srgb, var(--lume-ink) 18%, transparent)', background: 'var(--lume-surface-field)' }
+                                : { borderColor: 'color-mix(in srgb, var(--lume-signal-critical) 28%, transparent)', background: 'var(--lume-surface-field)' }}
+                            data-testid="treatment-reasoning-kill-switch-card"
+                        >
+                            <div className="flex items-start justify-between gap-3">
+                                <div>
+                                    <p className="text-sm font-semibold" style={{ color: 'var(--lume-ink)' }}>Revisione del trattamento</p>
+                                    <p className="mt-1 text-[11px] leading-5" style={{ color: 'var(--lume-ink-muted)' }}>
+                                        Se spento, il pannello terapie non genera nuove bozze con ATHENA-R1-Qwen3-8B via MLX locale. Le bozze restano consultive, richiedono verifica clinica e non scrivono in scheda.
+                                    </p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <label
+                                        htmlFor="treatmentReasoningKillSwitch"
+                                        className="rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em]"
+                                        style={treatmentReasoningEnabled
+                                            ? { borderColor: 'color-mix(in srgb, var(--lume-ink) 18%, transparent)', background: 'var(--lume-surface-focal)', color: 'var(--lume-ink)' }
+                                            : { borderColor: 'color-mix(in srgb, var(--lume-signal-critical) 32%, transparent)', background: 'var(--lume-surface-focal)', color: 'var(--lume-signal-critical)' }}
+                                    >
+                                        {treatmentReasoningEnabled ? 'Attivo' : 'Spento'}
+                                    </label>
+                                    <button
+                                        id="treatmentReasoningKillSwitch"
+                                        type="button"
+                                        role="switch"
+                                        aria-checked={treatmentReasoningEnabled}
+                                        aria-label="Treatment Reasoning locale"
+                                        onClick={() => setTreatmentReasoningEnabled(!treatmentReasoningEnabled)}
+                                        className="relative h-7 w-12 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[color:var(--lume-accent)]"
+                                        style={{ background: treatmentReasoningEnabled ? 'var(--lume-ink)' : 'color-mix(in srgb, var(--lume-ink) 20%, transparent)' }}
+                                    >
+                                        <span
+                                            className="absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform"
+                                            style={{ transform: treatmentReasoningEnabled ? 'translateX(20px)' : 'translateX(0)' }}
+                                        />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <details className={SETTINGS_CARD_CLASS}>
+                    <summary className={functionStyles.advancedSummary}>Lettura e instradamento dei documenti</summary>
+                        <div
+                            className="rounded-[18px] border p-4"
+                            style={{ borderColor: 'color-mix(in srgb, var(--lume-signal-critical) 28%, transparent)', background: 'var(--lume-surface-field)' }}
+                            data-testid="ocr-unavailable-card"
+                        >
+                            <div className="flex items-start justify-between gap-3">
+                                <div>
+                                    <p className="text-sm font-semibold" style={{ color: 'var(--lume-ink)' }}>Lettura locale degli allegati</p>
+                                    <p className="mt-1 text-[11px] leading-5" style={{ color: 'var(--lume-ink-muted)' }}>
+                                        AnyDoc estrae il testo; sui PDF supportati il percorso locale puo usare Apple Vision per le pagine scansionate. Le immagini singole restano da rivedere manualmente. Questo percorso e separato dal registro OCR di Fabric.
+                                    </p>
+                                </div>
+                                <span className="rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em]" style={{ borderColor: 'color-mix(in srgb, var(--lume-signal-critical) 32%, transparent)', background: 'var(--lume-surface-focal)', color: 'var(--lume-signal-critical)' }}>
+                                    Revisione richiesta
+                                </span>
+                            </div>
+                        </div>
+
+                        <div
+                            className="rounded-[18px] border p-4"
+                            style={{ borderColor: 'color-mix(in srgb, var(--lume-ink) 18%, transparent)', background: 'var(--lume-surface-field)' }}
+                            data-testid="document-router-control-flow-card"
+                        >
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                <div className="min-w-0">
+                                    <p className="text-sm font-semibold" style={{ color: 'var(--lume-ink)' }}>Instradamento documentale deterministico</p>
+                                    <p className="mt-1 text-[11px] leading-5" style={{ color: 'var(--lume-ink-muted)' }}>
+                                        Decide quando le classi a estrazione certa possono usare la sintesi deterministica invece del modello.
+                                    </p>
+                                </div>
+                                <label className="text-xs font-medium" style={{ color: 'var(--lume-ink-muted)' }}>
+                                    Modalita
+                                    <select
+                                        aria-label="Modalita instradamento documentale deterministico"
+                                        value={documentRouterControlFlowMode}
+                                        onChange={(event) => setDocumentRouterControlFlowMode(event.target.value as typeof documentRouterControlFlowMode)}
+                                        className={`mt-1 min-w-40 ${SETTINGS_INPUT_CLASS}`}
+                                    >
+                                        <option value="off">Spento</option>
+                                        <option value="shadow">Osservazione</option>
+                                        <option value="active">Attivo</option>
+                                    </select>
+                                </label>
+                            </div>
+                            <p className="mt-3 rounded-[14px] border px-3 py-2 text-[11px] leading-5" style={{ borderColor: 'color-mix(in srgb, var(--lume-ink) 12%, transparent)', background: 'var(--lume-surface-focal)', color: 'var(--lume-ink-muted)' }}>
+                                {documentRouterControlFlowMode === 'off'
+                                    ? 'Spento: il modello analizza tutti i documenti.'
+                                    : documentRouterControlFlowMode === 'shadow'
+                                        ? 'Osservazione: il router registra cosa salterebbe senza cambiare la sintesi.'
+                                        : 'Attivo: le classi a estrazione certa saltano il modello e usano la sintesi deterministica.'}
+                            </p>
+                        </div>
+
+                </details>
+
+                {/* @Codex: advanced controls remain available below the function choices. */}
+                <details className={SETTINGS_CARD_CLASS}>
+                    <summary className={functionStyles.advancedSummary}>Regola contesto e lunghezza delle sintesi</summary>
                     {/* @Codex WUL-273: Patient Insight runtime settings stay neutral and role-led. */}
                     <div className="mb-5 flex items-start gap-3">
                         <div className="rounded-2xl p-2" style={{ background: 'color-mix(in srgb, var(--lume-ink) 6%, transparent)', color: 'var(--lume-ink)' }}>
@@ -57,7 +306,7 @@ export default function SettingsAiFunctionsPage() {
                         </div>
                         <div className="flex min-w-0 flex-1 items-start justify-between gap-3">
                             <div className="min-w-0">
-                                <p className="section-kicker">Patient Insight</p>
+                                <p className="section-kicker">Quadro paziente</p>
                                 <h3 className="mt-1 text-base font-semibold" style={{ color: 'var(--lume-ink)' }}>Budget contesto e output</h3>
                                 <p className="mt-1 text-xs" style={{ color: 'var(--lume-ink-muted)' }}>Quanto contesto leggere e quanto produrre per ogni insight: bilancia velocità e completezza.</p>
                             </div>
@@ -156,249 +405,7 @@ export default function SettingsAiFunctionsPage() {
                             </label>
                         </div>
                     )}
-                </div>
-
-                {/* AI safety toggles */}
-                <div className={SETTINGS_CARD_CLASS}>
-                    {/* @Codex WUL-273: active AI switches use neutral confirmation; red is reserved for off/blocked states. */}
-                    <div className="mb-5 flex items-start gap-3">
-                        <div className="rounded-2xl p-2" style={{ background: 'var(--lume-surface-field)', color: 'var(--lume-signal-critical)' }}>
-                            <Shield className="h-4 w-4" />
-                        </div>
-                        <div className="min-w-0">
-                            <p className="section-kicker">Sicurezza AI</p>
-                            <h3 className="mt-1 text-base font-semibold" style={{ color: 'var(--lume-ink)' }}>Disattiva singole funzioni AI</h3>
-                            <p className="mt-1 text-xs" style={{ color: 'var(--lume-ink-muted)' }}>Ogni interruttore ferma una funzione specifica, anche se i modelli locali sono installati.</p>
-                        </div>
-                    </div>
-
-                    <div className="space-y-3">
-                        <div
-                            className="rounded-[18px] border p-4"
-                            style={{ borderColor: 'color-mix(in srgb, var(--lume-signal-critical) 28%, transparent)', background: 'var(--lume-surface-field)' }}
-                            data-testid="ocr-unavailable-card"
-                        >
-                            <div className="flex items-start justify-between gap-3">
-                                <div>
-                                    <p className="text-sm font-semibold" style={{ color: 'var(--lume-ink)' }}>Lettura locale degli allegati</p>
-                                    <p className="mt-1 text-[11px] leading-5" style={{ color: 'var(--lume-ink-muted)' }}>
-                                        AnyDoc estrae il testo; sui PDF supportati il percorso locale puo usare Apple Vision per le pagine scansionate. Le immagini singole restano da rivedere manualmente. Questo percorso e separato dal registro OCR di Fabric.
-                                    </p>
-                                </div>
-                                <span className="rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em]" style={{ borderColor: 'color-mix(in srgb, var(--lume-signal-critical) 32%, transparent)', background: 'var(--lume-surface-focal)', color: 'var(--lume-signal-critical)' }}>
-                                    Revisione richiesta
-                                </span>
-                            </div>
-                        </div>
-
-                        <div
-                            className="rounded-[18px] border p-4"
-                            style={{ borderColor: 'color-mix(in srgb, var(--lume-ink) 18%, transparent)', background: 'var(--lume-surface-field)' }}
-                            data-testid="document-router-control-flow-card"
-                        >
-                            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                                <div className="min-w-0">
-                                    <p className="text-sm font-semibold" style={{ color: 'var(--lume-ink)' }}>Instradamento documentale deterministico</p>
-                                    <p className="mt-1 text-[11px] leading-5" style={{ color: 'var(--lume-ink-muted)' }}>
-                                        Decide quando le classi a estrazione certa possono usare la sintesi deterministica invece del modello.
-                                    </p>
-                                </div>
-                                <label className="text-xs font-medium" style={{ color: 'var(--lume-ink-muted)' }}>
-                                    Modalita
-                                    <select
-                                        aria-label="Modalita instradamento documentale deterministico"
-                                        value={documentRouterControlFlowMode}
-                                        onChange={(event) => setDocumentRouterControlFlowMode(event.target.value as typeof documentRouterControlFlowMode)}
-                                        className={`mt-1 min-w-40 ${SETTINGS_INPUT_CLASS}`}
-                                    >
-                                        <option value="off">Spento</option>
-                                        <option value="shadow">Osservazione</option>
-                                        <option value="active">Attivo</option>
-                                    </select>
-                                </label>
-                            </div>
-                            <p className="mt-3 rounded-[14px] border px-3 py-2 text-[11px] leading-5" style={{ borderColor: 'color-mix(in srgb, var(--lume-ink) 12%, transparent)', background: 'var(--lume-surface-focal)', color: 'var(--lume-ink-muted)' }}>
-                                {documentRouterControlFlowMode === 'off'
-                                    ? 'Spento: il modello analizza tutti i documenti.'
-                                    : documentRouterControlFlowMode === 'shadow'
-                                        ? 'Osservazione: il router registra cosa salterebbe senza cambiare la sintesi.'
-                                        : 'Attivo: le classi a estrazione certa saltano il modello e usano la sintesi deterministica.'}
-                            </p>
-                        </div>
-
-                        <div
-                            className="rounded-[18px] border p-4"
-                            style={patientInsightEnabled
-                                ? { borderColor: 'color-mix(in srgb, var(--lume-ink) 18%, transparent)', background: 'var(--lume-surface-field)' }
-                                : { borderColor: 'color-mix(in srgb, var(--lume-signal-critical) 28%, transparent)', background: 'var(--lume-surface-field)' }}
-                            data-testid="patient-insight-kill-switch-card"
-                        >
-                            <div className="flex items-start justify-between gap-3">
-                                <div>
-                                    <p className="text-sm font-semibold" style={{ color: 'var(--lume-ink)' }}>Patient Insight</p>
-                                    <p className="mt-1 text-[11px] leading-5" style={{ color: 'var(--lume-ink-muted)' }}>
-                                        Se spento, la scheda paziente non genera nuovi riepiloghi AI.
-                                    </p>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <label
-                                        htmlFor="patientInsightKillSwitch"
-                                        className="rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em]"
-                                        style={patientInsightEnabled
-                                            ? { borderColor: 'color-mix(in srgb, var(--lume-ink) 18%, transparent)', background: 'var(--lume-surface-focal)', color: 'var(--lume-ink)' }
-                                            : { borderColor: 'color-mix(in srgb, var(--lume-signal-critical) 32%, transparent)', background: 'var(--lume-surface-focal)', color: 'var(--lume-signal-critical)' }}
-                                    >
-                                        {patientInsightEnabled ? 'Attivo' : 'Spento'}
-                                    </label>
-                                    <button
-                                        id="patientInsightKillSwitch"
-                                        type="button"
-                                        role="switch"
-                                        aria-checked={patientInsightEnabled}
-                                        aria-label="Patient Insight locale"
-                                        onClick={() => setPatientInsightEnabled(!patientInsightEnabled)}
-                                        className="relative h-7 w-12 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[color:var(--lume-accent)]"
-                                        style={{ background: patientInsightEnabled ? 'var(--lume-ink)' : 'color-mix(in srgb, var(--lume-ink) 20%, transparent)' }}
-                                    >
-                                        <span
-                                            className="absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform"
-                                            style={{ transform: patientInsightEnabled ? 'translateX(20px)' : 'translateX(0)' }}
-                                        />
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div
-                            className="rounded-[18px] border p-4"
-                            style={documentSynthesisEnabled
-                                ? { borderColor: 'color-mix(in srgb, var(--lume-ink) 18%, transparent)', background: 'var(--lume-surface-field)' }
-                                : { borderColor: 'color-mix(in srgb, var(--lume-signal-critical) 28%, transparent)', background: 'var(--lume-surface-field)' }}
-                            data-testid="document-synthesis-kill-switch-card"
-                        >
-                            <div className="flex items-start justify-between gap-3">
-                                <div>
-                                    <p className="text-sm font-semibold" style={{ color: 'var(--lume-ink)' }}>Document Synthesis</p>
-                                    <p className="mt-1 text-[11px] leading-5" style={{ color: 'var(--lume-ink-muted)' }}>
-                                        Se spento, estrazione locale e import base restano disponibili, ma non vengono prodotte sintesi cliniche automatiche.
-                                    </p>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <label
-                                        htmlFor="documentSynthesisKillSwitch"
-                                        className="rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em]"
-                                        style={documentSynthesisEnabled
-                                            ? { borderColor: 'color-mix(in srgb, var(--lume-ink) 18%, transparent)', background: 'var(--lume-surface-focal)', color: 'var(--lume-ink)' }
-                                            : { borderColor: 'color-mix(in srgb, var(--lume-signal-critical) 32%, transparent)', background: 'var(--lume-surface-focal)', color: 'var(--lume-signal-critical)' }}
-                                    >
-                                        {documentSynthesisEnabled ? 'Attivo' : 'Spento'}
-                                    </label>
-                                    <button
-                                        id="documentSynthesisKillSwitch"
-                                        type="button"
-                                        role="switch"
-                                        aria-checked={documentSynthesisEnabled}
-                                        aria-label="Document Synthesis locale"
-                                        onClick={() => setDocumentSynthesisEnabled(!documentSynthesisEnabled)}
-                                        className="relative h-7 w-12 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[color:var(--lume-accent)]"
-                                        style={{ background: documentSynthesisEnabled ? 'var(--lume-ink)' : 'color-mix(in srgb, var(--lume-ink) 20%, transparent)' }}
-                                    >
-                                        <span
-                                            className="absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform"
-                                            style={{ transform: documentSynthesisEnabled ? 'translateX(20px)' : 'translateX(0)' }}
-                                        />
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div
-                            className="rounded-[18px] border p-4"
-                            style={smartImportEnabled
-                                ? { borderColor: 'color-mix(in srgb, var(--lume-ink) 18%, transparent)', background: 'var(--lume-surface-field)' }
-                                : { borderColor: 'color-mix(in srgb, var(--lume-signal-critical) 28%, transparent)', background: 'var(--lume-surface-field)' }}
-                            data-testid="smart-import-kill-switch-card"
-                        >
-                            <div className="flex items-start justify-between gap-3">
-                                <div>
-                                    <p className="text-sm font-semibold" style={{ color: 'var(--lume-ink)' }}>Smart Import</p>
-                                    <p className="mt-1 text-[11px] leading-5" style={{ color: 'var(--lume-ink-muted)' }}>
-                                        Se spento, il pannello paziente non propone nuovi suggerimenti Smart Import e non applica quelli in sospeso.
-                                    </p>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <label
-                                        htmlFor="smartImportKillSwitch"
-                                        className="rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em]"
-                                        style={smartImportEnabled
-                                            ? { borderColor: 'color-mix(in srgb, var(--lume-ink) 18%, transparent)', background: 'var(--lume-surface-focal)', color: 'var(--lume-ink)' }
-                                            : { borderColor: 'color-mix(in srgb, var(--lume-signal-critical) 32%, transparent)', background: 'var(--lume-surface-focal)', color: 'var(--lume-signal-critical)' }}
-                                    >
-                                        {smartImportEnabled ? 'Attivo' : 'Spento'}
-                                    </label>
-                                    <button
-                                        id="smartImportKillSwitch"
-                                        type="button"
-                                        role="switch"
-                                        aria-checked={smartImportEnabled}
-                                        aria-label="Smart Import locale"
-                                        onClick={() => setSmartImportEnabled(!smartImportEnabled)}
-                                        className="relative h-7 w-12 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[color:var(--lume-accent)]"
-                                        style={{ background: smartImportEnabled ? 'var(--lume-ink)' : 'color-mix(in srgb, var(--lume-ink) 20%, transparent)' }}
-                                    >
-                                        <span
-                                            className="absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform"
-                                            style={{ transform: smartImportEnabled ? 'translateX(20px)' : 'translateX(0)' }}
-                                        />
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div
-                            className="rounded-[18px] border p-4"
-                            style={treatmentReasoningEnabled
-                                ? { borderColor: 'color-mix(in srgb, var(--lume-ink) 18%, transparent)', background: 'var(--lume-surface-field)' }
-                                : { borderColor: 'color-mix(in srgb, var(--lume-signal-critical) 28%, transparent)', background: 'var(--lume-surface-field)' }}
-                            data-testid="treatment-reasoning-kill-switch-card"
-                        >
-                            <div className="flex items-start justify-between gap-3">
-                                <div>
-                                    <p className="text-sm font-semibold" style={{ color: 'var(--lume-ink)' }}>Treatment Reasoning</p>
-                                    <p className="mt-1 text-[11px] leading-5" style={{ color: 'var(--lume-ink-muted)' }}>
-                                        Se spento, il pannello terapie non genera nuove bozze con ATHENA-R1-Qwen3-8B via MLX locale. Le bozze restano consultive, richiedono verifica clinica e non scrivono in scheda.
-                                    </p>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <label
-                                        htmlFor="treatmentReasoningKillSwitch"
-                                        className="rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em]"
-                                        style={treatmentReasoningEnabled
-                                            ? { borderColor: 'color-mix(in srgb, var(--lume-ink) 18%, transparent)', background: 'var(--lume-surface-focal)', color: 'var(--lume-ink)' }
-                                            : { borderColor: 'color-mix(in srgb, var(--lume-signal-critical) 32%, transparent)', background: 'var(--lume-surface-focal)', color: 'var(--lume-signal-critical)' }}
-                                    >
-                                        {treatmentReasoningEnabled ? 'Attivo' : 'Spento'}
-                                    </label>
-                                    <button
-                                        id="treatmentReasoningKillSwitch"
-                                        type="button"
-                                        role="switch"
-                                        aria-checked={treatmentReasoningEnabled}
-                                        aria-label="Treatment Reasoning locale"
-                                        onClick={() => setTreatmentReasoningEnabled(!treatmentReasoningEnabled)}
-                                        className="relative h-7 w-12 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[color:var(--lume-accent)]"
-                                        style={{ background: treatmentReasoningEnabled ? 'var(--lume-ink)' : 'color-mix(in srgb, var(--lume-ink) 20%, transparent)' }}
-                                    >
-                                        <span
-                                            className="absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform"
-                                            style={{ transform: treatmentReasoningEnabled ? 'translateX(20px)' : 'translateX(0)' }}
-                                        />
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                </details>
 
                 {/* Save (shared with Modelli e Hardware: persists the whole AI configuration) */}
                 <div className={SETTINGS_CARD_CLASS}>
