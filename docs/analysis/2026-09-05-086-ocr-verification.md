@@ -581,3 +581,96 @@ riporta source assolute e destinazioni relative del manifest. Il parent ha
 comunicato copia completa con hash source/dest corrispondenti nella propria
 receipt `ocr-parent-artifact-copy.json`: questa lane non ne attesta il bundle
 integrato e non esegue ulteriori copie o redistribuzioni automatiche.
+
+## Chiusura prerequisito Windows e expected auth — 22:14 UTC, 7 settembre
+
+Il successivo provisioning del runtime Microsoft e stato esplicitamente
+autorizzato dall'utente. **Primo passaggio AnyDoc Windows ripristinato**, senza
+riavvio: il blocco documentato nelle prove precedenti e risolto. Resta aperto
+il gate di accuratezza sintetica a +5 gradi e la qualifica del bundle completo.
+
+### Installer ufficiale e recupero osservato
+
+Guest ARM64, Node 24.19.0 x64 emulato riverificati prima dell'installazione.
+Usato il [redistributable Microsoft Visual C++ v14 x64 ufficiale](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170),
+che Microsoft indica anche per applicazioni x64 su dispositivi ARM64.
+Download `https://aka.ms/vc14/vc_redist.x64.exe`, redirect verificato su
+`download.visualstudio.microsoft.com`; 18.731.856 byte, versione
+`14.51.36247.0`. SHA-256
+`843068991daaa1f73ad9f6239bce4d0f6a07a51f18c37ea2a867e9beca71295c`.
+Authenticode `Valid`, firmatario `Microsoft Corporation`, thumbprint
+`1D77A9B9E8FE2075D9AD15123257FB90DB0DA4A1`. Firma e hash ricontrollati
+immediatamente prima dell'esecuzione.
+
+Installazione supportata `/install /quiet /norestart /log ...`: exit 0,
+nessun riavvio richiesto o eseguito. Nessuna DLL copiata da altri progetti.
+Il primo tentativo di download falliva nel parser Internet Explorer di
+PowerShell prima di ottenere il file; il retry con `-UseBasicParsing` e la
+successiva verifica sono conservati. Nessun installer non verificato eseguito.
+
+Il preflight passa ora `anydocFirstPass=verified`, anche dopo le suite.
+L'installazione e una modifica del guest autorizzata, non una modifica o
+redistribuzione del runtime MediFlow. Non prova l'installer dell'app integrata.
+
+### Sei PDF Windows, corpus e soglie invariati
+
+Sorgente eseguita `6be71a1c32557841efd320f3049e97badf9c8bdd`, trasferita
+tramite archive selettivo e riverificata per ogni file anche dopo i test;
+SHA-256 archivio
+`c0f76c1d23643f52e3dbf19ba462ac428490a194352d24c07c7a233f466e2017`.
+Corpus e soglie restano quelli congelati alle 20:33:24 UTC, SHA-256 manifest
+`8d28a283058fb0f0d3853f66d9ff07cdb95e90fe365ad4ae360994aae2e10b8d`.
+Il report distingue il commit sorgente del corpus (7f8441615) da quello del
+runtime eseguito (6be71a1c3); nessun output dei tentativi falliti e cancellato.
+
+| Caso Windows | CER | WER | Exact match | Latenza caso | Massimo child working set osservato | Gate |
+| --- | ---: | ---: | --- | ---: | ---: | --- |
+| Nativo | 0% | 0% | Si | 392,8 ms | 66,5 MiB | Passa, nessun OCR |
+| Scansione IT | 0% | 0% | Si | 3.571,9 ms | 130,6 MiB | Passa |
+| Misto, scansione pagina 2 | 0% | 0% | Si | 4.703,6 ms | 130,5 MiB | Passa |
+| Rotazione +5 gradi | 0,9804% | 7,6923% | No | 5.964,0 ms | 213,0 MiB | **Fallisce token:** `quantità` → `Quantità` |
+| Rotazione +90 gradi | 0% | 0% | Si | 5.843,3 ms | 210,4 MiB | Passa |
+| Tabella con rumore | 0% | 0% | Si | 5.491,2 ms | 130,7 MiB | Passa |
+
+Tutti e sei i PDF completano l'estrazione. Routing 5/5 pagine `needsOcr`, due
+pagine native preservate esattamente, nessuna pagina nativa renderizzata e
+nessuna pagina omessa. Binding sorgente/raster/receipt set verificati.
+L'overview applica la stessa correzione interpretativa del routing nativo
+`null` gia descritta sopra; soglie e report grezzi restano invariati.
+
+Parent working set massimo 198,0 MiB; child OCR campionati 39–51 volte,
+durata massima 2.926 ms. Polling richiesto 20 ms, mediana effettiva 43,9 ms,
+massimo 162,7 ms. Tutti i massimi osservati sono inferiori a 1 GiB per
+processo; non sono misure statistiche o limiti RSS imposti. Child chiusi,
+exit benchmark 0, inventario finale dei processi della lane pari a zero.
+
+Suite desktop Windows: **10 passati, 0 falliti, 1 skip** esclusivamente per
+la selezione del preflight Mac. Nessuno skip per motore o prerequisito mancante.
+Child owner **6/6**, preflight dopo i test positivo. Le prove negative e di
+retry gia nella suite sono ora eseguite anche attraverso AnyDoc funzionante.
+Nessun nuovo test Linux o build Next/Xcode in questa tranche; entrambe le VM
+utente lasciate RUNNING.
+
+### Limite preciso a +5 gradi e commit auth separato
+
+Anche Windows riproduce sulla stessa fixture la sostituzione di maiuscola
+osservata in Linux. L'accento resta corretto; fallisce il token case-sensitive,
+non le soglie CER/WER. Un singolo raster, pur provato su due sistemi, non
+fornisce evidenza sufficiente per cambiare globalmente segmentazione o
+preprocessing. Nessun dizionario correttivo, forzatura del testo o soglia
+allentata. Un eventuale deskew generale richiede un corpus piu ampio di
+inclinazioni, font e layout e una nuova verifica, conservando questo gate.
+
+Commit auth separato `307beedb3`: aggiornato soltanto
+`scripts/check-standalone-runtime-bundle.test.mjs` a versione 0.8.7,
+23 chiavi della superficie canonica e 13 file, incluso native-session.
+Nessuna modifica runtime per far passare i test. Suite standalone completa
+**11/11**, ESLint mirato passato. I due expected obsoleti descritti nella
+receipt precedente sono quindi corretti nel worktree; le prove storiche
+rimangono conservate.
+
+Prove private in `artifacts/windows-vcredist-20260907` del task
+ContextContinuity: verifica firma/architettura/hash, ricevuta installer,
+corpus congelato, harness, report con metriche/RSS/provenienza, log suite,
+cleanup e nuovo stato VM. Non includono una build o qualifica completa del
+bundle Windows/Linux, ne accuratezza clinica o currentness DB/sessione/UI.
