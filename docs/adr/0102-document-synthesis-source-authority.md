@@ -527,4 +527,11 @@ citazioni: questi limiti rimangono distinti dalla validità strutturale.
 Verifiche: payload reale con schema fisso e nessuna derivazione da input;
 regressione dell'output privo di versione ancora negata; contratti di
 citazioni e lifecycle invariati; poi una generazione sintetica ordinaria.
-Stato di questa integrazione: da implementare e verificare.
+Integrazione `3a762bb30f086ea2d7fb0189ad258b509f4f22c9`: 22 test mirati
+rieseguiti dal coordinatore e build standalone riusciti. Una generazione dal
+percorso ordinario, con documento fittizio e Ollama `qwen3.5:35b-a3b`, ha
+restituito una proposta disponibile con citazione in 29,67 secondi, senza
+retry. La receipt dichiara `reviewOnly`, zero scritture e nessun apply; la
+rilettura indipendente delle quattro tabelle cliniche presenti conferma
+conteggi e digest invariati. Questo esito riguarda quel caso su host macOS,
+non ogni documento, modello o sistema operativo.
