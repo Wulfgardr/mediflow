@@ -9,6 +9,10 @@ ritiro dell'autorità locale richiesto da
 [ADR 0106](../adr/0106-web-auth-logout-pin-setup-lifecycle.md).
 La correzione è in corso in un'attività separata; questa pagina mantiene il
 blocco aperto finché non sono disponibili il commit corretto e le prove pertinenti.
+Il coordinatore include nella correzione anche la risposta `409` con ritiro
+della sessione non confermato: dopo il CAS, cioè il confronto e aggiornamento
+atomico delle credenziali, questo esito resta ambiguo. La pulizia locale
+prevista non è ancora attestata da prove ricevute.
 
 ## Sintesi dei sei ambiti
 
@@ -24,7 +28,7 @@ esaustiva del prodotto o di 298 test eseguiti.
 | A. Autenticazione, sessioni e PIN | Difetto contrattuale deterministico: dopo il successo o una risposta non osservabile al cambio PIN, il client conserva autorità e presentazione locali. Il modello di minaccia esclude l'abuso dimostrato, limitato allo stesso utente o all'accesso fisico mirato con app sbloccata. Zero vulnerabilità reportabili; blocco di promozione aperto. |
 | B. Autorizzazione e isolamento dei dati | Nessun problema rilevato nel perimetro: pairing e sessione operatore distinti, appartenenza del paziente, ambulatorio e controlli di versione. Non attesta un modello multiutente con controllo completo dei ruoli. |
 | C. Privacy asincrona nativa | Controllati generazioni, richieste, contesto e pulizia della presentazione. Il difetto PIN resta nell'ambito A; nessun ulteriore percorso di attacco nel perimetro. |
-| D. Cifratura, Keychain, cache e backup | Esaminati cifratura dei campi, cache AES-GCM vincolata al contesto e ripristino amministrativo transazionale. Nessuna prova della firma o degli entitlements di produzione. |
+| D. Cifratura, Keychain, cache e backup | Esaminati cifratura dei campi, cache AES-GCM vincolata al contesto e ripristino amministrativo transazionale. ThisDeviceOnly è esplicito per il nuovo inserimento della chiave cache, non per il token paired. Firma ed entitlements di produzione non attestati. |
 | E. Documenti, estrazione e comunicazioni esterne | Esaminati autorità delle fonti, attualità dei dati, limiti dei processi locali e destinazioni WHO/provider esplicite. Nessuna esecuzione con servizi o provider live. |
 | F. Agenti headless e processi | Esaminati ambiente consentito dei figli, avvio e RPC su IPC ereditato, limiti e revoca. Nessun problema rilevato nel perimetro. |
 
@@ -51,18 +55,38 @@ post-release secondo il [verbale integrato](./2026-09-06-086-integrated-closeout
 Non è attestata una validazione completa multipiattaforma; nessun installer
 firmato di produzione è attestato da queste prove.
 
-Restano aperte tre domande, in analisi in un'attività separata:
+## Esito dell'approfondimento sulle tre domande
 
-1. Il proxy del pacchetto limita il corpo delle richieste prima di ogni route
-   che usa `request.json()`?
-2. Firma ed entitlements di produzione restringono l'accesso Keychain oltre
-   la classe di accessibilità visibile nel sorgente?
-3. Un futuro uso multioperatore introdurrà l'appartenenza operatore–ambulatorio
-   oltre il modello documentato di singolo utente locale?
+L'approfondimento del 7 settembre 2026 riguarda lo stesso SHA della review.
+È una lettura statica del sorgente; non aggiunge test, build, esecuzioni del
+pacchetto o verifiche del Keychain reale. Le domande originali restano nel
+report completo come fotografia della review; le disposizioni successive sono:
 
-Nessuna risposta è presunta. La chiusura di queste domande e quella del blocco
-PIN richiedono evidenze distinte. La review non certifica sicurezza generale,
-conformità normativa, installabilità o rilascio.
+| Tema | Evidenza e disposizione |
+| --- | --- |
+| Limiti del corpo delle richieste | Il proxy fornito inoltra il corpo senza un limite di byte esplicito. È una lacuna attuale di hardening, assegnata a un'attività separata, non un non-goal. Non sono dimostrati impatto runtime, sfruttabilità o bypass dell'autenticazione; non è attestata la correzione. |
+| Firma, entitlements e Keychain | Il pacchetto sorgente, senza artefatto finale firmato e con Xcode non disponibile, non attesta la policy effettiva di produzione. Manca una prova di distribuzione, non è dimostrato un difetto di isolamento. |
+| Appartenenza operatore–ambulatorio | È un non-goal del modello attuale secondo [ADR 0036](../adr/0036-network-identity-thin-slice-node-credentials-and-ambulatory-scope.md). Non richiede l'introduzione di RBAC nella 0.8.6. Un futuro isolamento per operatore richiede una scelta prodotto e un contratto dedicato. |
+
+Nel sorgente, `HomeBasePatientCacheStore` imposta
+`kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly` quando inserisce una nuova
+chiave cache. La lettura di un item preesistente non ne attesta né migra gli
+attributi. `HomeBasePairedStore` non imposta esplicitamente quell'attributo
+nell'inserimento o aggiornamento del token paired. **Non attribuire
+ThisDeviceOnly al token paired.** Questa differenza non dimostra che altri
+processi possano leggere il token; l'enforcement del sistema operativo non è
+stato provato. La frase sulla cache nel report originale va letta con questi
+limiti, non come attestazione di tutti gli item o della firma di produzione.
+
+Il controllo paziente–ambulatorio resta distinto da una membership per
+operatore: pairing, sessione, capability e appartenenza del paziente devono
+restare verificati anche senza RBAC completo. Per questo limite prevale
+ADR 0036; i riferimenti ad `ARCHITECTURE.md` nel report descrivono il confine
+non multi-tenant, senza attestare una segregazione multioperatore.
+
+La lane di hardening e il coordinatore devono fornire prove delle rispettive
+correzioni; **il blocco PIN resta aperto**. La review non certifica sicurezza
+generale, conformità normativa, installabilità o rilascio.
 
 ## Provenienza e trasformazioni editoriali
 
@@ -75,7 +99,9 @@ esclusioni e domande aperte.
   nell'originale occupava una sola riga; adattata la gerarchia dei titoli.
 - Corretto il riferimento a `HomeBasePatientCacheStore.swift` secondo la
   nota della ricevuta: il file è in `MediFlowAppleShared`, non nella sua
-  sottodirectory `AppleFoundation`. Il contenuto della valutazione non cambia.
+  sottodirectory `AppleFoundation`. L’approfondimento ha verificato la stessa
+  correzione per `HomeBasePairedStore.swift`, applicata anche qui. Il contenuto
+  della valutazione originale non cambia.
 - I JSON originali restano fonti di provenienza e non sono copiati nella
   pagina: sono esclusi percorsi locali, metadati operativi privati e consumi.
   I riferimenti al codice nel report sono percorsi della repository sullo SHA
@@ -88,14 +114,16 @@ Ricevuta completata il `2026-09-07T08:24:28.493473Z`.
 SHA Git originale: `1d633d98d0a093623c8c4f488815af804c769a6e`.
 Gli hash SHA-256 seguenti identificano i file originali, non questa pagina.
 Gli hash di report e copertura sono ricalcolati e confrontati con la ricevuta;
-l'hash della ricevuta è ricalcolato per identificarla, senza un'attestazione
-indipendente del suo contenuto.
+gli hash della ricevuta e dell'approfondimento sono ricalcolati per identificarli,
+senza un'attestazione indipendente del loro contenuto. Dell'approfondimento
+sono riportati soltanto gli esiti sanitizzati, non i percorsi locali.
 
 | Fonte originale | SHA-256 |
 | --- | --- |
 | `report.md` | `06cb6382e198a9fa3f112fa73caa77aff8e6bf36e3687288db0edc13417667df` |
 | `coverage.json` | `dfce2a0165f1f0a478ec094cd8ed12d26a0fdfd8904a3a5a2b061b35a7218f60` |
 | `review-receipt.json` | `49882c572a1c6fe19d4a8659b713ebef39b36cd4f08c27328e87d97c1fadd7a1` |
+| Approfondimento `daybreak-open-questions.md` | `1e44a962b1c5c3220cdd909c6047a2889648a915f3a67b832d24341ceb0dcad9` |
 
 Nel report, “Coverage: complete” riguarda soltanto l’inventario dichiarato;
 “Rejected” nell’ambito A riguarda la reportabilità, non la validità del difetto
@@ -169,7 +197,7 @@ MediFlow is a local-first territorial clinical record. A Next.js process owns th
 | Paired Apple client -\> TLS proxy -\> network API | Untrusted LAN traffic crosses TLS pinning; clinical operations require a valid paired credential plus exact current native operator session. Pairing alone is not operator authority. | `SECURITY.md:120-147`; `docs/adr/0038-network-readonly-data-plane-auth-boundary.md:61-84` |
 | Operator PIN -\> credential CAS/session retirement | PIN verification and wrapped-key replacement cross from client to host. On success all same-user Web and current native authority must terminate; the client must synchronously discard local presentation authority. | `docs/adr/0106-web-auth-logout-pin-setup-lifecycle.md:65-121`; `lib/security/pin-change-service.ts:211-232` |
 | Server ciphertext -\> Apple plaintext | Host forwards `ENC:` values opaquely; the Apple process decrypts with an in-memory master key. Failed decryptions must not turn presentation placeholders into writes. | `SECURITY.md:61-69`; `native/MediFlowMac/Sources/MediFlowAppleShared/AppleFoundation/PatientFieldCrypto.swift:1-119` |
-| Apple process -\> Keychain/encrypted cache | Paired token and cache key enter Keychain; encrypted cache contents are bound to server, scope, TLS pin, paired identity, operator, and session digest, and expire within a bounded TTL. | `native/MediFlowMac/Sources/MediFlowAppleShared/AppleFoundation/HomeBasePairedStore.swift:95-176`; `native/MediFlowMac/Sources/MediFlowAppleShared/HomeBasePatientCacheStore.swift:14-94` |
+| Apple process -\> Keychain/encrypted cache | Paired token and cache key enter Keychain; encrypted cache contents are bound to server, scope, TLS pin, paired identity, operator, and session digest, and expire within a bounded TTL. | `native/MediFlowMac/Sources/MediFlowAppleShared/HomeBasePairedStore.swift:95-176`; `native/MediFlowMac/Sources/MediFlowAppleShared/HomeBasePatientCacheStore.swift:14-94` |
 | Attachment selector -\> host bytes -\> parser children | Caller supplies only an attachment identifier. Host resolves unique active patient membership/currentness, caps source bytes, pins worker paths/hashes, limits output/time, and revalidates before publication. | `lib/domain/documents/attachment-extraction-selection-binding.ts:67-117`; `lib/domain/documents/attachment-extraction-source-authority.ts:84-170`; `lib/domain/documents/anydoc-local-extraction-runner.ts:18-29`, `lib/domain/documents/anydoc-local-extraction-runner.ts:94-175` |
 | Web process -\> Supervisor/MCP child | Host sends an opaque one-use bootstrap and authenticated bounded RPC over inherited IPC. Child environment is replaced, not inherited; cleanup revokes scopes, owners, RPC, and terminates the child. | `lib/security/portable-supervisor-child-processes.ts:94-125`; `lib/headless/authenticated-agent-launcher.ts:143-163`; `lib/headless/authenticated-agent-launcher.ts:181-200` |
 | Server -\> WHO/cloud provider | Only host-owned fixed targets and explicit egress/credential state may produce external requests. Raw secrets stay inside a one-use broker injection callback and must not enter DB, browser, audit, or child environment. | `lib/reference-data/icd11-who-service.ts:200-242`; `lib/ai-providers/v2/provider-secret-broker.ts:89-147`; `SECURITY.md:182-217` |

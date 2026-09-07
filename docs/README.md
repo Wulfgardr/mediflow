@@ -39,7 +39,10 @@ programma 0.8.6.
 fonte pubblica della review sullo SHA `1d633d98d0a0`, con sintesi italiana e
 report completo derivato. Sei ambiti, 298/298 elementi esaminati, 13 test Node
 PASS e zero vulnerabilità reportabili non rimuovono il blocco PIN. Correzione,
-prove e tre domande di approfondimento restano aperte.
+prove PIN restano aperte. L’approfondimento distingue la lacuna sui limiti del
+corpo delle richieste, assegnata a una lane di hardening, dalla firma di
+produzione non attestata e dal non-goal della membership per operatore.
+ThisDeviceOnly riguarda il nuovo inserimento della chiave cache, non il token paired.
 
 [Promozione della UI web](./adr/0123-official-web-ui-navigation-compositions.md):
 contratto accettato per B predefinita e A selezionabile, con confronto sintetico

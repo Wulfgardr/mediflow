@@ -12,6 +12,10 @@ The feature-complete decision at `c320694c3` is retained as history. The
 of `1d633d98d0a0` records 298/298 review items closed, 13 Node tests PASS and
 zero reportable vulnerabilities, but **promotion is BLOCKED** by the native
 PIN-change contract defect. Correction and relevant verification remain open.
+The follow-up identifies a request-body limit hardening gap assigned separately;
+production signing/entitlements remain unverified. ThisDeviceOnly applies to
+new cache-key insertion, not the paired token. Per-operator ambulatory membership
+remains an ADR 0036 non-goal; no new RBAC is claimed.
 This entry does not imply a PR, tag, release or production-signed installer.
 Targeted iPhone–Mac/Home Base UI interoperability remains a **DEFERRED VALIDATION
 ITEM / POST-RELEASE VERIFICATION GATE**. Existing platform evidence is retained;
