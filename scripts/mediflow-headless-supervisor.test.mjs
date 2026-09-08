@@ -8,9 +8,10 @@ import path from 'node:path';
 import test from 'node:test';
 
 import Database from 'better-sqlite3';
+import { createSupervisorTestUrls } from './test-fixtures/portable-supervisor-import-urls.mjs';
 
 const ROOT = process.cwd();
-const LOADER = path.join(ROOT, 'scripts', 'register-strip-types-loader.mjs');
+const { rootUrl: ROOT_URL, loaderUrl: LOADER } = createSupervisorTestUrls(ROOT);
 const temporary = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-supervisor-cross-process-')));
 const dataDir = path.join(temporary, 'data');
 const webDirectory = path.join(temporary, 'standalone');
@@ -92,8 +93,8 @@ server.listen(0, '127.0.0.1', () => {
 
 fs.writeFileSync(harnessPath, `
 import { createHash, randomBytes } from 'node:crypto';
-const root = ${JSON.stringify(ROOT)};
-const url = (relative) => new URL(relative, 'file://' + root + '/').href;
+const root = ${JSON.stringify(ROOT_URL)};
+const url = (relative) => new URL(relative, root).href;
 const [{ createPortableSupervisorContextMirrorV1 },
   { createProductionMcpAgentLauncherWithPreSpawnedChildV1 },
   { createPortableSupervisorAipAuditPortV1 },

@@ -72,11 +72,38 @@ function requireAbsoluteDirectory(value: string, label: string, root?: string): 
   return real;
 }
 
+// Process cleanup only: IPC/authority is closed immediately, not after this grace period.
+const CHILD_EXIT_GRACE_MS = 5_000;
+
 function stop(child: ChildProcess): void {
+  const hasExited = (): boolean => child.exitCode !== null || child.signalCode !== null;
+  if (!hasExited()) {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    // A signal error is not proof of exit. Also cover a pending spawn error when the
+    // second spawn throws before normal lifecycle watchers can be installed.
+    const onError = (): void => { /* shutdown already requested */ };
+    const cancelEscalation = (): void => {
+      if (timer !== undefined) clearTimeout(timer);
+      timer = undefined;
+      child.off('exit', cancelEscalation);
+    };
+    child.on('error', onError);
+    child.once('exit', cancelEscalation);
+    child.once('close', () => {
+      cancelEscalation();
+      child.off('error', onError);
+    });
+    timer = setTimeout(() => {
+      timer = undefined;
+      child.off('exit', cancelEscalation);
+      // `killed` only records signal delivery; it does not establish termination.
+      // Kill the same owned ChildProcess, never a discovered PID or process group.
+      try { if (!hasExited()) child.kill('SIGKILL'); } catch { /* terminal */ }
+    }, CHILD_EXIT_GRACE_MS);
+    timer.unref();
+  }
   try { if (child.connected) child.disconnect(); } catch { /* terminal */ }
-  try {
-    if (child.exitCode === null && child.signalCode === null && !child.killed) child.kill();
-  } catch { /* terminal */ }
+  try { if (!hasExited() && !child.killed) child.kill(); } catch { /* terminal */ }
 }
 
 /** Creates both production children; no existing process or public listener is adopted. */
