@@ -56,10 +56,13 @@ un titolo di video non prova che il contenuto sia stato esaminato.
   il caricamento. Dopo l'importazione, mostrare cronologia e comandi utili.
   Togliere dal primo livello hero Fabric, riquadri duplicati e avvisi ripetuti,
   mantenendo conferme, currentness e informazioni necessarie per la scelta.
-- **Scale:** rendere leggibili catalogo, selezione rapida, compilazione MMSE/CFS
+- **Scale:** rendere leggibili catalogo, selezione rapida, compilazione MMSE
   e ritorno alla lista. Eliminare cornici annidate, ombre e metadati duplicati;
   distribuire i comandi in modo coerente. Questa revisione non cambia quesiti,
   scoring, versioni, licenze o distinzione fra zero e risposta mancante.
+- **SISS/FSE:** la successiva precisazione dell'utente chiarisce che la voce
+  trascritta come «CFS» si riferisce a questa sezione, non a una nuova scala di
+  fragilità. Rivederne presentazione e navigazione entro il contratto esistente.
 - **Organizzazione:** riepilogo con quadro clinico, terapie, timeline, elementi
   da rivedere e spunti dai documenti. Anagrafica, clinica e amministrazione
   devono essere riconoscibili e raggiungibili separatamente. Le esenzioni
