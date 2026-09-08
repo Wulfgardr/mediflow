@@ -78,7 +78,7 @@ async function bounded<T>(work: Promise<T>, controller: AbortController, ms: num
     finally { if (timer) clearTimeout(timer); controller.signal.removeEventListener('abort', onAbort); }
 }
 
-/** Trusted server composition only; callers of Search supply just a terminology query. */
+/** Trusted server composition only; Search accepts a query and optional request cancellation. */
 export function createIcd11WhoLocalRuntime(sources: Sources) {
     let config = configuration(sources.readEnvironment), generation = 0, disposed = false;
     let lastClock = 0, lastLive: number | null = null;
@@ -128,14 +128,21 @@ export function createIcd11WhoLocalRuntime(sources: Sources) {
             imageDigest: config.imageDigest, datasetSnapshotId: config.datasetSnapshotId,
             lastLiveObservedAt: lastLive === null ? null : new Date(lastLive).toISOString(), lastResultSource });
     };
-    const search = async (value: string): Promise<WhoLocalSearchResult> => {
+    const search = async (value: string, signal?: AbortSignal): Promise<WhoLocalSearchResult> => {
+        if (signal !== undefined && !(signal instanceof AbortSignal)) throw new Icd11WhoServiceError('input_invalid');
+        if (signal?.aborted) throw new Icd11WhoServiceError('request_cancelled');
         const query = normalizedQuery(value); gate();
         const started = clock(), revision = generation;
         const key = `${WHO_LOCAL_BINDING_ID}|${config.imageDigest}|${config.datasetSnapshotId}|${query}`;
         for (const [oldKey, entry] of cache) if (entry.expiresAt <= started) remove(oldKey);
         let cached = cache.get(key);
-        const controller = new AbortController(); active.add(controller);
+        const controller = new AbortController();
+        const abort = () => controller.abort('request_cancelled');
+        signal?.addEventListener('abort', abort, { once: true });
+        if (signal?.aborted) abort();
+        active.add(controller);
         try {
+            current(revision, controller);
             let result: Pick<Cached, 'entries' | 'partial' | 'fetchedAt' | 'expiresAt'>;
             const source = cached ? 'cache' as const : 'live' as const;
             if (cached) { cache.delete(key); cache.set(key, cached); result = cached; }
@@ -184,7 +191,7 @@ export function createIcd11WhoLocalRuntime(sources: Sources) {
         } catch (error) {
             if (revision === generation && !disposed) observed = 'unavailable';
             throw error;
-        } finally { active.delete(controller); }
+        } finally { active.delete(controller); signal?.removeEventListener('abort', abort); }
     };
     const checkCode = async (code: string, signal?: AbortSignal): Promise<WhoCodeCheckResult> => {
         if (!isWhoCheckCode(code) || (signal !== undefined && !(signal instanceof AbortSignal))) throw new Icd11WhoServiceError('input_invalid');

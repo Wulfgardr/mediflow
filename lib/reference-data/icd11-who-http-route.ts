@@ -76,10 +76,14 @@ function readinessResponse(runtime: Runtime): Response {
 
 export function createIcd11WhoHttpRoute(dependencies: Dependencies) {
     return async (request: Request): Promise<Response> => {
-        let authorized = false;
-        try { authorized = await dependencies.authorize(); }
-        catch { authorized = false; }
-        if (!authorized) return json({ error: 'Unauthorized' }, 401);
+        const authorized = async (): Promise<boolean> => {
+            if (request.signal.aborted) return false;
+            try {
+                const current = await dependencies.authorize();
+                return current && !request.signal.aborted;
+            } catch { return false; }
+        };
+        if (!await authorized() || request.signal.aborted) return json({ error: 'Unauthorized' }, 401);
 
         let url: URL;
         try { url = new URL(request.url); }
@@ -95,7 +99,8 @@ export function createIcd11WhoHttpRoute(dependencies: Dependencies) {
         if (isReadinessRequest) return readinessResponse(runtime);
 
         try {
-            const result = await runtime.search(query!);
+            const result = await runtime.search(query!, request.signal);
+            if (!await authorized() || request.signal.aborted) return json({ error: 'Unauthorized' }, 401);
             if ('partial' in result) return json(Object.freeze({
                 schemaVersion: 'mediflow.reference-data.icd11-search-response.v2' as const,
                 entries: result.entries, partial: result.partial, receipt: result.receipt,
@@ -106,6 +111,7 @@ export function createIcd11WhoHttpRoute(dependencies: Dependencies) {
                 receipt: result.receipt,
             }), 200);
         } catch (error) {
+            if (!await authorized() || request.signal.aborted) return json({ error: 'Unauthorized' }, 401);
             return mapFailure(error);
         }
     };
