@@ -244,3 +244,80 @@ test('status rejects a context changed to remote before inspecting any container
     await assert.rejects(onboardWho('status', deps), { code: 'local_context_required' });
     assert.equal(docker.calls.length, 0);
 });
+
+/* @Codex round 2: bounded recovery diagnostics; synthetic Docker, never a live install. */
+test('fresh setup always requests exact license acceptance; declining one profile never authorizes another', async t => {
+    for (const answer of ['', 's', 'accetto', 'ACCETTO ']) {
+        const { deps, directory, docker } = fixture(t); deps.ask = async () => answer;
+        await assert.rejects(onboardWho('setup', deps), { code: 'cancelled' });
+        noMutation(docker.calls);
+        assert.equal(existsSync(path.join(directory, 'license.json')), false);
+        assert.equal(existsSync(path.join(directory, '.setup-active')), false);
+    }
+});
+
+test('failed image acquisition preserves prepared records, gives a phase error and releases the lock', async t => {
+    const { friendlySetupMessage } = await import('./who-local-onboarding.mjs');
+    const faults = { fail: args => args.includes('pull') };
+    const { deps, directory, docker } = fixture(t, faults);
+    await assert.rejects(onboardWho('setup', deps), error => {
+        assert.equal(error.code, 'pull_failed');
+        assert.match(friendlySetupMessage(error), /consenso e lo stato preparato sono conservati/u);
+        assert.doesNotMatch(friendlySetupMessage(error), /DO_NOT_PRINT/u); return true;
+    });
+    const saved = read(directory, 'installation.json'); assert.equal(saved.phase, 'prepared');
+    assert.equal(existsSync(path.join(directory, '.setup-active')), false);
+    docker.calls.length = 0; faults.fail = () => false;
+    const status = await onboardWho('status', deps);
+    assert.equal(status.state, 'qualification_required'); assert.match(status.message, /Preparazione WHO salvata/u);
+    noMutation(docker.calls);
+    deps.ask = async prompt => prompt.includes('Riprendere') ? 's' : 'n';
+    assert.equal((await onboardWho('setup', deps)).state, 'ready');
+    assert.equal(read(directory, 'installation.json').installationId, saved.installationId);
+});
+
+test('create and initial start failures name the phase without leaking Docker output or removing resources', async t => {
+    const { friendlySetupMessage } = await import('./who-local-onboarding.mjs');
+    for (const phase of ['create', 'start']) {
+        const { deps, directory, docker } = fixture(t, { fail: args => args[2] === 'container' && args[3] === phase });
+        await assert.rejects(onboardWho('setup', deps), error => {
+            assert.equal(error.code, `${phase}_failed`);
+            assert.doesNotMatch(friendlySetupMessage(error), /DO_NOT_PRINT/u); return true;
+        });
+        assert.equal(existsSync(path.join(directory, '.setup-active')), false);
+        assert.equal(existsSync(path.join(directory, 'installation.json')), true);
+        assert.equal(existsSync(path.join(directory, 'who.env')), false);
+        assert.equal(docker.calls.some(args => args.includes('rm') || args.includes('prune')), false);
+    }
+});
+
+test('resume revalidates existing manifest prerequisites before any Docker call', async t => {
+    const { deps, directory, docker } = fixture(t);
+    await onboardWho('setup', deps); docker.calls.length = 0;
+    const manifest = read(directory, 'manifest.json'); manifest.license.url = 'https://example.invalid/not-the-license';
+    writeFileSync(path.join(directory, 'manifest.json'), JSON.stringify(manifest), { mode: 0o600 });
+    await assert.rejects(onboardWho('status', deps), { code: 'private_state_invalid' });
+    assert.equal(docker.calls.length, 0);
+});
+
+test('a failed or signalled app launch is not reported as successful and does not reinstall WHO', async t => {
+    const { deps, directory, docker } = fixture(t); await onboardWho('setup', deps);
+    const before = readFileSync(path.join(directory, 'manifest.json'), 'utf8');
+    deps.appPortFree = async () => {};
+    for (const result of [1, null, 'throw']) {
+        docker.calls.length = 0;
+        deps.launch = async () => { if (result === 'throw') throw new Error('synthetic private launch detail'); return result; };
+        await assert.rejects(onboardWho('start', deps), { code: 'app_launch_failed' });
+        assert.equal(readFileSync(path.join(directory, 'manifest.json'), 'utf8'), before);
+        assert.equal(existsSync(path.join(directory, '.setup-active')), false); noMutation(docker.calls);
+    }
+    deps.launch = async () => 0;
+    assert.equal((await onboardWho('start', deps)).state, 'ready');
+});
+
+test('status of a qualified running container does not claim a fresh search', async t => {
+    const { deps, docker } = fixture(t); await onboardWho('setup', deps); docker.calls.length = 0;
+    const result = await onboardWho('status', deps);
+    assert.equal(result.state, 'ready'); assert.match(result.message, /non esegue una ricerca/u);
+    assert.equal(docker.calls.some(args => args.includes('curl')), false); noMutation(docker.calls);
+});
