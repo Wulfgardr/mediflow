@@ -1,4 +1,5 @@
 /* @Codex */
+import { isTrustedWebMutationRequest } from '@/lib/security/request-transport';
 import { getLocalProviderOnboardingService, LocalProviderOnboardingError } from '@/lib/ai-providers/fabric/local-provider-onboarding-service';
 
 export const runtime = 'nodejs';
@@ -23,8 +24,8 @@ export async function POST(request: Request) {
         // Authentication precedes body parsing and all provider contact.
         await service.inspect();
         if (new URL(request.url).searchParams.size
-            || request.headers.get('origin') !== new URL(request.url).origin
-            || request.headers.get('sec-fetch-site') === 'cross-site'
+            // NextRequest normalizes loopback URLs; the canonical guard uses browser Host.
+            || !isTrustedWebMutationRequest(request, false)
             || request.headers.get('content-type')?.split(';')[0].trim() !== 'application/json')
             return reply({ error: 'input_invalid' }, 400);
         const reader = request.body?.getReader();
