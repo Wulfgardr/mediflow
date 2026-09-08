@@ -1,4 +1,5 @@
 /* @Codex */
+import { readBoundedJsonBody } from '@/lib/bounded-request-body';
 import { isTrustedWebMutationRequest } from '@/lib/security/request-transport';
 import { getLocalProviderOnboardingService, LocalProviderOnboardingError } from '@/lib/ai-providers/fabric/local-provider-onboarding-service';
 
@@ -28,33 +29,28 @@ export async function POST(request: Request) {
             || !isTrustedWebMutationRequest(request, false)
             || request.headers.get('content-type')?.split(';')[0].trim() !== 'application/json')
             return reply({ error: 'input_invalid' }, 400);
-        const reader = request.body?.getReader();
-        if (!reader) return reply({ error: 'input_invalid' }, 400);
-        const chunks: Uint8Array[] = [];
-        let size = 0;
-        let timer: ReturnType<typeof setTimeout> | undefined;
-        try {
-            await Promise.race([
-                (async () => {
-                    while (true) {
-                        const { value, done } = await reader.read();
-                        if (done) break;
-                        size += value.byteLength;
-                        if (size > 256) throw new LocalProviderOnboardingError('input_invalid');
-                        chunks.push(value);
-                    }
-                })(),
-                new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new LocalProviderOnboardingError('input_invalid')), 5000); }),
-            ]);
-        } finally { clearTimeout(timer); void reader.cancel().catch(() => undefined); }
+        const controller = new AbortController();
+        const deadline = performance.now() + 5000;
+        const timer = setTimeout(() => controller.abort(), 5000);
+        const abortRequest = () => controller.abort();
+        request.signal.addEventListener('abort', abortRequest, { once: true });
+        if (request.signal.aborted) controller.abort();
         let body: unknown;
-        try { body = JSON.parse(Buffer.concat(chunks).toString('utf8')); }
-        catch { return reply({ error: 'input_invalid' }, 400); }
+        try {
+            const parsed = await readBoundedJsonBody(request, 256, 'strict', { signal: controller.signal, deadline });
+            if (request.signal.aborted) throw new LocalProviderOnboardingError('verification_interrupted');
+            // Preserve the route's existing 400 contract and byte/time limits.
+            if (!parsed.ok) return reply({ error: 'input_invalid' }, 400);
+            body = parsed.value;
+        } finally {
+            clearTimeout(timer);
+            request.signal.removeEventListener('abort', abortRequest);
+        }
         if (!body || typeof body !== 'object' || Array.isArray(body)
             || Object.keys(body).sort().join(',') !== 'expectedRevision,intent'
             || (body as { intent: unknown }).intent !== 'verify_and_activate'
             || typeof (body as { expectedRevision: unknown }).expectedRevision !== 'string')
             return reply({ error: 'input_invalid' }, 400);
-        return reply(await service.activate((body as { expectedRevision: string }).expectedRevision));
+        return reply(await service.activate((body as { expectedRevision: string }).expectedRevision, request.signal));
     } catch (error) { return failure(error); }
 }

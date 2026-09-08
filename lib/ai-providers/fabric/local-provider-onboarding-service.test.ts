@@ -1,6 +1,7 @@
 /* @Codex */
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { getEventListeners } from 'node:events';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, test } from 'node:test';
@@ -14,7 +15,8 @@ import { buildFunctionModelCatalog } from './function-model-preferences';
 
 const cleanup: Array<() => void> = [];
 afterEach(() => { for (const close of cleanup.splice(0).reverse()) close(); });
-function fixture(attest?: typeof attestLocalOllamaModel) {
+function fixture(attest?: typeof attestLocalOllamaModel,
+    authenticate?: (projection: owner.WebSessionProjection | null) => Promise<owner.WebSessionProjection | null>) {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mf-local-onboarding-'));
     const db = new Database(path.join(root, 'medical.db'));
     db.exec('CREATE TABLE settings(key TEXT PRIMARY KEY, value TEXT NOT NULL)');
@@ -31,7 +33,8 @@ function fixture(attest?: typeof attestLocalOllamaModel) {
     const service = createLocalProviderOnboardingService({ appDataDir: root,
         authenticate: async () => {
             const reread = owner.resolve(issue.sessionId, control.controlId);
-            return reread.status === 'active' ? reread.projection : null;
+            const projection = reread.status === 'active' ? reread.projection : null;
+            return authenticate ? authenticate(projection) : projection;
         },
         immediate: operation => db.transaction(operation).immediate(),
         readSettings: () => Object.fromEntries((db.prepare('SELECT key,value FROM settings').all() as { key: string; value: string }[]).map(row => [row.key, row.value])),
@@ -154,4 +157,76 @@ test('canonical attestor keeps version, tags, show, preload and running digest c
     const result = await f.service.activate((await f.service.inspect()).revision);
     assert.equal(result.state, 'available_unqualified');
     assert.deepEqual(seen, ['/api/version', '/api/tags', '/api/show', '/api/generate', '/api/ps']);
+});
+
+/* @Codex: these tests require the canonical owner and real SQLite, as above.
+   The attestation seam supplies synthetic metadata, never a model/inference claim. */
+test('a request cancelled before activation does not contact the provider or write lifecycle', async () => {
+    const f = fixture(); const initial = await f.service.inspect();
+    const controller = new AbortController(); controller.abort();
+    await assert.rejects(f.service.activate(initial.revision, controller.signal), /verification_interrupted/);
+    assert.equal(f.calls(), 0); assert.equal(f.lifecycle.service.read().status, 'denied');
+    assert.equal(getEventListeners(controller.signal, 'abort').length, 0);
+});
+
+test('request cancellation interrupts an unresolved attestation; a late result cannot commit', async () => {
+    let started!: () => void;
+    const waiting = new Promise<void>(resolve => { started = resolve; });
+    let finish!: (value: Awaited<ReturnType<typeof attestLocalOllamaModel>>) => void;
+    let observed: AbortSignal | undefined;
+    const f = fixture(async (_base, _model, signal) => {
+        observed = signal; started(); return new Promise(resolve => { finish = resolve; });
+    });
+    const controller = new AbortController();
+    const operation = f.service.activate((await f.service.inspect()).revision, controller.signal);
+    const rejected = assert.rejects(operation, /verification_interrupted/);
+    await waiting; controller.abort(); await rejected;
+    assert.equal(observed?.aborted, true);
+    assert.equal(getEventListeners(controller.signal, 'abort').length, 0);
+    finish({} as Awaited<ReturnType<typeof attestLocalOllamaModel>>); await Promise.resolve();
+    assert.equal(f.lifecycle.service.read().status, 'denied');
+    assert.equal((await f.service.inspect()).state, 'missing');
+});
+
+test('synchronous request cancellation inside a pending attestor cannot miss the abort', async () => {
+    const controller = new AbortController();
+    const f = fixture(async () => { controller.abort(); return new Promise(() => {}); });
+    await assert.rejects(f.service.activate((await f.service.inspect()).revision, controller.signal), /verification_interrupted/);
+    assert.equal(f.calls(), 1); assert.equal(f.lifecycle.service.read().status, 'denied');
+    assert.equal(getEventListeners(controller.signal, 'abort').length, 0);
+});
+
+test('the existing verification budget also bounds final reauthentication and its late result', async context => {
+    context.mock.timers.enable({ apis: ['setTimeout'] });
+    let calls = 0;
+    let waiting!: () => void;
+    const started = new Promise<void>(resolve => { waiting = resolve; });
+    let finish!: () => void;
+    const f = fixture(undefined, async projection => {
+        if (++calls !== 3) return projection; // inspect, activation, final continuity check
+        waiting(); return new Promise(resolve => { finish = () => resolve(projection); });
+    });
+    const operation = f.service.activate((await f.service.inspect()).revision);
+    const rejected = assert.rejects(operation, /verification_interrupted/);
+    await started; context.mock.timers.tick(30_001); await rejected;
+    finish(); await Promise.resolve();
+    assert.equal(f.calls(), 1); assert.equal(f.lifecycle.service.read().status, 'denied');
+});
+
+test('elapsed monotonic deadline denies commit even before the timeout callback runs', async context => {
+    let now = 0; context.mock.method(performance, 'now', () => now);
+    const f = fixture(async () => { now = 30_000; return {} as Awaited<ReturnType<typeof attestLocalOllamaModel>>; });
+    await assert.rejects(f.service.activate((await f.service.inspect()).revision), /verification_interrupted/);
+    assert.equal(f.calls(), 1); assert.equal(f.lifecycle.service.read().status, 'denied');
+});
+
+test('successful activation removes caller cancellation listener and reactivation still attests', async () => {
+    const f = fixture(); const controller = new AbortController();
+    const admitted = await f.service.activate((await f.service.inspect()).revision, controller.signal);
+    assert.equal(admitted.state, 'available_unqualified');
+    assert.equal(getEventListeners(controller.signal, 'abort').length, 0);
+    controller.abort();
+    assert.deepEqual(await f.service.inspect(), admitted);
+    assert.deepEqual(await f.service.activate(admitted.revision), admitted);
+    assert.equal(f.calls(), 2);
 });

@@ -79,54 +79,79 @@ export function createLocalProviderOnboardingService(sources: Sources) {
                 } finally { owner.abortResourceUse(use); }
             } finally { owner.releaseResourcePort(port); }
         },
-        async activate(expectedRevision: string) {
+        async activate(expectedRevision: string, requestSignal?: AbortSignal) {
             if (!/^[a-f0-9]{64}$/.test(expectedRevision)) deny('input_invalid');
             const current = await session();
+            if (requestSignal?.aborted) deny('verification_interrupted');
             const port = owner.mintResourcePort(current);
             if (!port) deny('owner_locked');
             const use = owner.beginResourceUse(port);
             if (!use) { owner.releaseResourcePort(port); deny('owner_locked'); }
             const controller = new AbortController();
+            const deadline = performance.now() + 30_000;
             const timeout = setTimeout(() => controller.abort(), 30_000);
+            const abortRequest = () => controller.abort();
+            requestSignal?.addEventListener('abort', abortRequest, { once: true });
+            if (requestSignal?.aborted) controller.abort();
             let retired = false;
+            const interrupted = () => new LocalProviderOnboardingError(retired ? 'owner_locked' : 'verification_interrupted');
+            const assertActive = () => {
+                // A busy event loop must not turn a delayed timer into extra authority.
+                if (performance.now() >= deadline) controller.abort();
+                if (controller.signal.aborted) throw interrupted();
+            };
+            async function withinDeadline<T>(operation: () => Promise<T>): Promise<T> {
+                assertActive();
+                let abort!: () => void;
+                const stopped = new Promise<never>((_, reject) => {
+                    abort = () => reject(interrupted());
+                    controller.signal.addEventListener('abort', abort, { once: true });
+                });
+                try {
+                    // Subscribe before invoking work, including work that aborts synchronously.
+                    const result = await Promise.race([stopped, Promise.resolve().then(() => {
+                        assertActive(); return operation();
+                    })]);
+                    assertActive();
+                    return result;
+                } finally { controller.signal.removeEventListener('abort', abort); }
+            }
             const registration = owner.registerPrivateResource(port, () => { retired = true; controller.abort(); });
             try {
                 if (!registration) deny('owner_locked');
+                assertActive();
                 const initial = snapshot();
                 if (initial.state === 'revoked') deny('revoked');
                 if (initial.status.revision !== expectedRevision) deny('configuration_changed');
                 if (!initial.status.canActivate) deny(initial.status.state);
-                const binding = await createLocalProviderBindingReader({ readSettings: async () => initial.settings }).readClinical();
+                const binding = await withinDeadline(() => createLocalProviderBindingReader({ readSettings: async () => initial.settings }).readClinical());
                 if (binding.status !== 'available') deny(binding.code);
                 if (binding.resolution.receipt.model !== initial.status.model) deny('configuration_missing');
-                if (controller.signal.aborted) deny(retired ? 'owner_locked' : 'verification_interrupted');
                 try {
-                    await Promise.race([
-                        (sources.attest ?? attestLocalOllamaModel)(binding.resolution.adapter.getBaseUrl(),
-                            binding.resolution.receipt.model, controller.signal),
-                        new Promise<never>((_, reject) => {
-                            controller.signal.addEventListener('abort', () => reject(new LocalProviderOnboardingError('verification_interrupted')), { once: true });
-                        }),
-                    ]);
+                    await withinDeadline(() => (sources.attest ?? attestLocalOllamaModel)(binding.resolution.adapter.getBaseUrl(),
+                        binding.resolution.receipt.model, controller.signal));
                 } catch (error) {
-                    if (controller.signal.aborted) deny(retired ? 'owner_locked' : 'verification_interrupted');
+                    assertActive();
                     if (error instanceof OllamaLocalityError) {
                         if (error.code === 'model_not_local') deny('model_absent_or_not_local');
                         if (error.code === 'endpoint_not_loopback' || error.code === 'model_cloud_reference') deny('locality_denied');
                     }
                     deny('provider_unreachable');
                 }
-                const latestSession = await session();
+                const latestSession = await withinDeadline(session);
                 // The canonical resolver emits a fresh projection on each read. These values
                 // check continuity; authority remains the original owner-bound resource use.
                 if (latestSession.id !== current.id || latestSession.userId !== current.userId
                     || latestSession.role !== current.role) deny('owner_locked');
-                if (controller.signal.aborted) deny(retired ? 'owner_locked' : 'verification_interrupted');
+                assertActive();
                 return sources.immediate(() => {
+                    assertActive();
                     const latest = snapshot();
                     if (latest.state === 'revoked') deny('revoked');
                     if (latest.status.revision !== expectedRevision) deny('configuration_changed');
+                    assertActive();
                     if (!owner.commitResourceUse(use)) deny('owner_locked');
+                    assertActive();
                     // Synchronous host-owned section: no await between authority and lifecycle CAS.
                     if (latest.state !== 'available_unqualified') {
                         let onboarding = startOnboarding('ollama', 'local_model');
@@ -144,6 +169,8 @@ export function createLocalProviderOnboardingService(sources: Sources) {
                 deny('state_unavailable');
             } finally {
                 clearTimeout(timeout);
+                requestSignal?.removeEventListener('abort', abortRequest);
+                controller.abort();
                 owner.abortResourceUse(use);
                 if (registration) owner.unregisterPrivateResource(port, registration);
                 owner.releaseResourcePort(port);

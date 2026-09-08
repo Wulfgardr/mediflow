@@ -22,9 +22,10 @@ export function createFunctionModelDispatch(dependencies: Readonly<{
     authenticate(): Promise<string | null>; readSources(): FunctionModelSources;
 }>) {
     return (id: FunctionModelId, handler: (request: Request) => Promise<Response>) => async (request: Request): Promise<Response> => {
+        let active = true;
         try {
             const session = await dependencies.authenticate();
-            if (!session) throw new FunctionModelError('session_stale');
+            if (!session || request.signal.aborted) throw new FunctionModelError('session_stale');
             // A UI query is never admission or model configuration.
             if (new URL(request.url).search !== '') throw new FunctionModelError('input_invalid');
             const raw = request.headers.get(FUNCTION_MODEL_CHOICE_HEADER);
@@ -36,7 +37,11 @@ export function createFunctionModelDispatch(dependencies: Readonly<{
             }
             const selection = resolveFunctionModelDispatch(dependencies.readSources(), id, choice);
             const verify = async () => {
-                if (request.signal.aborted || await dependencies.authenticate() !== session) throw new FunctionModelError('session_stale');
+                if (!active || request.signal.aborted) throw new FunctionModelError('session_stale');
+                const currentSession = await dependencies.authenticate();
+                // Authentication may yield while the request is cancelled or its
+                // response closes. A captured guard cannot outlive that preview.
+                if (!active || request.signal.aborted || currentSession !== session) throw new FunctionModelError('session_stale');
                 const current = resolveFunctionModelDispatch(dependencies.readSources(), id, choice);
                 if (current.catalogRevision !== selection.catalogRevision || current.preferenceRevision !== selection.preferenceRevision
                     || current.binding.modelOptionId !== selection.binding.modelOptionId) throw new FunctionModelError('binding_stale');
@@ -51,6 +56,7 @@ export function createFunctionModelDispatch(dependencies: Readonly<{
                 return response;
             });
         } catch (error) { return functionModelErrorResponse(error); }
+        finally { active = false; }
     };
 }
 

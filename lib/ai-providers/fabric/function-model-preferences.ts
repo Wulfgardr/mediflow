@@ -179,10 +179,16 @@ export function planFunctionModelUpdate(sources: FunctionModelSources, value: un
     if (command.expectedRevision !== revision(state, sources.settings)) return fail('revision_conflict');
     const defaults = { ...state.defaults }; const nextSettings = { ...sources.settings }; const writes: Record<string, string> = {};
     const set = (id: FunctionModelId, enabled: boolean, option: string | null) => {
-        // A disabled function may retain a stale preference until an explicit rebind.
-        if (option !== null) lookup(catalog, id, option, enabled);
-        else if (enabled) lookup(catalog, id, catalog.hostDefaults[id], true);
-        defaults[id] = option === null ? null : { modelOptionId: option, catalogRevision: catalog.revision };
+        // Switching off is not a rebind. Retain an existing choice verbatim, even
+        // if it has disappeared from the catalog; execution still requires a
+        // current, available binding and the switch to be explicitly enabled.
+        const retained = state.defaults[id];
+        if (!enabled && option !== null && retained?.modelOptionId === option) defaults[id] = retained;
+        else {
+            if (option !== null) lookup(catalog, id, option, enabled);
+            else if (enabled) lookup(catalog, id, catalog.hostDefaults[id], true);
+            defaults[id] = option === null ? null : { modelOptionId: option, catalogRevision: catalog.revision };
+        }
         writes[FUNCTION_SWITCH_KEYS[id]] = enabled ? 'enabled' : 'disabled';
     };
     if (command.action === 'set') set(command.functionId, command.enabled, command.defaultModelOptionId);
