@@ -1,7 +1,8 @@
 /* @Codex */
 import assert from 'node:assert/strict';
-import { test, type TestContext } from 'node:test';
-import { mkdirSync, readFileSync, readdirSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { after, test, type TestContext } from 'node:test';
+import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { isAbsolute, join } from 'node:path';
 import { createHash } from 'node:crypto';
 import type { ExecutionMethod, ExecutionTransport, SynthesisCatalog, SynthesisRequest, SynthesisResult } from '../../chatgpt-execution/execution-contract';
@@ -9,9 +10,15 @@ import type { QualifiedExecutionHost } from '../../chatgpt-execution/execution-h
 import type { WebSessionProjection } from '../../security/web-auth-lifecycle-owner-adapter';
 
 // The real owner fixture may only be imported after this synthetic directory exists.
-const dataDir = process.env.MEDIFLOW_DATA_DIR;
-assert.ok(dataDir && isAbsolute(dataDir), 'An absolute synthetic MEDIFLOW_DATA_DIR is required');
-mkdirSync(dataDir, { recursive: true });
+const inheritedDataDir = process.env.MEDIFLOW_DATA_DIR;
+assert.ok(inheritedDataDir && isAbsolute(inheritedDataDir), 'An absolute synthetic MEDIFLOW_DATA_DIR is required');
+// @Codex: this file owns an empty directory, even when the suite bootstraps its DB.
+const dataDir = mkdtempSync(join(tmpdir(), 'mediflow-binding-test-'));
+process.env.MEDIFLOW_DATA_DIR = dataDir;
+after(() => {
+    rmSync(dataDir, { recursive: true, force: true });
+    process.env.MEDIFLOW_DATA_DIR = inheritedDataDir;
+});
 const { issueSyntheticWebSessionContext, retireSyntheticWebSession } = await import('../../security/web-auth-lifecycle-owner-test-fixture');
 const owner = await import('../../security/web-auth-lifecycle-owner-adapter');
 const { bindChatGptSyntheticSynthesis } = await import('./chatgpt-synthetic-synthesis-binding');

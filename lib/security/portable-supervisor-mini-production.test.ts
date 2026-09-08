@@ -111,6 +111,32 @@ async function until(predicate: () => boolean): Promise<void> {
   }
 }
 
+// @Codex: exit can precede stdout delivery; close proves the Web streams drained.
+function waitForWebFixtureMarker(child: ChildProcess, output: () => string, marker: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    let closed = false;
+    const finish = (error?: Error) => {
+      clearTimeout(timer);
+      child.stdout?.removeListener('data', check);
+      child.stderr?.removeListener('data', check);
+      child.removeListener('close', onClose);
+      if (error) reject(error); else resolve();
+    };
+    const check = () => {
+      if (output().includes(marker)) finish();
+      else if (closed || /FIXTURE_DENIED|FIXTURE_FAILED/u.test(output())) {
+        finish(new Error(`Mini Web fixture ended before ${marker}`));
+      }
+    };
+    const onClose = () => { closed = true; check(); };
+    const timer = setTimeout(() => finish(new Error('Mini production fixture timed out')), 8_000);
+    child.stdout?.on('data', check);
+    child.stderr?.on('data', check);
+    child.once('close', onClose);
+    check();
+  });
+}
+
 const operationRequests = [
   { command: 'terminology search', args: { system: 'LOINC', query: 'emoglobina', limit: 2 } },
   { command: 'open-loops', args: {} },
@@ -183,8 +209,7 @@ for (const { ending, revokedRequest } of scenarios) {
       assert.equal((await request(operation.command, operation.args)).error.code, 'SESSION_NOT_UNLOCKED');
     }
     web.send('fixture.authorize');
-    await until(() => webOutput.includes('FIXTURE_ACTIVATED') || webOutput.includes('FIXTURE_DENIED')
-      || children.some((child) => child.exitCode !== null || child.signalCode !== null));
+    await waitForWebFixtureMarker(web, () => webOutput, 'FIXTURE_ACTIVATED');
     assert.match(webOutput, /FIXTURE_ACTIVATED/u);
     const active = await request('status');
     assert.equal(active.ok, true); assert.equal(active.result.ready, true);
@@ -230,3 +255,30 @@ for (const { ending, revokedRequest } of scenarios) {
     for (const line of miniOutput.split('\n').filter(Boolean)) assert.doesNotThrow(() => JSON.parse(line));
   });
 }
+
+// @Codex: force the proven exit-before-stdout ordering, then require the real marker.
+test('Web fixture marker survives exit before stdout delivery', async (t) => {
+  const child = spawn(process.execPath, ['-e', "process.stdout.write('FIXTURE_ACTIVATED\\n');"], {
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  t.after(() => { if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL'); });
+  let output = '';
+  child.stdout!.on('data', chunk => { output += chunk; });
+  child.stdout!.pause();
+  const exited = new Promise<void>(resolve => child.once('exit', () => {
+    assert.equal(output, '');
+    resolve();
+  }));
+  const closed = new Promise<void>(resolve => child.once('close', () => resolve()));
+  await waitForWebFixtureMarker(child, () => output, 'FIXTURE_ACTIVATED');
+  await exited;
+  await closed;
+  assert.equal(output, 'FIXTURE_ACTIVATED\n');
+});
+
+// @Codex: a closed Web fixture without an activation marker still fails closed.
+test('Web fixture closure cannot substitute for the activation marker', async () => {
+  const child = spawn(process.execPath, ['-e', ''], { stdio: ['ignore', 'pipe', 'pipe'] });
+  await assert.rejects(waitForWebFixtureMarker(child, () => '', 'FIXTURE_ACTIVATED'),
+    /Mini Web fixture ended before FIXTURE_ACTIVATED/u);
+});

@@ -1,18 +1,25 @@
 /* @Codex */
 import assert from 'node:assert/strict';
-import { mkdirSync } from 'node:fs';
-import { isAbsolute } from 'node:path';
-import { test } from 'node:test';
+import { tmpdir } from 'node:os';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { isAbsolute, join } from 'node:path';
+import { after, test } from 'node:test';
 import { createConnection, type Socket } from 'node:net';
 import { Duplex } from 'node:stream';
 
 // Set the synthetic directory before importing any application module (ADR 0130).
-const dataDir = process.env.MEDIFLOW_DATA_DIR;
-assert.ok(dataDir && isAbsolute(dataDir), 'An absolute synthetic MEDIFLOW_DATA_DIR is required');
-mkdirSync(dataDir, { recursive: true });
+const inheritedDataDir = process.env.MEDIFLOW_DATA_DIR;
+assert.ok(inheritedDataDir && isAbsolute(inheritedDataDir), 'An absolute synthetic MEDIFLOW_DATA_DIR is required');
+// @Codex: this file owns an empty directory, even when the suite bootstraps its DB.
+const dataDir = mkdtempSync(join(tmpdir(), 'mediflow-proxy-test-'));
+process.env.MEDIFLOW_DATA_DIR = dataDir;
+after(() => {
+    rmSync(dataDir, { recursive: true, force: true });
+    process.env.MEDIFLOW_DATA_DIR = inheritedDataDir;
+});
 
-const proxyModuleUrl = new URL('./execution-egress-proxy.ts', import.meta.url);
-const { createForTest, createOpenAIConnectProxy } = await import(proxyModuleUrl.href);
+// @Codex: literal delayed import is analyzable and follows data-directory setup.
+const { createForTest, createOpenAIConnectProxy } = await import('./execution-egress-proxy.ts');
 type ConnectTarget = { address: string; family: 4; port: 443 };
 type ResolvedTarget = { address: string; family: 4 };
 type Lookup = (hostname: 'auth.openai.com' | 'chatgpt.com') => Promise<readonly ResolvedTarget[]>;

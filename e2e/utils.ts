@@ -25,9 +25,10 @@ export async function openPatientSection(page: Page, id: string): Promise<void> 
   if (!(await link.isVisible())) await navigation.locator('summary').click();
   await link.click();
   await expect(link).toHaveAttribute('aria-current', 'location');
+  // @Codex: ordinary sections use navigation state and visibility; the twin-only
+  // data-folder-active attribute is not part of their contract.
   const pane = page.locator(`#${id}`);
   await expect(pane).toBeVisible();
-  await expect(pane).toHaveAttribute('data-folder-active', 'true');
 }
 
 /* @Codex */
