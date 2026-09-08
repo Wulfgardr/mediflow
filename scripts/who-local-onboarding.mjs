@@ -1,5 +1,6 @@
 /* @Codex: ordinary Mac ARM setup; all host authority remains in this CLI. */
 import { randomUUID } from 'node:crypto';
+import { validateWhoLocalManifest } from './check-who-local-sidecar-manifest.mjs';
 import { existsSync, lstatSync, mkdirSync, readFileSync, renameSync, rmdirSync, writeFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline/promises';
@@ -37,6 +38,10 @@ const message = Object.freeze({
     restore_metadata_mismatch: 'I metadati dei file ripristinati non corrispondono. Non attivo WHO.',
     offline_network_mismatch: 'La rete della verifica non e isolata come previsto. Non attivo WHO.',
     external_route_present: 'La verifica ha rilevato una route esterna. Non attivo WHO.',
+    pull_failed: 'Download immagine WHO non riuscito. Controlla la connessione e riapri la procedura: il consenso e lo stato preparato sono conservati. Non cambio il pin.',
+    create_failed: 'Creazione del servizio WHO non confermata. Conservo la registrazione: controlla lo stato con il gestore prima di riprovare, senza rimuovere servizi.',
+    start_failed: 'Avvio WHO non riuscito. Il servizio registrato è conservato: controlla Docker e riprendi la procedura.',
+    app_launch_failed: 'Avvio di MediFlow non riuscito o interrotto. La configurazione WHO qualificata è conservata; riprova il launcher senza reinstallare WHO.',
     app_running: 'MediFlow e gia in esecuzione: non lo interrompo. Al prossimo avvio usa “Avvia MediFlow con WHO” nella cartella privata.',
 });
 export function friendlySetupMessage(error) { return message[error?.code] ?? message.qualification_failed; }
@@ -120,7 +125,7 @@ function validQualification(state, manifest) {
         && r.restoredHashesMatch === true && r.originalHashesMatch === true && r.originalRecovered === true;
 }
 const shellQuote = value => `'${value.replaceAll("'", "'\\''")}'`;
-export function launchWithWho(manifest, dependencies = {}) {
+export async function launchWithWho(manifest, dependencies = {}) {
     configurationText(manifest); // Reapply the existing activation contract before loading environment.
     const environment = { ...process.env, MEDIFLOW_ICD_WHO_ENABLED: '1', MEDIFLOW_ICD_WHO_LOCAL_IMAGE_DIGEST: manifest.image.digest,
         MEDIFLOW_ICD_WHO_LOCAL_DATASET_ID: manifest.dataset.snapshotId };
@@ -128,7 +133,12 @@ export function launchWithWho(manifest, dependencies = {}) {
         const child = spawn('/bin/bash', [path.join(root, 'Start_MediFlow.command')], { cwd: root, env, stdio: 'inherit', shell: false });
         child.once('error', reject); child.once('exit', code => resolve(code));
     }));
-    return launch(environment);
+    try {
+        const code = await launch(environment);
+        // The real child returns a numeric exit code, or null when terminated by a signal.
+        if (code !== undefined && code !== 0) deny('app_launch_failed');
+        return code;
+    } catch { deny('app_launch_failed'); }
 }
 
 export async function onboardWho(action = 'setup', dependencies = {}) {
@@ -159,15 +169,19 @@ export async function onboardWho(action = 'setup', dependencies = {}) {
                 || license.gesture !== 'ACCETTO' || license.imageDigest !== lock.imageDigest
                 || manifest.image.digest !== lock.imageDigest || manifest.license.acceptanceRecordRef !== `who-${state.installationId}`) deny('private_state_invalid');
         }
+        // Reapply the existing fixed manifest gate on resume before any Docker operation.
+        if (manifest && validateWhoLocalManifest(manifest, 'provision').length) deny('private_state_invalid');
         if (action === 'start' && state?.phase !== 'ready') deny('qualification_required');
         if (state?.phase === 'ready' && !validQualification(state, manifest)) deny('private_state_invalid');
         if (action === 'status') {
-            if (!state?.containerId) return { state: 'not_installed', message: 'WHO locale non e ancora installato da questa procedura.' };
+            if (!state?.containerId) return state
+                ? { state: 'qualification_required', message: 'Preparazione WHO salvata; creazione del servizio non ancora confermata. Riapri la procedura per controllare e riprendere.' }
+                : { state: 'not_installed', message: 'WHO locale non e ancora installato da questa procedura.' };
             localEngine(state.context, run);
             assertOwnedContainer(state, state.containerId, scopedDocker(state, run));
             const observed = inspectStatus(manifest, state.context, state.containerName, run);
             return { state: state.phase === 'ready' && observed.state === 'running' ? 'ready' : 'qualification_required',
-                message: state.phase === 'ready' && observed.state === 'running' ? 'WHO locale pronto. Verifica la ricerca in MediFlow.' : message.qualification_required };
+                message: state.phase === 'ready' && observed.state === 'running' ? 'Qualifica WHO salvata e container in esecuzione. Questo controllo non esegue una ricerca: verifica WHO in MediFlow.' : message.qualification_required };
         }
         if (!state) {
             if (action !== 'setup') deny('qualification_required');
@@ -191,18 +205,21 @@ export async function onboardWho(action = 'setup', dependencies = {}) {
             if (await ask('Riprendere installazione e verifiche del solo servizio creato qui? [s/N] ') !== 's') deny('cancelled');
         }
         const command = scopedDocker(state, run);
+        const runPhase = (code, args, timeout) => {
+            try { return command(args, timeout); } catch { deny(code); }
+        };
         localEngine(state.context, run);
         if (!state.containerId) {
             await (dependencies.portFree ?? checkPort)();
             report('Scarico la versione WHO verificata…');
-            command(['image', 'pull', '--platform', 'linux/arm64', '--quiet', state.image], 15 * 60 * 1000);
-            state.containerId = command(createOwnedContainerArgs(state, state.containerName, 'bridge', true));
+            runPhase('pull_failed', ['image', 'pull', '--platform', 'linux/arm64', '--quiet', state.image], 15 * 60 * 1000);
+            state.containerId = runPhase('create_failed', createOwnedContainerArgs(state, state.containerName, 'bridge', true));
             if (!/^[0-9a-f]{64}$/u.test(state.containerId)) deny('container_ownership_invalid');
             state.phase = 'created'; save(state);
         }
         if (state.phase !== 'ready' || action === 'qualify') {
             const original = assertOwnedContainer(state, state.containerId, command);
-            if (!original.running) command(['container', 'start', state.containerId], 30000);
+            if (!original.running) runPhase('start_failed', ['container', 'start', state.containerId], 30000);
             state.phase = 'started'; save(state);
             manifest.dataset = { include: '2026-01_en', snapshotId: null, snapshotInventorySha256: null, offlineRestartVerified: false, restoreVerified: false };
             writeLocal(directory, 'manifest.json', `${JSON.stringify(manifest, null, 2)}\n`);
@@ -222,7 +239,7 @@ export async function onboardWho(action = 'setup', dependencies = {}) {
         if (!current.running) {
             if (action !== 'start' && await ask('WHO locale e fermo. Avviare il servizio gia verificato? [s/N] ') !== 's') deny('cancelled');
             report('Avvio il servizio WHO gia verificato…');
-            command(['container', 'start', state.containerId], 30000);
+            runPhase('start_failed', ['container', 'start', state.containerId], 30000);
             await waitForSearch(state, state.containerId, 'acquisition', command, dependencies);
         }
         assertOwnedContainer(state, state.containerId, command, true);
