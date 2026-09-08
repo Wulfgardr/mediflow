@@ -6,6 +6,10 @@ import { createRequire } from 'node:module';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { assertNodeRuntime, readNodeContract, standaloneDirectory } from './node-runtime-contract.mjs';
+import { formatPdfSmokeFailure } from './anydoc-pdf-smoke-diagnostics.mjs';
+
+// @Codex: only safe, failure-only smoke diagnostics omit the CLI exception stack.
+class PdfPageWorkerSmokeError extends Error {}
 
 const ANYDOC_WORKER_FILE = 'anydoc-local-extraction-worker.mjs';
 const ANYDOC_WORKER_SHA256 = '5d6e2e60f1d71f3fd45065961258a7debe8a96e017abdcee92823986c8f08c67';
@@ -257,7 +261,7 @@ function framedPdfPageWorkerSmokeFailure(workerPath) {
   }, [source]));
   if (materialize.error || materialize.status !== 0 || materialize.signal !== null
       || !Buffer.isBuffer(materialize.stderr) || materialize.stderr.byteLength !== 0) {
-    return 'Standalone PDF page worker did not complete the framed materialization smoke.';
+    return formatPdfSmokeFailure('materialize', 'transport', materialize);
   }
   const materialized = decodePdfChildFrame(materialize.stdout);
   const page = materialized?.header?.pages?.[0];
@@ -267,7 +271,7 @@ function framedPdfPageWorkerSmokeFailure(workerPath) {
       || !Array.isArray(materialized.header.pages) || materialized.header.pages.length !== 1
       || page?.page !== 1 || page?.byteLength !== materialized.body.byteLength
       || materialized.body.byteLength < 1) {
-    return 'Standalone PDF page worker emitted an invalid materialization frame.';
+    return formatPdfSmokeFailure('materialize', 'response', materialize);
   }
 
   const render = runPdfChild(workerPath, encodePdfChildFrame({
@@ -278,7 +282,7 @@ function framedPdfPageWorkerSmokeFailure(workerPath) {
   }, [materialized.body]), { allowAddons: true });
   if (render.error || render.status !== 0 || render.signal !== null
       || !Buffer.isBuffer(render.stderr) || render.stderr.byteLength !== 0) {
-    return 'Standalone PDF page worker did not complete the framed rendering smoke.';
+    return formatPdfSmokeFailure('render', 'transport', render);
   }
   const rendered = decodePdfChildFrame(render.stdout);
   const profiles = JSON.parse(fs.readFileSync(path.join(path.dirname(workerPath), 'anydoc-pdf-renderer-profiles.json'), 'utf8'));
@@ -288,7 +292,7 @@ function framedPdfPageWorkerSmokeFailure(workerPath) {
       && rendered.header.status === 'error' && rendered.header.reason === 'engine_unavailable'
       && rendered.header.bodyByteLength === 0 && rendered.body.byteLength === 0
       ? null
-      : 'Standalone PDF page worker did not fail closed on an unsupported rendering host.';
+      : formatPdfSmokeFailure('render', 'unsupported_host', render);
   }
   const raster = rendered?.header?.pages?.[0];
   const pngSignature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
@@ -300,7 +304,7 @@ function framedPdfPageWorkerSmokeFailure(workerPath) {
       || raster?.width !== 144 || raster?.height !== 72
       || !Number.isSafeInteger(raster?.durationMs) || raster.durationMs < 0
       || !rendered.body.subarray(0, pngSignature.byteLength).equals(pngSignature)) {
-    return 'Standalone PDF page worker emitted an invalid rendering frame.';
+    return formatPdfSmokeFailure('render', 'response', render);
   }
   return null;
 }
@@ -774,7 +778,7 @@ function runPdfPageWorkerSelfTest() {
       throw new Error('expected the AnyDoc route trace to reference the PDF page worker');
     }
     const smokeFailure = framedPdfPageWorkerSmokeFailure(sourceWorker);
-    if (smokeFailure) throw new Error(smokeFailure);
+    if (smokeFailure) throw new PdfPageWorkerSmokeError(smokeFailure);
 
     fs.rmSync(workerPath);
     if (!bundledPdfPageWorkerFailure(standaloneDir)?.includes('does not contain')) {
@@ -939,7 +943,13 @@ if (process.argv[2] === '--self-test=apple-vision-canvas') {
   process.exit(0);
 }
 if (process.argv[2] === '--self-test=pdf-page-worker') {
-  runPdfPageWorkerSelfTest();
+  try {
+    runPdfPageWorkerSelfTest();
+  } catch (error) {
+    if (!(error instanceof PdfPageWorkerSmokeError)) throw error;
+    console.error(error.message);
+    process.exit(1);
+  }
   process.exit(0);
 }
 
