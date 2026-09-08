@@ -135,7 +135,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                                         <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--lume-ink-muted)' }} />
                                         <input
                                             type="password"
-                                            inputMode="numeric"
+                                            inputMode="text"
                                             id="setup-pin"
                                             value={formData.pin}
                                             onChange={(e) => setFormData({ ...formData, pin: e.target.value })}
@@ -151,7 +151,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                                         <Check className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--lume-ink-muted)' }} />
                                         <input
                                             type="password"
-                                            inputMode="numeric"
+                                            inputMode="text"
                                             id="setup-confirm-pin"
                                             value={formData.confirmPin}
                                             onChange={(e) => setFormData({ ...formData, confirmPin: e.target.value })}
