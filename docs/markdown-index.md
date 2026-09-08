@@ -334,3 +334,5 @@ sorgenti, toolchain, prove delle bozze e limiti della lane nativa.
 4. Se cambiano priorità o fonti autorevoli, aggiorna anche [docs/README.md](./README.md).
 
 - [ADR 0135](./adr/0135-native-ai-configuration-authority.md): grant nativo esplicito, preferenze AI e preset; account distinto.
+
+- [Test UI 0.8.6](../tests/ui06/README.md): test dei componenti con fixture sintetiche, comandi e limiti della verifica.

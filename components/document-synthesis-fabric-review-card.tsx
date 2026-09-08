@@ -194,22 +194,28 @@ function DocumentSynthesisFabricReviewCardSession({
 
             {!enabled && (
                 <p className="mt-3 text-[color:var(--lume-ink-muted)]" role="status">
-                    unavailable · la funzione di sintesi è disabilitata localmente.
+                    La funzione di sintesi è disabilitata localmente.
                 </p>
             )}
 
             {phase === 'terminal' && error && (
-                <p
-                    className="mt-3 rounded-xl border border-[color:color-mix(in_srgb,var(--lume-signal-warning)_28%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-warning)_9%,var(--lume-surface-field))] p-2 text-[color:color-mix(in_srgb,var(--lume-signal-warning)_65%,var(--lume-ink))]"
-                    role="status"
-                >
-                    {error}
-                </p>
+                <div className="mt-3">
+                    <p role="status" className="text-[color:var(--lume-ink)]">
+                        {error.startsWith('review_required · unsupported_local_extraction')
+                            ? 'Testo locale non disponibile. È necessaria la revisione manuale del documento.'
+                            : 'Sintesi non disponibile. La cartella rimane invariata.'}
+                    </p>
+                    <details className={disclosure.disclosure}>
+                        <summary>Dettagli dell’esito</summary>
+                        <p>{error}</p>
+                    </details>
+                </div>
             )}
 
             {phase === 'terminal' && publication && providerBindingReceipt && (
                 <div className="mt-4 grid min-w-0 gap-4" data-testid="document-synthesis-fabric-result">
-                    <div className="rounded-[var(--lume-control-radius)] border border-[color:color-mix(in_srgb,var(--lume-ink)_16%,transparent)] bg-[color:var(--lume-surface-focal)] p-4">
+                    {/* @Codex: summary, sources and receipt share the document reading plane. */}
+                    <div className={disclosure.synthesisSection}>
                         <p className="font-semibold text-[color:var(--lume-ink)]">Riepilogo da rivedere</p>
                         <p className="mt-2 break-words text-[color:var(--lume-ink)]">
                             <PrivacyBlur intensity="sm">{publication.output.summary}</PrivacyBlur>
@@ -226,8 +232,8 @@ function DocumentSynthesisFabricReviewCardSession({
                         <p className="mt-3 text-[color:var(--lume-ink-muted)]">Nessun invio a provider esterni e nessun passaggio a un altro modello.</p>
                     </div>
 
-                    <div>
-                        <p className="font-semibold text-[color:var(--lume-ink)]">Citazioni dal documento</p>
+                    <details className={disclosure.disclosure}>
+                        <summary>Citazioni dal documento <span className={disclosure.count}>{publication.citations.length}</span></summary>
                         <p className="mt-1 text-[color:var(--lume-ink-muted)]">I passaggi citati sono stati riscontrati nel testo estratto. Confrontali con il riepilogo.</p>
                         <ol className="mt-3 grid gap-3">
                             {publication.citations.map((citation) => (
@@ -240,7 +246,7 @@ function DocumentSynthesisFabricReviewCardSession({
                                 </li>
                             ))}
                         </ol>
-                    </div>
+                    </details>
 
                     <details className={disclosure.disclosure}>
                         <summary>Dettagli di verifica</summary>
