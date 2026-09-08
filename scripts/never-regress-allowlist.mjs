@@ -244,6 +244,16 @@ export const NEVER_REGRESS_ALLOWLIST = {
     ],
     externalUrls: [
         {
+            path: 'lib/chatgpt-account/account-browser.test.ts',
+            pattern: 'https://auth\\.openai\\.com/oauth/authorize\\?state=synthetic-test',
+            reason: 'Synthetic browser lifecycle payload only; the injected fetcher never sends this URL.',
+        },
+        {
+            path: 'lib/chatgpt-account/account-service.test.ts',
+            pattern: 'https://auth\\.openai\\.com/oauth/authorize\\?state=synthetic-test',
+            reason: 'Synthetic account transport response only; no real login or network request.',
+        },
+        {
             path: 'lib/chatgpt-execution/execution-egress-proxy.test.ts',
             pattern: "^\\s*'(?:GET http://auth\\.openai\\.com:443/|CONNECT https://auth\\.openai\\.com:443/) HTTP/1\\.1",
             reason: 'ADR 0134 negative CONNECT tests submit these invalid request targets only to an owned loopback listener and assert no DNS or upstream connection.',

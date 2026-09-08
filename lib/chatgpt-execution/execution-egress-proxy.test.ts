@@ -163,6 +163,7 @@ test('rejects private, local and reserved IPv4 DNS answers before numeric connec
     for (const answer of cases) {
         let connectCalls = 0;
         const proxy = await createForTest({
+            // @ts-expect-error Deliberately includes an invalid address family to exercise runtime rejection.
             lookup: async () => [answer],
             connect: () => { connectCalls += 1; throw new Error('private answer must not connect'); },
         });
