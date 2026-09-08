@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import { spawnSync } from 'node:child_process';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -38,6 +39,29 @@ const webAuthOwnerRoster = [
   'internal/support/value.cjs',
   'package.json',
 ];
+
+// fs.globSync emits host paths; preserve the exact suffix on Windows as well as POSIX.
+function hasSemverCoerceImplementation(candidates) {
+  return candidates.some((candidate) => candidate.split(path.sep).join('/').endsWith('/functions/coerce.js'));
+}
+
+test('standalone semver witness uses exact path segments from a native filesystem glob', (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-semver-witness-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  for (const relative of [
+    'semver/notfunctions/coerce.js', 'semver/functions/coerce.js.map', 'semver/functions/coerce.json',
+  ]) {
+    const target = path.join(directory, ...relative.split('/'));
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, '// synthetic test witness only\n');
+  }
+  assert.equal(hasSemverCoerceImplementation(fs.globSync('**/*', { cwd: directory })), false);
+  const target = path.join(directory, 'semver', 'functions', 'coerce.js');
+  fs.writeFileSync(target, '// synthetic exact witness only\n');
+  assert.equal(hasSemverCoerceImplementation(fs.globSync('**/*', { cwd: directory })), true);
+  fs.unlinkSync(target);
+  assert.equal(hasSemverCoerceImplementation(fs.globSync('**/*', { cwd: directory })), false);
+});
 
 function runSelfTest(argument) {
   return spawnSync(node, [checker, argument], {
@@ -178,7 +202,7 @@ test('standalone config traces the installed semver layout for sharp', () => {
       || (npmSemver.length > 0 && includes.includes(`"${sharpTracePattern}"`)),
     'installed sharp semver layout is not traced for standalone',
   );
-  assert.ok([...pnpmSemver, ...npmSemver].some((candidate) => candidate.endsWith('/functions/coerce.js')),
+  assert.ok(hasSemverCoerceImplementation([...pnpmSemver, ...npmSemver]),
     'installed sharp semver does not provide functions/coerce.js');
 });
 
