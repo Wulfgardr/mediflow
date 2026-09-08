@@ -3,12 +3,19 @@
 // WUL-297 settings shell: persistent sidebar + sub-routes.
 
 import type { ReactNode } from 'react';
+/* @Codex: an explicit local return, never browser-history navigation. */
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { ArrowLeft } from 'lucide-react';
+import styles from '@/components/settings/settings-lume.module.css';
 
 import { Kree8WorkspaceShell } from '@/components/kree8/kree8-workspace-shell';
 import { SettingsNavSidebar } from '@/components/settings/settings-nav-sidebar';
 import { SettingsSearchOverlay, useSettingsSearch } from '@/components/settings/settings-search';
 
 export default function SettingsLayout({ children }: { children: ReactNode }) {
+    const pathname = usePathname();
+    const isSubroute = pathname?.startsWith('/settings/') && pathname !== '/settings/';
     const { isSearchOpen, openSearch, closeSearch } = useSettingsSearch();
 
     return (
@@ -27,6 +34,12 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
                     <SettingsNavSidebar onSearchRequest={openSearch} />
                 </aside>
                 <div className="min-w-0 space-y-8" data-testid="settings-subroute-content">
+                    {isSubroute ? (
+                        <Link href="/settings" className={styles.returnLink}>
+                            <ArrowLeft size={16} aria-hidden="true" />
+                            Torna alle impostazioni
+                        </Link>
+                    ) : null}
                     {children}
                 </div>
             </div>

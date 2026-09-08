@@ -26,7 +26,7 @@ test('Untouched/partial scales do not write; explicit zero and complete POMA-28 
     await expect(form.getByRole('button', { name: 'Avanti', exact: true })).toBeDisabled();
     expect(writes).toBe(0);
     // @Codex: button cancellation must preserve a partial draft until the explicit leave decision.
-    const firstAnswer = form.getByRole('button', { name: /^0\./ });
+    const firstAnswer = form.getByRole('radio', { name: /^0\./ });
     await firstAnswer.click();
     await form.getByLabel('Contesto').selectOption('home');
     await form.getByRole('button', { name: 'Annulla', exact: true }).click();
@@ -34,7 +34,7 @@ test('Untouched/partial scales do not write; explicit zero and complete POMA-28 
     await expect(leaveDialog).toBeVisible();
     await expect(page.getByRole('dialog')).toHaveCount(1);
     await leaveDialog.getByRole('button', { name: 'Continua a scrivere', exact: true }).click();
-    await expect(firstAnswer).toHaveAttribute('aria-pressed', 'true');
+    await expect(firstAnswer).toBeChecked();
     await expect(form.getByLabel('Contesto')).toHaveValue('home');
     expect(writes).toBe(0);
     await form.getByRole('button', { name: 'Annulla', exact: true }).click();
@@ -47,7 +47,7 @@ test('Untouched/partial scales do not write; explicit zero and complete POMA-28 
         const next = form.getByRole('button', { name: index === 5 ? 'Completa' : 'Avanti', exact: true });
         await expect(next).toBeDisabled();
         expect(writes).toBe(0);
-        await form.getByRole('button', { name: /^0\./ }).click();
+        await form.getByRole('radio', { name: /^0\./ }).click();
         await expect(next).toBeEnabled();
         await next.click();
     }
@@ -71,7 +71,7 @@ test('Untouched/partial scales do not write; explicit zero and complete POMA-28 
         const next = form.getByRole('button', { name: index === 19 ? 'Completa' : 'Avanti', exact: true });
         await expect(next).toBeDisabled();
         expect(writes).toBe(1);
-        await form.getByRole('button', { name: new RegExp(`^${maxima[index]}\\.`) }).click();
+        await form.getByRole('radio', { name: new RegExp(`^${maxima[index]}\\.`) }).click();
         await next.click();
     }
     await expect.poll(() => writes).toBe(2);
@@ -79,10 +79,13 @@ test('Untouched/partial scales do not write; explicit zero and complete POMA-28 
     await page.reload();
     const records = history.getByRole('article');
     await expect(records).toHaveCount(2);
-    await expect(records.nth(0)).toContainText('Tinetti POMA-28 (v1)');
-    await expect(records.nth(0)).toContainText('Punteggio: 28');
-    await expect(records.nth(0).getByTestId('scale-provenance-notice')).toContainText('NHS FPS 006 V1 (2012)');
-    await expect(records.nth(1)).toContainText('ADL (Indice di Katz)');
-    await expect(records.nth(1)).toContainText('Punteggio: 0');
+    // @Codex: same-day assessments can share a timestamp; verify identity, not tie order.
+    const poma = records.filter({ hasText: 'Tinetti POMA-28 (v1)' });
+    const adl = records.filter({ hasText: 'ADL (Indice di Katz)' });
+    await expect(poma).toHaveCount(1);
+    await expect(poma).toContainText('Punteggio: 28');
+    await expect(poma.getByTestId('scale-provenance-notice')).toContainText('NHS FPS 006 V1 (2012)');
+    await expect(adl).toHaveCount(1);
+    await expect(adl).toContainText('Punteggio: 0');
     expect(writes).toBe(2);
 });

@@ -63,3 +63,11 @@
 .clinicalSupport { margin-top: 24px; min-width: 0; }
 /* @Codex WUL-678: readable domain headings in both themes, scoped to these destinations. */
 .domainSection > h3 :global(.text-ink) { color: var(--lume-ink); }
+
+/* @Codex: exact counters and full context, including narrow rails and text zoom. */
+.signals { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 9.375rem), 1fr)); gap: 12px; min-width: 0; margin: 0; }
+.signal { min-width: 0; overflow-wrap: anywhere; }
+.signalLabel { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--lume-ink-muted); font-size: .875rem; line-height: 1.5; font-weight: 500; }
+.signalLabel svg { flex-shrink: 0; }
+.signalValue { margin: 6px 0 0; font-size: 1.375rem; line-height: 1.3; font-weight: 600; font-variant-numeric: tabular-nums; }
+.signalHint { margin: 4px 0 0; color: var(--lume-ink-muted); font-size: .875rem; line-height: 1.5; }
