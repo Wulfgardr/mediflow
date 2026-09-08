@@ -1,6 +1,50 @@
 # MediFlow 0.8.6: verifica del candidato sorgente
 
-Aggiornamento: 7 settembre 2026. Programma WUL-669.
+Aggiornamento: 8 settembre 2026. Programma WUL-669.
+
+## Verifica notturna dell'8 settembre: programma ancora aperto
+
+Il runtime `11b9ab534c54026937558c82f5861a5256f2218e` supera build di
+produzione e postbuild. Sul candidato `4c99ee4f89303f5efa62ce497236005a020f7c9a`,
+che aggiunge soltanto checker e test/helper, la suite aggregata registra
+3.583 pass, 10 skip e zero fallimenti su 3.593 test. Il test producer che
+avvia una build distinta è esplicitamente escluso da questo passaggio.
+I due E2E Smart Import sono ancora in riallineamento al catalogo corrente.
+
+Linux avvia realmente il bundle `ddff0a929fbe4d60f144b64c55269892ec2419f6`
+e supera cinque controlli UI; il checker corretto `ef0c1d576` passa sul
+medesimo bundle immutato. Windows supera cinque controlli della preview dev
+sulla base ddff con i soli due file onboarding di `8b3ed4073`; la build di
+produzione termina per timeout a 570 secondi. Questa composizione non è un
+checkout completo di 11b9. Mac conserva prove native dedicate, build Debug
+arm64 e suite Swift: nessuna delle tre prove attesta parità o distribuzione.
+
+Patient Insight ha prodotto un risultato locale reale sul runtime `493a6123a`.
+Document Synthesis ha invece restituito un output rifiutato per fonte non
+esatta e campo assente; la validazione resta invariata. Il nuovo onboarding
+locale supera il precedente errore di origine, ma il caricamento a freddo
+non completa la verifica entro 30 secondi. Il nuovo percorso ChatGPT resta
+ristretto al corpus dimostrativo e non ha catalogo autenticato o inferenza
+reale qualificati. Le prove account storiche sotto non qualificano questo
+nuovo percorso di esecuzione.
+
+WHO locale ufficiale, con licenza accettata e dataset MMS 2026-01 inglese,
+restituisce nella UI ordinaria 16 risultati per la ricerca sintetica e il
+codice noto 1A00. Il wizard da installazione pulita resta da provare. AIFA
+ha una prova di acquisizione e rilettura di 159.929 record; esenzioni e
+protesica hanno prove sintetiche. La fonte normativa della protesica resta
+da scegliere. L'OCR reale nei due guest elabora sei documenti ciascuno,
+con cinque su sei conformi al gate di accuratezza: la differenza del caso
+ruotato è conservata, senza cambiare soglie.
+
+Linear WUL-669–696 è aggiornato e riletto: 22 In Progress, 5 In Review,
+1 Todo, nessuna Done. Galleria ordinaria e video di navigazione sono
+disponibili; fixture presentazionali separate e dichiarate. Restano aperti
+percorsi intelligenti completi, setup, installazioni desktop/Mini, revisione
+utente e accessibilità, dossier competente e CI/merge/tag/release.
+La scadenza dello sviluppo non chiude questi gate.
+
+## Storico della verifica del 7 settembre
 
 **7 settembre 2026 — candidato locale aggiornato; pubblicazione sospesa.**
 Il blocco contrattuale PIN è chiuso a livello sorgente dall'addendum indipendente
