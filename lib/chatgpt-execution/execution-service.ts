@@ -64,6 +64,7 @@ export function createSynthesisExecutionService(options: {
     let active: { reject: (error: ExecutionError) => void; failure: Promise<never>; deadline: number } | undefined;
     let shutdown: Promise<void> | undefined;
     let unsubscribe = () => {};
+    const resultBindings = new WeakMap<object, { accountRevision: number; signal?: AbortSignal }>();
 
     function authority(): ExecutionCode | undefined {
         try {
@@ -112,7 +113,7 @@ export function createSynthesisExecutionService(options: {
         guard();
         return response;
     }
-    async function operation<T>(work: () => Promise<T>, signal?: AbortSignal): Promise<T> {
+    async function operation<T extends SynthesisCatalog | SynthesisResult>(work: () => Promise<T>, signal?: AbortSignal): Promise<T> {
         guard();
         if (active) throw new ExecutionError('busy');
         if (usedTurn) throw new ExecutionError('session_expired');
@@ -133,6 +134,7 @@ export function createSynthesisExecutionService(options: {
             const result = await Promise.race([work(), failure]);
             await ensureAccountCurrent();
             guard();
+            resultBindings.set(result, { accountRevision, signal });
             return result;
         } catch (error) {
             const code = terminal ?? (error instanceof ExecutionError ? error.code : 'upstream_error');
@@ -377,6 +379,16 @@ export function createSynthesisExecutionService(options: {
                 guard();
                 return result;
             }, signal);
+        },
+        // Local result witness, NOT an owner grant. The binding must still commit
+        // its resource use. Never re-enter isCurrent() while inside that owner.
+        isCurrent(result: SynthesisCatalog | SynthesisResult): boolean {
+            const binding = resultBindings.get(result);
+            if (!binding || terminal || binding.signal?.aborted || binding.accountRevision !== accountRevision
+                || verifiedAccountRevision !== accountRevision) return false;
+            try { if (!boundaryQualified()) return false; } catch { return false; }
+            // Intentional transport close does not retire a completed proposal.
+            return 'choices' in result ? result === catalog && !usedTurn : completed && usedTurn;
         },
         cancel(): Promise<void> { invalidate('canceled'); return close(true); },
         dispose(): Promise<void> { invalidate('revoked'); return close(true); },

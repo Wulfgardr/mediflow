@@ -471,3 +471,69 @@ test('valid initial identity never appears in catalog or result', async () => {
     const result = await service.generate({ modelOptionId: catalog.choices[0].optionId, expectedCatalogRevision: catalog.revision });
     assert.ok(!JSON.stringify({ catalog, result }).includes('fixture-account@example.invalid'));
 });
+
+// The publication witness is service-local; an owner-bound caller still commits its resource use.
+test('publication witness accepts only the exact current catalog, never clones or another service result', async () => {
+    const first = setup(); const second = setup();
+    try {
+        const catalog = await first.service.readCatalog(); const foreign = await second.service.readCatalog();
+        assert.equal(first.service.isCurrent(catalog), true);
+        assert.equal(first.service.isCurrent({ ...catalog }), false);
+        assert.equal(first.service.isCurrent(foreign), false);
+        const next = await first.service.readCatalog();
+        assert.equal(first.service.isCurrent(catalog), false); assert.equal(first.service.isCurrent(next), true);
+    } finally { await first.service.dispose(); await second.service.dispose(); }
+});
+
+for (const action of ['cancel', 'dispose'] as const) test(`resolved catalog is not publishable after ${action}`, async () => {
+    const { service } = setup();
+    try {
+        const catalog = await service.readCatalog();
+        await service[action]();
+        assert.equal(service.isCurrent(catalog), false);
+    } finally { await service.dispose(); }
+});
+
+test('account notification invalidates a catalog witness until a fresh verified catalog is produced', async () => {
+    const { service, transport } = setup();
+    try {
+        const catalog = await service.readCatalog();
+        transport.listener('account/updated', { authMode: 'chatgpt', planType: 'plus' });
+        assert.equal(service.isCurrent(catalog), false);
+        const next = await service.readCatalog();
+        assert.equal(service.isCurrent(catalog), false); assert.equal(service.isCurrent(next), true);
+    } finally { await service.dispose(); }
+});
+
+for (const guard of ['false', 'throws'] as const) test(`publication witness fails closed when boundary qualification ${guard}`, async () => {
+    let qualified = true;
+    const { service } = setup({ boundaryQualified: () => { if (!qualified && guard === 'throws') throw new Error('synthetic-boundary-error'); return qualified; } });
+    try {
+        const catalog = await service.readCatalog(); qualified = false;
+        assert.equal(service.isCurrent(catalog), false);
+    } finally { await service.dispose(); }
+});
+
+for (const action of ['cancel', 'dispose', 'signal'] as const) test(`completed result remains locally valid after intentional transport close, but not after ${action}`, async () => {
+    const { service, transport } = setup(); const controller = new AbortController();
+    try {
+        const catalog = await service.readCatalog();
+        const request = { modelOptionId: catalog.choices[0].optionId, expectedCatalogRevision: catalog.revision };
+        transport.onTurn = () => { transport.final(); transport.complete(); };
+        const result = await service.generate(request, controller.signal);
+        assert.equal(transport.closed, 1); assert.equal(service.isCurrent(result), true);
+        assert.equal(service.isCurrent({ ...result }), false); assert.equal(service.isCurrent(catalog), false);
+        if (action === 'signal') controller.abort(); else await service[action]();
+        assert.equal(service.isCurrent(result), false);
+    } finally { await service.dispose(); }
+});
+
+test('publication witness never re-enters the caller owner callback', async () => {
+    let ownerReads = 0;
+    const { service } = setup({ isCurrent: () => { ownerReads++; return true; } });
+    try {
+        const catalog = await service.readCatalog(); const readsAtHandoff = ownerReads;
+        assert.equal(service.isCurrent(catalog), true);
+        assert.equal(ownerReads, readsAtHandoff);
+    } finally { await service.dispose(); }
+});

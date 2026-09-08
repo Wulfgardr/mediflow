@@ -195,3 +195,26 @@ test('binding and corpus expose no DB, writer, filesystem, shell or arbitrary in
     assert.ok(CHATGPT_SYNTHESIS_FIXTURE.sources.every(Object.isFrozen));
     assert.ok(readdirSync(dataDir!).every(name => !/\.(?:db|sqlite|sqlite3)(?:-|$)/i.test(name)), 'No database artifact in synthetic data directory');
 });
+
+for (const operation of ['catalog', 'generate'] as const) test(`real owner cannot commit ${operation} canceled by its synchronous renderer`, async t => {
+    const f = fixture(t); const binding = f.bind(); let rendered = false;
+    const render = () => { rendered = true; void binding.cancel(); return Response.json({ mustNotBePublished: true }); };
+    const response = operation === 'catalog' ? binding.catalog(render) : binding.generate(await select(binding), render);
+    await assert.rejects(response, (error: unknown) => error instanceof ExecutionError && error.code === 'session_expired');
+    assert.equal(rendered, true);
+});
+
+test('real owner cannot commit a catalog if its renderer disqualifies the host', async t => {
+    const f = fixture(t); const binding = f.bind(); let rendered = false;
+    await assert.rejects(binding.catalog(() => {
+        rendered = true; f.disqualify(); return Response.json({ mustNotBePublished: true });
+    }), (error: unknown) => error instanceof ExecutionError && error.code === 'session_expired');
+    assert.equal(rendered, true);
+});
+
+test('real owner cannot commit a completed result if its renderer aborts the originating signal', async t => {
+    const f = fixture(t); const binding = f.bind(); const request = await select(binding); const controller = new AbortController();
+    await assert.rejects(binding.generate(request, () => {
+        controller.abort(); return Response.json({ mustNotBePublished: true });
+    }, controller.signal), (error: unknown) => error instanceof ExecutionError && error.code === 'session_expired');
+});

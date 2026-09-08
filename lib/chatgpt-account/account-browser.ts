@@ -80,10 +80,12 @@ export function createAccountBrowser(fetcher: typeof fetch = fetch) {
                 ...(operation === 'status' ? {} : { headers: { 'Content-Type': 'application/json' }, body: '{}' }),
             });
             if (!active || epoch !== generation) return;
+            if (controller.signal.aborted) throw new Error('unavailable');
             if (response.status === 401) { setActive(false); return; }
             if (!response.ok) throw new Error(response.status === 409 ? 'changed' : 'unavailable');
             const payload = object(await response.json());
             if (!active || epoch !== generation) return;
+            if (controller.signal.aborted) throw new Error('unavailable');
             const status = parseAccountBrowserStatus(payload.status ?? payload);
             const connected = status.state === 'connected';
             const awaiting = status.state === 'awaiting_login';
