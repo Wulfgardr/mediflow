@@ -230,3 +230,73 @@ test('successful activation removes caller cancellation listener and reactivatio
     assert.deepEqual(await f.service.activate(admitted.revision), admitted);
     assert.equal(f.calls(), 2);
 });
+
+/* @Codex round 2: explicit resume keeps the same real owner/SQLite/lifecycle fixtures. */
+test('cancelled attempt requires a fresh revision and fresh attestation for explicit resume', async () => {
+    let first = true; let started!: () => void; let finish!: () => void;
+    const waiting = new Promise<void>(resolve => { started = resolve; });
+    const f = fixture(async (_base, model) => {
+        const result = { authorityPlane: 'clinical_application', provider: 'ollama', executionMode: 'local', endpointClass: 'loopback',
+            requestedModel: model, canonicalModel: model, digest: 'a'.repeat(64), serverVersion: '0.33.3', checkedAt: new Date().toISOString() } as const;
+        if (!first) return result;
+        first = false; started(); return new Promise(resolve => { finish = () => resolve(result); });
+    });
+    const initial = await f.service.inspect(); const controller = new AbortController();
+    const pending = f.service.activate(initial.revision, controller.signal);
+    const rejected = assert.rejects(pending, /verification_interrupted/);
+    await waiting; controller.abort(); await rejected;
+    f.db.exec("UPDATE settings SET value='http://localhost:11434' WHERE key='aiUrl'");
+    const reread = await f.service.inspect(); assert.notEqual(reread.revision, initial.revision);
+    assert.equal(f.calls(), 1); assert.equal(reread.state, 'missing');
+    await assert.rejects(f.service.activate(initial.revision), /configuration_changed/); assert.equal(f.calls(), 1);
+    const admitted = await f.service.activate(reread.revision);
+    assert.equal(admitted.version, 1); assert.equal(f.calls(), 2);
+    finish(); await Promise.resolve(); assert.deepEqual(await f.service.inspect(), admitted);
+});
+
+test('two ordinary overlapping activations conflict instead of accepting a late stale revision', async () => {
+    let first = true; let started!: () => void; let finish!: () => void;
+    const waiting = new Promise<void>(resolve => { started = resolve; });
+    const f = fixture(async (_base, model) => {
+        const result = { authorityPlane: 'clinical_application', provider: 'ollama', executionMode: 'local', endpointClass: 'loopback',
+            requestedModel: model, canonicalModel: model, digest: 'a'.repeat(64), serverVersion: '0.33.3', checkedAt: new Date().toISOString() } as const;
+        if (!first) return result;
+        first = false; started(); return new Promise(resolve => { finish = () => resolve(result); });
+    });
+    const initial = await f.service.inspect(); const pending = f.service.activate(initial.revision);
+    const rejected = assert.rejects(pending, /configuration_changed/);
+    await waiting;
+    const winner = await f.service.activate(initial.revision); assert.equal(winner.version, 1);
+    finish(); await rejected; assert.equal(f.calls(), 2);
+    assert.deepEqual(await f.service.inspect(), winner);
+});
+
+test('explicit resume cannot bypass owner retirement after cancellation', async () => {
+    let started!: () => void; const waiting = new Promise<void>(resolve => { started = resolve; });
+    const f = fixture(async () => { started(); return new Promise(() => {}); });
+    const initial = await f.service.inspect(); const controller = new AbortController();
+    const pending = f.service.activate(initial.revision, controller.signal);
+    const rejected = assert.rejects(pending, /verification_interrupted/);
+    await waiting; controller.abort(); await rejected;
+    owner.retireForUser(f.session);
+    await assert.rejects(f.service.inspect(), /owner_locked/);
+    await assert.rejects(f.service.activate(initial.revision), /owner_locked/);
+    assert.equal(f.calls(), 1); assert.equal(f.lifecycle.service.read().status, 'denied');
+});
+
+test('revocation between cancellation and resumed read remains terminal and does not reattest', async () => {
+    let pause = false; let started!: () => void;
+    const waiting = new Promise<void>(resolve => { started = resolve; });
+    const f = fixture(async (_base, model) => {
+        if (pause) { started(); return new Promise(() => {}); }
+        return { authorityPlane: 'clinical_application', provider: 'ollama', executionMode: 'local', endpointClass: 'loopback',
+            requestedModel: model, canonicalModel: model, digest: 'a'.repeat(64), serverVersion: '0.33.3', checkedAt: new Date().toISOString() };
+    });
+    const admitted = await f.service.activate((await f.service.inspect()).revision); pause = true;
+    const controller = new AbortController(); const pending = f.service.activate(admitted.revision, controller.signal);
+    const rejected = assert.rejects(pending, /verification_interrupted/);
+    await waiting; controller.abort(); await rejected;
+    f.lifecycle.control.revoke({ expectedVersion: admitted.version });
+    const reread = await f.service.inspect(); assert.equal(reread.state, 'revoked'); assert.equal(reread.canActivate, false);
+    await assert.rejects(f.service.activate(reread.revision), /revoked/); assert.equal(f.calls(), 2);
+});
