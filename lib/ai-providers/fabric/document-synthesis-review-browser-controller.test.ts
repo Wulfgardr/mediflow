@@ -19,12 +19,12 @@ const ATTACHMENT = 'synthetic-document';
 function fixture(pause?: string, status = 200) {
     const state = { version: 1, name: 'Ambulatorio Centro' };
     const calls: Array<{ url: string; body: unknown; signal?: AbortSignal | null }> = [];
-    let resume: (() => void) | undefined; let entered!: () => void;
+    let resume: (() => void) | undefined; let entered!: () => void; let pauseOnce = true;
     const paused = new Promise<void>((resolve) => { entered = resolve; });
     const controller = createDocumentSynthesisReviewBrowserController({ fetch: async (input, init) => {
         const url = String(input); const body = init?.body ? JSON.parse(String(init.body)) : null;
         calls.push({ url, body, signal: init?.signal });
-        if (url.endsWith(pause ?? 'never')) { entered(); await new Promise<void>((resolve) => { resume = resolve; }); }
+        if (pauseOnce && url.endsWith(pause ?? 'never')) { pauseOnce = false; entered(); await new Promise<void>((resolve) => { resume = resolve; }); }
         // The ordinary session has no ambulatory cookie; this route must not be needed.
         if (url === '/api/context') return Response.json({ ambulatoryId: null });
         if (url === `/api/patients/${PATIENT}`) return Response.json({ id: PATIENT, firstName: 'Alice', lastName: 'Esempio', version: state.version });
@@ -118,5 +118,31 @@ test('missing patient or empty ambulatory catalog never produces a confirmable c
         await assert.rejects(controller.readProposal(PATIENT), { code: unavailable === 'session' ? 'session_unavailable' : 'context_unavailable' });
         assert.equal(calls.some((url) => url.includes('/api/ai/')), false);
         controller.reset();
+    }
+});
+
+/* @Codex */
+test('a fresh confirmed request recovers after cancellation without reusing the old proposal or transport', async () => {
+    for (const pause of ['/capture', '/ingest', '/preview']) {
+        const f = fixture(pause);
+        try {
+            const oldProposal = await f.controller.readProposal(PATIENT);
+            const pending = f.controller.run({ ...intent, proposal: oldProposal, ambulatory: oldProposal.ambulatories[0] }, true);
+            await f.paused;
+            const oldSignal = f.calls.at(-1)?.signal;
+            f.controller.reset();
+            assert.equal(oldSignal?.aborted, true);
+            f.resume();
+            await assert.rejects(pending, { code: 'operation_superseded' });
+            await assert.rejects(f.controller.run({ ...intent, proposal: oldProposal,
+                ambulatory: oldProposal.ambulatories[0] }, true), { code: 'proposal_stale' });
+            const fresh = await f.controller.readProposal(PATIENT);
+            const result = await f.controller.run({ ...intent, proposal: fresh, ambulatory: fresh.ambulatories[0] }, true);
+            assert.notEqual(f.calls.at(-1)?.signal, oldSignal);
+            assert.equal(f.calls.at(-1)?.signal?.aborted, false);
+            assert.deepEqual([result.publication.receipt.reviewOnly, result.publication.receipt.writesPerformed,
+                result.publication.receipt.applyPolicy], [true, 0, 'none']);
+            assert.equal(f.calls.some(({ url }) => /(?:apply|commit|ocr-replay)/u.test(url)), false);
+        } finally { f.resume(); f.controller.reset(); }
     }
 });
