@@ -159,7 +159,7 @@ export function IntelligentHostCheckupAction({ patientId, ambulatoryId, checkups
           <p className="font-semibold">Transizione checkup controllata</p>
           <p role="status" aria-live="polite" aria-atomic="true">{message}</p>
           <label htmlFor={pinId} className="mf-field-label">PIN fresco</label>
-          <input id={pinId} className="mf-input mf-input-sm w-full" type="password" inputMode="numeric"
+          <input id={pinId} className="mf-input mf-input-sm w-full" type="password" inputMode="text"
             autoComplete="current-password" value={pin} onChange={(event) => setPin(event.target.value)} />
           <div className="flex flex-wrap gap-2">
             <button type="button" className={actionClass} disabled={busy || pin.length < 4} onClick={enroll}>Abilita ruolo</button>

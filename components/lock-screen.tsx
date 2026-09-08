@@ -120,8 +120,7 @@ export function LockScreen() {
                             value={pin}
                             onChange={(e) => setPin(e.target.value)}
                             className={styles.pinInput}
-                            inputMode="numeric"
-                            pattern="[0-9]*"
+                            inputMode="text"
                             autoComplete="off"
                             aria-invalid={Boolean(visibleError)}
                             aria-describedby={visibleError ? 'mediflow-lock-error' : recoveryMessage ? 'mediflow-auth-recovery' : undefined}
@@ -142,8 +141,7 @@ export function LockScreen() {
                                 value={confirmPin}
                                 onChange={(e) => setConfirmPin(e.target.value)}
                                 className={styles.pinInput}
-                                inputMode="numeric"
-                                pattern="[0-9]*"
+                                inputMode="text"
                                 autoComplete="off"
                                 aria-invalid={Boolean(visibleError)}
                                 aria-describedby={visibleError ? 'mediflow-lock-error' : undefined}
