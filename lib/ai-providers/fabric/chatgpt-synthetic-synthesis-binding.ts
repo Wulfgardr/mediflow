@@ -30,7 +30,7 @@ export function bindChatGptSyntheticSynthesis(session: owner.WebSessionProjectio
     if (!owner.registerPrivateResource(port, dispose)) { dispose(); throw new ExecutionError('session_expired'); }
     expiry = setTimeout(dispose, Math.max(0, session.expiresAt - Date.now())); expiry.unref();
 
-    async function respond<T>(work: () => Promise<T>, render: (result: T) => Response): Promise<Response> {
+    async function respond<T extends SynthesisCatalog | SynthesisResult>(work: () => Promise<T>, render: (result: T) => Response): Promise<Response> {
         if (!active) throw new ExecutionError('session_expired');
         const use = owner.beginResourceUse(port);
         if (!use) { dispose(); throw new ExecutionError('session_expired'); }
@@ -38,9 +38,9 @@ export function bindChatGptSyntheticSynthesis(session: owner.WebSessionProjectio
             const result = await work();
             let response: Response | undefined;
             const bound = owner.withCurrentResourceBinding(use, () => {
-                if (active && Date.now() < session.expiresAt) response = render(result);
+                if (active && Date.now() < session.expiresAt && service.isCurrent(result)) response = render(result);
             });
-            if (!bound || !response || !owner.commitResourceUse(use)) throw new ExecutionError('session_expired');
+            if (!bound || !response || !service.isCurrent(result) || !owner.commitResourceUse(use)) throw new ExecutionError('session_expired');
             return response;
         } finally { owner.abortResourceUse(use); }
     }

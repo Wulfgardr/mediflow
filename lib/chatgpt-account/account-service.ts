@@ -68,9 +68,20 @@ export function createAccountService(options: Options) {
         if (!await cleanup) throw new AccountError('process_exited');
         checkEpoch(epoch);
         state = 'starting'; notice = null;
-        const created = await options.createTransport();
-        if (terminal || epoch !== generation) { await created.close(); throw new AccountError('session_expired'); }
+        // Reserve cleanup before the factory yields: a canceled pending startup
+        // still owns its eventual child until that child has actually drained.
+        let settleStartup!: (drained: boolean) => void;
+        cleanup = new Promise<boolean>(resolve => { settleStartup = resolve; });
+        let created: AccountTransport;
+        try { created = await options.createTransport(); }
+        catch (error) { settleStartup(true); throw error; }
+        if (terminal || epoch !== generation) {
+            const drained = await Promise.resolve().then(() => created.close()).catch(() => false);
+            settleStartup(drained);
+            throw new AccountError('session_expired');
+        }
         transport = created;
+        settleStartup(true);
         unsubscribe = created.subscribe((method, params) => {
             if (terminal || epoch !== generation) return;
             try {
@@ -112,8 +123,10 @@ export function createAccountService(options: Options) {
         try {
             if (previous && logout) {
                 const response = record(await previous.request('account/logout', undefined));
+                checkEpoch(epoch);
                 if (Object.keys(response).length !== 0) throw new AccountError('protocol_error');
                 confirmed = !accountResponse(await previous.request('account/read', { refreshToken: false })).connected;
+                checkEpoch(epoch);
             } else if (previous && pendingId) {
                 const response = record(await previous.request('account/login/cancel', { loginId: pendingId }));
                 if (!['canceled', 'notFound'].includes(response.status as string)) throw new AccountError('protocol_error');
