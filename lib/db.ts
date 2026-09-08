@@ -407,6 +407,9 @@ class ApiTable<T> {
     /* @Codex */
     async add(item: T, options?: { suppressNotify?: boolean }): Promise<string> {
         const encryptedItem = await this.encryptItem(item);
+        // @Codex: attachment creation time is assigned by the host. Read-model
+        // timestamps must not leak into the strict attachment creation payload.
+        if (this.tableName === 'attachments') delete encryptedItem.createdAt;
         const res = await fetch(this.endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
