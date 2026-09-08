@@ -9,7 +9,12 @@ produzione e postbuild. Sul candidato `4c99ee4f89303f5efa62ce497236005a020f7c9a`
 che aggiunge soltanto checker e test/helper, la suite aggregata registra
 3.583 pass, 10 skip e zero fallimenti su 3.593 test. Il test producer che
 avvia una build distinta è esplicitamente escluso da questo passaggio.
-I due E2E Smart Import sono ancora in riallineamento al catalogo corrente.
+I due E2E Smart Import, integrati in `3f5b010b6`, passano anche nella ripetizione
+del coordinatore sul bundle 11b9 immutato, al primo tentativo. La preview usa
+catalogo e risposte HTTP simulati e dichiarati; verifica scelta del modello,
+receipt e nessuna applicazione legacy. Il kill-switch usa invece UI, API e
+persistenza reali nel database sintetico, con anteprima senza scrittura e
+conferma separata. Non è una prova di inferenza o ammissione provider reali.
 
 Linux avvia realmente il bundle `ddff0a929fbe4d60f144b64c55269892ec2419f6`
 e supera cinque controlli UI; il checker corretto `ef0c1d576` passa sul
