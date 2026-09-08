@@ -21,9 +21,9 @@ Informazioni, fonti e prossimi passi. Un po’ più facili da ritrovare.
 
 </div>
 
-![MediFlow: pazienti e anteprima della cartella](./docs/images/getmediflow-086/worklist.png)
+![MediFlow: elenco pazienti](./docs/images/getmediflow-086/worklist.png)
 
-*Interfaccia web 0.8.6 con soli dati sintetici; acquisizione del candidato `e7f8a555a`.*
+*Interfaccia web 0.8.6 con soli dati sintetici; acquisizione del candidato `ddff0a929`.*
 
 <details>
 <summary><strong>Versione sorgente, verifiche e distribuzione</strong></summary>
@@ -42,9 +42,9 @@ Informazioni, fonti e prossimi passi. Un po’ più facili da ritrovare.
 </details>
 
 <details>
-<summary><strong>La scheda clinica, da vicino</strong></summary>
+<summary><strong>Le terapie, da vicino</strong></summary>
 
-![Scheda clinica con dati sintetici](./docs/images/getmediflow-086/record.png)
+![Terapie del paziente con dati sintetici](./docs/images/getmediflow-086/record.png)
 
 Schermata reale con dati interamente sintetici.
 
