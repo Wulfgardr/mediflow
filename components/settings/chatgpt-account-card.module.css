@@ -24,3 +24,8 @@
 .quota progress::-moz-progress-bar { background: var(--lume-accent); }
 .error { color: var(--lume-signal-critical); }
 @media (max-width: 480px) { .header { gap: .75rem; } }
+
+/* @Codex: keep service/account identity distinct from suspended function use. */
+.boundary { display: grid; gap: .5rem; padding: 1rem; border: 1px solid var(--lume-border-color); border-radius: var(--lume-radius-control); background: var(--lume-surface-field); }
+.boundary strong { font-size: .875rem; }
+.card { scroll-margin-top: 5rem; }

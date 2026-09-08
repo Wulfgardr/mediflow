@@ -4,7 +4,7 @@
 import { FunctionPreferencesPanel } from '@/components/function-models/function-preferences-panel';
 import { useCallback } from 'react';
 import type { FunctionModelPreferences } from '@/lib/function-models/browser';
-import { ChatGptAccountPanel } from '@/components/settings/chatgpt-account-panel';
+import Link from 'next/link';
 
 // WUL-297 Funzioni cliniche AI: moved from the monolithic settings page.
 
@@ -61,8 +61,11 @@ export default function SettingsAiFunctionsPage() {
                 description="Scegli quali proposte usare. Puoi modificare ogni funzione e salvare le preferenze."
             />
 
-            {/* @Codex: account control is separate from function/model preferences. */}
-            <ChatGptAccountPanel />
+            {/* @Codex: one account control surface; no catalog-to-picker bridge. */}
+            <aside className={SETTINGS_CARD_CLASS} aria-label="ChatGPT e modelli delle funzioni">
+                <p>Il selettore usa solo le opzioni locali del catalogo host. ChatGPT resta un servizio esterno con uso nelle funzioni sospeso, anche quando l’account è collegato.</p>
+                <Link href="/settings/ai/fabric#chatgpt-account" className="underline">Gestisci ChatGPT in Intelligence Fabric</Link>
+            </aside>
             <FunctionPreferencesPanel onRead={syncPreferences} />
 
             <div className="space-y-6">

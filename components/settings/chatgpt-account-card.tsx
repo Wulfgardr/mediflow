@@ -3,18 +3,11 @@
 import Image from 'next/image';
 import { useEffect, useId, useState } from 'react';
 import { createAccountBrowser, type AccountBrowserView } from '@/lib/chatgpt-account/account-browser';
-import type { AccountAction, AccountLimitWindow, AccountNotice, AccountOperation, AccountState } from '@/lib/chatgpt-account/account-contract';
+import { accountNotices, presentAccount } from '@/lib/chatgpt-account/account-presentation';
+import type { AccountAction, AccountLimitWindow, AccountOperation } from '@/lib/chatgpt-account/account-contract';
 import { SETTINGS_CARD_CLASS, SETTINGS_PRIMARY_BUTTON_CLASS, SETTINGS_SECONDARY_BUTTON_CLASS } from './settings-ui';
 import styles from './chatgpt-account-card.module.css';
 
-const labels: Record<AccountState, string> = { unavailable: 'Da configurare', disconnected: 'Non collegato', starting: 'Avvio accesso', awaiting_login: 'Accesso in attesa', verifying: 'Da verificare', connected: 'Account collegato', error: 'Collegamento interrotto' };
-const notices: Partial<Record<Exclude<AccountNotice, null>, string>> = {
-    host_unavailable: 'Il collegamento richiede la configurazione del computer che ospita MediFlow.',
-    timeout: 'Il controllo ha impiegato troppo tempo. Puoi riprovare.', protocol_error: 'Il servizio account ha restituito una risposta inattesa.',
-    process_exited: 'Il servizio account si è arrestato. Collega di nuovo ChatGPT.', login_failed: 'Accesso non completato. Puoi riprovare.',
-    login_expired: 'Il tempo per accedere è scaduto. Avvia un nuovo accesso.', canceled: 'Accesso annullato.',
-    logout_unconfirmed: 'Account scollegato da MediFlow. Il servizio non ha confermato il logout remoto.',
-};
 function Quota({ window, title }: { window: AccountLimitWindow | null; title: string }) {
     if (!window) return <p>{title}: dato non disponibile.</p>;
     return <div className={styles.quota}>
@@ -24,10 +17,14 @@ function Quota({ window, title }: { window: AccountLimitWindow | null; title: st
         {window.resetsAt !== null && <p className={styles.hint}>Ripristino: {new Date(window.resetsAt * 1000).toLocaleString('it-IT')}</p>}
     </div>;
 }
+function ObservationTime({ value }: { value: number }) {
+    return <span>Ultima lettura: <time dateTime={new Date(value).toISOString()}>{new Date(value).toLocaleTimeString('it-IT')}</time>.</span>;
+}
 export function ChatGptAccountCard({ active }: { active: boolean }) {
     const [client] = useState(() => createAccountBrowser());
     const [view, setView] = useState<AccountBrowserView>(client.snapshot);
     const id = useId();
+    const presentation = presentAccount(view, active);
     useEffect(() => {
         const unsubscribe = client.subscribe(() => setView(client.snapshot()));
         client.setActive(active);
@@ -41,30 +38,33 @@ export function ChatGptAccountCard({ active }: { active: boolean }) {
         return () => { unsubscribe(); client.setActive(false); window.removeEventListener('pagehide', hide); window.removeEventListener('pageshow', show); };
     }, [active, client]);
     useEffect(() => {
-        if (!active || view.kind === 'locked' || view.busy || !view.status || !['starting', 'awaiting_login', 'verifying', 'connected'].includes(view.status.state)) return;
-        const timer = setTimeout(() => { void client.run('status'); }, view.status.state === 'connected' ? 10_000 : 2000);
+        if (presentation.pollDelay === null) return;
+        const timer = setTimeout(() => { void client.run('status'); }, presentation.pollDelay);
         return () => clearTimeout(timer);
-    }, [active, client, view]);
-    const locked = !active || view.kind === 'locked';
+    }, [client, presentation.pollDelay, view]);
+    const locked = presentation.locked;
     const status = locked ? null : view.status;
     const busy = view.busy !== null;
     const allowed = (action: AccountAction) => !locked && (!view.error || ['cancel_login', 'logout'].includes(action)) && status?.actions.includes(action);
     const run = (operation: AccountOperation | 'status') => { void client.run(operation); };
-    const operationCaption = view.busy === 'login/start' ? 'Avvio accesso…' : view.busy === 'login/cancel' ? 'Annullamento…' : view.busy === 'login/complete' ? 'Verifica in corso…' : view.busy === 'logout' ? 'Scollegamento…' : null;
-    const caption = locked ? 'Sessione bloccata' : operationCaption ? operationCaption : view.error ? 'Stato da rileggere' : status ? labels[status.state] : view.kind === 'error' ? 'Stato non disponibile' : 'Lettura dello stato…';
-    return <section className={`${SETTINGS_CARD_CLASS} ${styles.card}`} aria-labelledby={`${id}-title`} data-testid="chatgpt-account-panel">
+    return <section id="chatgpt-account" className={`${SETTINGS_CARD_CLASS} ${styles.card}`} aria-labelledby={`${id}-title`} data-testid="chatgpt-account-panel">
         <header className={styles.header}>
             <div className={styles.identity}>
                 <Image className={styles.logo} src="/brand/openai/chatgpt-mark.png" alt="Logo OpenAI" width={40} height={40} unoptimized />
-                <div><h3 id={`${id}-title`}>ChatGPT</h3><p>Account personale · accesso ufficiale</p></div>
+                <div><h3 id={`${id}-title`}>ChatGPT · OpenAI</h3><p>Servizio esterno · account personale</p></div>
             </div>
-            <span className={styles.status} role="status">{caption}</span>
+            <span className={styles.status} role="status" data-testid="chatgpt-account-state">{presentation.accountLabel}</span>
         </header>
-        <p className={styles.hint}>Il collegamento dell’account non abilita le funzioni di MediFlow.</p>
+        <div className={styles.boundary} aria-label="Disponibilità ChatGPT in MediFlow">
+            <strong data-testid="chatgpt-execution-state">{presentation.executionLabel}</strong>
+            <p>Il collegamento dell’account non abilita le funzioni di MediFlow. L’ammissione OpenAI resta sospesa (ADR0134).</p>
+            <p>Questa scheda gestisce soltanto accesso e informazioni account: non invia contesto paziente e non avvia sintesi, neppure dimostrative.</p>
+        </div>
         {locked ? <p>Sblocca MediFlow per gestire il collegamento.</p> : <>
-            {status?.notice && notices[status.notice] && <p role="status">{notices[status.notice]}</p>}
+            {status?.notice && <p role="status">{accountNotices[status.notice]}</p>}
+            {presentation.planLabel && <p>Piano restituito dal servizio: <strong>{presentation.planLabel}</strong>. Non attesta la disponibilità di una funzione.</p>}
             {view.error && <p role="alert" className={styles.error}>{view.error}</p>}
-            {status?.state === 'awaiting_login' && <p>Completa l’accesso sul computer che ospita MediFlow, poi torna qui.</p>}
+            {status?.state === 'awaiting_login' && <p>Completa l’accesso ufficiale sul computer che ospita MediFlow, poi torna qui. Se il link non è più visibile, annulla e avvia un nuovo accesso.</p>}
             {status?.state === 'verifying' && <p>Accesso ricevuto. Verifica il collegamento per completare.</p>}
             <div className={styles.actions}>
                 {allowed('connect') && <button type="button" className={SETTINGS_PRIMARY_BUTTON_CLASS} disabled={busy} onClick={() => run('login/start')}>Collega ChatGPT</button>}
@@ -74,21 +74,36 @@ export function ChatGptAccountCard({ active }: { active: boolean }) {
                 {allowed('logout') && <button type="button" className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={view.busy === 'logout'} onClick={() => run('logout')}>Scollega ChatGPT</button>}
                 <button type="button" className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={busy} onClick={() => run('status')}>Rileggi stato</button>
             </div>
-            {busy && !operationCaption && view.busy !== 'status' && <p role="status">Lettura in corso…</p>}
-            {status?.state === 'connected' && <details className={styles.disclosure}>
+            {busy && !presentation.operation && view.busy !== 'status' && <p role="status">Lettura in corso…</p>}
+            {presentation.showDetails && <details className={styles.disclosure}>
                 <summary>Modelli e utilizzo dell’account</summary>
                 <div className={styles.detailBody}>
-                    <p className={styles.hint}>Catalogo informativo. I modelli non sono utilizzabili nelle funzioni di MediFlow.</p>
+                    <p className={styles.hint}>Catalogo informativo dell’account, separato dal selettore delle funzioni. Nessun modello qui è selezionabile per una proposta.</p>
+                    <p className={styles.hint}>Modelli e utilizzo si leggono solo su richiesta e vengono nascosti dopo un minuto o quando lo stato cambia. «Rileggi stato» controlla lo stato locale, non aggiorna questi dati.</p>
                     <div className={styles.actions}>
-                        {allowed('read_models') && <button type="button" className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={busy} onClick={() => run('models')}>Mostra modelli</button>}
+                        {allowed('read_models') && <button type="button" className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={busy} onClick={() => run('models')}>{view.modelsObservedAt === null ? 'Mostra modelli' : 'Rileggi modelli'}</button>}
                         {allowed('read_rate_limits') && <button type="button" className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={busy} onClick={() => run('rate-limits')}>Controlla utilizzo</button>}
                         {allowed('refresh_account') && <button type="button" className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={busy} onClick={() => run('read')}>Aggiorna account</button>}
                     </div>
-                    {view.models !== null && <div><h4>Modelli dell’account</h4>{view.models.length ? <ul className={styles.catalog}>{view.models.map((model, index) => <li key={`${model.id}-${index}`}>{model.model}</li>)}</ul> : <p>Nessun modello restituito dal servizio.</p>}</div>}
-                    {view.limits && <div className={styles.quotas}><Quota title="Limite principale" window={view.limits.primary} /><Quota title="Limite aggiuntivo" window={view.limits.secondary} /></div>}
+                    <div data-testid="chatgpt-catalog">
+                        <h4>Modelli dell’account · sola consultazione</h4>
+                        {view.modelsObservedAt !== null && <p className={styles.hint}><ObservationTime value={view.modelsObservedAt} /></p>}
+                        {view.busy === 'models' ? <p role="status">Lettura catalogo…</p>
+                            : view.models !== null ? view.models.length ? <ul className={styles.catalog}>{view.models.map((model, index) => <li key={`${model.id}-${index}`}>{model.model}{model.isDefault ? ' · predefinito dell’account, non di MediFlow' : ''}</li>)}</ul>
+                                : <p>Nessun modello restituito dal servizio.</p>
+                            : <p role="status">{view.modelsObservedAt === null ? 'Catalogo non ancora letto.' : 'Catalogo da rileggere: i valori precedenti non sono più mostrati.'}</p>}
+                    </div>
+                    <div data-testid="chatgpt-limits">
+                        <h4>Utilizzo restituito dal servizio account</h4>
+                        <p className={styles.hint}>Finestre del servizio Codex: non sono credito API né garanzia di esecuzione. Un dato assente non significa utilizzo zero.</p>
+                        {view.limitsObservedAt !== null && <p className={styles.hint}><ObservationTime value={view.limitsObservedAt} /></p>}
+                        {view.busy === 'rate-limits' ? <p role="status">Lettura utilizzo…</p>
+                            : view.limits ? <div className={styles.quotas}><Quota title="Limite principale" window={view.limits.primary} /><Quota title="Limite aggiuntivo" window={view.limits.secondary} /></div>
+                                : <p role="status">{view.limitsObservedAt === null ? 'Utilizzo non ancora letto.' : 'Utilizzo da rileggere: i valori precedenti non sono più mostrati.'}</p>}
+                    </div>
                 </div>
             </details>}
-            {allowed('configure_host') && <details className={styles.disclosure}><summary>Come predisporre il collegamento</summary><div className={styles.detailBody}><p>Il componente account deve essere configurato sul computer che ospita MediFlow. Dopo la configurazione, rileggi lo stato.</p></div></details>}
+            {allowed('configure_host') && <details className={styles.disclosure}><summary>Come predisporre il collegamento</summary><div className={styles.detailBody}><p>Il componente account deve essere predisposto dall’operatore sul computer che ospita MediFlow. Dopo la configurazione, rileggi lo stato. Il login si completa sullo stesso computer; questa scheda non installa componenti né recupera credenziali esistenti.</p></div></details>}
         </>}
     </section>;
 }

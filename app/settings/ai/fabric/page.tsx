@@ -150,18 +150,23 @@ export default function SettingsAiFabricPage() {
             <SettingsSectionIntro
                 kicker="Funzioni intelligenti"
                 title="Intelligence Fabric"
-                description="Configura i modelli e le funzioni intelligenti. Qui trovi lo stato della postazione e i passaggi ancora necessari per usarle."
+                description="Distingui configurazione locale, collegamento account esterno e disponibilità delle funzioni. Collegare un account non ammette un provider."
             />
 
-            {/* @Codex: account control is separate from function/model preferences. */}
-            <ChatGptAccountPanel />
+            <section className={SETTINGS_CARD_CLASS} aria-labelledby="fabric-local-title" data-testid="fabric-local-setup">
+                <header className={styles.fabricBlockHeader}>
+                    <h3 id="fabric-local-title">Modelli locali e funzioni</h3>
+                    <p>Ollama e ATHENA seguono la configurazione e l’ammissione locali. Le preferenze mostrano soltanto le opzioni del catalogo host; salvarle non prova che una funzione sia pronta.</p>
+                </header>
+                <nav aria-label="Configura Intelligence Fabric" className={serviceStyles.fabricActions}>
+                    <Link href="/settings/ai/modelli" className={SETTINGS_SECONDARY_BUTTON_CLASS}>Modelli e hardware</Link>
+                    <Link href="/settings/ai/funzioni" className={SETTINGS_SECONDARY_BUTTON_CLASS}>Funzioni cliniche</Link>
+                    <Link href="/settings/ai/governance" className={SETTINGS_SECONDARY_BUTTON_CLASS}>Governance e rollout</Link>
+                </nav>
+            </section>
 
-            {/* @Codex: expose the existing configuration routes alongside their status. */}
-            <nav aria-label="Configura Intelligence Fabric" className={serviceStyles.fabricActions}>
-                <Link href="/settings/ai/modelli" className={SETTINGS_SECONDARY_BUTTON_CLASS}>Modelli e hardware</Link>
-                <Link href="/settings/ai/funzioni" className={SETTINGS_SECONDARY_BUTTON_CLASS}>Funzioni cliniche</Link>
-                <Link href="/settings/ai/governance" className={SETTINGS_SECONDARY_BUTTON_CLASS}>Governance e rollout</Link>
-            </nav>
+            {/* @Codex: external account metadata never feeds local preferences or readiness. */}
+            <ChatGptAccountPanel />
             <FunctionStatusPanel />
 
             <details className={SETTINGS_CARD_CLASS}>
