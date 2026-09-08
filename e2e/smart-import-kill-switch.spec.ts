@@ -2,7 +2,7 @@
 import { expect, test } from '@playwright/test';
 import { bootstrapUnlockedSession, openAiFunzioniSettings, openPatientSection, setAiLaneKillSwitch } from './utils';
 
-test('smart import kill switch disables analysis on patient detail', async ({ page }) => {
+test('[E2E fixture] smart import kill switch disables analysis on patient detail', async ({ page }) => {
   const pin = process.env.E2E_PIN || '1234';
   const suffix = `${Date.now()}`.slice(-4);
   const firstName = `Smart${suffix}`;
@@ -22,14 +22,36 @@ test('smart import kill switch disables analysis on patient detail', async ({ pa
     // values and would otherwise undo a click that landed too early.
     await openAiFunzioniSettings(page);
 
-    const killSwitch = page.getByRole('switch', { name: 'Smart Import locale' });
+    // @Codex: ordinary preferences require preview and a separate apply gesture.
+    const preferences = page.getByTestId('function-preferences');
+    const card = preferences.locator('article').filter({
+      has: page.getByRole('heading', { name: 'Importazione assistita', exact: true }),
+    });
+    const killSwitch = card.getByRole('switch', { name: 'Importazione assistita nella proposta', exact: true });
+    await expect(killSwitch).toHaveAttribute('aria-checked', 'true');
     await killSwitch.click();
     await expect(killSwitch).toHaveAttribute('aria-checked', 'false');
-    await expect(page.getByTestId('smart-import-kill-switch-card')).toContainText('Spento');
-    const saveButton = page.getByRole('button', { name: 'Salva Configurazione' });
-    await saveButton.click();
-    await expect(page.getByRole('button', { name: 'Salvataggio...' })).toHaveCount(0);
-    await expect(saveButton).toBeEnabled();
+    const previewResponse = page.waitForResponse(response =>
+      response.url().endsWith('/api/settings/ai/functions/preview') && response.request().method() === 'POST');
+    await card.getByRole('button', { name: 'Anteprima modifica', exact: true }).click();
+    const preview = await previewResponse;
+    expect(preview.status()).toBe(200);
+    expect(await preview.json()).toMatchObject({
+      writesPerformed: 0, command: { action: 'set', functionId: 'smart_import', enabled: false },
+    });
+    const readEnabled = () => page.evaluate(async () => {
+      const response = await fetch('/api/settings/ai/functions', { cache: 'no-store' });
+      if (!response.ok) throw new Error(`Preferences read failed: ${response.status}`);
+      const value = await response.json() as { functions: { id: string; enabled: boolean }[] };
+      return value.functions.find(row => row.id === 'smart_import')?.enabled;
+    });
+    expect(await readEnabled()).toBe(true);
+    await preferences.getByRole('region', { name: 'Anteprima impostazioni', exact: true })
+      .getByRole('button', { name: 'Applica alle impostazioni', exact: true }).click();
+    await expect(preferences.getByRole('status')).toHaveText('Impostazioni salvate e rilette. Nessuna modifica clinica.');
+    await expect(killSwitch).toHaveAttribute('aria-checked', 'false');
+    await expect(card.getByText('Spento', { exact: true })).toBeVisible();
+    expect(await readEnabled()).toBe(false);
   };
 
   const restoreSmartImport = async () => {
