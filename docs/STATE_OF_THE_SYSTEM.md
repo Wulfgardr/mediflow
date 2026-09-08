@@ -18,7 +18,14 @@ read_when:
 > prevalgono [AGENTS.md](../AGENTS.md) e
 > [docs/repository-topology.md](./repository-topology.md).
 
-Ultimo aggiornamento: 2026-09-07 (v0.8.6: correzioni sorgente verificate, CI e rilascio pendenti)
+Ultimo aggiornamento: 2026-09-08 (v0.8.6: candidato locale verificato in parte, programma e rilascio aperti)
+
+La [verifica notturna dell'8 settembre](./analysis/2026-09-07-086-release-verification.md#verifica-notturna-dell8-settembre-programma-ancora-aperto)
+registra build produzione 11b9, suite aggregata 4c99 senza fallimenti con
+esclusioni esplicite, Linux standalone e Windows preview. Restano caricamento
+locale a freddo, nuovo percorso ChatGPT, installazione WHO pulita, accuratezza
+OCR completa, parità desktop/Mini e dossier finale da qualificare. Le prove
+storiche seguenti mantengono il proprio SHA e non attestano questi risultati.
 
 Nota candidato 0.8.6: [ADR 0119](./adr/0119-anydoc-apple-vision-current-source.md)
 chiarisce la precedenza del percorso AnyDoc + Apple Vision descritto qui.

@@ -7,8 +7,11 @@ read_when:
 
 # MediFlow 0.8.6 — consolidamento funzionale e interfaccia
 
-Aggiornamento: 7 settembre 2026. Stato: **sviluppo riaperto sui nuovi requisiti
-di configurazione e parità desktop**. Il
+Aggiornamento: 8 settembre 2026. Stato: **candidato locale integrato;
+Definition of Done complessiva non raggiunta**. La
+[verifica notturna](./analysis/2026-09-07-086-release-verification.md#verifica-notturna-dell8-settembre-programma-ancora-aperto)
+registra esiti, SHA, piattaforme e residui; nessuna delle 28 issue del
+programma è dichiarata Done. Il
 [piano operativo corrente](./analysis/2026-09-07-086-guided-configuration-plan.md)
 prevale sulle precedenti dichiarazioni di completezza, riferite alla base
 funzionale già congelata. La preparazione conserva la
