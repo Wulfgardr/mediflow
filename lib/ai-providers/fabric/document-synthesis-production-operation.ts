@@ -90,7 +90,8 @@ function extractionSourceKind(receipt: LocalExtractionReceipt): 'native_text' | 
         const schemaVersion = fields.schemaVersion!.value; const engine = fields.engine!.value;
         const scriptSha256 = fields.scriptSha256!.value; const receiptSetSha256 = fields.receiptSetSha256!.value;
         const pageCount = fields.pageCount!.value; const ocrPageCount = fields.ocrPageCount!.value;
-        return schemaVersion === ANYDOC_LOCAL_OCR_PROVENANCE_SCHEMA_VERSION && engine === 'apple_vision'
+        return schemaVersion === ANYDOC_LOCAL_OCR_PROVENANCE_SCHEMA_VERSION
+            && (engine === 'apple_vision' || engine === 'tesseract_wasm')
             && typeof scriptSha256 === 'string' && SHA256.test(scriptSha256)
             && typeof receiptSetSha256 === 'string' && SHA256.test(receiptSetSha256)
             && Number.isSafeInteger(pageCount) && pageCount >= 1 && pageCount <= 500
