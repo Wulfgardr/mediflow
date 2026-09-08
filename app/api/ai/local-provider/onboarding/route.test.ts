@@ -9,6 +9,7 @@ import * as auth from '../../../../../lib/security/server-auth';
 import * as owner from '../../../../../lib/security/web-auth-lifecycle-owner-adapter';
 import * as locality from '../../../../../lib/ai-providers/ollama-locality';
 import { GET, POST } from './route';
+import { NextRequest } from 'next/server';
 
 const root = process.env.MEDIFLOW_DATA_DIR!;
 assert.ok(root && root.includes('local-onboarding'));
@@ -36,7 +37,7 @@ function fixture() {
     return attest;
 }
 const request = (body: unknown, extra: Record<string, string> = {}) => new Request('http://localhost:3000/api/ai/local-provider/onboarding', {
-    method: 'POST', headers: { origin: 'http://localhost:3000', 'Content-Type': 'application/json', ...extra }, body: JSON.stringify(body),
+    method: 'POST', headers: { origin: 'http://localhost:3000', 'sec-fetch-site': 'same-origin', 'Content-Type': 'application/json', ...extra }, body: JSON.stringify(body),
 });
 
 test('route composes canonical service: no-store read, explicit activation, receipt and no caller target', async () => {
@@ -74,4 +75,47 @@ test('network error reports practical code and preserves missing lifecycle', asy
     const response = await POST(request({ intent: 'verify_and_activate', expectedRevision: status.revision }));
     assert.equal(response.status, 503); assert.deepEqual(await response.json(), { error: 'provider_unreachable' });
     assert.equal((await (await GET(new Request('http://localhost:3000/api/ai/local-provider/onboarding'))).json()).state, 'missing');
+});
+
+/* @Codex: real NextRequest normalization, not a plain WHATWG Request fixture. */
+test('ordinary NextRequest preserves browser Host authority when loopback URL normalizes', async () => {
+    const attest = fixture();
+    const initial = await (await GET(new NextRequest('http://127.0.0.1:4396/api/ai/local-provider/onboarding'))).json();
+    const browserRequest = new NextRequest('http://127.0.0.1:4396/api/ai/local-provider/onboarding', {
+        method: 'POST', headers: { host: '127.0.0.1:4396', origin: 'http://127.0.0.1:4396',
+            'sec-fetch-site': 'same-origin', 'content-type': 'application/json; charset=utf-8' },
+        body: JSON.stringify({ intent: 'verify_and_activate', expectedRevision: initial.revision }),
+    });
+    assert.equal(new URL(browserRequest.url).hostname, 'localhost');
+    const response = await POST(browserRequest);
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).state, 'available_unqualified');
+    assert.equal(attest.mock.callCount(), 1);
+});
+
+/* @Codex: exact scheme/host/port remain required despite Next URL normalization. */
+test('ordinary NextRequest rejects inconsistent browser transport without provider work', async () => {
+    const attest = fixture();
+    const initial = await (await GET(new NextRequest('http://127.0.0.1:4396/api/ai/local-provider/onboarding'))).json();
+    for (const extra of [
+        { origin: 'http://localhost:4396' },
+        { origin: 'http://127.0.0.1:4397' },
+        { origin: 'https://127.0.0.1:4396' },
+        { origin: 'null' },
+        { 'sec-fetch-site': 'cross-site' },
+        { 'sec-fetch-site': 'same-site' },
+        { 'sec-fetch-site': '' },
+    ]) {
+        const headers = new Headers({ host: '127.0.0.1:4396', origin: 'http://127.0.0.1:4396',
+            'sec-fetch-site': 'same-origin', 'content-type': 'application/json' });
+        for (const [key, value] of Object.entries(extra)) headers.set(key, value);
+        const response = await POST(new NextRequest('http://127.0.0.1:4396/api/ai/local-provider/onboarding', {
+            method: 'POST', headers,
+            body: JSON.stringify({ intent: 'verify_and_activate', expectedRevision: initial.revision }),
+        }));
+        assert.equal(response.status, 400);
+        assert.deepEqual(await response.json(), { error: 'input_invalid' });
+    }
+    assert.equal(attest.mock.callCount(), 0);
+    assert.equal(fs.existsSync(path.join(root, 'ai')), false);
 });
