@@ -236,6 +236,17 @@ function runPdfChild(workerPath, input, { allowAddons = false, args = [] } = {})
   });
 }
 
+/* @Codex: follow the pinned worker's desktop profiles and minimum glibc version.
+   A supported host must produce a valid PNG; unavailable engines are not a pass. */
+function supportsPdfRendering(profiles, platform, arch, glibcVersion) {
+  const profile = profiles.find((entry) => entry.platform === platform && entry.arch === arch);
+  if (!profile) return false;
+  if (profile.libc === null) return true;
+  if (profile.libc !== 'glibc') return false;
+  const [major, minor] = String(glibcVersion).split('.').map(Number);
+  return major > 2 || (major === 2 && minor >= 18);
+}
+
 function framedPdfPageWorkerSmokeFailure(workerPath) {
   const source = syntheticPdfPage();
   const materialize = runPdfChild(workerPath, encodePdfChildFrame({
@@ -270,7 +281,9 @@ function framedPdfPageWorkerSmokeFailure(workerPath) {
     return 'Standalone PDF page worker did not complete the framed rendering smoke.';
   }
   const rendered = decodePdfChildFrame(render.stdout);
-  if (process.platform !== 'darwin' || process.arch !== 'arm64') {
+  const profiles = JSON.parse(fs.readFileSync(path.join(path.dirname(workerPath), 'anydoc-pdf-renderer-profiles.json'), 'utf8'));
+  const glibcVersion = process.platform === 'linux' ? process.report.getReport().header.glibcVersionRuntime : undefined;
+  if (!supportsPdfRendering(profiles, process.platform, process.arch, glibcVersion)) {
     return rendered?.header?.schemaVersion === ANYDOC_PDF_CHILD_SCHEMA_VERSION
       && rendered.header.status === 'error' && rendered.header.reason === 'engine_unavailable'
       && rendered.header.bodyByteLength === 0 && rendered.body.byteLength === 0
@@ -732,6 +745,19 @@ function runPdfPageWorkerSelfTest() {
     fs.copyFileSync(sourceWorker, workerPath);
     // @Codex
     fs.copyFileSync(path.join(process.cwd(), 'scripts', 'anydoc-pdf-renderer-profiles.json'), path.join(scriptsDir, 'anydoc-pdf-renderer-profiles.json'));
+    // @Codex: exercise supported and unsupported hosts without simulating a renderer result.
+    const profiles = JSON.parse(fs.readFileSync(path.join(scriptsDir, 'anydoc-pdf-renderer-profiles.json'), 'utf8'));
+    for (const [platform, arch, libc, expected] of [
+      ['darwin', 'arm64', undefined, true], ['win32', 'x64', undefined, true],
+      ['linux', 'arm64', '2.18', true], ['linux', 'x64', '2.36', true],
+      ['linux', 'x64', '3.0', true], ['linux', 'x64', '2.17', false],
+      ['linux', 'arm64', undefined, false], ['linux', 'x64', 'musl', false],
+      ['darwin', 'x64', undefined, false], ['win32', 'arm64', undefined, false],
+      ['freebsd', 'x64', undefined, false],
+    ]) {
+      if (supportsPdfRendering(profiles, platform, arch, libc) !== expected)
+        throw new Error(`incorrect PDF rendering host classification: ${platform}/${arch}/${libc}`);
+    }
     const artifactManifestPath = path.join(scriptsDir, 'anydoc-tesseract-artifacts.json');
     fs.copyFileSync(path.join(process.cwd(), 'scripts', 'anydoc-tesseract-artifacts.json'), artifactManifestPath);
     writeValidTrace();
