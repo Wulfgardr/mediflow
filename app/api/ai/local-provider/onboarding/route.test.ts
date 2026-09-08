@@ -119,3 +119,86 @@ test('ordinary NextRequest rejects inconsistent browser transport without provid
     assert.equal(attest.mock.callCount(), 0);
     assert.equal(fs.existsSync(path.join(root, 'ai')), false);
 });
+
+/* @Codex: cancellation never creates an admission or a successful late response. */
+test('POST forwards ordinary request cancellation through the canonical service to attestation', async () => {
+    const attest = fixture();
+    const initial = await (await GET(new Request('http://localhost:3000/api/ai/local-provider/onboarding'))).json();
+    let started!: () => void;
+    const waiting = new Promise<void>(resolve => { started = resolve; });
+    let observed: AbortSignal | undefined;
+    let finish!: () => void;
+    attest.mock.mockImplementation(async (...args: unknown[]): Promise<Awaited<ReturnType<typeof locality.attestLocalOllamaModel>>> => {
+        observed = args[2] as AbortSignal;
+        started(); return new Promise(resolve => { finish = () => resolve({
+            authorityPlane: 'clinical_application', provider: 'ollama', executionMode: 'local', endpointClass: 'loopback',
+            requestedModel: 'synthetic-local', canonicalModel: 'synthetic-local', digest: 'a'.repeat(64),
+            serverVersion: '0.33.3', checkedAt: new Date().toISOString(),
+        }); });
+    });
+    const controller = new AbortController();
+    const pending = POST(new Request(request({ intent: 'verify_and_activate', expectedRevision: initial.revision }), { signal: controller.signal }));
+    await waiting; controller.abort();
+    const response = await pending;
+    assert.equal(response.status, 409); assert.deepEqual(await response.json(), { error: 'verification_interrupted' });
+    assert.equal(response.headers.get('cache-control'), 'no-store'); assert.equal(observed?.aborted, true);
+    finish(); await Promise.resolve();
+    assert.equal(fs.existsSync(path.join(root, 'ai')), false);
+    assert.equal((await (await GET(new Request('http://localhost:3000/api/ai/local-provider/onboarding'))).json()).state, 'missing');
+});
+
+test('already cancelled POST does not reach attestation', async () => {
+    const attest = fixture();
+    const initial = await (await GET(new Request('http://localhost:3000/api/ai/local-provider/onboarding'))).json();
+    const controller = new AbortController(); controller.abort();
+    const response = await POST(new Request(request({ intent: 'verify_and_activate', expectedRevision: initial.revision }), { signal: controller.signal }));
+    assert.equal(response.status, 409); assert.deepEqual(await response.json(), { error: 'verification_interrupted' });
+    assert.equal(attest.mock.callCount(), 0); assert.equal(fs.existsSync(path.join(root, 'ai')), false);
+});
+
+for (const stop of ['request', 'deadline'] as const) {
+    test(`incomplete body is cancelled and unlocked on ${stop} without provider work`, async context => {
+        context.mock.timers.enable({ apis: ['setTimeout'] });
+        const attest = fixture();
+        let started!: () => void;
+        const waiting = new Promise<void>(resolve => { started = resolve; });
+        let pulls = 0; let cancelled = false;
+        const stream = new ReadableStream<Uint8Array>({
+            pull(target) { if (++pulls === 1) target.enqueue(new TextEncoder().encode('{')); else started(); },
+            cancel() { cancelled = true; },
+        });
+        const controller = new AbortController();
+        const input = new Request('http://localhost:3000/api/ai/local-provider/onboarding', {
+            method: 'POST', headers: { origin: 'http://localhost:3000', 'sec-fetch-site': 'same-origin', 'content-type': 'application/json' },
+            body: stream, signal: controller.signal, duplex: 'half',
+        } as RequestInit & { duplex: 'half' });
+        const pending = POST(input); await waiting;
+        if (stop === 'request') controller.abort(); else context.mock.timers.tick(5001);
+        const response = await pending;
+        assert.equal(response.status, stop === 'request' ? 409 : 400);
+        assert.deepEqual(await response.json(), { error: stop === 'request' ? 'verification_interrupted' : 'input_invalid' });
+        assert.equal(cancelled, true); assert.equal(stream.locked, false);
+        assert.equal(attest.mock.callCount(), 0); assert.equal(fs.existsSync(path.join(root, 'ai')), false);
+    });
+}
+
+test('body remains capped at 256 actual bytes, accepting the boundary and rejecting the next byte', async () => {
+    const attest = fixture();
+    const initial = await (await GET(new Request('http://localhost:3000/api/ai/local-provider/onboarding'))).json();
+    const body = JSON.stringify({ intent: 'verify_and_activate', expectedRevision: initial.revision });
+    const exact = body.padEnd(256, ' ');
+    assert.equal(new TextEncoder().encode(exact).byteLength, 256);
+    assert.equal((await POST(new Request(request({}), { body: exact + ' ' }))).status, 400);
+    assert.equal(attest.mock.callCount(), 0);
+    assert.equal((await POST(new Request(request({}), { body: exact }))).status, 200);
+    assert.equal(attest.mock.callCount(), 1);
+});
+
+test('ambiguous duplicate intent is invalid JSON input, not a second activation instruction', async () => {
+    const attest = fixture();
+    const initial = await (await GET(new Request('http://localhost:3000/api/ai/local-provider/onboarding'))).json();
+    const body = `{"intent":"verify_and_activate","intent":"verify_and_activate","expectedRevision":"${initial.revision}"}`;
+    const response = await POST(new Request(request({}), { body }));
+    assert.equal(response.status, 400); assert.deepEqual(await response.json(), { error: 'input_invalid' });
+    assert.equal(attest.mock.callCount(), 0); assert.equal(fs.existsSync(path.join(root, 'ai')), false);
+});
