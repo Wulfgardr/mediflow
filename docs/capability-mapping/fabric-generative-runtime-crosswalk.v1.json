@@ -76,7 +76,7 @@
         "path": "components/patient-smart-import-fabric-preview-card.tsx",
         "requestBindingLiteral": "createSmartImportReviewBrowserController",
         "requiredLiterals": [
-          "Receipt",
+          "Modello usato:",
           "Provenienza",
           "preview.receipt",
           "preview.provenance"
