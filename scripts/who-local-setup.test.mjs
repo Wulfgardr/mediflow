@@ -157,7 +157,7 @@ test('install uses only pinned fixed flags and starts only its newly-created con
     const result = await executeSetup(options(filename, 'install', { confirm: INSTALL_CONFIRMATION }), { ...fake, portFree: async () => { checkedPort = true; } });
     assert.equal(result.state, 'container_started'); assert.equal(checkedPort, true);
     const create = fake.calls.find(c => c.args[3] === 'create').args;
-    assert.deepEqual(create.slice(4), ['--name', CONTAINER_NAME, '--platform', 'linux/arm64', '--label', 'org.mediflow.owner=mediflow.who.guided.v1', '--restart', 'no', '--publish', '127.0.0.1:8382:80', '--env', 'acceptLicense=true', '--env', 'include=2026-01_en', '--env', 'saveAnalytics=false', '--env', 'enableDoris=false', '--env', 'fhirSupport=false', `whoicd/icd-api@${hash}`]);
+    assert.deepEqual(create.slice(4), ['--name', CONTAINER_NAME, '--platform', 'linux/arm64', '--label', 'org.mediflow.owner=mediflow.who.guided.v1', '--restart', 'no', '--publish', '127.0.0.1:8382:80', '--env', 'SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt', '--env', 'acceptLicense=true', '--env', 'include=2026-01_en', '--env', 'saveAnalytics=false', '--env', 'enableDoris=false', '--env', 'fhirSupport=false', `whoicd/icd-api@${hash}`]);
     assert.deepEqual(fake.calls.at(-1).args, ['--context', 'synthetic-context', 'container', 'start', 'b'.repeat(64)]);
 });
 
