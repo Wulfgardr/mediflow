@@ -17,9 +17,9 @@ const PRODUCER = 'lib/security/web-auth-next-producer-boundary.test.ts';
 const H1_MATRIX = 'lib/security/server-auth.test.ts';
 const GUARD_SCRIPT = `check:${OWNER_STEM}-boundary`;
 const GUARD_COMMAND = `node scripts/run-strip-types.mjs --test --test-concurrency=1 ${D1A} ${PRODUCER} ${D1B} ${H1_MATRIX}`;
-// @Codex ADR 0128 / 066dd104c: the only projected delta is the desktop trace import.
-// Freeze its complete local dependency closure; aliases and owner delivery stay guarded.
-const NEXT_RESOLVER_AST_SHA256 = 'a08b97b451d33e4cc5df39af6ed6d71e4cf617f9ad7407c214a4c45c64615a84';
+// @Codex ADR 0128 / 066dd104c: freeze the resolver projection and reviewed trace closure.
+// Aliases and owner delivery stay guarded independently of standalone tracing additions.
+const NEXT_RESOLVER_AST_SHA256 = '6f82f937e84472448200761daf22e3629b9d4683f2fd9161c5bf30979160cf70';
 const REVIEWED_TRACE_FILES = {
     'scripts/anydoc-desktop-renderer-trace.mjs': 'd1e117793f872ceae0eab22dcc7e222830dba6f44ffd3f5228f13095941c6b5f',
     'scripts/anydoc-pdf-renderer-profiles.json': '41355c1e4360acdc293aa383a07ba2c8216a8a018b0a38ac2a9ec5cc0fe37e41',
