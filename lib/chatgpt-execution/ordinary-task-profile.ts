@@ -3,6 +3,7 @@ import 'server-only';
 
 import { createHash } from 'node:crypto';
 import { types } from 'node:util';
+import { scanJsonObject } from '../ai-json-lexical';
 
 import {
     buildPatientInsightExtractionPrompt,
@@ -181,7 +182,7 @@ function register(functionId: OrdinaryTaskFunctionId, input: unknown, prompt: st
     const token = Object.freeze(Object.create(null));
     const stored = Object.freeze({ functionId, prompt, outputSchema: strictSchema(schemas[functionId]), inputSha256: digest(input),
         parseOutput(text: string) {
-            if (typeof text !== 'string' || text.length === 0 || text.length > 262_144) return reject('ordinary_task_output_invalid');
+            if (scanJsonObject(text) === null) return reject('ordinary_task_output_invalid');
             try { return parseOutput(text); } catch { return reject('ordinary_task_output_invalid'); }
         } });
     profiles.set(token, stored);
