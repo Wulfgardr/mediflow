@@ -14,7 +14,7 @@
 #                                 (fine for a local run of a locally built app).
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 NEXT_DIST_DIR="${MEDIFLOW_NEXT_DIST_DIR:-.next}"
 STANDALONE_DIR="$ROOT_DIR/$NEXT_DIST_DIR/standalone"
 STAGE_EXECUTION_MAC_ASSETS="$ROOT_DIR/scripts/stage-chatgpt-execution-mac-assets.ts"
@@ -22,6 +22,42 @@ PROJECT="$ROOT_DIR/native/MediFlowAppleApp/MediFlowAppleApp.xcodeproj"
 SCHEME="MediFlowMacApp"
 CONFIG="${MEDIFLOW_MAC_CONFIG:-Debug}"
 DERIVED="${MEDIFLOW_MAC_DERIVED_DATA:-$ROOT_DIR/tmp-mac-derived-data}"
+APP="$DERIVED/Build/Products/$CONFIG/MediFlow.app"
+
+# @Codex: reject path aliases and a sealed previous output before Xcode or rm/cp.
+preflight_app_destination() {
+node - "$APP" <<'NODE'
+const fs = require('node:fs'), path = require('node:path');
+const app = process.argv[2];
+function physical(directory, optional = false) {
+  if (!path.isAbsolute(directory) || path.normalize(directory) !== directory || /[\x00-\x1f\x7f]/u.test(directory)) throw new Error('Noncanonical app directory');
+  let current = path.parse(directory).root;
+  for (const part of directory.slice(current.length).split(path.sep)) {
+    current = path.join(current, part);
+    let status;
+    try { status = fs.lstatSync(current); }
+    catch (error) { if (optional && error.code === 'ENOENT') return; throw error; }
+    if (!status.isDirectory() || status.isSymbolicLink()) throw new Error('Nonphysical app directory');
+  }
+  if (fs.realpathSync(directory) !== directory) throw new Error('Aliased app directory');
+}
+physical(app, true);
+physical(path.join(app, 'Contents'), true);
+for (const name of ['_CodeSignature', 'CodeResources']) {
+  try { fs.lstatSync(path.join(app, 'Contents', name)); }
+  catch (error) { if (error.code === 'ENOENT') continue; throw error; }
+  throw new Error('Refusing to mutate a sealed app. Build in fresh, unsigned DerivedData.');
+}
+for (const name of ['Resources', 'Resources/WebRuntime', 'Resources/WebRuntime/.next',
+  'Resources/WebRuntime/.next/static', 'Resources/WebRuntime/public', 'Frameworks', 'Helpers']) physical(path.join(app, 'Contents', name), true);
+const proxy = path.join(app, 'Contents/Resources/local-api-tls-proxy.mjs');
+try {
+  const status = fs.lstatSync(proxy);
+  if (!status.isFile() || status.isSymbolicLink()) throw new Error('Nonphysical proxy destination');
+} catch (error) { if (error.code !== 'ENOENT') throw error; }
+NODE
+}
+preflight_app_destination
 
 # xcodebuild needs a full Xcode (the Liquid Glass code needs the 26 SDK).
 # @Codex: an explicit per-command toolchain must win over global selection.
@@ -45,7 +81,7 @@ if [[ ! -f "$STANDALONE_DIR/server.js" ]]; then
 fi
 
 # @Codex: a caller must provide every public staging input explicitly. Without
-# them an already-staged standalone payload is reused unchanged, if present.
+# them an already-staged standalone payload must be complete and is reused unchanged.
 EXECUTION_MAC_STAGE_VARS=(
   MEDIFLOW_CHATGPT_EXECUTION_BINARY
   MEDIFLOW_CHATGPT_EXECUTION_NATIVE_SOURCE
@@ -66,6 +102,9 @@ if (( EXECUTION_MAC_STAGE_COUNT == ${#EXECUTION_MAC_STAGE_VARS[@]} )); then
     --schema-directory "$MEDIFLOW_CHATGPT_EXECUTION_SCHEMA_DIRECTORY" \
     --c1-receipt "$MEDIFLOW_CHATGPT_EXECUTION_C1_RECEIPT"
 fi
+# @Codex: absence is a packaging error, not a successful app with a HELD helper.
+node "$ROOT_DIR/scripts/run-strip-types.mjs" "$STAGE_EXECUTION_MAC_ASSETS" \
+  --check --installation-root "$STANDALONE_DIR"
 
 # @Codex: better-sqlite3 is architecture-specific, so the app executable must
 # match the WebRuntime built by the active Node process.
@@ -83,13 +122,14 @@ xcodebuild -project "$PROJECT" -scheme "$SCHEME" -configuration "$CONFIG" \
   -jobs 2 build CODE_SIGNING_ALLOWED=NO ARCHS="$XCODE_ARCH" ONLY_ACTIVE_ARCH=YES \
   'OTHER_SWIFT_FLAGS=$(inherited) -j2'
 
-APP="$DERIVED/Build/Products/$CONFIG/MediFlow.app"
 [[ -d "$APP" ]] || { echo "Build failed: $APP not found" >&2; exit 1; }
 
 # 3. Inject the WebRuntime + the TLS proxy script into the bundle
 RES="$APP/Contents/Resources"
 WEB="$RES/WebRuntime"
 FRAMEWORKS="$APP/Contents/Frameworks"
+EXECUTION_MAC_HELPER="$APP/Contents/Helpers/mediflow-chatgpt-codex"
+preflight_app_destination
 WEB_NATIVE_TARGETS=(
   "$FRAMEWORKS/mediflow-web-libvips.dylib"
   "$FRAMEWORKS/mediflow-web-anydoc.node"
@@ -100,8 +140,10 @@ WEB_NATIVE_TARGETS=(
 )
 echo "Injecting WebRuntime into the app bundle..."
 rm -rf "$WEB"
-mkdir -p "$WEB/.next"
+mkdir -p "$WEB"
 cp -R "$STANDALONE_DIR/." "$WEB/"
+# @Codex: copied overlay roots must be physical before mkdir/cp can write through them.
+preflight_app_destination
 # @Codex: merge contents when a reused standalone already includes these assets.
 mkdir -p "$WEB/.next/static"
 cp -R "$ROOT_DIR/$NEXT_DIST_DIR/static/." "$WEB/.next/static/"
@@ -110,7 +152,19 @@ if [[ -d "$ROOT_DIR/public" ]]; then
   cp -R "$ROOT_DIR/public/." "$WEB/public/"
 fi
 cp "$ROOT_DIR/scripts/local-api-tls-proxy.mjs" "$RES/local-api-tls-proxy.mjs"
+# @Codex: split the copied standalone payload before the strict Resources guard.
+# The original standalone stays usable. No symlink and no native bytes change.
+node "$ROOT_DIR/scripts/run-strip-types.mjs" "$STAGE_EXECUTION_MAC_ASSETS" \
+  --relocate-bundle --installation-root "$WEB"
+# Verify the pre-existing signature; re-signing codex would invalidate its pin.
+if ! codesign --verify --strict "$EXECUTION_MAC_HELPER"; then
+  echo "Pinned Codex signature is invalid; no re-signing is allowed. A different binary requires a new qualification." >&2
+  exit 1
+fi
+lipo -verify_arch "$XCODE_ARCH" "$EXECUTION_MAC_HELPER"
 "$ROOT_DIR/scripts/check-macos-web-runtime-native-payload.sh" --normalize --web-runtime "$WEB" --frameworks "$FRAMEWORKS"
+node "$ROOT_DIR/scripts/run-strip-types.mjs" "$STAGE_EXECUTION_MAC_ASSETS" \
+  --check --installation-root "$WEB"
 
 # 4. Optional codesign (so the injected runtime is covered for distribution)
 if [[ -n "${MEDIFLOW_CODESIGN_IDENTITY:-}" ]]; then
@@ -120,7 +174,9 @@ if [[ -n "${MEDIFLOW_CODESIGN_IDENTITY:-}" ]]; then
   else
     SIGN_ARGS=(--force --options runtime --timestamp --sign "$MEDIFLOW_CODESIGN_IDENTITY")
   fi
-  # @Codex: sign nested code inside-out; --deep is verification-only here.
+  # @Codex: sign only the six rewritten Web dependencies. The independently
+  # signed, pinned Codex helper is already verified and MUST NOT be re-signed.
+  # --deep is verification-only; no staging or normalization follows this seal.
   for native_code in "${WEB_NATIVE_TARGETS[@]}"; do
     codesign "${SIGN_ARGS[@]}" "$native_code"
     codesign --verify --strict "$native_code"
@@ -129,5 +185,11 @@ if [[ -n "${MEDIFLOW_CODESIGN_IDENTITY:-}" ]]; then
   codesign --verify --deep --strict "$APP"
 fi
 
-echo "Runnable macOS app: $APP"
+# @Codex: read-only final acceptance, including AFTER optional outer signing.
+# These checks do not write Resources/Helpers or assert runtime qualification.
+node "$ROOT_DIR/scripts/run-strip-types.mjs" "$STAGE_EXECUTION_MAC_ASSETS" \
+  --check --installation-root "$WEB"
+codesign --verify --strict "$EXECUTION_MAC_HELPER"
+"$ROOT_DIR/scripts/check-macos-web-runtime-native-payload.sh" --web-runtime "$WEB" --frameworks "$FRAMEWORKS"
+echo "Runnable macOS app candidate (runtime smoke still required): $APP"
 echo "WebRuntime: $WEB/server.js"

@@ -64,6 +64,7 @@ first_physical_macho() {
     const path = require("node:path");
     const magics = new Set([0xfeedface, 0xcefaedfe, 0xfeedfacf, 0xcffaedfe,
       0xcafebabe, 0xbebafeca, 0xcafebabf, 0xbfbafeca]);
+    const allowed = new Set(process.argv.slice(2));
     let found = "";
     function walk(directory) {
       for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
@@ -75,7 +76,7 @@ first_physical_macho() {
           try {
             const prefix = Buffer.alloc(4);
             if (fs.readSync(descriptor, prefix, 0, 4, 0) === 4 && magics.has(prefix.readUInt32BE(0))) {
-              found = candidate;
+              if (!allowed.has(candidate)) found = candidate;
             }
           } finally { fs.closeSync(descriptor); }
         }
@@ -83,7 +84,22 @@ first_physical_macho() {
     }
     walk(process.argv[1]);
     process.stdout.write(found);
-  ' "$1"
+  ' "$@"
+}
+
+# @Codex: do not turn a caller alias (including an ancestor symlink) into a root.
+canonical_directory() {
+  node -e '
+    const fs = require("node:fs"), path = require("node:path"), value = process.argv[1];
+    if (!path.isAbsolute(value) || path.normalize(value) !== value || /[\x00-\x1f\x7f]/u.test(value)) process.exit(1);
+    let current = path.parse(value).root;
+    for (const part of value.slice(current.length).split(path.sep)) {
+      current = path.join(current, part);
+      const status = fs.lstatSync(current);
+      if (!status.isDirectory() || status.isSymbolicLink()) process.exit(1);
+    }
+    if (fs.realpathSync(value) !== value) process.exit(1);
+  ' "$1" || fail "directory is not a canonical physical path: $1"
 }
 
 validate_resource_symlinks() {
@@ -167,6 +183,7 @@ package_web_runtime_machos() {
   local node_arch resources contents expected_frameworks native source target resolved link loader
   local physical_count=0 framework_count=0 old_vips_ref old_vips_count=0 rpath index
   local sharp_candidates=() libvips_candidates=() sources=() targets=() loaders=() before=() after=()
+  local normalize="$normalize"
 
   node_arch="$(node -p 'process.arch')"
   [[ "$node_arch" == "arm64" || "$node_arch" == "x64" ]] || fail "unsupported Node architecture: $node_arch"
@@ -178,12 +195,19 @@ package_web_runtime_machos() {
     fail "WebRuntime is outside a macOS app Contents/Resources directory"
   [[ ! -L "$resources" && ! -L "$contents" && "$(basename "$(dirname "$contents")")" == *.app ]] || \
     fail "WebRuntime must be rooted in a physical .app bundle"
+  canonical_directory "$web_runtime"
+  if [[ "$normalize" == "1" ]]; then
+    for sealed_path in "$contents/_CodeSignature" "$contents/CodeResources"; do
+      [[ ! -e "$sealed_path" && ! -L "$sealed_path" ]] || fail "refusing normalization after the app has been signed"
+    done
+  fi
   expected_frameworks="$contents/Frameworks"
   [[ "$frameworks" == "$expected_frameworks" ]] || fail "Frameworks must be the sibling Contents/Frameworks directory"
   if [[ "$normalize" == "1" ]]; then
     mkdir -p "$frameworks"
   fi
   [[ -d "$frameworks" && ! -L "$frameworks" ]] || fail "Contents/Frameworks is missing or is a symlink"
+  canonical_directory "$frameworks"
   [[ "$(real_path "$frameworks")" == "$(real_path "$contents")/Frameworks" ]] || \
     fail "Contents/Frameworks resolves outside the app bundle"
   # @Codex: reject escaping or native symlinks before moving or rewriting any
@@ -207,16 +231,10 @@ package_web_runtime_machos() {
     "$frameworks/mediflow-web-libvips.dylib" "$frameworks/mediflow-web-canvas.node"
     "$frameworks/mediflow-web-better-sqlite3.node" "$frameworks/mediflow-web-fsevents.node"
   )
-  if [[ "$normalize" == "1" ]]; then
-    # @Codex: Xcode may preserve Frameworks across an incremental build. The
-    # root is canonical above, so removing only these exact owned paths cannot
-    # escape the app bundle.
-    for target in "${targets[@]}"; do
-      if [[ -e "$target" || -L "$target" ]]; then
-        [[ -f "$target" || -L "$target" ]] || fail "owned native target is not a file or symlink: $target"
-        rm -f -- "$target"
-      fi
-    done
+  # @Codex: a second normalization of a complete relocated tree is read-only.
+  # A partial tree still fails the full validation below; do not delete its targets.
+  if [[ "$normalize" == "1" && -z "$(find "$web_runtime" -type f \( -name '*.node' -o -name '*.dylib' \) -print -quit)" ]]; then
+    normalize=0
   fi
   loaders=(
     "$web_runtime/node_modules/@firecrawl/anydoc/index.js"
@@ -272,6 +290,18 @@ package_web_runtime_machos() {
         fail "loader pattern must occur exactly once before relocation: ${loaders[$index]}"
       [[ "$(literal_count "${loaders[$index]}" "${after[$index]}")" == "0" ]] || \
         fail "loader already contains packaged target before relocation: ${loaders[$index]}"
+    done
+    # @Codex: detect the original extensionless-Codex conflict BEFORE touching
+    # any of the six dependencies. Only their exact source paths are exempt.
+    native="$(first_physical_macho "$resources" "${sources[@]}")"
+    [[ -z "$native" ]] || fail "unexpected physical Mach-O below Contents/Resources: $native"
+    # Xcode may preserve the six owned targets in an unsigned incremental build.
+    # Delete them only after all source/loader preflights have succeeded.
+    for target in "${targets[@]}"; do
+      if [[ -e "$target" || -L "$target" ]]; then
+        [[ -f "$target" || -L "$target" ]] || fail "owned native target is not a file or symlink: $target"
+        rm -f -- "$target"
+      fi
     done
     for index in 0 1 2 3 4 5; do
       source="${sources[$index]}"
@@ -331,8 +361,10 @@ package_web_runtime_machos() {
 run_self_test() {
   local temp_dir fake_bin fixture valid_web worker_path binding_path event_log state_file events
   local layout_bin layout_state layout_log layout_web layout_frameworks bad_app bad_web bad_frameworks path
-  local bad_pattern_app bad_pattern_web extensionless_app extensionless_web
+  local bad_pattern_app bad_pattern_web extensionless_app extensionless_web real_node legacy_app legacy_web idempotent_events alias_root partial_app
   temp_dir="$(mktemp -d "${TMPDIR:-/tmp}/mediflow-macho-guard.XXXXXX")"
+  temp_dir="$(real_path "$temp_dir")"
+  real_node="$(command -v node)"
   trap "rm -rf '$temp_dir'" EXIT
   fake_bin="$temp_dir/bin"
   fixture="$temp_dir/skia.darwin-arm64.node"
@@ -566,7 +598,11 @@ run_self_test() {
     'else' \
     '  printf "%s: Mach-O 64-bit bundle arm64\n" "${!#}"' \
     'fi' > "$layout_bin/file"
-  chmod 755 "$layout_bin/otool" "$layout_bin/install_name_tool" "$layout_bin/codesign" "$layout_bin/file"
+  # The fixture is arm64 even when this synthetic self-test runs on Linux/x64.
+  printf '%s\n' '#!/bin/bash' \
+    'if [[ "${1:-}" == "-p" && "${2:-}" == "process.arch" ]]; then printf "arm64\n"; exit 0; fi' \
+    "exec \"$real_node\" \"\$@\"" > "$layout_bin/node"
+  chmod 755 "$layout_bin/otool" "$layout_bin/install_name_tool" "$layout_bin/codesign" "$layout_bin/file" "$layout_bin/node"
   : > "$layout_log"
   bad_pattern_app="$temp_dir/bad-pattern/MediFlow.app"
   mkdir -p "$(dirname "$bad_pattern_app")"
@@ -579,10 +615,56 @@ run_self_test() {
       --frameworks "$bad_pattern_app/Contents/Frameworks" >/dev/null 2>&1; then
     fail "self-test accepted a loader pattern that occurred twice"
   fi
+  # Reproduce the original codex-in-Resources conflict before normalizing any dependency.
+  legacy_app="$temp_dir/legacy/MediFlow.app"
+  mkdir -p "$(dirname "$legacy_app")"
+  cp -R "$temp_dir/layout/MediFlow.app" "$legacy_app"
+  legacy_web="$legacy_app/Contents/Resources/WebRuntime"
+  mkdir -p "$legacy_web/resources/chatgpt-execution/mac/codex-0.153.4"
+  printf '\xfe\xed\xfa\xcf' > "$legacy_web/resources/chatgpt-execution/mac/codex-0.153.4/codex"
+  if MEDIFLOW_LAYOUT_STATE_DIR="$layout_state" MEDIFLOW_LAYOUT_EVENT_LOG="$layout_log" \
+      PATH="$layout_bin:$PATH" "$script_path" --normalize --web-runtime "$legacy_web" \
+      --frameworks "$legacy_app/Contents/Frameworks" >/dev/null 2>&1; then
+    fail "self-test accepted the legacy extensionless codex in Resources"
+  fi
+  [[ ! -s "$layout_log" ]] || fail "self-test changed native dependencies before rejecting legacy codex"
   MEDIFLOW_LAYOUT_STATE_DIR="$layout_state" MEDIFLOW_LAYOUT_EVENT_LOG="$layout_log" \
     PATH="$layout_bin:$PATH" "$script_path" --normalize --web-runtime "$layout_web" --frameworks "$layout_frameworks" >/dev/null
   MEDIFLOW_LAYOUT_STATE_DIR="$layout_state" MEDIFLOW_LAYOUT_EVENT_LOG="$layout_log" \
     PATH="$layout_bin:$PATH" "$script_path" --web-runtime "$layout_web" --frameworks "$layout_frameworks" >/dev/null
+  idempotent_events="$(cat "$layout_log")"
+  MEDIFLOW_LAYOUT_STATE_DIR="$layout_state" MEDIFLOW_LAYOUT_EVENT_LOG="$layout_log" \
+    PATH="$layout_bin:$PATH" "$script_path" --normalize --web-runtime "$layout_web" --frameworks "$layout_frameworks" >/dev/null
+  [[ "$(cat "$layout_log")" == "$idempotent_events" ]] || fail "self-test rewrote already-normalized native targets"
+  # A helper outside Resources does not relax the Resources guard or add a seventh Frameworks target.
+  mkdir -p "$(dirname "$layout_frameworks")/Helpers"
+  printf '\xfe\xed\xfa\xcf' > "$(dirname "$layout_frameworks")/Helpers/mediflow-chatgpt-codex"
+  MEDIFLOW_LAYOUT_STATE_DIR="$layout_state" MEDIFLOW_LAYOUT_EVENT_LOG="$layout_log" \
+    PATH="$layout_bin:$PATH" "$script_path" --web-runtime "$layout_web" --frameworks "$layout_frameworks" >/dev/null
+  mkdir -p "$(dirname "$layout_frameworks")/_CodeSignature"
+  if MEDIFLOW_LAYOUT_STATE_DIR="$layout_state" MEDIFLOW_LAYOUT_EVENT_LOG="$layout_log" \
+      PATH="$layout_bin:$PATH" "$script_path" --normalize --web-runtime "$layout_web" --frameworks "$layout_frameworks" >/dev/null 2>&1; then
+    fail "self-test allowed normalization of a sealed bundle"
+  fi
+  [[ "$(cat "$layout_log")" == "$idempotent_events" ]] || fail "self-test mutated a sealed bundle"
+  rmdir "$(dirname "$layout_frameworks")/_CodeSignature"
+  alias_root="$temp_dir/aliased-layout"
+  ln -s "$temp_dir/layout" "$alias_root"
+  if MEDIFLOW_LAYOUT_STATE_DIR="$layout_state" MEDIFLOW_LAYOUT_EVENT_LOG="$layout_log" \
+      PATH="$layout_bin:$PATH" "$script_path" --web-runtime "$alias_root/MediFlow.app/Contents/Resources/WebRuntime" \
+      --frameworks "$alias_root/MediFlow.app/Contents/Frameworks" >/dev/null 2>&1; then
+    fail "self-test accepted an ancestor symlink"
+  fi
+  partial_app="$temp_dir/partial/MediFlow.app"
+  mkdir -p "$(dirname "$partial_app")"
+  cp -R "$temp_dir/layout/MediFlow.app" "$partial_app"
+  rm "$partial_app/Contents/Frameworks/mediflow-web-canvas.node"
+  if MEDIFLOW_LAYOUT_STATE_DIR="$layout_state" MEDIFLOW_LAYOUT_EVENT_LOG="$layout_log" \
+      PATH="$layout_bin:$PATH" "$script_path" --normalize --web-runtime "$partial_app/Contents/Resources/WebRuntime" \
+      --frameworks "$partial_app/Contents/Frameworks" >/dev/null 2>&1; then
+    fail "self-test accepted a partial normalized tree"
+  fi
+  [[ -f "$partial_app/Contents/Frameworks/mediflow-web-anydoc.node" ]] || fail "self-test deleted a partial tree target"
   [[ "$(grep -c '^strip ' "$layout_log")" == "6" ]] || fail "self-test did not strip exactly six copied native signatures"
   [[ "$(grep -c '^sign ' "$layout_log")" == "6" && "$(grep -c '^verify ' "$layout_log")" == "6" ]] || \
     fail "self-test did not ad-hoc sign and verify exactly six relocated native targets"
@@ -603,7 +685,7 @@ run_self_test() {
       PATH="$layout_bin:$PATH" "$script_path" --web-runtime "$bad_web" --frameworks "$bad_frameworks" >/dev/null 2>&1; then
     fail "self-test accepted an unexpected seventh native artifact"
   fi
-  mv "$bad_web/node_modules/unexpected.node" "$bad_web/node_modules/unexpected.disabled"
+  rm "$bad_web/node_modules/unexpected.node"
   ln -s ../../../Frameworks/mediflow-web-anydoc.node "$bad_web/node_modules/native-alias"
   if MEDIFLOW_LAYOUT_STATE_DIR="$layout_state" MEDIFLOW_LAYOUT_EVENT_LOG="$layout_log" \
       PATH="$layout_bin:$PATH" "$script_path" --web-runtime "$bad_web" --frameworks "$bad_frameworks" >/dev/null 2>&1; then

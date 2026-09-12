@@ -1,125 +1,143 @@
-/* @Codex — explicit build-time staging of public Mac execution assets only. */
-import { copyFileSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync } from 'node:fs';
-import { createHash } from 'node:crypto';
-import { dirname, isAbsolute, join, normalize, relative, resolve } from 'node:path';
-import { resolveInstalledMacExecutionAssets } from '../lib/chatgpt-execution/execution-mac-assets';
-import { MAC_C1_RECEIPT, MAC_CONFIG_SOURCE, readPinnedMacFile } from '../lib/chatgpt-execution/execution-mac-config';
+/* @Codex — explicit public inputs; all writes precede the outer app signature. */
+import { chmodSync, constants, copyFileSync, lstatSync, mkdirSync, readdirSync, unlinkSync } from 'node:fs';
+import { dirname, join, relative, sep } from 'node:path';
+import {
+    MAC_EXECUTION_SCHEMA_FILES, macExecutionAssetLayout, physicalMacAssetPath,
+    resolveInstalledMacExecutionAssets, verifyMacExecutionAssetFiles,
+    type InstalledMacExecutionAssets, type MacExecutionAssetLayout,
+} from '../lib/chatgpt-execution/execution-mac-assets';
 
-const ASSET_PATH = ['resources', 'chatgpt-execution', 'mac', 'codex-0.153.4'] as const;
-const SCHEMA_FILES = ['config.schema.json', 'RECEIPT.json', 'config-loader-mod.rs', 'LOADER-RECEIPT.json'] as const;
 const REQUIRED = ['installation-root', 'binary', 'native-source', 'schema-directory', 'c1-receipt'] as const;
 type ArgumentName = typeof REQUIRED[number];
+type Mode = 'stage' | 'check' | 'relocate-bundle';
+function fail(message: string): never { throw new Error(`CHATGPT_EXECUTION_MAC_ASSETS: ${message}`); }
 
-const fail = (message: string): never => { throw new Error(`CHATGPT_EXECUTION_MAC_ASSETS: ${message}`); };
-
-function parseArguments(argv: readonly string[]): Record<ArgumentName, string> {
-    const values = Object.create(null) as Record<ArgumentName, string>;
+function parseArguments(argv: readonly string[]): { mode: Mode; values: Partial<Record<ArgumentName, string>> } {
+    const values: Partial<Record<ArgumentName, string>> = Object.create(null);
+    let mode: Mode = 'stage';
     for (let index = 0; index < argv.length; index += 1) {
-        const match = /^--([a-z0-9-]+)$/u.exec(argv[index]);
-        const rawName = match?.[1];
-        if (!rawName) fail('ingressi CLI non validi');
-        const name = rawName as ArgumentName;
-        if (!REQUIRED.includes(name) || values[name] || index + 1 >= argv.length) fail('ingressi CLI non validi');
+        const argument = argv[index];
+        if (argument === '--check' || argument === '--relocate-bundle') {
+            if (mode !== 'stage') fail('modalita CLI duplicata');
+            mode = argument === '--check' ? 'check' : 'relocate-bundle';
+            continue;
+        }
+        const name = /^--([a-z0-9-]+)$/u.exec(argument)?.[1] as ArgumentName | undefined;
+        if (!name || !REQUIRED.includes(name) || values[name] || index + 1 >= argv.length) fail('ingressi CLI non validi');
         const value = argv[++index];
         if (!value || value.startsWith('--')) fail('ingressi CLI non validi');
-        values[name] = value;
+        values[name!] = value;
     }
-    for (const name of REQUIRED) if (!values[name]) fail(`manca --${name}`);
-    return values;
+    for (const name of mode === 'stage' ? REQUIRED : ['installation-root'] as const) if (!values[name]) fail(`manca --${name}`);
+    if (mode !== 'stage' && Object.keys(values).length !== 1) fail('la modalita non ammette percorsi sorgente');
+    return { mode, values };
 }
 
-function regularSource(path: string): string {
-    try {
-        const value = resolve(path), status = lstatSync(value);
-        if (!isAbsolute(path) || normalize(path) !== path || !status.isFile() || status.isSymbolicLink()) fail('sorgente non fisica');
-        return value;
-    } catch { return fail('sorgente non fisica'); }
+function exists(path: string): boolean {
+    try { lstatSync(path); return true; }
+    catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false; throw error; }
 }
 
-function safeDirectories(root: string, parts: readonly string[]): string {
-    if (!isAbsolute(root) || normalize(root) !== root) fail('installation root non valido');
+function unsignedBundle(layout: MacExecutionAssetLayout): void {
+    if (layout.bundleContents && (exists(join(layout.bundleContents, '_CodeSignature')) || exists(join(layout.bundleContents, 'CodeResources'))))
+        fail('bundle gia firmato: usare una build non firmata; nessuno staging dopo firma');
+}
+
+function safeDirectories(root: string, destination: string): void {
+    physicalMacAssetPath(root, 'directory');
+    const delta = relative(root, destination);
+    if (!delta || delta === '..' || delta.startsWith(`..${sep}`)) fail('destinazione fuori dal root');
     let current = root;
-    try {
-        const status = lstatSync(current);
-        if (!status.isDirectory() || status.isSymbolicLink() || realpathSync(current) !== current) fail('installation root non fisico');
-        for (const part of parts) {
-            const next = join(current, part);
-            if (relative(root, next).startsWith('..')) fail('destinazione fuori dal root');
-            try {
-                const nextStatus = lstatSync(next);
-                if (!nextStatus.isDirectory() || nextStatus.isSymbolicLink() || realpathSync(next) !== next) fail('destinazione non fisica');
-            } catch {
-                mkdirSync(next, { mode: 0o755 });
-            }
-            current = next;
-        }
-        return current;
-    } catch (error) { if (error instanceof Error && error.message.startsWith('CHATGPT_EXECUTION_MAC_ASSETS:')) throw error; return fail('destinazione non preparabile'); }
-}
-
-function validatePublicSources(schemaDirectory: string, c1Receipt: string): void {
-    const status = lstatSync(schemaDirectory);
-    if (!status.isDirectory() || status.isSymbolicLink()) fail('schema directory non fisica');
-    try {
-        readPinnedMacFile(regularSource(join(schemaDirectory, 'config.schema.json')), MAC_CONFIG_SOURCE);
-        readPinnedMacFile(regularSource(join(schemaDirectory, 'RECEIPT.json')), MAC_CONFIG_SOURCE.receipt);
-        readPinnedMacFile(regularSource(join(schemaDirectory, 'config-loader-mod.rs')), MAC_CONFIG_SOURCE.loader);
-        readPinnedMacFile(regularSource(join(schemaDirectory, 'LOADER-RECEIPT.json')), {
-            bytes: MAC_CONFIG_SOURCE.loader.receiptBytes, sha256: MAC_CONFIG_SOURCE.loader.receiptSha256,
-        });
-        readPinnedMacFile(c1Receipt, MAC_C1_RECEIPT);
-    } catch { fail('pin pubblico non valido'); }
-}
-
-function samePhysicalBytes(source: string, target: string): boolean {
-    try {
-        const status = lstatSync(target);
-        if (!status.isFile() || status.isSymbolicLink()) return false;
-        const left = readFileSync(source), right = readFileSync(target);
-        return left.equals(right) && createHash('sha256').update(left).digest('hex') === createHash('sha256').update(right).digest('hex');
-    } catch { return false; }
-}
-
-function existingPayload(destination: string, binary: string, nativeSource: string, schemaDirectory: string, c1Receipt: string): boolean {
-    try {
-        if (!lstatSync(destination).isDirectory()
-            || JSON.stringify(readdirSync(destination).sort()) !== JSON.stringify(['C1-RECEIPT.json', 'codex', 'mac-owner.c', 'schema'])
-            || JSON.stringify(readdirSync(join(destination, 'schema')).sort()) !== JSON.stringify([...SCHEMA_FILES].sort())) return false;
-        resolveInstalledMacExecutionAssets(dirname(dirname(dirname(dirname(destination)))));
-        return samePhysicalBytes(binary, join(destination, 'codex'))
-            && samePhysicalBytes(nativeSource, join(destination, 'mac-owner.c'))
-            && samePhysicalBytes(c1Receipt, join(destination, 'C1-RECEIPT.json'))
-            && SCHEMA_FILES.every(name => samePhysicalBytes(join(schemaDirectory, name), join(destination, 'schema', name)));
-    } catch { return false; }
-}
-
-function stage(values: Record<ArgumentName, string>): void {
-    const requestedRoot = resolve(values['installation-root']);
-    if (!isAbsolute(values['installation-root']) || normalize(values['installation-root']) !== values['installation-root']) fail('installation root non canonico');
-    const requestedRootStatus = lstatSync(requestedRoot);
-    if (!requestedRootStatus.isDirectory() || requestedRootStatus.isSymbolicLink()) fail('installation root non fisico');
-    const root = realpathSync(requestedRoot);
-    const binary = regularSource(values.binary), nativeSource = regularSource(values['native-source']);
-    const schemaDirectory = resolve(values['schema-directory']);
-    if (!isAbsolute(values['schema-directory']) || normalize(values['schema-directory']) !== values['schema-directory']) fail('schema directory non valido');
-    const c1Receipt = regularSource(values['c1-receipt']);
-    validatePublicSources(schemaDirectory, c1Receipt);
-    const destination = join(root, ...ASSET_PATH);
-    try {
-        lstatSync(destination);
-        if (!existingPayload(destination, binary, nativeSource, schemaDirectory, c1Receipt)) fail('payload esistente non idempotente');
-        return;
-    } catch (error) {
-        if (error instanceof Error && error.message.startsWith('CHATGPT_EXECUTION_MAC_ASSETS:')) throw error;
+    for (const part of delta.split(sep)) {
+        current = join(current, part);
+        if (!exists(current)) mkdirSync(current, { mode: 0o755 });
+        physicalMacAssetPath(current, 'directory');
     }
-    safeDirectories(root, ASSET_PATH);
-    const schemaDestination = safeDirectories(destination, ['schema']);
-    copyFileSync(binary, join(destination, 'codex'));
-    copyFileSync(nativeSource, join(destination, 'mac-owner.c'));
-    for (const name of SCHEMA_FILES) copyFileSync(regularSource(join(schemaDirectory, name)), join(schemaDestination, name));
-    copyFileSync(c1Receipt, join(destination, 'C1-RECEIPT.json'));
-    resolveInstalledMacExecutionAssets(root);
 }
 
-try { stage(parseArguments(process.argv.slice(2))); }
-catch (error) { console.error(error instanceof Error ? error.message : 'CHATGPT_EXECUTION_MAC_ASSETS: staging fallito'); process.exitCode = 1; }
+function exactEntries(path: string, names: readonly string[]): void {
+    physicalMacAssetPath(path, 'directory');
+    if (JSON.stringify(readdirSync(path).sort()) !== JSON.stringify([...names].sort())) fail('payload esistente non idempotente');
+}
+
+function sourceSet(values: Partial<Record<ArgumentName, string>>): InstalledMacExecutionAssets {
+    const source = Object.freeze({ binaryPath: values.binary!, nativeSourcePath: values['native-source']!,
+        schemaDirectory: values['schema-directory']!, c1ReceiptPath: values['c1-receipt']! });
+    try { verifyMacExecutionAssetFiles(source); }
+    catch { fail('sorgente non fisica o pin pubblico non valido'); }
+    return source;
+}
+
+function copy(source: string, target: string, mode: number): void {
+    physicalMacAssetPath(source, 'file');
+    physicalMacAssetPath(dirname(target), 'directory');
+    copyFileSync(source, target, constants.COPYFILE_EXCL); // Never overwrite a link, partial payload or previous deployment.
+    chmodSync(target, mode); // Metadata only; never change signed executable bytes.
+    physicalMacAssetPath(target, 'file');
+}
+
+function stage(layout: MacExecutionAssetLayout, sources: InstalledMacExecutionAssets): void {
+    unsignedBundle(layout);
+    // Validate ALL public sources before creating anything. A matching existing
+    // deployment is a read-only no-op; a partial/altered deployment is not repaired.
+    verifyMacExecutionAssetFiles(sources);
+    if (exists(layout.assetDirectory) || layout.bundleContents && exists(layout.assets.binaryPath)) {
+        try { resolveInstalledMacExecutionAssets(layout.installationRoot); }
+        catch { fail('payload esistente non idempotente'); }
+        return;
+    }
+    safeDirectories(layout.installationRoot, layout.assets.schemaDirectory);
+    if (layout.bundleContents) safeDirectories(layout.bundleContents, layout.binaryDirectory);
+    copy(sources.binaryPath, layout.assets.binaryPath, 0o755);
+    copy(sources.nativeSourcePath, layout.assets.nativeSourcePath, 0o644);
+    copy(sources.c1ReceiptPath, layout.assets.c1ReceiptPath, 0o644);
+    for (const [name] of MAC_EXECUTION_SCHEMA_FILES) copy(join(sources.schemaDirectory, name), join(layout.assets.schemaDirectory, name), 0o644);
+    resolveInstalledMacExecutionAssets(layout.installationRoot);
+}
+
+/** Migration of the exact standalone copy just injected by the app builder.
+ * Only this pinned codex is relocated. No caller-chosen helper path, re-signing,
+ * install_name_tool, link or binary mutation is permitted. A previous identical
+ * helper from an unsigned incremental build can be reused, never overwritten. */
+function relocateBundle(layout: MacExecutionAssetLayout): void {
+    if (!layout.bundleContents) fail('relocation richiede Contents/Resources/WebRuntime in un bundle fisico');
+    unsignedBundle(layout);
+    const legacyBinary = join(layout.assetDirectory, 'codex');
+    if (!exists(legacyBinary)) {
+        resolveInstalledMacExecutionAssets(layout.installationRoot); // Idempotent only for the complete split layout.
+        return;
+    }
+    exactEntries(layout.assetDirectory, ['C1-RECEIPT.json', 'codex', 'mac-owner.c', 'schema']);
+    exactEntries(layout.assets.schemaDirectory, MAC_EXECUTION_SCHEMA_FILES.map(([name]) => name));
+    const legacy = { ...layout.assets, binaryPath: legacyBinary };
+    verifyMacExecutionAssetFiles(legacy); // All seven pins, before creating Helpers.
+    if (exists(layout.assets.binaryPath)) {
+        verifyMacExecutionAssetFiles(layout.assets);
+    } else {
+        safeDirectories(layout.bundleContents, layout.binaryDirectory);
+        copy(legacyBinary, layout.assets.binaryPath, 0o755);
+        verifyMacExecutionAssetFiles(layout.assets);
+    }
+    // Copy/check/delete, not a symlink or byte-transforming move. Failed checks
+    // leave the duplicate and therefore a layout which the resolver denies.
+    unsignedBundle(layout);
+    verifyMacExecutionAssetFiles(legacy);
+    unlinkSync(legacyBinary);
+    resolveInstalledMacExecutionAssets(layout.installationRoot);
+}
+
+try {
+    const { mode, values } = parseArguments(process.argv.slice(2));
+    const root = values['installation-root']!;
+    if (mode === 'check') {
+        resolveInstalledMacExecutionAssets(root); // No staging, even after signing.
+    } else {
+        const layout = macExecutionAssetLayout(root);
+        unsignedBundle(layout);
+        if (mode === 'relocate-bundle') relocateBundle(layout);
+        else stage(layout, sourceSet(values));
+    }
+} catch (error) {
+    console.error(error instanceof Error ? error.message : 'CHATGPT_EXECUTION_MAC_ASSETS: staging fallito');
+    process.exitCode = 1;
+}
