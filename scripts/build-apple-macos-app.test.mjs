@@ -50,7 +50,7 @@ switch (command) {
     appRoot(path.join(process.env.MEDIFLOW_MAC_DERIVED_DATA, 'Build/Products', process.env.MEDIFLOW_MAC_CONFIG));
     console.log('SYNTHETIC Xcode stub, no compilation'); break;
   case 'lipo':
-    if (args[0] !== '-verify_arch' || !helper || process.env.MEDIFLOW_PACKAGING_TEST_BAD_ARCH === '1') process.exit(88);
+    if (args[1] !== '-verify_arch' || path.basename(args[0]) !== 'mediflow-chatgpt-codex' || process.env.MEDIFLOW_PACKAGING_TEST_BAD_ARCH === '1') process.exit(88);
     break;
   case 'file': {
     const s = fs.statSync(target);
