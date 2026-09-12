@@ -3,8 +3,25 @@ import assert from 'node:assert/strict';
 import {
     TREATMENT_REASONING_SCHEMA_VERSION,
     buildTreatmentReasoningPrompt,
+    buildChatGptTreatmentReasoningPrompt,
     parseTreatmentReasoningResponse,
 } from './treatment-reasoning-contract';
+
+/* @Codex */
+test('named ChatGPT prompt keeps source bindings and describes the actual channel without classifying input', () => {
+    const input = { question: 'Revisione sintetica?', patientContext: 'Contesto di collaudo.', sources: [{ id: 'src-synthetic', sourceKind: 'clinical-entry' as const, label: 'Nota sintetica' }] };
+    const remote = buildChatGptTreatmentReasoningPrompt(input);
+    const local = buildTreatmentReasoningPrompt(input);
+    assert.match(remote, /chatgpt_subscription/u);
+    assert.match(remote, /sourceBindings/u);
+    assert.match(remote, /claimPath/u);
+    assert.match(remote, /mai auto_apply/u);
+    assert.match(remote, /src-synthetic/u);
+    assert.doesNotMatch(remote, /lane locale|Contesto paziente sintetico|local_model|"prefill"/u);
+    assert.match(local, /lane locale/u);
+    assert.match(local, /local_model/u);
+    assert.doesNotMatch(local, /chatgpt_subscription|sourceBindings/u);
+});
 
 test('treatment reasoning parser accepts valid review-only output', () => {
     const parsed = parseTreatmentReasoningResponse(JSON.stringify({
