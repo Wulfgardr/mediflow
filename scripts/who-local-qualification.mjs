@@ -514,7 +514,8 @@ export async function qualifyOwnedDeployment(state, lock, directory, dependencie
             inventorySha256: result.snapshotInventorySha256, fileCount: metadata.length, bytes: metadata.reduce((sum, f) => sum + f.bytes, 0) }; save();
         check();
         if (command(['network', 'ls', '--filter', `name=^${networkName}$`, '--format', '{{.ID}}'])) deny('network_name_conflict');
-        const networkId = command(['network', 'create', '--driver', 'bridge', '--internal', '--ipv6=false',
+        // @Codex: explicit IPv4 prevents Docker's implicit option alias in the strict readback.
+        const networkId = command(['network', 'create', '--driver', 'bridge', '--internal', '--ipv4=true', '--ipv6=false',
             ...Object.entries(networkOptions).flatMap(([key, value]) => ['--opt', `${key}=${value}`]),
             '--label', `${OWNER_LABEL}=${state.installationId}`, networkName]);
         if (!idPattern.test(networkId)) deny('network_creation_failed');
