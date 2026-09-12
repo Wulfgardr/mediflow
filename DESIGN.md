@@ -15,6 +15,38 @@ feel calm, precise, trustworthy, and fast to scan.
 Information hierarchy outranks decoration. Materials, motion, and intelligence
 support the task. They do not become the task.
 
+## Plain language for physicians
+
+Every MediFlow interface must be usable by a physician with no knowledge of
+code, infrastructure, artificial intelligence, or interface conventions. This
+is a product requirement across web/localhost, macOS, iPhone, and iPad,
+including settings, onboarding, field descriptions, buttons, tooltips,
+notifications, errors, confirmations, and accessibility labels.
+
+- Every word must help the physician understand the task. Name fields by what
+  they contain and actions by what they do; explain the expected input and
+  consequences when they are not evident. Do not assume icon literacy.
+- Use familiar, precise language and consistent names for the same concept.
+  Preserve appropriate clinical terminology without requiring technical literacy.
+- Do not expose implementation vocabulary such as host, MCP, payload, receipt,
+  or gate as ordinary product labels. Explain necessary technical concepts in
+  everyday language. Optional diagnostic details belong in a separate support
+  view and must never be required to complete the ordinary task.
+- Describe settings by their practical effect. For data sharing, state what is
+  sent, to whom, and when in understandable terms; simplicity must not hide
+  consent, limits, risks, or the distinction between a proposal and an action
+  already performed.
+- Errors explain what happened and the next available action. A short label
+  must remain meaningful; a tooltip cannot rescue an unintelligible control.
+
+Acceptance requires reading the affected flow on the actual interface,
+including relevant secondary states, and answering: can a physician without
+technical knowledge understand what this means, what to enter or choose, and
+what will happen next, without a developer's explanation? Unexplained jargon
+or ambiguous actions fail this criterion even when automated tests pass.
+This rule applies to existing and future interfaces; documenting it does not
+certify that all current text already complies.
+
 ## Shared language
 
 Lume is the active visual language. The web and Apple implementations share:
@@ -53,6 +85,22 @@ stacked across clinical cards.
 
 Localhost uses a restrained material analogue. It does not copy decorative
 glass effects.
+
+### Nested frames
+
+Nested containers must use coordinated corner geometry. Avoid a square or
+nearly square enclosing frame around a strongly rounded inner frame when both
+frame the same content. For parallel inset outlines, coordinate the inner
+radius with the outer radius and inset so the spacing looks uniform.
+
+Every frame must identify a meaningful group. Prefer one enclosing frame with
+spacing or subtle dividers over repeated boxes around the same content. This
+does not prohibit rounded controls inside a rectangular page; the constraint
+concerns redundant enclosing frames and conflicting container geometry.
+
+Review the affected surface at its supported sizes and appearances: nested
+corners must look coherent, spacing must remain uniform, and removing redundant
+frames must preserve understandable grouping, focus indicators, and behavior.
 
 ## Components and states
 
