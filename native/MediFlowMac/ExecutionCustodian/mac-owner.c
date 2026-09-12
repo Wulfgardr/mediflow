@@ -16,6 +16,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
+#include <libproc.h>
 #include <poll.h>
 #include <pthread.h>
 #include <signal.h>
@@ -25,6 +26,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/proc_info.h>
 #include <sys/resource.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
@@ -113,11 +115,38 @@ static bool set_limits(void) {
     if (setrlimit(RLIMIT_NPROC, &nproc) || setrlimit(RLIMIT_CORE, &core) || setrlimit(RLIMIT_NOFILE, &nofile)) return false;
     return getrlimit(RLIMIT_NPROC, &observed) == 0 && observed.rlim_cur == 0 && observed.rlim_max == 0;
 }
+/* This is the fresh, single-threaded --child image, before sandbox/limits.
+ * Current soft/hard limits do NOT bound already inherited descriptor numbers.
+ * Inspect our own kernel FD list instead: no directory opens, paths or content.
+ * A full/malformed/unobservable snapshot is a failure, never a truncated success.
+ * Two fixed-size snapshots bound work to at most 4095 close calls; the second
+ * proves that only stdio and the private FD4 remain. No retry on ambiguous close
+ * errors (including EINTR): the caller reports F and exits without staging R. */
+static bool close_inherited_descriptors(void) {
+    struct proc_fdinfo descriptors[4096];
+    for (unsigned pass = 0; pass < 2; ++pass) {
+        int bytes = proc_pidinfo(getpid(), PROC_PIDLISTFDS, 0, descriptors, (int)sizeof(descriptors));
+        if (bytes <= 0 || (size_t)bytes >= sizeof(descriptors)
+            || (size_t)bytes % sizeof(descriptors[0]) != 0) return false;
+        size_t count = (size_t)bytes / sizeof(descriptors[0]);
+        bool status_present = false;
+        for (size_t i = 0; i < count; ++i) {
+            int fd = descriptors[i].proc_fd;
+            if (fd < 0) return false;
+            if (fd == 4) { status_present = true; continue; }
+            if (fd <= STDERR_FILENO) continue;
+            if (pass != 0 || (close(fd) != 0 && errno != EBADF)) return false;
+        }
+        if (!status_present) return false;
+    }
+    return true;
+}
 static int child_exec(const char *mode, const char *root, const char *nonce) {
     /* Descriptor 4 is the private exec-status pipe, not the owner channel.
      * It is close-on-exec; Codex inherits ONLY stdin/stdout/stderr. */
-    close(3); closefrom(5);
-    if (fcntl(4, F_SETFD, FD_CLOEXEC) < 0) return 78;
+    if (fcntl(4, F_SETFD, FD_CLOEXEC) < 0 || !close_inherited_descriptors()) {
+        (void)write_all(4, "F", 1); return 78;
+    }
     char profile_path[PATH_MAX], binary[PATH_MAX], helper[PATH_MAX], output[PATH_MAX];
     if (!path_join(profile_path, root, !strcmp(mode, "probe") ? "runtime/profile-probe.sb" : "runtime/profile.sb")
         || !path_join(binary, root, "runtime/codex") || !path_join(helper, root, "runtime/mac-owner")
