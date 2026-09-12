@@ -141,6 +141,34 @@ final class PairedPatientsNavigationTests: XCTestCase {
     }
 
     @MainActor
+    func testPatientCreationStartsWithAnEmptyFormButSavingStillRequiresFieldsAndAnIdleCapability() async throws {
+        let (model, transport) = try harness()
+
+        XCTAssertFalse(model.canStartCreatingPatient)
+
+        model.updateAvailableCapabilities(["network.replica.write-patient-lifecycle"])
+        XCTAssertTrue(model.canStartCreatingPatient)
+        XCTAssertFalse(model.canCreatePatient)
+        model.startCreatingPatient()
+        XCTAssertTrue(model.isCreatingPatient)
+        XCTAssertFalse(model.canCreatePatient)
+
+        model.newPatientFirstName = "Paziente"
+        model.newPatientLastName = "Sintetico"
+        model.newPatientTaxCode = "SYNTHETIC-CREATE"
+        XCTAssertTrue(model.canCreatePatient)
+
+        model.cancelCreatingPatient()
+        let started = transport.holdNextPatient(pathSuffix: "/patients/patient-a/attachments")
+        let attachmentRead = Task { await model.loadSelectedPatientAttachments() }
+        await fulfillment(of: [started], timeout: 3)
+        XCTAssertTrue(model.isWorking)
+        XCTAssertFalse(model.canStartCreatingPatient)
+        transport.releasePatient()
+        await attachmentRead.value
+    }
+
+    @MainActor
     func testCancelledProfileEditorDoesNotTreatItsRetainedInputAsAnActiveDraft() async throws {
         let (model, transport) = try harness()
         model.startEditingPatient()

@@ -23,6 +23,7 @@ final class PairedPatientsWorkspaceOfflineCacheTests: XCTestCase {
         model.newPatientFirstName = "Paziente"
         model.newPatientLastName = "Sintetico"
         model.newPatientTaxCode = "SYNTHETIC-P2"
+        XCTAssertFalse(model.canStartCreatingPatient)
         XCTAssertFalse(model.canCreatePatient)
         await model.createPatient()
         XCTAssertEqual(transport.requestCount, before)
