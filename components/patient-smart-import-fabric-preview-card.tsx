@@ -77,7 +77,7 @@ export function PatientSmartImportFabricPreviewCard({ patientId, captureInput, e
                                     <dt>Esecuzione</dt>
                                     <dd>{preview.receipt.provider} · {preview.receipt.model} · {preview.receipt.venue}</dd>
                                     <dt>Egress</dt>
-                                    <dd>{preview.receipt.egressProfile.egress} · fallback {preview.receipt.fallbackCount}</dd>
+                                    <dd>{preview.receipt.provider === 'chatgpt_subscription' ? 'Testo redatto inviato a OpenAI con consenso · nessun provider alternativo' : <>{preview.receipt.egressProfile.egress} · fallback {preview.receipt.fallbackCount}</>}</dd>
                                     <dt>Provenienza</dt>
                                     <dd>{preview.provenance.preprocessing.join(' → ')}</dd>
                                     <dt>Review</dt>

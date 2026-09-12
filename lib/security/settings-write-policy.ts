@@ -28,6 +28,7 @@ export type SettingsKeyPolicy = {
 // in the notes so the classification can be re-audited when a key moves.
 export const SETTINGS_WRITE_REGISTRY: Record<string, SettingsKeyPolicy> = {
     /* @Codex: only the named preferences service owns revision CAS. */
+    'ai.fabric.chatgptOrdinary': { write: [], note: 'ADR 0077 named authenticated ordinary controller with revision CAS only' },
     'ai.fabric.functionPreferences': { write: [], note: 'ADR 0129 dedicated authenticated preference service' },
     // --- AI model / provider / endpoint config (written from the web settings
     // controller only; treated as operator config because it steers where PHI is

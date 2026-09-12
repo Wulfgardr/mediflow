@@ -123,3 +123,10 @@ export function createMacProductPlatformManager(options: {
         });
     } });
 }
+
+// One production manager across DEMO, ordinary functions and route chunks.
+const sharedManagerKey = Symbol.for('mediflow.chatgpt.mac-platform-manager.v1');
+const sharedManagers = globalThis as typeof globalThis & { [sharedManagerKey]?: ReturnType<typeof createMacProductPlatformManager> };
+export function createSharedMacProductPlatform() {
+    return (sharedManagers[sharedManagerKey] ??= createMacProductPlatformManager()).createPlatform();
+}

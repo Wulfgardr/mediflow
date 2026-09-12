@@ -1,5 +1,6 @@
 /* @Codex */
 import 'server-only';
+import { isOrdinaryFunctionSelected, bindOrdinaryApplicationContext } from '../chatgpt-product/ordinary-flow';
 
 import type { SmartImportProjection } from '../smart-import-projection';
 import type { PatientSmartImportHostCapabilityResult } from '../domain/documents/patient-smart-import-host-capability';
@@ -48,6 +49,7 @@ export function createAuthenticatedSmartImportPreviewService(sources: Sources) {
         });
         return Object.freeze({
             async preview(input: unknown): Promise<PatientSmartImportHostCapabilityResult> {
+                if (isOrdinaryFunctionSelected('smart_import')) await bindOrdinaryApplicationContext('smart_import', context.owner, context.session);
                 if (!hasSafeInputBoundary(input)) return inputInvalid;
                 let capability: Capability;
                 try { capability = sources.createCapability(broker); } catch { return fail('preview_unavailable'); }

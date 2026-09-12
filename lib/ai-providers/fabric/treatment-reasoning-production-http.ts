@@ -1,5 +1,7 @@
 /* @Codex */
 import 'server-only';
+import type { createTreatmentReasoningChatGptService } from './treatment-reasoning-chatgpt-production';
+type RemoteResult = Awaited<ReturnType<Awaited<ReturnType<ReturnType<typeof createTreatmentReasoningChatGptService>['acquirePreview']>>['preview']>>;
 
 import { NextResponse } from 'next/server';
 
@@ -8,7 +10,7 @@ import { TreatmentReasoningAuthenticatedProjectionError } from './treatment-reas
 import type { TreatmentReasoningProductionResult, PortableTreatmentProductionResult } from './treatment-reasoning-production-operation';
 
 type IngestOperation = Readonly<{ ingest(input: unknown): string }>;
-type PreviewOperation = Readonly<{ preview(input: unknown): Promise<TreatmentReasoningProductionResult | PortableTreatmentProductionResult> }>;
+type PreviewOperation = Readonly<{ preview(input: unknown): Promise<TreatmentReasoningProductionResult | PortableTreatmentProductionResult | RemoteResult> }>;
 type IngestSources = Readonly<{ acquireIngest(): Promise<IngestOperation | null> }>;
 type PreviewSources = Readonly<{ acquirePreview(): Promise<PreviewOperation | null> }>;
 

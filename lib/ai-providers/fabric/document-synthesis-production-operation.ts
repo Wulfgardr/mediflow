@@ -1,5 +1,7 @@
 /* @Codex */
 import 'server-only';
+import { isOrdinaryFunctionSelected, bindOrdinaryApplicationContext } from '../../chatgpt-product/ordinary-flow';
+import { executeDocumentSynthesisChatGpt } from './document-synthesis-chatgpt-composition';
 
 import { createHash, randomBytes } from 'node:crypto';
 import { types } from 'node:util';
@@ -224,7 +226,14 @@ function createOperation(context: AuthenticatedWebSessionProjectionOwnerContext,
                 if (!sourceSet) return previewDenied('currentness_mismatch');
                 capsule = createDocumentSynthesisSourceSetCurrentnessOwner(Object.freeze({ owner: context.owner, session: context.session, sourceSet }));
                 const configuration = Object.freeze({ owner: context.owner, session: context.session, capsule });
-                const publication = await dependencies.execute(configuration);
+                const remote = isOrdinaryFunctionSelected('document_synthesis');
+                if (remote) await bindOrdinaryApplicationContext('document_synthesis', context.owner, context.session);
+                const stillCurrent = () => {
+                    try { return dependencies.readLaneEnabled() === true && context.owner.withLeaseCriticalSection(context.session,
+                        selection => selectionAgrees(context, preview, selection) && sameCurrentness(preview.currentness, read(preview))); }
+                    catch { return false; }
+                };
+                const publication = remote ? await executeDocumentSynthesisChatGpt(configuration, sourceSet, stillCurrent) : await dependencies.execute(configuration);
                 if (!publication) return previewDenied('operation_unavailable');
                 const current = context.owner.withLeaseCriticalSection(context.session, (selection) => selectionAgrees(context, preview, selection) && sameCurrentness(preview.currentness, read(preview)));
                 if (!current) return previewDenied('currentness_mismatch');

@@ -1,22 +1,23 @@
-/* @Codex — exactly the unresolved ADR0033/0077 boundary, not a new grant API. */
+/* @Codex — one named governed boundary, no free callback or boolean grant. */
 import 'server-only';
-import { isEgressGateOpen } from '../ai-egress-gate';
 import { appendChatGptEgressAudit } from '../ai-egress-audit';
 import { assertOrdinaryProductConsent, type OrdinaryProductConsent } from '../chatgpt-product/product-consent';
 import { readPreparedOrdinaryProfile, type PreparedOrdinaryProfile } from './ordinary-preparation';
+import { readOrdinaryGovernance } from './ordinary-governance';
 import { ExecutionError } from './execution-contract';
-
-/** There is no positive admission issuer in the supplied sources. Even a future
- * global boolean cannot stand in for payload-bound opt-in/governance/retention.
- * A real evaluator must replace this missing boundary, not be injected by a caller.
- * The hash-only record describes a denial, NEVER transmission. */
-export function assertOrdinaryEgress(preparation: PreparedOrdinaryProfile, consent: OrdinaryProductConsent): void {
+export async function assertOrdinaryEgress(preparation: PreparedOrdinaryProfile, consent: OrdinaryProductConsent): Promise<void> {
     assertOrdinaryProductConsent(consent, preparation);
-    const read = readPreparedOrdinaryProfile(preparation);
-    const laneOpen = isEgressGateOpen();
-    appendChatGptEgressAudit({ payload: read.payload, lane: read.functionId,
-        entityCounts: read.entityCounts, status: 'closed_pending_redaction_lane' });
-    if (!laneOpen) throw new ExecutionError('unqualified_boundary');
-    // No governed, payload-bound positive result exists in this frozen context.
-    throw new ExecutionError('unqualified_boundary');
+    const before = readPreparedOrdinaryProfile(preparation);
+    try {
+        await readOrdinaryGovernance(before.functionId, before);
+        assertOrdinaryProductConsent(consent, preparation);
+        const after = readPreparedOrdinaryProfile(preparation);
+        if (after !== before || after.payload !== before.payload || after.payloadSha256 !== before.payloadSha256) throw new Error('payload_changed');
+        // An append failure is a denial. This is an authorization-to-attempt
+        // record, not a fabricated claim of successful transmission.
+        appendChatGptEgressAudit({ payload: after.payload, lane: after.functionId, entityCounts: after.entityCounts, status: 'allowed' });
+    } catch {
+        appendChatGptEgressAudit({ payload: before.payload, lane: before.functionId, entityCounts: before.entityCounts, status: 'closed_pending_redaction_lane' });
+        throw new ExecutionError('unqualified_boundary');
+    }
 }

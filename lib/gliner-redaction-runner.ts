@@ -2,6 +2,15 @@
 import 'server-only';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
+import { readFileSync, statSync, realpathSync } from 'node:fs';
+import { parseRedactionRuntimeIdentity } from './ai-redaction-evidence';
+import { REDACTION_WORKER_SHA256, type RedactionRuntimeIdentity } from './redaction-runtime-identity';
+const runtimeObservations = new WeakMap<object, RedactionRuntimeIdentity>();
+export function readGlinerRuntimeObservation(runner: object): RedactionRuntimeIdentity | null {
+    return runtimeObservations.get(runner) ?? null;
+}
+
 import type { RedactionEntityType } from './redaction-contracts';
 
 export const GLINER_REDACTION_REVISION = 'c153999da5f4c509df4322b0c6a1baf3d2c284d7';
@@ -43,6 +52,20 @@ export function createGlinerRedactionRunner(config: Readonly<{ pythonExecutable:
     let pending: { resolve(value: unknown): void; reject(reason: Error): void } | undefined;
     let exit: Promise<void> = Promise.resolve();
     let closing: Promise<void> | undefined;
+    let installed: string | undefined;
+    function installedFingerprint(): string {
+        const values = [pythonExecutable, workerPath, ...Object.keys({
+            'model.safetensors': 0, 'config.json': 0, 'encoder_config/config.json': 0,
+            'tokenizer.json': 0, 'tokenizer_config.json': 0,
+        }).map(name => path.join(modelDirectory, name))];
+        return JSON.stringify(values.map(name => {
+            const resolved = realpathSync(name), info = statSync(resolved, { bigint: true });
+            if (!info.isFile() || Number(info.mode) & 0o022) throw failure();
+            return [resolved, String(info.dev), String(info.ino), String(info.size), String(info.mtimeNs), String(info.ctimeNs)];
+        }));
+    }
+    function checkInstalled() { if (installed !== undefined && installedFingerprint() !== installed) throw failure(); }
+
 
     function close(): Promise<void> {
         if (closing) return closing;
@@ -98,23 +121,36 @@ export function createGlinerRedactionRunner(config: Readonly<{ pythonExecutable:
             try { receive(JSON.parse(line.toString('utf8'))); } catch { void close(); }
         });
     }
-    return Object.freeze({
+    const api = Object.freeze({
         async extract(text: string, signal?: AbortSignal): Promise<readonly NeuralRedactionSpan[]> {
             if (closed || busy || typeof text !== 'string' || !text || text.length > 12_000 || !text.isWellFormed()) throw failure();
             busy = true;
             try {
                 if (!ready) {
+                    // Legacy unbound workers remain usable only for local tests;
+                    // egress requires the privately recorded observed identity.
+                    try {
+                        if (createHash('sha256').update(readFileSync(workerPath)).digest('hex') === REDACTION_WORKER_SHA256) installed = installedFingerprint();
+                    } catch { installed = undefined; }
                     const greeting = await exchange(startWorker, signal) as Record<string, unknown>;
-                    if (!greeting || Object.keys(greeting).length !== 1 || greeting.ready !== GLINER_REDACTION_REVISION) throw failure();
+                    if (!greeting || greeting.ready !== GLINER_REDACTION_REVISION || ![1, 2].includes(Object.keys(greeting).length)) throw failure();
+                    if (Object.hasOwn(greeting, 'runtimeIdentity')) {
+                        const identity = parseRedactionRuntimeIdentity(greeting.runtimeIdentity);
+                        if (!identity || !installed || createHash('sha256').update(readFileSync(pythonExecutable)).digest('hex') !== identity.pythonSha256) throw failure();
+                        checkInstalled(); runtimeObservations.set(api, identity);
+                    } else if (Object.keys(greeting).length !== 1) throw failure();
                     ready = true;
                 }
+                checkInstalled();
                 const id = ++sequence;
                 const result = await exchange(() => child!.stdin.write(JSON.stringify({ id, text }) + '\n'), signal) as Record<string, unknown>;
                 if (closed || !result || Object.keys(result).length !== 2 || result.id !== id || !Object.hasOwn(result, 'entities')) throw failure();
+                checkInstalled();
                 return decodeGlinerEntities(text, result.entities);
             } catch { await close(); throw failure(); }
             finally { busy = false; }
         },
         close,
     });
+    return api;
 }

@@ -20,6 +20,18 @@ VERSIONS = {"gliner2": "2.0.0", "torch": "2.14.0", "transformers": "4.57.6", "hu
 LABELS = ["person", "full_name", "date_of_birth", "email", "phone_number", "address", "street_address", "city", "state_or_region", "postal_code", "government_id", "national_id_number", "tax_id", "sensitive_account_id", "sensitive_date", "document_date"]
 
 
+def digest_file(file):
+    with Path(file).open("rb") as handle:
+        before = os.fstat(handle.fileno())
+        digest = hashlib.sha256()
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(block)
+        after = os.fstat(handle.fileno())
+    if (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns, before.st_ctime_ns) != (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns, after.st_ctime_ns):
+        raise ValueError("artifact_changed")
+    return digest.hexdigest()
+
+
 def emit(value):
     print(json.dumps(value, ensure_ascii=True, allow_nan=False), flush=True)
 
@@ -46,7 +58,16 @@ def main():
         torch.set_num_threads(4)
         model = GLiNER2.from_pretrained(str(root), map_location="cpu", local_files_only=True)
         model.eval()
-    emit({"ready": REVISION})
+    # Recheck after load: the observed identity describes the model used by this
+    # exact process, not a report supplied by its caller. No input is logged.
+    for name, expected in FILES.items():
+        if digest_file(root / name) != expected:
+            raise ValueError("artifact_changed")
+    identity = {"schema": "mediflow.redaction-runtime-binding.v1",
+                "adapter": "mediflow.layer1-gliner.runtime.v1", "model": "gliner2-pii",
+                "revision": REVISION, "workerSha256": digest_file(__file__),
+                "pythonSha256": digest_file(sys.executable), "files": FILES, "packages": VERSIONS}
+    emit({"ready": REVISION, "runtimeIdentity": identity})
     while True:
         line = sys.stdin.buffer.readline(100_001)
         if not line:

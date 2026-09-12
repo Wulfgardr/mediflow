@@ -41,7 +41,7 @@ type SuggestedAction = TreatmentReasoningPublication['value']['data']['suggested
 type ScopedValue<T> = Readonly<{ contextRevision: string; value: T }>;
 
 const LOCAL_DISABLED_ERROR = 'Treatment Reasoning è disabilitato nel controllo locale. Riattivalo in Impostazioni AI per chiedere una nuova anteprima.';
-const PREVIEW_UNAVAILABLE_ERROR = 'Anteprima non disponibile. Verifica sessione, selezione e disponibilità di ATHENA locale, poi riprova.';
+const PREVIEW_UNAVAILABLE_ERROR = 'Anteprima non disponibile. Verifica sessione, selezione e il motore scelto; nessun fallback automatico.';
 
 function severityClasses(severity: SafetySeverity): string {
     switch (severity) {
@@ -188,7 +188,7 @@ export default function TreatmentReasoningPanel({
                                 <span className="apple-chip">{sourceSummary.total} fonti</span>
                                 <span className="apple-chip">review-only</span>
                                 <span className="text-[10px] font-semibold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
-                                    {picker.selected?.provider === 'athena_mlx' ? 'ATHENA MLX · locale' : picker.selected?.provider === 'athena_transformers' ? 'ATHENA Transformers · CPU locale' : 'Motore locale da selezionare'}
+                                    {picker.view.remote ? 'OpenAI · abbonamento ChatGPT · contesto redatto' : picker.selected?.provider === 'athena_mlx' ? 'ATHENA MLX · locale' : picker.selected?.provider === 'athena_transformers' ? 'ATHENA Transformers · CPU locale' : 'Motore locale da selezionare'}
                                 </span>
                             </div>
                         </div>
@@ -206,7 +206,7 @@ export default function TreatmentReasoningPanel({
                         {publication ? 'Aggiorna bozza' : 'Genera bozza'}
                     </button>
                     <p id="treatment-reasoning-boundary-note" className="sr-only">
-                        Anteprima locale di sola revisione. Non scrive né applica modifiche alla scheda clinica.
+                        Anteprima di sola revisione. Non scrive né applica modifiche alla scheda clinica.
                     </p>
                 </div>
             </div>
@@ -243,14 +243,14 @@ export default function TreatmentReasoningPanel({
 
                 {!publication && !isGenerating ? (
                     <div className="rounded-[var(--lume-radius-card)] border border-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)] bg-[color:var(--lume-surface-field)] p-4 text-sm leading-6 text-[color:var(--lume-ink-muted)] transition-colors duration-[var(--lume-dur-firma)]">
-                        Anteprima manuale da ATHENA locale per verificare coerenza, rischi e prossime azioni. Non modifica la scheda e richiede sempre revisione clinica.
+                        Anteprima manuale dal motore selezionato per verificare coerenza, rischi e prossime azioni. Non modifica la scheda e richiede sempre revisione clinica.
                     </div>
                 ) : null}
 
                 {isGenerating ? (
                     <div role="status" aria-live="polite" className="space-y-3 py-8 text-center">
                         <RefreshCw className="mx-auto h-7 w-7 animate-spin text-[color:var(--lume-ink-muted)]" aria-hidden="true" />
-                        <p className="text-xs font-bold uppercase tracking-widest text-[color:var(--lume-ink-muted)]">Preparazione anteprima locale...</p>
+                        <p className="text-xs font-bold uppercase tracking-widest text-[color:var(--lume-ink-muted)]">Preparazione anteprima...</p>
                     </div>
                 ) : null}
 
@@ -271,7 +271,7 @@ export default function TreatmentReasoningPanel({
                             ) : null}
                             <div className="mt-3 flex items-start gap-2 border-t border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] pt-3 text-xs leading-5 text-[color:var(--lume-ink-muted)]">
                                 <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                                <p>Supporto locale alla revisione: non è una prescrizione, esegue 0 scritture e non applica modifiche.</p>
+                                <p>Supporto alla revisione: non è una prescrizione, esegue 0 scritture e non applica modifiche.</p>
                             </div>
                         </div>
 
@@ -314,7 +314,7 @@ export default function TreatmentReasoningPanel({
                                     <h4 className="text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--lume-ink-muted)]">Flag e cautele</h4>
                                 </div>
                                 {publication.value.data.safetyFlags.length === 0 ? (
-                                    <p className="rounded-[14px] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-focal)] p-3 text-xs text-[color:var(--lume-ink-muted)]">Nessun flag strutturato da ATHENA.</p>
+                                    <p className="rounded-[14px] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-focal)] p-3 text-xs text-[color:var(--lume-ink-muted)]">Nessun flag strutturato nella proposta.</p>
                                 ) : publication.value.data.safetyFlags.map((flag) => (
                                     <div key={flag.id} className={`rounded-[16px] border p-3 ${severityClasses(flag.severity)}`}>
                                         <p className="text-sm font-semibold"><PrivacyBlur intensity="sm">{flag.label}</PrivacyBlur></p>
@@ -384,11 +384,11 @@ export default function TreatmentReasoningPanel({
                             <dl className="grid gap-3 border-t border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] px-4 py-3 text-xs sm:grid-cols-2">
                                 <div>
                                     <dt className="font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">Provider attestato</dt>
-                                    <dd className="mt-1 text-[color:var(--lume-ink)]">{publication.attestation.provider === 'athena_mlx' ? 'ATHENA MLX · locale' : 'ATHENA Transformers · CPU locale'}</dd>
+                                    <dd className="mt-1 text-[color:var(--lume-ink)]">{publication.attestation.provider === 'chatgpt_subscription' ? 'OpenAI · abbonamento ChatGPT · contesto redatto' : publication.attestation.provider === 'athena_mlx' ? 'ATHENA MLX · locale' : 'ATHENA Transformers · CPU locale'}</dd>
                                 </div>
                                 <div>
                                     <dt className="font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">Stato</dt>
-                                    <dd className="mt-1 text-[color:var(--lume-ink)]">{publication.attestation.readiness} · {publication.review} · {publication.writesPerformed} scritture</dd>
+                                    <dd className="mt-1 text-[color:var(--lume-ink)]">{publication.attestation.provider === 'chatgpt_subscription' ? 'Consenso sui byte redatti · nessuna ammissione clinica implicita' : publication.attestation.readiness} · {publication.review} · {publication.writesPerformed} scritture</dd>
                                 </div>
                                 {publication.schemaVersion === 'mediflow.ai.treatment-reasoning-publication.v2' && <div>
                                     <dt className="font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">Motore e artefatto attestati</dt>
@@ -404,7 +404,7 @@ export default function TreatmentReasoningPanel({
                                 </div>
                                 <div>
                                     <dt className="font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">Receipt Fabric</dt>
-                                    <dd className="mt-1 break-all text-[color:var(--lume-ink)]">{publication.fabricReceipt.venue} · {publication.fabricReceipt.egressProfile.id}@{publication.fabricReceipt.egressProfile.version} · egress {publication.fabricReceipt.egressProfile.egress}</dd>
+                                    <dd className="mt-1 break-all text-[color:var(--lume-ink)]">{publication.fabricReceipt.provider === 'chatgpt_subscription' ? <>OpenAI · {publication.fabricReceipt.model} · {publication.fabricReceipt.effort} · testo redatto inviato con consenso</> : <>{publication.fabricReceipt.venue} · {publication.fabricReceipt.egressProfile.id}@{publication.fabricReceipt.egressProfile.version} · egress {publication.fabricReceipt.egressProfile.egress}</>}</dd>
                                 </div>
                                 <div>
                                     <dt className="font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">Provenienza</dt>
@@ -412,11 +412,11 @@ export default function TreatmentReasoningPanel({
                                 </div>
                                 <div>
                                     <dt className="font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">Attestazione receipt</dt>
-                                    <dd className="mt-1 break-all font-mono text-[10px] text-[color:var(--lume-ink)]">{publication.attestation.receiptRef}</dd>
+                                    <dd className="mt-1 break-all font-mono text-[10px] text-[color:var(--lume-ink)]">{publication.attestation.provider === 'chatgpt_subscription' ? publication.attestation.outputSha256 : publication.attestation.receiptRef}</dd>
                                 </div>
                                 <div>
                                     <dt className="font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">Attestazione provenienza</dt>
-                                    <dd className="mt-1 break-all font-mono text-[10px] text-[color:var(--lume-ink)]">{publication.attestation.provenanceRef}</dd>
+                                    <dd className="mt-1 break-all font-mono text-[10px] text-[color:var(--lume-ink)]">{publication.attestation.provider === 'chatgpt_subscription' ? publication.attestation.sourceSha256 : publication.attestation.provenanceRef}</dd>
                                 </div>
                             </dl>
                         </details>

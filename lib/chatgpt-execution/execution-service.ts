@@ -37,7 +37,7 @@ type ExecutionTask<Result extends object> = Readonly<{
     prompt: string; outputSchema: object;
     decode(text: string, choice: SynthesisChoice): Result;
     content?: PreparedOrdinaryRead['content']; payload?: string;
-    beforeContent?(): void; localCurrent?(): boolean;
+    beforeContent?(): void | Promise<void>; localCurrent?(): boolean;
 }>;
 
 function createTaskExecutionService<Result extends object>(options: ExecutionAuthorityOptions, task: ExecutionTask<Result>) {
@@ -111,7 +111,7 @@ function createTaskExecutionService<Result extends object>(options: ExecutionAut
         if (method === 'turn/start' && task.content) {
             const supplied = record(params);
             if (JSON.stringify({ input: supplied.input, outputSchema: supplied.outputSchema }) !== task.payload) throw new ExecutionError('invalid_request');
-            task.beforeContent?.(); guard();
+            await task.beforeContent?.(); guard();
         }
         const response = await Promise.race([transport.request(method, params), active!.failure]);
         guard();
@@ -336,7 +336,7 @@ function createTaskExecutionService<Result extends object>(options: ExecutionAut
                 const signature = (values: readonly SynthesisChoice[]) => JSON.stringify(values.map(value => JSON.stringify([value.model, value.effort])).sort());
                 if (signature(fresh) !== signature(catalog.choices)) throw new ExecutionError('catalog_stale');
                 limits(await rpc('account/rateLimits/read'));
-                task.beforeContent?.(); guard();
+                await task.beforeContent?.(); guard();
                 usedTurn = true;
                 const started = record(await rpc('thread/start', {
                     model: choice.model, modelProvider: 'openai', serviceTier: 'priority', cwd,
@@ -484,7 +484,7 @@ export function createOrdinaryExecutionService(options: ExecutionAuthorityOption
     const service = createTaskExecutionService<OrdinaryExecutionResult>(options, Object.freeze({
         prompt: prepared.content.input[0].text, outputSchema: prepared.content.outputSchema,
         content: prepared.content, payload: prepared.payload,
-        beforeContent() { assertOrdinaryEgress(preparation, consent); },
+        beforeContent() { return assertOrdinaryEgress(preparation, consent); },
         localCurrent: () => ordinaryConsentIsCurrent(consent, preparation),
         decode(text: string, choice: SynthesisChoice): OrdinaryExecutionResult {
             assertOrdinaryProductConsent(consent, preparation);

@@ -2,7 +2,7 @@
 import 'server-only';
 import type { WebSessionProjection } from '../security/web-auth-lifecycle-owner-adapter';
 import { createProductionExecutionPlatform, type ProductExecutionPlatform } from '../chatgpt-execution/execution-platform';
-import { createMacProductPlatformManager } from '../chatgpt-execution/execution-mac-product';
+import { createSharedMacProductPlatform } from '../chatgpt-execution/execution-mac-product';
 import { createProductService } from './product-service';
 import { createProductSessionRegistry } from './product-session';
 import { createProductHttp } from './product-http';
@@ -19,8 +19,7 @@ export function createChatGptProduct(options: {
     return Object.freeze({ handle, dispose: () => registry.dispose() });
 }
 function createProductionRoot() {
-    const manager = createMacProductPlatformManager();
-    return createChatGptProduct({ platform: () => process.platform === 'darwin' ? manager.createPlatform() : createProductionExecutionPlatform(), async resolveSession() {
+    return createChatGptProduct({ platform: () => process.platform === 'darwin' ? createSharedMacProductPlatform() : createProductionExecutionPlatform(), async resolveSession() {
     // The existing Web auth owner is the authority; no account cookie, API token,
     // public ID or native-session projection is accepted in its place.
     const { requireSession } = await import('../security/server-auth');

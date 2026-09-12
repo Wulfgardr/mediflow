@@ -1,11 +1,14 @@
+import { parseOrdinaryRemoteReceipt, parseOrdinaryRemoteProvenance, type OrdinaryRemoteReceipt, type OrdinaryRemoteProvenance } from './chatgpt-product/ordinary-wire';
 /* @Codex */
 import { EGRESS_PROFILE_VERSION } from './ai-providers/fabric/contract';
 import { assertLocalOllamaModelReference } from './ai-providers/ollama-locality';
 
 type ProviderReceipt = Readonly<{ schemaVersion: 'mediflow.ai.provider-selection.v1'; authorityPlane: 'clinical_application'; task: 'clinical'; provider: 'ollama'; model: string; execution: 'local'; endpointClass: 'loopback'; egress: 'none'; runtimeReadiness: 'required'; fallbackCount: 0 }>;
-export type SmartImportFabricResolutionReceiptWire = Readonly<{ schemaVersion: 'mediflow.ai.fabric-resolution.v1'; capability: 'smart_import'; class: 'generative'; venue: 'local_process'; egressProfile: Readonly<{ id: 'local_only'; version: typeof EGRESS_PROFILE_VERSION; egress: 'none' }>; provider: 'ollama'; model: string; providerReceipt: ProviderReceipt; fallbackCount: 0 }>;
-export type SmartImportFabricProvenanceWire = Readonly<{ schemaVersion: 'mediflow.ai.fabric-provenance.v1'; capability: 'smart_import'; venue: 'local_process'; provider: 'ollama'; model: string; preprocessing: readonly ['context_minimization', 'envelope_validation']; receipt: SmartImportFabricResolutionReceiptWire }>;
+type LocalSmartImportFabricResolutionReceiptWire = Readonly<{ schemaVersion: 'mediflow.ai.fabric-resolution.v1'; capability: 'smart_import'; class: 'generative'; venue: 'local_process'; egressProfile: Readonly<{ id: 'local_only'; version: typeof EGRESS_PROFILE_VERSION; egress: 'none' }>; provider: 'ollama'; model: string; providerReceipt: ProviderReceipt; fallbackCount: 0 }>;
+type LocalSmartImportFabricProvenanceWire = Readonly<{ schemaVersion: 'mediflow.ai.fabric-provenance.v1'; capability: 'smart_import'; venue: 'local_process'; provider: 'ollama'; model: string; preprocessing: readonly ['context_minimization', 'envelope_validation']; receipt: SmartImportFabricResolutionReceiptWire }>;
 
+export type SmartImportFabricResolutionReceiptWire = LocalSmartImportFabricResolutionReceiptWire | OrdinaryRemoteReceipt;
+export type SmartImportFabricProvenanceWire = LocalSmartImportFabricProvenanceWire | OrdinaryRemoteProvenance;
 function record(value: unknown, keys: readonly string[]): Record<string, unknown> | null {
     try {
         if (!value || typeof value !== 'object' || Array.isArray(value) || Object.getPrototypeOf(value) !== Object.prototype) return null;
@@ -23,18 +26,21 @@ export function snapshotSmartImportProviderSelectionReceipt(value: unknown): Pro
     return !input || !parsedModel || input.schemaVersion !== 'mediflow.ai.provider-selection.v1' || input.authorityPlane !== 'clinical_application' || input.task !== 'clinical' || input.provider !== 'ollama' || input.execution !== 'local' || input.endpointClass !== 'loopback' || input.egress !== 'none' || input.runtimeReadiness !== 'required' || input.fallbackCount !== 0 ? null : Object.freeze({ schemaVersion: 'mediflow.ai.provider-selection.v1', authorityPlane: 'clinical_application', task: 'clinical', provider: 'ollama', model: parsedModel, execution: 'local', endpointClass: 'loopback', egress: 'none', runtimeReadiness: 'required', fallbackCount: 0 });
 }
 function sameReceipt(left: SmartImportFabricResolutionReceiptWire, right: SmartImportFabricResolutionReceiptWire): boolean {
+    if (left.provider === 'chatgpt_subscription' || right.provider === 'chatgpt_subscription') return left.provider === 'chatgpt_subscription' && right.provider === 'chatgpt_subscription' && (Object.keys(left) as (keyof OrdinaryRemoteReceipt)[]).every(key => left[key] === right[key]);
     const a = left.providerReceipt; const b = right.providerReceipt;
     return left.schemaVersion === right.schemaVersion && left.capability === right.capability && left.class === right.class && left.venue === right.venue && left.egressProfile.id === right.egressProfile.id && left.egressProfile.version === right.egressProfile.version && left.egressProfile.egress === right.egressProfile.egress && left.provider === right.provider && left.model === right.model && left.fallbackCount === right.fallbackCount && a.schemaVersion === b.schemaVersion && a.authorityPlane === b.authorityPlane && a.task === b.task && a.provider === b.provider && a.model === b.model && a.execution === b.execution && a.endpointClass === b.endpointClass && a.egress === b.egress && a.runtimeReadiness === b.runtimeReadiness && a.fallbackCount === b.fallbackCount;
 }
 
 /** Browser-safe snapshot of the closed Smart Import Fabric receipt. */
 export function snapshotSmartImportFabricResolutionReceipt(value: unknown): SmartImportFabricResolutionReceiptWire | null {
+    const remote = parseOrdinaryRemoteReceipt(value, 'smart_import'); if (remote) return remote;
     const input = record(value, ['schemaVersion', 'capability', 'class', 'venue', 'egressProfile', 'provider', 'model', 'providerReceipt', 'fallbackCount']); const profile = input && record(input.egressProfile, ['id', 'version', 'egress']); const parsedModel = input ? model(input.model) : null; const nested = input ? snapshotSmartImportProviderSelectionReceipt(input.providerReceipt) : null;
     return !input || !profile || !parsedModel || !nested || input.schemaVersion !== 'mediflow.ai.fabric-resolution.v1' || input.capability !== 'smart_import' || input.class !== 'generative' || input.venue !== 'local_process' || profile.id !== 'local_only' || profile.version !== EGRESS_PROFILE_VERSION || profile.egress !== 'none' || input.provider !== 'ollama' || nested.model !== parsedModel || input.fallbackCount !== 0 ? null : Object.freeze({ schemaVersion: 'mediflow.ai.fabric-resolution.v1', capability: 'smart_import', class: 'generative', venue: 'local_process', egressProfile: Object.freeze({ id: 'local_only', version: EGRESS_PROFILE_VERSION, egress: 'none' }), provider: 'ollama', model: parsedModel, providerReceipt: nested, fallbackCount: 0 });
 }
 
 /** Browser-safe snapshot of Smart Import provenance bound to a receipt snapshot. */
 export function snapshotSmartImportFabricProvenance(value: unknown, receipt: SmartImportFabricResolutionReceiptWire): SmartImportFabricProvenanceWire | null {
+    if (receipt.provider === 'chatgpt_subscription') return parseOrdinaryRemoteProvenance(value, receipt);
     try {
         const expected = snapshotSmartImportFabricResolutionReceipt(receipt); const input = record(value, ['schemaVersion', 'capability', 'venue', 'provider', 'model', 'preprocessing', 'receipt']); const labels = input && Array.isArray(input.preprocessing) && Object.getPrototypeOf(input.preprocessing) === Array.prototype && Reflect.ownKeys(input.preprocessing).length === 3 ? input.preprocessing : null; const nested = input ? snapshotSmartImportFabricResolutionReceipt(input.receipt) : null;
         if (!expected || !input || !labels || !nested || !sameReceipt(nested, expected) || input.schemaVersion !== 'mediflow.ai.fabric-provenance.v1' || input.capability !== 'smart_import' || input.venue !== 'local_process' || input.provider !== 'ollama' || input.model !== expected.model) return null;

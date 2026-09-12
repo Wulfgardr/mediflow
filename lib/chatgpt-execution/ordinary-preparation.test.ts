@@ -17,7 +17,7 @@ let calls: string[] = [], closes = 0;
 let detection = 'Bea Riva';
 let behavior: 'normal' | 'cross' | 'surrogate' | 'fail' | 'late' | 'dense' | 'close-fail' = 'normal';
 let release: (() => void) | undefined;
-mockOrdinaryModule(import.meta.url, '../gliner-redaction-runner', { namedExports: { createGlinerRedactionRunner: () => ({
+mockOrdinaryModule(import.meta.url, '../gliner-redaction-runner', { namedExports: { readGlinerRuntimeObservation: () => null, createGlinerRedactionRunner: () => ({
     async extract(text: string) {
         calls.push(text);
         if (behavior === 'fail') throw new Error('private diagnostics must not leak');

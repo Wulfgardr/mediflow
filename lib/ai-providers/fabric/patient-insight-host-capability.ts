@@ -1,5 +1,8 @@
 /* @Codex */
 import 'server-only';
+import { isOrdinaryFunctionSelected, executeOwnedOrdinaryProfile, ordinaryResultMetadata } from '../../chatgpt-product/ordinary-flow';
+import { createPatientInsightOrdinaryTaskProfile } from '../../chatgpt-execution/ordinary-task-profile';
+import type { OrdinaryRemoteReceipt, OrdinaryRemoteProvenance } from '../../chatgpt-product/ordinary-wire';
 
 import { randomBytes } from 'node:crypto';
 
@@ -22,9 +25,9 @@ import type {
 
 type Common = Readonly<{ writesPerformed: 0; apply: 'denied' }>;
 export type PatientInsightHostCapabilityResult =
-    | (Common & Readonly<{ status: 'available'; code: null; proposal: PatientInsightReviewProposal; receipt: FabricResolutionReceipt; provenance: FabricProvenanceRecord; reviewRef: string }>)
+    | (Common & Readonly<{ status: 'available'; code: null; proposal: PatientInsightReviewProposal; receipt: FabricResolutionReceipt | OrdinaryRemoteReceipt; provenance: FabricProvenanceRecord | OrdinaryRemoteProvenance; reviewRef: string }>)
     | (Common & Readonly<{ status: 'denied'; code: PatientInsightDenialCode; proposal: null; receipt: null; provenance: null; reviewRef: null }>)
-    | (Common & Readonly<{ status: 'failed'; code: PatientInsightFailureCode; proposal: null; receipt: FabricResolutionReceipt; provenance: FabricProvenanceRecord; reviewRef: null }>);
+    | (Common & Readonly<{ status: 'failed'; code: PatientInsightFailureCode; proposal: null; receipt: FabricResolutionReceipt | OrdinaryRemoteReceipt; provenance: FabricProvenanceRecord | OrdinaryRemoteProvenance; reviewRef: null }>);
 
 type Sources = Readonly<{ clock(): unknown; entropy(): unknown }>;
 type Dependencies = Readonly<{
@@ -155,6 +158,16 @@ export function createPatientInsightHostCapability(dependencies: Dependencies) {
             } catch { return deny('kill_switch_unavailable'); }
             try { if (dependencies.currentness.verify() !== true) return deny('source_stale'); }
             catch { return deny('source_stale'); }
+            if (isOrdinaryFunctionSelected('patient_insight')) {
+                const result = await executeOwnedOrdinaryProfile('patient_insight', createPatientInsightOrdinaryTaskProfile(request.projection), () => dependencies.currentness.verify());
+                const metadata = generatedMetadata(sources); if (!metadata || !dependencies.currentness.verify()) return deny('source_stale');
+                const extraction = result.output as import('../../ai-task-contracts').PatientInsightExtraction;
+                const proposal: PatientInsightReviewProposal = Object.freeze({ schemaVersion: 'mediflow.patient-insight.review-proposal.v2', reviewOnly: true,
+                    summary: extraction.summary, currentState: Object.freeze([...extraction.data.currentState]), alerts: Object.freeze([...extraction.data.alerts]),
+                    nextSteps: Object.freeze([...extraction.data.nextSteps]), gaps: Object.freeze([...extraction.data.gaps]), generatedAt: metadata.timestamp,
+                    currentness: Object.freeze({ ...request.currentness, verifiedAt: metadata.timestamp }) });
+                return Object.freeze({ ...common, status: 'available', code: null, proposal, ...ordinaryResultMetadata(result), reviewRef: metadata.reviewRef });
+            }
             let lifecycleState: Extract<ProviderLifecycleRead, { status: 'available' }>;
             try {
                 const lifecycle = dependencies.lifecycle.read();

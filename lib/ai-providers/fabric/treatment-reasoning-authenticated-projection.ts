@@ -1,5 +1,6 @@
 /* @Codex */
 import 'server-only';
+import { isOrdinaryFunctionSelected, bindOrdinaryApplicationContext } from '../../chatgpt-product/ordinary-flow';
 
 import { types } from 'node:util';
 
@@ -66,7 +67,7 @@ const INGEST_KEYS = ['projection', 'requestId'] as const;
 const PREVIEW_KEYS = ['handle', 'requestId'] as const;
 const HANDLE = /^trp_[0-9a-f]{32}$/u;
 const REQUEST = /^[A-Za-z][A-Za-z0-9._:-]{15,159}$/u;
-const OWNER_BROKERS = new WeakMap<object, WeakMap<object, Broker>>();
+const OWNER_BROKERS = new WeakMap<object, Broker>();
 
 function fail(code: TreatmentReasoningAuthenticatedProjectionErrorCode): never {
     throw new TreatmentReasoningAuthenticatedProjectionError(code);
@@ -104,12 +105,10 @@ function positive(value: unknown, code: TreatmentReasoningAuthenticatedProjectio
 }
 
 function brokerFor(context: AuthenticatedWebSessionProjectionOwnerContext): Broker {
-    let sessions = OWNER_BROKERS.get(context.owner);
-    if (!sessions) { sessions = new WeakMap<object, Broker>(); OWNER_BROKERS.set(context.owner, sessions); }
-    let broker = sessions.get(context.session);
+    let broker = OWNER_BROKERS.get(context.owner);
     if (broker && !broker.disposed) return broker;
     broker = { records: new Map(), requests: new Set(), executions: new Set(), unregister: null, disposed: false };
-    sessions.set(context.session, broker);
+    OWNER_BROKERS.set(context.owner, broker);
     return broker;
 }
 
@@ -217,6 +216,7 @@ export function createTreatmentReasoningAuthenticatedProjectionBroker(sources: S
         },
         async acquirePreview() {
             const { context, broker } = await acquire();
+            if (isOrdinaryFunctionSelected('treatment_reasoning')) await bindOrdinaryApplicationContext('treatment_reasoning', context.owner, context.session);
             return Object.freeze({
                 begin(value: unknown): TreatmentReasoningProjectionExecution {
                     const input = exact(value, PREVIEW_KEYS); acceptRequest(broker, input.requestId);

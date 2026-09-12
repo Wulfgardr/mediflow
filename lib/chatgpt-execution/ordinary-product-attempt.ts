@@ -1,8 +1,7 @@
-/* @Codex — backend-only companion to the DEMO controller; no HTTP/UI registration.
- * The function owner supplies an acquired profile and its negative retirement
- * signal, and MUST use its own original currentness binding/commit to publish.
- * A profile/revision/signal is NOT a positive clinical acquisition grant.
- * This frozen candidate cannot send ordinary content: ADR0077 remains closed. */
+/* @Codex — owned backend attempt for the four named ordinary profiles.
+ * The original application owners acquire context and commit publication;
+ * ordinary-flow retains those handlers across the explicit UI interactions.
+ * The named egress chokepoint verifies current governance on exact bytes. */
 import 'server-only';
 import { randomUUID } from 'node:crypto';
 import type { WebSessionProjection } from '../security/web-auth-lifecycle-owner-adapter';
@@ -12,6 +11,7 @@ import { createExecutionLogin } from './execution-login';
 import { ExecutionError, type SynthesisCatalog, type SynthesisRequest } from './execution-contract';
 import { createOrdinaryExecutionService, type OrdinaryExecutionResult } from './execution-service';
 import { createOrdinaryPreparation, type OrdinaryRunnerConfiguration, type PreparedOrdinaryProfile } from './ordinary-preparation';
+import type { RedactionSessionInput } from '../ai-redaction-session';
 import type { OrdinaryTaskProfile } from './ordinary-task-profile';
 import { createOrdinaryProductConsent, ordinaryConsentIsCurrent } from '../chatgpt-product/product-consent';
 import { ProductError } from '../chatgpt-product/product-contract';
@@ -75,7 +75,8 @@ export async function createOrdinaryProductAttempt(session: WebSessionProjection
         return cleanup;
     }
     const retire = () => { void dispose(); };
-    const registration = owner.registerPrivateResource(port, retire);
+    let registration: ReturnType<typeof owner.registerPrivateResource> = null;
+    registration = owner.registerPrivateResource(port, retire);
     if (!registration || !current()) { await dispose(); throw new ProductError('session_expired'); }
     expiry = setTimeout(retire, remaining()); expiry.unref?.();
     async function operation<T>(allowed: readonly State[], work: (expected: number) => Promise<T>): Promise<T> {
@@ -92,7 +93,7 @@ export async function createOrdinaryProductAttempt(session: WebSessionProjection
     return Object.freeze({
         /** No content, account secret, map or ordinary output in this projection. */
         snapshot() { guard(); return Object.freeze({ state, attemptRevision, contextRevision, qualificationRevision, expiresAt }); },
-        prepare(profile: OrdinaryTaskProfile, selectedContextRevision: string, configuration: OrdinaryRunnerConfiguration, signal: AbortSignal) {
+        prepare(profile: OrdinaryTaskProfile, selectedContextRevision: string, configuration: OrdinaryRunnerConfiguration, signal: AbortSignal, knownIdentifiers?: RedactionSessionInput['knownIdentifiers']) {
             return operation(['empty'], async expected => {
                 if (typeof selectedContextRevision !== 'string' || !selectedContextRevision || selectedContextRevision.length > 256 || !signal) throw new ProductError('invalid_request');
                 contextRevision = selectedContextRevision;
@@ -102,7 +103,7 @@ export async function createOrdinaryProductAttempt(session: WebSessionProjection
                 // Watch platform qualification, NOT the intentional draining host witness.
                 watcher = setInterval(() => { try { guard(); } catch { retire(); } }, 50); watcher.unref?.();
                 guard(expected); state = 'preparing';
-                job = createOrdinaryPreparation(profile, configuration, controller.signal);
+                job = createOrdinaryPreparation(profile, configuration, controller.signal, knownIdentifiers);
                 preparation = await job.ready; guard(expected);
                 if (platform.prepare) await platform.prepare(controller.signal, remaining());
                 guard(expected);

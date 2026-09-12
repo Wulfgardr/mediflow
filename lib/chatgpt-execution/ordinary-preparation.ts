@@ -2,8 +2,9 @@
 import 'server-only';
 import { createHash } from 'node:crypto';
 import { types } from 'node:util';
-import { createGlinerRedactionRunner } from '../gliner-redaction-runner';
+import { createGlinerRedactionRunner, readGlinerRuntimeObservation } from '../gliner-redaction-runner';
 import { createRedactionSession, type PreparedRedaction, type RedactionSessionInput } from '../ai-redaction-session';
+import type { RedactionRuntimeIdentity } from '../redaction-runtime-identity';
 import { scanJsonObject } from '../ai-json-lexical';
 import { renderEmissionPlan, type EmissionUnit } from './ordinary-emission-plan';
 import { readOrdinaryTaskProfile, ordinaryTextPath, ordinaryCanonicalTextBounds, type OrdinaryTaskProfile, type OrdinaryTaskOutput } from './ordinary-task-profile';
@@ -17,6 +18,7 @@ export type PreparedOrdinaryRead = Readonly<{
     payload: string;
     content: Readonly<{ input: readonly Readonly<{ type: 'text'; text: string; text_elements: readonly [] }>[]; outputSchema: Readonly<Record<string, unknown>> }>;
     entityCounts: Readonly<Record<string, number>>;
+    redactionIdentity: RedactionRuntimeIdentity | null;
     parseOutput(text: string): OrdinaryTaskOutput;
 }>;
 type Slot = { unit: EmissionUnit; start: number; end: number };
@@ -173,7 +175,7 @@ export function createOrdinaryPreparation(profile: OrdinaryTaskProfile, configur
             // units; remote output retains the existing 262144 lexical cap.
             const metadata = Object.freeze({ functionId: read.functionId, profileVersion: read.profileVersion,
                 sourceSha256: read.inputSha256, payloadSha256: sha256(payload), payloadBytes: Buffer.byteLength(payload, 'utf8'),
-                payload, content, entityCounts: Object.freeze(entityCounts), parseOutput: rehydrateJson });
+                payload, content, entityCounts: Object.freeze(entityCounts), redactionIdentity: readGlinerRuntimeObservation(runner), parseOutput: rehydrateJson });
             await runner.close(); // No neural process need survive until remote login.
             guard();
             records.set(token, { read: metadata, close });
