@@ -9,7 +9,7 @@ import { macDigest, readPinnedMacFile } from './execution-mac-config';
 import { MacOwnerSequence, parseMacOwnerFrame } from './execution-mac-state';
 
 // Updated only with the complete reviewed native source, never from caller JSON.
-export const MAC_NATIVE_SOURCE = Object.freeze({ bytes: 18879, sha256: '062b731b9932bc4827846c4185d9662037d4018dbc5105363987a02aa8ea8174' });
+export const MAC_NATIVE_SOURCE = Object.freeze({ bytes: 20411, sha256: 'c26edcc883e311f279507fc5a80c792242a252d66e99ee97c5f67693bcb14fac' });
 export class MacNativeBuildError extends ExecutionError {
     constructor(readonly drainUnconfirmed: boolean) { super('unqualified_boundary'); }
 }
@@ -36,7 +36,7 @@ export function buildMacCustodian(root: string, sourcePath: string) {
     const helper = join(root, 'runtime', 'mac-owner');
     trustedCommand(compiler, ['-std=c11', '-O2', '-Wall', '-Wextra', '-Werror', '-Wno-deprecated-declarations',
         '-isysroot', sdk, '-mmacosx-version-min=13.0', '-fstack-protector-strong', '-D_FORTIFY_SOURCE=2',
-        '-Wl,-no_uuid', copiedSource, '-framework', 'CoreFoundation', '-lsandbox', '-o', helper], root);
+        copiedSource, '-framework', 'CoreFoundation', '-lsandbox', '-o', helper], root);
     chmodSync(helper, 0o500);
     return Object.freeze({ helper, helperSha256: macDigest(readFileSync(helper)), compilerSha256: macDigest(readFileSync(compiler)),
         sdkPathSha256: macDigest(sdk), sourceSha256: MAC_NATIVE_SOURCE.sha256 });
