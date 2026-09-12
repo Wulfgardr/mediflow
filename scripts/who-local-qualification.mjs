@@ -82,7 +82,9 @@ export function createOwnedContainerArgs(state, name, network, publish) {
     const effectivePublish = isMacAccess(state) ? false : publish;
     return ['container', 'create', '--name', name, '--platform', platform, '--network', network,
         '--label', `${OWNER_LABEL}=${state.installationId}`, '--restart', 'no',
-        ...(effectivePublish === true ? ['--publish', '127.0.0.1:8382:80'] : effectivePublish === 'ephemeral' ? ['--publish', '127.0.0.1::80'] : []), '--env', 'acceptLicense=true',
+        ...(effectivePublish === true ? ['--publish', '127.0.0.1:8382:80'] : effectivePublish === 'ephemeral' ? ['--publish', '127.0.0.1::80'] : []),
+        // @Codex: fixed in-image CA bundle enables the pinned WHO image TLS verification.
+        '--env', 'SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt', '--env', 'acceptLicense=true',
         '--env', 'include=2026-01_en', '--env', 'saveAnalytics=false', '--env', 'enableDoris=false',
         '--env', 'fhirSupport=false', state.image];
 }

@@ -200,7 +200,8 @@ export async function executeSetup(options, dependencies = {}) {
     command('pull_failed', ['image', 'pull', '--platform', manifest.image.platform, '--quiet', image], 15 * 60 * 1000);
     const id = command('create_failed', ['container', 'create', '--name', CONTAINER_NAME, '--platform', manifest.image.platform,
         '--label', `org.mediflow.owner=${owner}`, '--restart', 'no', '--publish', '127.0.0.1:8382:80',
-        '--env', 'acceptLicense=true', '--env', 'include=2026-01_en', '--env', 'saveAnalytics=false',
+        // @Codex: fixed in-image CA bundle enables the pinned WHO image TLS verification.
+        '--env', 'SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt', '--env', 'acceptLicense=true', '--env', 'include=2026-01_en', '--env', 'saveAnalytics=false',
         '--env', 'enableDoris=false', '--env', 'fhirSupport=false', image]);
     if (!/^[0-9a-f]{64}$/u.test(id)) fail('create_failed');
     command('start_failed', ['container', 'start', id], 30000);

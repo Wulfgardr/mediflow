@@ -220,7 +220,7 @@ test('ordinary single procedure creates manifest, computes snapshot and restore 
     assert.equal(docker.calls.some(a => a.includes('curl')), false);
     for (const a of creations) {
         assert.equal(a.at(-1), `whoicd/icd-api@${lock.imageDigest}`);
-        for (const expected of ['acceptLicense=true', 'include=2026-01_en', 'saveAnalytics=false', 'enableDoris=false', 'fhirSupport=false']) assert.ok(a.includes(expected));
+        for (const expected of ['SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt', 'acceptLicense=true', 'include=2026-01_en', 'saveAnalytics=false', 'enableDoris=false', 'fhirSupport=false']) assert.ok(a.includes(expected));
         assert.equal(a.includes('--mount'), false); assert.equal(a.includes('--privileged'), false);
     }
     assert.doesNotMatch(JSON.stringify(docker.calls), /Config\.Env|"logs"|"rm"|"prune"|"sh"/u);

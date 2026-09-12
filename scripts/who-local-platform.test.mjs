@@ -41,6 +41,7 @@ for (const platform of ['win32', 'linux', 'darwin']) for (const arch of ['x64', 
             image: `whoicd/icd-api@${target.imageDigest}` }, 'mediflow-who-local-synthetic', 'bridge', true);
         assert.equal(args[args.indexOf('--platform') + 1], binding.platform);
         assert.equal(args.at(-1), `whoicd/icd-api@${target.imageDigest}`);
+        assert.ok(args.includes('SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt'));
         // F-WHO4 / proposed D10: only Mac is served by the owned Node listener.
         if (platform === 'darwin') assert.equal(args.includes('--publish'), false);
         else assert.ok(args.includes('127.0.0.1:8382:80'));
