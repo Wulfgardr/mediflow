@@ -1,3 +1,4 @@
+/* @Codex */
 /* PROPOSED Mac host-only WHO bridge. F3 topology; F4 BusyBox compatibility. No Web import. */
 import http from 'node:http';
 import { spawn } from 'node:child_process';
@@ -52,13 +53,119 @@ function validNcHelp(value) {
         && /\n\s*-w SEC\s+Timeout for connects and final net reads/u.test(value);
 }
 
+/** Header syntax shared by framing observation and the final strict response parser. */
+function readExecHeader(bytes) {
+    const header = bytes.toString('latin1').split('\r\n');
+    const statusLine = /^HTTP\/1\.[01] ([1-5][0-9]{2})(?: [\x20-\x7e]{0,128})?$/u.exec(header.shift());
+    if (!statusLine) fail('probe_response_invalid');
+    const status = Number(statusLine[1]), headers = Object.create(null);
+    if (header.length > 64) fail('probe_response_invalid');
+    for (const line of header) {
+        const field = /^([!#$%&'*+.^_`|~0-9A-Za-z-]+):[ \t]*([\x20-\x7e\t]*)$/u.exec(line);
+        if (!field || Object.hasOwn(headers, field[1].toLowerCase())) fail('probe_response_invalid');
+        headers[field[1].toLowerCase()] = field[2].trim();
+    }
+    return { status, headers };
+}
+
+/**
+ * Bounded incremental framing OBSERVATION, not response acceptance. A complete frame
+ * permits HTTP stdin EOF, never delivery. Keep observing through child close: bytes
+ * after a complete frame are invalid. Final status/MIME/UTF-8/JSON parsing still runs
+ * on ALL output after exit0; the owner must then re-read the binding before delivery.
+ * The fixed buffer and advancing cursors avoid quadratic concatenation on trickles.
+ */
+export function createExecResponseFramer() {
+    const wire = Buffer.alloc(EXEC_MAX_WIRE_BYTES);
+    let used = 0, headerScan = 0, offset, length, chunked = false;
+    let size = 0, count = 0, chunkLength, lineScan, complete = false, failed = false;
+    return Object.freeze({ push(chunk) {
+        try {
+            if (failed || !Buffer.isBuffer(chunk) || used + chunk.length > EXEC_MAX_WIRE_BYTES) fail('probe_response_invalid');
+            chunk.copy(wire, used); used += chunk.length;
+            if (complete) {
+                if (chunk.length) fail(chunked ? 'probe_response_invalid' : 'probe_response_incomplete');
+                return true;
+            }
+            const available = wire.subarray(0, used);
+            if (offset === undefined) {
+                const split = available.indexOf('\r\n\r\n', headerScan);
+                if (split < 0) {
+                    if (used > 8195) fail('probe_response_invalid');
+                    headerScan = Math.max(0, used - 3); return false;
+                }
+                if (split > 8192) fail('probe_response_invalid');
+                const { headers } = readExecHeader(available.subarray(0, split));
+                offset = split + 4;
+                if (headers['transfer-encoding'] !== undefined) {
+                    if (headers['transfer-encoding'].toLowerCase() !== 'chunked' || headers['content-length'] !== undefined) fail('probe_response_invalid');
+                    chunked = true; lineScan = offset;
+                } else {
+                    if (headers['content-length'] === undefined || !/^[0-9]+$/u.test(headers['content-length'])) fail('probe_response_incomplete');
+                    length = Number(headers['content-length']);
+                    if (!Number.isSafeInteger(length) || length > PROBE_MAX_BYTES) fail('probe_response_invalid');
+                }
+            }
+            if (!chunked) {
+                if (used - offset > length) fail('probe_response_incomplete');
+                complete = used - offset === length; return complete;
+            }
+            for (;;) {
+                if (chunkLength === undefined) {
+                    const end = available.indexOf('\r\n', lineScan);
+                    if (end < 0) {
+                        // Eight hex digits plus a possible trailing CR is the longest prefix.
+                        if (used - offset > 9) fail('probe_response_invalid');
+                        lineScan = Math.max(offset, used - 1); return false;
+                    }
+                    if (end - offset > 8 || ++count > 1024) fail('probe_response_invalid');
+                    const text = available.subarray(offset, end).toString('latin1');
+                    if (!/^[0-9a-fA-F]{1,8}$/u.test(text)) fail('probe_response_invalid');
+                    chunkLength = Number.parseInt(text, 16); offset = end + 2;
+                    if (size + chunkLength > PROBE_MAX_BYTES) fail('probe_response_invalid');
+                }
+                if (used - offset < chunkLength + 2) return false;
+                if (wire[offset + chunkLength] !== 13 || wire[offset + chunkLength + 1] !== 10) fail('probe_response_invalid');
+                offset += chunkLength + 2;
+                if (chunkLength === 0) {
+                    if (offset !== used) fail('probe_response_invalid'); // No trailers or second response.
+                    complete = true; return true;
+                }
+                size += chunkLength; chunkLength = undefined; lineScan = offset;
+            }
+        } catch (error) { failed = true; throw error; }
+    } });
+}
+
+function execHttpRequestPath(input) {
+    // Only the existing bounded, canonical request may reach the HTTP applet.
+    if (!Buffer.isBuffer(input) || input.length > 4096) fail('relay_request_invalid');
+    const end = input.indexOf('\r\n');
+    const line = end < 0 ? undefined : /^GET (\S+) HTTP\/1\.1$/u.exec(input.subarray(0, end).toString('ascii'));
+    if (!line || !input.equals(makeExecRequest(line[1]))) fail('relay_request_invalid');
+    return line[1];
+}
+
 /** Async bounded CLI. Only internal callers construct args; no executable/env override. */
 export function runDockerAsync(args, { input, signal, timeoutMs = PROBE_TIMEOUT_MS, maxBytes = EXEC_MAX_WIRE_BYTES } = {}) {
     try { checkCancelled(signal); } catch (error) { return Promise.reject(error); }
     const program = identifyProgram(args);
+    let httpPath;
+    try {
+        if (program === EXEC_HTTP_PROGRAM) {
+            httpPath = execHttpRequestPath(input);
+            if (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > PROBE_TIMEOUT_MS
+                || !Number.isInteger(maxBytes) || maxBytes < 1 || maxBytes > EXEC_MAX_WIRE_BYTES) fail('probe_binding_invalid');
+        }
+    } catch (error) { return Promise.reject(error); }
     return new Promise((resolve, reject) => {
-        let child, timer, killer, failure, firstOutputAt, closed = false, finished = false, bytes = 0, stderrBytes = 0;
+        let child, timer, killer, failure, framingError, firstOutputAt, closed = false, finished = false, bytes = 0, stderrBytes = 0;
         const out = [], err = [];
+        const expiresAt = performance.now() + timeoutMs;
+        let framer = program === EXEC_HTTP_PROGRAM ? createExecResponseFramer() : undefined;
+        const endInput = () => {
+            if (child?.stdin && !child.stdin.destroyed && !child.stdin.writableEnded) child.stdin.end();
+        };
         const terminateCli = () => {
             child?.stdin?.destroy();
             if (child && child.exitCode === null && child.signalCode === null) {
@@ -70,7 +177,7 @@ export function runDockerAsync(args, { input, signal, timeoutMs = PROBE_TIMEOUT_
         const done = (error, value) => {
             if (finished) return;
             finished = true; clearTimeout(timer); signal?.removeEventListener('abort', abort);
-            out.length = 0; err.length = 0;
+            out.length = 0; err.length = 0; framer = undefined;
             if (error) { if (!closed) terminateCli(); reject(error); } else resolve(value);
         };
         const rejectOperation = error => {
@@ -78,7 +185,7 @@ export function runDockerAsync(args, { input, signal, timeoutMs = PROBE_TIMEOUT_
             failure = error; out.length = 0; err.length = 0;
             // Do not free an EXEC operation slot just because the caller disconnected.
             // Keep draining (without retaining) until inner exit or the original deadline.
-            if (program && child && !closed) child.stdin.end();
+            if (program && child && !closed) endInput();
             else done(error);
         };
         const abort = () => rejectOperation(probeError('cancelled'));
@@ -87,13 +194,32 @@ export function runDockerAsync(args, { input, signal, timeoutMs = PROBE_TIMEOUT_
             child = spawn('docker', args, { env: dockerEnvironment(), stdio: ['pipe', 'pipe', 'pipe'], shell: false, windowsHide: true });
             child.once('error', error => done(probeError(error.code === 'ENOENT' ? 'docker_cli_missing'
                 : error.code === 'EACCES' ? 'docker_executable_denied' : 'docker_unavailable', { executable: 'docker' })));
-            child.stdin.on('error', () => {}); // Exit status, never raw stderr, is authoritative.
+            child.stdin.on('error', () => {
+                if (program === EXEC_HTTP_PROGRAM) rejectOperation(probeError('relay_transport_failed', { executable: 'busybox_timeout_nc' }));
+            }); // Never expose raw stream diagnostics.
             child.stdout.on('data', chunk => {
                 if (finished || failure) return;
+                if (program === EXEC_HTTP_PROGRAM && performance.now() >= expiresAt) {
+                    done(probeError('docker_command_timeout', { timeoutMs })); return;
+                }
                 firstOutputAt ??= performance.now();
                 bytes += chunk.length;
                 if (bytes > maxBytes) rejectOperation(probeError('probe_response_invalid'));
-                else out.push(chunk);
+                else {
+                    out.push(chunk);
+                    try { if (framer?.push(chunk)) endInput(); }
+                    catch (error) {
+                        // An impossible frame permits error cleanup, not delivery. Keep
+                        // bounded output so exit status and the final parser retain their
+                        // diagnostic precedence (e.g. a real 503 without a body length).
+                        framingError = error; framer = undefined; endInput();
+                    }
+                }
+            });
+            child.stdout.once('end', () => {
+                // Terminal stdout EOF also closes the input side, but cannot bless an
+                // empty/truncated frame. Exit status and the final parser still decide.
+                if (program === EXEC_HTTP_PROGRAM && !finished) endInput();
             });
             child.stderr.on('data', chunk => {
                 if (finished || failure) return;
@@ -105,6 +231,10 @@ export function runDockerAsync(args, { input, signal, timeoutMs = PROBE_TIMEOUT_
                 closed = true; clearTimeout(killer);
                 if (finished) return;
                 if (failure || signal?.aborted) { done(failure ?? probeError('cancelled')); return; }
+                // Timers may run late under event-loop load. A late close is never success.
+                if (program === EXEC_HTTP_PROGRAM && performance.now() >= expiresAt) {
+                    done(probeError('docker_command_timeout', { timeoutMs })); return;
+                }
                 const stdout = Buffer.concat(out, bytes), stderr = Buffer.concat(err).toString('utf8');
                 if (program === EXEC_DEADLINE_PROGRAM) {
                     const elapsed = performance.now() - (firstOutputAt ?? Infinity);
@@ -121,11 +251,16 @@ export function runDockerAsync(args, { input, signal, timeoutMs = PROBE_TIMEOUT_
                 else if (program === EXEC_NC_HELP_PROGRAM) {
                     if (validNcHelp(stdout.toString('utf8') + stderr)) done(null, Buffer.from(NC_MARKER));
                     else done(probeError('relay_nc_unsupported', { executable: 'busybox_nc' }));
+                } else if (program === EXEC_HTTP_PROGRAM) {
+                    try { parseExecResponse(stdout, httpPath); if (framingError) throw framingError; done(null, stdout); }
+                    catch (error) { done(error); }
                 } else done(null, stdout);
             });
             signal?.addEventListener('abort', abort, { once: true });
             if (signal?.aborted) abort();
-            else if (program === EXEC_DEADLINE_PROGRAM) child.stdin.write(input); // Deliberately no EOF.
+            // HTTP must keep stdin open until the exact response frame is observed.
+            // Prerequisite cat still receives EOF; deadline cat still stays open to KILL.
+            else if (program === EXEC_HTTP_PROGRAM || program === EXEC_DEADLINE_PROGRAM) child.stdin.write(input);
             else child.stdin.end(input);
         } catch { done(probeError('docker_unavailable')); }
     });
@@ -209,16 +344,7 @@ export function parseExecResponse(wire, requestPath) {
     if (!Buffer.isBuffer(wire) || wire.length > EXEC_MAX_WIRE_BYTES) fail('probe_response_invalid');
     const split = wire.indexOf('\r\n\r\n');
     if (split < 0 || split > 8192) fail('probe_response_invalid');
-    const header = wire.subarray(0, split).toString('latin1').split('\r\n');
-    const statusLine = /^HTTP\/1\.[01] ([1-5][0-9]{2})(?: [\x20-\x7e]{0,128})?$/u.exec(header.shift());
-    if (!statusLine) fail('probe_response_invalid');
-    const status = Number(statusLine[1]), headers = Object.create(null);
-    if (header.length > 64) fail('probe_response_invalid');
-    for (const line of header) {
-        const field = /^([!#$%&'*+.^_`|~0-9A-Za-z-]+):[ \t]*([\x20-\x7e\t]*)$/u.exec(line);
-        if (!field || Object.hasOwn(headers, field[1].toLowerCase())) fail('probe_response_invalid');
-        headers[field[1].toLowerCase()] = field[2].trim();
-    }
+    const { status, headers } = readExecHeader(wire.subarray(0, split));
     if (status >= 300 && status < 400) fail('probe_redirect_refused', { status });
     if (status === 503) fail('probe_service_starting', { status });
     if (status !== 200 && !(status === 404 && operation === 'codeinfo')) fail('probe_http_status', { status });

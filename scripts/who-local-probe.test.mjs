@@ -1,3 +1,4 @@
+/* @Codex */
 /* PROPOSED transport tests: real host loopback sockets and SYNTHETIC JSON, never WHO/Docker evidence. */
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -451,20 +452,25 @@ process.stdin.on('data', c => {
     if (mode === 'valid-deadline' && !globalThis.timer) {
         process.stdout.write(marker); globalThis.timer = setTimeout(() => process.exit(137), 1000);
     }
+    // HTTP replies to the completed request, not stdin EOF. Model the real stream
+    // ordering; the old EOF-dependent fake incorrectly made immediate end() pass.
+    if (!globalThis.replied && Buffer.concat(data).includes('\\r\\n\\r\\n')) {
+        globalThis.replied = true;
+        if (mode === 'valid') process.stdout.write(response);
+        else if (mode === 'body-exit1') { process.stdout.write(response); process.exitCode = 1; }
+        else if (mode === 'partial') process.stdout.end(response.slice(0, -1));
+        else if (mode === 'oversize') { process.stdout.write('x'.repeat(180000)); setTimeout(() => process.exit(137), 400); }
+        else if (mode === 'stderr-limit') process.stderr.write('x'.repeat(5000));
+        else if (mode === 'delay') { process.stdout.write(response); setTimeout(() => process.exit(137), 400); }
+        else if (mode === 'host-deadline') { process.stdout.write(response); setInterval(() => {}, 1000); }
+        else if (mode === 'missing') { process.exitCode = 127; process.stdin.destroy(); }
+    }
 });
 process.stdin.on('end', () => {
     record(); writeFileSync(${JSON.stringify(eof)}, 'EOF');
     if (mode === 'echo') process.stdout.write(Buffer.concat(data));
     else if (mode === 'help') process.stderr.write(help);
     else if (mode === 'bad-help') process.stderr.write('BusyBox v1.37.0\\nUsage: nc [-iN]\\n');
-    else if (mode === 'valid') process.stdout.write(response);
-    else if (mode === 'body-exit1') { process.stdout.write(response); process.exitCode = 1; }
-    else if (mode === 'partial') process.stdout.write(response.slice(0, -1));
-    else if (mode === 'oversize') { process.stdout.write('x'.repeat(180000)); setTimeout(() => process.exit(137), 400); }
-    else if (mode === 'stderr-limit') process.stderr.write('x'.repeat(5000));
-    else if (mode === 'delay') { process.stdout.write(response); setTimeout(() => process.exit(137), 400); }
-    else if (mode === 'host-deadline') { process.stdout.write(response); setInterval(() => {}, 1000); }
-    else if (mode === 'missing') process.exitCode = 127;
 });
 `;
     // The .mjs suffix is unnecessary because Node24 detects import syntax. No shell executes the script.
@@ -481,7 +487,7 @@ async function waitUntil(check, timeout = 2000) {
     }
 }
 const f4Args = selector => ['--host', f4Target.endpoint, ...execProgramArgs(f4Target.containerId, selector)];
-test('F4 real child pipes deliver canonical request through stdin, close stdin and return exact framed response', async t => {
+test('HTTP real child replies before stdin EOF, then closes and returns the exact frame', async t => {
     const f = fakeCli(t, 'valid');
     assert.equal((await exchangeWhoExec(f4Target, probePath('acquisition'))).body, body);
     const capture = JSON.parse(readFileSync(f.capture, 'utf8'));
@@ -575,9 +581,9 @@ test('F4 host TCP/EOF qualification is not substituted when the host nc lacks re
  * No WHO service/data. Uses only a locally present exact image and its BusyBox.
  * Peers are unique, owned, network=none, no mounts, non-root, no published ports.
  * This proves transport behavior ONLY, not real WHO/restore/PID1 lifecycle. */
-test('F4 parent Mac pinned-image TCP EOF, hard deadline and detached internal process acceptance', {
+test('parent Mac pinned-image HTTP frame-driven EOF, hard deadline and detached internal process acceptance', {
     skip: process.env.MEDIFLOW_WHO_BUSYBOX_MAC_ACCEPTANCE !== 'I_ACCEPT_TEMPORARY_NO_NETWORK_TRANSPORT_TESTS',
-    timeout: 180_000,
+    timeout: 240_000,
 }, async t => {
     assert.equal(process.platform, 'darwin', 'This gate must run on the real Mac, not Linux');
     assert.equal(process.arch, 'arm64'); assert.match(process.versions.node, /^24\./u);
@@ -599,7 +605,7 @@ test('F4 parent Mac pinned-image TCP EOF, hard deadline and detached internal pr
     assert.equal(imageData.os, 'linux'); assert.equal(imageData.arch, 'arm64');
     assert.ok(imageData.digests.includes(image)); assert.match(imageData.id, /^sha256:[a-f0-9]{64}$/u);
     // Never pull/install. If the exact local image is absent, the test fails here.
-    for (const scenario of ['reply-after-EOF', 'non-closing', 'partial-trickle', 'detach-CLI']) {
+    for (const scenario of ['reply-before-EOF-peer-closes', 'reply-before-EOF-peer-held-open', 'non-closing', 'partial-trickle', 'detach-CLI']) {
         await t.test(scenario, async st => {
             const owner = randomUUID(), name = `mediflow-f4-transport-${owner}`;
             const peerArgs = ['nc', '-n', '-l', '-s', '127.0.0.1', '-p', '80'];
@@ -663,19 +669,23 @@ test('F4 parent Mac pinned-image TCP EOF, hard deadline and detached internal pr
                     client = spawn('docker', ['--host', endpoint, ...execProgramArgs(cid, EXEC_HTTP_PROGRAM)],
                         { env: dockerEnvironment(), stdio: ['pipe', 'pipe', 'pipe'], shell: false });
                     client.stdin.on('error', () => {}); client.stdout.resume(); client.stderr.resume();
-                    client.once('error', () => {}); client.stdin.end(makeExecRequest(probePath('acquisition')));
+                    client.once('error', () => {}); client.stdin.write(makeExecRequest(probePath('acquisition'))); // HTTP input stays open.
                 } else result = exchangeWhoExec(target, probePath('acquisition')).then(value => ({ value }), error => ({ error }));
                 try {
                     await poll(async () => peerBytes >= makeExecRequest(probePath('acquisition')).length);
                     assert.ok(peerBytes <= 8192); assert.equal(Buffer.concat(stdout).toString(), makeExecRequest(probePath('acquisition')).toString());
-                    // Server CLOSE_WAIT is observed only after TCP FIN from client stdin EOF.
-                    // The server has not sent a byte yet. This is NOT inferred from pipe EOF.
-                    await poll(async () => /0100007F:0050\s+[0-9A-F]+:[0-9A-F]+\s+08\b/u.test((await execCat('/proc/net/tcp')).toString()));
+                    // Before the first response byte the HTTP client must NOT send FIN.
+                    // The old reply-after-EOF scenario assumed the behavior contradicted
+                    // by the parent WHO wire. Cat EOF remains independently mandatory.
+                    await poll(async () => /0100007F:0050\s+[0-9A-F]+:[0-9A-F]+\s+01\b/u.test((await execCat('/proc/net/tcp')).toString()));
                     const active = (await top()).filter(row => !baseline.has(row.pid) && !row.stat.startsWith('Z'));
                     assert.equal(active.length, 2, 'Exactly one request nc and its independent watchdog, no request descendants');
                     assert.ok(active.some(row => /\/bin\/busybox timeout -s KILL 4 \/bin\/busybox nc\b/u.test(row.args)), 'Observe the inner watchdog, not just the CLI');
                     assert.ok(active.some(row => /\/bin\/busybox nc -n -w 5 127\.0\.0\.1 80$/u.test(row.args)), 'Exact internal client must be observed alive before deadline/detach');
-                    if (scenario === 'reply-after-EOF') peer.stdin.end(wire(body));
+                    // The real BusyBox keeps reading until peer EOF; a complete frame alone
+                    // must remain a timeout if the peer ignores Connection: close.
+                    if (scenario === 'reply-before-EOF-peer-closes') peer.stdin.end(wire(body));
+                    else if (scenario === 'reply-before-EOF-peer-held-open') peer.stdin.write(wire(body));
                     else if (scenario === 'partial-trickle') {
                         peer.stdin.write('HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 1000\r\n\r\n{');
                         interval = setInterval(() => peer.stdin.write(' '), 200); // Never a complete response; activity must not extend deadline.
@@ -684,7 +694,7 @@ test('F4 parent Mac pinned-image TCP EOF, hard deadline and detached internal pr
                     }
                     if (scenario !== 'detach-CLI') {
                         const observed = await result;
-                        if (scenario === 'reply-after-EOF') assert.equal(observed.value?.body, body);
+                        if (scenario === 'reply-before-EOF-peer-closes') assert.equal(observed.value?.body, body);
                         else { assert.equal(observed.error?.code, 'probe_timeout'); assert.ok(Date.now() - started < 5500); }
                     } else assert.equal(detached, true); // This alone is deliberately insufficient.
                     clearInterval(interval);
