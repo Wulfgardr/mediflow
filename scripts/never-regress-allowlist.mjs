@@ -241,6 +241,31 @@ export const NEVER_REGRESS_ALLOWLIST = {
             pattern: "username:\\s*'synthetic-logout-operator'",
             reason: 'Logout server tests use a synthetic operator identity against an isolated local session store.',
         },
+        {
+            path: 'app/api/patients/route.test.ts',
+            pattern: "username:\\s*'synthetic-route-user'",
+            reason: 'Patient route tests use a synthetic Web owner identity with in-memory SQL and no live credential.',
+        },
+        {
+            path: 'lib/chatgpt-account/account-product-integration.test.ts',
+            pattern: "username:\\s*'invented'",
+            reason: 'ChatGPT account integration tests use a synthetic owner identity and transport with no live login.',
+        },
+        {
+            path: 'lib/chatgpt-product/product-production.test.ts',
+            pattern: "username:\\s*'synthetic'",
+            reason: 'ChatGPT product production tests use a synthetic Web owner identity with a local transport fixture.',
+        },
+        {
+            path: 'lib/chatgpt-product/product-session.test.ts',
+            pattern: "username:\\s*'synthetic'",
+            reason: 'ChatGPT product session tests use a synthetic owner identity for isolated lifecycle cases.',
+        },
+        {
+            path: 'lib/patient-create-service.test.ts',
+            pattern: "username:\\s*'synthetic-sql-user'",
+            reason: 'Patient service tests use a synthetic owner identity with an in-memory SQL fixture.',
+        },
     ],
     externalUrls: [
         {
@@ -572,6 +597,86 @@ export const NEVER_REGRESS_ALLOWLIST = {
             path: 'native/MediFlowMac/Sources/MediFlowMac/Models/OncologyPrototype.swift',
             pattern: 'https://interactiveguidelines.esmo.org/esmo-web-app/home/',
             reason: 'The oncology prototype exposes clinician-invoked guidance links and does not perform background egress or runtime API calls.',
+        },
+        {
+            path: 'app/api/patients/route.test.ts',
+            pattern: '^(?!.*https?://.*https?://).*http://synthetic\\.invalid/api/patients(?=["\\x27`]).*$',
+            reason: 'Patient route tests construct synthetic Request objects only; no request is sent to the reserved invalid host.',
+        },
+        {
+            path: 'lib/aifa-update-guide-route.test.ts',
+            pattern: '^(?!.*https?://.*https?://).*https://www\\.aifa\\.gov\\.it/open-data(?=["\\x27`]).*$',
+            reason: 'AIFA update-guide tests store official Open Data provenance in a synthetic manifest; no provenance URL is fetched.',
+        },
+        {
+            path: 'lib/aifa-update-guide-route.test.ts',
+            pattern: '^(?!.*https?://.*https?://).*https://drive\\.aifa\\.gov\\.it/farmaci/confezioni_fornitura\\.csv(?=["\\x27`]).*$',
+            reason: 'AIFA update-guide tests observe the fixed feed through a synthetic fetch seam and perform no external download.',
+        },
+        {
+            path: 'lib/aifa-update-guide.test.ts',
+            pattern: '^(?!.*https?://.*https?://).*https://example\\.invalid/synthetic\\.csv(?=["\\x27`]).*$',
+            reason: 'AIFA update-guide tests use a reserved invalid source URL as synthetic manifest metadata only.',
+        },
+        {
+            path: 'lib/aifa-update-guide.test.ts',
+            pattern: '^(?!.*https?://.*https?://).*https://www\\.aifa\\.gov\\.it/copyright(?=["\\x27`]).*$',
+            reason: 'AIFA update-guide tests retain the official reuse-terms URL as synthetic metadata and never fetch it.',
+        },
+        {
+            path: 'lib/chatgpt-account/account-product-integration.test.ts',
+            pattern: '^(?!.*https?://.*https?://).*https://auth\\.openai\\.com/oauth/authorize\\?state=synthetic-product(?=["\\x27`]).*$',
+            reason: 'ChatGPT account integration tests return a synthetic authorization payload; the URL is never opened or sent.',
+        },
+        {
+            path: 'lib/chatgpt-account/account-product.browser.test.mjs',
+            pattern: '^(?!.*https?://.*https?://).*https://auth\\.openai\\.com/oauth/authorize\\?state=synthetic-fixture(?=["\\x27`]).*$',
+            reason: 'ChatGPT browser tests return a synthetic authorization payload through an injected fetcher with no navigation.',
+        },
+        {
+            path: 'lib/chatgpt-execution/execution-login.test.ts',
+            pattern: "^\\s*for \\(const url of \\['http://auth\\.openai\\.com/fixture', 'https://other\\.invalid/fixture', 'https://auth\\.openai\\.com:444/fixture', 'https://user@auth\\.openai\\.com/fixture', 'https://auth\\.openai\\.com/fixture#secret'\\]\\) test\\('device URL is only a validated official server response, not arbitrary navigation', async t => \\{\\s*$",
+            reason: 'Execution login tests retain five exact hostile URLs on one synthetic fixture line; the complete line is allowlisted and no URL is opened or fetched.',
+        },
+        {
+            path: 'lib/chatgpt-execution/execution-mac-config.ts',
+            pattern: '^(?!.*https?://.*https?://).*https://raw\\.githubusercontent\\.com/openai/codex/3d2ee51ca2d5db578f328aa75e20aa22c0197c9a/codex-rs/core/config\\.schema\\.json(?=["\\x27`]).*$',
+            reason: 'Mac execution keeps this exact reviewed source URL pinned to commit 3d2ee51ca2d5db578f328aa75e20aa22c0197c9a; local bytes and SHA-256 are verified and no fetch occurs.',
+        },
+        {
+            path: 'lib/chatgpt-execution/execution-mac-config.ts',
+            pattern: '^(?!.*https?://.*https?://).*https://raw\\.githubusercontent\\.com/openai/codex/3d2ee51ca2d5db578f328aa75e20aa22c0197c9a/codex-rs/config/src/loader/mod\\.rs(?=["\\x27`]).*$',
+            reason: 'Mac execution keeps this exact reviewed loader source URL pinned to commit 3d2ee51ca2d5db578f328aa75e20aa22c0197c9a; local bytes and SHA-256 are verified and no fetch occurs.',
+        },
+        {
+            path: 'lib/chatgpt-product/product-browser.test.ts',
+            pattern: '^(?!.*https?://.*https?://).*https://other\\.invalid(?=["\\x27`]).*$',
+            reason: 'ChatGPT product browser tests use a reserved invalid URL only in a synthetic disclosure-corruption fixture.',
+        },
+        {
+            path: 'lib/chatgpt-product/product-production.test.ts',
+            pattern: '^(?!.*https?://.*https?://).*https://auth\\.openai\\.com/fixture-only-not-opened(?=["\\x27`]).*$',
+            reason: 'ChatGPT product tests use a synthetic verification URL in a mocked response and never open or fetch it.',
+        },
+        {
+            path: 'lib/chatgpt-product/product-production.test.ts',
+            pattern: '^(?!.*https?://.*https?://).*https://example\\.invalid(?=["\\x27`]).*$',
+            reason: 'ChatGPT product tests use a reserved invalid URL only as a synthetic forbidden-egress fixture.',
+        },
+        {
+            path: 'lib/patient-create-service.test.ts',
+            pattern: '^(?!.*https?://.*https?://).*http://synthetic\\.invalid/api/patients(?=["\\x27`]).*$',
+            reason: 'Patient service tests construct a synthetic Request object only; no request is sent to the reserved invalid host.',
+        },
+        {
+            path: 'lib/reference-data/repertory-guides-ui.test.ts',
+            pattern: '^(?!.*https?://.*https?://).*https://example\\.invalid/invented\\.csv(?=["\\x27`]).*$',
+            reason: 'Repertory guide UI tests use a reserved invalid source URL as synthetic metadata only.',
+        },
+        {
+            path: 'lib/reference-data/repertory-guides-ui.test.ts',
+            pattern: '^(?!.*https?://.*https?://).*https://www\\.aifa\\.gov\\.it/copyright(?=["\\x27`]).*$',
+            reason: 'Repertory guide UI tests retain the official AIFA reuse-terms URL as synthetic metadata and never fetch it.',
         },
     ],
 };
