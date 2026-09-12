@@ -21,6 +21,24 @@ consegnare registry e binding per ruolo, adapter locali alternativi, layer 2 di
 redazione, consenso e qualunque provider cloud. Il problema sotto conserva la
 fotografia precedente all'estrazione e non descrive lo stato runtime corrente.
 
+## Integrazione candidata 0.8.6: redazione locale
+
+Il runner GLiNER2-PII usa un artifact locale con revisione e digest fissati,
+versioni delle librerie verificate e caricamento offline, senza download o
+fallback automatici. Sul Mac il processo nasce con rete negata dal sandbox del
+sistema; errori di avvio, protocollo, timeout o annullamento invalidano il
+runner. Non si conservano testi o predizioni su disco. Una prova sui corpus
+sintetici qualifica quel runner e quei dati, non l'assenza universale di PII.
+
+La composizione mantiene Layer 1 obbligatorio, verifica gli offset neurali e
+produce pseudonimi coerenti nella sola sessione in RAM. La reidratazione di un
+risultato accede solo ai token della propria preparazione; la chiusura della
+sessione invalida anche i risultati precedenti. Questi moduli non rilasciano
+consenso o autorita di egress: il report di benchmark, il percorso del modello e
+l'esito della redazione non sostituiscono la governance e il chokepoint previsti
+sopra. Il gate ordinario resta chiuso finche la composizione completa non e
+collegata e verificata.
+
 ## Problema
 
 Il runtime AI di MediFlow e oggi monolitico su Ollama: `AIProvider = 'ollama'`
