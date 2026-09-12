@@ -78,8 +78,13 @@ echo "Injecting WebRuntime into the app bundle..."
 rm -rf "$WEB"
 mkdir -p "$WEB/.next"
 cp -R "$STANDALONE_DIR/." "$WEB/"
-cp -R "$ROOT_DIR/$NEXT_DIST_DIR/static" "$WEB/.next/static"
-[[ -d "$ROOT_DIR/public" ]] && cp -R "$ROOT_DIR/public" "$WEB/public"
+# @Codex: merge contents when a reused standalone already includes these assets.
+mkdir -p "$WEB/.next/static"
+cp -R "$ROOT_DIR/$NEXT_DIST_DIR/static/." "$WEB/.next/static/"
+if [[ -d "$ROOT_DIR/public" ]]; then
+  mkdir -p "$WEB/public"
+  cp -R "$ROOT_DIR/public/." "$WEB/public/"
+fi
 cp "$ROOT_DIR/scripts/local-api-tls-proxy.mjs" "$RES/local-api-tls-proxy.mjs"
 "$ROOT_DIR/scripts/check-macos-web-runtime-native-payload.sh" --normalize --web-runtime "$WEB" --frameworks "$FRAMEWORKS"
 
