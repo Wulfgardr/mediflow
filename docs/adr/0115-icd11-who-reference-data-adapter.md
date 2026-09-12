@@ -5,6 +5,73 @@ Status: Accepted
 
 Amendment: 2026-09-06, WUL-672, candidato locale da `07725c7`.
 
+## Amendment WUL-673 — consultazione WHO paired nell'app Mac (2026-09-12)
+
+Run `e25d456b66df489786a4e27d63f1966b`, base
+`73442886cecb9b5c21446974819822c058d848d4`. Questo amendment additivo
+estende la superficie di consultazione, non cambia il production root locale.
+Precede l'implementazione ed è riflesso nella specifica OpenAPI v1.
+Le restrizioni storiche «nessun nuovo endpoint/Search nativa» sotto non si
+applicano ai soli tre endpoint qui autorizzati.
+
+- `GET /api/v1/network/terminology/who/readiness`: nessun parametro;
+  readiness v2 passiva, `200` solo per `available`, altrimenti `503` con la
+  medesima struttura. `configured` non è una prova di servizio disponibile.
+- `GET /api/v1/network/terminology/who/search?q=…`: un solo parametro `q`,
+  normalizzato dal binding (1–160 byte UTF-8), nessun limit/paging;
+  envelope Search v2 con `partial`, voci complete e receipt v2.
+- `GET /api/v1/network/terminology/who/code-check?code=…&release=2026-01`:
+  codice singolo/combinato nel linguaggio del parser canonico; risultato
+  code-check v1 `found|not_found`, entry opzionale e receipt esclusivamente
+  `live`. `not_found` è un risultato `200`, non indisponibilità o diagnosi.
+
+Tutte e tre usano `requireNetworkCapabilityContext` e la capability già
+esistente `network.catalogs.readonly`: token del dispositivo paired,
+operatore autenticato e ambulatorio effettivo. La sessione nativa resta nativa;
+nessuna conversione in WebSession, nuova capability o modifica auth/DB. La
+consultazione è globale ma resta legata all'identità e all'ambito iniziali.
+Si catturano valori immutabili di sessione/utente/ruolo/canale,
+dispositivo/piattaforma/tokenHash e ambulatorio, più l'identità dell'oggetto
+sessione. Si riautentica prima del lavoro e dopo ogni attesa del servizio;
+`peekSession` verifica sincronicamente la sessione originaria prima e dopo
+l'attesa di riautenticazione. Una nuova autorizzazione, anche valida, non
+convalida il risultato della precedente. Abort, revoca o cambio binding
+negano la consegna; nessun token o snapshot di autorità viene restituito.
+
+Il servizio resta `getIcd11WhoProductionRuntime`: nessun secondo runtime,
+audit parallelo, accesso WHO dal client o endpoint caller-supplied. I parser
+canonici validano anche la proiezione in uscita. Il limite upstream di 65.536
+byte è invariato; anche l'envelope paired e il decoder Swift hanno un limite
+massimo di 65.536 byte. Un risultato non consegnabile fallisce chiuso,
+non viene troncato a un envelope falsamente completo. Il server non espone
+errori vendor, query, credenziali o configurazione host. Risposte `no-store`.
+
+Il client Swift conserva schema, codice/titolo/URI, binding, release `2026-01`,
+lingua `en`, immagine/dataset, `partial`, fonte e tempi della receipt. Rifiuta
+schema/versione/binding incongruenti, codici malformati, URI estranei, conteggi
+incoerenti, enum sconosciuti e receipt non valide. Usa la stessa URLSession
+effimera e il delegate TLS pinning del client paired. Non usa un'altra sessione.
+Il datasource locale e gli altri conformer ereditano un errore WHO esplicito
+`unsupported`; nessun ripiego a ICD-10, altro dataset o WHO remoto.
+
+Repertori Mac sostituisce la ricerca ICD-10 non supportata con la scelta
+«ICD-11 WHO». Ricerca, controllo codice e verifica servizio richiedono intento
+esplicito, non partono digitando o su campo vuoto. La superficie mostra inglese,
+release, stato/provenienza, partial/vuoto, errori con retry manuale e annullamento.
+Generazione richiesta e identità corrente impediscono pubblicazione fuori
+ordine o dopo cambio query/catalogo/connessione/ambulatorio o chiusura. Nessun
+autoapply o scrittura paziente. Farmaci/Esenzioni e API ATC/LOINC/UCUM restano.
+
+Recupero: restringere una ricerca non consegnabile e/o verificare il servizio;
+non attribuire genericamente un `503` alla dimensione. Servizio non configurato
+richiede l'intervento esplicito del responsabile dell'host secondo il setup
+esistente, mai avvio/installazione/accettazione licenza automatica.
+
+**Claim ceiling:** contributo di codice e prove sintetiche eseguibili sul
+materiale allegato. Xcode/build Mac, pinning reale, WHO live/UI e qualifica
+exact-candidate Mac/localhost/Headless restano al parent/Astra (WUL-697).
+Questo contributo non chiude WUL-673 né dichiara parità delle altre piattaforme.
+
 ## Decisione vigente per il candidato 0.8.6 — prima del codice
 
 L'utente ha scelto il **sidecar WHO locale** il 6 settembre, come registrato

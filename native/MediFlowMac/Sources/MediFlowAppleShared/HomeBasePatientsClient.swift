@@ -335,6 +335,65 @@ public actor HomeBasePatientsClient {
         return try decode([HomeBaseExemptionSummary].self, from: data)
     }
 
+    /* @Codex: WUL-673. Named local WHO contracts on the canonical paired channel. */
+    public func searchWHO(query: String, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?) async throws -> HomeBaseWHOSearchResponse {
+        let query = try HomeBaseWHODecoder.normalizedQuery(query)
+        let (data, status) = try await sendWHO(path: "search", parameters: [URLQueryItem(name: "q", value: query)], credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        guard status == 200 else { throw HomeBaseWHODecoder.error(data, status: status) }
+        let result = try HomeBaseWHODecoder.search(data)
+        try Task.checkCancellation()
+        return result
+    }
+
+    public func readWHOReadiness(credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?) async throws -> HomeBaseWHOReadiness {
+        let (data, status) = try await sendWHO(path: "readiness", parameters: [], credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        if status == 200 || status == 503, let result = try? HomeBaseWHODecoder.readiness(data) {
+            guard (status == 200) == (result.status == .available) else { throw HomeBaseWHOError.invalidResponse }
+            try Task.checkCancellation()
+            return result
+        }
+        throw HomeBaseWHODecoder.error(data, status: status)
+    }
+
+    public func checkWHOCode(code: String, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?) async throws -> HomeBaseWHOCodeCheckResponse {
+        guard HomeBaseWHODecoder.isCheckCode(code) else { throw HomeBaseWHOError.invalidRequest }
+        let (data, status) = try await sendWHO(path: "code-check", parameters: [URLQueryItem(name: "code", value: code), URLQueryItem(name: "release", value: HomeBaseWHODecoder.release)], credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        guard status == 200 else { throw HomeBaseWHODecoder.error(data, status: status) }
+        let result = try HomeBaseWHODecoder.checkCode(data, requestedCode: code)
+        try Task.checkCancellation()
+        return result
+    }
+
+    private func sendWHO(path: String, parameters: [URLQueryItem], credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?) async throws -> (Data, Int) {
+        try Task.checkCancellation()
+        guard Self.hasPairedCredentials(credentials), !sessionCookie.isEmpty,
+              ["readiness", "search", "code-check"].contains(path) else { throw HomeBaseWHOError.unauthorized }
+        let url = try configuration.apiBaseURL().appendingPathComponent("network/terminology/who")
+            .appendingPathComponent(path).appending(queryItems: parameters)
+        var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData)
+        request.httpMethod = "GET"
+        request.httpShouldHandleCookies = false
+        request.setValue("native", forHTTPHeaderField: "X-MediFlow-Source-Surface")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("no-store", forHTTPHeaderField: "Cache-Control")
+        for (name, value) in pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId) {
+            request.setValue(value, forHTTPHeaderField: name)
+        }
+        do {
+            // Same ephemeral URLSession and TLS delegate; no alternate transport.
+            let (data, response) = try await session.data(for: request)
+            try Task.checkCancellation()
+            guard let response = response as? HTTPURLResponse,
+                  data.count <= HomeBaseWHODecoder.maximumBytes,
+                  response.mimeType?.lowercased() == "application/json"
+            else { throw HomeBaseWHOError.invalidResponse }
+            return (data, response.statusCode)
+        } catch let error as URLError {
+            if error.code == .cancelled || Task.isCancelled { throw CancellationError() }
+            throw HomeBaseClientError.transport(Self.mapTransportError(error))
+        }
+    }
+
     /* @Codex */
     public func searchTerminology(
         system: String,
