@@ -49,7 +49,7 @@ export function executionSandboxProfile(root: string, binary: string, proxyPort:
     return `(version 1)
 (deny default)
 (import "dyld-support.sb")
-(allow process-fork)
+(deny process-fork)
 (allow process-exec (literal ${executable})${probe})
 (allow signal (target same-sandbox))
 (allow process-info* (target same-sandbox))
@@ -62,21 +62,35 @@ export function executionSandboxProfile(root: string, binary: string, proxyPort:
   (literal "/private/etc/localtime")
   (literal "/etc") (literal "/private/etc")
   (literal "/private/etc/codex") (literal "/private/etc/codex/requirements.toml")
-  (literal "/private/etc/codex/config.toml"))
+  (literal "/private/etc/codex/config.toml") (literal "/private/etc/codex/managed_config.toml")
+  (literal "/etc/codex") (literal "/etc/codex/requirements.toml")
+  (literal "/etc/codex/config.toml") (literal "/etc/codex/managed_config.toml"))
 (allow file-map-executable file-read-data
   (subpath "/System/Library") (subpath "/usr/lib")
   (subpath "/Library/Apple/System/Library")
   (literal "/dev/null") (literal "/dev/random") (literal "/dev/urandom")
   (literal "/private/etc/localtime") (literal ${executable})${probe}
   (subpath ${owned}))
-(allow file-write* (subpath ${owned}) (literal "/dev/null"))
+; ONLY exact absent administrative paths, checked by the native custodian.
+; PermissionDenied is never converted to NotFound.
+(allow file-read-data
+  (literal "/etc/codex/requirements.toml") (literal "/private/etc/codex/requirements.toml")
+  (literal "/etc/codex/config.toml") (literal "/private/etc/codex/config.toml")
+  (literal "/etc/codex/managed_config.toml") (literal "/private/etc/codex/managed_config.toml"))
+(allow file-write* ${['codex', 'work', 'tmp', 'config', 'cache', 'data'].map(name => `(subpath ${literal(join(root, name))})`).join(' ')} (literal "/dev/null"))
+; All protected files lack owner-write permission. Deny chmod/chown/chflags
+; globally so a hard-link alias in scratch cannot regain write permission.
+(deny file-write-mode file-write-owner file-write-flags)
+; Protect parent directory entries as well as immutable leaf files.
+(deny file-write* (literal ${owned}) (subpath ${literal(join(root, 'runtime'))})
+  ${['codex', 'work', 'tmp', 'config', 'cache', 'data'].map(name => `(literal ${literal(join(root, name))})`).join(' ')})
 (deny file-write* (literal ${literal(join(root, 'codex', 'config.toml'))})
   (literal ${literal(join(root, 'profile.sb'))}) (literal ${literal(join(root, 'runtime', 'public-ca.pem'))}) (literal ${executable}))
 (allow sysctl-read)
 (allow system-mac-syscall (mac-policy-name "vnguard"))
 (allow system-mac-syscall (require-all (mac-policy-name "Sandbox") (mac-syscall-number 67)))
-(allow mach-lookup (global-name "com.apple.system.opendirectoryd.libinfo")
-  (global-name "com.apple.SystemConfiguration.configd"))
+; No ambient Mach lookup, preferences IPC, Unix sockets or local services.
+(deny mach-lookup)
 (allow network-outbound (remote tcp "localhost:${proxyPort}"))
 `;
 }

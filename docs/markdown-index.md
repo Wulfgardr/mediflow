@@ -336,3 +336,13 @@ sorgenti, toolchain, prove delle bozze e limiti della lane nativa.
 - [ADR 0135](./adr/0135-native-ai-configuration-authority.md): grant nativo esplicito, preferenze AI e preset; account distinto.
 
 - [Test UI 0.8.6](../tests/ui06/README.md): test dei componenti con fixture sintetiche, comandi e limiti della verifica.
+
+## Proposte recuperate nella riconciliazione del 12 settembre 2026
+
+| File | Scopo | Quando consultarlo |
+| --- | --- | --- |
+| [ADR-WUL-689-MAC-EXECUTION-CUSTODIAN.md](../proposals/ADR-WUL-689-MAC-EXECUTION-CUSTODIAN.md) | Proposta tecnica recuperata della candidata 0.8.6; accettazione e qualifica restano distinte. | Riesame del relativo contributo. |
+| [ADR-WUL-689-OPENAI-PRODUCT.md](../proposals/ADR-WUL-689-OPENAI-PRODUCT.md) | Proposta tecnica recuperata della candidata 0.8.6; accettazione e qualifica restano distinte. | Riesame del relativo contributo. |
+| [PATIENT-BULK-IMPORT-CONTRACT.md](../proposals/PATIENT-BULK-IMPORT-CONTRACT.md) | Proposta tecnica recuperata della candidata 0.8.6; accettazione e qualifica restano distinte. | Riesame del relativo contributo. |
+| [TREATMENT-PORTABLE-ADR.md](../proposals/TREATMENT-PORTABLE-ADR.md) | Proposta tecnica recuperata della candidata 0.8.6; accettazione e qualifica restano distinte. | Riesame del relativo contributo. |
+| [WHO-TRIOS-ADR.md](../proposals/WHO-TRIOS-ADR.md) | Proposta tecnica recuperata della candidata 0.8.6; accettazione e qualifica restano distinte. | Riesame del relativo contributo. |

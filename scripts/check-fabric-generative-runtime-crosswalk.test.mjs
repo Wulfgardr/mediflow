@@ -125,3 +125,27 @@ test('requires opaque catalog choice and preserves CLI admission and proposal-on
   const route = readFileSync(patient.descriptorEntryPoint, 'utf8').replace("withFunctionModelDispatch('patient_insight',", "unscopedDispatch(");
   assert.throws(() => validateFabricGenerativeRuntimeCrosswalk(manifest, repositorySources({ [patient.descriptorEntryPoint]: route })), /sealed model dispatch/u);
 });
+
+import { TREATMENT_PORTABLE_RUNTIME_CROSSWALK, validateTreatmentReasoningPortableCrosswalk } from './check-fabric-generative-runtime-crosswalk.mjs';
+test('capability-local v2 map pins the untouched v1 crosswalk and keeps runtime qualification unobserved', () => {
+  const result = validateTreatmentReasoningPortableCrosswalk();
+  assert.equal(result.provider, 'athena_transformers'); assert.equal(result.runtimeQualification, 'not_observed'); assert.equal(result.applyPolicy, 'none');
+  assert.equal(TREATMENT_PORTABLE_RUNTIME_CROSSWALK.integrationStatus, 'proposed_not_integrated');
+});
+test('portable map rejects field drift, altered legacy manifest and any generic v1 provider widening', () => {
+  for (const [key, value] of [['provider', 'athena_mlx'], ['runtimeQualification', 'available'], ['applyPolicy', 'allowed'], ['unexpected', true]]) {
+    assert.throws(() => validateTreatmentReasoningPortableCrosswalk({ ...TREATMENT_PORTABLE_RUNTIME_CROSSWALK, [key]: value }), /portable v2 map/u);
+  }
+  assert.throws(() => validateTreatmentReasoningPortableCrosswalk(TREATMENT_PORTABLE_RUNTIME_CROSSWALK,
+    repositorySources({ [MANIFEST_PATH]: readFileSync(MANIFEST_PATH, 'utf8') + '\n' })), /legacy crosswalk drift/u);
+  const contract = 'lib/ai-providers/fabric/contract.ts';
+  assert.throws(() => validateTreatmentReasoningPortableCrosswalk(TREATMENT_PORTABLE_RUNTIME_CROSSWALK,
+    repositorySources({ [contract]: readFileSync(contract, 'utf8') + '\nathena_transformers\n' })), /widened generic v1/u);
+});
+for (const source of ['scripts/treatment-reasoning-portable-worker.py', 'scripts/treatment-reasoning-portable-setup.mjs',
+  'lib/ai-providers/fabric/treatment-reasoning-production-operation.ts', 'app/api/ai/fabric/status/route.ts',
+  'app/settings/ai/fabric/page.tsx', 'next.config.ts', 'lib/ai-providers/fabric/function-model-preferences-http.ts']) {
+  test(`portable v2 guard fails closed when integration source is missing: ${source}`, () => {
+    assert.throws(() => validateTreatmentReasoningPortableCrosswalk(TREATMENT_PORTABLE_RUNTIME_CROSSWALK, repositorySources({ [source]: null })), /portable v2 source/u);
+  });
+}

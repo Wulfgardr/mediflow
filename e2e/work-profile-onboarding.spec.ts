@@ -55,6 +55,7 @@ test('onboarding: persisted preview, resume, changed recommendation, manual entr
     await panel.getByRole('button', { name: 'Mostra anteprima' }).click();
     await expect(panel.getByRole('heading', { name: 'Anteprima del profilo' })).toBeVisible();
     await expect(panel.getByText(/Consigliato:/)).toContainText('Agent');
+    await panel.locator('summary').filter({ hasText: 'Dettagli del profilo' }).click();
     await expect(panel.getByText(/non collega né verifica un agente/)).toBeVisible();
     await expect(panel.getByText(/app desktop completa non è attestata/)).toBeVisible();
     expect((await read()).active).toBeNull();

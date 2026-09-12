@@ -5,10 +5,11 @@ import { createPreferencesClient, parsePreferences, type FunctionModelPreference
 import { createModelPreviewClient } from '../../lib/function-models/preview-client';
 export const rev = (digit = 'a') => `sha256_${digit.repeat(64)}`;
 export const optionId = (digit = 'a') => `model_option_${digit.repeat(32)}`;
-export function dto(): FunctionModelPreferences { return { schemaVersion: 'mediflow.function-preferences.v1', revision: rev(), catalogRevision: rev('b'), check: 'configuration_only', apply: 'denied', presets: ['host_defaults', 'all_off'], functions: ['patient_insight','smart_import','document_synthesis','treatment_reasoning'].map(id => ({ id, enabled: true, defaultModelOptionId: optionId(), defaultSource: 'host_configuration', bindingState: 'current', options: [{ modelOptionId: optionId(), label: 'synthetic-local:small', provider: 'ollama', state: 'available_unqualified' }, { modelOptionId: optionId('b'), label: 'synthetic-local:large', provider: 'ollama', state: 'available_unqualified' }] })) } as FunctionModelPreferences; }
+type SyntheticPreferences = Extract<FunctionModelPreferences, { schemaVersion: 'mediflow.function-preferences.v1' }>;
+export function dto(): SyntheticPreferences { return { schemaVersion: 'mediflow.function-preferences.v1', revision: rev(), catalogRevision: rev('b'), check: 'configuration_only', apply: 'denied', presets: ['host_defaults', 'all_off'], functions: ['patient_insight','smart_import','document_synthesis','treatment_reasoning'].map(id => ({ id, enabled: true, defaultModelOptionId: optionId(), defaultSource: 'host_configuration', bindingState: 'current', options: [{ modelOptionId: optionId(), label: 'synthetic-local:small', provider: 'ollama', state: 'available_unqualified' }, { modelOptionId: optionId('b'), label: 'synthetic-local:large', provider: 'ollama', state: 'available_unqualified' }] })) } as SyntheticPreferences; }
 function deferred<T>() { let resolve!: (value: T) => void; const promise = new Promise<T>(fn => { resolve = fn; }); return { promise, resolve }; }
 function fixture(id: 'patient_insight' | 'smart_import' | 'document_synthesis' | 'treatment_reasoning' = 'patient_insight') {
-    let value = dto(); const calls: { path: string; init?: RequestInit }[] = [];
+    let value: FunctionModelPreferences = dto(); const calls: { path: string; init?: RequestInit }[] = [];
     let response: Response | null = null;
     const client = createModelPreviewClient(id, (async (input, init) => { calls.push({ path: String(input), init }); return response ?? Response.json(String(input).includes('/settings/') ? value : { synthetic: true }); }) as typeof fetch);
     client.reset(true); return { client, calls, set: (next: FunctionModelPreferences) => { value = next; }, response: (next: Response) => { response = next; } };
@@ -37,8 +38,8 @@ test('revision or catalog changes never fall back from stale override', async ()
         f.set({ ...dto(), [key]: rev('c') }); await assert.rejects(f.client.begin()); assert.equal(f.client.getSnapshot().blocked, true); assert.match(f.client.getSnapshot().error!, /nessun modello alternativo/); assert.ok(f.calls.every(c => c.path.includes('/settings/'))); }
 });
 test('disabled, unavailable, empty and stale bindings fail before clinical requests', async () => {
-    for (const kind of ['disabled','unavailable','empty','stale']) { const f = fixture(); const value = dto(); const row = value.functions[0];
-        if (kind === 'disabled') row.enabled = false; if (kind === 'unavailable') row.options[0].state = 'unavailable'; if (kind === 'empty') row.options = []; if (kind === 'stale') row.bindingState = 'stale';
+    for (const kind of ['disabled','unavailable','empty','stale']) { const f = fixture(); const source = dto();
+        const value: FunctionModelPreferences = { ...source, functions: source.functions.map((row, index) => index !== 0 ? row : kind === 'disabled' ? { ...row, enabled: false } : kind === 'unavailable' ? { ...row, options: row.options.map((option, optionIndex) => optionIndex !== 0 ? option : { ...option, state: 'unavailable' }) } : kind === 'empty' ? { ...row, options: [] } : { ...row, bindingState: 'stale' }) };
         f.set(value); await assert.rejects(f.client.begin()); assert.equal(f.calls.length, 1); }
 });
 test('context/session reset rejects late body even when transport ignores abort', async () => {

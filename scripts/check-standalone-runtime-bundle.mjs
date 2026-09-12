@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
+import { bundledTreatmentPortableFailure, treatmentPortablePrivateArtifact, runTreatmentPortableSelfTest } from './treatment-reasoning-portable-setup.mjs';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { assertNodeRuntime, readNodeContract, standaloneDirectory } from './node-runtime-contract.mjs';
@@ -926,6 +927,11 @@ function runPdfRetirementSelfTest() {
   }
 }
 
+
+if (process.argv[2] === '--self-test=treatment-portable') {
+  console.log(JSON.stringify(runTreatmentPortableSelfTest())); process.exit(0);
+}
+
 if (process.argv[2] === '--self-test') {
   runSelfTest();
   process.exit(0);
@@ -959,6 +965,7 @@ const serverPath = path.join(standaloneDir, 'server.js');
 const runtimeContractPath = path.join(standaloneDir, 'mediflow-runtime-contract.json');
 
 const forbiddenMatchers = [
+  treatmentPortablePrivateArtifact,
   (relativePath) => /^medical\.db$/i.test(relativePath),
   (relativePath) => /\.(db|sqlite|sqlite3)$/i.test(relativePath),
   (relativePath) => /^tmp[-_/]/.test(relativePath),
@@ -990,6 +997,9 @@ function fail(message) {
   console.error(message);
   process.exit(1);
 }
+
+const treatmentPortableFailure = bundledTreatmentPortableFailure(standaloneDir, root);
+if (treatmentPortableFailure) fail(treatmentPortableFailure);
 
 const retiredPdfFailure = retiredPdfRuntimeFailure(standaloneDir);
 if (retiredPdfFailure) fail(retiredPdfFailure);

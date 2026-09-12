@@ -8,7 +8,10 @@ import { requireSession } from '../../security/server-auth';
 import { createHostProviderLifecycleService } from './provider-lifecycle-service';
 import { createFunctionModelPreferencesService, FUNCTION_MODEL_SETTING_KEYS, FUNCTION_PREFERENCES_KEY, FUNCTION_SWITCH_KEYS, FunctionModelError, functionModelDigest, type FunctionModelSources } from './function-model-preferences';
 import { createFunctionModelDispatch } from './function-model-dispatch';
+import { createPortableProvisioning } from './treatment-reasoning-portable-provisioning';
 
+// @Codex: launcher-owned root, independent of the Webpack module/asset location.
+const portable = createPortableProvisioning({ applicationRoot: process.cwd() });
 const ollama = createHostProviderLifecycleService().service;
 const athena = createHostProviderLifecycleService({ provider: 'athena_mlx' }).service;
 export function readProductionFunctionModelSources(): FunctionModelSources {
@@ -16,7 +19,8 @@ export function readProductionFunctionModelSources(): FunctionModelSources {
         .where(inArray(settings.key, FUNCTION_MODEL_SETTING_KEYS)).all();
     return { settings: Object.fromEntries(rows.map(row => [row.key, row.value])), ollamaLifecycle: ollama.read(), athenaLifecycle: athena.read(),
         athenaIdentity: functionModelDigest([defaultAthenaMlxModelDir(), process.env.MEDIFLOW_ATHENA_MLX_GENERATE_BIN ?? null,
-            process.env.MEDIFLOW_ATHENA_MLX_LM_PACKAGE ?? null]), athenaAvailable: isAthenaMlxModelAvailable() };
+            process.env.MEDIFLOW_ATHENA_MLX_LM_PACKAGE ?? null]), athenaAvailable: process.platform === 'darwin' && process.arch === 'arm64' && isAthenaMlxModelAvailable(),
+        ...(['win32', 'linux'].includes(process.platform) ? { portable: portable.status() } : {}) };
 }
 export const functionModelPreferencesService = createFunctionModelPreferencesService({
     readSources: readProductionFunctionModelSources, immediate: runDbServerImmediateTransaction,

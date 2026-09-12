@@ -115,6 +115,7 @@ function DocumentSynthesisFabricReviewCardSession({
         <section
             className={disclosure.synthesis}
             data-testid={`document-synthesis-fabric-review-${attachmentId}`}
+            aria-busy={phase === 'loading' || phase === 'running'}
         >
             <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
@@ -153,12 +154,13 @@ function DocumentSynthesisFabricReviewCardSession({
                         data-lume-action="quiet"
                     >
                         <RotateCcw className="h-3.5 w-3.5" />
-                        Chiudi proposta
+                        {error ? 'Prepara un nuovo tentativo' : 'Chiudi proposta'}
                     </button>
                 )}
             </div>
 
-            <FunctionModelPicker picker={picker} />
+            {/* The result reports the executed model, not a new selectable configuration. */}
+            {phase !== 'terminal' && <FunctionModelPicker picker={picker} />}
             {phase === 'confirm' && proposal && (
                 <div className="mt-4 grid gap-4 text-sm leading-relaxed">
                     <div className="grid min-w-0 gap-1 break-words">

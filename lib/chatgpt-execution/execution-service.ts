@@ -270,44 +270,49 @@ export function createSynthesisExecutionService(options: {
         } catch (error) { invalidate(error instanceof ExecutionError ? error.code : 'protocol_error'); }
     }, code => invalidate(code));
 
+    async function catalogChoices(): Promise<readonly SynthesisChoice[]> {
+        const choices: SynthesisChoice[] = [];
+        const seen = new Set<string>();
+        const cursors = new Set<string>();
+        let cursor: string | undefined;
+        let rows = 0;
+        // Intentional budget: 100 rows TOTAL across at most 10 pages, not 10 x 100.
+        for (let page = 0; page < 10; page++) {
+            const response = record(await rpc('model/list', { limit: 100 - rows, includeHidden: false, ...(cursor ? { cursor } : {}) }));
+            if (!Array.isArray(response.data)) throw new ExecutionError('protocol_error');
+            rows += response.data.length;
+            if (rows > 100) throw new ExecutionError('protocol_error');
+            for (const raw of response.data) {
+                const model = record(raw);
+                if (model.hidden !== false || !Array.isArray(model.inputModalities) || !model.inputModalities.includes('text')) continue;
+                if (!boundedText(model.model, 256) || !Array.isArray(model.supportedReasoningEfforts) || model.supportedReasoningEfforts.length > 8) throw new ExecutionError('protocol_error');
+                for (const rawEffort of model.supportedReasoningEfforts) {
+                    const effort = record(rawEffort).reasoningEffort as ModelEffort;
+                    if (!efforts.has(effort)) throw new ExecutionError('protocol_error');
+                    const key = JSON.stringify([model.model, effort]);
+                    if (seen.has(key)) continue;
+                    seen.add(key);
+                    choices.push(Object.freeze({ optionId: randomUUID(), model: model.model, effort }));
+                }
+            }
+            if (response.nextCursor == null) {
+                if (!choices.length) throw new ExecutionError('model_unavailable');
+                return Object.freeze(choices);
+            }
+            if (!boundedText(response.nextCursor, 1024) || cursors.has(response.nextCursor) || rows >= 100) throw new ExecutionError('protocol_error');
+            cursor = response.nextCursor; cursors.add(cursor);
+        }
+        throw new ExecutionError('protocol_error');
+    }
+
     return {
         readCatalog(): Promise<SynthesisCatalog> {
             return operation(async () => {
                 catalog = undefined;
                 await account();
-                const choices: SynthesisChoice[] = [];
-                const seen = new Set<string>();
-                const cursors = new Set<string>();
-                let cursor: string | undefined;
-                let rows = 0;
-                // Intentional budget: 100 rows TOTAL across at most 10 pages, not 10 x 100.
-                for (let page = 0; page < 10; page++) {
-                    const response = record(await rpc('model/list', { limit: 100 - rows, includeHidden: false, ...(cursor ? { cursor } : {}) }));
-                    if (!Array.isArray(response.data)) throw new ExecutionError('protocol_error');
-                    rows += response.data.length;
-                    if (rows > 100) throw new ExecutionError('protocol_error');
-                    for (const raw of response.data) {
-                        const model = record(raw);
-                        if (model.hidden !== false || !Array.isArray(model.inputModalities) || !model.inputModalities.includes('text')) continue;
-                        if (!boundedText(model.model, 256) || !Array.isArray(model.supportedReasoningEfforts) || model.supportedReasoningEfforts.length > 8) throw new ExecutionError('protocol_error');
-                        for (const rawEffort of model.supportedReasoningEfforts) {
-                            const effort = record(rawEffort).reasoningEffort as ModelEffort;
-                            if (!efforts.has(effort)) throw new ExecutionError('protocol_error');
-                            const key = JSON.stringify([model.model, effort]);
-                            if (seen.has(key)) continue;
-                            seen.add(key);
-                            choices.push(Object.freeze({ optionId: randomUUID(), model: model.model, effort }));
-                        }
-                    }
-                    if (response.nextCursor == null) {
-                        if (!choices.length) throw new ExecutionError('model_unavailable');
-                        catalog = Object.freeze({ revision: randomUUID(), choices: Object.freeze(choices) });
-                        return catalog;
-                    }
-                    if (!boundedText(response.nextCursor, 1024) || cursors.has(response.nextCursor) || rows >= 100) throw new ExecutionError('protocol_error');
-                    cursor = response.nextCursor; cursors.add(cursor);
-                }
-                throw new ExecutionError('protocol_error');
+                const choices = await catalogChoices();
+                catalog = Object.freeze({ revision: randomUUID(), choices });
+                return catalog;
             });
         },
         generate(request: SynthesisRequest, signal?: AbortSignal): Promise<SynthesisResult> {
@@ -318,6 +323,11 @@ export function createSynthesisExecutionService(options: {
                 const choice = catalog.choices.find(option => option.optionId === value.modelOptionId);
                 if (!choice) throw new ExecutionError('catalog_stale');
                 await account();
+                // An old UI revision alone cannot prove the server catalog stayed
+                // unchanged. Re-enumerate the same bounded execution catalog.
+                const fresh = await catalogChoices();
+                const signature = (values: readonly SynthesisChoice[]) => JSON.stringify(values.map(value => JSON.stringify([value.model, value.effort])).sort());
+                if (signature(fresh) !== signature(catalog.choices)) throw new ExecutionError('catalog_stale');
                 limits(await rpc('account/rateLimits/read'));
                 usedTurn = true;
                 const started = record(await rpc('thread/start', {

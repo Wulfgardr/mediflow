@@ -8,6 +8,7 @@ import { parseAccountBrowserStatus } from '@/lib/chatgpt-account/account-browser
 import type { AccountStatus } from '@/lib/chatgpt-account/account-contract';
 import { SETTINGS_PRIMARY_BUTTON_CLASS, SETTINGS_SECONDARY_BUTTON_CLASS } from '@/components/settings/settings-ui';
 import styles from './model-picker.module.css';
+import { TreatmentReasoningPortableSetup } from '../treatment-reasoning-portable-setup';
 type FunctionRow = FunctionModelPreferences['functions'][number];
 function Description({ row }: { row: FunctionRow }) {
     const model = row.options.find(o => o.modelOptionId === row.defaultModelOptionId);
@@ -29,6 +30,7 @@ function PreferenceCard({ row, disabled, account, preview }: { row: FunctionRow;
                 {row.options.map(o => <option key={o.modelOptionId} value={o.modelOptionId} disabled={enabled && o.state === 'unavailable'}>{o.label} · {providerName(o.provider)}{o.state === 'unavailable' ? ' · non disponibile' : ''}</option>)}
             </select>
         </label>
+        {row.id === 'treatment_reasoning' && <TreatmentReasoningPortableSetup option={row.options.find(o => o.provider === 'athena_transformers')} />}
         {!selected && model !== null && <p>Nessun modello selezionabile</p>}
         <div className={styles.actions}><button type="button" role="switch" aria-checked={enabled} aria-label={`${names[row.id]} nella proposta`} className={`${SETTINGS_SECONDARY_BUTTON_CLASS} ${styles.switch}`} disabled={disabled} onClick={() => setEnabled(!enabled)}>{enabled ? 'Spegni' : 'Attiva'}</button>
             <button type="button" className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={disabled || (enabled && model !== null && selected?.state !== 'available_unqualified')} onClick={() => preview(enabled, model)}>Anteprima modifica</button></div>

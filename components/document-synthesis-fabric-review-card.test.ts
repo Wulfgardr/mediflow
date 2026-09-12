@@ -61,7 +61,7 @@ test('DS confirmation binds patient identity and invalidates the controller on l
 /* @Codex */
 test('DS ordinary confirmation shows human names, requires an explicit choice and uses shared action geometry', async () => {
     const card = await readFile(CARD, 'utf8'); const upload = await readFile(UPLOAD, 'utf8');
-    assert.match(upload, /attachmentName=\{file.name\}/u);
+    assert.match(upload, /attachmentName=\{selectedAttachment.name\}/u);
     assert.match(card, /Paziente: \{proposal.patientName\}/u);
     assert.match(card, /Documento: \{attachmentName\}/u);
     assert.match(card, /\{choice.name\}/u);

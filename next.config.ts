@@ -68,6 +68,13 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     "/*": [
       "./package.json",
+      // @Codex: capability-local offline CLI/worker closure; no model/runtime payloads.
+      "./scripts/treatment-reasoning-portable-worker.py",
+      "./scripts/treatment-reasoning-portable-setup.mjs",
+      "./lib/ai-providers/fabric/treatment-reasoning-portable-provisioning.ts",
+      "./lib/athena-model-identity.ts",
+      "./scripts/node-runtime-contract.mjs",
+      "./.nvmrc",
       "./scripts/anydoc-local-extraction-worker.mjs",
       "./scripts/anydoc-pdf-page-worker.mjs",
       "./scripts/anydoc-tesseract-artifacts.json", // @Codex
@@ -92,6 +99,14 @@ const nextConfig: NextConfig = {
   /* @Codex */
   outputFileTracingExcludes: {
     "/*": [
+      // @Codex: Treatment runtime/model data are external, explicitly provisioned objects.
+      "./**/treatment-reasoning-portable/**",
+      "./**/*.safetensors",
+      "./**/*.gguf",
+      "./**/.venv/**",
+      "./**/site-packages/**",
+      "./**/__pycache__/**",
+      "./**/.env*",
       // @Codex ADR 0123: synthetic fixture tools never belong to the product bundle.
       "./tools/runtime-twin-086/**/*",
       "./*.db",

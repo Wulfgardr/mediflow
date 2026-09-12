@@ -1,6 +1,7 @@
 'use client';
 /* @Codex */
 import Image from 'next/image';
+import Link from 'next/link';
 import { useEffect, useId, useState } from 'react';
 import { createAccountBrowser, type AccountBrowserView } from '@/lib/chatgpt-account/account-browser';
 import { accountNotices, presentAccount } from '@/lib/chatgpt-account/account-presentation';
@@ -59,6 +60,9 @@ export function ChatGptAccountCard({ active }: { active: boolean }) {
             <strong data-testid="chatgpt-execution-state">{presentation.executionLabel}</strong>
             <p>Il collegamento dell’account non abilita le funzioni di MediFlow. L’ammissione OpenAI resta sospesa (ADR0134).</p>
             <p>Questa scheda gestisce soltanto accesso e informazioni account: non invia contesto paziente e non avvia sintesi, neppure dimostrative.</p>
+        </div>
+        <div className={styles.actions}>
+            <Link href="/settings/ai/chatgpt" prefetch={false} className={SETTINGS_SECONDARY_BUTTON_CLASS}>Apri prova OpenAI · solo dati demo</Link>
         </div>
         {locked ? <p>Sblocca MediFlow per gestire il collegamento.</p> : <>
             {status?.notice && <p role="status">{accountNotices[status.notice]}</p>}

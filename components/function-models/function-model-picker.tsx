@@ -6,6 +6,7 @@ import { createModelPreviewClient } from '@/lib/function-models/preview-client';
 import { providerName, type FunctionModelId } from '@/lib/function-models/browser';
 import { SETTINGS_SECONDARY_BUTTON_CLASS } from '@/components/settings/settings-ui';
 import styles from './model-picker.module.css';
+import { TreatmentReasoningPortableSetup } from '../treatment-reasoning-portable-setup';
 export function useFunctionModelPicker(functionId: FunctionModelId, context: unknown, selection?: unknown, enabled = true) {
     const security = useSecurity();
     const active = enabled && security.isAuthenticated && !security.isLocked && security.authRecoveryState === 'ready';
@@ -18,7 +19,7 @@ export function useFunctionModelPicker(functionId: FunctionModelId, context: unk
     const row = view.dto?.functions.find(f => f.id === functionId);
     const selected = row?.options.find(o => o.modelOptionId === (view.choice?.modelOptionId ?? row.defaultModelOptionId));
     const canGenerate = active && !view.blocked && !view.loading && !view.consumed && (!row || (row.enabled && (view.choice !== null || row.bindingState === 'current') && selected?.state === 'available_unqualified'));
-    return { client, view, active, functionId, canGenerate };
+    return { client, view, active, functionId, canGenerate, selected };
 }
 export function FunctionModelPicker({ picker }: { picker: ReturnType<typeof useFunctionModelPicker> }) {
     const { client, view, active, functionId } = picker;
@@ -53,6 +54,7 @@ export function FunctionModelPicker({ picker }: { picker: ReturnType<typeof useF
             </details>
         </div>
         {blockingStatus && <p role="status" className={styles.hint}>{blockingStatus}</p>}
+        {functionId === 'treatment_reasoning' && <TreatmentReasoningPortableSetup option={selected?.provider === 'athena_transformers' ? selected : f?.options.find(o => o.provider === 'athena_transformers')} />}
         {view.error && <p role="alert" className={styles.error}>{view.error}</p>}
 
     </div>;

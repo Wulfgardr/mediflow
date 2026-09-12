@@ -107,3 +107,28 @@ test('overview is searchable and only the exact settings page is current', () =>
         assert.equal(items.filter((item) => isSettingsItemActive(item, pathname)).length, 0);
     }
 });
+
+/* @Codex: the explicit OpenAI demo is a peer, not an account or local-model alias. */
+test('OpenAI demo is reachable and searchable under Funzioni intelligenti', () => {
+    const group = SETTINGS_NAV_GROUPS.find((entry) => entry.id === 'ai');
+    assert.equal(group?.label, 'Funzioni intelligenti');
+    const item = group?.items.find((entry) => entry.id === 'ai-chatgpt');
+    assert.ok(item);
+    assert.equal(item.href, '/settings/ai/chatgpt');
+    assert.equal(item.label, 'OpenAI · ChatGPT');
+    assert.match(item.description, /demo/);
+    assert.ok(existsSync(path.join(process.cwd(), 'app/settings/ai/chatgpt/page.tsx')));
+    for (const query of ['OpenAI', 'ChatGPT', 'account ChatGPT', 'sintesi demo', 'prova OpenAI', 'accesso OpenAI']) {
+        assert.equal(searchSettingsNav(query)[0]?.item.id, item.id, query);
+    }
+});
+
+/* @Codex */
+test('OpenAI has one exact active entry, independent of Fabric and local models', () => {
+    const items = SETTINGS_NAV_GROUPS.flatMap((group) => group.items);
+    assert.deepEqual(items.filter((item) => isSettingsItemActive(item, '/settings/ai/chatgpt')).map((item) => item.id), ['ai-chatgpt']);
+    for (const target of ['/settings/ai/fabric', '/settings/ai/modelli']) {
+        assert.ok(!items.filter((item) => isSettingsItemActive(item, target)).some((item) => item.id === 'ai-chatgpt'));
+    }
+    assert.equal(searchSettingsNav('ollama')[0]?.item.id, 'ai-modelli');
+});

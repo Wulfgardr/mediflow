@@ -7,7 +7,7 @@ import type { LocalProviderResolution } from '../registry';
 
 export const FUNCTION_MODEL_CHOICE_HEADER = 'x-mediflow-function-model';
 type Selection = ReturnType<typeof resolveFunctionModelDispatch>;
-type Scope = Readonly<{ selection: Selection; verify(): Promise<void> }>;
+type Scope = Readonly<{ selection: Selection; signal: AbortSignal; verify(): Promise<void> }>;
 const scopes = new AsyncLocalStorage<Scope>();
 export function functionModelErrorResponse(error: unknown): Response {
     const code = error instanceof FunctionModelError ? error.code : 'unavailable';
@@ -46,7 +46,7 @@ export function createFunctionModelDispatch(dependencies: Readonly<{
                 if (current.catalogRevision !== selection.catalogRevision || current.preferenceRevision !== selection.preferenceRevision
                     || current.binding.modelOptionId !== selection.binding.modelOptionId) throw new FunctionModelError('binding_stale');
             };
-            return await scopes.run(Object.freeze({ selection, verify }), async () => {
+            return await scopes.run(Object.freeze({ selection, verify, signal: request.signal }), async () => {
                 await verify(); const response = await handler(request); await verify();
                 // Selection evidence contains no endpoints, session/patient identifiers or authority.
                 response.headers.set('Cache-Control', 'no-store');
@@ -71,13 +71,13 @@ export async function functionModelBindingSettings<T extends Readonly<Record<str
 }
 
 /** Captures the scope at binding time, so detached work cannot shed its checks. */
-export function captureFunctionModelTransportGuard(provider: 'ollama' | 'athena_mlx', model?: string, endpoint?: string) {
+export function captureFunctionModelTransportGuard(provider: 'ollama' | 'athena_mlx' | 'athena_transformers', model?: string, endpoint?: string) {
     const scope = scopes.getStore();
     return async () => {
-        if (!scope) return;
+        if (!scope) { if (provider === 'athena_transformers') throw new FunctionModelError('unsupported'); return; }
         await scope.verify();
         const binding = scope.selection.binding;
-        if (binding.provider !== provider || (provider === 'ollama' && (binding.model !== model || binding.endpoint !== endpoint))) {
+        if (binding.provider !== provider || (provider === 'athena_transformers' && binding.model !== model) || (provider === 'ollama' && (binding.model !== model || binding.endpoint !== endpoint))) {
             throw new FunctionModelError('binding_stale');
         }
     };
@@ -92,4 +92,14 @@ export function guardFunctionModelResolution(resolution: LocalProviderResolution
             await verify(); const result = await raw.chat(...args); await verify(); return result;
         },
     }) });
+}
+
+/** Host-only selection; no browser provider string is accepted and no missing-scope fallback exists. */
+export function captureTreatmentReasoningDispatch() {
+    const scope = scopes.getStore();
+    if (!scope || scope.selection.functionId !== 'treatment_reasoning'
+        || !['athena_mlx', 'athena_transformers'].includes(scope.selection.binding.provider)) throw new FunctionModelError('unsupported');
+    return Object.freeze({ provider: scope.selection.binding.provider as 'athena_mlx' | 'athena_transformers',
+        modelOptionId: scope.selection.binding.modelOptionId, catalogRevision: scope.selection.catalogRevision,
+        signal: scope.signal, verify: scope.verify });
 }

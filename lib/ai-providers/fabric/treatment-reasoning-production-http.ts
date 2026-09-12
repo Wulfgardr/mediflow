@@ -5,10 +5,10 @@ import { NextResponse } from 'next/server';
 
 import { apiFailure } from '../../api-error-response';
 import { TreatmentReasoningAuthenticatedProjectionError } from './treatment-reasoning-authenticated-projection';
-import type { TreatmentReasoningProductionResult } from './treatment-reasoning-production-operation';
+import type { TreatmentReasoningProductionResult, PortableTreatmentProductionResult } from './treatment-reasoning-production-operation';
 
 type IngestOperation = Readonly<{ ingest(input: unknown): string }>;
-type PreviewOperation = Readonly<{ preview(input: unknown): Promise<TreatmentReasoningProductionResult> }>;
+type PreviewOperation = Readonly<{ preview(input: unknown): Promise<TreatmentReasoningProductionResult | PortableTreatmentProductionResult> }>;
 type IngestSources = Readonly<{ acquireIngest(): Promise<IngestOperation | null> }>;
 type PreviewSources = Readonly<{ acquirePreview(): Promise<PreviewOperation | null> }>;
 

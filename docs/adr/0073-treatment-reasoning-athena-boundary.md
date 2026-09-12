@@ -191,3 +191,38 @@ Fermarsi e aprire ADR/issue separata se una proposta:
   clinica;
 - espone stderr/stdout MLX, prompt completi o output grezzi in risposte HTTP,
   log persistenti o report.
+
+## Estensione candidata 0.8.6 — 8 settembre 2026
+
+Decisione accettata per l'implementazione candidata richiesta: un secondo motore
+locale esplicito `athena_transformers` per Windows e Linux, con runtime Python
+e pesi originali inventariati offline. MLX resta il percorso macOS; nessuna
+sostituzione automatica, chiamata cloud o dipendenza da un Mac remoto. La
+[proposta tecnica](../../proposals/TREATMENT-PORTABLE-ADR.md) conserva il
+contesto e i dettagli del candidato; questa estensione ne adotta i contratti
+indicati sotto, senza promuovere le dichiarazioni di disponibilità.
+
+Importazione dell'artefatto, ammissione locale e interruttore clinico restano
+azioni distinte. Identità del modello, digest di runtime e worker, licenze e
+piattaforma devono essere verificati; revoca e scelte obsolete falliscono
+chiuse. La sorgente non installa dipendenze o pesi durante un'inferenza.
+
+Le preferenze e lo stato espongono proiezioni v2 negoziate esplicitamente:
+le unioni provider e le ricevute generiche Fabric v1 rimangono invariate. Il
+client storico può disabilitare una scelta opaca conservata, ma non può
+abilitare o riassegnare un provider assente dal suo contratto. La pubblicazione
+clinica portable usa una ricevuta distinta, con la propria provenienza.
+
+Restano invariati i requisiti di revisione, collegamento alle fonti, incertezza,
+kill switch e assenza di scritture cliniche automatiche. Il limite di concorrenza
+vale per una singola istanza dell'adapter: un servizio con più processi non è
+qualificato come avente un limite globale.
+
+**Qualifica operativa aperta.** I test di contratto e del pacchetto sorgente
+non dimostrano inferenza o isolamento di rete sul sistema operativo. Il budget
+conservativo attuale richiede 40 GiB sull'host e 36 GiB per il processo; non è
+un minimo misurato del modello. Le VM disponibili da 12/18 GiB non sono
+ammesse da tale criterio. Servono runtime e pesi verificati, inferenza sintetica
+locale, limiti e arresto osservati, prove di rete negata, recupero e revoca sui
+target. L'integrazione candidata non dichiara la parità di rilascio né autorizza
+usi clinici non qualificati.

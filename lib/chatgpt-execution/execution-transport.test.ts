@@ -239,3 +239,26 @@ test('owned-group: spontaneous leader exit still drains before cleanup', async (
     assert.equal(await f.transport.close(), true);
     assert.equal(observed, 1); assert.equal(f.cleanup(), 1); assert.deepEqual(f.signals, []);
 });
+
+/* @Codex: receipt observations are evidence of this owned transport only. */
+test('drain observation distinguishes pending group evidence from leader exit', async () => {
+    let resolveGroup!: (value: boolean) => void;
+    const group = new Promise<boolean>(resolve => { resolveGroup = resolve; });
+    const f = groupFixture({ waitForOwnedGroupExit: () => group });
+    assert.deepEqual(f.transport.drainObservation?.(), { closing: false, leaderExited: false, ownedGroupCeased: null });
+    const closed = f.transport.close();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.deepEqual(f.transport.drainObservation?.(), { closing: true, leaderExited: true, ownedGroupCeased: null });
+    assert.equal(f.cleanup(), 0);
+    resolveGroup(true); assert.equal(await closed, true);
+    assert.deepEqual(f.transport.drainObservation?.(), { closing: true, leaderExited: true, ownedGroupCeased: true });
+});
+test('drain observation cannot upgrade a timed-out group to confirmed from late evidence', async () => {
+    let resolveGroup!: (value: boolean) => void;
+    const f = groupFixture({ waitForOwnedGroupExit: () => new Promise(resolve => { resolveGroup = resolve; }) }, true);
+    assert.equal(await f.transport.close(), false);
+    assert.deepEqual(f.transport.drainObservation?.(), { closing: true, leaderExited: true, ownedGroupCeased: false });
+    resolveGroup(true); await new Promise(resolve => setImmediate(resolve));
+    assert.deepEqual(f.transport.drainObservation?.(), { closing: true, leaderExited: true, ownedGroupCeased: false });
+    assert.equal(f.cleanup(), 0);
+});

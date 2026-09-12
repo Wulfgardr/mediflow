@@ -17,3 +17,11 @@ test('all known statuses give a bounded next action and unknown status never rep
     assert.match(whoSetupGuideStatus('unavailable'), /Recupera/u);
     assert.match(whoSetupGuideStatus(undefined), /non riconosciuto/u);
 });
+
+// Presentation only: these CLI phases are not added to the application readiness DTO.
+test('download, qualification and missing prerequisites never represent an available service', () => {
+    assert.match(whoSetupGuideStatus('downloading'), /Non conferma/u);
+    assert.match(whoSetupGuideStatus('qualifying'), /Non è disponibilità/u);
+    assert.match(whoSetupGuideStatus('missing_prerequisites'), /Mancano prerequisiti/u);
+    assert.match(whoSetupGuideStatus('image_evidence_missing'), /restano bloccati/u);
+});

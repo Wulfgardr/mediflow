@@ -23,6 +23,7 @@ export function createStdioExecutionTransport(child: ChildProcessWithoutNullStre
     let buffer = '';
     let nextId = 1;
     let closed = false;
+    let ownedGroupCeased: boolean | null = null;
     let exited = child.exitCode !== null || child.signalCode !== null;
     let closePromise: Promise<boolean> | null = null;
     let resolveExit: () => void = () => undefined;
@@ -131,7 +132,8 @@ export function createStdioExecutionTransport(child: ChildProcessWithoutNullStre
                 if (!await waitExit(options.killGraceMs ?? 500)) return false;
             }
             child.stdout.destroy(); child.stderr.destroy();
-            if (!await waitOwnedGroup()) return false;
+            ownedGroupCeased = await waitOwnedGroup();
+            if (!ownedGroupCeased) return false;
             try { await options.onClosed?.(); return closingSucceeded; } catch { return false; }
         })();
         return closePromise;
@@ -155,5 +157,6 @@ export function createStdioExecutionTransport(child: ChildProcessWithoutNullStre
             return () => { listeners.delete(listener); };
         },
         close,
+        drainObservation: () => Object.freeze({ closing: closed, leaderExited: exited, ownedGroupCeased }),
     });
 }

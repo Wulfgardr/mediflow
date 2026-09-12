@@ -136,6 +136,14 @@ export const SETTINGS_NAV_GROUPS: SettingsNavGroup[] = [
                 description: 'Profilo hardware, modelli, Ollama',
                 keywords: ['modelli ai', 'ollama', 'profilo hardware', 'download modelli', 'url provider', 'docker', 'test connessione', 'ocr', 'reasoning'],
             },
+            /* @Codex: account control and this explicit demo stay distinct. */
+            {
+                id: 'ai-chatgpt',
+                href: '/settings/ai/chatgpt',
+                label: 'OpenAI · ChatGPT',
+                description: 'Prova con dati demo e controllo account',
+                keywords: ['openai', 'chatgpt', 'account chatgpt', 'abbonamento chatgpt', 'sintesi demo', 'prova openai', 'accesso openai', 'consenso demo'],
+            },
             {
                 id: 'ai-funzioni',
                 href: '/settings/ai/funzioni',

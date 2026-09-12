@@ -258,3 +258,29 @@ test('keeps the controller browser-only, manual, and free of persistence, apply,
     assert.doesNotMatch(source, /server-only|node:|localStorage|sessionStorage|indexedDB|setInterval|setTimeout|\.apply\(|\/api\/system\/treatment-reasoning|generatePatientTreatmentReasoningDraft|generic.{0,20}(invoke|prompt)/u);
     assert.deepEqual(Object.keys(createTreatmentReasoningBrowserController({ fetch: async () => response({}) })), ['reset', 'readProposal', 'run']);
 });
+
+import { ATHENA_R1_QWEN3_8B_MODEL_ID } from '../../athena-model-identity.ts';
+function portablePublication(): Record<string, unknown> {
+    const old = publication();
+    const engine = { provider: 'athena_transformers', model: ATHENA_R1_QWEN3_8B_MODEL_ID, platform: 'linux-x64',
+        artifactDigest: 'a'.repeat(64), runtimeDigest: 'b'.repeat(64), workerDigest: 'c'.repeat(64), admissionRevision: 2 };
+    const receipt = { ...fabricReceipt(), schemaVersion: 'mediflow.ai.treatment-reasoning-engine-receipt.v2', provider: engine.provider,
+        model: engine.model, engine, modelOptionId: `model_option_${'d'.repeat(32)}`, catalogRevision: `sha256_${'e'.repeat(64)}` };
+    return { ...old, schemaVersion: 'mediflow.ai.treatment-reasoning-publication.v2',
+        attestation: { ...old.attestation, ...engine, schema: 'mediflow.ai.treatment-reasoning-engine-attestation.v2' }, fabricReceipt: receipt,
+        provenance: { ...old.provenance, schemaVersion: 'mediflow.ai.treatment-reasoning-engine-provenance.v2', provider: engine.provider, model: engine.model, receipt } };
+}
+test('portable client schema requires exact engine/receipt/provenance agreement without weakening v1', () => {
+    const value = portablePublication(); assert.ok(parseTreatmentReasoningPublication(value));
+    const modify = (key: string, extra: Record<string, unknown>) => ({ ...value, [key]: { ...(value[key] as Record<string, unknown>), ...extra } });
+    for (const invalid of [
+        { ...value, schemaVersion: 'mediflow.ai.treatment-reasoning-publication.v1' },
+        modify('attestation', { provider: 'athena_mlx' }), modify('attestation', { model: 'unrelated-model' }),
+        modify('attestation', { artifactDigest: 'f'.repeat(64) }), modify('attestation', { admissionRevision: 3 }),
+        modify('attestation', { platform: 'darwin-arm64' }), modify('attestation', { workerDigest: '' }),
+        modify('fabricReceipt', { fallbackCount: 1 }), modify('fabricReceipt', { modelOptionId: 'arbitrary' }),
+        modify('provenance', { model: null }), { ...value, writesPerformed: 1 }, { ...value, applyPolicy: 'automatic' },
+        { ...value, sourceBindings: [] }, modify('attestation', { prompt: 'must-not-escape' }),
+    ]) assert.equal(parseTreatmentReasoningPublication(invalid), null);
+    const legacy = publication(); legacy.attestation.provider = 'athena_transformers'; assert.equal(parseTreatmentReasoningPublication(legacy), null);
+});

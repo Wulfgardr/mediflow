@@ -120,3 +120,49 @@ test('model and endpoint mismatch still deny before transport; abort never cause
     }
     assert.equal(calls, 0);
 });
+
+import { captureTreatmentReasoningDispatch } from './function-model-dispatch';
+import { readFunctionModelPreferences, resolveFunctionModelDispatch } from './function-model-preferences';
+import { parsePreferences } from '../../function-models/browser';
+import { ATHENA_R1_QWEN3_8B_MODEL_ID } from '../../athena-model-identity';
+import type { PortableStatus } from './treatment-reasoning-portable-provisioning';
+const portableStatus = (state: PortableStatus['state'] = 'admitted', revision = 2): PortableStatus => ({
+    schemaVersion: 'mediflow.treatment-portable-status.v1', provider: 'athena_transformers', model: ATHENA_R1_QWEN3_8B_MODEL_ID,
+    state, releaseDigest: 'a'.repeat(64), revision, selected: true, prerequisites: state === 'admitted' ? [] : [state], writesPerformed: 0, applyPolicy: 'none',
+});
+test('portable catalog is unavailable until explicitly admitted and does not change the other three bindings', () => {
+    const before = fixture(); const original = buildFunctionModelCatalog(before);
+    const missing = { ...before, portable: portableStatus('model_not_provisioned', 0) };
+    const missingView = readFunctionModelPreferences(missing, 'v2'); assert.ok(parsePreferences(JSON.parse(JSON.stringify(missingView))));
+    assert.equal(missingView.functions.find(f => f.id === 'treatment_reasoning')!.options.find(o => o.provider === 'athena_transformers')!.state, 'unavailable');
+    const after = buildFunctionModelCatalog({ ...before, portable: portableStatus() });
+    for (const id of ['patient_insight', 'document_synthesis', 'smart_import'] as const) {
+        assert.equal(original.hostDefaults[id], after.hostDefaults[id]);
+        assert.deepEqual(original.bindings.filter(x => x.functions.includes(id)), after.bindings.filter(x => x.functions.includes(id)));
+    }
+    assert.equal(original.bindings.find(x => x.provider === 'athena_mlx')!.modelOptionId, after.bindings.find(x => x.provider === 'athena_mlx')!.modelOptionId);
+});
+test('portable dispatch captures only the scoped exact choice; stale catalog or revocation cannot publish', async () => {
+    for (const mutation of ['catalog', 'revoke', 'none'] as const) {
+        let sources = { ...fixture(), portable: portableStatus() }; const initial = buildFunctionModelCatalog(sources);
+        const option = initial.bindings.find(x => x.provider === 'athena_transformers')!; let invocations = 0;
+        const handler = createFunctionModelDispatch({ readSources: () => sources, authenticate: async () => 'synthetic-session' })('treatment_reasoning', async () => {
+            const capture = captureTreatmentReasoningDispatch(); assert.equal(capture.provider, 'athena_transformers'); assert.equal(capture.modelOptionId, option.modelOptionId);
+            await capture.verify(); invocations++;
+            if (mutation === 'catalog') sources = { ...sources, portable: portableStatus('admitted', 3) };
+            if (mutation === 'revoke') sources = { ...sources, portable: portableStatus('revoked', 3) };
+            return Response.json({ proposal: 'synthetic-portable-never-clinical' });
+        });
+        const result = await handler(request(undefined, { modelOptionId: option.modelOptionId, expectedCatalogRevision: initial.revision }));
+        assert.equal(result.status, mutation === 'none' ? 200 : 409); assert.equal(invocations, 1);
+        if (mutation !== 'none') assert.doesNotMatch(await result.text(), /synthetic-portable-never-clinical/u);
+    }
+    assert.throws(() => captureTreatmentReasoningDispatch(), /unsupported/u);
+    await assert.rejects(captureFunctionModelTransportGuard('athena_transformers')(), /unsupported/u);
+});
+test('portable catalog digest changes invalidate a prior explicit request rather than falling back', () => {
+    const before = { ...fixture(), portable: portableStatus() }; const catalog = buildFunctionModelCatalog(before);
+    const option = catalog.bindings.find(x => x.provider === 'athena_transformers')!;
+    const after = { ...before, portable: portableStatus('revoked', 3) };
+    assert.throws(() => resolveFunctionModelDispatch(after, 'treatment_reasoning', { modelOptionId: option.modelOptionId, expectedCatalogRevision: catalog.revision }), /catalog_stale/u);
+});

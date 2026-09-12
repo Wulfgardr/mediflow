@@ -9,11 +9,18 @@ export class ExecutionError extends Error {
 export const EXECUTION_METHODS = ['initialize', 'account/login/start', 'account/login/cancel', 'account/read',
     'account/logout', 'model/list', 'account/rateLimits/read', 'config/read', 'thread/start', 'turn/start', 'turn/interrupt'] as const;
 export type ExecutionMethod = typeof EXECUTION_METHODS[number];
+export type ExecutionDrainObservation = Readonly<{
+    closing: boolean; leaderExited: boolean; ownedGroupCeased: boolean | null; ownedTreeCeased?: boolean | null;
+}>;
 export interface ExecutionTransport {
     request(method: ExecutionMethod, params?: unknown): Promise<unknown>;
     initialized(): void;
+    /** Same-process, one-use authentic bootstrap response; NOT an authority.
+     * Prepared Mac transports have already sent initialize/initialized account-free. */
+    takeInitializationObservation?(): unknown;
     subscribe(notification: (method: string, params: unknown) => void, failure: (code: ExecutionCode) => void): () => void;
     close(): Promise<boolean>;
+    drainObservation?(): ExecutionDrainObservation;
 }
 export type SynthesisSource = Readonly<{ id: string; title: string; text: string; sha256: string }>;
 export type SynthesisInput = Readonly<{ fixtureId: string; sources: readonly SynthesisSource[] }>;
