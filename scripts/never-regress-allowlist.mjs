@@ -1,6 +1,9 @@
 /* @Codex */
 export const NEVER_REGRESS_ALLOWLIST = {
     credentialLiterals: [
+        /* @Codex: exact WUL-673 reference and fixture lines. */
+        {"path": "lib/reference-data/icd11-who-network-route.test.ts", "pattern": "^\\ \\ \\ \\ const\\ session\\ =\\ \\{\\ id:\\ 'synthetic\\-session',\\ userId:\\ 'synthetic\\-user',\\ username:\\ 'synthetic',\\ role:\\ 'user',\\ authChannel:\\ 'native'\\ \\};$", "reason": "WUL-673: exact canonical WHO URI comparison or inert synthetic fixture line; no network permission or live credential."},
+        {"path": "native/MediFlowMac/Tests/MediFlowAppleSharedTests/RepertoriWHOStoreTests.swift", "pattern": "^\\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ case\\ \"pin\":\\ current\\ =\\ connection\\(source,\\ pin:\\ \"synthetic\\-new\\-pin\"\\)$", "reason": "WUL-673: exact canonical WHO URI comparison or inert synthetic fixture line; no network permission or live credential."},
         {
             path: 'lib/ai-providers/fabric/chatgpt-synthetic-synthesis-binding.test.ts',
             pattern: "username:\\s*'synthetic'",
@@ -274,6 +277,16 @@ export const NEVER_REGRESS_ALLOWLIST = {
         },
     ],
     externalUrls: [
+        /* @Codex: exact WUL-673 reference and fixture lines. */
+        {"path": "lib/reference-data/icd11-who-network-route.test.ts", "pattern": "^const\\ URI\\ =\\ 'http://id\\.who\\.int/icd/release/11/2026\\-01/mms/1000000001';$", "reason": "WUL-673: exact canonical WHO URI comparison or inert synthetic fixture line; no network permission or live credential."},
+        {"path": "lib/reference-data/icd11-who-network-route.test.ts", "pattern": "^\\ \\ \\ \\ \\ \\ \\ \\ new\\ Request\\(`https://synthetic\\.invalid/api/v1/network/terminology/who/\\$\\{op\\}\\$\\{suffix\\}`,\\ \\{\\ signal\\ \\}\\);$", "reason": "WUL-673: exact canonical WHO URI comparison or inert synthetic fixture line; no network permission or live credential."},
+        {"path": "lib/reference-data/icd11-who-network-route.test.ts", "pattern": "^\\ \\ \\ \\ \\ \\ \\ \\ \\{\\ \\.\\.\\.valid,\\ entries:\\ \\[\\{\\ \\.\\.\\.valid\\.entries\\[0\\],\\ canonicalUri:\\ 'https://example\\.invalid/'\\ \\}\\]\\ \\},$", "reason": "WUL-673: exact canonical WHO URI comparison or inert synthetic fixture line; no network permission or live credential."},
+        {"path": "native/MediFlowMac/Sources/MediFlowAppleShared/HomeBaseWHOModels.swift", "pattern": "^\\ \\ \\ \\ private\\ static\\ let\\ mms\\ =\\ \"http://id\\.who\\.int/icd/release/11/2026\\-01/mms/\"$", "reason": "WUL-673: exact canonical WHO URI comparison or inert synthetic fixture line; no network permission or live credential."},
+        {"path": "native/MediFlowMac/Tests/MediFlowAppleSharedTests/HomeBaseWHOContractTests.swift", "pattern": "^\\ \\ \\ \\ static\\ let\\ uri\\ =\\ \"http://id\\.who\\.int/icd/release/11/2026\\-01/mms/1000000001\"$", "reason": "WUL-673: exact canonical WHO URI comparison or inert synthetic fixture line; no network permission or live credential."},
+        {"path": "native/MediFlowMac/Tests/MediFlowAppleSharedTests/HomeBaseWHOContractTests.swift", "pattern": "^\\ \\ \\ \\ \\ \\ \\ \\ \"http://id\\.who\\.int/icd/release/11/2026\\-01/mms/codeinfo/\"\\ \\+\\ code\\.replacingOccurrences\\(of:\\ \"\\&\",\\ with:\\ \"%26\"\\)\\.replacingOccurrences\\(of:\\ \"/\",\\ with:\\ \"%2F\"\\)$", "reason": "WUL-673: exact canonical WHO URI comparison or inert synthetic fixture line; no network permission or live credential."},
+        {"path": "native/MediFlowMac/Tests/MediFlowAppleSharedTests/HomeBaseWHOContractTests.swift", "pattern": "^\\ \\ \\ \\ \\ \\ \\ \\ for\\ \\(key,\\ value\\)\\ in\\ \\[\\(\"code\",\\ \"N/A\"\\),\\ \\(\"code\",\\ \"AA00\\&\\&XA00\"\\),\\ \\(\"canonicalUri\",\\ \"https://example\\.invalid/\"\\),\\ \\(\"canonicalUri\",\\ WHOSyntheticFixtures\\.uri\\.replacingOccurrences\\(of:\\ \"2026\\-01\",\\ with:\\ \"2025\\-01\"\\)\\),\\ \\(\"description\",\\ \"<b>term</b>\"\\),\\ \\(\"description\",\\ \"\\ term\"\\),\\ \\(\"description\",\\ \"term\\\\u\\{200f\\}\"\\),\\ \\(\"system\",\\ \"ICD\\-10\"\\),\\ \\(\"vendor\",\\ \"unexpected\"\\)\\]\\ \\{$", "reason": "WUL-673: exact canonical WHO URI comparison or inert synthetic fixture line; no network permission or live credential."},
+        {"path": "native/MediFlowMac/Tests/MediFlowAppleSharedTests/RepertoriWHOStoreTests.swift", "pattern": "^\\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ token:\\ String\\ =\\ \"synthetic\\-token\",\\ server:\\ String\\ =\\ \"https://synthetic\\.invalid\",$", "reason": "WUL-673: exact canonical WHO URI comparison or inert synthetic fixture line; no network permission or live credential."},
+        {"path": "native/MediFlowMac/Tests/MediFlowAppleSharedTests/RepertoriWHOStoreTests.swift", "pattern": "^\\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ case\\ \"server\":\\ current\\ =\\ connection\\(source,\\ server:\\ \"https://new\\-synthetic\\.invalid\"\\)$", "reason": "WUL-673: exact canonical WHO URI comparison or inert synthetic fixture line; no network permission or live credential."},
         /* @Codex — exact inert login responses; no runtime or directory-wide exemption. */
         ...['lib/chatgpt-execution/fixtures/login-peer.ts',
             'lib/chatgpt-execution/fixtures/mac-login-harness.mjs'].map(path => ({

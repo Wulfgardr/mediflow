@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: MediFlow Local API v1
-  version: 1.25.0
+  version: 1.26.0
   summary: Stable patient contract plus executable home-base network slice with explicit pairing review, paired-client auth boundary, ambulatory scope options, scoped remote patient, cross-patient agenda and diary reads, therapy, checkup, observation, and catalog read boundaries, replica planning state, explicit identity summary, and declarative AI runtime summary for the local `/api/v1` surface.
   description: |
     OpenAPI contract for the client-facing local API defined by ADR 0010.
@@ -1010,6 +1010,208 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '500':
           $ref: '#/components/responses/InternalServerError'
+  /api/v1/network/terminology/who/readiness:
+    get:
+      tags:
+      - Network
+      operationId: readNetworkWhoReadiness
+      summary: Read observed local WHO readiness
+      description: Read-only WHO local service; requires network.catalogs.readonly, paired-device credentials and
+        a current operator session with an effective ambulatory. Native sessions remain native. Reauthenticates the
+        original session/device/token/role/scope before work and after awaits; abort or changed authority denies delivery.
+        No patient write, automatic setup, retry, fallback or direct WHO access by the client. All responses are no-store.
+        Release 2026-01, MMS, en; upstream and paired envelope maximum 65536 UTF-8 bytes. Readiness is passive, not
+        a probe.
+      security:
+      - pairedClientId: []
+        pairedClientToken: []
+        sessionCookieAuth: []
+      responses:
+        '200':
+          description: Observed available (not a new live probe).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WhoLocalReadiness'
+        '400':
+          description: Invalid, duplicate, missing or unknown query parameter.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WhoNetworkError'
+        '401':
+          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Home-base network mode disabled.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                - $ref: '#/components/schemas/NetworkErrorResponse'
+        '502':
+          description: Invalid or over-bound upstream/paired response. Narrow the search or check the service.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WhoNetworkError'
+        '503':
+          description: Service unavailable (not necessarily an over-bound response). For readiness, a valid non-available
+            readiness v2 may be returned.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                - $ref: '#/components/schemas/WhoNetworkError'
+                - $ref: '#/components/schemas/WhoLocalReadiness'
+        '504':
+          description: WHO request timeout.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WhoNetworkError'
+  /api/v1/network/terminology/who/search:
+    get:
+      tags:
+      - Network
+      operationId: searchNetworkWhoIcd11
+      summary: Search local WHO ICD-11
+      description: Read-only WHO local service; requires network.catalogs.readonly, paired-device credentials and
+        a current operator session with an effective ambulatory. Native sessions remain native. Reauthenticates the
+        original session/device/token/role/scope before work and after awaits; abort or changed authority denies delivery.
+        No patient write, automatic setup, retry, fallback or direct WHO access by the client. All responses are no-store.
+        Release 2026-01, MMS, en; upstream and paired envelope maximum 65536 UTF-8 bytes. Readiness is passive, not
+        a probe.
+      security:
+      - pairedClientId: []
+        pairedClientToken: []
+        sessionCookieAuth: []
+      responses:
+        '200':
+          description: Matching entries, including an empty or partial result with provenance.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WhoLocalSearchResponse'
+        '400':
+          description: Invalid, duplicate, missing or unknown query parameter.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WhoNetworkError'
+        '401':
+          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Home-base network mode disabled.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                - $ref: '#/components/schemas/NetworkErrorResponse'
+        '502':
+          description: Invalid or over-bound upstream/paired response. Narrow the search or check the service.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WhoNetworkError'
+        '503':
+          description: Service unavailable (not necessarily an over-bound response). For readiness, a valid non-available
+            readiness v2 may be returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WhoNetworkError'
+        '504':
+          description: WHO request timeout.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WhoNetworkError'
+      parameters:
+      - name: q
+        in: query
+        required: true
+        description: Exactly one nonempty normalized terminology query, at most 160 UTF-8 bytes; no patient context.
+          No paging or limit parameter.
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 160
+  /api/v1/network/terminology/who/code-check:
+    get:
+      tags:
+      - Network
+      operationId: checkNetworkWhoIcd11Code
+      summary: Check a code in local WHO ICD-11
+      description: Read-only WHO local service; requires network.catalogs.readonly, paired-device credentials and
+        a current operator session with an effective ambulatory. Native sessions remain native. Reauthenticates the
+        original session/device/token/role/scope before work and after awaits; abort or changed authority denies delivery.
+        No patient write, automatic setup, retry, fallback or direct WHO access by the client. All responses are no-store.
+        Release 2026-01, MMS, en; upstream and paired envelope maximum 65536 UTF-8 bytes. Readiness is passive, not
+        a probe.
+      security:
+      - pairedClientId: []
+        pairedClientToken: []
+        sessionCookieAuth: []
+      responses:
+        '200':
+          description: Found or not_found with a live check receipt; not a clinical validation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WhoCodeCheckResponse'
+        '400':
+          description: Invalid, duplicate, missing or unknown query parameter.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WhoNetworkError'
+        '401':
+          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Home-base network mode disabled; or release unsupported.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                - $ref: '#/components/schemas/NetworkErrorResponse'
+                - $ref: '#/components/schemas/WhoNetworkError'
+        '502':
+          description: Invalid or over-bound upstream/paired response. Narrow the search or check the service.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WhoNetworkError'
+        '503':
+          description: Service unavailable (not necessarily an over-bound response). For readiness, a valid non-available
+            readiness v2 may be returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WhoNetworkError'
+        '504':
+          description: WHO request timeout.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WhoNetworkError'
+      parameters:
+      - name: code
+        in: query
+        required: true
+        schema:
+          $ref: '#/components/schemas/WhoCheckCode'
+      - name: release
+        in: query
+        required: true
+        schema:
+          type: string
+          const: 2026-01
   /api/v1/network/terminology/search:
     get:
       tags:
@@ -3591,6 +3793,306 @@ components:
               value:
                 error: Failed to fetch patient
   schemas:
+    WhoArtifactDigest:
+      type: string
+      pattern: ^sha256:[a-f0-9]{64}$
+    WhoCheckCode:
+      type: string
+      minLength: 1
+      maxLength: 32
+      pattern: ^[A-Z0-9][A-Z0-9.-]*(?:[&/][A-Z0-9][A-Z0-9.-]*)*$
+      not:
+        const: N/A
+    WhoNetworkError:
+      type: object
+      additionalProperties: false
+      required:
+      - schemaVersion
+      - code
+      properties:
+        schemaVersion:
+          type: string
+          const: mediflow.reference-data.icd11-error.v1
+        code:
+          type: string
+          enum:
+          - request_invalid
+          - release_not_supported
+          - service_unavailable
+          - upstream_response_invalid
+          - upstream_timeout
+    WhoLocalEntry:
+      type: object
+      additionalProperties: false
+      required:
+      - code
+      - description
+      - system
+      - canonicalUri
+      properties:
+        code:
+          $ref: '#/components/schemas/WhoCheckCode'
+        description:
+          type: string
+          minLength: 1
+          maxLength: 4096
+          description: Normalized plain English WHO title; no markup, controls or bidi overrides.
+        system:
+          type: string
+          const: ICD-11
+        canonicalUri:
+          type: string
+          description: Exact WHO MMS 2026-01 entity URI for simple codes, or exact percent-encoded CodeInfo URI matching
+            a combination. Data only, never dereferenced.
+          pattern: ^http://id\.who\.int/icd/release/11/2026-01/mms/(?:[1-9][0-9]{0,19}(?:/(?:other|unspecified))?|codeinfo/[A-Z0-9.%-]+)$
+    WhoLocalSearchReceipt:
+      type: object
+      additionalProperties: false
+      required:
+      - schemaVersion
+      - operation
+      - releaseId
+      - language
+      - bindingId
+      - imageDigest
+      - datasetSnapshotId
+      - deployment
+      - source
+      - resultCount
+      - latencyMs
+      - fetchedAt
+      - expiresAt
+      - completedAt
+      properties:
+        schemaVersion:
+          type: string
+          const: mediflow.reference-data.icd11-search-receipt.v2
+        operation:
+          type: string
+          const: mediflow.reference_data.icd11.search.v2
+        releaseId:
+          type: string
+          const: 2026-01
+        language:
+          type: string
+          const: en
+        bindingId:
+          type: string
+          const: who.icd11.v2.2026-01.mms.en.local.v1
+        imageDigest:
+          $ref: '#/components/schemas/WhoArtifactDigest'
+        datasetSnapshotId:
+          $ref: '#/components/schemas/WhoArtifactDigest'
+        deployment:
+          type: string
+          const: local
+        source:
+          type: string
+          enum:
+          - live
+          - cache
+        resultCount:
+          type: integer
+          minimum: 0
+          maximum: 25
+        latencyMs:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+        fetchedAt:
+          type: string
+          format: date-time
+          pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$
+        expiresAt:
+          type: string
+          format: date-time
+          pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$
+        completedAt:
+          type: string
+          format: date-time
+          pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$
+      description: Exact 24-hour TTL; fetchedAt <= completedAt < expiresAt. For live, completedAt-fetchedAt <= latencyMs.
+        Count equals entries length; cache is not a new live observation.
+    WhoLocalSearchResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - schemaVersion
+      - entries
+      - partial
+      - receipt
+      properties:
+        schemaVersion:
+          type: string
+          const: mediflow.reference-data.icd11-search-response.v2
+        entries:
+          type: array
+          maxItems: 25
+          items:
+            $ref: '#/components/schemas/WhoLocalEntry'
+        partial:
+          type: boolean
+        receipt:
+          $ref: '#/components/schemas/WhoLocalSearchReceipt'
+    WhoLocalReadiness:
+      type: object
+      additionalProperties: false
+      required:
+      - schemaVersion
+      - status
+      - releaseId
+      - language
+      - bindingId
+      - imageDigest
+      - datasetSnapshotId
+      - deployment
+      - lastLiveObservedAt
+      - lastResultSource
+      properties:
+        schemaVersion:
+          type: string
+          const: mediflow.reference-data.icd11-who-readiness.v2
+        status:
+          type: string
+          enum:
+          - disabled
+          - configuration_required
+          - configured
+          - available
+          - unavailable
+        releaseId:
+          type: string
+          const: 2026-01
+        language:
+          type: string
+          const: en
+        bindingId:
+          type: string
+          const: who.icd11.v2.2026-01.mms.en.local.v1
+        imageDigest:
+          oneOf:
+          - $ref: '#/components/schemas/WhoArtifactDigest'
+          - type: 'null'
+        datasetSnapshotId:
+          oneOf:
+          - $ref: '#/components/schemas/WhoArtifactDigest'
+          - type: 'null'
+        deployment:
+          type: string
+          const: local
+        lastLiveObservedAt:
+          oneOf:
+          - type: string
+            format: date-time
+            pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$
+          - type: 'null'
+        lastResultSource:
+          type:
+          - string
+          - 'null'
+          enum:
+          - live
+          - cache
+          - null
+      description: Image/dataset may be null only for disabled/configuration_required; available requires lastLiveObservedAt.
+        Configured is not available; cache never promotes status to available.
+    WhoCodeCheckReceipt:
+      type: object
+      additionalProperties: false
+      required:
+      - schemaVersion
+      - operation
+      - releaseId
+      - language
+      - bindingId
+      - imageDigest
+      - datasetSnapshotId
+      - source
+      - found
+      - checkedAt
+      - latencyMs
+      properties:
+        schemaVersion:
+          type: string
+          const: mediflow.reference-data.icd11-code-check-receipt.v1
+        operation:
+          type: string
+          const: mediflow.reference_data.icd11.code_check.v1
+        releaseId:
+          type: string
+          const: 2026-01
+        language:
+          type: string
+          const: en
+        bindingId:
+          type: string
+          const: who.icd11.v2.2026-01.mms.en.local.v1
+        imageDigest:
+          $ref: '#/components/schemas/WhoArtifactDigest'
+        datasetSnapshotId:
+          $ref: '#/components/schemas/WhoArtifactDigest'
+        source:
+          type: string
+          const: live
+        found:
+          type: boolean
+        checkedAt:
+          type: string
+          format: date-time
+          pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$
+        latencyMs:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+    WhoCheckedCode:
+      type: object
+      additionalProperties: false
+      required:
+      - canonicalUri
+      - stemUri
+      - stemCode
+      - stemTitle
+      properties:
+        canonicalUri:
+          type: string
+          description: Exact CodeInfo URI ending in encodeURIComponent(requested code).
+        stemUri:
+          type: string
+          pattern: ^http://id\.who\.int/icd/release/11/2026-01/mms/[1-9][0-9]{0,19}(?:/(?:other|unspecified))?$
+        stemCode:
+          $ref: '#/components/schemas/WhoCheckCode'
+        stemTitle:
+          type: string
+          minLength: 1
+          maxLength: 4096
+    WhoCodeCheckResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - schemaVersion
+      - code
+      - status
+      - entry
+      - receipt
+      properties:
+        schemaVersion:
+          type: string
+          const: mediflow.reference-data.icd11-code-check.v1
+        code:
+          $ref: '#/components/schemas/WhoCheckCode'
+        status:
+          type: string
+          enum:
+          - found
+          - not_found
+        entry:
+          oneOf:
+          - $ref: '#/components/schemas/WhoCheckedCode'
+          - type: 'null'
+        receipt:
+          $ref: '#/components/schemas/WhoCodeCheckReceipt'
+      description: Code must equal the request; found iff entry is present and receipt.found is true. not_found requires
+        a null entry. stemCode equals the first code component. This is terminology existence, not diagnostic validation.
     NativeFunctionCommand:
       oneOf:
         - $ref: '#/components/schemas/NativeFunctionSetCommand'

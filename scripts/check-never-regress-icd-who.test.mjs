@@ -98,3 +98,52 @@ test('canonical URI data exception is confined to the exact native codec fixture
     assert.equal(isExternalUrlLiteralAllowed('native/MediFlowMac/Sources/MediFlowCore/DiagnosesCodec.swift',
         uri, `let uri = "${uri}"`), false);
 });
+
+/* @Codex: pin each new exception to its exact source line and file. */
+const pairedWhoUrlSeams = [
+  [
+    "lib/reference-data/icd11-who-network-route.test.ts",
+    "const URI = 'http://id.who.int/icd/release/11/2026-01/mms/1000000001';"
+  ],
+  [
+    "lib/reference-data/icd11-who-network-route.test.ts",
+    "        new Request(`https://synthetic.invalid/api/v1/network/terminology/who/${op}${suffix}`, { signal });"
+  ],
+  [
+    "lib/reference-data/icd11-who-network-route.test.ts",
+    "        { ...valid, entries: [{ ...valid.entries[0], canonicalUri: 'https://example.invalid/' }] },"
+  ],
+  [
+    "native/MediFlowMac/Sources/MediFlowAppleShared/HomeBaseWHOModels.swift",
+    "    private static let mms = \"http://id.who.int/icd/release/11/2026-01/mms/\""
+  ],
+  [
+    "native/MediFlowMac/Tests/MediFlowAppleSharedTests/HomeBaseWHOContractTests.swift",
+    "    static let uri = \"http://id.who.int/icd/release/11/2026-01/mms/1000000001\""
+  ],
+  [
+    "native/MediFlowMac/Tests/MediFlowAppleSharedTests/HomeBaseWHOContractTests.swift",
+    "        \"http://id.who.int/icd/release/11/2026-01/mms/codeinfo/\" + code.replacingOccurrences(of: \"&\", with: \"%26\").replacingOccurrences(of: \"/\", with: \"%2F\")"
+  ],
+  [
+    "native/MediFlowMac/Tests/MediFlowAppleSharedTests/HomeBaseWHOContractTests.swift",
+    "        for (key, value) in [(\"code\", \"N/A\"), (\"code\", \"AA00&&XA00\"), (\"canonicalUri\", \"https://example.invalid/\"), (\"canonicalUri\", WHOSyntheticFixtures.uri.replacingOccurrences(of: \"2026-01\", with: \"2025-01\")), (\"description\", \"<b>term</b>\"), (\"description\", \" term\"), (\"description\", \"term\\u{200f}\"), (\"system\", \"ICD-10\"), (\"vendor\", \"unexpected\")] {"
+  ],
+  [
+    "native/MediFlowMac/Tests/MediFlowAppleSharedTests/RepertoriWHOStoreTests.swift",
+    "                            token: String = \"synthetic-token\", server: String = \"https://synthetic.invalid\","
+  ],
+  [
+    "native/MediFlowMac/Tests/MediFlowAppleSharedTests/RepertoriWHOStoreTests.swift",
+    "            case \"server\": current = connection(source, server: \"https://new-synthetic.invalid\")"
+  ]
+];
+test('paired WHO exceptions reject changed URLs, extra URLs and other paths', () => {
+    for (const [path, line] of pairedWhoUrlSeams) {
+        const url = line.match(/https?:\/\/[^"'`\s]+/u)[0];
+        assert.equal(isExternalUrlLiteralAllowed(path, url, line), true, path);
+        assert.equal(isExternalUrlLiteralAllowed('lib/unrelated.ts', url, line), false);
+        assert.equal(isExternalUrlLiteralAllowed(path, url + '?changed', line.replace(url, url + '?changed')), false);
+        assert.equal(isExternalUrlLiteralAllowed(path, url, line + ' https://unapproved.invalid'), false);
+    }
+});
