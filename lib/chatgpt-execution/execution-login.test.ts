@@ -2,7 +2,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { join } from 'node:path';
-const { SyntheticProductTransport } = await import('../chatgpt-product/product-production.test.ts');
+// Login-only unit peer; product/owner/consent integration stays parent-only.
+const { SyntheticLoginTransport: SyntheticProductTransport } = await import('./fixtures/login-peer.ts');
 const { createExecutionLogin, assertExecutionConfig, expectedExecutionConfig, expectedExecutionEnvironment, EXECUTION_PROTOCOL_PROVENANCE, readExecutionLimits } = await import('./execution-login.ts');
 const { ExecutionError } = await import('./execution-contract.ts');
 const { ProductError } = await import('../chatgpt-product/product-contract.ts');

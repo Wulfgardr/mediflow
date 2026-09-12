@@ -178,8 +178,30 @@ L'audit distingue `layered_source_projection_observed` dalla verifica indiretta
 dei due controlli tools omessi dalla risposta API. Il legame completo fra
 sorgenti e build resta `unqualified`: questa prova non lo sostituisce.
 Nessun login, turno provider o ammissione di produzione è stato eseguito.
-Il login conserva un verificatore precedente da integrare; il percorso utente
-completo e l'accettazione con fixture sintetica rimangono da dimostrare.
+Il percorso utente completo e l'accettazione con fixture sintetica rimangono
+da dimostrare.
+
+## Collegamento candidato del login allo stesso host preparato
+
+Il login può consumare una sola volta l'osservazione di initialize del processo
+Mac preparato. L'issuer associa privatamente l'identità di quell'oggetto al
+trasporto concreto: il wrapper di prodotto lo inoltra, ma non può sostituirlo
+con una ricevuta ricostruita, un callback di successo o un flag di piattaforma.
+Il claim è monouso, vincolato al cwd posseduto e alla custodia corrente. Non è
+una nuova autorità dichiarativa e non modifica il consenso del prodotto.
+
+Per quel solo host, `start` e `complete` richiedono il readback attuale con
+`includeLayers:true` e cwd esplicito sullo stesso trasporto. L'issuer esegue il
+verificatore già accettato e le sue fence; non riscrive la risposta in config
+attesa. Tutti gli RPC login/account e le notifiche usano il trasporto concreto;
+`read` e `cancel` mantengono guard e currentness, senza estendere durata o
+capacità. Logout e chiusura restano sotto il proprietario di prodotto.
+Il percorso storico/sintetico rimane distinto e non qualifica un Mac.
+
+Il factory di produzione resta HELD. Questa modifica non è un login reale,
+non rappresenta consenso o accettazione dell'utente e non abilita provider turn.
+`omittedToolBinding` resta indiretto e `fullSourceBuildBinding` resta
+`unqualified`. L'esito live end-to-end rimane da verificare dal parent.
 
 ## Fonti
 
