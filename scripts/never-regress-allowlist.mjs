@@ -277,6 +277,8 @@ export const NEVER_REGRESS_ALLOWLIST = {
         },
     ],
     externalUrls: [
+        /* @Codex: scoped ordinary integration test peer. */
+        {"path": "lib/chatgpt-execution/ordinary-integration.test.ts", "pattern": "^\\ \\ \\ \\ \\ \\ \\ \\ if\\ \\(method\\ ===\\ 'account/login/start'\\)\\ return\\ \\{\\ type:\\ 'chatgptDeviceCode',\\ loginId:\\ 'fixture\\-login',\\ userCode:\\ 'FAKE\\-ONLY',\\ verificationUrl:\\ 'https://auth\\.openai\\.com/fixture\\-never\\-navigate'\\ \\};$", "reason": "WUL-689/691: exact inert device-login response in the synthetic ordinary integration peer; never navigated or fetched."},
         /* @Codex: exact WUL-673 reference and fixture lines. */
         {"path": "lib/reference-data/icd11-who-network-route.test.ts", "pattern": "^const\\ URI\\ =\\ 'http://id\\.who\\.int/icd/release/11/2026\\-01/mms/1000000001';$", "reason": "WUL-673: exact canonical WHO URI comparison or inert synthetic fixture line; no network permission or live credential."},
         {"path": "lib/reference-data/icd11-who-network-route.test.ts", "pattern": "^\\ \\ \\ \\ \\ \\ \\ \\ new\\ Request\\(`https://synthetic\\.invalid/api/v1/network/terminology/who/\\$\\{op\\}\\$\\{suffix\\}`,\\ \\{\\ signal\\ \\}\\);$", "reason": "WUL-673: exact canonical WHO URI comparison or inert synthetic fixture line; no network permission or live credential."},

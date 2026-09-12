@@ -3,6 +3,10 @@ import 'server-only';
 import { createHash, randomUUID } from 'node:crypto';
 import { isAbsolute } from 'node:path';
 import { ExecutionError } from './execution-contract';
+import { readPreparedOrdinaryProfile, closePreparedOrdinaryProfile, type PreparedOrdinaryProfile, type PreparedOrdinaryRead } from './ordinary-preparation';
+import { assertOrdinaryProductConsent, ordinaryConsentIsCurrent, closeOrdinaryProductConsent, type OrdinaryProductConsent } from '../chatgpt-product/product-consent';
+import { assertOrdinaryEgress } from './ordinary-egress-chokepoint';
+import type { OrdinaryTaskOutput } from './ordinary-task-profile';
 import type { ExecutionCode, ExecutionMethod, ExecutionTransport, ModelEffort, SynthesisCatalog, SynthesisChoice, SynthesisInput, SynthesisRequest, SynthesisResult } from './execution-contract';
 
 type RecordValue = Record<string, unknown>;
@@ -32,6 +36,8 @@ type ExecutionAuthorityOptions = Readonly<{
 type ExecutionTask<Result extends object> = Readonly<{
     prompt: string; outputSchema: object;
     decode(text: string, choice: SynthesisChoice): Result;
+    content?: PreparedOrdinaryRead['content']; payload?: string;
+    beforeContent?(): void; localCurrent?(): boolean;
 }>;
 
 function createTaskExecutionService<Result extends object>(options: ExecutionAuthorityOptions, task: ExecutionTask<Result>) {
@@ -64,7 +70,7 @@ function createTaskExecutionService<Result extends object>(options: ExecutionAut
     function authority(): ExecutionCode | undefined {
         try {
             if (!boundaryQualified()) return 'unqualified_boundary';
-            if (!isCurrent()) return 'revoked';
+            if (!isCurrent() || task.localCurrent && !task.localCurrent()) return 'revoked';
         } catch { return 'revoked'; }
     }
     function guard() {
@@ -102,6 +108,11 @@ function createTaskExecutionService<Result extends object>(options: ExecutionAut
     async function rpc(method: ExecutionMethod, params?: unknown) {
         await ensureAccountCurrent();
         guard();
+        if (method === 'turn/start' && task.content) {
+            const supplied = record(params);
+            if (JSON.stringify({ input: supplied.input, outputSchema: supplied.outputSchema }) !== task.payload) throw new ExecutionError('invalid_request');
+            task.beforeContent?.(); guard();
+        }
         const response = await Promise.race([transport.request(method, params), active!.failure]);
         guard();
         await ensureAccountCurrent();
@@ -325,6 +336,7 @@ function createTaskExecutionService<Result extends object>(options: ExecutionAut
                 const signature = (values: readonly SynthesisChoice[]) => JSON.stringify(values.map(value => JSON.stringify([value.model, value.effort])).sort());
                 if (signature(fresh) !== signature(catalog.choices)) throw new ExecutionError('catalog_stale');
                 limits(await rpc('account/rateLimits/read'));
+                task.beforeContent?.(); guard();
                 usedTurn = true;
                 const started = record(await rpc('thread/start', {
                     model: choice.model, modelProvider: 'openai', serviceTier: 'priority', cwd,
@@ -345,8 +357,8 @@ function createTaskExecutionService<Result extends object>(options: ExecutionAut
                 turnPending = true;
                 const turnResponse = record(await rpc('turn/start', {
                     threadId, model: choice.model, effort: choice.effort, serviceTier: 'priority', summary: 'none',
-                    input: [{ type: 'text', text: task.prompt, text_elements: [] }],
-                    outputSchema: task.outputSchema,
+                    input: task.content?.input ?? [{ type: 'text', text: task.prompt, text_elements: [] }],
+                    outputSchema: task.content?.outputSchema ?? task.outputSchema,
                 }));
                 const turn = record(turnResponse.turn);
                 if (!boundedText(turn.id, 128)) throw new ExecutionError('protocol_error');
@@ -384,7 +396,7 @@ function createTaskExecutionService<Result extends object>(options: ExecutionAut
             const binding = resultBindings.get(result);
             if (!binding || terminal || binding.signal?.aborted || binding.accountRevision !== accountRevision
                 || verifiedAccountRevision !== accountRevision) return false;
-            try { if (!boundaryQualified()) return false; } catch { return false; }
+            try { if (!boundaryQualified() || task.localCurrent && !task.localCurrent()) return false; } catch { return false; }
             // Intentional transport close does not retire a completed proposal.
             return binding.kind === 'catalog' ? result === catalog && !usedTurn : completed && usedTurn;
         },
@@ -440,4 +452,59 @@ function synthesisTask(inputValue: SynthesisInput): ExecutionTask<SynthesisResul
 /** Existing DEMO contract and wire format remain unchanged. */
 export function createSynthesisExecutionService(options: ExecutionAuthorityOptions & Readonly<{ input: SynthesisInput }>) {
     return createTaskExecutionService(options, synthesisTask(options.input));
+}
+
+
+/** Canonical parser objects are adopted, not cloned or relabelled. Freeze all
+ * descendants before issuing a witness so content cannot change before commit. */
+function freezeOrdinaryOutput<T>(value: T): T {
+    if (value && typeof value === 'object') {
+        for (const child of Object.values(value)) freezeOrdinaryOutput(child);
+        Object.freeze(value);
+    }
+    return value;
+}
+
+export type OrdinaryExecutionResult = Readonly<{
+    status: 'completed'; functionId: PreparedOrdinaryRead['functionId']; output: OrdinaryTaskOutput;
+    proposalOnly: true; clinicalWrites: 0;
+    provenance: Readonly<{ provider: 'openai'; channel: 'codex_app_server'; authentication: 'chatgpt_subscription';
+        model: string; effort: ModelEffort; fallback: 'none'; profileVersion: PreparedOrdinaryRead['profileVersion'];
+        sourceSha256: string; payloadSha256: string; outputSha256: string }>;
+}>;
+/** Named factory: no prompt/schema/parser/policy supplied by the caller.
+ * Content + consent do NOT grant egress. The concrete chokepoint still denies.
+ * The original function owner must bind/commit the returned content, not the DEMO UI. */
+export function createOrdinaryExecutionService(options: ExecutionAuthorityOptions & Readonly<{
+    preparation: PreparedOrdinaryProfile; consent: OrdinaryProductConsent;
+}>) {
+    const { preparation, consent } = options;
+    const prepared = readPreparedOrdinaryProfile(preparation);
+    assertOrdinaryProductConsent(consent, preparation);
+    const service = createTaskExecutionService<OrdinaryExecutionResult>(options, Object.freeze({
+        prompt: prepared.content.input[0].text, outputSchema: prepared.content.outputSchema,
+        content: prepared.content, payload: prepared.payload,
+        beforeContent() { assertOrdinaryEgress(preparation, consent); },
+        localCurrent: () => ordinaryConsentIsCurrent(consent, preparation),
+        decode(text: string, choice: SynthesisChoice): OrdinaryExecutionResult {
+            assertOrdinaryProductConsent(consent, preparation);
+            const output = freezeOrdinaryOutput(prepared.parseOutput(text));
+            return Object.freeze({ status: 'completed', functionId: prepared.functionId, output,
+                proposalOnly: true, clinicalWrites: 0,
+                provenance: Object.freeze({ provider: 'openai', channel: 'codex_app_server', authentication: 'chatgpt_subscription',
+                    model: choice.model, effort: choice.effort, fallback: 'none', profileVersion: prepared.profileVersion,
+                    sourceSha256: prepared.sourceSha256, payloadSha256: prepared.payloadSha256, outputSha256: hash(JSON.stringify(output)) }) });
+        },
+    }));
+    const release = async () => { closeOrdinaryProductConsent(consent); await closePreparedOrdinaryProfile(preparation); };
+    return Object.freeze({
+        readCatalog: () => service.readCatalog(),
+        async generate(request: SynthesisRequest, signal?: AbortSignal) {
+            try { return await service.generate(request, signal); }
+            catch (error) { await release(); throw error; }
+        },
+        isCurrent: (value: SynthesisCatalog | OrdinaryExecutionResult) => service.isCurrent(value),
+        async cancel() { closeOrdinaryProductConsent(consent); try { await service.cancel(); } finally { await release(); } },
+        async dispose() { closeOrdinaryProductConsent(consent); try { await service.dispose(); } finally { await release(); } },
+    });
 }

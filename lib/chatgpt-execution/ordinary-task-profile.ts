@@ -4,36 +4,40 @@ import 'server-only';
 import { createHash } from 'node:crypto';
 import { types } from 'node:util';
 import { scanJsonObject } from '../ai-json-lexical';
+import { emissionPlan, emissionUnit, renderEmissionPlan, type EmissionPart, type EmissionPlan } from './ordinary-emission-plan';
+import { buildPatientInsightExtractionPlan } from '../ai-task-contract-prompts';
 
 import {
-    buildPatientInsightExtractionPrompt,
     isEnvelopeUsable,
     parsePatientInsightExtractionResponse,
     type PatientInsightExtraction,
 } from '../ai-task-contracts';
 import type { PatientInsightProjection } from '../ai-providers/fabric/patient-insight-host-boundary';
 import { DOCUMENT_SYNTHESIS_V2_JSON_SCHEMA } from '../ai-providers/document-synthesis-json-schema';
-import { buildDocumentSynthesisMultiSourcePrompt } from '../ai-providers/fabric/document-synthesis-multi-source-prompt';
+import { buildDocumentSynthesisMultiSourcePrompt, buildDocumentSynthesisMultiSourcePlan } from '../ai-providers/fabric/document-synthesis-multi-source-prompt';
 import { composeDocumentSynthesisProviderProjection } from '../ai-providers/fabric/document-synthesis-source-set-contract';
 import { parseDocumentSynthesisProviderEnvelope, resolveDocumentSynthesisProviderEnvelope } from '../ai-providers/fabric/document-synthesis-provider-envelope';
 import { bindDocumentSynthesisProviderEnvelope } from '../ai-providers/fabric/document-synthesis-provider-envelope-binding';
 import type { DocumentSynthesisClaimCitationsResult } from '../ai-providers/fabric/document-synthesis-claim-citations';
 import { createTreatmentReasoningChatGptOutputContract, type TreatmentReasoningChatGptContent } from '../ai-providers/fabric/treatment-reasoning-athena-output-contract-v2';
 import {
-    buildPatientSmartImportCapabilityPrompt,
+    buildPatientSmartImportCapabilityPrompt, buildPatientSmartImportCapabilityPlan,
     parsePatientSmartImportCapabilityProposal,
     type PatientSmartImportCapabilityProposal,
 } from '../domain/documents/patient-smart-import-capability-contract';
 import { snapshotSmartImportProjection, type SmartImportProjection } from '../smart-import-projection';
 import {
-    buildChatGptTreatmentReasoningPrompt, type TreatmentReasoningPromptInput,
+    buildChatGptTreatmentReasoningPrompt, buildChatGptTreatmentReasoningPlan, type TreatmentReasoningPromptInput,
 } from '../treatment-reasoning-contract';
 
 export type OrdinaryTaskFunctionId = 'patient_insight' | 'smart_import' | 'document_synthesis' | 'treatment_reasoning';
 export type OrdinaryTaskOutput = PatientInsightExtraction | PatientSmartImportCapabilityProposal | Extract<DocumentSynthesisClaimCitationsResult, { status: 'available' }> | TreatmentReasoningChatGptContent;
+export const ORDINARY_PROFILE_VERSION = 'mediflow.ordinary-redacted-profile.v1' as const;
 export type OrdinaryTaskProfile = object;
 export type OrdinaryTaskProfileRead = Readonly<{
     functionId: OrdinaryTaskFunctionId;
+    profileVersion: typeof ORDINARY_PROFILE_VERSION;
+    emissionPlan: EmissionPlan;
     prompt: string;
     outputSchema: Readonly<Record<string, unknown>>;
     inputSha256: string;
@@ -157,13 +161,13 @@ function validTreatmentInput(value: unknown): value is TreatmentReasoningPromptI
             && (!Object.hasOwn(source, 'date') || typeof source.date === 'string' && source.date.length <= 80);
     });
 }
-function insightPrompt(input: PatientInsightProjection): string {
+function insightPlan(input: PatientInsightProjection): EmissionPlan {
     let index = 1;
-    const lines = [`[S${index++}] ${input.clinicalFocus}`];
-    for (const value of input.activeConditions) lines.push(`[S${index++}] Condizione attiva: ${value}`);
-    for (const value of input.currentTherapies) lines.push(`[S${index++}] Terapia corrente: ${value}`);
-    for (const value of input.recentClinicalEvents) lines.push(`[S${index++}] Evento clinico recente: ${value}`);
-    return buildPatientInsightExtractionPrompt(lines.join('\n'));
+    const parts: EmissionPart[] = [`[S${index++}] `, emissionUnit(input.clinicalFocus)];
+    for (const [label, values] of [['Condizione attiva', input.activeConditions], ['Terapia corrente', input.currentTherapies], ['Evento clinico recente', input.recentClinicalEvents]] as const) {
+        for (const value of values) parts.push(`\n[S${index++}] ${label}: `, emissionUnit(value));
+    }
+    return buildPatientInsightExtractionPlan(emissionPlan(parts));
 }
 function supportedInsight(value: PatientInsightExtraction, sourceCount: number): boolean {
     const claims = [value.summary, ...value.data.currentState, ...value.data.alerts, ...value.data.nextSteps, ...value.data.gaps].filter(Boolean);
@@ -177,10 +181,10 @@ function supportedInsight(value: PatientInsightExtraction, sourceCount: number):
         });
     });
 }
-function register(functionId: OrdinaryTaskFunctionId, input: unknown, prompt: string, parseOutput: (text: string) => OrdinaryTaskOutput): OrdinaryTaskProfile {
-    if (typeof prompt !== 'string' || prompt.length === 0) return reject('ordinary_task_input_invalid');
+function register(functionId: OrdinaryTaskFunctionId, input: unknown, prompt: string, plan: EmissionPlan, parseOutput: (text: string) => OrdinaryTaskOutput): OrdinaryTaskProfile {
+    if (typeof prompt !== 'string' || prompt.length === 0 || renderEmissionPlan(plan) !== prompt) return reject('ordinary_task_input_invalid');
     const token = Object.freeze(Object.create(null));
-    const stored = Object.freeze({ functionId, prompt, outputSchema: strictSchema(schemas[functionId]), inputSha256: digest(input),
+    const stored = Object.freeze({ functionId, profileVersion: ORDINARY_PROFILE_VERSION, emissionPlan: plan, prompt, outputSchema: strictSchema(schemas[functionId]), inputSha256: digest(input),
         parseOutput(text: string) {
             if (scanJsonObject(text) === null) return reject('ordinary_task_output_invalid');
             try { return parseOutput(text); } catch { return reject('ordinary_task_output_invalid'); }
@@ -194,7 +198,8 @@ export function createPatientInsightOrdinaryTaskProfile(input: PatientInsightPro
     const snapshot = clone(input) as PatientInsightProjection;
     if (!validPatientInsightInput(snapshot)) return reject('ordinary_task_input_invalid');
     const sourceCount = 1 + snapshot.activeConditions.length + snapshot.currentTherapies.length + snapshot.recentClinicalEvents.length;
-    return register('patient_insight', snapshot, insightPrompt(snapshot), (text) => { const parsed = parsePatientInsightExtractionResponse(text); if (!isEnvelopeUsable(parsed) || !supportedInsight(parsed.value, sourceCount)) return reject('ordinary_task_output_invalid'); return parsed.value; });
+    const plan = insightPlan(snapshot);
+    return register('patient_insight', snapshot, renderEmissionPlan(plan), plan, (text) => { const parsed = parsePatientInsightExtractionResponse(text); if (!isEnvelopeUsable(parsed) || !supportedInsight(parsed.value, sourceCount)) return reject('ordinary_task_output_invalid'); return parsed.value; });
 }
 
 /** Builds the fixed Smart Import formatter/parser profile from an already owner-acquired projection. */
@@ -205,15 +210,16 @@ export function createSmartImportOrdinaryTaskProfile(input: Readonly<{ projectio
     let snapshot: Readonly<{ projection: SmartImportProjection; generatedAt: string }>;
     try { snapshot = Object.freeze({ projection: snapshotSmartImportProjection(fields.projection, fields.generatedAt), generatedAt: fields.generatedAt }); }
     catch { return reject('ordinary_task_input_invalid'); }
-    return register('smart_import', snapshot, buildPatientSmartImportCapabilityPrompt(snapshot.projection), (text) => { try { return parsePatientSmartImportCapabilityProposal(JSON.stringify(canonicalOptionals(JSON.parse(text), schemas.smart_import)), snapshot.projection, snapshot.generatedAt); } catch { return reject('ordinary_task_output_invalid'); } });
+    return register('smart_import', snapshot, buildPatientSmartImportCapabilityPrompt(snapshot.projection), buildPatientSmartImportCapabilityPlan(snapshot.projection), (text) => { try { return parsePatientSmartImportCapabilityProposal(JSON.stringify(canonicalOptionals(JSON.parse(text), schemas.smart_import)), snapshot.projection, snapshot.generatedAt); } catch { return reject('ordinary_task_output_invalid'); } });
 }
 
 /** Captured source-set identity is a content binding, never session admission. */
 export function createDocumentSynthesisOrdinaryTaskProfile(sourceSet: unknown): OrdinaryTaskProfile {
     const projection = composeDocumentSynthesisProviderProjection(sourceSet);
     const built = buildDocumentSynthesisMultiSourcePrompt(sourceSet);
-    if (!projection || built.status !== 'available') return reject('ordinary_task_input_invalid');
-    return register('document_synthesis', projection, built.prompt, (text) => {
+    const plan = buildDocumentSynthesisMultiSourcePlan(sourceSet);
+    if (!projection || !plan || built.status !== 'available') return reject('ordinary_task_input_invalid');
+    return register('document_synthesis', projection, built.prompt, plan, (text) => {
         // First parse preserves the canonical duplicate-key and bounded-input checks.
         const parsed = parseDocumentSynthesisProviderEnvelope({ content: text });
         if (parsed.status !== 'available') return reject('ordinary_task_output_invalid');
@@ -234,7 +240,7 @@ export function createTreatmentReasoningOrdinaryTaskProfile(input: TreatmentReas
         const allowedEvidenceRefs = snapshot.sources.map(source => source.id);
         const contract = createTreatmentReasoningChatGptOutputContract({ allowedEvidenceRefs });
         const prompt = buildChatGptTreatmentReasoningPrompt(snapshot);
-        return register('treatment_reasoning', snapshot, prompt, (text) => {
+        return register('treatment_reasoning', snapshot, prompt, buildChatGptTreatmentReasoningPlan(snapshot), (text) => {
             let value: unknown;
             try { value = JSON.parse(text); } catch { return reject('ordinary_task_output_invalid'); }
             const result = contract.normalize(value);
@@ -246,4 +252,37 @@ export function createTreatmentReasoningOrdinaryTaskProfile(input: TreatmentReas
 /** Resolves only a same-module registered opaque profile and returns immutable content details. */
 export function readOrdinaryTaskProfile(profile: unknown): OrdinaryTaskProfileRead {
     try { if (!profile || typeof profile !== 'object' || types.isProxy(profile)) return reject('ordinary_task_profile_invalid'); const stored = profiles.get(profile); return stored ?? reject('ordinary_task_profile_invalid'); } catch { return reject('ordinary_task_profile_invalid'); }
+}
+
+/** Fixed profile path classification. Labels/IDs/policies are never rehydrated. */
+export function ordinaryTextPath(profile: OrdinaryTaskProfile, path: readonly (string | number)[]): boolean {
+    const read = readOrdinaryTaskProfile(profile);
+    const last = path[path.length - 1];
+    if (['sourceId', 'id', 'claimPath', 'mode'].includes(String(last)) || path.includes('evidenceRefs') || path.includes('toolsUsed')) return false;
+    if (read.functionId === 'document_synthesis' && (path[0] === 'claims' || path[0] === 'citations' && last !== 'quote')) return false;
+    let schema: Readonly<Record<string, unknown>> | undefined = schemas[read.functionId];
+    for (const step of path) {
+        if (!schema) return false;
+        if (typeof step === 'number') schema = schema.type === 'array' ? schema.items as typeof schema : undefined;
+        else {
+            const properties = schema.properties as Record<string, typeof schema> | undefined;
+            schema = schema.type === 'object' && properties && Object.hasOwn(properties, step) ? properties[step] : undefined;
+        }
+    }
+    return schema?.type === 'string' && schema.enum === undefined && schema.const === undefined;
+}
+
+/** Checks canonical text bounds before legacy parsers can normalize/truncate them. */
+export function ordinaryCanonicalTextBounds(profile: OrdinaryTaskProfile, value: unknown): boolean {
+    const root = schemas[readOrdinaryTaskProfile(profile).functionId];
+    function check(value: unknown, schema: Readonly<Record<string, unknown>>): boolean {
+        if (typeof value === 'string') return typeof schema.maxLength !== 'number' || value.length <= schema.maxLength;
+        if (Array.isArray(value) && schema.type === 'array') return value.every(item => check(item, schema.items as Readonly<Record<string, unknown>>));
+        if (value && typeof value === 'object' && schema.type === 'object') {
+            const properties = schema.properties as Record<string, Readonly<Record<string, unknown>>>;
+            return Object.entries(value).every(([key, child]) => !Object.hasOwn(properties, key) || check(child, properties[key]));
+        }
+        return true;
+    }
+    return check(value, root);
 }

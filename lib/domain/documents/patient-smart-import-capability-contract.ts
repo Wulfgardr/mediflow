@@ -1,4 +1,6 @@
 /* @Codex */
+import { jsonEmissionPlan, type EmissionPlan } from '../../chatgpt-execution/ordinary-emission-plan';
+import { buildSmartImportExtractionPlan } from '../../ai-task-contract-prompts';
 import type { SmartImportProjection } from '../../smart-import-projection';
 import {
     buildSmartImportExtractionPrompt,
@@ -53,6 +55,19 @@ export function buildPatientSmartImportCapabilityPrompt(projection: SmartImportP
     } catch {
         return fail('prompt_input_invalid');
     }
+}
+
+/** Structural IDs and kind enums remain host labels; all other values are data. */
+export function buildPatientSmartImportCapabilityPlan(projection: SmartImportProjection): EmissionPlan {
+    const payload = {
+        currentDiagnoses: projection.currentDiagnoses.map(item => ({ ...item })),
+        currentActiveTherapies: projection.currentActiveTherapies.map(item => ({ ...item })),
+        therapyCandidateHints: projection.therapyCandidateHints.map(item => ({ ...item })),
+        sources: projection.sources.map(item => ({ ...item })),
+    };
+    return buildSmartImportExtractionPlan(jsonEmissionPlan(payload, path =>
+        path.length === 3 && (path[0] === 'sources' && ['id', 'kind'].includes(String(path[2]))
+            || path[0] === 'therapyCandidateHints' && path[2] === 'sourceId')));
 }
 
 function validIso(value: string): boolean {

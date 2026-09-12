@@ -408,3 +408,7 @@ export function createProductService(options: {
     });
 }
 export type ProductService = ReturnType<typeof createProductService>;
+
+/** Named backend companion. It is deliberately NOT routed through the DEMO
+ * controller: the original function owner retains result publication authority. */
+export { createOrdinaryProductAttempt } from '../chatgpt-execution/ordinary-product-attempt';

@@ -1,4 +1,5 @@
 /* @Codex */
+import { emissionPlan, emissionUnit, renderEmissionPlan, type EmissionPlan } from './chatgpt-execution/ordinary-emission-plan';
 export const AI_TASK_EXTRACTION_SCHEMA_VERSION = 'mediflow.ai.extract.v1';
 
 type PromptTaskKind = 'patient_insight' | 'smart_import' | 'document_synthesis';
@@ -35,7 +36,11 @@ export function buildExtractionPrompt(
 }
 
 export function buildPatientInsightExtractionPrompt(contextPrompt: string): string {
-    return buildExtractionPrompt(
+    return renderEmissionPlan(buildPatientInsightExtractionPlan(emissionPlan([emissionUnit(contextPrompt)])));
+}
+
+export function buildPatientInsightExtractionPlan(contextPlan: EmissionPlan): EmissionPlan {
+    const prefix = buildExtractionPrompt(
         'patient_insight',
         [
             'Sei un assistente medico locale.',
@@ -88,12 +93,17 @@ export function buildPatientInsightExtractionPrompt(contextPrompt: string): stri
             'usa un italiano clinico neutro e non moralizzante',
         ],
         'DATI PAZIENTE',
-        contextPrompt,
+        '',
     );
+    return emissionPlan([prefix, ...contextPlan]);
 }
 
 export function buildSmartImportExtractionPrompt(payload: unknown): string {
-    return buildExtractionPrompt(
+    return renderEmissionPlan(buildSmartImportExtractionPlan(emissionPlan([JSON.stringify(payload, null, 2)])));
+}
+
+export function buildSmartImportExtractionPlan(contextPlan: EmissionPlan): EmissionPlan {
+    const prefix = buildExtractionPrompt(
         'smart_import',
         [
             'Sei un assistente clinico locale per MediFlow.',
@@ -175,8 +185,9 @@ export function buildSmartImportExtractionPrompt(payload: unknown): string {
             'non riassumere la scheda paziente fuori dai campi strettamente necessari',
         ],
         'CONTESTO STRUTTURATO',
-        JSON.stringify(payload, null, 2),
+        '',
     );
+    return emissionPlan([prefix, ...contextPlan]);
 }
 
 export function buildDocumentSynthesisExtractionPrompt(rawText: string): string {
