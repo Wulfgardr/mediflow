@@ -331,6 +331,40 @@ assenza di un binding autentico o della decisione vigente rimane un blocco, non
 viene compensata da callback o flag positivi. Nessun risultato dei test sintetici
 costituisce ammissione di dati reali o completamento di WUL-689/691.
 
+## Confezionamento Mac del payload fissato — WUL-697, 12 settembre 2026
+
+Il resolver conserva il layout standalone `resources/chatgpt-execution/mac/codex-0.153.4`
+ma riconosce separatamente il cwd esatto `.app/Contents/Resources/WebRuntime`.
+Nel bundle il solo eseguibile `codex` e fisico in
+`Contents/Helpers/mediflow-chatgpt-codex` (file diretto, senza directory
+intermedie per codice annidato); sorgente C, schema e
+ricevute rimangono nelle risorse. Non sono ammessi fallback al binario sotto
+Resources, symlink, root non canonici o ancestor symlink. I marker del bundle
+verificano la struttura, non autenticita, firma o ammissione all'esecuzione.
+
+Staging, risoluzione e migrazione controllano tutti i sette pin pubblici esistenti,
+inclusi binario e sorgente nativa. La migrazione riguarda solo il payload fisso,
+prima della normalizzazione delle sei dipendenze Web in Frameworks. Il guard
+continua a vietare qualsiasi Mach-O o symlink nativo in Resources; le sei
+dipendenze e la loro politica di linkage/firma non cambiano. Una seconda
+normalizzazione di un layout completo e valido e una verifica senza scritture.
+
+Il binario qualificato viene copiato senza cambiarne i byte: la sua firma
+esistente viene verificata, mai rimossa o sostituita. La firma delle dipendenze
+Web e quella esterna dell'app sono separate; `--deep` e solo verifica.
+I sette pin sono riletti dopo l'eventuale firma esterna, senza staging.
+Una firma esistente non valida o incompatibile con la distribuzione richiesta
+non autorizza una ri-firma del binario: occorrono nuova qualifica e approvazione
+fuori da questo intervento. Notarizzazione e distribuibilita non sono attestate
+da questo layout. Build native, verifica reale delle firme e smoke restano
+necessari sulla candidata integrata; test con fixture non li sostituiscono.
+
+Lo staging e la normalizzazione rifiutano bundle gia sigillati. Una build
+incrementale firmata richiede una nuova destinazione DerivedData non firmata,
+non la modifica del bundle distribuito. Senza tutti gli asset validi il builder
+fallisce prima di dichiarare l'app pronta. C1/C2, custodian, pin OS/CA,
+consenso, autenticazione ed autorita runtime restano invariati.
+
 ## Fonti
 
 - [ConfigToml del tag verificato](https://github.com/openai/codex/blob/3d2ee51ca2d5db578f328aa75e20aa22c0197c9a/codex-rs/config/src/config_toml.rs),
