@@ -9,9 +9,9 @@ import { ExecutionError, type ExecutionTransport, type ExecutionMethod, type Exe
 import type { QualifiedExecutionHost } from './execution-host';
 import { createOpenAIConnectProxy } from './execution-egress-proxy';
 import { createStdioExecutionTransport } from './execution-transport';
-import { assertExecutionConfig, assertInitialized, executionInitializationParams, expectedExecutionConfig } from './execution-login';
+import { assertInitialized, executionInitializationParams, expectedExecutionConfig } from './execution-login';
 import { EXECUTION_CONFIG, EXECUTION_SUBSTRATE, executionPublicCaBundle, executionSandboxProfile, verifyExecutionSubstrate } from './execution-sandbox';
-import { MAC_CONFIG_SOURCE, MAC_CONTEXT_SHA256, MAC_POLICY_REVISION, macDigest, verifyMacSourceSet } from './execution-mac-config';
+import { MAC_CONFIG_SOURCE, MAC_CONTEXT_SHA256, MAC_POLICY_REVISION, MAC_READBACK_SOURCE, assertMacConfigReadback, macDigest, verifyMacSourceSet } from './execution-mac-config';
 import { buildMacCustodian, launchMacCustodian, MacNativeBuildError, type MacNativeOwner } from './execution-mac-native';
 import type { MacProductQualificationAuthority } from './execution-platform';
 
@@ -22,7 +22,8 @@ export type MacPreparationOptions = Readonly<{ binaryPath: string; nativeSourceP
 export type MacQualificationAudit = Readonly<{ schema: 'mediflow.mac-custody-audit.v1'; run: string; phase: Phase;
     stage: MacQualificationStage; claim: 'candidate_boundary_only_not_live_or_clinical'; revision: string | null;
     baseContextSha256: string; sourceAvailable: true; fullSourceBuildBinding: 'unqualified';
-    consumedProjectionBinding: 'not_observed' | 'strict_startup_and_exact_readback'; protocolRegeneration: 'not_observed' | '24_digests_matched';
+    consumedProjectionBinding: 'not_observed' | 'layered_source_projection_observed';
+    omittedToolBinding: 'not_observed' | 'source_resolver_and_immutable_input_not_direct_tool_observation'; protocolRegeneration: 'not_observed' | '24_digests_matched';
     initializeSha256: string | null; readbackSha256: string | null; nativeHelperSha256: string | null;
     compilerSha256: string | null; binarySha256: string; osBuild: string; cleanupComplete: boolean;
     ownedTreeCeased: boolean; administrativePolicy: 'absent_only_no_overrides'; resourcesRetained: boolean }>;
@@ -59,6 +60,13 @@ function administrativeFilesAbsent(): boolean {
         catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') return false; }
     }
     return true;
+}
+/** Parent entries are pinned without mtime/ctime: owned scratch content may grow. */
+function directoryIdentity(path: string): string {
+    const s = lstatSync(path);
+    if (!s.isDirectory() || s.isSymbolicLink() || s.uid !== process.getuid?.()
+        || (s.mode & 0o7777) !== 0o700 || realpathSync(path) !== path) throw new ExecutionError('unqualified_boundary');
+    return JSON.stringify([s.dev, s.ino, s.uid, s.gid, s.mode]);
 }
 function identity(path: string): string {
     const s = lstatSync(path);
@@ -114,6 +122,7 @@ export async function prepareMacProductQualification(options: MacPreparationOpti
     let proxy: Awaited<ReturnType<typeof createOpenAIConnectProxy>> | undefined;
     let raw: ExecutionTransport | undefined, host: QualifiedExecutionHost | undefined, serverOwner: MacNativeOwner | undefined;
     const owners: MacNativeOwner[] = [], listeners: Server[] = [], immutable = new Map<string, string>();
+    const directories = new Map<string, string>();
     const nonce = randomBytes(16).toString('hex');
     const start = performance.now(), wallStart = Date.now(), lifetime = options.lifetimeMs ?? 300_000;
     let drainingAt = 0, cleanupPromise: Promise<boolean> | undefined, expiry: ReturnType<typeof setTimeout> | undefined;
@@ -122,7 +131,9 @@ export async function prepareMacProductQualification(options: MacPreparationOpti
         return Object.freeze({ schema: 'mediflow.mac-custody-audit.v1', run: nonce, phase, stage,
             claim: 'candidate_boundary_only_not_live_or_clinical', revision, baseContextSha256: MAC_CONTEXT_SHA256,
             sourceAvailable: true, fullSourceBuildBinding: 'unqualified',
-            consumedProjectionBinding: configSha ? 'strict_startup_and_exact_readback' : 'not_observed',
+            // Audit is historical evidence, never a live witness after drain/revoke.
+            consumedProjectionBinding: configSha ? 'layered_source_projection_observed' : 'not_observed',
+            omittedToolBinding: configSha ? 'source_resolver_and_immutable_input_not_direct_tool_observation' : 'not_observed',
             protocolRegeneration: protocolMatched ? '24_digests_matched' : 'not_observed',
             initializeSha256: initSha, readbackSha256: configSha, nativeHelperSha256: native?.helperSha256 ?? null,
             compilerSha256: native?.compilerSha256 ?? null, binarySha256: EXECUTION_SUBSTRATE.codexSha256,
@@ -180,9 +191,32 @@ export async function prepareMacProductQualification(options: MacPreparationOpti
             if (phase === 'sealed') return cleaned && treeCeased;
             if (phase === 'draining') return intentionalDrain && performance.now() - drainingAt < 500;
             if (phase !== 'ready' && phase !== 'borrowed' || !serverOwner?.live() || !administrativeFilesAbsent()) { withdraw(); return false; }
-            for (const [path, expected] of immutable) if (identity(path) !== expected) { withdraw(); return false; }
+            assertReadbackCurrent();
             return true;
         } catch { withdraw(); return false; }
+    }
+    // Private live fence. No external observer, receipt, boolean or callback can
+    // stand in for these observations. Used before/after the RPC and by current().
+    function assertReadbackCurrent(): void {
+        check();
+        if (!root || intentionalDrain || !serverOwner?.live() || !administrativeFilesAbsent()
+            || directories.size !== 8 || immutable.size !== 8) throw new ExecutionError('unqualified_boundary');
+        for (const [path, expected] of directories) if (directoryIdentity(path) !== expected) throw new ExecutionError('unqualified_boundary');
+        for (const [path, expected] of immutable) if (identity(path) !== expected) throw new ExecutionError('unqualified_boundary');
+        const path = join(root, 'codex', 'config.toml');
+        if (readFileSync(path, 'utf8') !== EXECUTION_CONFIG || identity(path) !== immutable.get(path)) throw new ExecutionError('unqualified_boundary');
+        check();
+    }
+    async function readCurrentMacConfig(): Promise<unknown> {
+        assertReadbackCurrent();
+        const owner = serverOwner, transport = raw, cwd = join(root!, 'work');
+        if (!transport) throw new ExecutionError('unqualified_boundary');
+        const response = await transport.request('config/read', { includeLayers: true, cwd });
+        if (serverOwner !== owner || raw !== transport) throw new ExecutionError('unqualified_boundary');
+        assertReadbackCurrent();
+        assertMacConfigReadback(response, cwd);
+        assertReadbackCurrent();
+        return response; // The actual response, never expected input or a reduced facade.
     }
     try {
         if (process.platform !== 'darwin' || process.getuid?.() === 0 || process.getuid?.() !== process.geteuid?.()) throw new ExecutionError('unqualified_boundary');
@@ -196,12 +230,14 @@ export async function prepareMacProductQualification(options: MacPreparationOpti
         root = realpathSync(mkdtempSync('/private/tmp/mfmac-')); chmodSync(root, 0o700);
         const rootStat = lstatSync(root); rootIdentity = JSON.stringify([rootStat.dev, rootStat.ino, rootStat.uid]);
         for (const name of ['runtime', 'codex', 'work', 'tmp', 'config', 'cache', 'data']) mkdirSync(join(root, name), { mode: 0o700 });
+        for (const path of [root, ...['runtime', 'codex', 'work', 'tmp', 'config', 'cache', 'data'].map(name => join(root!, name))]) directories.set(path, directoryIdentity(path));
         const binary = join(root, 'runtime', 'codex');
         copyFileSync(binaryPath, binary, constants.COPYFILE_EXCL | constants.COPYFILE_FICLONE); chmodSync(binary, 0o500);
         verifyExecutionSubstrate(binary);
         const binaryIdentity = identity(binary);
         writeFileSync(join(root, 'runtime', 'public-ca.pem'), ca, { mode: 0o400, flag: 'wx' });
         writeFileSync(join(root, 'codex', 'config.toml'), EXECUTION_CONFIG, { mode: 0o400, flag: 'wx' });
+        immutable.set(join(root, 'codex', 'config.toml'), identity(join(root, 'codex', 'config.toml')));
         stage = 'build'; native = buildMacCustodian(root, options.nativeSourcePath); check();
         proxy = await createOpenAIConnectProxy({ initiallyClosed: true }); check();
         const proxyUrl = `http://127.0.0.1:${proxy.port}`;
@@ -236,6 +272,14 @@ export async function prepareMacProductQualification(options: MacPreparationOpti
             const path = join(root, 'work', 'schemas', pin.path), st = lstatSync(path);
             if (!st.isFile() || st.isSymbolicLink() || st.size > 2_097_152 || macDigest(readFileSync(path)) !== pin.sha256) throw new ExecutionError('unqualified_boundary');
         }
+        // Capture BEFORE server startup. Never reset the config identity captured
+        // immediately after exclusive creation, or adopt a replacement on readback.
+        for (const path of [binary, native.helper, join(root, 'runtime', 'mac-owner.c'), join(root, 'runtime', 'profile.sb'),
+            join(root, 'runtime', 'profile-probe.sb'), join(root, 'runtime', 'public-ca.pem'), join(root, 'runtime', 'probe-ports'), join(root, 'codex', 'config.toml')]) {
+            const stamp = identity(path), previous = immutable.get(path);
+            if (previous !== undefined && previous !== stamp) throw new ExecutionError('unqualified_boundary');
+            immutable.set(path, stamp);
+        }
         protocolMatched = true; check();
         stage = 'initialize';
         prepareMacInstallationId(root); check();
@@ -254,18 +298,16 @@ export async function prepareMacProductQualification(options: MacPreparationOpti
         initialization = await raw.request('initialize', executionInitializationParams()); assertInitialized(initialization, join(root, 'work'));
         initSha = macDigest(JSON.stringify(initialization)); raw.initialized(); check();
         stage = 'readback';
-        const actualConfig = await raw.request('config/read', { includeLayers: false });
-        assertExecutionConfig(actualConfig); configSha = macDigest(JSON.stringify(actualConfig)); check();
+        const actualConfig = await readCurrentMacConfig();
+        configSha = macDigest(JSON.stringify(actualConfig)); check();
         stage = 'custody';
-        for (const path of [binary, native.helper, join(root, 'runtime', 'mac-owner.c'), join(root, 'runtime', 'profile.sb'),
-            join(root, 'runtime', 'profile-probe.sb'), join(root, 'runtime', 'public-ca.pem'), join(root, 'runtime', 'probe-ports'), join(root, 'codex', 'config.toml')]) immutable.set(path, identity(path));
         // Keep the authenticated large binary identity without blocking the native
         // heartbeat by synchronously re-hashing 220 MB during a live session.
         if (identity(binary) !== binaryIdentity) throw new ExecutionError('unqualified_boundary');
         if (macDigest(readFileSync(native.helper)) !== native.helperSha256 || readFileSync(join(root, 'codex', 'config.toml'), 'utf8') !== EXECUTION_CONFIG
             || readFileSync(join(root, 'runtime', 'public-ca.pem'), 'utf8') !== ca) throw new ExecutionError('unqualified_boundary');
         revision = macDigest(JSON.stringify({ base: MAC_CONTEXT_SHA256, policy: MAC_POLICY_REVISION, nonce, binary: EXECUTION_SUBSTRATE,
-            native, source: MAC_CONFIG_SOURCE, protocol: pins, initSha, configSha,
+            native, source: MAC_CONFIG_SOURCE, readbackSource: MAC_READBACK_SOURCE, protocol: pins, initSha, configSha,
             profile: macDigest(readFileSync(join(root, 'runtime', 'profile.sb'))), config: macDigest(EXECUTION_CONFIG) }));
         phase = 'ready';
         const evidence = Object.freeze({ revision, isCurrent: current });

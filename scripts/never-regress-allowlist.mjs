@@ -269,6 +269,11 @@ export const NEVER_REGRESS_ALLOWLIST = {
     ],
     externalUrls: [
         {
+            path: 'lib/chatgpt-execution/execution-mac-config.ts',
+            pattern: "^\\ \\ \\ \\ \\ \\ \\ \\ chatgpt_base_url:\\ 'https://chatgpt\\.com/backend\\-api/',\\ file_opener:\\ 'vscode',$",
+            reason: 'ADR 0134 exact typed readback expectation for the pinned official Codex default; comparison only, no request or egress permission.',
+        },
+        {
             path: 'lib/chatgpt-account/account-browser.test.ts',
             pattern: 'https://auth\\.openai\\.com/oauth/authorize\\?state=synthetic-test',
             reason: 'Synthetic browser lifecycle payload only; the injected fetcher never sends this URL.',

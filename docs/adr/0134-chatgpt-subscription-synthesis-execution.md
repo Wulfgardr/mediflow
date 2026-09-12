@@ -125,8 +125,68 @@ di ogni affermazione. Nessuna route, CTA, preferenza, dispatch di produzione,
 database o writer clinico è collegato da questo cambiamento. Il gate di
 integrazione utente e l'ammissione runtime restano aperti.
 
+## Verifica del readback corrente: proposta del 12 settembre 2026
+
+La ricostruzione corrente usa macOS `26A428` e il binario ufficiale Codex
+`0.153.4`, distinto dal binario della ricevuta C1 storica. Pin, rigenerazione
+dei 24 schemi e inizializzazione sono stati osservati sul nuovo substrato;
+il readback resta bloccato e la produzione non è ammessa.
+
+Il sorgente del tag ufficiale `rust-v0.153.4`, commit
+`3d2ee51ca2d5db578f328aa75e20aa22c0197c9a`, distingue il `ConfigToml`
+consumato dalla rappresentazione `ApiConfig`. Quest'ultima aggiunge valori
+predefiniti e omette due campi `tools` che il resolver supporta. Una risposta
+parziale non deve attestare da sola che tali opzioni siano applicate.
+
+La correzione del verificatore deve mantenere queste condizioni:
+
+- Richiedere i layer e il cwd posseduto esplicitamente, senza scoprire percorsi
+  personali. Il layer utente deve contenere esattamente la configurazione
+  imposta dall'host, provenire dal file immutabile del run e avere versione
+  coerente con il suo contenuto canonico.
+- Verificare chiavi, cardinalità e provenienza di tutte le origini. Non
+  accettare layer di progetto, profili, flag di sessione, MDM o altre autorità.
+  L'eventuale layer di sistema vuoto non prova assenza di policy: restano
+  obbligatori i controlli indipendenti sull'assenza dei file amministrativi.
+- Confrontare la proiezione effettiva con aspettative chiuse e fondate sul
+  sorgente della versione esatta. Non ignorare campi aggiuntivi né considerare
+  automaticamente innocui `null`, mappe vuote o valori predefiniti. Un hash di
+  una risposta osservata, da solo, non sostituisce questa verifica semantica.
+- Per opzioni omesse dalla proiezione, legare il layer esatto al resolver
+  della versione verificata e al medesimo processo posseduto. Un layer
+  ricaricato dopo l'avvio non è da solo prova della configurazione consumata:
+  devono restare verificate immutabilità, percorso, substrato e currentness.
+- Conservare la ricevuta C1 come provenienza storica degli schemi, senza
+  attribuirle il nuovo hash binario o autorità runtime. Nessun callback,
+  ricevuta importata o flag dichiarativo può sostituire l'issuer concreto.
+
+Questa proposta non cambia le capacità ammesse sopra, non abilita egress o
+login e non dichiara completata la qualifica. Richiede prove positive sul
+readback reale e prove negative per contenuti, origini, layer e risposte
+tardive alterati prima di qualsiasi promozione.
+
+## Esito locale del readback — 12 settembre 2026
+
+La candidata Mac ha superato il readback reale con layer e cwd espliciti sul
+binario ufficiale `0.153.4`, macOS `26A428`. Il controllo include configurazione
+utente immutabile prima dell'avvio, origini e proiezione chiuse, identità delle
+directory possedute e assenza indipendente delle policy amministrative.
+I 24 schemi coincidono; inizializzazione, chiusura e cessazione dell'albero
+posseduto sono state osservate. La ricevuta resta evidenza del singolo run.
+
+L'audit distingue `layered_source_projection_observed` dalla verifica indiretta
+dei due controlli tools omessi dalla risposta API. Il legame completo fra
+sorgenti e build resta `unqualified`: questa prova non lo sostituisce.
+Nessun login, turno provider o ammissione di produzione è stato eseguito.
+Il login conserva un verificatore precedente da integrare; il percorso utente
+completo e l'accettazione con fixture sintetica rimangono da dimostrare.
+
 ## Fonti
 
+- [ConfigToml del tag verificato](https://github.com/openai/codex/blob/3d2ee51ca2d5db578f328aa75e20aa22c0197c9a/codex-rs/config/src/config_toml.rs),
+  [costruzione del readback](https://github.com/openai/codex/blob/3d2ee51ca2d5db578f328aa75e20aa22c0197c9a/codex-rs/app-server/src/config_manager_service.rs)
+  e [proiezione API](https://github.com/openai/codex/blob/3d2ee51ca2d5db578f328aa75e20aa22c0197c9a/codex-rs/app-server-protocol/src/protocol/v2/config.rs):
+  fonti della proposta del 12 settembre, non prova autonoma di ammissione.
 - [OpenAI App Server](https://learn.chatgpt.com/docs/app-server): integrazione
   di prodotto, autenticazione gestita, thread/turn e `externalSandbox`.
 - [OpenAI Authentication](https://learn.chatgpt.com/docs/auth): distinzione tra

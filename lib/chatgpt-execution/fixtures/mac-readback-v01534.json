@@ -1,0 +1,745 @@
+{
+  "config": {
+    "model": null,
+    "review_model": null,
+    "model_context_window": null,
+    "model_auto_compact_token_limit": null,
+    "model_auto_compact_token_limit_scope": null,
+    "model_provider": null,
+    "approval_policy": "never",
+    "approvals_reviewer": "user",
+    "sandbox_mode": "read-only",
+    "sandbox_workspace_write": null,
+    "forced_chatgpt_workspace_id": null,
+    "forced_login_method": "chatgpt",
+    "web_search": "disabled",
+    "tools": {
+      "web_search": null
+    },
+    "instructions": null,
+    "developer_instructions": null,
+    "compact_prompt": null,
+    "model_reasoning_effort": null,
+    "model_reasoning_summary": "none",
+    "model_verbosity": null,
+    "service_tier": null,
+    "analytics": {
+      "enabled": false
+    },
+    "apps": {
+      "_default": {
+        "enabled": false,
+        "approvals_reviewer": null,
+        "destructive_enabled": false,
+        "open_world_enabled": false,
+        "default_tools_approval_mode": null
+      }
+    },
+    "browser_use": null,
+    "computer_use": null,
+    "desktop": null,
+    "hooks": null,
+    "mcp_oauth_callback_url": null,
+    "otel": null,
+    "windows": null,
+    "model_providers": {},
+    "experimental_compact_prompt_file": null,
+    "mcp_optional_startup_grace_ms": null,
+    "experimental_realtime_webrtc_call_base_url": null,
+    "personality": null,
+    "disable_paste_burst": null,
+    "chatgpt_base_url": "https://chatgpt.com/backend-api/",
+    "include_environment_context": false,
+    "ghost_snapshot": null,
+    "notice": null,
+    "tool_output_token_limit": null,
+    "profile": null,
+    "openai_base_url": null,
+    "sqlite_home": null,
+    "tool_suggest": null,
+    "permissions": null,
+    "file_opener": "vscode",
+    "goals": null,
+    "auto_review": null,
+    "plugins": {},
+    "background_terminal_max_timeout": 300000,
+    "include_collaboration_mode_instructions": true,
+    "project_doc_max_bytes": 0,
+    "experimental_realtime_ws_startup_context": null,
+    "include_apps_instructions": true,
+    "experimental_realtime_ws_backend_prompt": null,
+    "marketplaces": {},
+    "apps_mcp_product_sku": null,
+    "allow_login_shell": false,
+    "notify": null,
+    "oss_provider": null,
+    "hide_agent_reasoning": true,
+    "model_catalog_json": null,
+    "experimental_thread_store": null,
+    "model_instructions_file": null,
+    "project_doc_fallback_filenames": [],
+    "realtime": null,
+    "project_root_markers": [
+      ".git"
+    ],
+    "plan_mode_reasoning_effort": null,
+    "memories": null,
+    "orchestrator": null,
+    "history": {
+      "persistence": "none",
+      "max_bytes": null
+    },
+    "include_permissions_instructions": true,
+    "cli_auth_credentials_store": "ephemeral",
+    "js_repl_node_module_dirs": null,
+    "show_raw_agent_reasoning": false,
+    "experimental_realtime_ws_model": null,
+    "skills": null,
+    "experimental_use_unified_exec_tool": null,
+    "features": {
+      "code_mode": false,
+      "code_mode_host": false,
+      "multi_agent_v2": false,
+      "network_proxy": null,
+      "apply_patch_freeform": false,
+      "apps": false,
+      "browser_use": false,
+      "browser_use_external": false,
+      "browser_use_full_cdp_access": false,
+      "code_mode_prewarm": false,
+      "codex_hooks": false,
+      "computer_use": false,
+      "enable_mcp_apps": false,
+      "external_agent_memory_import": false,
+      "hooks": false,
+      "in_app_browser": false,
+      "js_repl": false,
+      "memories": false,
+      "memory_tool": false,
+      "multi_agent": false,
+      "plugin_hooks": false,
+      "plugins": false,
+      "realtime_conversation": false,
+      "remote_plugin": false,
+      "request_permissions_tool": false,
+      "search_tool": false,
+      "shell_tool": false,
+      "skill_mcp_dependency_install": false,
+      "skill_search": false,
+      "skip_host_skill_discovery": true,
+      "standalone_web_search": false,
+      "tool_search": false,
+      "tool_suggest": false,
+      "unified_exec": false,
+      "web_search": false,
+      "web_search_cached": false,
+      "web_search_request": false,
+      "auth_elicitation": true,
+      "background_paginated_rollout_migration": false,
+      "mcp_2026_07_28": false,
+      "mentions_v2": true,
+      "remote_control": false
+    },
+    "suppress_unstable_features_warning": null,
+    "check_for_update_on_startup": false,
+    "shell_environment_policy": {
+      "inherit": null,
+      "ignore_default_excludes": null,
+      "exclude": null,
+      "set": null,
+      "include_only": null,
+      "filters": null,
+      "experimental_use_profile": null
+    },
+    "feedback": {
+      "enabled": false
+    },
+    "default_permissions": null,
+    "experimental_realtime_ws_base_url": null,
+    "js_repl_node_path": null,
+    "mcp_servers": {},
+    "mcp_oauth_credentials_store": "auto",
+    "mcp_oauth_callback_port": null,
+    "tui": null,
+    "responses_api_metadata": null,
+    "profiles": {},
+    "projects": null,
+    "experimental_thread_store_endpoint": null,
+    "audio": null,
+    "experimental_realtime_start_instructions": null,
+    "agents": {
+      "enabled": false,
+      "max_concurrent_threads_per_session": null,
+      "max_depth": null,
+      "default_subagent_model": null,
+      "default_subagent_reasoning_effort": null,
+      "job_max_runtime_seconds": null,
+      "interrupt_message": null
+    },
+    "log_dir": null
+  },
+  "origins": {
+    "features.computer_use": {
+      "name": {
+        "type": "user",
+        "file": "/SYNTHETIC_RUN_ROOT/codex/config.toml",
+        "profile": null
+      },
+      "version": "sha256:5dc3ffd7ddb1623c6b063d0acaa2b7ea592c5d27f0e98c1a9f575e1ab9db6276"
+    },
+    "features.browser_use_full_cdp_access": {
+      "name": {
+        "type": "user",
+        "file": "/SYNTHETIC_RUN_ROOT/codex/config.toml",
+        "profile": null
+      },
+      "version": "sha256:5dc3ffd7ddb1623c6b063d0acaa2b7ea592c5d27f0e98c1a9f575e1ab9db6276"
+    },
+    "tools.experimental_request_user_input.enabled": {
+      "name": {
+        "type": "user",
+        "file": "/SYNTHETIC_RUN_ROOT/codex/config.toml",
+        "profile": null
+      },
+      "version": "sha256:5dc3ffd7ddb1623c6b063d0acaa2b7ea592c5d27f0e98c1a9f575e1ab9db6276"
+    },
+    "features.tool_suggest": {
+      "name": {
+        "type": "user",
+        "file": "/SYNTHETIC_RUN_ROOT/codex/config.toml",
+        "profile": null
+      },
+      "version": "sha256:5dc3ffd7ddb1623c6b063d0acaa2b7ea592c5d27f0e98c1a9f575e1ab9db6276"
+    },
+    "tools.update_plan.enabled": {
+      "name": {
+        "type": "user",
+        "file": "/SYNTHETIC_RUN_ROOT/codex/config.toml",
+        "profile": null
+      },
+      "version": "sha256:5dc3ffd7ddb1623c6b063d0acaa2b7ea592c5d27f0e98c1a9f575e1ab9db6276"
+    },
+    "features.realtime_conversation": {
+      "name": {
+        "type": "user",
+        "file": "/SYNTHETIC_RUN_ROOT/codex/config.toml",
+        "profile": null
+      },
+      "version": "sha256:5dc3ffd7ddb1623c6b063d0acaa2b7ea592c5d27f0e98c1a9f575e1ab9db6276"
+    },
+    "agents.enabled": {
+      "name": {
+        "type": "user",
+        "file": "/SYNTHETIC_RUN_ROOT/codex/config.toml",
+        "profile": null
+      },
+      "version": "sha256:5dc3ffd7ddb1623c6b063d0acaa2b7ea592c5d27f0e98c1a9f575e1ab9db6276"
+    },
+    "apps._default.destructive_enabled": {
+      "name": {
+        "type": "user",
+        "file": "/SYNTHETIC_RUN_ROOT/codex/config.toml",
+        "profile": null
+      },
+      "version": "sha256:5dc3ffd7ddb1623c6b063d0acaa2b7ea592c5d27f0e98c1a9f575e1ab9db6276"
+    },
+    "features.plugin_hooks": {
+      "name": {
+        "type": "user",
+        "file": "/SYNTHETIC_RUN_ROOT/codex/config.toml",
+        "profile": null
+      },
+      "version": "sha256:5dc3ffd7ddb1623c6b063d0acaa2b7ea592c5d27f0e98c1a9f575e1ab9db6276"
+    },
+    "features.shell_tool": {
+      "name": {
+        "type": "user",
+        "file": "/SYNTHETIC_RUN_ROOT/codex/config.toml",
+        "profile": null
+      },
+      "version": "sha256:5dc3ffd7ddb1623c6b063d0acaa2b7ea592c5d27f0e98c1a9f575e1ab9db6276"
+    },
+    "approval_policy": {
+      "name": {
+        "type": "user",
+        "file": "/SYNTHETIC_RUN_ROOT/codex/config.toml",
+        "profile": null
+      },
+      "version": "sha256:5dc3ffd7ddb1623c6b063d0acaa2b7ea592c5d27f0e98c1a9f575e1ab9db6276"
+    },
+    "allow_login_shell": {
+      "name": {
+        "type": "user",
+        "file": "/SYNTHETIC_RUN_ROOT/codex/config.toml",
+        "profile": null
+      },
+      "version": "sha256:5dc3ffd7ddb1623c6b063d0acaa2b7ea592c5d27f0e98c1a9f575e1ab9db6276"
+    },
+    "cli_auth_credentials_store": {
+      "name": {
+        "type": "user",
+        "file": "/SYNTHETIC_RUN_ROOT/codex/config.toml",
+        "profile": null
+      },
+      "version": "sha256:5dc3ffd7ddb1623c6b063d0acaa2b7ea592c5d27f0e98c1a9f575e1ab9db6276"
+    },
+    "features.browser_use": {
+      "name": {
+        "type": "user",
+        "file": "/SYNTHETIC_RUN_ROOT/codex/config.toml",
+        "profile": null
+      },
+      "version": "sha256:5dc3ffd7ddb1623c6b063d0acaa2b7ea592c5d27f0e98c1a9f575e1ab9db6276"
+    },
+    "web_search": {
+      "name": {
+        "type": "user",
+        "file": "/SYNTHETIC_RUN_ROOT/codex/config.toml",
+        "profile": null
+      },
+      "version": "sha256:5dc3ffd7ddb1623c6b063d0acaa2b7ea592c5d27f0e98c1a9f575e1ab9db6276"
+    },
+    "features.hooks": {
+      "name": {
+        "type": "user",
+        "file": "/SYNTHETIC_RUN_ROOT/codex/config.toml",
+        "profile": null
+      },
+      "version": "sha256:5dc3ffd7ddb1623c6b063d0acaa2b7ea592c5d27f0e98c1a9f575e1ab9db6276"
+    },
+    "features.memory_tool": {
+      "name": {
+        "type": "user",
+        "file": "/SYNTHETIC_RUN_ROOT/codex/config.toml",
+        "profile": null
+      },
+      "version": "sha256:5dc3ffd7ddb1623c6b063d0acaa2b7ea592c5d27f0e98c1a9f575e1ab9db6276"
+    },
+    "features.plugins": {
+      "name": {
+        "type": "user",
+        "file": "/SYNTHETIC_RUN_ROOT/codex/config.toml",
+        "profile": null
+      },
+      "version": "sha256:5dc3ffd7ddb1623c6b063d0acaa2b7ea592c5d27f0e98c1a9f575e1ab9db6276"
+    },
+    "features.browser_use_external": {
+      "name": {
+        "type": "user",
+        "file": "/SYNTHETIC_RUN_ROOT/codex/config.toml",
+        "profile": null
+      },
+      "version": "sha256:5dc3ffd7ddb1623c6b063d0acaa2b7ea592c5d27f0e98c1a9f575e1ab9db6276"
+    },
+    "features.code_mode_prewarm": {
+      "name": {
+        "type": "user",
+        "file": "/SYNTHETIC_RUN_ROOT/codex/config.toml",
+        "profile": null
+      },
+      "version": "sha256:5dc3ffd7ddb1623c6b063d0acaa2b7ea592c5d27f0e98c1a9f575e1ab9db6276"
+    },
+    "features.unified_exec": {
+      "name": {
+        "type": "user",
+        "file": "/SYNTHETIC_RUN_ROOT/codex/config.toml",
+        "profile": null
+      },
+      "version": "sha256:5dc3ffd7ddb1623c6b063d0acaa2b7ea592c5d27f0e98c1a9f575e1ab9db6276"
+    },
+    "show_raw_agent_reasoning": {
+      "name": {
+        "type": "user",
+        "file": "/SYNTHETIC_RUN_ROOT/codex/config.toml",
+        "profile": null
+      },
+      "version": "sha256:5dc3ffd7ddb1623c6b063d0acaa2b7ea592c5d27f0e98c1a9f575e1ab9db6276"
+    },
+    "features.skip_host_skill_discovery": {
+      "name": {
+        "type": "user",
+        "file": "/SYNTHETIC_RUN_ROOT/codex/config.toml",
+        "profile": null
+      },
+      "version": "sha256:5dc3ffd7ddb1623c6b063d0acaa2b7ea592c5d27f0e98c1a9f575e1ab9db6276"
+    },
+    "features.enable_mcp_apps": {
+      "name": {
+        "type": "user",
+        "file": "/SYNTHETIC_RUN_ROOT/codex/config.toml",
+        "profile": null
+      },
+      "version": "sha256:5dc3ffd7ddb1623c6b063d0acaa2b7ea592c5d27f0e98c1a9f575e1ab9db6276"
+    },
+    "features.multi_agent_v2.enabled": {
+      "name": {
+        "type": "user",
+        "file": "/SYNTHETIC_RUN_ROOT/codex/config.toml",
+        "profile": null
+      },
+      "version": "sha256:5dc3ffd7ddb1623c6b063d0acaa2b7ea592c5d27f0e98c1a9f575e1ab9db6276"
+    },
+    "analytics.enabled": {
+      "name": {
+        "type": "user",
+        "file": "/SYNTHETIC_RUN_ROOT/codex/config.toml",
+        "profile": null
+      },
+      "version": "sha256:5dc3ffd7ddb1623c6b063d0acaa2b7ea592c5d27f0e98c1a9f575e1ab9db6276"
+    },
+    "features.request_permissions_tool": {
+      "name": {
+        "type": "user",
+        "file": "/SYNTHETIC_RUN_ROOT/codex/config.toml",
+        "profile": null
+      },
+      "version": "sha256:5dc3ffd7ddb1623c6b063d0acaa2b7ea592c5d27f0e98c1a9f575e1ab9db6276"
+    },
+    "approvals_reviewer": {
+      "name": {
+        "type": "user",
+        "file": "/SYNTHETIC_RUN_ROOT/codex/config.toml",
+        "profile": null
+      },
+      "version": "sha256:5dc3ffd7ddb1623c6b063d0acaa2b7ea592c5d27f0e98c1a9f575e1ab9db6276"
+    },
+    "features.multi_agent": {
+      "name": {
+        "type": "user",
+        "file": "/SYNTHETIC_RUN_ROOT/codex/config.toml",
+        "profile": null
+      },
+      "version": "sha256:5dc3ffd7ddb1623c6b063d0acaa2b7ea592c5d27f0e98c1a9f575e1ab9db6276"
+    },
+    "features.web_search_request": {
+      "name": {
+        "type": "user",
+        "file": "/SYNTHETIC_RUN_ROOT/codex/config.toml",
+        "profile": null
+      },
+      "version": "sha256:5dc3ffd7ddb1623c6b063d0acaa2b7ea592c5d27f0e98c1a9f575e1ab9db6276"
+    },
+    "features.memories": {
+      "name": {
+        "type": "user",
+        "file": "/SYNTHETIC_RUN_ROOT/codex/config.toml",
+        "profile": null
+      },
+      "version": "sha256:5dc3ffd7ddb1623c6b063d0acaa2b7ea592c5d27f0e98c1a9f575e1ab9db6276"
+    },
+    "features.skill_search": {
+      "name": {
+        "type": "user",
+        "file": "/SYNTHETIC_RUN_ROOT/codex/config.toml",
+        "profile": null
+      },
+      "version": "sha256:5dc3ffd7ddb1623c6b063d0acaa2b7ea592c5d27f0e98c1a9f575e1ab9db6276"
+    },
+    "features.apps": {
+      "name": {
+        "type": "user",
+        "file": "/SYNTHETIC_RUN_ROOT/codex/config.toml",
+        "profile": null
+      },
+      "version": "sha256:5dc3ffd7ddb1623c6b063d0acaa2b7ea592c5d27f0e98c1a9f575e1ab9db6276"
+    },
+    "check_for_update_on_startup": {
+      "name": {
+        "type": "user",
+        "file": "/SYNTHETIC_RUN_ROOT/codex/config.toml",
+        "profile": null
+      },
+      "version": "sha256:5dc3ffd7ddb1623c6b063d0acaa2b7ea592c5d27f0e98c1a9f575e1ab9db6276"
+    },
+    "include_environment_context": {
+      "name": {
+        "type": "user",
+        "file": "/SYNTHETIC_RUN_ROOT/codex/config.toml",
+        "profile": null
+      },
+      "version": "sha256:5dc3ffd7ddb1623c6b063d0acaa2b7ea592c5d27f0e98c1a9f575e1ab9db6276"
+    },
+    "features.web_search_cached": {
+      "name": {
+        "type": "user",
+        "file": "/SYNTHETIC_RUN_ROOT/codex/config.toml",
+        "profile": null
+      },
+      "version": "sha256:5dc3ffd7ddb1623c6b063d0acaa2b7ea592c5d27f0e98c1a9f575e1ab9db6276"
+    },
+    "features.tool_search": {
+      "name": {
+        "type": "user",
+        "file": "/SYNTHETIC_RUN_ROOT/codex/config.toml",
+        "profile": null
+      },
+      "version": "sha256:5dc3ffd7ddb1623c6b063d0acaa2b7ea592c5d27f0e98c1a9f575e1ab9db6276"
+    },
+    "features.in_app_browser": {
+      "name": {
+        "type": "user",
+        "file": "/SYNTHETIC_RUN_ROOT/codex/config.toml",
+        "profile": null
+      },
+      "version": "sha256:5dc3ffd7ddb1623c6b063d0acaa2b7ea592c5d27f0e98c1a9f575e1ab9db6276"
+    },
+    "features.apply_patch_freeform": {
+      "name": {
+        "type": "user",
+        "file": "/SYNTHETIC_RUN_ROOT/codex/config.toml",
+        "profile": null
+      },
+      "version": "sha256:5dc3ffd7ddb1623c6b063d0acaa2b7ea592c5d27f0e98c1a9f575e1ab9db6276"
+    },
+    "features.web_search": {
+      "name": {
+        "type": "user",
+        "file": "/SYNTHETIC_RUN_ROOT/codex/config.toml",
+        "profile": null
+      },
+      "version": "sha256:5dc3ffd7ddb1623c6b063d0acaa2b7ea592c5d27f0e98c1a9f575e1ab9db6276"
+    },
+    "hide_agent_reasoning": {
+      "name": {
+        "type": "user",
+        "file": "/SYNTHETIC_RUN_ROOT/codex/config.toml",
+        "profile": null
+      },
+      "version": "sha256:5dc3ffd7ddb1623c6b063d0acaa2b7ea592c5d27f0e98c1a9f575e1ab9db6276"
+    },
+    "apps._default.enabled": {
+      "name": {
+        "type": "user",
+        "file": "/SYNTHETIC_RUN_ROOT/codex/config.toml",
+        "profile": null
+      },
+      "version": "sha256:5dc3ffd7ddb1623c6b063d0acaa2b7ea592c5d27f0e98c1a9f575e1ab9db6276"
+    },
+    "feedback.enabled": {
+      "name": {
+        "type": "user",
+        "file": "/SYNTHETIC_RUN_ROOT/codex/config.toml",
+        "profile": null
+      },
+      "version": "sha256:5dc3ffd7ddb1623c6b063d0acaa2b7ea592c5d27f0e98c1a9f575e1ab9db6276"
+    },
+    "features.code_mode": {
+      "name": {
+        "type": "user",
+        "file": "/SYNTHETIC_RUN_ROOT/codex/config.toml",
+        "profile": null
+      },
+      "version": "sha256:5dc3ffd7ddb1623c6b063d0acaa2b7ea592c5d27f0e98c1a9f575e1ab9db6276"
+    },
+    "project_doc_max_bytes": {
+      "name": {
+        "type": "user",
+        "file": "/SYNTHETIC_RUN_ROOT/codex/config.toml",
+        "profile": null
+      },
+      "version": "sha256:5dc3ffd7ddb1623c6b063d0acaa2b7ea592c5d27f0e98c1a9f575e1ab9db6276"
+    },
+    "features.codex_hooks": {
+      "name": {
+        "type": "user",
+        "file": "/SYNTHETIC_RUN_ROOT/codex/config.toml",
+        "profile": null
+      },
+      "version": "sha256:5dc3ffd7ddb1623c6b063d0acaa2b7ea592c5d27f0e98c1a9f575e1ab9db6276"
+    },
+    "features.external_agent_memory_import": {
+      "name": {
+        "type": "user",
+        "file": "/SYNTHETIC_RUN_ROOT/codex/config.toml",
+        "profile": null
+      },
+      "version": "sha256:5dc3ffd7ddb1623c6b063d0acaa2b7ea592c5d27f0e98c1a9f575e1ab9db6276"
+    },
+    "features.search_tool": {
+      "name": {
+        "type": "user",
+        "file": "/SYNTHETIC_RUN_ROOT/codex/config.toml",
+        "profile": null
+      },
+      "version": "sha256:5dc3ffd7ddb1623c6b063d0acaa2b7ea592c5d27f0e98c1a9f575e1ab9db6276"
+    },
+    "sandbox_mode": {
+      "name": {
+        "type": "user",
+        "file": "/SYNTHETIC_RUN_ROOT/codex/config.toml",
+        "profile": null
+      },
+      "version": "sha256:5dc3ffd7ddb1623c6b063d0acaa2b7ea592c5d27f0e98c1a9f575e1ab9db6276"
+    },
+    "model_reasoning_summary": {
+      "name": {
+        "type": "user",
+        "file": "/SYNTHETIC_RUN_ROOT/codex/config.toml",
+        "profile": null
+      },
+      "version": "sha256:5dc3ffd7ddb1623c6b063d0acaa2b7ea592c5d27f0e98c1a9f575e1ab9db6276"
+    },
+    "history.persistence": {
+      "name": {
+        "type": "user",
+        "file": "/SYNTHETIC_RUN_ROOT/codex/config.toml",
+        "profile": null
+      },
+      "version": "sha256:5dc3ffd7ddb1623c6b063d0acaa2b7ea592c5d27f0e98c1a9f575e1ab9db6276"
+    },
+    "features.standalone_web_search": {
+      "name": {
+        "type": "user",
+        "file": "/SYNTHETIC_RUN_ROOT/codex/config.toml",
+        "profile": null
+      },
+      "version": "sha256:5dc3ffd7ddb1623c6b063d0acaa2b7ea592c5d27f0e98c1a9f575e1ab9db6276"
+    },
+    "features.skill_mcp_dependency_install": {
+      "name": {
+        "type": "user",
+        "file": "/SYNTHETIC_RUN_ROOT/codex/config.toml",
+        "profile": null
+      },
+      "version": "sha256:5dc3ffd7ddb1623c6b063d0acaa2b7ea592c5d27f0e98c1a9f575e1ab9db6276"
+    },
+    "features.code_mode_host": {
+      "name": {
+        "type": "user",
+        "file": "/SYNTHETIC_RUN_ROOT/codex/config.toml",
+        "profile": null
+      },
+      "version": "sha256:5dc3ffd7ddb1623c6b063d0acaa2b7ea592c5d27f0e98c1a9f575e1ab9db6276"
+    },
+    "apps._default.open_world_enabled": {
+      "name": {
+        "type": "user",
+        "file": "/SYNTHETIC_RUN_ROOT/codex/config.toml",
+        "profile": null
+      },
+      "version": "sha256:5dc3ffd7ddb1623c6b063d0acaa2b7ea592c5d27f0e98c1a9f575e1ab9db6276"
+    },
+    "features.remote_plugin": {
+      "name": {
+        "type": "user",
+        "file": "/SYNTHETIC_RUN_ROOT/codex/config.toml",
+        "profile": null
+      },
+      "version": "sha256:5dc3ffd7ddb1623c6b063d0acaa2b7ea592c5d27f0e98c1a9f575e1ab9db6276"
+    },
+    "features.js_repl": {
+      "name": {
+        "type": "user",
+        "file": "/SYNTHETIC_RUN_ROOT/codex/config.toml",
+        "profile": null
+      },
+      "version": "sha256:5dc3ffd7ddb1623c6b063d0acaa2b7ea592c5d27f0e98c1a9f575e1ab9db6276"
+    },
+    "forced_login_method": {
+      "name": {
+        "type": "user",
+        "file": "/SYNTHETIC_RUN_ROOT/codex/config.toml",
+        "profile": null
+      },
+      "version": "sha256:5dc3ffd7ddb1623c6b063d0acaa2b7ea592c5d27f0e98c1a9f575e1ab9db6276"
+    }
+  },
+  "layers": [
+    {
+      "name": {
+        "type": "user",
+        "file": "/SYNTHETIC_RUN_ROOT/codex/config.toml",
+        "profile": null
+      },
+      "version": "sha256:5dc3ffd7ddb1623c6b063d0acaa2b7ea592c5d27f0e98c1a9f575e1ab9db6276",
+      "config": {
+        "cli_auth_credentials_store": "ephemeral",
+        "forced_login_method": "chatgpt",
+        "check_for_update_on_startup": false,
+        "approval_policy": "never",
+        "approvals_reviewer": "user",
+        "sandbox_mode": "read-only",
+        "web_search": "disabled",
+        "allow_login_shell": false,
+        "project_doc_max_bytes": 0,
+        "include_environment_context": false,
+        "hide_agent_reasoning": true,
+        "show_raw_agent_reasoning": false,
+        "model_reasoning_summary": "none",
+        "history": {
+          "persistence": "none"
+        },
+        "analytics": {
+          "enabled": false
+        },
+        "feedback": {
+          "enabled": false
+        },
+        "agents": {
+          "enabled": false
+        },
+        "apps": {
+          "_default": {
+            "enabled": false,
+            "destructive_enabled": false,
+            "open_world_enabled": false
+          }
+        },
+        "features": {
+          "apps": false,
+          "plugins": false,
+          "remote_plugin": false,
+          "tool_suggest": false,
+          "shell_tool": false,
+          "unified_exec": false,
+          "code_mode": false,
+          "js_repl": false,
+          "multi_agent": false,
+          "multi_agent_v2": false,
+          "code_mode_host": false,
+          "code_mode_prewarm": false,
+          "apply_patch_freeform": false,
+          "request_permissions_tool": false,
+          "tool_search": false,
+          "search_tool": false,
+          "standalone_web_search": false,
+          "web_search_cached": false,
+          "web_search_request": false,
+          "skip_host_skill_discovery": true,
+          "skill_search": false,
+          "skill_mcp_dependency_install": false,
+          "external_agent_memory_import": false,
+          "memory_tool": false,
+          "realtime_conversation": false,
+          "in_app_browser": false,
+          "browser_use_external": false,
+          "browser_use_full_cdp_access": false,
+          "enable_mcp_apps": false,
+          "plugin_hooks": false,
+          "codex_hooks": false,
+          "web_search": false,
+          "browser_use": false,
+          "computer_use": false,
+          "hooks": false,
+          "memories": false
+        },
+        "tools": {
+          "update_plan": {
+            "enabled": false
+          },
+          "experimental_request_user_input": {
+            "enabled": false
+          }
+        }
+      }
+    },
+    {
+      "name": {
+        "type": "system",
+        "file": "/etc/codex/config.toml"
+      },
+      "version": "sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "config": {}
+    }
+  ]
+}
