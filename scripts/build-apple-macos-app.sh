@@ -161,7 +161,7 @@ if ! codesign --verify --strict "$EXECUTION_MAC_HELPER"; then
   echo "Pinned Codex signature is invalid; no re-signing is allowed. A different binary requires a new qualification." >&2
   exit 1
 fi
-lipo -verify_arch "$XCODE_ARCH" "$EXECUTION_MAC_HELPER"
+lipo "$EXECUTION_MAC_HELPER" -verify_arch "$XCODE_ARCH"
 "$ROOT_DIR/scripts/check-macos-web-runtime-native-payload.sh" --normalize --web-runtime "$WEB" --frameworks "$FRAMEWORKS"
 node "$ROOT_DIR/scripts/run-strip-types.mjs" "$STAGE_EXECUTION_MAC_ASSETS" \
   --check --installation-root "$WEB"
