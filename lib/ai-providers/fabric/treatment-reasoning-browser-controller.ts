@@ -1,5 +1,7 @@
 /* @Codex */
 'use client';
+import { parseOrdinaryRemoteReceipt, parseOrdinaryRemoteProvenance, type OrdinaryRemoteReceipt, type OrdinaryRemoteProvenance } from '../../chatgpt-product/ordinary-wire';
+
 
 import { ATHENA_R1_QWEN3_8B_MODEL_ID } from '../../athena-model-identity';
 import type { PortableEngineMetadata } from './treatment-reasoning-portable-runtime';
@@ -19,7 +21,7 @@ export type TreatmentReasoningPublicationFabricReceipt = Readonly<{ schemaVersio
 type KeyEvidence = Readonly<{ id: string; statement: string; evidenceRefs: RefList }>;
 type SafetyFlag = Readonly<{ id: string; severity: 'info' | 'caution' | 'urgent_review'; label: string; rationale: string; evidenceRefs: RefList }>;
 type SuggestedAction = Readonly<{ id: string; intent: 'no_action' | 'review_only' | 'open_therapy_form_prefill' | 'open_monitoring_form_prefill' | 'open_diagnosis_review'; label: string; rationale: string; writePolicy: 'no_write' | 'review_only' | 'form_prefill_only'; evidenceRefs: RefList }>;
-export type TreatmentReasoningPublicationValue = Readonly<{ schemaVersion: 'mediflow.treatment_reasoning.v1'; task: 'treatment_reasoning'; summary: string; data: Readonly<{ recommendation: string; keyEvidence: readonly KeyEvidence[]; reasoning: readonly string[]; caveats: readonly string[]; safetyFlags: readonly SafetyFlag[]; suggestedActions: readonly SuggestedAction[]; trace: Readonly<{ mode: 'local_model'; toolsUsed: RefList; limitations: readonly string[] }> }> }>;
+export type TreatmentReasoningPublicationValue = Readonly<{ schemaVersion: 'mediflow.treatment_reasoning.v1'; task: 'treatment_reasoning'; summary: string; data: Readonly<{ recommendation: string; keyEvidence: readonly KeyEvidence[]; reasoning: readonly string[]; caveats: readonly string[]; safetyFlags: readonly SafetyFlag[]; suggestedActions: readonly SuggestedAction[]; trace: Readonly<{ mode: 'local_model' | 'chatgpt_subscription'; toolsUsed: RefList; limitations: readonly string[] }> }> }>;
 export type MlxTreatmentReasoningPublication = Readonly<{
     schemaVersion: typeof TREATMENT_REASONING_PUBLICATION_SCHEMA_VERSION; capability: 'treatment_reasoning'; stage: 'preview'; review: 'required'; status: 'available';
     value: TreatmentReasoningPublicationValue; sourceBindings: readonly TreatmentReasoningPublicationSourceBinding[]; attestation: TreatmentReasoningPublicationAttestation;
@@ -34,7 +36,10 @@ export type PortableBrowserPublication = Omit<MlxTreatmentReasoningPublication, 
         venue: 'local_process'; provider: 'athena_transformers'; model: typeof ATHENA_R1_QWEN3_8B_MODEL_ID;
         preprocessing: readonly ['context_minimization', 'envelope_validation']; receipt: PortableTreatmentResolutionReceipt }>;
 }>;
-export type TreatmentReasoningPublication = MlxTreatmentReasoningPublication | PortableBrowserPublication;
+export type RemoteTreatmentReasoningPublication = Omit<MlxTreatmentReasoningPublication, 'schemaVersion' | 'attestation' | 'fabricReceipt' | 'provenance'> & Readonly<{
+    schemaVersion: 'mediflow.ai.treatment-reasoning-publication.chatgpt.v1'; attestation: OrdinaryRemoteReceipt; fabricReceipt: OrdinaryRemoteReceipt; provenance: OrdinaryRemoteProvenance;
+}>;
+export type TreatmentReasoningPublication = MlxTreatmentReasoningPublication | PortableBrowserPublication | RemoteTreatmentReasoningPublication;
 
 const ROOT_KEYS = ['schemaVersion', 'capability', 'stage', 'review', 'status', 'value', 'sourceBindings', 'attestation', 'fabricReceipt', 'provenance', 'sourceRevision', 'capturedAt', 'writesPerformed', 'applyPolicy'] as const;
 const REFERENCE = /^[A-Za-z][A-Za-z0-9._:-]{2,159}$/u;
@@ -93,13 +98,13 @@ function actions(value: unknown): readonly SuggestedAction[] | null {
     for (const candidate of input) { const item = record(candidate, ['id', 'intent', 'label', 'rationale', 'writePolicy', 'evidenceRefs']); const id = item && ref(item.id); const label = item && text(item.label, 180); const rationale = item && text(item.rationale, 400); const evidenceRefs = item && refs(item.evidenceRefs, true); if (!item || !id || !label || !rationale || !evidenceRefs || !intents.includes(item.intent as string) || !policies.includes(item.writePolicy as string) || seen.has(id)) return null; seen.add(id); output.push(Object.freeze({ id, intent: item.intent as SuggestedAction['intent'], label, rationale, writePolicy: item.writePolicy as SuggestedAction['writePolicy'], evidenceRefs })); }
     return Object.freeze(output);
 }
-function publicationValue(value: unknown): TreatmentReasoningPublicationValue | null {
+function publicationValue(value: unknown, expectedMode: 'local_model' | 'chatgpt_subscription' = 'local_model'): TreatmentReasoningPublicationValue | null {
     const root = record(value, ['schemaVersion', 'task', 'summary', 'data']); const summary = root && text(root.summary, 480);
     const data = root && record(root.data, ['recommendation', 'keyEvidence', 'reasoning', 'caveats', 'safetyFlags', 'suggestedActions', 'trace']); const recommendation = data && text(data.recommendation, 900);
     const evidence = data && keyEvidence(data.keyEvidence); const reasoning = data && strings(data.reasoning, 8, 400); const caveats = data && strings(data.caveats, 8, 400); const flags = data && safetyFlags(data.safetyFlags); const suggested = data && actions(data.suggestedActions);
     const trace = data && record(data.trace, ['mode', 'toolsUsed', 'limitations']); const tools = trace && refs(trace.toolsUsed); const limitations = trace && strings(trace.limitations, 8, 180);
-    if (!root || root.schemaVersion !== 'mediflow.treatment_reasoning.v1' || root.task !== 'treatment_reasoning' || !summary || !data || !recommendation || !evidence || !reasoning || !caveats || !flags || !suggested || !trace || trace.mode !== 'local_model' || !tools || !limitations) return null;
-    return Object.freeze({ schemaVersion: root.schemaVersion, task: root.task, summary, data: Object.freeze({ recommendation, keyEvidence: evidence, reasoning, caveats, safetyFlags: flags, suggestedActions: suggested, trace: Object.freeze({ mode: 'local_model' as const, toolsUsed: tools, limitations }) }) }) as TreatmentReasoningPublicationValue;
+    if (!root || root.schemaVersion !== 'mediflow.treatment_reasoning.v1' || root.task !== 'treatment_reasoning' || !summary || !data || !recommendation || !evidence || !reasoning || !caveats || !flags || !suggested || !trace || trace.mode !== expectedMode || !tools || (expectedMode === 'chatgpt_subscription' && tools.length !== 0) || !limitations) return null;
+    return Object.freeze({ schemaVersion: root.schemaVersion, task: root.task, summary, data: Object.freeze({ recommendation, keyEvidence: evidence, reasoning, caveats, safetyFlags: flags, suggestedActions: suggested, trace: Object.freeze({ mode: expectedMode, toolsUsed: tools, limitations }) }) }) as TreatmentReasoningPublicationValue;
 }
 function sourceBindings(value: unknown, publication: TreatmentReasoningPublicationValue): readonly TreatmentReasoningPublicationSourceBinding[] | null {
     const claims = [{ claimPath: 'summary', claim: publication.summary }, { claimPath: 'data.recommendation', claim: publication.data.recommendation }, ...publication.data.reasoning.map((claim, index) => ({ claimPath: `data.reasoning.${index}`, claim })), ...publication.data.caveats.map((claim, index) => ({ claimPath: `data.caveats.${index}`, claim }))];
@@ -190,10 +195,25 @@ function parsePortablePublication(value: unknown): PortableBrowserPublication | 
             provider: receipt.provider, model: receipt.model, preprocessing: Object.freeze(['context_minimization', 'envelope_validation'] as const), receipt: provenanceReceipt }),
         sourceRevision, capturedAt, writesPerformed: 0 as const, applyPolicy: 'none' as const });
 }
+function parseRemotePublication(value: unknown): RemoteTreatmentReasoningPublication | null {
+    const root = record(value, ROOT_KEYS);
+    const parsed = root && publicationValue(root.value, 'chatgpt_subscription');
+    const bindings = root && parsed && sourceBindings(root.sourceBindings, parsed);
+    const receipt = root && parseOrdinaryRemoteReceipt(root.fabricReceipt, 'treatment_reasoning');
+    const observed = root && parseOrdinaryRemoteReceipt(root.attestation, 'treatment_reasoning');
+    const provenance = root && receipt && parseOrdinaryRemoteProvenance(root.provenance, receipt);
+    const revision = root && ref(root.sourceRevision), captured = root && iso(root.capturedAt);
+    if (!root || root.schemaVersion !== 'mediflow.ai.treatment-reasoning-publication.chatgpt.v1' || root.capability !== 'treatment_reasoning'
+        || root.stage !== 'preview' || root.review !== 'required' || root.status !== 'available' || !parsed || !bindings || !receipt || !observed
+        || JSON.stringify(observed) !== JSON.stringify(receipt) || !provenance || !revision || !captured || root.writesPerformed !== 0 || root.applyPolicy !== 'none') return null;
+    return Object.freeze({ schemaVersion: root.schemaVersion, capability: 'treatment_reasoning', stage: 'preview', review: 'required', status: 'available',
+        value: parsed, sourceBindings: bindings, attestation: observed, fabricReceipt: receipt, provenance, sourceRevision: revision, capturedAt: captured,
+        writesPerformed: 0, applyPolicy: 'none' });
+}
 /** Versions are disjoint: a portable engine is never accepted by the legacy MLX parser. */
 export function parseTreatmentReasoningPublication(value: unknown): TreatmentReasoningPublication | null {
     const root = record(value, ROOT_KEYS);
-    return root?.schemaVersion === 'mediflow.ai.treatment-reasoning-publication.v2' ? parsePortablePublication(value) : parseMlxPublication(value);
+    return root?.schemaVersion === 'mediflow.ai.treatment-reasoning-publication.chatgpt.v1' ? parseRemotePublication(value) : root?.schemaVersion === 'mediflow.ai.treatment-reasoning-publication.v2' ? parsePortablePublication(value) : parseMlxPublication(value);
 }
 
 type Sources = Readonly<{ fetch?: typeof fetch; clock?: () => Date; requestId?: () => unknown }>;

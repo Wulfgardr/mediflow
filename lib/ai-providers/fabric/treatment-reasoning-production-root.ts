@@ -1,4 +1,6 @@
 import 'server-only';
+import { isOrdinaryFunctionSelected } from '../../chatgpt-product/ordinary-flow';
+import { createTreatmentReasoningChatGptService } from './treatment-reasoning-chatgpt-production';
 import { captureFunctionModelTransportGuard, captureTreatmentReasoningDispatch } from './function-model-dispatch';
 
 /* @Codex */
@@ -84,6 +86,7 @@ const portableRuntime = createTreatmentReasoningPortableRuntime({ provisioning: 
     applicationRoot: process.cwd(),
 }) });
 export async function acquireTreatmentReasoningPreview() {
+    if (isOrdinaryFunctionSelected('treatment_reasoning')) return createTreatmentReasoningChatGptService({ projectionBroker, killSwitch }).acquirePreview();
     const selected = captureTreatmentReasoningDispatch();
     await selected.verify();
     if (selected.provider === 'athena_mlx') return service.acquirePreview();

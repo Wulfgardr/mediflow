@@ -18,7 +18,7 @@ mkdirSync(directory, { recursive: true });
 const owner = syntheticOwner();
 mockOrdinaryModule(import.meta.url, '../security/web-auth-lifecycle-owner-adapter', { namedExports: owner.api });
 let releaseNer: (() => void) | undefined, holdNer = false, nerClosed = 0;
-mockOrdinaryModule(import.meta.url, '../gliner-redaction-runner', { namedExports: { createGlinerRedactionRunner: () => ({
+mockOrdinaryModule(import.meta.url, '../gliner-redaction-runner', { namedExports: { readGlinerRuntimeObservation: () => null, createGlinerRedactionRunner: () => ({
     async extract(text: string) {
         if (holdNer) await new Promise<void>(resolve => { releaseNer = resolve; });
         return [...text.matchAll(/Bea Riva/gu)].map(match => ({ type: 'person', start: match.index, end: match.index + match[0].length, text: match[0], confidence: 1 }));

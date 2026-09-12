@@ -46,6 +46,7 @@ export type OrdinaryTaskProfileRead = Readonly<{
 
 type StoredProfile = OrdinaryTaskProfileRead;
 const profiles = new WeakMap<object, StoredProfile>();
+const documentEnvelopes = new WeakMap<object, object>();
 const object = Object.prototype;
 const array = Array.prototype;
 const MAX_CLONE_DEPTH = 12;
@@ -228,7 +229,9 @@ export function createDocumentSynthesisOrdinaryTaskProfile(sourceSet: unknown): 
         const canonical = parseDocumentSynthesisProviderEnvelope({ content: JSON.stringify(normalized) });
         if (canonical.status !== 'available') return reject('ordinary_task_output_invalid');
         const bound = bindDocumentSynthesisProviderEnvelope({ sourceSet, envelopeToken: canonical.token });
-        return bound.status === 'available' ? bound : reject('ordinary_task_output_invalid');
+        if (bound.status !== 'available') return reject('ordinary_task_output_invalid');
+        documentEnvelopes.set(bound, canonical.token);
+        return bound;
     });
 }
 
@@ -285,4 +288,9 @@ export function ordinaryCanonicalTextBounds(profile: OrdinaryTaskProfile, value:
         return true;
     }
     return check(value, root);
+}
+
+/** Same-module token from canonical parsing, never reconstructed from a DTO. */
+export function readOrdinaryDocumentEnvelope(output: unknown): object | null {
+    return output && typeof output === 'object' && !types.isProxy(output) ? documentEnvelopes.get(output) ?? null : null;
 }

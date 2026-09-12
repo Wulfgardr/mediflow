@@ -381,3 +381,32 @@ consenso, autenticazione ed autorita runtime restano invariati.
   gestione comune delle CA pubbliche tramite `CODEX_CA_CERTIFICATE`.
 - Protocollo e config schema locali generati da Codex 0.153.4; hash e ricevute
   fuori Git. Le pagine correnti non costituiscono un pin di versione.
+
+
+## Raccordo ordinario candidato WUL-689/691
+
+Il canale `chatgpt_subscription` e consumato esclusivamente dalle quattro
+operazioni host nominate (Patient Insight, Smart Import, Document Synthesis e
+Treatment Reasoning), dopo acquisizione degli owner originali. La preparazione
+locale non concede egress. Il consenso si riferisce ai byte UTF-8 congelati del
+payload; esecuzione e pubblicazione ricontrollano owner, revisione e tentativo.
+La preferenza di modello/effort e intenzione persistente, non catalogo o autorita.
+Il catalogo e l'opzione eseguibile appartengono al singolo processo corrente.
+
+Il percorso positivo richiede opt-in esplicito (default OFF), dichiarazione
+non equivoca della retention del servizio ChatGPT, kill switch della funzione,
+report redaction completo e corrente legato al runner, al corpus e agli artifact
+realmente caricati. Il booleano storico `shadowReady` e il solo esito del
+rollout evaluator non sono sufficienti. La binding runtime estende la ricevuta
+tecnica esistente, non introduce una decisione di conformita. Nessuna scrittura
+automatica dei report o promozione basata su un test. Report o installazione
+mancanti/incoerenti negano l'invio, senza fallback. Il worker locale rimane
+offline nel sandbox Mac; il modello, la versione e i digest osservati devono
+corrispondere all'evidenza usata durante preparazione e invio.
+
+L'output remoto riporta il canale, il modello/effort osservati e la redazione:
+non riceve un'attestazione Ollama/ATHENA o `egress:none`. I parser e i commit
+originali rimangono necessari. Il processo Mac resta monouso, con chiusura
+verificata; nessuna modifica di C2, sandbox o finestra di drain. Il software
+candidato e le prove sintetiche non ammettono dati clinici reali; WUL-688
+conserva la review del deployment concreto.

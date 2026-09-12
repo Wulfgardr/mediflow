@@ -273,9 +273,9 @@ function scoreOffsetIntegrity(inputText: string, entities: RedactionEntity[]) {
     return toRate(valid, entities.length);
 }
 
-export async function runRedactionBenchmark(options: { corpusPath: string; adapterModule: string | null }): Promise<BenchmarkReport> {
+export async function runRedactionBenchmark(options: { corpusPath: string; adapterModule: string | null }, installedAdapter?: RedactionAdapter): Promise<BenchmarkReport> {
     const corpus = readCorpus(options.corpusPath);
-    const adapter = await loadAdapter(options.adapterModule);
+    const adapter = installedAdapter ?? await loadAdapter(options.adapterModule);
     const cases: CaseResult[] = [];
     const recallByType = createEmptyTypeRecallBreakdown();
 

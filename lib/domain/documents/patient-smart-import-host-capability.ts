@@ -1,5 +1,8 @@
 /* @Codex */
 import 'server-only';
+import { isOrdinaryFunctionSelected, executeOwnedOrdinaryProfile, ordinaryResultMetadata, ordinaryApplicationIsCurrent } from '../../chatgpt-product/ordinary-flow';
+import { createSmartImportOrdinaryTaskProfile } from '../../chatgpt-execution/ordinary-task-profile';
+import type { OrdinaryRemoteReceipt, OrdinaryRemoteProvenance } from '../../chatgpt-product/ordinary-wire';
 import { randomBytes } from 'node:crypto';
 import type { SmartImportProjection } from '../../smart-import-projection';
 import type { LocalProviderResolution } from '../../ai-providers/registry';
@@ -27,11 +30,11 @@ export type PatientSmartImportHostFailureCode = 'provider_failed' | 'proposal_in
 type Common = Readonly<{ writesPerformed: 0; apply: 'denied' }>;
 export type PatientSmartImportHostCapabilityResult =
     | (Common & Readonly<{ status: 'available'; code: null; proposal: PatientSmartImportCapabilityProposal;
-        receipt: FabricResolutionReceipt; provenance: FabricProvenanceRecord; reviewRef: string }>)
+        receipt: FabricResolutionReceipt | OrdinaryRemoteReceipt; provenance: FabricProvenanceRecord | OrdinaryRemoteProvenance; reviewRef: string }>)
     | (Common & Readonly<{ status: 'denied'; code: PatientSmartImportHostDenialCode; proposal: null;
         receipt: null; provenance: null; reviewRef: null }>)
     | (Common & Readonly<{ status: 'failed'; code: PatientSmartImportHostFailureCode; proposal: null;
-        receipt: FabricResolutionReceipt; provenance: FabricProvenanceRecord; reviewRef: null }>);
+        receipt: FabricResolutionReceipt | OrdinaryRemoteReceipt; provenance: FabricProvenanceRecord | OrdinaryRemoteProvenance; reviewRef: null }>);
 type Sources = Readonly<{ clock: () => unknown; entropy: () => unknown }>;
 type Dependencies = Readonly<{
     killSwitch: Readonly<{ read(): Promise<PatientSmartImportHostKillSwitchResult> }>;
@@ -98,6 +101,12 @@ export function createPatientSmartImportHostCapability(dependencies: Dependencie
             let projection: SmartImportProjection;
             try { projection = dependencies.broker.consume({ ...request, capability: 'smart_import' }); }
             catch { return deny('projection_unavailable'); }
+            if (isOrdinaryFunctionSelected('smart_import')) {
+                const generatedAt = timestamp(sources);
+                const result = await executeOwnedOrdinaryProfile('smart_import', createSmartImportOrdinaryTaskProfile({ projection, generatedAt }), () => true);
+                return Object.freeze({ ...common, status: 'available', code: null,
+                    proposal: result.output as PatientSmartImportCapabilityProposal, ...ordinaryResultMetadata(result), reviewRef: reviewRef(sources) });
+            }
             let lifecycleState: Extract<ProviderLifecycleRead, { status: 'available' }>;
             try {
                 const lifecycle = dependencies.lifecycle.read();

@@ -142,7 +142,7 @@ function DocumentSynthesisFabricReviewCardSession({
                     <>
                         <span className="inline-flex items-center gap-1.5 text-[color:var(--lume-accent)]" role="status">
                             <Loader2 className="h-3.5 w-3.5" aria-hidden="true" />
-                            {phase === 'loading' ? 'Caricamento contesto…' : 'Generazione locale…'}
+                            {phase === 'loading' ? 'Caricamento contesto…' : picker.view.remote ? 'Preparazione / proposta OpenAI…' : 'Generazione locale…'}
                         </span>
                         <button type="button" className="ui-btn-secondary" data-lume-action="quiet" onClick={cancelPreview}>Annulla</button>
                     </>
@@ -226,12 +226,12 @@ function DocumentSynthesisFabricReviewCardSession({
                     </div>
 
                     <div className={disclosure.synthesisSection}>
-                        <p className="font-semibold text-[color:var(--lume-ink)]">Elaborato sul computer</p>
+                        <p className="font-semibold text-[color:var(--lume-ink)]">{providerBindingReceipt.provider === 'chatgpt_subscription' ? 'Elaborato con OpenAI' : 'Elaborato sul computer'}</p>
                         <dl className="mt-2 grid min-w-0 gap-x-4 gap-y-2 sm:grid-cols-[auto_minmax(0,1fr)]">
-                            <dt className="text-[color:var(--lume-ink-muted)]">Servizio</dt><dd className="text-[color:var(--lume-ink)]">Ollama · locale</dd>
+                            <dt className="text-[color:var(--lume-ink-muted)]">Servizio</dt><dd className="text-[color:var(--lume-ink)]">{providerBindingReceipt.provider === 'chatgpt_subscription' ? 'OpenAI · abbonamento ChatGPT · contesto redatto' : 'Ollama · locale'}</dd>
                             <dt className="text-[color:var(--lume-ink-muted)]">Modello usato</dt><dd className="break-words text-[color:var(--lume-ink)]">{providerBindingReceipt.model}</dd>
                         </dl>
-                        <p className="mt-3 text-[color:var(--lume-ink-muted)]">Nessun invio a provider esterni e nessun passaggio a un altro modello.</p>
+                        <p className="mt-3 text-[color:var(--lume-ink-muted)]">{providerBindingReceipt.provider === 'chatgpt_subscription' ? 'Contenuto redatto inviato con consenso esplicito. Condizioni e conservazione del servizio ChatGPT applicabili. Nessun fallback.' : 'Nessun invio a provider esterni e nessun passaggio a un altro modello.'}</p>
                     </div>
 
                     <details className={disclosure.disclosure}>

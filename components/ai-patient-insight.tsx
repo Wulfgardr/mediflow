@@ -171,7 +171,7 @@ export default function AIPatientInsight({ patient, stale = false }: AIPatientIn
             <header className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0 flex-1 basis-64">
                     <h3 className="text-base font-semibold">Supporto al ragionamento clinico</h3>
-                    <p className="mt-1 text-[color:var(--lume-ink-muted)]">Generazione manuale · proposta locale</p>
+                    <p className="mt-1 text-[color:var(--lume-ink-muted)]">{picker.view.remote ? 'Generazione manuale · OpenAI con redazione locale' : 'Generazione manuale · proposta locale'}</p>
                 </div>
                 <button type="button" onClick={generateInsight} disabled={isGenerating || !enabled || !picker.canGenerate} className="ui-btn-secondary" style={actionStyle}><RefreshCw className="h-4 w-4" aria-hidden="true" />{isGenerating ? 'Analisi…' : enabled ? 'Nuova bozza' : 'Disabilitata'}</button>
             </header>

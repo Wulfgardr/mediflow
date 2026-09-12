@@ -1,5 +1,6 @@
 /* @Codex */
 import 'server-only';
+import { isOrdinaryFunctionSelected, bindOrdinaryApplicationContext } from '../../chatgpt-product/ordinary-flow';
 
 import { createHash } from 'node:crypto';
 import { NextResponse } from 'next/server';
@@ -116,6 +117,7 @@ export function createAuthenticatedPatientInsightPreviewService(sources: Sources
                     atomic = createPatientInsightAtomicLease(Object.freeze({ port: context.owner.mintPatientInsightLeaseCommitPort(context.session), broker }));
                     const handle = atomic.commit();
                     const hostProjection = consumePatientInsightProjection(broker, Object.freeze({ handle }));
+                    if (isOrdinaryFunctionSelected('patient_insight')) await bindOrdinaryApplicationContext('patient_insight', context.owner, context.session);
                     const capability = sources.createCapability(currentness);
                     return await capability.preview(Object.freeze({ requestId: request.requestId, projection: hostProjection,
                         currentness: Object.freeze({ selectionEpoch: selection.selectionEpoch, patientRevision: request.patientRevision,
