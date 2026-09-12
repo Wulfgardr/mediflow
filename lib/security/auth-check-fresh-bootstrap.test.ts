@@ -9,7 +9,7 @@ import { pathToFileURL } from 'node:url';
 
 // Each first request owns a new process and directory: no DB module, fixture
 // seed or preliminary API request can initialize the database before auth.
-for (const scenario of ['empty', 'missing-existing', 'unknown-schema'] as const) {
+for (const scenario of ['empty', 'missing-existing', 'unknown-schema', 'native-empty', 'native-missing-existing'] as const) {
     test(`first auth check: ${scenario}`, () => {
         const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-first-auth-'));
         try {
@@ -20,17 +20,23 @@ for (const scenario of ['empty', 'missing-existing', 'unknown-schema'] as const)
                 const directory = process.env.MEDIFLOW_DATA_DIR;
                 const database = path.join(directory, 'medical.db');
                 const scenario = ${JSON.stringify(scenario)};
-                if (scenario === 'missing-existing') fs.writeFileSync(path.join(directory, 'existing-workspace.txt'), 'synthetic');
+                if (scenario === 'missing-existing' || scenario === 'native-missing-existing') fs.writeFileSync(path.join(directory, 'existing-workspace.txt'), 'synthetic');
                 if (scenario === 'unknown-schema') {
                     const { default: Database } = await import('better-sqlite3');
                     const db = new Database(database);
                     db.exec('CREATE TABLE unknown_workspace (id TEXT)');
                     db.close();
                 }
+                if (scenario.startsWith('native-')) {
+                    await import('./scripts/native-first-install.mjs');
+                    // TLS setup writes metadata before the first Web request.
+                    fs.writeFileSync(path.join(directory, 'runtime-status.json'), '{}');
+                    fs.mkdirSync(path.join(directory, 'certs'));
+                }
                 const { GET } = await import('./app/api/auth/check/route.ts');
                 const response = await GET(new Request('http://127.0.0.1/api/auth/check'));
                 const body = await response.json();
-                if (scenario === 'empty') {
+                if (scenario === 'empty' || scenario === 'native-empty') {
                     assert.equal(body.status, 'ok');
                     assert.equal(body.isSetup, false);
                     assert.equal(body.hasSession, false);
@@ -38,7 +44,7 @@ for (const scenario of ['empty', 'missing-existing', 'unknown-schema'] as const)
                     assert.ok(fs.existsSync(database));
                     const second = await GET(new Request('http://127.0.0.1/api/auth/check'));
                     assert.equal((await second.json()).status, 'ok');
-                } else if (scenario === 'missing-existing') {
+                } else if (scenario === 'missing-existing' || scenario === 'native-missing-existing') {
                     assert.equal(body.error.code, 'DB_MISSING');
                     assert.equal(fs.existsSync(database), false);
                 } else {

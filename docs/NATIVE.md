@@ -127,6 +127,8 @@ schema `mediflow`. Queste prove non attestano apertura OS o pairing reale.
 ./scripts/Launch_MediFlowMac.command
 ```
 
+* inizializza il database soltanto in una cartella dati nuova o vuota, prima dei file TLS
+* conserva cartelle non vuote senza database: richiedono recupero esplicito
 * configura TLS locale
 * compila il client nativo
 * apre la app macOS
