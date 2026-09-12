@@ -120,8 +120,11 @@ test('request cancellation and revocation terminate pending local work', async t
 });
 test('unconfirmed termination poisons single flight until the actual close event', async t => {
     const f = fixture(t); await f.admit(); const child = fakeChild(null, false);
-    const runtime = createTreatmentReasoningPortableRuntime({ provisioning: f.service, timeoutMs: 100, terminationGraceMs: 30, spawn: () => child });
-    const ready = await runtime.prepare(); try { await assert.rejects(ready.invoke({ instruction, signal }), runtimeCode('termination_unconfirmed')); } finally { ready.close(); }
+    // @Codex: cancel after dispatch; filesystem preparation is not the condition under test.
+    const controller = new AbortController();
+    child.stdin.once('finish', () => controller.abort());
+    const runtime = createTreatmentReasoningPortableRuntime({ provisioning: f.service, terminationGraceMs: 30, spawn: () => child });
+    const ready = await runtime.prepare({ signal: controller.signal }); try { await assert.rejects(ready.invoke({ instruction, signal }), runtimeCode('termination_unconfirmed')); } finally { ready.close(); }
     await assert.rejects(runtime.prepare(), runtimeCode('runtime_busy'));
     child.emit('close', null, 'SIGKILL'); const next = await runtime.prepare(); next.close();
 });
