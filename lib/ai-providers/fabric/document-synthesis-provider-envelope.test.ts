@@ -45,7 +45,7 @@ test('rejects accessors, inherited/custom/null prototypes, symbols, proxies, arr
 test('accepts no forged, cloned, spread, structured-cloned, proxied, or cross-module token', async () => {
     const result = parseDocumentSynthesisProviderEnvelope(response()); assert.equal(result.status, 'available'); if (result.status !== 'available') return;
     for (const token of [{}, { ...result.token }, structuredClone(result.token), new Proxy(result.token, {}), Object.create(null)]) assert.equal(resolveDocumentSynthesisProviderEnvelope(token), null);
-    const source = readFileSync(new URL('./document-synthesis-provider-envelope.ts', import.meta.url), 'utf8').replace("import 'server-only';", ''); const typescript = await import('typescript');
+    const source = readFileSync(new URL('./document-synthesis-provider-envelope.ts', import.meta.url), 'utf8').replace("import 'server-only';", '').replace("'../../ai-json-lexical'", JSON.stringify(new URL('../../ai-json-lexical.ts', import.meta.url).href)); const typescript = await import('typescript');
     const code = typescript.transpileModule(source, { compilerOptions: { module: typescript.ModuleKind.ESNext, target: typescript.ScriptTarget.ESNext } }).outputText; const foreign = await import(`data:text/javascript;base64,${Buffer.from(code).toString('base64')}`); const foreignResult = foreign.parseDocumentSynthesisProviderEnvelope(response());
     assert.equal(foreignResult.status, 'available'); if (foreignResult.status === 'available') { assert.equal(resolveDocumentSynthesisProviderEnvelope(foreignResult.token), null); assert.equal(foreign.resolveDocumentSynthesisProviderEnvelope(result.token), null); }
     assert.notEqual(resolveDocumentSynthesisProviderEnvelope(result.token), null);

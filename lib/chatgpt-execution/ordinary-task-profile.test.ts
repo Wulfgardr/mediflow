@@ -55,6 +55,20 @@ test('profiles reject wrong function output and forged handles', () => {
     assert.throws(() => readOrdinaryTaskProfile({}), /ordinary_task_profile_invalid/u);
 });
 
+test('all four profiles reject duplicate decoded keys before canonical normalization', () => {
+    const cases = [
+        [createPatientInsightOrdinaryTaskProfile(PI), piOutput()],
+        [createSmartImportOrdinaryTaskProfile({ projection: SI, generatedAt: SI.capturedAt }), siOutput()],
+        [createDocumentSynthesisOrdinaryTaskProfile(documentSources()), dsOutput()],
+        [createTreatmentReasoningOrdinaryTaskProfile(TR), trOutput()],
+    ] as const;
+    for (const [profile, output] of cases) {
+        const parser = readOrdinaryTaskProfile(profile).parseOutput;
+        assert.throws(() => parser(output.replace('"summary":', '"summary":"discarded","summ\\u0061ry":')), /ordinary_task_output_invalid/u);
+        assert.throws(() => parser(output.replace('"summary":', '"extra":1e999,"summary":')), /ordinary_task_output_invalid/u);
+    }
+});
+
 test('Patient Insight denies a claim that mixes a supported and a foreign source reference', () => {
     const profile = createPatientInsightOrdinaryTaskProfile(PI);
     const output = piOutput().replace('Quadro stabile [S1]', 'Quadro stabile [S1] e inventato [S999]');

@@ -20,6 +20,16 @@ export interface EgressGateAuditRecord {
     entityCounts: EgressEntityCounts;
 }
 
+export type ChatGptEgressAuditRecord = EgressGateAuditRecord & {
+    provider: 'chatgpt_subscription';
+};
+
+function appendRecord(record: EgressGateAuditRecord): void {
+    const auditPath = getEgressGateAuditPath();
+    mkdirSync(path.dirname(auditPath), { recursive: true });
+    appendFileSync(auditPath, `${JSON.stringify(record)}\n`, { encoding: 'utf8', mode: 0o600 });
+}
+
 export function getEgressGateAuditPath(): string {
     const dataDir = process.env.MEDIFLOW_DATA_DIR
         || (process.platform === 'darwin'
@@ -42,9 +52,36 @@ export function appendEgressGateAudit(input: {
         status: input.status,
         entityCounts: { ...input.entityCounts },
     };
-    const auditPath = getEgressGateAuditPath();
-    mkdirSync(path.dirname(auditPath), { recursive: true });
-    appendFileSync(auditPath, `${JSON.stringify(record)}\n`, { encoding: 'utf8', mode: 0o600 });
+    appendRecord(record);
+    return record;
+}
+
+/** The caller supplies the exact prepared wire bytes, never the original text.
+ * This records a gate decision; it does not attest transmission or grant it. */
+export function appendChatGptEgressAudit(input: {
+    payload: string;
+    lane: 'patient_insight' | 'smart_import' | 'document_synthesis' | 'treatment_reasoning';
+    status: EgressGateStatus;
+    entityCounts: EgressEntityCounts;
+    timestamp?: Date;
+}): ChatGptEgressAuditRecord {
+    const { payload, lane, status } = input;
+    const timestamp = input.timestamp === undefined ? new Date().toISOString() : new Date(Date.prototype.getTime.call(input.timestamp)).toISOString();
+    const lanes = ['patient_insight', 'smart_import', 'document_synthesis', 'treatment_reasoning'];
+    const entities = ['person', 'date', 'phone', 'address', 'tax_id', 'email', 'organization', 'identifier', 'other'];
+    if (typeof payload !== 'string' || !payload || !lanes.includes(lane)
+        || !['allowed', 'closed_pending_redaction_lane', 'blocked_residual_entities'].includes(status)) throw new Error('Invalid egress audit');
+    const entityCounts: EgressEntityCounts = {};
+    for (const [type, count] of Object.entries(input.entityCounts)) {
+        if (!entities.includes(type) || !Number.isSafeInteger(count) || count < 0 || count > 4096) throw new Error('Invalid egress audit');
+        entityCounts[type] = count;
+    }
+    const record: ChatGptEgressAuditRecord = {
+        timestamp,
+        payloadSha256: createHash('sha256').update(payload, 'utf8').digest('hex'),
+        provider: 'chatgpt_subscription', lane, status, entityCounts,
+    };
+    appendRecord(record);
     return record;
 }
 
