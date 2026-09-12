@@ -87,6 +87,33 @@ funzione spenta, provider indisponibile/revocato, sessione/paziente mutati,
 no autoapply, preset preview/apply/reread e retry idempotente. Build e prova UI
 integrata restano gate del parent se non eseguite nella lane.
 
+## Estensione nominata ChatGPT — decisione del 12 settembre 2026
+
+Per WUL-689/691 l'esclusione del remoto dal picker viene superata soltanto
+dal ponte ChatGPT di ADR 0134 per le quattro esperienze nominate. Il registry
+locale e i suoi endpoint restano invariati. L'estensione non ammette provider,
+dati o esecuzioni per effetto di una preferenza.
+
+La preferenza remota conserva modello ed effort esatti scelti da un catalogo
+autenticato come intenzione non autorizzativa, con formato persistito
+versionato. Non conserva account, consenso, credenziali, port, qualifica o ID
+effimeri. Il tentativo corrente emette le proprie opzioni opache, risolve
+l'intenzione contro il catalogo del suo processo e rifiuta modello/effort
+assenti senza sostituzione. L'override resta limitato alla richiesta.
+
+Revisione delle preferenze e catalogo locale restano distinti dalla revisione
+del tentativo remoto: login, chiusura o cambio del catalogo ChatGPT non devono
+invalidare i default locali. CAS, rilettura e interruttori restano obbligatori;
+i client precedenti non ricevono varianti fuori dal loro schema. Le letture
+GET proiettano soltanto stato gia posseduto, senza login o chiamate provider.
+
+La UI distingue account collegato, modello disponibile nel tentativo e
+funzione pronta con contesto/consenso correnti. Dopo la chiusura il modello
+non e riutilizzabile come processo vivo; la proposta puo restare visibile nel
+proprio contesto. La preparazione di una nuova operazione non e una generazione
+automatica. Questa decisione definisce l'integrazione richiesta, non attesta
+che picker, persistenza o percorsi ordinari siano gia implementati e verificati.
+
 ## Lettura HTTP e continuità dell'owner
 
 Il modulo HTTP riusa readBoundedJsonBody in modalità strict, massimo 4096 byte

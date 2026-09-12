@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { createTreatmentReasoningAthenaOutputContractV2 } from './treatment-reasoning-athena-output-contract-v2';
+import { createTreatmentReasoningAthenaOutputContractV2, createTreatmentReasoningChatGptOutputContract } from './treatment-reasoning-athena-output-contract-v2';
 
 const refs = () => ['evidence.synthetic.alpha', 'evidence.synthetic.beta'];
 const attestation = () => ({ schema: 'mediflow.ai.treatment-reasoning-athena-attestation.v1', readiness: 'available_unqualified', provider: 'athena_mlx', venue: 'local_process', egress: 'none', receiptRef: 'receipt.synthetic.01', provenanceRef: 'provenance.synthetic.01' });
@@ -19,6 +19,67 @@ const output = (extra: Record<string, unknown> = {}) => ({
 });
 const contract = () => createTreatmentReasoningAthenaOutputContractV2({ allowedEvidenceRefs: refs(), attestation: attestation() });
 const denied = (value: unknown) => assert.deepEqual(contract().normalize(value), { status: 'denied', code: 'output_invalid', value: null, sourceBindings: null, attestation: null, writesPerformed: 0, applyPolicy: 'none' });
+
+/* @Codex */
+const remoteOutput = () => {
+    const value = output();
+    value.data.trace.mode = 'chatgpt_subscription';
+    value.data.trace.toolsUsed = [];
+    return value;
+};
+const remoteContract = () => createTreatmentReasoningChatGptOutputContract({ allowedEvidenceRefs: refs() });
+
+test('ChatGPT content preserves the complete source-bound proposal without minting an attestation', () => {
+    const value = remoteOutput();
+    const result = remoteContract().normalize(value);
+    assert.equal(result.status, 'accepted');
+    if (result.status !== 'accepted') return;
+    assert.deepEqual(result.value, { schemaVersion: value.schemaVersion, task: value.task, summary: value.summary, data: value.data });
+    assert.deepEqual(result.sourceBindings, bindings());
+    assert.equal(result.resultSchema, 'mediflow.ai.treatment-reasoning-chatgpt-content.v1');
+    assert.equal(Object.hasOwn(result, 'attestation'), false);
+    assert.equal(Object.hasOwn(result, 'provenance'), false);
+    assert.equal(result.writesPerformed, 0);
+    assert.equal(result.applyPolicy, 'none');
+    assert.ok(Object.isFrozen(result.value.data.trace));
+    assert.ok(Object.isFrozen(result.sourceBindings));
+});
+
+test('local and ChatGPT parsers reject each other and remote tools or forged host metadata', () => {
+    denied(remoteOutput());
+    assert.equal(remoteContract().normalize(output()).status, 'denied');
+    const tools = remoteOutput(); tools.data.trace.toolsUsed = ['tool.forged'];
+    const mode = remoteOutput(); mode.data.trace.mode = 'athena_sidecar';
+    for (const value of [tools, mode, { ...remoteOutput(), attestation: attestation() }, { ...remoteOutput(), authority: true }]) {
+        assert.equal(remoteContract().normalize(value).status, 'denied');
+    }
+    assert.throws(() => createTreatmentReasoningChatGptOutputContract({ allowedEvidenceRefs: refs(), attestation: attestation() }));
+});
+
+test('ChatGPT retains all clinical claim, source and no-autoapply checks', () => {
+    const foreign = remoteOutput(); foreign.sourceBindings[0].evidenceRefs = ['source.foreign'];
+    const missing = remoteOutput(); missing.sourceBindings.pop();
+    const mismatched = remoteOutput(); mismatched.sourceBindings[0].claim = 'Other claim';
+    const invalidEvidence = remoteOutput(); invalidEvidence.data.keyEvidence[0].evidenceRefs = ['source.foreign'];
+    const invalidFlag = remoteOutput(); invalidFlag.data.safetyFlags[0].severity = 'safe';
+    const invalidAction = remoteOutput(); invalidAction.data.suggestedActions[0].writePolicy = 'auto_apply';
+    const duplicate = remoteOutput(); duplicate.sourceBindings[1] = duplicate.sourceBindings[0];
+    for (const value of [foreign, missing, mismatched, invalidEvidence, invalidFlag, invalidAction, duplicate]) {
+        assert.equal(remoteContract().normalize(value).status, 'denied');
+    }
+});
+
+test('ChatGPT snapshots source selection and rejects getters and proxies without invoking them', () => {
+    const selected = refs(); const parser = createTreatmentReasoningChatGptOutputContract({ allowedEvidenceRefs: selected });
+    selected[0] = 'source.foreign';
+    assert.equal(parser.normalize(remoteOutput()).status, 'accepted');
+    let reads = 0;
+    const getter = remoteOutput(); Object.defineProperty(getter.data, 'trace', { enumerable: true, get() { reads++; return {}; } });
+    const proxy = new Proxy(remoteOutput(), { ownKeys() { reads++; return []; } });
+    assert.equal(parser.normalize(getter).status, 'denied');
+    assert.equal(parser.normalize(proxy).status, 'denied');
+    assert.equal(reads, 0);
+});
 
 test('normalizes the distinct v2 source-bound review-only result and host attestation', () => {
     const result = contract().normalize(output());

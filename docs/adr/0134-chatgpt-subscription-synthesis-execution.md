@@ -246,6 +246,62 @@ trasferimento, account/catalogo, generazione, stop/rinnovo e distribuzione
 verificati. La prova sintetica non sostituisce le esperienze ordinarie di
 WUL-689 e non ammette dati clinici reali.
 
+## Decisione di integrazione nelle esperienze ordinarie — 12 settembre 2026
+
+WUL-689/691 richiedono il canale ChatGPT nelle quattro esperienze ordinarie,
+non la sola sintesi DEMO. Il ponte usa quattro profili host nominati:
+`patient_insight`, `smart_import`, `document_synthesis`, `treatment_reasoning`.
+Ogni profilo conserva il builder, il parser e il risultato specifico della
+funzione. Un profilo prepara e valida contenuti: non concede autorita,
+consenso, ammissione dei dati o una qualifica del provider.
+
+L'acquisizione del contesto rimane nell'owner/broker della funzione. Il
+tentativo conserva privatamente funzione, selezione, revisioni e hash delle
+fonti; copie dei riferimenti browser, testo libero, prompt, schema o callback
+del caller non sostituiscono questa acquisizione. La preparazione precede
+la disponibilita del modello. Consenso, catalogo e Genera restano azioni
+esplicite riferite al medesimo tentativo; nessuna estensione delle lease.
+
+Trasporto, account, limiti, modello/effort, annullamento e chiusura rimangono
+condivisi. Istruzioni e validazione dell'output sono scelte esclusivamente dai
+quattro profili host. Il risultato torna al proprietario della funzione per
+la pubblicazione corrente; il pannello account non conserva fonti o proposte
+del paziente. Prima del turno serve il catalogo vivo; dopo la chiusura serve
+il sigillo terminale insieme a owner, consenso e selezione ancora correnti.
+Una ricevuta remota dichiara OpenAI, canale ChatGPT ed egress effettivo; non
+simula una ricevuta Ollama, una attestazione ATHENA o assenza di egress.
+
+Per Treatment Reasoning il parser nominato ChatGPT condivide le verifiche
+cliniche e i `sourceBindings` del contratto locale, ma richiede una trace
+`chatgpt_subscription` senza strumenti. Produce una proposta, non una
+attestazione del processo o dell'ammissione: la provenienza di esecuzione viene
+aggiunta esclusivamente dal ponte host dopo il turno qualificato. Il parser
+ATHENA continua a rifiutare la trace remota. Il prompt ChatGPT non dichiara
+esecuzione locale e non classifica autonomamente le fonti come sintetiche.
+
+La codifica Structured Outputs rende espliciti con `null` solo i campi che
+il contratto canonico considera opzionali; il decoder host li riporta ad
+assenza prima del parser esistente. Non ripara campi obbligatori o contenuti
+non validi. Document Synthesis conserva l'envelope completo, le citazioni e
+il binding al source-set autentico; la decodifica iniziale conserva anche il
+rifiuto di chiavi JSON duplicate. Queste trasformazioni sono locali e non
+concedono ammissione, consenso o currentness.
+
+Questa integrazione non sostituisce il chokepoint egress degli ADR 0033/0077:
+il testo narrativo clinico richiede redazione locale promossa, consenso,
+minimizzazione e audit. Lo stato benchmark-only non viene promosso dal login
+o dalla generazione DEMO. Le prove di sviluppo usano solo fonti sintetiche
+possedute dal test; un flag `synthetic` del caller non ne prova l'origine.
+La decisione competente sul deployment e sui dati reali resta WUL-688.
+Finche i requisiti applicabili non sono soddisfatti non si dichiara conclusa
+l'esperienza OpenAI ordinaria; non si sostituisce il requisito con una DEMO.
+
+La verifica integrata richiede i quattro percorsi reali su dati sintetici
+nella stessa candidata, output e fonti specifici, preferenza/override/restart,
+revoca e cambio contesto, modello rimosso e quota, chiusura e pubblicazione,
+assenza di fallback e regressione dei percorsi locali. Il ponte e i profili
+sono implementazioni candidate fino a queste verifiche, non prove di rilascio.
+
 ## Fonti
 
 - [ConfigToml del tag verificato](https://github.com/openai/codex/blob/3d2ee51ca2d5db578f328aa75e20aa22c0197c9a/codex-rs/config/src/config_toml.rs),
