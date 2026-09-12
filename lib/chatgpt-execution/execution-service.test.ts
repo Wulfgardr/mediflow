@@ -343,8 +343,67 @@ test('account update during awaited process close still revokes output', async (
     transport.onTurn = () => { transport.final(); transport.complete(); };
     const pending = service.generate(request); const rejected = assert.rejects(pending, errorCode('revoked'));
     await started(transport); assert.equal(transport.closed, 1);
-    transport.listener('account/updated', {}); hold.resolve(true);
+    const reads = transport.calls.filter(call => call.method === 'account/read').length;
+    transport.listener('account/updated', { authMode: 'chatgpt', planType: 'plus' }); hold.resolve(true);
     await rejected;
+    assert.equal(transport.calls.filter(call => call.method === 'account/read').length, reads);
+});
+
+test('intentional native drain waits for the final seal without treating its transitional witness as a revocation', async () => {
+    let qualified = true;
+    const { service, transport } = setup({ boundaryQualified: () => qualified });
+    const request = await selection(service);
+    transport.onTurn = () => { transport.final(); transport.complete(); };
+    transport.close = async () => {
+        transport.closed++; qualified = false;
+        await new Promise(resolve => setTimeout(resolve, 120));
+        qualified = true; return true;
+    };
+    try {
+        const result = await service.generate(request);
+        assert.equal(result.status, 'completed'); assert.equal(service.isCurrent(result), true);
+        assert.equal(transport.closed, 1);
+    } finally { await service.dispose(); }
+});
+
+for (const failure of ['owner', 'signal', 'seal', 'deadline'] as const) test(`intentional drain cannot publish after ${failure} failure`, async () => {
+    let qualified = true, current = true, clock = 0;
+    const controller = new AbortController();
+    const { service, transport } = setup({ boundaryQualified: () => qualified, isCurrent: () => current, now: () => clock });
+    const request = await selection(service);
+    transport.onTurn = () => { transport.final(); transport.complete(); };
+    transport.close = async () => {
+        transport.closed++; qualified = false;
+        await tick();
+        qualified = failure !== 'seal';
+        if (failure === 'owner') current = false;
+        if (failure === 'signal') controller.abort();
+        if (failure === 'deadline') clock = 2001;
+        return failure !== 'seal';
+    };
+    const code = { owner: 'revoked', signal: 'canceled', seal: 'unqualified_boundary', deadline: 'timeout' } as const;
+    try { await assert.rejects(service.generate(request, controller.signal), errorCode(code[failure])); }
+    finally { await service.dispose(); }
+    assert.equal(transport.closed, 1);
+});
+
+for (const failure of ['false', 'reject', 'pending'] as const) test(`native close ${failure} stays terminal even if the boundary later recovers`, async () => {
+    let qualified = true;
+    const { service, transport } = setup({ boundaryQualified: () => qualified });
+    const request = await selection(service); const hold = deferred<boolean>();
+    transport.onTurn = () => { transport.final(); transport.complete(); };
+    transport.close = async () => {
+        transport.closed++; qualified = false;
+        if (failure === 'reject') throw new Error('Synthetic close detail must not escape');
+        if (failure === 'pending') return hold.promise;
+        return false;
+    };
+    await assert.rejects(service.generate(request), errorCode('unqualified_boundary'));
+    const calls = transport.calls.length;
+    qualified = true; hold.resolve(true);
+    await assert.rejects(service.readCatalog(), errorCode('unqualified_boundary'));
+    assert.equal(transport.calls.length, calls); assert.equal(transport.closed, 1);
+    await service.dispose();
 });
 
 test('hanging interrupt is bounded and always followed by process close', async () => {

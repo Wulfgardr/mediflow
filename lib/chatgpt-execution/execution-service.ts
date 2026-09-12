@@ -315,8 +315,9 @@ export function createSynthesisExecutionService(options: {
                 return catalog;
             });
         },
-        generate(request: SynthesisRequest, signal?: AbortSignal): Promise<SynthesisResult> {
-            return operation(async () => {
+        async generate(request: SynthesisRequest, signal?: AbortSignal): Promise<SynthesisResult> {
+            const publicationDeadline = now() + timeoutMs;
+            const result = await operation(async () => {
                 const value = record(request);
                 if (!exactKeys(value, ['modelOptionId', 'expectedCatalogRevision'])) throw new ExecutionError('invalid_request');
                 if (!catalog || value.expectedCatalogRevision !== catalog.revision) throw new ExecutionError('catalog_stale');
@@ -385,10 +386,23 @@ export function createSynthesisExecutionService(options: {
                         requestedServiceTier: 'priority', observedServiceTier: null, fallback: 'none', fixtureId, inputSha256,
                         outputSha256: hash(JSON.stringify({ summary: output.summary, explanation: output.explanation, citations: output.citations })) }),
                 });
-                await close(false);
-                guard();
                 return result;
             }, signal);
+            // The native boundary is intentionally non-publishable while draining.
+            // Stop the execution watcher before close, then require its final seal
+            // and the original authority/deadline before returning any proposal.
+            try {
+                await close(false);
+                if (signal?.aborted) invalidate('canceled');
+                if (now() >= publicationDeadline) invalidate('timeout');
+                guard();
+                return result;
+            } catch (error) {
+                const code = terminal ?? (error instanceof ExecutionError ? error.code : 'upstream_error');
+                invalidate(code);
+                await close(true); // Reuses the same shutdown; no second close or RPC.
+                throw new ExecutionError(code);
+            }
         },
         // Local result witness, NOT an owner grant. The binding must still commit
         // its resource use. Never re-enter isCurrent() while inside that owner.
