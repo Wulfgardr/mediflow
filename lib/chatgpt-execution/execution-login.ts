@@ -35,6 +35,16 @@ export const EXECUTION_PROTOCOL_PROVENANCE = Object.freeze({
 }),
 } as const);
 
+/* @Codex: current binary expectation, separate from the historical C1 receipt.
+ * This declaration grants no authority. The Mac issuer verifies the actual
+ * binary, version and all 24 freshly generated schema digests before initialize;
+ * exact readback and privately owned, current custody are still required.
+ */
+const CURRENT_PROTOCOL_RUNTIME = Object.freeze({
+    binaryVersion: '0.153.4',
+    binarySha256: 'b973d440acac501fd2594a43e7ca9ce41e0a65b9dfb28d0d7a7837c99e1261e3',
+} as const);
+
 /** Shared request shape, not an observation. */
 export function executionInitializationParams() {
     return { clientInfo: { name: 'mediflow_synthetic_product', title: 'MediFlow synthetic synthesis', version: '0.8.6' }, capabilities: { experimentalApi: true } };
@@ -50,11 +60,11 @@ export function expectedExecutionEnvironment(executionCwd: string) {
 }
 export function assertInitialized(raw: unknown, executionCwd: string): void {
     const response = object(raw), expected = expectedExecutionEnvironment(executionCwd);
-    if (EXECUTION_SUBSTRATE.codexVersion !== EXECUTION_PROTOCOL_PROVENANCE.binaryVersion
-        || EXECUTION_SUBSTRATE.codexSha256 !== EXECUTION_PROTOCOL_PROVENANCE.binarySha256
+    if (EXECUTION_SUBSTRATE.codexVersion !== CURRENT_PROTOCOL_RUNTIME.binaryVersion
+        || EXECUTION_SUBSTRATE.codexSha256 !== CURRENT_PROTOCOL_RUNTIME.binarySha256
         || Object.keys(response).some(key => !['userAgent', 'codexHome', 'platformOs', 'platformFamily'].includes(key))
         || !text(response.userAgent, 1024)
-        || !response.userAgent.split(/[^0-9A-Za-z.-]+/u).includes(EXECUTION_PROTOCOL_PROVENANCE.binaryVersion)
+        || !response.userAgent.split(/[^0-9A-Za-z.-]+/u).includes(CURRENT_PROTOCOL_RUNTIME.binaryVersion)
         || response.codexHome !== expected.codexHome || response.platformOs !== expected.platformOs
         || response.platformFamily !== expected.platformFamily) throw new ExecutionError('unqualified_boundary');
 }

@@ -2,7 +2,7 @@
  * injected OS observer, helper binary, success callback or environment switch. */
 import 'server-only';
 import { randomBytes } from 'node:crypto';
-import { chmodSync, constants, copyFileSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, closeSync, constants, copyFileSync, fchmodSync, fstatSync, lstatSync, mkdirSync, mkdtempSync, openSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:net';
 import { join } from 'node:path';
 import { ExecutionError, type ExecutionTransport, type ExecutionMethod, type ExecutionCode } from './execution-contract';
@@ -64,6 +64,43 @@ function identity(path: string): string {
     const s = lstatSync(path);
     if (!s.isFile() || s.isSymbolicLink() || s.nlink !== 1 || s.uid !== process.getuid?.() || (s.mode & 0o222) !== 0) throw new ExecutionError('unqualified_boundary');
     return JSON.stringify([s.dev, s.ino, s.size, s.mode, s.uid, s.gid, s.mtimeMs, s.ctimeMs, s.nlink]);
+}
+/** rust-v0.153.4 core/src/installation_id.rs conditionally fchmods to 0644.
+ * Custodian umask 0077 otherwise creates 0600 and the mandatory mode deny stops
+ * startup. Prepare only this empty run-owned file before server launch, after
+ * earlier custodians have drained. The server generates its own ephemeral ID.
+ * Never repair/adopt an existing path or chmod by pathname: protected-file
+ * aliases must not acquire this host-side operation. No sandbox grant changes.
+ * Private synchronous preparation, not a general concurrent-filesystem API. */
+function prepareMacInstallationId(root: string): void {
+    const home = join(root, 'codex'), path = join(home, 'installation_id');
+    function privateDirectory(path: string): string {
+        const s = lstatSync(path);
+        if (!s.isDirectory() || s.isSymbolicLink() || s.uid !== process.getuid?.()
+            || (s.mode & 0o7777) !== 0o700 || realpathSync(path) !== path)
+            throw new ExecutionError('unqualified_boundary');
+        return JSON.stringify([s.dev, s.ino, s.uid, s.gid, s.mode]);
+    }
+    const rootBefore = privateDirectory(root), homeBefore = privateDirectory(home);
+    const fd = openSync(path, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600);
+    try {
+        const created = fstatSync(fd);
+        if (!created.isFile() || created.nlink !== 1 || created.uid !== process.getuid?.() || created.size !== 0)
+            throw new ExecutionError('unqualified_boundary');
+        if (privateDirectory(root) !== rootBefore || privateDirectory(home) !== homeBefore)
+            throw new ExecutionError('unqualified_boundary');
+        // This descriptor names the exclusive fresh inode, not a reopened alias.
+        // 0644 is contained by two verified 0700 directories; no private input
+        // or durable machine/account identifier is copied into the empty file.
+        fchmodSync(fd, 0o644);
+        const ready = fstatSync(fd), named = lstatSync(path);
+        if (!ready.isFile() || ready.nlink !== 1 || ready.uid !== created.uid || ready.gid !== created.gid
+            || ready.dev !== created.dev || ready.ino !== created.ino || ready.size !== 0 || (ready.mode & 0o7777) !== 0o644
+            || !named.isFile() || named.isSymbolicLink() || named.nlink !== 1 || named.dev !== ready.dev || named.ino !== ready.ino
+            || named.uid !== ready.uid || named.gid !== ready.gid || named.size !== 0 || (named.mode & 0o7777) !== 0o644
+            || privateDirectory(root) !== rootBefore || privateDirectory(home) !== homeBefore)
+            throw new ExecutionError('unqualified_boundary');
+    } finally { closeSync(fd); }
 }
 /** Explicit host operation: compiles/probes locally and starts account-free with
  * CLOSED provider egress. It does not log in, acquire credentials or grant a turn. */
@@ -201,6 +238,7 @@ export async function prepareMacProductQualification(options: MacPreparationOpti
         }
         protocolMatched = true; check();
         stage = 'initialize';
+        prepareMacInstallationId(root); check();
         serverOwner = launchMacCustodian(root, nonce, 'server', env, withdraw); owners.push(serverOwner);
         const server = serverOwner;
         raw = createStdioExecutionTransport(server.child, { killGraceMs: 150, groupDrainMs: 150,

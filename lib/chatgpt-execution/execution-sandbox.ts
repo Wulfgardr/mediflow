@@ -9,8 +9,8 @@ import { ExecutionError } from './execution-contract';
 // A candidate is admitted only on this observed substrate. Updating a pin needs
 // a new synthetic OS qualification; this is not a portable macOS sandbox claim.
 export const EXECUTION_SUBSTRATE = Object.freeze({
-    codexVersion: '0.153.4', osBuild: '26A5425a',
-    codexSha256: 'a30ec314bbd0e3721632234d07db7c99855db3b9f1e32dbe8c791947f07e7629',
+    codexVersion: '0.153.4', osBuild: '26A428',
+    codexSha256: 'b973d440acac501fd2594a43e7ca9ce41e0a65b9dfb28d0d7a7837c99e1261e3',
     dyldSupportSha256: 'bdfc2354c683c8fb95a39e63fbc8610e9739b0256c89ab880564edefbe73a5ce',
     publicCaSha256: 'fcd6a24dfe6185af9b508d0fcb8b8525b7451dc241a2c18978abdd7b50ecfc84',
 });
