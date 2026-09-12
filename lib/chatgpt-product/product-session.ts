@@ -56,15 +56,20 @@ export function createProductSessionRegistry(create: (session: owner.WebSessionP
                     if (!current() || signal?.aborted) throw new ProductError('session_expired');
                     const use = owner.beginResourceUse(value.port);
                     if (!use) throw new ProductError('session_expired');
+                    let result: ProductResponse | undefined;
+                    let committed = false;
                     try {
-                        const result = await value.service.execute(operation, request, signal);
+                        result = await value.service.execute(operation, request, signal);
                         let response: Response | undefined;
                         const bound = owner.withCurrentResourceBinding(use, () => {
-                            if (!signal?.aborted && !value.abort.signal.aborted && value.service.isCurrent(result)) response = render(result);
+                            if (!signal?.aborted && !value.abort.signal.aborted && value.service.isCurrent(result!)) response = render(result!);
                         });
                         if (!bound || !response || signal?.aborted || !value.service.isCurrent(result) || !owner.commitResourceUse(use)) throw new ProductError('session_expired');
-                        return response;
-                    } finally { owner.abortResourceUse(use); }
+                        committed = true; return response;
+                    } finally {
+                        owner.abortResourceUse(use);
+                        if (result && !committed) value.service.abandon(result);
+                    }
                 },
             });
         },

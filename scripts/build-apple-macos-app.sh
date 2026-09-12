@@ -17,6 +17,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 NEXT_DIST_DIR="${MEDIFLOW_NEXT_DIST_DIR:-.next}"
 STANDALONE_DIR="$ROOT_DIR/$NEXT_DIST_DIR/standalone"
+STAGE_EXECUTION_MAC_ASSETS="$ROOT_DIR/scripts/stage-chatgpt-execution-mac-assets.ts"
 PROJECT="$ROOT_DIR/native/MediFlowAppleApp/MediFlowAppleApp.xcodeproj"
 SCHEME="MediFlowMacApp"
 CONFIG="${MEDIFLOW_MAC_CONFIG:-Debug}"
@@ -41,6 +42,29 @@ fi
 if [[ ! -f "$STANDALONE_DIR/server.js" ]]; then
   echo "Missing $NEXT_DIST_DIR/standalone/server.js. Run 'npm run build' first (or unset MEDIFLOW_SKIP_WEB_BUILD)." >&2
   exit 1
+fi
+
+# @Codex: a caller must provide every public staging input explicitly. Without
+# them an already-staged standalone payload is reused unchanged, if present.
+EXECUTION_MAC_STAGE_VARS=(
+  MEDIFLOW_CHATGPT_EXECUTION_BINARY
+  MEDIFLOW_CHATGPT_EXECUTION_NATIVE_SOURCE
+  MEDIFLOW_CHATGPT_EXECUTION_SCHEMA_DIRECTORY
+  MEDIFLOW_CHATGPT_EXECUTION_C1_RECEIPT
+)
+EXECUTION_MAC_STAGE_COUNT=0
+for variable in "${EXECUTION_MAC_STAGE_VARS[@]}"; do [[ -n "${!variable:-}" ]] && ((EXECUTION_MAC_STAGE_COUNT+=1)); done
+if (( EXECUTION_MAC_STAGE_COUNT != 0 && EXECUTION_MAC_STAGE_COUNT != ${#EXECUTION_MAC_STAGE_VARS[@]} )); then
+  echo "Incomplete explicit ChatGPT execution Mac asset staging inputs." >&2
+  exit 1
+fi
+if (( EXECUTION_MAC_STAGE_COUNT == ${#EXECUTION_MAC_STAGE_VARS[@]} )); then
+  node "$ROOT_DIR/scripts/run-strip-types.mjs" "$STAGE_EXECUTION_MAC_ASSETS" \
+    --installation-root "$STANDALONE_DIR" \
+    --binary "$MEDIFLOW_CHATGPT_EXECUTION_BINARY" \
+    --native-source "$MEDIFLOW_CHATGPT_EXECUTION_NATIVE_SOURCE" \
+    --schema-directory "$MEDIFLOW_CHATGPT_EXECUTION_SCHEMA_DIRECTORY" \
+    --c1-receipt "$MEDIFLOW_CHATGPT_EXECUTION_C1_RECEIPT"
 fi
 
 # @Codex: better-sqlite3 is architecture-specific, so the app executable must

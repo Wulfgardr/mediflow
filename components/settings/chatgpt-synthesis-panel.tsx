@@ -23,7 +23,9 @@ export function ChatGptSynthesisCard({ active }: { active: boolean }) {
     const snapshot = view.snapshot;
     const invoke = (operation: ProductOperation) => { void client.run(operation); };
     if (!active) return <section className={`${SETTINGS_CARD_CLASS} ${styles.panel}`} data-testid="chatgpt-synthesis-panel"><h2>Prova di sintesi</h2><p>Sblocca la sessione MediFlow per accedere.</p></section>;
-    const canConsent = snapshot && ['needs_consent', 'held', 'error', 'canceled'].includes(snapshot.state);
+    const canConsent = snapshot?.state === 'needs_consent';
+    const canPrepare = snapshot && snapshot.qualification.platform === 'darwin' && ['not_prepared', 'closed'].includes(snapshot.preparation.state);
+    const preparing = view.busy === 'prepare' || snapshot?.preparation.state === 'preparing';
     const canRead = snapshot && ['connected', 'ready'].includes(snapshot.state);
     const loginPending = snapshot && ['starting', 'awaiting_login', 'verifying'].includes(snapshot.state);
     const selected = snapshot?.catalog?.choices.find(choice => choice.optionId === view.selection?.modelOptionId);
@@ -46,6 +48,12 @@ export function ChatGptSynthesisCard({ active }: { active: boolean }) {
             {!snapshot || snapshot.state === 'held' || snapshot.state === 'error' || snapshot.qualification.state !== 'qualified' || snapshot.receipt.cleanup === 'unconfirmed' ?
                 <Link href="/settings/ai/modelli" prefetch={false} className={SETTINGS_SECONDARY_BUTTON_CLASS}>Apri Modelli e hardware</Link> : null}
         </div>
+        {canPrepare ? <div className={styles.step}>
+            <p>Prepara un ambiente dedicato con verifiche locali. Questo passaggio non apre collegamenti a OpenAI e non usa il tuo account.</p>
+            <button type="button" className={SETTINGS_PRIMARY_BUTTON_CLASS} disabled={!!view.busy} onClick={() => invoke('prepare')}>Prepara postazione</button>
+        </div> : null}
+        {preparing || snapshot?.preparation.state === 'ready' ? <button type="button" className={SETTINGS_SECONDARY_BUTTON_CLASS} onClick={() => invoke('cancel')}>Annulla preparazione</button> : null}
+        {snapshot?.preparation.state === 'blocked' ? <p className={styles.error}>La chiusura dell’ambiente precedente non è confermata. La preparazione resta sospesa: riavviare l’app non risolve questa verifica.</p> : null}
         {snapshot ? <>
             <details className={styles.disclosure}>
                 <summary>Fonti demo da inviare ({snapshot.disclosure.sources.length})</summary>
@@ -57,10 +65,10 @@ export function ChatGptSynthesisCard({ active }: { active: boolean }) {
             </details>
             {canConsent ? <fieldset className={styles.step} disabled={!!view.busy}>
                 <legend>Autorizza questa prova</legend>
-                <p>La preparazione apre un collegamento a OpenAI e richiede un accesso dedicato. Le sole fonti demo sopra saranno inviate quando premi Genera sintesi DEMO. Il consenso dura al massimo cinque minuti.</p>
+                <p>Avviare l’accesso aprirà un collegamento a OpenAI nel solo ambiente appena preparato. Le sole fonti demo sopra saranno inviate quando premi Genera sintesi DEMO. La prova scade entro cinque minuti dall’inizio della preparazione.</p>
                 <label className={styles.consent}>
                     <input type="checkbox" checked={acceptedRevision === snapshot.disclosure.revision} onChange={event => setAcceptedRevision(event.target.checked ? snapshot.disclosure.revision : null)} />
-                    <span>Autorizzo preparazione, accesso dedicato e invio delle sole fonti demo per questa prova.</span>
+                    <span>Autorizzo accesso dedicato e invio delle sole fonti demo per questa prova.</span>
                 </label>
                 <button type="button" className={SETTINGS_PRIMARY_BUTTON_CLASS} disabled={acceptedRevision !== snapshot.disclosure.revision || snapshot.qualification.state !== 'qualified' || snapshot.receipt.cleanup === 'unconfirmed'} onClick={() => { setAcceptedRevision(null); invoke('consent'); }}>Autorizza prova DEMO</button>
             </fieldset> : null}
@@ -102,7 +110,7 @@ export function ChatGptSynthesisCard({ active }: { active: boolean }) {
                 <p>Modello utilizzato: {snapshot.result.provenance.model} · effort: {snapshot.result.provenance.effort}.</p>
                 <p>Solo proposta. Scritture cliniche: {snapshot.result.clinicalWrites}. Completare la DEMO non abilita l’uso clinico.</p>
             </article> : null}
-            {!canConsent ? <button type="button" className={SETTINGS_SECONDARY_BUTTON_CLASS} onClick={() => invoke('logout')}>Scollega e ritira consenso</button> : null}
+            {!canConsent && snapshot.consentExpiresAt ? <button type="button" className={SETTINGS_SECONDARY_BUTTON_CLASS} onClick={() => invoke('logout')}>Scollega e ritira consenso</button> : null}
             <details className={styles.disclosure} data-testid="synthesis-receipt">
                 <summary>Ricevuta di chiusura e limiti</summary>
                 <div className={styles.detailBody}>

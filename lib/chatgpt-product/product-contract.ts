@@ -3,7 +3,7 @@ import type { SynthesisCatalog, SynthesisRequest, SynthesisResult, SynthesisSour
 export const PRODUCT_NAMESPACE = '/api/settings/ai/chatgpt/synthesis/' as const;
 export const PRODUCT_OPERATION = 'synthetic_synthesis' as const;
 export const PRODUCT_DATA_CLASS = 'synthetic_fixture' as const;
-export const PRODUCT_MUTATIONS = ['consent', 'login/start', 'login/complete', 'login/cancel', 'read', 'models', 'generate', 'cancel', 'logout'] as const;
+export const PRODUCT_MUTATIONS = ['prepare', 'consent', 'login/start', 'login/complete', 'login/cancel', 'read', 'models', 'generate', 'cancel', 'logout'] as const;
 export type ProductMutation = typeof PRODUCT_MUTATIONS[number];
 export type ProductOperation = ProductMutation | 'status';
 export type ProductCode = ExecutionCode | 'consent_required' | 'consent_stale' | 'invalid_state' | 'login_pending'
@@ -11,7 +11,7 @@ export type ProductCode = ExecutionCode | 'consent_required' | 'consent_stale' |
 export class ProductError extends Error {
     constructor(readonly code: ProductCode) { super(code); this.name = 'ProductError'; }
 }
-export type ProductState = 'held' | 'needs_consent' | 'consented' | 'starting' | 'awaiting_login' | 'verifying'
+export type ProductState = 'preparing' | 'held' | 'needs_consent' | 'consented' | 'starting' | 'awaiting_login' | 'verifying'
     | 'connected' | 'ready' | 'generating' | 'completed' | 'canceled' | 'error';
 export type QualificationSnapshot = Readonly<{
     platform: string; state: 'unqualified' | 'unsupported' | 'qualified'; revision: string;
@@ -36,8 +36,13 @@ export type ProductReceipt = Readonly<{
     globalRemoteRevocation: 'not_claimed'; secureErase: 'not_claimed'; quotaRefund: 'not_claimed';
 }>;
 export type ProductLimits = Readonly<{ primaryUsedPercent: number | null; secondaryUsedPercent: number | null }>;
+export type ProductPreparation = Readonly<{
+    state: 'not_prepared' | 'preparing' | 'ready' | 'in_use' | 'closing' | 'closed' | 'blocked';
+    expiresAt: number | null;
+}>;
 export type ProductSnapshot = Readonly<{
     schema: 'mediflow.chatgpt-product.v1'; state: ProductState; notice: ProductCode | null;
+    preparation: ProductPreparation;
     contextRevision: string; qualification: QualificationSnapshot; disclosure: ProductDisclosure;
     authenticatedProcess: 'none' | 'dedicated_execution'; accountControlAdmitsExecution: false;
     plan: 'plus' | 'pro' | null; consentExpiresAt: number | null; loginExpiresAt: number | null;

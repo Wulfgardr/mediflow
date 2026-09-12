@@ -9,6 +9,7 @@ NEXT_DIST_DIR="${MEDIFLOW_NEXT_DIST_DIR:-.next}"
 STANDALONE_DIR="$ROOT_DIR/$NEXT_DIST_DIR/standalone"
 NODE_BINARY="${MEDIFLOW_NODE_BINARY:-$(command -v node || true)}"
 LAUNCHER_SOURCE="$ROOT_DIR/scripts/installability-v0-macos-launcher.sh"
+STAGE_EXECUTION_MAC_ASSETS="$ROOT_DIR/scripts/stage-chatgpt-execution-mac-assets.ts"
 
 fail() {
   echo "[installabilita-v0] ERRORE: $*" >&2
@@ -102,6 +103,27 @@ cp -R "$STANDALONE_DIR/." "$APP/Contents/Resources/WebRuntime/"
 cp -R "$ROOT_DIR/$NEXT_DIST_DIR/static" "$APP/Contents/Resources/WebRuntime/.next/static"
 if [[ -d "$ROOT_DIR/public" ]]; then
   cp -R "$ROOT_DIR/public" "$APP/Contents/Resources/WebRuntime/public"
+fi
+
+# @Codex: a partial payload is a packaging error; no inputs reuse any standalone payload already copied.
+EXECUTION_MAC_STAGE_VARS=(
+  MEDIFLOW_CHATGPT_EXECUTION_BINARY
+  MEDIFLOW_CHATGPT_EXECUTION_NATIVE_SOURCE
+  MEDIFLOW_CHATGPT_EXECUTION_SCHEMA_DIRECTORY
+  MEDIFLOW_CHATGPT_EXECUTION_C1_RECEIPT
+)
+EXECUTION_MAC_STAGE_COUNT=0
+for variable in "${EXECUTION_MAC_STAGE_VARS[@]}"; do [[ -n "${!variable:-}" ]] && ((EXECUTION_MAC_STAGE_COUNT+=1)); done
+if (( EXECUTION_MAC_STAGE_COUNT != 0 && EXECUTION_MAC_STAGE_COUNT != ${#EXECUTION_MAC_STAGE_VARS[@]} )); then
+  fail "ingressi staging asset ChatGPT execution Mac incompleti"
+fi
+if (( EXECUTION_MAC_STAGE_COUNT == ${#EXECUTION_MAC_STAGE_VARS[@]} )); then
+  "$NODE_BINARY" "$ROOT_DIR/scripts/run-strip-types.mjs" "$STAGE_EXECUTION_MAC_ASSETS" \
+    --installation-root "$APP/Contents/Resources/WebRuntime" \
+    --binary "$MEDIFLOW_CHATGPT_EXECUTION_BINARY" \
+    --native-source "$MEDIFLOW_CHATGPT_EXECUTION_NATIVE_SOURCE" \
+    --schema-directory "$MEDIFLOW_CHATGPT_EXECUTION_SCHEMA_DIRECTORY" \
+    --c1-receipt "$MEDIFLOW_CHATGPT_EXECUTION_C1_RECEIPT"
 fi
 
 REVISION="$(git -C "$ROOT_DIR" rev-parse --short=12 HEAD)"

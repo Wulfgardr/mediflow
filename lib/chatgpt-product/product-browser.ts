@@ -20,7 +20,7 @@ function sameLoginContext(previous: ProductSnapshot | null, next: ProductSnapsho
         && next.consentExpiresAt !== null && next.consentExpiresAt > Date.now()
         && next.loginExpiresAt !== null && next.loginExpiresAt > Date.now();
 }
-const states = ['held', 'needs_consent', 'consented', 'starting', 'awaiting_login', 'verifying', 'connected', 'ready', 'generating', 'completed', 'canceled', 'error'];
+const states = ['preparing', 'held', 'needs_consent', 'consented', 'starting', 'awaiting_login', 'verifying', 'connected', 'ready', 'generating', 'completed', 'canceled', 'error'];
 const object = (value: unknown): Record<string, unknown> => {
     if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('invalid_response');
     return value as Record<string, unknown>;
@@ -41,6 +41,9 @@ function parse(value: unknown, operation: ProductOperation): ProductResponse {
         || disclosure.clinicalWrites !== 0 || !uuid(disclosure.revision) || !sha(disclosure.inputSha256) || !text(disclosure.fixtureId, 128)
         || disclosure.maximumDurationMs !== 300000 || JSON.stringify(disclosure.egress) !== JSON.stringify(['auth.openai.com:443', 'chatgpt.com:443'])
         || !Array.isArray(disclosure.sources) || disclosure.sources.length < 1 || disclosure.sources.length > 32) throw new Error('invalid_response');
+    const preparation = object(row.preparation);
+    if (Object.keys(preparation).length !== 2 || !['not_prepared', 'preparing', 'ready', 'in_use', 'closing', 'closed', 'blocked'].includes(String(preparation.state))
+        || preparation.expiresAt !== null && (typeof preparation.expiresAt !== 'number' || !Number.isSafeInteger(preparation.expiresAt) || preparation.expiresAt <= 0)) throw new Error('invalid_response');
     const sources = disclosure.sources.map(value => object(value));
     if (sources.some(source => !text(source.id, 128) || !text(source.title, 256) || !text(source.text, 32000) || !sha(source.sha256))
         || new Set(sources.map(source => source.id)).size !== sources.length
@@ -117,7 +120,7 @@ export function createProductBrowser(fetcher: typeof fetch = fetch) {
     const listeners = new Set<() => void>();
     function publish(next: ProductBrowserView) {
         view = Object.freeze(next); clearTimeout(expiry); expiry = undefined;
-        const deadlines = [view.snapshot?.consentExpiresAt, view.snapshot?.loginExpiresAt]
+        const deadlines = [view.snapshot?.consentExpiresAt, view.snapshot?.loginExpiresAt, view.snapshot && ['preparing', 'ready', 'in_use'].includes(view.snapshot.preparation.state) ? view.snapshot.preparation.expiresAt : null]
             .filter((value): value is number => typeof value === 'number');
         if (view.active && deadlines.length) {
             const remaining = Math.min(...deadlines) - Date.now();
@@ -132,7 +135,7 @@ export function createProductBrowser(fetcher: typeof fetch = fetch) {
         for (const listener of listeners) listener();
     }
     function setActive(active: boolean) {
-        const mustCancel = !active && view.active && (!!view.snapshot?.consentExpiresAt || view.busy === 'login/start' || view.busy === 'generate');
+        const mustCancel = !active && view.active && (!!view.snapshot?.consentExpiresAt || view.busy === 'prepare' || !!view.snapshot && ['preparing', 'ready', 'in_use'].includes(view.snapshot.preparation.state) || view.busy === 'login/start' || view.busy === 'generate');
         generation++; pending?.abort(); pending = undefined; clearTimeout(expiry);
         publish({ ...initial, active });
         if (mustCancel) {
@@ -160,7 +163,7 @@ export function createProductBrowser(fetcher: typeof fetch = fetch) {
         }
         generation++; pending?.abort(); const epoch = generation;
         const controller = new AbortController(); pending = controller;
-        const clear = ['consent', 'login/start', 'login/complete', 'login/cancel', 'cancel', 'logout', 'read', 'models'].includes(operation);
+        const clear = ['prepare', 'consent', 'login/start', 'login/complete', 'login/cancel', 'cancel', 'logout', 'read', 'models'].includes(operation);
         const loginSnapshot = view.snapshot;
         const keepLogin = (operation === 'status' || operation === 'login/complete') && view.login !== null
             && loginSnapshot !== null && sameLoginContext(loginSnapshot, loginSnapshot);
@@ -169,7 +172,7 @@ export function createProductBrowser(fetcher: typeof fetch = fetch) {
             login: keepLogin ? view.login : null,
             ...(clear ? { selection: null, snapshot: view.snapshot ? { ...view.snapshot, result: null, catalog: null } : null } : {}) });
         if (epoch !== generation || controller.signal.aborted) return;
-        const deadline = setTimeout(() => controller.abort(), operation === 'generate' ? 120000 : operation === 'login/start' ? 120000 : 20000);
+        const deadline = setTimeout(() => controller.abort(), operation === 'generate' ? 120000 : ['prepare', 'login/start'].includes(operation) ? 120000 : 20000);
         try {
             const response = await fetcher(PRODUCT_NAMESPACE + operation, { method: operation === 'status' ? 'GET' : 'POST',
                 cache: 'no-store', credentials: 'same-origin', signal: controller.signal,
