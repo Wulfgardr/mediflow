@@ -50,3 +50,47 @@ test('synchronous retirement before resource registration disposes once, without
     assert.throws(() => registry.acquire(context.session as WebSessionProjection), expired);
     assert.equal(disposals, 1);
 });
+
+test('fresh authentic projections from repeated owner resolve retain the same service', async t => {
+    const owner = await import('../security/web-auth-lifecycle-owner-adapter.ts');
+    const context = issueSyntheticWebSessionContext({ id: 'projection-renewal', username: 'synthetic', role: 'doctor' }, 'projection-renewal');
+    let created = 0;
+    const registry = createProductSessionRegistry((session, isCurrent) => {
+        created++; return createProductService({ session, isCurrent, platform: createProductionExecutionPlatform() });
+    });
+    t.after(() => { registry.dispose(); retireSyntheticWebSession(context.session); });
+    const initial = registry.acquire(context.session as WebSessionProjection);
+    const first = await initial.respond('status', {}, value => Response.json(value));
+    const firstSnapshot = (await first.json()).snapshot;
+    for (let i = 0; i < 3; i++) {
+        const resolution = owner.resolve(context.session.id, context.controlId);
+        assert.equal(resolution.status, 'active'); if (resolution.status !== 'active') return;
+        assert.notEqual(resolution.projection, context.session);
+        const next = registry.acquire(resolution.projection);
+        const response = await next.respond('status', {}, value => Response.json(value));
+        assert.equal((await response.json()).snapshot.contextRevision, firstSnapshot.contextRevision);
+        assert.throws(() => registry.acquire({ ...resolution.projection }), expired);
+    }
+    assert.equal(created, 1);
+    retireSyntheticWebSession(context.session); assert.equal(initial.current(), false);
+});
+
+test('untrusted projections cannot run getters and separate authentications retain separate services', async t => {
+    const first = issueSyntheticWebSessionContext({ id: 'same-user', username: 'synthetic', role: 'doctor' }, 'identity-first');
+    const second = issueSyntheticWebSessionContext({ id: 'same-user', username: 'synthetic', role: 'doctor' }, 'identity-second');
+    let created = 0, inspected = 0;
+    const registry = createProductSessionRegistry((session, isCurrent) => {
+        created++; return createProductService({ session, isCurrent, platform: createProductionExecutionPlatform() });
+    });
+    t.after(() => { registry.dispose(); retireSyntheticWebSession(first.session); retireSyntheticWebSession(second.session); });
+    const one = registry.acquire(first.session as WebSessionProjection);
+    const two = registry.acquire(second.session as WebSessionProjection);
+    const proxy = new Proxy(first.session, { get() { inspected++; throw new Error('untrusted getter'); } });
+    assert.throws(() => registry.acquire(proxy as WebSessionProjection), expired);
+    const forged = Object.defineProperty({}, 'id', { get() { inspected++; throw new Error('untrusted getter'); } });
+    assert.throws(() => registry.acquire(forged as WebSessionProjection), expired);
+    assert.equal(inspected, 0); assert.equal(created, 2);
+    retireSyntheticWebSession(first.session);
+    assert.equal(one.current(), false); assert.equal(two.current(), true);
+    assert.equal((await two.respond('status', {}, value => Response.json(value))).status, 200);
+});

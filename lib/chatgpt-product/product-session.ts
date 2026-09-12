@@ -1,6 +1,7 @@
 /* @Codex */
 import 'server-only';
 import * as owner from '../security/web-auth-lifecycle-owner-adapter';
+import { acquireWebSessionResourceIdentity } from '../security/web-session-resource-identity';
 import { ProductError, type ProductOperation, type ProductRequest, type ProductResponse } from './product-contract';
 import type { ProductService } from './product-service';
 export type ProductSessionHandle = Readonly<{
@@ -9,15 +10,16 @@ export type ProductSessionHandle = Readonly<{
 }>;
 export function createProductSessionRegistry(create: (session: owner.WebSessionProjection, current: () => boolean) => ProductService) {
     type Entry = { session: owner.WebSessionProjection; port: owner.WebResourcePort; service: ProductService; abort: AbortController; dispose(): void };
-    const entries = new Map<string, Entry>();
+    const entries = new Map<owner.WebAuthenticationGeneration, Entry>();
     return Object.freeze({
         acquire(session: owner.WebSessionProjection): ProductSessionHandle {
-            let entry = entries.get(session.id);
-            if (entry && entry.session !== session) throw new ProductError('session_expired');
+            const identity = acquireWebSessionResourceIdentity(session);
+            if (!identity) throw new ProductError('session_expired');
+            const { port, generation } = identity;
+            let entry = entries.get(generation);
+            if (entry) owner.releaseResourcePort(port);
             if (!entry) {
-                if (entries.size >= 16) throw new ProductError('busy');
-                const port = owner.mintResourcePort(session);
-                if (!port) throw new ProductError('session_expired');
+                if (entries.size >= 16) { owner.releaseResourcePort(port); throw new ProductError('busy'); }
                 const abort = new AbortController();
                 let disposed = false;
                 const current = () => {
@@ -31,18 +33,19 @@ export function createProductSessionRegistry(create: (session: owner.WebSessionP
                 catch (error) { owner.releaseResourcePort(port); throw error; }
                 const dispose = () => {
                     if (disposed) return;
-                    disposed = true; clearTimeout(expiry); entries.delete(session.id);
+                    disposed = true; clearTimeout(expiry);
+                    if (entries.get(generation)?.port === port) entries.delete(generation);
                     // Owner retirement calls disposers synchronously. Do not call
                     // the owner again until outside its critical section.
-                    abort.abort(); service.dispose();
                     queueMicrotask(() => owner.releaseResourcePort(port));
+                    abort.abort(); service.dispose();
                 };
                 const expiry = setTimeout(dispose, Math.max(0, session.expiresAt - Date.now())); expiry.unref?.();
                 // Registration can reject/dispose synchronously: expiry is already initialized.
                 try {
                     if (!owner.registerPrivateResource(port, dispose) || disposed) throw new ProductError('session_expired');
                 } catch (error) { dispose(); throw error; }
-                entry = { session, port, service, abort, dispose }; entries.set(session.id, entry);
+                entry = { session, port, service, abort, dispose }; entries.set(generation, entry);
             }
             const value = entry;
             const current = () => {

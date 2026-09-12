@@ -14,6 +14,7 @@ const { presentAccount } = await import('./account-presentation.ts');
 const { createAccountService } = await import('./account-service.ts');
 const { createAccountSessionRegistry } = await import('./account-session.ts');
 const { createAccountHttp } = await import('./account-http.ts');
+const { AccountError } = await import('./account-protocol.ts');
 const { issueSyntheticWebSessionContext, retireSyntheticWebSession } = await import('../security/web-auth-lifecycle-owner-test-fixture.ts');
 const { resolve: resolveOwner } = await import('../security/web-auth-lifecycle-owner-adapter.ts');
 const tick = () => new Promise<void>(resolve => setImmediate(resolve));
@@ -40,12 +41,14 @@ class SyntheticAccount implements AccountTransport {
 }
 function setup(t: TestContext, suffix: string) {
     const context = issueSyntheticWebSessionContext({ id: `invented-${suffix}`, username: 'invented', role: 'doctor' }, suffix);
-    const resolution = resolveOwner(context.session.id, context.controlId);
-    assert.ok(resolution.status === 'active');
-    const projection = resolution.projection;
     const transport = new SyntheticAccount(); const responses: number[] = []; const operations: string[] = [];
     const registry = createAccountSessionRegistry(() => createAccountService({ configured: true, createTransport: async () => transport }));
-    const http = createAccountHttp({ acquire: async () => registry.acquire(projection) });
+    const http = createAccountHttp({ acquire: async () => {
+        // Production resolves a newly branded projection for every request.
+        const resolution = resolveOwner(context.session.id, context.controlId);
+        if (resolution.status !== 'active') throw new AccountError('session_expired');
+        return registry.acquire(resolution.projection);
+    } });
     const browser = createAccountBrowser(async (input, init) => {
         const path = String(input); assert.ok(path.startsWith('/api/settings/ai/chatgpt/'));
         const op = path.slice('/api/settings/ai/chatgpt/'.length) as AccountOperation | 'status'; operations.push(op);

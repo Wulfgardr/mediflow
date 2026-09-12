@@ -8,6 +8,7 @@ const { createProductSessionRegistry } = await import('./product-session.ts');
 const { createProductService } = await import('./product-service.ts');
 const { ProductError, PRODUCT_NAMESPACE, PRODUCT_OPERATION, PRODUCT_DATA_CLASS } = await import('./product-contract.ts');
 const { issueSyntheticWebSessionContext, retireSyntheticWebSession } = await import('../security/web-auth-lifecycle-owner-test-fixture.ts');
+const { resolve: resolveOwner } = await import('../security/web-auth-lifecycle-owner-adapter.ts');
 const { SyntheticProductTransport, deferred, tick } = await import('./product-production.test.ts');
 const { createProductBrowser } = await import('./product-browser.ts');
 let sequence = 0;
@@ -44,7 +45,10 @@ function fixture(t: TestContext) {
             projection = { ...projection, state: 'closed' };
         },
     };
-    const root = createChatGptProduct({ resolveSession: async () => context.session as WebSessionProjection, platform });
+    const root = createChatGptProduct({ resolveSession: async () => {
+        const resolution = resolveOwner(context.session.id, context.controlId);
+        return resolution.status === 'active' ? resolution.projection : null;
+    }, platform });
     async function call(operation: Parameters<typeof root.handle>[1], body: unknown = {}, signal?: AbortSignal) {
         return root.handle(new Request(`http://localhost:3987${PRODUCT_NAMESPACE}${operation}`, {
             method: operation === 'status' ? 'GET' : 'POST',
