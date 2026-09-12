@@ -214,8 +214,12 @@ export async function checkApiStatus(client: ICDReferenceDataClient = browserCli
     catch { return false; }
 }
 
-export function icdClientErrorMessage(error: unknown): string {
+export function icdClientErrorMessage(error: unknown, context: 'status' | 'search' = 'status'): string {
     if (!(error instanceof ICDClientError)) return 'Il servizio WHO ICD-11 non è disponibile.';
+    // @Codex: a rejected search does not establish that the local service is down.
+    if (context === 'search' && ['service_unavailable', 'upstream_response_invalid', 'response_invalid'].includes(error.code)) {
+        return 'Ricerca WHO non riuscita. Prova termini più specifici; se l’errore persiste, verifica il servizio locale.';
+    }
     switch (error.code) {
         case 'unauthorized': return 'Sessione non valida: accedi di nuovo per consultare ICD-11.';
         case 'request_invalid': return 'La ricerca ICD-11 non è valida.';
