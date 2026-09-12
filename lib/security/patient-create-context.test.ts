@@ -1,4 +1,4 @@
-/* @Codex: real unchanged 0.8.7 physical owner. No auth doubles. */
+/* @Codex: real 0.8.8 physical owner. No auth doubles. */
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
@@ -20,8 +20,8 @@ function issue(suffix: string, userId = 'synthetic-context-user'): Owner.WebSess
 }
 const target = { id: 'synthetic-A', name: 'Ambulatorio sintetico A' };
 
-test('physical package root is exact 0.8.7, not a shim', () => {
-    assert.equal(JSON.parse(readFileSync(join(dirname(ownerPath), 'package.json'), 'utf8')).version, '0.8.7');
+test('physical package root is exact 0.8.8, not a shim', () => {
+    assert.equal(JSON.parse(readFileSync(join(dirname(ownerPath), 'package.json'), 'utf8')).version, '0.8.8');
     assert.equal(createHash('sha256').update(readFileSync(ownerPath)).digest('hex'), '1abc52ee8abe9fd25b28046f1f00ecc2f09d699ba220c61e6222730c22ca44c5');
 });
 test('preview emits only inert bounded metadata; reusable only under the original generation', t => {

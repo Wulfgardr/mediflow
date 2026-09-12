@@ -60,7 +60,7 @@ class SyntheticTransport implements ExecutionTransport {
         assert.fail('Unexpected RPC ' + method);
     }
 }
-function fixture(t: TestContext, userId = 'synthetic-binding-user') {
+function fixture(t: TestContext, userId = 'synthetic-binding-user', boundaryCurrent = () => true) {
     const id = 'synthetic-binding-' + ++sequence;
     const context = issueSyntheticWebSessionContext({ id: userId, username: 'synthetic', role: 'doctor' }, id);
     const session = context.session as WebSessionProjection;
@@ -68,7 +68,7 @@ function fixture(t: TestContext, userId = 'synthetic-binding-user') {
     let qualified = true;
     let hostCloseCalls = 0;
     const host: QualifiedExecutionHost = {
-        transport, cwd: transport.cwd, boundaryQualified: () => qualified,
+        transport, cwd: transport.cwd, boundaryQualified: () => qualified && boundaryCurrent(),
         async close() { hostCloseCalls++; qualified = false; return transport.close(); },
         // Fake close is not physical cleanup evidence.
         cleanupComplete: () => false,
@@ -166,6 +166,32 @@ test('real owner-bound generation uses only the fixed corpus and returns proposa
     assert.deepEqual(JSON.parse(corpus), CHATGPT_SYNTHESIS_FIXTURE.sources);
     for (const source of result.sources) assert.equal(source.sha256, sha(source.text));
     assert.deepEqual(f.transport.calls.map(call => call.method), ['account/read', 'model/list', 'account/read', 'model/list', 'account/rateLimits/read', 'thread/start', 'turn/start']);
+});
+
+for (const action of ['seal', 'retire', 'cancel', 'signal'] as const) test(`real owner binding waits for native drain and handles ${action} before rendering`, async t => {
+    let draining = false; let rendered = 0;
+    const f = fixture(t, undefined, () => !draining);
+    const binding = f.bind(); const request = await select(binding);
+    const reached = deferred<void>(); const release = deferred<void>();
+    const controller = new AbortController();
+    f.transport.close = async () => {
+        f.transport.closed = true; draining = true; reached.resolve();
+        await release.promise; draining = false; return true;
+    };
+    const pending = binding.generate(request, result => { rendered++; return Response.json(result); }, controller.signal);
+    const rejected = action === 'seal' ? undefined : assert.rejects(pending,
+        (error: unknown) => error instanceof ExecutionError && ['revoked', 'canceled', 'session_expired', 'unqualified_boundary'].includes(error.code));
+    await reached.promise;
+    await new Promise(resolve => setTimeout(resolve, 120));
+    assert.equal(rendered, 0);
+    if (action === 'retire') retireSyntheticWebSession(f.context.session);
+    if (action === 'cancel') void binding.cancel();
+    if (action === 'signal') controller.abort();
+    release.resolve();
+    if (action === 'seal') {
+        const response = await pending; assert.equal(response.status, 200); assert.equal(rendered, 1);
+    } else { await rejected; assert.equal(rendered, 0); }
+    assert.equal(f.transport.calls.filter(call => call.method === 'turn/start').length, 1);
 });
 
 test('extra caller text cannot become synthetic corpus or reach the provider', async t => {

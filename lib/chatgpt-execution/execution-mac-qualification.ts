@@ -362,7 +362,7 @@ export async function prepareMacProductQualification(options: MacPreparationOpti
             async close() {
                 if (!intentionalDrain) { intentionalDrain = true; drainingAt = performance.now(); if (!revoked) phase = 'draining'; }
                 const success = await raw!.close();
-                if (!success || !cleaned || !treeCeased || expired()) { withdraw(); return false; }
+                if (!success || !cleaned || !treeCeased || expired() || performance.now() - drainingAt >= 500) { withdraw(); return false; }
                 if (!revoked) phase = 'sealed';
                 return !revoked;
             },
