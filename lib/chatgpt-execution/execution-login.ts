@@ -1,7 +1,8 @@
 /* @Codex — source candidate; gated by exact protocol/config/OS qualification. */
 import 'server-only';
 import { createHash } from 'node:crypto';
-import { ExecutionError, assertExecutionInitialization, executionInitializationParams, expectedExecutionEnvironment, executionConfigFromToml, type ExecutionTransport } from './execution-contract';
+import { ExecutionError, type ExecutionTransport } from './execution-contract';
+import { assertExecutionInitialization, executionInitializationParams, expectedExecutionEnvironment, executionConfigFromToml } from './execution-bootstrap';
 import { takeMacLoginTransport } from './execution-mac-qualification';
 import { EXECUTION_CONFIG, EXECUTION_SUBSTRATE } from './execution-sandbox';
 import { MAC_CONFIG_SOURCE } from './execution-mac-config';
@@ -37,7 +38,7 @@ export const EXECUTION_PROTOCOL_PROVENANCE = Object.freeze({
 
 // Compatibility exports for existing consumers. Shared helpers are pure and
 // below both login and the private issuer in the dependency graph.
-export { executionInitializationParams, expectedExecutionEnvironment } from './execution-contract';
+export { executionInitializationParams, expectedExecutionEnvironment } from './execution-bootstrap';
 export function assertInitialized(raw: unknown, executionCwd: string): void {
     assertExecutionInitialization(raw, executionCwd, EXECUTION_SUBSTRATE);
 }
