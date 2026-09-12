@@ -41,11 +41,35 @@ export function createProductService(options: {
     let controller = new AbortController();
     let busy = false;
     let pendingCreation = 0;
+    let attemptDeadline = 0, attemptExpiresAt = 0;
+    let disclosureBound = false;
     let draining = 0;
     let expiry: ReturnType<typeof setTimeout> | undefined;
     let watcher: ReturnType<typeof setInterval> | undefined;
     let unsubscribe = () => {};
     const publications = new WeakMap<ProductResponse, number>();
+    const preparedPublications = new WeakSet<ProductResponse>();
+    if (!platform.prepare && qualification.state === 'qualified') {
+        consent.bind(context, qualification.revision, session.expiresAt - Date.now()); disclosureBound = true;
+    }
+    const attemptRemaining = () => Math.max(0, Math.min(attemptDeadline - performance.now(), attemptExpiresAt - Date.now(), session.expiresAt - Date.now()));
+    function prepareGuard(expectedEpoch?: number) {
+        current();
+        if (controller.signal.aborted || expectedEpoch !== undefined && epoch !== expectedEpoch) throw new ProductError('revoked');
+        if (attemptRemaining() <= 0) throw new ProductError('consent_stale');
+    }
+    async function closePlatform(ownedContext: string) {
+        if (!platform.close || platform.preparation?.().state === 'not_prepared') return;
+        draining++;
+        updateReceipt({ egressWithdrawalRequested: true, cleanup: 'unconfirmed' }, ownedContext);
+        try {
+            await platform.close();
+            const closed = platform.preparation?.().state === 'closed';
+            updateReceipt({ cleanup: closed ? 'confirmed' : 'unconfirmed',
+                ...(closed ? { leaderExit: 'confirmed', ownedGroupCessation: 'confirmed' } as const : {}) }, ownedContext);
+        } catch { updateReceipt({ cleanup: 'unconfirmed' }, ownedContext); }
+        finally { draining--; }
+    }
     function localQualified() {
         const current = platform.snapshot();
         return current.state === 'qualified' && current.revision === qualification.revision && current.platform === qualification.platform;
@@ -90,7 +114,7 @@ export function createProductService(options: {
         // Abort active generation while the owner is still current. The binding
         // independently decides whether an interrupt RPC remains authorized.
         controller.abort();
-        consent.reset(); login?.dispose(); login = undefined;
+        consent.reset(); disclosureBound = false; login?.dispose(); login = undefined;
         unsubscribe(); unsubscribe = () => {};
         const oldBinding = binding; binding = undefined;
         const owned = host; host = undefined;
@@ -100,12 +124,17 @@ export function createProductService(options: {
             if (started) return; started = true;
             if (oldBinding) { void oldBinding.cancel().catch(() => {}); oldBinding.dispose(); }
             if (owned) void closeOwned(owned, ownedContext);
+            if (platform.close) void closePlatform(ownedContext);
         };
         if (!deferCleanup) cleanup();
         return cleanup;
     }
     function enforceLocalState() {
         current();
+        if (platform.prepare && !controller.signal.aborted && attemptDeadline) {
+            try { prepareGuard(); if (state !== 'preparing' && !localQualified()) throw new ProductError('unqualified_boundary'); }
+            catch (error) { withdraw(errorCode(error)); }
+        }
         if (!consent.expiresAt()) return;
         try { guard(); }
         catch (error) { withdraw(errorCode(error)); }
@@ -113,7 +142,13 @@ export function createProductService(options: {
     function snapshot(): ProductResponse {
         enforceLocalState();
         if (host) observe(host);
+        // Legacy server-only adapters still bind their disclosure before grant.
+        if (!platform.prepare && !disclosureBound && !pendingCreation && !draining && !host && receipt.cleanup !== 'unconfirmed') {
+            qualification = platform.snapshot();
+            if (qualification.state === 'qualified') { consent.bind(context, qualification.revision, session.expiresAt - Date.now()); disclosureBound = true; }
+        }
         const value: ProductSnapshot = Object.freeze({ schema: 'mediflow.chatgpt-product.v1', state, notice,
+            preparation: platform.preparation?.() ?? Object.freeze({ state: 'not_prepared', expiresAt: null }),
             contextRevision: context, qualification: platform.snapshot(), disclosure: consent.disclosure(),
             authenticatedProcess: plan ? 'dedicated_execution' : 'none', accountControlAdmitsExecution: false, plan,
             consentExpiresAt: consent.expiresAt(), loginExpiresAt: ['starting', 'awaiting_login', 'verifying'].includes(state) ? consent.expiresAt() : null,
@@ -210,20 +245,73 @@ export function createProductService(options: {
         if (receipt.remoteLogout === 'unconfirmed') notice = 'logout_unconfirmed';
         current(); return snapshot();
     }
+    async function prepare(signal?: AbortSignal): Promise<ProductResponse> {
+        if (!platform.prepare || !['held', 'canceled', 'error'].includes(state) || host || receipt.cleanup === 'unconfirmed') throw new ProductError('invalid_state');
+        context = randomUUID(); controller = new AbortController(); receipt = emptyReceipt();
+        consent.reset(); disclosureBound = false;
+        const expectedEpoch = ++epoch, local = controller;
+        const preparationDeadline = performance.now() + 120_000, preparationExpiresAt = Date.now() + 120_000;
+        attemptDeadline = performance.now() + 300_000;
+        attemptExpiresAt = Math.min(Date.now() + 300_000, session.expiresAt);
+        state = 'preparing'; notice = null; busy = true;
+        const abort = () => { if (epoch === expectedEpoch) withdraw('canceled', 'canceled'); };
+        signal?.addEventListener('abort', abort, { once: true });
+        let reject!: (error: ProductError) => void;
+        const interrupted = new Promise<never>((_, failure) => { reject = failure; });
+        void interrupted.catch(() => {});
+        const stopWaiting = () => reject(new ProductError(notice ?? 'revoked'));
+        local.signal.addEventListener('abort', stopWaiting, { once: true });
+        const timeout = setTimeout(() => { if (epoch === expectedEpoch) withdraw('timeout'); }, 120_000);
+        expiry = setTimeout(() => withdraw('consent_stale'), attemptRemaining()); expiry.unref?.();
+        watcher = setInterval(() => {
+            if (disposed || local.signal.aborted) return;
+            try { prepareGuard(); if (state !== 'preparing' && !localQualified()) throw new ProductError('unqualified_boundary'); }
+            catch (error) { withdraw(errorCode(error)); }
+        }, 50); watcher.unref?.();
+        try {
+            if (signal?.aborted) abort();
+            prepareGuard(expectedEpoch);
+            // The original promise stays observed after timeout/cancel. The
+            // platform owns and drains a late handle; no continuation can publish.
+            const work = (async () => {
+                await platform.prepare!(local.signal, attemptRemaining());
+                prepareGuard(expectedEpoch);
+                // A blocked event loop can delay the timeout callback. Completion
+                // itself must check both clocks before granting a ready state.
+                if (performance.now() >= preparationDeadline || Date.now() >= preparationExpiresAt) throw new ProductError('timeout');
+                qualification = platform.snapshot();
+                if (qualification.state !== 'qualified') throw new ProductError('unqualified_boundary');
+                consent.bind(context, qualification.revision, attemptRemaining()); disclosureBound = true;
+                state = 'needs_consent';
+                const response = snapshot(); preparedPublications.add(response); return response;
+            })();
+            return await Promise.race([work, interrupted]);
+        } catch (error) {
+            if (epoch === expectedEpoch) withdraw(errorCode(error));
+            throw error;
+        } finally {
+            clearTimeout(timeout); signal?.removeEventListener('abort', abort);
+            local.signal.removeEventListener('abort', stopWaiting);
+            if (epoch === expectedEpoch) busy = false;
+        }
+    }
     async function execute(operation: ProductOperation, raw: ProductRequest, signal?: AbortSignal): Promise<ProductResponse> {
         current();
         const request = parseProductRequest(operation, raw);
         if (operation === 'status') return snapshot();
         if (operation === 'cancel' || operation === 'login/cancel' || operation === 'logout') return stop(operation);
         if (busy || pendingCreation || draining) throw new ProductError('busy');
+        if (operation === 'prepare') return prepare(signal);
         if (operation === 'consent') {
             if (!['held', 'needs_consent', 'canceled', 'error'].includes(state) || host || receipt.cleanup === 'unconfirmed') throw new ProductError('invalid_state');
             qualification = platform.snapshot();
             if (qualification.state !== 'qualified') throw new ProductError('unqualified_boundary');
             // Do not rotate the disclosure until its exact revision was checked.
-            context = randomUUID(); controller = new AbortController(); receipt = emptyReceipt();
+            if (platform.prepare) { prepareGuard(); if (state !== 'needs_consent') throw new ProductError('invalid_state'); }
+            else { controller = new AbortController(); receipt = emptyReceipt(); }
             consent.grant(request as ConsentRequest, context, qualification.revision);
             epoch++; state = 'consented'; notice = null;
+            clearTimeout(expiry); clearInterval(watcher);
             expiry = setTimeout(() => withdraw('consent_stale'), consent.remainingMs()); expiry.unref?.();
             watcher = setInterval(() => {
                 if (disposed || controller.signal.aborted) return;
@@ -302,12 +390,18 @@ export function createProductService(options: {
         }
     }
     return Object.freeze({ execute, snapshot,
+        /** Negative-only publication rollback, invoked outside the owner binding. */
+        abandon(response: ProductResponse) {
+            if (preparedPublications.has(response) && publications.get(response) === epoch
+                && response.snapshot.contextRevision === context) withdraw('revoked');
+        },
         // This runs *inside* withCurrentResourceBinding; never call owner here.
         isCurrent(response: ProductResponse) {
             return !disposed && Date.now() < session.expiresAt && publications.get(response) === epoch
                 && response.snapshot.contextRevision === context
                 && response.snapshot.qualification.revision === platform.snapshot().revision
                 && response.snapshot.qualification.state === platform.snapshot().state
+                && (!platform.prepare || controller.signal.aborted || !attemptDeadline || attemptRemaining() > 0)
                 && (consent.expiresAt() === null || consent.remainingMs() > 0);
         },
         dispose() { if (!disposed) { disposed = true; withdraw('session_expired'); } },

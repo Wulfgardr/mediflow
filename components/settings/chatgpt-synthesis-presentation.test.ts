@@ -86,7 +86,7 @@ test('technical disclosures default closed; visible state, errors and blockers p
     for (const visible of ['data-testid="synthesis-state"', '{view.error}', 'presentSynthesisNotice(snapshot.notice)', 'qualificationCopy[snapshot.qualification.state]', 'La pulizia della prova precedente non è confermata', 'Lo scollegamento remoto non è confermato']) {
         assert.ok(panel.indexOf(visible) > 0 && panel.indexOf(visible) < firstDisclosure, visible);
     }
-    assert.ok(panel.indexOf('Fonti demo da inviare') < panel.indexOf('Autorizzo preparazione'));
+    assert.ok(panel.indexOf('Fonti demo da inviare') < panel.indexOf('Autorizzo accesso dedicato'));
     const resultStart = panel.indexOf('data-testid="synthesis-result"');
     const result = panel.slice(resultStart, panel.indexOf('</article> : null}', resultStart));
     assert.match(result, /Modello utilizzato/);

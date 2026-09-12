@@ -6,11 +6,15 @@ import { ExecutionError } from './execution-contract';
 import { EXECUTION_SUBSTRATE } from './execution-sandbox';
 import { LINUX_EXECUTION_QUALIFICATION } from './execution-linux';
 import { WINDOWS_EXECUTION_QUALIFICATION } from './execution-windows';
-import type { QualificationSnapshot } from '../chatgpt-product/product-contract';
+import type { QualificationSnapshot, ProductPreparation } from '../chatgpt-product/product-contract';
 
 /** Host dependency, not a public registration/enable route. Fake only in tests. */
 export type ProductExecutionPlatform = Readonly<{
     snapshot(): QualificationSnapshot;
+    /** Optional only for legacy server-side test adapters; production Mac always prepares. */
+    prepare?(signal: AbortSignal, lifetimeMs: number): Promise<void>;
+    preparation?(): ProductPreparation;
+    close?(): Promise<void>;
     create(signal: AbortSignal): Promise<QualifiedExecutionHost>;
 }>;
 /** Read-only source disposition. Pin declarations alone never grant admission. */
@@ -30,7 +34,8 @@ export function executionPlatformSnapshot(platform: string = process.platform): 
  * Production intentionally has NO env flag, caller callback or synthetic success
  * escape. Parent must supply reviewed, version-specific qualification evidence
  * and an actual substrate adapter before replacing this held implementation.
- * The concrete candidate issuer exists, but this production root is still held.
+ * Passive held adapter for unsupported production platforms and server tests.
+ * The Mac production root instead uses the explicit per-session prepare path.
  */
 export function createProductionExecutionPlatform(): ProductExecutionPlatform {
     const snapshot = executionPlatformSnapshot();

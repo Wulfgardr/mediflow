@@ -203,6 +203,49 @@ non rappresenta consenso o accettazione dell'utente e non abilita provider turn.
 `omittedToolBinding` resta indiretto e `fullSourceBuildBinding` resta
 `unqualified`. L'esito live end-to-end rimane da verificare dal parent.
 
+## Decisione per il collegamento applicativo Mac
+
+Il collegamento candidato usa un `POST prepare` autenticato prima del
+consenso. Import, avvio del backend e GET restano passivi. La preparazione
+locale mantiene il processo account-free con egress provider chiuso; non
+preleva l'host e non consuma l'osservazione di initialize.
+
+Il tentativo appartiene alla vera sessione Web, con prenotazione prima del
+primo await e una sola preparazione/esecuzione Mac viva per backend. Le
+sessioni non condividono autorita. Abort, retirement e scadenza ritirano il
+tentativo; un handle restituito in ritardo resta posseduto e viene chiuso.
+Un errore di pubblicazione ritira soltanto la risposta del tentativo relativo,
+fuori dalla sezione critica dell'owner. Nessuna ricostruzione da JSON o IPC.
+
+La disclosure viene associata privatamente al contesto e alla qualifica del
+tentativo preparato. Il consenso verifica questa associazione senza sostituire
+il controller o rinnovare la qualifica. La scadenza effettiva e il minimo fra
+sessione, vita residua del tentativo e limite del consenso. Soltanto
+`login/start` puo trasferire una volta lo stesso host e attivare l'egress.
+
+La chiusura comprende preparazioni pendenti, pronte e host trasferiti.
+Un cleanup non confermato blocca il riavvio anche dopo la rimozione della
+sessione. La chiusura intenzionale conserva soltanto il sigillo necessario
+alla pubblicazione finale; non abilita un secondo turno. Un nuovo ciclo
+richiede preparazione e consenso espliciti. Il riavvio del backend non prova
+retroattivamente la cessazione delle risorse precedenti. Una prenotazione
+persistente nel data-dir impedisce di aggirare un cleanup non confermato
+creando una nuova sessione o un nuovo backend; non viene rimossa in base
+al solo PID o all'assenza di un processo. La riconciliazione di un arresto
+anomalo resta un'operazione esplicita, non un ripristino automatico.
+
+Gli asset pubblici necessari sono risolti nell'installazione del backend,
+senza ricerca in HOME o nelle credenziali dello sviluppatore. Il loro
+ritrovamento non emette qualifica: pin, toolchain, protocollo e custodia sono
+verificati nuovamente dall'issuer concreto. La distribuzione deve preservare
+la stessa autorita fra le route del backend effettivo.
+
+Questa decisione non attesta il collaudo della candidata installata. L'accettazione del
+collegamento richiede ingress/passivita, ownership, pubblicazione, consenso e
+trasferimento, account/catalogo, generazione, stop/rinnovo e distribuzione
+verificati. La prova sintetica non sostituisce le esperienze ordinarie di
+WUL-689 e non ammette dati clinici reali.
+
 ## Fonti
 
 - [ConfigToml del tag verificato](https://github.com/openai/codex/blob/3d2ee51ca2d5db578f328aa75e20aa22c0197c9a/codex-rs/config/src/config_toml.rs),

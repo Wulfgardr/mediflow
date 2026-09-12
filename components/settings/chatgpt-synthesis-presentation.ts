@@ -3,6 +3,7 @@ import type { ProductCode, ProductOperation, ProductSnapshot, ProductState, Qual
 
 type StatusCopy = Readonly<{ title: string; next: string }>;
 const stateCopy: Record<ProductState, StatusCopy> = {
+    preparing: { title: 'Preparazione della postazione', next: 'Verifiche locali in corso. Puoi annullare; nessun accesso OpenAI è avviato.' },
     held: { title: 'Prova sospesa', next: 'Controlla la configurazione della postazione prima di riprovare.' },
     needs_consent: { title: 'In attesa del tuo consenso', next: 'Leggi le fonti demo, poi autorizza la prova.' },
     consented: { title: 'Consenso acquisito', next: 'Avvia l’accesso dedicato a questa prova.' },
@@ -17,6 +18,7 @@ const stateCopy: Record<ProductState, StatusCopy> = {
     error: { title: 'Prova interrotta', next: 'Leggi il messaggio qui sotto, poi rileggi lo stato prima di riprovare.' },
 };
 const busyCopy: Record<Exclude<ProductOperation, 'status'>, string> = {
+    prepare: 'Preparazione della postazione…',
     consent: 'Acquisizione del consenso…',
     'login/start': 'Avvio dell’accesso…',
     'login/complete': 'Verifica dell’accesso…',

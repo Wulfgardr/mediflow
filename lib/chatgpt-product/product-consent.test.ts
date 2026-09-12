@@ -7,12 +7,13 @@ const denied = (code: string) => (error: unknown) => error instanceof ProductErr
 function setup() {
     let now = 50, wall = 1000000, current = true;
     const consent = createProductConsent(Object.freeze({ synthetic: true }), () => current, () => now, () => wall);
+    consent.bind('c', 'q');
     const request = () => ({ operation: 'synthetic_synthesis', dataClass: 'synthetic_fixture', expectedDisclosureRevision: consent.disclosure().revision } as const);
     return { consent, request, advance: (ms: number) => { now += ms; }, wall: (ms: number) => { wall += ms; }, revoke: () => { current = false; } };
 }
 test('host corpus/grant is fixed; old checkbox, different context and different qualification deny', () => {
     const f = setup(); assert.throws(() => f.consent.assert('context', 'qualification'), denied('consent_required'));
-    const old = f.request(); f.consent.reset(); assert.throws(() => f.consent.grant(old, 'context', 'qualification'), denied('consent_stale'));
+    f.consent.bind('context', 'qualification'); const old = f.request(); f.consent.bind('context', 'qualification'); assert.throws(() => f.consent.grant(old, 'context', 'qualification'), denied('consent_stale'));
     f.consent.grant(f.request(), 'context', 'qualification'); f.consent.assert('context', 'qualification');
     assert.throws(() => f.consent.assert('other', 'qualification'), denied('consent_stale'));
     assert.throws(() => f.consent.assert('context', 'other'), denied('consent_stale'));
@@ -28,4 +29,19 @@ test('forward wall expiry and owner retirement independently revoke', () => {
     const f = setup(); f.consent.grant(f.request(), 'c', 'q'); f.wall(300000);
     assert.throws(() => f.consent.assert('c', 'q'), denied('consent_stale'));
     f.revoke(); assert.throws(() => f.consent.assert('c', 'q'), denied('session_expired'));
+});
+
+test('a disclosure cannot acquire a different preparation at grant time', () => {
+    const f = setup(); const old = f.request();
+    assert.throws(() => f.consent.grant(old, 'new-context', 'q'), denied('consent_stale'));
+    assert.throws(() => f.consent.grant(old, 'c', 'new-qualification'), denied('consent_stale'));
+    f.consent.bind('new-context', 'new-qualification', 1000);
+    assert.throws(() => f.consent.grant(old, 'new-context', 'new-qualification'), denied('consent_stale'));
+    f.consent.reset();
+    assert.throws(() => f.consent.grant(f.request(), 'c', 'q'), denied('consent_stale'));
+});
+test('time spent before consent reduces the grant instead of restarting its life', () => {
+    const f = setup(); f.consent.bind('c', 'q', 1000); f.advance(700); f.wall(700);
+    f.consent.grant(f.request(), 'c', 'q'); assert.equal(f.consent.remainingMs(), 300);
+    f.advance(300); assert.throws(() => f.consent.assert('c', 'q'), denied('consent_stale'));
 });

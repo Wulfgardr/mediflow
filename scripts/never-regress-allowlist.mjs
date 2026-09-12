@@ -256,6 +256,12 @@ export const NEVER_REGRESS_ALLOWLIST = {
             pattern: "username:\\s*'synthetic'",
             reason: 'ChatGPT product production tests use a synthetic Web owner identity with a local transport fixture.',
         },
+        /* @Codex — exact synthetic test identity, no runtime exemption. */
+        {
+            path: 'lib/chatgpt-product/product-preparation.test.ts',
+            pattern: "username:\\s*'synthetic'",
+            reason: 'Preparation lifecycle tests use only the synthetic Web owner fixture; no live credential or runtime default.',
+        },
         {
             path: 'lib/chatgpt-product/product-session.test.ts',
             pattern: "username:\\s*'synthetic'",
