@@ -268,6 +268,13 @@ export const NEVER_REGRESS_ALLOWLIST = {
         },
     ],
     externalUrls: [
+        /* @Codex — exact inert login responses; no runtime or directory-wide exemption. */
+        ...['lib/chatgpt-execution/fixtures/login-peer.ts',
+            'lib/chatgpt-execution/fixtures/mac-login-harness.mjs'].map(path => ({
+            path,
+            pattern: '^(?!.*https?://.*https?://).*https://auth\\.openai\\.com/fixture(?=["\\x27`]).*$',
+            reason: 'Synthetic login peers return this exact URL as inert RPC data; they never open or fetch it.',
+        })),
         {
             path: 'lib/chatgpt-execution/execution-mac-config.ts',
             pattern: "^\\ \\ \\ \\ \\ \\ \\ \\ chatgpt_base_url:\\ 'https://chatgpt\\.com/backend\\-api/',\\ file_opener:\\ 'vscode',$",

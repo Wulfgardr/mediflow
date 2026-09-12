@@ -1,8 +1,8 @@
 /* @Codex — source candidate; gated by exact protocol/config/OS qualification. */
 import 'server-only';
 import { createHash } from 'node:crypto';
-import { dirname, isAbsolute, join, normalize } from 'node:path';
-import { ExecutionError, type ExecutionTransport } from './execution-contract';
+import { ExecutionError, assertExecutionInitialization, executionInitializationParams, expectedExecutionEnvironment, executionConfigFromToml, type ExecutionTransport } from './execution-contract';
+import { takeMacLoginTransport } from './execution-mac-qualification';
 import { EXECUTION_CONFIG, EXECUTION_SUBSTRATE } from './execution-sandbox';
 import { MAC_CONFIG_SOURCE } from './execution-mac-config';
 import { ProductError, type ProductLoginChallenge, type ProductLimits } from '../chatgpt-product/product-contract';
@@ -35,54 +35,14 @@ export const EXECUTION_PROTOCOL_PROVENANCE = Object.freeze({
 }),
 } as const);
 
-/* @Codex: current binary expectation, separate from the historical C1 receipt.
- * This declaration grants no authority. The Mac issuer verifies the actual
- * binary, version and all 24 freshly generated schema digests before initialize;
- * exact readback and privately owned, current custody are still required.
- */
-const CURRENT_PROTOCOL_RUNTIME = Object.freeze({
-    binaryVersion: '0.153.4',
-    binarySha256: 'b973d440acac501fd2594a43e7ca9ce41e0a65b9dfb28d0d7a7837c99e1261e3',
-} as const);
-
-/** Shared request shape, not an observation. */
-export function executionInitializationParams() {
-    return { clientInfo: { name: 'mediflow_synthetic_product', title: 'MediFlow synthetic synthesis', version: '0.8.6' }, capabilities: { experimentalApi: true } };
-}
-
-/** Existing, pinned execution-host layout; no filesystem discovery or env read. */
-export function expectedExecutionEnvironment(executionCwd: string) {
-    if (!text(executionCwd, 4096) || !isAbsolute(executionCwd) || normalize(executionCwd) !== executionCwd
-        || join(dirname(executionCwd), 'work') !== executionCwd) throw new ExecutionError('unqualified_boundary');
-    const platformOs = process.platform === 'darwin' ? 'macos' : process.platform === 'win32' ? 'windows' : process.platform === 'linux' ? 'linux' : null;
-    if (!platformOs) throw new ExecutionError('unqualified_boundary');
-    return Object.freeze({ codexHome: join(dirname(executionCwd), 'codex'), platformOs, platformFamily: process.platform === 'win32' ? 'windows' : 'unix' });
-}
+// Compatibility exports for existing consumers. Shared helpers are pure and
+// below both login and the private issuer in the dependency graph.
+export { executionInitializationParams, expectedExecutionEnvironment } from './execution-contract';
 export function assertInitialized(raw: unknown, executionCwd: string): void {
-    const response = object(raw), expected = expectedExecutionEnvironment(executionCwd);
-    if (EXECUTION_SUBSTRATE.codexVersion !== CURRENT_PROTOCOL_RUNTIME.binaryVersion
-        || EXECUTION_SUBSTRATE.codexSha256 !== CURRENT_PROTOCOL_RUNTIME.binarySha256
-        || Object.keys(response).some(key => !['userAgent', 'codexHome', 'platformOs', 'platformFamily'].includes(key))
-        || !text(response.userAgent, 1024)
-        || !response.userAgent.split(/[^0-9A-Za-z.-]+/u).includes(CURRENT_PROTOCOL_RUNTIME.binaryVersion)
-        || response.codexHome !== expected.codexHome || response.platformOs !== expected.platformOs
-        || response.platformFamily !== expected.platformFamily) throw new ExecutionError('unqualified_boundary');
+    assertExecutionInitialization(raw, executionCwd, EXECUTION_SUBSTRATE);
 }
-
-/** All fixed config expectations derive from the attached TOML, not invented keys. */
 export function expectedExecutionConfig(): Readonly<Record<string, unknown>> {
-    const root: Record<string, unknown> = {}; let section = root;
-    for (const line of EXECUTION_CONFIG.split('\n').map(line => line.trim()).filter(Boolean)) {
-        if (line.startsWith('[')) {
-            section = root;
-            for (const part of line.slice(1, -1).split('.')) section = (section[part] ??= {}) as Record<string, unknown>;
-        } else {
-            const index = line.indexOf(' = ');
-            if (index < 1) throw new ExecutionError('unqualified_boundary');
-            section[line.slice(0, index)] = JSON.parse(line.slice(index + 3));
-        }
-    }
-    return root;
+    return executionConfigFromToml(EXECUTION_CONFIG);
 }
 /**
  * Requires every restrictive setting to be observable; absence is NOT a default.
@@ -139,13 +99,14 @@ export function readExecutionLimits(raw: unknown): ProductLimits {
 
 export function createExecutionLogin(transport: ExecutionTransport, guard: () => void, changed: (state: 'verifying') => void, fail: (error: ProductError | ExecutionError) => void, executionCwd: string) {
     let loginId: string | undefined;
+    let activeTransport = transport, macPrepared = false;
     let starting = false, acceptingEarlyCompletion = false, matched = false, retired = false;
     let early: Record<string, unknown> | undefined;
     let fingerprint: string | undefined;
     let plan: 'plus' | 'pro' | undefined;
     const check = () => { guard(); if (retired) throw new ProductError('revoked'); };
     async function rpc(method: Parameters<ExecutionTransport['request']>[0], params?: unknown) {
-        check(); const response = await transport.request(method, params); check(); return response;
+        check(); const response = await activeTransport.request(method, params); check(); return response;
     }
     function completion(raw: unknown) {
         const notice = object(raw);
@@ -158,7 +119,7 @@ export function createExecutionLogin(transport: ExecutionTransport, guard: () =>
         if (!notice.success || notice.error != null) throw new ProductError('login_failed');
         matched = true; changed('verifying');
     }
-    const unsubscribe = transport.subscribe((method, raw) => {
+    const subscribe = (source: ExecutionTransport) => source.subscribe((method, raw) => {
         if (retired || method !== 'account/login/completed') return;
         try { check(); completion(raw); } catch (error) {
             // A malformed/foreign/duplicate completion invalidates this login even
@@ -167,6 +128,17 @@ export function createExecutionLogin(transport: ExecutionTransport, guard: () =>
             fail(error instanceof ProductError || error instanceof ExecutionError ? error : new ExecutionError('protocol_error'));
         }
     }, code => { if (!retired) { retired = true; matched = false; early = undefined; fail(new ExecutionError(code)); } });
+    let unsubscribe = subscribe(transport);
+    async function config(): Promise<void> {
+        if (macPrepared) {
+            // Only the private issuer can select this concrete transport. Its
+            // request path performs the current layered readback itself, with
+            // live file/process fences, and returns the unmodified response.
+            await rpc('config/read', { includeLayers: true, cwd: executionCwd });
+        } else {
+            assertExecutionConfig(await rpc('config/read', { includeLayers: false }));
+        }
+    }
     async function account(requireEmpty: boolean) {
         const response = object(await rpc('account/read', { refreshToken: false }));
         if (typeof response.requiresOpenaiAuth !== 'boolean') throw new ExecutionError('protocol_error');
@@ -193,8 +165,18 @@ export function createExecutionLogin(transport: ExecutionTransport, guard: () =>
             const prepared = transport.takeInitializationObservation;
             const initialized = prepared ? prepared() : await rpc('initialize', executionInitializationParams());
             assertInitialized(initialized, executionCwd);
-            check(); if (!prepared) transport.initialized(); check();
-            assertExecutionConfig(await rpc('config/read', { includeLayers: false }));
+            check();
+            const concrete = prepared ? takeMacLoginTransport(initialized, executionCwd) : null;
+            if (concrete) {
+                // The product's wrapper is only a carrier for the authentic
+                // one-use observation, not an authority or an RPC substitute.
+                // Use the very transport privately bound to that observation,
+                // including notifications; no second process or initialize.
+                unsubscribe(); activeTransport = concrete; macPrepared = true;
+                unsubscribe = subscribe(concrete);
+            }
+            check(); if (!prepared) activeTransport.initialized(); check();
+            await config();
             await account(true);
             let response: Record<string, unknown>;
             acceptingEarlyCompletion = true;
@@ -212,7 +194,7 @@ export function createExecutionLogin(transport: ExecutionTransport, guard: () =>
         },
         async complete(): Promise<'plus' | 'pro'> {
             check(); if (!matched) throw new ProductError('login_pending');
-            assertExecutionConfig(await rpc('config/read', { includeLayers: false }));
+            await config();
             await account(false); check(); return plan!;
         },
         async read(): Promise<'plus' | 'pro'> {

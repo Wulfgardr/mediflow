@@ -5,11 +5,10 @@ import { randomBytes } from 'node:crypto';
 import { chmodSync, closeSync, constants, copyFileSync, fchmodSync, fstatSync, lstatSync, mkdirSync, mkdtempSync, openSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:net';
 import { join } from 'node:path';
-import { ExecutionError, type ExecutionTransport, type ExecutionMethod, type ExecutionCode } from './execution-contract';
+import { ExecutionError, assertExecutionInitialization, executionInitializationParams, executionConfigFromToml, type ExecutionTransport, type ExecutionMethod, type ExecutionCode } from './execution-contract';
 import type { QualifiedExecutionHost } from './execution-host';
 import { createOpenAIConnectProxy } from './execution-egress-proxy';
 import { createStdioExecutionTransport } from './execution-transport';
-import { assertInitialized, executionInitializationParams, expectedExecutionConfig } from './execution-login';
 import { EXECUTION_CONFIG, EXECUTION_SUBSTRATE, executionPublicCaBundle, executionSandboxProfile, verifyExecutionSubstrate } from './execution-sandbox';
 import { MAC_CONFIG_SOURCE, MAC_CONTEXT_SHA256, MAC_POLICY_REVISION, MAC_READBACK_SOURCE, assertMacConfigReadback, macDigest, verifyMacSourceSet } from './execution-mac-config';
 import { buildMacCustodian, launchMacCustodian, MacNativeBuildError, type MacNativeOwner } from './execution-mac-native';
@@ -35,6 +34,19 @@ export class MacQualificationFailure extends ExecutionError {
 type Evidence = Readonly<{ revision: string; isCurrent(): boolean }>;
 type Entry = Readonly<{ binaryPath: string; current(): Evidence | null; take(signal: AbortSignal): Promise<QualifiedExecutionHost> }>;
 const authorities = new WeakMap<object, Entry>();
+// Only this concrete issuer writes the association, after its current C2 run.
+// Never delete consumed entries: a stale/replayed authentic object must throw,
+// not silently downgrade to the legacy/synthetic login path.
+const loginTransports = new WeakMap<object, Readonly<{ take(cwd: string): ExecutionTransport }>>();
+/** Claim the same prepared transport through its authentic initialization
+ * object. Wrappers may forward that object, but cannot register a callback,
+ * cloned receipt, platform flag or replacement transport as an authority.
+ * Unknown observations stay on the existing non-Mac/synthetic path. */
+export function takeMacLoginTransport(observation: unknown, cwd: string): ExecutionTransport | null {
+    const entry = observation && typeof observation === 'object' ? loginTransports.get(observation) : undefined;
+    return entry ? entry.take(cwd) : null;
+}
+
 /** Even a structurally perfect caller object is rejected without invoking it. */
 export function readMacQualification(authority: MacProductQualificationAuthority, binaryPath: string): Evidence | null {
     if (process.platform !== 'darwin' || !authority || typeof authority !== 'object') return null;
@@ -223,7 +235,7 @@ export async function prepareMacProductQualification(options: MacPreparationOpti
         check(); options.signal?.addEventListener('abort', withdraw, { once: true });
         expiry = setTimeout(() => { withdraw(); void close(); }, lifetime);
         stage = 'sources';
-        const pins = verifyMacSourceSet(options.schemaDirectory, options.c1ReceiptPath, expectedExecutionConfig());
+        const pins = verifyMacSourceSet(options.schemaDirectory, options.c1ReceiptPath, executionConfigFromToml(EXECUTION_CONFIG));
         binaryPath = verifyExecutionSubstrate(options.binaryPath);
         const ca = executionPublicCaBundle();
         check();
@@ -295,7 +307,7 @@ export async function prepareMacProductQualification(options: MacPreparationOpti
         raw.subscribe(() => undefined, () => withdraw());
         void server.finished.then(() => { if (!intentionalDrain) withdraw(); });
         await within(server.started, 6000); check();
-        initialization = await raw.request('initialize', executionInitializationParams()); assertInitialized(initialization, join(root, 'work'));
+        initialization = await raw.request('initialize', executionInitializationParams()); assertExecutionInitialization(initialization, join(root, 'work'), EXECUTION_SUBSTRATE);
         initSha = macDigest(JSON.stringify(initialization)); raw.initialized(); check();
         stage = 'readback';
         const actualConfig = await readCurrentMacConfig();
@@ -311,13 +323,34 @@ export async function prepareMacProductQualification(options: MacPreparationOpti
             profile: macDigest(readFileSync(join(root, 'runtime', 'profile.sb'))), config: macDigest(EXECUTION_CONFIG) }));
         phase = 'ready';
         const evidence = Object.freeze({ revision, isCurrent: current });
-        let observationTaken = false;
+        let observationTaken = false, loginTaken = false;
+        const observedInitialization = initialization as object;
         const transport: ExecutionTransport = Object.freeze({
             async request(method: ExecutionMethod, params?: unknown) {
                 if (!borrowed || intentionalDrain || !current() || method === 'initialize') throw new ExecutionError('unqualified_boundary');
-                const value = await raw!.request(method, params);
-                if (!current() || intentionalDrain) throw new ExecutionError('unqualified_boundary');
-                return value;
+                const owner = serverOwner, transport = raw;
+                try {
+                    let value: unknown;
+                    if (method === 'config/read') {
+                        // Never translate an incompatible request into an
+                        // expected-config facade. Accept only the exact owned
+                        // layered request and perform/validate it on raw here.
+                        const fields = params && typeof params === 'object' && !Array.isArray(params)
+                            ? Object.getOwnPropertyDescriptors(params) : {};
+                        if (Reflect.ownKeys(fields).length !== 2
+                            || fields.includeLayers?.value !== true
+                            || fields.cwd?.value !== join(root!, 'work')) throw new ExecutionError('unqualified_boundary');
+                        value = await readCurrentMacConfig();
+                    } else {
+                        value = await transport!.request(method, params);
+                    }
+                    if (serverOwner !== owner || raw !== transport || !current() || intentionalDrain) throw new ExecutionError('unqualified_boundary');
+                    return value;
+                } catch (error) {
+                    // Invalid readback, a lost lease or late response cannot
+                    // leave the prior C2 witness usable for a retry.
+                    withdraw(); throw error;
+                }
             },
             initialized() { throw new ExecutionError('invalid_request'); },
             takeInitializationObservation() {
@@ -338,6 +371,14 @@ export async function prepareMacProductQualification(options: MacPreparationOpti
                     ownedGroupCeased: null, ownedTreeCeased: treeCeased ? true : observation.closing ? server.drained() : null });
             },
         });
+        loginTransports.set(observedInitialization, Object.freeze({
+            take(cwd: string): ExecutionTransport {
+                if (!observationTaken || loginTaken || !borrowed || intentionalDrain
+                    || cwd !== join(root!, 'work') || !current()) throw new ExecutionError('unqualified_boundary');
+                loginTaken = true;
+                return transport;
+            },
+        }));
         // The product may keep its watcher during bounded drain; execution publication
         // must NOT accept that transitional witness before the native STOP+close proof.
         host = Object.freeze({ transport, cwd: join(root, 'work'), boundaryQualified: () => phase !== 'draining' && current(), close, cleanupComplete: () => cleaned });
