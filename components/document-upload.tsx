@@ -19,7 +19,7 @@ import {
     isAiDocumentSynthesisEnabledValue,
 } from '@/lib/ai-document-synthesis-kill-switch';
 import { db, type Attachment } from '@/lib/db';
-import { requestAnyDocLocalExtractionPreview, type AnyDocLocalExtractionPreview } from '@/lib/domain/documents/anydoc-local-extraction-client';
+import { requestAnyDocDecryptedLocalExtractionPreview, type AnyDocLocalExtractionPreview } from '@/lib/domain/documents/anydoc-local-extraction-client';
 import { createDocumentUploadQueue, readDocumentDataUrl, type DocumentUploadResult } from '@/lib/domain/documents/document-upload-queue';
 import { useLiveQueryState } from '@/lib/live-query';
 import { sharedKillSwitchSignal } from '@/lib/ui-semantic-signal';
@@ -30,8 +30,8 @@ interface DocumentUploadProps {
     children?: ReactNode;
 }
 
-type LocalExtractionState = (Readonly<{ attachmentId: string }> & AnyDocLocalExtractionPreview)
-    | Readonly<{ attachmentId: string; status: 'review_required' | 'interrupted' }>;
+type LocalExtractionState = (Readonly<{ attachmentId: string; sourceSnapshot?: readonly Attachment[] }> & AnyDocLocalExtractionPreview)
+    | Readonly<{ attachmentId: string; sourceSnapshot?: readonly Attachment[]; status: 'review_required' | 'interrupted' }>;
 
 function rejectionMessages(rejected: FileRejection[]): string[] {
     return [...new Set(rejected.map((entry) => {
@@ -54,7 +54,7 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
     const summaryHeading = useRef<HTMLHeadingElement>(null);
     const [extractingId, setExtractingId] = useState<string | null>(null);
     const [localExtraction, setLocalExtraction] = useState<LocalExtractionState | null>(null);
-    const activeExtraction = useRef<{ attachmentId: string; controller: AbortController } | null>(null);
+    const activeExtraction = useRef<{ attachmentId: string; sourceSnapshot: readonly Attachment[] | undefined; controller: AbortController } | null>(null);
     const activeDelete = useRef<object | null>(null);
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [deleteErrorId, setDeleteErrorId] = useState<string | null>(null);
@@ -156,21 +156,51 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
         }
     };
 
+    /* @Codex: extraction-only lifecycle; upload/delete/synthesis ownership is unchanged. */
+    const extractionSessionSignal = db.getSessionReadSignal();
+    const retireExtraction = useCallback(() => {
+        activeExtraction.current?.controller.abort(); activeExtraction.current = null;
+        setExtractingId(null); setLocalExtraction(null);
+    }, []);
+    useEffect(() => {
+        extractionSessionSignal.addEventListener('abort', retireExtraction, { once: true });
+        return () => extractionSessionSignal.removeEventListener('abort', retireExtraction);
+    }, [extractionSessionSignal, retireExtraction]);
+    useEffect(() => {
+        // A source/view choice retires only transient extraction work.
+        return () => retireExtraction();
+    }, [selectedId, viewingId, retireExtraction]);
+    useEffect(() => {
+        const pending = activeExtraction.current;
+        // Any refresh of the attachment view retires transient extraction. The ordinary
+        // list intentionally has no host currentness tuple, so do not invent one here.
+        if (pending && (listError || listLoading || attachments !== pending.sourceSnapshot))
+            pending.controller.abort();
+    }, [attachments, listError, listLoading]);
+    if (localExtraction && (listError || listLoading || attachments !== localExtraction.sourceSnapshot))
+        setLocalExtraction(null);
+
     const interruptLocalExtraction = () => {
         const operation = activeExtraction.current;
         if (!operation) return;
         operation.controller.abort(); activeExtraction.current = null; setExtractingId(null);
-        setLocalExtraction({ attachmentId: operation.attachmentId, status: 'interrupted' });
+        setLocalExtraction({ attachmentId: operation.attachmentId, sourceSnapshot: operation.sourceSnapshot, status: 'interrupted' });
     };
 
     const handleLocalExtractionPreview = async (file: Attachment) => {
-        if (activeExtraction.current || deletingId === file.id) return;
-        const operation = { attachmentId: file.id, controller: new AbortController() };
+        if (activeExtraction.current || listLoading || listError || deletingId === file.id || extractionSessionSignal.aborted) return;
+        const operation = { attachmentId: file.id, sourceSnapshot: attachments, controller: new AbortController() };
+        const signal = AbortSignal.any([operation.controller.signal, extractionSessionSignal]);
         activeExtraction.current = operation; setExtractingId(file.id); setLocalExtraction(null);
         try {
-            const preview = await requestAnyDocLocalExtractionPreview(file.id, globalThis.fetch, operation.controller.signal);
-            if (activeExtraction.current !== operation) return;
-            setLocalExtraction(preview ? { attachmentId: file.id, ...preview } : { attachmentId: file.id, status: 'review_required' });
+            const preview = await requestAnyDocDecryptedLocalExtractionPreview(file.id, async () => {
+                if (signal.aborted) return null;
+                const source = await db.attachments.get(file.id, { signal });
+                return !signal.aborted && source?.patientId === patientId ? source : null;
+            }, globalThis.fetch, signal);
+            if (activeExtraction.current !== operation || signal.aborted) return;
+            setLocalExtraction(preview ? { attachmentId: file.id, sourceSnapshot: operation.sourceSnapshot, ...preview }
+                : { attachmentId: file.id, sourceSnapshot: operation.sourceSnapshot, status: 'review_required' });
         } finally {
             if (activeExtraction.current === operation) { activeExtraction.current = null; setExtractingId(null); }
         }
