@@ -5,7 +5,7 @@ import SwiftUI
 @MainActor
 struct ClinicalWorkspaceNavigationAction {
     let section: ClinicalWorkspaceSection
-    let canCreatePatient: Bool
+    let canStartCreatingPatient: Bool
     let select: (ClinicalWorkspaceSection) -> Void
     let createPatient: () -> Void
 }
@@ -95,13 +95,13 @@ public final class MediFlowMacSceneModel: ObservableObject {
 
     /// Whether the current section can accept a new patient. The menu item stays
     /// visible but disabled elsewhere, so the shortcut never silently no-ops.
-    public var canCreatePatient: Bool {
+    public var canStartCreatingPatient: Bool {
         guard let workspaceModel, section == .patients else { return false }
-        return workspaceModel.canCreatePatient && !workspaceModel.isWorking
+        return workspaceModel.canStartCreatingPatient
     }
 
     public func createPatient() {
-        guard canCreatePatient else { return }
+        guard canStartCreatingPatient else { return }
         navigationRouter.cancel() // @Codex
         workspaceModel?.startCreatingPatient()
     }
@@ -220,7 +220,7 @@ public struct MediFlowMacRootView: View {
     private var navigationAction: ClinicalWorkspaceNavigationAction {
         ClinicalWorkspaceNavigationAction(
             section: scene.section,
-            canCreatePatient: scene.canCreatePatient,
+            canStartCreatingPatient: scene.canStartCreatingPatient,
             select: scene.select,
             createPatient: scene.createPatient
         )
@@ -414,7 +414,7 @@ public struct MediFlowMacCommands: Commands {
                 navigation?.createPatient()
             }
             .keyboardShortcut("n", modifiers: .command)
-            .disabled(navigation == nil || (navigation?.section == .patients && navigation?.canCreatePatient == false))
+            .disabled(navigation == nil || (navigation?.section == .patients && navigation?.canStartCreatingPatient == false))
         }
 
         CommandMenu("Vai") {

@@ -1668,13 +1668,18 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     // ADR 0071 update: patient CREATE still works through the on-device local
     // authority when available, and now also has a paired HTTP wire path gated by
     // network.replica.write-patient-lifecycle.
-    var canCreatePatient: Bool {
+    // @Codex: opening controls must not depend on the still-empty draft.
+    var canStartCreatingPatient: Bool {
         !isWorking
         && connectionState != .cached && connectionState != .pairedOfflineDegraded // @Codex
+        && permitsCapability(NetworkCapabilityKey.writePatientLifecycle)
+    }
+
+    var canCreatePatient: Bool {
+        canStartCreatingPatient
         && !newPatientFirstName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         && !newPatientLastName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         && !newPatientTaxCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        && permitsCapability(NetworkCapabilityKey.writePatientLifecycle)
     }
 
     /* @Codex: lifecycle and exact manual draft of this create flow only. */

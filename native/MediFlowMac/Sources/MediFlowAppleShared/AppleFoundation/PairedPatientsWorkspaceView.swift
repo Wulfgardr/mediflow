@@ -692,7 +692,7 @@ struct PairedPatientsWorkspaceView: View {
             } label: {
                 Label("Nuovo paziente", systemImage: "person.badge.plus")
             }
-            .disabled(!model.canCreatePatient || model.isWorking)
+            .disabled(!model.canStartCreatingPatient)
             .help("Nuovo paziente")
             .accessibilityIdentifier("new-patient-toolbar-button")
         }
