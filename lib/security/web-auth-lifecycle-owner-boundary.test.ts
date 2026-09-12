@@ -24,27 +24,27 @@ import { gunzipSync } from 'node:zlib';
 const REPOSITORY_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const PACKAGE_DIRECTORY = join(REPOSITORY_ROOT, 'packages/web-auth-lifecycle-owner');
 const ARTIFACT_RELATIVE_PATH =
-    'packages/web-auth-lifecycle-owner/artifacts/mediflow-web-auth-lifecycle-owner-0.8.7.tgz';
+    'packages/web-auth-lifecycle-owner/artifacts/mediflow-web-auth-lifecycle-owner-0.8.8.tgz';
 const ARTIFACT_PATH = join(REPOSITORY_ROOT, ARTIFACT_RELATIVE_PATH);
 const PROVENANCE_PATH = join(
     REPOSITORY_ROOT,
-    'packages/web-auth-lifecycle-owner/artifacts/mediflow-web-auth-lifecycle-owner-0.8.7.provenance.json',
+    'packages/web-auth-lifecycle-owner/artifacts/mediflow-web-auth-lifecycle-owner-0.8.8.provenance.json',
 );
 const DEPENDENCY_SPECIFIER = `file:${ARTIFACT_RELATIVE_PATH}`;
-const ARTIFACT_SHA256 = 'ed4f7fd68707a6e82e17150ffd89ad23f1090e7281bb84184bdb3d03f8985f88';
-const ARTIFACT_INTEGRITY = 'sha512-thrO0KKQrRls9ITV2kYpcnBmK9lQSgj/mmOO6mSfGlNUw/3zx0y8ECZdUtnxTSqmjHtdDeT7tkZVYgkeqSdfKw==';
-const PROVENANCE_SHA256 = '91153ec1f021a4c4fbdb8a4d47ef671e564b3781e7dacf6afdeb86e188753c35';
-const ACCEPTED_BASE = 'fdac252a52219ad4b60cc240b289c0ccb450d124';
+const ARTIFACT_SHA256 = '374ffb275fc6b2e98a452c3d61373644faa2f95961ea2802115486aea96cde7a';
+const ARTIFACT_INTEGRITY = 'sha512-pNNkmDX9DGnp69hWGhrDeHR4oqQKQP5Up6+RmYpLF47eMGCwfYlmdWJ0Ua3ao9fnxBoPh798Ymitpasqp/WNwA==';
+const PROVENANCE_SHA256 = '08533dcb434244120147e0c8886a90adb5711a6b71df6d5e6f1da834a1668f38';
+const ACCEPTED_BASE = '70caa364a152704fe883a12a1ec48b93824f2ab8';
 const PREDECESSOR_ARTIFACT_PATH = join(
     PACKAGE_DIRECTORY,
-    'artifacts/mediflow-web-auth-lifecycle-owner-0.8.6.tgz',
+    'artifacts/mediflow-web-auth-lifecycle-owner-0.8.7.tgz',
 );
 const PREDECESSOR_PROVENANCE_PATH = join(
     PACKAGE_DIRECTORY,
-    'artifacts/mediflow-web-auth-lifecycle-owner-0.8.6.provenance.json',
+    'artifacts/mediflow-web-auth-lifecycle-owner-0.8.7.provenance.json',
 );
-const PREDECESSOR_ARTIFACT_SHA256 = '044dfb1a9aedfc52da181707ddab2c582c097909d2f54cff886f6f33273f2b45';
-const PREDECESSOR_PROVENANCE_SHA256 = '66c4e11cd29657fc824308a4ded5bfa6fe212fdc6ccef869dcddb6d86bddfca4';
+const PREDECESSOR_ARTIFACT_SHA256 = 'ed4f7fd68707a6e82e17150ffd89ad23f1090e7281bb84184bdb3d03f8985f88';
+const PREDECESSOR_PROVENANCE_SHA256 = '91153ec1f021a4c4fbdb8a4d47ef671e564b3781e7dacf6afdeb86e188753c35';
 
 const EXPECTED_INPUTS = [
     ['index.js', 116, '1abc52ee8abe9fd25b28046f1f00ecc2f09d699ba220c61e6222730c22ca44c5'],
@@ -55,11 +55,11 @@ const EXPECTED_INPUTS = [
     ['internal/session-activation.cjs', 6143, '5ed4c9543f8bc15903c0915a8565b997d697d004e9ccfaaa54a3da6236a2aa96'],
     ['internal/session-cell.cjs', 23897, '4cd0c2e9f8b40b346d43a93de561e20e85c5662fc8a2f9a0a170403fc80c2e31'],
     ['internal/session-resolver.cjs', 2965, '75409d670b8411dbadcc95e4bd9bfebeff47d2f687bde0d638809bb9114b5fa0'],
-    ['internal/session-resource.cjs', 14096, '127de77dfb73f91f313e5318fd64e838f3f5e3147e801e19b492e0876127d876'],
+    ['internal/session-resource.cjs', 14687, 'b71c56ebb7f76db3e59e411e90daac8eb41f175eb20300b4ed6dc7ce9437012c'],
     ['internal/session-retirement.cjs', 5664, '8848c92cb88635c6c09baf685839e7c6f1aca40d667ea6580e84e275349f1516'],
     ['internal/support/successor-fence.cjs', 1172, '7e36178331d5f899d81d877603acb0100eef1436d1873287ad4b27ccc227e7ff'],
     ['internal/support/value.cjs', 47, '9f0968a0290c6184c898f06de2c408540d4eda1ecd0e3e80ae013bb37a782be1'],
-    ['package.json', 281, '9a45967edd1058ca75f06f2fa43026f658c41e674a360c1f756080f46671c00c'],
+    ['package.json', 281, '688d0a9eea6846c3a20ad54add5c6b68aa93cecadecefe653fd024e4f7cd69ae'],
 ] as const;
 
 const EXPECTED_TAR_PATHS = [
@@ -171,7 +171,7 @@ function walkFiles(directory: string): string[] {
     return files;
 }
 
-test('preserves the accepted 0.8.6 artifact and provenance as immutable predecessor evidence', () => {
+test('preserves the accepted 0.8.7 artifact and provenance as immutable predecessor evidence', () => {
     assert.equal(sha256(readFileSync(PREDECESSOR_ARTIFACT_PATH)), PREDECESSOR_ARTIFACT_SHA256);
     assert.equal(sha256(readFileSync(PREDECESSOR_PROVENANCE_PATH)), PREDECESSOR_PROVENANCE_SHA256);
 });
@@ -180,7 +180,7 @@ test('pins the exact final source manifest and immutable input bytes', () => {
     const manifest = readJson(join(PACKAGE_DIRECTORY, 'package.json'));
     assert.deepEqual(manifest, {
         name: '@mediflow/web-auth-lifecycle-owner',
-        version: '0.8.7',
+        version: '0.8.8',
         private: true,
         type: 'commonjs',
         main: './index.js',
@@ -205,7 +205,7 @@ test('pins the exact final source manifest and immutable input bytes', () => {
 
 test('pins the final tarball and its normalized regular-file roster', () => {
     const archive = readFileSync(ARTIFACT_PATH);
-    assert.equal(archive.length, 36557);
+    assert.equal(archive.length, 36754);
     assert.equal(sha256(archive), ARTIFACT_SHA256);
     assert.equal(`sha512-${createHash('sha512').update(archive).digest('base64')}`, ARTIFACT_INTEGRITY);
 
@@ -260,7 +260,7 @@ test('reproduces the tracked artifact byte-for-byte from two clean offline sourc
                 '--pack-destination', output,
             ], { cwd: REPOSITORY_ROOT, encoding: 'utf8' });
             assert.equal(packed.status, 0, `${packed.stdout}\n${packed.stderr}`);
-            artifacts.push(readFileSync(join(output, 'mediflow-web-auth-lifecycle-owner-0.8.7.tgz')));
+            artifacts.push(readFileSync(join(output, 'mediflow-web-auth-lifecycle-owner-0.8.8.tgz')));
         }
         assert.ok(artifacts[0]);
         assert.ok(artifacts[1]);
@@ -279,13 +279,13 @@ test('binds provenance to the accepted base, predecessor, inputs, and tar roster
     assert.equal(provenance.schemaVersion, 'mediflow.web-auth-lifecycle-owner.package-provenance.v1');
     assert.equal(provenance.acceptedBase, ACCEPTED_BASE);
     assert.deepEqual(provenance.predecessor, {
-        version: '0.8.6',
+        version: '0.8.7',
         tarSha256: PREDECESSOR_ARTIFACT_SHA256,
         provenanceSha256: PREDECESSOR_PROVENANCE_SHA256,
     });
     assert.deepEqual(provenance.package, {
         name: '@mediflow/web-auth-lifecycle-owner',
-        version: '0.8.7',
+        version: '0.8.8',
     });
     assert.deepEqual(provenance.pack, {
         command: 'npm pack <clean-temporary-copy> --ignore-scripts --offline --cache <empty-temporary-cache> --pack-destination <temporary-directory>',
@@ -305,7 +305,7 @@ test('binds provenance to the accepted base, predecessor, inputs, and tar roster
     });
     assert.deepEqual(provenance.artifact, {
         path: ARTIFACT_RELATIVE_PATH,
-        bytes: 36557,
+        bytes: 36754,
         sha256: ARTIFACT_SHA256,
         integrity: ARTIFACT_INTEGRITY,
     });
@@ -336,7 +336,7 @@ test('installs exactly one physical package copy from the pinned artifact', () =
     assert.equal(dependencies['@mediflow/web-auth-lifecycle-owner'], DEPENDENCY_SPECIFIER);
     assert.equal(lockRootDependencies['@mediflow/web-auth-lifecycle-owner'], DEPENDENCY_SPECIFIER);
     assert.deepEqual(lockEntry, {
-        version: '0.8.7',
+        version: '0.8.8',
         resolved: DEPENDENCY_SPECIFIER,
         integrity: ARTIFACT_INTEGRITY,
         engines: { node: '>=24 <25' },
@@ -349,7 +349,7 @@ test('installs exactly one physical package copy from the pinned artifact', () =
     assert.equal(realpathSync(installedDirectory), installedDirectory);
     assert.notEqual(realpathSync(installedDirectory), realpathSync(PACKAGE_DIRECTORY));
     const installedManifest = readJson(join(installedDirectory, 'package.json'));
-    assert.equal(installedManifest.version, '0.8.7');
+    assert.equal(installedManifest.version, '0.8.8');
     for (const [path, bytes, expectedSha256] of EXPECTED_INPUTS) {
         const installedPath = join(installedDirectory, path);
         const installedLstat = lstatSync(installedPath);

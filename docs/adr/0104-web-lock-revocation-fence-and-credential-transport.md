@@ -743,3 +743,24 @@ egress, push, PR, merge, tag o release.
 Claim ceiling: **decisione tecnica accettata, solo documentale, per un fence
 di revoca Web process-local e un trasporto bearer temporaneo; nessun runtime o
 integrazione native e consegnato.**
+
+
+### Successore 0.8.8: reclamazione delle risorse Web concluse
+
+Il successore locale `@mediflow/web-auth-lifecycle-owner@0.8.8` preserva API,
+proiezioni non canoniche, generazioni di autenticazione e semantica di revoca.
+Scollega dalle liste private i port rilasciati, gli use consumati e le
+registrazioni rimosse; il cleanup terminale elimina anche i riferimenti alle
+sessioni. Le risorse ancora attive restano collegate e revocabili. Non introduce
+una cache di proiezioni o autorita basata su ID pubblici.
+
+Il motivo concreto e il polling autenticato dei registry OpenAI: ogni richiesta
+risolve una nuova proiezione autentica e ne verifica la generazione con un port
+transitorio. Il servizio originale, il consenso e le scadenze restano associati
+alla stessa generazione. I record terminali non devono crescere con lo storico
+delle richieste.
+
+Si applica il packet atomico dell'addendum H6: predecessore 0.8.7 immutabile,
+doppio pack offline, provenienza dei byte, installazione fisica, pin e guard
+allineati. La versione del prodotto resta MediFlow 0.8.6. Questo aggiornamento
+non attesta una release o il collaudo della candidata Mac.

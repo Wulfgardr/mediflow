@@ -38,7 +38,7 @@ const PDF_ROUTE_DIRECTORY = path.join('server', 'app', 'api', 'pdf-extract');
 const PDF_RUNTIME_REFERENCE = /(?:pdf-inspector-worker\.mjs|pdf-inspector-router|(?:node_modules[\\/])?@firecrawl[\\/]pdf-inspector(?:[-/]|$))/i;
 const SYNTHETIC_RTF = Buffer.from('{\\rtf1\\ansi Synthetic standalone note.}', 'utf8');
 const WEB_AUTH_OWNER_PACKAGE = '@mediflow/web-auth-lifecycle-owner';
-const WEB_AUTH_OWNER_VERSION = '0.8.7';
+const WEB_AUTH_OWNER_VERSION = '0.8.8';
 const WEB_AUTH_OWNER_KEYS = Object.freeze([
   'abort', 'abortAdminReset', 'abortResourceUse', 'abortUserRetirement', 'begin', 'beginResourceUse',
   'bootstrapControl', 'commitAdminReset', 'commitResourceUse', 'commitUserRetirement', 'issue',
@@ -55,11 +55,11 @@ const WEB_AUTH_OWNER_FILES = Object.freeze([
   ['internal/session-activation.cjs', '5ed4c9543f8bc15903c0915a8565b997d697d004e9ccfaaa54a3da6236a2aa96'],
   ['internal/session-cell.cjs', '4cd0c2e9f8b40b346d43a93de561e20e85c5662fc8a2f9a0a170403fc80c2e31'],
   ['internal/session-resolver.cjs', '75409d670b8411dbadcc95e4bd9bfebeff47d2f687bde0d638809bb9114b5fa0'],
-  ['internal/session-resource.cjs', '127de77dfb73f91f313e5318fd64e838f3f5e3147e801e19b492e0876127d876'],
+  ['internal/session-resource.cjs', 'b71c56ebb7f76db3e59e411e90daac8eb41f175eb20300b4ed6dc7ce9437012c'],
   ['internal/session-retirement.cjs', '8848c92cb88635c6c09baf685839e7c6f1aca40d667ea6580e84e275349f1516'],
   ['internal/support/successor-fence.cjs', '7e36178331d5f899d81d877603acb0100eef1436d1873287ad4b27ccc227e7ff'],
   ['internal/support/value.cjs', '9f0968a0290c6184c898f06de2c408540d4eda1ecd0e3e80ae013bb37a782be1'],
-  ['package.json', '9a45967edd1058ca75f06f2fa43026f658c41e674a360c1f756080f46671c00c'],
+  ['package.json', '688d0a9eea6846c3a20ad54add5c6b68aa93cecadecefe653fd024e4f7cd69ae'],
 ]);
 
 /* @Codex: P12 proves that the externalized final owner is a physical standalone copy
