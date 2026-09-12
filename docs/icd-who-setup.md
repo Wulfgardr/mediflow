@@ -14,9 +14,17 @@ corrente. Per Mac prevalgono questo capitolo e D9–D11.
 
 ## Correzioni e gate
 
-F-WHO2 accetta solo combinazioni di URI WHO canonici della release 2026-01,
-separati esattamente da ` & `: massimo16 componenti/1536 caratteri; limite codice32
-invariato. F-WHO3 usa `container stop --timeout 30`, con ID esatto restituito e
+F-WHO2, solo per la qualificazione, accetta combinazioni di URI WHO canonici della
+release 2026-01, separati esattamente da ` & ` oppure ` / `: nessun trim o
+normalizzazione, massimo16 componenti/1536 caratteri e limite codice32 invariato.
+Ogni URI deve mantenere lo stesso host `http://id.who.int`, release e percorso
+`mms`, con il suffisso ammesso `other` o `unspecified`. La ricerca ufficiale con
+`medicalCodingMode=true` può restituire
+[postcoordinazione](https://icd.who.int/icdapi/docs2/ReleaseNotes-Version2.3/); i due separatori sono
+un'osservazione della risposta pubblica acquisita, non una generalizzazione
+normativa del separatore dei codici.
+
+F-WHO3 usa `container stop --timeout 30`, con ID esatto restituito e
 readback indipendente dello stato fermo. Il delta locale pre-direttiva a quattro
 file è attribuito al suo autore precedente, non presentato come nuovo codice o
 nuova evidenza di questo run.
