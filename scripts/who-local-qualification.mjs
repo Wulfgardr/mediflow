@@ -525,16 +525,20 @@ export async function qualifyOwnedDeployment(state, lock, directory, dependencie
         check(); assertOwnedNetwork(state, offlineNetwork, command);
         assertOwnedContainer(state, state.containerId, command, false);
         command(['container', 'start', state.containerId], 30000);
-        assertOwnedContainer(state, state.containerId, command, true);
+        // @Codex: Docker can assign the default bridge ID only when a newly created container starts.
+        const beforeConnect = assertOwnedContainer(state, state.containerId, command, true);
+        const currentPrior = assertOwnedTopology(state, beforeConnect, command, true);
+        if (Boolean(prior) !== Boolean(currentPrior) || (prior && currentPrior.id !== prior.id)) deny('original_network_mismatch');
+        const expectedOld = currentPrior?.id ?? beforeConnect.networks.bridge?.NetworkID;
+        if (!idPattern.test(expectedOld)) deny('original_network_mismatch');
         check(); assertOwnedNetwork(state, offlineNetwork, command);
         command(['network', 'connect', networkId, state.containerId]);
         const connected = assertOwnedContainer(state, state.containerId, command, true);
-        const expectedOld = prior?.id ?? initial.networks.bridge.NetworkID;
         const ids = Object.values(connected.networks).map(n => n.NetworkID);
         if (ids.length !== 2 || !ids.includes(networkId) || !ids.includes(expectedOld)) deny('original_network_mismatch');
         assertOwnedNetwork(state, offlineNetwork, command);
-        if (prior) assertOwnedNetwork(state, prior, command);
-        command(['network', 'disconnect', prior?.id ?? 'bridge', state.containerId]);
+        if (currentPrior) assertOwnedNetwork(state, currentPrior, command);
+        command(['network', 'disconnect', currentPrior?.id ?? 'bridge', state.containerId]);
         state.offlineNetwork = offlineNetwork; save();
         assertOffline(state, state.containerId, offlineNetwork, command);
         restartOriginal();

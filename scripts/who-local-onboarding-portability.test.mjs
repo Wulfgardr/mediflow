@@ -58,7 +58,7 @@ function fakeDocker(options = {}) {
                 startedAt: '0001-01-01T00:00:00Z', restartCount: 0,
                 ports: publish ? { '80/tcp': [{ HostIp: '127.0.0.1', HostPort: port }] } : {},
                 requestedPorts: publish ? { '80/tcp': [{ HostIp: '127.0.0.1', HostPort: cid === id('a') ? '8382' : '' }] } : {},
-                networks: { [network]: { NetworkID: network === 'bridge' ? id('d') : n?.id ?? id('c') } } });
+                networks: { [network]: { NetworkID: network === 'bridge' && options.bridgeIdAssignedOnStart ? '' : network === 'bridge' ? id('d') : n?.id ?? id('c') } } });
             payloads.set(cid, cid === id('a') ? new Map(sourceFiles) : new Map()); return cid;
         }
         if (a[0] === 'container' && a[1] === 'inspect') {
@@ -75,7 +75,10 @@ function fakeDocker(options = {}) {
         }
         if (a[0] === 'container' && ['start', 'stop'].includes(a[1])) {
             const c = containers.get(a.at(-1)); c.running = a[1] === 'start';
-            if (c.running) { starts++; c.startedAt = new Date(Date.parse('2026-09-08T00:00:00Z') + starts * 1000).toISOString(); c.pid = 100 + starts; }
+            if (c.running) {
+                starts++; c.startedAt = new Date(Date.parse('2026-09-08T00:00:00Z') + starts * 1000).toISOString(); c.pid = 100 + starts;
+                if (options.bridgeIdAssignedOnStart && c.networks.bridge?.NetworkID === '') c.networks.bridge.NetworkID = id('d');
+            }
             else c.pid = 0;
             c.status = c.running ? 'running' : 'exited'; c.exitCode = 0;
             c.finishedAt = c.running ? '0001-01-01T00:00:00Z' : '2026-09-08T02:00:00.000Z';
@@ -171,6 +174,26 @@ function fakeDocker(options = {}) {
     };
     return { calls, requests, containers, networks, payloads, run, request, execDocker, execCalls, options };
 }
+
+test('new macOS container reads its default bridge identity after start before offline connect', async t => {
+    // @Codex: real Docker reports an empty NetworkID until the freshly created container starts.
+    const f = fixture(t, 'darwin', { bridgeIdAssignedOnStart: true }, 'arm64');
+    const result = await onboardWho('setup', f.deps);
+    assert.equal(result.state, 'ready');
+    assert.equal(read(f, 'installation.json').qualificationAttempt.complete, true);
+    assert.equal(f.docker.containers.get(id('a')).networks.bridge, undefined);
+    assert.equal(f.docker.containers.get(id('a')).networks[read(f, 'installation.json').offlineNetwork.name].NetworkID, id('c'));
+});
+
+test('bridge identity drift after the pre-connect read is rejected', async t => {
+    const f = fixture(t, 'darwin', { bridgeIdAssignedOnStart: true }, 'arm64');
+    f.options.onCall = args => {
+        if (args[2] === 'network' && args[3] === 'connect') f.docker.containers.get(id('a')).networks.bridge.NetworkID = id('e');
+    };
+    await assert.rejects(onboardWho('setup', f.deps), { code: 'original_network_mismatch' });
+    disabled(f);
+    assert.equal(f.docker.calls.some(args => args[2] === 'network' && args[3] === 'disconnect'), false);
+});
 function fixture(t, platform = 'linux', options = {}, arch = 'x64') {
     const directory = sandbox(t);
     options.endpoint ??= platform === 'win32' ? 'npipe:////./pipe/dockerDesktopLinuxEngine' : 'unix:///synthetic/docker.sock';
@@ -217,7 +240,8 @@ for (const platform of ['darwin', 'linux', 'win32']) for (const arch of ['x64', 
         assert.equal(f.reports.some(x => x.includes('Download immagine')), true);
         assert.equal(f.reports.some(x => x.includes('Qualifica in corso')), true);
         const corrections = f.docker.calls.filter(a => a.includes('chown') || a.includes('chmod'));
-        assert.equal(corrections.length, platform === 'win32' ? 10 : 0);
+        // @Codex: Docker Desktop preserves host metadata on both Mac and Windows copies.
+        assert.equal(corrections.length, ['win32', 'darwin'].includes(platform) ? 10 : 0);
         for (const a of corrections) assert.equal(a[3], id('b'));
         f.docker.calls.length = 0;
         const status = await onboardWho('status', f.deps);
