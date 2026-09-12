@@ -70,6 +70,7 @@ const nextConfig: NextConfig = {
       "./package.json",
       // @Codex: capability-local offline CLI/worker closure; no model/runtime payloads.
       "./scripts/treatment-reasoning-portable-worker.py",
+      "./scripts/gliner-redaction-worker.py", // @Codex: code only; model stays outside the bundle.
       "./scripts/treatment-reasoning-portable-setup.mjs",
       "./lib/ai-providers/fabric/treatment-reasoning-portable-provisioning.ts",
       "./lib/athena-model-identity.ts",
