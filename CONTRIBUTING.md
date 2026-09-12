@@ -404,6 +404,12 @@ Una PR è considerata conclusa quando:
 - Nessun PHI/PII introdotto in repo, fixture, log o screenshot
 - Se una feature è user-facing e interagibile, deve avere una UI/UX esplicita e coerente
   (CTA/pulsante, label comprensibile, percorso utente verificabile).
+- Per ogni modifica all'interfaccia, verificare sul percorso interessato che
+  etichette, descrizioni, azioni e stati siano comprensibili a un medico senza
+  conoscenze tecniche, secondo [DESIGN.md](./DESIGN.md#plain-language-for-physicians).
+  Il medico deve capire significato, scelta richiesta e conseguenze senza una
+  spiegazione dello sviluppatore; gergo non spiegato o azioni ambigue impediscono
+  l'accettazione anche con test verdi.
 - Se cambia `/api/v1/*`, la documentazione contrattuale (spec OpenAPI o nota esplicita
   `no contract impact`) deve stare nello stesso diff.
 - Se cambiano comportamenti/contratti, documentazione aggiornata:
