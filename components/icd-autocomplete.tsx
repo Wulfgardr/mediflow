@@ -95,7 +95,7 @@ export default function ICDAutocomplete({ value, onChange, initialValue, onSelec
                     }) // @Codex
                     .catch((error) => { // @Codex
                         if (!latestSearchRef.current.isLatest(requestId)) return; // @Codex
-                        setSearchError(icdClientErrorMessage(error)); // @Codex
+                        setSearchError(icdClientErrorMessage(error, 'search')); // @Codex
                         setResults([]); // @Codex
                         setIsOpen(true); // @Codex
                     }) // @Codex
