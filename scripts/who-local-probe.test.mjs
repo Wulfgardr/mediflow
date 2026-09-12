@@ -158,23 +158,27 @@ test('IPv4 and IPv6 route proof rejects default and non-default routed egress; L
 });
 
 // @Codex: observed public WHO postcoordination shape, still a synthetic transport peer.
-test('probe accepts bounded canonical URI combinations and rejects any malformed component', async t => {
+test('probe accepts both exact observed URI separators and rejects malformed combinations', async t => {
     const first = 'http://id.who.int/icd/release/11/2026-01/mms/257068234';
     const second = 'http://id.who.int/icd/release/11/2026-01/mms/194483911';
+    const third = 'http://id.who.int/icd/release/11/2026-01/mms/194483912';
     const make = (id, theCode = '1A00&XN8P1') => JSON.stringify({ destinationEntities: [{ id, title: 'Synthetic combination', theCode }] });
-    const combined = make(`${first} & ${second}`);
+    const combined = make(`${first}/other / ${second}/unspecified`);
     assert.equal(validateProbeBody(combined), 1);
     const peer = await server(t, (_req, res) => json(res, combined));
     assert.equal(await readWhoProbe(peer.port, 'acquisition'), combined);
     assert.equal(validateProbeBody(make(first, '1A00')), 1);
     assert.equal(validateProbeBody(make(`${first}/other & ${second}/unspecified`)), 1);
-    assert.equal(validateProbeBody(make(Array(16).fill(first).join(' & '), Array(16).fill('A').join('&'))), 1);
+    assert.equal(validateProbeBody(make(`${first} & ${second} / ${third}`)), 1);
+    assert.equal(validateProbeBody(make(Array(16).fill(first).join(' & ').replace(' & ', ' / '), Array(16).fill('A').join('&'))), 1);
     for (const invalid of [
         `${first} & https://example.invalid/mms/1`, `${first} & ${second.replace('2026-01', '2025-01')}`,
         `${first} & ${second.replace('http:', 'https:')}`, `${first} & ${second}?x=1`,
-        `${first} & `, ` & ${second}`, `${first} &  & ${second}`, `${first}&${second}`,
-        `${first}  & ${second}`, ` ${first} & ${second}`, `${first} & ${second} `,
-        Array(17).fill(first).join(' & '), 'x'.repeat(1537),
+        `${first} & `, ` & ${second}`, `${first} / `, ` / ${second}`, `${first} &  & ${second}`,
+        `${first}&${second}`, `${first}/${second}`, `${first}  & ${second}`, `${first} &  ${second}`,
+        `${first}  / ${second}`, `${first} /  ${second}`, ` ${first} & ${second}`, `${first} / ${second} `,
+        `${first} | ${second}`, `${first} + ${second}`, `${first},${second}`,
+        Array(17).fill(first).join(' / '), 'x'.repeat(1537),
     ]) assert.throws(() => validateProbeBody(make(invalid)), { code: 'probe_response_invalid' });
     assert.throws(() => validateProbeBody(make(`${first} & ${second}`, 'A'.repeat(33))), { code: 'probe_response_invalid' });
 });
