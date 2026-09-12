@@ -27,9 +27,9 @@ type ConnectAddress = Readonly<{ address: string; family: AddressFamily; port: t
 type UpstreamAttempt = Readonly<{ socket: Duplex; connected: Promise<void> }>;
 type LookupAddress = (hostname: AllowedHost) => Promise<readonly ResolvedAddress[]>;
 type ConnectAddressFn = (target: ConnectAddress) => UpstreamAttempt;
-type TestOverrides = Readonly<{ lookup?: LookupAddress; connect?: ConnectAddressFn }>;
+type TestOverrides = Readonly<{ lookup?: LookupAddress; connect?: ConnectAddressFn; initiallyClosed?: boolean }>;
 
-type ProxyHandle = Readonly<{ port: number; close(): Promise<void> }>;
+type ProxyHandle = Readonly<{ port: number; activate(): boolean; close(): Promise<void> }>;
 type ErrorStatus = 400 | 502 | 503;
 
 type Tunnel = {
@@ -153,6 +153,7 @@ async function createProxy(overrides: TestOverrides = {}): Promise<ProxyHandle> 
     const tunnels = new Set<Tunnel>();
     const tunnelByClient = new Map<Socket, Tunnel>();
     let closing = false;
+    let admitted = overrides.initiallyClosed !== true;
     let closePromise: Promise<void> | undefined;
 
     const server = createServer({ maxHeaderSize: HEADER_LIMIT_BYTES }, (request, response) => {
@@ -213,7 +214,8 @@ async function createProxy(overrides: TestOverrides = {}): Promise<ProxyHandle> 
             writeGenericError(client, 400);
             return;
         }
-        if (closing || !clients.has(client)) {
+        // Preparation must not even resolve an upstream before manual admission.
+        if (!admitted || closing || !clients.has(client)) {
             client.destroy();
             return;
         }
@@ -321,11 +323,11 @@ async function createProxy(overrides: TestOverrides = {}): Promise<ProxyHandle> 
         await close();
         throw new Error('proxy listener did not expose a TCP port');
     }
-    return Object.freeze({ port: address.port, close });
+    return Object.freeze({ port: address.port, activate() { if (closing) return false; admitted = true; return true; }, close });
 }
 
-export async function createOpenAIConnectProxy(): Promise<{ port: number; close(): Promise<void> }> {
-    return createProxy();
+export async function createOpenAIConnectProxy(options: Readonly<{ initiallyClosed?: boolean }> = {}): Promise<ProxyHandle> {
+    return createProxy({ initiallyClosed: options.initiallyClosed });
 }
 
 /** @internal Test-only seam: production targets remain fixed in createOpenAIConnectProxy. */

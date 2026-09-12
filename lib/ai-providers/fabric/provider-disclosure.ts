@@ -175,3 +175,6 @@ export function buildProviderDisclosureSnapshot(
         providers,
     });
 }
+
+// Capability-local extension only: PROVIDER_DISCLOSURE_IDS and the v1 projection above stay closed.
+export { buildTreatmentReasoningPortableDisclosure } from './treatment-reasoning-portable-disclosure';

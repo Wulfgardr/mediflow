@@ -116,7 +116,7 @@ export default function PatientDetailPage() {
         ['checkups'],
     );
     /* WUL-262: same data the archive and Smart Import panels already read. */
-    const attachments = useLiveQuery(
+    const { data: attachments, error: attachmentsError } = useLiveQueryState(
         async () => db.attachments.query({ patientId: id }).toArray(),
         [id],
         undefined,
@@ -865,8 +865,10 @@ export default function PatientDetailPage() {
                     keepMounted
                     kicker="Documenti"
                     title="Archivio documenti ed evidenze"
-                    count={attachmentItems.length > 0 ? `${attachmentItems.length} file` : undefined}
-                    summary={attachmentItems.length > 0 ? 'Carica, consulta e rivedi i documenti.' : 'Nessun documento ancora caricato.'}
+                    count={attachmentsError || attachments === undefined ? undefined : `${attachments.length} file`}
+                    summary={attachmentsError ? 'Conteggio non disponibile. Apri Documenti per consultare o rileggere l’elenco.'
+                        : attachments === undefined ? 'Caricamento documenti…'
+                        : attachments.length > 0 ? 'Carica, consulta e rivedi i documenti.' : 'Nessun documento ancora caricato.'}
                     surfaceClassName={workspaceStyles.clinicalSection}
                     defaultOpen={!documentSynthesisKillSwitchLoading
                         && !patientInsightKillSwitchLoading

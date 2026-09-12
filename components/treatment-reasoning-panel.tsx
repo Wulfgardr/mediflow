@@ -188,7 +188,7 @@ export default function TreatmentReasoningPanel({
                                 <span className="apple-chip">{sourceSummary.total} fonti</span>
                                 <span className="apple-chip">review-only</span>
                                 <span className="text-[10px] font-semibold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
-                                    ATHENA MLX · locale
+                                    {picker.selected?.provider === 'athena_mlx' ? 'ATHENA MLX · locale' : picker.selected?.provider === 'athena_transformers' ? 'ATHENA Transformers · CPU locale' : 'Motore locale da selezionare'}
                                 </span>
                             </div>
                         </div>
@@ -384,12 +384,16 @@ export default function TreatmentReasoningPanel({
                             <dl className="grid gap-3 border-t border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] px-4 py-3 text-xs sm:grid-cols-2">
                                 <div>
                                     <dt className="font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">Provider attestato</dt>
-                                    <dd className="mt-1 text-[color:var(--lume-ink)]">{publication.attestation.provider === 'athena_mlx' ? 'ATHENA MLX · locale' : publication.attestation.provider}</dd>
+                                    <dd className="mt-1 text-[color:var(--lume-ink)]">{publication.attestation.provider === 'athena_mlx' ? 'ATHENA MLX · locale' : 'ATHENA Transformers · CPU locale'}</dd>
                                 </div>
                                 <div>
                                     <dt className="font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">Stato</dt>
                                     <dd className="mt-1 text-[color:var(--lume-ink)]">{publication.attestation.readiness} · {publication.review} · {publication.writesPerformed} scritture</dd>
                                 </div>
+                                {publication.schemaVersion === 'mediflow.ai.treatment-reasoning-publication.v2' && <div>
+                                    <dt className="font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">Motore e artefatto attestati</dt>
+                                    <dd className="mt-1 break-all text-[color:var(--lume-ink)]">{publication.attestation.model} · {publication.attestation.platform} · ammissione {publication.attestation.admissionRevision}<br />SHA-256 {publication.attestation.artifactDigest}</dd>
+                                </div>}
                                 <div>
                                     <dt className="font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">Currentness</dt>
                                     <dd className="mt-1 text-[color:var(--lume-ink)]">Acquisita {formatDateTime(publication.capturedAt)}</dd>

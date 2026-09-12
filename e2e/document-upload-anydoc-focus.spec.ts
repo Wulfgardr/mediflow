@@ -97,7 +97,7 @@ test('AnyDoc: le azioni allegato restano visibili al focus e sui viewport strett
   const patientId = await createSyntheticFixture(page);
   await openDocumentArchive(page, patientId);
 
-  // @Codex: one accessible chooser opens the native picker and one Tab reaches the first file action.
+  // @Codex: one accessible chooser opens the native picker and Tab visits the viewer before local extraction.
   const chooser = page.getByRole('button', { name: 'Carica documenti', exact: true });
   await expect(chooser).toHaveCount(1);
   await chooser.focus();
@@ -105,6 +105,9 @@ test('AnyDoc: le azioni allegato restano visibili al focus e sui viewport strett
   await page.keyboard.press('Enter');
   await (await nativeChooser).setFiles([]);
   await chooser.focus();
+  await page.keyboard.press('Tab');
+
+  await expect(page.getByRole('button', { name: `Visualizza ${SYNTHETIC_ATTACHMENT_NAME}`, exact: true })).toBeFocused();
   await page.keyboard.press('Tab');
 
   let extractButton = page.getByRole('button', { name: `Estrai testo localmente da ${SYNTHETIC_ATTACHMENT_NAME}` });
@@ -118,6 +121,10 @@ test('AnyDoc: le azioni allegato restano visibili al focus e sui viewport strett
 
   await extractButton.focus();
   await page.keyboard.press('Tab');
+  await expect(page.getByRole('button', { name: `Prepara sintesi di ${SYNTHETIC_ATTACHMENT_NAME}`, exact: true })).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('button', { name: `Elimina ${SYNTHETIC_ATTACHMENT_NAME}`, exact: true })).toBeFocused();
+  await page.keyboard.press('Shift+Tab');
   await page.keyboard.press('Shift+Tab');
   await expect(extractButton).toBeFocused();
   await expect(actionGroup).toHaveCSS('opacity', '1');
@@ -175,7 +182,32 @@ test('AnyDoc: il browser usa la route autenticata e mostra solo l’anteprima lo
 
   const preview = page.getByTestId('anydoc-local-extraction-preview');
   await expect(preview).toBeVisible();
-  await expect(preview).toContainText('Anteprima AnyDoc locale · sola lettura');
+  await preview.locator('summary').click();
+  await expect(preview.locator('summary')).toHaveText('Testo estratto localmente · da rivedere');
+  await expect(preview.locator('pre')).toBeVisible();
   await expect(preview).toContainText(SYNTHETIC_RTF_TEXT);
   await expect(page.getByText('review_required · unsupported_local_extraction', { exact: false })).toHaveCount(0);
+});
+
+// @Codex: native options must conceal filenames while preserving source identity.
+test('Documenti: privacy nasconde i nomi nel selettore prima e dopo la scelta', async ({ page }) => {
+  await establishSyntheticSession(page);
+  const patientId = await createSyntheticFixture(page);
+  await openDocumentArchive(page, patientId);
+  const toggle = page.getByTestId('privacy-mode-header-toggle').first();
+  if (await toggle.getAttribute('aria-pressed') === 'true') await toggle.click();
+  const selector = page.getByLabel('Documento da sintetizzare');
+  const sourceId = await selector.locator('option').nth(1).getAttribute('value');
+  expect(sourceId).toBeTruthy();
+  await toggle.click();
+  await expect(selector.locator('option').nth(1)).toHaveText('Documento 1');
+  await selector.selectOption(sourceId!);
+  await expect(selector).toHaveValue(sourceId!);
+  await expect(selector.locator('option:checked')).toHaveText('Documento 1');
+  await toggle.click();
+  await expect(selector.locator('option:checked')).toHaveText(SYNTHETIC_ATTACHMENT_NAME);
+  await toggle.click();
+  await expect(selector.locator('option:checked')).toHaveText('Documento 1');
+  await expect(selector).toHaveValue(sourceId!);
+  await toggle.click();
 });

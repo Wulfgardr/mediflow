@@ -236,7 +236,17 @@ export interface ApiTableQuery {
     includeDeleted?: boolean;
 }
 
-class ApiTable<T> {
+export type PatientCreateClientContext = Readonly<{
+    nonce: string;
+    ambulatoryId: string;
+    expiresAt: number;
+    signal: AbortSignal;
+    isCurrent: () => boolean;
+}>;
+type ApiAddOptions = { suppressNotify?: boolean };
+export type PatientAddOptions = ApiAddOptions & { createContext?: PatientCreateClientContext };
+
+class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
     private endpoint: string;
     private tableName: string;
     private getMasterKey: () => CryptoKey | null;
@@ -405,21 +415,46 @@ class ApiTable<T> {
     }
 
     /* @Codex */
-    async add(item: T, options?: { suppressNotify?: boolean }): Promise<string> {
+    async add(item: T, options?: AddOptions): Promise<string> {
+        const fenced = options != null && 'createContext' in options;
+        const context = fenced ? (options as PatientAddOptions).createContext : undefined;
+        const key = fenced ? this.getMasterKey() : null;
+        const assertCurrent = () => {
+            if (!fenced) return;
+            if (this.tableName !== 'patients' || !context || !/^[a-f0-9]{64}$/u.test(context.nonce)
+                || typeof context.ambulatoryId !== 'string' || !context.ambulatoryId || context.ambulatoryId.length > 128
+                || /[\u0000-\u0020\u007f]/u.test(context.ambulatoryId)
+                || !Number.isSafeInteger(context.expiresAt) || context.expiresAt <= Date.now()
+                || !key || this.getMasterKey() !== key || !context.signal
+                || typeof context.isCurrent !== 'function' || !context.isCurrent()) {
+                throw new Error('Patient create context unavailable.');
+            }
+            context.signal.throwIfAborted();
+        };
+        assertCurrent();
         const encryptedItem = await this.encryptItem(item);
-        // @Codex: attachment creation time is assigned by the host. Read-model
-        // timestamps must not leak into the strict attachment creation payload.
+        assertCurrent();
+        // @Codex: attachment creation time remains owned by the host.
         if (this.tableName === 'attachments') delete encryptedItem.createdAt;
         const res = await fetch(this.endpoint, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', ...(context ? {
+                'X-MediFlow-Patient-Create-Mode': 'fixed-preview-v1',
+                'X-MediFlow-Patient-Create-Context': context.nonce,
+                'X-MediFlow-Patient-Create-Target': context.ambulatoryId,
+            } : {}) },
+            ...(context ? { signal: context.signal } : {}),
             body: JSON.stringify(encryptedItem)
         });
+        assertCurrent();
         if (!res.ok) {
+            // Fenced errors never echo server/driver bodies containing patient data.
+            if (fenced) throw new Error('Patient create was not confirmed.');
             const errorText = await res.text();
             throw new Error(`Failed to add item: ${res.status} ${res.statusText} - ${errorText}`);
         }
         const data = await res.json();
+        assertCurrent();
         if (!options?.suppressNotify) this.emitChange();
         return data.id;
     }
@@ -432,7 +467,7 @@ class ApiTable<T> {
     // Alias for Dexie compatibility (Upsert-like behavior)
     /* @Codex */
     async put(item: T, options?: { suppressNotify?: boolean }): Promise<string> {
-        return this.add(item, options);
+        return this.add(item, options as AddOptions);
     }
 
     /* @Codex */
@@ -772,7 +807,7 @@ class MedicalApiClient {
     // @Codex: cancellation only; this signal grants no server authority or key access.
     private sessionReads: AbortController | null = null;
 
-    patients: ApiTable<Patient>;
+    patients: ApiTable<Patient, PatientAddOptions>;
     ambulatories: ApiTable<Ambulatory>;
     entries: ApiTable<ClinicalEntry>;
     therapies: ApiTable<Therapy>;
@@ -801,7 +836,7 @@ class MedicalApiClient {
 
     constructor() {
         const getKey = () => this.masterKey;
-        this.patients = new ApiTable<Patient>('/api/patients', 'patients', getKey);
+        this.patients = new ApiTable<Patient, PatientAddOptions>('/api/patients', 'patients', getKey);
         this.ambulatories = new ApiTable<Ambulatory>('/api/ambulatories', 'ambulatories', getKey);
         // ... (existing)
         this.entries = new ApiTable<ClinicalEntry>('/api/entries', 'entries', getKey);

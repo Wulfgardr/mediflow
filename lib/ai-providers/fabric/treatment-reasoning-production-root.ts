@@ -1,5 +1,5 @@
 import 'server-only';
-import { captureFunctionModelTransportGuard } from './function-model-dispatch';
+import { captureFunctionModelTransportGuard, captureTreatmentReasoningDispatch } from './function-model-dispatch';
 
 /* @Codex */
 import { randomBytes } from 'node:crypto';
@@ -20,7 +20,9 @@ import { registerServerSessionResource } from '../../security/server-session';
 import { patients, patientsToAmbulatories, settings } from '../../schema';
 import { createHostProviderLifecycleService } from './provider-lifecycle-service';
 import { createTreatmentReasoningAuthenticatedProjectionBroker } from './treatment-reasoning-authenticated-projection';
-import { createTreatmentReasoningProductionService } from './treatment-reasoning-production-operation';
+import { createTreatmentReasoningProductionService, createTreatmentReasoningPortableProductionService } from './treatment-reasoning-production-operation';
+import { createTreatmentReasoningPortableRuntime } from './treatment-reasoning-portable-runtime';
+import { createPortableProvisioning } from './treatment-reasoning-portable-provisioning';
 
 const lifecycle = createHostProviderLifecycleService({ provider: 'athena_mlx' }).service;
 
@@ -77,4 +79,20 @@ const service = createTreatmentReasoningProductionService({
 });
 
 export const acquireTreatmentReasoningIngest = service.acquireIngest;
-export const acquireTreatmentReasoningPreview = service.acquirePreview;
+// Launcher owns the application cwd; bundler chunk paths are not artifact identities.
+const portableRuntime = createTreatmentReasoningPortableRuntime({ provisioning: createPortableProvisioning({
+    applicationRoot: process.cwd(),
+}) });
+export async function acquireTreatmentReasoningPreview() {
+    const selected = captureTreatmentReasoningDispatch();
+    await selected.verify();
+    if (selected.provider === 'athena_mlx') return service.acquirePreview();
+    const portableService = createTreatmentReasoningPortableProductionService({
+        projectionBroker, killSwitch, entropy: () => randomBytes(32),
+        selection: () => Object.freeze({ provider: 'athena_transformers' as const,
+            modelOptionId: selected.modelOptionId, catalogRevision: selected.catalogRevision }),
+        verifyChoice: selected.verify,
+        prepare: () => portableRuntime.prepare({ signal: selected.signal, verifyChoice: selected.verify }),
+    });
+    return portableService.acquirePreview();
+}

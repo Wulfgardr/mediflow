@@ -7,7 +7,7 @@ import {
     type ServicePrescriptionPriority,
 } from '@/lib/db';
 import { useRouter } from 'next/navigation';
-import { AlertTriangle, CheckCircle2, FileSearch } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, FileSearch, FileSpreadsheet } from 'lucide-react'; // @Codex: manual CSV entrypoint
 import { v4 as uuidv4 } from 'uuid';
 import PatientForm from '@/components/patient-form';
 import PdfImporter from '@/components/pdf-importer';
@@ -240,6 +240,7 @@ export default function NewPatientPage() {
             backLabel="Torna alla lista"
             statusLabel={statusLabel}
             navItems={navItems}
+            primaryAction={{ href: "/patients/import", label: "Importa elenco CSV", icon: FileSpreadsheet }}
         >
             <section id="documento" className="patient-detail-section mf-section p-6 md:p-8 space-y-5 scroll-mt-40">
                 <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">

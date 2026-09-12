@@ -2,7 +2,7 @@
 import { readBoundedJsonBody } from '../../bounded-request-body';
 import { mintResourcePort, releaseResourcePort, registerPrivateResource, unregisterPrivateResource,
     beginResourceUse, commitResourceUse, abortResourceUse } from '../../security/web-auth-lifecycle-owner-adapter';
-import { FunctionModelError, functionModelDigest } from './function-model-preferences';
+import { FunctionModelError, functionModelDigest, FUNCTION_PREFERENCES_VERSION_HEADER, parseFunctionModelCommand } from './function-model-preferences';
 import { functionModelErrorResponse } from './function-model-dispatch';
 import type { createFunctionModelPreferencesService } from './function-model-preferences';
 
@@ -25,6 +25,9 @@ export function createFunctionModelPreferencesHttp(dependencies: Readonly<{ auth
             if (!registration) throw new FunctionModelError('session_stale');
             request.signal.addEventListener('abort', abort, { once: true });
             if (new URL(request.url).search !== '') throw new FunctionModelError('input_invalid');
+            const requested = request.headers.get(FUNCTION_PREFERENCES_VERSION_HEADER);
+            if (requested !== null && requested !== '1' && requested !== '2') throw new FunctionModelError('input_invalid');
+            const version = requested === '2' ? 'v2' as const : 'v1' as const;
             let value: unknown;
             if (action !== 'read') {
                 if (request.headers.get('content-type')?.split(';')[0].trim() !== 'application/json') throw new FunctionModelError('input_invalid');
@@ -37,7 +40,9 @@ export function createFunctionModelPreferencesHttp(dependencies: Readonly<{ auth
                 } finally { clearTimeout(timer); }
                 if (request.signal.aborted || (controller.signal.aborted && !timedOut)) throw new FunctionModelError('session_stale');
                 if (!body.ok || timedOut || performance.now() >= deadline) throw new FunctionModelError('input_invalid');
-                value = body.value;
+                const parsed = parseFunctionModelCommand(body.value);
+                if (parsed.schemaVersion !== `mediflow.function-preferences-command.${version}`) throw new FunctionModelError('input_invalid');
+                value = parsed;
                 // Do not replace database-backed authentication with an owner-only check.
                 const currentSession = await dependencies.authenticate();
                 if (!currentSession || controller.signal.aborted || request.signal.aborted
@@ -46,9 +51,9 @@ export function createFunctionModelPreferencesHttp(dependencies: Readonly<{ auth
             // No await between the owner check, synchronous CAS/read and response construction.
             use = beginResourceUse(port);
             if (!use || controller.signal.aborted || request.signal.aborted) throw new FunctionModelError('session_stale');
-            const result = action === 'read' ? dependencies.service.read() : action === 'preview'
+            const result = action === 'read' ? dependencies.service.read(version) : action === 'preview'
                 ? dependencies.service.preview(value) : dependencies.service.apply(value);
-            const response = Response.json(result, { headers: { 'Cache-Control': 'no-store' } });
+            const response = Response.json(result, { headers: { 'Cache-Control': 'no-store', Vary: FUNCTION_PREFERENCES_VERSION_HEADER, [FUNCTION_PREFERENCES_VERSION_HEADER]: version === 'v2' ? '2' : '1' } });
             if (controller.signal.aborted || request.signal.aborted || !commitResourceUse(use)) throw new FunctionModelError('session_stale');
             use = null;
             return response;

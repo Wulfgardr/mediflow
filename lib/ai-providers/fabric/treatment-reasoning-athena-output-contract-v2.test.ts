@@ -95,3 +95,13 @@ test('preserves V1 substantive evidence, action, and trace denials', () => {
     const duplicateEvidence = output(); duplicateEvidence.data.keyEvidence.push({ ...duplicateEvidence.data.keyEvidence[0] });
     for (const value of [unknownEvidence, unboundFlag, badSeverity, unboundAction, badIntent, badPolicy, remoteTrace, duplicateEvidence]) denied(value);
 });
+
+// Compatible regression: passes on frozen MLX code; no new runtime/contract import.
+test('legacy MLX attestation cannot represent another engine or acquire portable metadata', () => {
+    for (const host of [
+        { ...attestation(), provider: 'athena_transformers' },
+        { ...attestation(), schema: 'mediflow.ai.treatment-reasoning-engine-attestation.v2' },
+        { ...attestation(), artifactDigest: 'a'.repeat(64) },
+    ]) assert.throws(() => createTreatmentReasoningAthenaOutputContractV2({ allowedEvidenceRefs: refs(), attestation: host }));
+    denied({ ...output(), provider: 'athena_transformers' });
+});

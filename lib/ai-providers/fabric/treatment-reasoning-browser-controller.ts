@@ -1,6 +1,10 @@
 /* @Codex */
 'use client';
 
+import { ATHENA_R1_QWEN3_8B_MODEL_ID } from '../../athena-model-identity';
+import type { PortableEngineMetadata } from './treatment-reasoning-portable-runtime';
+import type { TreatmentReasoningPortableAttestation } from './treatment-reasoning-athena-output-contract-v2';
+import type { PortableTreatmentResolutionReceipt } from './treatment-reasoning-production-operation';
 import type { TreatmentReasoningContextInput } from '../../treatment-reasoning-context';
 import { createSmartImportContextProposalBrowserAdapter, type SmartImportContextProposal } from '../../security/smart-import-context-proposal-browser-adapter';
 import { createSmartImportSelectionBrowserAdapter } from '../../security/smart-import-selection-browser-adapter';
@@ -16,12 +20,21 @@ type KeyEvidence = Readonly<{ id: string; statement: string; evidenceRefs: RefLi
 type SafetyFlag = Readonly<{ id: string; severity: 'info' | 'caution' | 'urgent_review'; label: string; rationale: string; evidenceRefs: RefList }>;
 type SuggestedAction = Readonly<{ id: string; intent: 'no_action' | 'review_only' | 'open_therapy_form_prefill' | 'open_monitoring_form_prefill' | 'open_diagnosis_review'; label: string; rationale: string; writePolicy: 'no_write' | 'review_only' | 'form_prefill_only'; evidenceRefs: RefList }>;
 export type TreatmentReasoningPublicationValue = Readonly<{ schemaVersion: 'mediflow.treatment_reasoning.v1'; task: 'treatment_reasoning'; summary: string; data: Readonly<{ recommendation: string; keyEvidence: readonly KeyEvidence[]; reasoning: readonly string[]; caveats: readonly string[]; safetyFlags: readonly SafetyFlag[]; suggestedActions: readonly SuggestedAction[]; trace: Readonly<{ mode: 'local_model'; toolsUsed: RefList; limitations: readonly string[] }> }> }>;
-export type TreatmentReasoningPublication = Readonly<{
+export type MlxTreatmentReasoningPublication = Readonly<{
     schemaVersion: typeof TREATMENT_REASONING_PUBLICATION_SCHEMA_VERSION; capability: 'treatment_reasoning'; stage: 'preview'; review: 'required'; status: 'available';
     value: TreatmentReasoningPublicationValue; sourceBindings: readonly TreatmentReasoningPublicationSourceBinding[]; attestation: TreatmentReasoningPublicationAttestation;
     fabricReceipt: TreatmentReasoningPublicationFabricReceipt; provenance: Readonly<{ schemaVersion: 'mediflow.ai.fabric-provenance.v1'; capability: 'treatment_reasoning'; venue: 'local_process'; provider: 'athena_mlx'; model: null; preprocessing: readonly ['context_minimization', 'envelope_validation']; receipt: TreatmentReasoningPublicationFabricReceipt }>;
     sourceRevision: string; capturedAt: string; writesPerformed: 0; applyPolicy: 'none';
 }>;
+
+export type PortableBrowserPublication = Omit<MlxTreatmentReasoningPublication, 'schemaVersion' | 'attestation' | 'fabricReceipt' | 'provenance'> & Readonly<{
+    schemaVersion: 'mediflow.ai.treatment-reasoning-publication.v2'; attestation: TreatmentReasoningPortableAttestation;
+    fabricReceipt: PortableTreatmentResolutionReceipt;
+    provenance: Readonly<{ schemaVersion: 'mediflow.ai.treatment-reasoning-engine-provenance.v2'; capability: 'treatment_reasoning';
+        venue: 'local_process'; provider: 'athena_transformers'; model: typeof ATHENA_R1_QWEN3_8B_MODEL_ID;
+        preprocessing: readonly ['context_minimization', 'envelope_validation']; receipt: PortableTreatmentResolutionReceipt }>;
+}>;
+export type TreatmentReasoningPublication = MlxTreatmentReasoningPublication | PortableBrowserPublication;
 
 const ROOT_KEYS = ['schemaVersion', 'capability', 'stage', 'review', 'status', 'value', 'sourceBindings', 'attestation', 'fabricReceipt', 'provenance', 'sourceRevision', 'capturedAt', 'writesPerformed', 'applyPolicy'] as const;
 const REFERENCE = /^[A-Za-z][A-Za-z0-9._:-]{2,159}$/u;
@@ -115,11 +128,72 @@ function publicationUsesOnly(value: TreatmentReasoningPublication, allowedRefs: 
 }
 
 /** Strict client projection of the only review-only Treatment Reasoning success wire. */
-export function parseTreatmentReasoningPublication(value: unknown): TreatmentReasoningPublication | null {
+function parseMlxPublication(value: unknown): MlxTreatmentReasoningPublication | null {
     const root = record(value, ROOT_KEYS); const parsedValue = root && publicationValue(root.value); const bindings = root && parsedValue && sourceBindings(root.sourceBindings, parsedValue); const hostAttestation = root && attestation(root.attestation); const receipt = root && fabricReceipt(root.fabricReceipt);
     const provenance = root && record(root.provenance, ['schemaVersion', 'capability', 'venue', 'provider', 'model', 'preprocessing', 'receipt']); const preprocessing = provenance && array(provenance.preprocessing, 2); const provenanceReceipt = provenance && fabricReceipt(provenance.receipt); const sourceRevision = root && ref(root.sourceRevision); const capturedAt = root && iso(root.capturedAt);
     if (!root || root.schemaVersion !== TREATMENT_REASONING_PUBLICATION_SCHEMA_VERSION || root.capability !== 'treatment_reasoning' || root.stage !== 'preview' || root.review !== 'required' || root.status !== 'available' || !parsedValue || !bindings || !hostAttestation || !receipt || !provenance || provenance.schemaVersion !== 'mediflow.ai.fabric-provenance.v1' || provenance.capability !== 'treatment_reasoning' || provenance.venue !== 'local_process' || provenance.provider !== 'athena_mlx' || provenance.model !== null || !preprocessing || preprocessing[0] !== 'context_minimization' || preprocessing[1] !== 'envelope_validation' || !provenanceReceipt || !receiptMatches(receipt, provenanceReceipt) || !sourceRevision || !capturedAt || root.writesPerformed !== 0 || root.applyPolicy !== 'none') return null;
-    return Object.freeze({ schemaVersion: root.schemaVersion, capability: root.capability, stage: root.stage, review: root.review, status: root.status, value: parsedValue, sourceBindings: bindings, attestation: hostAttestation, fabricReceipt: receipt, provenance: Object.freeze({ schemaVersion: provenance.schemaVersion, capability: provenance.capability, venue: provenance.venue, provider: provenance.provider, model: null, preprocessing: Object.freeze(['context_minimization', 'envelope_validation'] as const), receipt: provenanceReceipt }), sourceRevision, capturedAt, writesPerformed: 0, applyPolicy: 'none' }) as TreatmentReasoningPublication;
+    return Object.freeze({ schemaVersion: root.schemaVersion, capability: root.capability, stage: root.stage, review: root.review, status: root.status, value: parsedValue, sourceBindings: bindings, attestation: hostAttestation, fabricReceipt: receipt, provenance: Object.freeze({ schemaVersion: provenance.schemaVersion, capability: provenance.capability, venue: provenance.venue, provider: provenance.provider, model: null, preprocessing: Object.freeze(['context_minimization', 'envelope_validation'] as const), receipt: provenanceReceipt }), sourceRevision, capturedAt, writesPerformed: 0, applyPolicy: 'none' }) as MlxTreatmentReasoningPublication;
+}
+
+const ENGINE_KEYS = ['provider', 'model', 'platform', 'artifactDigest', 'runtimeDigest', 'workerDigest', 'admissionRevision'] as const;
+const ATTESTATION_KEYS = [...ENGINE_KEYS, 'schema', 'readiness', 'venue', 'egress', 'receiptRef', 'provenanceRef'] as const;
+const DIGEST = /^[0-9a-f]{64}$/u;
+function portableEngine(value: unknown): PortableEngineMetadata | null {
+    const item = record(value, ENGINE_KEYS);
+    if (!item || item.provider !== 'athena_transformers' || item.model !== ATHENA_R1_QWEN3_8B_MODEL_ID
+        || !['win32-x64', 'win32-arm64', 'linux-x64', 'linux-arm64'].includes(item.platform as string)
+        || !['artifactDigest', 'runtimeDigest', 'workerDigest'].every(key => typeof item[key] === 'string' && DIGEST.test(item[key] as string))
+        || !Number.isSafeInteger(item.admissionRevision) || (item.admissionRevision as number) < 1) return null;
+    return Object.freeze({ provider: item.provider, model: item.model, platform: item.platform as PortableEngineMetadata['platform'],
+        artifactDigest: item.artifactDigest as string, runtimeDigest: item.runtimeDigest as string, workerDigest: item.workerDigest as string,
+        admissionRevision: item.admissionRevision as number });
+}
+function portableAttestation(value: unknown): TreatmentReasoningPortableAttestation | null {
+    const item = record(value, ATTESTATION_KEYS); if (!item) return null;
+    const engine = portableEngine(Object.fromEntries(ENGINE_KEYS.map(key => [key, item[key]])));
+    const receiptRef = ref(item.receiptRef); const provenanceRef = ref(item.provenanceRef);
+    if (!engine || !receiptRef || !provenanceRef || item.schema !== 'mediflow.ai.treatment-reasoning-engine-attestation.v2'
+        || item.readiness !== 'available_unqualified' || item.venue !== 'local_process' || item.egress !== 'none') return null;
+    return Object.freeze({ ...engine, schema: item.schema, readiness: item.readiness, venue: item.venue, egress: item.egress, receiptRef, provenanceRef });
+}
+function portableReceipt(value: unknown): PortableTreatmentResolutionReceipt | null {
+    const item = record(value, ['schemaVersion', 'capability', 'class', 'venue', 'egressProfile', 'provider', 'model', 'providerReceipt', 'fallbackCount', 'engine', 'modelOptionId', 'catalogRevision']);
+    const profile = item && record(item.egressProfile, ['id', 'version', 'egress']); const engine = item && portableEngine(item.engine);
+    if (!item || !profile || !engine || item.schemaVersion !== 'mediflow.ai.treatment-reasoning-engine-receipt.v2'
+        || item.capability !== 'treatment_reasoning' || item.class !== 'generative' || item.venue !== 'local_process'
+        || profile.id !== 'local_only' || profile.version !== EGRESS_PROFILE_VERSION || profile.egress !== 'none'
+        || item.provider !== engine.provider || item.model !== engine.model || item.providerReceipt !== null || item.fallbackCount !== 0
+        || typeof item.modelOptionId !== 'string' || !/^model_option_[0-9a-f]{32}$/u.test(item.modelOptionId)
+        || typeof item.catalogRevision !== 'string' || !/^sha256_[0-9a-f]{64}$/u.test(item.catalogRevision)) return null;
+    return Object.freeze({ schemaVersion: item.schemaVersion, capability: item.capability, class: item.class, venue: item.venue,
+        egressProfile: Object.freeze({ id: profile.id, version: profile.version, egress: profile.egress }), provider: engine.provider,
+        model: engine.model, providerReceipt: null, fallbackCount: 0, engine, modelOptionId: item.modelOptionId, catalogRevision: item.catalogRevision });
+}
+function parsePortablePublication(value: unknown): PortableBrowserPublication | null {
+    const root = record(value, ROOT_KEYS); const parsedValue = root && publicationValue(root.value);
+    const bindings = root && parsedValue && sourceBindings(root.sourceBindings, parsedValue);
+    const hostAttestation = root && portableAttestation(root.attestation); const receipt = root && portableReceipt(root.fabricReceipt);
+    const provenance = root && record(root.provenance, ['schemaVersion', 'capability', 'venue', 'provider', 'model', 'preprocessing', 'receipt']);
+    const preprocessing = provenance && array(provenance.preprocessing, 2); const provenanceReceipt = provenance && portableReceipt(provenance.receipt);
+    const sourceRevision = root && ref(root.sourceRevision); const capturedAt = root && iso(root.capturedAt);
+    if (!root || root.schemaVersion !== 'mediflow.ai.treatment-reasoning-publication.v2' || root.capability !== 'treatment_reasoning'
+        || root.stage !== 'preview' || root.review !== 'required' || root.status !== 'available' || !parsedValue || !bindings
+        || !hostAttestation || !receipt || !provenance || provenance.schemaVersion !== 'mediflow.ai.treatment-reasoning-engine-provenance.v2'
+        || provenance.capability !== 'treatment_reasoning' || provenance.venue !== 'local_process' || provenance.provider !== receipt.provider
+        || provenance.model !== receipt.model || !preprocessing || preprocessing.length !== 2 || preprocessing[0] !== 'context_minimization'
+        || preprocessing[1] !== 'envelope_validation' || !provenanceReceipt || JSON.stringify(receipt) !== JSON.stringify(provenanceReceipt)
+        || !ENGINE_KEYS.every(key => receipt.engine[key] === hostAttestation[key]) || !sourceRevision || !capturedAt
+        || root.writesPerformed !== 0 || root.applyPolicy !== 'none') return null;
+    return Object.freeze({ schemaVersion: root.schemaVersion, capability: root.capability, stage: root.stage, review: root.review,
+        status: root.status, value: parsedValue, sourceBindings: bindings, attestation: hostAttestation, fabricReceipt: receipt,
+        provenance: Object.freeze({ schemaVersion: provenance.schemaVersion, capability: root.capability, venue: 'local_process' as const,
+            provider: receipt.provider, model: receipt.model, preprocessing: Object.freeze(['context_minimization', 'envelope_validation'] as const), receipt: provenanceReceipt }),
+        sourceRevision, capturedAt, writesPerformed: 0 as const, applyPolicy: 'none' as const });
+}
+/** Versions are disjoint: a portable engine is never accepted by the legacy MLX parser. */
+export function parseTreatmentReasoningPublication(value: unknown): TreatmentReasoningPublication | null {
+    const root = record(value, ROOT_KEYS);
+    return root?.schemaVersion === 'mediflow.ai.treatment-reasoning-publication.v2' ? parsePortablePublication(value) : parseMlxPublication(value);
 }
 
 type Sources = Readonly<{ fetch?: typeof fetch; clock?: () => Date; requestId?: () => unknown }>;

@@ -299,3 +299,106 @@ review-only e zero scritture**.
 Non prova qualità clinica, disponibilità del modello, prescrizione, apply,
 fallback, AI paired, ToolUniverse/vLLM operativo, egress, deployment, release,
 certificazione o conformità legale.
+
+## Proposta non promossa: motore locale portabile (run 542972899b0244b8b7c345bcb219f1f5)
+
+Il percorso MLX documentato sopra resta il contratto storico. Il candidato
+separato `proposals/TREATMENT-PORTABLE-ADR.md` propone `athena_transformers`
+CPU su Windows/Linux, senza host Mac, relay, cloud o fallback. Non è una
+attestazione di disponibilità: il pacchetto sorgente non contiene runtime,
+pesi, licenze o prove d'inferenza utilizzabili per ammettere il motore.
+
+Il ramo portabile è composto da moduli dedicati di provisioning e runtime,
+scelta opaca nel catalogo della funzione, processo locale bounded e pubblicazione
+`mediflow.ai.treatment-reasoning-publication.v2`. Mantiene l'envelope clinico
+`mediflow.treatment_reasoning.v1`, la stessa validazione delle fonti, il kill
+switch, l'anteprima da revisionare, `writesPerformed=0`, `applyPolicy=none`.
+Il conteggio riguarda le scritture cliniche; il provisioning scrive soltanto
+file tecnici nel proprio namespace. Il parser MLX v1 non accetta il motore
+portabile. I consumer generici di receipt v1 non sono stati ampliati.
+
+### Preparazione esplicita, prima dell'inferenza
+
+L'operatore imposta `MEDIFLOW_DATA_DIR` su una directory locale dedicata e,
+senza usare il browser, prepara `treatment-reasoning-portable/incoming/`:
+`release.json` e `artifacts/` con modello, runtime autocontenuto, licenze e
+worker. La specifica tipizzata e il validatore sono in
+`lib/ai-providers/fabric/treatment-reasoning-portable-provisioning.ts`.
+Non viene fornito un manifest pronto all'ammissione con hash fittizi.
+
+Con Node 24, dalla directory dell'applicazione:
+
+```text
+node scripts/treatment-reasoning-portable-setup.mjs status
+node scripts/treatment-reasoning-portable-setup.mjs import --consent-digest <SHA256-del-release.json-verificato>
+node scripts/treatment-reasoning-portable-setup.mjs activate --consent-digest <stesso-SHA256>
+node scripts/treatment-reasoning-portable-setup.mjs revoke --consent-digest <stesso-SHA256>
+node scripts/treatment-reasoning-portable-setup.mjs recover --confirm
+```
+
+I segnaposto non sono valori accettabili. `import` verifica e promuove lo staging
+ma non seleziona il modello. `activate` verifica nuovamente e ammette l'artefatto,
+senza accendere il kill switch clinico. `revoke` è terminale per quel digest;
+`recover` non rimuove un lock di processo vivo e non promuove dati parziali.
+Una versione precedente ammessa resta selezionata se un nuovo import fallisce.
+Il browser mostra stato e prerequisiti, senza ricevere percorsi o comandi.
+
+### Limiti ed evidenza ancora necessaria
+
+L'adapter ha un solo lavoro in corso per istanza, senza coda o retry; limita
+l'intera preparazione/invocazione a 420 secondi, poi concede al massimo due
+secondi per osservare la chiusura del processo. Se la terminazione non è
+confermata, il canale resta bloccato fino all'effettiva chiusura. Non logga
+prompt, stdout clinico o stderr del worker. Le fonti entrano soltanto in stdin.
+La configurazione candidata usa CPU, 1–4 thread, budget memoria esplicito
+1–64 GiB, massimo 8192 token d'ingresso e 1600 nuovi token: sono limiti di
+policy, non requisiti o prestazioni misurati del modello.
+
+Servono una distribuzione runtime autocontenuta con versioni esatte, inventario
+completo e licenze approvate, una revisione immutabile del modello con pesi
+originali safetensors verificati, test sotto rete in uscita negata e prove
+reali di resource/termination boundary su ogni OS/architettura. I flag offline
+non sono una sandbox di rete del sistema operativo. Non si dichiarano supporto
+CPU BF16, memoria sufficiente, qualità clinica o portabilità dei binari senza
+queste prove. GGUF/llama.cpp e GPU restano esclusi.
+
+Il follow-up 1 include ora le connessioni allowlisted a status/disclosure,
+preferenze HTTP, pagina Fabric, `next.config.ts`, guard standalone e crosswalk.
+Il worker in `scripts/` usa il cwd applicativo posseduto dal launcher. La chiusura
+tracciata comprende worker, CLI, provisioning, identità modello, contratto Node,
+`.nvmrc` e `package.json`; il guard rifiuta file mancanti, contenuti alterati,
+trace incompleti e presenza di pesi/runtime/stato/credenziali nel bundle.
+Gli indici degli ADR accettati restano di competenza del parent.
+
+### Compatibilità negoziata e prerequisiti del follow-up 1
+
+Senza header o con `x-mediflow-function-preferences: 1` la proiezione rimane
+`mediflow.function-preferences.v1`: solo `ollama` e `athena_mlx`. Il client nuovo
+richiede `2` e usa `mediflow.function-preferences.v2`, comandi e preview v2
+coerenti. Le revisioni del catalogo restano autoritative e comuni; default opachi
+legacy non sono riscritti. Il client precedente può leggere/aggiornare le
+opzioni storiche; non può ammettere, selezionare o riattivare un motore nascosto.
+La configurazione su disco delle preferenze resta v1, senza migrazione automatica.
+
+Con `x-mediflow-fabric-status: 2` lo status contiene lo snapshot storico `legacy`
+e la disclosure capability-local v2, validata separatamente. La pagina distingue
+configurazione ammessa da inferenza non osservata e mostra prerequisiti/RAM.
+La union Fabric generica e il parser v1 storico non sono ampliati.
+
+I metadati ufficiali allegati fissano la revisione
+`acacc6b08e341aaf03c9639097255013ac65ebf2` e i checksum dichiarati dei quattro
+shard originali BF16, ma non attestano pesi acquisiti, runtime qualificato o
+licenze approvate. `hardware` e `inventory --confirm` sono comandi host espliciti:
+il secondo inventaria i byte reali e produce un manifest, senza importare o
+ammettere. La ricetta offline completa è nella consegna `OS-OFFLINE-RECIPE.md`.
+
+La policy prudenziale del BF16 originale richiede 36 GiB di budget processo e
+40 GiB host; non è una misura di prestazioni o del minimo fisico possibile.
+Le VM osservate dal parent (Linux ARM64 12 GiB, Windows ARM64 18 GiB) non passano
+questa policy. Il worker confronta anche ABI Python e architettura target:
+Node x64 emulato non qualifica Python/torch ARM64. Nessun cambio VM, modello,
+quantizzazione o fallback remoto è proposto per aggirare il blocco.
+
+L'implementazione resta candidata PROPOSED: build completa, runtime offline
+verificato, licenze e prove reali Windows/Linux/macOS sono gate separati del
+parent. Vedere `INTEGRATION.md`, `VALIDATION.md` e `NEEDS_CONTEXT.md` della consegna.

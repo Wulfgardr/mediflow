@@ -94,7 +94,7 @@ test('success keeps exact model/effort/priority, verified source hashes, one tur
     assert.equal((turn.outputSchema as { additionalProperties: boolean }).additionalProperties, false);
     assert.equal(transport.closed, 1);
     await assert.rejects(service.generate(request), errorCode('session_expired'));
-    assert.deepEqual(transport.calls.map(call => call.method), ['account/read', 'model/list', 'account/read', 'account/rateLimits/read', 'thread/start', 'turn/start']);
+    assert.deepEqual(transport.calls.map(call => call.method), ['account/read', 'model/list', 'account/read', 'model/list', 'account/rateLimits/read', 'thread/start', 'turn/start']);
 });
 
 test('catalog rotates opaque choices and excludes hidden/nontext models', async () => {
@@ -134,7 +134,7 @@ for (const [name, limits, code] of [
     const { service, transport } = setup(); const request = await selection(service);
     transport.override = method => method === 'account/rateLimits/read' ? limits : undefined;
     await assert.rejects(service.generate(request), errorCode(code));
-    assert.deepEqual(transport.calls.map(call => call.method), ['account/read', 'model/list', 'account/read', 'account/rateLimits/read']);
+    assert.deepEqual(transport.calls.map(call => call.method), ['account/read', 'model/list', 'account/read', 'model/list', 'account/rateLimits/read']);
 });
 
 test('legacy quota only when map absent, external restricted sandbox allowed', async () => {

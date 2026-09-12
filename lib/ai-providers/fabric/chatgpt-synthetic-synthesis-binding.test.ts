@@ -165,7 +165,7 @@ test('real owner-bound generation uses only the fixed corpus and returns proposa
     const corpus = supplied[0].text.split('Sources:\n')[1];
     assert.deepEqual(JSON.parse(corpus), CHATGPT_SYNTHESIS_FIXTURE.sources);
     for (const source of result.sources) assert.equal(source.sha256, sha(source.text));
-    assert.deepEqual(f.transport.calls.map(call => call.method), ['account/read', 'model/list', 'account/read', 'account/rateLimits/read', 'thread/start', 'turn/start']);
+    assert.deepEqual(f.transport.calls.map(call => call.method), ['account/read', 'model/list', 'account/read', 'model/list', 'account/rateLimits/read', 'thread/start', 'turn/start']);
 });
 
 test('extra caller text cannot become synthetic corpus or reach the provider', async t => {

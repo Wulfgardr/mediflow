@@ -5,6 +5,9 @@ read_when:
   - "Checking whether a feature, integration, or claim is shipped, directional, or out of bounds."
 ---
 
+<!-- reconciliation-20260912 -->
+> **Candidata ricostruita il 12 settembre 2026, non release.** Il perimetro vigente della 0.8.6 è Mac, localhost, backend, WHO/OpenAI e Headless sul Mac. Windows, Linux, Mini, iPhone e iPad sono rinviati alla 1.0; ATHENA è opzionale. Le prove storiche sotto conservano i propri SHA e non qualificano automaticamente questa ricostruzione. Il coordinamento resta [WUL-669](https://linear.app/wulfgardr/issue/WUL-669); proposte recuperate e servizi configurati non attestano funzionamento reale.
+
 # Stato del Sistema MediFlow
 
 > [!IMPORTANT]

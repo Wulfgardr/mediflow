@@ -4,6 +4,7 @@ import { lstatSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { inspectLocalEngine, assertSameEngine, dockerEnvironment, engineArchitecture, windowsAcl } from './who-local-platform.mjs';
 import { validateWhoLocalManifest } from './check-who-local-sidecar-manifest.mjs';
 
 export const INSTALL_CONFIRMATION = 'install-who-2.6.0-2026-01_en';
@@ -19,9 +20,13 @@ export const MESSAGES = Object.freeze({
     output_exists_or_unwritable: 'File non scritto: esiste gia oppure la cartella non e scrivibile. Scegli un nuovo file.',
     prerequisites_incomplete: 'Completa nel manifesto lock del registry, accettazione WHO e prove richieste dalla fase.',
     confirmation_required: 'Conferma esplicitamente questa operazione e la versione indicata.',
+    docker_cli_missing: 'Eseguibile Docker host non trovato. Nessuna installazione automatica.',
+    docker_executable_missing: 'Eseguibile richiesto assente (exit127). Verifica prerequisito interrotta; nessun polling.',
+    docker_executable_denied: 'Eseguibile richiesto non consentito (exit126 o EACCES). Nessuna elevazione.',
+    docker_command_timeout: 'Comando Docker oltre il limite temporale. Risorse conservate; verifica interrotta.',
     docker_unavailable: 'Docker non risponde. Installa o avvia il runtime locale scelto e ripeti status.',
-    local_context_required: 'Il contesto Docker deve usare un socket Unix locale. Non viene modificato il contesto predefinito.',
-    platform_mismatch: 'Il percorso supportato richiede un motore Docker Linux ARM64.',
+    local_context_required: 'Serve un endpoint Docker locale ammesso: socket Unix per il contratto v1; socket locale o pipe Windows esatto per v2. Nessun cambio del contesto predefinito.',
+    platform_mismatch: 'Il motore deve corrispondere al manifesto: Linux ARM64 per v1; Linux ARM64/AMD64 con evidenza verificata per v2.',
     container_absent: 'Container assente: usa install solo per una nuova installazione; controlla il nome per un servizio esistente.',
     container_conflict: 'Esiste gia il container previsto. Usa status; recupero o sostituzione richiedono un intervento esplicito sul solo container.',
     container_not_running: 'Il container e fermo o in errore. Chiedi al gestore locale di ripristinarlo, poi ripeti status.',
@@ -34,7 +39,7 @@ export const MESSAGES = Object.freeze({
     node24_required: 'Esegui questa procedura con Node.js 24.',
 });
 class SetupError extends Error {
-    constructor(code, details = []) { super(MESSAGES[code]); this.code = code; this.details = details; }
+    constructor(code, details = []) { super(MESSAGES[code] ?? code); this.code = code; this.details = details; }
 }
 const fail = (code, details) => { throw new SetupError(code, details); };
 
@@ -52,12 +57,17 @@ export function readManifest(filename) {
     try {
         const stat = lstatSync(filename);
         if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 32768) fail('manifest_unreadable');
+        if (process.platform === 'win32') windowsAcl(filename);
         return JSON.parse(readFileSync(filename, 'utf8'));
     } catch { fail('manifest_unreadable'); }
 }
 function writePrivate(filename, content) {
     privatePath(filename);
-    try { writeFileSync(filename, content, { flag: 'wx', mode: 0o600 }); }
+    try {
+        if (process.platform === 'win32') windowsAcl(path.dirname(filename), { directory: true });
+        writeFileSync(filename, content, { flag: 'wx', mode: 0o600 });
+        if (process.platform === 'win32') windowsAcl(filename);
+    }
     catch { fail('output_exists_or_unwritable'); }
 }
 export function parseArguments(args) {
@@ -80,14 +90,31 @@ export function parseArguments(args) {
     return options;
 }
 
+export function dockerFailure(result, args) {
+    const code = result.error?.code === 'ENOENT' ? 'docker_cli_missing'
+        : result.status === 127 ? 'docker_executable_missing'
+            : result.status === 126 || result.error?.code === 'EACCES' ? 'docker_executable_denied'
+                : result.error?.code === 'ETIMEDOUT' ? 'docker_command_timeout' : 'docker_unavailable';
+    const execIndex = args[0] === '--context' ? 2 : 0;
+    const executable = args[execIndex] === 'exec' && /^[a-zA-Z0-9_.-]{1,64}$/u.test(args[execIndex + 2] ?? '')
+        ? args[execIndex + 2] : 'docker';
+    const details = { code, executable,
+        ...(Number.isInteger(result.status) ? { exitCode: result.status } : {}),
+        ...(/^[A-Z0-9_]{1,48}$/u.test(result.error?.code ?? '') ? { systemCode: result.error.code } : {}) };
+    const error = new SetupError(code, details);
+    if (Number.isInteger(result.status)) error.exitCode = result.status;
+    return error;
+}
 export function runDocker(args, timeout = 8000) {
-    // Raw Docker output may contain host metadata: it is consumed privately, never logged.
-    const result = spawnSync('docker', args, { encoding: 'utf8', timeout, maxBuffer: 128 * 1024, shell: false });
-    if (result.error || result.status !== 0) fail('docker_unavailable');
+    // Private raw output is never logged or copied to qualification receipts.
+    const result = spawnSync('docker', args, { encoding: 'utf8', timeout, maxBuffer: 128 * 1024, shell: false, env: dockerEnvironment() });
+    if (result.error || result.status !== 0) throw dockerFailure(result, args);
     return result.stdout.trim();
 }
 const json = value => { try { return JSON.parse(value); } catch { fail('docker_unavailable'); } };
-export function localEngine(context, run) {
+export function localEngine(context, run, options = {}) {
+    if (options.proposed) return inspectLocalEngine(context, run, options.host);
+    // Preserve the legacy v1 Unix/ARM64 rule; multiarchitecture is explicitly v2.
     const endpoint = run(['context', 'inspect', context, '--format', '{{.Endpoints.docker.Host}}']);
     if (!/^unix:\/\/\//u.test(endpoint) || /[\r\n\0]/u.test(endpoint)) fail('local_context_required');
     const info = json(run(['--context', context, 'info', '--format', '{"os":{{json .OSType}},"arch":{{json .Architecture}}}']));
@@ -98,14 +125,21 @@ function names(context, container, run) {
     const exactName = container.replaceAll('.', '\\.');
     return run(['--context', context, 'container', 'ls', '--all', '--filter', `name=^/${exactName}$`, '--format', '{{.Names}}']).split('\n');
 }
-export function inspectStatus(manifest, context, container, run = runDocker) {
-    localEngine(context, run);
-    if (!names(context, container, run).includes(container)) return { state: 'container_absent', matching: false };
-    const c = json(run(['--context', context, 'container', 'inspect', container, '--format', containerFormat]));
+export function inspectStatus(manifest, context, container, run = runDocker, options = {}) {
+    const proposed = manifest.schemaVersion === 'mediflow.who-local-sidecar.manifest.v2';
+    const engine = localEngine(context, run, { proposed, host: options.host });
+    if (proposed && engine.platform !== manifest.image.platform) fail('platform_mismatch');
+    if (proposed && options.engineBinding) assertSameEngine(options.engineBinding, engine);
+    const read = proposed ? (args, timeout) => {
+        assertSameEngine(engine, localEngine(context, run, { proposed: true, host: options.host }));
+        return run(args, timeout);
+    } : run;
+    if (!names(context, container, read).includes(container)) return { state: 'container_absent', matching: false };
+    const c = json(read(['--context', context, 'container', 'inspect', container, '--format', containerFormat]));
     if (typeof c.imageId !== 'string' || !/^sha256:[0-9a-f]{64}$/u.test(c.imageId)) fail('docker_unavailable');
-    const im = json(run(['--context', context, 'image', 'inspect', c.imageId, '--format', '{"digests":{{json .RepoDigests}},"os":{{json .Os}},"arch":{{json .Architecture}}}']));
+    const im = json(read(['--context', context, 'image', 'inspect', c.imageId, '--format', '{"digests":{{json .RepoDigests}},"os":{{json .Os}},"arch":{{json .Architecture}}}']));
     const ports = c.ports?.['80/tcp'];
-    const matching = im.os === 'linux' && im.arch === 'arm64'
+    const matching = im.os === 'linux' && (proposed ? `linux/${engineArchitecture(im.arch)}` === manifest.image.platform : im.arch === 'arm64')
         && Array.isArray(im.digests) && im.digests.includes(`${manifest.image.repository}@${manifest.image.digest}`)
         && c.mountCount === 0 && c.privileged === false && typeof c.network === 'string' && c.network !== 'host' && !c.network.startsWith('container:')
         && c.restart === 'no' && Array.isArray(ports) && ports.length === 1
@@ -141,13 +175,13 @@ export async function executeSetup(options, dependencies = {}) {
     if (provisionErrors.length) fail('prerequisites_incomplete', provisionErrors);
     const container = options.container ?? CONTAINER_NAME;
     if (action === 'status') {
-        const status = inspectStatus(manifest, context, container, run);
+        const status = inspectStatus(manifest, context, container, run, { host: dependencies.host });
         return { ...status, activationErrors, message: MESSAGES[status.state] ?? 'Container in esecuzione; metadati coerenti. La ricerca applicativa resta da verificare.', next: activationErrors.length ? 'Completa inventario e qualifica offline/ripristino prima di configure.' : 'Esegui configure se desideri attivare MediFlow, poi la verifica di esempio nelle impostazioni.' };
     }
     if (action === 'configure') {
         if (options.confirm !== ENABLE_CONFIRMATION) fail('confirmation_required');
         const config = configurationText(manifest);
-        const status = inspectStatus(manifest, context, container, run);
+        const status = inspectStatus(manifest, context, container, run, { host: dependencies.host });
         if (status.state !== 'running') fail(status.state);
         writePrivate(options.output, config);
         return { state: 'configuration_written', next: 'Carica il file nel prossimo avvio autorizzato del server con Node 24 --env-file. Rileggi la configurazione e verifica il termine di esempio in Impostazioni > Terminologia WHO. Il processo corrente non e stato modificato.' };
@@ -156,13 +190,15 @@ export async function executeSetup(options, dependencies = {}) {
     if (options.confirm !== INSTALL_CONFIRMATION) fail('confirmation_required');
     if (manifest.dataset.snapshotId !== null || manifest.dataset.snapshotInventorySha256 !== null
         || manifest.dataset.offlineRestartVerified || manifest.dataset.restoreVerified) fail('fresh_qualification_required');
-    localEngine(context, run);
+    const proposed = manifest.schemaVersion === 'mediflow.who-local-sidecar.manifest.v2';
+    const engine = localEngine(context, run, { proposed, host: dependencies.host });
+    if (proposed && engine.platform !== manifest.image.platform) fail('platform_mismatch');
     if (names(context, CONTAINER_NAME, run).includes(CONTAINER_NAME)) fail('container_conflict');
     await portFree();
     const image = `${manifest.image.repository}@${manifest.image.digest}`;
     const command = (phase, args, timeout) => { try { return run(['--context', context, ...args], timeout); } catch { fail(phase); } };
-    command('pull_failed', ['image', 'pull', '--platform', 'linux/arm64', '--quiet', image], 15 * 60 * 1000);
-    const id = command('create_failed', ['container', 'create', '--name', CONTAINER_NAME, '--platform', 'linux/arm64',
+    command('pull_failed', ['image', 'pull', '--platform', manifest.image.platform, '--quiet', image], 15 * 60 * 1000);
+    const id = command('create_failed', ['container', 'create', '--name', CONTAINER_NAME, '--platform', manifest.image.platform,
         '--label', `org.mediflow.owner=${owner}`, '--restart', 'no', '--publish', '127.0.0.1:8382:80',
         '--env', 'acceptLicense=true', '--env', 'include=2026-01_en', '--env', 'saveAnalytics=false',
         '--env', 'enableDoris=false', '--env', 'fhirSupport=false', image]);

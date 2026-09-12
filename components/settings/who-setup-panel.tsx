@@ -52,7 +52,7 @@ export function WhoSetupPanel() {
         <details className="mt-5 text-sm">
             <summary className="cursor-pointer font-medium">Per chi gestisce il server</summary>
             <p className="mt-3 leading-6">Il setup host conserva manifesto, consenso, snapshot e prove nella cartella privata MediFlow/WHO. Non espone Docker al Web. Per controllare o riprendere le verifiche del solo servizio creato dalla procedura:</p>
-            <pre className="mt-3 whitespace-pre-wrap break-all text-xs leading-5"><code>{'./Setup_WHO.command status\n./Setup_WHO.command qualify'}</code></pre>
+            <pre className="mt-3 whitespace-pre-wrap break-all text-xs leading-5"><code>{'node scripts/who-local-onboarding.mjs status\nnode scripts/who-local-onboarding.mjs qualify'}</code></pre>
             <p className="mt-3 leading-6">La procedura completa è in docs/icd-who-setup.md. La CLI tecnica precedente resta disponibile per deployment gestiti separatamente; le prove di un altro deployment non si ereditano.</p>
             <dl className="mt-4 space-y-2 break-words text-xs">
                 <div><dt><code>MEDIFLOW_ICD_WHO_ENABLED</code></dt><dd>1, soltanto quando vuoi abilitare il servizio.</dd></div>

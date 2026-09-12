@@ -240,3 +240,16 @@ test('standalone config traces the pinned Apple Vision canvas runtime', () => {
   assert.equal(installedManifest.version, '0.1.100');
   assert.equal(installedManifest.optionalDependencies?.['@napi-rs/canvas-darwin-arm64'], '0.1.100');
 });
+
+// Follow-up 1: isolated physical bundle fixtures, not a Next build or model run.
+test('Treatment portable bundle requires exact worker/CLI/TS closure and rejects data/runtime/secrets', () => {
+  const result = runSelfTest('--self-test=treatment-portable');
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  const evidence = JSON.parse(result.stdout.trim());
+  assert.equal(evidence.liveInference, false); assert.ok(evidence.cases >= 23);
+  const config = fs.readFileSync(path.join(root, 'next.config.ts'), 'utf8');
+  for (const relative of ["scripts/treatment-reasoning-portable-worker.py", "scripts/treatment-reasoning-portable-setup.mjs", "lib/ai-providers/fabric/treatment-reasoning-portable-provisioning.ts", "lib/athena-model-identity.ts", "scripts/node-runtime-contract.mjs", ".nvmrc"]) assert.ok(config.includes(`"./${relative}"`), `Trace missing ${relative}`);
+  const source = fs.readFileSync(checker, 'utf8');
+  assert.match(source, /bundledTreatmentPortableFailure\(standaloneDir, root\)/u);
+  assert.match(config, /\*\*\/\*\.safetensors/u);
+});

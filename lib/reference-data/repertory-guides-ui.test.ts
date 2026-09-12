@@ -129,14 +129,28 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`, 390, async rou
     try {
         const p = f.page; const guide = p.getByTestId('who-local-setup-guide'); const summary = guide.locator('summary');
         await summary.click(); await expect(guide).toContainText('Questa pagina guida i passaggi');
+        await expect(guide.getByRole('combobox')).toHaveValue('node');
         const install = guide.getByRole('button', { name: '3. Installa e avvia', exact: true });
         await expect(install).toBeDisabled(); await guide.getByRole('button', { name: '2. Licenza', exact: true }).click();
         const consent = guide.getByRole('checkbox'); await expect(consent).not.toBeChecked();
         await expect(guide.getByRole('button', { name: 'Avanti', exact: true })).toBeDisabled();
-        await consent.check(); await install.click(); await expect(guide.getByText('./Setup_WHO.command', { exact: true })).toBeVisible();
-        await guide.getByRole('button', { name: 'Copia ./Setup_WHO.command', exact: true }).click();
-        await expect(guide.getByText('Comando copiato. Non è stato eseguito.', { exact: true })).toBeVisible();
-        assert.equal(await p.evaluate(() => navigator.clipboard.readText()), './Setup_WHO.command');
+        await consent.check(); await install.click();
+        const commands = { node: 'node scripts/who-local-onboarding.mjs', darwin: './Setup_WHO.command',
+            win32: '.\\Setup_WHO.ps1', linux: 'bash ./Setup_WHO.sh' };
+        for (const [host, command] of Object.entries(commands)) {
+            if (host !== 'node') {
+                await guide.getByRole('button', { name: '1. Prepara', exact: true }).click();
+                await guide.getByRole('combobox').selectOption(host);
+                await expect(guide.getByRole('combobox')).toHaveValue(host);
+                await install.click();
+            }
+            await expect(guide.getByText(command, { exact: true })).toBeVisible();
+            await expect(guide.getByText('Comando copiato. Non è stato eseguito.', { exact: true })).toHaveCount(0);
+            await guide.getByRole('button', { name: `Copia ${command}`, exact: true }).click();
+            await expect(guide.getByText('Comando copiato. Non è stato eseguito.', { exact: true })).toBeVisible();
+            assert.equal(await p.evaluate(() => navigator.clipboard.readText()), command);
+            assert.equal(calls, 0); // Showing/copying every host command sends no request.
+        }
         await guide.getByRole('button', { name: '4. Verifica', exact: true }).click();
         await expect(guide).toContainText('non conferma una risposta del servizio');
         await guide.getByRole('button', { name: 'Rileggi stato WHO', exact: true }).click();
