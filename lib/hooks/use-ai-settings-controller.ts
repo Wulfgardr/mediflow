@@ -54,6 +54,21 @@ type AIConfigState = {
     url: string;
 };
 
+type AISettingsStore = Pick<typeof db.settings, 'put'>;
+
+/* @Codex: the ordinary clinical-functions save persists the fixed local binding required by ADR 0136. */
+export async function saveLocalOllamaBinding(
+    configuration: Pick<AIConfigState, 'model_clinical' | 'model_reasoning' | 'url'>,
+    settings: AISettingsStore = db.settings,
+) {
+    await settings.put({ key: 'aiProvider', value: 'ollama' });
+    await settings.put({ key: 'aiModel_clinical', value: configuration.model_clinical });
+    await settings.put({ key: 'aiModel_reasoning', value: configuration.model_reasoning });
+    await settings.put({ key: 'aiModel', value: configuration.model_clinical });
+    await settings.put({ key: 'aiUrl', value: configuration.url });
+    await settings.put({ key: 'ollamaUrl', value: configuration.url });
+}
+
 type AIHealthState = {
     status: 'ok' | 'error';
     message: string;
@@ -188,11 +203,7 @@ export function useAiSettingsController() {
         setIsSavingAi(true);
         try {
             await db.settings.put({ key: 'hardwareProfile', value: hardwareProfile });
-            await db.settings.put({ key: 'aiModel_clinical', value: aiConfig.model_clinical });
-            await db.settings.put({ key: 'aiModel_reasoning', value: aiConfig.model_reasoning });
-            await db.settings.put({ key: 'aiModel', value: aiConfig.model_clinical });
-            await db.settings.put({ key: 'aiUrl', value: aiConfig.url });
-            await db.settings.put({ key: 'ollamaUrl', value: aiConfig.url });
+            await saveLocalOllamaBinding(aiConfig);
             await db.settings.put({
                 key: DOCUMENT_ROUTER_CONTROL_FLOW_SETTING_KEY,
                 value: documentRouterControlFlowMode,
