@@ -556,8 +556,9 @@ export async function qualifyOwnedDeployment(state, lock, directory, dependencie
         }
         check(); assertOwnedContainer(state, restoreId, command, false); assertOwnedNetwork(state, offlineNetwork, command);
         command(['container', 'start', restoreId], 30000);
-        if (state.engineBinding?.hostPlatform === 'win32') {
-            // Existing explicit prerequisite, not inferred from WHO image metadata.
+        if (['win32', 'darwin'].includes(state.engineBinding?.hostPlatform)) {
+            // @Codex: Docker cp can preserve host ownership on Mac as well as Windows.
+            // Restore the existing root/0644 contract before the strict metadata readback.
             for (const file of metadata) {
                 check(); assertOffline(state, restoreId, offlineNetwork, command);
                 command(['exec', restoreId, 'chown', '0:0', '--', `/tmp/${file.relativePath}`]);
