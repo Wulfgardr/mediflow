@@ -11,6 +11,41 @@ La ricerca documenta requisiti, condizioni ed evidenze nel sorgente pubblico.
 Non attesta conformità, adeguatezza di un deployment, qualificazione del
 prodotto, adozione di procedure o completamento di WUL-686/687/688.
 
+### Raccordo tecnico del 12 settembre 2026
+
+Le sezioni successive conservano la fotografia del 6 settembre e le sue
+baseline. Questo aggiornamento aggiunge prove delimitate; non sostituisce la
+matrice con un'attestazione della release corrente.
+
+Il sorgente esaminato è `65d0a3ac36e8e7dbe918fd366c6855e56123a6c6`.
+La QA localhost usata per le prove interattive ha invece build
+`4kDmyY4VX6cfJMZhKj12d`, precedente a quel sorgente. Le integrazioni OpenAI e
+OCR sono ancora in corso. **Non esiste ancora una qualifica finale ottenuta
+sommando queste prove.** Il gate WUL-697 richiede la stessa candidata per Mac,
+localhost e Headless sul Mac; WUL-680 e la decisione WUL-688 restano aperti.
+
+| Raccordo | Prova eseguita | Limite conservato |
+| --- | --- | --- |
+| P2, export PDF | Dal comando ordinario della scheda sintetica è stato scaricato un PDF di 9.080 byte. Estrazione del testo e ispezione della pagina renderizzata confermano identità sintetica, nota manuale e scala ADL 6/6, senza tagli o sovrapposizioni osservati. | Prova sulla QA precedente, non sulla candidata finale. Restano le esclusioni della matrice §6.1: non è un export completo per una richiesta di accesso. |
+| P3, restore | Sul sorgente indicato, [backup-total-roundtrip.test.ts](../../lib/backup-total-roundtrip.test.ts) eseguito con Node 24.19.0 e directory dati sintetiche isolate: 7 test superati, nessun errore o skip, codice di uscita 0. Verificati scheduler e ripristino delle collezioni previste, conservazione dei byte cifrati, controlli di autorità, audit e rollback. | Non prova l'interfaccia del ripristino, la gestione delle copie esterne, i tempi legali di conservazione o la gestione dei record cancellati dopo la creazione del backup. P3 resta parzialmente coperto. |
+| P3, distinzione del drill | Lo [script del drill](../../scripts/backup-restore-drill.mjs) dichiara `sandbox-payload-materialization`: materializza il payload JSON e verifica il preflight. Non è stato eseguito in questo raccordo. | Non presentarlo come prova del ripristino effettivo del database. |
+
+Provenienza delle prove, conservate nel checkpoint locale di collaudo fuori
+da Git, senza database o sessioni nel dossier pubblico:
+
+- PDF sintetico, SHA-256:
+  `653d51e0bfe05ae6903237e071ae512c5806a4132913034a76fd677b6b358c97`.
+- Output originale dei test di restore, SHA-256:
+  `d7b55920966a26d7dfeab4a8a59527896326e2c521f8793a6035704ca93ed23a`.
+- Ricevute: `localhost-pdf-report.json` e
+  `backup-total-roundtrip-current.json`, con superficie, versione, esito e limiti.
+
+La responsabilità operativa del seguito e della revisione è stata indicata
+dall'utente nel registro locale, con eventuale supporto legale. Questo non
+equivale a revisione già effettuata, nomina, base giuridica o classificazione.
+La conclusione dovrà riferirsi alla candidata esatta e alle decisioni
+applicabili; non è richiesta qui una nuova attribuzione personale pubblica.
+
 ## 1. Perimetro e metodo
 
 Sono stati letti AGENTS, CONTRIBUTING, SECURITY, i confini pertinenti di
