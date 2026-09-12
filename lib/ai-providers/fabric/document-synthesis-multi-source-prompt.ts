@@ -1,5 +1,6 @@
 /* @Codex */
 import 'server-only';
+import { emissionPlan, emissionUnit, utf8Length, renderEmissionPlan, type EmissionPart, type EmissionPlan } from '../../chatgpt-execution/ordinary-emission-plan';
 
 import { types } from 'node:util';
 
@@ -24,11 +25,6 @@ const ArrayIsArray = Array.isArray;
 const NumberIsSafeInteger = Number.isSafeInteger;
 const StringConstructor = String;
 const IsProxy = types.isProxy;
-const JSON_OBJECT = JSON;
-const JSONStringify = JSON.stringify;
-const TextEncoderConstructor = TextEncoder;
-const TextEncoderEncode = TextEncoder.prototype.encode;
-const encoder = new TextEncoderConstructor();
 const COMMON = { reviewOnly: true as const, writesPerformed: 0 as const, applyPolicy: 'none' as const };
 const PREFIX = [
     "MediFlow Document Synthesis Provider Envelope v2.",
@@ -100,20 +96,26 @@ function denied(): DocumentSynthesisMultiSourcePromptResult {
 
 /** Builds the fixed provider prompt from the private C3c2 source-set identity only. */
 export function buildDocumentSynthesisMultiSourcePrompt(sourceSet: unknown): DocumentSynthesisMultiSourcePromptResult {
+    const plan = buildDocumentSynthesisMultiSourcePlan(sourceSet);
+    return plan ? sealed({ status: 'available' as const, code: null, schemaVersion: DOCUMENT_SYNTHESIS_MULTI_SOURCE_PROMPT_SCHEMA_VERSION,
+        prompt: renderEmissionPlan(plan), ...COMMON }) as DocumentSynthesisMultiSourcePromptResult : denied();
+}
+
+/** Uses the same private source-set, never a rewritten projection. */
+export function buildDocumentSynthesisMultiSourcePlan(sourceSet: unknown): EmissionPlan | null {
     try {
         const projection = composeDocumentSynthesisProviderProjection(sourceSet);
         const root = projection && record(projection, ['schemaVersion', 'sources']);
         const sources = root && root.schemaVersion === 'mediflow.document-synthesis.provider-projection.v1' ? list(root.sources) : null;
-        if (!root || !sources) return denied();
-        let prompt = `${PREFIX}\nSOURCE_COUNT ${sources.length}`;
+        if (!root || !sources) return null;
+        const parts: EmissionPart[] = [`${PREFIX}\nSOURCE_COUNT ${sources.length}`];
         for (let index = 0; index < sources.length; index += 1) {
             const item = record(sources[index], ['label', 'sourceText']); const label = `S${index + 1}`;
-            if (!item || item.label !== label || typeof item.sourceText !== 'string') return denied();
-            const encoded = ReflectApply(JSONStringify, JSON_OBJECT, [item.sourceText]);
-            const bytes = ReflectApply(TextEncoderEncode, encoder, [item.sourceText]) as Uint8Array;
-            if (typeof encoded !== 'string') return denied();
-            prompt += `\nSOURCE ${label} UTF8_BYTES ${bytes.length} JSON_TEXT ${encoded}`;
+            if (!item || item.label !== label || typeof item.sourceText !== 'string') return null;
+            const unit = emissionUnit(item.sourceText, 'json-string');
+            parts.push(`\nSOURCE ${label} UTF8_BYTES `, utf8Length(unit), ' JSON_TEXT ', unit);
         }
-        return sealed({ status: 'available' as const, code: null, schemaVersion: DOCUMENT_SYNTHESIS_MULTI_SOURCE_PROMPT_SCHEMA_VERSION, prompt: `${prompt}\nEND_SOURCE_SET`, ...COMMON }) as DocumentSynthesisMultiSourcePromptResult;
-    } catch { return denied(); }
+        parts[parts.length] = '\nEND_SOURCE_SET';
+        return emissionPlan(parts);
+    } catch { return null; }
 }

@@ -302,6 +302,35 @@ revoca e cambio contesto, modello rimosso e quota, chiusura e pubblicazione,
 assenza di fallback e regressione dei percorsi locali. Il ponte e i profili
 sono implementazioni candidate fino a queste verifiche, non prove di rilascio.
 
+## Raccordo redatto dei profili — candidata 462f1652
+
+I builder nominati producono un piano di emissione: letterali e campi strutturali,
+unita dati decodificate e codifica text/json-string. Senza redazione il rendering
+resta byte-identico; per DS UTF8_BYTES e derivato dalla stessa unita effettivamente
+inviata. Il source-set originale e i parser canonici non vengono sostituiti.
+Una preparazione possiede una sola sessione RAM e un runner locale, usa batch di
+unita intere entro 12000 UTF16 e respinge span fra unita o su surrogate. Il runner
+viene chiuso al termine della preparazione; la mappa vive solo fino alla consegna
+o revoca. Il risultato remoto passa prima dallo scanner lessicale, con isolamento
+dei token per envelope e reidratazione delle sole stringhe dati ammesse. Non si
+riparano chiavi, tipi, numeri, citazioni o limiti del contratto canonico.
+
+Un unico envelope di contenuto {input, outputSchema} e serializzato UTF8 e congelato
+prima della disclosure; il suo hash e distinto dall'hash del contesto originale.
+Il consenso ordinario e un oggetto privato, legato alla sessione autenticata,
+al contesto/tentativo/qualifica e alla preparazione precisa; il browser puo
+soltanto accettare la sua revisione. Il pannello DEMO non ospita input o output
+ordinari. Un risultato ordinario torna al proprietario della funzione per il
+binding/commit e contiene provenienza ChatGPT, mai un'attestazione locale.
+
+Questa candidata non emette l'ammissione egress: il gate degli ADR0033/0077 rimane
+chiuso. Ne un consenso, ne un profilo registrato, ne shadowReady, ne una sessione
+Web provano da soli provenienza/currentness del contesto o governance. Gli innesti
+nei root delle quattro funzioni devono preservare i loro lease e commit originali;
+assenza di un binding autentico o della decisione vigente rimane un blocco, non
+viene compensata da callback o flag positivi. Nessun risultato dei test sintetici
+costituisce ammissione di dati reali o completamento di WUL-689/691.
+
 ## Fonti
 
 - [ConfigToml del tag verificato](https://github.com/openai/codex/blob/3d2ee51ca2d5db578f328aa75e20aa22c0197c9a/codex-rs/config/src/config_toml.rs),

@@ -289,10 +289,13 @@ test('source identity and hashes validated before transport', () => {
     assert.equal(transport.calls.length, 0);
 });
 
-test('service has no clinical writer, filesystem, shell or transitive application runtime imports', () => {
+test('service has only named content/consent/egress imports and no clinical writer or direct IO', () => {
     const code = readFileSync(new URL('./execution-service.ts', import.meta.url), 'utf8');
     const imports = [...code.matchAll(/^import\s+(?!type\b).*?from\s+'([^']+)'/gm)].map(match => match[1]);
-    assert.deepEqual(imports, ['node:crypto', 'node:path', './execution-contract']);
+    assert.deepEqual(imports, ['node:crypto', 'node:path', './execution-contract', './ordinary-preparation',
+        '../chatgpt-product/product-consent', './ordinary-egress-chokepoint']);
+    assert.doesNotMatch(code, /export\s+(?:async\s+)?function\s+createTaskExecutionService/);
+    assert.doesNotMatch(code, /from\s+['"][^'"]*(?:db|server-auth|registry|ollama)[^'"]*['"]/);
     assert.match(code, /^import 'server-only';/m);
     assert.doesNotMatch(code, /\b(?:require|eval)\s*\(|import\s*\(|\bprocess\.|node:(?:fs|child_process|net|http)/);
     const contract = readFileSync(new URL('./execution-contract.ts', import.meta.url), 'utf8');
