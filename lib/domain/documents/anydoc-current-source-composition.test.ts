@@ -27,6 +27,9 @@ const { composeAnyDocCurrentSourceExtraction, composeAnyDocCurrentSelectionExtra
 const { serverSessionProjectionOwnerRegistry } = productionOwnerModule;
 const { issueSyntheticWebSession, issueSyntheticWebSessionContext, retireSyntheticWebSession } = webFixtureModule;
 const { retire } = await import('../../security/web-auth-lifecycle-owner-adapter.ts');
+const { acquireAttachmentExtractionProjection } = await import('./attachment-extraction-projection-broker.ts');
+const { composeAnyDocClientProjectionExtraction } = compositionModule;
+const { encryptData, decryptData } = await import('../../security/security.ts');
 const PATIENT = 'patient.synthetic.p1d';
 const ATTACHMENT = 'attachment.synthetic.p1d';
 const AMBULATORY = 'ambulatory.synthetic.p1d';
@@ -342,4 +345,101 @@ test('admits the complete local OCR continuation before page work and releases i
     assert.ok(admissionAt >= 0); assert.ok(routingAt > admissionAt);
     assert.match(source, /return mapAnyDocLocalFailure\(source, 'resourceLimit'\)/u);
     assert.match(source, /finally \{ activeLocalOcrDocument = false; \}/u);
+});
+
+/* @Codex: production SQLite/migrations + unchanged security primitives + real AnyDoc worker.
+ * These tests require the canonical Node24 dependency tree; the delivery harness does not replace this gate. */
+
+async function seedEncrypted(bytes: Buffer = RTF) {
+    const masterKey = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
+    const plaintext = `data:application/rtf;base64,${bytes.toString('base64')}`;
+    const encrypted = await encryptData(plaintext, masterKey);
+    const ciphertext = `ENC:${encrypted.iv}:${encrypted.data}`;
+    seed(ciphertext);
+    return { ciphertext, masterKey };
+}
+function projectionRequest(bytes: Uint8Array): Request {
+    return new Request(`http://127.0.0.1/api/attachments/${ATTACHMENT}/local-extraction`, {
+        method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: new Uint8Array(bytes).buffer,
+    });
+}
+function persistedAttachment() {
+    const db = new Database(dbPath);
+    try { return db.prepare('SELECT * FROM attachments WHERE id = ?').get(ATTACHMENT) as Record<string, unknown>; }
+    finally { db.close(); }
+}
+
+test('ordinary ENC persistence can produce real AnyDoc preview via authenticated client decryption, never a plaintext DB write', async () => {
+    const { ciphertext, masterKey } = await seedEncrypted(); const active = session();
+    const before = persistedAttachment();
+    assert.equal((await composeAnyDocCurrentSourceExtraction(active, { attachmentId: ATTACHMENT })).status, 'denied');
+    const grant = acquireAttachmentExtractionProjection(active, ATTACHMENT); assert.ok(grant);
+    const [, iv, sealed] = ciphertext.split(':');
+    const source = await decryptData(sealed!, iv!, masterKey); assert.equal(typeof source, 'string');
+    const bytes = Buffer.from((source as string).split(',')[1]!, 'base64');
+    const response = await composeAnyDocClientProjectionExtraction(active, { attachmentId: ATTACHMENT }, grant.grantId, projectionRequest(bytes));
+    assert.equal(response.status, 200); assert.equal(response.headers.get('Cache-Control'), 'no-store');
+    const envelope = await response.json();
+    assert.deepEqual(envelope.acquisition, { origin: 'authenticated_client_decryption', ciphertextEquality: 'not_attested',
+        canonicalSource: { sourceRef: REF, revision: 1, freshnessEpoch: 1 } });
+    assert.equal(envelope.extraction.status, 'extracted'); assert.equal(envelope.extraction.markdown, 'Synthetic current source note.');
+    assert.equal(envelope.extraction.provenance.sourceSha256, createHash('sha256').update(RTF).digest('hex'));
+    assert.deepEqual([envelope.extraction.review, envelope.extraction.writes, envelope.extraction.apply], ['required', 0, 'none']);
+    assert.deepEqual(persistedAttachment(), before); assert.match(persistedAttachment().data as string, /^ENC:/);
+    assert.equal((await composeAnyDocClientProjectionExtraction(active, { attachmentId: ATTACHMENT }, grant.grantId, projectionRequest(bytes))).status, 409);
+});
+
+for (const change of ['revision', 'ciphertext-only', 'delete', 'selection', 'revoke'] as const)
+    test(`encrypted source ${change} cannot publish from a previously acquired projection grant`, async () => {
+        await seedEncrypted(); const active = session();
+        const grant = acquireAttachmentExtractionProjection(active, ATTACHMENT); assert.ok(grant);
+        const db = new Database(dbPath);
+        try {
+            if (change === 'revision') db.prepare('UPDATE attachments SET document_revision = 2 WHERE id = ?').run(ATTACHMENT);
+            if (change === 'ciphertext-only') db.prepare('UPDATE attachments SET data = ? WHERE id = ?').run('ENC:changed:same-canonical-tuple', ATTACHMENT);
+            if (change === 'delete') db.prepare('DELETE FROM attachments WHERE id = ?').run(ATTACHMENT);
+        } finally { db.close(); }
+        if (change === 'selection') serverSessionProjectionOwnerRegistry.acquire(active)
+            .issueSelection({ expectedEpoch: 1, patientId: PATIENT, ambulatoryId: AMBULATORY });
+        if (change === 'revoke') retireSyntheticWebSession(active);
+        const response = await composeAnyDocClientProjectionExtraction(active, { attachmentId: ATTACHMENT }, grant.grantId, projectionRequest(RTF));
+        assert.equal(response.status, 409); assert.deepEqual(await response.json(), { error: 'Local extraction unavailable' });
+    });
+
+test('real lock retires a projection while HTTP body acquisition is suspended', async () => {
+    await seedEncrypted();
+    const web = issueSyntheticWebSessionContext({ id: 'user.synthetic.p1d', username: path.basename(dataDir), role: 'clinician' },
+        `encrypted-lock-${sessionSequence += 1}`); finalSessions.push(web.session);
+    const grant = acquireAttachmentExtractionProjection(web.session, ATTACHMENT); assert.ok(grant);
+    const reached = Promise.withResolvers<void>(); let cancelled = false;
+    const body = new ReadableStream<Uint8Array>({ pull() { reached.resolve(); }, cancel() { cancelled = true; } }, { highWaterMark: 0 });
+    const request = new Request('http://127.0.0.1/', { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body,
+        duplex: 'half' } as RequestInit);
+    const pending = composeAnyDocClientProjectionExtraction(web.session, { attachmentId: ATTACHMENT }, grant.grantId, request);
+    await reached.promise;
+    assert.equal(retire(web.session, 'lock', { controlId: web.controlId, ifMatch: web.etag,
+        idempotencyKey: 'synthetic-encrypted-projection-lock' }).outcome, 'completed');
+    assert.equal((await pending).status, 409); assert.equal(cancelled, true);
+});
+
+test('encrypted unsupported bytes stay review-only under the real AnyDoc worker', async () => {
+    const bytes = Buffer.from([0, 1, 2, 3]); await seedEncrypted(bytes); const active = session(); const before = persistedAttachment();
+    const grant = acquireAttachmentExtractionProjection(active, ATTACHMENT); assert.ok(grant);
+    const response = await composeAnyDocClientProjectionExtraction(active, { attachmentId: ATTACHMENT }, grant.grantId, projectionRequest(bytes));
+    assert.equal(response.status, 200); const { extraction } = await response.json();
+    assert.equal(extraction.status, 'review_required'); assert.equal(extraction.markdown, '');
+    assert.equal(extraction.candidateUse, 'blocked'); assert.deepEqual(persistedAttachment(), before);
+});
+
+test('encrypted scanned PDF reaches real Apple Vision only after AnyDoc needsOcr', {
+    skip: process.platform !== 'darwin' || process.arch !== 'arm64',
+}, async () => {
+    const bytes = await syntheticScannedPdf(); await seedEncrypted(bytes); const active = session(); const before = persistedAttachment();
+    const grant = acquireAttachmentExtractionProjection(active, ATTACHMENT); assert.ok(grant);
+    const response = await composeAnyDocClientProjectionExtraction(active, { attachmentId: ATTACHMENT }, grant.grantId, projectionRequest(bytes));
+    assert.equal(response.status, 200); const { extraction } = await response.json();
+    assert.equal(extraction.status, 'extracted'); assert.match(extraction.markdown, /DOCUMENTO SINTETICO/iu);
+    assert.deepEqual([extraction.receipt.ocrProvenance.engine, extraction.receipt.ocrProvenance.pageCount,
+        extraction.receipt.ocrProvenance.ocrPageCount], ['apple_vision', 1, 1]);
+    assert.deepEqual(persistedAttachment(), before);
 });

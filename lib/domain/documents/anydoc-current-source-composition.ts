@@ -14,6 +14,9 @@ import {
     type LocalExtractionResult,
 } from './anydoc-local-extraction-contract';
 import { extractAnyDocLocalBytes } from './anydoc-local-extraction-runner';
+import { claimAttachmentExtractionProjection } from './attachment-extraction-projection-broker';
+import { readAttachmentExtractionProjectionBytes } from './attachment-extraction-projection-transport';
+import { ATTACHMENT_EXTRACTION_PROJECTION_SCHEMA } from './attachment-extraction-projection-protocol';
 
 const create = Object.create;
 const defineProperty = Object.defineProperty;
@@ -113,9 +116,13 @@ async function extractSelectedSource(session: ServerSession, selector: unknown, 
         operation = begun.operation;
         let result: LocalExtractionResult;
         try {
+            if (!authority.checkpoint(operation)) return denied();
             result = await extractAnyDocLocalBytes(id, begun.bytes);
-            if (result.status === 'review_required' && result.detail === 'image_or_scan')
+            if (!authority.checkpoint(operation)) return denied();
+            if (result.status === 'review_required' && result.detail === 'image_or_scan') {
                 result = await continueAnyDocImageOrScanWithLocalOcr(id, begun.bytes, result);
+                if (!authority.checkpoint(operation)) return denied();
+            }
         }
         catch { authority.abort(operation); operation = null; return denied(); }
         const final = authority.finalize(operation); operation = null;
@@ -124,4 +131,41 @@ async function extractSelectedSource(session: ServerSession, selector: unknown, 
         if (operation) authority.abort(operation);
         return denied();
     } finally { authority.dispose(); }
+}
+
+
+/** HTTP publication is constructed synchronously after the last authority check; no await follows finalize. */
+export async function composeAnyDocClientProjectionExtraction(
+    session: ServerSession, selector: unknown, grantId: unknown, request: Request,
+): Promise<Response> {
+    const unavailable = () => Response.json({ error: 'Local extraction unavailable' },
+        { status: 409, headers: { 'Cache-Control': 'no-store' } });
+    const id = attachmentId(selector); if (!id || request.signal.aborted) return unavailable();
+    const use = claimAttachmentExtractionProjection(session, id, grantId); if (!use) return unavailable();
+    const cancel = () => use.cancel();
+    request.signal.addEventListener('abort', cancel, { once: true });
+    let bytes: Uint8Array | null = null;
+    try {
+        if (request.signal.aborted || !use.current()) return unavailable();
+        bytes = await readAttachmentExtractionProjectionBytes(request, use);
+        if (!bytes || request.signal.aborted || !use.current()) return unavailable();
+        const begun = use.consume(bytes);
+        bytes.fill(0); bytes = null;
+        if (!begun || request.signal.aborted || !use.current()) return unavailable();
+        let result = await extractAnyDocLocalBytes(id, begun.bytes);
+        if (request.signal.aborted || !use.current()) return unavailable();
+        if (result.status === 'review_required' && result.detail === 'image_or_scan') {
+            result = await continueAnyDocImageOrScanWithLocalOcr(id, begun.bytes, result);
+            if (request.signal.aborted || !use.current()) return unavailable();
+        }
+        if (result.status === 'denied' || request.signal.aborted || !use.finalize()) return unavailable();
+        return Response.json({
+            schemaVersion: ATTACHMENT_EXTRACTION_PROJECTION_SCHEMA,
+            grantId: use.grant.grantId,
+            acquisition: { origin: 'authenticated_client_decryption', ciphertextEquality: 'not_attested',
+                canonicalSource: use.grant.canonicalSource },
+            extraction: publishFinalizedResult(result),
+        }, { headers: { 'Cache-Control': 'no-store' } });
+    } catch { return unavailable(); }
+    finally { bytes?.fill(0); request.signal.removeEventListener('abort', cancel); use.dispose(); }
 }

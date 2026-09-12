@@ -49,18 +49,31 @@ async function openSyntheticAttachment(page: Page, scenario: Scenario, bytes: Bu
   });
   expect(patientResponse.ok()).toBe(true);
   const patientId = (await patientResponse.json() as { id: string }).id;
-  const id = `ocr-synthetic-${marker}`;
-  const name = `documento-sintetico-${scenario}.${scenario === 'image' ? 'png' : 'pdf'}`;
+  const name = `documento-sintetico-${scenario}-${marker}.${scenario === 'image' ? 'png' : 'pdf'}`;
   const type = scenario === 'image' ? 'image/png' : 'application/pdf';
-  const attachmentResponse = await page.request.post('/api/attachments', {
-    data: { id, patientId, name, type, size: bytes.byteLength, path: `uploads/${name}`,
-      data: `data:${type};base64,${bytes.toString('base64')}` },
-  });
-  expect(attachmentResponse.ok()).toBe(true);
   await page.goto(`/patients/${patientId}/modules`);
   await openPatientSection(page, 'documenti');
   await expect(page.locator('#documenti').getByRole('heading', { name: /Archivio documenti ed evidenze/ })).toBeVisible();
-  return { id, name };
+  // The ordinary facade encrypts the upload. Plaintext API seeds do NOT qualify this test.
+  const saved = page.waitForResponse(response => response.request().method() === 'POST'
+    && new URL(response.url()).pathname === '/api/attachments');
+  await page.locator('#documenti input[type="file"]').setInputFiles({ name, mimeType: type, buffer: bytes });
+  const response = await saved;
+  expect(response.ok()).toBe(true);
+  const uploaded = response.request().postDataJSON() as { id: string; patientId: string; data: string };
+  expect(uploaded.patientId).toBe(patientId);
+  expect(uploaded.data).toMatch(/^ENC:/);
+  const id = uploaded.id;
+  expect(id).toBeTruthy();
+  await expect(page.getByRole('button', { name: `Estrai testo localmente da ${name}` })).toBeVisible();
+  const persistedResponse = await page.request.get(`/api/attachments/${id}`);
+  expect(persistedResponse.ok()).toBe(true);
+  const persisted = await persistedResponse.json();
+  expect(persisted.data).toBe(uploaded.data);
+  for (const key of ['documentSourceRef', 'documentRevision', 'documentFreshnessEpoch'])
+    expect(persisted).not.toHaveProperty(key); // Preserve the ordinary API projection.
+  return { id, name, persisted };
+
 }
 
 for (const scenario of ['text', 'scan', 'mixed', 'image'] as const) {
@@ -72,12 +85,26 @@ for (const scenario of ['text', 'scan', 'mixed', 'image'] as const) {
     await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
     const bytes = await syntheticDocument(scenario);
     const attachment = await openSyntheticAttachment(page, scenario, bytes);
+    const acquirePromise = page.waitForResponse(response => response.request().method() === 'POST'
+      && response.url().endsWith(`/api/attachments/${attachment.id}/local-extraction`)
+      && response.request().headers()['x-mediflow-extraction-action'] === 'acquire');
     const responsePromise = page.waitForResponse(response => response.request().method() === 'POST'
-      && response.url().endsWith(`/api/attachments/${attachment.id}/local-extraction`));
+      && response.url().endsWith(`/api/attachments/${attachment.id}/local-extraction`)
+      && response.request().headers()['x-mediflow-extraction-action'] === 'project');
+    void responsePromise.catch(() => {}); // An acquire failure still reports its own assertion.
     await page.getByRole('button', { name: `Estrai testo localmente da ${attachment.name}` }).click();
+    const acquired = await acquirePromise;
+    expect(acquired.status()).toBe(200);
+    const grant = await acquired.json();
+    expect(grant.canonicalSource.sourceRef).toMatch(/^[a-f0-9]{64}$/);
+    expect(grant.canonicalSource.revision).toBeGreaterThan(0);
+    expect(grant.canonicalSource.freshnessEpoch).toBeGreaterThan(0);
     const response = await responsePromise;
     expect(response.status()).toBe(200);
-    const result = await response.json();
+    const envelope = await response.json();
+    expect(envelope).toMatchObject({ schemaVersion: 'mediflow.attachment_extraction_projection.v1',
+      acquisition: { origin: 'authenticated_client_decryption', ciphertextEquality: 'not_attested', canonicalSource: grant.canonicalSource } });
+    const result = envelope.extraction;
     expect(result).toMatchObject({
       provenance: { attachmentId: attachment.id, sourceSha256: createHash('sha256').update(bytes).digest('hex'), byteLength: bytes.byteLength },
       review: 'required', writes: 0, apply: 'none',
@@ -88,10 +115,12 @@ for (const scenario of ['text', 'scan', 'mixed', 'image'] as const) {
       expect(result.status).toBe('review_required');
       expect(result.receipt.ocrProvenance).toBeUndefined();
       await expect(preview).toHaveCount(0);
-      await expect(page.getByText(/revisione manuale necessaria/).first()).toBeVisible();
+      await expect(page.getByText(/Revisione manuale necessaria/i).first()).toBeVisible();
     } else {
       expect(result).toMatchObject({ status: 'extracted', candidateUse: 'review_only' });
       await expect(preview).toBeVisible();
+      await preview.locator('summary').click();
+      await expect(preview.locator('pre')).toHaveText(result.markdown);
       // AnyDoc normalizes whitespace around punctuation; preserve words and order.
       if (scenario !== 'scan') await expect(preview).toContainText(/PRIMA PAGINA TESTUALE\s*-\s*DOCUMENTO SINTETICO/);
       if (scenario === 'text') {
@@ -104,13 +133,59 @@ for (const scenario of ['text', 'scan', 'mixed', 'image'] as const) {
           engine: 'apple_vision', pageCount: scenario === 'mixed' ? 2 : 1, ocrPageCount: 1,
         });
         expect(result.receipt.ocrProvenance.receiptSetSha256).toMatch(/^[a-f0-9]{64}$/);
-        await expect(preview).toContainText('OCR completato su questo dispositivo');
-        await expect(preview).toContainText(`1 pagina su ${scenario === 'mixed' ? 2 : 1}`);
+        await expect(preview).toContainText('Testo OCR locale · da rivedere');
+        await expect(preview).toContainText(`OCR: 1 pagine su ${scenario === 'mixed' ? 2 : 1}`);
       }
       if (scenario === 'mixed') {
         expect(result.markdown).toMatch(/## Pagina 1[\s\S]*PRIMA PAGINA TESTUALE[\s\S]*## Pagina 2[\s\S]*ULTIMA PAGINA SCANSIONATA/);
       }
     }
+    const after = await page.request.get(`/api/attachments/${attachment.id}`);
+    expect(await after.json()).toEqual(attachment.persisted); // Extraction performs no clinical writes.
     await page.screenshot({ path: testInfo.outputPath(`${scenario}-synthetic.png`), fullPage: true });
   });
 }
+
+/* @Codex: a completed response held by the browser must never reappear after cancellation. */
+test('Upload cifrato: annullamento, risposta tardiva, replay e nuovo tentativo', async ({ page }) => {
+  test.setTimeout(90_000);
+  await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+  const bytes = await syntheticDocument('text');
+  const attachment = await openSyntheticAttachment(page, 'text', bytes);
+  const endpoint = `/api/attachments/${attachment.id}/local-extraction`;
+  const reached = Promise.withResolvers<void>();
+  const release = Promise.withResolvers<void>();
+  const delivered = Promise.withResolvers<void>();
+  let held = true;
+  let token = '';
+  await page.route(`**${endpoint}`, async route => {
+    if (held && route.request().method() === 'POST'
+      && route.request().headers()['x-mediflow-extraction-action'] === 'project') {
+      held = false;
+      token = route.request().headers()['x-mediflow-extraction-grant'];
+      const response = await route.fetch();
+      expect(response.status()).toBe(200); reached.resolve();
+      await release.promise;
+      try { await route.fulfill({ response }); } catch { /* Browser cancellation may close the request first. */ }
+      finally { delivered.resolve(); }
+    } else await route.continue();
+  });
+  try {
+    await page.getByRole('button', { name: `Estrai testo localmente da ${attachment.name}` }).click();
+    await reached.promise;
+    await page.getByRole('button', { name: 'Interrompi attesa' }).click();
+    release.resolve(); await delivered.promise;
+    await expect(page.getByTestId('anydoc-local-extraction-preview')).toHaveCount(0);
+    const replay = await page.request.post(endpoint, { data: bytes, headers: {
+      Origin: new URL(page.url()).origin, 'Content-Type': 'application/octet-stream',
+      'X-MediFlow-Extraction-Action': 'project', 'X-MediFlow-Extraction-Grant': token,
+    } });
+    expect(replay.status()).toBe(409);
+    const retry = page.waitForResponse(response => response.url().endsWith(endpoint)
+      && response.request().headers()['x-mediflow-extraction-action'] === 'project');
+    await page.getByRole('button', { name: `Estrai testo localmente da ${attachment.name}` }).click();
+    expect((await retry).status()).toBe(200);
+    await expect(page.getByTestId('anydoc-local-extraction-preview')).toBeVisible();
+    expect(await (await page.request.get(`/api/attachments/${attachment.id}`)).json()).toEqual(attachment.persisted);
+  } finally { release.resolve(); await page.unroute(`**${endpoint}`); }
+});

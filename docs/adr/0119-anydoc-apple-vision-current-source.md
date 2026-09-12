@@ -106,3 +106,100 @@ discovery del modello non giustificano la loro attivazione.
 WUL-671 resta aperta per completare recupero/errori dalla UI e prova sul pacchetto
 target. WUL-674 dovrà rendere comprensibile la distinzione tra percorso
 documentale e registro Fabric. La scelta estetica globale rimane in WUL-677.
+
+
+## Raccordo WUL-671 del 12 settembre 2026: allegati ordinari cifrati
+
+Il precedente E2E inseriva plaintext via API: non attestava il percorso ordinario
+upload UI → `ENC:`. In questa candidata l'upload e la cifratura restano invariati.
+Si applica la projection client prevista da ADR 0095 §2 con un adattatore
+strettamente documentale; `typed-projection-broker.ts` resta Smart Import-only.
+Non vengono estesi owner auth, schema, PIN, Fabric, DS/SI o motori.
+
+Il client sbloccato chiede una concessione monouso al medesimo endpoint locale
+con `X-MediFlow-Extraction-Action: acquire`. Il server usa la selezione canonica
+corrente compatibile, oppure, per questo nuovo gesto esplicito, il binding
+univoco già previsto. Nessuna fase successiva al grant può riselezionare o
+rinnovare un lease obsoleto. L'owner
+verifica paziente, appartenenza all'ambulatorio, versioni ed epoch. La concessione
+opaca è associata in RAM a sessione, locator, sourceRef/revision/freshness,
+generazione di restore e digest **calcolato dall'host sul dato cifrato memorizzato**.
+Non contiene chiavi o dati clinici. Le versioni e gli hash del caller non sono
+accettati per costruire, rinnovare o validare questa authority.
+
+Dopo la concessione il client rilegge l'allegato con la facade `db` già decifrante,
+tramite un GET `no-store` successivo al grant e invia solo i byte
+richiesti, come `application/octet-stream`, con azione `project` e concessione in
+header. La master key resta nel client. Il server accetta soltanto richieste
+same-origin su loopback, con sessione web valida; nessun endpoint anonimo di
+conversione, percorso file, provider, engine, pagine o URL è accettato. Il corpo
+è letto in streaming bounded, dopo aver riservato monouso la concessione e con
+controlli di currentness prima/dopo ogni attesa di lettura. L'authority copia i
+byte e ricontrolla il ciphertext corrente nello stesso lease del consumo.
+
+La provenienza è esplicita: `authenticated_client_decryption`, con
+`ciphertextEquality: not_attested`. L'host attesta identità/incarnazione e
+currentness della riga cifrata; i digest AnyDoc attestano i byte ricevuti e il
+testo prodotto. **Nessuno di questi dati dimostra crittograficamente che il
+plaintext sia la decifratura di quel ciphertext.** Il client medico sbloccato e
+il suo codice di decifratura sono parte del trust domain ADR 0095. La facade esegue una lettura fresca dopo acquire; consume/finalize verificano
+che il ciphertext host non sia cambiato. Le API ordinarie conservano la
+proiezione senza tuple di currentness: il client non le inventa e non le usa
+come prova contro un client compromesso. Non è previsto trasferire chiavi o introdurre
+una nuova prova crittografica in questo intervento.
+
+AnyDoc resta il primo passaggio; soltanto `image_or_scan` prosegue nella
+composizione OCR esistente, che rende esclusivamente pagine `needsOcr`. Prima e
+dopo ciascun await di composizione l'authority verifica sessione, selezione,
+review, sorgente e restore. Il risultato viene serializzato soltanto dopo il
+finalize corrente. I processi già avviati restano soggetti ai loro timeout
+esistenti: cancel non promette preemption del motore. Impedisce l’avvio della
+continuazione OCR dopo una revoca osservata dalla composizione e ogni
+pubblicazione tardiva; non interrompe le fasi interne già delegate al motore. Nessun cambiamento ai digest degli script o ai limiti dei
+motori. Il percorso senza payload esistente resta compatibile per le sole
+sorgenti già leggibili dall'host; non è il percorso della UI ordinaria.
+
+Limiti dell'adattatore: 25 MiB per sorgente, 16 concessioni in memoria, una
+acquisizione/esecuzione attiva per processo; concessione non usata 30 secondi,
+operazione 120 secondi. Concorrenza eccedente nega senza coda e consente un nuovo
+gesto esplicito. Riutilizzo, sessione diversa, scadenza o source/selection change
+non ammettono retry impliciti. `DELETE` autenticato sullo stesso endpoint revoca
+la concessione; lock/logout revocano anche tramite l'owner. Il segnale sincrono
+`db.getSessionReadSignal()` impedisce al client di continuare fra lock e unmount.
+Cambio selezione, cancellazione e pagehide eliminano la preview transiente.
+
+Le copie mutabili di proprietà di questo adattatore sono azzerate a consumo,
+revoca e termine; concessioni, input e risultati non sono persistiti né loggati.
+Le copie interne dei motori e le stringhe immutabili JavaScript sono rilasciate
+secondo il lifecycle/GC esistente: non si rivendica secure erasure dell'intero
+processo. Nessuna modifica allo storage del client o agli engine. Cache HTTP
+`no-store`, redirect client `error`, nessun egress o fallback di rete.
+
+L'E2E aggiornato carica file sintetici dal vero input UI e verifica `ENC:` sia
+nella richiesta di persistenza sia nella successiva lettura API. Distingue la
+risposta `acquire` dall'esecuzione `project`, verifica provenienza, testo completo,
+ordine e ultima pagina; include annullamento e replay. Il lock è coperto dalle
+prove client e di composizione con owner reale. Le prove deterministiche
+aggiunte coprono inoltre mutazione/eliminazione, revoca, appartenenza, selezione,
+scadenza, corpo malformato/oversize e input non supportati. I risultati effettivi
+e quelli mancanti sono nel VALIDATION della consegna: non sono qualifica release.
+
+Il grant di proiezione registra inoltre una dipendenza sulla selezione presso il
+`selectionLifecycleController` del singleton owner già esistente. Il cambio
+selezione revoca sincronicamente il grant, interrompe una lettura HTTP sospesa e
+azzera i buffer posseduti: non attende il completamento del parser. Gli ulteriori
+check canonici prima/dopo ogni attesa restano necessari per modifiche del record,
+appartenenza, versione e restore. Nessuna nuova authority di selezione viene creata.
+
+Verifica di integrazione del parent: la lista e il dettaglio web omettono
+intenzionalmente sourceRef/revision/freshness (test del contratto esistente
+invariati). Solo il grant documentale espone la propria provenienza descrittiva.
+La UI ritira la preview a ogni refresh della lista di allegati, oltre che a
+selezione/lock/pagehide; non deduce currentness da campi assenti. La pulizia
+locale e l abort sono sincroni; l unregister delle risorse viene rinviato alla
+microtask successiva per evitare reingresso nell owner durante il lock.
+
+Next puo normalizzare `request.url` a localhost anche quando il browser usa
+127.0.0.1. Il trasporto verifica URL interno e Host entrambi loopback, stessa
+porta e Origin esattamente uguale all Host pubblico. Non usa header forwarded
+ne ammette host esterni, credenziali o percorsi dentro Host.
