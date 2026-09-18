@@ -38,7 +38,7 @@ test('account metadata never changes the suspended function label or makes a pre
     await f.browser.run('models'); await f.browser.run('rate-limits');
     const view = f.browser.snapshot(); const presentation = presentAccount(view, true);
     assert.equal(presentation.accountLabel, 'Account collegato'); assert.equal(presentation.planLabel, 'Pro');
-    assert.equal(presentation.executionLabel, 'Uso nelle funzioni sospeso');
+    assert.equal(presentation.executionLabel, 'Account informativo · non abilita le funzioni');
     assert.equal(view.status?.inferenceEnabled, false); assert.equal(view.status?.executionBlock, 'data_boundary_unqualified');
     assert.deepEqual(f.calls, ['models', 'rate-limits']);
     assert.throws(() => parsePreferences({ status: connected, models: catalog }));
@@ -118,7 +118,7 @@ test('null quota windows are unavailable observations, not zero or permission to
     t.after(() => browser.dispose()); browser.setActive(true); await browser.run('rate-limits');
     assert.deepEqual(browser.snapshot().limits, { primary: null, secondary: null });
     assert.ok(browser.snapshot().limitsObservedAt);
-    assert.equal(presentAccount(browser.snapshot(), true).executionLabel, 'Uso nelle funzioni sospeso');
+    assert.equal(presentAccount(browser.snapshot(), true).executionLabel, 'Account informativo · non abilita le funzioni');
 });
 
 test('lock erases observation times and late response bodies, then unlock only rereads local status', async t => {
@@ -166,7 +166,7 @@ test('all account lifecycle states retain suspended function use; only waiting s
     for (const state of ['unavailable', 'disconnected', 'starting', 'awaiting_login', 'verifying', 'connected', 'error'] as const) {
         const view = { ...f.browser.snapshot(), kind: 'ready' as const, status: { ...connected, state } };
         const presentation = presentAccount(view, true);
-        assert.equal(presentation.executionLabel, 'Uso nelle funzioni sospeso');
+        assert.equal(presentation.executionLabel, 'Account informativo · non abilita le funzioni');
         assert.equal(presentation.pollDelay, state === 'connected' ? 10_000 : ['starting', 'awaiting_login', 'verifying'].includes(state) ? 2000 : null);
         assert.equal(presentAccount(view, false).showDetails, false);
     }

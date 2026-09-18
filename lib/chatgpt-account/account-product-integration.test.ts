@@ -76,7 +76,7 @@ test('integrated account lifecycle renders connected, informational catalog and 
     const f = setup(t, 'lifecycle'); await f.connect();
     await f.browser.run('models'); await f.browser.run('rate-limits');
     assert.equal(presentAccount(f.browser.snapshot(), true).accountLabel, 'Account collegato');
-    assert.equal(presentAccount(f.browser.snapshot(), true).executionLabel, 'Uso nelle funzioni sospeso');
+    assert.equal(presentAccount(f.browser.snapshot(), true).executionLabel, 'Account informativo · non abilita le funzioni');
     assert.equal(f.browser.snapshot().models?.[0].model, 'synthetic-model'); assert.equal(f.browser.snapshot().limits?.primary?.usedPercent, 25);
     assert.doesNotMatch(JSON.stringify(f.browser.snapshot()), /invented@example/);
     const calls = f.transport.calls.length; await f.browser.run('status'); assert.equal(f.transport.calls.length, calls);
