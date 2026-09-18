@@ -23,6 +23,33 @@ public actor HomeBasePatientsClient {
     }
 
     /* @Codex: named ADR0135 configuration services, native credentials only. */
+    #if os(macOS)
+    /* @Codex — named paired Mac ordinary routes, distinct from account/configuration. */
+    public func prepareNativeOrdinary(_ preparation: NativeOrdinaryPreparation, credentials: HomeBasePairedCredentials,
+                                      sessionCookie: String) async throws -> NativeOrdinaryResponse {
+        let url = try configuration.apiBaseURL().appendingPathComponent("network/ai/chatgpt/ordinary/prepare")
+        let (data, _) = try await send(to: url, method: "POST",
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: preparation.ambulatoryId),
+            body: encode(preparation))
+        return try decode(NativeOrdinaryResponse.self, from: data)
+    }
+    public func commandNativeOrdinary(_ command: NativeOrdinaryCommand, credentials: HomeBasePairedCredentials,
+                                      sessionCookie: String, ambulatoryId: String?) async throws -> NativeOrdinaryResponse {
+        let url = try configuration.apiBaseURL().appendingPathComponent("network/ai/chatgpt/ordinary/\(command.path)")
+        let (data, _) = try await send(to: url, method: "POST",
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId),
+            body: encode(command.body))
+        return try decode(NativeOrdinaryResponse.self, from: data)
+    }
+    public func statusNativeOrdinary(credentials: HomeBasePairedCredentials, sessionCookie: String,
+                                     ambulatoryId: String?) async throws -> NativeOrdinaryResponse {
+        let url = try configuration.apiBaseURL().appendingPathComponent("network/ai/chatgpt/ordinary/status")
+        let (data, _) = try await send(to: url,
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId))
+        return try decode(NativeOrdinaryResponse.self, from: data)
+    }
+    #endif
+
     public func readNativeFunctionPreferences(credentials: HomeBasePairedCredentials, sessionCookie: String) async throws -> NativeAIFunctionPreferences {
         let url = try configuration.apiBaseURL().appendingPathComponent("network/ai/functions")
         let (data, _) = try await send(to: url, headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: nil).merging(["Cache-Control": "no-store"]) { _, new in new })
@@ -1399,6 +1426,14 @@ public actor HomeBasePatientsClient {
                 throw HomeBaseClientError.contract
             }
             guard 200..<300 ~= httpResponse.statusCode else {
+                #if os(macOS)
+                // Only this exact native operation may preserve a pending device login.
+                if method == "POST", url.path == "/api/v1/network/ai/chatgpt/ordinary/login/complete",
+                   httpResponse.statusCode == 503,
+                   let payload = try? JSONDecoder().decode(APIErrorPayload.self, from: data), payload.code == "login_pending" {
+                    throw NativeOrdinaryContractError.loginPending
+                }
+                #endif
                 // WUL-308: a 409 carries a structured VERSION_CONFLICT body; surface
                 // it as a typed error so the UI can show expected-vs-current version.
                 if httpResponse.statusCode == 409,

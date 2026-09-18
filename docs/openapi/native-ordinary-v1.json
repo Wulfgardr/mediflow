@@ -1,0 +1,1743 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "MediFlow native Mac ordinary OpenAI supplemental contract",
+    "version": "0.8.6-native-ordinary.1",
+    "description": "Supplement to the canonical v1 spec, not a reconstruction of files absent from the supplied snapshot. ADR0134 / ADR0076 Mac addendum. Source/logic candidate, not OS qualification, release or clinical apply."
+  },
+  "paths": {
+    "/api/v1/network/ai/chatgpt/ordinary/prepare": {
+      "post": {
+        "operationId": "nativeOrdinaryPrepare",
+        "summary": "Prepare locally, no provider egress",
+        "security": [
+          {
+            "NativeOrdinarySession": [],
+            "NativeOrdinaryClientId": [],
+            "NativeOrdinaryClientToken": []
+          }
+        ],
+        "x-authority-ceiling": "scoped_local_candidate",
+        "x-native-only": "macos",
+        "responses": {
+          "202": {
+            "description": "No-store response; no clinical apply authority. Cleanup false blocks reuse.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Referrer-Policy": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-referrer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryState"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid body/path/method",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Native session or current inference authority absent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale context, busy operation or revoked resource",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Unavailable/closed runtime, redaction, governance or cleanup; no fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NativeOrdinaryPreparation"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/network/ai/chatgpt/ordinary/status": {
+      "get": {
+        "operationId": "nativeOrdinaryStatus",
+        "summary": "Read phase only; never return a proposal",
+        "security": [
+          {
+            "NativeOrdinarySession": [],
+            "NativeOrdinaryClientId": [],
+            "NativeOrdinaryClientToken": []
+          }
+        ],
+        "x-authority-ceiling": "scoped_local_candidate",
+        "x-native-only": "macos",
+        "responses": {
+          "200": {
+            "description": "No-store response; no clinical apply authority. Cleanup false blocks reuse.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Referrer-Policy": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-referrer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/NativeOrdinaryState"
+                    },
+                    {
+                      "$ref": "#/components/schemas/NativeOrdinaryClosed"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid body/path/method",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Native session or current inference authority absent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale context, busy operation or revoked resource",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Unavailable/closed runtime, redaction, governance or cleanup; no fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/network/ai/chatgpt/ordinary/consent": {
+      "post": {
+        "operationId": "nativeOrdinaryConsent",
+        "summary": "Consent to exact frozen UTF-8 bytes",
+        "security": [
+          {
+            "NativeOrdinarySession": [],
+            "NativeOrdinaryClientId": [],
+            "NativeOrdinaryClientToken": []
+          }
+        ],
+        "x-authority-ceiling": "scoped_local_candidate",
+        "x-native-only": "macos",
+        "responses": {
+          "200": {
+            "description": "No-store response; no clinical apply authority. Cleanup false blocks reuse.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Referrer-Policy": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-referrer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryState"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid body/path/method",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Native session or current inference authority absent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale context, busy operation or revoked resource",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Unavailable/closed runtime, redaction, governance or cleanup; no fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NativeOrdinaryConsent"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/network/ai/chatgpt/ordinary/login/start": {
+      "post": {
+        "operationId": "nativeOrdinaryLoginStart",
+        "summary": "Start dedicated execution login",
+        "security": [
+          {
+            "NativeOrdinarySession": [],
+            "NativeOrdinaryClientId": [],
+            "NativeOrdinaryClientToken": []
+          }
+        ],
+        "x-authority-ceiling": "scoped_local_candidate",
+        "x-native-only": "macos",
+        "responses": {
+          "200": {
+            "description": "No-store response; no clinical apply authority. Cleanup false blocks reuse.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Referrer-Policy": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-referrer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryState"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid body/path/method",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Native session or current inference authority absent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale context, busy operation or revoked resource",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Unavailable/closed runtime, redaction, governance or cleanup; no fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NativeOrdinaryCommand"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/network/ai/chatgpt/ordinary/login/complete": {
+      "post": {
+        "operationId": "nativeOrdinaryLoginComplete",
+        "summary": "Verify dedicated execution login",
+        "security": [
+          {
+            "NativeOrdinarySession": [],
+            "NativeOrdinaryClientId": [],
+            "NativeOrdinaryClientToken": []
+          }
+        ],
+        "x-authority-ceiling": "scoped_local_candidate",
+        "x-native-only": "macos",
+        "responses": {
+          "200": {
+            "description": "No-store response; no clinical apply authority. Cleanup false blocks reuse.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Referrer-Policy": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-referrer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryState"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid body/path/method",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Native session or current inference authority absent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale context, busy operation or revoked resource",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Unavailable/closed runtime, redaction, governance or cleanup; no fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NativeOrdinaryCommand"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/network/ai/chatgpt/ordinary/models": {
+      "post": {
+        "operationId": "nativeOrdinaryModels",
+        "summary": "Read the live execution catalog, not informational account models",
+        "security": [
+          {
+            "NativeOrdinarySession": [],
+            "NativeOrdinaryClientId": [],
+            "NativeOrdinaryClientToken": []
+          }
+        ],
+        "x-authority-ceiling": "scoped_local_candidate",
+        "x-native-only": "macos",
+        "responses": {
+          "200": {
+            "description": "No-store response; no clinical apply authority. Cleanup false blocks reuse.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Referrer-Policy": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-referrer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryState"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid body/path/method",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Native session or current inference authority absent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale context, busy operation or revoked resource",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Unavailable/closed runtime, redaction, governance or cleanup; no fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NativeOrdinaryCommand"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/network/ai/chatgpt/ordinary/generate": {
+      "post": {
+        "operationId": "nativeOrdinaryGenerate",
+        "summary": "Generate and publish through the original function owner after confirmed cleanup",
+        "security": [
+          {
+            "NativeOrdinarySession": [],
+            "NativeOrdinaryClientId": [],
+            "NativeOrdinaryClientToken": []
+          }
+        ],
+        "x-authority-ceiling": "scoped_local_candidate",
+        "x-native-only": "macos",
+        "responses": {
+          "200": {
+            "description": "No-store response; no clinical apply authority. Cleanup false blocks reuse.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Referrer-Policy": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-referrer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryCompleted"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid body/path/method",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Native session or current inference authority absent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale context, busy operation or revoked resource",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Unavailable/closed runtime, redaction, governance or cleanup; no fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NativeOrdinaryGenerate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/network/ai/chatgpt/ordinary/cancel": {
+      "post": {
+        "operationId": "nativeOrdinaryCancel",
+        "summary": "Revoke and verify cleanup; no implicit fallback",
+        "security": [
+          {
+            "NativeOrdinarySession": [],
+            "NativeOrdinaryClientId": [],
+            "NativeOrdinaryClientToken": []
+          }
+        ],
+        "x-authority-ceiling": "scoped_local_candidate",
+        "x-native-only": "macos",
+        "responses": {
+          "200": {
+            "description": "No-store response; no clinical apply authority. Cleanup false blocks reuse.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Referrer-Policy": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-referrer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryClosed"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid body/path/method",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Native session or current inference authority absent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale context, busy operation or revoked resource",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Unavailable/closed runtime, redaction, governance or cleanup; no fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NativeOrdinaryCommand"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "NativeOrdinarySession": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "mediflow_session"
+      },
+      "NativeOrdinaryClientId": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-mediflow-paired-client-id"
+      },
+      "NativeOrdinaryClientToken": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-mediflow-paired-client-token"
+      }
+    },
+    "schemas": {
+      "NativeOrdinaryFunction": {
+        "type": "string",
+        "enum": [
+          "patient_insight",
+          "smart_import",
+          "document_synthesis",
+          "treatment_reasoning"
+        ]
+      },
+      "NativePatientInsightInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schemaVersion",
+          "requestId",
+          "patientId",
+          "ambulatoryId",
+          "patientRevision",
+          "capturedAt",
+          "sources"
+        ],
+        "properties": {
+          "schemaVersion": {
+            "type": "string",
+            "const": "mediflow.patient-insight.preview-request.v1"
+          },
+          "requestId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "patientId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "ambulatoryId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "patientRevision": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "capturedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+          },
+          "sources": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "focus",
+              "conditions",
+              "activeTherapies",
+              "recentEvents"
+            ],
+            "properties": {
+              "focus": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "summary"
+                ],
+                "properties": {
+                  "summary": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 240
+                  }
+                }
+              },
+              "conditions": {
+                "type": "array",
+                "maxItems": 12,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "label"
+                  ],
+                  "properties": {
+                    "label": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 240
+                    }
+                  }
+                }
+              },
+              "activeTherapies": {
+                "type": "array",
+                "maxItems": 12,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "label"
+                  ],
+                  "properties": {
+                    "label": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 240
+                    }
+                  }
+                }
+              },
+              "recentEvents": {
+                "type": "array",
+                "maxItems": 12,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "summary"
+                  ],
+                  "properties": {
+                    "summary": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 240
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "NativeSmartImportInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schemaVersion",
+          "capability",
+          "patientRevision",
+          "sourceRevision",
+          "capturedAt",
+          "currentDiagnoses",
+          "currentActiveTherapies",
+          "therapyCandidateHints",
+          "sources"
+        ],
+        "properties": {
+          "schemaVersion": {
+            "type": "string",
+            "const": "mediflow.smart-import.projection-attachment.v1"
+          },
+          "capability": {
+            "type": "string",
+            "const": "smart_import"
+          },
+          "patientRevision": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "sourceRevision": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "capturedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+          },
+          "currentDiagnoses": {
+            "type": "array",
+            "maxItems": 64,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "system",
+                "code",
+                "description"
+              ],
+              "properties": {
+                "system": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                },
+                "code": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                },
+                "description": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 320
+                }
+              }
+            }
+          },
+          "currentActiveTherapies": {
+            "type": "array",
+            "maxItems": 64,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "drugName",
+                "activePrinciple",
+                "dosage",
+                "aic",
+                "atc"
+              ],
+              "properties": {
+                "drugName": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160
+                },
+                "activePrinciple": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "dosage": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "aic": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 32
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "atc": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 32
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "therapyCandidateHints": {
+            "type": "array",
+            "maxItems": 32,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "sourceId",
+                "label",
+                "excerpt"
+              ],
+              "properties": {
+                "sourceId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160
+                },
+                "label": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160
+                },
+                "excerpt": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 600
+                }
+              }
+            }
+          },
+          "sources": {
+            "type": "array",
+            "maxItems": 32,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "kind",
+                "label",
+                "date",
+                "content"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160
+                },
+                "kind": {
+                  "enum": [
+                    "patient-notes",
+                    "clinical-entry",
+                    "document-insight",
+                    "attachment-summary"
+                  ]
+                },
+                "label": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160
+                },
+                "date": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "content": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 900
+                }
+              }
+            },
+            "minItems": 1
+          }
+        }
+      },
+      "NativeTreatmentReasoningInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schemaVersion",
+          "capability",
+          "patientRevision",
+          "sourceRevision",
+          "capturedAt",
+          "therapyRefs",
+          "evidenceRefs",
+          "sources"
+        ],
+        "properties": {
+          "schemaVersion": {
+            "type": "string",
+            "const": "mediflow.ai.treatment-reasoning-projection-attachment.v1"
+          },
+          "capability": {
+            "type": "string",
+            "const": "treatment_reasoning"
+          },
+          "patientRevision": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "sourceRevision": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "capturedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+          },
+          "therapyRefs": {
+            "type": "array",
+            "maxItems": 16,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160
+            }
+          },
+          "evidenceRefs": {
+            "type": "array",
+            "maxItems": 16,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160
+            }
+          },
+          "sources": {
+            "type": "array",
+            "maxItems": 16,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "sourceKind",
+                "label",
+                "excerpt",
+                "date"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160
+                },
+                "sourceKind": {
+                  "enum": [
+                    "patient-profile",
+                    "diagnosis",
+                    "therapy",
+                    "observation",
+                    "clinical-entry",
+                    "document-insight",
+                    "attachment-evidence"
+                  ]
+                },
+                "label": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 180
+                },
+                "excerpt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 480
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "date": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            },
+            "minItems": 1
+          }
+        }
+      },
+      "NativeDocumentSynthesisInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "attachmentId"
+        ],
+        "properties": {
+          "attachmentId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        }
+      },
+      "NativeOrdinaryError": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "error",
+          "code"
+        ],
+        "properties": {
+          "error": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048
+          },
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        }
+      },
+      "NativeOrdinaryCommand": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "attemptId"
+        ],
+        "properties": {
+          "attemptId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        }
+      },
+      "NativeOrdinaryConsent": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "attemptId",
+          "expectedDisclosureRevision"
+        ],
+        "properties": {
+          "attemptId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "expectedDisclosureRevision": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        }
+      },
+      "NativeOrdinaryGenerate": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "attemptId",
+          "modelOptionId",
+          "expectedCatalogRevision"
+        ],
+        "properties": {
+          "attemptId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "modelOptionId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "expectedCatalogRevision": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        }
+      },
+      "NativeOrdinaryDisclosure": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schema",
+          "revision",
+          "operation",
+          "profileVersion",
+          "contextRevision",
+          "attemptRevision",
+          "qualificationRevision",
+          "sourceSha256",
+          "payloadSha256",
+          "payloadBytes",
+          "egress",
+          "proposalOnly",
+          "clinicalWrites"
+        ],
+        "properties": {
+          "schema": {
+            "type": "string",
+            "const": "mediflow.chatgpt-ordinary-disclosure.v1"
+          },
+          "revision": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operation": {
+            "$ref": "#/components/schemas/NativeOrdinaryFunction"
+          },
+          "profileVersion": {
+            "type": "string",
+            "const": "mediflow.ordinary-redacted-profile.v1"
+          },
+          "contextRevision": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "attemptRevision": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "qualificationRevision": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "sourceSha256": {
+            "type": "string",
+            "pattern": "^sha256_[0-9a-f]{64}$"
+          },
+          "payloadSha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "payloadBytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "egress": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": {
+              "enum": [
+                "auth.openai.com:443",
+                "chatgpt.com:443"
+              ]
+            }
+          },
+          "proposalOnly": {
+            "const": true
+          },
+          "clinicalWrites": {
+            "const": 0
+          }
+        }
+      },
+      "NativeOrdinaryCatalog": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "revision",
+          "choices"
+        ],
+        "properties": {
+          "revision": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "choices": {
+            "type": "array",
+            "maxItems": 512,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "optionId",
+                "model",
+                "effort"
+              ],
+              "properties": {
+                "optionId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "model": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                },
+                "effort": {
+                  "enum": [
+                    "none",
+                    "minimal",
+                    "low",
+                    "medium",
+                    "high",
+                    "xhigh",
+                    "max",
+                    "ultra"
+                  ]
+                }
+              }
+            },
+            "minItems": 1
+          }
+        }
+      },
+      "NativeOrdinaryChallenge": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "verificationUrl",
+          "userCode"
+        ],
+        "properties": {
+          "verificationUrl": {
+            "type": "string",
+            "format": "uri",
+            "pattern": "^https://(auth\\.openai\\.com|chatgpt\\.com)(:443)?/"
+          },
+          "userCode": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        }
+      },
+      "NativeOrdinaryCompleted": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schema",
+          "phase",
+          "attemptId",
+          "functionId",
+          "cleanupConfirmed",
+          "result"
+        ],
+        "properties": {
+          "schema": {
+            "type": "string",
+            "const": "mediflow.native-ordinary.v1"
+          },
+          "phase": {
+            "type": "string",
+            "const": "completed"
+          },
+          "attemptId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "functionId": {
+            "$ref": "#/components/schemas/NativeOrdinaryFunction"
+          },
+          "cleanupConfirmed": {
+            "const": true
+          },
+          "result": {
+            "type": "object",
+            "description": "Original function wire, unmodified: Patient Insight/Smart Import preview, Document Synthesis publication or Treatment Reasoning publication. Proposal-only; original parser, receipt and final owner commit remain mandatory.",
+            "additionalProperties": true
+          }
+        }
+      },
+      "NativeOrdinaryClosed": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schema",
+          "phase",
+          "cleanupConfirmed"
+        ],
+        "properties": {
+          "schema": {
+            "type": "string",
+            "const": "mediflow.chatgpt-ordinary-flow.v1"
+          },
+          "phase": {
+            "type": "string",
+            "const": "closed"
+          },
+          "cleanupConfirmed": {
+            "type": "boolean"
+          },
+          "attemptId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "functionId": {
+            "$ref": "#/components/schemas/NativeOrdinaryFunction"
+          }
+        }
+      },
+      "NativeOrdinaryPreparation": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "functionId",
+              "patientId",
+              "ambulatoryId",
+              "patientRevision",
+              "input"
+            ],
+            "properties": {
+              "functionId": {
+                "type": "string",
+                "const": "patient_insight"
+              },
+              "patientId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160
+              },
+              "ambulatoryId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160
+              },
+              "patientRevision": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "input": {
+                "$ref": "#/components/schemas/NativePatientInsightInput"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "functionId",
+              "patientId",
+              "ambulatoryId",
+              "patientRevision",
+              "input"
+            ],
+            "properties": {
+              "functionId": {
+                "type": "string",
+                "const": "smart_import"
+              },
+              "patientId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160
+              },
+              "ambulatoryId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160
+              },
+              "patientRevision": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "input": {
+                "$ref": "#/components/schemas/NativeSmartImportInput"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "functionId",
+              "patientId",
+              "ambulatoryId",
+              "patientRevision",
+              "input"
+            ],
+            "properties": {
+              "functionId": {
+                "type": "string",
+                "const": "document_synthesis"
+              },
+              "patientId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160
+              },
+              "ambulatoryId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160
+              },
+              "patientRevision": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "input": {
+                "$ref": "#/components/schemas/NativeDocumentSynthesisInput"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "functionId",
+              "patientId",
+              "ambulatoryId",
+              "patientRevision",
+              "input"
+            ],
+            "properties": {
+              "functionId": {
+                "type": "string",
+                "const": "treatment_reasoning"
+              },
+              "patientId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160
+              },
+              "ambulatoryId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160
+              },
+              "patientRevision": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "input": {
+                "$ref": "#/components/schemas/NativeTreatmentReasoningInput"
+              }
+            }
+          }
+        ]
+      },
+      "NativeOrdinaryState": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schema",
+          "phase",
+          "attemptId",
+          "functionId",
+          "expiresAt"
+        ],
+        "properties": {
+          "schema": {
+            "type": "string",
+            "const": "mediflow.chatgpt-ordinary-flow.v1"
+          },
+          "phase": {
+            "enum": [
+              "preparing",
+              "needs_consent",
+              "consented",
+              "awaiting_login",
+              "connected",
+              "ready",
+              "generating"
+            ]
+          },
+          "attemptId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "functionId": {
+            "$ref": "#/components/schemas/NativeOrdinaryFunction"
+          },
+          "expiresAt": {
+            "type": "integer",
+            "description": "Absolute Unix milliseconds; never renewed by commands."
+          },
+          "disclosure": {
+            "$ref": "#/components/schemas/NativeOrdinaryDisclosure"
+          },
+          "catalog": {
+            "$ref": "#/components/schemas/NativeOrdinaryCatalog"
+          },
+          "challenge": {
+            "$ref": "#/components/schemas/NativeOrdinaryChallenge"
+          }
+        }
+      }
+    }
+  }
+}
