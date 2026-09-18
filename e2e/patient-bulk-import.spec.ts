@@ -62,9 +62,16 @@ async function unlockAfterReload(page: Page): Promise<void> {
     }
     await expect(panel).toBeVisible();
 }
-async function createExistingFromUi(page: Page): Promise<WirePatient> {
+// @Codex: first access can open Agenda; use the visible patient-area navigation.
+async function openNewPatient(page: Page): Promise<void> {
+    await page.getByRole('navigation', { name: 'Navigazione principale', exact: true })
+        .getByRole('link', { name: 'Pazienti', exact: true }).click();
+    await expect(page).toHaveURL(/\/\?area=incarico$/u);
     await page.getByRole('link', { name: 'Nuova scheda', exact: true }).click();
     await expect(page).toHaveURL(/\/patients\/new$/u);
+}
+async function createExistingFromUi(page: Page): Promise<WirePatient> {
+    await openNewPatient(page);
     await page.locator('input[name="firstName"]').fill('Preesistente');
     await page.locator('input[name="lastName"]').fill('Sintetico');
     await page.locator('input[name="taxCode"]').fill(existingCode);
@@ -79,8 +86,7 @@ async function createExistingFromUi(page: Page): Promise<WirePatient> {
     return rows[0];
 }
 async function enterImportViaNewPatient(page: Page): Promise<void> {
-    await page.getByRole('link', { name: 'Nuova scheda', exact: true }).click();
-    await expect(page).toHaveURL(/\/patients\/new$/u);
+    await openNewPatient(page);
     await page.getByRole('link', { name: 'Importa elenco CSV', exact: true }).click();
     await expect(page).toHaveURL(/\/patients\/import$/u);
     await expect(page.getByRole('heading', { name: 'Importa elenco', exact: true })).toBeVisible();
