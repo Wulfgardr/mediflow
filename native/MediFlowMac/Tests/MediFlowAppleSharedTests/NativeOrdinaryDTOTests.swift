@@ -130,7 +130,64 @@ final class NativeOrdinaryDTOTests: XCTestCase {
         let unicode = NativeOrdinaryJSON.object(["testo": .string("È sintetico: 🩺")])
         XCTAssertEqual(try JSONDecoder().decode(NativeOrdinaryJSON.self, from: JSONEncoder().encode(unicode)), unicode)
     }
+    // @Codex — the request type has no representable clinical content or authority fields.
+    func testFourClosedSelectorPreparationsRoundTrip() throws {
+        let inputs: [NativeOrdinaryInput] = [.patientInsight, .smartImport, .documentSynthesis(attachmentId: "synthetic-attachment"), .treatmentReasoning]
+        for input in inputs {
+            let value = NativeOrdinaryPreparation(functionId: input.function, patientId: "synthetic-patient", ambulatoryId: "synthetic-ambulatory", patientRevision: 1, input: input)
+            try value.validate()
+            let bytes = try JSONEncoder().encode(value)
+            XCTAssertEqual(try JSONDecoder().decode(NativeOrdinaryPreparation.self, from: bytes), value)
+            let object = try XCTUnwrap(JSONSerialization.jsonObject(with: bytes) as? [String: Any])
+            XCTAssertEqual(Set(object.keys), ["functionId", "patientId", "ambulatoryId", "patientRevision", "input"])
+            let payload = try XCTUnwrap(object["input"] as? [String: Any])
+            XCTAssertEqual(Set(payload.keys), input.function == .documentSynthesis ? ["attachmentId"] : ["selector"])
+            XCTAssertLessThan(bytes.count, 4096)
+        }
+    }
+    func testEveryCrossFunctionSelectorIsRejected() throws {
+        let inputs: [NativeOrdinaryInput] = [.patientInsight, .smartImport, .documentSynthesis(attachmentId: "synthetic-attachment"), .treatmentReasoning]
+        for input in inputs {
+            for function in NativeOrdinaryFunction.allCases where function != input.function {
+                let wrong = NativeOrdinaryPreparation(functionId: function, patientId: "synthetic-patient", ambulatoryId: "synthetic-ambulatory", patientRevision: 1, input: input)
+                XCTAssertThrowsError(try JSONEncoder().encode(wrong))
+                let body = try JSONSerialization.jsonObject(with: JSONEncoder().encode(input))
+                XCTAssertThrowsError(try F.decode(NativeOrdinaryPreparation.self, ["functionId": function.rawValue, "patientId": "synthetic-patient", "ambulatoryId": "synthetic-ambulatory", "patientRevision": 1, "input": body]))
+            }
+        }
+    }
+    func testSelectorDecoderRejectsFreeContentExtraKeysAndWrongTypes() throws {
+        let base: [String: Any] = ["functionId": "patient_insight", "patientId": "synthetic-patient", "ambulatoryId": "synthetic-ambulatory", "patientRevision": 1, "input": ["selector": "current_patient_insight"]]
+        for key in ["text", "sources", "projection", "session", "capability", "attachmentId", "apply", "sourceRevision"] {
+            var value = base; value[key] = "invented"
+            XCTAssertThrowsError(try F.decode(NativeOrdinaryPreparation.self, value))
+            value = base; value["input"] = ["selector": "current_patient_insight", key: "invented"]
+            XCTAssertThrowsError(try F.decode(NativeOrdinaryPreparation.self, value))
+        }
+        for payload: Any in [[:], ["text": "invented"], ["selector": 1], ["selector": NSNull()], ["selector": "wrong"], [], "current_patient_insight"] {
+            var value = base; value["input"] = payload
+            XCTAssertThrowsError(try F.decode(NativeOrdinaryPreparation.self, value))
+        }
+        for key in base.keys { var value = base; value.removeValue(forKey: key); XCTAssertThrowsError(try F.decode(NativeOrdinaryPreparation.self, value)) }
+    }
+    func testSelectorIdentifierAndRevisionBounds() throws {
+        for id in ["", " x", "x ", "x\n", "x\u{0}", "x\u{7f}", String(repeating: "x", count: 161), String(repeating: "😀", count: 81)] {
+            let value = NativeOrdinaryPreparation(functionId: .patientInsight, patientId: id, ambulatoryId: "synthetic-ambulatory", patientRevision: 1, input: .patientInsight)
+            XCTAssertThrowsError(try JSONEncoder().encode(value))
+        }
+        for revision in [0, -1, 9_007_199_254_740_992] {
+            let value = NativeOrdinaryPreparation(functionId: .patientInsight, patientId: "synthetic-patient", ambulatoryId: "synthetic-ambulatory", patientRevision: revision, input: .patientInsight)
+            XCTAssertThrowsError(try JSONEncoder().encode(value))
+        }
+        let edge = NativeOrdinaryPreparation(functionId: .documentSynthesis, patientId: String(repeating: "😀", count: 80), ambulatoryId: String(repeating: "a", count: 160), patientRevision: 9_007_199_254_740_991, input: .documentSynthesis(attachmentId: String(repeating: "a", count: 200)))
+        XCTAssertNoThrow(try JSONEncoder().encode(edge))
+        XCTAssertThrowsError(try JSONEncoder().encode(NativeOrdinaryInput.documentSynthesis(attachmentId: String(repeating: "a", count: 201))))
+    }
     static let portableTests = [
+        ("fourClosedSelectorPreparationsRoundTrip", testFourClosedSelectorPreparationsRoundTrip),
+        ("everyCrossFunctionSelectorIsRejected", testEveryCrossFunctionSelectorIsRejected),
+        ("selectorDecoderRejectsFreeContentExtraKeysAndWrongTypes", testSelectorDecoderRejectsFreeContentExtraKeysAndWrongTypes),
+        ("selectorIdentifierAndRevisionBounds", testSelectorIdentifierAndRevisionBounds),
         ("fourOriginalFunctionResultsRequireOriginalReceipt", testFourOriginalFunctionResultsRequireOriginalReceipt),
         ("unconfirmedCleanupNeverReturnsAProposalOrPermitsRestart", testUnconfirmedCleanupNeverReturnsAProposalOrPermitsRestart),
         ("catalogIsExecutableOnlyAsFreshExplicitOpaqueChoice", testCatalogIsExecutableOnlyAsFreshExplicitOpaqueChoice),

@@ -25,7 +25,7 @@ export async function handleNativeOrdinaryHttp(request: Request, operation: Nati
         let preparation: ReturnType<typeof parseNativeOrdinaryPreparation> | null = null;
         if (operation !== 'status') {
             const abort = new AbortController(); timer = setTimeout(() => abort.abort(), 2000);
-            const read = await readBoundedJsonBody(request, operation === 'prepare' ? 1024 * 1024 : 4096, 'strict',
+            const read = await readBoundedJsonBody(request, 4096, 'strict',
                 { signal: AbortSignal.any([request.signal, abort.signal]), deadline: performance.now() + 2000 });
             clearTimeout(timer);
             if (!read.ok || abort.signal.aborted) throw new ProductError('invalid_request');

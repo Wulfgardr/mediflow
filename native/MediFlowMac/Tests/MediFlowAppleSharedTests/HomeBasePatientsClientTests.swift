@@ -2513,7 +2513,7 @@ final class HomeBasePatientsClientTests: XCTestCase {
     #if os(macOS)
     func testNativeOrdinaryPrepareKeepsPairedHeadersAndExactPassiveBody() async throws {
         let input = NativeOrdinaryPreparation(functionId: .patientInsight, patientId: "synthetic-patient",
-            ambulatoryId: "synthetic-ambulatory", patientRevision: 1, input: .object([:]))
+            ambulatoryId: "synthetic-ambulatory", patientRevision: 1, input: .patientInsight)
         let client = makeClient { request in
             XCTAssertEqual(request.httpMethod, "POST")
             XCTAssertEqual(request.url?.path, "/api/v1/network/ai/chatgpt/ordinary/prepare")
@@ -2523,6 +2523,8 @@ final class HomeBasePatientsClientTests: XCTestCase {
             XCTAssertEqual(request.value(forHTTPHeaderField: "X-MediFlow-Source-Surface"), "native")
             let body = try self.requestObject(request)
             XCTAssertEqual(Set(body.keys), Set(["functionId", "patientId", "ambulatoryId", "patientRevision", "input"]))
+            // @Codex: only the host selector crosses the native preparation ingress.
+            XCTAssertEqual(body["input"] as? [String: String], ["selector": "current_patient_insight"])
             let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 202, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
             return (response, try JSONSerialization.data(withJSONObject: NativeOrdinaryTestFixtures.response(.patientInsight, "needs_consent")))
         }

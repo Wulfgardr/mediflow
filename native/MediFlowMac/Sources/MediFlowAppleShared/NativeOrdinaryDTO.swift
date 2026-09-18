@@ -54,15 +54,91 @@ public indirect enum NativeOrdinaryJSON: Codable, Equatable, Sendable {
     public var number: Double? { if case .number(let v) = self { return v }; return nil }
     public var bool: Bool? { if case .bool(let v) = self { return v }; return nil }
 }
+/// Closed selector input. Clinical text/projections cannot be represented here.
+public enum NativeOrdinaryInput: Codable, Equatable, Sendable {
+    case patientInsight, smartImport, treatmentReasoning
+    case documentSynthesis(attachmentId: String)
+    public var function: NativeOrdinaryFunction {
+        switch self {
+        case .patientInsight: return .patientInsight
+        case .smartImport: return .smartImport
+        case .treatmentReasoning: return .treatmentReasoning
+        case .documentSynthesis: return .documentSynthesis
+        }
+    }
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: NativeOrdinaryKey.self)
+        let keys = Set(c.allKeys.map(\.stringValue))
+        if keys == ["attachmentId"] {
+            let id = try c.decode(String.self, forKey: .init("attachmentId"))
+            guard nativeOrdinaryIdentifier(id, maximum: 200) else { throw NativeOrdinaryContractError.invalid }
+            self = .documentSynthesis(attachmentId: id)
+        } else if keys == ["selector"] {
+            switch try c.decode(String.self, forKey: .init("selector")) {
+            case "current_patient_insight": self = .patientInsight
+            case "current_smart_import": self = .smartImport
+            case "current_treatment_reasoning": self = .treatmentReasoning
+            default: throw NativeOrdinaryContractError.invalid
+            }
+        } else { throw NativeOrdinaryContractError.invalid }
+    }
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: NativeOrdinaryKey.self)
+        switch self {
+        case .patientInsight: try c.encode("current_patient_insight", forKey: .init("selector"))
+        case .smartImport: try c.encode("current_smart_import", forKey: .init("selector"))
+        case .treatmentReasoning: try c.encode("current_treatment_reasoning", forKey: .init("selector"))
+        case .documentSynthesis(let id):
+            guard nativeOrdinaryIdentifier(id, maximum: 200) else { throw NativeOrdinaryContractError.invalid }
+            try c.encode(id, forKey: .init("attachmentId"))
+        }
+    }
+}
+private struct NativeOrdinaryKey: CodingKey {
+    let stringValue: String
+    var intValue: Int? { nil }
+    init(_ value: String) { stringValue = value }
+    init?(stringValue: String) { self.init(stringValue) }
+    init?(intValue: Int) { return nil }
+}
+// ECMAScript TrimString set, shared with the host parser (not Foundation's wider set).
+private let nativeOrdinaryTrimCharacters = CharacterSet(charactersIn: "\u{0009}\u{000a}\u{000b}\u{000c}\u{000d}\u{0020}\u{00a0}\u{1680}\u{2000}\u{2001}\u{2002}\u{2003}\u{2004}\u{2005}\u{2006}\u{2007}\u{2008}\u{2009}\u{200a}\u{2028}\u{2029}\u{202f}\u{205f}\u{3000}\u{feff}")
+private func nativeOrdinaryIdentifier(_ value: String, maximum: Int = 160) -> Bool {
+    !value.isEmpty && value.utf16.count <= maximum && value == value.trimmingCharacters(in: nativeOrdinaryTrimCharacters)
+        && !value.unicodeScalars.contains { $0.value < 32 || $0.value == 127 }
+}
 public struct NativeOrdinaryPreparation: Codable, Equatable, Sendable {
     public let functionId: NativeOrdinaryFunction
     public let patientId: String
     public let ambulatoryId: String
     public let patientRevision: Int
-    public let input: NativeOrdinaryJSON
-    public init(functionId: NativeOrdinaryFunction, patientId: String, ambulatoryId: String, patientRevision: Int, input: NativeOrdinaryJSON) {
+    public let input: NativeOrdinaryInput
+    public init(functionId: NativeOrdinaryFunction, patientId: String, ambulatoryId: String, patientRevision: Int, input: NativeOrdinaryInput) {
         self.functionId = functionId; self.patientId = patientId; self.ambulatoryId = ambulatoryId
         self.patientRevision = patientRevision; self.input = input
+    }
+    public func validate() throws {
+        guard functionId == input.function, nativeOrdinaryIdentifier(patientId), nativeOrdinaryIdentifier(ambulatoryId),
+              patientRevision > 0, patientRevision <= 9_007_199_254_740_991 else { throw NativeOrdinaryContractError.invalid }
+        if case .documentSynthesis(let id) = input, !nativeOrdinaryIdentifier(id, maximum: 200) { throw NativeOrdinaryContractError.invalid }
+    }
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: NativeOrdinaryKey.self)
+        guard Set(c.allKeys.map(\.stringValue)) == ["functionId", "patientId", "ambulatoryId", "patientRevision", "input"]
+        else { throw NativeOrdinaryContractError.invalid }
+        functionId = try c.decode(NativeOrdinaryFunction.self, forKey: .init("functionId"))
+        patientId = try c.decode(String.self, forKey: .init("patientId"))
+        ambulatoryId = try c.decode(String.self, forKey: .init("ambulatoryId"))
+        patientRevision = try c.decode(Int.self, forKey: .init("patientRevision"))
+        input = try c.decode(NativeOrdinaryInput.self, forKey: .init("input"))
+        try validate()
+    }
+    public func encode(to encoder: Encoder) throws {
+        try validate()
+        var c = encoder.container(keyedBy: NativeOrdinaryKey.self)
+        try c.encode(functionId, forKey: .init("functionId")); try c.encode(patientId, forKey: .init("patientId"))
+        try c.encode(ambulatoryId, forKey: .init("ambulatoryId")); try c.encode(patientRevision, forKey: .init("patientRevision"))
+        try c.encode(input, forKey: .init("input"))
     }
 }
 public struct NativeOrdinaryDisclosure: Codable, Equatable, Sendable {

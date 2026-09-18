@@ -1,6 +1,9 @@
 /* @Codex — named host orchestration. Original function handlers own acquisition
  * and publication. This registry never turns a prompt/source/DTO into authority. */
 import 'server-only';
+import { nativeOrdinaryHostSourcesAreCurrent, readNativeOrdinaryHostSource, closeNativeOrdinaryHostSources,
+    type NativeOrdinaryHostSourceCapture } from '../security/server-session-clinical-context-native-sources';
+import type { PairedNativeSession } from '../security/paired-native-session';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { randomUUID } from 'node:crypto';
 import * as owner from '../security/ordinary-session-authority';
@@ -22,6 +25,7 @@ type Entry = {
     generation: owner.AuthenticationGeneration; session: owner.OrdinarySession; port: owner.ResourcePort;
     id: string; functionId: OrdinaryFunction; controller: AbortController; active: boolean; busy: boolean; claimed: boolean;
     publishing: boolean; delivered: boolean; expiresAt: number; deadline: number; attempt?: Attempt; catalog?: SynthesisCatalog;
+    nativeSources?: NativeOrdinaryHostSourceCapture;
     applicationCurrent?: () => boolean; knownIdentifiers?: RedactionSessionInput['knownIdentifiers'];
     sourceCurrent?: () => boolean; sourceTimer?: ReturnType<typeof setInterval>; timer?: ReturnType<typeof setTimeout>;
     initial: Deferred<Response>; output: Deferred<OrdinaryExecutionResult>; original?: Promise<Response>;
@@ -47,12 +51,14 @@ function guard(entry: Entry, withSource = true) {
     if (!local(entry)) throw new ProductError('revoked');
     const use = owner.beginResourceUse(entry.port); if (!use) throw new ProductError('session_expired');
     owner.abortResourceUse(use);
+    if (withSource && entry.nativeSources && !nativeOrdinaryHostSourcesAreCurrent(entry.nativeSources)) throw new ProductError('revoked');
     if (withSource && entry.applicationCurrent && !entry.applicationCurrent()) throw new ProductError('revoked');
     if (withSource && entry.sourceCurrent && !entry.sourceCurrent()) throw new ProductError('revoked');
 }
 async function close(entry: Entry): Promise<Readonly<{ cleanupConfirmed: boolean }>> {
     if (entry.cleanup) return entry.cleanup;
-    entry.active = false; entry.controller.abort(); clearTimeout(entry.timer); clearInterval(entry.sourceTimer);
+    entry.active = false; entry.controller.abort();
+    if (entry.nativeSources) closeNativeOrdinaryHostSources(entry.nativeSources); clearTimeout(entry.timer); clearInterval(entry.sourceTimer);
     entry.output.reject(new ProductError('revoked')); entry.initial.reject(new ProductError('revoked'));
     entry.cleanup = Promise.resolve().then(async () => {
         let cleanupConfirmed = true;
@@ -78,6 +84,13 @@ export function ordinaryFailure(error: unknown): Response {
     return reply({ error: 'OpenAI non disponibile per questa operazione. Nessun provider alternativo e stato usato.', code },
         code === 'session_expired' ? 401 : ['invalid_request'].includes(code) ? 400 : ['busy', 'catalog_stale', 'model_unavailable', 'revoked'].includes(code) ? 409 : 503);
 }
+/** Binds only a genuine, opaque host capture; never a callback or client source. */
+export function bindNativeOrdinaryHostSources(capture: NativeOrdinaryHostSourceCapture): void {
+    const entry = scope.getStore();
+    if (!entry || entry.session.authChannel !== 'native' || entry.claimed || entry.nativeSources) throw new ProductError('invalid_request');
+    readNativeOrdinaryHostSource(capture, entry.session as PairedNativeSession, entry.functionId);
+    entry.nativeSources = capture; guard(entry);
+}
 /** Reads only the fact that this exact host handler is in the fixed remote scope. */
 export function isOrdinaryFunctionSelected(functionId: OrdinaryFunction): boolean {
     const entry = scope.getStore();
@@ -91,12 +104,15 @@ export async function executeOwnedOrdinaryProfile(functionId: OrdinaryFunction, 
     current: () => boolean, knownIdentifiers?: RedactionSessionInput['knownIdentifiers']): Promise<OrdinaryExecutionResult> {
     const entry = scope.getStore();
     if (!entry || entry.functionId !== functionId || entry.claimed || !entry.applicationCurrent || readOrdinaryTaskProfile(profile).functionId !== functionId) throw new ProductError('invalid_request');
+    if (entry.session.authChannel === 'native' && functionId !== 'document_synthesis' && !entry.nativeSources) throw new ProductError('revoked');
     guard(entry); if (!current()) throw new ProductError('revoked');
     entry.claimed = true; entry.sourceCurrent = current;
     entry.sourceTimer = setInterval(() => { try { guard(entry); } catch { void close(entry); } }, 50); entry.sourceTimer.unref?.();
     try {
         const governed = await readOrdinaryGovernance(functionId); guard(entry);
-        const attempt = await createOrdinaryProductAttempt(entry.session, createSharedMacProductPlatform());
+        const attempt = await createOrdinaryProductAttempt(entry.session, createSharedMacProductPlatform(), () => {
+            try { guard(entry); return true; } catch { return false; }
+        });
         entry.attempt = attempt;
         try { guard(entry); } catch (error) { await attempt.dispose(); throw error; }
         const disclosure = await attempt.prepare(profile, randomUUID(), governed.configuration, entry.controller.signal, entry.knownIdentifiers ?? knownIdentifiers);
@@ -143,14 +159,15 @@ export async function beginOrdinaryFunction(request: Request, functionId: Ordina
         if (!settings.enabled) throw new ProductError('unqualified_boundary');
         const headers = new Headers(request.headers); headers.delete(key);
         const ownedRequest = new Request(request, { headers, signal: entry.controller.signal });
-        entry.original = scope.run(entry, async () => {
+        const original: Promise<Response> = scope.run(entry, async () => {
             try {
                 const response = await originalHandler(ownedRequest);
                 if (!entry.claimed) entry.initial.resolve(response);
                 return response;
             } catch (error) { entry.initial.reject(error); throw error; }
         });
-        void entry.original.catch(() => {});
+        entry.original = original;
+        void original.catch(() => {});
         const response = await entry.initial.promise; guard(entry);
         if (!entry.claimed) { await close(entry); return response; }
         const use = owner.beginResourceUse(entry.port); if (!use) throw new ProductError('session_expired');

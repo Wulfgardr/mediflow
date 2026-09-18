@@ -454,3 +454,53 @@ Restano intatti C2, custode, sandbox, drain, asset, pin OS/processo, DB/crypto, 
 WHO, provisioning redazione e WUL-688. macOS 27.2 deve essere riqualificato dal parent;
 le prove storiche su macOS 26 e i test sintetici non costituiscono ammissione,
 readiness clinica, conformità o release. iOS/iPadOS e altri target restano differiti.
+
+
+## Correzione source authority — follow-up 9e7ecb80 (18 settembre 2026)
+
+Base candidata: `c00539ff273da8cf53b45970a0dcb310a89b2b77`. Questo delta
+precede il codice. Il client Mac non trasmette testo, proiezioni, diagnosi,
+terapie, timestamp di cattura o revisioni delle fonti. Trasmette soltanto
+patientId, ambulatoryId, patientRevision e un input discriminato chiuso:
+`{selector: "current_patient_insight"}`, `{selector: "current_smart_import"}`,
+`{selector: "current_treatment_reasoning"}`, oppure `{attachmentId}` per
+Document Synthesis. Gli input delle altre funzioni e ogni chiave aggiuntiva
+sono negati prima di creare un'operazione o acquisire contenuti.
+
+Il nuovo Application Service `server-session-clinical-context-native-sources`
+acquisisce le righe correnti host, sotto l'owner nativo autentico e la selection
+lease originale. Usa la membership e currentness canoniche; non legge dal DTO
+le fonti. Le proiezioni sono costruite internamente e validate dai parser delle
+funzioni originali. Patient Insight riusa la stessa selection lease, invece di
+sostituirla. Smart Import mantiene l'attacher e il broker originali; Treatment
+Reasoning mantiene il broker/commit originali. Document Synthesis conserva il
+capture/ingest AnyDoc autorizzato: attachmentId non e una prova di contenuto.
+
+Un capture opaco in memoria lega sessione, owner, funzione, lease, review epoch,
+revisione e digest SHA-256 delle righe effettivamente acquisite. Non e un handle
+serializzabile. Prima di ogni dispatch e prima della pubblicazione si ripetono
+le verifiche di owner/lease e la lettura delle fonti. Una modifica di contenuto,
+versione, inclusione, tombstone o freshness documentale invalida il capture
+anche se patientRevision non cambia. Il veto delle fonti attraversa il product
+attempt fino al guard immediatamente precedente a `transport.request` e resta
+attivo durante parser, commit proposal-only e cleanup. Non basta un polling.
+La prima revoca osservata rende il capture terminale; non si rinnova implicitamente.
+
+Si leggono esclusivamente righe host nel perimetro paziente/ambulatorio. Nessuna
+nuova decrittazione, scrittura, persistenza di proiezioni, estrazione alternativa
+o fallback. Contenuti `ENC:` nel set selezionato, fonti malformate/non leggibili,
+assenza di evidenze o limiti superati negano la funzione: non sono sostituiti da
+testo Mac, da dati inventati o da riassunti di un altro paziente. Questo limite
+non qualifica l'uso su cartelle cifrate; la qualificazione richiede l'acquisizione
+canonica gia autorizzata. C2/OS/PIN/drain e ammissione clinica restano invariati.
+
+La currentness e basata sulle revisioni canoniche e sulle osservazioni alle
+barriere sincrone. Non attesta modifiche esterne mutate e ripristinate senza
+incrementare le revisioni tra due letture. Nessun test locale concede readiness.
+
+
+@Codex — Nel raccordo Treatment Reasoning l'acquisizione e lo snapshot del lease port
+non rientrano nella sezione critica dell'owner. Il servizio legge la selezione, esce
+dalla sezione, acquisisce il port autentico e riconferma coppia, epoche e revisione
+prima di registrare l'handle. In caso di errore elimina il solo nuovo record e
+dispone il port. La protezione anti-rientro dell'owner resta invariata.

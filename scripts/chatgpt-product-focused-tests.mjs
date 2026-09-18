@@ -83,7 +83,7 @@ for (const folder of ['lib/chatgpt-product', 'lib/chatgpt-account', 'lib/chatgpt
         tests.push(`${folder}/${entry}`);
     }
 }
-tests.push('lib/security/native-inference.test.cjs', 'lib/security/native-ordinary-content.test.cjs');
+tests.push('lib/security/native-inference.test.cjs', 'lib/security/native-ordinary-content.test.cjs', 'lib/security/native-ordinary-host-sources.test.cjs');
 tests.push('lib/ai-providers/fabric/chatgpt-synthetic-synthesis-binding.test.ts', 'components/settings/chatgpt-synthesis-panel.test.ts');
 if (args.includes('--browser')) tests.push('e2e/chatgpt-synthesis-product.spec.ts', 'lib/chatgpt-account/account-product.browser.test.mjs');
 const command = [join(root, 'scripts/run-strip-types.mjs'), '--test', '--test-concurrency=1', ...tests];
