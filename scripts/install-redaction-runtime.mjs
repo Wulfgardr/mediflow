@@ -18,7 +18,10 @@ Root must be the operator-selected ai/rollout-readiness/redaction directory.
 All paths must be absolute, physical (no destination symlink) and protected.
 install requires a missing or empty, owned root; it never overwrites or repairs.
 verify is read-only and requires the same externally checked input manifest.
-The input schema is mediflow.redaction-offline-input.v1; see the delivery VALIDATION.
+The input schema is mediflow.redaction-offline-input.v1; its exact keys and pins
+are enforced by scripts/redaction-install/manifest.mjs. Obtain the manifest and
+external digests from the validated operator delivery packet; this command does
+not create or qualify them.
 Local hashes prove byte integrity, not provenance, safety, readiness or consent.
 No latest.json, QA report, rollout record or clinical admission is produced.
 `;
