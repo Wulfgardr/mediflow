@@ -7,7 +7,7 @@
 # Node is NOT bundled: the supervisor resolves system node (or MEDIFLOW_NODE_BINARY).
 #
 # Env:
-#   MEDIFLOW_SKIP_WEB_BUILD=1     reuse an existing .next/standalone (fast iteration)
+#   MEDIFLOW_SKIP_WEB_BUILD=1     reuse a matching payload with recorded build identity
 #   MEDIFLOW_MAC_CONFIG=Release   build configuration (default Debug)
 #   MEDIFLOW_CODESIGN_IDENTITY    sign the bundle (incl. the injected runtime);
 #                                 "-" for ad-hoc, or a Developer ID. Unset = no sign
@@ -23,6 +23,97 @@ SCHEME="MediFlowMacApp"
 CONFIG="${MEDIFLOW_MAC_CONFIG:-Debug}"
 DERIVED="${MEDIFLOW_MAC_DERIVED_DATA:-$ROOT_DIR/tmp-mac-derived-data}"
 APP="$DERIVED/Build/Products/$CONFIG/MediFlow.app"
+IDENTITY_HELPER="$ROOT_DIR/scripts/launcher-helpers.mjs"
+BUILD_IDENTITY_FILE="$STANDALONE_DIR/mediflow-build-identity.json"
+
+# @Codex: use the shared launcher identity rather than a packaging-specific Git
+# formula, then make the exact source visible to the bundled standalone server.
+CURRENT_APP_REVISION=""
+CURRENT_APP_BRANCH=""
+CURRENT_APP_WORKTREE_HASH=""
+CURRENT_APP_SOURCE_FINGERPRINT=""
+read_checkout_identity() {
+  if ! CURRENT_APP_REVISION="$(node "$IDENTITY_HELPER" identity-field revision)" \
+    || ! CURRENT_APP_BRANCH="$(node "$IDENTITY_HELPER" identity-field branch)" \
+    || ! CURRENT_APP_WORKTREE_HASH="$(node "$IDENTITY_HELPER" identity-field worktreeHash)" \
+    || ! CURRENT_APP_SOURCE_FINGERPRINT="$(node "$IDENTITY_HELPER" identity-field sourceFingerprint)" \
+    || [[ -z "$CURRENT_APP_REVISION" || -z "$CURRENT_APP_BRANCH" || -z "$CURRENT_APP_WORKTREE_HASH" || -z "$CURRENT_APP_SOURCE_FINGERPRINT" ]] \
+    || [[ "$CURRENT_APP_REVISION" == "unknown" || "$CURRENT_APP_BRANCH" == "unknown" ]] \
+    || [[ "$CURRENT_APP_SOURCE_FINGERPRINT" != "$CURRENT_APP_BRANCH@$CURRENT_APP_REVISION:$CURRENT_APP_WORKTREE_HASH" ]]; then
+    echo "Impossibile determinare un'identita completa del checkout per il bundle macOS." >&2
+    return 1
+  fi
+}
+
+read_checkout_identity
+INITIAL_APP_REVISION="$CURRENT_APP_REVISION"
+INITIAL_APP_BRANCH="$CURRENT_APP_BRANCH"
+INITIAL_APP_WORKTREE_HASH="$CURRENT_APP_WORKTREE_HASH"
+INITIAL_APP_SOURCE_FINGERPRINT="$CURRENT_APP_SOURCE_FINGERPRINT"
+
+# @Codex: skipped Web builds may reuse only a payload sealed by this script's
+# full-build path. This is provenance for local packaging, not a content digest.
+write_build_identity() {
+node - "$BUILD_IDENTITY_FILE" "$ROOT_DIR/$NEXT_DIST_DIR/BUILD_ID" "$STANDALONE_DIR/.next/BUILD_ID" \
+  "$INITIAL_APP_REVISION" "$INITIAL_APP_BRANCH" "$INITIAL_APP_WORKTREE_HASH" "$INITIAL_APP_SOURCE_FINGERPRINT" <<'NODE'
+const fs = require('node:fs');
+const [identityFile, rootBuildId, standaloneBuildId, revision, branch, worktreeHash, sourceFingerprint] = process.argv.slice(2);
+function physicalFile(file, label) {
+  const status = fs.lstatSync(file);
+  if (!status.isFile() || status.isSymbolicLink()) throw new Error(`${label} is not a physical regular file`);
+  return fs.readFileSync(file, 'utf8').trim();
+}
+try {
+  const buildId = physicalFile(rootBuildId, 'Root BUILD_ID');
+  if (!buildId || buildId !== physicalFile(standaloneBuildId, 'Standalone BUILD_ID')) throw new Error('Web BUILD_ID files differ');
+  try {
+    const status = fs.lstatSync(identityFile);
+    if (!status.isFile() || status.isSymbolicLink()) throw new Error('Build identity destination is not a physical regular file');
+  } catch (error) { if (error.code !== 'ENOENT') throw error; }
+  const temporary = `${identityFile}.${process.pid}.tmp`;
+  fs.writeFileSync(temporary, `${JSON.stringify({ schemaVersion: 1, revision, branch, worktreeHash, sourceFingerprint, buildId })}\n`, { flag: 'wx' });
+  fs.renameSync(temporary, identityFile);
+} catch (error) {
+  console.error(`Cannot record Web build identity: ${error instanceof Error ? error.message : String(error)}`);
+  process.exit(1);
+}
+NODE
+}
+
+assert_build_identity() {
+node - "$BUILD_IDENTITY_FILE" "$ROOT_DIR/$NEXT_DIST_DIR/BUILD_ID" "$STANDALONE_DIR/.next/BUILD_ID" \
+  "$INITIAL_APP_REVISION" "$INITIAL_APP_BRANCH" "$INITIAL_APP_WORKTREE_HASH" "$INITIAL_APP_SOURCE_FINGERPRINT" <<'NODE'
+const fs = require('node:fs');
+const [identityFile, rootBuildId, standaloneBuildId, revision, branch, worktreeHash, sourceFingerprint] = process.argv.slice(2);
+function physicalFile(file, label) {
+  const status = fs.lstatSync(file);
+  if (!status.isFile() || status.isSymbolicLink()) throw new Error(`${label} is not a physical regular file`);
+  return fs.readFileSync(file, 'utf8').trim();
+}
+try {
+  const buildId = physicalFile(rootBuildId, 'Root BUILD_ID');
+  if (!buildId || buildId !== physicalFile(standaloneBuildId, 'Standalone BUILD_ID')) throw new Error('Web BUILD_ID files differ');
+  const status = fs.lstatSync(identityFile);
+  if (!status.isFile() || status.isSymbolicLink()) throw new Error('Build identity is not a physical regular file');
+  const value = JSON.parse(fs.readFileSync(identityFile, 'utf8'));
+  const expected = { schemaVersion: 1, revision, branch, worktreeHash, sourceFingerprint, buildId };
+  if (Object.keys(value).sort().join(',') !== Object.keys(expected).sort().join(',')
+      || Object.entries(expected).some(([key, item]) => value[key] !== item)) throw new Error('Build identity does not match this checkout and Web BUILD_ID');
+} catch (error) {
+  console.error(`Cannot reuse Web runtime: ${error instanceof Error ? error.message : String(error)}`);
+  process.exit(1);
+}
+NODE
+}
+
+assert_checkout_unchanged() {
+  read_checkout_identity
+  if [[ "$CURRENT_APP_REVISION" != "$INITIAL_APP_REVISION" || "$CURRENT_APP_BRANCH" != "$INITIAL_APP_BRANCH" \
+    || "$CURRENT_APP_WORKTREE_HASH" != "$INITIAL_APP_WORKTREE_HASH" || "$CURRENT_APP_SOURCE_FINGERPRINT" != "$INITIAL_APP_SOURCE_FINGERPRINT" ]]; then
+    echo "Il checkout e cambiato durante la creazione del bundle macOS; il bundle non viene sigillato." >&2
+    exit 1
+  fi
+}
 
 # @Codex: reject path aliases and a sealed previous output before Xcode or rm/cp.
 preflight_app_destination() {
@@ -77,8 +168,12 @@ if [[ "${MEDIFLOW_SKIP_WEB_BUILD:-0}" != "1" ]]; then
   echo "Building web runtime (next build, standalone)..."
   # @Codex: webpack supports the repository's sibling-worktree node_modules
   # layout; Turbopack rejects dependencies resolved outside the worktree root.
-  ( cd "$ROOT_DIR" && npm run build -- --webpack )
+  ( cd "$ROOT_DIR" && MEDIFLOW_APP_REVISION="$INITIAL_APP_REVISION" MEDIFLOW_APP_BRANCH="$INITIAL_APP_BRANCH" \
+    MEDIFLOW_APP_WORKTREE_HASH="$INITIAL_APP_WORKTREE_HASH" MEDIFLOW_APP_SOURCE_FINGERPRINT="$INITIAL_APP_SOURCE_FINGERPRINT" \
+    MEDIFLOW_APP_FINGERPRINT="$INITIAL_APP_SOURCE_FINGERPRINT" npm run build -- --webpack )
+  write_build_identity
 fi
+assert_build_identity
 ( cd "$ROOT_DIR" && npm run check:standalone-runtime-bundle )
 if [[ ! -f "$STANDALONE_DIR/server.js" ]]; then
   echo "Missing $NEXT_DIST_DIR/standalone/server.js. Run 'npm run build' first (or unset MEDIFLOW_SKIP_WEB_BUILD)." >&2
@@ -129,6 +224,28 @@ xcodebuild -project "$PROJECT" -scheme "$SCHEME" -configuration "$CONFIG" \
 
 [[ -d "$APP" ]] || { echo "Build failed: $APP not found" >&2; exit 1; }
 
+# @Codex: do not place the initial identity in an app whose checkout changed
+# while Web/Xcode build was running.
+assert_checkout_unchanged
+
+# @Codex: preserve any Xcode-provided launch variables while placing the
+# canonical build identity in the app process environment before signing.
+PLIST="$APP/Contents/Info.plist"
+[[ -f "$PLIST" && ! -L "$PLIST" ]] || { echo "Info.plist del bundle mancante o non fisico." >&2; exit 1; }
+if ! plutil -extract LSEnvironment raw "$PLIST" >/dev/null 2>&1; then
+  plutil -insert LSEnvironment -dictionary "$PLIST"
+fi
+for identity_key in MEDIFLOW_APP_REVISION MEDIFLOW_APP_BRANCH MEDIFLOW_APP_WORKTREE_HASH MEDIFLOW_APP_SOURCE_FINGERPRINT MEDIFLOW_APP_FINGERPRINT; do
+  case "$identity_key" in
+    MEDIFLOW_APP_REVISION) identity_value="$CURRENT_APP_REVISION" ;;
+    MEDIFLOW_APP_BRANCH) identity_value="$CURRENT_APP_BRANCH" ;;
+    MEDIFLOW_APP_WORKTREE_HASH) identity_value="$CURRENT_APP_WORKTREE_HASH" ;;
+    MEDIFLOW_APP_SOURCE_FINGERPRINT|MEDIFLOW_APP_FINGERPRINT) identity_value="$CURRENT_APP_SOURCE_FINGERPRINT" ;;
+  esac
+  plutil -replace "LSEnvironment.$identity_key" -string "$identity_value" "$PLIST" 2>/dev/null \
+    || plutil -insert "LSEnvironment.$identity_key" -string "$identity_value" "$PLIST"
+done
+
 # 3. Inject the WebRuntime + the TLS proxy script into the bundle
 RES="$APP/Contents/Resources"
 WEB="$RES/WebRuntime"
@@ -178,6 +295,9 @@ lipo "$EXECUTION_MAC_HELPER" -verify_arch "$XCODE_ARCH"
 "$ROOT_DIR/scripts/check-macos-web-runtime-native-payload.sh" --normalize --web-runtime "$WEB" --frameworks "$FRAMEWORKS"
 node "$ROOT_DIR/scripts/run-strip-types.mjs" "$STAGE_EXECUTION_MAC_ASSETS" \
   --check --installation-root "$WEB"
+
+# @Codex: staging must not hide a checkout change before the outer seal.
+assert_checkout_unchanged
 
 # 4. Optional codesign (so the injected runtime is covered for distribution)
 if [[ -n "${MEDIFLOW_CODESIGN_IDENTITY:-}" ]]; then

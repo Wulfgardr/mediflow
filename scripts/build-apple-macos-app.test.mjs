@@ -43,12 +43,25 @@ const helper = base === 'mediflow-chatgpt-codex';
 const emit = (cmd, name) => console.log('Load command 0\n          cmd ' + cmd + '\n         ' + (cmd === 'LC_RPATH' ? 'path ' : 'name ') + name + ' (offset 24)');
 switch (command) {
   case 'npm':
-    if (args.join(' ') !== 'run check:standalone-runtime-bundle') throw new Error('Unexpected npm invocation');
+    if (args.join(' ') === 'run build -- --webpack') {
+      const identity = Object.fromEntries(['MEDIFLOW_APP_REVISION', 'MEDIFLOW_APP_BRANCH', 'MEDIFLOW_APP_WORKTREE_HASH', 'MEDIFLOW_APP_SOURCE_FINGERPRINT', 'MEDIFLOW_APP_FINGERPRINT'].map(key => [key, process.env[key]]));
+      if (Object.values(identity).some(value => typeof value !== 'string' || !value)) throw new Error('Missing full-build identity environment');
+      state.npmBuildIdentity = identity;
+      const buildId = process.env.MEDIFLOW_PACKAGING_TEST_BUILD_ID || 'synthetic-full-build-id';
+      fs.mkdirSync(path.join(root, '.next/standalone/.next'), { recursive: true });
+      fs.writeFileSync(path.join(root, '.next/BUILD_ID'), buildId + '\n');
+      fs.writeFileSync(path.join(root, '.next/standalone/.next/BUILD_ID'), buildId + '\n');
+      save();
+    } else if (args.join(' ') !== 'run check:standalone-runtime-bundle') throw new Error('Unexpected npm invocation');
     break;
   case 'generate': case 'record-stager': break;
-  case 'xcodebuild':
-    appRoot(path.join(process.env.MEDIFLOW_MAC_DERIVED_DATA, 'Build/Products', process.env.MEDIFLOW_MAC_CONFIG));
+  case 'xcodebuild': {
+    const fixture = appRoot(path.join(process.env.MEDIFLOW_MAC_DERIVED_DATA, 'Build/Products', process.env.MEDIFLOW_MAC_CONFIG));
+    const plist = path.join(fixture.contents, 'Info.plist');
+    fs.writeFileSync(plist, fs.readFileSync(plist, 'utf8').replace('</dict></plist>', '<key>LSEnvironment</key><dict><key>EXISTING_NATIVE_ENV</key><string>preserve-me</string></dict></dict></plist>'));
+    if (process.env.MEDIFLOW_PACKAGING_TEST_MUTATE_CHECKOUT === '1') fs.appendFileSync(path.join(root, 'package.json'), '\n');
     console.log('SYNTHETIC Xcode stub, no compilation'); break;
+  }
   case 'lipo':
     if (args[1] !== '-verify_arch' || path.basename(args[0]) !== 'mediflow-chatgpt-codex' || process.env.MEDIFLOW_PACKAGING_TEST_BAD_ARCH === '1') process.exit(88);
     break;
@@ -91,9 +104,9 @@ switch (command) {
 
 function buildFixture(t) {
   const input = fixture(t), root = path.join(input.directory, 'repo with spaces');
-  for (const file of ['scripts/build-apple-macos-app.sh', 'scripts/check-macos-web-runtime-native-payload.sh',
+  for (const file of ['package.json', 'scripts/build-apple-macos-app.sh', 'scripts/check-macos-web-runtime-native-payload.sh',
     'scripts/stage-chatgpt-execution-mac-assets.ts', 'scripts/run-strip-types.mjs',
-    'scripts/native-first-install.mjs',
+    'scripts/native-first-install.mjs', 'scripts/launcher-helpers.mjs', 'scripts/node-runtime-contract.mjs',
     'scripts/fixtures/mac-packaging-test-loader.mjs', 'scripts/fixtures/mac-packaging-test-support.mjs',
     ...['execution-mac-assets.ts', 'execution-mac-config.ts', 'execution-mac-native.ts', 'execution-mac-state.ts', 'execution-sandbox.ts', 'execution-contract.ts'].map(name => 'lib/chatgpt-execution/' + name)]) {
     const destination = path.join(root, file); fs.mkdirSync(path.dirname(destination), { recursive: true });
@@ -109,6 +122,7 @@ function buildFixture(t) {
   for (const command of ['npm', 'xcodebuild', 'codesign', 'otool', 'install_name_tool', 'file', 'lipo']) {
     write(path.join(bin, command), `#!/bin/bash\nexec "${process.execPath}" "${driverPath}" ${command} "$@"\n`, 0o755);
   }
+  write(path.join(bin, 'git'), '#!/bin/bash\nunset DEVELOPER_DIR\nexec /usr/bin/git "$@"\n', 0o755);
   write(path.join(bin, 'node'), `#!/bin/bash
 if [[ "\${1:-}" == */scripts/run-strip-types.mjs && "\${2:-}" == */stage-chatgpt-execution-mac-assets.ts ]]; then
   "${process.execPath}" "${driverPath}" record-stager "$@"
@@ -122,7 +136,29 @@ exec "${process.execPath}" "$@"
     MEDIFLOW_PACKAGING_TEST_ROOT: root, MEDIFLOW_PACKAGING_TEST_PINS: 'synthetic-only', MEDIFLOW_CODESIGN_IDENTITY: '',
     MEDIFLOW_CHATGPT_EXECUTION_BINARY: input.binary, MEDIFLOW_CHATGPT_EXECUTION_NATIVE_SOURCE: input.nativeSource,
     MEDIFLOW_CHATGPT_EXECUTION_SCHEMA_DIRECTORY: input.schemaDirectory, MEDIFLOW_CHATGPT_EXECUTION_C1_RECEIPT: input.c1Receipt };
-  return { ...input, root, env, web, app: path.join(root, 'derived/Build/Products/Debug/MediFlow.app'),
+  write(path.join(root, '.gitignore'), '.next/\nderived/\nevents.jsonl\ntool-state.json\n');
+  const gitInit = spawnSync('git', ['init', '--initial-branch=main'], { cwd: root, encoding: 'utf8' });
+  assert.equal(gitInit.status, 0, gitInit.stderr);
+  const gitCommit = spawnSync('git', ['add', '.'], { cwd: root, encoding: 'utf8' });
+  assert.equal(gitCommit.status, 0, gitCommit.stderr);
+  const gitAuthor = { ...process.env, GIT_AUTHOR_NAME: 'MediFlow test', GIT_AUTHOR_EMAIL: 'test@example.invalid', GIT_COMMITTER_NAME: 'MediFlow test', GIT_COMMITTER_EMAIL: 'test@example.invalid' };
+  const gitCreateCommit = spawnSync('git', ['commit', '-m', 'synthetic packaging fixture'], { cwd: root, encoding: 'utf8', env: gitAuthor });
+  assert.equal(gitCreateCommit.status, 0, gitCreateCommit.stderr);
+  const identityProbe = spawnSync(process.execPath, [path.join(root, 'scripts/launcher-helpers.mjs'), 'identity-field', 'sourceFingerprint'], { cwd: root, encoding: 'utf8', env });
+  assert.equal(identityProbe.status, 0, identityProbe.stderr);
+  const gitProbe = spawnSync('git', ['rev-parse', '--short=12', 'HEAD'], { cwd: root, encoding: 'utf8', env });
+  assert.equal(gitProbe.status, 0, `${gitProbe.error ?? ''}\n${gitProbe.stderr}`);
+  assert.match(identityProbe.stdout.trim(), /^main@[a-f0-9]{12}:clean$/u);
+  const identity = Object.fromEntries(['revision', 'branch', 'worktreeHash', 'sourceFingerprint'].map(field => {
+    const result = spawnSync(process.execPath, [path.join(root, 'scripts/launcher-helpers.mjs'), 'identity-field', field], { cwd: root, encoding: 'utf8', env });
+    assert.equal(result.status, 0, result.stderr);
+    return [field, result.stdout.trim()];
+  }));
+  const buildId = 'synthetic-reused-build-id';
+  write(path.join(root, '.next/BUILD_ID'), `${buildId}\n`);
+  write(path.join(web, '.next/BUILD_ID'), `${buildId}\n`);
+  write(path.join(web, 'mediflow-build-identity.json'), `${JSON.stringify({ schemaVersion: 1, ...identity, buildId })}\n`);
+  return { ...input, root, bin, env, web, identity, buildId, expectedRevision: gitProbe.stdout.trim(), app: path.join(root, 'derived/Build/Products/Debug/MediFlow.app'),
     run(overrides = {}) { return spawnSync('bash', [path.join(root, 'scripts/build-apple-macos-app.sh')], { cwd: root, encoding: 'utf8', env: { ...env, ...overrides }, timeout: 180_000, maxBuffer: 1024 * 1024 }); },
     events() { const file = path.join(root, 'events.jsonl'); return fs.existsSync(file) ? fs.readFileSync(file, 'utf8').trim().split('\n').filter(Boolean).map(line => JSON.parse(line)) : []; } };
 }
@@ -138,6 +174,23 @@ for (const identity of ['', '-', 'Synthetic Developer ID']) {
     assert.deepEqual(fs.readFileSync(path.join(input.app, 'Contents/Resources/WebRuntime/native-first-install.mjs')), fs.readFileSync(path.join(input.root, 'scripts/native-first-install.mjs')));
     assert.deepEqual(fs.readFileSync(path.join(input.web, ...assetParts, 'codex')), syntheticFiles.codex);
     assert.equal(fs.existsSync(path.join(input.app, 'Contents/Resources/WebRuntime', ...assetParts, 'codex')), false);
+    const stagedIdentity = Object.fromEntries(['MEDIFLOW_APP_REVISION', 'MEDIFLOW_APP_BRANCH', 'MEDIFLOW_APP_WORKTREE_HASH', 'MEDIFLOW_APP_SOURCE_FINGERPRINT', 'MEDIFLOW_APP_FINGERPRINT'].map(key => {
+      const result = spawnSync('/usr/libexec/PlistBuddy', ['-c', `Print :LSEnvironment:${key}`, path.join(input.app, 'Contents/Info.plist')], { encoding: 'utf8' });
+      assert.equal(result.status, 0, result.stderr);
+      return [key, result.stdout.trim()];
+    }));
+    assert.equal(stagedIdentity.MEDIFLOW_APP_REVISION, input.expectedRevision);
+    assert.equal(stagedIdentity.MEDIFLOW_APP_BRANCH, 'main');
+    assert.equal(stagedIdentity.MEDIFLOW_APP_WORKTREE_HASH, 'clean');
+    assert.equal(stagedIdentity.MEDIFLOW_APP_SOURCE_FINGERPRINT, `main@${stagedIdentity.MEDIFLOW_APP_REVISION}:clean`);
+    assert.equal(stagedIdentity.MEDIFLOW_APP_FINGERPRINT, stagedIdentity.MEDIFLOW_APP_SOURCE_FINGERPRINT);
+    const plist = path.join(input.app, 'Contents/Info.plist');
+    const environment = spawnSync('plutil', ['-extract', 'LSEnvironment', 'raw', '-o', '-', plist], { encoding: 'utf8' });
+    assert.equal(environment.status, 0, environment.stderr);
+    assert.match(environment.stdout, /EXISTING_NATIVE_ENV/u);
+    const preserved = spawnSync('/usr/libexec/PlistBuddy', ['-c', 'Print :LSEnvironment:EXISTING_NATIVE_ENV', plist], { encoding: 'utf8' });
+    assert.equal(preserved.status, 0, preserved.stderr);
+    assert.equal(preserved.stdout.trim(), 'preserve-me');
     const targets = fs.readdirSync(path.join(input.app, 'Contents/Frameworks')).sort();
     assert.deepEqual(targets, ['mediflow-web-anydoc.node', 'mediflow-web-better-sqlite3.node', 'mediflow-web-canvas.node', 'mediflow-web-fsevents.node', 'mediflow-web-libvips.dylib', 'mediflow-web-sharp.node']);
     const events = input.events();
@@ -156,6 +209,59 @@ for (const identity of ['', '-', 'Synthetic Developer ID']) {
     } else assert.equal(seal, -1);
   });
 }
+test('incomplete shared checkout identity fails before Xcode staging', t => {
+  const input = buildFixture(t);
+  write(path.join(input.bin, 'git'), '#!/bin/bash\nif [[ "$1" == "branch" && "$2" == "--show-current" ]]; then exit 0; fi\nexec /usr/bin/git "$@"\n', 0o755);
+
+  const result = input.run();
+
+  deny(result);
+  assert.match(result.stderr, /identita completa del checkout/u);
+  assert.equal(input.events().some(event => event.command === 'xcodebuild'), false);
+});
+test('skip rejects a Web payload whose recorded revision differs before Xcode', t => {
+  const input = buildFixture(t), identityFile = path.join(input.web, 'mediflow-build-identity.json');
+  write(identityFile, `${JSON.stringify({ schemaVersion: 1, ...input.identity, revision: 'foreign', buildId: input.buildId })}\n`);
+
+  const result = input.run();
+
+  deny(result); assert.match(result.stderr, /Build identity does not match/u);
+  assert.equal(input.events().some(event => event.command === 'xcodebuild'), false);
+});
+test('skip rejects divergent physical Web BUILD_ID files before Xcode', t => {
+  const input = buildFixture(t);
+  write(path.join(input.web, '.next/BUILD_ID'), 'other-build-id\n');
+
+  const result = input.run();
+
+  deny(result); assert.match(result.stderr, /BUILD_ID files differ/u);
+  assert.equal(input.events().some(event => event.command === 'xcodebuild'), false);
+});
+test('full Web build passes its canonical identity and records a reusable payload identity', t => {
+  const input = buildFixture(t), identityFile = path.join(input.web, 'mediflow-build-identity.json');
+  fs.rmSync(identityFile);
+  fs.rmSync(path.join(input.root, '.next/BUILD_ID'));
+  fs.rmSync(path.join(input.web, '.next/BUILD_ID'));
+
+  const result = input.run({ MEDIFLOW_SKIP_WEB_BUILD: '0' }); pass(result);
+
+  const state = JSON.parse(fs.readFileSync(path.join(input.root, 'tool-state.json'), 'utf8'));
+  assert.deepEqual(state.npmBuildIdentity, {
+    MEDIFLOW_APP_REVISION: input.identity.revision,
+    MEDIFLOW_APP_BRANCH: input.identity.branch,
+    MEDIFLOW_APP_WORKTREE_HASH: input.identity.worktreeHash,
+    MEDIFLOW_APP_SOURCE_FINGERPRINT: input.identity.sourceFingerprint,
+    MEDIFLOW_APP_FINGERPRINT: input.identity.sourceFingerprint,
+  });
+  assert.deepEqual(JSON.parse(fs.readFileSync(identityFile, 'utf8')), { schemaVersion: 1, ...input.identity, buildId: 'synthetic-full-build-id' });
+});
+test('checkout mutation during Xcode build stops before identity plist and runtime injection', t => {
+  const input = buildFixture(t), result = input.run({ MEDIFLOW_PACKAGING_TEST_MUTATE_CHECKOUT: '1' });
+
+  deny(result); assert.match(result.stderr, /checkout e cambiato/u);
+  assert.equal(input.events().some(event => event.command === 'record-stager' && event.args.includes('--relocate-bundle')), false);
+  assert.doesNotMatch(result.stdout, /Runnable macOS app candidate/u);
+});
 test('invalid existing helper signature fails before native rewriting, with no attempted helper re-sign', t => {
   const input = buildFixture(t), result = input.run({ MEDIFLOW_PACKAGING_TEST_BAD_SIGNATURE: '1', MEDIFLOW_CODESIGN_IDENTITY: '-' });
   deny(result); assert.match(result.stderr, /no re-signing is allowed/);
@@ -186,7 +292,9 @@ for (const overlay of ['.next', '.next/static', 'public']) {
   test(`copied ${overlay} overlay symlink is rejected before writing through it`, t => {
     const input = buildFixture(t), outside = path.join(input.directory, 'unrelated-overlay');
     write(path.join(outside, 'sentinel.txt'), 'must stay unchanged\n');
-    const link = path.join(input.web, overlay); fs.mkdirSync(path.dirname(link), { recursive: true });
+    // @Codex: keep identity valid so the overlay guard, not a missing BUILD_ID, denies this fixture.
+    if (overlay === '.next') write(path.join(outside, 'BUILD_ID'), `${input.buildId}\n`);
+    const link = path.join(input.web, overlay); fs.rmSync(link, { recursive: true, force: true }); fs.mkdirSync(path.dirname(link), { recursive: true });
     fs.symlinkSync(outside, link);
     const before = snapshot(outside), result = input.run();
     deny(result); assert.match(result.stderr, /Nonphysical app directory/);
