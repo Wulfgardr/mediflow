@@ -97,10 +97,10 @@ export function createProcessAdapter(launch) {
     try { const result = strictJson(output); demand(record(result) && !Object.hasOwn(result, 'error'), 'inspection_failed', context.phase); return result; }
     catch { throw new InstallError('inspection_failed', context.phase); }
   };
-  const module = (name, args, context) => run({ ...context,
+  const runModule = (name, args, context) => run({ ...context,
     args: ['-I', '-B', '-c', 'import os,runpy,sys; os.umask(0o077); name=sys.argv.pop(1); runpy.run_module(name,run_name="__main__",alter_sys=True)', name, ...args] });
   return Object.freeze({
-    inspect, module,
+    inspect, module: runModule,
     // Execute the explicitly hashed local pip wheel, not ensurepip or a user cache.
     pip: (wheel, args, context) => run({ ...context,
       args: ['-I', '-B', '-c', 'import os,runpy,sys; os.umask(0o077); sys.path.insert(0,sys.argv.pop(1)); runpy.run_module("pip",run_name="__main__",alter_sys=True)', wheel, ...args] }),

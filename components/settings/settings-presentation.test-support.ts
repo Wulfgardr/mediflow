@@ -62,7 +62,7 @@ export function mountContract(file: string, name: string, options: {
         useMemo(callback: () => unknown) { return callback(); },
         useRef(initial: unknown) { const index = refCursor++; if (!refs.has(index)) refs.set(index, { current: initial }); return refs.get(index); },
     };
-    const filename = resolve(file), module = { exports: {} as Record<string, unknown> };
+    const filename = resolve(file), testModule = { exports: {} as Record<string, unknown> };
     const packageRequire = createRequire(filename);
     const imports: Record<string, unknown> = { ...frameworkDoubles, ...options.imports };
     const source = readFileSync(filename, 'utf8');
@@ -80,7 +80,7 @@ export function mountContract(file: string, name: string, options: {
         throw new Error(`Undeclared test dependency: ${specifier}`);
     };
     const unexpectedNetwork = () => { throw new Error('Unexpected network in presentation contract test'); };
-    runInNewContext(compiled.outputText, { module, exports: module.exports, require: requireDouble,
+    runInNewContext(compiled.outputText, { module: testModule, exports: testModule.exports, require: requireDouble,
         Date, setTimeout, clearTimeout, AbortController, AbortSignal, fetch: unexpectedNetwork, ...options.globals }, { filename });
     function expand(value: unknown): unknown {
         if (Array.isArray(value)) return value.map(expand);
@@ -91,7 +91,7 @@ export function mountContract(file: string, name: string, options: {
     }
     function render() {
         cursor = 0; refCursor = 0; idCursor = 0; effects.length = 0;
-        return expand((module.exports[name] as (props: Record<string, unknown>) => unknown)(options.props ?? {}));
+        return expand((testModule.exports[name] as (props: Record<string, unknown>) => unknown)(options.props ?? {}));
     }
     return { render, values, effects };
 }
