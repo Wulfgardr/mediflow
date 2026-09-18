@@ -12,17 +12,6 @@ enum NativeOrdinaryTestFixtures {
     static let source = "sha256_" + String(repeating: "a", count: 64)
     static let payload = String(repeating: "b", count: 64)
     static let output = String(repeating: "c", count: 64)
-    static func authenticationURL(scheme: String = "https", host: String = "auth.openai.com",
-                                  port: Int? = nil, user: String? = nil, path: String = "/synthetic") -> String {
-        // @Codex: construct explicit synthetic login endpoints without runtime URL literals.
-        var components = URLComponents()
-        components.scheme = scheme
-        components.host = host
-        components.port = port
-        components.user = user
-        components.path = path
-        return components.string!
-    }
     static func decode<T: Decodable>(_ type: T.Type, _ object: [String: Any]) throws -> T {
         try JSONDecoder().decode(type, from: JSONSerialization.data(withJSONObject: object))
     }
@@ -39,7 +28,7 @@ enum NativeOrdinaryTestFixtures {
             "attemptId": attempt, "functionId": function.rawValue, "expiresAt": Date().timeIntervalSince1970 * 1000 + 60000]
         switch phase {
         case "needs_consent": v["disclosure"] = disclosure(function)
-        case "awaiting_login": v["challenge"] = ["verificationUrl": authenticationURL(), "userCode": "SYNTHETIC-CODE"]
+        case "awaiting_login": v["challenge"] = ["verificationUrl": "https://auth.openai.com/synthetic", "userCode": "SYNTHETIC-CODE"]
         case "ready": v["catalog"] = ["revision": revision, "choices": [choice]]
         case "closed": v["cleanupConfirmed"] = true
         case "completed": v["schema"] = "mediflow.native-ordinary.v1"; v["cleanupConfirmed"] = true; v["result"] = result(function)
@@ -103,10 +92,7 @@ final class NativeOrdinaryDTOTests: XCTestCase {
         }
     }
     func testLoginRejectsOtherHostCredentialsAndScheme() throws {
-        for url in [F.authenticationURL(scheme: "http", path: "/a"),
-                    F.authenticationURL(host: "auth.openai.com" + ".evil.invalid", path: "/a"),
-                    F.authenticationURL(user: "user", path: "/a"),
-                    F.authenticationURL(host: "chatgpt.com", port: 444, path: "/a")] {
+        for url in ["http://auth.openai.com/a", "https://auth.openai.com.evil.invalid/a", "https://user@auth.openai.com/a", "https://chatgpt.com:444/a"] {
             let value = try F.decode(NativeOrdinaryChallenge.self, ["verificationUrl": url, "userCode": "SYNTHETIC"])
             XCTAssertNil(value.safeURL)
         }
