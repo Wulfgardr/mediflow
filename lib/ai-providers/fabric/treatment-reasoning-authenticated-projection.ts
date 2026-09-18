@@ -195,22 +195,42 @@ export function createTreatmentReasoningAuthenticatedProjectionBroker(sources: S
                     let projection: TreatmentReasoningProjectionAttachment;
                     try { projection = snapshotTreatmentReasoningProjectionAttachment(input.projection, clock(sources)); }
                     catch { return fail('input_invalid'); }
-                    return selection(context, (pair) => {
+                    // @Codex — never mint/read a lease port inside the owner's critical section.
+                    // The original anti-reentry guard remains intact for Web and native callers.
+                    const selected = selection(context, (pair) => {
                         const version = patientVersion(sources, pair.patientId, pair.ambulatoryId);
                         if (version !== projection.patientRevision) return fail('projection_stale');
-                        const selectionEpoch = positive(context.owner.snapshotSelectionEpoch(context.session), 'selection_unavailable');
-                        let port: TreatmentReasoningLeaseCommitPort;
-                        try { port = context.owner.mintTreatmentReasoningLeaseCommitPort(context.session); }
-                        catch { return fail('lease_unavailable'); }
-                        const snapshot = port.snapshot();
-                        if (!snapshot || snapshot.terminal || snapshot.stagedRef !== null) { port.dispose(); return fail('lease_unavailable'); }
-                        const projectionHandle = handle(sources);
-                        if (broker.records.has(projectionHandle)) { port.dispose(); return fail('source_invalid'); }
-                        register(broker, context, sources);
-                        broker.records.set(projectionHandle, frozen({ projection, patientRef: pair.patientId, ambulatoryRef: pair.ambulatoryId,
-                            selectionEpoch, patientVersion: version, port, expected: snapshot.currentRef }) as State);
-                        return projectionHandle;
+                        return { ...pair, version,
+                            epoch: positive(context.owner.snapshotSelectionEpoch(context.session), 'selection_unavailable'),
+                            reviewEpoch: context.owner.snapshotReviewContextEpoch(context.session) };
                     });
+                    let port: TreatmentReasoningLeaseCommitPort;
+                    try { port = context.owner.mintTreatmentReasoningLeaseCommitPort(context.session); }
+                    catch { return fail('lease_unavailable'); }
+                    let projectionHandle: string | null = null, installed = false;
+                    try {
+                        const snapshot = port.snapshot();
+                        if (!snapshot || snapshot.terminal || snapshot.stagedRef !== null) return fail('lease_unavailable');
+                        projectionHandle = handle(sources);
+                        if (broker.records.has(projectionHandle)) return fail('source_invalid');
+                        register(broker, context, sources);
+                        selection(context, (pair) => {
+                            if (pair.patientId !== selected.patientId || pair.ambulatoryId !== selected.ambulatoryId
+                                || context.owner.snapshotSelectionEpoch(context.session) !== selected.epoch
+                                || context.owner.snapshotReviewContextEpoch(context.session) !== selected.reviewEpoch
+                                || patientVersion(sources, pair.patientId, pair.ambulatoryId) !== selected.version) return fail('selection_changed');
+                        });
+                        const current = port.snapshot();
+                        if (!current || current.terminal || current.stagedRef !== null || current.currentRef !== snapshot.currentRef)
+                            return fail('lease_unavailable');
+                        broker.records.set(projectionHandle, frozen({ projection, patientRef: selected.patientId, ambulatoryRef: selected.ambulatoryId,
+                            selectionEpoch: selected.epoch, patientVersion: selected.version, port, expected: current.currentRef }) as State);
+                        installed = true; return projectionHandle;
+                    } catch (error) {
+                        if (installed && projectionHandle) broker.records.delete(projectionHandle);
+                        try { port.dispose(); } catch { /* no authority is returned */ }
+                        releaseIfIdle(broker); throw error;
+                    }
                 },
             });
         },

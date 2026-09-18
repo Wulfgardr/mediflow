@@ -45,6 +45,8 @@ function harness(overrides: { epoch?: number; patientVersion?: number; context?:
     });
     const owner = Object.freeze({
         snapshotSelectionEpoch: () => epoch,
+        // @Codex: explicit review epoch in this legacy protocol-only fixture.
+        snapshotReviewContextEpoch: () => epoch,
         withLeaseCriticalSection: (_session: unknown, operation: (selection: { patientId: string; ambulatoryId: string }) => unknown) => operation({ patientId: PATIENT, ambulatoryId: AMBULATORY }),
         mintTreatmentReasoningLeaseCommitPort: () => port,
     });

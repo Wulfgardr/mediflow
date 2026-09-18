@@ -8,11 +8,12 @@ import { createAuthenticatedWebSessionSelectionService } from '../security/serve
 import type { AuthenticatedWebSessionProjectionOwnerContext } from '../security/server-auth';
 import type { PairedNativeSession } from '../security/paired-native-session';
 import { ProductError } from './product-contract';
-import { beginOrdinaryFunction } from './ordinary-flow';
-import { ordinaryWireObject } from './ordinary-wire';
-import type { NativeOrdinaryPreparation } from './native-ordinary-wire';
+import { beginOrdinaryFunction, bindNativeOrdinaryHostSources } from './ordinary-flow';
+import { parseNativeOrdinaryPreparation, type NativeOrdinaryPreparation } from './native-ordinary-wire';
+import { captureNativeOrdinaryHostSources, readNativeOrdinaryHostSource, closeNativeOrdinaryHostSources, nativeOrdinaryHostSourcesAreCurrent,
+    type NativeOrdinaryHostSourceCapture, type NativeOrdinarySelectionLease } from '../security/server-session-clinical-context-native-sources';
 
-type Context = AuthenticatedWebSessionProjectionOwnerContext & { session: PairedNativeSession; request: NativeOrdinaryPreparation };
+type Context = AuthenticatedWebSessionProjectionOwnerContext & { session: PairedNativeSession; request: NativeOrdinaryPreparation; selection: NativeOrdinarySelectionLease; sources: NativeOrdinaryHostSourceCapture | null };
 const scope = new AsyncLocalStorage<Context>();
 function confirm(context: Context): void {
     const port = native.mintResourcePort(context.session);
@@ -22,6 +23,9 @@ function confirm(context: Context): void {
             { patientId: context.request.patientId, ambulatoryId: context.request.ambulatoryId });
         if (current.patientVersion !== context.request.patientRevision
             || !nativeSessionProjectionOwnerRegistry.isAuthenticOwner(context.owner)) throw new ProductError('revoked');
+        const { sessionRef, selectionEpoch, patientRef, ambulatoryRef, leaseRef } = context.selection;
+        context.owner.dereferenceSelection(context.session, { sessionRef, selectionEpoch, patientRef, ambulatoryRef, leaseRef });
+        if (context.sources && !nativeOrdinaryHostSourcesAreCurrent(context.sources)) throw new ProductError('revoked');
     } finally { native.releaseResourcePort(port); }
 }
 /** This accessor cannot create a native scope or select a function. */
@@ -37,10 +41,11 @@ const requestId = () => `native_${randomUUID()}`;
 async function originalFunction(request: Request, context: Context): Promise<Response> {
     confirm(context);
     const prepared = context.request;
+    const source = context.sources ? readNativeOrdinaryHostSource(context.sources, context.session, prepared.functionId) : null;
+    if (context.sources) bindNativeOrdinaryHostSources(context.sources);
     if (prepared.functionId === 'patient_insight') {
-        const input = prepared.input as Record<string, unknown>;
-        if (input.patientId !== prepared.patientId || input.ambulatoryId !== prepared.ambulatoryId
-            || input.patientRevision !== prepared.patientRevision) throw new ProductError('invalid_request');
+        if (source?.functionId !== 'patient_insight') throw new ProductError('revoked');
+        const input = source.input;
         const [{ acquireAuthenticatedPatientInsightPreview }, { createPatientInsightPreviewHttpHandler }] = await Promise.all([
             import('../ai-providers/fabric/patient-insight-authenticated-preview-production'),
             import('../ai-providers/fabric/patient-insight-authenticated-preview'),
@@ -48,14 +53,10 @@ async function originalFunction(request: Request, context: Context): Promise<Res
         confirm(context);
         return createPatientInsightPreviewHttpHandler({ acquirePreview: acquireAuthenticatedPatientInsightPreview })(requestFor(request, input));
     }
-    // Named selection Application Service, never a route-local DB query or client capability.
-    const selection = createAuthenticatedWebSessionSelectionService({ acquireOwner: async () => context.owner });
-    const lease = await selection.issue({ expectedEpoch: context.owner.snapshotSelectionEpoch(context.session),
-        patientId: prepared.patientId, ambulatoryId: prepared.ambulatoryId });
-    confirm(context);
+    const lease = context.selection;
     if (prepared.functionId === 'smart_import') {
-        const projection = prepared.input as Record<string, unknown>;
-        if (projection.patientRevision !== prepared.patientRevision) throw new ProductError('invalid_request');
+        if (source?.functionId !== 'smart_import') throw new ProductError('revoked');
+        const projection = source.input;
         const [{ acquireAuthenticatedSmartImportAttachmentIngest }, { acquireAuthenticatedSmartImportPreview },
             { createSmartImportPreviewHttpHandler }] = await Promise.all([
             import('../security/server-session-authenticated-smart-import-attachment-ingest-production'),
@@ -71,18 +72,17 @@ async function originalFunction(request: Request, context: Context): Promise<Res
             requestFor(request, { handle, requestId: requestId() }));
     }
     if (prepared.functionId === 'treatment_reasoning') {
-        if ((prepared.input as Record<string, unknown>).patientRevision !== prepared.patientRevision) throw new ProductError('invalid_request');
+        if (source?.functionId !== 'treatment_reasoning') throw new ProductError('revoked');
         const [{ acquireTreatmentReasoningIngest, acquireTreatmentReasoningPreview }, { createTreatmentReasoningPreviewHttpHandler }] = await Promise.all([
             import('../ai-providers/fabric/treatment-reasoning-production-root'),
             import('../ai-providers/fabric/treatment-reasoning-production-http'),
         ]);
         const operation = await acquireTreatmentReasoningIngest(); confirm(context);
-        const handle = operation.ingest({ projection: prepared.input, requestId: requestId() });
+        const handle = operation.ingest({ projection: source.input, requestId: requestId() });
         return createTreatmentReasoningPreviewHttpHandler({ acquirePreview: acquireTreatmentReasoningPreview })(
             requestFor(request, { handle, requestId: requestId() }));
     }
-    const input = ordinaryWireObject(prepared.input, ['attachmentId']);
-    if (!input || typeof input.attachmentId !== 'string' || !input.attachmentId || input.attachmentId.length > 200) throw new ProductError('invalid_request');
+    const input = prepared.input;
     const [{ acquireDocumentSynthesisProductionOperation }, { createDocumentSynthesisPreviewHttpHandler }] = await Promise.all([
         import('../ai-providers/fabric/document-synthesis-production-operation'),
         import('../ai-providers/fabric/document-synthesis-production-http'),
@@ -99,13 +99,26 @@ async function originalFunction(request: Request, context: Context): Promise<Res
 
 /** Only the paired Mac ingress calls this fixed four-way composition. */
 export async function prepareNativeOrdinary(request: Request, session: PairedNativeSession, input: NativeOrdinaryPreparation): Promise<Response> {
+    // Revalidate even direct internal calls BEFORE owner acquisition/operation creation.
+    input = parseNativeOrdinaryPreparation(input);
     const port = native.mintResourcePort(session);
     if (!port) throw new ProductError('session_expired');
     try {
         const owner = nativeSessionProjectionOwnerRegistry.acquire(session);
-        const context: Context = Object.freeze({ session, owner, request: input });
-        confirm(context);
-        return await scope.run(context, () => beginOrdinaryFunction(request, input.functionId, session,
-            ownedRequest => originalFunction(ownedRequest, context)));
+        return await beginOrdinaryFunction(request, input.functionId, session, async ownedRequest => {
+            const service = createAuthenticatedWebSessionSelectionService({ acquireOwner: async () => owner });
+            const selection = await service.issue({ expectedEpoch: owner.snapshotSelectionEpoch(session),
+                patientId: input.patientId, ambulatoryId: input.ambulatoryId });
+            const sources = input.functionId === 'document_synthesis' ? null : captureNativeOrdinaryHostSources(session, owner, input, selection);
+            const context: Context = Object.freeze({ session, owner, request: input, selection, sources });
+            try {
+                confirm(context);
+                return await scope.run(context, async () => {
+                    const response = await originalFunction(ownedRequest, context);
+                    confirm(context); // Original parser/commit is not a bypass of host-source currentness.
+                    return response;
+                });
+            } catch (error) { if (sources) closeNativeOrdinaryHostSources(sources); throw error; }
+        });
     } finally { native.releaseResourcePort(port); }
 }

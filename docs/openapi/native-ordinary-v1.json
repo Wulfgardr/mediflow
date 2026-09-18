@@ -764,468 +764,43 @@
         "type": "object",
         "additionalProperties": false,
         "required": [
-          "schemaVersion",
-          "requestId",
-          "patientId",
-          "ambulatoryId",
-          "patientRevision",
-          "capturedAt",
-          "sources"
+          "selector"
         ],
         "properties": {
-          "schemaVersion": {
+          "selector": {
             "type": "string",
-            "const": "mediflow.patient-insight.preview-request.v1"
-          },
-          "requestId": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 160
-          },
-          "patientId": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 160
-          },
-          "ambulatoryId": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 160
-          },
-          "patientRevision": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 9007199254740991
-          },
-          "capturedAt": {
-            "type": "string",
-            "format": "date-time",
-            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
-          },
-          "sources": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": [
-              "focus",
-              "conditions",
-              "activeTherapies",
-              "recentEvents"
-            ],
-            "properties": {
-              "focus": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": [
-                  "summary"
-                ],
-                "properties": {
-                  "summary": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 240
-                  }
-                }
-              },
-              "conditions": {
-                "type": "array",
-                "maxItems": 12,
-                "items": {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "required": [
-                    "label"
-                  ],
-                  "properties": {
-                    "label": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 240
-                    }
-                  }
-                }
-              },
-              "activeTherapies": {
-                "type": "array",
-                "maxItems": 12,
-                "items": {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "required": [
-                    "label"
-                  ],
-                  "properties": {
-                    "label": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 240
-                    }
-                  }
-                }
-              },
-              "recentEvents": {
-                "type": "array",
-                "maxItems": 12,
-                "items": {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "required": [
-                    "summary"
-                  ],
-                  "properties": {
-                    "summary": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 240
-                    }
-                  }
-                }
-              }
-            }
+            "const": "current_patient_insight"
           }
-        }
+        },
+        "description": "Selettore passivo. Le fonti sono acquisite e ricostruite esclusivamente dall’Application Service host; nessun testo o proiezione dal client."
       },
       "NativeSmartImportInput": {
         "type": "object",
         "additionalProperties": false,
         "required": [
-          "schemaVersion",
-          "capability",
-          "patientRevision",
-          "sourceRevision",
-          "capturedAt",
-          "currentDiagnoses",
-          "currentActiveTherapies",
-          "therapyCandidateHints",
-          "sources"
+          "selector"
         ],
         "properties": {
-          "schemaVersion": {
+          "selector": {
             "type": "string",
-            "const": "mediflow.smart-import.projection-attachment.v1"
-          },
-          "capability": {
-            "type": "string",
-            "const": "smart_import"
-          },
-          "patientRevision": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 9007199254740991
-          },
-          "sourceRevision": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 9007199254740991
-          },
-          "capturedAt": {
-            "type": "string",
-            "format": "date-time",
-            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
-          },
-          "currentDiagnoses": {
-            "type": "array",
-            "maxItems": 64,
-            "items": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": [
-                "system",
-                "code",
-                "description"
-              ],
-              "properties": {
-                "system": {
-                  "type": "string",
-                  "minLength": 1,
-                  "maxLength": 64
-                },
-                "code": {
-                  "type": "string",
-                  "minLength": 1,
-                  "maxLength": 64
-                },
-                "description": {
-                  "type": "string",
-                  "minLength": 1,
-                  "maxLength": 320
-                }
-              }
-            }
-          },
-          "currentActiveTherapies": {
-            "type": "array",
-            "maxItems": 64,
-            "items": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": [
-                "drugName",
-                "activePrinciple",
-                "dosage",
-                "aic",
-                "atc"
-              ],
-              "properties": {
-                "drugName": {
-                  "type": "string",
-                  "minLength": 1,
-                  "maxLength": 160
-                },
-                "activePrinciple": {
-                  "anyOf": [
-                    {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 160
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "dosage": {
-                  "anyOf": [
-                    {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 160
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "aic": {
-                  "anyOf": [
-                    {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 32
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "atc": {
-                  "anyOf": [
-                    {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 32
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                }
-              }
-            }
-          },
-          "therapyCandidateHints": {
-            "type": "array",
-            "maxItems": 32,
-            "items": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": [
-                "sourceId",
-                "label",
-                "excerpt"
-              ],
-              "properties": {
-                "sourceId": {
-                  "type": "string",
-                  "minLength": 1,
-                  "maxLength": 160
-                },
-                "label": {
-                  "type": "string",
-                  "minLength": 1,
-                  "maxLength": 160
-                },
-                "excerpt": {
-                  "type": "string",
-                  "minLength": 1,
-                  "maxLength": 600
-                }
-              }
-            }
-          },
-          "sources": {
-            "type": "array",
-            "maxItems": 32,
-            "items": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": [
-                "id",
-                "kind",
-                "label",
-                "date",
-                "content"
-              ],
-              "properties": {
-                "id": {
-                  "type": "string",
-                  "minLength": 1,
-                  "maxLength": 160
-                },
-                "kind": {
-                  "enum": [
-                    "patient-notes",
-                    "clinical-entry",
-                    "document-insight",
-                    "attachment-summary"
-                  ]
-                },
-                "label": {
-                  "type": "string",
-                  "minLength": 1,
-                  "maxLength": 160
-                },
-                "date": {
-                  "anyOf": [
-                    {
-                      "type": "string",
-                      "format": "date-time",
-                      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "content": {
-                  "type": "string",
-                  "minLength": 1,
-                  "maxLength": 900
-                }
-              }
-            },
-            "minItems": 1
+            "const": "current_smart_import"
           }
-        }
+        },
+        "description": "Selettore passivo. Le fonti sono acquisite e ricostruite esclusivamente dall’Application Service host; nessun testo o proiezione dal client."
       },
       "NativeTreatmentReasoningInput": {
         "type": "object",
         "additionalProperties": false,
         "required": [
-          "schemaVersion",
-          "capability",
-          "patientRevision",
-          "sourceRevision",
-          "capturedAt",
-          "therapyRefs",
-          "evidenceRefs",
-          "sources"
+          "selector"
         ],
         "properties": {
-          "schemaVersion": {
+          "selector": {
             "type": "string",
-            "const": "mediflow.ai.treatment-reasoning-projection-attachment.v1"
-          },
-          "capability": {
-            "type": "string",
-            "const": "treatment_reasoning"
-          },
-          "patientRevision": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 9007199254740991
-          },
-          "sourceRevision": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 160
-          },
-          "capturedAt": {
-            "type": "string",
-            "format": "date-time",
-            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
-          },
-          "therapyRefs": {
-            "type": "array",
-            "maxItems": 16,
-            "items": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 160
-            }
-          },
-          "evidenceRefs": {
-            "type": "array",
-            "maxItems": 16,
-            "items": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 160
-            }
-          },
-          "sources": {
-            "type": "array",
-            "maxItems": 16,
-            "items": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": [
-                "id",
-                "sourceKind",
-                "label",
-                "excerpt",
-                "date"
-              ],
-              "properties": {
-                "id": {
-                  "type": "string",
-                  "minLength": 1,
-                  "maxLength": 160
-                },
-                "sourceKind": {
-                  "enum": [
-                    "patient-profile",
-                    "diagnosis",
-                    "therapy",
-                    "observation",
-                    "clinical-entry",
-                    "document-insight",
-                    "attachment-evidence"
-                  ]
-                },
-                "label": {
-                  "type": "string",
-                  "minLength": 1,
-                  "maxLength": 180
-                },
-                "excerpt": {
-                  "anyOf": [
-                    {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 480
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "date": {
-                  "anyOf": [
-                    {
-                      "type": "string",
-                      "format": "date-time",
-                      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                }
-              }
-            },
-            "minItems": 1
+            "const": "current_treatment_reasoning"
           }
-        }
+        },
+        "description": "Selettore passivo. Le fonti sono acquisite e ricostruite esclusivamente dall’Application Service host; nessun testo o proiezione dal client."
       },
       "NativeDocumentSynthesisInput": {
         "type": "object",
@@ -1237,7 +812,8 @@
           "attachmentId": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 200
+            "maxLength": 200,
+            "pattern": "^(?!\\s)(?![\\s\\S]*\\s$)[^\\u0000-\\u001f\\u007f]+$"
           }
         }
       },
@@ -1566,12 +1142,14 @@
               "patientId": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 160
+                "maxLength": 160,
+                "pattern": "^(?!\\s)(?![\\s\\S]*\\s$)[^\\u0000-\\u001f\\u007f]+$"
               },
               "ambulatoryId": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 160
+                "maxLength": 160,
+                "pattern": "^(?!\\s)(?![\\s\\S]*\\s$)[^\\u0000-\\u001f\\u007f]+$"
               },
               "patientRevision": {
                 "type": "integer",
@@ -1601,12 +1179,14 @@
               "patientId": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 160
+                "maxLength": 160,
+                "pattern": "^(?!\\s)(?![\\s\\S]*\\s$)[^\\u0000-\\u001f\\u007f]+$"
               },
               "ambulatoryId": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 160
+                "maxLength": 160,
+                "pattern": "^(?!\\s)(?![\\s\\S]*\\s$)[^\\u0000-\\u001f\\u007f]+$"
               },
               "patientRevision": {
                 "type": "integer",
@@ -1636,12 +1216,14 @@
               "patientId": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 160
+                "maxLength": 160,
+                "pattern": "^(?!\\s)(?![\\s\\S]*\\s$)[^\\u0000-\\u001f\\u007f]+$"
               },
               "ambulatoryId": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 160
+                "maxLength": 160,
+                "pattern": "^(?!\\s)(?![\\s\\S]*\\s$)[^\\u0000-\\u001f\\u007f]+$"
               },
               "patientRevision": {
                 "type": "integer",
@@ -1671,12 +1253,14 @@
               "patientId": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 160
+                "maxLength": 160,
+                "pattern": "^(?!\\s)(?![\\s\\S]*\\s$)[^\\u0000-\\u001f\\u007f]+$"
               },
               "ambulatoryId": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 160
+                "maxLength": 160,
+                "pattern": "^(?!\\s)(?![\\s\\S]*\\s$)[^\\u0000-\\u001f\\u007f]+$"
               },
               "patientRevision": {
                 "type": "integer",
@@ -1688,7 +1272,8 @@
               }
             }
           }
-        ]
+        ],
+        "description": "Ingress esatto per functionId, massimo 4096 byte UTF-8; ulteriori vincoli runtime: stringhe ben formate, limiti UTF-16, soli oggetti ordinari enumerabili senza proxy/accessor/simboli. Nessuna autorità di sorgente dal DTO."
       },
       "NativeOrdinaryState": {
         "type": "object",

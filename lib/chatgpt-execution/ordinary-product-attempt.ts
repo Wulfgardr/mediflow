@@ -17,7 +17,7 @@ import { createOrdinaryProductConsent, ordinaryConsentIsCurrent } from '../chatg
 import { ProductError } from '../chatgpt-product/product-contract';
 
 type State = 'empty' | 'preparing' | 'needs_consent' | 'consented' | 'awaiting_login' | 'connected' | 'ready' | 'completed' | 'closed';
-export async function createOrdinaryProductAttempt(session: OrdinarySession, platform: ProductExecutionPlatform) {
+export async function createOrdinaryProductAttempt(session: OrdinarySession, platform: ProductExecutionPlatform, additionalCurrentness: () => boolean = () => true) {
     const owner = await import('../security/ordinary-session-authority');
     const port = owner.mintResourcePort(session);
     if (!port) throw new ProductError('session_expired');
@@ -40,8 +40,11 @@ export async function createOrdinaryProductAttempt(session: OrdinarySession, pla
     let watcher: ReturnType<typeof setInterval> | undefined;
     const remaining = () => Math.max(0, Math.min(expiresAt - Date.now(), deadline ? deadline - performance.now() : Infinity));
     const local = () => active && !controller.signal.aborted && !selectionSignal?.aborted && remaining() > 0;
+    function sourcesCurrent(): boolean {
+        try { return additionalCurrentness() === true; } catch { return false; }
+    }
     function current(): boolean {
-        if (!local()) return false;
+        if (!local() || !sourcesCurrent()) return false;
         const use = owner.beginResourceUse(port); if (!use) return false;
         owner.abortResourceUse(use); return local();
     }
@@ -146,7 +149,7 @@ export async function createOrdinaryProductAttempt(session: OrdinarySession, pla
         },
         /** Only a local witness. The original function owner must bind/commit. */
         isCurrent(result: SynthesisCatalog | OrdinaryExecutionResult): boolean {
-            return local() && !!consent && !!preparation && ordinaryConsentIsCurrent(consent.token, preparation)
+            return local() && sourcesCurrent() && !!consent && !!preparation && ordinaryConsentIsCurrent(consent.token, preparation)
                 && platform.snapshot().revision === qualificationRevision && !!execution && execution.isCurrent(result);
         },
         dispose,

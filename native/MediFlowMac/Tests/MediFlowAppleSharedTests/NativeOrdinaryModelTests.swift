@@ -13,7 +13,7 @@ final class NativeOrdinaryModelTests: XCTestCase {
             sessionCookie: "mediflow_session=synthetic-native", ambulatoryId: "synthetic-ambulatory", masterKey: nil,
             serverURL: "https://localhost", tlsPin: String(repeating: "a", count: 64), sessionGeneration: generation)
         return NativeOrdinarySnapshot(connection: connection, preparation: NativeOrdinaryPreparation(functionId: .patientInsight,
-            patientId: "synthetic-patient", ambulatoryId: "synthetic-ambulatory", patientRevision: 1, input: .object([:])), fingerprint: fingerprint)
+            patientId: "synthetic-patient", ambulatoryId: "synthetic-ambulatory", patientRevision: 1, input: .patientInsight), fingerprint: fingerprint)
     }
     private func response(_ phase: String) throws -> NativeOrdinaryResponse { try F.decode(NativeOrdinaryResponse.self, F.response(.patientInsight, phase)) }
     private func settle(_ model: NativeOrdinaryModel) async {
@@ -85,7 +85,7 @@ final class NativeOrdinaryModelTests: XCTestCase {
         let a = source(); XCTAssertTrue(a.matches(source()))
         XCTAssertFalse(a.matches(source(generation: 1))); XCTAssertFalse(a.matches(source(fingerprint: "synthetic-source-b")))
         let changed = NativeOrdinarySnapshot(connection: a.connection, preparation: .init(functionId: .smartImport,
-            patientId: "synthetic-other-patient", ambulatoryId: "synthetic-ambulatory", patientRevision: 2, input: .object([:])), fingerprint: a.fingerprint)
+            patientId: "synthetic-other-patient", ambulatoryId: "synthetic-ambulatory", patientRevision: 2, input: .smartImport), fingerprint: a.fingerprint)
         XCTAssertFalse(a.matches(changed))
     }
 }
