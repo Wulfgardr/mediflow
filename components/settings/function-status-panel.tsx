@@ -1,6 +1,6 @@
 'use client';
 
-/* @Codex WUL-674 */
+/* @Codex WUL-674 / WUL-684: presentation only; status/actions remain server-owned. */
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { FUNCTION_META, FUNCTION_STATE_LABELS, parseFunctionStatus, type FunctionId, type FunctionStatusRow, type FunctionStatusSnapshot } from '@/lib/function-status';
@@ -10,7 +10,7 @@ import styles from './function-status-panel.module.css';
 /* @Codex: Fabric presents intelligent functions; ICD-11 belongs to Repertori.
    The complete seven-row API snapshot is still validated without modification. */
 const FUNCTION_GROUPS: readonly { id: string; title: string; functions: readonly FunctionId[] }[] = [
-    { id: 'summaries', title: 'Sintesi e importazione assistita', functions: ['patient_insight', 'smart_import', 'document_synthesis', 'treatment_reasoning'] },
+    { id: 'summaries', title: 'Sintesi, importazione e revisione del trattamento', functions: ['patient_insight', 'smart_import', 'document_synthesis', 'treatment_reasoning'] },
     { id: 'reading', title: 'Lettura dei documenti', functions: ['document_text', 'document_ocr'] },
 ];
 
@@ -26,7 +26,7 @@ function FunctionCard({ row }: { row: FunctionStatusRow }) {
             </div>
             <p className={styles.purpose}>{meta.purpose}</p>
             <div className={styles.provider}>
-                <span className={styles.providerLabel}>{row.model ? 'Modello configurato' : 'Servizio previsto'}</span>
+                <span className={styles.providerLabel}>{row.model ? 'Servizio e modello configurati' : 'Servizio previsto'}</span>
                 <strong>{row.provider}{row.model ? ` · ${row.model}` : ''}</strong>
             </div>
             <p>{row.reason}</p>
@@ -34,7 +34,7 @@ function FunctionCard({ row }: { row: FunctionStatusRow }) {
                 <Link className={SETTINGS_SECONDARY_BUTTON_CLASS} href={action.href}>{action.action}</Link>
                 <details>
                     <summary>Come leggere lo stato</summary>
-                    <p>Questa vista legge la configurazione. L’ultima esecuzione non è rilevata qui: il risultato e le fonti si controllano nella cartella.</p>
+                    <p>Questa vista legge la configurazione, non prova il funzionamento. «Da provare» non significa pronta all’uso clinico. Controlla il risultato e le fonti nella cartella: qui non è rilevata l’ultima esecuzione. Lo stato del collegamento account e l’esito della demo OpenAI non sostituiscono i controlli della singola funzione.</p>
                 </details>
             </div>
         </li>
@@ -63,12 +63,12 @@ export function FunctionStatusPanel() {
             <header className={styles.header}>
                 <div>
                     <h2 id="function-status-title">Le tue funzioni</h2>
-                    <p>Per ogni attività, il servizio configurato e il prossimo passo.</p>
+                    <p>Per ogni attività: configurazione, eventuali blocchi e prossimo passo. Questa lettura non attiva funzioni e non autorizza l’invio di dati.</p>
                 </div>
                 <button type="button" className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={state.kind === 'loading'} onClick={() => setRevision(value => value + 1)}>Rileggi stato</button>
             </header>
             {state.kind === 'loading' && <p className="py-5 text-sm" role="status">Lettura dello stato…</p>}
-            {state.kind === 'error' && <p className="py-5 text-sm" role="alert">Stato non disponibile. Riprova: un errore di lettura non significa che le funzioni siano spente.</p>}
+            {state.kind === 'error' && <p className="py-5 text-sm" role="alert">Stato non disponibile. Premi «Rileggi stato»: un errore di lettura non significa che le funzioni siano spente.</p>}
             {state.kind === 'unauthorized' && <p className="py-5 text-sm" role="alert">Sblocca la sessione per leggere lo stato.</p>}
             {state.kind === 'ready' && <>
                 <p className={styles.checkedAt}>Configurazione letta il <time dateTime={state.snapshot.checkedAt}>{new Date(state.snapshot.checkedAt).toLocaleString('it-IT')}</time>. Questo controllo non esegue modelli.</p>
