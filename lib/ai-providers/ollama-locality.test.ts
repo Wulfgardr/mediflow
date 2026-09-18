@@ -50,7 +50,7 @@ test('limita il riferimento modello locale a 674 byte UTF-8 dopo trim senza ripa
     );
 });
 
-for (const serverVersion of ['0.32.5', '0.33.3']) test(`attesta ${serverVersion} senza inviare un prompt`, async (t) => {
+for (const serverVersion of ['0.32.5', '0.33.3', '0.34.2']) test(`attesta ${serverVersion} senza inviare un prompt`, async (t) => {
     const originalFetch = globalThis.fetch;
     const calls: Array<{ url: string; init?: RequestInit }> = [];
     globalThis.fetch = (async (input, init) => {
@@ -108,7 +108,7 @@ test('rifiuta un modello remoto prima della chiamata show', async (t) => {
     assert.equal(urls.some((url) => url.endsWith('/api/show')), false);
 });
 
-for (const unqualified of ['0.33.0', '0.33.4', '0.34.0', '0.33.3-preview', 'unknown']) test(`nega versione non qualificata ${unqualified}`, async (t) => {
+for (const unqualified of ['0.33.0', '0.33.4', '0.34.0', '0.34.1', '0.34.3', '0.33.3-preview', '0.34.2-preview', 'unknown']) test(`nega versione non qualificata ${unqualified}`, async (t) => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = (async () => Response.json({ version: unqualified })) as typeof fetch;
     t.after(() => {
