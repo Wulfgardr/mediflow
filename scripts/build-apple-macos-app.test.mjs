@@ -93,6 +93,7 @@ function buildFixture(t) {
   const input = fixture(t), root = path.join(input.directory, 'repo with spaces');
   for (const file of ['scripts/build-apple-macos-app.sh', 'scripts/check-macos-web-runtime-native-payload.sh',
     'scripts/stage-chatgpt-execution-mac-assets.ts', 'scripts/run-strip-types.mjs',
+    'scripts/native-first-install.mjs',
     'scripts/fixtures/mac-packaging-test-loader.mjs', 'scripts/fixtures/mac-packaging-test-support.mjs',
     ...['execution-mac-assets.ts', 'execution-mac-config.ts', 'execution-mac-native.ts', 'execution-mac-state.ts', 'execution-sandbox.ts', 'execution-contract.ts'].map(name => 'lib/chatgpt-execution/' + name)]) {
     const destination = path.join(root, file); fs.mkdirSync(path.dirname(destination), { recursive: true });
@@ -134,6 +135,7 @@ for (const identity of ['', '-', 'Synthetic Developer ID']) {
     assert.match(result.stdout, /runtime smoke still required/);
     const helper = path.join(input.app, 'Contents/Helpers/mediflow-chatgpt-codex');
     assert.deepEqual(fs.readFileSync(helper), syntheticFiles.codex);
+    assert.deepEqual(fs.readFileSync(path.join(input.app, 'Contents/Resources/WebRuntime/native-first-install.mjs')), fs.readFileSync(path.join(input.root, 'scripts/native-first-install.mjs')));
     assert.deepEqual(fs.readFileSync(path.join(input.web, ...assetParts, 'codex')), syntheticFiles.codex);
     assert.equal(fs.existsSync(path.join(input.app, 'Contents/Resources/WebRuntime', ...assetParts, 'codex')), false);
     const targets = fs.readdirSync(path.join(input.app, 'Contents/Frameworks')).sort();
@@ -198,6 +200,17 @@ test('a pre-existing proxy symlink is rejected before Xcode or any asset staging
   fs.symlinkSync(outside, path.join(input.app, 'Contents/Resources/local-api-tls-proxy.mjs'));
   const before = fs.readFileSync(outside), result = input.run();
   deny(result); assert.match(result.stderr, /Nonphysical proxy destination/);
+  assert.deepEqual(fs.readFileSync(outside), before);
+  assert.equal(input.events().length, 0);
+});
+test('a pre-existing native first-install symlink is rejected before Xcode or any asset staging', t => {
+  const input = buildFixture(t), outside = write(path.join(input.directory, 'unrelated-first-install.mjs'), '// must stay unchanged\n');
+  appRoot(path.dirname(input.app));
+  const destination = path.join(input.app, 'Contents/Resources/WebRuntime/native-first-install.mjs');
+  fs.mkdirSync(path.dirname(destination), { recursive: true });
+  fs.symlinkSync(outside, destination);
+  const before = fs.readFileSync(outside), result = input.run();
+  deny(result); assert.match(result.stderr, /Nonphysical native first-install destination/);
   assert.deepEqual(fs.readFileSync(outside), before);
   assert.equal(input.events().length, 0);
 });

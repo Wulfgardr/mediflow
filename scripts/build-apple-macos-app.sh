@@ -50,11 +50,16 @@ for (const name of ['_CodeSignature', 'CodeResources']) {
 }
 for (const name of ['Resources', 'Resources/WebRuntime', 'Resources/WebRuntime/.next',
   'Resources/WebRuntime/.next/static', 'Resources/WebRuntime/public', 'Frameworks', 'Helpers']) physical(path.join(app, 'Contents', name), true);
-const proxy = path.join(app, 'Contents/Resources/local-api-tls-proxy.mjs');
-try {
-  const status = fs.lstatSync(proxy);
-  if (!status.isFile() || status.isSymbolicLink()) throw new Error('Nonphysical proxy destination');
-} catch (error) { if (error.code !== 'ENOENT') throw error; }
+for (const [relative, message] of [
+  ['Resources/local-api-tls-proxy.mjs', 'Nonphysical proxy destination'],
+  ['Resources/WebRuntime/native-first-install.mjs', 'Nonphysical native first-install destination'],
+]) {
+  const destination = path.join(app, 'Contents', relative);
+  try {
+    const status = fs.lstatSync(destination);
+    if (!status.isFile() || status.isSymbolicLink()) throw new Error(message);
+  } catch (error) { if (error.code !== 'ENOENT') throw error; }
+}
 NODE
 }
 preflight_app_destination
@@ -142,6 +147,14 @@ echo "Injecting WebRuntime into the app bundle..."
 rm -rf "$WEB"
 mkdir -p "$WEB"
 cp -R "$STANDALONE_DIR/." "$WEB/"
+# @Codex: native startup reserves a fresh database before it creates log/PID files.
+# The helper has a direct-Node packaged mode, so no source tree or TS loader ships.
+# `preflight_app_destination` above and here reject a pre-existing symlink before this copy.
+preflight_app_destination
+cp "$ROOT_DIR/scripts/native-first-install.mjs" "$WEB/native-first-install.mjs"
+cmp -s "$ROOT_DIR/scripts/native-first-install.mjs" "$WEB/native-first-install.mjs" || {
+  echo "Native first-install helper was not copied intact into WebRuntime." >&2; exit 1;
+}
 # @Codex: copied overlay roots must be physical before mkdir/cp can write through them.
 preflight_app_destination
 # @Codex: merge contents when a reused standalone already includes these assets.
