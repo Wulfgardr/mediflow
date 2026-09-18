@@ -11,8 +11,8 @@ export type OllamaLocalityFailure =
 
 export const OLLAMA_LOCAL_KEEP_ALIVE = '30m';
 export const OLLAMA_LOCAL_MODEL_REFERENCE_MAX_UTF8_BYTES = 674;
-// @Codex 0.8.6: retain the qualified 0.32 line and add only the observed 0.33.3 release.
-const SUPPORTED_OLLAMA_LOCALITY_VERSION = /^(?:0\.32\.\d+(?:[-+].+)?|0\.33\.3)$/;
+// @Codex 0.8.6: retain the qualified 0.32 line and the observed 0.33.3/0.34.2 releases.
+const SUPPORTED_OLLAMA_LOCALITY_VERSION = /^(?:0\.32\.\d+(?:[-+].+)?|0\.33\.3|0\.34\.2)$/;
 
 export class OllamaLocalityError extends Error {
     constructor(public readonly code: OllamaLocalityFailure) {
