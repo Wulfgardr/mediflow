@@ -40,13 +40,6 @@ struct PairedPatientDocumentsSection: View {
                 .accessibilityIdentifier("documents-insights-disclosure")
             }
 
-            #if os(macOS)
-            if capabilities.hasCapability("network.replica.readonly-documents") {
-                Divider()
-                NativeDocumentSynthesisView(workspaceModel: model)
-            }
-            #endif
-
             followupSuggestionsSection
 
             Divider()

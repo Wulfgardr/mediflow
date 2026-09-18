@@ -368,7 +368,7 @@ test('full port factory exposes its complete broker and critical-section surface
     assert.equal(registry.lookup(value.id), owner);
 
     const source = readFileSync(new URL('./server-session-projection-owner.ts', import.meta.url), 'utf8');
-    assert.match(source, /const brokerPort = mintResourcePort\(presentedSession\);\s+if \(!brokerPort\) return fail\('session_unavailable'\);\s+binding\.unregister = native\s+\? bindProjectionBrokerToNativeSessionResource\(brokerPort, candidate\.control\)\s+: bindProjectionBrokerToActiveWebSessionResource\(brokerPort, candidate\.control\);/u);
+    assert.match(source, /const brokerPort = mintResourcePort\(presentedSession\);[\s\S]{0,240}binding\.unregister = bindProjectionBrokerToActiveWebSessionResource\(brokerPort, candidate\.control\);/u);
 
     retirePortSession(value);
     assert.equal(revocations, 1);
@@ -395,7 +395,7 @@ test('legacy factory remains the default and port publication has a lexical-only
     assert.equal(compatible.acquire(second).snapshotSelectionEpoch(second), 0);
 
     const source = readFileSync(new URL('./server-session-projection-owner.ts', import.meta.url), 'utf8');
-    assert.match(source, /const exposedOwner = authorityKind === 'port-full' \|\| native \? completedOwner : completedPortOwner;[\s\S]*if \(!commitResourceUse\(acquisitionUse\)\) return fail\('session_ineligible'\);\s+portRevealActive = false;\s+revealed = true;[\s\S]*return exposedOwner as Owner;/u);
+    assert.match(source, /const exposedOwner = authorityKind === 'port-full' \? completedOwner : completedPortOwner;[\s\S]*if \(!commitResourceUse\(acquisitionUse\)\) return fail\('session_ineligible'\);\s+portRevealActive = false;\s+revealed = true;[\s\S]*return exposedOwner as Owner;/u);
     assert.match(source, /from '\.\/web-auth-lifecycle-owner-adapter';/u);
     assert.doesNotMatch(source, /(?:abort|begin|commit)ActiveWebSessionResourceUse|(?:mint|release)ActiveWebSessionResourcePort|resolveActiveWebServerSession/u);
     assert.match(source, /export function createServerSessionProjectionOwnerRegistry[\s\S]*return createLegacyProjectionOwnerFactory\(sourceOverrides\);/u);

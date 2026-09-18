@@ -1,6 +1,5 @@
 /* @Codex */
 import 'server-only';
-import * as nativeLifetime from './native-inference-lifecycle';
 
 import { createHostSmartImportProjectionAttacher } from '../smart-import-projection-attachment-host';
 import type { ServerSession } from './server-session';
@@ -103,19 +102,4 @@ export function ingestServerSessionSmartImportAttachment(
         if (!owner) return fail('owner_unavailable');
         return ingestPrepared(session, owner, input);
     });
-}
-
-/** Native counterpart, using the same attacher and owner ingest, not a Web projection. */
-export function ingestNativeSessionSmartImportAttachmentWithOwner(
-    session: ServerSession, owner: ProjectionOwner, inputValue: unknown,
-): string {
-    const port = nativeLifetime.mintResourcePort(session);
-    if (!port) return fail('session_unavailable');
-    const use = nativeLifetime.beginResourceUse(port);
-    try {
-        if (!use) return fail('session_unavailable');
-        const result = ingestPrepared(session, owner, prepared(inputValue));
-        if (!nativeLifetime.commitResourceUse(use)) return fail('session_unavailable');
-        return result;
-    } finally { if (use) nativeLifetime.abortResourceUse(use); nativeLifetime.releaseResourcePort(port); }
 }

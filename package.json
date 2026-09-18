@@ -221,7 +221,7 @@
   "dependencies": {
     "@firecrawl/anydoc": "0.2.4",
     "@hookform/resolvers": "^5.2.2",
-    "@mediflow/web-auth-lifecycle-owner": "file:packages/web-auth-lifecycle-owner/artifacts/mediflow-web-auth-lifecycle-owner-0.8.9-local.3f2e6f2a.tgz",
+    "@mediflow/web-auth-lifecycle-owner": "file:packages/web-auth-lifecycle-owner/artifacts/mediflow-web-auth-lifecycle-owner-0.8.8.tgz",
     "@modelcontextprotocol/server": "2.0.0",
     "@tailwindcss/typography": "^0.5.19",
     "@tanstack/react-virtual": "^3.14.5",

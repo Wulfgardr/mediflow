@@ -16,13 +16,10 @@ import {
     registerPrivateResource,
     releaseResourcePort,
     unregisterPrivateResource,
-    type ResourcePort as WebResourcePort,
-    type ResourceRegistration as WebResourceRegistration,
-    type ResourceUse as WebResourceUse,
-} from '../../security/ordinary-session-authority';
-import * as webLifetime from '../../security/web-auth-lifecycle-owner-adapter';
-import * as nativeLifetime from '../../security/native-inference-lifecycle';
-import { nativeSessionProjectionOwnerRegistry } from '../../security/native-session-projection-owner-production';
+    type WebResourcePort,
+    type WebResourceRegistration,
+    type WebResourceUse,
+} from '../../security/web-auth-lifecycle-owner-adapter';
 import { ANYDOC_LOCAL_EXTRACTION_MAX_SOURCE_BYTES } from './anydoc-local-extraction-contract';
 import {
     captureAttachmentExtractionLocatorGeneration,
@@ -59,7 +56,7 @@ function exact(value: unknown, keys: readonly string[]): Record<string, unknown>
     }
     return result;
 }
-function validSession(value: unknown, native: boolean): value is ServerSession {
+function validSession(value: unknown): value is ServerSession {
     const keys = ['id', 'userId', 'username', 'role', 'authChannel', 'createdAt', 'expiresAt'];
     if (!value || typeof value !== 'object' || isProxy(value)) return false;
     try {
@@ -79,7 +76,7 @@ function validSession(value: unknown, native: boolean): value is ServerSession {
             && typeof fields.userId === 'string' && fields.userId.length > 0
             && typeof fields.username === 'string' && fields.username.length > 0
             && typeof fields.role === 'string' && fields.role.length > 0
-            && fields.authChannel === (native ? 'native' : 'web')
+            && fields.authChannel === 'web'
             && Number.isFinite(fields.createdAt) && Number.isFinite(fields.expiresAt);
     } catch { return false; }
 }
@@ -127,10 +124,8 @@ function ledger<T>() {
 }
 
 /** Owns attachment acquisition without accepting caller currentness, patient authority, or parser options. */
-function createSourceAuthority(sessionValue: ServerSession, native: boolean) {
-    const { abortResourceUse, beginResourceUse, commitResourceUse, mintResourcePort, registerPrivateResource,
-        releaseResourcePort, unregisterPrivateResource } = native ? nativeLifetime : webLifetime;
-    if (!validSession(sessionValue, native)) throw new TypeError('Attachment extraction source authority unavailable');
+export function createAttachmentExtractionSourceAuthority(sessionValue: ServerSession) {
+    if (!validSession(sessionValue)) throw new TypeError('Attachment extraction source authority unavailable');
     const session = sessionValue;
     let port: WebResourcePort | null = mintResourcePort(session);
     let acquisitionUse: WebResourceUse | null = port ? beginResourceUse(port) : null;
@@ -138,7 +133,7 @@ function createSourceAuthority(sessionValue: ServerSession, native: boolean) {
     let acquisitionCommitted = false;
     try {
         if (!port || !acquisitionUse) throw new TypeError('Attachment extraction source authority unavailable');
-        const owner = (native ? nativeSessionProjectionOwnerRegistry : serverSessionProjectionOwnerRegistry).acquire(session);
+        const owner = serverSessionProjectionOwnerRegistry.acquire(session);
         const [addLocator, takeLocator, clearLocators, peekLocator] = ledger<Bound>();
         const [addOperation, takeOperation, clearOperations, peekOperation] = ledger<{ bound: Bound; bytes: Uint8Array }>(); let active = true;
         const retirement = new AbortController();
@@ -246,11 +241,4 @@ function createSourceAuthority(sessionValue: ServerSession, native: boolean) {
     } finally {
         acquisitionUse = null;
     }
-}
-
-export function createAttachmentExtractionSourceAuthority(session: ServerSession) {
-    return createSourceAuthority(session, false);
-}
-export function createNativeAttachmentExtractionSourceAuthority(session: ServerSession) {
-    return createSourceAuthority(session, true);
 }

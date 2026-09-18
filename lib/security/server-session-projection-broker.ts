@@ -1,6 +1,5 @@
 /* @Codex */
 import 'server-only';
-import * as nativeLifetime from './native-inference-lifecycle';
 
 import type { createTypedProjectionBroker } from '../typed-projection-broker';
 import { registerServerSessionResource } from './server-session';
@@ -50,7 +49,7 @@ export function bindProjectionBrokerToServerSession(
  */
 /* @Codex */
 export function bindProjectionBrokerToActiveWebSessionResource(
-    port: WebResourcePort | import('./native-inference-lifecycle').NativeInferencePort,
+    port: WebResourcePort,
     control: ProjectionBrokerControl,
 ): () => void {
     const registration = registerPrivateResource(port, () => control.revoke());
@@ -71,24 +70,5 @@ export function bindProjectionBrokerToActiveWebSessionResource(
         active = false;
         unregisterPrivateResource(port, registration);
         releaseResourcePort(port);
-    };
-}
-
-/** Native pairing/inference lifetime is a different issuer, never a Web port. */
-export function bindProjectionBrokerToNativeSessionResource(
-    port: unknown, control: ProjectionBrokerControl,
-): () => void {
-    const registration = nativeLifetime.registerPrivateResource(port, () => control.revoke());
-    if (!registration) {
-        try { containNativePromiseRejection(control.revoke() as unknown); }
-        finally { nativeLifetime.releaseResourcePort(port); }
-        throw new ServerSessionProjectionBrokerBindingError();
-    }
-    let active = true;
-    return () => {
-        if (!active) return;
-        active = false;
-        nativeLifetime.unregisterPrivateResource(port, registration);
-        nativeLifetime.releaseResourcePort(port);
     };
 }

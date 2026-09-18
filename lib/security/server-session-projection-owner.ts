@@ -11,10 +11,11 @@ import {
 import {
     getSession, peekSession, registerServerSessionResource, type ServerSession,
 } from './server-session';
-import * as webLifetime from './web-auth-lifecycle-owner-adapter';
-import * as nativeLifetime from './native-inference-lifecycle';
-import type { ResourcePort as WebResourcePort } from './ordinary-session-authority';
-import { bindProjectionBrokerToNativeSessionResource } from './server-session-projection-broker';
+import {
+    abortResourceUse, beginResourceUse, commitResourceUse, mintResourcePort, releaseResourcePort,
+    registerPrivateResource, unregisterPrivateResource,
+    type WebResourcePort,
+} from './web-auth-lifecycle-owner-adapter';
 
 type TypedBroker = ReturnType<typeof createTypedProjectionBroker>;
 type ActiveBinding = {
@@ -391,7 +392,7 @@ function canonicalClinicalContext(input: unknown, requested: CanonicalPair): Can
         patientVersion: value.patientVersion as number });
 }
 
-type ProjectionOwnerAuthorityKind = 'legacy' | 'port' | 'port-full' | 'native-port-full';
+type ProjectionOwnerAuthorityKind = 'legacy' | 'port' | 'port-full';
 
 function createProjectionOwnerProcessOwner<Owner extends ProjectionOwnerSurface>(authorityKind: ProjectionOwnerAuthorityKind,
     sourceOverrides: Partial<SelectionSources> = {}): Readonly<{
@@ -400,9 +401,6 @@ function createProjectionOwnerProcessOwner<Owner extends ProjectionOwnerSurface>
         selectionBindingController: ServerSessionSelectionBindingControllerV1;
         selectionCommitBindingController: ServerSessionSelectionCommitBindingControllerV1;
     }> {
-    const native = authorityKind === 'native-port-full';
-    const { abortResourceUse, beginResourceUse, commitResourceUse, mintResourcePort, releaseResourcePort,
-        registerPrivateResource, unregisterPrivateResource } = native ? nativeLifetime : webLifetime;
     const sources = ObjectFreeze({ ...defaultSources, ...sourceOverrides });
     const owners = new MapConstructor<string, ProjectionOwnerSurface>();
     const registryOwners = new WeakSetConstructor<object>();
@@ -626,7 +624,7 @@ function createProjectionOwnerProcessOwner<Owner extends ProjectionOwnerSurface>
             use = beginResourceUse(port);
             current = use !== null && commitResourceUse(use);
             if (!current && use) abortResourceUse(use);
-            return current && session.authChannel === (native ? 'native' : 'web') && session.id !== 'local-api';
+            return current && session.authChannel === 'web' && session.id !== 'local-api';
         } catch { return false; }
         finally { if (port) releaseResourcePort(port); }
     };
@@ -712,7 +710,7 @@ function createProjectionOwnerProcessOwner<Owner extends ProjectionOwnerSurface>
                     use = beginResourceUse(port);
                     current = use !== null && commitResourceUse(use);
                     if (!current && use) abortResourceUse(use);
-                    return current && (!native || presented === session) && presented.id === session.id && presented.authChannel === (native ? 'native' : 'web')
+                    return current && presented.id === session.id && presented.authChannel === 'web'
                         && currentSession(true) === session;
                 } catch { return false; }
                 finally { if (port) releaseResourcePort(port); }
@@ -1090,9 +1088,7 @@ function createProjectionOwnerProcessOwner<Owner extends ProjectionOwnerSurface>
                         if (portBacked) {
                             const brokerPort = mintResourcePort(presentedSession);
                             if (!brokerPort) return fail('session_unavailable');
-                            binding.unregister = native
-                                ? bindProjectionBrokerToNativeSessionResource(brokerPort, candidate.control)
-                                : bindProjectionBrokerToActiveWebSessionResource(brokerPort, candidate.control);
+                            binding.unregister = bindProjectionBrokerToActiveWebSessionResource(brokerPort, candidate.control);
                         } else {
                             binding.unregister = bindProjectionBrokerToServerSession(session.id, candidate.control);
                         }
@@ -1123,11 +1119,11 @@ function createProjectionOwnerProcessOwner<Owner extends ProjectionOwnerSurface>
                         if (!NumberIsSafeInteger(value.expectedEpoch) || (value.expectedEpoch as number) < 0
                             || typeof value.patientId !== 'string' || typeof value.ambulatoryId !== 'string') fail('input_invalid');
                         const live = currentSession(true);
-                        if (session.authChannel !== (native ? 'native' : 'web') || live !== session) fail('session_unavailable');
+                        if (session.authChannel !== 'web' || live !== session) fail('session_unavailable');
                         const pair = resolveClinicalContext({ patientId: value.patientId, ambulatoryId: value.ambulatoryId });
                         const assertCurrent = () => {
                             const current = currentSession(true);
-                            if (terminal || current !== session || session.authChannel !== (native ? 'native' : 'web')
+                            if (terminal || current !== session || session.authChannel !== 'web'
                                 || getMapValue(owners, session.id) !== publishedOwner) {
                                 return fail('session_unavailable');
                             }
@@ -1239,7 +1235,6 @@ function createProjectionOwnerProcessOwner<Owner extends ProjectionOwnerSurface>
                 return mintLeaseCommitPort<PatientInsightLeaseCommitRef>(presentedSession, patientInsightRefs, patientInsightPorts) as PatientInsightLeaseCommitPort;
             } });
             ObjectDefineProperty(owner, 'mintOcrLeaseCommitPort', { enumerable: false, value(presentedSession: ServerSession) {
-                if (native) return fail('session_ineligible');
                 if (this !== owner) return fail('session_unavailable');
                 if (rejectDurableReviewReentry()) return fail('selection_busy');
                 return mintLeaseCommitPort<OcrLeaseCommitRef>(presentedSession, ocrRefs, ocrPorts) as OcrLeaseCommitPort;
@@ -1255,7 +1250,6 @@ function createProjectionOwnerProcessOwner<Owner extends ProjectionOwnerSurface>
                 return mintLeaseCommitPort<TreatmentReasoningLeaseCommitRef>(presentedSession, treatmentReasoningRefs, treatmentReasoningPorts) as TreatmentReasoningLeaseCommitPort;
             } });
             ObjectDefineProperty(owner, 'mintDurableReviewCommitPort', { enumerable: false, value(presentedSession: ServerSession) {
-                if (native) return fail('session_ineligible');
                 if (this !== owner) return fail('session_unavailable');
                 return mintDurableReviewCommitPort(presentedSession);
             } });
@@ -1318,14 +1312,9 @@ function createProjectionOwnerProcessOwner<Owner extends ProjectionOwnerSurface>
             const acquisitionUse = beginResourceUse(authorityPort);
             if (!acquisitionUse) { releaseResourcePort(authorityPort); return fail('session_ineligible'); }
             let revealed = false;
-            const exposedOwner = authorityKind === 'port-full' || native ? completedOwner : completedPortOwner;
+            const exposedOwner = authorityKind === 'port-full' ? completedOwner : completedPortOwner;
             try {
-                const registration = native ? registerPrivateResource(authorityPort, () => finish(true)) : null;
-                if (native && !registration) return fail('session_ineligible');
-                unregisterOwner = () => {
-                    if (authorityPort && registration) unregisterPrivateResource(authorityPort, registration);
-                    if (authorityPort) releaseResourcePort(authorityPort);
-                };
+                unregisterOwner = () => { if (authorityPort) releaseResourcePort(authorityPort); };
                 publishedOwner = exposedOwner;
                 setMapValue(owners, session.id, publishedOwner);
                 registryNode = { owner: exposedOwner, authority: authorityPort,
@@ -1338,7 +1327,7 @@ function createProjectionOwnerProcessOwner<Owner extends ProjectionOwnerSurface>
                 if (!commitResourceUse(acquisitionUse)) return fail('session_ineligible');
                 portRevealActive = false;
                 revealed = true;
-                if (authorityKind === 'port-full' || native) addOwnerIdentity(authenticOwners, completedOwner);
+                if (authorityKind === 'port-full') addOwnerIdentity(authenticOwners, completedOwner);
                 return exposedOwner as Owner;
             } finally {
                 if (!revealed) {
@@ -1383,10 +1372,4 @@ export function createFullPortProjectionOwnerProcessOwner(sourceOverrides: Parti
 
 export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Partial<SelectionSources> = {}) {
     return createLegacyProjectionOwnerFactory(sourceOverrides);
-}
-
-/** A distinct registry: only fixed, current native inference ports can acquire it.
- * Source overrides cannot mint session, pairing, role or capability authority. */
-export function createNativePortProjectionOwnerProcessOwner(sourceOverrides: Partial<SelectionSources> = {}) {
-    return createProjectionOwnerProcessOwner<ServerSessionProjectionOwner>('native-port-full', sourceOverrides);
 }

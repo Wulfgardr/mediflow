@@ -17,8 +17,8 @@ import {
 } from '../../athena-mlx-runtime';
 import { dbServer } from '../../db-server';
 import { activePatients } from '../../patient-lifecycle';
-import { acquireOrdinaryApplicationContext } from '../../security/ordinary-application-context';
-import { registerOrdinaryApplicationResource } from '../../security/ordinary-application-context';
+import { acquireAuthenticatedWebSessionProjectionOwnerContext } from '../../security/server-auth';
+import { registerServerSessionResource } from '../../security/server-session';
 import { patients, patientsToAmbulatories, settings } from '../../schema';
 import { createHostProviderLifecycleService } from './provider-lifecycle-service';
 import { createTreatmentReasoningAuthenticatedProjectionBroker } from './treatment-reasoning-authenticated-projection';
@@ -29,7 +29,7 @@ import { createPortableProvisioning } from './treatment-reasoning-portable-provi
 const lifecycle = createHostProviderLifecycleService({ provider: 'athena_mlx' }).service;
 
 const projectionBroker = createTreatmentReasoningAuthenticatedProjectionBroker({
-    acquireContext: acquireOrdinaryApplicationContext,
+    acquireContext: acquireAuthenticatedWebSessionProjectionOwnerContext,
     clock: () => new Date().toISOString(),
     entropy: () => randomBytes(16),
     readPatientVersion(patientId, ambulatoryId) {
@@ -42,7 +42,7 @@ const projectionBroker = createTreatmentReasoningAuthenticatedProjectionBroker({
             )).get();
         return Number.isSafeInteger(row?.version) ? row!.version : null;
     },
-    registerResource: (sessionId, dispose) => registerOrdinaryApplicationResource(sessionId, dispose),
+    registerResource: (sessionId, dispose) => registerServerSessionResource(sessionId, () => dispose()),
 });
 
 const killSwitch = Object.freeze({

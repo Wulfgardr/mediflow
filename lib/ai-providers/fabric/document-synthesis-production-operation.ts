@@ -9,10 +9,9 @@ import { sql } from 'drizzle-orm';
 
 import { AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY, isAiDocumentSynthesisEnabledValue } from '@/lib/ai-document-synthesis-kill-switch';
 import { dbServer } from '@/lib/db-server';
-import type { AuthenticatedWebSessionProjectionOwnerContext } from '@/lib/security/server-auth';
-import { acquireOrdinaryApplicationContext } from '@/lib/security/ordinary-application-context';
+import { acquireAuthenticatedWebSessionProjectionOwnerContext, type AuthenticatedWebSessionProjectionOwnerContext } from '@/lib/security/server-auth';
 import { isServerSessionProjectionOwner } from '@/lib/security/server-session-projection-owner';
-import { mintResourcePort, registerPrivateResource, unregisterPrivateResource, releaseResourcePort } from '@/lib/security/ordinary-session-authority';
+import { mintResourcePort, registerPrivateResource, unregisterPrivateResource, releaseResourcePort } from '@/lib/security/web-auth-lifecycle-owner-adapter';
 import type { ServerSession } from '@/lib/security/server-session';
 import { composeAnyDocCurrentSelectionExtraction } from '@/lib/domain/documents/anydoc-current-source-composition';
 import {
@@ -289,7 +288,7 @@ function readProductionLaneEnabled(): boolean {
     return isAiDocumentSynthesisEnabledValue(row?.value);
 }
 const production = factory(Object.freeze({
-    acquireContext: acquireOrdinaryApplicationContext,
+    acquireContext: acquireAuthenticatedWebSessionProjectionOwnerContext,
     readCurrentness: readProductionCurrentness,
     readLaneEnabled: readProductionLaneEnabled,
     extract: (session: ServerSession, attachmentId: string) => composeAnyDocCurrentSelectionExtraction(session, { attachmentId }),
