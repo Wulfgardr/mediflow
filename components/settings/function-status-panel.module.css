@@ -1,4 +1,4 @@
-/* @Codex: function boundaries stay visible without relying on thin dividers. */
+/* @Codex WUL-684: one frame per function; provider details use spacing and a divider. */
 .panel { display: grid; gap: 24px; min-width: 0; color: var(--lume-ink); }
 .header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; }
 .header h2 { margin: 0; font-size: 20px; line-height: 1.4; font-weight: 600; }
@@ -6,14 +6,14 @@
 .group { display: grid; gap: 12px; min-width: 0; }
 .group > h3 { margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600; }
 .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 350px), 1fr)); gap: 16px; padding: 0; margin: 0; list-style: none; }
-.card { display: flex; flex-direction: column; gap: 16px; min-width: 0; padding: 20px; border: 1px solid var(--lume-border-color); border-radius: var(--lume-control-radius); background: var(--lume-surface-field); }
+.card { display: flex; flex-direction: column; gap: 16px; min-width: 0; padding: 20px; border: 1px solid var(--lume-border-color); border-radius: var(--lume-radius-panel); background: var(--lume-surface-field); }
 .cardHeader { display: flex; align-items: start; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
 .card h4 { margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600; }
 .card p { margin: 0; font-size: 14px; line-height: 1.6; overflow-wrap: anywhere; }
 .purpose, .providerLabel { color: var(--lume-ink-muted); }
 .status { display: inline-flex; align-items: center; min-height: 32px; padding: 4px 10px; border: 1px solid var(--lume-border-color); border-radius: var(--lume-control-radius); background: var(--lume-surface-focal); font-size: 13px; font-weight: 600; line-height: 1.5; }
 .status[data-state='blocked'], .status[data-state='unavailable'] { color: var(--lume-signal-critical); border-color: currentColor; }
-.provider { display: grid; gap: 4px; padding: 12px; border-radius: var(--lume-control-radius); background: var(--lume-surface-focal); }
+.provider { display: grid; min-width: 0; gap: 4px; padding-top: 12px; border-top: 1px solid var(--lume-border-color); }
 .providerLabel { font-size: 13px; line-height: 1.5; }
 .provider strong { font-size: 14px; line-height: 1.5; font-weight: 600; overflow-wrap: anywhere; }
 .footer { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; margin-top: auto; }
@@ -21,7 +21,8 @@
 .footer summary::before { content: '+'; margin-right: 8px; }
 .footer details[open] summary::before { content: '−'; }
 .footer summary:focus-visible { outline: 2px solid var(--lume-accent); outline-offset: 3px; border-radius: var(--lume-control-radius); }
-.footer a { max-width: 100%; white-space: normal; text-align: center; }
+.footer a { max-width: 100%; white-space: normal; text-align: center; overflow-wrap: anywhere; }
+.header > div, .cardHeader > *, .footer, .footer details { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
 .advancedSummary { display: flex; align-items: center; min-height: 44px; font-size: 16px; font-weight: 600; cursor: pointer; }
 .advancedSummary::before { content: '+'; margin-right: 12px; }
 details[open] > .advancedSummary::before { content: '−'; }

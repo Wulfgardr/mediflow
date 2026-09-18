@@ -25,7 +25,9 @@
 .error { color: var(--lume-signal-critical); }
 @media (max-width: 480px) { .header { gap: .75rem; } }
 
-/* @Codex: keep service/account identity distinct from suspended function use. */
-.boundary { display: grid; gap: .5rem; padding: 1rem; border: 1px solid var(--lume-border-color); border-radius: var(--lume-radius-control); background: var(--lume-surface-field); }
+/* @Codex WUL-684: one enclosing account card; the boundary is a readable
+   group separated by a rule, not another rounded enclosure. */
+.boundary { display: grid; gap: .75rem; min-width: 0; padding-top: 1rem; border-top: 1px solid var(--lume-border-color); }
 .boundary strong { font-size: .875rem; }
-.card { scroll-margin-top: 5rem; }
+.card { scroll-margin-top: 5rem; overflow-wrap: anywhere; }
+.detailBody, .detailBody > *, .actions > *, .status { min-width: 0; }

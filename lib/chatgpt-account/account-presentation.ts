@@ -38,9 +38,9 @@ export function presentAccount(view: AccountBrowserView, active: boolean) {
         operation,
         planLabel: !locked && !view.error && view.status?.state === 'connected'
             ? planLabels[view.status.plan ?? 'unknown'] ?? 'Non disponibile' : null,
-        // This is a statement of the current suspended contract, not derived from
-        // connected, plan, catalog, quota, preferences or a synthetic result.
-        executionLabel: 'Uso nelle funzioni sospeso',
+        // @Codex WUL-684: this card is informational, not the ordinary execution
+        // session or an admission decision. Account/plan/demo never grant use.
+        executionLabel: 'Account informativo · non abilita le funzioni',
         showDetails: !locked && view.status?.state === 'connected',
         // A failed read requires an explicit gesture. Polling must not hide it.
         pollDelay: !locked && !view.error && !view.busy && view.status

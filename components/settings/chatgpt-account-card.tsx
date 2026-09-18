@@ -14,8 +14,8 @@ function Quota({ window, title }: { window: AccountLimitWindow | null; title: st
     return <div className={styles.quota}>
         <p><strong>{title}</strong> · {Math.round(window.usedPercent)}% utilizzato</p>
         <progress max={100} value={Math.min(window.usedPercent, 100)} aria-label={`${title}: utilizzo`} />
-        {window.windowDurationMins !== null && <p className={styles.hint}>Finestra di {window.windowDurationMins >= 60 ? `${window.windowDurationMins / 60} ore` : `${window.windowDurationMins} minuti`}</p>}
-        {window.resetsAt !== null && <p className={styles.hint}>Ripristino: {new Date(window.resetsAt * 1000).toLocaleString('it-IT')}</p>}
+        {window.windowDurationMins !== null && <p className={styles.hint}>Periodo di {window.windowDurationMins >= 60 ? `${window.windowDurationMins / 60} ore` : `${window.windowDurationMins} minuti`}</p>}
+        {window.resetsAt !== null && <p className={styles.hint}>Rinnovo del limite: {new Date(window.resetsAt * 1000).toLocaleString('it-IT')}</p>}
     </div>;
 }
 function ObservationTime({ value }: { value: number }) {
@@ -56,10 +56,13 @@ export function ChatGptAccountCard({ active }: { active: boolean }) {
             </div>
             <span className={styles.status} role="status" data-testid="chatgpt-account-state">{presentation.accountLabel}</span>
         </header>
-        <div className={styles.boundary} aria-label="Disponibilità ChatGPT in MediFlow">
+        <div className={styles.boundary} aria-label="Account, prova e uso nelle funzioni">
             <strong data-testid="chatgpt-execution-state">{presentation.executionLabel}</strong>
-            <p>Il collegamento dell’account non abilita le funzioni di MediFlow. L’ammissione OpenAI resta sospesa (ADR0134).</p>
-            <p>Questa scheda gestisce soltanto accesso e informazioni account: non invia contesto paziente e non avvia sintesi, neppure dimostrative.</p>
+            <p>Qui gestisci l’accesso e consulti modelli e utilizzo dell’account. Questa scheda non invia dati del paziente e non avvia elaborazioni.</p>
+            <p><strong>Prova dimostrativa.</strong> È un percorso separato, solo con dati demo. Una prova riuscita non autorizza l’uso clinico.</p>
+            <p><strong>Funzioni ordinarie.</strong> Quadro paziente, Importazione assistita, Sintesi dei documenti e Revisione del trattamento prevedono un percorso OpenAI separato, solo su scelta esplicita. Quando i controlli lo consentono, ogni invio richiede il controllo e l’oscuramento dei dati identificativi e il tuo consenso sul contenuto esatto da trasmettere a OpenAI; ogni risultato richiede revisione.</p>
+            <p>Il collegamento qui mostrato non verifica la disponibilità di quel percorso né della sessione che esegue la richiesta.</p>
+            <p><strong>Dati sanitari reali.</strong> Collegare l’account, avere un piano a pagamento o superare la demo non autorizza a usarli. Restano necessarie le verifiche tecniche e le autorizzazioni previste per l’uso clinico; questa scheda non le concede.</p>
         </div>
         <div className={styles.actions}>
             <Link href="/settings/ai/chatgpt" prefetch={false} className={SETTINGS_SECONDARY_BUTTON_CLASS}>Apri prova OpenAI · solo dati demo</Link>
@@ -82,7 +85,7 @@ export function ChatGptAccountCard({ active }: { active: boolean }) {
             {presentation.showDetails && <details className={styles.disclosure}>
                 <summary>Modelli e utilizzo dell’account</summary>
                 <div className={styles.detailBody}>
-                    <p className={styles.hint}>Catalogo informativo dell’account, separato dal selettore delle funzioni. Nessun modello qui è selezionabile per una proposta.</p>
+                    <p className={styles.hint}>Questo elenco descrive i modelli dell’account. Qui non scegli il modello delle funzioni e non avvii proposte.</p>
                     <p className={styles.hint}>Modelli e utilizzo si leggono solo su richiesta e vengono nascosti dopo un minuto o quando lo stato cambia. «Rileggi stato» controlla lo stato locale, non aggiorna questi dati.</p>
                     <div className={styles.actions}>
                         {allowed('read_models') && <button type="button" className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={busy} onClick={() => run('models')}>{view.modelsObservedAt === null ? 'Mostra modelli' : 'Rileggi modelli'}</button>}
@@ -98,8 +101,8 @@ export function ChatGptAccountCard({ active }: { active: boolean }) {
                             : <p role="status">{view.modelsObservedAt === null ? 'Catalogo non ancora letto.' : 'Catalogo da rileggere: i valori precedenti non sono più mostrati.'}</p>}
                     </div>
                     <div data-testid="chatgpt-limits">
-                        <h4>Utilizzo restituito dal servizio account</h4>
-                        <p className={styles.hint}>Finestre del servizio Codex: non sono credito API né garanzia di esecuzione. Un dato assente non significa utilizzo zero.</p>
+                        <h4>Utilizzo dell’account</h4>
+                        <p className={styles.hint}>Limiti di utilizzo comunicati dal servizio collegato: non sono credito per altri servizi OpenAI e non garantiscono che una funzione possa essere eseguita. Un dato assente non significa utilizzo zero.</p>
                         {view.limitsObservedAt !== null && <p className={styles.hint}><ObservationTime value={view.limitsObservedAt} /></p>}
                         {view.busy === 'rate-limits' ? <p role="status">Lettura utilizzo…</p>
                             : view.limits ? <div className={styles.quotas}><Quota title="Limite principale" window={view.limits.primary} /><Quota title="Limite aggiuntivo" window={view.limits.secondary} /></div>
@@ -109,5 +112,13 @@ export function ChatGptAccountCard({ active }: { active: boolean }) {
             </details>}
             {allowed('configure_host') && <details className={styles.disclosure}><summary>Come predisporre il collegamento</summary><div className={styles.detailBody}><p>Il componente account deve essere predisposto dall’operatore sul computer che ospita MediFlow. Dopo la configurazione, rileggi lo stato. Il login si completa sullo stesso computer; questa scheda non installa componenti né recupera credenziali esistenti.</p></div></details>}
         </>}
+        <details className={styles.disclosure}>
+            <summary>Dettagli per l’assistenza</summary>
+            <div className={styles.detailBody}>
+                <p>Questa scheda usa il servizio account informativo. I percorsi di esecuzione hanno verifiche e sessioni proprie; il collegamento account non ne attesta lo stato.</p>
+                <p className={styles.hint}>Riferimento tecnico: ADR 0134. Il contratto account conserva <code>inferenceEnabled: false</code> e <code>executionBlock: data_boundary_unqualified</code>; non è un verdetto globale sul percorso ordinario.</p>
+                <p className={styles.hint}>L’utilizzo mostrato riguarda le finestre del servizio Codex, non il credito API.</p>
+            </div>
+        </details>
     </section>;
 }
