@@ -52,7 +52,6 @@ export function createProductConsent(session: object, current: () => boolean, mo
 import { types } from 'node:util';
 import { readPreparedOrdinaryProfile, isPreparedOrdinaryProfileCurrent, closePreparedOrdinaryProfile, type PreparedOrdinaryProfile } from '../chatgpt-execution/ordinary-preparation';
 import { parseOrdinaryConsentRequest, type OrdinaryContentDisclosure } from './product-contract';
-import type { WebSessionProjection } from '../security/web-auth-lifecycle-owner-adapter';
 export type OrdinaryProductConsent = object;
 type OrdinaryRecord = {
     preparation: PreparedOrdinaryProfile; disclosure: OrdinaryContentDisclosure;
@@ -71,9 +70,9 @@ function ordinaryRecord(token: unknown): OrdinaryRecord {
  * The dynamic import does not initialize the external owner for DEMO-only use.
  * Context revisions come from the existing host attempt; they do NOT certify the
  * clinical owner's acquisition. That owner's original lease/commit is still required. */
-export async function createOrdinaryProductConsent(session: WebSessionProjection, preparation: PreparedOrdinaryProfile,
+export async function createOrdinaryProductConsent(session: import('../security/ordinary-session-authority').OrdinarySession, preparation: PreparedOrdinaryProfile,
     binding: Readonly<{ contextRevision: string; attemptRevision: string; qualificationRevision: string; remainingMs: number }>) {
-    const owner = await import('../security/web-auth-lifecycle-owner-adapter');
+    const owner = await import('../security/ordinary-session-authority');
     // Do not inspect session fields or look up records before authentic mint.
     const port = owner.mintResourcePort(session);
     if (!port) throw new ProductError('session_expired');
@@ -94,7 +93,9 @@ export async function createOrdinaryProductConsent(session: WebSessionProjection
         const { contextRevision, attemptRevision, qualificationRevision, remainingMs } = binding;
         if ([contextRevision, attemptRevision, qualificationRevision].some(value => typeof value !== 'string' || !value || value.length > 256)
             || !Number.isFinite(remainingMs) || remainingMs <= 0) throw new ProductError('consent_stale');
-        const duration = Math.min(remainingMs, 300_000, session.expiresAt - Date.now());
+        const authorityExpiry = owner.readResourceExpiresAt(port, session.expiresAt);
+        if (authorityExpiry === null) throw new ProductError('session_expired');
+        const duration = Math.min(remainingMs, 300_000, authorityExpiry - Date.now());
         if (duration <= 0) throw new ProductError('session_expired');
         const deadline = performance.now() + duration, expiresAt = Date.now() + duration;
         const localCurrent = () => active && performance.now() < deadline && Date.now() < expiresAt && isPreparedOrdinaryProfileCurrent(preparation);

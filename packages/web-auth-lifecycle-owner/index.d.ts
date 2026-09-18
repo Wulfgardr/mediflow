@@ -60,6 +60,29 @@ export declare function unregisterPrivateResource(port: unknown, registration: u
 
 /* @Codex: isolated native/system compatibility surface, same physical root. */
 export namespace serverSessions {
+const nativeResourcePort: unique symbol;
+const nativeResourceUse: unique symbol;
+const nativeResourceRegistration: unique symbol;
+const nativeAuthenticationGeneration: unique symbol;
+type NativeSessionResourcePort = Readonly<{ readonly [nativeResourcePort]: never }>;
+type NativeSessionResourceUse = Readonly<{ readonly [nativeResourceUse]: never }>;
+type NativeSessionResourceRegistration = Readonly<{ readonly [nativeResourceRegistration]: never }>;
+type NativeAuthenticationGeneration = Readonly<{ readonly [nativeAuthenticationGeneration]: never }>;
+type NativeSessionResourceBinding = Readonly<{
+    principalRef: string; authenticationGeneration: NativeAuthenticationGeneration;
+    sessionId: string; username: string; role: string; clientId: string;
+    clientPlatform: 'macos'; tokenHash: string; expiresAt: number;
+}>;
+function mintNativeSessionResourcePort(session: unknown): NativeSessionResourcePort | null;
+function releaseNativeSessionResourcePort(port: unknown): boolean;
+function beginNativeSessionResourceUse(port: unknown): NativeSessionResourceUse | null;
+function commitNativeSessionResourceUse(use: unknown): boolean;
+function abortNativeSessionResourceUse(use: unknown): boolean;
+function withCurrentNativeSessionResourceBinding(use: unknown, operation: (binding: NativeSessionResourceBinding) => void): boolean;
+function registerNativeSessionPrivateResource(port: unknown, dispose: WebResourceDisposer): NativeSessionResourceRegistration | null;
+function unregisterNativeSessionPrivateResource(port: unknown, registration: unknown): boolean;
+function revokeNativeSessionResourceAuthority(session: unknown): boolean;
+
 const SESSION_COOKIE_NAME = "mediflow_session";
 type ServerSessionDisposalReason = 'session_deleted' | 'session_expired' | 'sessions_cleared' | 'application_locked';
 type ServerSessionResourceDisposer = (reason: ServerSessionDisposalReason) => void;
