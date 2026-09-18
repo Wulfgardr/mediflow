@@ -1,12 +1,13 @@
 import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
+import reactHooks from "eslint-plugin-react-hooks";
 
 // @Codex: apply the existing Next lint contract to the package CommonJS sources.
 const packageCommonJsConfig = {
   ...nextVitals[0],
   name: "mediflow/web-auth-lifecycle-owner-commonjs",
-  files: ["packages/web-auth-lifecycle-owner/**/*.{cjs,js}"],
+  files: ["**/*.cjs", "packages/web-auth-lifecycle-owner/**/*.js"],
   languageOptions: {
     ...nextVitals[0].languageOptions,
     sourceType: "commonjs",
@@ -27,6 +28,8 @@ const eslintConfig = defineConfig([
   ...nextTs,
   packageCommonJsConfig,
   {
+    // @Codex: flat-config rules must declare their plugin in the same config object.
+    plugins: { "react-hooks": reactHooks },
     rules: {
       // @Codex: temporary downgrade to unblock delivery while typed refactors are phased in.
       "@typescript-eslint/no-explicit-any": "warn",
