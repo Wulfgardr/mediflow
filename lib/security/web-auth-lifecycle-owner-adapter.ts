@@ -119,11 +119,6 @@ export function unregisterPrivateResource(port: unknown, registration: unknown):
 
 /* @Codex */
 export const serverSessions = owner.serverSessions;
-export type NativeSessionResourcePort = owner.serverSessions.NativeSessionResourcePort;
-export type NativeSessionResourceUse = owner.serverSessions.NativeSessionResourceUse;
-export type NativeSessionResourceRegistration = owner.serverSessions.NativeSessionResourceRegistration;
-export type NativeSessionResourceBinding = owner.serverSessions.NativeSessionResourceBinding;
-export type NativeAuthenticationGeneration = owner.serverSessions.NativeAuthenticationGeneration;
 export type ServerSessionDisposalReason = owner.serverSessions.ServerSessionDisposalReason;
 export type ServerSessionResourceDisposer = owner.serverSessions.ServerSessionResourceDisposer;
 export type ServerSessionCleanupOutcome = owner.serverSessions.ServerSessionCleanupOutcome;

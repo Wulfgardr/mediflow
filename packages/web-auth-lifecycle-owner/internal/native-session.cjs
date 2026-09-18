@@ -145,14 +145,6 @@ function createServerSessionOwner() {
     });
     const sessions = new MapConstructor();
     const nativeSessionBindings = new WeakMap();
-    // Native resource authority is not a Web projection, bearer DTO or configuration grant.
-    const nativeResourceCells = new WeakMapConstructor();
-    const nativeResourcePorts = new WeakMapConstructor();
-    const nativeResourceUses = new WeakMapConstructor();
-    const nativeResourceRegistrations = new WeakMapConstructor();
-    const nativeMonotonicNow = process.hrtime.bigint.bind(process.hrtime);
-    const nativeSetTimeout = setTimeout;
-    const nativeClearTimeout = clearTimeout;
     const sessionResources = new MapConstructor();
     const sessionCleanupOutcomes = new MapConstructor();
     const stagedWebSessionRecords = new WeakMapConstructor();
@@ -609,12 +601,8 @@ function createServerSessionOwner() {
         return disposalFailed;
     }
     function completeSessionTermination(sessionId, sessionBeforeDeletion, reason) {
-        const nativeCell = sessionBeforeDeletion && getWeakMapValue(nativeResourceCells, sessionBeforeDeletion);
-        if (nativeCell) retireNativeResourceCell(nativeCell, reason === 'session_expired' ? 'expired'
-            : reason === 'application_locked' ? 'lock' : reason === 'sessions_cleared' ? 'clear' : 'delete');
         const registrations = getMapValue(sessionResources, sessionId);
-        const ordinaryDisposalFailed = disposeSessionResources(sessionId, reason);
-        const disposalFailed = ordinaryDisposalFailed || Boolean(nativeCell && nativeCell.cleanupFailed);
+        const disposalFailed = disposeSessionResources(sessionId, reason);
         const cleanupOutcome = sessionBeforeDeletion || registrations
             ? recordCleanupOutcome(sessionId, disposalFailed)
             : getMapValue(sessionCleanupOutcomes, sessionId) ?? 'unknown';
@@ -732,17 +720,6 @@ function createServerSessionOwner() {
             if (loginFence !== undefined && !nativeLoginFenceAllowsUser(admittedEpoch, session.userId)) {
                 throw new Error('native_login_session_fence_stale');
             }
-            const tagged = getWeakMapValue(nativeSessionBindings, session);
-            // Capture at original issuance, not at first use or a later getSession renewal.
-            const generation = ObjectFreeze(ObjectCreate(null));
-            setWeakMapValue(nativeResourceCells, session, {
-                session, tagged, generation, active: true, cleanupFailed: false,
-                principal: ObjectFreeze({ id: session.id, userId: session.userId, username: session.username,
-                    role: session.role, createdAt: session.createdAt }),
-                expiresAt: session.expiresAt,
-                deadline: nativeMonotonicNow() + BigInt(Math.max(0, session.expiresAt - DateNow())) * 1000000n,
-                ports: new SetConstructor(), timer: null,
-            });
             return session;
         }
         catch (error) {
@@ -761,7 +738,7 @@ function createServerSessionOwner() {
     }
     function isNativeBinding(value) {
         try {
-            if (!value || typeof value !== 'object' || isProxy(value) || ObjectGetPrototypeOf(value) !== ObjectPrototype)
+            if (!value || typeof value !== 'object' || isProxy(value) || ObjectGetPrototypeOf(value) !== Object.prototype)
                 return false;
             const tokenHash = ObjectGetOwnPropertyDescriptor(value, 'tokenHash');
             if (tokenHash && (!('value' in tokenHash) || !tokenHash.enumerable
@@ -789,164 +766,6 @@ function createServerSessionOwner() {
             return false;
         }
     }
-
-    // Fixed native issuer; no caller-provided authority resolver or qualification callback.
-    function nativeOpaque() { return ObjectFreeze(ObjectCreate(null)); }
-    function nativeRecord(registry, candidate) {
-        return candidate && typeof candidate === 'object' && !isProxy(candidate)
-            ? getWeakMapValue(registry, candidate) || null : null;
-    }
-    function nativeSessionFieldsMatch(cell) {
-        if (!isExactStoredSession(cell.session)) return false;
-        const session = cell.session;
-        if (ObjectGetOwnPropertyNames(session).length !== 7 || ObjectGetOwnPropertySymbols(session).length) return false;
-        for (const key of ['id', 'userId', 'username', 'role', 'createdAt']) {
-            const descriptor = ObjectGetOwnPropertyDescriptor(session, key);
-            if (!descriptor || !('value' in descriptor) || descriptor.value !== cell.principal[key]) return false;
-        }
-        const channel = ObjectGetOwnPropertyDescriptor(session, 'authChannel');
-        const expiry = ObjectGetOwnPropertyDescriptor(session, 'expiresAt');
-        return Boolean(channel && 'value' in channel && channel.value === 'native'
-            && expiry && 'value' in expiry && NumberIsSafeInteger(expiry.value) && expiry.value > DateNow()
-            && cell.tagged === getWeakMapValue(nativeSessionBindings, session)
-            && cell.tagged.clientPlatform === 'macos' && typeof cell.tagged.tokenHash === 'string'
-            && /^[a-f0-9]{64}$/u.test(cell.tagged.tokenHash)
-            && (cell.principal.role === 'admin' || cell.principal.role === 'user'));
-    }
-    function nativeCellCurrent(cell) {
-        if (!cell || !cell.active) return false;
-        try {
-            if (DateNow() < cell.expiresAt && nativeMonotonicNow() < cell.deadline
-                && nativeSessionFieldsMatch(cell)) return true;
-        } catch { /* Fail closed; no retry can revive this generation. */ }
-        retireNativeResourceCell(cell, 'expired');
-        return false;
-    }
-    function disposeNativePort(record, reason) {
-        if (!record.active) return;
-        record.active = false;
-        deleteSetValue(record.cell.ports, record);
-        // Invalidate every outstanding use before invoking a resource's cleanup.
-        const uses = applyIntrinsic(setValues, record.uses, []);
-        for (let next = nextSetIterator(uses); !next.done; next = nextSetIterator(uses)) next.value.active = false;
-        clearSet(record.uses);
-        const registrations = applyIntrinsic(setValues, record.registrations, []);
-        for (let next = nextSetIterator(registrations); !next.done; next = nextSetIterator(registrations)) {
-            const registration = next.value;
-            if (!registration.active) continue;
-            registration.active = false;
-            try {
-                const result = registration.dispose(reason);
-                if (result !== undefined) {
-                    record.cell.cleanupFailed = true;
-                    try { applyIntrinsic(promiseThen, result, [undefined, () => undefined]); } catch { /* not a promise */ }
-                }
-            } catch { record.cell.cleanupFailed = true; }
-        }
-        clearSet(record.registrations);
-    }
-    function retireNativeResourceCell(cell, reason) {
-        if (!cell || !cell.active) return false;
-        cell.active = false;
-        if (cell.timer !== null) nativeClearTimeout(cell.timer);
-        cell.timer = null;
-        const iterator = applyIntrinsic(setValues, cell.ports, []);
-        for (let next = nextSetIterator(iterator); !next.done; next = nextSetIterator(iterator))
-            disposeNativePort(next.value, reason);
-        clearSet(cell.ports);
-        return !cell.cleanupFailed;
-    }
-    function mintNativeSessionResourcePort(session) {
-        const cell = nativeRecord(nativeResourceCells, session);
-        if (!nativeCellCurrent(cell)) return null;
-        const port = nativeOpaque();
-        const record = { cell, active: true, uses: new SetConstructor(), registrations: new SetConstructor() };
-        setWeakMapValue(nativeResourcePorts, port, record);
-        addSetValue(cell.ports, record);
-        if (cell.timer === null) {
-            const remaining = Math.min(cell.expiresAt - DateNow(), Number((cell.deadline - nativeMonotonicNow()) / 1000000n));
-            cell.timer = nativeSetTimeout(() => retireNativeResourceCell(cell, 'expired'), Math.max(1, Math.min(remaining, 2147483647)));
-            cell.timer.unref?.();
-        }
-        return nativeCellCurrent(cell) ? port : null;
-    }
-    function releaseNativeSessionResourcePort(port) {
-        const record = nativeRecord(nativeResourcePorts, port);
-        if (!record || !record.active) return false;
-        disposeNativePort(record, 'dispose');
-        return !record.cell.cleanupFailed;
-    }
-    function beginNativeSessionResourceUse(port) {
-        const record = nativeRecord(nativeResourcePorts, port);
-        if (!record || !record.active || !nativeCellCurrent(record.cell)) return null;
-        const use = nativeOpaque();
-        const useRecord = { port: record, active: true, binding: false, poisoned: false };
-        setWeakMapValue(nativeResourceUses, use, useRecord);
-        addSetValue(record.uses, useRecord);
-        return use;
-    }
-    function abortNativeSessionResourceUse(use) {
-        const record = nativeRecord(nativeResourceUses, use);
-        if (!record || !record.active) return false;
-        if (record.binding) { record.poisoned = true; return false; }
-        record.active = false;
-        deleteSetValue(record.port.uses, record);
-        return true;
-    }
-    function commitNativeSessionResourceUse(use) {
-        const record = nativeRecord(nativeResourceUses, use);
-        if (!record || !record.active) return false;
-        if (record.binding) { record.poisoned = true; return false; }
-        record.active = false;
-        deleteSetValue(record.port.uses, record);
-        return !record.poisoned && record.port.active && nativeCellCurrent(record.port.cell);
-    }
-    function withCurrentNativeSessionResourceBinding(use, operation) {
-        const record = nativeRecord(nativeResourceUses, use);
-        if (!record || !record.active || !record.port.active) return false;
-        if (record.binding) { record.poisoned = true; return false; }
-        if (!isSupportedPrivateResourceDisposer(operation) || !nativeCellCurrent(record.port.cell)) {
-            abortNativeSessionResourceUse(use); return false;
-        }
-        const cell = record.port.cell;
-        const binding = ObjectFreeze({ principalRef: cell.principal.userId,
-            authenticationGeneration: cell.generation, sessionId: cell.principal.id,
-            username: cell.principal.username, role: cell.principal.role,
-            clientId: cell.tagged.clientId, clientPlatform: 'macos', tokenHash: cell.tagged.tokenHash,
-            expiresAt: cell.expiresAt });
-        let completed = false;
-        record.binding = true;
-        try {
-            const result = operation(binding);
-            completed = result === undefined;
-            if (!completed) { try { applyIntrinsic(promiseThen, result, [undefined, () => undefined]); } catch { /* contained */ } }
-        } catch { /* No capability escapes on failure. */ }
-        finally { record.binding = false; }
-        if (!completed || record.poisoned) { abortNativeSessionResourceUse(use); return false; }
-        return record.active && record.port.active && nativeCellCurrent(cell);
-    }
-    function registerNativeSessionPrivateResource(port, dispose) {
-        const record = nativeRecord(nativeResourcePorts, port);
-        if (!record || !record.active || !isSupportedPrivateResourceDisposer(dispose) || !nativeCellCurrent(record.cell)) return null;
-        const registration = nativeOpaque();
-        const entry = { port: record, active: true, dispose };
-        setWeakMapValue(nativeResourceRegistrations, registration, entry);
-        addSetValue(record.registrations, entry);
-        return nativeCellCurrent(record.cell) && record.active ? registration : null;
-    }
-    function unregisterNativeSessionPrivateResource(port, registration) {
-        const record = nativeRecord(nativeResourcePorts, port);
-        const entry = nativeRecord(nativeResourceRegistrations, registration);
-        if (!record || !entry || entry.port !== record || !entry.active) return false;
-        entry.active = false;
-        deleteSetValue(record.registrations, entry);
-        return true;
-    }
-    function revokeNativeSessionResourceAuthority(session) {
-        const cell = nativeRecord(nativeResourceCells, session);
-        return cell ? retireNativeResourceCell(cell, 'delete') : false;
-    }
-
     function isStrictWebSessionUser(value) {
         try {
             if (!value || typeof value !== 'object' || isProxy(value) || ObjectGetPrototypeOf(value) !== ObjectPrototype)
@@ -2530,9 +2349,6 @@ function createServerSessionOwner() {
         return cleanupRetiredWebServerSession(sessionId, reason);
     }
 
-    return ObjectFreeze({ api: ObjectFreeze({ mintNativeSessionResourcePort, releaseNativeSessionResourcePort,
-        beginNativeSessionResourceUse, commitNativeSessionResourceUse, abortNativeSessionResourceUse,
-        withCurrentNativeSessionResourceBinding, registerNativeSessionPrivateResource,
-        unregisterNativeSessionPrivateResource, revokeNativeSessionResourceAuthority, SESSION_COOKIE_NAME, registerServerSessionResource, createSession, captureNativeLoginSessionFence, createNativeServerSession, isPairedNativeServerSession, stageWebServerSession, prepareStagedWebServerSession, getPreparedWebServerSessionId, armPreparedWebServerSession, getArmedWebServerSessionId, tombstoneArmedWebServerSession, activateArmedWebServerSession, retireActiveWebServerSession, commitPreparedWebServerSession, abortPreparedWebServerSession, activateStagedWebServerSession, abortStagedWebServerSession, resolveActiveWebServerSession, mintActiveWebSessionResourcePort, releaseActiveWebSessionResourcePort, beginActiveWebSessionResourceUse, commitActiveWebSessionResourceUse, abortActiveWebSessionResourceUse, registerActiveWebSessionPrivateResource, unregisterActiveWebSessionPrivateResource, getSession, peekSession, deleteSession, invalidateServerSessionForApplicationLock, invalidateSessionsForUser, prepareNativeSystemAdminReset, commitNativeSystemAdminReset, abortNativeSystemAdminReset, prepareNativeLegacyUserRetirement, preparePairedNativePinRetirement, commitNativeLegacyUserRetirement, abortNativeLegacyUserRetirement, clearAllSessions, retireServerSessionForLogout, retireServerSessionForApplicationLock, retireExpiredServerSession, retireServerSessionsForUser, retireWebP3SessionsForUser, cleanupRetiredWebServerSession, dispatchActiveWebServerSessionRetirement }), claimPreparedNativePinRetirement });
+    return ObjectFreeze({ api: ObjectFreeze({ SESSION_COOKIE_NAME, registerServerSessionResource, createSession, captureNativeLoginSessionFence, createNativeServerSession, isPairedNativeServerSession, stageWebServerSession, prepareStagedWebServerSession, getPreparedWebServerSessionId, armPreparedWebServerSession, getArmedWebServerSessionId, tombstoneArmedWebServerSession, activateArmedWebServerSession, retireActiveWebServerSession, commitPreparedWebServerSession, abortPreparedWebServerSession, activateStagedWebServerSession, abortStagedWebServerSession, resolveActiveWebServerSession, mintActiveWebSessionResourcePort, releaseActiveWebSessionResourcePort, beginActiveWebSessionResourceUse, commitActiveWebSessionResourceUse, abortActiveWebSessionResourceUse, registerActiveWebSessionPrivateResource, unregisterActiveWebSessionPrivateResource, getSession, peekSession, deleteSession, invalidateServerSessionForApplicationLock, invalidateSessionsForUser, prepareNativeSystemAdminReset, commitNativeSystemAdminReset, abortNativeSystemAdminReset, prepareNativeLegacyUserRetirement, preparePairedNativePinRetirement, commitNativeLegacyUserRetirement, abortNativeLegacyUserRetirement, clearAllSessions, retireServerSessionForLogout, retireServerSessionForApplicationLock, retireExpiredServerSession, retireServerSessionsForUser, retireWebP3SessionsForUser, cleanupRetiredWebServerSession, dispatchActiveWebServerSessionRetirement }), claimPreparedNativePinRetirement });
 }
 module.exports = { createServerSessionOwner };

@@ -4,7 +4,7 @@ import 'server-only';
 import { types } from 'node:util';
 import type { ServerSession } from '../../security/server-session';
 import { bindAttachmentExtractionSelection } from './attachment-extraction-selection-binding';
-import { createAttachmentExtractionSourceAuthority, createNativeAttachmentExtractionSourceAuthority } from './attachment-extraction-source-authority';
+import { createAttachmentExtractionSourceAuthority } from './attachment-extraction-source-authority';
 import { continueAnyDocImageOrScanWithLocalOcr } from './anydoc-apple-vision-ocr-composition';
 import {
     buildAnyDocLocalExtraction,
@@ -107,8 +107,7 @@ export async function composeAnyDocCurrentSelectionExtraction(session: ServerSes
 
 async function extractSelectedSource(session: ServerSession, selector: unknown, id: string): Promise<LocalExtractionResult> {
     let authority: ReturnType<typeof createAttachmentExtractionSourceAuthority>;
-    try { authority = session.authChannel === 'native'
-        ? createNativeAttachmentExtractionSourceAuthority(session) : createAttachmentExtractionSourceAuthority(session); }
+    try { authority = createAttachmentExtractionSourceAuthority(session); }
     catch { return denied(); }
     let operation: object | null = null;
     try {
