@@ -28,6 +28,14 @@ for (const scenario of ['empty', 'missing-existing', 'unknown-schema', 'native-e
                     db.close();
                 }
                 if (scenario.startsWith('native-')) {
+                    if (scenario === 'native-missing-existing') {
+                        await assert.rejects(
+                            import('./scripts/native-first-install.mjs'),
+                            /NATIVE_DATA_DIRECTORY_NOT_EMPTY_WITHOUT_DATABASE/u
+                        );
+                        assert.equal(fs.existsSync(database), false);
+                        process.exit(0);
+                    }
                     await import('./scripts/native-first-install.mjs');
                     // TLS setup writes metadata before the first Web request.
                     fs.writeFileSync(path.join(directory, 'runtime-status.json'), '{}');

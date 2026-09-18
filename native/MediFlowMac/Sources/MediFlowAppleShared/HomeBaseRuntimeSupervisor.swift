@@ -31,6 +31,13 @@ public struct HomeBaseRuntimeLaunchPlan: Equatable, Sendable {
     }
 }
 
+/* @Codex: only the packaged first-install helper runs before WebRuntime logs/PID exist. */
+struct HomeBaseRuntimeFirstInstallPlan: Sendable {
+    let nodeBinaryPath: String
+    let scriptPath: String
+    let environment: [String: String]
+}
+
 /* @Codex */
 struct HomeBaseNodeRuntimeContract: Decodable {
     struct Node: Decodable { let major: Int; let version: String; let moduleVersion: String }
@@ -119,6 +126,8 @@ public final class HomeBaseRuntimeSupervisor: ObservableObject {
                 statusMessage = "Backend web gia attivo."
                 return
             }
+            let firstInstallPlan = try makeFirstInstallLaunchPlan(snapshot: snapshot)
+            try await runFirstInstall(plan: firstInstallPlan)
 
             managedBackendProcess = try launchProcess(plan: plan, terminationStatusPrefix: "Backend web")
             statusMessage = "Backend web production avviato dalla app."
@@ -216,6 +225,20 @@ public final class HomeBaseRuntimeSupervisor: ObservableObject {
         )
     }
 
+    func makeFirstInstallLaunchPlan(snapshot: HomeBaseRuntimeSnapshot) throws -> HomeBaseRuntimeFirstInstallPlan {
+        let webRuntimeURL = try webRuntimeURL()
+        let scriptURL = webRuntimeURL.appendingPathComponent("native-first-install.mjs")
+        let nodeBinary = try resolveNodeBinary(contract: bundledNodeContract())
+        guard fileManager.fileExists(atPath: scriptURL.path) else {
+            throw HomeBaseRuntimeSupervisorError.missingFirstInstallHelper
+        }
+        return HomeBaseRuntimeFirstInstallPlan(
+            nodeBinaryPath: nodeBinary,
+            scriptPath: scriptURL.path,
+            environment: ["MEDIFLOW_DATA_DIR": snapshot.dataDirectory]
+        )
+    }
+
     private func proxyScriptURL() throws -> URL {
         if let resourceURL = Bundle.main.url(forResource: "local-api-tls-proxy", withExtension: "mjs") {
             return resourceURL
@@ -241,6 +264,36 @@ public final class HomeBaseRuntimeSupervisor: ObservableObject {
     }
 
     #if os(macOS)
+    private func runFirstInstall(plan: HomeBaseRuntimeFirstInstallPlan) async throws {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: plan.nodeBinaryPath)
+        process.arguments = [plan.scriptPath, "--create-empty-only"]
+        process.environment = processInfo.environment.merging(plan.environment) { _, new in new }
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        try process.run()
+        // Any cancellation or thrown sleep leaves this owned child behind only
+        // briefly; it has no PID file and must not outlive the supervisor action.
+        defer {
+            if process.isRunning {
+                process.terminate()
+                if process.isRunning { _ = kill(process.processIdentifier, SIGKILL) }
+            }
+        }
+
+        let deadline = DispatchTime.now().uptimeNanoseconds + 5_000_000_000
+        while process.isRunning && DispatchTime.now().uptimeNanoseconds < deadline {
+            try await Task.sleep(nanoseconds: 25_000_000)
+        }
+        if process.isRunning {
+            _ = await stop(process: process)
+            throw HomeBaseRuntimeSupervisorError.firstInstallTimedOut
+        }
+        guard process.terminationStatus == 0 else {
+            throw HomeBaseRuntimeSupervisorError.firstInstallFailed(process.terminationStatus)
+        }
+    }
+
     private func launchProcess(plan: HomeBaseRuntimeLaunchPlan, terminationStatusPrefix: String) throws -> Process {
         try fileManager.createDirectory(
             at: URL(fileURLWithPath: plan.logPath).deletingLastPathComponent(),
@@ -445,6 +498,9 @@ public enum HomeBaseRuntimeSupervisorError: LocalizedError, Equatable {
     case missingProxyScript
     case missingWebRuntime
     case missingRuntimeContract
+    case missingFirstInstallHelper
+    case firstInstallTimedOut
+    case firstInstallFailed(Int32)
     case incompatibleNode(Int, String)
     case missingNode
 
@@ -458,6 +514,12 @@ public enum HomeBaseRuntimeSupervisorError: LocalizedError, Equatable {
             return "Runtime web standalone non incluso nel bundle. Ricompila la app con lo script nativo."
         case .missingRuntimeContract:
             return "Contratto Node/ABI del runtime web mancante. Ricompila il bundle senza riusare artefatti obsoleti."
+        case .missingFirstInstallHelper:
+            return "Helper di primo avvio non incluso nel runtime web. Ricompila la app con lo script nativo."
+        case .firstInstallTimedOut:
+            return "La preparazione iniziale dell’archivio ha superato il tempo previsto. Il servizio locale non è stato avviato."
+        case .firstInstallFailed:
+            return "Preparazione iniziale dell’archivio non riuscita. Il servizio locale non è stato avviato."
         case .incompatibleNode(let major, let abi):
             return "Node \(major).x con ABI \(abi) non trovato. Installa la versione richiesta dal bundle o configura MEDIFLOW_NODE_BINARY."
         case .missingNode:
