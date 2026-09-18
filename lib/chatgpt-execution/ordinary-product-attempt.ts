@@ -4,7 +4,7 @@
  * The named egress chokepoint verifies current governance on exact bytes. */
 import 'server-only';
 import { randomUUID } from 'node:crypto';
-import type { WebSessionProjection } from '../security/web-auth-lifecycle-owner-adapter';
+import type { OrdinarySession } from '../security/ordinary-session-authority';
 import type { ProductExecutionPlatform } from './execution-platform';
 import type { QualifiedExecutionHost } from './execution-host';
 import { createExecutionLogin } from './execution-login';
@@ -17,14 +17,16 @@ import { createOrdinaryProductConsent, ordinaryConsentIsCurrent } from '../chatg
 import { ProductError } from '../chatgpt-product/product-contract';
 
 type State = 'empty' | 'preparing' | 'needs_consent' | 'consented' | 'awaiting_login' | 'connected' | 'ready' | 'completed' | 'closed';
-export async function createOrdinaryProductAttempt(session: WebSessionProjection, platform: ProductExecutionPlatform) {
-    const owner = await import('../security/web-auth-lifecycle-owner-adapter');
+export async function createOrdinaryProductAttempt(session: OrdinarySession, platform: ProductExecutionPlatform) {
+    const owner = await import('../security/ordinary-session-authority');
     const port = owner.mintResourcePort(session);
     if (!port) throw new ProductError('session_expired');
+    const authorityExpiry = owner.readResourceExpiresAt(port, session.expiresAt);
+    if (authorityExpiry === null || authorityExpiry <= Date.now()) { owner.releaseResourcePort(port); throw new ProductError('session_expired'); }
     const controller = new AbortController();
     const attemptRevision = randomUUID();
     let active = true, busy = false, state: State = 'empty', epoch = 0;
-    let deadline = 0, expiresAt = session.expiresAt, qualificationRevision = '';
+    let deadline = 0, expiresAt = authorityExpiry, qualificationRevision = '';
     let contextRevision = '';
     let selectionSignal: AbortSignal | undefined;
     let job: ReturnType<typeof createOrdinaryPreparation> | undefined;
@@ -98,7 +100,8 @@ export async function createOrdinaryProductAttempt(session: WebSessionProjection
                 if (typeof selectedContextRevision !== 'string' || !selectedContextRevision || selectedContextRevision.length > 256 || !signal) throw new ProductError('invalid_request');
                 contextRevision = selectedContextRevision;
                 selectionSignal = signal; selectionSignal.addEventListener('abort', retire, { once: true });
-                deadline = performance.now() + 300_000; expiresAt = Math.min(session.expiresAt, Date.now() + 300_000);
+                expiresAt = Math.min(expiresAt, Date.now() + 300_000);
+                deadline = performance.now() + Math.max(0, expiresAt - Date.now());
                 clearTimeout(expiry); expiry = setTimeout(retire, remaining()); expiry.unref?.();
                 // Watch platform qualification, NOT the intentional draining host witness.
                 watcher = setInterval(() => { try { guard(); } catch { retire(); } }, 50); watcher.unref?.();

@@ -3,8 +3,8 @@
 import 'server-only';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { randomUUID } from 'node:crypto';
-import * as owner from '../security/web-auth-lifecycle-owner-adapter';
-import { acquireWebSessionResourceIdentity } from '../security/web-session-resource-identity';
+import * as owner from '../security/ordinary-session-authority';
+import { acquireOrdinarySessionResourceIdentity } from '../security/ordinary-session-authority';
 import { createOrdinaryProductAttempt } from '../chatgpt-execution/ordinary-product-attempt';
 import { createSharedMacProductPlatform } from '../chatgpt-execution/execution-mac-product';
 import { readOrdinaryGovernance } from '../chatgpt-execution/ordinary-governance';
@@ -19,7 +19,7 @@ import { ORDINARY_FLOW_SCHEMA, type OrdinaryFunction, type OrdinaryFlowState, ty
 
 type Attempt = Awaited<ReturnType<typeof createOrdinaryProductAttempt>>;
 type Entry = {
-    generation: owner.WebAuthenticationGeneration; session: owner.WebSessionProjection; port: owner.WebResourcePort;
+    generation: owner.AuthenticationGeneration; session: owner.OrdinarySession; port: owner.ResourcePort;
     id: string; functionId: OrdinaryFunction; controller: AbortController; active: boolean; busy: boolean; claimed: boolean;
     publishing: boolean; delivered: boolean; expiresAt: number; deadline: number; attempt?: Attempt; catalog?: SynthesisCatalog;
     applicationCurrent?: () => boolean; knownIdentifiers?: RedactionSessionInput['knownIdentifiers'];
@@ -37,7 +37,7 @@ const scopeKey = Symbol.for('mediflow.chatgpt.ordinary-scope.v1');
 const scopeRoots = globalThis as typeof globalThis & { [scopeKey]?: AsyncLocalStorage<Entry> };
 const scope = scopeRoots[scopeKey] ??= new AsyncLocalStorage<Entry>();
 const registryKey = Symbol.for('mediflow.chatgpt.ordinary-registry.v1');
-const shared = globalThis as typeof globalThis & { [registryKey]?: Map<owner.WebAuthenticationGeneration, Entry> };
+const shared = globalThis as typeof globalThis & { [registryKey]?: Map<owner.AuthenticationGeneration, Entry> };
 const entries = shared[registryKey] ??= new Map();
 const key = 'x-mediflow-function-model';
 function local(entry: Entry): boolean {
@@ -120,15 +120,17 @@ export function ordinaryResultMetadata(result: OrdinaryExecutionResult): Readonl
         preprocessing: Object.freeze(['context_minimization', 'layer1_redaction', 'layer2_redaction', 'envelope_validation'] as const), receipt }) });
 }
 /** The route passes the authenticated projection; identity is minted BEFORE lookup. */
-export async function beginOrdinaryFunction(request: Request, functionId: OrdinaryFunction, session: owner.WebSessionProjection,
+export async function beginOrdinaryFunction(request: Request, functionId: OrdinaryFunction, session: owner.OrdinarySession,
     originalHandler: (request: Request) => Promise<Response>): Promise<Response> {
-    const identity = acquireWebSessionResourceIdentity(session);
+    const identity = acquireOrdinarySessionResourceIdentity(session);
     if (!identity) throw new ProductError('session_expired');
     const previous = entries.get(identity.generation);
     if (previous || entries.size >= 16) { owner.releaseResourcePort(identity.port); throw new ProductError('busy'); }
+    const authorityExpiry = owner.readResourceExpiresAt(identity.port, session.expiresAt);
+    if (authorityExpiry === null || authorityExpiry <= Date.now()) { owner.releaseResourcePort(identity.port); throw new ProductError('session_expired'); }
     const entry: Entry = { ...identity, session, id: randomUUID(), functionId, controller: new AbortController(), active: true,
-        busy: false, claimed: false, publishing: false, delivered: false, expiresAt: Math.min(session.expiresAt, Date.now() + 300000),
-        deadline: performance.now() + Math.min(300000, session.expiresAt - Date.now()), initial: deferred<Response>(), output: deferred<OrdinaryExecutionResult>() };
+        busy: false, claimed: false, publishing: false, delivered: false, expiresAt: Math.min(authorityExpiry, Date.now() + 300000),
+        deadline: performance.now() + Math.min(300000, authorityExpiry - Date.now()), initial: deferred<Response>(), output: deferred<OrdinaryExecutionResult>() };
     const retire = () => { void close(entry); };
     // Registration and synchronous ownership precede every asynchronous start.
     entry.timer = setTimeout(retire, Math.max(0, entry.expiresAt - Date.now())); entry.timer.unref?.();
@@ -162,12 +164,14 @@ export async function beginOrdinaryFunction(request: Request, functionId: Ordina
 }
 /** Every command authenticates afresh, then uses the ORIGINAL persistent port.
  * The function result is never returned by status or a cached GET. */
-export async function ordinaryFunctionCommand(session: owner.WebSessionProjection, operation: string, body: Record<string, unknown>, signal: AbortSignal): Promise<Response> {
-    const identity = acquireWebSessionResourceIdentity(session); if (!identity) throw new ProductError('session_expired');
+export async function ordinaryFunctionCommand(session: owner.OrdinarySession, operation: string, body: Record<string, unknown>, signal: AbortSignal): Promise<Response> {
+    const identity = acquireOrdinarySessionResourceIdentity(session); if (!identity) throw new ProductError('session_expired');
     const entry = entries.get(identity.generation); owner.releaseResourcePort(identity.port);
-    if (operation === 'status' && !entry) return reply({ schema: ORDINARY_FLOW_SCHEMA, phase: 'closed', attemptId: null });
+    if (operation === 'status' && !entry) return reply({ schema: ORDINARY_FLOW_SCHEMA, phase: 'closed', attemptId: null, cleanupConfirmed: true });
     if (!entry || (operation !== 'status' && body.attemptId !== entry.id)) throw new ProductError('invalid_state');
     if (operation === 'cancel') return reply({ schema: ORDINARY_FLOW_SCHEMA, phase: 'closed', ...(await close(entry)) });
+    if (operation === 'status' && !entry.active) return reply({ schema: ORDINARY_FLOW_SCHEMA, phase: 'closed',
+        attemptId: entry.id, functionId: entry.functionId, cleanupConfirmed: false });
     guard(entry); if (signal.aborted) { await close(entry); throw new ProductError('revoked'); }
     if (operation === 'status') {
         const response = reply(snapshot(entry));
@@ -198,7 +202,15 @@ export async function ordinaryFunctionCommand(session: owner.WebSessionProjectio
             response = await entry.original!;
             guard(entry);
             if (!response.ok || !attempt.isCurrent(result)) throw new ProductError('revoked');
+            if (session.authChannel === 'native') {
+                // Read the original owner's proposal BEFORE disposal, and seal the
+                // fixed envelope with the final binding below; never transform it later.
+                const resultBody: unknown = await response.json(); guard(entry);
+                response = reply({ schema: 'mediflow.native-ordinary.v1', phase: 'completed',
+                    attemptId: entry.id, functionId: entry.functionId, cleanupConfirmed: true, result: resultBody });
+            }
         } else if (operation === 'preference') {
+            if (session.authChannel !== 'web') throw new ProductError('forbidden');
             const option = entry.catalog?.choices.find((option: import('../chatgpt-execution/execution-contract').SynthesisChoice) => option.optionId === body.modelOptionId);
             if (!option || entry.catalog?.revision !== body.expectedCatalogRevision || typeof body.expectedRevision !== 'string') throw new ProductError('catalog_stale');
             await writeOrdinaryCloudSettings(session, body.expectedRevision, { preference: { functionId: entry.functionId, value: { use: 'chatgpt_subscription', model: option.model, effort: option.effort } } }, signal);
@@ -237,7 +249,7 @@ export async function bindOrdinaryApplicationContext(functionId: OrdinaryFunctio
         import('../security/server-session-projection-owner'), import('../schema'), import('../db-server'), import('drizzle-orm'), import('../patient-lifecycle'),
     ]);
     guard(entry);
-    const identity = acquireWebSessionResourceIdentity(applicationSession as owner.WebSessionProjection);
+    const identity = acquireOrdinarySessionResourceIdentity(applicationSession as owner.OrdinarySession);
     if (!identity) throw new ProductError('session_expired');
     try { if (identity.generation !== entry.generation || !isServerSessionProjectionOwner(applicationOwner)) throw new ProductError('session_expired'); }
     finally { owner.releaseResourcePort(identity.port); }

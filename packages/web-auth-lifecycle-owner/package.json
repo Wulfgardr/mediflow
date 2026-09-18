@@ -1,11 +1,17 @@
 {
   "name": "@mediflow/web-auth-lifecycle-owner",
-  "version": "0.8.8",
+  "version": "0.8.9-local.3f2e6f2a",
   "private": true,
   "type": "commonjs",
   "main": "./index.js",
   "types": "./index.d.ts",
   "exports": "./index.js",
-  "files": ["index.js", "index.d.ts", "internal/"],
-  "engines": { "node": ">=24 <25" }
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "internal/"
+  ],
+  "engines": {
+    "node": ">=24 <25"
+  }
 }

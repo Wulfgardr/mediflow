@@ -8,7 +8,7 @@ import { AI_PATIENT_INSIGHT_KILL_SWITCH_KEY, isAiPatientInsightEnabledValue } fr
 import { createHostLocalProviderBindingService } from '../host-local-provider-binding';
 import { observeClinical } from '../host-local-provider-readiness';
 import { dbServer } from '../../db-server';
-import { acquireAuthenticatedWebSessionProjectionOwnerContext } from '../../security/server-auth';
+import { acquireOrdinaryApplicationContext } from '../../security/ordinary-application-context';
 import { patients, settings } from '../../schema';
 import { activePatients } from '../../patient-lifecycle';
 import { routeHostResolvedCandidateCapability } from './candidate-router';
@@ -32,7 +32,7 @@ const killSwitch = Object.freeze({
 });
 
 export const acquireAuthenticatedPatientInsightPreview = createAuthenticatedPatientInsightPreviewService({
-    acquireContext: acquireAuthenticatedWebSessionProjectionOwnerContext,
+    acquireContext: acquireOrdinaryApplicationContext,
     readPatientRevision: (patientId) => {
         // ADR 0066: ordinary currentness reads must not expose tombstoned rows.
         const row = dbServer.select({ version: patients.version }).from(patients)
