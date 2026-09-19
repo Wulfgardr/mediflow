@@ -2,6 +2,7 @@
 import type { RenderTask } from 'pdfjs-dist';
 import { assertImageSize, PREVIEW_LIMITS, PreviewError } from './document-viewer-policy.ts';
 import { PreviewScope } from './document-viewer-scope.ts';
+import { OwnedStandardFontDataFactory } from './document-viewer-pdf-fonts.ts';
 import { boundedCanvasFactory, checkPdfOperators } from './document-viewer-pdf-resources.ts';
 import { paintPdfPage, type PreviewPdfEngineFactory, type PreviewPdfPage, type PreviewRenderTask } from './document-viewer-pdf-core.ts';
 
@@ -74,9 +75,9 @@ export async function renderPdfPreview(bytes: Uint8Array, number: number, canvas
                     enableXfa: false,
                     useWorkerFetch: false,
                     CMapReaderFactory: NoAuxiliaryResources,
-                    StandardFontDataFactory: NoAuxiliaryResources,
+                    StandardFontDataFactory: OwnedStandardFontDataFactory,
                     CanvasFactory: canvases.CanvasFactory,
-                    useSystemFonts: true,
+                    useSystemFonts: false,
                     disableFontFace: true,
                     stopAtErrors: true,
                     disableRange: true,
