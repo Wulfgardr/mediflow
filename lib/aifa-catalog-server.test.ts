@@ -271,9 +271,12 @@ test('update route guards streamed bodies and cancels on actual session retireme
         cancel() { stalledCancelled = true; return Promise.reject(new Error('synthetic cancellation failure')); },
     })))).status, 400, 'stalled body must time out before transport');
     assert.equal(stalledCancelled, true);
-    assert.equal((await POST(streamed(new ReadableStream({
+    const failedBody = await POST(streamed(new ReadableStream({
         start(controller) { controller.error(new Error('synthetic body read failure')); },
-    })))).status, 422);
+    })));
+    assert.equal(failedBody.status, 422);
+    /* @Codex Unexpected errors never expose raw exception text through the domain-error branch. */
+    assert.deepEqual(await failedBody.json(), { error: 'Aggiornamento AIFA non riuscito; catalogo conservato' });
     assert.equal(calls, 0);
     assert.equal(getAifaCatalogSnapshot(), bodySnapshot);
     const validCsv = 'CODICE_AIC;DENOMINAZIONE;CODICE_ATC;PA_ASSOCIATI\n000000401;TEST ROUTE;A01AA01;Principio route';

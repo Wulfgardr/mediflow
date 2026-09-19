@@ -33,6 +33,15 @@ const repoRoot = path.resolve(__dirname, '..');
 const apiRoot = path.join(repoRoot, 'app', 'api');
 
 const ALLOWLIST = [
+    /* @Codex Domain refusals are authored constants; unexpected exceptions stay generic. */
+    {
+        file: 'app/api/drugs/update/route.ts',
+        motivo:
+            "Il ramo `error instanceof AifaUpdateError` restituisce soltanto messaggi autoriali "
+            + 'su richiesta, sessione, acquisizione e validazione del catalogo AIFA. I costruttori '
+            + 'non incorporano input, risposte remote o eccezioni di sistema; il ramo generico '
+            + 'restituisce un messaggio fisso e conserva il catalogo.',
+    },
     {
         file: 'app/api/drugs/route.ts',
         motivo:
