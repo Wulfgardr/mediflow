@@ -25,14 +25,16 @@ test('treatment reasoning kill switch blocks new drafts on the Scheda', async ({
 
   await openAiFunzioniSettings(page);
 
-  const killSwitch = page.getByRole('switch', { name: 'Treatment Reasoning locale' });
+  const killSwitch = page.getByRole('switch', { name: 'Ragionamento terapeutico nella proposta' });
   await expect(killSwitch).toHaveAttribute('aria-checked', 'true');
   await killSwitch.click();
   await expect(killSwitch).toHaveAttribute('aria-checked', 'false');
-  const saveButton = page.getByRole('button', { name: 'Salva Configurazione' });
-  await saveButton.click();
-  await expect(page.getByRole('button', { name: 'Salvataggio...' })).toHaveCount(0);
-  await expect(saveButton).toBeEnabled();
+  const preferenceCard = killSwitch.locator('xpath=ancestor::article');
+  await preferenceCard.getByRole('button', { name: 'Anteprima modifica' }).click();
+  const settingsPreview = page.getByRole('region', { name: 'Anteprima impostazioni' });
+  await expect(settingsPreview).toContainText('Ragionamento terapeutico: spento');
+  await settingsPreview.getByRole('button', { name: 'Applica alle impostazioni' }).click();
+  await expect(page.getByRole('status')).toContainText('Impostazioni salvate e rilette. Nessuna modifica clinica.');
 
   const patientId = await page.evaluate(async () => {
     const response = await fetch('/api/patients', {

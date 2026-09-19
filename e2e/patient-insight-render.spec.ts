@@ -93,7 +93,10 @@ test('patient insight renders stored markdown as read-only history without fallb
   // /patients/:id lands on the cockpit "Quadro" which does not host the insight card.
   await page.goto(`/patients/${patientId}/modules`);
   await expect(page).toHaveURL(new RegExp(`/patients/${patientId}/modules$`));
-  await openPatientSection(page, 'documenti');
+  await openPatientSection(page, 'quadro');
+  const insightDisclosure = page.locator('#patient-insight');
+  await insightDisclosure.locator(':scope > summary').click();
+  await expect(insightDisclosure).toHaveAttribute('open', '');
 
   // Saved summaries are historical Markdown in read-only mode. New structured
   // proposals have their own review-only surface and are covered separately.

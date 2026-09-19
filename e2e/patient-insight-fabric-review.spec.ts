@@ -1,6 +1,7 @@
 /* @Codex */
 import { expect, test, type Page } from '@playwright/test';
 
+import type { FunctionModelPreferences } from '../lib/function-models/browser';
 import {
   parsePatientInsightPreviewRequest,
   type PatientInsightPreviewRequest,
@@ -9,6 +10,23 @@ import { bootstrapUnlockedSession, openPatientSection, setAiLaneKillSwitch } fro
 
 const MODEL = 'synthetic-patient-insight:latest';
 const REVIEW_REF = `review_${'b'.repeat(32)}`;
+const MODEL_OPTION_ID = `model_option_${'a'.repeat(32)}`;
+const PATIENT_INSIGHT_CATALOG = {
+  schemaVersion: 'mediflow.function-preferences.v1',
+  revision: `sha256_${'c'.repeat(64)}`,
+  catalogRevision: `sha256_${'d'.repeat(64)}`,
+  check: 'configuration_only',
+  apply: 'denied',
+  presets: ['host_defaults', 'all_off'],
+  functions: (['patient_insight', 'smart_import', 'document_synthesis', 'treatment_reasoning'] as const).map(id => ({
+    id,
+    enabled: id === 'patient_insight',
+    defaultModelOptionId: MODEL_OPTION_ID,
+    defaultSource: 'host_configuration',
+    bindingState: 'current',
+    options: [{ modelOptionId: MODEL_OPTION_ID, label: MODEL, provider: 'ollama', state: 'available_unqualified' }],
+  })),
+} satisfies FunctionModelPreferences;
 
 async function createSyntheticPatient(page: Page): Promise<string> {
   return await page.evaluate(async (taxCode: string) => {
@@ -106,10 +124,30 @@ test('Patient Insight UI invia un payload strict e mostra una proposta review-on
       body: JSON.stringify(availablePreview(capturedRequest)),
     });
   });
+  await page.route('**/api/settings/ai/functions', async (route) => {
+    expect(route.request().method()).toBe('GET');
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(PATIENT_INSIGHT_CATALOG) });
+  });
 
-  await page.goto(`/patients/${patientId}/modules#documenti`);
-  await expect(page).toHaveURL(new RegExp(`/patients/${patientId}/modules#documenti$`));
-  await openPatientSection(page, 'documenti');
+  await page.goto(`/patients/${patientId}/modules#quadro`);
+  await expect(page).toHaveURL(new RegExp(`/patients/${patientId}/modules#quadro$`));
+  await openPatientSection(page, 'quadro');
+  const insightDisclosure = page.locator('#patient-insight');
+  await insightDisclosure.locator(':scope > summary').click();
+  await expect(insightDisclosure).toHaveAttribute('open', '');
+  // @Codex: this spec already owns a synthetic preview transport; make its local
+  // catalog prerequisite explicit without claiming a real provider invocation.
+  const modelPicker = page.getByRole('combobox', { name: 'Modello per questa proposta' });
+  await expect(modelPicker).toBeEnabled();
+  // @Codex: the picker reads its catalog on first focus, matching ordinary UI use.
+  await modelPicker.focus();
+  await expect(modelPicker.locator('option')).toHaveText([
+    `Predefinito · ${MODEL}`,
+    'OpenAI · abbonamento ChatGPT · prepara',
+    `${MODEL} · Ollama · locale`,
+  ]);
+  await modelPicker.selectOption(MODEL_OPTION_ID);
+  await expect(modelPicker).toHaveValue(MODEL_OPTION_ID);
   generationStarted = true;
   await page.getByRole('button', { name: 'Avvia supporto' }).click();
 
