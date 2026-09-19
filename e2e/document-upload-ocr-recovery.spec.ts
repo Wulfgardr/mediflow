@@ -18,16 +18,19 @@ async function fixture(page: Page, bytes = RTF, extension = 'rtf') {
   } });
   expect(patient.ok()).toBe(true);
   const patientId = (await patient.json()).id as string;
-  const id = `ocr-recovery-${marker}`; const name = `synthetic-recovery.${extension}`;
+  const name = `synthetic-recovery.${extension}`;
   const type = extension === 'pdf' ? 'application/pdf' : 'application/rtf';
   const url = `/patients/${patientId}/modules`;
-  const response = await page.request.post('/api/attachments', { data: {
-    id, patientId, name, type, size: bytes.byteLength, path: `uploads/${name}`,
-    data: `data:${type};base64,${bytes.toString('base64')}`,
-  } });
-  expect(response.ok()).toBe(true);
   await openArchive(page, url);
-  return { id, name, patientId, url, endpoint: `**/api/attachments/${id}/local-extraction` };
+  const saved = page.waitForResponse((response) => response.request().method() === 'POST'
+    && new URL(response.url()).pathname === '/api/attachments');
+  await page.locator('#documenti input[type="file"]').setInputFiles({ name, mimeType: type, buffer: bytes });
+  const response = await saved;
+  expect(response.ok()).toBe(true);
+  const uploaded = response.request().postDataJSON() as { id: string; patientId: string; data: string };
+  expect(uploaded.patientId).toBe(patientId);
+  expect(uploaded.data).toMatch(/^ENC:/u);
+  return { id: uploaded.id, name, patientId, url, endpoint: `**/api/attachments/${uploaded.id}/local-extraction` };
 }
 
 async function openArchive(page: Page, url: string) {
@@ -41,6 +44,7 @@ for (const failure of ['engine_absent', 'timeout', 'crash', 'transport_interrupt
     const file = await fixture(page); let calls = 0;
     // HTTP fault injection only; normal authentication and persisted synthetic source are real.
     await page.route(file.endpoint, async (route) => {
+      if (route.request().headers()['x-mediflow-extraction-action'] !== 'project') return route.continue();
       calls += 1;
       if (calls > 1) return route.continue();
       if (failure === 'transport_interrupted') return route.abort('failed');
