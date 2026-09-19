@@ -2571,6 +2571,20 @@ final class HomeBasePatientsClientTests: XCTestCase {
             XCTAssertEqual(failure, .init(status: 503, code: .unqualifiedBoundary))
         }
     }
+    func testNativeOrdinaryPreparationFailureKeepsOnlyNewAllowlistedCode() async throws {
+        let input = NativeOrdinaryPreparation(functionId: .patientInsight, patientId: "synthetic-patient",
+            ambulatoryId: "synthetic-ambulatory", patientRevision: 1, input: .patientInsight)
+        let client = makeClient { request in
+            let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 503, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+            return (response, Data(#"{"error":"host detail must not cross the boundary","code":"preparation_unavailable"}"#.utf8))
+        }
+        do {
+            _ = try await client.prepareNativeOrdinary(input, credentials: .init(clientId: "synthetic-mac", clientToken: "synthetic-token"), sessionCookie: "mediflow_session=synthetic-native")
+            XCTFail("expected bounded ordinary failure")
+        } catch let failure as NativeOrdinaryServerFailure {
+            XCTAssertEqual(failure, .init(status: 503, code: .preparationUnavailable))
+        }
+    }
     func testNativeOrdinaryFailureRejectsUnknownCodeAndHostText() async throws {
         let input = NativeOrdinaryPreparation(functionId: .patientInsight, patientId: "synthetic-patient",
             ambulatoryId: "synthetic-ambulatory", patientRevision: 1, input: .patientInsight)

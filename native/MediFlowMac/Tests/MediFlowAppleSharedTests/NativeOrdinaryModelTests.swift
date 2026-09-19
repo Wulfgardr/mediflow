@@ -78,6 +78,18 @@ final class NativeOrdinaryModelTests: XCTestCase {
         XCTAssertEqual(model.message, "Operazione non completata (HTTP 503): servizio non disponibile o risposta non verificata. Operazione chiusa; nessuna modifica alla cartella.")
         XCTAssertFalse(model.message.contains("untrusted host payload"))
     }
+    func testPrepareUpstreamFailureUsesNeutralPreparationReasonAfterConfirmedCleanup() async throws {
+        let model = NativeOrdinaryModel(function: .patientInsight, snapshot: { self.source() }, services: .init(
+            prepare: { _, _ in throw NativeOrdinaryServerFailure(status: 503, code: .upstreamError) },
+            command: { _, _ in throw NativeOrdinaryContractError.invalid },
+            status: { _ in
+                var closed = F.response(.patientInsight, "closed")
+                closed.removeValue(forKey: "attemptId")
+                return try F.decode(NativeOrdinaryResponse.self, closed)
+            }))
+        model.prepare(); await settle(model)
+        XCTAssertEqual(model.message, "Operazione non completata (upstream_error): preparazione locale non disponibile. Operazione chiusa; nessuna modifica alla cartella.")
+    }
     func testPrepareFailureKeepsOnlyAllowlistedServerCodeAfterConfirmedCleanup() async throws {
         let model = NativeOrdinaryModel(function: .patientInsight, snapshot: { self.source() }, services: .init(
             prepare: { _, _ in throw NativeOrdinaryServerFailure(status: 503, code: .unqualifiedBoundary) },

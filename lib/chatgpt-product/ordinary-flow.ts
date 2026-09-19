@@ -9,7 +9,7 @@ import { randomUUID } from 'node:crypto';
 import * as owner from '../security/ordinary-session-authority';
 import { acquireOrdinarySessionResourceIdentity } from '../security/ordinary-session-authority';
 import { createOrdinaryProductAttempt } from '../chatgpt-execution/ordinary-product-attempt';
-import { createSharedMacProductPlatform } from '../chatgpt-execution/execution-mac-product';
+import { createSharedMacProductPlatform, reportMacProductPreparationDiagnostic } from '../chatgpt-execution/execution-mac-product';
 import { readOrdinaryGovernance } from '../chatgpt-execution/ordinary-governance';
 import { readOrdinaryCloudSettings, writeOrdinaryCloudSettings } from './ordinary-settings';
 import { readOrdinaryTaskProfile, type OrdinaryTaskProfile } from '../chatgpt-execution/ordinary-task-profile';
@@ -108,8 +108,15 @@ export async function executeOwnedOrdinaryProfile(functionId: OrdinaryFunction, 
     guard(entry); if (!current()) throw new ProductError('revoked');
     entry.claimed = true; entry.sourceCurrent = current;
     entry.sourceTimer = setInterval(() => { try { guard(entry); } catch { void close(entry); } }, 50); entry.sourceTimer.unref?.();
+    let disclosurePrepared = false;
     try {
-        const governed = await readOrdinaryGovernance(functionId); guard(entry);
+        let governed: Awaited<ReturnType<typeof readOrdinaryGovernance>>;
+        try { governed = await readOrdinaryGovernance(functionId); }
+        catch (error) {
+            if (!(error instanceof ProductError || error instanceof ExecutionError)) reportMacProductPreparationDiagnostic('governance');
+            throw error;
+        }
+        guard(entry);
         const attempt = await createOrdinaryProductAttempt(entry.session, createSharedMacProductPlatform(), () => {
             try { guard(entry); return true; } catch { return false; }
         });
@@ -118,11 +125,15 @@ export async function executeOwnedOrdinaryProfile(functionId: OrdinaryFunction, 
         const disclosure = await attempt.prepare(profile, randomUUID(), governed.configuration, entry.controller.signal, entry.knownIdentifiers ?? knownIdentifiers);
         guard(entry);
         entry.initial.resolve(reply({ ...snapshot(entry), disclosure }, 202));
+        disclosurePrepared = true;
         const result = await entry.output.promise;
         if (result !== entry.result || result.functionId !== functionId || !entry.attempt.isCurrent(result)) throw new ProductError('revoked');
         // The final source commit is performed by the original caller, not here.
         return result;
-    } catch (error) { entry.initial.reject(error); throw error; }
+    } catch (error) {
+        const bounded = error instanceof ProductError || error instanceof ExecutionError || disclosurePrepared ? error : new ProductError('preparation_unavailable');
+        entry.initial.reject(bounded); throw bounded;
+    }
 }
 export function ordinaryResultMetadata(result: OrdinaryExecutionResult): Readonly<{ receipt: OrdinaryRemoteReceipt; provenance: OrdinaryRemoteProvenance }> {
     const entry = scope.getStore();
@@ -262,6 +273,7 @@ export async function ordinaryFunctionCommand(session: owner.OrdinarySession, op
  * fresh projection must prove the same opaque authentication generation. */
 export async function bindOrdinaryApplicationContext(functionId: OrdinaryFunction, applicationOwner: unknown, applicationSession: unknown): Promise<void> {
     const entry = scope.getStore(); if (!entry || entry.functionId !== functionId || entry.claimed) throw new ProductError('invalid_request');
+    try {
     const [{ isServerSessionProjectionOwner }, schema, { dbServer }, orm, { activePatients }] = await Promise.all([
         import('../security/server-session-projection-owner'), import('../schema'), import('../db-server'), import('drizzle-orm'), import('../patient-lifecycle'),
     ]);
@@ -292,6 +304,10 @@ export async function bindOrdinaryApplicationContext(functionId: OrdinaryFunctio
         } catch { return false; }
     };
     guard(entry); if (!entry.applicationCurrent()) throw new ProductError('revoked');
+    } catch (error) {
+        if (entry.session.authChannel === 'native' && !(error instanceof ProductError || error instanceof ExecutionError)) reportMacProductPreparationDiagnostic('binding');
+        throw error;
+    }
 }
 export function ordinaryApplicationIsCurrent(functionId: OrdinaryFunction): boolean {
     const entry = scope.getStore();

@@ -182,7 +182,8 @@ final class NativeOrdinaryModel: ObservableObject {
         let reason: String
         switch error {
         case let failure as NativeOrdinaryServerFailure:
-            return "Operazione non completata (\(failure.code.rawValue)): \(failure.code.safeReason). Operazione chiusa; nessuna modifica alla cartella."
+            let reason = failure.code == .upstreamError && phase == .preparing ? "preparazione locale non disponibile" : failure.code.safeReason
+            return "Operazione non completata (\(failure.code.rawValue)): \(reason). Operazione chiusa; nessuna modifica alla cartella."
         case HomeBaseClientError.httpStatus(let status, _):
             switch status {
             case 401: reason = "sessione o pairing non più validi"

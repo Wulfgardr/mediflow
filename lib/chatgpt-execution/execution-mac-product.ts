@@ -8,7 +8,7 @@ import { ExecutionError } from './execution-contract';
 import { prepareMacProductQualification, MacQualificationFailure, type MacQualificationAudit } from './execution-mac-qualification';
 import { resolveInstalledMacExecutionAssets } from './execution-mac-assets';
 import { createReviewedMacProductPlatform, executionPlatformSnapshot, type ProductExecutionPlatform } from './execution-platform';
-import { reportExecutionDiagnostic, type ExecutionDiagnostic } from './execution-transport';
+import { reportExecutionDiagnostic, type ExecutionDiagnostic, type PreparationDiagnosticStage } from './execution-transport';
 import type { ProductPreparation } from '../chatgpt-product/product-contract';
 
 type Prepared = Awaited<ReturnType<typeof prepareMacProductQualification>>;
@@ -17,6 +17,11 @@ const EXECUTION_DIAGNOSTIC_PREFIX = 'MEDIFLOW_CHATGPT_EXECUTION_DIAGNOSTIC';
 function hostExecutionDiagnostic(event: ExecutionDiagnostic): void {
     if (process.env[EXECUTION_DIAGNOSTIC_ENV] !== '1') return;
     reportExecutionDiagnostic((projection) => console.warn(EXECUTION_DIAGNOSTIC_PREFIX, JSON.stringify(projection)), event);
+}
+/** @Codex — closed preparation stage only; no error object or local artifact metadata crosses this sink. */
+export function reportMacProductPreparationDiagnostic(stage: PreparationDiagnosticStage): void {
+    hostExecutionDiagnostic({ event: 'preparation_failed', method: null, errorCode: 'upstream_error', rpcCode: null,
+        httpStatus: null, tls: false, network: false, device: false, experimental: false, permission: false, stage });
 }
 /** Kept even when the owning Web session disappears. Never clear a hold merely
  * because a PID is absent, a request ended or this backend restarted. */

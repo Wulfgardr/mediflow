@@ -10,28 +10,38 @@ function record(value: unknown): Record<string, unknown> {
 }
 type ExecutionNotification = (method: string, params: unknown) => void;
 
-const DIAGNOSTIC_EVENTS = ['rpc_error', 'transport_failure', 'turn_start_failed', 'turn_completed_failed'] as const;
+const DIAGNOSTIC_EVENTS = ['rpc_error', 'transport_failure', 'turn_start_failed', 'turn_completed_failed', 'preparation_failed'] as const;
+export const PREPARATION_DIAGNOSTIC_STAGES = ['governance', 'redaction', 'binding', 'platform_qualification'] as const;
+export type PreparationDiagnosticStage = typeof PREPARATION_DIAGNOSTIC_STAGES[number];
 const DIAGNOSTIC_CODES = ['upstream_error', 'timeout', 'process_exited', 'protocol_error', 'tool_use_denied'] as const;
 const RPC_CODES = [-32700, -32600, -32601, -32602, -32603, -32000] as const;
 export type ExecutionDiagnostic = Readonly<{ event: typeof DIAGNOSTIC_EVENTS[number]; method: ExecutionMethod | null;
     errorCode: typeof DIAGNOSTIC_CODES[number]; rpcCode: typeof RPC_CODES[number] | null; httpStatus: number | null;
-    tls: boolean; network: boolean; device: boolean; experimental: boolean; permission: boolean }>;
+    tls: boolean; network: boolean; device: boolean; experimental: boolean; permission: boolean; stage?: PreparationDiagnosticStage }>;
 /** This host-only observer is not authority. Rebuild a closed data projection;
  * never forward an upstream object, free numeric code, prose or accessor. */
 export function reportExecutionDiagnostic(observer: ((event: ExecutionDiagnostic) => void) | undefined, input: ExecutionDiagnostic): void {
     if (!observer) return;
     try {
         const read = (key: keyof ExecutionDiagnostic): unknown => Object.getOwnPropertyDescriptor(input, key)?.value;
-        const event = read('event'), method = read('method'), errorCode = read('errorCode');
+        const event = read('event'), method = read('method'), errorCode = read('errorCode'), stage = read('stage');
         if (!(DIAGNOSTIC_EVENTS as readonly unknown[]).includes(event)
             || !(method === null || (EXECUTION_METHODS as readonly unknown[]).includes(method))
             || !(DIAGNOSTIC_CODES as readonly unknown[]).includes(errorCode)) return;
-        const code = read('rpcCode'), status = read('httpStatus');
-        const result: unknown = observer(Object.freeze({ event, method, errorCode,
-            rpcCode: (RPC_CODES as readonly unknown[]).includes(code) ? code : typeof code === 'number' && Number.isInteger(code) && code >= -32099 && code <= -32000 ? -32000 : null,
-            httpStatus: typeof status === 'number' && Number.isInteger(status) && status >= 400 && status <= 599 ? status : null,
-            tls: read('tls') === true, network: read('network') === true, device: read('device') === true,
-            experimental: read('experimental') === true, permission: read('permission') === true } as ExecutionDiagnostic));
+        let projection: ExecutionDiagnostic;
+        if (event === 'preparation_failed') {
+            if (!(PREPARATION_DIAGNOSTIC_STAGES as readonly unknown[]).includes(stage)) return;
+            projection = Object.freeze({ event: event as ExecutionDiagnostic['event'], method: null, errorCode: 'upstream_error', rpcCode: null, httpStatus: null,
+                tls: false, network: false, device: false, experimental: false, permission: false, stage: stage as PreparationDiagnosticStage });
+        } else {
+            const code = read('rpcCode'), status = read('httpStatus');
+            projection = Object.freeze({ event: event as ExecutionDiagnostic['event'], method: method as ExecutionDiagnostic['method'], errorCode: errorCode as ExecutionDiagnostic['errorCode'],
+                rpcCode: ((RPC_CODES as readonly unknown[]).includes(code) ? code : typeof code === 'number' && Number.isInteger(code) && code >= -32099 && code <= -32000 ? -32000 : null) as ExecutionDiagnostic['rpcCode'],
+                httpStatus: typeof status === 'number' && Number.isInteger(status) && status >= 400 && status <= 599 ? status : null,
+                tls: read('tls') === true, network: read('network') === true, device: read('device') === true,
+                experimental: read('experimental') === true, permission: read('permission') === true });
+        }
+        const result: unknown = observer(projection);
         // An accidental async observer must not create an unhandled rejection.
         void Promise.resolve(result).catch(() => {});
     } catch { /* Observation failure cannot change the original execution result. */ }

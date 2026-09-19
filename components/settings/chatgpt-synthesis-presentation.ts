@@ -58,6 +58,7 @@ const noticeCopy: Record<ProductCode, string> = {
     process_exited: 'Il processo della prova si è chiuso. Rileggi lo stato prima di riprovare.',
     protocol_error: 'Comunicazione con il servizio non valida. Rileggi lo stato prima di riprovare.',
     upstream_error: 'Il servizio ha restituito un errore. Rileggi lo stato prima di riprovare.',
+    preparation_unavailable: 'La preparazione locale non è disponibile. Rileggi lo stato prima di riprovare.',
     consent_required: 'È necessario autorizzare questa prova prima di procedere.',
     consent_stale: 'Il consenso non è più valido. Rileggi lo stato e autorizza nuovamente.',
     invalid_state: 'L’operazione non è disponibile nello stato attuale. Rileggi lo stato.',
