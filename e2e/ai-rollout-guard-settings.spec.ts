@@ -76,8 +76,8 @@ test('settings warns when selected AI model is still on hold in rollout readines
   const guardNotice = page.getByTestId('ai-rollout-guard-notice');
   await expect(guardNotice).toBeVisible();
   await expect(guardNotice).toContainText('Patient Insight');
-  // WUL-297: the local-guard status is rendered in Italian ("disattivata localmente").
-  await expect(guardNotice).toContainText('disattivata localmente');
+  // A disabled local control stays explicit even if a model has readiness evidence.
+  await expect(guardNotice).toContainText('Spenta nelle impostazioni');
 
   const clinicalSelector = page.getByTestId('ai-model-selector-clinical');
   const resetToRecommended = clinicalSelector.getByRole('button', { name: 'Torna ai consigliati' });
@@ -95,6 +95,6 @@ test('settings warns when selected AI model is still on hold in rollout readines
   await expect(guardNotice).toContainText('Generative Challenger');
   await expect(guardNotice).toContainText('therapyStateRecall 0.7 < 0.95');
   await expect(guardNotice).toContainText('Patient Insight');
-  await expect(guardNotice).toContainText('disattivata localmente');
+  await expect(guardNotice).toContainText('Spenta nelle impostazioni');
   await expect(page.getByTestId('ai-rollout-local-guard-patient_insight')).toBeVisible();
 });

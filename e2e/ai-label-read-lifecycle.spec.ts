@@ -64,10 +64,16 @@ test('locking retires the pending model footer read before its response or fallb
         await page.getByRole('button', { name: 'Blocca', exact: true }).click();
         expect((await confirmed).status()).toBe(200);
         await expect(page.getByRole('heading', { name: 'Sblocca MediFlow', exact: true })).toBeVisible();
-        await expect.poll(() => aborted).toEqual(['net::ERR_ABORTED']);
+        // Development StrictMode can retire the first hook lifetime and mount the
+        // replacement before the lock. Both reads are real pending page reads:
+        // locking must abort every one, without a legacy fallback or a late read.
+        const readsAtLock = [...reads];
+        expect(readsAtLock).not.toHaveLength(0);
+        expect(readsAtLock).toEqual(readsAtLock.map(() => '/api/settings/aiModel_clinical'));
+        await expect.poll(() => aborted).toEqual(readsAtLock.map(() => 'net::ERR_ABORTED'));
         release();
         await page.waitForLoadState('networkidle');
-        expect(reads).toEqual(['/api/settings/aiModel_clinical']);
+        expect(reads).toEqual(readsAtLock);
         expect(lateReads).toEqual([]);
         expect(errors).toEqual([]);
         await page.unrouteAll({ behavior: 'wait' });
