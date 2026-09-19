@@ -3,6 +3,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { createHash, randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { mapAnyDocLocalFailure } from '../lib/domain/documents/anydoc-local-extraction-contract';
+import type { AttachmentExtractionProjectionGrant } from '../lib/domain/documents/attachment-extraction-projection-protocol';
 import { bootstrapUnlockedSession, openPatientSection } from './utils';
 
 const TEXT = 'DOCUMENTO SINTETICO PER RECUPERO';
@@ -42,21 +43,30 @@ async function openArchive(page: Page, url: string) {
 for (const failure of ['engine_absent', 'timeout', 'crash', 'transport_interrupted', 'stale'] as const) {
   test(`OCR recovery UI: ${failure}, manual review and explicit retry`, async ({ page }) => {
     const file = await fixture(page); let calls = 0;
-    // HTTP fault injection only; normal authentication and persisted synthetic source are real.
+    let grant: AttachmentExtractionProjectionGrant | undefined;
+    // Authentication and source acquisition stay real. Only the first parser
+    // response is simulated; a parser failure must not require a successful parse.
     await page.route(file.endpoint, async (route) => {
+      if (route.request().headers()['x-mediflow-extraction-action'] === 'acquire') {
+        const response = await route.fetch();
+        expect(response.status()).toBe(200);
+        grant = await response.json() as AttachmentExtractionProjectionGrant;
+        return route.fulfill({ response });
+      }
       if (route.request().headers()['x-mediflow-extraction-action'] !== 'project') return route.continue();
       calls += 1;
       if (calls > 1) return route.continue();
+      expect(grant?.schemaVersion).toBe('mediflow.attachment_extraction_projection.v1');
+      expect(route.request().headers()['x-mediflow-extraction-grant']).toBe(grant?.grantId);
       if (failure === 'transport_interrupted') return route.abort('failed');
       if (failure === 'stale') return route.fulfill({ status: 409, json: { error: 'Local extraction unavailable' } });
       const body = mapAnyDocLocalFailure({ attachmentId: file.id, byteLength: RTF.byteLength,
         sourceSha256: createHash('sha256').update(RTF).digest('hex') }, failure === 'timeout' ? 'resourceLimit' : 'io');
-      const response = await route.fetch();
-      expect(response.status()).toBe(200);
-      const projection = await response.json();
-      expect(projection).toMatchObject({ schemaVersion: 'mediflow.attachment_extraction_projection.v1',
-        acquisition: { origin: 'authenticated_client_decryption', ciphertextEquality: 'not_attested' } });
-      await route.fulfill({ response, json: { ...projection, extraction: body } });
+      await route.fulfill({ status: 200, json: {
+        schemaVersion: grant!.schemaVersion, grantId: grant!.grantId,
+        acquisition: { origin: 'authenticated_client_decryption', ciphertextEquality: 'not_attested',
+          canonicalSource: grant!.canonicalSource }, extraction: body,
+      } });
     });
     const extract = page.getByRole('button', { name: `Estrai testo localmente da ${file.name}` });
     await extract.click();
