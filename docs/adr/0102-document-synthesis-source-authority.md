@@ -140,6 +140,30 @@ identificatore di allegato, ID paziente, revisione, freshness, provider o
 prompt. Cattura e preview sono due frontiere di authority distinte anche quando
 una composizione locale le richiama in sequenza.
 
+### Follow-up — ingest Web di allegati cifrati (19 settembre 2026)
+
+Per l'allegato Web ordinario persistito cifrato,
+`POST /api/ai/document-synthesis/ingest` non accetta JSON di projection o testo.
+Accetta soltanto `application/octet-stream` same-origin/loopback, con il capture
+handle opaco nel solo header `X-MediFlow-Document-Synthesis-Capture`. Il browser
+legge e decritta la facade corrente esclusivamente dopo la cattura; non invia
+`attachmentId`, paziente, source ref, revision, freshness, provider o prompt
+all'ingest.
+
+L'ingest risolve e brucia il capture handle nel medesimo owner. Poi emette e
+consuma internamente il grant di extraction per l'allegato gia catturato; il
+grant vincola `sourceRef`, revisione, freshness, selezione e sessione prima e
+dopo AnyDoc. L'host deriva la projection di sintesi soltanto dal risultato
+AnyDoc finalizzato e dalla sua receipt. La provenance della proiezione resta
+`authenticated_client_decryption` con `ciphertextEquality=not_attested`: non
+afferma uguaglianza tra ciphertext persistito e bytes decrittati, ne trasforma
+il client in authority di contenuto.
+
+L'handle e comunque bruciato prima del body e ogni errore, annullamento,
+reselezione, lock, logout o mismatch lascia l'operazione non pubblicabile. Il
+browser ricontrolla la generazione dopo lettura/decrittazione e prima del POST,
+scartando i bytes se un reset ha ritirato il flusso.
+
 `sourceSetAuthority=application_host` dichiara soltanto che l'host possiede il
 set catturato e ha validato lo scope del digest dell'input provider. Non
 dichiara plaintext, digest o provenienza dell'allegato originale, ne verita

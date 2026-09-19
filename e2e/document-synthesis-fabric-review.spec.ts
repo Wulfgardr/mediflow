@@ -115,9 +115,9 @@ function previewResponse() {
   };
 }
 
-async function createFixture(page: Page): Promise<{ patientId: string; attachmentId: string; attachmentName: string }> {
+async function createFixture(page: Page): Promise<{ patientId: string; attachmentId: string; attachmentName: string; attachmentBytes: Buffer }> {
   const suffix = `${Date.now()}`.slice(-8);
-  return page.evaluate(async (marker) => {
+  const fixture = await page.evaluate(async (marker) => {
     const patientResponse = await fetch('/api/patients', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -133,24 +133,20 @@ async function createFixture(page: Page): Promise<{ patientId: string; attachmen
     });
     if (!patientResponse.ok) throw new Error(`Fixture paziente Fabric: HTTP ${patientResponse.status}`);
     const patientId = (await patientResponse.json() as { id: string }).id;
-    const attachmentId = `attachment-fabric-review-${marker}`;
-    const attachmentName = `documento-fabric-review-${marker}.pdf`;
-    const attachmentResponse = await fetch('/api/attachments', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        id: attachmentId,
-        patientId,
-        name: attachmentName,
-        type: 'application/pdf',
-        size: 24,
-        path: `uploads/${attachmentName}`,
-        data: 'data:application/pdf;base64,JVBERi0xLjQ=',
-      }),
-    });
-    if (!attachmentResponse.ok) throw new Error(`Fixture allegato Fabric: HTTP ${attachmentResponse.status}`);
-    return { patientId, attachmentId, attachmentName };
+    const attachmentName = `documento-fabric-review-${marker}.rtf`;
+    return { patientId, attachmentName };
   }, suffix);
+  const attachmentBytes = Buffer.from('{\\rtf1\\ansi Documento Fabric sintetico cifrato dalla facade.}');
+  await openDocumentArchive(page, fixture.patientId);
+  const saved = page.waitForResponse(response => response.request().method() === 'POST'
+    && new URL(response.url()).pathname === '/api/attachments');
+  await page.locator('#documenti input[type="file"]').setInputFiles({ name: fixture.attachmentName,
+    mimeType: 'application/rtf', buffer: attachmentBytes });
+  const response = await saved;
+  if (!response.ok()) throw new Error(`Fixture allegato Fabric: HTTP ${response.status()}`);
+  const uploaded = response.request().postDataJSON() as { id: string; patientId: string; data: string };
+  if (uploaded.patientId !== fixture.patientId || !/^ENC:/u.test(uploaded.data)) throw new Error('Fixture allegato Fabric non cifrato dalla facade');
+  return { ...fixture, attachmentId: uploaded.id, attachmentBytes };
 }
 
 async function openDocumentArchive(page: Page, patientId: string): Promise<void> {
@@ -205,7 +201,10 @@ test('Document Synthesis Fabric mostra una sola proposta con receipt, provenienz
   });
   await page.route('**/api/ai/document-synthesis/ingest', async (route) => {
     calls.ingest += 1;
-    bodies.ingest = route.request().postDataJSON();
+    const bytes = route.request().postDataBuffer();
+    bodies.ingest = { captureHandle: route.request().headers()['x-mediflow-document-synthesis-capture'],
+      contentType: route.request().headers()['content-type'], byteLength: bytes?.byteLength,
+      sourceSha256: bytes ? createHash('sha256').update(bytes).digest('hex') : null };
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ previewHandle: PREVIEW_HANDLE }) });
   });
   await page.route('**/api/ai/document-synthesis/preview', async (route) => {
@@ -238,7 +237,8 @@ test('Document Synthesis Fabric mostra una sola proposta con receipt, provenienz
   expect(calls).toEqual({ capture: 1, extraction: 0, ingest: 1, preview: 1, legacy: 0 });
   expect(bodies).toEqual({
     capture: { attachmentId },
-    ingest: { captureHandle: CAPTURE_HANDLE },
+    ingest: { captureHandle: CAPTURE_HANDLE, contentType: 'application/octet-stream', byteLength: fixture.attachmentBytes.byteLength,
+      sourceSha256: createHash('sha256').update(fixture.attachmentBytes).digest('hex') },
     preview: { previewHandle: PREVIEW_HANDLE },
   });
   expect(forbiddenWrites).toEqual([]);
