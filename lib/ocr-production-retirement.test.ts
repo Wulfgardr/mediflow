@@ -22,8 +22,9 @@ test('production document surfaces leave automatic extraction to persisted-sourc
     for (const activeSource of [upload, importer, context]) {
         assert.doesNotMatch(activeSource, /extractPatientDataSmart|extractDocumentTextForSummary|extractTextFromPdf|\/api\/ocr\/extract/u);
     }
-    assert.match(upload, /requestAnyDocLocalExtractionPreview\(file\.id,/u);
-    assert.match(upload, /db\.attachments\.add[\s\S]*requestAnyDocLocalExtractionPreview/u);
+    assert.match(upload, /requestAnyDocDecryptedLocalExtractionPreview\(file\.id,\s*async/u);
+    assert.match(upload, /db\.attachments\.add[\s\S]*requestAnyDocDecryptedLocalExtractionPreview/u);
+    assert.match(upload, /db\.attachments\.get\(file\.id,\s*\{\s*signal\s*\}\)/u);
 });
 
 test('system diagnostics do not expose a runnable OCR health check', () => {
