@@ -19,7 +19,7 @@ type WorklistCase = {
 
 type WorklistFixture = {
   marker: string;
-  patientIds: string[];
+  patients: Array<{ id: string; name: string }>;
 };
 
 const WORKLIST_VIEWPORTS: Omit<WorklistCase, 'register'>[] = [
@@ -57,9 +57,11 @@ async function openSyntheticWorklist(page: Page, worklistCase: WorklistCase): Pr
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
   const marker = `WL${Date.now().toString(36).slice(-4)}${Math.random().toString(36).slice(2, 6)}`;
   // @Codex: exercise the ordinary directory with records created through its API.
-  const patientIds = await page.evaluate(async (fixtureMarker) => {
-    const created: string[] = [];
+  const patients = await page.evaluate(async (fixtureMarker) => {
+    const created: Array<{ id: string; name: string }> = [];
     for (let index = 0; index < 3; index += 1) {
+      // The worklist presents the ordinary directory name as surname then given name.
+      const name = `${fixtureMarker} Caso ${index + 1}`;
       const response = await fetch('/api/patients', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ firstName: `Caso ${index + 1}`, lastName: fixtureMarker,
@@ -74,7 +76,7 @@ async function openSyntheticWorklist(page: Page, worklistCase: WorklistCase): Pr
       if (!response.ok) throw new Error(`Fixture worklist ${index}: HTTP ${response.status}`);
       const payload = await response.json() as { id?: string };
       if (typeof payload.id !== 'string') throw new Error(`Fixture worklist ${index}: patient id assente`);
-      created.push(payload.id);
+      created.push({ id: payload.id, name });
     }
     return created;
   }, marker);
@@ -87,7 +89,7 @@ async function openSyntheticWorklist(page: Page, worklistCase: WorklistCase): Pr
   await expect(page.getByTestId('lume-worklist')).toBeVisible();
   await page.getByRole('searchbox', { name: 'Cerca nella lista pazienti', exact: true }).fill(marker);
   await expect(page.getByText('3 risultati', { exact: true })).toBeVisible();
-  return { marker, patientIds };
+  return { marker, patients };
 }
 
 async function resolvedRegisterFamily(page: Page): Promise<string> {
@@ -102,7 +104,7 @@ async function resolvedRegisterFamily(page: Page): Promise<string> {
 }
 
 async function assertWorklistContract(page: Page, fixture: WorklistFixture): Promise<void> {
-  const { marker, patientIds } = fixture;
+  const { marker, patients } = fixture;
   const list = page.getByRole('listbox', { name: 'Elenco pazienti in carico', exact: true });
   const listItems = list.getByRole('option');
   const rows = list.getByTestId('lume-patient-row');
@@ -128,14 +130,19 @@ async function assertWorklistContract(page: Page, fixture: WorklistFixture): Pro
 
   await expect(firstRow).toHaveAttribute('aria-selected', 'true');
   await expect(secondRow).toHaveAttribute('aria-selected', 'false');
+  // Creation order is not a directory-order contract. Bind the rendered row
+  // identity to the synthetic fixture before keyboard selection changes it.
+  const selectedName = (await secondRow.locator('strong').innerText()).trim();
+  const selectedFixtures = patients.filter((patient) => patient.name === selectedName);
+  expect(selectedFixtures).toHaveLength(1);
+  const selectedPatientId = selectedFixtures[0]?.id;
+  expect(selectedPatientId).toEqual(expect.any(String));
   // Single click now opens the record. ArrowDown still changes the selection.
   // @Codex: compare keyboard selection without a retained pointer hover.
   await page.mouse.move(0, 0);
   expect(await firstRow.evaluate((element) => element.matches(':hover'))).toBe(false);
   await firstRow.focus();
   await firstRow.press('ArrowDown');
-  const selectedPatientId = patientIds[1];
-  expect(selectedPatientId).toEqual(expect.any(String));
   // Selection persists its real directory context in the query. Wait for that
   // state before inspecting focus or layout, because Next may replace the URL.
   await expect(page).toHaveURL((url) => (
