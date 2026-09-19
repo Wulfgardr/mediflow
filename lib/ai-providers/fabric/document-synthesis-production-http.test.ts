@@ -46,15 +46,16 @@ test('denies before body observation when authentication is unavailable', async 
     assert.equal(reads, 0);
 });
 
-test('rejects a non-local binary ingress before the capture can reach the operation', async () => {
+test('rejects a binary ingress with a non-local Host before the capture can reach the operation', async () => {
     let ingests = 0;
     const handler = createDocumentSynthesisIngestHttpHandler({ acquireOperation: async () => Object.freeze({
         capture: async () => ({ status: 'denied' as const, code: 'input_invalid', captureHandle: null }),
         ingest: async () => { ingests += 1; return { status: 'available' as const, code: null, previewHandle: `dsp_${'2'.repeat(32)}` }; },
         preview: async () => ({ status: 'denied' as const, code: 'input_invalid', publication: null }),
     }) });
-    const response = await handler(new Request('https://example.test/api/ai/document-synthesis/ingest', { method: 'POST', body: new Uint8Array([1]),
-        headers: { host: 'example.test', origin: 'https://example.test', 'content-type': 'application/octet-stream',
+    const remote = new URL('http://localhost'); remote.hostname = 'remote.invalid';
+    const response = await handler(new Request('http://localhost/api/ai/document-synthesis/ingest', { method: 'POST', body: new Uint8Array([1]),
+        headers: { host: remote.host, origin: remote.origin, 'content-type': 'application/octet-stream',
             [DOCUMENT_SYNTHESIS_CAPTURE_HEADER]: `dsc_${'1'.repeat(32)}` } }));
     assert.equal(response.status, 400);
     assert.equal(ingests, 0);
