@@ -196,7 +196,7 @@ async function assertCompactWorklistGeometry(page: Page, width: number): Promise
     const rail = document.querySelector<HTMLElement>('[data-twin-workspace] > aside');
     const worklist = document.querySelector<HTMLElement>('[data-testid="lume-worklist"]');
     const title = worklist?.querySelector<HTMLElement>('h2');
-    const count = worklist?.querySelector<HTMLElement>('.lume-registro');
+    const count = worklist?.querySelector<HTMLElement>('[class*="resultCount"]');
     const action = worklist?.querySelector<HTMLElement>('[data-lume-action="quiet"]');
     const rows = [...document.querySelectorAll<HTMLElement>('[data-testid="lume-patient-row"]')];
     const navItems = [...document.querySelectorAll<HTMLElement>('nav[aria-label="Navigazione principale"] a')];
