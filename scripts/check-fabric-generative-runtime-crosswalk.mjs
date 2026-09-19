@@ -249,7 +249,7 @@ export const TREATMENT_PORTABLE_RUNTIME_CROSSWALK = Object.freeze({
   "decision": "proposals/TREATMENT-PORTABLE-ADR.md",
   "legacyCrosswalk": {
     "path": "docs/capability-mapping/fabric-generative-runtime-crosswalk.v1.json",
-    "sha256": "8f1defc83566b83fb18b09e780f1466d5e3fb0144659bb1e1f4721dcd7ad4034"
+    "sha256": "133bcbfb049ab6fc429f47ac0cf5a5cedb967327a59673348b633c868a9991b3"
   },
   "preferenceSchema": "mediflow.function-preferences.v2",
   "preferenceHeader": "x-mediflow-function-preferences",

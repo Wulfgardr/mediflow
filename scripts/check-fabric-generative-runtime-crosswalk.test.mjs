@@ -76,6 +76,19 @@ test('rejects a missing route or caller request literal', () => {
   );
 });
 
+test('pins document synthesis to the authenticated client projection composition', () => {
+  const manifest = loadFabricGenerativeRuntimeCrosswalk();
+  const document = manifest.capabilities.find(({ id }) => id === 'document_synthesis');
+  const production = readFileSync(document.productionRoot, 'utf8').replaceAll(
+    'composeAnyDocCurrentSelectionClientProjectionExtraction',
+    'composeAnyDocCurrentSelectionExtraction',
+  );
+  assert.throws(
+    () => validateFabricGenerativeRuntimeCrosswalk(manifest, repositorySources({ [document.productionRoot]: production })),
+    /document_synthesis.*production root.*composeAnyDocCurrentSelectionClientProjectionExtraction/u,
+  );
+});
+
 test('rejects hidden receipt or provenance metadata in the live UI', () => {
   const manifest = loadFabricGenerativeRuntimeCrosswalk();
   const patient = manifest.capabilities.find(({ id }) => id === 'patient_insight');

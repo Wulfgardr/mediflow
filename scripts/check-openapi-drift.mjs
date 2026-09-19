@@ -54,33 +54,41 @@ function extractMethods(source) {
     ));
 }
 
+function hasRecognizedApiV1AuthGuard(sourcePath, source) {
+    const hasLocalTokenGuard = source.includes('requireLocalApiToken(');
+    const hasPairedClientGuard = source.includes('authenticateNetworkPairedClient(')
+        || source.includes('requireNetworkCapabilityContext(')
+        || source.includes('requireNetworkWriteContext(')
+        || source.includes('requireNetworkDiscoveryAuth(');
+    // @Codex: ADR0135 delegates to one named native authority, not a Web adapter.
+    const nativeConfigurationRoutes = new Set([
+        'app/api/v1/network/ai/functions/route.ts',
+        'app/api/v1/network/ai/functions/preview/route.ts',
+    ]);
+    const hasNativeConfigurationGuard = nativeConfigurationRoutes.has(sourcePath)
+        && source.includes("import { nativeConfigurationHttp } from '@/lib/native-ai-configuration-production'")
+        && /return nativeConfigurationHttp\.(GET|POST|PREVIEW)\(request\)/u.test(source);
+    const nativeOperations = new Map([
+        ['prepare', 'POST'], ['project', 'POST,DELETE'], ['status', 'GET'], ['consent', 'POST'],
+        ['login/start', 'POST'], ['login/complete', 'POST'], ['models', 'POST'], ['generate', 'POST'], ['cancel', 'POST'],
+    ]);
+    const nativeOperation = [...nativeOperations].find(([operation]) =>
+        sourcePath === `app/api/v1/network/ai/chatgpt/ordinary/${operation}/route.ts`);
+    const hasNativeOrdinaryGuard = nativeOperation !== undefined
+        && source.includes("import { handleNativeOrdinaryHttp } from '@/lib/chatgpt-product/native-ordinary-http'")
+        && source.includes(`return handleNativeOrdinaryHttp(request, '${nativeOperation[0]}')`)
+        && extractMethods(source).join(',') === nativeOperation[1];
+    return hasLocalTokenGuard || hasPairedClientGuard || hasNativeConfigurationGuard || hasNativeOrdinaryGuard;
+}
+
 function buildCurrentRoutes() {
     const routes = new Map();
     const routeFiles = [];
     for (const filePath of walkRoutes(path.join(ROOT, ROUTE_ROOT))) {
         routeFiles.push(filePath);
         const source = fs.readFileSync(filePath, 'utf8');
-        const hasLocalTokenGuard = source.includes('requireLocalApiToken(');
-        const hasPairedClientGuard = source.includes('authenticateNetworkPairedClient(')
-            || source.includes('requireNetworkCapabilityContext(')
-            || source.includes('requireNetworkWriteContext(')
-            || source.includes('requireNetworkDiscoveryAuth(');
-        // @Codex: ADR0135 delegates to one named native authority, not a Web adapter.
-        const nativeConfigurationRoutes = new Set([
-            'app/api/v1/network/ai/functions/route.ts',
-            'app/api/v1/network/ai/functions/preview/route.ts',
-        ]);
-        const hasNativeConfigurationGuard = nativeConfigurationRoutes.has(path.relative(ROOT, filePath).split(path.sep).join('/'))
-            && source.includes("import { nativeConfigurationHttp } from '@/lib/native-ai-configuration-production'")
-            && /return nativeConfigurationHttp\.(GET|POST|PREVIEW)\(request\)/u.test(source);
-        const nativeOperations = ['prepare', 'status', 'consent', 'login/start', 'login/complete', 'models', 'generate', 'cancel'];
         const sourcePath = path.relative(ROOT, filePath).split(path.sep).join('/');
-        const hasNativeOrdinaryGuard = nativeOperations.some(operation =>
-            sourcePath === `app/api/v1/network/ai/chatgpt/ordinary/${operation}/route.ts`
-            && source.includes("import { handleNativeOrdinaryHttp } from '@/lib/chatgpt-product/native-ordinary-http'")
-            && source.includes(`return handleNativeOrdinaryHttp(request, '${operation}')`)
-            && extractMethods(source).join(',') === (operation === 'status' ? 'GET' : 'POST'));
-        if (!hasLocalTokenGuard && !hasPairedClientGuard && !hasNativeConfigurationGuard && !hasNativeOrdinaryGuard) {
+        if (!hasRecognizedApiV1AuthGuard(sourcePath, source)) {
             throw new Error(
                 `${path.relative(ROOT, filePath)} is missing a recognized /api/v1 auth guard`
             );
@@ -595,6 +603,22 @@ const STR = { type: 'string' };
 
 function runSelfTest() {
     const cases = [
+        {
+            name: 'project native riconosce solo il wrapper autenticato con POST e DELETE',
+            run: () => hasRecognizedApiV1AuthGuard(
+                'app/api/v1/network/ai/chatgpt/ordinary/project/route.ts',
+                "import { handleNativeOrdinaryHttp } from '@/lib/chatgpt-product/native-ordinary-http';\nexport async function POST(request) { return handleNativeOrdinaryHttp(request, 'project'); }\nexport async function DELETE(request) { return handleNativeOrdinaryHttp(request, 'project'); }",
+            ),
+            expect: (recognized) => recognized === true,
+        },
+        {
+            name: 'project native senza wrapper autenticato resta rifiutato',
+            run: () => hasRecognizedApiV1AuthGuard(
+                'app/api/v1/network/ai/chatgpt/ordinary/project/route.ts',
+                "export async function POST(request) { return projectNativeOrdinary(request); }\nexport async function DELETE(request) { return cancelNativeOrdinaryProjection(request); }",
+            ),
+            expect: (recognized) => recognized === false,
+        },
         {
             name: 'campo di RISPOSTA nuovo e obbligatorio → breaking (la regressione WUL-542)',
             run: () => diffOf(
