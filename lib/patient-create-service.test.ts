@@ -12,7 +12,7 @@ import type * as Owner from '@mediflow/web-auth-lifecycle-owner';
 const load = createRequire(import.meta.url);
 const ownerPath = load.resolve(process.env.MEDIFLOW_TEST_OWNER_PATH ?? '@mediflow/web-auth-lifecycle-owner');
 const owner = load(ownerPath) as typeof Owner;
-assert.equal(JSON.parse(readFileSync(join(dirname(ownerPath), 'package.json'), 'utf8')).version, '0.8.8');
+assert.equal(JSON.parse(readFileSync(join(dirname(ownerPath), 'package.json'), 'utf8')).version, '0.8.9-local.3f2e6f2a');
 // Use the actual built-in SQLite, not an emulated database. Local typing keeps
 // the test compatible with the project's @types/node20 without changing deps.
 type SqliteValue = string | number | null;
