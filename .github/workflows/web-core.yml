@@ -25,6 +25,9 @@ jobs:
       - run: npm run check:lume-tokens
       - run: npm run test:lume-tokens
       - run: npm run check:motion-budget
+      # @Codex: component tests in test:unit launch Chromium as well as Node.
+      - name: Install Chromium for component tests
+        run: npx playwright install --with-deps chromium
       - name: Allocate synthetic test data directory
         run: |
           DATA_DIR="$(mktemp -d "${RUNNER_TEMP}/mediflow-web-core.XXXXXX")"
