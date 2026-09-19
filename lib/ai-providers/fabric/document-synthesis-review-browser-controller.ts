@@ -4,8 +4,9 @@
 import { createSmartImportSelectionBrowserAdapter } from '../../security/smart-import-selection-browser-adapter';
 import { createDocumentSynthesisBrowserOrchestrator } from './document-synthesis-browser-orchestrator';
 import type { DocumentSynthesisPreviewWire } from './document-synthesis-preview-wire';
+import type { AnyDocDecryptedAttachmentSource } from '@/lib/domain/documents/anydoc-local-extraction-client';
 
-type Sources = Readonly<{ fetch?: typeof fetch }>;
+type Sources = Readonly<{ fetch?: typeof fetch; readAttachment?: (attachmentId: string) => Promise<AnyDocDecryptedAttachmentSource | undefined | null> }>;
 export type DocumentSynthesisAmbulatoryChoice = Readonly<{ ambulatoryId: string; name: string; address: string; version: number }>;
 export type DocumentSynthesisContextProposal = Readonly<{ patientId: string; patientName: string; patientVersion: number;
     ambulatories: readonly DocumentSynthesisAmbulatoryChoice[] }>;
@@ -98,7 +99,8 @@ export function createDocumentSynthesisReviewBrowserController(sources: Sources 
                 const selected = await selection.select({ patientId: input.patientId, ambulatoryId: input.ambulatory.ambulatoryId }, true);
                 current(token);
                 if (!selection.isCurrent(selected)) return fail('operation_superseded');
-                const preview = await synthesis.run(input.attachmentId); current(token);
+                if (!sources.readAttachment) return fail('context_unavailable');
+                const preview = await synthesis.run(input.attachmentId, () => sources.readAttachment!(input.attachmentId)); current(token);
                 if (!selection.isCurrent(selected)) return fail('operation_superseded');
                 return preview;
             } catch (error) { current(token); throw error; }

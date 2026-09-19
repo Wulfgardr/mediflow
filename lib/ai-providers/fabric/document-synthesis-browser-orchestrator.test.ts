@@ -19,22 +19,22 @@ const publication = {
 };
 
 test('runs capture, host-owned ingest, and one preview without source, write, or provider inputs', async () => {
-    const calls: Array<{ url: string; body: unknown }> = [];
+    const calls: Array<{ url: string; body: unknown; headers?: HeadersInit }> = [];
     const fetcher = async (input: RequestInfo | URL, init?: RequestInit) => {
-        const url = String(input); const body = init?.body ? JSON.parse(String(init.body)) : null;
-        calls.push({ url, body });
+        const url = String(input); const body = typeof init?.body === 'string' ? JSON.parse(init.body) : init?.body ?? null;
+        calls.push({ url, body, headers: init?.headers });
         if (url.endsWith('/capture')) return response({ captureHandle: `dsc_${'1'.repeat(32)}` });
         if (url.endsWith('/ingest')) return response({ previewHandle: `dsp_${'2'.repeat(32)}` });
         if (url.endsWith('/preview')) return response(serializeDocumentSynthesisPreviewWire(publication));
         throw new Error('unexpected route');
     };
     const orchestrator = createDocumentSynthesisBrowserOrchestrator({ fetch: fetcher as typeof fetch });
-    const result = await orchestrator.run('attachment.synthetic.1');
+    const result = await orchestrator.run('attachment.synthetic.1', async () => ({ id: 'attachment.synthetic.1', data: 'U3ludGhldGljLg==' }));
     assert.equal(result.publication.receipt.writesPerformed, 0);
     assert.deepEqual(calls, [
-        { url: '/api/ai/document-synthesis/capture', body: { attachmentId: 'attachment.synthetic.1' } },
-        { url: '/api/ai/document-synthesis/ingest', body: { captureHandle: `dsc_${'1'.repeat(32)}` } },
-        { url: '/api/ai/document-synthesis/preview', body: { previewHandle: `dsp_${'2'.repeat(32)}` } },
+        { url: '/api/ai/document-synthesis/capture', body: { attachmentId: 'attachment.synthetic.1' }, headers: { 'content-type': 'application/json' } },
+        { url: '/api/ai/document-synthesis/ingest', body: new ArrayBuffer(10), headers: { 'X-MediFlow-Document-Synthesis-Capture': `dsc_${'1'.repeat(32)}`, 'Content-Type': 'application/octet-stream' } },
+        { url: '/api/ai/document-synthesis/preview', body: { previewHandle: `dsp_${'2'.repeat(32)}` }, headers: { 'content-type': 'application/json' } },
     ]);
     assert.equal(JSON.stringify(calls).includes('provider'), false);
     assert.equal(JSON.stringify(calls).includes('prompt'), false);
@@ -52,7 +52,7 @@ test('fails closed for unsupported extraction and never continues after reset', 
                 : response({ error: 'unavailable', code: 'unsupported_local_extraction' }, false);
         },
     });
-    await assert.rejects(() => orchestrator.run('attachment.synthetic.1'), (error: unknown) => error instanceof DocumentSynthesisBrowserOrchestratorError && error.code === 'unsupported_local_extraction');
+    await assert.rejects(() => orchestrator.run('attachment.synthetic.1', async () => ({ id: 'attachment.synthetic.1', data: 'U3ludGhldGljLg==' })), (error: unknown) => error instanceof DocumentSynthesisBrowserOrchestratorError && error.code === 'unsupported_local_extraction');
     assert.equal(calls, 2);
     const pending = createDocumentSynthesisBrowserOrchestrator({
         fetch: async (input) => {
@@ -61,7 +61,7 @@ test('fails closed for unsupported extraction and never continues after reset', 
             return new Promise((resolve) => setImmediate(() => resolve(response({ previewHandle: `dsp_${'2'.repeat(32)}` }))));
         },
     });
-    const run = pending.run('attachment.synthetic.2');
+    const run = pending.run('attachment.synthetic.2', async () => ({ id: 'attachment.synthetic.2', data: 'U3ludGhldGljLg==' }));
     await new Promise((resolve) => setImmediate(resolve));
     pending.reset();
     await assert.rejects(run, (error: unknown) => error instanceof DocumentSynthesisBrowserOrchestratorError && error.code === 'operation_superseded');
@@ -73,6 +73,6 @@ test('preserves session unavailability without continuing to ingest or inference
     const orchestrator = createDocumentSynthesisBrowserOrchestrator({ fetch: async () => {
         calls++; return Response.json({ error: 'Document Synthesis non disponibile.', code: 'session_unavailable' }, { status: 401 });
     } });
-    await assert.rejects(orchestrator.run('synthetic-attachment'), { code: 'session_unavailable' });
+    await assert.rejects(orchestrator.run('synthetic-attachment', async () => ({ id: 'synthetic-attachment', data: 'U3ludGhldGljLg==' })), { code: 'session_unavailable' });
     assert.equal(calls, 1);
 });
