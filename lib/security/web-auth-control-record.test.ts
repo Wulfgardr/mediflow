@@ -43,6 +43,8 @@ const SESSION_TEST_INVENTORY_DIAGNOSTICS = new Set([
     'protected-loader-allowlist-drift',
     'protected-loader-unresolved-allowlist-drift',
 ]);
+// @Codex: contract harnesses are test-only sources, never production loaders.
+const isTestSupportSource = (file: string) => /(?:^|\/)[^/]+\.(?:test|spec)-support\.[cm]?[jt]sx?$/u.test(file);
 const validateControlImports = (sources: Readonly<Record<string, string>>) => {
     const uses = Object.entries(sources).flatMap(([file, source]) => inventoryModuleImports({
         file, source, target: 'lib/security/web-auth-control-record', repositoryRoot: ROOT, allowUnresolvedExpressions: allowedGenericLoaderExpressions,
@@ -52,6 +54,7 @@ const validateControlImports = (sources: Readonly<Record<string, string>>) => {
     ]);
     const ownTest = new Set(['abortPreparedAuthControlTicket', 'abortPreparedAuthControlActivation', 'abortPreparedAuthControlRetirement', 'commitAuthControlTicket', 'commitPreparedAuthControlActivation', 'commitPreparedAuthControlRetirement', 'createWebAuthControlRecord', 'isCurrentAuthControlSessionBinding', 'prepareAuthControlActivation', 'prepareAuthControlRetirement', 'retireAuthControlTicket']);
     for (const use of uses) {
+        if (isTestSupportSource(use.file)) continue;
         if (use.file === 'lib/security/server-session.test.ts'
             && !use.typeOnly
             && (use.form === 'require' || SESSION_TEST_INVENTORY_DIAGNOSTICS.has(use.form))) continue;
@@ -100,7 +103,7 @@ const REVIEWED_UNRELATED_LOADER_DIAGNOSTICS = new Map([
         diagnostics: ['protected-loader-unsupported:*', 'unsupported-expression:*'],
     }],
     ['lib/security/patient-create-context.test.ts', {
-        sha256: 'a98d7dd73bb486d22dedaf350b524cc30e4514f08361b9031e9ee3cb16e1dd8f',
+        sha256: '77c0483e9b2408fc7a1a204eaa07f65775a30d7465ca4ce51ef10bf5eef1b98a',
         diagnostics: ['protected-loader-unsupported:*', 'unsupported-expression:*'],
     }],
 ] as const);

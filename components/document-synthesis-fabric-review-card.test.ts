@@ -23,7 +23,7 @@ test('document upload persists the attachment first and never invokes OCR, legac
     const source = await readFile(UPLOAD, 'utf8');
     assert.match(source, /DocumentSynthesisFabricReviewCard/u);
     assert.match(source, /db\.attachments\.add/u);
-    assert.match(source, /requestAnyDocLocalExtractionPreview/u);
+    assert.match(source, /requestAnyDocDecryptedLocalExtractionPreview/u);
     assert.doesNotMatch(source, /document-synthesis-service|synthesizeDocument|refreshPatientSummaryIfEnabled|extractPatientDataSmart|extractDocumentTextForSummary|aiModels\.ocr|OCR in corso/u);
     assert.match(source, /unsupported_local_extraction/u);
     assert.match(source, /review_required/u);

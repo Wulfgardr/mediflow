@@ -94,7 +94,7 @@ const DORMANT_WEB_OWNER_MODULE_IMPORTS = new Map<string, ReadonlyMap<string, Rea
     ['lib/security/web-auth-session-issuer', new Map()],
 ]);
 
-const isTestSource = (file: string) => /(?:^|\/)[^/]+\.(?:test|spec)\.[cm]?[jt]sx?$/u.test(file);
+const isTestSource = (file: string) => /(?:^|\/)[^/]+\.(?:test|spec)(?:-support)?\.[cm]?[jt]sx?$/u.test(file);
 const inventory = (sources: Readonly<Record<string, string>>, target: string) => Object.entries(sources)
     .flatMap(([file, source]) => inventoryModuleImports({
         file, source, target, repositoryRoot: REPOSITORY_ROOT,
