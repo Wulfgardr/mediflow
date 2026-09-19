@@ -604,7 +604,8 @@ export default function Page(){const [active,setActive]=useState(true);return <m
         await expect(page.getByTestId('chatgpt-synthesis-panel')).toContainText('Sblocca la sessione'); assert.equal(f.transport.closed, true);
     }));
     await t.test('unqualified platform stays recognizable; consent cannot start a process', () => scenario('held', async (page, f) => {
-        await expect(page.getByText('Verifiche della postazione incomplete. La prova resta bloccata finché la configurazione non è verificata.', { exact: true })).toBeVisible(); await page.getByRole('checkbox').check();
-        await expect(page.getByRole('button', { name: 'Autorizza prova DEMO' })).toBeDisabled(); assert.equal(f.created(), 0);
+        await expect(page.getByText('Verifiche della postazione incomplete. La prova resta bloccata finché la configurazione non è verificata.', { exact: true })).toBeVisible();
+        await expect(page.getByRole('checkbox')).toHaveCount(0);
+        await expect(page.getByRole('button', { name: 'Autorizza prova DEMO' })).toHaveCount(0); assert.equal(f.created(), 0);
     }, 1280, true));
 });

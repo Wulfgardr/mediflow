@@ -13,7 +13,7 @@ import type { ExecutionCode, ExecutionMethod } from './execution-contract';
 const dataDir = process.env.MEDIFLOW_DATA_DIR;
 assert.ok(dataDir && isAbsolute(dataDir), 'An absolute synthetic MEDIFLOW_DATA_DIR is required');
 mkdirSync(dataDir, { recursive: true });
-const { createStdioExecutionTransport } = await import('./execution-transport.ts');
+const { createStdioExecutionTransport, reportExecutionDiagnostic } = await import('./execution-transport.ts');
 const { ExecutionError } = await import('./execution-contract.ts');
 
 // A standalone Node fake using only stdlib; no shell, clinical data, credential or network.
@@ -145,7 +145,7 @@ test('diagnostics retain fixed categories only and cannot alter RPC failure', as
     const events: unknown[] = [];
     const { transport } = fixture(t, { diagnostic: event => { events.push(event); throw new Error('PRIVATE_PROVIDER_SENTINEL'); } });
     await assert.rejects(transport.request('account/login/start', { mode: 'diagnostic' }), codeIs('upstream_error'));
-    assert.deepEqual(events, [{ method: 'account/login/start', rpcCode: -32603, httpStatus: 503, tls: true, network: true, device: true, experimental: true, permission: true }]);
+    assert.deepEqual(events, [{ event: 'rpc_error', errorCode: 'upstream_error', method: 'account/login/start', rpcCode: -32603, httpStatus: 503, tls: true, network: true, device: true, experimental: true, permission: true }]);
     assert.ok(!JSON.stringify(events).includes('PRIVATE_'));
 });
 
@@ -261,4 +261,38 @@ test('drain observation cannot upgrade a timed-out group to confirmed from late 
     resolveGroup(true); await new Promise(resolve => setImmediate(resolve));
     assert.deepEqual(f.transport.drainObservation?.(), { closing: true, leaderExited: true, ownedGroupCeased: false });
     assert.equal(f.cleanup(), 0);
+});
+
+/* @Codex — same privacy sentinels as the stdio fixtures above. */
+test('diagnostic projection drops raw fields, numeric channels and accessors', () => {
+    const events: unknown[] = []; let accessed = 0;
+    const observe = (event: import('./execution-transport').ExecutionDiagnostic) => { events.push(event); };
+    const input = { event: 'rpc_error', method: 'turn/start', errorCode: 'upstream_error', rpcCode: 123456789,
+        httpStatus: 123456789, tls: 'PRIVATE_PROVIDER_SENTINEL', network: true, device: false, experimental: false, permission: false,
+        message: 'PRIVATE_PROVIDER_SENTINEL', url: 'PRIVATE_PROVIDER_SENTINEL_URL',
+        headers: { authorization: 'PRIVATE_PROVIDER_SENTINEL' }, prompt: 'PRIVATE_PROVIDER_SENTINEL', output: 'PRIVATE_PROVIDER_SENTINEL',
+        reasoning: 'PRIVATE_REASONING_SENTINEL' };
+    Object.defineProperty(input, 'tls', { enumerable: true, get() { accessed++; throw new Error('PRIVATE_PROVIDER_SENTINEL'); } });
+    reportExecutionDiagnostic(observe, input as unknown as import('./execution-transport').ExecutionDiagnostic);
+    assert.equal(accessed, 0);
+    assert.deepEqual(events, [{ event: 'rpc_error', method: 'turn/start', errorCode: 'upstream_error', rpcCode: null,
+        httpStatus: null, tls: false, network: true, device: false, experimental: false, permission: false }]);
+    assert.ok(Object.isFrozen(events[0])); assert.doesNotMatch(JSON.stringify(events), /PRIVATE_|https:|authorization|reasoning/u);
+    const base = events[0] as import('./execution-transport').ExecutionDiagnostic;
+    for (const field of ['method', 'event', 'errorCode'] as const) {
+        reportExecutionDiagnostic(observe, { ...base, [field]: 'PRIVATE_PROVIDER_SENTINEL' });
+    }
+    assert.equal(events.length, 1);
+    reportExecutionDiagnostic(observe, { ...base, rpcCode: -32042 as -32000, httpStatus: 599 });
+    assert.deepEqual(events[1], { ...base, rpcCode: -32000, httpStatus: 599 });
+});
+
+test('transport failure stays distinct and observer rejection does not affect drain', async t => {
+    const events: unknown[] = [];
+    const state = fixture(t, { diagnostic: async event => { events.push(event); throw new Error('PRIVATE_REASONING_SENTINEL'); } });
+    await assert.rejects(state.transport.request('account/read', { mode: 'malformed' }), codeIs('protocol_error'));
+    assert.equal(await state.transport.close(), true); assert.equal(state.cleanupCount(), 1);
+    assert.deepEqual(state.failures, ['protocol_error']);
+    assert.deepEqual(events, [{ event: 'transport_failure', method: 'account/read', errorCode: 'protocol_error', rpcCode: null,
+        httpStatus: null, tls: false, network: false, device: false, experimental: false, permission: false }]);
 });

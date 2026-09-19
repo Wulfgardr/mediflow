@@ -57,3 +57,22 @@ test('cancel keeps the original pending promise and reservation until actual fai
     gate.resolve(); await assert.rejects(work); await cleanup;
     assert.equal(first.preparation!().state, 'closed'); assert.equal(existsSync(join(root, 'mac-preparation.hold')), false);
 });
+
+
+test('host-only diagnostic reaches preparation without changing failed-start cleanup', async t => {
+    const { reportExecutionDiagnostic } = await import('./execution-transport.ts');
+    const root = mkdtempSync(join(tmpdir(), 'mf-mac-diagnostic-')); t.after(() => rmSync(root, { recursive: true, force: true }));
+    const events: unknown[] = []; const diagnostic = (event: unknown) => { events.push(event); throw new Error('PRIVATE_PROVIDER_SENTINEL'); };
+    const failure = new MacQualificationFailure('readback', audit(true), null);
+    const manager = createMacProductPlatformManager({ assets, diagnostic, reservationDirectory: () => root,
+        async prepare(options) {
+            assert.equal(options.diagnostic, diagnostic);
+            reportExecutionDiagnostic(options.diagnostic, { event: 'rpc_error', method: 'initialize', errorCode: 'upstream_error',
+                rpcCode: -32603, httpStatus: 503, tls: true, network: false, device: false, experimental: false, permission: false });
+            throw failure;
+        } });
+    const platform = manager.createPlatform();
+    await assert.rejects(platform.prepare!(new AbortController().signal, 300000), error => error === failure);
+    assert.equal(events.length, 1); assert.doesNotMatch(JSON.stringify(events), /PRIVATE_/u);
+    assert.equal(platform.preparation!().state, 'closed'); assert.equal(existsSync(join(root, 'mac-preparation.hold')), false);
+});

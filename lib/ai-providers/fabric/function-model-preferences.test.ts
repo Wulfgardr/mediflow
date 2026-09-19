@@ -338,3 +338,30 @@ test('HTTP reread checks owner again before publishing the response', async (t) 
     assert.equal(response.status, 401); assert.equal((await response.json()).code, 'session_stale');
     assert.equal(f.writes(), 0);
 });
+
+
+test('activation-only v2 uses the authenticated HTTP owner and reauthentication before CAS/apply', async t => {
+    const session = issueSyntheticWebSession({ id: `synthetic-${randomUUID()}`, username: 'synthetic', role: 'admin' }, randomUUID());
+    t.after(() => retireSyntheticWebSession(session));
+    let sources: FunctionModelSources = { ...fixture(), athenaAvailable: false, athenaLifecycle: { status: 'denied' } };
+    sources = { ...sources, settings: { ...sources.settings, [FUNCTION_SWITCH_KEYS.treatment_reasoning]: 'disabled' } };
+    let writes = 0;
+    const service = createFunctionModelPreferencesService({ readSources: () => sources, immediate: fn => fn(), writeSettings(next) {
+        writes++; sources = { ...sources, settings: { ...sources.settings, ...next } };
+    } });
+    const dto = service.read('v2');
+    const command = { schemaVersion: 'mediflow.function-preferences-command.v2', commandId: randomUUID(), action: 'set_activation',
+        functionId: 'treatment_reasoning', enabled: true, expectedRevision: dto.revision, expectedCatalogRevision: dto.catalogRevision };
+    const request = () => new Request('http://localhost/api/settings/ai/functions', { method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-mediflow-function-preferences': '2' }, body: JSON.stringify(command) });
+    let authCalls = 0;
+    const revoked = createFunctionModelPreferencesHttp({ service, authenticate: async () => ++authCalls === 1 ? session : null });
+    assert.equal((await revoked.POST(request())).status, 401); assert.equal(writes, 0);
+    const allowed = createFunctionModelPreferencesHttp({ service, authenticate: async () => session });
+    assert.equal((await allowed.PREVIEW(request())).status, 200); assert.equal(writes, 0);
+    const reply = await allowed.POST(request()); assert.equal(reply.status, 200); assert.equal(writes, 1);
+    assert.equal((await reply.json()).functions.find((row: { id: string }) => row.id === 'treatment_reasoning').enabled, true);
+    assert.throws(() => resolveFunctionModelDispatch(sources, 'treatment_reasoning'), /provider_unavailable/u);
+    const stale = { ...command, commandId: randomUUID() };
+    assert.equal((await allowed.POST(new Request(request(), { body: JSON.stringify(stale) }))).status, 409); assert.equal(writes, 1);
+});

@@ -3,7 +3,7 @@
 import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { notifyDbChange } from '@/lib/live-query';
 import { useSecurity } from '@/components/security-provider';
-import { createPreferencesClient, names, providerName, type FunctionModelPreferences } from '@/lib/function-models/browser';
+import { createPreferencesClient, names, providerName, type FunctionModelPreferences, type FunctionPreferenceAction } from '@/lib/function-models/browser';
 import { parseAccountBrowserStatus } from '@/lib/chatgpt-account/account-browser';
 import type { AccountStatus } from '@/lib/chatgpt-account/account-contract';
 import { SETTINGS_PRIMARY_BUTTON_CLASS, SETTINGS_SECONDARY_BUTTON_CLASS } from '@/components/settings/settings-ui';
@@ -12,9 +12,11 @@ import { TreatmentReasoningPortableSetup } from '../treatment-reasoning-portable
 type FunctionRow = FunctionModelPreferences['functions'][number];
 function Description({ row }: { row: FunctionRow }) {
     const model = row.options.find(o => o.modelOptionId === row.defaultModelOptionId);
-    return <p>{names[row.id]}: {row.enabled ? 'attivo' : 'spento'} · {model ? `${model.label} · ${providerName(model.provider)}` : 'modello non disponibile'}{row.defaultSource === 'host_configuration' ? ' · modello del computer' : ' · preferenza salvata'}</p>;
+    return <p>{names[row.id]}: {row.enabled ? 'attivo' : 'spento'} · {model ? `${model.label} · ${providerName(model.provider)}` : 'modello locale non disponibile'}{row.defaultSource === 'host_configuration' ? ' · modello del computer' : ' · preferenza salvata'}</p>;
 }
-function PreferenceCard({ row, disabled, account, preview }: { row: FunctionRow; disabled: boolean; account: AccountStatus | null; preview: (enabled: boolean, id: string | null) => void }) {
+function PreferenceCard({ row, disabled, account, activationSupported, preview }: { row: FunctionRow; disabled: boolean; account: AccountStatus | null; activationSupported: boolean; preview: (action: FunctionPreferenceAction) => void }) {
+    const [channel, setChannel] = useState<'local' | 'chatgpt_subscription'>('local');
+    const remote = channel === 'chatgpt_subscription';
     const [enabled, setEnabled] = useState(row.enabled);
     const [model, setModel] = useState<string | null>(row.defaultSource === 'host_configuration' ? null : row.defaultModelOptionId);
     const selected = model === null && row.defaultSource !== 'host_configuration' ? undefined : row.options.find(o => o.modelOptionId === (model ?? row.defaultModelOptionId));
@@ -22,19 +24,29 @@ function PreferenceCard({ row, disabled, account, preview }: { row: FunctionRow;
     const warning = model === null && row.defaultSource !== 'host_configuration' ? 'Il modello del computer sarà indicato nell’anteprima.' : row.bindingState === 'stale' ? 'Scelta salvata scaduta: serve una nuova decisione.' : row.bindingState === 'unsupported' ? 'Predefinito non disponibile.' : selected?.state === 'available_unqualified' ? '' : 'Provider locale non disponibile';
     return <article className={styles.card}>
         <div className={styles.row}><h3>{names[row.id]}</h3><span>{row.enabled ? 'Attivo' : 'Spento'}</span></div>
-        {warning && <p className={styles.hint}>{warning}</p>}
-        <label>Modello predefinito
+        {activationSupported && <label>Canale per questa modifica
+            <select aria-label={`Canale per questa modifica · ${names[row.id]}`} value={channel} disabled={disabled}
+                onChange={e => setChannel(e.target.value === 'chatgpt_subscription' ? 'chatgpt_subscription' : 'local')}>
+                <option value="local">Provider locale · modello predefinito</option>
+                <option value="chatgpt_subscription">OpenAI · abbonamento ChatGPT</option>
+            </select>
+        </label>}
+        {remote && <p className={styles.hint}>Questa modifica riguarda solo l’interruttore condiviso della funzione; non seleziona né ammette un modello locale. La preferenza locale resta invariata. Per ogni proposta scegli OpenAI nella funzione: restano necessari opt-in dell’host, contesto corrente, consenso, accesso dedicato e catalogo del tentativo.</p>}
+        {!remote && warning && <p className={styles.hint}>{warning}</p>}
+        {!remote && <label>Modello locale predefinito
             <select aria-label={`Modello predefinito · ${names[row.id]}`} value={model ?? ''} disabled={disabled} onChange={e => setModel(e.target.value || null)}>
                 <option value="">{computerDefault ? `${computerDefault.label} · ${providerName(computerDefault.provider)} · predefinito` : 'Predefinito del computer'}</option>
                 {row.defaultSource === 'saved_preference' && !row.options.some(o => o.modelOptionId === model) && model && <option value={model} disabled>Preferenza non più disponibile</option>}
                 {row.options.map(o => <option key={o.modelOptionId} value={o.modelOptionId} disabled={enabled && o.state === 'unavailable'}>{o.label} · {providerName(o.provider)}{o.state === 'unavailable' ? ' · non disponibile' : ''}</option>)}
             </select>
-        </label>
-        {row.id === 'treatment_reasoning' && <TreatmentReasoningPortableSetup option={row.options.find(o => o.provider === 'athena_transformers')} />}
-        {!selected && model !== null && <p>Nessun modello selezionabile</p>}
+        </label>}
+        {!remote && row.id === 'treatment_reasoning' && <TreatmentReasoningPortableSetup option={row.options.find(o => o.provider === 'athena_transformers')} />}
+        {!remote && !selected && model !== null && <p>Nessun modello selezionabile</p>}
         <div className={styles.actions}><button type="button" role="switch" aria-checked={enabled} aria-label={`${names[row.id]} nella proposta`} className={`${SETTINGS_SECONDARY_BUTTON_CLASS} ${styles.switch}`} disabled={disabled} onClick={() => setEnabled(!enabled)}>{enabled ? 'Spegni' : 'Attiva'}</button>
-            <button type="button" className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={disabled || (enabled && model !== null && selected?.state !== 'available_unqualified')} onClick={() => preview(enabled, model)}>Anteprima modifica</button></div>
-        <details><summary>Stato e dettagli</summary><Description row={row} /><p className={styles.hint}>La configurazione non prova la disponibilità del modello: viene verificata alla richiesta.</p><p className={styles.hint}>OpenAI · ChatGPT {account?.state === 'connected' ? 'collegato' : account?.state === 'awaiting_login' || account?.state === 'verifying' ? 'accesso in corso' : account?.state === 'starting' ? 'avvio accesso' : account?.state === 'disconnected' ? 'non collegato' : account?.state === 'error' ? 'errore nel collegamento' : 'stato non disponibile'}. Nessuna opzione di esecuzione ChatGPT abilitata.</p></details>
+            <button type="button" className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={disabled} onClick={() => preview(activationSupported && (remote || !enabled)
+                ? { action: 'set_activation', functionId: row.id, enabled }
+                : { action: 'set', functionId: row.id, enabled, defaultModelOptionId: model })}>Anteprima modifica</button></div>
+        <details><summary>Stato e dettagli</summary><Description row={row} /><p className={styles.hint}>La configurazione non prova la disponibilità del modello: viene verificata alla richiesta.</p><p className={styles.hint}>OpenAI · ChatGPT {account?.state === 'connected' ? 'collegato' : account?.state === 'awaiting_login' || account?.state === 'verifying' ? 'accesso in corso' : account?.state === 'starting' ? 'avvio accesso' : account?.state === 'disconnected' ? 'non collegato' : account?.state === 'error' ? 'errore nel collegamento' : 'stato non disponibile'}. Il collegamento account non abilita la funzione, non concede consenso e non prova la disponibilità del modello.</p></details>
     </article>;
 }
 export function FunctionPreferencesContent({ active, onRead, session }: { active: boolean; session?: unknown; onRead?: (dto: FunctionModelPreferences) => void }) {
@@ -85,11 +97,11 @@ export function FunctionPreferencesContent({ active, onRead, session }: { active
             {active && view.saved && <p role="status">Impostazioni salvate e rilette. Nessuna modifica clinica.</p>}
         </div>
         {active && view.proposed && <div ref={proposalRef} tabIndex={-1} className={styles.card} role="region" aria-label="Anteprima impostazioni">
-            <h3>Anteprima · non ancora applicata</h3>
+            <h3>Anteprima · non ancora applicata</h3><p className={styles.hint}>Interruttori condivisi e preferenze locali. L’attivazione non autorizza invii OpenAI né ammette provider locali.</p>
             {view.proposed.functions.map(row => <Description key={row.id} row={row} />)}
             <div className={styles.actions}><button type="button" className={SETTINGS_PRIMARY_BUTTON_CLASS} disabled={view.busy} onClick={() => void client.apply()}>Applica alle impostazioni</button><button type="button" className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={view.busy} onClick={client.cancel}>Annulla proposta</button></div>
         </div>}
-        {active && view.dto && <div className={styles.grid}>{view.dto.functions.map(row => <PreferenceCard key={`${view.dto!.revision}:${view.dto!.catalogRevision}:${row.id}`} row={row} account={account} disabled={view.busy || !!view.proposed} preview={(enabled, defaultModelOptionId) => void client.preview({ action: 'set', functionId: row.id, enabled, defaultModelOptionId })} />)}</div>}
+        {active && view.dto && <div className={styles.grid}>{view.dto.functions.map(row => <PreferenceCard key={`${view.dto!.revision}:${view.dto!.catalogRevision}:${row.id}`} row={row} account={account} activationSupported={view.dto!.schemaVersion === 'mediflow.function-preferences.v2'} disabled={view.busy || !!view.proposed} preview={action => void client.preview(action)} />)}</div>}
     </section>;
 }
 export function FunctionPreferencesPanel({ onRead }: { onRead?: (dto: FunctionModelPreferences) => void }) {

@@ -3,10 +3,11 @@ import type { FunctionModelPreferences, FunctionModelCommand, FunctionModelId, F
 export type { FunctionModelPreferences, FunctionModelCommand, FunctionModelId, FunctionModelChoice, FunctionModelOption, FunctionPreferenceRow, LegacyFunctionModelOption };
 export const names: Record<FunctionModelId, string> = { patient_insight: 'Quadro paziente', smart_import: 'Importazione assistita', document_synthesis: 'Sintesi dei documenti', treatment_reasoning: 'Ragionamento terapeutico' };
 export const providerName = (provider: string) => provider === 'ollama' ? 'Ollama · locale' : provider === 'athena_mlx' ? 'ATHENA MLX · locale' : provider === 'athena_transformers' ? 'ATHENA Transformers · CPU locale' : 'Provider non supportato';
-export class ModelUiError extends Error { constructor(readonly code: 'unavailable' | 'invalid' | 'conflict' | 'stale' | 'locked') { super(code); } }
+export class ModelUiError extends Error { constructor(readonly code: 'unavailable' | 'provider_unavailable' | 'invalid' | 'conflict' | 'stale' | 'locked') { super(code); } }
 export const errorText = (error: unknown) => error instanceof ModelUiError && error.code === 'conflict'
     ? 'Le impostazioni sono cambiate. Rileggi e decidi di nuovo; nulla viene ritentato automaticamente.'
     : error instanceof ModelUiError && error.code === 'stale' ? 'La scelta del modello non è più attuale. Rileggi e scegli di nuovo: nessun modello alternativo viene usato.'
+    : error instanceof ModelUiError && error.code === 'provider_unavailable' ? 'provider_unavailable: il provider locale selezionato non è disponibile. Nessuna modifica e nessun fallback. Scegli esplicitamente OpenAI oppure rendi disponibile il provider locale.'
     : error instanceof ModelUiError && error.code === 'locked' ? 'Sessione non disponibile. Sblocca MediFlow e rileggi.'
     : 'Impossibile confermare le impostazioni. Rileggi prima di continuare.';
 const record = (x: unknown): Record<string, unknown> => { if (!x || typeof x !== 'object' || Array.isArray(x) || Object.getPrototypeOf(x) !== Object.prototype || Reflect.ownKeys(x).some(key => typeof key !== 'string' || !Object.getOwnPropertyDescriptor(x, key)?.enumerable || !('value' in Object.getOwnPropertyDescriptor(x, key)!))) throw new ModelUiError('invalid'); return x as Record<string, unknown>; };
@@ -64,7 +65,14 @@ export async function api(request: typeof fetch, signal: AbortSignal, command?: 
             ...(command ? { 'Content-Type': 'application/json' } : {}) },
         ...(command ? { body: JSON.stringify(command) } : {}) });
     if (signal.aborted) throw new ModelUiError('stale');
-    if (!response.ok) throw new ModelUiError(response.status === 409 ? 'conflict' : response.status === 401 ? 'locked' : 'unavailable');
+    if (!response.ok) {
+        if (response.status === 401) throw new ModelUiError('locked');
+        // Consume only the fixed code; never display arbitrary server error prose.
+        const error: unknown = await response.json().catch(() => null);
+        if (signal.aborted) throw new ModelUiError('stale');
+        if (error && typeof error === 'object' && Object.getOwnPropertyDescriptor(error, 'code')?.value === 'provider_unavailable') throw new ModelUiError('provider_unavailable');
+        throw new ModelUiError(response.status === 409 ? 'conflict' : 'unavailable');
+    }
     const value: unknown = await response.json(); if (signal.aborted) throw new ModelUiError('stale'); return value;
 }
 export function parsePreview(value: unknown, command: FunctionModelCommand): FunctionModelPreferences {
@@ -74,6 +82,28 @@ export function parsePreview(value: unknown, command: FunctionModelCommand): Fun
     const proposed = parsePreferences(row.proposed);
     if (proposed.schemaVersion !== (command.schemaVersion === 'mediflow.function-preferences-command.v2' ? 'mediflow.function-preferences.v2' : 'mediflow.function-preferences.v1')) throw new ModelUiError('invalid');
     return proposed;
+}
+export type FunctionPreferenceAction =
+    | Omit<Extract<FunctionModelCommand, { action: 'set' }>, 'schemaVersion' | 'commandId' | 'expectedRevision' | 'expectedCatalogRevision'>
+    | Omit<Extract<FunctionModelCommand, { action: 'set_activation' }>, 'schemaVersion' | 'commandId' | 'expectedRevision' | 'expectedCatalogRevision'>
+    | { action: 'preset'; presetId: 'host_defaults' | 'all_off' };
+/** A local preview is not permission to probe an unavailable provider. */
+function guardLocalPreview(dto: FunctionModelPreferences, action: FunctionPreferenceAction): void {
+    if (action.action === 'set_activation') {
+        if (dto.schemaVersion !== 'mediflow.function-preferences.v2') throw new ModelUiError('invalid');
+        return;
+    }
+    if (action.action === 'preset' && action.presetId === 'all_off') return;
+    const rows = action.action === 'set' ? dto.functions.filter(row => row.id === action.functionId) : dto.functions;
+    for (const row of rows) {
+        if (!(action.action === 'set' ? action.enabled : row.enabled)) continue;
+        const id = action.action === 'set' ? action.defaultModelOptionId : null;
+        // A saved preference does not disclose the host default. Only the
+        // server's metadata-only preview may resolve it; never guess a binding.
+        if (id === null && row.defaultSource !== 'host_configuration') continue;
+        const selected = row.options.find(option => option.modelOptionId === (id ?? row.defaultModelOptionId));
+        if (!selected || selected.state !== 'available_unqualified') throw new ModelUiError('provider_unavailable');
+    }
 }
 export type PreferenceView = Readonly<{ dto: FunctionModelPreferences | null; proposed: FunctionModelPreferences | null; busy: boolean; error: string | null; saved: boolean }>;
 export function createPreferencesClient(request: typeof fetch = globalThis.fetch) {
@@ -85,13 +115,15 @@ export function createPreferencesClient(request: typeof fetch = globalThis.fetch
         transport?.abort(); const token = ++generation; const controller = new AbortController(); transport = controller;
         const timeout = setTimeout(() => controller.abort(), 15000); emit({ busy: true, error: null, saved: false });
         try { const next = await work(controller.signal); if (token === generation && !controller.signal.aborted) emit(next); }
-        catch (error) { if (token === generation) { pending = null; emit({ dto: null, proposed: null, error: errorText(error) }); } }
+        catch (error) { if (token === generation) { pending = null; emit({ ...(error instanceof ModelUiError && error.code === 'provider_unavailable' ? {} : { dto: null }), proposed: null, error: errorText(error) }); } }
         finally { clearTimeout(timeout); if (token === generation) { transport = null; emit({ busy: false }); } }
     };
     return { getSnapshot: () => view, subscribe: (fn: () => void) => { listeners.add(fn); return () => { listeners.delete(fn); }; }, reset,
         read: () => { pending = null; return execute(async signal => ({ dto: parsePreferences(await api(request, signal)), proposed: null })); },
-        preview: (action: Omit<Extract<FunctionModelCommand, { action: 'set' }>, 'schemaVersion' | 'commandId' | 'expectedRevision' | 'expectedCatalogRevision'> | { action: 'preset'; presetId: 'host_defaults' | 'all_off' }) => {
+        preview: (action: FunctionPreferenceAction) => {
             const dto = view.dto; if (!dto || view.busy) return Promise.resolve();
+            try { guardLocalPreview(dto, action); }
+            catch (error) { pending = null; emit({ proposed: null, saved: false, error: errorText(error) }); return Promise.resolve(); }
             const command: FunctionModelCommand = { schemaVersion: dto.schemaVersion === 'mediflow.function-preferences.v2' ? 'mediflow.function-preferences-command.v2' : 'mediflow.function-preferences-command.v1', commandId: crypto.randomUUID(), expectedRevision: dto.revision, expectedCatalogRevision: dto.catalogRevision, ...action };
             pending = null; return execute(async signal => { const proposed = parsePreview(await api(request, signal, command, true), command); if (!signal.aborted) pending = command; return { proposed }; });
         },

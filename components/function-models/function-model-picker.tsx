@@ -77,7 +77,7 @@ function OrdinaryFunctionControls({ client, view }: { client: ReturnType<typeof 
         </>}
         {phase === 'needs_consent' && view.disclosure && <>
             <p>Contesto preparato e redatto: {view.disclosure.payloadBytes} byte. Questa proposta non modifica la cartella.</p>
-            <details><summary>Verifica contenuto preparato</summary><code style={{ overflowWrap: 'anywhere' }}>{view.disclosure.payloadSha256}</code></details>
+            <details><summary>Identità del contesto preparato</summary><code style={{ overflowWrap: 'anywhere' }}>{view.disclosure.payloadSha256}</code></details>
             <button type="button" disabled={view.loading} onClick={() => void client.remote.action('consent')}>Consenti per questo contesto</button>
         </>}
         {phase === 'consented' && <button type="button" disabled={view.loading} onClick={() => void client.remote.action('login/start')}>Avvia accesso dedicato ChatGPT</button>}
