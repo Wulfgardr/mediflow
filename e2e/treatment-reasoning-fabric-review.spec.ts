@@ -5,11 +5,27 @@ import {
   snapshotTreatmentReasoningProjectionAttachment,
   type TreatmentReasoningProjectionAttachment,
 } from '../lib/ai-providers/fabric/treatment-reasoning-projection';
+import type { FunctionModelPreferences } from '../lib/function-models/browser';
 import { bootstrapUnlockedSession, openPatientSection, setAiLaneKillSwitch } from './utils';
 
 const HANDLE = `trp_${'a'.repeat(32)}`;
 const RECEIPT_REF = 'receipt_synthetic_01';
 const PROVENANCE_REF = 'provenance_synthetic_01';
+const AMBULATORY_A = { id: 'ambulatory.synthetic.01', name: 'Ambulatorio sintetico A', address: 'Via sintetica 1', version: 3 };
+const AMBULATORY_B = { id: 'ambulatory.synthetic.02', name: 'Ambulatorio sintetico B', address: 'Via sintetica 2', version: 5 };
+const MODEL_OPTION_ID = `model_option_${'7'.repeat(32)}`;
+const FIXTURE_CATALOG = {
+  schemaVersion: 'mediflow.function-preferences.v1', revision: `sha256_${'8'.repeat(64)}`,
+  catalogRevision: `sha256_${'9'.repeat(64)}`, check: 'configuration_only', apply: 'denied',
+  presets: ['host_defaults', 'all_off'],
+  functions: (['patient_insight', 'smart_import', 'document_synthesis', 'treatment_reasoning'] as const).map((id) => ({
+    id, enabled: id === 'treatment_reasoning', defaultModelOptionId: id === 'treatment_reasoning' ? MODEL_OPTION_ID : null,
+    defaultSource: 'host_configuration', bindingState: 'current',
+    options: id === 'treatment_reasoning'
+      ? [{ modelOptionId: MODEL_OPTION_ID, label: 'ATHENA / MLX fixture', provider: 'athena_mlx' as const, state: 'available_unqualified' as const }]
+      : [],
+  })),
+} satisfies FunctionModelPreferences;
 
 type Projection = TreatmentReasoningProjectionAttachment;
 
@@ -175,19 +191,27 @@ test('Treatment Reasoning UI invia payload strict e mostra una proposta source-b
   const postGestureMutations: string[] = [];
   let projection: Projection | null = null;
   let generationStarted = false;
+  let catalogReads = 0;
 
   page.on('request', (request) => {
-    if (!generationStarted || !['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method())) return;
     const pathname = new URL(request.url()).pathname;
+    if (generationStarted && request.method() === 'GET' && (/^\/api\/patients\/[^/]+$/u.test(pathname) || pathname === '/api/ambulatories')) {
+      calls.push(`GET:${pathname}`);
+    }
+    if (!generationStarted || !['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method())) return;
     postGestureMutations.push(`${request.method()} ${pathname}`);
   });
 
-  await page.route('**/api/context', async (route) => {
-    calls.push(`${route.request().method()}:/api/context`);
+  await page.route('**/api/settings/ai/functions', async (route) => {
+    expect(route.request().method()).toBe('GET'); catalogReads += 1;
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(FIXTURE_CATALOG) });
+  });
+
+  await page.route('**/api/ambulatories', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ ambulatoryId: 'ambulatory.synthetic.01' }),
+      body: JSON.stringify([AMBULATORY_A, AMBULATORY_B]),
     });
   });
   await page.route('**/api/ai/smart-import/selection', async (route) => {
@@ -259,6 +283,34 @@ test('Treatment Reasoning UI invia payload strict e mostra una proposta source-b
   generationStarted = true;
   await generate.click();
 
+  const ambulatory = panel.getByLabel('Ambulatorio per questa bozza');
+  const confirmation = panel.getByRole('checkbox');
+  const confirmGeneration = panel.getByRole('button', { name: 'Conferma e genera bozza' });
+  await expect(ambulatory).toHaveValue('');
+  await expect(confirmation).not.toBeChecked();
+  await expect(confirmation).toBeDisabled();
+  await expect(confirmGeneration).toBeDisabled();
+  expect(postGestureMutations).toEqual([]);
+
+  await ambulatory.selectOption(AMBULATORY_A.id);
+  await confirmation.check();
+  await ambulatory.selectOption(AMBULATORY_B.id);
+  await expect(confirmation).not.toBeChecked();
+  await expect(confirmGeneration).toBeDisabled();
+  expect(postGestureMutations).toEqual([]);
+
+  await panel.getByRole('button', { name: 'Annulla' }).click();
+  await expect(ambulatory).toHaveCount(0);
+  expect(postGestureMutations).toEqual([]);
+
+  await generate.click();
+  const nextAmbulatory = panel.getByLabel('Ambulatorio per questa bozza');
+  const nextConfirmation = panel.getByRole('checkbox');
+  await expect(nextAmbulatory).toHaveValue('');
+  await nextAmbulatory.selectOption(AMBULATORY_B.id);
+  await nextConfirmation.check();
+  await panel.getByRole('button', { name: 'Conferma e genera bozza' }).click();
+
   await expect(panel).toContainText('Anteprima da rivedere');
   await expect(panel).toContainText('Rivedere la terapia sintetica prima di ogni decisione clinica.');
   await expect(panel).toContainText('non è una prescrizione, esegue 0 scritture e non applica modifiche');
@@ -283,7 +335,12 @@ test('Treatment Reasoning UI invia payload strict e mostra una proposta source-b
   await expect(panel).toContainText(publishedProjection.sourceRevision);
 
   expect(calls).toEqual([
-    'GET:/api/context',
+    `GET:/api/patients/${fixture.patientId}`,
+    'GET:/api/ambulatories',
+    `GET:/api/patients/${fixture.patientId}`,
+    'GET:/api/ambulatories',
+    `GET:/api/patients/${fixture.patientId}`,
+    'GET:/api/ambulatories',
     'GET:/api/ai/smart-import/selection',
     'POST:/api/ai/smart-import/selection',
     'POST:/api/ai/treatment-reasoning/ingest',
@@ -292,7 +349,7 @@ test('Treatment Reasoning UI invia payload strict e mostra una proposta source-b
   expect(bodies.selection).toEqual({
     expectedEpoch: 0,
     patientId: fixture.patientId,
-    ambulatoryId: 'ambulatory.synthetic.01',
+    ambulatoryId: AMBULATORY_B.id,
   });
   expect(Object.keys(bodies.ingest as object)).toEqual(['projection', 'requestId']);
   expect(bodies.preview).toEqual({
@@ -300,6 +357,7 @@ test('Treatment Reasoning UI invia payload strict e mostra una proposta source-b
     requestId: expect.stringMatching(/^req_[0-9a-f]{32}$/u),
   });
   expect((bodies.ingest as { projection: Projection }).projection.therapyRefs).toContain(`therapy:${fixture.therapyId}`);
+  expect(catalogReads).toBeGreaterThanOrEqual(1);
 
   const callerKeys = collectKeys([bodies.selection, bodies.ingest, bodies.preview]);
   for (const forbidden of ['provider', 'model', 'endpoint', 'venue', 'prompt', 'fallback', 'egress', 'apply']) {
