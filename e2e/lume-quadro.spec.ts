@@ -185,6 +185,15 @@ for (const quadroCase of QUADRO_CASES) {
     await quadro.getByRole('link', { name: 'Gestisci', exact: true }).click();
     await expect(page.locator('#terapie')).toHaveAttribute('data-folder-active', 'true');
     await expect(page.locator('#terapie')).toContainText('Ramipril sintetico');
+    if (quadroCase.width === 320) {
+      const sectionNavigation = page.getByRole('navigation', { name: 'Sezioni della vista', exact: true });
+      const moreSections = sectionNavigation.locator('summary');
+      await moreSections.focus();
+      await page.keyboard.press('Enter');
+      await expect(sectionNavigation.locator('a[href="#follow-up"]')).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(moreSections).toBeFocused();
+    }
     await openPatientSection(page, 'parametri');
     await expect(page.locator('#parametri')).toContainText('160');
     await openPatientSection(page, 'follow-up');

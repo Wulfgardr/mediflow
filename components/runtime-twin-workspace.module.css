@@ -49,4 +49,16 @@
 .workspace[data-active='false'], .workspace[data-active='false'] .workarea, .workspace[data-active='false'] .page { display: contents; }
 .workspace[data-active='false'] .rail, .workspace[data-active='false'] .workspaceBar { display: none; }
 .navigation a[aria-current], .railBottom a[aria-current] { background: var(--lume-surface-field); color: var(--lume-ink); font-weight: 550; }
-@media (max-width: 700px) { .sectionMenu { position: fixed; left: 14px; right: 14px; top: auto; width: auto; max-width: none; } }
+@media (max-width: 700px) {
+  .sectionMenu {
+    position: fixed;
+    left: 14px;
+    right: 14px;
+    top: auto;
+    bottom: max(12px, env(safe-area-inset-bottom));
+    width: auto;
+    max-width: none;
+    max-height: min(65dvh, calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 24px));
+    overflow: auto;
+  }
+}
