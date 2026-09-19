@@ -18,7 +18,7 @@ Informazioni, fonti e prossimi passi. Un po’ più facili da ritrovare.
 [![Release pubblica](https://img.shields.io/github/v/release/Wulfgardr/mediflow?label=release&style=flat)](https://github.com/Wulfgardr/mediflow/releases/latest)
 [![Licenza](https://img.shields.io/badge/license-MIT-2ea043?style=flat)](./LICENSE)
 [![Local-first](https://img.shields.io/badge/data-local--first-8957e5?style=flat)](#dove-stanno-i-dati)
-[![Swift core](https://img.shields.io/badge/Swift%20core-macOS%20%7C%20Linux%20%7C%20Windows-6e7681?style=flat)](./docs/NATIVE.md)
+[![Candidata 0.8.6](https://img.shields.io/badge/candidata-macOS%20%7C%20localhost-6e7681?style=flat)](./docs/analysis/2026-09-07-086-release-verification.md)
 
 [**Scopri Get MediFlow**](https://getmediflow.dev) · [Perché nasce](#perché-nasce) · [Cosa puoi fare](#cosa-puoi-fare) · [Provalo](#provalo) · [Per chi sviluppa](#per-chi-sviluppa) · [Documentazione](#documentazione)
 
@@ -31,15 +31,13 @@ Informazioni, fonti e prossimi passi. Un po’ più facili da ritrovare.
 <details>
 <summary><strong>Versione sorgente, verifiche e distribuzione</strong></summary>
 
-> **0.8.6: navigazione rinnovata e correzioni guidate dalla review di sicurezza.**
-> Gli addenda indipendenti chiudono il difetto PIN e il finding LOW sugli allegati
-> nel perimetro revisionato. La [PR 351](https://github.com/Wulfgardr/mediflow/pull/351)
-> è aperta; la release 0.8.6 non è ancora pubblicata. CI e qualificazione delle
-> nuove capacità restano necessarie prima della distribuzione.
-> La UI segue [ADR 0123](./docs/adr/0123-official-web-ui-navigation-compositions.md):
-> B predefinita e A alternativa. Le immagini 0.8.6 usano soltanto dati sintetici.
-> La verifica UI iPhone–Mac/Home Base resta differita al post-release;
-> non è attestata una validazione completa multipiattaforma.
+> **0.8.6: candidata locale per Mac e browser localhost.**
+> Backend, Intelligence Fabric e Headless operano sul Mac locale. L’adapter
+> OpenAI è spento per default; se autorizzato, invia il contenuto preparato al
+> servizio esterno. Le immagini usano soltanto
+> dati sintetici. Windows, Linux, Mini, iPhone e iPad sono rinviati alla 1.0;
+> ATHENA è opzionale. Una candidata, una build o una prova locale non equivalgono
+> a release pubblicata, validazione clinica o disponibilità su altri sistemi.
 > [Verifiche e limiti](./docs/analysis/2026-09-07-086-release-verification.md).
 
 </details>
@@ -114,11 +112,11 @@ limiti. La risposta del modello è una proposta da esaminare.
 - **Document Synthesis**: mettere in relazione il contenuto dei documenti.
 - **Treatment Reasoning**: supportare il riesame professionale con un percorso dedicato.
 
-Ollama può servire i primi tre percorsi; ATHENA/MLX è separata e destinata a
-Treatment Reasoning. Entrambi richiedono configurazione e verifica locali.
-Gli adapter OpenAI e Anthropic sono limitati a **prove controllate e spenti per default**. Non esiste un
-ripiego silenzioso sul cloud. La presenza dell'adapter non prova la disponibilità
-di un account, del servizio o di un uso con dati clinici reali.
+Ollama può servire i primi tre percorsi. ATHENA/MLX resta opzionale per
+Treatment Reasoning e richiede configurazione e verifica locali. L’adapter
+OpenAI è disponibile solo in prove controllate e spento per default: non esiste
+un ripiego silenzioso sul cloud. La sua presenza non prova la disponibilità di
+un account, del servizio o di un uso con dati clinici reali.
 
 <details>
 <summary><strong>Perché una proposta non è ancora una modifica</strong></summary>
@@ -161,21 +159,20 @@ la conformità; la presenza di supervisione umana non è una certificazione.
 
 ## Dove stanno i dati
 
-Il Mac home base è il riferimento autorevole del prodotto Apple: conserva
-SQLite e ospita servizi e API. Browser locale e app Mac offrono le interfacce.
-iPhone e iPad sono client paired in sviluppo, collegati esplicitamente al nodo.
+Il Mac è il nodo autorevole della candidata 0.8.6: conserva SQLite e ospita
+servizi e API. Browser localhost e app Mac sono le interfacce nel perimetro
+attuale. iPhone, iPad e gli altri sistemi restano rinviati alla 1.0.
 
 ```mermaid
 flowchart LR
     web[Browser locale] --> host[Host MediFlow: servizi e API]
     mac[App Mac] --> host
-    paired[iPhone e iPad: pairing esplicito] --> host
     host --> db[(SQLite locale)]
     mcp[MCP: capacità delimitate] --> broker[AIP e policy host]
     broker --> host
 ```
 
-I client paired e gli adapter non aprono direttamente SQLite. La cifratura
+Gli adapter non aprono direttamente SQLite. La cifratura
 protegge campi clinici sensibili secondo il contratto documentato; non è un
 claim di cifratura integrale di ogni metadato o del file database.
 
@@ -200,12 +197,10 @@ il tuo gestore. `better-sqlite3` deve corrispondere all'ABI del Node attivo.
 | Ambiente Web locale | Avvio |
 | --- | --- |
 | macOS | `./Start_MediFlow.command` |
-| Windows | `powershell -ExecutionPolicy Bypass -File .\Start-MediFlow.ps1` |
-| Linux | `./scripts/start-mediflow.sh` |
 
 Apri `http://localhost:3000`. Il launcher verifica checkout e porta per evitare
-di aprire un'altra istanza. La portabilità del workspace Web e del core Swift
-non equivale a parità delle applicazioni Apple su ogni sistema.
+di aprire un'altra istanza. Windows e Linux, Mini, iPhone e iPad non fanno parte
+della candidata 0.8.6: sono rinviati alla 1.0.
 
 I provider AI, il servizio WHO e gli altri connettori opzionali non si
 attivano con questi comandi. La clone segue il ramo predefinito pubblico:
@@ -221,7 +216,7 @@ del Personal Team. Developer ID e notarizzazione Mac richiedono l'Apple
 Developer Program. Non sono prerequisiti per pubblicare il codice sorgente.
 
 [Guida nativa](./docs/NATIVE.md) ·
-[Canali e verifiche 0.8.5](./docs/release-085-readiness.md) ·
+[Verifiche e limiti della candidata 0.8.6](./docs/analysis/2026-09-07-086-release-verification.md) ·
 [Confronto ufficiale Apple](https://developer.apple.com/support/compare-memberships/)
 
 </details>
@@ -244,18 +239,16 @@ npm run build -- --webpack
 npm run mcp:intelligent-host:production
 ```
 
-Il Supervisor mantiene il runtime Web e MCP come processi figli separati.
-MCP usa stdio. Per una capacità riferita al paziente servono autenticazione,
-selezione e attivazione esplicita nell'interfaccia fidata. Revoca, logout,
-cambio di selezione o scadenza chiudono il grant.
+Nella candidata 0.8.6 il Supervisor mantiene il runtime Web e MCP come
+processi figli separati sul Mac. MCP usa stdio. Per una capacità riferita al
+paziente servono autenticazione, selezione e attivazione esplicita
+nell'interfaccia fidata. Revoca, logout, cambio di selezione o scadenza chiudono
+il grant.
 
-Nella lane 0.8.6 WUL-696, `npm run mini:production` avvia Web e Mini con
-una sessione NDJSON con i comandi governati già presenti nella CLI
-(stato, catalogo, letture, proposta follow-up e piano semantico read-only). Prima dell’attivazione
-Web indica sessione non sbloccata; senza parent AIP fallisce chiuso.
-[Contratto Mini e limiti delle prove](./docs/design/2026-08-21-mini-headless-agent-cli.md).
-Questi comandi non concedono accesso generale al database né autorizzano
-scritture cliniche. Il planner semantico resta limitato a strumenti approvati.
+Headless non concede accesso generale al database né autorizza scritture
+cliniche fuori dai controlli applicabili. Mini non fa parte della candidata
+0.8.6 ed è rinviato alla 1.0. Il planner semantico resta limitato a strumenti
+approvati.
 
 </details>
 
@@ -264,7 +257,7 @@ scritture cliniche. Il planner semantico resta limitato a strumenti approvati.
 | Se vuoi… | Parti da… |
 | --- | --- |
 | Capire il progetto senza conoscere il codice | [Get MediFlow](https://getmediflow.dev) |
-| Vedere cosa è implementato e cosa resta da provare | [Stato del sistema](./docs/STATE_OF_THE_SYSTEM.md) e [readiness 0.8.5](./docs/release-085-readiness.md) |
+| Vedere cosa è implementato e cosa resta da provare | [Stato del sistema](./docs/STATE_OF_THE_SYSTEM.md) e [verifiche della candidata 0.8.6](./docs/analysis/2026-09-07-086-release-verification.md) |
 | Trovare la fonte autorevole di un tema | [Mappa della documentazione](./docs/README.md) |
 | Capire piattaforme e parità | [Guida nativa](./docs/NATIVE.md) e [matrice di parità](./docs/parity-matrix.md) |
 | Ricostruire una decisione tecnica | [ADR](./docs/adr/README.md) |
