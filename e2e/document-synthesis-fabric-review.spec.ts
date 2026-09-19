@@ -115,6 +115,22 @@ function previewResponse() {
   };
 }
 
+function localModelPreferencesResponse() {
+  const revision = `sha256_${'a'.repeat(64)}`;
+  const optionId = `model_option_${'b'.repeat(32)}`;
+  return {
+    schemaVersion: 'mediflow.function-preferences.v2', revision, catalogRevision: revision,
+    check: 'configuration_only', presets: ['host_defaults', 'all_off'], apply: 'denied',
+    functions: [
+      { id: 'patient_insight', enabled: false, defaultModelOptionId: null, defaultSource: 'host_configuration', bindingState: 'current', options: [] },
+      { id: 'smart_import', enabled: false, defaultModelOptionId: null, defaultSource: 'host_configuration', bindingState: 'current', options: [] },
+      { id: 'document_synthesis', enabled: true, defaultModelOptionId: optionId, defaultSource: 'host_configuration', bindingState: 'current',
+        options: [{ modelOptionId: optionId, label: 'MediFlow sintetico', provider: 'ollama', state: 'available_unqualified' }] },
+      { id: 'treatment_reasoning', enabled: false, defaultModelOptionId: null, defaultSource: 'host_configuration', bindingState: 'current', options: [] },
+    ],
+  };
+}
+
 async function createFixture(page: Page): Promise<{ patientId: string; attachmentId: string; attachmentName: string; attachmentBytes: Buffer }> {
   const suffix = `${Date.now()}`.slice(-8);
   const fixture = await page.evaluate(async (marker) => {
@@ -176,7 +192,7 @@ async function bootstrapFabricSession(page: Page, pin: string): Promise<void> {
 
 test.describe.configure({ retries: 0 });
 
-test('Document Synthesis Fabric mostra una sola proposta con receipt, provenienza e citazioni', async ({ page }) => {
+test('Document Synthesis Fabric mostra una proposta con verifica, provenienza e citazioni', async ({ page }) => {
   const calls = { capture: 0, extraction: 0, ingest: 0, preview: 0, legacy: 0 };
   const bodies: { capture?: unknown; ingest?: unknown; preview?: unknown } = {};
   let attachmentId = '';
@@ -194,6 +210,9 @@ test('Document Synthesis Fabric mostra una sola proposta con receipt, provenienz
     calls.capture += 1;
     bodies.capture = route.request().postDataJSON();
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ captureHandle: CAPTURE_HANDLE }) });
+  });
+  await page.route('**/api/settings/ai/functions', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(localModelPreferencesResponse()) });
   });
   await page.route('**/api/attachments/*/local-extraction', async (route) => {
     calls.extraction += 1;
@@ -222,17 +241,21 @@ test('Document Synthesis Fabric mostra una sola proposta con receipt, provenienz
   const fixture = await createFixture(page);
   attachmentId = fixture.attachmentId;
   await openDocumentArchive(page, fixture.patientId);
+  await page.getByRole('button', { name: `Prepara sintesi di ${fixture.attachmentName}` }).click();
 
   const card = page.getByTestId(`document-synthesis-fabric-review-${attachmentId}`);
   await expect(card).toContainText('Sintesi da rivedere');
   previewStarted = true;
   await card.getByRole('button', { name: 'Genera proposta' }).click();
+  await card.getByLabel('Ambulatorio per questa proposta').selectOption({ index: 1 });
+  await card.getByRole('checkbox').check();
+  await card.getByRole('button', { name: 'Conferma e genera proposta' }).click();
 
-  await expect(card).toContainText('0 scritture · applicazione non consentita');
   await expect(card).toContainText('Sintesi Fabric sintetica, proposta per sola revisione.');
-  await expect(card).toContainText('Receipt');
+  await card.getByText('Dettagli di verifica').click();
+  await expect(card).toContainText('0 scritture · applicazione non consentita');
   await expect(card).toContainText('Provenienza');
-  await expect(card).toContainText('Citazioni');
+  await card.getByText(/Citazioni dal documento/u).click();
   await expect(card).toContainText(QUOTE);
   expect(calls).toEqual({ capture: 1, extraction: 0, ingest: 1, preview: 1, legacy: 0 });
   expect(bodies).toEqual({
