@@ -64,6 +64,20 @@ final class NativeOrdinaryModelTests: XCTestCase {
         confirmed = true; model.verifyClosure(); await settle(model); XCTAssertEqual(model.phase, .idle)
         model.prepare(); await settle(model); XCTAssertEqual(prepares, 2); model.cancel(); await settle(model)
     }
+    func testPrepareFailureKeepsBoundedReasonAfterConfirmedCleanup() async throws {
+        let model = NativeOrdinaryModel(function: .patientInsight, snapshot: { self.source() }, services: .init(
+            prepare: { _, _ in throw HomeBaseClientError.httpStatus(503, "untrusted host payload") },
+            command: { _, _ in throw NativeOrdinaryContractError.invalid },
+            status: { _ in
+                var closed = F.response(.patientInsight, "closed")
+                closed.removeValue(forKey: "attemptId")
+                return try F.decode(NativeOrdinaryResponse.self, closed)
+            }))
+        model.prepare(); await settle(model)
+        XCTAssertEqual(model.phase, .idle)
+        XCTAssertEqual(model.message, "Preparazione non completata (HTTP 503): servizio non disponibile o risposta non verificata. Operazione chiusa; nessuna modifica alla cartella.")
+        XCTAssertFalse(model.message.contains("untrusted host payload"))
+    }
     func testPendingLoginKeepsTheOriginalAttemptWithoutClosingOrRestarting() async throws {
         var completed = false, cancellations = 0
         let model = NativeOrdinaryModel(function: .patientInsight, snapshot: { self.source() }, services: .init(
