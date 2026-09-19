@@ -766,6 +766,11 @@
   .recordContent { grid-template-columns: minmax(0, 1fr); gap: 4px; }
   .recordIdentity { gap: 2px; }
   .recordIdentity strong { font-size: 16px; line-height: 1.3; }
+  /* @Codex: a closed mobile row keeps its secondary identity on one readable
+     line. Its complete text stays in the accessible name; selected rows retain
+     the expanded clinical context. */
+  :global(html[data-runtime-twin-design='proposal']) .patientRow:not([aria-selected='true']) .recordIdentity { min-width: 0; }
+  :global(html[data-runtime-twin-design='proposal']) .patientRow:not([aria-selected='true']) .recordIdentity > span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .recordDiagnosis { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .recordDiagnosis small { margin-left: 6px; }
   :global(html[data-runtime-twin-design='proposal']) .patientRow:is(:hover, :focus-visible, [aria-selected='true']) .recordDiagnosis { overflow: visible; white-space: normal; }
