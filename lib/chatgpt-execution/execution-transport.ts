@@ -13,14 +13,11 @@ type ExecutionNotification = (method: string, params: unknown) => void;
 const DIAGNOSTIC_EVENTS = ['rpc_error', 'transport_failure', 'turn_start_failed', 'turn_completed_failed', 'preparation_failed'] as const;
 export const PREPARATION_DIAGNOSTIC_STAGES = ['governance', 'redaction', 'binding', 'platform_qualification'] as const;
 export type PreparationDiagnosticStage = typeof PREPARATION_DIAGNOSTIC_STAGES[number];
-export const CLOSED_MAC_QUALIFICATION_STAGES = ['platform', 'sources', 'build', 'probe', 'version', 'protocol', 'initialize', 'readback', 'custody'] as const;
-export type ClosedMacQualificationStage = typeof CLOSED_MAC_QUALIFICATION_STAGES[number];
 const DIAGNOSTIC_CODES = ['upstream_error', 'timeout', 'process_exited', 'protocol_error', 'tool_use_denied'] as const;
 const RPC_CODES = [-32700, -32600, -32601, -32602, -32603, -32000] as const;
 export type ExecutionDiagnostic = Readonly<{ event: typeof DIAGNOSTIC_EVENTS[number]; method: ExecutionMethod | null;
     errorCode: typeof DIAGNOSTIC_CODES[number]; rpcCode: typeof RPC_CODES[number] | null; httpStatus: number | null;
-    tls: boolean; network: boolean; device: boolean; experimental: boolean; permission: boolean; stage?: PreparationDiagnosticStage;
-    closedQualificationStage?: ClosedMacQualificationStage }>;
+    tls: boolean; network: boolean; device: boolean; experimental: boolean; permission: boolean; stage?: PreparationDiagnosticStage }>;
 /** This host-only observer is not authority. Rebuild a closed data projection;
  * never forward an upstream object, free numeric code, prose or accessor. */
 export function reportExecutionDiagnostic(observer: ((event: ExecutionDiagnostic) => void) | undefined, input: ExecutionDiagnostic): void {
@@ -34,11 +31,8 @@ export function reportExecutionDiagnostic(observer: ((event: ExecutionDiagnostic
         let projection: ExecutionDiagnostic;
         if (event === 'preparation_failed') {
             if (!(PREPARATION_DIAGNOSTIC_STAGES as readonly unknown[]).includes(stage)) return;
-            const qualificationStage = read('closedQualificationStage');
             projection = Object.freeze({ event: event as ExecutionDiagnostic['event'], method: null, errorCode: 'upstream_error', rpcCode: null, httpStatus: null,
-                tls: false, network: false, device: false, experimental: false, permission: false, stage: stage as PreparationDiagnosticStage,
-                ...stage === 'platform_qualification' && (CLOSED_MAC_QUALIFICATION_STAGES as readonly unknown[]).includes(qualificationStage)
-                    ? { closedQualificationStage: qualificationStage as ClosedMacQualificationStage } : {} });
+                tls: false, network: false, device: false, experimental: false, permission: false, stage: stage as PreparationDiagnosticStage });
         } else {
             const code = read('rpcCode'), status = read('httpStatus');
             projection = Object.freeze({ event: event as ExecutionDiagnostic['event'], method: method as ExecutionDiagnostic['method'], errorCode: errorCode as ExecutionDiagnostic['errorCode'],

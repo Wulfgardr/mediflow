@@ -9,14 +9,14 @@ import { ExecutionError, type ExecutionTransport, type ExecutionMethod, type Exe
 import { assertExecutionInitialization, executionInitializationParams, executionConfigFromToml } from './execution-bootstrap';
 import type { QualifiedExecutionHost } from './execution-host';
 import { createOpenAIConnectProxy } from './execution-egress-proxy';
-import { createStdioExecutionTransport, reportExecutionDiagnostic, type ClosedMacQualificationStage, type ExecutionDiagnostic } from './execution-transport';
+import { createStdioExecutionTransport, reportExecutionDiagnostic, type ExecutionDiagnostic } from './execution-transport';
 import { EXECUTION_CONFIG, EXECUTION_SUBSTRATE, executionPublicCaBundle, executionSandboxProfile, verifyExecutionSubstrate } from './execution-sandbox';
 import { MAC_CONFIG_SOURCE, MAC_CONTEXT_SHA256, MAC_POLICY_REVISION, MAC_READBACK_SOURCE, assertMacConfigReadback, macDigest, verifyMacSourceSet } from './execution-mac-config';
 import { buildMacCustodian, launchMacCustodian, MacNativeBuildError, type MacNativeOwner } from './execution-mac-native';
 import type { MacProductQualificationAuthority } from './execution-platform';
 
 type Phase = 'preparing' | 'ready' | 'borrowed' | 'draining' | 'sealed' | 'revoked';
-export type MacQualificationStage = ClosedMacQualificationStage;
+export type MacQualificationStage = 'platform' | 'sources' | 'build' | 'probe' | 'version' | 'protocol' | 'initialize' | 'readback' | 'custody';
 export type MacPreparationOptions = Readonly<{ binaryPath: string; nativeSourcePath: string; schemaDirectory: string;
     c1ReceiptPath: string; lifetimeMs?: number; signal?: AbortSignal; diagnostic?: (event: ExecutionDiagnostic) => void }>;
 export type MacQualificationAudit = Readonly<{ schema: 'mediflow.mac-custody-audit.v1'; run: string; phase: Phase;
