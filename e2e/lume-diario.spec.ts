@@ -326,9 +326,11 @@ async function assertContrastAndFocus(
 
   await expect(entries.filter({ hasText: `${FIXTURE_PREFIX} 3` })).toHaveAttribute('data-active', 'true');
   await expect(page.locator('[data-testid="lume-diario-entry"][data-active="true"]')).toHaveCount(1);
-  const shadows = await entries.evaluateAll((elements) => elements.map((element) => getComputedStyle(element).boxShadow));
-  expect(shadows[0]).not.toBe('none');
-  expect(shadows.slice(1).every((shadow) => shadow === 'none')).toBe(true);
+  // The focused diary row stays in the flat register: active state is the
+  // deliberate ink-tint background, while a shadow remains reserved for focus.
+  const backgrounds = await entries.evaluateAll((elements) => elements.map((element) => getComputedStyle(element).backgroundColor));
+  expect(backgrounds[0]).not.toBe(backgrounds[1]);
+  expect(backgrounds.slice(1).every((background) => background === backgrounds[1])).toBe(true);
 }
 
 async function assertReflowStack(diary: Locator): Promise<void> {
