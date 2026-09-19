@@ -22,12 +22,14 @@ export function createProductConsent(session: object, current: () => boolean, mo
     return Object.freeze({
         disclosure: () => disclosure, reset,
         /** Bind and rotate BEFORE the browser can see or accept the disclosure. */
-        bind(context: string, qualification: string, remainingMs = 300_000) {
+        bind(context: string, qualification: string, remainingMs = 300_000, absoluteExpiresAt = Infinity) {
             if (!current()) throw new ProductError('session_expired');
-            if (!Number.isFinite(remainingMs) || remainingMs <= 0) throw new ProductError('consent_stale');
+            const wallNow = wall(), monotonicNow = monotonic();
+            if (!Number.isFinite(remainingMs) || remainingMs <= 0 || absoluteExpiresAt !== Infinity
+                && (!Number.isFinite(absoluteExpiresAt) || absoluteExpiresAt <= wallNow)) throw new ProductError('consent_stale');
             reset();
-            const duration = Math.min(300_000, remainingMs);
-            bound = { session, context, qualification, digest, deadline: monotonic() + duration, expiresAt: wall() + duration };
+            const duration = Math.min(300_000, remainingMs, absoluteExpiresAt - wallNow);
+            bound = { session, context, qualification, digest, deadline: monotonicNow + duration, expiresAt: wallNow + duration };
         },
         grant(request: ConsentRequest, context: string, qualification: string) {
             if (!current()) throw new ProductError('session_expired');

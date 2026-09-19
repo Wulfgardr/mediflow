@@ -24,6 +24,8 @@ test('mounted panel: inert initial read, single explicit click, refresh, recover
     let status = { provider: 'ollama', credentialClass: 'local_model', model: 'synthetic-local', state: 'missing', revision: 'a'.repeat(64),
         version: 0, receipt: null as string | null, canActivate: true, inference: 'not_run', qualification: 'not_assessed' };
     let posts = 0; let functions = 0; let fail = false;
+    let releaseFirstPost!: () => void;
+    const firstPost = new Promise<void>(resolve => { releaseFirstPost = resolve; });
     const server = createServer(async (req, res) => {
         res.setHeader('Content-Type', 'application/json');
         if (req.url === '/bundle.js') { res.setHeader('Content-Type', 'text/javascript'); res.end(bundle); return; }
@@ -33,8 +35,8 @@ test('mounted panel: inert initial read, single explicit click, refresh, recover
             if (req.method === 'POST') {
                 posts++; let body = ''; for await (const chunk of req) body += chunk;
                 assert.deepEqual(JSON.parse(body), { intent: 'verify_and_activate', expectedRevision: status.revision });
-                // Keep the request pending long enough to verify the button cannot double-submit.
-                await new Promise(resolve => setTimeout(resolve, 100));
+                // Keep the first request pending until the UI's in-flight state has been observed.
+                if (posts === 1) await firstPost;
                 if (fail) { res.statusCode = 503; res.end(JSON.stringify({ error: 'provider_unreachable' })); return; }
                 status = { ...status, state: 'available_unqualified', version: status.version + 1, receipt: 'receipt_' + 'a'.repeat(32) };
             }
@@ -56,6 +58,7 @@ test('mounted panel: inert initial read, single explicit click, refresh, recover
         await activate.click();
         await expect(page.getByRole('button', { name: 'Verifica in corso…', exact: true })).toBeDisabled();
         await expect(page.getByRole('status')).toContainText('caricamento');
+        releaseFirstPost();
         await expect(page.getByText('Stato delle funzioni riletto.', { exact: false })).toBeVisible();
         assert.equal(posts, 1); assert.equal(functions, 1);
         await expect(page.getByText('Quadro paziente: Da provare', { exact: true })).toBeVisible();
@@ -71,7 +74,7 @@ test('mounted panel: inert initial read, single explicit click, refresh, recover
         await page.getByRole('button', { name: 'Aggiorna stato' }).click();
         await expect(page.getByRole('status')).toContainText('non può riattivarlo');
         await expect(activate).toBeDisabled(); assert.equal(posts, 2);
-    } finally { await browser?.close(); server.closeAllConnections(); await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve())); }
+    } finally { releaseFirstPost(); await browser?.close(); server.closeAllConnections(); await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve())); }
 });
 
 /* @Codex: same production component, with delayed synthetic HTTP and StrictMode. */

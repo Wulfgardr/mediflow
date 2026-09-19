@@ -45,3 +45,9 @@ test('time spent before consent reduces the grant instead of restarting its life
     f.consent.grant(f.request(), 'c', 'q'); assert.equal(f.consent.remainingMs(), 300);
     f.advance(300); assert.throws(() => f.consent.assert('c', 'q'), denied('consent_stale'));
 });
+test('an absolute preparation deadline caps the consent lease across wall-clock resampling', () => {
+    const f = setup(); f.consent.bind('c', 'q', 1000, 1000250);
+    f.consent.grant(f.request(), 'c', 'q'); assert.equal(f.consent.expiresAt(), 1000250);
+    f.advance(249); f.wall(249); f.consent.assert('c', 'q');
+    f.wall(1); assert.throws(() => f.consent.assert('c', 'q'), denied('consent_stale'));
+});

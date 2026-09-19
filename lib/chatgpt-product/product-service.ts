@@ -50,7 +50,7 @@ export function createProductService(options: {
     const publications = new WeakMap<ProductResponse, number>();
     const preparedPublications = new WeakSet<ProductResponse>();
     if (!platform.prepare && qualification.state === 'qualified') {
-        consent.bind(context, qualification.revision, session.expiresAt - Date.now()); disclosureBound = true;
+        consent.bind(context, qualification.revision, session.expiresAt - Date.now(), session.expiresAt); disclosureBound = true;
     }
     const attemptRemaining = () => Math.max(0, Math.min(attemptDeadline - performance.now(), attemptExpiresAt - Date.now(), session.expiresAt - Date.now()));
     function prepareGuard(expectedEpoch?: number) {
@@ -145,7 +145,7 @@ export function createProductService(options: {
         // Legacy server-only adapters still bind their disclosure before grant.
         if (!platform.prepare && !disclosureBound && !pendingCreation && !draining && !host && receipt.cleanup !== 'unconfirmed') {
             qualification = platform.snapshot();
-            if (qualification.state === 'qualified') { consent.bind(context, qualification.revision, session.expiresAt - Date.now()); disclosureBound = true; }
+            if (qualification.state === 'qualified') { consent.bind(context, qualification.revision, session.expiresAt - Date.now(), session.expiresAt); disclosureBound = true; }
         }
         const value: ProductSnapshot = Object.freeze({ schema: 'mediflow.chatgpt-product.v1', state, notice,
             preparation: platform.preparation?.() ?? Object.freeze({ state: 'not_prepared', expiresAt: null }),
@@ -281,7 +281,10 @@ export function createProductService(options: {
                 if (performance.now() >= preparationDeadline || Date.now() >= preparationExpiresAt) throw new ProductError('timeout');
                 qualification = platform.snapshot();
                 if (qualification.state !== 'qualified') throw new ProductError('unqualified_boundary');
-                consent.bind(context, qualification.revision, attemptRemaining()); disclosureBound = true;
+                const projectedExpiresAt = platform.preparation?.().expiresAt;
+                const consentCap = typeof projectedExpiresAt === 'number'
+                    ? Math.min(attemptExpiresAt, projectedExpiresAt) : attemptExpiresAt;
+                consent.bind(context, qualification.revision, attemptRemaining(), consentCap); disclosureBound = true;
                 state = 'needs_consent';
                 const response = snapshot(); preparedPublications.add(response); return response;
             })();
