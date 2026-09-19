@@ -14,7 +14,7 @@ export type NativeOrdinaryHostValue =
 const fail = (): never => { throw new ProductError('invalid_state'); };
 function text(value: unknown, maximum: number): string | null {
     if (value == null || value === '') return null;
-    if (typeof value !== 'string' || value.trimStart().startsWith('ENC:') || value.length > 262144) return fail();
+    if (typeof value !== 'string' || (value.includes('ENC:') || value.includes('[LOCKED DATA]')) || value.length > 262144) return fail();
     const normalized = value.normalize('NFC').replace(/\s+/gu, ' ').trim();
     if (/[\x00-\x1f\x7f]/u.test(normalized)) return fail();
     // Avoid splitting a UTF-16 surrogate pair at the canonical parser's limit.
@@ -38,14 +38,14 @@ function diagnoses(value: string | null): Array<{ system: string | null; code: s
     });
 }
 const ref = (kind: string, id: string) => `source_${createHash('sha256').update(`${kind}\0${id}`).digest('hex').slice(0, 40)}`;
-export function buildNativeOrdinaryHostValue(functionId: NativeChartFunction, ambulatoryId: string, rows: NativeOrdinarySourceRows, capturedAt: string): NativeOrdinaryHostValue {
+export function buildNativeOrdinaryHostValue(functionId: NativeChartFunction, ambulatoryId: string, rows: NativeOrdinarySourceRows, capturedAt: string, hostSourceRevision?: string): NativeOrdinaryHostValue {
     const patientRevision = rows.patient.version, conditions = diagnoses(rows.patient.diagnoses);
     const notes = text(rows.patient.notes, functionId === 'smart_import' ? 900 : 480);
     const therapyRows = rows.therapies.map(t => ({ ...t, drugName: text(t.drugName, 160), dosage: text(t.dosage, 160),
         activePrinciple: text(t.activePrinciple, 160), aic: text(t.aic, 32), atc: text(t.atc, 32) }));
     const entryRows = rows.entries.map(e => {
         // Ciphertext is rejected BEFORE the rich-text converter can transform it.
-        if (typeof e.content !== 'string' || e.content.length > 262144 || e.content.trimStart().startsWith('ENC:')) return fail();
+        if (typeof e.content !== 'string' || e.content.length > 262144 || (e.content.includes('ENC:') || e.content.includes('[LOCKED DATA]'))) return fail();
         return { ...e, title: text(e.title, 160), content: text(clinicalRichTextToPlainText(e.content), functionId === 'smart_import' ? 900 : 480) };
     });
     const summaries = rows.attachments.map(a => ({ ...a, name: text(a.name, 160), summarySnapshot: text(a.summarySnapshot, functionId === 'smart_import' ? 900 : 480) }));
@@ -86,7 +86,7 @@ export function buildNativeOrdinaryHostValue(functionId: NativeChartFunction, am
     for (const a of summaries) if (a.summarySnapshot) add('attachment-evidence', a.id, a.name ?? 'Sintesi documentale', a.summarySnapshot, a.createdAt);
     if (!sources.length) return fail();
     const input = snapshotTreatmentReasoningProjectionAttachment({ schemaVersion: 'mediflow.ai.treatment-reasoning-projection-attachment.v1', capability: functionId,
-        patientRevision, sourceRevision: `source_${createHash('sha256').update(JSON.stringify(rows)).digest('hex')}`, capturedAt,
+        patientRevision, sourceRevision: hostSourceRevision ?? `source_${createHash('sha256').update(JSON.stringify(rows)).digest('hex')}`, capturedAt,
         therapyRefs: sources.filter(s => s.sourceKind === 'therapy').map(s => s.id), evidenceRefs: sources.map(s => s.id), sources }, capturedAt);
     return Object.freeze({ functionId, input });
 }

@@ -16,6 +16,8 @@ final class NativeOrdinaryModel: ObservableObject {
     @Published var selectedOptionId = ""
     @Published private(set) var isWorking = false
     private(set) var attemptId: String?
+    private var pendingProjection: NativeOrdinaryProjectionPlan?
+    private var preparationInFlight = false
     private var original: NativeOrdinarySnapshot?
     private var generation: UInt = 0
     private var task: Task<Void, Never>?
@@ -28,6 +30,8 @@ final class NativeOrdinaryModel: ObservableObject {
         var prepare: (NativeOrdinaryPreparation, ClinicalWorkspaceConnection) async throws -> NativeOrdinaryResponse
         var command: (NativeOrdinaryCommand, ClinicalWorkspaceConnection) async throws -> NativeOrdinaryResponse
         var status: (ClinicalWorkspaceConnection) async throws -> NativeOrdinaryResponse
+        var project: (NativeOrdinaryProjectionPlan, NativeOrdinaryPreparation, NativeOrdinaryProjectionIO) async throws -> NativeOrdinaryResponse = { _, _, _ in throw NativeOrdinaryContractError.invalid }
+        var cancelProjection: (NativeOrdinaryProjectionPlan, ClinicalWorkspaceConnection) async throws -> NativeOrdinaryResponse = { _, _ in throw NativeOrdinaryContractError.cleanupUnconfirmed }
         static let live = Services(prepare: { preparation, connection in
             try await client(connection).prepareNativeOrdinary(preparation, credentials: connection.credentials, sessionCookie: connection.sessionCookie)
         }, command: { command, connection in
@@ -35,6 +39,11 @@ final class NativeOrdinaryModel: ObservableObject {
                 sessionCookie: connection.sessionCookie, ambulatoryId: connection.ambulatoryId)
         }, status: { connection in
             try await client(connection).statusNativeOrdinary(credentials: connection.credentials,
+                sessionCookie: connection.sessionCookie, ambulatoryId: connection.ambulatoryId)
+        }, project: { plan, preparation, io in
+            try await NativeOrdinaryProjectionClient.project(plan, preparation: preparation, io: io)
+        }, cancelProjection: { plan, connection in
+            try await client(connection).cancelNativeOrdinaryProjection(plan, credentials: connection.credentials,
                 sessionCookie: connection.sessionCookie, ambulatoryId: connection.ambulatoryId)
         })
         private static func client(_ connection: ClinicalWorkspaceConnection) throws -> HomeBasePatientsClient {
@@ -63,22 +72,57 @@ final class NativeOrdinaryModel: ObservableObject {
         return source.matches(fresh)
     }
     func prepare() {
-        guard !isWorking, phase == .idle || phase == .completed else { return }
+        guard !isWorking, !preparationInFlight, phase == .idle || phase == .completed else { return }
         do {
             let source = try snapshot(); generation &+= 1; let epoch = generation
-            original = source; attemptId = nil; expiry = .infinity; proposal = nil; disclosure = nil; challenge = nil; catalog = nil
+            original = source; attemptId = nil; pendingProjection = nil; expiry = .infinity; proposal = nil; disclosure = nil; challenge = nil; catalog = nil
             phase = .preparing; isWorking = true; message = "Preparazione locale e verifica dei contenuti… Nessun invio a OpenAI."
+            preparationInFlight = true
             task = Task {
+                defer { preparationInFlight = false }
                 do {
-                    let value = try await services.prepare(source.preparation, source.connection)
+                    var value = try await services.prepare(source.preparation, source.connection)
                     // A late prepare may require cleanup, but never disclosure or result publication.
                     guard current(epoch, source) else {
                         await retireLate(value, source: source)
                         if generation == epoch { invalidate() }
                         return
                     }
+                    if value.functionId == function, let id = value.attemptId, UUID(uuidString: id) != nil { attemptId = id }
+                    if value.functionId == function, let plan = value.sourceProjection,
+                       NativeOrdinaryDisclosure.matches(plan.grantId, "^[a-f0-9]{64}$") { pendingProjection = plan }
                     try value.validate(function: function)
+                    if value.phase == "needs_source_projection" {
+                        guard let plan = value.sourceProjection else { throw NativeOrdinaryContractError.invalid }
+                        // Retain the authentic descriptive handle before the next suspension, including failures.
+                        pendingProjection = plan
+                        try plan.validate(preparation: source.preparation)
+                        applyExpiry(plan.expiresAt)
+                        message = "Lettura e decifratura locale delle fonti selezionate… Nessun invio a OpenAI."
+                        let io = NativeOrdinaryProjectionIO(current: { [weak self] in
+                            guard let self, self.current(epoch, source) else { throw NativeOrdinaryContractError.stale }
+                            let fresh = try self.snapshot()
+                            guard fresh.connection.masterKey != nil else { throw NativeOrdinaryContractError.stale }
+                            return fresh.connection
+                        }, willSubmit: { [weak self] in
+                            guard let self, self.current(epoch, source) else { throw NativeOrdinaryContractError.stale }
+                            // The server still owns its 30s grant / 120s processing deadlines.
+                            self.expiry = .infinity; self.expiryTask?.cancel()
+                            self.applyExpiry(Date().timeIntervalSince1970 * 1000 + 120_000)
+                        })
+                        value = try await services.project(plan, source.preparation, io)
+                        guard current(epoch, source), (try? snapshot().connection.masterKey) != nil else {
+                            await retireLate(value, source: source)
+                            if generation == epoch { invalidate() }
+                            return
+                        }
+                        if value.functionId == function, let id = value.attemptId, UUID(uuidString: id) != nil { attemptId = id }
+                        try value.validate(function: function)
+                        guard value.acquisition?.origin == "authenticated_client_decryption",
+                              value.acquisition?.ciphertextEquality == "not_attested" else { throw NativeOrdinaryContractError.invalid }
+                    }
                     guard value.phase == "needs_consent", let id = value.attemptId else { throw NativeOrdinaryContractError.invalid }
+                    pendingProjection = nil; expiry = .infinity; expiryTask?.cancel()
                     attemptId = id; disclosure = value.disclosure; applyExpiry(value.expiresAt)
                     phase = .needsConsent; isWorking = false; message = "Contenuti preparati. Leggi l’informativa prima di autorizzare l’invio."
                 } catch { if generation == epoch { await failAndClose(error, source: source) } }
@@ -145,7 +189,7 @@ final class NativeOrdinaryModel: ObservableObject {
         guard phase != .closing else { return }
         generation &+= 1; task?.cancel(); expiryTask?.cancel(); challenge = nil; catalog = nil; disclosure = nil
         guard let source = original, phase != .completed, phase != .idle else {
-            original = nil; attemptId = nil; phase = .idle; isWorking = false
+            original = nil; attemptId = nil; pendingProjection = nil; phase = .idle; isWorking = false
             message = "Il contesto è cambiato. Prepara una nuova proposta."; return
         }
         close(source: source)
@@ -153,17 +197,18 @@ final class NativeOrdinaryModel: ObservableObject {
     func cancel() { invalidate() }
     func verifyClosure() { guard !isWorking, phase == .blocked, let source = original else { return }; close(source: source) }
     private func close(source: NativeOrdinarySnapshot, closedMessage: String? = nil) {
-        let id = attemptId, epoch = generation
+        let id = attemptId, projection = pendingProjection, epoch = generation
         phase = .closing; isWorking = true; message = "Chiusura dell’operazione in corso…"
         task = Task {
             do {
                 let value: NativeOrdinaryResponse
                 if let id { value = try await services.command(.cancel(attemptId: id), source.connection) }
+                else if let projection { value = try await services.cancelProjection(projection, source.connection) }
                 else { value = try await services.status(source.connection) }
                 guard generation == epoch else { return }
                 try value.validate(function: function, attempt: id)
                 guard value.phase == "closed", value.cleanupConfirmed == true else { throw NativeOrdinaryContractError.cleanupUnconfirmed }
-                attemptId = nil; original = nil; expiry = .infinity; isWorking = false; phase = .idle
+                attemptId = nil; pendingProjection = nil; original = nil; expiry = .infinity; isWorking = false; phase = .idle
                 message = closedMessage ?? "Operazione chiusa. Nessuna modifica alla cartella."
             } catch {
                 guard generation == epoch else { return }
@@ -216,9 +261,34 @@ final class NativeOrdinaryModel: ObservableObject {
         return "Operazione non completata: \(reason). Operazione chiusa; nessuna modifica alla cartella."
     }
     private func retireLate(_ value: NativeOrdinaryResponse, source: NativeOrdinarySnapshot) async {
-        guard value.functionId == function, let id = value.attemptId, UUID(uuidString: id) != nil else { return }
-        // Use the old connection and exact returned attempt, never the new patient's session.
-        _ = try? await services.command(.cancel(attemptId: id), source.connection)
+        // A late response must not turn failed cleanup into an idle/restartable model.
+        // Retain the exact old connection/handle; generation invalidates any concurrent status cleanup.
+        generation &+= 1; expiryTask?.cancel(); original = source
+        proposal = nil; disclosure = nil; challenge = nil; catalog = nil
+        guard value.functionId == function else {
+            phase = .blocked; isWorking = false
+            message = "Risposta tardiva non verificata. Verifica la chiusura prima di riprovare."
+            return
+        }
+        let id = value.attemptId.flatMap { UUID(uuidString: $0) == nil ? nil : $0 }
+        let plan = value.sourceProjection.flatMap { $0.functionId == function && NativeOrdinaryDisclosure.matches($0.grantId, "^[a-f0-9]{64}$") ? $0 : nil }
+        attemptId = id; pendingProjection = plan; phase = .closing; isWorking = true
+        let services = services
+        do {
+            // An unstructured cleanup task does not inherit the canceled preparation task.
+            let closed = try await Task { () throws -> NativeOrdinaryResponse in
+                if let id { return try await services.command(.cancel(attemptId: id), source.connection) }
+                if let plan { return try await services.cancelProjection(plan, source.connection) }
+                throw NativeOrdinaryContractError.cleanupUnconfirmed
+            }.value
+            try closed.validate(function: function, attempt: id)
+            guard closed.phase == "closed", closed.cleanupConfirmed == true else { throw NativeOrdinaryContractError.cleanupUnconfirmed }
+            attemptId = nil; pendingProjection = nil; original = nil; expiry = .infinity
+            isWorking = false; phase = .idle; message = "Operazione tardiva chiusa. Nessuna modifica alla cartella."
+        } catch {
+            isWorking = false; phase = .blocked
+            message = "Chiusura tardiva non confermata. Verifica la chiusura; nessun nuovo invio è consentito."
+        }
     }
 }
 #endif

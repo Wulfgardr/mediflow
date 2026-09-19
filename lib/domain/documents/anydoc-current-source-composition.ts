@@ -18,6 +18,9 @@ import { acquireAttachmentExtractionProjection, claimAttachmentExtractionProject
 import { readAttachmentExtractionProjectionBytes } from './attachment-extraction-projection-transport';
 import { ATTACHMENT_EXTRACTION_PROJECTION_SCHEMA } from './attachment-extraction-projection-protocol';
 
+import { getNativeOrdinaryApplicationContext } from '../../chatgpt-product/native-ordinary-composition';
+import { nativeOrdinaryDocumentRequiresProjection, consumeNativeOrdinaryDocumentProjection } from '../../security/server-session-clinical-context-native-sources';
+
 const create = Object.create;
 const defineProperty = Object.defineProperty;
 const freeze = Object.freeze;
@@ -181,8 +184,23 @@ export async function composeAnyDocCurrentSelectionClientProjectionExtraction(
     session: ServerSession, selector: unknown, request: Request,
 ): Promise<LocalExtractionResult> {
     const id = attachmentId(selector); if (!id || request.signal.aborted) return denied();
-    const grant = acquireAttachmentExtractionProjection(session, id); if (!grant) return denied();
-    const use = claimAttachmentExtractionProjection(session, id, grant.grantId); if (!use) return denied();
+    // Native ingress uses the source captured BEFORE the client's fresh HTTP read.
+    // Never mint an attachment grant from the received body's metadata.
+    let use;
+    if (session.authChannel === 'native') {
+        const context = getNativeOrdinaryApplicationContext();
+        if (!context?.sources || context.request.functionId !== 'document_synthesis'
+            || context.request.input.attachmentId !== id || context.session.id !== session.id) return denied();
+        if (!nativeOrdinaryDocumentRequiresProjection(context.sources)) {
+            if (request.body !== null) return denied();
+            return composeAnyDocCurrentSelectionExtraction(session, selector);
+        }
+        use = consumeNativeOrdinaryDocumentProjection(context.sources, context.session, id);
+    } else {
+        const grant = acquireAttachmentExtractionProjection(session, id); if (!grant) return denied();
+        use = claimAttachmentExtractionProjection(session, id, grant.grantId);
+    }
+    if (!use) return denied();
     const cancel = () => use.cancel();
     request.signal.addEventListener('abort', cancel, { once: true });
     let bytes: Uint8Array | null = null;

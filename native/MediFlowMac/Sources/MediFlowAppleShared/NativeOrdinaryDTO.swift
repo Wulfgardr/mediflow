@@ -181,6 +181,86 @@ public struct NativeOrdinaryPreparation: Codable, Equatable, Sendable {
         try c.encode(input, forKey: .init("input"))
     }
 }
+/* @Codex — descriptive selector plan. No key, plaintext or source authority is encoded here. */
+public struct NativeOrdinaryProjectionSelector: Codable, Equatable, Sendable {
+    public let entity, id: String
+    public let fields: [String]
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: NativeOrdinaryKey.self)
+        guard Set(c.allKeys.map(\.stringValue)) == ["entity", "id", "fields"] else { throw NativeOrdinaryContractError.invalid }
+        entity = try c.decode(String.self, forKey: .init("entity"))
+        id = try c.decode(String.self, forKey: .init("id"))
+        fields = try c.decode([String].self, forKey: .init("fields"))
+    }
+}
+public struct NativeOrdinaryProjectionPlan: Codable, Equatable, Sendable {
+    public let schemaVersion, grantId: String
+    public let functionId: NativeOrdinaryFunction
+    public let expiresAt: Double
+    public let roster: [NativeOrdinaryProjectionSelector]
+    public static let schema = "mediflow.native-ordinary.source-projection.v1"
+    static let fields: [String: [String]] = [
+        "patient": ["notes", "diagnoses"], "entries": ["title", "content"],
+        "therapies": ["drugName", "dosage", "activePrinciple", "aic", "atc"],
+        "observations": ["display", "value", "unitCode"], "attachments": ["name", "summarySnapshot"],
+        "attachment_bytes": ["data"]
+    ]
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: NativeOrdinaryKey.self)
+        guard Set(c.allKeys.map(\.stringValue)) == ["schemaVersion", "grantId", "functionId", "expiresAt", "roster"] else { throw NativeOrdinaryContractError.invalid }
+        schemaVersion = try c.decode(String.self, forKey: .init("schemaVersion"))
+        grantId = try c.decode(String.self, forKey: .init("grantId"))
+        functionId = try c.decode(NativeOrdinaryFunction.self, forKey: .init("functionId"))
+        expiresAt = try c.decode(Double.self, forKey: .init("expiresAt"))
+        roster = try c.decode([NativeOrdinaryProjectionSelector].self, forKey: .init("roster"))
+    }
+    public func validate(preparation: NativeOrdinaryPreparation, now: Date = Date()) throws {
+        try preparation.validate()
+        guard schemaVersion == Self.schema, functionId == preparation.functionId,
+              NativeOrdinaryDisclosure.matches(grantId, "^[a-f0-9]{64}$"), expiresAt.isFinite,
+              expiresAt > now.timeIntervalSince1970 * 1000, !roster.isEmpty, roster.count <= 74 else { throw NativeOrdinaryContractError.invalid }
+        let limits: [String: Int]
+        switch functionId {
+        case .patientInsight: limits = ["patient": 1, "entries": 12, "therapies": 12]
+        case .smartImport: limits = ["patient": 1, "entries": 6, "therapies": 64, "attachments": 3]
+        case .treatmentReasoning: limits = ["patient": 1, "entries": 2, "therapies": 4, "observations": 3, "attachments": 1]
+        case .documentSynthesis: limits = ["attachment_bytes": 1]
+        }
+        var seen = Set<String>(), counts: [String: Int] = [:]
+        for row in roster {
+            guard nativeOrdinaryIdentifier(row.id, maximum: 200), let allowed = Self.fields[row.entity],
+                  let maximum = limits[row.entity], seen.insert(row.entity + "\0" + row.id).inserted,
+                  !row.fields.isEmpty, row.fields == allowed.filter({ row.fields.contains($0) }) else { throw NativeOrdinaryContractError.invalid }
+            counts[row.entity, default: 0] += 1
+            guard counts[row.entity, default: 0] <= maximum else { throw NativeOrdinaryContractError.invalid }
+            if row.entity == "patient", row.id != preparation.patientId { throw NativeOrdinaryContractError.invalid }
+        }
+        if case .documentSynthesis(let attachmentId) = preparation.input {
+            guard roster.count == 1, roster[0].entity == "attachment_bytes", roster[0].id == attachmentId,
+                  roster[0].fields == ["data"] else { throw NativeOrdinaryContractError.invalid }
+        }
+    }
+}
+public struct NativeOrdinaryProjectionRow: Encodable, Sendable {
+    public struct Field: Encodable, Sendable { public let name, value: String }
+    public let entity, id: String
+    public let fields: [Field]
+}
+public struct NativeOrdinaryProjectionBody: Encodable, Sendable {
+    public let schemaVersion = NativeOrdinaryProjectionPlan.schema
+    public let functionId: NativeOrdinaryFunction
+    public let rows: [NativeOrdinaryProjectionRow]
+}
+public struct NativeOrdinaryAcquisition: Decodable, Sendable {
+    public let origin, ciphertextEquality: String
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: NativeOrdinaryKey.self)
+        guard Set(c.allKeys.map(\.stringValue)) == ["origin", "ciphertextEquality"] else { throw NativeOrdinaryContractError.invalid }
+        origin = try c.decode(String.self, forKey: .init("origin"))
+        ciphertextEquality = try c.decode(String.self, forKey: .init("ciphertextEquality"))
+        guard origin == "authenticated_client_decryption", ciphertextEquality == "not_attested" else { throw NativeOrdinaryContractError.invalid }
+    }
+}
 public struct NativeOrdinaryDisclosure: Codable, Equatable, Sendable {
     public let schema, revision: String
     public let operation: NativeOrdinaryFunction
@@ -240,7 +320,37 @@ public struct NativeOrdinaryResponse: Decodable, Sendable {
     public let challenge: NativeOrdinaryChallenge?
     public let catalog: NativeOrdinaryCatalog?
     public let result: NativeOrdinaryJSON?
+    public let sourceProjection: NativeOrdinaryProjectionPlan?
+    public let acquisition: NativeOrdinaryAcquisition?
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: NativeOrdinaryKey.self)
+        schema = try c.decode(String.self, forKey: .init("schema"))
+        phase = try c.decode(String.self, forKey: .init("phase"))
+        if phase == "needs_source_projection" {
+            guard Set(c.allKeys.map(\.stringValue)) == ["schema", "phase", "functionId", "expiresAt", "sourceProjection"]
+            else { throw NativeOrdinaryContractError.invalid }
+        }
+        attemptId = try c.decodeIfPresent(String.self, forKey: .init("attemptId"))
+        functionId = try c.decodeIfPresent(NativeOrdinaryFunction.self, forKey: .init("functionId"))
+        expiresAt = try c.decodeIfPresent(Double.self, forKey: .init("expiresAt"))
+        cleanupConfirmed = try c.decodeIfPresent(Bool.self, forKey: .init("cleanupConfirmed"))
+        disclosure = try c.decodeIfPresent(NativeOrdinaryDisclosure.self, forKey: .init("disclosure"))
+        challenge = try c.decodeIfPresent(NativeOrdinaryChallenge.self, forKey: .init("challenge"))
+        catalog = try c.decodeIfPresent(NativeOrdinaryCatalog.self, forKey: .init("catalog"))
+        result = try c.decodeIfPresent(NativeOrdinaryJSON.self, forKey: .init("result"))
+        sourceProjection = try c.decodeIfPresent(NativeOrdinaryProjectionPlan.self, forKey: .init("sourceProjection"))
+        acquisition = try c.decodeIfPresent(NativeOrdinaryAcquisition.self, forKey: .init("acquisition"))
+    }
     public func validate(function: NativeOrdinaryFunction, attempt: String? = nil, now: Date = Date()) throws {
+        if phase == "needs_source_projection" {
+            guard schema == "mediflow.native-ordinary.v1", functionId == function, attempt == nil, attemptId == nil,
+                  disclosure == nil, challenge == nil, catalog == nil, result == nil, cleanupConfirmed == nil, acquisition == nil,
+                  let plan = sourceProjection, plan.functionId == function, plan.schemaVersion == NativeOrdinaryProjectionPlan.schema,
+                  NativeOrdinaryDisclosure.matches(plan.grantId, "^[a-f0-9]{64}$"), expiresAt == plan.expiresAt,
+                  plan.expiresAt.isFinite, plan.expiresAt > now.timeIntervalSince1970 * 1000 else { throw NativeOrdinaryContractError.invalid }
+            return
+        }
+        guard sourceProjection == nil, acquisition == nil || phase == "needs_consent" else { throw NativeOrdinaryContractError.invalid }
         if phase == "closed" {
             guard schema == "mediflow.chatgpt-ordinary-flow.v1", result == nil,
                   functionId == nil || functionId == function,

@@ -30,7 +30,7 @@ import {
 } from './attachment-extraction-locator-revocation';
 
 export type AttachmentExtractionCurrent = Readonly<{ sourceRef: string; revision: number; freshnessEpoch: number }>;
-type Bound = Readonly<{ id: string; patientId: string; current: AttachmentExtractionCurrent; selectionEpoch: number; reviewContextEpoch: number; locatorGeneration: object; storedDataSha256: string }>;
+type Bound = Readonly<{ id: string; patientId: string; current: AttachmentExtractionCurrent; selectionEpoch: number; reviewContextEpoch: number; locatorGeneration: object; storedDataSha256: string; encrypted: boolean }>;
 type Begun = Readonly<{ status: 'begun'; operation: object; bytes: Uint8Array; evidenceAdmissible: false; applyPolicy: 'none'; writesPerformed: 0 }>;
 type Final = Readonly<{ status: 'spent' | 'aborted' | 'denied'; evidenceAdmissible: boolean; applyPolicy: 'none'; writesPerformed: 0 }>;
 type Row = Readonly<{ id: string; patientId: string; data: string; current: AttachmentExtractionCurrent }>;
@@ -132,26 +132,27 @@ function createSourceAuthority(sessionValue: ServerSession, native: boolean) {
         releaseResourcePort, unregisterPrivateResource } = native ? nativeLifetime : webLifetime;
     if (!validSession(sessionValue, native)) throw new TypeError('Attachment extraction source authority unavailable');
     const session = sessionValue;
-    let port: WebResourcePort | null = mintResourcePort(session);
-    let acquisitionUse: WebResourceUse | null = port ? beginResourceUse(port) : null;
+    let port: WebResourcePort | nativeLifetime.NativeInferencePort | null = mintResourcePort(session);
+    let acquisitionUse: WebResourceUse | nativeLifetime.NativeInferenceUse | null = port ? beginResourceUse(port) : null;
     let registration: WebResourceRegistration | null = null;
     let acquisitionCommitted = false;
     try {
         if (!port || !acquisitionUse) throw new TypeError('Attachment extraction source authority unavailable');
         const owner = (native ? nativeSessionProjectionOwnerRegistry : serverSessionProjectionOwnerRegistry).acquire(session);
         const [addLocator, takeLocator, clearLocators, peekLocator] = ledger<Bound>();
+        const [addWitness, , clearWitnesses, peekWitness] = ledger<Bound>();
         const [addOperation, takeOperation, clearOperations, peekOperation] = ledger<{ bound: Bound; bytes: Uint8Array }>(); let active = true;
         const retirement = new AbortController();
         const buffers: Uint8Array[] = [];
         const wipe = () => { for (let index = 0; index < buffers.length; index += 1) apply(bytesFill, buffers[index]!, [0]); buffers.length = 0; };
-        const revoke = () => { active = false; clearLocators(); clearOperations(); wipe(); retirement.abort(); };
+        const revoke = () => { active = false; clearLocators(); clearWitnesses(); clearOperations(); wipe(); retirement.abort(); };
         registration = registerPrivateResource(port, () => { revoke(); });
         if (!registration) throw new TypeError('Attachment extraction source authority unavailable');
         acquisitionCommitted = commitResourceUse(acquisitionUse);
         if (!acquisitionCommitted) throw new TypeError('Attachment extraction source authority unavailable');
         const lease = (work: (patientId: string) => number) => {
             if (!active || !port) return 0;
-            let use: WebResourceUse | null = null;
+            let use: WebResourceUse | nativeLifetime.NativeInferenceUse | null = null;
             let committed = false;
             try {
                 use = beginResourceUse(port);
@@ -179,7 +180,7 @@ function createSourceAuthority(sessionValue: ServerSession, native: boolean) {
                 const row = read(id, patientId); if (!row || (encryptedOnly && !row.data.startsWith('ENC:'))) return 0;
                 const locatorGeneration = captureAttachmentExtractionLocatorGeneration();
                 bound = Object.freeze({ id: row.id, patientId: row.patientId, current: row.current,
-                    storedDataSha256: storedDigest(row.data), ...epochs(), locatorGeneration });
+                    storedDataSha256: storedDigest(row.data), encrypted: row.data.startsWith('ENC:'), ...epochs(), locatorGeneration });
                 return isCurrentAttachmentExtractionLocatorGeneration(locatorGeneration) ? 1 : 0;
             }) !== 1) return null;
             const published = bound as Bound | null;
@@ -212,6 +213,14 @@ function createSourceAuthority(sessionValue: ServerSession, native: boolean) {
             cancel(): void { revoke(); },
             issue(value: unknown): object | null { return issue(value, false)?.locator ?? null; },
             issueProjection(value: unknown) { return issue(value, true); },
+            /* @Codex — one native capture, with a separate veto-only witness surviving byte finalize. */
+            issueNativeOrdinarySource(value: unknown) {
+                if (!native) return null;
+                const issued = issue(value, false); if (!issued) return null;
+                const bound = peekLocator(issued.locator); if (!bound) return null;
+                return Object.freeze({ ...issued, witness: addWitness(bound), clientProjectionRequired: bound.encrypted });
+            },
+            checkNativeOrdinaryWitness(value: unknown): boolean { return native && current(peekWitness(value), true); },
             checkLocator(value: unknown): boolean { return current(peekLocator(value), false); },
             checkpoint(value: unknown): boolean { return current(peekOperation(value)?.bound ?? null); },
             consume(value: unknown): Begun | Final { return consume(value); },
