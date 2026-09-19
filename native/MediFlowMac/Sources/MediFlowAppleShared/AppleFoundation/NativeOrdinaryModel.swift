@@ -152,7 +152,7 @@ final class NativeOrdinaryModel: ObservableObject {
     }
     func cancel() { invalidate() }
     func verifyClosure() { guard !isWorking, phase == .blocked, let source = original else { return }; close(source: source) }
-    private func close(source: NativeOrdinarySnapshot) {
+    private func close(source: NativeOrdinarySnapshot, closedMessage: String? = nil) {
         let id = attemptId, epoch = generation
         phase = .closing; isWorking = true; message = "Chiusura dell’operazione in corso…"
         task = Task {
@@ -164,7 +164,7 @@ final class NativeOrdinaryModel: ObservableObject {
                 try value.validate(function: function, attempt: id)
                 guard value.phase == "closed", value.cleanupConfirmed == true else { throw NativeOrdinaryContractError.cleanupUnconfirmed }
                 attemptId = nil; original = nil; expiry = .infinity; isWorking = false; phase = .idle
-                message = "Operazione chiusa. Nessuna modifica alla cartella."
+                message = closedMessage ?? "Operazione chiusa. Nessuna modifica alla cartella."
             } catch {
                 guard generation == epoch else { return }
                 isWorking = false; phase = .blocked
@@ -175,8 +175,42 @@ final class NativeOrdinaryModel: ObservableObject {
     private func failAndClose(_ error: Error, source: NativeOrdinarySnapshot) async {
         proposal = nil; challenge = nil; catalog = nil; disclosure = nil; generation &+= 1; expiryTask?.cancel()
         // Reconcile only this retained attempt; an unknown active operation is never cancelled.
-        message = (error as? LocalizedError)?.errorDescription ?? "Operazione non disponibile. Nessun servizio alternativo utilizzato."
-        close(source: source)
+        close(source: source, closedMessage: failureMessage(error))
+    }
+    /// The host error payload is not operator-safe diagnostic content.
+    private func failureMessage(_ error: Error) -> String {
+        let reason: String
+        switch error {
+        case HomeBaseClientError.httpStatus(let status, _):
+            switch status {
+            case 401: reason = "sessione o pairing non più validi"
+            case 403: reason = "operazione non autorizzata"
+            case 409: reason = "contesto o operazione non più correnti"
+            case 429: reason = "servizio temporaneamente non disponibile"
+            default: reason = "servizio non disponibile o risposta non verificata"
+            }
+            return "Preparazione non completata (HTTP \(status)): \(reason). Operazione chiusa; nessuna modifica alla cartella."
+        case NativeOrdinaryContractError.invalid:
+            reason = "risposta non verificata"
+        case NativeOrdinaryContractError.stale:
+            reason = "contesto scaduto o modificato"
+        case NativeOrdinaryContractError.noSources:
+            reason = "nessun contenuto clinico leggibile"
+        case NativeOrdinaryContractError.loginPending:
+            reason = "accesso non completato"
+        case NativeOrdinaryContractError.cleanupUnconfirmed:
+            reason = "chiusura non confermata"
+        case HomeBaseClientError.transport(let issue):
+            switch issue {
+            case .tlsHandshakeFailed: reason = "verifica TLS non riuscita"
+            case .unreachable: reason = "host non raggiungibile"
+            case .timeout: reason = "tempo di risposta scaduto"
+            case .other: reason = "trasporto non disponibile"
+            }
+        default:
+            reason = "errore locale o risposta non verificata"
+        }
+        return "Preparazione non completata: \(reason). Operazione chiusa; nessuna modifica alla cartella."
     }
     private func retireLate(_ value: NativeOrdinaryResponse, source: NativeOrdinarySnapshot) async {
         guard value.functionId == function, let id = value.attemptId, UUID(uuidString: id) != nil else { return }
