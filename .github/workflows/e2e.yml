@@ -131,7 +131,7 @@ jobs:
         run: |
           CHATGPT_PRODUCT_DATA_DIR="$(mktemp -d "${RUNNER_TEMP}/mediflow-chatgpt-product.XXXXXX")"
           MEDIFLOW_DATA_DIR="${CHATGPT_PRODUCT_DATA_DIR}" \
-            node scripts/chatgpt-product-focused-tests.mjs --browser
+            node scripts/chatgpt-product-focused-tests.mjs --browser-only
 
       # Seconda fase di `npm run check:terminology-parity`, l'unica che non
       # girava da nessuna parte. Avvia un proprio Next dev su 127.0.0.1:3200 in

@@ -10,7 +10,9 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 function fail(message) { console.error(message); process.exit(2); }
 if (Number(process.versions.node.split('.')[0]) !== 24) fail(`NODE24_REQUIRED: observed ${process.versions.node}; no alternative-runtime PASS is accepted.`);
 const args = process.argv.slice(2);
-if (args.some(arg => !['--browser', '--loopback-proxy'].includes(arg))) fail('Usage: MEDIFLOW_DATA_DIR=<absolute fresh run-owned synthetic directory> node scripts/chatgpt-product-focused-tests.mjs [--browser] [--loopback-proxy]');
+const browserOnly = args.includes('--browser-only');
+if (args.some(arg => !['--browser', '--browser-only', '--loopback-proxy'].includes(arg)) || (browserOnly && args.includes('--browser')))
+    fail('Usage: MEDIFLOW_DATA_DIR=<absolute fresh run-owned synthetic directory> node scripts/chatgpt-product-focused-tests.mjs [--browser | --browser-only] [--loopback-proxy]');
 const raw = process.env.MEDIFLOW_DATA_DIR;
 if (!raw || !isAbsolute(raw) || resolve(raw) === root) fail('EXPLICIT_SYNTHETIC_DATA_DIR_REQUIRED');
 const directory = resolve(raw);
@@ -76,20 +78,24 @@ function rejectInstalledExtras(path = ownerRoot, child = '') {
 }
 rejectInstalledExtras();
 const tests = [];
-for (const folder of ['lib/chatgpt-product', 'lib/chatgpt-account', 'lib/chatgpt-execution']) {
-    for (const entry of readdirSync(join(root, folder)).sort()) {
-        if (!entry.endsWith('.test.ts') && !entry.endsWith('.test.cjs')) continue;
-        if (entry === 'execution-egress-proxy.test.ts' && !args.includes('--loopback-proxy')) continue;
-        tests.push(`${folder}/${entry}`);
+if (browserOnly) {
+    tests.push('e2e/chatgpt-synthesis-product.spec.ts', 'lib/chatgpt-account/account-product.browser.test.mjs');
+} else {
+    for (const folder of ['lib/chatgpt-product', 'lib/chatgpt-account', 'lib/chatgpt-execution']) {
+        for (const entry of readdirSync(join(root, folder)).sort()) {
+            if (!entry.endsWith('.test.ts') && !entry.endsWith('.test.cjs')) continue;
+            if (entry === 'execution-egress-proxy.test.ts' && !args.includes('--loopback-proxy')) continue;
+            tests.push(`${folder}/${entry}`);
+        }
     }
+    tests.push('lib/security/native-inference.test.cjs', 'lib/security/native-ordinary-content.test.cjs', 'lib/security/native-ordinary-host-sources.test.cjs');
+    tests.push('lib/ai-providers/fabric/chatgpt-synthetic-synthesis-binding.test.ts', 'components/settings/chatgpt-synthesis-panel.test.ts');
+    if (args.includes('--browser')) tests.push('e2e/chatgpt-synthesis-product.spec.ts', 'lib/chatgpt-account/account-product.browser.test.mjs');
 }
-tests.push('lib/security/native-inference.test.cjs', 'lib/security/native-ordinary-content.test.cjs', 'lib/security/native-ordinary-host-sources.test.cjs');
-tests.push('lib/ai-providers/fabric/chatgpt-synthetic-synthesis-binding.test.ts', 'components/settings/chatgpt-synthesis-panel.test.ts');
-if (args.includes('--browser')) tests.push('e2e/chatgpt-synthesis-product.spec.ts', 'lib/chatgpt-account/account-product.browser.test.mjs');
 const command = [join(root, 'scripts/run-strip-types.mjs'), '--test', '--test-concurrency=1', ...tests];
 console.log(JSON.stringify({ node: process.version, ownerVersion: pinned.version, ownerArchiveIntegrity: digest,
     testData: 'explicit-run-owned-synthetic', selectedTests: tests, loopbackProxy: args.includes('--loopback-proxy'),
-    browser: args.includes('--browser'), liveProvider: 'NOT_RUN', osQualification: 'NOT_RUN' }, null, 2));
+    browser: args.includes('--browser') || browserOnly, browserOnly, liveProvider: 'NOT_RUN', osQualification: 'NOT_RUN' }, null, 2));
 const result = spawnSync(process.execPath, command, { cwd: root, stdio: 'inherit', shell: false,
     env: { ...process.env, MEDIFLOW_DATA_DIR: directory, NEXT_TELEMETRY_DISABLED: '1' } });
 if (result.error) fail(`TEST_PROCESS_FAILED: ${result.error.code ?? 'unknown'}`);
