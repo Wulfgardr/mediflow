@@ -92,3 +92,66 @@ nella redazione. Cambiare una riga selezionata senza aumentare patientRevision
 nega comunque. Righe fuori dal sottoinsieme non sono fonti dell'operazione.
 La cattura ha durata massima cinque minuti, ulteriormente limitata dal lease
 originale, e nessun rinnovo. Un nuovo consenso richiede una nuova acquisizione.
+
+## Raccordo ENC nativo — WUL689_NATIVE_CLIENT_DECRYPT_20260919 (@Codex)
+
+Data: 19 settembre 2026. Base pubblica immutabile:
+`4fbb1c44d5cf674c911761cae03b1141693123f3`. Stato: candidato locale;
+nessuna ammissione clinica o qualificazione di piattaforma. Questo delta viene
+scritto prima del codice e sostituisce **soltanto** il diniego ENC incondizionato
+del raccordo Mac del 18 settembre, non le sue altre condizioni.
+
+`prepare` resta un DTO chiuso selector-only. L'host autentica sessione nativa,
+owner e selection lease, cattura il sottoinsieme ordinato già previsto e le
+revisioni/digest correnti. Prima di creare qualsiasi ordinary attempt può
+rispondere `needs_source_projection`, con grant opaco monouso e roster chiuso
+di soli selettori riga/campo. Il roster non contiene testo, ciphertext, chiavi,
+PIN o authority ricostruibile. Il grant dura al massimo 30 secondi ed è una
+risorsa del lifecycle nativo e della selezione; non rinnova il lease. La fase
+successiva ha budget 120 secondi, sempre intersecato con la scadenza originaria.
+Le catture restano limitate a cinque minuti e 16 grant pendenti per processo.
+
+Dopo il grant, il Mac effettua letture fresche HTTP tramite
+`HomeBasePatientsClient`, usando la connessione workspace corrente e la sola
+master key già sbloccata. Nessun accesso SQLite/LocalPatientsDataSource. Decifra
+in RAM esattamente i campi nominati. `POST ordinary/project` risolve l'authority
+dal grant autentico in `X-MediFlow-Ordinary-Projection`, prima del corpo.
+PI/SI/TR hanno un corpo JSON discriminato per funzione, limitato a 2 MiB,
+con righe e campi esatti e ordinati. Il limite di ogni stringa è 262144 unità
+UTF-16. Campi non cifrati restano quelli riletti dall'host. Righe/campi mancanti,
+aggiuntivi, duplicati, riordinati, altro discriminante, residui `ENC:` o
+`[LOCKED DATA]`, UTF-8/JSON non validi e plaintext non leggibile negano l'intera
+operazione: nessuna riduzione silenziosa del set.
+
+SourceRevision, cattura, scadenza, selezione, review epoch, membership,
+revisioni e digest ciphertext sono valori privati host-owned, non sostituibili
+da metadati del caller. Prima/dopo ogni attesa di acquisizione, prima/dopo
+parsing e minimizzazione, immediatamente prima del dispatch e della
+pubblicazione sono verificati gli stessi owner e source capture. La prima
+revoca osservata è terminale, incluso A→B→A. Questo non attesta mutazioni
+esterne ripristinate senza revisioni tra due osservazioni.
+
+Document Synthesis estende la source authority AnyDoc nativa già esistente:
+un locator e un witness privati nascono dalla stessa cattura del ciphertext.
+Il client rilegge e decifra `data` dell'allegato selezionato e consegna soltanto
+un corpo binario bounded (25 MiB). Il medesimo ingest AnyDoc, la sua continuazione
+OCR e il parser DS producono la proiezione; non si aggiungono reader, motori,
+percorsi OCR o decrittazione server. Il witness di ciphertext resta veto-only
+fino al dispatch e alla pubblicazione, anche dopo il finalize dei byte.
+
+La provenienza di questa acquisizione è esattamente
+`authenticated_client_decryption`, `ciphertextEquality: not_attested`.
+L'host attesta la currentness della riga cifrata e il set ricevuto dal client
+fidato, **non** un legame crittografico tra plaintext e ciphertext. Le proiezioni
+passano dai parser canonici prima dell'ordinary attempt; consenso, redazione,
+login, catalogo, provider e commit proposal-only restano invariati.
+
+`DELETE ordinary/project`, autenticato con lo stesso grant, ritira anche una
+preparazione senza attemptId. Abort, lock/logout, scadenza e invalidazione UI
+revocano sincronicamente e azzerano i buffer mutabili posseduti; unregister e
+dispose che possono rientrare negli owner sono differiti alla microtask.
+Stringhe immutabili Swift/JavaScript e copie interne dei parser seguono ARC/GC:
+non si promette secure erasure dell'intero processo. Nessuna persistenza o log
+di plaintext. Client precedenti rifiutano la nuova fase senza invio provider;
+nessun retry o fallback implicito. C2, OS, PIN, drain, packaging, writer,
+auto-apply e ammissione WUL-688 rimangono fuori scope.

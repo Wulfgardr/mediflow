@@ -13,9 +13,17 @@ import { parseNativeOrdinaryPreparation, type NativeOrdinaryPreparation } from '
 import { ExecutionError } from '../chatgpt-execution/execution-contract';
 import { reportMacProductPreparationDiagnostic } from '../chatgpt-execution/execution-mac-product';
 import { ServerSessionProjectionOwnerError } from '../security/server-session-projection-owner';
-import { captureNativeOrdinaryHostSources, readNativeOrdinaryHostSource, closeNativeOrdinaryHostSources, nativeOrdinaryHostSourcesAreCurrent,
+import { captureNativeOrdinaryProjectionSources, readNativeOrdinaryHostSource, closeNativeOrdinaryHostSources, nativeOrdinaryHostSourcesAreCurrent,
+    nativeOrdinaryHostSourceSignal, nativeOrdinaryProjectionHandedOff,
+    issueNativeOrdinaryProjection, claimNativeOrdinaryProjection, nativeOrdinaryProjectionContext,
+    nativeOrdinaryProjectionReadControl, finalizeNativeOrdinaryChartProjection, completeNativeOrdinaryProjection,
     type NativeOrdinaryHostSourceCapture, type NativeOrdinarySelectionLease } from '../security/server-session-clinical-context-native-sources';
 
+import { NATIVE_PROJECTION_HEADER } from './native-ordinary-projection-wire';
+import { readNativeOrdinaryProjectionJson } from './native-ordinary-projection-transport';
+import type { DocumentSynthesisProductionOperation } from '../ai-providers/fabric/document-synthesis-production-operation';
+type DocumentPreparation = { operation: DocumentSynthesisProductionOperation; discard(input: unknown): void; captureHandle: string; previewHandle?: string };
+const documents = new WeakMap<NativeOrdinaryHostSourceCapture, DocumentPreparation>();
 type Context = AuthenticatedWebSessionProjectionOwnerContext & { session: PairedNativeSession; request: NativeOrdinaryPreparation; selection: NativeOrdinarySelectionLease; sources: NativeOrdinaryHostSourceCapture | null };
 const scope = new AsyncLocalStorage<Context>();
 function confirm(context: Context): void {
@@ -102,44 +110,112 @@ async function originalFunction(request: Request, context: Context): Promise<Res
         return createTreatmentReasoningPreviewHttpHandler({ acquirePreview: acquireTreatmentReasoningPreview })(
             requestFor(request, { handle, requestId: requestId() }));
     }
-    const input = prepared.input;
-    const [{ acquireDocumentSynthesisProductionOperation }, { createDocumentSynthesisPreviewHttpHandler }] = await Promise.all([
-        import('../ai-providers/fabric/document-synthesis-production-operation'),
-        import('../ai-providers/fabric/document-synthesis-production-http'),
-    ]);
-    const operation = await acquireDocumentSynthesisProductionOperation(); confirm(context);
-    if (!operation) throw new ProductError('revoked');
-    const capture = await operation.capture({ attachmentId: input.attachmentId }); confirm(context);
-    if (capture.status !== 'available') throw new ProductError('revoked');
-    const ingest = await operation.ingest({ captureHandle: capture.captureHandle }); confirm(context);
-    if (ingest.status !== 'available') throw new ProductError('invalid_state');
-    return createDocumentSynthesisPreviewHttpHandler({ acquireOperation: async () => operation })(
-        requestFor(request, { previewHandle: ingest.previewHandle }));
+    const document = context.sources ? documents.get(context.sources) : null;
+    if (!document?.previewHandle) throw new ProductError('revoked');
+    const { createDocumentSynthesisPreviewHttpHandler } = await import('../ai-providers/fabric/document-synthesis-production-http');
+    confirm(context);
+    return createDocumentSynthesisPreviewHttpHandler({ acquireOperation: async () => document.operation })(
+        requestFor(request, { previewHandle: document.previewHandle }));
 }
 
-/** Only the paired Mac ingress calls this fixed four-way composition. */
+/** Document capture and binary ingest precede the ordinary attempt, but keep the same native scope. */
+async function captureDocument(context: Context): Promise<void> {
+    if (!context.sources || context.request.functionId !== 'document_synthesis') return;
+    const { acquireDocumentSynthesisProductionOperation, discardDocumentSynthesisPreparation } = await import('../ai-providers/fabric/document-synthesis-production-operation');
+    confirm(context);
+    const operation = await acquireDocumentSynthesisProductionOperation(); confirm(context);
+    if (!operation) throw new ProductError('revoked');
+    const signal = nativeOrdinaryHostSourceSignal(context.sources);
+    const captured = await operation.capture(context.request.input);
+    if (captured.status !== 'available') throw new ProductError('revoked');
+    const document: DocumentPreparation = { operation, discard: input => discardDocumentSynthesisPreparation(operation, input), captureHandle: captured.captureHandle };
+    const retire = () => {
+        documents.delete(context.sources!);
+        document.discard({ captureHandle: document.captureHandle });
+        if (document.previewHandle) document.discard({ previewHandle: document.previewHandle });
+    };
+    documents.set(context.sources, document);
+    signal.addEventListener('abort', retire, { once: true });
+    if (signal.aborted) { retire(); throw new ProductError('revoked'); }
+    confirm(context);
+}
+async function ingestDocument(context: Context, request?: Request): Promise<void> {
+    if (!context.sources || context.request.functionId !== 'document_synthesis') throw new ProductError('revoked');
+    const document = documents.get(context.sources); if (!document || document.previewHandle) throw new ProductError('revoked');
+    confirm(context);
+    const signal = nativeOrdinaryHostSourceSignal(context.sources);
+    const ingested = await document.operation.ingest({ captureHandle: document.captureHandle }, request);
+    if (ingested.status !== 'available') throw new ProductError('invalid_state');
+    document.previewHandle = ingested.previewHandle;
+    if (signal.aborted) { document.discard({ previewHandle: ingested.previewHandle }); throw new ProductError('revoked'); }
+    confirm(context);
+}
+async function beginPrepared(request: Request, context: Context): Promise<Response> {
+    if (!context.sources) throw new ProductError('revoked');
+    completeNativeOrdinaryProjection(context.sources); confirm(context);
+    // Both prepare and project ingress streams may already be disturbed; never reuse their body.
+    const identity = new Request(request.url, { method: 'POST', headers: request.headers,
+        signal: AbortSignal.any([request.signal, nativeOrdinaryHostSourceSignal(context.sources)]) });
+    const response = await beginOrdinaryFunction(identity, context.request.functionId, context.session, ownedRequest => scope.run(context, async () => {
+        const response = await originalFunction(ownedRequest, context); confirm(context); return response;
+    }));
+    // A lane-disabled original handler may have already closed its source. Never resurrect it.
+    if (nativeOrdinaryHostSourcesAreCurrent(context.sources)) nativeOrdinaryProjectionHandedOff(context.sources);
+    return response;
+}
+/** Only the paired Mac ingress calls this fixed four-way composition. No attempt exists during a grant. */
 export async function prepareNativeOrdinary(request: Request, session: PairedNativeSession, input: NativeOrdinaryPreparation): Promise<Response> {
-    // Revalidate even direct internal calls BEFORE owner acquisition/operation creation.
     input = parseNativeOrdinaryPreparation(input);
     const port = native.mintResourcePort(session);
     if (!port) throw new ProductError('session_expired');
+    let sources: NativeOrdinaryHostSourceCapture | null = null;
+    const cancel = () => { if (sources) closeNativeOrdinaryHostSources(sources); };
+    request.signal.addEventListener('abort', cancel, { once: true });
     try {
+        if (request.signal.aborted) throw new ProductError('revoked');
         const owner = nativeSessionProjectionOwnerRegistry.acquire(session);
-        return await beginOrdinaryFunction(request, input.functionId, session, async ownedRequest => {
-            const service = createAuthenticatedWebSessionSelectionService({ acquireOwner: async () => owner });
-            const selection = await service.issue({ expectedEpoch: owner.snapshotSelectionEpoch(session),
-                patientId: input.patientId, ambulatoryId: input.ambulatoryId });
-            const sources = input.functionId === 'document_synthesis' ? null : captureNativeOrdinaryHostSources(session, owner, input, selection);
-            const context: Context = Object.freeze({ session, owner, request: input, selection, sources });
-            try {
-                confirm(context);
-                return await scope.run(context, async () => {
-                    const response = await originalFunction(ownedRequest, context);
-                    confirm(context); // Original parser/commit is not a bypass of host-source currentness.
-                    return response;
-                });
-            } catch (error) { if (sources) closeNativeOrdinaryHostSources(sources); throw error; }
+        const service = createAuthenticatedWebSessionSelectionService({ acquireOwner: async () => owner });
+        const selection = await service.issue({ expectedEpoch: owner.snapshotSelectionEpoch(session),
+            patientId: input.patientId, ambulatoryId: input.ambulatoryId });
+        if (request.signal.aborted) throw new ProductError('revoked');
+        sources = captureNativeOrdinaryProjectionSources(session, owner, input, selection);
+        const context: Context = Object.freeze({ session, owner, request: input, selection, sources });
+        return await scope.run(context, async () => {
+            confirm(context);
+            const plan = issueNativeOrdinaryProjection(sources!);
+            if (input.functionId === 'document_synthesis') await captureDocument(context);
+            confirm(context);
+            if (request.signal.aborted) throw new ProductError('revoked');
+            if (plan) return Response.json({ schema: 'mediflow.native-ordinary.v1', phase: 'needs_source_projection',
+                functionId: input.functionId, expiresAt: plan.expiresAt, sourceProjection: plan },
+                { status: 202, headers: { 'Cache-Control': 'no-store' } });
+            if (input.functionId === 'document_synthesis') await ingestDocument(context);
+            return beginPrepared(request, context);
         });
-    } catch (error) { nativePreparationFailure(error); }
-    finally { native.releaseResourcePort(port); }
+    } catch (error) { cancel(); nativePreparationFailure(error); }
+    finally { request.signal.removeEventListener('abort', cancel); native.releaseResourcePort(port); }
+}
+/** Claims before any body read; header, MIME and body never select the source or function. */
+export async function projectNativeOrdinary(request: Request, session: PairedNativeSession): Promise<Response> {
+    const capture = claimNativeOrdinaryProjection(session, request.headers.get(NATIVE_PROJECTION_HEADER));
+    const cancel = () => closeNativeOrdinaryHostSources(capture);
+    request.signal.addEventListener('abort', cancel, { once: true });
+    try {
+        if (request.signal.aborted || request.headers.has('content-encoding')) throw new ProductError('revoked');
+        const context: Context = nativeOrdinaryProjectionContext(capture);
+        return await scope.run(context, async () => {
+            confirm(context);
+            if (context.request.functionId === 'document_synthesis') {
+                if (request.headers.get('content-type') !== 'application/octet-stream') throw new ProductError('invalid_request');
+                await ingestDocument(context, request);
+            } else {
+                const body = await readNativeOrdinaryProjectionJson(request, nativeOrdinaryProjectionReadControl(capture));
+                confirm(context); finalizeNativeOrdinaryChartProjection(capture, body);
+            }
+            confirm(context);
+            if (request.signal.aborted) throw new ProductError('revoked');
+            return beginPrepared(request, context);
+        });
+    } catch (error) { cancel(); nativePreparationFailure(error); }
+    finally { request.signal.removeEventListener('abort', cancel); }
 }

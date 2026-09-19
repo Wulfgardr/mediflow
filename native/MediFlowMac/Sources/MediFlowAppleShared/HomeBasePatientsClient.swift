@@ -33,6 +33,30 @@ public actor HomeBasePatientsClient {
             body: encode(preparation))
         return try decode(NativeOrdinaryResponse.self, from: data)
     }
+    /* @Codex — only the named pre-attempt projection endpoint accepts these bounded bytes. */
+    public func projectNativeOrdinary(_ plan: NativeOrdinaryProjectionPlan, body: Data,
+                                      credentials: HomeBasePairedCredentials, sessionCookie: String,
+                                      ambulatoryId: String?) async throws -> NativeOrdinaryResponse {
+        let maximum = plan.functionId == .documentSynthesis ? 25 * 1024 * 1024 : 2 * 1024 * 1024
+        guard NativeOrdinaryDisclosure.matches(plan.grantId, "^[a-f0-9]{64}$"), !body.isEmpty, body.count <= maximum else { throw NativeOrdinaryContractError.invalid }
+        let url = try configuration.apiBaseURL().appendingPathComponent("network/ai/chatgpt/ordinary/project")
+        let headers = pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId).merging([
+            "X-MediFlow-Ordinary-Projection": plan.grantId, "Cache-Control": "no-store",
+            "Content-Type": plan.functionId == .documentSynthesis ? "application/octet-stream" : "application/json"
+        ]) { _, new in new }
+        let (data, _) = try await send(to: url, method: "POST", headers: headers, body: body)
+        return try decode(NativeOrdinaryResponse.self, from: data)
+    }
+    public func cancelNativeOrdinaryProjection(_ plan: NativeOrdinaryProjectionPlan, credentials: HomeBasePairedCredentials,
+                                               sessionCookie: String, ambulatoryId: String?) async throws -> NativeOrdinaryResponse {
+        guard NativeOrdinaryDisclosure.matches(plan.grantId, "^[a-f0-9]{64}$") else { throw NativeOrdinaryContractError.invalid }
+        let url = try configuration.apiBaseURL().appendingPathComponent("network/ai/chatgpt/ordinary/project")
+        let headers = pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId).merging([
+            "X-MediFlow-Ordinary-Projection": plan.grantId, "Cache-Control": "no-store"
+        ]) { _, new in new }
+        let (data, _) = try await send(to: url, method: "DELETE", headers: headers)
+        return try decode(NativeOrdinaryResponse.self, from: data)
+    }
     public func commandNativeOrdinary(_ command: NativeOrdinaryCommand, credentials: HomeBasePairedCredentials,
                                       sessionCookie: String, ambulatoryId: String?) async throws -> NativeOrdinaryResponse {
         let url = try configuration.apiBaseURL().appendingPathComponent("network/ai/chatgpt/ordinary/\(command.path)")
@@ -492,6 +516,18 @@ public actor HomeBasePatientsClient {
         sessionCookie: String,
         ambulatoryId: String?
     ) async throws -> HomeBasePatientDetail {
+        // @Codex: preserve the data-source protocol witness; native projection opts into a fresh read explicitly.
+        try await fetchPatient(id: id, credentials: credentials, sessionCookie: sessionCookie,
+                               ambulatoryId: ambulatoryId, fresh: false)
+    }
+
+    public func fetchPatient(
+        id: String,
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?,
+        fresh: Bool
+    ) async throws -> HomeBasePatientDetail {
         let url = try configuration.apiBaseURL()
             .appendingPathComponent("network")
             .appendingPathComponent("patients")
@@ -502,7 +538,7 @@ public actor HomeBasePatientsClient {
                 "x-mediflow-paired-client-id": credentials.clientId,
                 "x-mediflow-paired-client-token": credentials.clientToken,
                 "Cookie": Self.cookieHeader(sessionCookie: sessionCookie, ambulatoryId: ambulatoryId),
-            ]
+            ].merging(fresh ? ["Cache-Control": "no-store"] : [:]) { _, new in new }
         )
         return try decode(HomeBasePatientDetail.self, from: data)
     }
@@ -578,6 +614,19 @@ public actor HomeBasePatientsClient {
         ambulatoryId: String?,
         limit: Int = HomeBaseClinicalListLimit.boundaryMaximum
     ) async throws -> [HomeBaseEntrySummary] {
+        // @Codex: preserve the protocol witness while keeping cache bypass explicit at the projection boundary.
+        try await fetchEntries(patientId: patientId, credentials: credentials, sessionCookie: sessionCookie,
+                               ambulatoryId: ambulatoryId, limit: limit, fresh: false)
+    }
+
+    public func fetchEntries(
+        patientId: String,
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?,
+        limit: Int = HomeBaseClinicalListLimit.boundaryMaximum,
+        fresh: Bool
+    ) async throws -> [HomeBaseEntrySummary] {
         let url = try configuration.apiBaseURL()
             .appendingPathComponent("network")
             .appendingPathComponent("patients")
@@ -588,7 +637,7 @@ public actor HomeBasePatientsClient {
             ])
         let (data, _) = try await send(
             to: url,
-            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId).merging(fresh ? ["Cache-Control": "no-store"] : [:]) { _, new in new }
         )
         return try decode([HomeBaseEntrySummary].self, from: data)
     }
@@ -684,6 +733,19 @@ public actor HomeBasePatientsClient {
         sessionCookie: String,
         ambulatoryId: String?
     ) async throws -> HomeBaseAttachmentDetail {
+        // @Codex: preserve the data-source protocol witness; sensitive projection reads pass fresh explicitly.
+        try await fetchAttachment(patientId: patientId, attachmentId: attachmentId, credentials: credentials,
+                                  sessionCookie: sessionCookie, ambulatoryId: ambulatoryId, fresh: false)
+    }
+
+    public func fetchAttachment(
+        patientId: String,
+        attachmentId: String,
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?,
+        fresh: Bool
+    ) async throws -> HomeBaseAttachmentDetail {
         let url = try configuration.apiBaseURL()
             .appendingPathComponent("network")
             .appendingPathComponent("patients")
@@ -692,7 +754,7 @@ public actor HomeBasePatientsClient {
             .appendingPathComponent(attachmentId)
         let (data, _) = try await send(
             to: url,
-            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId).merging(fresh ? ["Cache-Control": "no-store"] : [:]) { _, new in new }
         )
         return try decode(HomeBaseAttachmentDetail.self, from: data)
     }
@@ -759,6 +821,19 @@ public actor HomeBasePatientsClient {
         ambulatoryId: String?,
         limit: Int = HomeBaseClinicalListLimit.boundaryMaximum
     ) async throws -> [HomeBaseTherapySummary] {
+        // @Codex: preserve the protocol witness while keeping cache bypass explicit at the projection boundary.
+        try await fetchTherapies(patientId: patientId, credentials: credentials, sessionCookie: sessionCookie,
+                                 ambulatoryId: ambulatoryId, limit: limit, fresh: false)
+    }
+
+    public func fetchTherapies(
+        patientId: String,
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?,
+        limit: Int = HomeBaseClinicalListLimit.boundaryMaximum,
+        fresh: Bool
+    ) async throws -> [HomeBaseTherapySummary] {
         let url = try configuration.apiBaseURL()
             .appendingPathComponent("network")
             .appendingPathComponent("patients")
@@ -769,7 +844,7 @@ public actor HomeBasePatientsClient {
             ])
         let (data, _) = try await send(
             to: url,
-            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId).merging(fresh ? ["Cache-Control": "no-store"] : [:]) { _, new in new }
         )
         return try decode([HomeBaseTherapySummary].self, from: data)
     }
@@ -963,6 +1038,19 @@ public actor HomeBasePatientsClient {
         ambulatoryId: String?,
         limit: Int = HomeBaseClinicalListLimit.boundaryMaximum
     ) async throws -> [HomeBaseObservationSummary] {
+        // @Codex: preserve the protocol witness while keeping cache bypass explicit at the projection boundary.
+        try await fetchObservations(patientId: patientId, credentials: credentials, sessionCookie: sessionCookie,
+                                    ambulatoryId: ambulatoryId, limit: limit, fresh: false)
+    }
+
+    public func fetchObservations(
+        patientId: String,
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?,
+        limit: Int = HomeBaseClinicalListLimit.boundaryMaximum,
+        fresh: Bool
+    ) async throws -> [HomeBaseObservationSummary] {
         let url = try configuration.apiBaseURL()
             .appendingPathComponent("network")
             .appendingPathComponent("patients")
@@ -973,7 +1061,7 @@ public actor HomeBasePatientsClient {
             ])
         let (data, _) = try await send(
             to: url,
-            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId).merging(fresh ? ["Cache-Control": "no-store"] : [:]) { _, new in new }
         )
         return try decode([HomeBaseObservationSummary].self, from: data)
     }
@@ -1416,12 +1504,19 @@ public actor HomeBasePatientsClient {
         for (key, value) in headers {
             request.setValue(value, forHTTPHeaderField: key)
         }
-        if body != nil {
+        if body != nil && request.value(forHTTPHeaderField: "Content-Type") == nil {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         }
 
+        if request.value(forHTTPHeaderField: "Cache-Control") == "no-store" {
+            request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+        }
         do {
-            let (data, response) = try await session.data(for: request)
+            try Task.checkCancellation()
+            let sensitive = request.value(forHTTPHeaderField: "Cache-Control") == "no-store"
+                || url.path.hasPrefix("/api/v1/network/ai/chatgpt/ordinary/")
+            let (data, response) = try await session.data(for: request,
+                delegate: sensitive ? NativeOrdinaryNoRedirectDelegate() : nil)
             guard let httpResponse = response as? HTTPURLResponse else {
                 throw HomeBaseClientError.contract
             }
@@ -1629,4 +1724,12 @@ private struct AmbulatoryClearRequest: Encodable {
 public struct HomeBaseCreatedResource: Decodable, Equatable, Sendable {
     public let id: String
     public let version: Int?
+}
+
+/* @Codex — the paired source/ordinary operation cannot redirect its credentials or projection. */
+private final class NativeOrdinaryNoRedirectDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+    func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
+                    newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
+        completionHandler(nil)
+    }
 }

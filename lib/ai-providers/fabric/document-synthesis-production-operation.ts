@@ -29,7 +29,7 @@ type Currentness = Readonly<{ documentSourceRef: string; documentRevision: numbe
 type Pair = Readonly<{ patientId: string; ambulatoryId: string }>;
 type Capture = Readonly<{ attachmentId: string; pair: Pair; currentness: Currentness; selectionEpoch: number; reviewContextEpoch: number }>;
 type Preview = Capture & Readonly<{ sourceText: string; sourceSetEpoch: bigint }>;
-type Broker = { captures: Map<string, Capture>; previews: Map<string, Preview>; handles: Set<string>; nextEpoch: bigint; dispose(): void };
+type Broker = { captures: Map<string, Capture>; previews: Map<string, Preview>; handles: Set<string>; discarded: Set<string>; nextEpoch: bigint; dispose(): void };
 
 type DenialCode = 'input_invalid' | 'operation_unavailable' | 'capture_consumed' | 'preview_consumed'
     | 'selection_changed' | 'currentness_mismatch' | 'lane_disabled' | 'unsupported_local_extraction';
@@ -61,6 +61,7 @@ const MAX_U64 = BigInt('18446744073709551615');
 const MAX_SESSION_HANDLES = 256;
 const TEST_HARNESS = process.execArgv.some((argument) => argument === '--test' || argument.startsWith('--test=') || argument.startsWith('--test-'));
 // Authentic Web projections change per resolve; their canonical owner owns the lineage.
+const operationBrokers = new WeakMap<DocumentSynthesisProductionOperation, Broker>();
 const brokers = new WeakMap<AuthenticatedWebSessionProjectionOwnerContext['owner'], Broker>();
 
 function captureDenied(code: DenialCode): CaptureResult { return Object.freeze({ status: 'denied', code, captureHandle: null }); }
@@ -144,8 +145,8 @@ function brokerFor(context: AuthenticatedWebSessionProjectionOwnerContext, depen
     const existing = brokers.get(context.owner); if (existing) return existing;
     let unregister: (() => void) | null = null;
     const broker: Broker = {
-        captures: new Map(), previews: new Map(), handles: new Set(), nextEpoch: BigInt(0),
-        dispose() { broker.captures.clear(); broker.previews.clear(); broker.handles.clear(); brokers.delete(context.owner); const release = unregister; unregister = null; release?.(); },
+        captures: new Map(), previews: new Map(), handles: new Set(), discarded: new Set(), nextEpoch: BigInt(0),
+        dispose() { broker.captures.clear(); broker.previews.clear(); broker.handles.clear(); broker.discarded.clear(); brokers.delete(context.owner); const release = unregister; unregister = null; release?.(); },
     };
     try { unregister = dependencies.registerResource(context, broker.dispose); } catch { return null; }
     if (!unregister) return null;
@@ -177,6 +178,7 @@ function createOperation(context: AuthenticatedWebSessionProjectionOwnerContext,
                 });
             } catch { return captureDenied('operation_unavailable'); }
         },
+        /* @Codex — retire only retained host handles; no external route or writer. */
         async ingest(input: unknown, request = new Request('http://localhost/api/ai/document-synthesis/ingest', { method: 'POST' })): Promise<IngestResult> {
             const parsed = exact(input, ['captureHandle']); const handle = parsed?.captureHandle;
             if (typeof handle !== 'string' || !CAPTURE_HANDLE.test(handle) || !(request instanceof Request)) return ingestDenied('input_invalid');
@@ -194,6 +196,7 @@ function createOperation(context: AuthenticatedWebSessionProjectionOwnerContext,
             let extraction: LocalExtractionResult;
             try { extraction = await dependencies.extract(context.session, capture.attachmentId, request); }
             catch { return ingestDenied('operation_unavailable'); }
+            if (broker.discarded.has(handle) || request.signal.aborted) return ingestDenied('capture_consumed');
             if (extraction.status === 'review_required' && extraction.reason === 'unsupported_local_extraction') return ingestDenied('unsupported_local_extraction');
             const projection = resolveDocumentSynthesisAnyDocProjection(extraction, capture.attachmentId);
             if (!projection) return ingestDenied('operation_unavailable');
@@ -201,6 +204,7 @@ function createOperation(context: AuthenticatedWebSessionProjectionOwnerContext,
                 return context.owner.withLeaseCriticalSection(context.session, (selection) => {
                     if (!selectionAgrees(context, capture, selection)) return ingestDenied('selection_changed');
                     if (!sameCurrentness(capture.currentness, read(capture))) return ingestDenied('currentness_mismatch');
+                    if (broker.discarded.has(handle) || request.signal.aborted) return ingestDenied('capture_consumed');
                     if (broker.nextEpoch >= MAX_U64 || broker.handles.size >= MAX_SESSION_HANDLES) return ingestDenied('operation_unavailable');
                     const previewHandle = mint('dsp_', dependencies.entropy());
                     if (!previewHandle || broker.handles.has(previewHandle)) return ingestDenied('operation_unavailable');
@@ -243,7 +247,17 @@ function createOperation(context: AuthenticatedWebSessionProjectionOwnerContext,
             finally { try { capsule?.dispose(); } catch { /* terminal cleanup is best effort */ } }
         },
     });
+    operationBrokers.set(operation, broker);
     return operation;
+}
+
+/** @Codex — revoke-only cleanup; a DTO or another operation cannot address this private broker. */
+export function discardDocumentSynthesisPreparation(operation: DocumentSynthesisProductionOperation, input: unknown): void {
+    const broker = operationBrokers.get(operation); if (!broker) return;
+    const parsed = exact(input, ['captureHandle']) ?? exact(input, ['previewHandle']);
+    const handle = parsed?.captureHandle ?? parsed?.previewHandle;
+    if (typeof handle !== 'string' || !broker.handles.has(handle)) return;
+    broker.discarded.add(handle); broker.captures.delete(handle); broker.previews.delete(handle);
 }
 
 function factory(dependencies: Dependencies) {

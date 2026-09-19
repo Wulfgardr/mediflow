@@ -1,7 +1,7 @@
 /* @Codex — named host orchestration. Original function handlers own acquisition
  * and publication. This registry never turns a prompt/source/DTO into authority. */
 import 'server-only';
-import { nativeOrdinaryHostSourcesAreCurrent, readNativeOrdinaryHostSource, closeNativeOrdinaryHostSources,
+import { nativeOrdinaryHostSourceSignal, nativeOrdinarySourceMatchesGrant, nativeOrdinarySourceAcquisition, nativeOrdinaryHostSourcesAreCurrent, readNativeOrdinaryHostSource, closeNativeOrdinaryHostSources,
     type NativeOrdinaryHostSourceCapture } from '../security/server-session-clinical-context-native-sources';
 import type { PairedNativeSession } from '../security/paired-native-session';
 import { AsyncLocalStorage } from 'node:async_hooks';
@@ -25,7 +25,7 @@ type Entry = {
     generation: owner.AuthenticationGeneration; session: owner.OrdinarySession; port: owner.ResourcePort;
     id: string; functionId: OrdinaryFunction; controller: AbortController; active: boolean; busy: boolean; claimed: boolean;
     publishing: boolean; delivered: boolean; expiresAt: number; deadline: number; attempt?: Attempt; catalog?: SynthesisCatalog;
-    nativeSources?: NativeOrdinaryHostSourceCapture;
+    nativeSources?: NativeOrdinaryHostSourceCapture; detachNativeSources?: () => void;
     applicationCurrent?: () => boolean; knownIdentifiers?: RedactionSessionInput['knownIdentifiers'];
     sourceCurrent?: () => boolean; sourceTimer?: ReturnType<typeof setInterval>; timer?: ReturnType<typeof setTimeout>;
     initial: Deferred<Response>; output: Deferred<OrdinaryExecutionResult>; original?: Promise<Response>;
@@ -57,7 +57,7 @@ function guard(entry: Entry, withSource = true) {
 }
 async function close(entry: Entry): Promise<Readonly<{ cleanupConfirmed: boolean }>> {
     if (entry.cleanup) return entry.cleanup;
-    entry.active = false; entry.controller.abort();
+    entry.active = false; entry.detachNativeSources?.(); entry.detachNativeSources = undefined; entry.controller.abort();
     if (entry.nativeSources) closeNativeOrdinaryHostSources(entry.nativeSources); clearTimeout(entry.timer); clearInterval(entry.sourceTimer);
     entry.output.reject(new ProductError('revoked')); entry.initial.reject(new ProductError('revoked'));
     entry.cleanup = Promise.resolve().then(async () => {
@@ -89,7 +89,20 @@ export function bindNativeOrdinaryHostSources(capture: NativeOrdinaryHostSourceC
     const entry = scope.getStore();
     if (!entry || entry.session.authChannel !== 'native' || entry.claimed || entry.nativeSources) throw new ProductError('invalid_request');
     readNativeOrdinaryHostSource(capture, entry.session as PairedNativeSession, entry.functionId);
-    entry.nativeSources = capture; guard(entry);
+    entry.nativeSources = capture;
+    const signal = nativeOrdinaryHostSourceSignal(capture), retire = () => { void close(entry); };
+    signal.addEventListener('abort', retire, { once: true });
+    entry.detachNativeSources = () => signal.removeEventListener('abort', retire);
+    if (signal.aborted) { retire(); throw new ProductError('revoked'); }
+    guard(entry);
+}
+/** The old grant can retire ONLY the attempt bound to that exact authentic capture, including a failed-cleanup tombstone. */
+export async function cancelNativeOrdinaryProjectionAttempt(session: PairedNativeSession, grantId: unknown): Promise<boolean> {
+    const identity = acquireOrdinarySessionResourceIdentity(session);
+    if (!identity) throw new ProductError('session_expired');
+    const entry = entries.get(identity.generation); owner.releaseResourcePort(identity.port);
+    if (!entry?.nativeSources || !nativeOrdinarySourceMatchesGrant(entry.nativeSources, session, grantId)) return true;
+    return (await close(entry)).cleanupConfirmed;
 }
 /** Reads only the fact that this exact host handler is in the fixed remote scope. */
 export function isOrdinaryFunctionSelected(functionId: OrdinaryFunction): boolean {
@@ -104,7 +117,7 @@ export async function executeOwnedOrdinaryProfile(functionId: OrdinaryFunction, 
     current: () => boolean, knownIdentifiers?: RedactionSessionInput['knownIdentifiers']): Promise<OrdinaryExecutionResult> {
     const entry = scope.getStore();
     if (!entry || entry.functionId !== functionId || entry.claimed || !entry.applicationCurrent || readOrdinaryTaskProfile(profile).functionId !== functionId) throw new ProductError('invalid_request');
-    if (entry.session.authChannel === 'native' && functionId !== 'document_synthesis' && !entry.nativeSources) throw new ProductError('revoked');
+    if (entry.session.authChannel === 'native' && !entry.nativeSources) throw new ProductError('revoked');
     guard(entry); if (!current()) throw new ProductError('revoked');
     entry.claimed = true; entry.sourceCurrent = current;
     entry.sourceTimer = setInterval(() => { try { guard(entry); } catch { void close(entry); } }, 50); entry.sourceTimer.unref?.();
@@ -124,7 +137,8 @@ export async function executeOwnedOrdinaryProfile(functionId: OrdinaryFunction, 
         try { guard(entry); } catch (error) { await attempt.dispose(); throw error; }
         const disclosure = await attempt.prepare(profile, randomUUID(), governed.configuration, entry.controller.signal, entry.knownIdentifiers ?? knownIdentifiers);
         guard(entry);
-        entry.initial.resolve(reply({ ...snapshot(entry), disclosure }, 202));
+        const acquisition = entry.nativeSources ? nativeOrdinarySourceAcquisition(entry.nativeSources) : null;
+        entry.initial.resolve(reply({ ...snapshot(entry), disclosure, ...(acquisition ? { acquisition } : {}) }, 202));
         disclosurePrepared = true;
         const result = await entry.output.promise;
         if (result !== entry.result || result.functionId !== functionId || !entry.attempt.isCurrent(result)) throw new ProductError('revoked');
@@ -149,6 +163,7 @@ export function ordinaryResultMetadata(result: OrdinaryExecutionResult): Readonl
 /** The route passes the authenticated projection; identity is minted BEFORE lookup. */
 export async function beginOrdinaryFunction(request: Request, functionId: OrdinaryFunction, session: owner.OrdinarySession,
     originalHandler: (request: Request) => Promise<Response>): Promise<Response> {
+    if (request.signal.aborted) throw new ProductError('revoked');
     const identity = acquireOrdinarySessionResourceIdentity(session);
     if (!identity) throw new ProductError('session_expired');
     const previous = entries.get(identity.generation);
@@ -166,6 +181,7 @@ export async function beginOrdinaryFunction(request: Request, functionId: Ordina
     entries.set(entry.generation, entry);
     request.signal.addEventListener('abort', retire, { once: true });
     try {
+        if (request.signal.aborted) throw new ProductError('revoked');
         const settings = await readOrdinaryCloudSettings(); guard(entry);
         if (!settings.enabled) throw new ProductError('unqualified_boundary');
         const headers = new Headers(request.headers); headers.delete(key);
