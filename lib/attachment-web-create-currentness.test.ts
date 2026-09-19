@@ -28,6 +28,7 @@ try {
 const { createWebAttachment } = await import('./attachment-web-create.ts');
 const route = await import('../app/api/attachments/route.ts');
 const detailRoute = await import('../app/api/attachments/[id]/route.ts');
+const { dbServer } = await import('./db-server.ts');
 const requireCurrent = createRequire(import.meta.url);
 const serverAuth = requireCurrent('./security/server-auth') as { requireSession: () => Promise<unknown> };
 
@@ -93,6 +94,53 @@ test('web creation persists a production lower-hex initial host tuple', async ()
     assert.match(created?.document_source_ref as string, /^[0-9a-f]{64}$/u);
     assert.equal(created?.document_revision, 1);
     assert.equal(created?.document_freshness_epoch, 1);
+});
+
+test('web creation reserves the WAL writer before validating the active patient', async () => {
+    reset();
+    const transaction = dbServer.transaction.bind(dbServer);
+    const contender = new Database(dbPath);
+    contender.pragma('busy_timeout = 1');
+    let contenderResult = 'not_attempted';
+    const interceptGet = (target: object): object => new Proxy(target, {
+        get(object, property, receiver) {
+            const value = Reflect.get(object, property, receiver) as unknown;
+            if (typeof value !== 'function') return value;
+            if (property === 'get') return (...args: unknown[]) => {
+                const selected = Reflect.apply(value, object, args) as unknown;
+                try {
+                    contender.prepare('UPDATE patients SET first_name = ? WHERE id = ?')
+                        .run('Concurrent Synthetic', patientId);
+                    contenderResult = 'committed';
+                } catch (error) {
+                    contenderResult = error && typeof error === 'object' && 'code' in error
+                        ? String(error.code) : 'unknown_error';
+                }
+                return selected;
+            };
+            return (...args: unknown[]) => {
+                const result = Reflect.apply(value, object, args) as unknown;
+                return result && typeof result === 'object' ? interceptGet(result) : result;
+            };
+        },
+    });
+    try {
+        dbServer.transaction = ((callback: Parameters<typeof dbServer.transaction>[0], config?: Parameters<typeof dbServer.transaction>[1]) =>
+            transaction((tx) => callback(new Proxy(tx, {
+                get(target, property, receiver) {
+                    const value = Reflect.get(target, property, receiver) as unknown;
+                    if (property !== 'select' || typeof value !== 'function') return value;
+                    return (...args: unknown[]) => interceptGet(Reflect.apply(value, target, args) as object);
+                },
+            })), config)) as typeof dbServer.transaction;
+        const response = await invoke(request(payload({ id: 'attachment.synthetic.writer-lock' })));
+        assert.equal(response.status, 201);
+        assert.equal(contenderResult, 'SQLITE_BUSY');
+        assert.equal(rows().some((row) => row.id === 'attachment.synthetic.writer-lock'), true);
+    } finally {
+        dbServer.transaction = transaction;
+        contender.close();
+    }
 });
 
 test('web creation denies absent auth, invalid input, currentness injection, and missing patients', async () => {
