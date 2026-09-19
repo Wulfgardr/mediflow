@@ -94,7 +94,11 @@ export function launchMacCustodian(root: string, nonce: string, mode: 'probe' | 
     channel.on('error', () => { if (!closing) failure(true); });
     channel.on('end', () => { if (buffer || !closing && sequence.reason === null) failure(); });
     const heartbeat = setInterval(() => {
-        if (!closing) { command('P\n'); if (sequence.started && !sequence.live(performance.now())) failure(); }
+        if (!closing) {
+            const lease = sequence.leaseTick(performance.now());
+            if (lease === 'renew') command('P\n');
+            else if (lease === 'expired') failure();
+        }
     }, 100);
     // Do not unref this lease: an outstanding child is a live owned resource.
     command('P\n');

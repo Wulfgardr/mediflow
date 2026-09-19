@@ -55,6 +55,10 @@ export class MacOwnerSequence {
         return !this.#failed && !this.#exited && !this.#stop && this.#pid !== null
             && Number.isFinite(now) && now >= this.#last && now - this.#last <= 350;
     }
+    leaseTick(now: number): 'renew' | 'expired' | 'stopped' {
+        if (this.#stop) return 'stopped';
+        return this.#pid !== null && !this.live(now) ? 'expired' : 'renew';
+    }
     get started(): boolean { return this.#pid !== null && !this.#failed; }
     get failed(): boolean { return this.#failed; }
     get drained(): boolean { return !this.#invalid && this.#exited && this.#exitAccepted && (this.#noChild || this.#stop !== null); }

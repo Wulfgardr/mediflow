@@ -80,9 +80,10 @@ test('same-run status framing rejects replay, wrong nonce, oversized, negative p
     }
 });
 test('native custody is current only while live, with strictly ordered same-pid observations', () => {
-    const s = new MacOwnerSequence(); assert.equal(s.live(0), false);
+    const s = new MacOwnerSequence(); assert.equal(s.live(0), false); assert.equal(s.leaseTick(0), 'renew');
     s.accept(frame(1, 'START', 123), 100); assert.equal(s.live(100), true); assert.equal(s.live(99), false);
-    assert.equal(s.live(451), false); s.accept(frame(2, 'LIVE', 123), 200);
+    assert.equal(s.leaseTick(100), 'renew'); assert.equal(s.live(451), false); assert.equal(s.leaseTick(451), 'expired');
+    s.accept(frame(2, 'LIVE', 123), 200);
     assert.equal(s.live(549), true); assert.equal(s.drained, false);
     assert.throws(() => s.accept(frame(2, 'LIVE', 123), 201), rejected);
     assert.equal(s.live(202), false);
@@ -107,6 +108,13 @@ test('leader exit/timeout is not a verified tree drain; actual STOP plus supervi
     s.accept(frame(2, 'STOP', -15, 1), 20); assert.equal(s.live(20), false); assert.equal(s.drained, false);
     s.exited(0, null); assert.equal(s.drained, true);
     const lost = new MacOwnerSequence(); lost.accept(frame(1, 'START', 123), 10); lost.exited(null, 'SIGKILL'); assert.equal(lost.drained, false);
+});
+test('a lease tick between a successful STOP and supervisor close preserves the terminal witness', () => {
+    const s = new MacOwnerSequence(); s.accept(frame(1, 'START', 123), 10);
+    s.accept(frame(2, 'STOP', 0), 100);
+    assert.equal(s.leaseTick(200), 'stopped');
+    assert.equal(s.failed, false); assert.equal(s.drained, false);
+    s.exited(0, null); assert.equal(s.drained, true);
 });
 test('expiry/policy revokes qualification even when authentic reaping permits cleanup', () => {
     const s = new MacOwnerSequence(); s.accept(frame(1, 'START', 123), 10);
