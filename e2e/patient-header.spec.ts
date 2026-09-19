@@ -24,7 +24,7 @@ async function createPatient(
 
 // WUL-560: the canonical patient view is /patients/:id/modules. Its Scheda semantics
 // expose the lead diagnosis in Riepilogo clinico and the secondary coding in
-// Anagrafica. Keep every code, description and system assertion scoped to
+// Clinica. Keep every code, description and system assertion scoped to
 // the current region so a duplicated or stale aggregate string cannot satisfy the test.
 test('Scheda paziente renders coded diagnoses and an explicit no-diagnosis state', async ({ page }) => {
   const pin = process.env.E2E_PIN || '1234';
@@ -109,7 +109,9 @@ test('Scheda paziente renders coded diagnoses and an explicit no-diagnosis state
   await expect(secondaryDiagnosisItem).toContainText('BA00 · ICD-11');
   await expect(secondaryDiagnosisItem).not.toHaveAttribute('title');
   await expect(secondaryDiagnosisItem).toMatchAriaSnapshot(
-    `- listitem: ${secondaryDiagnosisDescription} BA00 · ICD-11`
+    `- listitem:
+  - strong: ${secondaryDiagnosisDescription}
+  - text: BA00 · ICD-11`
   );
 
   await page.goto(`/patients/${patientWithoutDiagnosisId}/modules`);

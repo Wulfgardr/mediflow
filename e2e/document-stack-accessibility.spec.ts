@@ -128,7 +128,7 @@ test('Evidence Stack web: fixture popolata, curation, empty ed errore restano ve
   const clearArchive = archive.getByRole('button', { name: 'Svuota archivio', exact: true });
   await clearArchive.click();
   await page.getByRole('dialog').getByRole('button', { name: 'Svuota', exact: true }).click();
-  await expect(page.getByTestId('patient-documents').getByText('Nessun documento caricato.', { exact: true })).toBeVisible();
+  await expect(page.getByTestId('patient-documents').getByText('Nessun documento caricato. Aggiungi un file per consultarlo e, separatamente, richiedere una sintesi.', { exact: true })).toBeVisible();
   await expect(page.getByTestId('document-insights-archive')).toHaveCount(0);
 
   const errorMarker = `${Date.now()}`.slice(-8);
@@ -167,6 +167,6 @@ test('Evidence Stack web: loading ed empty hanno segnali distinti', async ({ pag
 
   await openPatientSection(page, 'documenti');
   await expect(page.locator('#documenti').getByRole('heading', { name: /Archivio documenti ed evidenze/ })).toBeVisible();
-  await expect(page.getByTestId('patient-documents').getByText('Nessun documento caricato.', { exact: true })).toBeVisible();
+  await expect(page.getByTestId('patient-documents').getByText('Nessun documento caricato. Aggiungi un file per consultarlo e, separatamente, richiedere una sintesi.', { exact: true })).toBeVisible();
   await expect(page.getByTestId('document-insights-archive')).toHaveCount(0);
 });
