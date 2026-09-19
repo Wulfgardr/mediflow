@@ -43,8 +43,6 @@ const SESSION_TEST_INVENTORY_DIAGNOSTICS = new Set([
     'protected-loader-allowlist-drift',
     'protected-loader-unresolved-allowlist-drift',
 ]);
-// @Codex: contract harnesses are test-only sources, never production loaders.
-const isTestSupportSource = (file: string) => /(?:^|\/)[^/]+\.(?:test|spec)-support\.[cm]?[jt]sx?$/u.test(file);
 const validateControlImports = (sources: Readonly<Record<string, string>>) => {
     const uses = Object.entries(sources).flatMap(([file, source]) => inventoryModuleImports({
         file, source, target: 'lib/security/web-auth-control-record', repositoryRoot: ROOT, allowUnresolvedExpressions: allowedGenericLoaderExpressions,
@@ -54,7 +52,6 @@ const validateControlImports = (sources: Readonly<Record<string, string>>) => {
     ]);
     const ownTest = new Set(['abortPreparedAuthControlTicket', 'abortPreparedAuthControlActivation', 'abortPreparedAuthControlRetirement', 'commitAuthControlTicket', 'commitPreparedAuthControlActivation', 'commitPreparedAuthControlRetirement', 'createWebAuthControlRecord', 'isCurrentAuthControlSessionBinding', 'prepareAuthControlActivation', 'prepareAuthControlRetirement', 'retireAuthControlTicket']);
     for (const use of uses) {
-        if (isTestSupportSource(use.file)) continue;
         if (use.file === 'lib/security/server-session.test.ts'
             && !use.typeOnly
             && (use.form === 'require' || SESSION_TEST_INVENTORY_DIAGNOSTICS.has(use.form))) continue;
@@ -105,6 +102,10 @@ const REVIEWED_UNRELATED_LOADER_DIAGNOSTICS = new Map([
     ['lib/security/patient-create-context.test.ts', {
         sha256: '77c0483e9b2408fc7a1a204eaa07f65775a30d7465ca4ce51ef10bf5eef1b98a',
         diagnostics: ['protected-loader-unsupported:*', 'unsupported-expression:*'],
+    }],
+    ['components/settings/settings-presentation.test-support.ts', {
+        sha256: '24f3aa0bd5cbe3acc809c4000e9b1af7e97a23fd56cbffd6a633e745f5027454',
+        diagnostics: ['reserved-loader-identity:*'],
     }],
 ] as const);
 const repositoryControlImportErrors = (sources = repositoryTypeScript()) => {
@@ -813,6 +814,12 @@ test('keeps the current-binding predicate inside the historical owner island and
     assert.notDeepEqual(validateControlImports({ 'lib/security/server-session.ts': "import { createWebAuthControlRecord } from './web-auth-control-record';" }).errors, []);
     assert.notDeepEqual(validateControlImports({ 'lib/security/extra.ts': "import { createWebAuthControlRecord } from './web-auth-control-record';" }).errors, []);
     assert.notDeepEqual(validateControlImports({ 'lib/security/extra.test.ts': "import { createWebAuthControlRecord } from './web-auth-control-record.ts';" }).errors, []);
+    assert.notDeepEqual(validateControlImports({ 'lib/security/evil.test-support.ts': "import { createWebAuthControlRecord } from './web-auth-control-record.ts';" }).errors, []);
+    const reviewedSupport = sources['components/settings/settings-presentation.test-support.ts']; assert.ok(reviewedSupport);
+    assert.notDeepEqual(repositoryControlImportErrors({
+        ...sources,
+        'components/settings/settings-presentation.test-support.ts': `${reviewedSupport}\n// scanner source drift`,
+    }), []);
     assert.notDeepEqual(validateControlImports({ 'lib/security/server-session.ts': "import type { prepareAuthControlActivation } from './web-auth-control-record';" }).errors, []);
     assert.notDeepEqual(validateControlImports({ 'lib/security/web-auth-control-owner.ts': "import { AuthControlTicket } from './web-auth-control-record';" }).errors, []);
     const source = readFileSync(fileURLToPath(new URL('./web-auth-control-record.ts', import.meta.url)), 'utf8');

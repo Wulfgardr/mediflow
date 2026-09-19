@@ -1,6 +1,6 @@
 /* @Codex */
 import assert from 'node:assert/strict';
-import { randomUUID } from 'node:crypto';
+import crypto, { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
@@ -94,7 +94,33 @@ const DORMANT_WEB_OWNER_MODULE_IMPORTS = new Map<string, ReadonlyMap<string, Rea
     ['lib/security/web-auth-session-issuer', new Map()],
 ]);
 
-const isTestSource = (file: string) => /(?:^|\/)[^/]+\.(?:test|spec)(?:-support)?\.[cm]?[jt]sx?$/u.test(file);
+const isTestSource = (file: string) => /(?:^|\/)[^/]+\.(?:test|spec)\.[cm]?[jt]sx?$/u.test(file);
+const sourceSha256 = (source: string) => crypto.createHash('sha256').update(source).digest('hex');
+// This isolated JSX harness uses an intentionally constrained createRequire double. Its path, source, and
+// only scanner diagnostics are pinned so any change returns to the fail-closed inventory.
+const REVIEWED_TEST_SUPPORT_DIAGNOSTICS = new Map([
+    ['components/settings/settings-presentation.test-support.ts', {
+        sha256: '24f3aa0bd5cbe3acc809c4000e9b1af7e97a23fd56cbffd6a633e745f5027454',
+        diagnostics: ['session-loader', 'historical-owner-reachable', 'historical-owner-reachable'],
+    }],
+] as const);
+const excludeReviewedTestSupportDiagnostics = (sources: Readonly<Record<string, string>>, errors: string[]) => {
+    const eligible = new Set<string>();
+    for (const [file, reviewed] of REVIEWED_TEST_SUPPORT_DIAGNOSTICS) {
+        if (!(file in sources)) continue;
+        const source = sources[file]; const expected = reviewed.diagnostics.map((diagnostic) => `${file}:${diagnostic}`);
+        const observed = errors.filter((error) => error.startsWith(`${file}:`));
+        if (sourceSha256(source) !== reviewed.sha256) {
+            errors.push(`${file}:reviewed-loader-source-drift`); continue;
+        }
+        const exact = observed.length === expected.length && [...new Set(expected)].every((error) => (
+            observed.filter((item) => item === error).length === expected.filter((item) => item === error).length
+        ));
+        if (!exact) { errors.push(`${file}:reviewed-loader-diagnostic-drift`); continue; }
+        for (const error of expected) eligible.add(error);
+    }
+    return errors.filter((error) => !eligible.has(error));
+};
 const inventory = (sources: Readonly<Record<string, string>>, target: string) => Object.entries(sources)
     .flatMap(([file, source]) => inventoryModuleImports({
         file, source, target, repositoryRoot: REPOSITORY_ROOT,
@@ -142,7 +168,7 @@ const validateO1CSessionImports = (sources: Readonly<Record<string, string>>) =>
             if (file in sources && !exactRuntimeSymbols(uses, file, symbols)) errors.push(`${file}:historical-owner-shape`);
         }
     }
-    return errors;
+    return excludeReviewedTestSupportDiagnostics(sources, errors);
 };
 const typescriptSources = () => repositoryTypeScriptSources(REPOSITORY_ROOT);
 
@@ -467,6 +493,16 @@ test('O1-C inventories historical Web authority as a dormant fail-closed island'
         'lib/security/unauthorized.ts': "const session = await import('./server-session');",
     });
     assert.ok(hiddenLoader.includes('lib/security/unauthorized.ts:session-loader'));
+
+    const evilTestSupport = validateO1CSessionImports({
+        'lib/security/evil.test-support.ts': "import { activateArmedWebServerSession } from './server-session';",
+    });
+    assert.ok(evilTestSupport.includes('lib/security/evil.test-support.ts:historical-web-authority'));
+    const reviewedSupport = sources['components/settings/settings-presentation.test-support.ts']; assert.ok(reviewedSupport);
+    assert.notDeepEqual(validateO1CSessionImports({
+        ...sources,
+        'components/settings/settings-presentation.test-support.ts': `${reviewedSupport}\n// scanner source drift`,
+    }), []);
 });
 
 test('O1-C binds native-system capabilities to reset and PIN change only', () => {
