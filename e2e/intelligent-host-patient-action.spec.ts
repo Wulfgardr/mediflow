@@ -115,7 +115,7 @@ test('checkup host creates the fresh selection once and revokes A before selecti
 
     await page.goto(`/patients/${fixture.patientId}/modules`);
     const action = page.getByTestId('intelligent-host-checkup-action');
-    const open = action.getByRole('button', { name: 'Checkup host' });
+    const open = action.getByRole('button', { name: 'Gestisci checkup' });
     await expect(open).toBeEnabled();
     const target = await open.boundingBox();
     expect(Math.min(target?.width ?? 0, target?.height ?? 0)).toBeGreaterThanOrEqual(44);
