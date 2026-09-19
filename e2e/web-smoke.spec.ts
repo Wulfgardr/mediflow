@@ -182,8 +182,9 @@ test('web smoke: live decision CTAs always open their declared patient context',
   await page.keyboard.press('Enter');
   await expect(page).toHaveURL(new RegExp(`/patients/${documentsPatient.id}/modules$`));
   await expect(page.getByTestId('lume-scheda-header')).toContainText(documentsPatient.taxCode);
-  await openPatientSection(page, 'identita');
-  await expect(page.locator('#identita')).toContainText('031');
+  await openPatientSection(page, 'amministrazione');
+  const exemptions = page.locator('#amministrazione').getByRole('list', { name: 'Esenzioni registrate' });
+  await expect(exemptions).toContainText('031');
 
   // The diary row selects its own patient even though the previous record was different.
   await navigation.getByRole('link', { name: 'Diario', exact: true }).click();

@@ -81,6 +81,7 @@ export function Kree8WorkspaceShell({
   const activeHrefRef = useRef<string | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const patientTitleRef = useRef<HTMLHeadingElement>(null);
+  const patientFocusPathRef = useRef<string | null>(null);
   const pathname = usePathname();
   const railId = useId();
   const [openGroups, setOpenGroups] = useState<Partial<Record<Kree8ClinicalRailDefinition[number]['id'], boolean>>>({
@@ -97,13 +98,21 @@ export function Kree8WorkspaceShell({
   const folderToggleRef = useRef<HTMLButtonElement>(null);
   const folderMode = isClinical && proposal;
 
-  /* @Codex: the patient arrives after its asynchronous read, after Next's
-     route focus pass. Orient keyboard users when that destination mounts;
-     never replace a focus they have already placed on another control. */
+  /* @Codex: a patient route may unmount the invoking control before the title
+     mounts. Treat only body or that detached control as unowned focus, once per
+     destination pathname; a connected control always retains the user's focus. */
   useEffect(() => {
-    if (!isClinical || document.activeElement !== document.body) return;
-    patientTitleRef.current?.focus({ preventScroll: true });
-  }, [folderMode, isClinical, pathname]);
+    if (!isClinical || patientFocusPathRef.current === pathname) return;
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && active !== document.body && active.isConnected) {
+      patientFocusPathRef.current = pathname;
+      return;
+    }
+    const title = patientTitleRef.current;
+    if (!title) return;
+    patientFocusPathRef.current = pathname;
+    title.focus({ preventScroll: true });
+  }, [isClinical, pathname]);
 
   /* @Codex WUL-678: resolve deep links within this patient, select their real
      section, then reveal and focus the requested disclosure. Never run its action. */
@@ -137,6 +146,13 @@ export function Kree8WorkspaceShell({
           // A later keyboard/pointer choice wins over this deferred focus pass.
           const active = document.activeElement;
           if (active !== initiatingFocus && active !== document.body) return;
+          // @Codex: a routed record has already placed its heading as the
+          // destination. Keep that one-time transfer while still revealing the
+          // requested section; later in-page hash navigation keeps its target focus.
+          if (patientFocusPathRef.current === pathname && active === patientTitleRef.current) {
+            target.scrollIntoView({ block: 'nearest' });
+            return;
+          }
           const control = target instanceof HTMLDetailsElement
             ? target.querySelector<HTMLElement>('button:not([disabled]), a[href], input:not([disabled])') ?? target.querySelector<HTMLElement>('summary')
             : target.querySelector<HTMLElement>('h2, h3');
@@ -164,7 +180,7 @@ export function Kree8WorkspaceShell({
       window.removeEventListener('hashchange', selectFromHash);
       root.removeEventListener('click', selectFromLink);
     };
-  }, [isClinical, folderMode, navKey, composition]);
+  }, [isClinical, folderMode, navKey, composition, pathname]);
 
   /* Lume focal locus + scrollspy (WUL-55, F2c). Un solo effetto governa la vita
      dei bersagli: li scopre nel DOM dentro QUESTO guscio (querySelector sul ref,
