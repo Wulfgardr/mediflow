@@ -24,6 +24,11 @@ import {
     createTreatmentReasoningBrowserController,
     type TreatmentReasoningPublication,
 } from '@/lib/ai-providers/fabric/treatment-reasoning-browser-controller';
+import {
+    SmartImportContextProposalBrowserAdapterError,
+    type SmartImportAmbulatoryChoice,
+    type SmartImportContextProposal,
+} from '@/lib/security/smart-import-patient-context-browser-adapter';
 import { db, type Attachment, type ClinicalEntry, type Observation, type Patient, type Therapy } from '@/lib/db';
 import { useLiveQuery } from '@/lib/live-query';
 import { countTreatmentReasoningSources } from '@/lib/treatment-reasoning-context';
@@ -42,6 +47,8 @@ type ScopedValue<T> = Readonly<{ contextRevision: string; value: T }>;
 
 const LOCAL_DISABLED_ERROR = 'Treatment Reasoning è disabilitato nel controllo locale. Riattivalo in Impostazioni AI per chiedere una nuova anteprima.';
 const PREVIEW_UNAVAILABLE_ERROR = 'Anteprima non disponibile. Verifica sessione, selezione e il motore scelto; nessun fallback automatico.';
+const CONTEXT_UNAVAILABLE_ERROR = 'Impossibile leggere paziente e ambulatori. Controlla la sessione e riprova.';
+const AMBULATORY_MISSING_ERROR = 'Aggiungi un ambulatorio nelle impostazioni, poi riprova.';
 
 function severityClasses(severity: SafetySeverity): string {
     switch (severity) {
@@ -98,6 +105,10 @@ export default function TreatmentReasoningPanel({
     const [publicationState, setPublicationState] = useState<ScopedValue<TreatmentReasoningPublication> | null>(null);
     const [runningRevision, setRunningRevision] = useState<string | null>(null);
     const [errorState, setErrorState] = useState<ScopedValue<string> | null>(null);
+    const [proposal, setProposal] = useState<SmartImportContextProposal | null>(null);
+    const [ambulatory, setAmbulatory] = useState<SmartImportAmbulatoryChoice | null>(null);
+    const [confirmed, setConfirmed] = useState(false);
+    const [loadingProposal, setLoadingProposal] = useState(false);
     const treatmentReasoningKillSwitch = useLiveQuery(
         () => db.settings.get(AI_TREATMENT_REASONING_KILL_SWITCH_KEY),
         [],
@@ -112,6 +123,7 @@ export default function TreatmentReasoningPanel({
     const publication = picker.active && publicationState?.contextRevision === contextRevision ? publicationState.value : null;
     const error = errorState?.contextRevision === contextRevision ? errorState.value : null;
     const isGenerating = runningRevision === contextRevision;
+    const isBusy = loadingProposal || isGenerating;
     const sourceSummaryItems = [
         ['Terapie', sourceSummary.activeTherapies],
         ['Diagnosi', sourceSummary.diagnoses],
@@ -119,12 +131,13 @@ export default function TreatmentReasoningPanel({
         ['Diario', sourceSummary.clinicalEntries],
         ['Evidenze', sourceSummary.documentInsights + sourceSummary.attachmentEvidence],
     ];
-    const canGenerate = treatmentReasoningEnabled && sourceSummary.total > 0 && !isGenerating && picker.canGenerate;
+    const canPrepare = treatmentReasoningEnabled && sourceSummary.total > 0 && !isBusy && !proposal && picker.canGenerate;
 
     useEffect(() => {
         operation.current += 1;
         controller.reset();
-        setPublicationState(null); setRunningRevision(null);
+        setPublicationState(null); setRunningRevision(null); setErrorState(null);
+        setProposal(null); setAmbulatory(null); setConfirmed(false); setLoadingProposal(false);
         return () => {
             operation.current += 1;
             controller.reset();
@@ -135,22 +148,42 @@ export default function TreatmentReasoningPanel({
         return null;
     }
 
-    const generatePreview = async () => {
+    const loadProposal = async () => {
         if (!treatmentReasoningEnabled) {
             setErrorState({ contextRevision, value: LOCAL_DISABLED_ERROR });
             return;
         }
 
         const token = ++operation.current;
-        setRunningRevision(contextRevision);
+        setLoadingProposal(true);
         setErrorState(null);
 
         try {
+            const nextProposal = await controller.readProposal(patient.id);
+            if (operation.current === token) {
+                setProposal(nextProposal); setAmbulatory(null); setConfirmed(false);
+            }
+        } catch (loadError) {
+            if (operation.current === token) {
+                const message = loadError instanceof SmartImportContextProposalBrowserAdapterError && loadError.code === 'context_missing'
+                    ? AMBULATORY_MISSING_ERROR : CONTEXT_UNAVAILABLE_ERROR;
+                setErrorState({ contextRevision, value: message });
+            }
+        } finally {
+            if (operation.current === token) setLoadingProposal(false);
+        }
+    };
+
+    const generatePreview = async () => {
+        if (!treatmentReasoningEnabled || !proposal || !ambulatory || !confirmed || isBusy) return;
+        const token = ++operation.current; const currentProposal = proposal; const currentAmbulatory = ambulatory;
+        setRunningRevision(contextRevision); setErrorState(null);
+        try {
             const modelToken = await picker.client.begin();
-            const proposal = await controller.readProposal();
             const nextPublication = await controller.run({
                 patientId: patient.id,
-                proposal,
+                proposal: currentProposal,
+                ambulatory: currentAmbulatory,
                 contextInput: {
                     patient,
                     entries,
@@ -161,6 +194,7 @@ export default function TreatmentReasoningPanel({
             }, true);
             if (operation.current === token && picker.client.isCurrent(modelToken)) {
                 setPublicationState({ contextRevision, value: nextPublication });
+                setProposal(null); setAmbulatory(null); setConfirmed(false);
             }
         } catch {
             if (operation.current === token) {
@@ -171,6 +205,10 @@ export default function TreatmentReasoningPanel({
                 setRunningRevision(null);
             }
         }
+    };
+
+    const cancelProposal = () => {
+        operation.current += 1; controller.reset(); setProposal(null); setAmbulatory(null); setConfirmed(false); setLoadingProposal(false);
     };
 
     return (
@@ -197,12 +235,12 @@ export default function TreatmentReasoningPanel({
                     <FunctionModelPicker picker={picker} />
                     <button
                         type="button"
-                        onClick={generatePreview}
-                        disabled={!canGenerate}
+                        onClick={loadProposal}
+                        disabled={!canPrepare}
                         aria-describedby="treatment-reasoning-boundary-note"
                         className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[12px] bg-[color:var(--lume-ink)] px-4 text-xs font-bold text-[color:var(--lume-surface-focal)] shadow-[var(--lume-shadow-focal)] transition-[background-color,opacity,transform] hover:bg-[color:var(--lume-accent)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                        {isGenerating ? <RefreshCw className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Sparkles className="h-4 w-4" aria-hidden="true" />}
+                        {isBusy ? <RefreshCw className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Sparkles className="h-4 w-4" aria-hidden="true" />}
                         {publication ? 'Aggiorna bozza' : 'Genera bozza'}
                     </button>
                     <p id="treatment-reasoning-boundary-note" className="sr-only">
@@ -232,6 +270,27 @@ export default function TreatmentReasoningPanel({
                     </div>
                 ) : null}
 
+                {proposal && !isGenerating ? (
+                    <div className="space-y-3 rounded-[var(--lume-radius-card)] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] p-4 text-sm">
+                        <p><PrivacyBlur>Paziente: {proposal.patientName}</PrivacyBlur></p>
+                        <label className="grid gap-2 font-medium">Ambulatorio per questa bozza
+                            <select className="min-h-11 min-w-0 w-full rounded-xl border px-3 py-2 bg-[color:var(--lume-surface-focal)]" value={ambulatory?.ambulatoryId ?? ''}
+                                onChange={(event) => { setAmbulatory(proposal.ambulatories.find((row) => row.ambulatoryId === event.target.value) ?? null); setConfirmed(false); }}>
+                                <option value="">Scegli l’ambulatorio</option>
+                                {proposal.ambulatories.map((row) => <option key={row.ambulatoryId} value={row.ambulatoryId}>{row.name}{row.address ? ` · ${row.address}` : ''}</option>)}
+                            </select>
+                        </label>
+                        <label className="flex min-h-11 items-start gap-3 py-2">
+                            <input className="mt-1 h-4 w-4" type="checkbox" disabled={!ambulatory} checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} />
+                            Confermo paziente e ambulatorio per una bozza da rivedere. La cartella resta invariata.
+                        </label>
+                        <div className="flex flex-wrap gap-3">
+                            <button type="button" className="ui-btn-primary" disabled={!ambulatory || !confirmed || !picker.canGenerate} onClick={generatePreview}>Conferma e genera bozza</button>
+                            <button type="button" className="ui-btn-secondary" onClick={cancelProposal}>Annulla</button>
+                        </div>
+                    </div>
+                ) : null}
+
                 <div className="grid gap-2 sm:grid-cols-5">
                     {sourceSummaryItems.map(([label, value]) => (
                         <div key={label} className="rounded-[14px] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-focal)] px-3 py-2">
@@ -241,7 +300,7 @@ export default function TreatmentReasoningPanel({
                     ))}
                 </div>
 
-                {!publication && !isGenerating ? (
+                {!publication && !isBusy && !proposal ? (
                     <div className="rounded-[var(--lume-radius-card)] border border-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)] bg-[color:var(--lume-surface-field)] p-4 text-sm leading-6 text-[color:var(--lume-ink-muted)] transition-colors duration-[var(--lume-dur-firma)]">
                         Anteprima manuale dal motore selezionato per verificare coerenza, rischi e prossime azioni. Non modifica la scheda e richiede sempre revisione clinica.
                     </div>

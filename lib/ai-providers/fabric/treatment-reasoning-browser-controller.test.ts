@@ -12,6 +12,7 @@ import {
 const PATIENT_ID = 'patient.synthetic.01';
 const HANDLE = `trp_${'a'.repeat(32)}`;
 const IDS = [`req_${'b'.repeat(32)}`, `req_${'c'.repeat(32)}`];
+const AMBULATORY = Object.freeze({ ambulatoryId: 'ambulatory.synthetic.01', name: 'Ambulatorio sintetico', address: 'Via sintetica 1', version: 3 });
 const LEASE = Object.freeze({
     sessionRef: `ssr_${'1'.repeat(32)}`,
     selectionEpoch: 1,
@@ -96,6 +97,11 @@ function publication() {
 function response(body: unknown, status = 200): Response {
     return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 }
+function contextResponse(path: string, patientVersion = 7, ambulatoryVersion = 3): Response | null {
+    if (path === `/api/patients/${PATIENT_ID}`) return response({ id: PATIENT_ID, firstName: 'Persona', lastName: 'Sintetica', version: patientVersion });
+    if (path === '/api/ambulatories') return response([{ id: AMBULATORY.ambulatoryId, name: AMBULATORY.name, address: AMBULATORY.address, version: ambulatoryVersion }]);
+    return null;
+}
 function deferred<T>() { let resolve!: (value: T) => void; const promise = new Promise<T>((next) => { resolve = next; }); return { promise, resolve }; }
 
 test('runs the explicit context, confirmed selection, minimized ingest, and proposal-only preview sequence', async () => {
@@ -108,7 +114,7 @@ test('runs the explicit context, confirmed selection, minimized ingest, and prop
             const path = String(input); const method = init?.method ?? 'GET';
             const body = init?.body ? JSON.parse(String(init.body)) : null;
             calls.push({ path, method, body });
-            if (path === '/api/context') return response({ ambulatoryId: 'ambulatory.synthetic.01' });
+            const context = contextResponse(path); if (context) return context;
             if (path === '/api/ai/smart-import/selection' && method === 'GET') return response({ selectionEpoch: 0 });
             if (path === '/api/ai/smart-import/selection') return response({ selection: LEASE });
             if (path === '/api/ai/treatment-reasoning/ingest') return response({ handle: HANDLE });
@@ -116,19 +122,22 @@ test('runs the explicit context, confirmed selection, minimized ingest, and prop
             throw new Error('unexpected request');
         },
     });
-    const proposal = await controller.readProposal();
-    const result = await controller.run({ patientId: PATIENT_ID, proposal, contextInput: contextInput() }, true);
+    const proposal = await controller.readProposal(PATIENT_ID); const ambulatory = proposal.ambulatories[0]!;
+    const result = await controller.run({ patientId: PATIENT_ID, proposal, ambulatory, contextInput: contextInput() }, true);
     assert.deepEqual(result, parseTreatmentReasoningPublication(publication()));
     assert.deepEqual(calls.map(({ path, method }) => `${method}:${path}`), [
-        'GET:/api/context',
+        `GET:/api/patients/${PATIENT_ID}`,
+        'GET:/api/ambulatories',
+        `GET:/api/patients/${PATIENT_ID}`,
+        'GET:/api/ambulatories',
         'GET:/api/ai/smart-import/selection',
         'POST:/api/ai/smart-import/selection',
         'POST:/api/ai/treatment-reasoning/ingest',
         'POST:/api/ai/treatment-reasoning/preview',
     ]);
-    assert.deepEqual(calls[3]?.body && Object.keys(calls[3].body as object), ['projection', 'requestId']);
-    assert.deepEqual(calls[4]?.body, { handle: HANDLE, requestId: IDS[1] });
-    const ingestJson = JSON.stringify(calls[3]?.body);
+    assert.deepEqual(calls[6]?.body && Object.keys(calls[6].body as object), ['projection', 'requestId']);
+    assert.deepEqual(calls[7]?.body, { handle: HANDLE, requestId: IDS[1] });
+    const ingestJson = JSON.stringify(calls[6]?.body);
     assert.doesNotMatch(ingestJson, /Persona|Sintetica|SYNTHETIC0000000|Indirizzo sintetico|0000000000/u);
     assert.doesNotMatch(ingestJson, /patientId|ambulatoryId|provider|model|prompt|question|apply/u);
 });
@@ -144,16 +153,16 @@ test('rejects a syntactically valid publication bound to evidence outside the su
         clock: () => new Date('2026-09-01T10:00:00.000Z'), requestId: () => IDS[id++],
         fetch: async (input, init) => {
             const path = String(input); const method = init?.method ?? 'GET';
-            if (path === '/api/context') return response({ ambulatoryId: 'ambulatory.synthetic.01' });
+            const context = contextResponse(path); if (context) return context;
             if (path.endsWith('/selection') && method === 'GET') return response({ selectionEpoch: 0 });
             if (path.endsWith('/selection')) return response({ selection: LEASE });
             if (path.endsWith('/ingest')) return response({ handle: HANDLE });
             return response(hostile);
         },
     });
-    const proposal = await controller.readProposal();
+    const proposal = await controller.readProposal(PATIENT_ID); const ambulatory = proposal.ambulatories[0]!;
     await assert.rejects(
-        () => controller.run({ patientId: PATIENT_ID, proposal, contextInput: contextInput() }, true),
+        () => controller.run({ patientId: PATIENT_ID, proposal, ambulatory, contextInput: contextInput() }, true),
         (error: unknown) => error instanceof TreatmentReasoningBrowserControllerError && error.code === 'response_invalid',
     );
 });
@@ -184,7 +193,7 @@ test('reset fences an awaited preview so its stale publication cannot be returne
         clock: () => new Date('2026-09-01T10:00:00.000Z'), requestId: () => IDS[id++],
         fetch: async (input, init) => {
             const path = String(input); const method = init?.method ?? 'GET';
-            if (path === '/api/context') return response({ ambulatoryId: 'ambulatory.synthetic.01' });
+            const context = contextResponse(path); if (context) return context;
             if (path.endsWith('/selection') && method === 'GET') return response({ selectionEpoch: 0 });
             if (path.endsWith('/selection')) return response({ selection: LEASE });
             if (path.endsWith('/ingest')) return response({ handle: HANDLE });
@@ -192,8 +201,8 @@ test('reset fences an awaited preview so its stale publication cannot be returne
             return { ok: true, json: () => pendingJson.promise } as Response;
         },
     });
-    const proposal = await controller.readProposal();
-    const stale = controller.run({ patientId: PATIENT_ID, proposal, contextInput: contextInput() }, true);
+    const proposal = await controller.readProposal(PATIENT_ID); const ambulatory = proposal.ambulatories[0]!;
+    const stale = controller.run({ patientId: PATIENT_ID, proposal, ambulatory, contextInput: contextInput() }, true);
     await previewStarted.promise; controller.reset(); pendingJson.resolve(publication());
     await assert.rejects(stale, (error: unknown) => error instanceof TreatmentReasoningBrowserControllerError && error.code === 'operation_superseded');
 });
@@ -205,7 +214,7 @@ test('a newer manual run supersedes an older awaited preview and only the newest
         requestId: () => `req_${(request++).toString(16).padStart(32, 'd')}`,
         fetch: async (input, init) => {
             const path = String(input); const method = init?.method ?? 'GET';
-            if (path === '/api/context') return response({ ambulatoryId: 'ambulatory.synthetic.01' });
+            const context = contextResponse(path); if (context) return context;
             if (path.endsWith('/selection') && method === 'GET') return response({ selectionEpoch: epoch });
             if (path.endsWith('/selection')) { epoch += 1; return response({ selection: { ...LEASE, selectionEpoch: epoch } }); }
             if (path.endsWith('/ingest')) return response({ handle: `trp_${String(epoch).repeat(32)}` });
@@ -214,48 +223,70 @@ test('a newer manual run supersedes an older awaited preview and only the newest
             return response(publication());
         },
     });
-    const firstProposal = await controller.readProposal();
-    const stale = controller.run({ patientId: PATIENT_ID, proposal: firstProposal, contextInput: contextInput() }, true);
+    const firstProposal = await controller.readProposal(PATIENT_ID); const firstAmbulatory = firstProposal.ambulatories[0]!;
+    const stale = controller.run({ patientId: PATIENT_ID, proposal: firstProposal, ambulatory: firstAmbulatory, contextInput: contextInput() }, true);
     await firstPreviewStarted.promise;
-    const nextProposal = await controller.readProposal();
-    const newest = await controller.run({ patientId: PATIENT_ID, proposal: nextProposal, contextInput: contextInput() }, true);
+    const nextProposal = await controller.readProposal(PATIENT_ID); const nextAmbulatory = nextProposal.ambulatories[0]!;
+    const newest = await controller.run({ patientId: PATIENT_ID, proposal: nextProposal, ambulatory: nextAmbulatory, contextInput: contextInput() }, true);
     assert.equal(newest.status, 'available');
     firstJson.resolve(publication());
     await assert.rejects(stale, (error: unknown) => error instanceof TreatmentReasoningBrowserControllerError && error.code === 'operation_superseded');
 });
 
-test('rejects missing confirmation, copied proposals, mismatched patients, and caller questions before selection POST', async () => {
+test('rejects missing confirmation, copied proposals or choices, mismatched patients, and caller questions before selection POST', async () => {
     let posts = 0;
-    const controller = createTreatmentReasoningBrowserController({ fetch: async (_input, init) => {
+    const controller = createTreatmentReasoningBrowserController({ fetch: async (input, init) => {
         if (init?.method === 'POST') posts += 1;
-        return response({ ambulatoryId: 'ambulatory.synthetic.01' });
+        return contextResponse(String(input)) ?? response({ selectionEpoch: 0 });
     } });
-    const proposal = await controller.readProposal();
+    const proposal = await controller.readProposal(PATIENT_ID); const ambulatory = proposal.ambulatories[0]!;
     await assert.rejects(
-        () => controller.run({ patientId: PATIENT_ID, proposal, contextInput: contextInput() }, false as never),
+        () => controller.run({ patientId: PATIENT_ID, proposal, ambulatory, contextInput: contextInput() }, false as never),
         (error: unknown) => error instanceof TreatmentReasoningBrowserControllerError && error.code === 'confirmation_required',
     );
     await assert.rejects(
-        () => controller.run({ patientId: PATIENT_ID, proposal: { ambulatoryId: proposal.ambulatoryId }, contextInput: contextInput() }, true),
+        () => controller.run({ patientId: PATIENT_ID, proposal: { ...proposal }, ambulatory, contextInput: contextInput() }, true),
         (error: unknown) => error instanceof TreatmentReasoningBrowserControllerError && error.code === 'proposal_stale',
+    );
+    await assert.rejects(
+        () => controller.run({ patientId: PATIENT_ID, proposal, ambulatory: { ...ambulatory }, contextInput: contextInput() }, true),
+        (error: unknown) => error instanceof TreatmentReasoningBrowserControllerError && error.code === 'selection_invalid',
     );
     const mismatched = contextInput(); mismatched.patient.id = 'patient.synthetic.other';
     await assert.rejects(
-        () => controller.run({ patientId: PATIENT_ID, proposal, contextInput: mismatched }, true),
+        () => controller.run({ patientId: PATIENT_ID, proposal, ambulatory, contextInput: mismatched }, true),
         (error: unknown) => error instanceof TreatmentReasoningBrowserControllerError && error.code === 'input_invalid',
     );
-    const next = await controller.readProposal();
+    const next = await controller.readProposal(PATIENT_ID); const nextAmbulatory = next.ambulatories[0]!;
     await assert.rejects(
-        () => controller.run({ patientId: PATIENT_ID, proposal: next, contextInput: { ...contextInput(), question: 'Caller prompt forbidden.' } }, true),
+        () => controller.run({ patientId: PATIENT_ID, proposal: next, ambulatory: nextAmbulatory, contextInput: { ...contextInput(), question: 'Caller prompt forbidden.' } }, true),
         (error: unknown) => error instanceof TreatmentReasoningBrowserControllerError && error.code === 'input_invalid',
     );
     assert.equal(posts, 0);
 });
 
+test('rejects changed patient or ambulatory facts before selection and ingest', async () => {
+    for (const changed of ['patient', 'ambulatory'] as const) {
+        let patientReads = 0; let ambulatoryReads = 0; const posts: string[] = [];
+        const controller = createTreatmentReasoningBrowserController({ fetch: async (input, init) => {
+            const path = String(input); if (init?.method === 'POST') posts.push(path);
+            if (path === `/api/patients/${PATIENT_ID}`) { patientReads += 1; return contextResponse(path, changed === 'patient' && patientReads > 1 ? 8 : 7)!; }
+            if (path === '/api/ambulatories') { ambulatoryReads += 1; return contextResponse(path, 7, changed === 'ambulatory' && ambulatoryReads > 1 ? 4 : 3)!; }
+            return response({ selectionEpoch: 0 });
+        } });
+        const proposal = await controller.readProposal(PATIENT_ID); const ambulatory = proposal.ambulatories[0]!;
+        await assert.rejects(
+            () => controller.run({ patientId: PATIENT_ID, proposal, ambulatory, contextInput: contextInput() }, true),
+            (error: unknown) => error instanceof TreatmentReasoningBrowserControllerError && error.code === 'proposal_stale',
+        );
+        assert.deepEqual(posts, []);
+    }
+});
+
 test('keeps the controller browser-only, manual, and free of persistence, apply, legacy, or refresh paths', () => {
     const source = readFileSync(new URL('./treatment-reasoning-browser-controller.ts', import.meta.url), 'utf8');
     assert.match(source, /^\/\* @Codex \*\/[\s\S]*?'use client';/u);
-    assert.doesNotMatch(source, /server-only|node:|localStorage|sessionStorage|indexedDB|setInterval|setTimeout|\.apply\(|\/api\/system\/treatment-reasoning|generatePatientTreatmentReasoningDraft|generic.{0,20}(invoke|prompt)/u);
+    assert.doesNotMatch(source, /server-only|node:|localStorage|sessionStorage|indexedDB|setInterval|setTimeout|\.apply\(|\/api\/context|\/api\/system\/treatment-reasoning|generatePatientTreatmentReasoningDraft|generic.{0,20}(invoke|prompt)/u);
     assert.deepEqual(Object.keys(createTreatmentReasoningBrowserController({ fetch: async () => response({}) })), ['reset', 'readProposal', 'run']);
 });
 

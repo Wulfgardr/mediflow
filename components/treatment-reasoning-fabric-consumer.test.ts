@@ -9,14 +9,19 @@ test('roots the manual Treatment Reasoning consumer only in the browser controll
     assert.match(source, /createTreatmentReasoningBrowserController/u);
     assert.doesNotMatch(source, /generatePatientTreatmentReasoningDraft|DEFAULT_TREATMENT_REASONING_QUESTION|TreatmentReasoningDraft|treatment-reasoning-service/u);
 
-    const proposalRead = source.indexOf('await controller.readProposal()');
+    const proposalRead = source.indexOf('await controller.readProposal(patient.id)');
     const previewRun = source.indexOf('await controller.run(');
-    assert.ok(proposalRead >= 0, 'the click handler must explicitly read the context proposal');
+    assert.ok(proposalRead >= 0, 'the click handler must explicitly read the patient and ambulatory proposal');
     assert.ok(previewRun > proposalRead, 'the confirmed run must follow the proposal read');
     assert.match(
         source,
-        /await controller\.run\(\{\s*patientId: patient\.id,\s*proposal,\s*contextInput: \{\s*patient,\s*entries,\s*therapies,\s*observations,\s*attachments,?\s*\},\s*\}, true\)/u,
+        /await controller\.run\(\{\s*patientId: patient\.id,\s*proposal: currentProposal,\s*ambulatory: currentAmbulatory,\s*contextInput: \{\s*patient,\s*entries,\s*therapies,\s*observations,\s*attachments,?\s*\},\s*\}, true\)/u,
     );
+    assert.match(source, /<option value="">Scegli l’ambulatorio<\/option>/u);
+    assert.match(source, /type="checkbox" disabled=\{!ambulatory\} checked=\{confirmed\}/u);
+    assert.match(source, /Conferma e genera bozza/u);
+    assert.ok(source.indexOf('await picker.client.begin()') > source.indexOf('if (!treatmentReasoningEnabled || !proposal || !ambulatory || !confirmed'),
+        'provider dispatch must remain behind the explicit choice and confirmation gate');
 });
 
 test('keeps the preview ephemeral, supersession-safe, and review-only', () => {

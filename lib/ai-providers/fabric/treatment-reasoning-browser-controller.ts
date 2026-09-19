@@ -8,7 +8,7 @@ import type { PortableEngineMetadata } from './treatment-reasoning-portable-runt
 import type { TreatmentReasoningPortableAttestation } from './treatment-reasoning-athena-output-contract-v2';
 import type { PortableTreatmentResolutionReceipt } from './treatment-reasoning-production-operation';
 import type { TreatmentReasoningContextInput } from '../../treatment-reasoning-context';
-import { createSmartImportContextProposalBrowserAdapter, type SmartImportContextProposal } from '../../security/smart-import-context-proposal-browser-adapter';
+import { createSmartImportContextProposalBrowserAdapter, type SmartImportAmbulatoryChoice, type SmartImportContextProposal } from '../../security/smart-import-patient-context-browser-adapter';
 import { createSmartImportSelectionBrowserAdapter } from '../../security/smart-import-selection-browser-adapter';
 import { EGRESS_PROFILE_VERSION } from './contract';
 import { buildTreatmentReasoningProjectionAttachment } from './treatment-reasoning-projection';
@@ -246,20 +246,27 @@ export function createTreatmentReasoningBrowserController(sources: Sources = {})
     const reset = () => { generation += 1; operation += 1; readOperation += 1; proposal = null; selection.reset(); };
     return Object.freeze({
         reset,
-        async readProposal(): Promise<SmartImportContextProposal> {
+        async readProposal(patientId: string): Promise<SmartImportContextProposal> {
             proposal = null; const token = generation; const currentRead = ++readOperation;
-            try { const value = await context.read(); if (token !== generation || currentRead !== readOperation) return fail('operation_superseded'); proposal = value; return value; }
+            try { const value = await context.read(patientId); if (token !== generation || currentRead !== readOperation) return fail('operation_superseded'); proposal = value; return value; }
             catch (error) { if (token !== generation || currentRead !== readOperation) return fail('operation_superseded'); throw error; }
         },
         async run(value: unknown, confirmed: true): Promise<TreatmentReasoningPublication> {
-            if (confirmed !== true) return fail('confirmation_required'); const input = record(value, ['patientId', 'proposal', 'contextInput']);
+            if (confirmed !== true) return fail('confirmation_required'); const input = record(value, ['patientId', 'proposal', 'ambulatory', 'contextInput']);
             if (!input || typeof input.patientId !== 'string' || !PATIENT_ID.test(input.patientId)) return fail('input_invalid');
-            if (proposal === null || input.proposal !== proposal) return fail('proposal_stale'); const selectedProposal = proposal; proposal = null; readOperation += 1;
+            if (proposal === null || input.proposal !== proposal || input.patientId !== proposal.patientId) return fail('proposal_stale');
+            if (!proposal.ambulatories.includes(input.ambulatory as SmartImportAmbulatoryChoice)) return fail('selection_invalid');
+            const selectedProposal = proposal; const ambulatory = input.ambulatory as SmartImportAmbulatoryChoice; proposal = null; readOperation += 1;
             const clinicalContext = inputContext(input.contextInput, input.patientId); if (!clinicalContext) return fail('input_invalid');
             const token = generation; const currentOperation = ++operation; let selected: unknown = null;
             const current = () => { if (token !== generation || currentOperation !== operation) return fail('operation_superseded'); if (selected && !selection.isCurrent(selected)) return fail('selection_invalid'); };
             try {
-                await selection.initialize(); current(); selected = await selection.select({ patientId: input.patientId, ambulatoryId: selectedProposal.ambulatoryId }, true); current();
+                const latest = await context.read(input.patientId); current();
+                const latestAmbulatory = latest.ambulatories.find((row) => row.ambulatoryId === ambulatory.ambulatoryId);
+                if (latest.patientVersion !== selectedProposal.patientVersion || latest.patientName !== selectedProposal.patientName
+                    || !latestAmbulatory || latestAmbulatory.version !== ambulatory.version || latestAmbulatory.name !== ambulatory.name
+                    || latestAmbulatory.address !== ambulatory.address) return fail('proposal_stale');
+                await selection.initialize(); current(); selected = await selection.select({ patientId: input.patientId, ambulatoryId: ambulatory.ambulatoryId }, true); current();
                 let now: Date; try { now = clock(); if (!(now instanceof Date) || !Number.isFinite(now.getTime())) return fail('input_invalid'); } catch { return fail('input_invalid'); }
                 let projection: ReturnType<typeof buildTreatmentReasoningProjectionAttachment>; try { projection = buildTreatmentReasoningProjectionAttachment({ ...clinicalContext, now }); } catch { return fail('input_invalid'); } current();
                 let ingestId: unknown; let previewId: unknown; try { ingestId = nextId(); previewId = nextId(); } catch { return fail('input_invalid'); }
