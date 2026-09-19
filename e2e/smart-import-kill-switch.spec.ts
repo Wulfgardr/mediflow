@@ -37,7 +37,7 @@ test('[E2E fixture] smart import kill switch disables analysis on patient detail
     const preview = await previewResponse;
     expect(preview.status()).toBe(200);
     expect(await preview.json()).toMatchObject({
-      writesPerformed: 0, command: { action: 'set', functionId: 'smart_import', enabled: false },
+      writesPerformed: 0, command: { action: 'set_activation', functionId: 'smart_import', enabled: false },
     });
     const readEnabled = () => page.evaluate(async () => {
       const response = await fetch('/api/settings/ai/functions', { cache: 'no-store' });

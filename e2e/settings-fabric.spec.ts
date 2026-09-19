@@ -61,7 +61,7 @@ test('Fabric settings renders the read-only venue and capability registry', asyn
 
   await expect(surface.locator('form')).toHaveCount(0);
   await expect(surface.locator('input, select, textarea, [role="switch"], [contenteditable="true"]')).toHaveCount(0);
-  await expect(surface.getByRole('button', { name: 'Rileggi stato', exact: true })).toBeVisible();
+  await expect(functions.getByRole('button', { name: 'Rileggi stato', exact: true })).toBeVisible();
 
   await page.screenshot({
     path: '/tmp/mediflow-settings-fabric.png',
@@ -84,8 +84,10 @@ test('Models settings scopes Ollama roles and keeps ATHENA on its separate lane'
 
   const surface = page.getByTestId('settings-ai-models-section');
   await expect(surface).toBeVisible();
-  await expect(surface).toContainText('Ollama per i ruoli generali');
-  await expect(surface).toContainText('Treatment Reasoning usa la lane locale ATHENA separata');
+  await expect(surface).toContainText('Sintesi e organizzazione');
+  await expect(surface).toContainText('Ragionamento testuale');
+  await expect(surface).toContainText('non configura la revisione terapeutica ATHENA');
+  await expect(surface).toContainText('La presenza in elenco non abilita le funzioni cliniche.');
   await expect(surface).not.toContainText('Ollama è l’unico provider supportato');
   await expect(surface).not.toContainText('Ollama è l\'unico provider supportato');
 });

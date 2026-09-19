@@ -122,6 +122,9 @@ jobs:
         # @Codex: the preceding steps seed and start an isolated synthetic DB.
         env:
           MF085_SYNTHETIC_E2E: "1"
+          # @Codex: document-flow-real-route owns an empty standalone runtime and
+          # runs only when this explicit synthetic-fixture opt-in is present.
+          E2E_DOCUMENTS_SYNTHETIC_ONLY: "1"
         run: npx playwright test --workers=1
 
       # This browser harness uses node:test and top-level await, so it is not
