@@ -18,7 +18,7 @@ const publication = {
     provenance: { schemaVersion: 'mediflow.document-synthesis.publication-provenance.v1', capability: 'document_synthesis', sourceSetAuthority: 'application_host', inputDigestScope: 'ordered_normalized_provider_projection_set', citationSupport: 'provider_declared_host_membership_and_locator_validated', modelCausality: 'not_established', fabricProvenance: { schemaVersion: 'mediflow.ai.fabric-provenance.v1', capability: 'document_synthesis', venue: 'local_process', provider: 'ollama', model: 'local:latest', preprocessing: ['context_minimization'], receipt: { schemaVersion: 'mediflow.ai.fabric-resolution.v1', capability: 'document_synthesis', class: 'generative', venue: 'local_process', egressProfile: { id: 'local_only', version: 'mediflow.ai.egress-profile.v1', egress: 'none' }, provider: 'ollama', model: 'local:latest', providerReceipt: null, fallbackCount: 0 } } },
 };
 
-test('runs capture, host-owned ingest, and one preview without source, write, or provider inputs', async () => {
+test('runs capture, binary ingest, and one preview without text, write, or provider inputs', async () => {
     const calls: Array<{ url: string; body: unknown; headers?: HeadersInit }> = [];
     const fetcher = async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = String(input); const body = typeof init?.body === 'string' ? JSON.parse(init.body) : init?.body ?? null;
@@ -65,6 +65,23 @@ test('fails closed for unsupported extraction and never continues after reset', 
     await new Promise((resolve) => setImmediate(resolve));
     pending.reset();
     await assert.rejects(run, (error: unknown) => error instanceof DocumentSynthesisBrowserOrchestratorError && error.code === 'operation_superseded');
+});
+
+test('reset during facade decryption discards bytes and never posts ingest', async () => {
+    const entered = Promise.withResolvers<void>(); const release = Promise.withResolvers<void>();
+    const calls: string[] = [];
+    const orchestrator = createDocumentSynthesisBrowserOrchestrator({ fetch: async (input) => {
+        calls.push(String(input));
+        return response({ captureHandle: `dsc_${'1'.repeat(32)}` });
+    } });
+    const pending = orchestrator.run('attachment.synthetic.3', async () => {
+        entered.resolve(); await release.promise;
+        return { id: 'attachment.synthetic.3', data: 'U3ludGhldGljLg==' };
+    });
+    await entered.promise;
+    orchestrator.reset(); release.resolve();
+    await assert.rejects(pending, (error: unknown) => error instanceof DocumentSynthesisBrowserOrchestratorError && error.code === 'operation_superseded');
+    assert.deepEqual(calls, ['/api/ai/document-synthesis/capture']);
 });
 
 /* @Codex */

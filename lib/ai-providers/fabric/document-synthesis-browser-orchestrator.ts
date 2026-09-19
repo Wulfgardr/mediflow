@@ -64,15 +64,20 @@ async function post(request: typeof fetch, url: string, body: unknown, unknownCo
 async function ingest(
     request: typeof fetch, captureHandle: string,
     readSource: () => Promise<AnyDocDecryptedAttachmentSource | undefined | null>, attachmentId: string,
+    current: () => void,
     unknownCode: DocumentSynthesisBrowserOrchestratorErrorCode, unavailableCode: DocumentSynthesisBrowserOrchestratorErrorCode,
 ): Promise<unknown> {
-    let bytes: Uint8Array<ArrayBuffer> | null = await readAnyDocDecryptedAttachmentBytes(attachmentId, readSource);
-    if (!bytes) return fail(unavailableCode);
+    let bytes: Uint8Array<ArrayBuffer> | null = null;
     try {
+        bytes = await readAnyDocDecryptedAttachmentBytes(attachmentId, readSource);
+        current();
+        if (!bytes) return fail(unavailableCode);
+        const payload = bytes;
         let response: Response;
         try {
+            current();
             response = await request('/api/ai/document-synthesis/ingest', { method: 'POST', cache: 'no-store', credentials: 'same-origin', redirect: 'error',
-                headers: { [CAPTURE_HEADER]: captureHandle, 'Content-Type': 'application/octet-stream' }, body: bytes.buffer });
+                headers: { [CAPTURE_HEADER]: captureHandle, 'Content-Type': 'application/octet-stream' }, body: payload.buffer });
         } catch { return fail(unknownCode); }
         if (response.status === 401) return fail('session_unavailable');
         if (!response.ok) {
@@ -85,7 +90,7 @@ async function ingest(
             return fail(unavailableCode);
         }
         try { return await response.json(); } catch { return fail('response_invalid'); }
-    } finally { bytes.fill(0); bytes = null; }
+    } finally { bytes?.fill(0); bytes = null; }
 }
 
 /** Browser adapter for the fixed capture -> AnyDoc -> ingest -> preview sequence. */
@@ -105,7 +110,7 @@ export function createDocumentSynthesisBrowserOrchestrator(sources: Sources = {}
             const captureHandle = exact(captured, 'captureHandle', CAPTURE);
             if (!captureHandle) return fail('response_invalid');
             if (!readSource) return fail('ingest_unavailable');
-            const ingested = await ingest(request, captureHandle, readSource, attachmentId, 'ingest_outcome_unknown', 'ingest_unavailable');
+            const ingested = await ingest(request, captureHandle, readSource, attachmentId, current, 'ingest_outcome_unknown', 'ingest_unavailable');
             current();
             const previewHandle = exact(ingested, 'previewHandle', PREVIEW);
             if (!previewHandle) return fail('response_invalid');
