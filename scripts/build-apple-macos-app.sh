@@ -1,8 +1,8 @@
 #!/bin/bash
 # Build a runnable macOS MediFlow.app: the Xcode MediFlowMacApp scheme plus the
 # bundled Next.js WebRuntime (home-base server) the supervisor launches at
-# runtime. Kept separate from the plain xcodebuild / CI path so CI stays fast and
-# npm-free; this is the "make a runnable / release app" step.
+# runtime. Kept separate from the plain xcodebuild path; this is the
+# "make a runnable / release app" step, including the standalone WebRuntime.
 #
 # Node is NOT bundled: the supervisor resolves system node (or MEDIFLOW_NODE_BINARY).
 #
