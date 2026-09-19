@@ -39,6 +39,8 @@ export async function waitForOwnedExecutionGroupExit(pid: number | undefined, ti
 export type QualifiedExecutionHost = Readonly<{
     transport: ExecutionTransport; cwd: string; boundaryQualified(): boolean;
     close(): Promise<boolean>; cleanupComplete(): boolean;
+    /** Host-only, bounded observation; not a qualification or publication gate. */
+    diagnostic?: (event: ExecutionDiagnostic) => void;
 }>;
 
 /** No sentinel, static pin or direct host call can grant product qualification.

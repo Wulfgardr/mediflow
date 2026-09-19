@@ -42,6 +42,7 @@ export function createMacProductPlatformManager(options: {
     prepare?: typeof prepareMacProductQualification;
     assets?: typeof resolveInstalledMacExecutionAssets;
     reservationDirectory?: () => string;
+    diagnostic?: Parameters<typeof prepareMacProductQualification>[0]['diagnostic'];
 } = {}) {
     let reserved = false;
     const issue = options.prepare ?? prepareMacProductQualification;
@@ -95,7 +96,7 @@ export function createMacProductPlatformManager(options: {
                 // Reservation and withdrawal exist BEFORE the first await.
                 pending = Promise.resolve().then(async () => {
                     try {
-                        const owned = await issue({ ...assets, signal: local.signal, lifetimeMs });
+                        const owned = await issue({ ...assets, signal: local.signal, lifetimeMs, diagnostic: options.diagnostic });
                         prepared = owned;
                         if (signal.aborted || local.signal.aborted) { await drain(owned); throw new ExecutionError('canceled'); }
                         reviewed = createReviewedMacProductPlatform({ binaryPath: owned.binaryPath, qualification: owned.authority });

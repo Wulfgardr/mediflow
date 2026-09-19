@@ -9,7 +9,7 @@ import { ExecutionError, type ExecutionTransport, type ExecutionMethod, type Exe
 import { assertExecutionInitialization, executionInitializationParams, executionConfigFromToml } from './execution-bootstrap';
 import type { QualifiedExecutionHost } from './execution-host';
 import { createOpenAIConnectProxy } from './execution-egress-proxy';
-import { createStdioExecutionTransport } from './execution-transport';
+import { createStdioExecutionTransport, reportExecutionDiagnostic, type ExecutionDiagnostic } from './execution-transport';
 import { EXECUTION_CONFIG, EXECUTION_SUBSTRATE, executionPublicCaBundle, executionSandboxProfile, verifyExecutionSubstrate } from './execution-sandbox';
 import { MAC_CONFIG_SOURCE, MAC_CONTEXT_SHA256, MAC_POLICY_REVISION, MAC_READBACK_SOURCE, assertMacConfigReadback, macDigest, verifyMacSourceSet } from './execution-mac-config';
 import { buildMacCustodian, launchMacCustodian, MacNativeBuildError, type MacNativeOwner } from './execution-mac-native';
@@ -18,7 +18,7 @@ import type { MacProductQualificationAuthority } from './execution-platform';
 type Phase = 'preparing' | 'ready' | 'borrowed' | 'draining' | 'sealed' | 'revoked';
 export type MacQualificationStage = 'platform' | 'sources' | 'build' | 'probe' | 'version' | 'protocol' | 'initialize' | 'readback' | 'custody';
 export type MacPreparationOptions = Readonly<{ binaryPath: string; nativeSourcePath: string; schemaDirectory: string;
-    c1ReceiptPath: string; lifetimeMs?: number; signal?: AbortSignal }>;
+    c1ReceiptPath: string; lifetimeMs?: number; signal?: AbortSignal; diagnostic?: (event: ExecutionDiagnostic) => void }>;
 export type MacQualificationAudit = Readonly<{ schema: 'mediflow.mac-custody-audit.v1'; run: string; phase: Phase;
     stage: MacQualificationStage; claim: 'candidate_boundary_only_not_live_or_clinical'; revision: string | null;
     baseContextSha256: string; sourceAvailable: true; fullSourceBuildBinding: 'unqualified';
@@ -298,7 +298,7 @@ export async function prepareMacProductQualification(options: MacPreparationOpti
         prepareMacInstallationId(root); check();
         serverOwner = launchMacCustodian(root, nonce, 'server', env, withdraw); owners.push(serverOwner);
         const server = serverOwner;
-        raw = createStdioExecutionTransport(server.child, { killGraceMs: 150, groupDrainMs: 150,
+        raw = createStdioExecutionTransport(server.child, { killGraceMs: 150, groupDrainMs: 150, diagnostic: options.diagnostic,
             // Compatibility hook: actual native whole-tree reaping is stronger
             // than a process-group observation. Public group field stays null.
             terminate: () => server.close(), waitForOwnedGroupExit: async () => {
@@ -382,7 +382,7 @@ export async function prepareMacProductQualification(options: MacPreparationOpti
         }));
         // The product may keep its watcher during bounded drain; execution publication
         // must NOT accept that transitional witness before the native STOP+close proof.
-        host = Object.freeze({ transport, cwd: join(root, 'work'), boundaryQualified: () => phase !== 'draining' && current(), close, cleanupComplete: () => cleaned });
+        host = Object.freeze({ transport, diagnostic: (event: ExecutionDiagnostic) => reportExecutionDiagnostic(options.diagnostic, event), cwd: join(root, 'work'), boundaryQualified: () => phase !== 'draining' && current(), close, cleanupComplete: () => cleaned });
         const authority: MacProductQualificationAuthority = Object.freeze({ currentEvidence: () => current() ? evidence : null });
         authorities.set(authority, Object.freeze({ binaryPath, current: () => current() ? evidence : null,
             async take(signal: AbortSignal) {

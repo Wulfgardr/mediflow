@@ -134,7 +134,7 @@ export async function createOrdinaryProductAttempt(session: OrdinarySession, pla
         loginComplete() {
             return operation(['awaiting_login'], async expected => {
                 const plan = await login!.complete(); guard(expected);
-                execution = createOrdinaryExecutionService({ transport: host!.transport, cwd: host!.cwd,
+                execution = createOrdinaryExecutionService({ transport: host!.transport, cwd: host!.cwd, diagnostic: host!.diagnostic,
                     preparation: preparation!, consent: consent!.token, isCurrent: current,
                     boundaryQualified: () => local() && platform.snapshot().revision === qualificationRevision && host!.boundaryQualified() });
                 state = 'connected'; return Object.freeze({ plan });

@@ -10,8 +10,32 @@ function record(value: unknown): Record<string, unknown> {
 }
 type ExecutionNotification = (method: string, params: unknown) => void;
 
-export type ExecutionDiagnostic = Readonly<{ method: ExecutionMethod; rpcCode: number | null; httpStatus: number | null;
+const DIAGNOSTIC_EVENTS = ['rpc_error', 'transport_failure', 'turn_start_failed', 'turn_completed_failed'] as const;
+const DIAGNOSTIC_CODES = ['upstream_error', 'timeout', 'process_exited', 'protocol_error', 'tool_use_denied'] as const;
+const RPC_CODES = [-32700, -32600, -32601, -32602, -32603, -32000] as const;
+export type ExecutionDiagnostic = Readonly<{ event: typeof DIAGNOSTIC_EVENTS[number]; method: ExecutionMethod | null;
+    errorCode: typeof DIAGNOSTIC_CODES[number]; rpcCode: typeof RPC_CODES[number] | null; httpStatus: number | null;
     tls: boolean; network: boolean; device: boolean; experimental: boolean; permission: boolean }>;
+/** This host-only observer is not authority. Rebuild a closed data projection;
+ * never forward an upstream object, free numeric code, prose or accessor. */
+export function reportExecutionDiagnostic(observer: ((event: ExecutionDiagnostic) => void) | undefined, input: ExecutionDiagnostic): void {
+    if (!observer) return;
+    try {
+        const read = (key: keyof ExecutionDiagnostic): unknown => Object.getOwnPropertyDescriptor(input, key)?.value;
+        const event = read('event'), method = read('method'), errorCode = read('errorCode');
+        if (!(DIAGNOSTIC_EVENTS as readonly unknown[]).includes(event)
+            || !(method === null || (EXECUTION_METHODS as readonly unknown[]).includes(method))
+            || !(DIAGNOSTIC_CODES as readonly unknown[]).includes(errorCode)) return;
+        const code = read('rpcCode'), status = read('httpStatus');
+        const result: unknown = observer(Object.freeze({ event, method, errorCode,
+            rpcCode: (RPC_CODES as readonly unknown[]).includes(code) ? code : typeof code === 'number' && Number.isInteger(code) && code >= -32099 && code <= -32000 ? -32000 : null,
+            httpStatus: typeof status === 'number' && Number.isInteger(status) && status >= 400 && status <= 599 ? status : null,
+            tls: read('tls') === true, network: read('network') === true, device: read('device') === true,
+            experimental: read('experimental') === true, permission: read('permission') === true } as ExecutionDiagnostic));
+        // An accidental async observer must not create an unhandled rejection.
+        void Promise.resolve(result).catch(() => {});
+    } catch { /* Observation failure cannot change the original execution result. */ }
+}
 type Options = { requestTimeoutMs?: number; killGraceMs?: number; maxFrameBytes?: number; onClosing?: () => void; onClosed?: () => Promise<void>;
     waitForOwnedGroupExit?: (timeoutMs: number) => Promise<boolean>; groupDrainMs?: number;
     terminate?: (signal: NodeJS.Signals) => void; diagnostic?: (event: ExecutionDiagnostic) => void };
@@ -35,6 +59,10 @@ export function createStdioExecutionTransport(child: ChildProcessWithoutNullStre
     }
     function fail(code: Exclude<ExecutionCode, null>) {
         if (closed) return;
+        const methods = pending.size ? [...pending.values()].map(value => value.method) : [null];
+        for (const method of methods) reportExecutionDiagnostic(options.diagnostic, {
+            event: 'transport_failure', method, errorCode: code as ExecutionDiagnostic['errorCode'],
+            rpcCode: null, httpStatus: null, tls: false, network: false, device: false, experimental: false, permission: false });
         rejectPending(code);
         for (const listener of listeners) listener.failure(code);
         void close();
@@ -66,10 +94,10 @@ export function createStdioExecutionTransport(child: ChildProcessWithoutNullStre
             // credentials, URLs, account identifiers or source contents.
             const prose = typeof error.message === 'string' ? error.message.slice(0, 4096) : '';
             const status = prose.match(/\b(4\d\d|5\d\d)\b/u);
-            try { options.diagnostic?.({ method: request.method, rpcCode: Number.isSafeInteger(error.code) ? error.code as number : null,
+            reportExecutionDiagnostic(options.diagnostic, { event: 'rpc_error', method: request.method, errorCode: 'upstream_error', rpcCode: Number.isSafeInteger(error.code) ? error.code as ExecutionDiagnostic['rpcCode'] : null,
                 httpStatus: status ? Number(status[1]) : null, tls: /tls|certificate|trust/iu.test(prose),
                 network: /network|connect|proxy|tunnel|sending request/iu.test(prose), device: /device/iu.test(prose),
-                experimental: /experimental/iu.test(prose), permission: /permission|not permitted|access denied/iu.test(prose) }); } catch { /* Diagnostic consumers cannot alter RPC failure. */ }
+                experimental: /experimental/iu.test(prose), permission: /permission|not permitted|access denied/iu.test(prose) });
             request.reject(new ExecutionError('upstream_error'));
         } else request.resolve(message.result);
     }

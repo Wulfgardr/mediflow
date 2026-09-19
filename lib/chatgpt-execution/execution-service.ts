@@ -3,6 +3,7 @@ import 'server-only';
 import { createHash, randomUUID } from 'node:crypto';
 import { isAbsolute } from 'node:path';
 import { ExecutionError } from './execution-contract';
+import { reportExecutionDiagnostic, type ExecutionDiagnostic } from './execution-transport';
 import { readPreparedOrdinaryProfile, closePreparedOrdinaryProfile, type PreparedOrdinaryProfile, type PreparedOrdinaryRead } from './ordinary-preparation';
 import { assertOrdinaryProductConsent, ordinaryConsentIsCurrent, closeOrdinaryProductConsent, type OrdinaryProductConsent } from '../chatgpt-product/product-consent';
 import { assertOrdinaryEgress } from './ordinary-egress-chokepoint';
@@ -30,6 +31,7 @@ const outputSchema = {
 type ExecutionAuthorityOptions = Readonly<{
     transport: ExecutionTransport; isCurrent: () => boolean;
     boundaryQualified: () => boolean; cwd: string; now?: () => number; timeoutMs?: number;
+    diagnostic?: (event: ExecutionDiagnostic) => void;
 }>;
 // Private engine inputs are assembled by the named host factories below. This
 // callback is not exported as a route/configuration or an admission mechanism.
@@ -202,6 +204,11 @@ function createTaskExecutionService<Result extends object>(options: ExecutionAut
             if (type !== 'reasoning' && type !== 'agentMessage' && type !== 'userMessage') throw new ExecutionError('tool_use_denied');
         }
     }
+    function turnFailed(event: 'turn_start_failed' | 'turn_completed_failed') {
+        // Status only: do not read turn.error, prompt/output or private reasoning.
+        reportExecutionDiagnostic(options.diagnostic, { event, method: 'turn/start', errorCode: 'upstream_error',
+            rpcCode: null, httpStatus: null, tls: false, network: false, device: false, experimental: false, permission: false });
+    }
     function consume(event: Event) {
         if (event.thread !== threadId || event.turn !== turnId) throw new ExecutionError('protocol_error');
         if (completed) throw new ExecutionError('protocol_error');
@@ -209,7 +216,10 @@ function createTaskExecutionService<Result extends object>(options: ExecutionAut
             if (finalText !== undefined) throw new ExecutionError('invalid_output');
             finalText = event.text;
         } else {
-            if (event.status !== 'completed') throw new ExecutionError('upstream_error');
+            if (event.status !== 'completed') {
+                if (event.status === 'failed') turnFailed('turn_completed_failed');
+                throw new ExecutionError('upstream_error');
+            }
             if (finalText === undefined) throw new ExecutionError('invalid_output');
             completed = true;
             resolveCompletion?.();
@@ -365,7 +375,10 @@ function createTaskExecutionService<Result extends object>(options: ExecutionAut
                 turnId = turn.id;
                 if (earlyTurnId && earlyTurnId !== turnId) throw new ExecutionError('protocol_error');
                 inspectItems(turn.items);
-                if (turn.status !== 'inProgress' && turn.status !== 'completed') throw new ExecutionError('upstream_error');
+                if (turn.status !== 'inProgress' && turn.status !== 'completed') {
+                    if (turn.status === 'failed') turnFailed('turn_start_failed');
+                    throw new ExecutionError('upstream_error');
+                }
                 turnPending = false;
                 for (const event of early) consume(event);
                 early = [];

@@ -197,19 +197,25 @@ export function resolveFunctionModelDispatch(sources: FunctionModelSources, id: 
 
 type SetCommand = { action: 'set'; functionId: FunctionModelId; enabled: boolean; defaultModelOptionId: string | null };
 type PresetCommand = { action: 'preset'; presetId: 'host_defaults' | 'all_off' };
+// Activation changes the ONE existing switch, not a local binding or remote policy.
+// Only the v2 UI can request it; the authenticated HTTP owner/CAS still apply.
+type ActivationCommand = { action: 'set_activation'; functionId: FunctionModelId; enabled: boolean };
 export type FunctionModelCommand = Readonly<{ schemaVersion: 'mediflow.function-preferences-command.v1' | 'mediflow.function-preferences-command.v2'; commandId: string;
-    expectedRevision: string; expectedCatalogRevision: string } & (SetCommand | PresetCommand)>;
+    expectedRevision: string; expectedCatalogRevision: string } & (SetCommand | PresetCommand | ActivationCommand)>;
 export function parseFunctionModelCommand(value: unknown): FunctionModelCommand {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return fail('input_invalid');
     const action = Object.getOwnPropertyDescriptor(value, 'action')?.value;
     const base = ['schemaVersion', 'commandId', 'expectedRevision', 'expectedCatalogRevision', 'action'];
-    const input = functionModelRecord(value, [...base, ...(action === 'set' ? ['functionId', 'enabled', 'defaultModelOptionId'] : ['presetId'])]);
+    const input = functionModelRecord(value, [...base, ...(action === 'set' ? ['functionId', 'enabled', 'defaultModelOptionId'] : action === 'set_activation' ? ['functionId', 'enabled'] : ['presetId'])]);
     if (!['mediflow.function-preferences-command.v1', 'mediflow.function-preferences-command.v2'].includes(input.schemaVersion as string) || typeof input.commandId !== 'string' || !COMMAND_ID.test(input.commandId)
         || typeof input.expectedRevision !== 'string' || !REVISION.test(input.expectedRevision)
         || typeof input.expectedCatalogRevision !== 'string' || !REVISION.test(input.expectedCatalogRevision)) return fail('input_invalid');
     if (action === 'set') {
         if (!isFunctionModelId(input.functionId) || typeof input.enabled !== 'boolean'
             || (input.defaultModelOptionId !== null && (typeof input.defaultModelOptionId !== 'string' || !OPTION.test(input.defaultModelOptionId)))) return fail('input_invalid');
+    } else if (action === 'set_activation') {
+        if (input.schemaVersion !== 'mediflow.function-preferences-command.v2' || !isFunctionModelId(input.functionId)
+            || typeof input.enabled !== 'boolean') return fail('input_invalid');
     } else if (action !== 'preset' || !['host_defaults', 'all_off'].includes(input.presetId as string)) return fail('input_invalid');
     return Object.freeze(input) as FunctionModelCommand;
 }
@@ -241,7 +247,11 @@ export function planFunctionModelUpdate(sources: FunctionModelSources, value: un
         }
         writes[FUNCTION_SWITCH_KEYS[id]] = enabled ? 'enabled' : 'disabled';
     };
-    if (command.action === 'set') set(command.functionId, command.enabled, command.defaultModelOptionId);
+    if (command.action === 'set_activation') {
+        // Preserve even stale local bindings unchanged. This does not admit
+        // Ollama/ATHENA, select OpenAI, grant consent or relax any dispatch gate.
+        writes[FUNCTION_SWITCH_KEYS[command.functionId]] = command.enabled ? 'enabled' : 'disabled';
+    } else if (command.action === 'set') set(command.functionId, command.enabled, command.defaultModelOptionId);
     else for (const id of FUNCTION_MODEL_IDS) {
         if (command.presetId === 'all_off') writes[FUNCTION_SWITCH_KEYS[id]] = 'disabled';
         else set(id, isAiLaneEnabledValue(sources.settings[FUNCTION_SWITCH_KEYS[id]]), null);

@@ -292,7 +292,7 @@ test('source identity and hashes validated before transport', () => {
 test('service has only named content/consent/egress imports and no clinical writer or direct IO', () => {
     const code = readFileSync(new URL('./execution-service.ts', import.meta.url), 'utf8');
     const imports = [...code.matchAll(/^import\s+(?!type\b).*?from\s+'([^']+)'/gm)].map(match => match[1]);
-    assert.deepEqual(imports, ['node:crypto', 'node:path', './execution-contract', './ordinary-preparation',
+    assert.deepEqual(imports, ['node:crypto', 'node:path', './execution-contract', './execution-transport', './ordinary-preparation',
         '../chatgpt-product/product-consent', './ordinary-egress-chokepoint']);
     assert.doesNotMatch(code, /export\s+(?:async\s+)?function\s+createTaskExecutionService/);
     assert.doesNotMatch(code, /from\s+['"][^'"]*(?:db|server-auth|registry|ollama)[^'"]*['"]/);
@@ -598,4 +598,27 @@ test('publication witness never re-enters the caller owner callback', async () =
         assert.equal(service.isCurrent(catalog), true);
         assert.equal(ownerReads, readsAtHandoff);
     } finally { await service.dispose(); }
+});
+
+/* @Codex — statuses are diagnostics, not an alternative result or retry path. */
+for (const phase of ['start', 'completed-early', 'completed-late'] as const) test(`failed ${phase} emits only bounded diagnostics; throwing observer preserves failure/cleanup`, async () => {
+    const events: import('./execution-transport').ExecutionDiagnostic[] = [];
+    const { service, transport } = setup({ diagnostic(event) { events.push(event); throw new Error('PRIVATE_PROVIDER_SENTINEL'); } });
+    const request = await selection(service);
+    let accessed = 0;
+    const turn = { id: 'turn-1', items: [], status: 'failed', get error() { accessed++; throw new Error('PRIVATE_PROVIDER_SENTINEL'); } };
+    const failed = () => transport.listener('turn/completed', { threadId: 'thread-1', turn });
+    if (phase === 'start') transport.override = method => method === 'turn/start' ? { turn } : undefined;
+    else if (phase === 'completed-early') transport.onTurn = failed;
+    const work = service.generate(request); const rejected = assert.rejects(work, errorCode('upstream_error'));
+    if (phase === 'completed-late') { await started(transport); failed(); }
+    await rejected;
+    assert.equal(accessed, 0);
+    assert.deepEqual(events, [{ event: phase === 'start' ? 'turn_start_failed' : 'turn_completed_failed',
+        method: 'turn/start', errorCode: 'upstream_error', rpcCode: null, httpStatus: null,
+        tls: false, network: false, device: false, experimental: false, permission: false }]);
+    assert.doesNotMatch(JSON.stringify(events), /PRIVATE_|thread-1|turn-1|summary|citations/u);
+    assert.equal(transport.closed, 1); assert.equal(transport.calls.filter(call => call.method === 'turn/start').length, 1);
+    await assert.rejects(service.generate(request), errorCode('upstream_error'));
+    assert.equal(transport.calls.filter(call => call.method === 'turn/start').length, 1);
 });

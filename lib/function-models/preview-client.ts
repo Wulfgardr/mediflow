@@ -30,7 +30,7 @@ export function createModelPreviewClient(functionId: FunctionModelId, request: t
             remoteMode = false; abort(); const { remote: _remoteView, ...localView } = view; view = localView; void _remoteView; const dto = view.dto; const f = dto?.functions.find(f => f.id === functionId);
             const selected = f?.options.find(o => o.modelOptionId === (id || f.defaultModelOptionId));
             if (!active || !dto || !f?.enabled || (!id && f.bindingState !== 'current') || selected?.state !== 'available_unqualified') {
-                emit({ choice: null, blocked: true, error: errorText(new ModelUiError('stale')) }); return;
+                emit({ choice: null, blocked: true, error: errorText(new ModelUiError(f?.enabled && selected?.state === 'unavailable' ? 'provider_unavailable' : 'stale')) }); return;
             }
             emit({ consumed: false, choice: id ? { modelOptionId: id, expectedCatalogRevision: dto.catalogRevision } : null, blocked: false, error: null });
         },
@@ -49,9 +49,10 @@ export function createModelPreviewClient(functionId: FunctionModelId, request: t
                 if (old && (old.revision !== dto.revision || old.catalogRevision !== dto.catalogRevision)) throw new ModelUiError('stale');
                 const f = dto.functions.find(f => f.id === functionId)!;
                 const selected = f.options.find(o => o.modelOptionId === (choice?.modelOptionId ?? f.defaultModelOptionId));
-                if (!f.enabled || (!choice && f.bindingState !== 'current') || selected?.state !== 'available_unqualified' || (choice && choice.expectedCatalogRevision !== dto.catalogRevision)) throw new ModelUiError('stale');
+                if (!f.enabled || (!choice && f.bindingState !== 'current') || (choice && choice.expectedCatalogRevision !== dto.catalogRevision)) throw new ModelUiError('stale');
+                if (selected?.state !== 'available_unqualified') throw new ModelUiError('provider_unavailable');
                 emit({ dto }); lease = { generation: token, choice }; return token;
-            } catch (error) { if (token === generation) emit({ choice: null, blocked: true, error: errorText(error) }); throw error; }
+            } catch (error) { if (token === generation) emit({ ...(error instanceof ModelUiError && error.code === 'provider_unavailable' ? {} : { choice: null }), blocked: true, error: errorText(error) }); throw error; }
         },
         isCurrent(token: number) { return active && generation === token && !transport.signal.aborted; },
         fetch: (async (input, init) => {
