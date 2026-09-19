@@ -4,6 +4,7 @@ import { createCanvas } from '@napi-rs/canvas';
 import { createHash, randomUUID } from 'node:crypto';
 import { PDFDocument, StandardFonts } from 'pdf-lib';
 import { bootstrapUnlockedSession, openPatientSection } from './utils';
+import { observeAnyDocProjectResponse } from './anydoc-project-response';
 
 const NATIVE_TEXT = 'PRIMA PAGINA TESTUALE - DOCUMENTO SINTETICO';
 const SCANNED_TEXT = 'ULTIMA PAGINA SCANSIONATA';
@@ -85,68 +86,73 @@ for (const scenario of ['text', 'scan', 'mixed', 'image'] as const) {
     await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
     const bytes = await syntheticDocument(scenario);
     const attachment = await openSyntheticAttachment(page, scenario, bytes);
-    const acquirePromise = page.waitForResponse(response => response.request().method() === 'POST'
-      && response.url().endsWith(`/api/attachments/${attachment.id}/local-extraction`)
-      && response.request().headers()['x-mediflow-extraction-action'] === 'acquire');
-    const responsePromise = page.waitForResponse(response => response.request().method() === 'POST'
-      && response.url().endsWith(`/api/attachments/${attachment.id}/local-extraction`)
-      && response.request().headers()['x-mediflow-extraction-action'] === 'project');
-    void responsePromise.catch(() => {}); // An acquire failure still reports its own assertion.
-    await page.getByRole('button', { name: `Estrai testo localmente da ${attachment.name}` }).click();
-    const acquired = await acquirePromise;
-    // Chromium can expose the acquire response headers after the client has consumed and aborted its body.
-    // The project envelope is the completed client-visible result, so assert its canonical source there.
-    expect(acquired.status()).toBe(200);
-    const response = await responsePromise;
-    expect(response.status()).toBe(200);
-    const envelope = await response.json();
-    expect(envelope).toMatchObject({ schemaVersion: 'mediflow.attachment_extraction_projection.v1',
-      acquisition: { origin: 'authenticated_client_decryption', ciphertextEquality: 'not_attested' } });
-    expect(envelope.acquisition.canonicalSource).toMatchObject({
-      sourceRef: expect.stringMatching(/^[a-f0-9]{64}$/),
-      revision: expect.any(Number), freshnessEpoch: expect.any(Number),
-    });
-    expect(envelope.acquisition.canonicalSource.revision).toBeGreaterThan(0);
-    expect(envelope.acquisition.canonicalSource.freshnessEpoch).toBeGreaterThan(0);
-    const result = envelope.extraction;
-    expect(result).toMatchObject({
-      provenance: { attachmentId: attachment.id, sourceSha256: createHash('sha256').update(bytes).digest('hex'), byteLength: bytes.byteLength },
-      review: 'required', writes: 0, apply: 'none',
-    });
-    const preview = page.getByTestId('anydoc-local-extraction-preview');
-    if (scenario === 'image') {
-      // Single images have no PDF page routing in the current application contract.
-      expect(result.status).toBe('review_required');
-      expect(result.receipt.ocrProvenance).toBeUndefined();
-      await expect(preview).toHaveCount(0);
-      await expect(page.getByText(/Revisione manuale necessaria/i).first()).toBeVisible();
-    } else {
-      expect(result).toMatchObject({ status: 'extracted', candidateUse: 'review_only' });
-      await expect(preview).toBeVisible();
-      await preview.locator('summary').click();
-      await expect(preview.locator('pre')).toHaveText(result.markdown);
-      // AnyDoc normalizes whitespace around punctuation; preserve words and order.
-      if (scenario !== 'scan') await expect(preview).toContainText(/PRIMA PAGINA TESTUALE\s*-\s*DOCUMENTO SINTETICO/);
-      if (scenario === 'text') {
+    const observed = await observeAnyDocProjectResponse(page, attachment.id);
+    try {
+      const acquirePromise = page.waitForResponse(response => response.request().method() === 'POST'
+        && response.url().endsWith(`/api/attachments/${attachment.id}/local-extraction`)
+        && response.request().headers()['x-mediflow-extraction-action'] === 'acquire');
+      const responsePromise = page.waitForResponse(response => response.request().method() === 'POST'
+        && response.url().endsWith(`/api/attachments/${attachment.id}/local-extraction`)
+        && response.request().headers()['x-mediflow-extraction-action'] === 'project');
+      void responsePromise.catch(() => {}); // An acquire failure still reports its own assertion.
+      await page.getByRole('button', { name: `Estrai testo localmente da ${attachment.name}` }).click();
+      const acquired = await acquirePromise;
+      // @Codex: acquire status stays direct; the unchanged client validates its grant.
+      // Observe project bytes passively, without relying on the inspector body cache.
+      expect(acquired.status()).toBe(200);
+      const response = await responsePromise;
+      expect(response.status()).toBe(200);
+      const envelope = await observed.json(response);
+      expect(envelope.grantId === response.request().headers()['x-mediflow-extraction-grant']).toBe(true);
+      expect(envelope).toMatchObject({ schemaVersion: 'mediflow.attachment_extraction_projection.v1',
+        acquisition: { origin: 'authenticated_client_decryption', ciphertextEquality: 'not_attested' } });
+      expect(envelope.acquisition.canonicalSource).toMatchObject({
+        sourceRef: expect.stringMatching(/^[a-f0-9]{64}$/),
+        revision: expect.any(Number), freshnessEpoch: expect.any(Number),
+      });
+      expect(envelope.acquisition.canonicalSource.revision).toBeGreaterThan(0);
+      expect(envelope.acquisition.canonicalSource.freshnessEpoch).toBeGreaterThan(0);
+      const result = envelope.extraction;
+      expect(result).toMatchObject({
+        provenance: { attachmentId: attachment.id, sourceSha256: createHash('sha256').update(bytes).digest('hex'), byteLength: bytes.byteLength },
+        review: 'required', writes: 0, apply: 'none',
+      });
+      const preview = page.getByTestId('anydoc-local-extraction-preview');
+      if (scenario === 'image') {
+        // Single images have no PDF page routing in the current application contract.
+        expect(result.status).toBe('review_required');
         expect(result.receipt.ocrProvenance).toBeUndefined();
-        await expect(preview).not.toContainText('OCR completato');
+        await expect(preview).toHaveCount(0);
+        await expect(page.getByText(/Revisione manuale necessaria/i).first()).toBeVisible();
+      } else {
+        expect(result).toMatchObject({ status: 'extracted', candidateUse: 'review_only' });
+        await expect(preview).toBeVisible();
+        await preview.locator('summary').click();
+        await expect(preview.locator('pre')).toHaveText(result.markdown);
+        // AnyDoc normalizes whitespace around punctuation; preserve words and order.
+        if (scenario !== 'scan') await expect(preview).toContainText(/PRIMA PAGINA TESTUALE\s*-\s*DOCUMENTO SINTETICO/);
+        if (scenario === 'text') {
+          expect(result.receipt.ocrProvenance).toBeUndefined();
+          await expect(preview).not.toContainText('OCR completato');
+        }
+        else {
+          await expect(preview).toContainText(SCANNED_TEXT);
+          expect(result.receipt.ocrProvenance).toMatchObject({
+            engine: 'apple_vision', pageCount: scenario === 'mixed' ? 2 : 1, ocrPageCount: 1,
+          });
+          expect(result.receipt.ocrProvenance.receiptSetSha256).toMatch(/^[a-f0-9]{64}$/);
+          await expect(preview).toContainText('Testo OCR locale · da rivedere');
+          await expect(preview).toContainText(`OCR: 1 pagine su ${scenario === 'mixed' ? 2 : 1}`);
+        }
+        if (scenario === 'mixed') {
+          expect(result.markdown).toMatch(/## Pagina 1[\s\S]*PRIMA PAGINA TESTUALE[\s\S]*## Pagina 2[\s\S]*ULTIMA PAGINA SCANSIONATA/);
+        }
       }
-      else {
-        await expect(preview).toContainText(SCANNED_TEXT);
-        expect(result.receipt.ocrProvenance).toMatchObject({
-          engine: 'apple_vision', pageCount: scenario === 'mixed' ? 2 : 1, ocrPageCount: 1,
-        });
-        expect(result.receipt.ocrProvenance.receiptSetSha256).toMatch(/^[a-f0-9]{64}$/);
-        await expect(preview).toContainText('Testo OCR locale · da rivedere');
-        await expect(preview).toContainText(`OCR: 1 pagine su ${scenario === 'mixed' ? 2 : 1}`);
-      }
-      if (scenario === 'mixed') {
-        expect(result.markdown).toMatch(/## Pagina 1[\s\S]*PRIMA PAGINA TESTUALE[\s\S]*## Pagina 2[\s\S]*ULTIMA PAGINA SCANSIONATA/);
-      }
-    }
-    const after = await page.request.get(`/api/attachments/${attachment.id}`);
-    expect(await after.json()).toEqual(attachment.persisted); // Extraction performs no clinical writes.
-    await page.screenshot({ path: testInfo.outputPath(`${scenario}-synthetic.png`), fullPage: true });
+      const after = await page.request.get(`/api/attachments/${attachment.id}`);
+      expect(await after.json()).toEqual(attachment.persisted); // Extraction performs no clinical writes.
+      await page.screenshot({ path: testInfo.outputPath(`${scenario}-synthetic.png`), fullPage: true });
+      observed.assertSameResponse(response);
+    } finally { await observed.dispose(); }
   });
 }
 
