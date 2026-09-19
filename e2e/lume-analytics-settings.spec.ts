@@ -237,6 +237,9 @@ async function verifySettings(page: Page, viewCase: ViewCase): Promise<void> {
   const networkValue = page.getByTestId('settings-network-mode-value');
   const networkAction = page.getByTestId('settings-network-mode-action');
   expect((await networkAction.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
+  // @Codex: wait for the real network overview to resolve. The disabled control
+  // is the observable loading state; no fixture or response is substituted.
+  await expect(networkAction).toBeEnabled();
   // @Codex: innerText excludes the hidden legacy label; keep the visible
   // status exact and verify each mode transition through the ordinary action.
   await expect(networkValue).toHaveText('Stato Locale', { useInnerText: true });
