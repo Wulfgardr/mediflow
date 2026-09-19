@@ -34,15 +34,17 @@ test('locking retires the pending model footer read before its response or fallb
     const delivery = new Promise<void>(resolve => { release = resolve; });
     const reads: string[] = [];
     const aborted: string[] = [];
-    const errors: string[] = [];
+    const errors: Array<{ text: string; url: string; locked: boolean }> = [];
+    const postLockUnauthorizedUrls = new Set<string>();
     let locked = false;
     const lateReads: string[] = [];
     page.on('console', message => {
-        // A lock intentionally retires in-flight session reads, which Chromium
-        // reports as a console 401. Model reads are asserted separately below.
-        if (message.type() === 'error' && !/401 \(Unauthorized\)/u.test(message.text())) errors.push(message.text());
+        if (message.type() === 'error') errors.push({ text: message.text(), url: message.location().url, locked });
     });
-    page.on('pageerror', error => errors.push(error.message));
+    page.on('pageerror', error => errors.push({ text: error.message, url: '', locked }));
+    page.on('response', response => {
+        if (locked && response.status() === 401) postLockUnauthorizedUrls.add(response.url());
+    });
     page.on('request', request => {
         const pathname = new URL(request.url()).pathname;
         if (pathname === '/api/auth/lock' && request.method() === 'POST') locked = true;
@@ -79,7 +81,13 @@ test('locking retires the pending model footer read before its response or fallb
         await page.waitForLoadState('networkidle');
         expect(reads).toEqual(readsAtLock);
         expect(lateReads).toEqual([]);
-        expect(errors).toEqual([]);
+        // Chromium may report an intentionally retired authenticated read as a
+        // console 401. Ignore only that response after lock when its resource
+        // URL is present in the corresponding response stream.
+        expect(errors.filter(error => !(error.locked
+            && /401 \(Unauthorized\)/u.test(error.text)
+            && error.url.length > 0
+            && postLockUnauthorizedUrls.has(error.url)))).toEqual([]);
         await page.unrouteAll({ behavior: 'wait' });
         locked = false;
         await unlockIfNeeded(page, pin);
