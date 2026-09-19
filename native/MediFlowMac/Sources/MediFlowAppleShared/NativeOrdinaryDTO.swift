@@ -13,6 +13,45 @@ public enum NativeOrdinaryContractError: Error, LocalizedError {
         }
     }
 }
+/// Closed server codes allowed at the ordinary operation boundary. Host error text is never retained.
+public enum NativeOrdinaryFailureCode: String, CaseIterable, Equatable, Sendable {
+    case unqualifiedBoundary = "unqualified_boundary", sessionExpired = "session_expired"
+    case notConnected = "not_connected", unsupportedAccount = "unsupported_account", busy, canceled, revoked
+    case quotaExhausted = "quota_exhausted", limitsUnavailable = "limits_unavailable", catalogStale = "catalog_stale"
+    case modelUnavailable = "model_unavailable", modelMismatch = "model_mismatch", invalidRequest = "invalid_request"
+    case invalidOutput = "invalid_output", toolUseDenied = "tool_use_denied", timeout, processExited = "process_exited"
+    case protocolError = "protocol_error", upstreamError = "upstream_error", invalidState = "invalid_state", forbidden
+    public var safeReason: String {
+        switch self {
+        case .unqualifiedBoundary: return "runtime locale non qualificato per questa operazione"
+        case .sessionExpired: return "sessione o pairing non più validi"
+        case .notConnected: return "accesso OpenAI non disponibile"
+        case .unsupportedAccount: return "account OpenAI non supportato"
+        case .busy: return "operazione già in corso"
+        case .canceled: return "operazione annullata"
+        case .revoked: return "contesto o autorizzazione non più correnti"
+        case .quotaExhausted: return "limite di utilizzo raggiunto"
+        case .limitsUnavailable: return "limiti di utilizzo non verificabili"
+        case .catalogStale: return "catalogo non più corrente"
+        case .modelUnavailable: return "modello non disponibile"
+        case .modelMismatch: return "modello non coerente con l’opzione selezionata"
+        case .invalidRequest: return "richiesta non valida"
+        case .invalidOutput: return "risposta non verificata"
+        case .toolUseDenied: return "strumento non ammesso"
+        case .timeout: return "tempo di risposta scaduto"
+        case .processExited: return "runtime terminato"
+        case .protocolError: return "protocollo non verificato"
+        case .upstreamError: return "servizio esterno non disponibile"
+        case .invalidState: return "stato dell’operazione non valido"
+        case .forbidden: return "operazione non autorizzata"
+        }
+    }
+}
+public struct NativeOrdinaryServerFailure: Error, Equatable, Sendable {
+    public let status: Int
+    public let code: NativeOrdinaryFailureCode
+    public init(status: Int, code: NativeOrdinaryFailureCode) { self.status = status; self.code = code }
+}
 public enum NativeOrdinaryFunction: String, Codable, CaseIterable, Sendable {
     case patientInsight = "patient_insight", smartImport = "smart_import"
     case documentSynthesis = "document_synthesis", treatmentReasoning = "treatment_reasoning"

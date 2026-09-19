@@ -1433,6 +1433,14 @@ public actor HomeBasePatientsClient {
                    let payload = try? JSONDecoder().decode(APIErrorPayload.self, from: data), payload.code == "login_pending" {
                     throw NativeOrdinaryContractError.loginPending
                 }
+                if url.path.hasPrefix("/api/v1/network/ai/chatgpt/ordinary/"),
+                   let payload = try? JSONDecoder().decode(APIErrorPayload.self, from: data),
+                   let rawCode = payload.code, let code = NativeOrdinaryFailureCode(rawValue: rawCode) {
+                    throw NativeOrdinaryServerFailure(status: httpResponse.statusCode, code: code)
+                }
+                if url.path.hasPrefix("/api/v1/network/ai/chatgpt/ordinary/") {
+                    throw HomeBaseClientError.httpStatus(httpResponse.statusCode, nil)
+                }
                 #endif
                 // WUL-308: a 409 carries a structured VERSION_CONFLICT body; surface
                 // it as a typed error so the UI can show expected-vs-current version.
