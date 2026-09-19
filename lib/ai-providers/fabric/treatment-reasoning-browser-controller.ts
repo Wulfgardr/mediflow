@@ -259,21 +259,36 @@ export function createTreatmentReasoningBrowserController(sources: Sources = {})
             const selectedProposal = proposal; const ambulatory = input.ambulatory as SmartImportAmbulatoryChoice; proposal = null; readOperation += 1;
             const clinicalContext = inputContext(input.contextInput, input.patientId); if (!clinicalContext) return fail('input_invalid');
             const token = generation; const currentOperation = ++operation; let selected: unknown = null;
-            const current = () => { if (token !== generation || currentOperation !== operation) return fail('operation_superseded'); if (selected && !selection.isCurrent(selected)) return fail('selection_invalid'); };
-            try {
-                const latest = await context.read(input.patientId); current();
+            // @Codex: caller facts and host-owned directory facts must remain bound to the accepted proposal.
+            const patientCurrent = () => {
+                const patient = clinicalContext.patient;
+                if (patient.id !== selectedProposal.patientId || patient.version !== selectedProposal.patientVersion
+                    || typeof patient.firstName !== 'string' || typeof patient.lastName !== 'string'
+                    || `${patient.firstName.trim()} ${patient.lastName.trim()}` !== selectedProposal.patientName) return fail('proposal_stale');
+            };
+            const current = () => { if (token !== generation || currentOperation !== operation) return fail('operation_superseded'); if (selected && !selection.isCurrent(selected)) return fail('selection_invalid'); patientCurrent(); };
+            const revalidate = async () => {
+                current();
+                const latest = await context.read(selectedProposal.patientId); current();
                 const latestAmbulatory = latest.ambulatories.find((row) => row.ambulatoryId === ambulatory.ambulatoryId);
                 if (latest.patientVersion !== selectedProposal.patientVersion || latest.patientName !== selectedProposal.patientName
                     || !latestAmbulatory || latestAmbulatory.version !== ambulatory.version || latestAmbulatory.name !== ambulatory.name
                     || latestAmbulatory.address !== ambulatory.address) return fail('proposal_stale');
-                await selection.initialize(); current(); selected = await selection.select({ patientId: input.patientId, ambulatoryId: ambulatory.ambulatoryId }, true); current();
+            };
+            try {
+                patientCurrent();
+                await selection.initialize(); current();
+                await revalidate(); current();
+                selected = await selection.select({ patientId: input.patientId, ambulatoryId: ambulatory.ambulatoryId }, true); current();
                 let now: Date; try { now = clock(); if (!(now instanceof Date) || !Number.isFinite(now.getTime())) return fail('input_invalid'); } catch { return fail('input_invalid'); }
                 let projection: ReturnType<typeof buildTreatmentReasoningProjectionAttachment>; try { projection = buildTreatmentReasoningProjectionAttachment({ ...clinicalContext, now }); } catch { return fail('input_invalid'); } current();
                 let ingestId: unknown; let previewId: unknown; try { ingestId = nextId(); previewId = nextId(); } catch { return fail('input_invalid'); }
                 if (typeof ingestId !== 'string' || typeof previewId !== 'string' || ingestId === previewId || RAW_UUID.test(ingestId) || RAW_UUID.test(previewId) || !REQUEST_ID.test(ingestId) || !REQUEST_ID.test(previewId)) return fail('input_invalid');
+                await revalidate(); current();
                 const ingestResponse = await post(request, '/api/ai/treatment-reasoning/ingest', { projection, requestId: ingestId }, 'ingest_outcome_unknown', 'ingest_unavailable'); current();
                 let ingestBody: unknown; try { ingestBody = await ingestResponse.json(); } catch { return fail('response_invalid'); } current();
                 const ingested = record(ingestBody, ['handle']); if (!ingested || typeof ingested.handle !== 'string' || !/^trp_[0-9a-f]{32}$/u.test(ingested.handle)) return fail('response_invalid');
+                await revalidate(); current();
                 const previewResponse = await post(request, '/api/ai/treatment-reasoning/preview', { handle: ingested.handle, requestId: previewId }, 'preview_outcome_unknown', 'preview_unavailable'); current();
                 let previewBody: unknown; try { previewBody = await previewResponse.json(); } catch { return fail('response_invalid'); } current();
                 const publication = parseTreatmentReasoningPublication(previewBody); if (!publication || publication.sourceRevision !== projection.sourceRevision || publication.capturedAt !== projection.capturedAt || !publicationUsesOnly(publication, projection.evidenceRefs)) return fail('response_invalid'); current(); return publication;

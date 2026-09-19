@@ -339,11 +339,15 @@ test('Treatment Reasoning UI invia payload strict e mostra una proposta source-b
     'GET:/api/ambulatories',
     `GET:/api/patients/${fixture.patientId}`,
     'GET:/api/ambulatories',
+    'GET:/api/ai/smart-import/selection',
     `GET:/api/patients/${fixture.patientId}`,
     'GET:/api/ambulatories',
-    'GET:/api/ai/smart-import/selection',
     'POST:/api/ai/smart-import/selection',
+    `GET:/api/patients/${fixture.patientId}`,
+    'GET:/api/ambulatories',
     'POST:/api/ai/treatment-reasoning/ingest',
+    `GET:/api/patients/${fixture.patientId}`,
+    'GET:/api/ambulatories',
     'POST:/api/ai/treatment-reasoning/preview',
   ]);
   expect(bodies.selection).toEqual({

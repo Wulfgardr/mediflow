@@ -101,6 +101,8 @@ export default function TreatmentReasoningPanel({
     const picker = useFunctionModelPicker('treatment_reasoning', `${patient.id}:${patient.version}`);
     const [controller] = useState(() => createTreatmentReasoningBrowserController({ fetch: picker.client.fetch }));
     const operation = useRef(0);
+    // @Codex: close same-render double activation before React can publish busy state.
+    const handler = useRef(false);
     const contextRevision = `${patient.id}:${patient.version ?? 'unversioned'}`;
     const [publicationState, setPublicationState] = useState<ScopedValue<TreatmentReasoningPublication> | null>(null);
     const [runningRevision, setRunningRevision] = useState<string | null>(null);
@@ -136,13 +138,14 @@ export default function TreatmentReasoningPanel({
     useEffect(() => {
         operation.current += 1;
         controller.reset();
+        handler.current = false;
         setPublicationState(null); setRunningRevision(null); setErrorState(null);
         setProposal(null); setAmbulatory(null); setConfirmed(false); setLoadingProposal(false);
         return () => {
             operation.current += 1;
             controller.reset();
         };
-    }, [controller, patient.id, patient.version, picker.active, picker.view.choice, picker.view.blocked]);
+    }, [controller, patient.id, patient.version, picker.active, picker.view.choice, picker.view.blocked, treatmentReasoningEnabled]);
 
     if (sourceSummary.total === 0) {
         return null;
@@ -153,7 +156,9 @@ export default function TreatmentReasoningPanel({
             setErrorState({ contextRevision, value: LOCAL_DISABLED_ERROR });
             return;
         }
+        if (handler.current) return;
 
+        handler.current = true;
         const token = ++operation.current;
         setLoadingProposal(true);
         setErrorState(null);
@@ -170,16 +175,21 @@ export default function TreatmentReasoningPanel({
                 setErrorState({ contextRevision, value: message });
             }
         } finally {
-            if (operation.current === token) setLoadingProposal(false);
+            if (operation.current === token) {
+                handler.current = false;
+                setLoadingProposal(false);
+            }
         }
     };
 
     const generatePreview = async () => {
-        if (!treatmentReasoningEnabled || !proposal || !ambulatory || !confirmed || isBusy) return;
+        if (!treatmentReasoningEnabled || !proposal || !ambulatory || !confirmed || isBusy || handler.current) return;
+        handler.current = true;
         const token = ++operation.current; const currentProposal = proposal; const currentAmbulatory = ambulatory;
         setRunningRevision(contextRevision); setErrorState(null);
         try {
             const modelToken = await picker.client.begin();
+            if (operation.current !== token || !picker.client.isCurrent(modelToken)) return;
             const nextPublication = await controller.run({
                 patientId: patient.id,
                 proposal: currentProposal,
@@ -202,13 +212,14 @@ export default function TreatmentReasoningPanel({
             }
         } finally {
             if (operation.current === token) {
+                handler.current = false;
                 setRunningRevision(null);
             }
         }
     };
 
     const cancelProposal = () => {
-        operation.current += 1; controller.reset(); setProposal(null); setAmbulatory(null); setConfirmed(false); setLoadingProposal(false);
+        operation.current += 1; handler.current = false; controller.reset(); setProposal(null); setAmbulatory(null); setConfirmed(false); setLoadingProposal(false);
     };
 
     return (
@@ -285,7 +296,7 @@ export default function TreatmentReasoningPanel({
                             Confermo paziente e ambulatorio per una bozza da rivedere. La cartella resta invariata.
                         </label>
                         <div className="flex flex-wrap gap-3">
-                            <button type="button" className="ui-btn-primary" disabled={!ambulatory || !confirmed || !picker.canGenerate} onClick={generatePreview}>Conferma e genera bozza</button>
+                            <button type="button" className="ui-btn-primary" disabled={!treatmentReasoningEnabled || !ambulatory || !confirmed || !picker.canGenerate || isBusy} onClick={generatePreview}>Conferma e genera bozza</button>
                             <button type="button" className="ui-btn-secondary" onClick={cancelProposal}>Annulla</button>
                         </div>
                     </div>
