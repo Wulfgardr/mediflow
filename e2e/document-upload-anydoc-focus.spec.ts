@@ -47,26 +47,19 @@ async function createSyntheticFixture(page: Page): Promise<string> {
 
 async function createExtractableRtf(page: Page, patientId: string): Promise<Readonly<{ id: string; name: string }>> {
   const suffix = `${Date.now()}`.slice(-8);
-  return page.evaluate(async ({ id, marker, expectedText }) => {
-    const attachmentId = `attachment-anydoc-route-${marker}`;
-    const name = `allegato-anydoc-route-${marker}.rtf`;
-    const source = `{\\rtf1\\ansi ${expectedText}}`;
-    const response = await fetch('/api/attachments', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        id: attachmentId,
-        patientId: id,
-        name,
-        type: 'application/rtf',
-        size: new TextEncoder().encode(source).byteLength,
-        path: `uploads/${name}`,
-        data: `data:application/rtf;base64,${btoa(source)}`,
-      }),
-    });
-    if (!response.ok) throw new Error(`Fixture RTF AnyDoc: HTTP ${response.status}`);
-    return { id: attachmentId, name };
-  }, { id: patientId, marker: suffix, expectedText: SYNTHETIC_RTF_TEXT });
+  const name = `allegato-anydoc-route-${suffix}.rtf`;
+  await openDocumentArchive(page, patientId);
+  const saved = page.waitForResponse((response) => response.request().method() === 'POST'
+    && new URL(response.url()).pathname === '/api/attachments');
+  await page.locator('#documenti input[type="file"]').setInputFiles({
+    name, mimeType: 'application/rtf', buffer: Buffer.from(`{\\rtf1\\ansi ${SYNTHETIC_RTF_TEXT}}`),
+  });
+  const response = await saved;
+  expect(response.ok()).toBe(true);
+  const uploaded = response.request().postDataJSON() as { id: string; patientId: string; data: string };
+  expect(uploaded.patientId).toBe(patientId);
+  expect(uploaded.data).toMatch(/^ENC:/u);
+  return { id: uploaded.id, name };
 }
 
 async function establishSyntheticSession(page: Page): Promise<void> {
@@ -157,27 +150,21 @@ test('AnyDoc: il browser usa la route autenticata e mostra solo l’anteprima lo
 
   const responsePromise = page.waitForResponse((response) => (
     response.request().method() === 'POST'
+    && response.request().headers()['x-mediflow-extraction-action'] === 'project'
     && response.url().endsWith(`/api/attachments/${attachment.id}/local-extraction`)
   ));
   await page.getByRole('button', { name: `Estrai testo localmente da ${attachment.name}` }).click();
 
   const response = await responsePromise;
   expect(response.status()).toBe(200);
-  const body = await response.json() as {
-    provenance?: { attachmentId?: string };
-    status?: string;
-    review?: string;
-    writes?: number;
-    apply?: string;
-    candidateUse?: string;
-  };
+  const body = await response.json();
   expect(body).toMatchObject({
-    provenance: { attachmentId: attachment.id },
-    status: 'extracted',
-    review: 'required',
-    writes: 0,
-    apply: 'none',
-    candidateUse: 'review_only',
+    schemaVersion: 'mediflow.attachment_extraction_projection.v1',
+    acquisition: { origin: 'authenticated_client_decryption', ciphertextEquality: 'not_attested' },
+    extraction: {
+      provenance: { attachmentId: attachment.id },
+      status: 'extracted', review: 'required', writes: 0, apply: 'none', candidateUse: 'review_only',
+    },
   });
 
   const preview = page.getByTestId('anydoc-local-extraction-preview');

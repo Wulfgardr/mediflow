@@ -97,8 +97,17 @@ async function hasSecurityOverlay(page: Page): Promise<boolean> {
 /* @Codex */
 async function hasStableUnlockedShell(page: Page): Promise<boolean> {
   if (await hasSecurityOverlay(page)) return false;
-  await page.waitForTimeout(750);
-  return !(await hasSecurityOverlay(page));
+
+  // The lock surface can be absent while SecurityProvider is still resolving
+  // the initial auth check. Wait for the authenticated application chrome, or
+  // for the authenticated work-profile flow rendered in place of that chrome.
+  const [navigationVisible, lockControlVisible, workProfileVisible] = await Promise.all([
+    isVisible(page.getByRole('navigation', { name: 'Navigazione principale', exact: true }), 750),
+    isVisible(page.getByRole('button', { name: 'Blocca', exact: true }), 750),
+    isVisible(page.getByTestId('work-profile-onboarding'), 750),
+  ]);
+
+  return (navigationVisible && lockControlVisible) || workProfileVisible;
 }
 
 /* @Codex */
@@ -178,8 +187,8 @@ export async function bootstrapUnlockedSession(page: Page, pin: string): Promise
     await unlockIfNeeded(page, pin);
   }
 
-  if (await hasSecurityOverlay(page)) {
-    throw new Error('Security overlay is still visible after E2E bootstrap');
+  if (!(await hasStableUnlockedShell(page))) {
+    throw new Error('Authenticated application shell is unavailable after E2E bootstrap');
   }
 }
 

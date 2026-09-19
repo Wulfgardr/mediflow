@@ -26,7 +26,7 @@ async function fixture(page: Page, bytes = RTF, extension = 'rtf') {
     && new URL(response.url()).pathname === '/api/attachments');
   await page.locator('#documenti input[type="file"]').setInputFiles({ name, mimeType: type, buffer: bytes });
   const response = await saved;
-  expect(response.ok()).toBe(true);
+  expect(response.status()).toBe(201);
   const uploaded = response.request().postDataJSON() as { id: string; patientId: string; data: string };
   expect(uploaded.patientId).toBe(patientId);
   expect(uploaded.data).toMatch(/^ENC:/u);
@@ -51,7 +51,12 @@ for (const failure of ['engine_absent', 'timeout', 'crash', 'transport_interrupt
       if (failure === 'stale') return route.fulfill({ status: 409, json: { error: 'Local extraction unavailable' } });
       const body = mapAnyDocLocalFailure({ attachmentId: file.id, byteLength: RTF.byteLength,
         sourceSha256: createHash('sha256').update(RTF).digest('hex') }, failure === 'timeout' ? 'resourceLimit' : 'io');
-      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+      const response = await route.fetch();
+      expect(response.status()).toBe(200);
+      const projection = await response.json();
+      expect(projection).toMatchObject({ schemaVersion: 'mediflow.attachment_extraction_projection.v1',
+        acquisition: { origin: 'authenticated_client_decryption', ciphertextEquality: 'not_attested' } });
+      await route.fulfill({ response, json: { ...projection, extraction: body } });
     });
     const extract = page.getByRole('button', { name: `Estrai testo localmente da ${file.name}` });
     await extract.click();
@@ -72,11 +77,16 @@ for (const input of ['protected', 'corrupt'] as const) {
       : Buffer.from('%PDF-1.7\nsynthetic corrupt document\n%%EOF');
     const file = await fixture(page, bytes, 'pdf');
     for (let attempt = 0; attempt < 2; attempt += 1) {
-      const responsePromise = page.waitForResponse(response => response.url().endsWith(`/api/attachments/${file.id}/local-extraction`));
+      const responsePromise = page.waitForResponse(response => response.request().method() === 'POST'
+        && response.request().headers()['x-mediflow-extraction-action'] === 'project'
+        && response.url().endsWith(`/api/attachments/${file.id}/local-extraction`));
       await page.getByRole('button', { name: `Estrai testo localmente da ${file.name}` }).click();
       const response = await responsePromise;
       expect(response.status()).toBe(200);
-      const result = await response.json();
+      const projection = await response.json();
+      expect(projection).toMatchObject({ schemaVersion: 'mediflow.attachment_extraction_projection.v1',
+        acquisition: { origin: 'authenticated_client_decryption', ciphertextEquality: 'not_attested' } });
+      const result = projection.extraction;
       expect(result).toMatchObject({ status: 'review_required', markdown: '', candidateUse: 'blocked',
         detail: input === 'protected' ? 'encrypted_document' : 'malformed_document', review: 'required', writes: 0, apply: 'none' });
       expect(result.receipt.ocrProvenance).toBeUndefined();
