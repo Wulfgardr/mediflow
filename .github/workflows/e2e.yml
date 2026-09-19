@@ -1,7 +1,7 @@
 name: E2E (Playwright)
 
 # Playwright end-to-end smoke for the local-first web app. Boots a seeded, ephemeral
-# Next.js dev server against a throwaway SQLite DB and runs the e2e/*.spec.ts suite.
+# Next.js standalone production server against a throwaway SQLite DB and runs the e2e/*.spec.ts suite.
 # The destructive auth lifecycle test starts its own production process and empty DB.
 #
 # Node 24: npm ci rebuilds the native better-sqlite3 binding against the Node 24 ABI,
@@ -94,10 +94,13 @@ jobs:
           } >> "$GITHUB_ENV"
           node scripts/prepare-e2e-db.mjs
 
-      - name: Start Next.js dev server
+      # @Codex: run the same traced production bundle prepared above. The seeded
+      # synthetic directory and explicit feature guards remain inherited from GITHUB_ENV.
+      - name: Start Next.js standalone server
         run: |
-          npx next dev --hostname 127.0.0.1 --port 3123 > "${RUNNER_TEMP}/next-dev.log" 2>&1 &
-          echo "$!" > "${RUNNER_TEMP}/next-dev.pid"
+          cd "${E2E_ISOLATED_STANDALONE_DIR}"
+          NODE_ENV=production HOSTNAME=127.0.0.1 PORT=3123 node server.js > "${RUNNER_TEMP}/next-standalone.log" 2>&1 &
+          echo "$!" > "${RUNNER_TEMP}/next-standalone.pid"
 
       - name: Wait for server readiness
         run: |
@@ -107,15 +110,15 @@ jobs:
               echo "Server ready after ${i}s (auth/check -> ${code})."
               exit 0
             fi
-            if ! kill -0 "$(cat "${RUNNER_TEMP}/next-dev.pid")" 2>/dev/null; then
-              echo "Dev server exited before readiness."
-              cat "${RUNNER_TEMP}/next-dev.log"
+            if ! kill -0 "$(cat "${RUNNER_TEMP}/next-standalone.pid")" 2>/dev/null; then
+              echo "Standalone server exited before readiness."
+              cat "${RUNNER_TEMP}/next-standalone.log"
               exit 1
             fi
             sleep 1
           done
           echo "Server did not become ready in time."
-          tail -50 "${RUNNER_TEMP}/next-dev.log"
+          tail -50 "${RUNNER_TEMP}/next-standalone.log"
           exit 1
 
       - name: Run Playwright suite
@@ -152,11 +155,11 @@ jobs:
           E2E_BASE_URL: http://127.0.0.1:3200
         run: npm run test:network:home-base-catalog-read
 
-      - name: Stop Next.js dev server
+      - name: Stop Next.js standalone server
         if: always()
         run: |
-          if [ -f "${RUNNER_TEMP}/next-dev.pid" ]; then
-            kill "$(cat "${RUNNER_TEMP}/next-dev.pid")" 2>/dev/null || true
+          if [ -f "${RUNNER_TEMP}/next-standalone.pid" ]; then
+            kill "$(cat "${RUNNER_TEMP}/next-standalone.pid")" 2>/dev/null || true
           fi
 
       - name: Upload Playwright report
