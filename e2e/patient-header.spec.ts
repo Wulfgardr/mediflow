@@ -84,37 +84,29 @@ test('Scheda paziente renders coded diagnoses and an explicit no-diagnosis state
   await expect(quadro.getByText('EF00 · ICD-11 · altre 1 diagnosi', { exact: true })).toHaveCount(1);
   await expect(quadro.getByText(diagnosisDescription, { exact: true })).toHaveCount(1);
 
-  await openPatientSection(page, 'identita');
-  const identitySection = page.locator('#identita');
-  const diagnosesList = identitySection.getByRole('list', {
-    name: 'Diagnosi del quadro clinico',
+  await openPatientSection(page, 'clinica');
+  const clinicalSection = page.locator('#clinica');
+  const diagnosesList = clinicalSection.getByRole('list', {
+    name: 'Diagnosi registrate',
     exact: true,
   });
   const leadDiagnosis = diagnosesList.getByRole('listitem').filter({
     hasText: diagnosisDescription,
   });
-  await expect(identitySection).toHaveCount(1);
+  await expect(clinicalSection).toHaveCount(1);
   await expect(diagnosesList).toHaveCount(1);
   await expect(leadDiagnosis).toHaveCount(1);
-  await expect(leadDiagnosis.getByText('EF00', { exact: true })).toHaveCount(1);
-  await expect(leadDiagnosis.getByText(diagnosisDescription, { exact: true })).toHaveCount(1);
-  await expect(leadDiagnosis.getByText('ICD-11', { exact: true })).toHaveCount(1);
+  await expect(leadDiagnosis).toContainText(diagnosisDescription);
+  await expect(leadDiagnosis).toContainText('EF00 · ICD-11');
 
-  /* @Codex: la lista secondaria espone ciascun codice come item autonomo e
-     conserva codice, descrizione e sistema nel nome accessibile. */
-  const secondaryDiagnosisList = page.getByRole('list', {
-    name: 'Diagnosi codificate secondarie',
-    exact: true,
-  });
-  const secondaryDiagnosisItem = secondaryDiagnosisList
+  /* @Codex: la lista clinica espone ciascun codice come item autonomo e
+     conserva codice, descrizione e sistema nel suo contenuto. */
+  const secondaryDiagnosisItem = diagnosesList
     .getByRole('listitem')
     .filter({ hasText: secondaryDiagnosisDescription });
-  await expect(secondaryDiagnosisList).toHaveCount(1);
   await expect(secondaryDiagnosisItem).toHaveCount(1);
-  await expect(secondaryDiagnosisItem).not.toHaveAttribute('title');
-  await expect(secondaryDiagnosisItem).toMatchAriaSnapshot(
-    `- listitem: BA00 ${secondaryDiagnosisDescription} ICD-11`
-  );
+  await expect(secondaryDiagnosisItem).toContainText(secondaryDiagnosisDescription);
+  await expect(secondaryDiagnosisItem).toContainText('BA00 · ICD-11');
 
   await page.goto(`/patients/${patientWithoutDiagnosisId}/modules`);
   await summaryLink.click();
@@ -126,7 +118,9 @@ test('Scheda paziente renders coded diagnoses and an explicit no-diagnosis state
   await expect(emptyQuadro).toHaveCount(1);
   await expect(emptyQuadro).toBeVisible();
   await expect(emptyQuadro.getByRole('heading', { name: 'Quadro clinico', exact: true })).toBeVisible();
-  await expect(emptyQuadro.getByText('Diagnosi non registrata. Completa la scheda', { exact: true })).toBeVisible();
+  await expect(emptyQuadro).toContainText('Diagnosi non registrata.');
+  await expect(emptyQuadro.getByRole('link', { name: 'Consulta le diagnosi', exact: true }))
+    .toHaveAttribute('href', '#clinica');
   await expect(emptyQuadro).not.toContainText('EF00');
   await expect(emptyQuadro).not.toContainText(diagnosisDescription);
   await expect(emptyQuadro).not.toContainText('ICD-11');

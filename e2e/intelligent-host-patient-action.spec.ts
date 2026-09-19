@@ -120,13 +120,13 @@ test('checkup host creates the fresh selection once and revokes A before selecti
     const target = await open.boundingBox();
     expect(Math.min(target?.width ?? 0, target?.height ?? 0)).toBeGreaterThanOrEqual(44);
     await open.click();
-    await action.getByLabel('PIN fresco').fill(pin);
-    await action.getByRole('button', { name: 'Abilita ruolo' }).click();
-    await expect(action.getByRole('status')).toContainText('Ruolo checkup attivo');
+    await action.getByLabel('Reinserisci il PIN per autorizzare').fill(pin);
+    await action.getByRole('button', { name: 'Abilita gestione checkup' }).click();
+    await expect(action.getByRole('status')).toContainText('Gestione assistita dei checkup abilitata');
 
-    const selector = action.getByLabel('Checkup pending');
+    const selector = action.getByLabel('Checkup da completare');
     await expect(selector).toHaveValue(fixture.firstCheckupId);
-    await action.getByRole('button', { name: 'Collega checkup' }).click();
+    await action.getByRole('button', { name: 'Attiva e collega checkup' }).click();
     await expect(action.getByTestId('checkup-host-resource')).toContainText('Controllo sintetico A');
     expect(selectionBodies).toEqual([{ expectedEpoch: 0, patientId: fixture.patientId,
         ambulatoryId: fixture.ambulatoryId }]);
@@ -134,7 +134,7 @@ test('checkup host creates the fresh selection once and revokes A before selecti
 
     await selector.selectOption(fixture.secondCheckupId);
     await expect(action.getByRole('status')).toContainText('Selezione cambiata');
-    await action.getByRole('button', { name: 'Collega checkup' }).click();
+    await action.getByRole('button', { name: 'Attiva e collega checkup' }).click();
     await expect(action.getByTestId('checkup-host-resource')).toContainText('Controllo sintetico B');
     expect(checkupCalls).toEqual([
         { method: 'POST', body: { checkupId: fixture.firstCheckupId } },
