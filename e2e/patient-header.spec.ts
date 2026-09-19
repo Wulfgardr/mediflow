@@ -86,13 +86,19 @@ test('Scheda paziente renders coded diagnoses and an explicit no-diagnosis state
 
   await openPatientSection(page, 'identita');
   const identitySection = page.locator('#identita');
-  const leadDiagnosisCard = identitySection.locator('.patient-diagnosis-card');
+  const diagnosesList = identitySection.getByRole('list', {
+    name: 'Diagnosi del quadro clinico',
+    exact: true,
+  });
+  const leadDiagnosis = diagnosesList.getByRole('listitem').filter({
+    hasText: diagnosisDescription,
+  });
   await expect(identitySection).toHaveCount(1);
-  await expect(identitySection.getByRole('heading', { name: 'Quadro clinico', exact: true })).toHaveCount(1);
-  await expect(leadDiagnosisCard).toHaveCount(1);
-  await expect(leadDiagnosisCard.getByText('EF00', { exact: true })).toHaveCount(1);
-  await expect(leadDiagnosisCard.getByText(diagnosisDescription, { exact: true })).toHaveCount(1);
-  await expect(leadDiagnosisCard.getByText('ICD-11', { exact: true })).toHaveCount(1);
+  await expect(diagnosesList).toHaveCount(1);
+  await expect(leadDiagnosis).toHaveCount(1);
+  await expect(leadDiagnosis.getByText('EF00', { exact: true })).toHaveCount(1);
+  await expect(leadDiagnosis.getByText(diagnosisDescription, { exact: true })).toHaveCount(1);
+  await expect(leadDiagnosis.getByText('ICD-11', { exact: true })).toHaveCount(1);
 
   /* @Codex: la lista secondaria espone ciascun codice come item autonomo e
      conserva codice, descrizione e sistema nel nome accessibile. */
