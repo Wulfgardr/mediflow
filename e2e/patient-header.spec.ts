@@ -107,6 +107,10 @@ test('Scheda paziente renders coded diagnoses and an explicit no-diagnosis state
   await expect(secondaryDiagnosisItem).toHaveCount(1);
   await expect(secondaryDiagnosisItem).toContainText(secondaryDiagnosisDescription);
   await expect(secondaryDiagnosisItem).toContainText('BA00 · ICD-11');
+  await expect(secondaryDiagnosisItem).not.toHaveAttribute('title');
+  await expect(secondaryDiagnosisItem).toMatchAriaSnapshot(
+    `- listitem: ${secondaryDiagnosisDescription} BA00 · ICD-11`
+  );
 
   await page.goto(`/patients/${patientWithoutDiagnosisId}/modules`);
   await summaryLink.click();

@@ -94,6 +94,7 @@ test('OCR recovery UI: interrupt waiting, ignore late result and recover with a 
   const lateDelivered = Promise.withResolvers<void>();
   let calls = 0;
   await page.route(file.endpoint, async (route) => {
+    if (route.request().headers()['x-mediflow-extraction-action'] !== 'project') return route.continue();
     calls += 1;
     const attempt = calls;
     if (attempt > 2) return route.continue();
@@ -133,17 +134,17 @@ test('OCR recovery UI: interrupt waiting, ignore late result and recover with a 
 
 test('OCR recovery UI: deleting a pending attachment releases the other extraction controls', async ({ page }) => {
   const file = await fixture(page);
-  const response = await page.request.post('/api/attachments', { data: {
-    id: `ocr-second-${randomUUID()}`, patientId: file.patientId, name: 'synthetic-second.rtf',
-    type: 'application/rtf', size: RTF.byteLength, path: 'uploads/synthetic-second.rtf',
-    data: `data:application/rtf;base64,${RTF.toString('base64')}`,
-  } });
+  const saved = page.waitForResponse((response) => response.request().method() === 'POST'
+    && new URL(response.url()).pathname === '/api/attachments');
+  await page.locator('#documenti input[type="file"]').setInputFiles({ name: 'synthetic-second.rtf', mimeType: 'application/rtf', buffer: RTF });
+  const response = await saved;
   expect(response.ok()).toBe(true);
   await openArchive(page, file.url);
   const second = page.getByRole('button', { name: 'Estrai testo localmente da synthetic-second.rtf' });
   await expect(second).toBeVisible();
   const ready = Promise.withResolvers<void>(); const release = Promise.withResolvers<void>();
   await page.route(file.endpoint, async (route) => {
+    if (route.request().headers()['x-mediflow-extraction-action'] !== 'project') return route.continue();
     const response = await route.fetch();
     ready.resolve(); await release.promise;
     await route.fulfill({ response }).catch(() => undefined);
