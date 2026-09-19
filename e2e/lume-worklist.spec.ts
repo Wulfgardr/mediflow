@@ -17,6 +17,11 @@ type WorklistCase = {
   height: number;
 };
 
+type WorklistFixture = {
+  marker: string;
+  patientIds: string[];
+};
+
 const WORKLIST_VIEWPORTS: Omit<WorklistCase, 'register'>[] = [
   ...REFLOW_PROXY_VIEWPORTS,
   { viewport: 'compact-transition', width: 600, height: 900 },
@@ -47,12 +52,13 @@ async function setRegister(page: Page, register: WorklistCase['register']): Prom
   await expect(page.locator('html')).toHaveCSS('color-scheme', theme);
 }
 
-async function openSyntheticWorklist(page: Page, worklistCase: WorklistCase): Promise<string> {
+async function openSyntheticWorklist(page: Page, worklistCase: WorklistCase): Promise<WorklistFixture> {
   await page.setViewportSize({ width: worklistCase.width, height: worklistCase.height });
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
   const marker = `WL${Date.now().toString(36).slice(-4)}${Math.random().toString(36).slice(2, 6)}`;
   // @Codex: exercise the ordinary directory with records created through its API.
-  await page.evaluate(async (fixtureMarker) => {
+  const patientIds = await page.evaluate(async (fixtureMarker) => {
+    const created: string[] = [];
     for (let index = 0; index < 3; index += 1) {
       const response = await fetch('/api/patients', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -66,7 +72,11 @@ async function openSyntheticWorklist(page: Page, worklistCase: WorklistCase): Pr
         }),
       });
       if (!response.ok) throw new Error(`Fixture worklist ${index}: HTTP ${response.status}`);
+      const payload = await response.json() as { id?: string };
+      if (typeof payload.id !== 'string') throw new Error(`Fixture worklist ${index}: patient id assente`);
+      created.push(payload.id);
     }
+    return created;
   }, marker);
   await page.goto('/?area=incarico');
   await page.waitForLoadState('domcontentloaded');
@@ -77,7 +87,7 @@ async function openSyntheticWorklist(page: Page, worklistCase: WorklistCase): Pr
   await expect(page.getByTestId('lume-worklist')).toBeVisible();
   await page.getByRole('searchbox', { name: 'Cerca nella lista pazienti', exact: true }).fill(marker);
   await expect(page.getByText('3 risultati', { exact: true })).toBeVisible();
-  return marker;
+  return { marker, patientIds };
 }
 
 async function resolvedRegisterFamily(page: Page): Promise<string> {
@@ -91,7 +101,8 @@ async function resolvedRegisterFamily(page: Page): Promise<string> {
   });
 }
 
-async function assertWorklistContract(page: Page, marker: string): Promise<void> {
+async function assertWorklistContract(page: Page, fixture: WorklistFixture): Promise<void> {
+  const { marker, patientIds } = fixture;
   const list = page.getByRole('listbox', { name: 'Elenco pazienti in carico', exact: true });
   const listItems = list.getByRole('option');
   const rows = list.getByTestId('lume-patient-row');
@@ -123,6 +134,14 @@ async function assertWorklistContract(page: Page, marker: string): Promise<void>
   expect(await firstRow.evaluate((element) => element.matches(':hover'))).toBe(false);
   await firstRow.focus();
   await firstRow.press('ArrowDown');
+  const selectedPatientId = patientIds[1];
+  expect(selectedPatientId).toEqual(expect.any(String));
+  // Selection persists its real directory context in the query. Wait for that
+  // state before inspecting focus or layout, because Next may replace the URL.
+  await expect(page).toHaveURL((url) => (
+    url.pathname === '/' && url.searchParams.get('area') === 'incarico'
+    && url.searchParams.get('paziente') === selectedPatientId
+  ));
   await expect(secondRow).toBeFocused();
   await expect(firstRow).toHaveAttribute('aria-selected', 'false');
   await expect(secondRow).toHaveAttribute('aria-selected', 'true');
@@ -314,9 +333,9 @@ async function assertTopComposition(page: Page, width: number): Promise<void> {
 
 for (const worklistCase of WORKLIST_CASES) {
   test(`worklist Lume ${worklistCase.register} ${worklistCase.viewport}`, async ({ page }) => {
-    const marker = await openSyntheticWorklist(page, worklistCase);
+    const fixture = await openSyntheticWorklist(page, worklistCase);
     await expect(page.locator('html')).toHaveClass(worklistCase.register === 'grafite' ? /dark/ : /light/);
-    await assertWorklistContract(page, marker);
+    await assertWorklistContract(page, fixture);
     await assertCompactAriaStable(page, worklistCase);
     await assertCompactWorklistGeometry(page, worklistCase.width);
     await assertNoHorizontalOverflow(page, [
