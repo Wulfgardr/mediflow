@@ -7,9 +7,6 @@ import path from 'node:path';
 import { after, afterEach, test } from 'node:test';
 import Database from 'better-sqlite3';
 
-import { createFullPortProjectionOwnerFactory } from '../../security/server-session-projection-owner.ts';
-import { clearAllSessions } from '../../security/server-session.ts';
-
 const DATA_DIRECTORY = mkdtempSync(path.join(os.tmpdir(), 'mediflow-ds-operation-'));
 process.env.MEDIFLOW_DATA_DIR = DATA_DIRECTORY;
 const bootstrap = new Database(path.join(DATA_DIRECTORY, 'medical.db'));
@@ -17,6 +14,8 @@ for (const file of readdirSync(path.resolve('drizzle')).filter((name) => name.en
     bootstrap.exec(readFileSync(path.join(path.resolve('drizzle'), file), 'utf8').replace(/^-->\s+statement-breakpoint\s*$/gmu, ''));
 }
 bootstrap.close();
+const { createFullPortProjectionOwnerFactory } = await import('../../security/server-session-projection-owner.ts');
+const { clearAllSessions } = await import('../../security/server-session.ts');
 const {
     createDocumentSynthesisProductionOperationForTest,
     resolveDocumentSynthesisAnyDocProjection,
