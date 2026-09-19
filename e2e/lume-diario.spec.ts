@@ -271,16 +271,40 @@ async function assertContrastAndFocus(
   register: DiaryCase['register'],
 ): Promise<void> {
   const ratios = await page.evaluate(() => {
-    const parse = (value: string) => value.match(/[\d.]+/g)?.slice(0, 3).map(Number) ?? [0, 0, 0];
+    type Rgba = readonly [number, number, number, number];
+    const parse = (value: string): Rgba => {
+      const channels = value.match(/[\d.]+/g)?.map(Number) ?? [];
+      return [channels[0] ?? 0, channels[1] ?? 0, channels[2] ?? 0, channels[3] ?? 1];
+    };
+    const compose = (foreground: Rgba, background: Rgba): Rgba => {
+      const alpha = foreground[3] + background[3] * (1 - foreground[3]);
+      if (alpha === 0) return [0, 0, 0, 0];
+      return [
+        (foreground[0] * foreground[3] + background[0] * background[3] * (1 - foreground[3])) / alpha,
+        (foreground[1] * foreground[3] + background[1] * background[3] * (1 - foreground[3])) / alpha,
+        (foreground[2] * foreground[3] + background[2] * background[3] * (1 - foreground[3])) / alpha,
+        alpha,
+      ];
+    };
+    // @Codex: a transparent entry inherits the first painted ancestor; evaluating
+    // its own computed background as black would measure a non-existent surface.
+    const paintedBackground = (element: HTMLElement): Rgba => {
+      const ancestors: HTMLElement[] = [];
+      for (let current: HTMLElement | null = element; current; current = current.parentElement) ancestors.push(current);
+      return ancestors.reverse().reduce<Rgba>(
+        (background, ancestor) => compose(parse(getComputedStyle(ancestor).backgroundColor), background),
+        [255, 255, 255, 1],
+      );
+    };
     const channel = (value: number) => {
       const normalized = value / 255;
       return normalized <= 0.04045 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
     };
-    const luminance = (value: string) => {
-      const [red, green, blue] = parse(value).map(channel);
+    const luminance = (value: Rgba) => {
+      const [red, green, blue] = value.map(channel);
       return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
     };
-    const ratio = (foreground: string, background: string) => {
+    const ratio = (foreground: Rgba, background: Rgba) => {
       const light = Math.max(luminance(foreground), luminance(background));
       const dark = Math.min(luminance(foreground), luminance(background));
       return (light + 0.05) / (dark + 0.05);
@@ -292,8 +316,8 @@ async function assertContrastAndFocus(
     const signedText = signed.querySelector<HTMLElement>('p');
     if (!draftText || !signedText) return null;
     return {
-      draft: ratio(getComputedStyle(draftText).color, getComputedStyle(draft).backgroundColor),
-      signed: ratio(getComputedStyle(signedText).color, getComputedStyle(signed).backgroundColor),
+      draft: ratio(parse(getComputedStyle(draftText).color), paintedBackground(draft)),
+      signed: ratio(parse(getComputedStyle(signedText).color), paintedBackground(signed)),
     };
   });
   expect(ratios).not.toBeNull();
