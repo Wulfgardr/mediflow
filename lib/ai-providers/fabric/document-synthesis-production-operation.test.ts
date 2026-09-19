@@ -20,7 +20,7 @@ const {
     createDocumentSynthesisProductionOperationForTest,
     resolveDocumentSynthesisAnyDocProjection,
 } = await import('./document-synthesis-production-operation.ts');
-const { composeAnyDocCurrentSelectionExtraction } = await import('../../domain/documents/anydoc-current-source-composition.ts');
+const { composeAnyDocCurrentSelectionClientProjectionExtraction } = await import('../../domain/documents/anydoc-current-source-composition.ts');
 const { serverSessionProjectionOwnerRegistry } = await import('../../security/server-session-projection-owner-production.ts');
 
 import { issueSyntheticWebSession, issueSyntheticWebSessionContext, retireSyntheticWebSession } from '../../security/web-auth-lifecycle-owner-test-fixture.ts';
@@ -109,7 +109,7 @@ function context(registry = createFullPortProjectionOwnerFactory({
     return Object.freeze({ session, owner, web, resolveContext });
 }
 
-test('preserves the confirmed selection through real AnyDoc composition and DS preview', async () => {
+test('preserves the confirmed selection through encrypted client bytes, real AnyDoc, and DS preview', async () => {
     const attachmentId = 'attachment.synthetic.document';
     const bytes = Buffer.from('{\\rtf1\\ansi Fonte sintetica da composizione reale.}');
     const database = new Database(path.join(DATA_DIRECTORY, 'medical.db'));
@@ -121,7 +121,7 @@ test('preserves the confirmed selection through real AnyDoc composition and DS p
         database.prepare('INSERT INTO patients_to_ambulatories (patient_id, ambulatory_id) VALUES (?, ?)')
             .run(PAIR.patientId, PAIR.ambulatoryId);
         database.prepare('INSERT INTO attachments (id, patient_id, name, type, size, path, data, document_source_ref, document_revision, document_freshness_epoch) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-            .run(attachmentId, PAIR.patientId, 'synthetic.rtf', 'application/rtf', bytes.length, 'synthetic.rtf', bytes.toString('base64'),
+            .run(attachmentId, PAIR.patientId, 'synthetic.rtf', 'application/rtf', bytes.length, 'synthetic.rtf', `ENC:${bytes.toString('base64')}`,
                 CURRENT.documentSourceRef, CURRENT.documentRevision, CURRENT.documentFreshnessEpoch);
     } finally { database.close(); }
     const selected = context(serverSessionProjectionOwnerRegistry);
@@ -132,14 +132,16 @@ test('preserves the confirmed selection through real AnyDoc composition and DS p
         acquireContext: async () => selected.resolveContext(),
         readCurrentness: () => CURRENT,
         readLaneEnabled: () => true,
-        extract: (session, id) => composeAnyDocCurrentSelectionExtraction(session, { attachmentId: id }),
+        extract: (session, id, request) => composeAnyDocCurrentSelectionClientProjectionExtraction(session, { attachmentId: id }, request),
         execute: async () => { executions++; return Object.freeze({ publication: 'synthetic' }); },
         entropy: () => Uint8Array.from({ length: 16 }, () => ++entropy),
     });
     const acquire = async () => { const operation = await factory.acquire(); assert.ok(operation); return operation; };
     const captured = await (await acquire()).capture({ attachmentId });
     assert.equal(captured.status, 'available');
-    const ingested = await (await acquire()).ingest({ captureHandle: captured.captureHandle });
+    const ingested = await (await acquire()).ingest({ captureHandle: captured.captureHandle }, new Request('http://localhost/api/ai/document-synthesis/ingest', {
+        method: 'POST', headers: { 'content-type': 'application/octet-stream' }, body: bytes,
+    }));
     assert.equal(ingested.code, null);
     assert.equal(ingested.status, 'available');
     assert.deepEqual(epochs(), [1, 1]);

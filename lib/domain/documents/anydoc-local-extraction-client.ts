@@ -172,6 +172,20 @@ function decodeClientSource(data: unknown): Uint8Array<ArrayBuffer> | null {
     } catch { return null; }
 }
 
+/** Decrypts the current facade value for a server-owned, one-use projection receiver. */
+export async function readAnyDocDecryptedAttachmentBytes(
+    attachmentId: string,
+    readSource: () => Promise<AnyDocDecryptedAttachmentSource | undefined | null>,
+    signal?: AbortSignal,
+): Promise<Uint8Array<ArrayBuffer> | null> {
+    if (typeof attachmentId !== 'string' || !attachmentId || attachmentId.length > 200
+        || attachmentId.trim() !== attachmentId || /[\u0000-\u001f\u007f]/u.test(attachmentId) || signal?.aborted) return null;
+    try {
+        const source = await readSource();
+        return signal?.aborted || !source || source.id !== attachmentId ? null : decodeClientSource(source.data);
+    } catch { return null; }
+}
+
 /** Ordinary encrypted upload: acquire → fresh facade decryption → bounded local projection → review only.
  * The source digest below compares request/response bytes, NEVER ciphertext/plaintext equality.
  */

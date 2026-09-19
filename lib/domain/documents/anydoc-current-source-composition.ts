@@ -14,7 +14,7 @@ import {
     type LocalExtractionResult,
 } from './anydoc-local-extraction-contract';
 import { extractAnyDocLocalBytes } from './anydoc-local-extraction-runner';
-import { claimAttachmentExtractionProjection } from './attachment-extraction-projection-broker';
+import { acquireAttachmentExtractionProjection, claimAttachmentExtractionProjection } from './attachment-extraction-projection-broker';
 import { readAttachmentExtractionProjectionBytes } from './attachment-extraction-projection-transport';
 import { ATTACHMENT_EXTRACTION_PROJECTION_SCHEMA } from './attachment-extraction-projection-protocol';
 
@@ -168,5 +168,38 @@ export async function composeAnyDocClientProjectionExtraction(
             extraction: publishFinalizedResult(result),
         }, { headers: { 'Cache-Control': 'no-store' } });
     } catch { return unavailable(); }
+    finally { bytes?.fill(0); request.signal.removeEventListener('abort', cancel); use.dispose(); }
+}
+
+/**
+ * Keeps an encrypted browser attachment on the same authenticated source-authority
+ * path when the receiving operation already owns a one-use capture handle.
+ * The browser supplies bytes only; this composition mints and consumes the
+ * projection grant, then returns the finalized AnyDoc evidence to its server owner.
+ */
+export async function composeAnyDocCurrentSelectionClientProjectionExtraction(
+    session: ServerSession, selector: unknown, request: Request,
+): Promise<LocalExtractionResult> {
+    const id = attachmentId(selector); if (!id || request.signal.aborted) return denied();
+    const grant = acquireAttachmentExtractionProjection(session, id); if (!grant) return denied();
+    const use = claimAttachmentExtractionProjection(session, id, grant.grantId); if (!use) return denied();
+    const cancel = () => use.cancel();
+    request.signal.addEventListener('abort', cancel, { once: true });
+    let bytes: Uint8Array | null = null;
+    try {
+        if (request.signal.aborted || !use.current()) return denied();
+        bytes = await readAttachmentExtractionProjectionBytes(request, use);
+        if (!bytes || request.signal.aborted || !use.current()) return denied();
+        const begun = use.consume(bytes);
+        bytes.fill(0); bytes = null;
+        if (!begun || request.signal.aborted || !use.current()) return denied();
+        let result = await extractAnyDocLocalBytes(id, begun.bytes);
+        if (request.signal.aborted || !use.current()) return denied();
+        if (result.status === 'review_required' && result.detail === 'image_or_scan') {
+            result = await continueAnyDocImageOrScanWithLocalOcr(id, begun.bytes, result);
+            if (request.signal.aborted || !use.current()) return denied();
+        }
+        return result.status !== 'denied' && !request.signal.aborted && use.finalize() ? publishFinalizedResult(result) : denied();
+    } catch { return denied(); }
     finally { bytes?.fill(0); request.signal.removeEventListener('abort', cancel); use.dispose(); }
 }

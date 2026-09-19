@@ -65,20 +65,20 @@ test('extraction unavailable response and abort before start never retry', async
 });
 
 test('synthesis sends only opaque handles over the actual three paths; invalid publication stays denied', async () => {
-    const calls: Array<{ path: unknown; body: unknown }> = [];
+    const calls: Array<{ path: unknown; body: unknown; headers?: HeadersInit }> = [];
     const captureHandle = `dsc_${'a'.repeat(32)}`; const previewHandle = `dsp_${'b'.repeat(32)}`;
     const request: typeof fetch = async (input, init) => {
         assert.equal(init?.method, 'POST'); assert.equal(init?.cache, 'no-store');
-        calls.push({ path: input, body: JSON.parse(String(init?.body)) });
+        calls.push({ path: input, body: typeof init?.body === 'string' ? JSON.parse(init.body) : init?.body ?? null, headers: init?.headers });
         return response(calls.length === 1 ? { captureHandle } : calls.length === 2 ? { previewHandle } : { status: 'available' });
     };
     const orchestrator = createDocumentSynthesisBrowserOrchestrator({ fetch: request });
     assert.equal(calls.length, 0);
-    await assert.rejects(orchestrator.run('synthetic-attachment'), { code: 'response_invalid' });
+    await assert.rejects(orchestrator.run('synthetic-attachment', async () => ({ id: 'synthetic-attachment', data: 'U3ludGhldGljLg==' })), { code: 'response_invalid' });
     assert.deepEqual(calls, [
-        { path: '/api/ai/document-synthesis/capture', body: { attachmentId: 'synthetic-attachment' } },
-        { path: '/api/ai/document-synthesis/ingest', body: { captureHandle } },
-        { path: '/api/ai/document-synthesis/preview', body: { previewHandle } },
+        { path: '/api/ai/document-synthesis/capture', body: { attachmentId: 'synthetic-attachment' }, headers: { 'content-type': 'application/json' } },
+        { path: '/api/ai/document-synthesis/ingest', body: new ArrayBuffer(10), headers: { 'X-MediFlow-Document-Synthesis-Capture': captureHandle, 'Content-Type': 'application/octet-stream' } },
+        { path: '/api/ai/document-synthesis/preview', body: { previewHandle }, headers: { 'content-type': 'application/json' } },
     ]);
 });
 

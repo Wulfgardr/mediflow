@@ -2,6 +2,7 @@
 'use client';
 
 import { parseDocumentSynthesisPreviewWire, type DocumentSynthesisPreviewWire } from './document-synthesis-preview-wire';
+import { readAnyDocDecryptedAttachmentBytes, type AnyDocDecryptedAttachmentSource } from '@/lib/domain/documents/anydoc-local-extraction-client';
 
 type Sources = Readonly<{
     fetch?: typeof fetch;
@@ -21,6 +22,7 @@ export class DocumentSynthesisBrowserOrchestratorError extends Error {
 
 const CAPTURE = /^dsc_[0-9a-f]{32}$/u;
 const PREVIEW = /^dsp_[0-9a-f]{32}$/u;
+const CAPTURE_HEADER = 'X-MediFlow-Document-Synthesis-Capture';
 
 function fail(code: DocumentSynthesisBrowserOrchestratorErrorCode): never {
     throw new DocumentSynthesisBrowserOrchestratorError(code);
@@ -59,6 +61,33 @@ async function post(request: typeof fetch, url: string, body: unknown, unknownCo
     try { return await response.json(); } catch { return fail('response_invalid'); }
 }
 
+async function ingest(
+    request: typeof fetch, captureHandle: string,
+    readSource: () => Promise<AnyDocDecryptedAttachmentSource | undefined | null>, attachmentId: string,
+    unknownCode: DocumentSynthesisBrowserOrchestratorErrorCode, unavailableCode: DocumentSynthesisBrowserOrchestratorErrorCode,
+): Promise<unknown> {
+    let bytes: Uint8Array<ArrayBuffer> | null = await readAnyDocDecryptedAttachmentBytes(attachmentId, readSource);
+    if (!bytes) return fail(unavailableCode);
+    try {
+        let response: Response;
+        try {
+            response = await request('/api/ai/document-synthesis/ingest', { method: 'POST', cache: 'no-store', credentials: 'same-origin', redirect: 'error',
+                headers: { [CAPTURE_HEADER]: captureHandle, 'Content-Type': 'application/octet-stream' }, body: bytes.buffer });
+        } catch { return fail(unknownCode); }
+        if (response.status === 401) return fail('session_unavailable');
+        if (!response.ok) {
+            let unsupported = false;
+            try { const value = await response.json(); unsupported = typeof value === 'object' && value !== null && !Array.isArray(value)
+                && Object.getPrototypeOf(value) === Object.prototype && Reflect.ownKeys(value).length === 2
+                && Object.hasOwn(value, 'error') && Object.hasOwn(value, 'code') && (value as { code?: unknown }).code === 'unsupported_local_extraction'; }
+            catch { /* stable unavailable code below */ }
+            if (unsupported) return fail('unsupported_local_extraction');
+            return fail(unavailableCode);
+        }
+        try { return await response.json(); } catch { return fail('response_invalid'); }
+    } finally { bytes.fill(0); bytes = null; }
+}
+
 /** Browser adapter for the fixed capture -> AnyDoc -> ingest -> preview sequence. */
 export function createDocumentSynthesisBrowserOrchestrator(sources: Sources = {}) {
     const request = sources.fetch ?? globalThis.fetch;
@@ -66,7 +95,7 @@ export function createDocumentSynthesisBrowserOrchestrator(sources: Sources = {}
     const reset = () => { generation += 1; };
     return Object.freeze({
         reset,
-        async run(attachmentId: unknown): Promise<DocumentSynthesisPreviewWire> {
+        async run(attachmentId: unknown, readSource?: () => Promise<AnyDocDecryptedAttachmentSource | undefined | null>): Promise<DocumentSynthesisPreviewWire> {
             if (typeof attachmentId !== 'string' || attachmentId.length < 1 || attachmentId.length > 200
                 || /[\u0000-\u001f\u007f]/u.test(attachmentId)) return fail('input_invalid');
             const token = generation;
@@ -75,7 +104,8 @@ export function createDocumentSynthesisBrowserOrchestrator(sources: Sources = {}
             current();
             const captureHandle = exact(captured, 'captureHandle', CAPTURE);
             if (!captureHandle) return fail('response_invalid');
-            const ingested = await post(request, '/api/ai/document-synthesis/ingest', { captureHandle }, 'ingest_outcome_unknown', 'ingest_unavailable');
+            if (!readSource) return fail('ingest_unavailable');
+            const ingested = await ingest(request, captureHandle, readSource, attachmentId, 'ingest_outcome_unknown', 'ingest_unavailable');
             current();
             const previewHandle = exact(ingested, 'previewHandle', PREVIEW);
             if (!previewHandle) return fail('response_invalid');

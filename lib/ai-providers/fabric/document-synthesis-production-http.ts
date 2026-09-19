@@ -4,13 +4,14 @@ import 'server-only';
 import { NextResponse } from 'next/server';
 import { apiFailure } from '@/lib/api-error-response';
 import { serializeDocumentSynthesisPreviewWire, type DocumentSynthesisPreviewWire } from './document-synthesis-preview-wire';
+import { isLocalAttachmentExtractionRequest } from '@/lib/domain/documents/attachment-extraction-projection-transport';
 
 type CaptureResult = Readonly<{ status: 'available'; code: null; captureHandle: string }> | Readonly<{ status: 'denied'; code: string; captureHandle: null }>;
 type IngestResult = Readonly<{ status: 'available'; code: null; previewHandle: string }> | Readonly<{ status: 'denied'; code: string; previewHandle: null }>;
 type PreviewResult = Readonly<{ status: 'available'; code: null; publication: unknown }> | Readonly<{ status: 'denied'; code: string; publication: null }>;
 type Operation = Readonly<{
     capture(input: unknown): Promise<CaptureResult> | CaptureResult;
-    ingest(input: unknown): Promise<IngestResult> | IngestResult;
+    ingest(input: unknown, request: Request): Promise<IngestResult> | IngestResult;
     preview(input: unknown): Promise<PreviewResult> | PreviewResult;
 }>;
 type Sources = Readonly<{
@@ -21,6 +22,7 @@ type Sources = Readonly<{
 const MESSAGE = 'Document Synthesis non disponibile.';
 const CAPTURE = /^dsc_[0-9a-f]{32}$/u;
 const PREVIEW = /^dsp_[0-9a-f]{32}$/u;
+export const DOCUMENT_SYNTHESIS_CAPTURE_HEADER = 'X-MediFlow-Document-Synthesis-Capture';
 
 function failure(code: string, status: number): NextResponse { return apiFailure(code, MESSAGE, status); }
 
@@ -45,10 +47,10 @@ function captureInput(value: unknown): unknown | null {
         && !/[\u0000-\u001f\u007f]/u.test(input.attachmentId) ? { attachmentId: input.attachmentId } : null;
 }
 
-function ingestInput(value: unknown): unknown | null {
-    const input = exact(value, ['captureHandle']);
-    return input && typeof input.captureHandle === 'string' && CAPTURE.test(input.captureHandle)
-        ? { captureHandle: input.captureHandle } : null;
+function ingestInput(request: Request): unknown | null {
+    const captureHandle = request.headers.get(DOCUMENT_SYNTHESIS_CAPTURE_HEADER);
+    return isLocalAttachmentExtractionRequest(request) && typeof captureHandle === 'string' && CAPTURE.test(captureHandle)
+        ? { captureHandle } : null;
 }
 
 function previewInput(value: unknown): unknown | null {
@@ -95,10 +97,10 @@ export function createDocumentSynthesisIngestHttpHandler(sources: Sources) {
     return async (request: Request): Promise<NextResponse> => {
         const operation = await acquire(sources);
         if (!operation) return failure('session_unavailable', 401);
-        const input = ingestInput(await body(request));
+        const input = ingestInput(request);
         if (!input) return failure('input_invalid', 400);
         let result: IngestResult;
-        try { result = await operation.ingest(input); } catch { return failure('operation_unavailable', 503); }
+        try { result = await operation.ingest(input, request); } catch { return failure('operation_unavailable', 503); }
         return result.status === 'available' ? json({ previewHandle: result.previewHandle }) : denied(result.code);
     };
 }

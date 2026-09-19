@@ -14,7 +14,7 @@ import { acquireOrdinaryApplicationContext } from '@/lib/security/ordinary-appli
 import { isServerSessionProjectionOwner } from '@/lib/security/server-session-projection-owner';
 import { mintResourcePort, registerPrivateResource, unregisterPrivateResource, releaseResourcePort } from '@/lib/security/ordinary-session-authority';
 import type { ServerSession } from '@/lib/security/server-session';
-import { composeAnyDocCurrentSelectionExtraction } from '@/lib/domain/documents/anydoc-current-source-composition';
+import { composeAnyDocCurrentSelectionClientProjectionExtraction } from '@/lib/domain/documents/anydoc-current-source-composition';
 import {
     ANYDOC_LOCAL_OCR_PROVENANCE_SCHEMA_VERSION,
     type LocalExtractionReceipt,
@@ -41,7 +41,7 @@ type PreviewResult = Readonly<{ status: 'available'; code: null; publication: un
     | Readonly<{ status: 'denied'; code: DenialCode; publication: null }>;
 export type DocumentSynthesisProductionOperation = Readonly<{
     capture(input: unknown): Promise<CaptureResult>;
-    ingest(input: unknown): Promise<IngestResult>;
+    ingest(input: unknown, request?: Request): Promise<IngestResult>;
     preview(input: unknown): Promise<PreviewResult>;
 }>;
 
@@ -49,7 +49,7 @@ type Dependencies = Readonly<{
     acquireContext(): Promise<AuthenticatedWebSessionProjectionOwnerContext | null>;
     readCurrentness(attachmentId: string, patientId: string, ambulatoryId: string): unknown;
     readLaneEnabled(): unknown;
-    extract(session: ServerSession, attachmentId: string): Promise<LocalExtractionResult>;
+    extract(session: ServerSession, attachmentId: string, request: Request): Promise<LocalExtractionResult>;
     execute(configuration: unknown): Promise<unknown>;
     entropy(): unknown;
     registerResource(context: AuthenticatedWebSessionProjectionOwnerContext, dispose: () => void): (() => void) | null;
@@ -177,9 +177,9 @@ function createOperation(context: AuthenticatedWebSessionProjectionOwnerContext,
                 });
             } catch { return captureDenied('operation_unavailable'); }
         },
-        async ingest(input: unknown): Promise<IngestResult> {
+        async ingest(input: unknown, request = new Request('http://localhost/api/ai/document-synthesis/ingest', { method: 'POST' })): Promise<IngestResult> {
             const parsed = exact(input, ['captureHandle']); const handle = parsed?.captureHandle;
-            if (typeof handle !== 'string' || !CAPTURE_HANDLE.test(handle)) return ingestDenied('input_invalid');
+            if (typeof handle !== 'string' || !CAPTURE_HANDLE.test(handle) || !(request instanceof Request)) return ingestDenied('input_invalid');
             const capture = broker.captures.get(handle); if (!capture) return ingestDenied('capture_consumed');
             broker.captures.delete(handle);
             if (dependencies.readLaneEnabled() !== true) return ingestDenied('lane_disabled');
@@ -192,7 +192,7 @@ function createOperation(context: AuthenticatedWebSessionProjectionOwnerContext,
             } catch { return ingestDenied('operation_unavailable'); }
             if (preflight) return ingestDenied(preflight);
             let extraction: LocalExtractionResult;
-            try { extraction = await dependencies.extract(context.session, capture.attachmentId); }
+            try { extraction = await dependencies.extract(context.session, capture.attachmentId, request); }
             catch { return ingestDenied('operation_unavailable'); }
             if (extraction.status === 'review_required' && extraction.reason === 'unsupported_local_extraction') return ingestDenied('unsupported_local_extraction');
             const projection = resolveDocumentSynthesisAnyDocProjection(extraction, capture.attachmentId);
@@ -292,7 +292,7 @@ const production = factory(Object.freeze({
     acquireContext: acquireOrdinaryApplicationContext,
     readCurrentness: readProductionCurrentness,
     readLaneEnabled: readProductionLaneEnabled,
-    extract: (session: ServerSession, attachmentId: string) => composeAnyDocCurrentSelectionExtraction(session, { attachmentId }),
+    extract: (session: ServerSession, attachmentId: string, request: Request) => composeAnyDocCurrentSelectionClientProjectionExtraction(session, { attachmentId }, request),
     async execute(configuration: unknown) { return (await createDocumentSynthesisFabricProductionComposition(configuration)?.execute()) ?? null; },
     entropy: () => randomBytes(16),
     registerResource: registerProductionResource,

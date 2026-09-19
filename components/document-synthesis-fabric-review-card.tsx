@@ -11,6 +11,7 @@ import {
     DocumentSynthesisBrowserOrchestratorError,
 } from '@/lib/ai-providers/fabric/document-synthesis-browser-orchestrator';
 import { useSecurity } from '@/components/security-provider';
+import { db } from '@/lib/db';
 import { createDocumentSynthesisReviewBrowserController, DocumentSynthesisReviewBrowserControllerError, type DocumentSynthesisContextProposal, type DocumentSynthesisAmbulatoryChoice } from '@/lib/ai-providers/fabric/document-synthesis-review-browser-controller';
 import { SmartImportSelectionBrowserAdapterError } from '@/lib/security/smart-import-selection-browser-adapter';
 import type { DocumentSynthesisPreviewWire } from '@/lib/ai-providers/fabric/document-synthesis-preview-wire';
@@ -36,7 +37,13 @@ function DocumentSynthesisFabricReviewCardSession({
     enabled,
 }: DocumentSynthesisFabricReviewCardProps) {
     const picker = useFunctionModelPicker('document_synthesis', patientId, attachmentId, enabled);
-    const [controller] = useState(() => createDocumentSynthesisReviewBrowserController({ fetch: picker.client.fetch }));
+    const [controller] = useState(() => createDocumentSynthesisReviewBrowserController({
+        fetch: picker.client.fetch,
+        readAttachment: async (id) => {
+            const source = await db.attachments.get(id);
+            return source?.patientId === patientId ? source : null;
+        },
+    }));
     const [proposal, setProposal] = useState<DocumentSynthesisContextProposal | null>(null);
     const [ambulatory, setAmbulatory] = useState<DocumentSynthesisAmbulatoryChoice | null>(null);
     const [confirmed, setConfirmed] = useState(false);

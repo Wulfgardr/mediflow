@@ -22,7 +22,7 @@ function fixture(pause?: string, status = 200) {
     let resume: (() => void) | undefined; let entered!: () => void; let pauseOnce = true;
     const paused = new Promise<void>((resolve) => { entered = resolve; });
     const controller = createDocumentSynthesisReviewBrowserController({ fetch: async (input, init) => {
-        const url = String(input); const body = init?.body ? JSON.parse(String(init.body)) : null;
+        const url = String(input); const body = typeof init?.body === 'string' ? JSON.parse(init.body) : init?.body ?? null;
         calls.push({ url, body, signal: init?.signal });
         if (pauseOnce && url.endsWith(pause ?? 'never')) { pauseOnce = false; entered(); await new Promise<void>((resolve) => { resume = resolve; }); }
         // The ordinary session has no ambulatory cookie; this route must not be needed.
@@ -41,7 +41,7 @@ function fixture(pause?: string, status = 200) {
         if (url.endsWith('/ingest')) return Response.json({ previewHandle: `dsp_${'6'.repeat(32)}` });
         if (url.endsWith('/preview')) return Response.json(serializeDocumentSynthesisPreviewWire(publication));
         throw new Error('Unexpected request');
-    } });
+    }, readAttachment: async () => ({ id: ATTACHMENT, data: 'U3ludGhldGljLg==' }) });
     return { controller, calls, state, paused, resume: () => resume?.() };
 }
 const intent = { patientId: PATIENT, attachmentId: ATTACHMENT };
@@ -57,11 +57,10 @@ test('missing cookie still offers named choices; only the explicit non-default s
     await assert.rejects(f.controller.run({ ...intent, proposal, ambulatory: { ...ambulatory } }, true), { code: 'choice_required' });
     const result = await f.controller.run({ ...intent, proposal, ambulatory }, true);
     assert.equal(result.publication.receipt.writesPerformed, 0);
-    const mutations = f.calls.filter(({ body }) => body !== null);
+    const mutations = f.calls.filter(({ body }) => body !== null && !(body instanceof ArrayBuffer));
     assert.deepEqual(mutations.map(({ url, body }) => ({ url, body })), [
         { url: '/api/ai/smart-import/selection', body: { expectedEpoch: 0, patientId: PATIENT, ambulatoryId: 'synthetic-nord' } },
         { url: '/api/ai/document-synthesis/capture', body: { attachmentId: ATTACHMENT } },
-        { url: '/api/ai/document-synthesis/ingest', body: { captureHandle: `dsc_${'5'.repeat(32)}` } },
         { url: '/api/ai/document-synthesis/preview', body: { previewHandle: `dsp_${'6'.repeat(32)}` } },
     ]);
     await assert.rejects(f.controller.run({ ...intent, proposal, ambulatory }, true), { code: 'proposal_stale' });
