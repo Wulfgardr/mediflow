@@ -10,6 +10,9 @@ import type { PairedNativeSession } from '../security/paired-native-session';
 import { ProductError } from './product-contract';
 import { beginOrdinaryFunction, bindNativeOrdinaryHostSources } from './ordinary-flow';
 import { parseNativeOrdinaryPreparation, type NativeOrdinaryPreparation } from './native-ordinary-wire';
+import { ExecutionError } from '../chatgpt-execution/execution-contract';
+import { reportMacProductPreparationDiagnostic } from '../chatgpt-execution/execution-mac-product';
+import { ServerSessionProjectionOwnerError } from '../security/server-session-projection-owner';
 import { captureNativeOrdinaryHostSources, readNativeOrdinaryHostSource, closeNativeOrdinaryHostSources, nativeOrdinaryHostSourcesAreCurrent,
     type NativeOrdinaryHostSourceCapture, type NativeOrdinarySelectionLease } from '../security/server-session-clinical-context-native-sources';
 
@@ -37,6 +40,23 @@ export function getNativeOrdinaryApplicationContext(): Context | null {
 const requestFor = (source: Request, value: unknown): Request => new Request(source.url,
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(value), signal: source.signal });
 const requestId = () => `native_${randomUUID()}`;
+
+/** The owner exposes closed failures, but the HTTP boundary only serializes
+ * Product/Execution errors. Preserve that closed distinction without exposing
+ * the owner code or any selected-record detail. */
+function nativePreparationFailure(error: unknown): never {
+    if (error instanceof ServerSessionProjectionOwnerError) {
+        reportMacProductPreparationDiagnostic('binding');
+        if (['session_unavailable', 'session_ineligible', 'lease_expired', 'owner_disposed'].includes(error.code)) {
+            throw new ProductError('session_expired');
+        }
+        if (['owner_acquiring', 'owner_exists', 'selection_busy'].includes(error.code)) throw new ProductError('busy');
+        if (error.code === 'input_invalid') throw new ProductError('invalid_request');
+        throw new ProductError('revoked');
+    }
+    if (!(error instanceof ProductError || error instanceof ExecutionError)) reportMacProductPreparationDiagnostic('binding');
+    throw error;
+}
 
 async function originalFunction(request: Request, context: Context): Promise<Response> {
     confirm(context);
@@ -120,5 +140,6 @@ export async function prepareNativeOrdinary(request: Request, session: PairedNat
                 });
             } catch (error) { if (sources) closeNativeOrdinaryHostSources(sources); throw error; }
         });
-    } finally { native.releaseResourcePort(port); }
+    } catch (error) { nativePreparationFailure(error); }
+    finally { native.releaseResourcePort(port); }
 }
