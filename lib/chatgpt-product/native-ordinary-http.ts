@@ -35,8 +35,15 @@ export async function handleNativeOrdinaryHttp(request: Request, operation: Nati
         const use = native.beginResourceUse(port);
         if (!use) throw new ProductError('session_expired');
         try {
+            // `readBoundedJsonBody` has consumed the ingress stream. The fixed
+            // composition only needs request identity (URL, method, headers and
+            // abort signal), so never pass the disturbed body into its owned
+            // Request constructor.
+            const preparationRequest = operation === 'prepare'
+                ? new Request(request.url, { method: request.method, headers: request.headers, signal: request.signal })
+                : null;
             const response = operation === 'prepare'
-                ? await prepareNativeOrdinary(request, session, preparation!)
+                ? await prepareNativeOrdinary(preparationRequest!, session, preparation!)
                 : await ordinaryFunctionCommand(session, operation, body, request.signal);
             let permitted = false;
             if (!native.withCurrentResourceBinding(use, () => { permitted = !request.signal.aborted; })
