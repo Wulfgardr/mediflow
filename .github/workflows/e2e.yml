@@ -124,6 +124,15 @@ jobs:
           MF085_SYNTHETIC_E2E: "1"
         run: npx playwright test --workers=1
 
+      # This browser harness uses node:test and top-level await, so it is not
+      # collectable by Playwright. Keep it in its canonical runner with an
+      # independent marked synthetic directory.
+      - name: Run ChatGPT product browser harness
+        run: |
+          CHATGPT_PRODUCT_DATA_DIR="$(mktemp -d "${RUNNER_TEMP}/mediflow-chatgpt-product.XXXXXX")"
+          MEDIFLOW_DATA_DIR="${CHATGPT_PRODUCT_DATA_DIR}" \
+            node scripts/chatgpt-product-focused-tests.mjs --browser
+
       # Seconda fase di `npm run check:terminology-parity`, l'unica che non
       # girava da nessuna parte. Avvia un proprio Next dev su 127.0.0.1:3200 in
       # un workspace effimero, quindi non tocca il server e2e sulla 3123. Sta
