@@ -7,7 +7,7 @@ export const PRODUCT_MUTATIONS = ['prepare', 'consent', 'login/start', 'login/co
 export type ProductMutation = typeof PRODUCT_MUTATIONS[number];
 export type ProductOperation = ProductMutation | 'status';
 export type ProductCode = ExecutionCode | 'consent_required' | 'consent_stale' | 'invalid_state' | 'login_pending'
-    | 'login_failed' | 'login_expired' | 'logout_unconfirmed' | 'unauthorized' | 'forbidden' | 'method_not_allowed';
+    | 'login_failed' | 'login_expired' | 'logout_unconfirmed' | 'unauthorized' | 'forbidden' | 'method_not_allowed' | 'preparation_unavailable';
 export class ProductError extends Error {
     constructor(readonly code: ProductCode) { super(code); this.name = 'ProductError'; }
 }

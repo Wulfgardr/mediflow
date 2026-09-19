@@ -6,6 +6,8 @@ import 'server-only';
 import { randomUUID } from 'node:crypto';
 import type { OrdinarySession } from '../security/ordinary-session-authority';
 import type { ProductExecutionPlatform } from './execution-platform';
+import { reportMacProductPreparationDiagnostic } from './execution-mac-product';
+import type { PreparationDiagnosticStage } from './execution-transport';
 import type { QualifiedExecutionHost } from './execution-host';
 import { createExecutionLogin } from './execution-login';
 import { ExecutionError, type SynthesisCatalog, type SynthesisRequest } from './execution-contract';
@@ -84,22 +86,30 @@ export async function createOrdinaryProductAttempt(session: OrdinarySession, pla
     registration = owner.registerPrivateResource(port, retire);
     if (!registration || !current()) { await dispose(); throw new ProductError('session_expired'); }
     expiry = setTimeout(retire, remaining()); expiry.unref?.();
-    async function operation<T>(allowed: readonly State[], work: (expected: number) => Promise<T>): Promise<T> {
+    async function operation<T>(allowed: readonly State[], work: (expected: number, setPreparationStage: (stage: PreparationDiagnosticStage) => void) => Promise<T>): Promise<T> {
         guard();
         if (busy) throw new ProductError('busy');
         if (!allowed.includes(state)) throw new ProductError('invalid_state');
+        const preparing = allowed.length === 1 && allowed[0] === 'empty';
+        let preparationStage: PreparationDiagnosticStage = 'binding';
         busy = true; const expected = ++epoch;
-        try { const result = await work(expected); guard(expected); return result; }
+        try { const result = await work(expected, stage => { preparationStage = stage; }); guard(expected); return result; }
         catch (error) {
             if (error instanceof ProductError && error.code === 'login_pending') throw error;
-            await dispose(); throw error instanceof ExecutionError || error instanceof ProductError ? error : new ProductError('upstream_error');
+            await dispose();
+            if (error instanceof ExecutionError || error instanceof ProductError) throw error;
+            if (preparing) {
+                reportMacProductPreparationDiagnostic(preparationStage);
+                throw new ProductError('preparation_unavailable');
+            }
+            throw new ProductError('upstream_error');
         } finally { if (expected === epoch) busy = false; }
     }
     return Object.freeze({
         /** No content, account secret, map or ordinary output in this projection. */
         snapshot() { guard(); return Object.freeze({ state, attemptRevision, contextRevision, qualificationRevision, expiresAt }); },
         prepare(profile: OrdinaryTaskProfile, selectedContextRevision: string, configuration: OrdinaryRunnerConfiguration, signal: AbortSignal, knownIdentifiers?: RedactionSessionInput['knownIdentifiers']) {
-            return operation(['empty'], async expected => {
+            return operation(['empty'], async (expected, setPreparationStage) => {
                 if (typeof selectedContextRevision !== 'string' || !selectedContextRevision || selectedContextRevision.length > 256 || !signal) throw new ProductError('invalid_request');
                 contextRevision = selectedContextRevision;
                 selectionSignal = signal; selectionSignal.addEventListener('abort', retire, { once: true });
@@ -109,13 +119,16 @@ export async function createOrdinaryProductAttempt(session: OrdinarySession, pla
                 // Watch platform qualification, NOT the intentional draining host witness.
                 watcher = setInterval(() => { try { guard(); } catch { retire(); } }, 50); watcher.unref?.();
                 guard(expected); state = 'preparing';
+                setPreparationStage('redaction');
                 job = createOrdinaryPreparation(profile, configuration, controller.signal, knownIdentifiers);
                 preparation = await job.ready; guard(expected);
+                setPreparationStage('platform_qualification');
                 if (platform.prepare) await platform.prepare(controller.signal, remaining());
                 guard(expected);
                 const qualification = platform.snapshot();
                 if (qualification.state !== 'qualified') throw new ProductError('unqualified_boundary');
                 qualificationRevision = qualification.revision;
+                setPreparationStage('binding');
                 consent = await createOrdinaryProductConsent(session, preparation, { contextRevision, attemptRevision, qualificationRevision, remainingMs: remaining() });
                 guard(expected); state = 'needs_consent'; return consent.disclosure();
             });

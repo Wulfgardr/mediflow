@@ -296,3 +296,18 @@ test('transport failure stays distinct and observer rejection does not affect dr
     assert.deepEqual(events, [{ event: 'transport_failure', method: 'account/read', errorCode: 'protocol_error', rpcCode: null,
         httpStatus: null, tls: false, network: false, device: false, experimental: false, permission: false }]);
 });
+
+/* @Codex — phase evidence is closed and cannot retain hostile local failure detail. */
+test('preparation diagnostic keeps only an allowlisted local stage', () => {
+    const events: unknown[] = [];
+    const observe = (event: import('./execution-transport').ExecutionDiagnostic) => { events.push(event); };
+    const input = { event: 'preparation_failed', method: 'turn/start', errorCode: 'protocol_error', rpcCode: -32603,
+        httpStatus: 503, tls: true, network: true, device: true, experimental: true, permission: true, stage: 'redaction',
+        message: 'PRIVATE_PROVIDER_SENTINEL', path: '/PRIVATE_PROVIDER_SENTINEL', source: 'PRIVATE_PROVIDER_SENTINEL' };
+    reportExecutionDiagnostic(observe, input as unknown as import('./execution-transport').ExecutionDiagnostic);
+    assert.deepEqual(events, [{ event: 'preparation_failed', method: null, errorCode: 'upstream_error', rpcCode: null,
+        httpStatus: null, tls: false, network: false, device: false, experimental: false, permission: false, stage: 'redaction' }]);
+    assert.doesNotMatch(JSON.stringify(events), /PRIVATE_|path|source/u);
+    reportExecutionDiagnostic(observe, { ...input, stage: 'PRIVATE_PROVIDER_SENTINEL' } as unknown as import('./execution-transport').ExecutionDiagnostic);
+    assert.equal(events.length, 1);
+});

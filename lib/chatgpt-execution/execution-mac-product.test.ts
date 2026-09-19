@@ -105,3 +105,18 @@ test('host diagnostics are silent by default and emit only the closed projection
     console.warn = () => { throw new Error('diagnostic sink failure'); };
     await run(true);
 });
+
+test('host preparation diagnostic is silent by default and emits only its closed stage when opted in', async t => {
+    const { reportMacProductPreparationDiagnostic } = await import('./execution-mac-product.ts');
+    const env = process.env.MEDIFLOW_CHATGPT_EXECUTION_DIAGNOSTICS, warn = console.warn;
+    const warnings: unknown[][] = []; console.warn = (...args: unknown[]) => { warnings.push(args); };
+    t.after(() => { console.warn = warn; if (env === undefined) delete process.env.MEDIFLOW_CHATGPT_EXECUTION_DIAGNOSTICS;
+        else process.env.MEDIFLOW_CHATGPT_EXECUTION_DIAGNOSTICS = env; });
+    delete process.env.MEDIFLOW_CHATGPT_EXECUTION_DIAGNOSTICS;
+    reportMacProductPreparationDiagnostic('governance'); assert.equal(warnings.length, 0);
+    process.env.MEDIFLOW_CHATGPT_EXECUTION_DIAGNOSTICS = '1';
+    reportMacProductPreparationDiagnostic('platform_qualification');
+    assert.deepEqual(warnings, [['MEDIFLOW_CHATGPT_EXECUTION_DIAGNOSTIC', JSON.stringify({ event: 'preparation_failed', method: null,
+        errorCode: 'upstream_error', rpcCode: null, httpStatus: null, tls: false, network: false, device: false,
+        experimental: false, permission: false, stage: 'platform_qualification' })]]);
+});

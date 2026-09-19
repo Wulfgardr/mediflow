@@ -20,7 +20,7 @@ public enum NativeOrdinaryFailureCode: String, CaseIterable, Equatable, Sendable
     case quotaExhausted = "quota_exhausted", limitsUnavailable = "limits_unavailable", catalogStale = "catalog_stale"
     case modelUnavailable = "model_unavailable", modelMismatch = "model_mismatch", invalidRequest = "invalid_request"
     case invalidOutput = "invalid_output", toolUseDenied = "tool_use_denied", timeout, processExited = "process_exited"
-    case protocolError = "protocol_error", upstreamError = "upstream_error", invalidState = "invalid_state", forbidden
+    case protocolError = "protocol_error", upstreamError = "upstream_error", preparationUnavailable = "preparation_unavailable", invalidState = "invalid_state", forbidden
     public var safeReason: String {
         switch self {
         case .unqualifiedBoundary: return "runtime locale non qualificato per questa operazione"
@@ -41,7 +41,8 @@ public enum NativeOrdinaryFailureCode: String, CaseIterable, Equatable, Sendable
         case .timeout: return "tempo di risposta scaduto"
         case .processExited: return "runtime terminato"
         case .protocolError: return "protocollo non verificato"
-        case .upstreamError: return "servizio esterno non disponibile"
+        case .upstreamError: return "esecuzione non disponibile"
+        case .preparationUnavailable: return "preparazione locale non disponibile"
         case .invalidState: return "stato dell’operazione non valido"
         case .forbidden: return "operazione non autorizzata"
         }

@@ -229,6 +229,16 @@ test('ordinary lifecycle uses one prepared host and existing login/catalogue; ac
     } finally { await attempt.dispose(); }
 });
 
+test('generic local preparation failure is bounded without changing typed execution failures', async () => {
+    const session = owner.issue(), peer = new Peer(), p = platform(peer), attempt = await createOrdinaryProductAttempt(session as never, p.value as never);
+    p.value.prepare = async () => { throw new Error('PRIVATE_PLATFORM_FAILURE'); };
+    try {
+        await assert.rejects(attempt.prepare(profiles()[0], 'owned-revision', configuration, new AbortController().signal),
+            (error: unknown) => error instanceof ProductError && error.code === 'preparation_unavailable');
+        assert.equal(peer.calls.length, 0);
+    } finally { await attempt.dispose(); }
+});
+
 test('source switch during local NER invalidates synchronously, closes late work, never prepares native host', async () => {
     const session = owner.issue(), peer = new Peer(), p = platform(peer), attempt = await createOrdinaryProductAttempt(session as never, p.value as never);
     const selection = new AbortController(); holdNer = true; const before = nerClosed;
