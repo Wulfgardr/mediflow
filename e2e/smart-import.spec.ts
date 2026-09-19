@@ -177,7 +177,11 @@ test('[E2E fixture] Smart Import exposes only the Fabric review preview and neve
   await card.getByRole('combobox', { name: 'Ambulatorio per questa proposta' }).selectOption('ambulatory.synthetic');
   const modelPicker = card.getByRole('combobox', { name: 'Modello per questa proposta' });
   await modelPicker.focus();
-  await expect(modelPicker.locator('option')).toHaveCount(2);
+  await expect(modelPicker.locator('option')).toHaveText([
+    `Predefinito · ${FIXTURE_MODEL.model}`,
+    'OpenAI · abbonamento ChatGPT · prepara',
+    `${FIXTURE_MODEL.model} · Ollama · locale`,
+  ]);
   await modelPicker.selectOption(FIXTURE_MODEL.modelOptionId);
   await expect(modelPicker).toHaveValue(FIXTURE_MODEL.modelOptionId);
   await card.getByRole('checkbox').check();
