@@ -2557,6 +2557,34 @@ final class HomeBasePatientsClientTests: XCTestCase {
         _ = try await client.statusNativeOrdinary(credentials: .init(clientId: "synthetic-mac", clientToken: "synthetic-token"),
             sessionCookie: "mediflow_session=synthetic-native", ambulatoryId: "synthetic-ambulatory")
     }
+    func testNativeOrdinaryFailureKeepsOnlyAllowlistedCode() async throws {
+        let input = NativeOrdinaryPreparation(functionId: .patientInsight, patientId: "synthetic-patient",
+            ambulatoryId: "synthetic-ambulatory", patientRevision: 1, input: .patientInsight)
+        let client = makeClient { request in
+            let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 503, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+            return (response, Data(#"{"error":"host detail must not cross the boundary","code":"unqualified_boundary"}"#.utf8))
+        }
+        do {
+            _ = try await client.prepareNativeOrdinary(input, credentials: .init(clientId: "synthetic-mac", clientToken: "synthetic-token"), sessionCookie: "mediflow_session=synthetic-native")
+            XCTFail("expected bounded ordinary failure")
+        } catch let failure as NativeOrdinaryServerFailure {
+            XCTAssertEqual(failure, .init(status: 503, code: .unqualifiedBoundary))
+        }
+    }
+    func testNativeOrdinaryFailureRejectsUnknownCodeAndHostText() async throws {
+        let input = NativeOrdinaryPreparation(functionId: .patientInsight, patientId: "synthetic-patient",
+            ambulatoryId: "synthetic-ambulatory", patientRevision: 1, input: .patientInsight)
+        let client = makeClient { request in
+            let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 503, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+            return (response, Data(#"{"error":"host detail must not cross the boundary","code":"host_controlled_code"}"#.utf8))
+        }
+        do {
+            _ = try await client.prepareNativeOrdinary(input, credentials: .init(clientId: "synthetic-mac", clientToken: "synthetic-token"), sessionCookie: "mediflow_session=synthetic-native")
+            XCTFail("expected generic HTTP failure")
+        } catch let error as HomeBaseClientError {
+            XCTAssertEqual(error, .httpStatus(503, nil))
+        }
+    }
     #endif
 
     private func makeClient(

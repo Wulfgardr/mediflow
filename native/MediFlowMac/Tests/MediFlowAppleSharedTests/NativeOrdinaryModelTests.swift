@@ -75,8 +75,20 @@ final class NativeOrdinaryModelTests: XCTestCase {
             }))
         model.prepare(); await settle(model)
         XCTAssertEqual(model.phase, .idle)
-        XCTAssertEqual(model.message, "Preparazione non completata (HTTP 503): servizio non disponibile o risposta non verificata. Operazione chiusa; nessuna modifica alla cartella.")
+        XCTAssertEqual(model.message, "Operazione non completata (HTTP 503): servizio non disponibile o risposta non verificata. Operazione chiusa; nessuna modifica alla cartella.")
         XCTAssertFalse(model.message.contains("untrusted host payload"))
+    }
+    func testPrepareFailureKeepsOnlyAllowlistedServerCodeAfterConfirmedCleanup() async throws {
+        let model = NativeOrdinaryModel(function: .patientInsight, snapshot: { self.source() }, services: .init(
+            prepare: { _, _ in throw NativeOrdinaryServerFailure(status: 503, code: .unqualifiedBoundary) },
+            command: { _, _ in throw NativeOrdinaryContractError.invalid },
+            status: { _ in
+                var closed = F.response(.patientInsight, "closed")
+                closed.removeValue(forKey: "attemptId")
+                return try F.decode(NativeOrdinaryResponse.self, closed)
+            }))
+        model.prepare(); await settle(model)
+        XCTAssertEqual(model.message, "Operazione non completata (unqualified_boundary): runtime locale non qualificato per questa operazione. Operazione chiusa; nessuna modifica alla cartella.")
     }
     func testPendingLoginKeepsTheOriginalAttemptWithoutClosingOrRestarting() async throws {
         var completed = false, cancellations = 0

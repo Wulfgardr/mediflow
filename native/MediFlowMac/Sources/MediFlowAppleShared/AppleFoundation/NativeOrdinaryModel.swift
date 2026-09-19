@@ -181,6 +181,8 @@ final class NativeOrdinaryModel: ObservableObject {
     private func failureMessage(_ error: Error) -> String {
         let reason: String
         switch error {
+        case let failure as NativeOrdinaryServerFailure:
+            return "Operazione non completata (\(failure.code.rawValue)): \(failure.code.safeReason). Operazione chiusa; nessuna modifica alla cartella."
         case HomeBaseClientError.httpStatus(let status, _):
             switch status {
             case 401: reason = "sessione o pairing non più validi"
@@ -189,7 +191,7 @@ final class NativeOrdinaryModel: ObservableObject {
             case 429: reason = "servizio temporaneamente non disponibile"
             default: reason = "servizio non disponibile o risposta non verificata"
             }
-            return "Preparazione non completata (HTTP \(status)): \(reason). Operazione chiusa; nessuna modifica alla cartella."
+            return "Operazione non completata (HTTP \(status)): \(reason). Operazione chiusa; nessuna modifica alla cartella."
         case NativeOrdinaryContractError.invalid:
             reason = "risposta non verificata"
         case NativeOrdinaryContractError.stale:
@@ -210,7 +212,7 @@ final class NativeOrdinaryModel: ObservableObject {
         default:
             reason = "errore locale o risposta non verificata"
         }
-        return "Preparazione non completata: \(reason). Operazione chiusa; nessuna modifica alla cartella."
+        return "Operazione non completata: \(reason). Operazione chiusa; nessuna modifica alla cartella."
     }
     private func retireLate(_ value: NativeOrdinaryResponse, source: NativeOrdinarySnapshot) async {
         guard value.functionId == function, let id = value.attemptId, UUID(uuidString: id) != nil else { return }
