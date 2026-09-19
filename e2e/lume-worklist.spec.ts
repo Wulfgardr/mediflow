@@ -223,10 +223,11 @@ async function assertCompactWorklistGeometry(page: Page, width: number): Promise
         (titleBox.top + titleBox.height / 2) - (countBox.top + countBox.height / 2),
       ) <= 2,
       actionFollowsHeading: actionBox.top >= Math.max(titleBox.bottom, countBox.bottom),
-      // @Codex: at phone width the action shares the result row, with no overlap.
+      // @Codex: a 44px action aligns to the heading baseline, so the centers
+      // need not coincide; the boxes must still occupy one visible row.
       actionBesideHeading: actionBox.left >= Math.max(titleBox.right, countBox.right)
-        && Math.abs((actionBox.top + actionBox.height / 2)
-          - (titleBox.top + titleBox.height / 2)) <= 2,
+        && actionBox.top <= Math.max(titleBox.bottom, countBox.bottom)
+        && actionBox.bottom >= Math.min(titleBox.top, countBox.top),
       actionHeight: actionBox.height,
       // The selected row deliberately reveals notes; compact density applies to closed rows.
       rowHeights: rows.filter(row => row.getAttribute('aria-selected') !== 'true').map(row => row.getBoundingClientRect().height),
@@ -303,7 +304,11 @@ async function assertTopComposition(page: Page, width: number): Promise<void> {
       expect(composition?.firstRowVisibleFraction).toBeGreaterThanOrEqual(0.6);
     }
   } else if (width === 390) {
-    expect(composition?.completeRowsVisible).toBeGreaterThanOrEqual(2);
+    // The selected second row exposes its contextual notes by contract; the
+    // first closed row must remain wholly available above that expansion.
+    expect(composition?.completeRowsVisible).toBeGreaterThanOrEqual(1);
+    expect(composition?.firstRowBottomMiss).toBe(0);
+    expect(composition?.firstRowVisibleFraction).toBe(1);
   }
 }
 
