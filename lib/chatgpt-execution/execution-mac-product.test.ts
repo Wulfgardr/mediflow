@@ -95,7 +95,7 @@ test('host diagnostics are silent by default and emit only the closed projection
             } });
         await assert.rejects(manager.createPlatform().prepare!(new AbortController().signal, 300000), MacQualificationFailure);
     };
-    await run(false); assert.deepEqual(warnings, []);
+    await run(false); assert.equal(warnings.length, 0);
     await run(true); assert.equal(warnings.length, 1);
     assert.deepEqual(warnings[0]?.slice(0, 1), ['MEDIFLOW_CHATGPT_EXECUTION_DIAGNOSTIC']);
     const projection = JSON.parse(String(warnings[0]?.[1]));
