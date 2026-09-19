@@ -4,12 +4,51 @@ import { randomUUID } from 'node:crypto';
 import { bootstrapUnlockedSession, openPatientSection } from './utils';
 
 /* @Codex: ordinary UI smoke observes every console error and uncaught page error. */
-const errorsByPage = new WeakMap<Page, string[]>();
+type ObservedConsoleError = Readonly<{ text: string; url: string }>;
+const errorsByPage = new WeakMap<Page, ObservedConsoleError[]>();
+const authLockReceiptsByPage = new WeakMap<Page, Array<Promise<{
+  status: number;
+  state: string | null;
+  requestEtag: string | null;
+  responseEtag: string | null;
+}>>>();
+const AUTH_LOCK_CONFLICT_CONSOLE = 'Failed to load resource: the server responded with a status of 409 (Conflict)';
 test.beforeEach(async ({ page }) => {
-  const errors: string[] = [];
+  const errors: ObservedConsoleError[] = [];
+  const authLockReceipts: Array<Promise<{
+    status: number;
+    state: string | null;
+    requestEtag: string | null;
+    responseEtag: string | null;
+  }>> = [];
   errorsByPage.set(page, errors);
-  page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
-  page.on('pageerror', error => errors.push(error.message));
+  authLockReceiptsByPage.set(page, authLockReceipts);
+  page.on('console', message => {
+    if (message.type() === 'error') errors.push({ text: message.text(), url: message.location().url });
+  });
+  page.on('response', response => {
+    if (new URL(response.url()).pathname !== '/api/auth/lock') return;
+    // @Codex: retain only the control-fence facts needed to prove the one
+    // permitted stale-fence retry; no credential or response payload is kept.
+    authLockReceipts.push(response.text().then((text) => {
+      let state: string | null = null;
+      try {
+        const payload = JSON.parse(text) as { state?: unknown };
+        state = typeof payload.state === 'string' ? payload.state : null;
+      } catch { /* An unparsable receipt remains unreconciled and therefore fails. */ }
+      return {
+        status: response.status(),
+        state,
+        requestEtag: response.request().headers()['if-match'] ?? null,
+        responseEtag: response.headers().etag ?? null,
+      };
+    }).catch(() => ({
+      status: response.status(), state: null,
+      requestEtag: response.request().headers()['if-match'] ?? null,
+      responseEtag: response.headers().etag ?? null,
+    })));
+  });
+  page.on('pageerror', error => errors.push({ text: error.message, url: '' }));
 });
 test.afterEach(async ({ page }, testInfo) => {
   if (testInfo.status !== 'passed') {
@@ -31,7 +70,34 @@ test.afterEach(async ({ page }, testInfo) => {
       }))),
     });
   }
-  expect(errorsByPage.get(page)).toEqual([]);
+  const authLockReceipts = await Promise.all(authLockReceiptsByPage.get(page) ?? []);
+  const recoveredAuthLockConflicts = authLockReceipts.filter((receipt, index) => {
+    const retry = authLockReceipts[index + 1];
+    return receipt.status === 409
+      && receipt.state === 'server_invalidation_unconfirmed'
+      && !!receipt.responseEtag
+      && retry?.status === 200
+      && retry.state === 'server_invalidation_confirmed'
+      && retry.requestEtag === receipt.responseEtag;
+  }).length;
+  const authLockConflicts = authLockReceipts.filter(receipt => receipt.status === 409).length;
+  const errors = errorsByPage.get(page) ?? [];
+  // @Codex: Chromium reports a handled fetch 409 as a console error. Admit it
+  // only after the immediately chained, ETag-matched lock retry is confirmed.
+  const pageOrigin = new URL(page.url()).origin;
+  const isReconciledAuthLockConsole = (error: ObservedConsoleError) => {
+    if (error.text !== AUTH_LOCK_CONFLICT_CONSOLE) return false;
+    try {
+      const url = new URL(error.url);
+      return url.origin === pageOrigin && url.pathname === '/api/auth/lock';
+    } catch { return false; }
+  };
+  const lockConsoleConflicts = errors.filter(isReconciledAuthLockConsole).length;
+  const remainingErrors = authLockConflicts === recoveredAuthLockConflicts
+    && lockConsoleConflicts === recoveredAuthLockConflicts
+    ? errors.filter(error => !isReconciledAuthLockConsole(error))
+    : errors;
+  expect(remainingErrors).toEqual([]);
 });
 
 test('web smoke: unlock/setup + patients filters + settings navigation', async ({ page }) => {
