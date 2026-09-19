@@ -4,7 +4,6 @@ import { createHash } from 'node:crypto';
 import { lstatSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { types } from 'node:util';
 
 export const ANYDOC_APPLE_VISION_OCR_SCHEMA_VERSION = 'mediflow.anydoc_apple_vision_ocr.v1' as const;
@@ -19,7 +18,6 @@ const MAX_DOCUMENT_PAGES = 16;
 const MAX_OUTPUT_BYTES = 8 * 1024 * 1024;
 const MAX_PROCESS_OUTPUT_BYTES = MAX_OUTPUT_BYTES + 4096;
 const MAX_DIAGNOSTIC_BYTES = 16 * 1024;
-const MODULE_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
 const SANDBOX_PROFILE = '(version 1) (allow default) (deny network*)';
 
 export type AnyDocAppleVisionOcrFailureReason =
@@ -85,23 +83,29 @@ function exact(value: unknown, keys: readonly string[]): Record<string, unknown>
         result[key] = descriptor.value; }
     return result;
 }
-function resolveOwnedScript(): string | null {
-    let directory: string; try { directory = realpathSync(MODULE_DIRECTORY); } catch { return null; }
-    for (let step = 0; step < 8; step += 1) {
-        try {
-            const manifest = JSON.parse(readFileSync(path.join(directory, 'package.json'), 'utf8')) as { name?: unknown };
-            if (manifest.name === 'medical-record-app') {
-                const root = realpathSync(directory); const candidate = path.join(root, 'scripts', SCRIPT_FILE);
-                if (!lstatSync(candidate).isFile()) return null;
-                const script = realpathSync(candidate); const relative = path.relative(root, script);
-                if (!relative || relative.startsWith('..') || path.isAbsolute(relative) || !statSync(script).isFile()) return null;
-                return sha256(readFileSync(script)) === ANYDOC_APPLE_VISION_OCR_SCRIPT_SHA256 ? script : null;
-            }
-        } catch { /* Continue toward the package root. */ }
-        const parent = path.dirname(directory); if (parent === directory) return null; directory = parent;
-    }
-    return null;
+function resolveOwnedScriptFromPackageRoot(packageRoot: string): string | null {
+    try {
+        const root = realpathSync(packageRoot);
+        const manifest = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8')) as { name?: unknown };
+        if (manifest.name !== 'medical-record-app') return null;
+        const candidate = path.join(root, 'scripts', SCRIPT_FILE);
+        if (!lstatSync(candidate).isFile()) return null;
+        const script = realpathSync(candidate); const relative = path.relative(root, script);
+        if (!relative || relative.startsWith('..') || path.isAbsolute(relative) || !statSync(script).isFile()) return null;
+        return sha256(readFileSync(script)) === ANYDOC_APPLE_VISION_OCR_SCRIPT_SHA256 ? script : null;
+    } catch { return null; }
 }
+
+// @Codex: standalone chunks can bake a source import.meta URL. The launcher CWD is the
+// package root of the staged runtime, so it is the only authority for the owned script.
+function resolveOwnedScript(): string | null {
+    return resolveOwnedScriptFromPackageRoot(process.cwd());
+}
+
+/* @Codex: test-only seam; production resolution accepts no caller-provided path. */
+export const ANYDOC_APPLE_VISION_OCR_INTERNAL_TEST_SEAM = Object.freeze({
+    resolveOwnedScriptFromPackageRoot,
+});
 function processEnvelope(raw: string, exitCode: number | null): { text: string; confidence: number } | AnyDocAppleVisionOcrFailureReason {
     let value: unknown; try { value = JSON.parse(raw.trim()); } catch { return 'recognition_failed'; }
     const success = exact(value, ['avgConfidence', 'engine', 'ok', 'schemaVersion', 'text']);
