@@ -76,3 +76,32 @@ test('host-only diagnostic reaches preparation without changing failed-start cle
     assert.equal(events.length, 1); assert.doesNotMatch(JSON.stringify(events), /PRIVATE_/u);
     assert.equal(platform.preparation!().state, 'closed'); assert.equal(existsSync(join(root, 'mac-preparation.hold')), false);
 });
+
+test('host diagnostics are silent by default and emit only the closed projection when opted in', async t => {
+    const root = mkdtempSync(join(tmpdir(), 'mf-mac-host-diagnostic-')); t.after(() => rmSync(root, { recursive: true, force: true }));
+    const env = process.env.MEDIFLOW_CHATGPT_EXECUTION_DIAGNOSTICS, warn = console.warn;
+    const warnings: unknown[][] = []; console.warn = (...args: unknown[]) => { warnings.push(args); };
+    t.after(() => { console.warn = warn; if (env === undefined) delete process.env.MEDIFLOW_CHATGPT_EXECUTION_DIAGNOSTICS;
+        else process.env.MEDIFLOW_CHATGPT_EXECUTION_DIAGNOSTICS = env; });
+    const run = async (enabled: boolean) => {
+        if (enabled) process.env.MEDIFLOW_CHATGPT_EXECUTION_DIAGNOSTICS = '1';
+        else delete process.env.MEDIFLOW_CHATGPT_EXECUTION_DIAGNOSTICS;
+        const manager = createMacProductPlatformManager({ assets, reservationDirectory: () => root,
+            async prepare(options) {
+                options.diagnostic?.({ event: 'rpc_error', method: 'initialize', errorCode: 'upstream_error',
+                    rpcCode: -32042 as -32000, httpStatus: 599, tls: true, network: false, device: false,
+                    experimental: false, permission: false, privateValue: 'PRIVATE_PROVIDER_SENTINEL' } as unknown as Parameters<NonNullable<typeof options.diagnostic>>[0]);
+                throw new MacQualificationFailure('readback', audit(true), null);
+            } });
+        await assert.rejects(manager.createPlatform().prepare!(new AbortController().signal, 300000), MacQualificationFailure);
+    };
+    await run(false); assert.deepEqual(warnings, []);
+    await run(true); assert.equal(warnings.length, 1);
+    assert.deepEqual(warnings[0]?.slice(0, 1), ['MEDIFLOW_CHATGPT_EXECUTION_DIAGNOSTIC']);
+    const projection = JSON.parse(String(warnings[0]?.[1]));
+    assert.deepEqual(projection, { event: 'rpc_error', method: 'initialize', errorCode: 'upstream_error',
+        rpcCode: -32000, httpStatus: 599, tls: true, network: false, device: false, experimental: false, permission: false });
+    assert.doesNotMatch(JSON.stringify(warnings), /PRIVATE_/u);
+    console.warn = () => { throw new Error('diagnostic sink failure'); };
+    await run(true);
+});

@@ -8,9 +8,16 @@ import { ExecutionError } from './execution-contract';
 import { prepareMacProductQualification, MacQualificationFailure, type MacQualificationAudit } from './execution-mac-qualification';
 import { resolveInstalledMacExecutionAssets } from './execution-mac-assets';
 import { createReviewedMacProductPlatform, executionPlatformSnapshot, type ProductExecutionPlatform } from './execution-platform';
+import { reportExecutionDiagnostic, type ExecutionDiagnostic } from './execution-transport';
 import type { ProductPreparation } from '../chatgpt-product/product-contract';
 
 type Prepared = Awaited<ReturnType<typeof prepareMacProductQualification>>;
+const EXECUTION_DIAGNOSTIC_ENV = 'MEDIFLOW_CHATGPT_EXECUTION_DIAGNOSTICS';
+const EXECUTION_DIAGNOSTIC_PREFIX = 'MEDIFLOW_CHATGPT_EXECUTION_DIAGNOSTIC';
+function hostExecutionDiagnostic(event: ExecutionDiagnostic): void {
+    if (process.env[EXECUTION_DIAGNOSTIC_ENV] !== '1') return;
+    reportExecutionDiagnostic((projection) => console.warn(EXECUTION_DIAGNOSTIC_PREFIX, JSON.stringify(projection)), event);
+}
 /** Kept even when the owning Web session disappears. Never clear a hold merely
  * because a PID is absent, a request ended or this backend restarted. */
 function reserveDirectory(directory: string): () => void {
@@ -46,6 +53,7 @@ export function createMacProductPlatformManager(options: {
 } = {}) {
     let reserved = false;
     const issue = options.prepare ?? prepareMacProductQualification;
+    const diagnostic = options.diagnostic ?? hostExecutionDiagnostic;
     return Object.freeze({ createPlatform(): ProductExecutionPlatform {
         let prepared: Prepared | undefined;
         let reviewed: ProductExecutionPlatform | undefined;
@@ -96,7 +104,7 @@ export function createMacProductPlatformManager(options: {
                 // Reservation and withdrawal exist BEFORE the first await.
                 pending = Promise.resolve().then(async () => {
                     try {
-                        const owned = await issue({ ...assets, signal: local.signal, lifetimeMs, diagnostic: options.diagnostic });
+                        const owned = await issue({ ...assets, signal: local.signal, lifetimeMs, diagnostic });
                         prepared = owned;
                         if (signal.aborted || local.signal.aborted) { await drain(owned); throw new ExecutionError('canceled'); }
                         reviewed = createReviewedMacProductPlatform({ binaryPath: owned.binaryPath, qualification: owned.authority });
