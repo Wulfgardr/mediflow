@@ -13,6 +13,9 @@ import { SETTINGS_CARD_CLASS } from './settings-ui';
 
 const AIFA_PANEL_STYLE = { minWidth: 0, border: '1px solid color-mix(in srgb, var(--lume-ink) 14%, transparent)', borderRadius: 'var(--lume-radius-panel)', background: 'var(--lume-surface-focal)', padding: 24 };
 const AIFA_COMMAND_STYLE = { minHeight: 44, minWidth: 44, borderRadius: 12, fontWeight: 600, gap: 8 };
+const AIFA_ICON_STYLE = { background: 'color-mix(in srgb, var(--lume-accent) 12%, var(--lume-surface-field))', color: 'var(--lume-accent)' };
+const AIFA_STAT_STYLE = { borderColor: 'color-mix(in srgb, var(--lume-ink) 14%, transparent)', background: 'var(--lume-surface-field)' };
+const AIFA_UPLOAD_STYLE = { ...AIFA_COMMAND_STYLE, borderColor: 'color-mix(in srgb, var(--lume-ink) 18%, transparent)', background: 'var(--lume-surface-field)', color: 'var(--lume-ink-muted)' };
 const phaseLabels: Record<AifaGuidePhase, string> = {
     idle: '', updating: 'Scaricamento, validazione e importazione in corso…',
     cancelling: 'Annullamento richiesto; attesa dell’esito della richiesta…',
@@ -62,19 +65,20 @@ export default function AifaCatalogManager() {
     return (
         <section className={SETTINGS_CARD_CLASS} style={AIFA_PANEL_STYLE} aria-labelledby={titleId} data-testid="aifa-catalog-guide">
             <div className="mb-5 flex items-start gap-3">
-                <div className="rounded-2xl bg-slate-100 p-2 text-slate-700 dark:bg-white/10 dark:text-slate-200">
+                <div className="rounded-2xl p-2" style={AIFA_ICON_STYLE}>
                     <Database className="h-4 w-4" />
                 </div>
                 <div className="min-w-0">
                     <p className="section-kicker">Farmaci</p>
-                    <h2 id={titleId} className="mt-1 text-base font-semibold text-slate-900 dark:text-white">Database AIFA offline</h2>
+                    <h2 id={titleId} className="mt-1 text-base font-semibold" style={{ color: 'var(--lume-ink)' }}>Database AIFA offline</h2>
                     <p className="mt-1 text-sm leading-6 text-[color:var(--lume-ink-muted)]">
                         Confezioni con AIC, codici ATC e principi attivi del feed AIFA.{' '}
                         <a
                             href={AIFA_CATALOG_DEFAULT_SOURCE_URL}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-slate-700 underline-offset-2 hover:underline dark:text-slate-200"
+                            className="underline-offset-2 hover:underline"
+                            style={{ color: 'var(--lume-accent)' }}
                         >
                             Fonte: AIFA Open Data
                         </a>
@@ -83,14 +87,14 @@ export default function AifaCatalogManager() {
             </div>
 
             <div className="space-y-4">
-                <div className="flex items-center justify-between rounded-[var(--lume-radius-control)] border border-slate-200 bg-slate-50/80 p-4 dark:border-white/10 dark:bg-white/5">
+                <div className="flex items-center justify-between rounded-[var(--lume-radius-control)] border p-4" style={AIFA_STAT_STYLE}>
                     <div>
-                        <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-300">Confezioni indicizzate</p>
-                        <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+                        <p className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--lume-ink-muted)' }}>Confezioni indicizzate</p>
+                        <p className="text-2xl font-bold" style={{ color: 'var(--lume-ink)' }}>
                             {drugCatalog !== null ? drugCatalog.count.toLocaleString('it-IT') : '-'}
                         </p>
                     </div>
-                    <Server className="w-8 h-8 text-slate-300 dark:text-white/20" />
+                    <Server className="w-8 h-8" style={{ color: 'color-mix(in srgb, var(--lume-ink-muted) 58%, transparent)' }} />
                 </div>
 
                 {/* @Codex Explicit acquisition; opening this page only reads local status. */}
@@ -195,9 +199,9 @@ export default function AifaCatalogManager() {
                     {!busy ? (
                         <button
                             onClick={() => fileInputRef.current?.click()}
-                            style={AIFA_COMMAND_STYLE}
+                            style={AIFA_UPLOAD_STYLE}
                             disabled={writeDisabled || !datasetVersion.trim() || !downloadedAt || !sourceUrl.trim()}
-                            className="mt-4 flex w-full items-center justify-center gap-2 rounded-[var(--lume-radius-control)] border-2 border-dashed border-slate-300 bg-white/72 px-4 py-3 text-slate-600 transition-[border-color,background-color,color] hover:border-slate-400 hover:bg-slate-50 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/15 dark:bg-white/5 dark:text-slate-300 dark:hover:border-white/25 dark:hover:bg-white/10"
+                            className="mt-4 flex w-full items-center justify-center gap-2 rounded-[var(--lume-radius-control)] border-2 border-dashed px-4 py-3 transition-opacity hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                             <Upload className="w-5 h-5" />
                             <span className="font-medium">Carica file AIFA (.csv)</span>
