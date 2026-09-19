@@ -7,14 +7,13 @@ import os from 'node:os';
 import path from 'node:path';
 import { after, test } from 'node:test';
 
-import { createFullPortProjectionOwnerProcessOwner } from './server-session-projection-owner.ts';
-import { resolve as resolveSyntheticWebSession } from './web-auth-lifecycle-owner-adapter.ts';
-
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-checkup-grant-production-'));
 process.env.MEDIFLOW_DATA_DIR = dataDir;
 execFileSync(process.execPath, ['scripts/prepare-e2e-db.mjs'], {
   env: { ...process.env, MEDIFLOW_DATA_DIR: dataDir },
 });
+const { createFullPortProjectionOwnerProcessOwner } = await import('./server-session-projection-owner.ts');
+const { resolve: resolveSyntheticWebSession } = await import('./web-auth-lifecycle-owner-adapter.ts');
 const production = await import('./headless-checkup-active-role-session-grant-production.ts');
 const storeModule = await import('./headless-checkup-active-role-attestation-store.ts');
 const fixtureModule = await import('./web-auth-lifecycle-owner-test-fixture.ts');
