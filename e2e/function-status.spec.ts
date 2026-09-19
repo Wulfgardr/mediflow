@@ -25,7 +25,7 @@ test('function configuration is authenticated, complete and distinguishes failed
     expect((await completeStatus.json()).functions.map((row: { id: string }) => row.id)).toEqual(FUNCTION_IDS);
     await expect(panel.getByTestId('function-state-patient_insight')).toContainText('Spenta');
     await expect(panel.getByTestId('function-state-document_ocr')).toContainText('Apple Vision');
-    await expect(panel).toContainText('Nessun modello eseguito');
+    await expect(panel).toContainText('Questo controllo non esegue modelli');
     const response = await page.request.get('/api/system/function-status?unexpected=1');
     expect(response.status()).toBe(400);
 });

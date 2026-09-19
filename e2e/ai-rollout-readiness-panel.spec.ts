@@ -95,8 +95,7 @@ test('settings shows rollout readiness lanes, missing artifacts and markdown pre
   await expect(page).toHaveURL(/\/settings\/ai\/governance$/);
 
   const panel = page.getByTestId('ai-rollout-readiness-panel');
-  // WUL-297: the panel heading is now Italian ("Stato rilascio AI locale").
-  await expect(panel.getByRole('heading', { name: 'Stato rilascio AI locale' })).toBeVisible();
+  await expect(panel.getByRole('heading', { name: 'Verifiche delle funzioni assistite' })).toBeVisible();
 
   await expect(page.getByTestId('ai-rollout-metric-ready')).toContainText('1');
   await expect(page.getByTestId('ai-rollout-metric-hold')).toContainText('1');
