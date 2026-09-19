@@ -34,9 +34,11 @@ test('service architecture and catalog surfaces describe the governed WHO bounda
     assert.doesNotMatch(catalogs, /ICD-11 locale|porta 8888|gestito dal launcher/iu);
 });
 
-test('document import E2E keeps unsaved input outside WHO and raw provider payloads', () => {
+test('document upload E2E saves the source without WHO or automatic provider requests', () => {
     const documentImport = source('../e2e/document-import.spec.ts');
-    assert.match(documentImport, /document import fails closed until the source is a saved AnyDoc attachment/u);
+    assert.match(documentImport, /document upload saves its source before any local extraction request/u);
+    assert.match(documentImport, /pathname === ['"]\/api\/ocr\/extract['"]/u);
+    assert.match(documentImport, /pathname\.startsWith\(['"]\/api\/ai\/document-synthesis\/['"]\)/u);
     assert.match(documentImport, /pathname === ['"]\/api\/icd\/proxy['"]/u);
     assert.match(documentImport, /expect\(forbiddenRequests\)\.toEqual\(\[\]\)/u);
     assert.doesNotMatch(
