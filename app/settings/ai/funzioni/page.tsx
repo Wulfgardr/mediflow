@@ -61,10 +61,10 @@ export default function SettingsAiFunctionsPage() {
                 description="Scegli quali proposte usare. Puoi modificare ogni funzione e salvare le preferenze."
             />
 
-            {/* @Codex: one account control surface; no catalog-to-picker bridge. */}
+            {/* @Codex: per-proposal access stays separate from local model preferences. */}
             <aside className={SETTINGS_CARD_CLASS} aria-label="ChatGPT e modelli delle funzioni">
-                <p>Il selettore usa solo le opzioni locali del catalogo host. ChatGPT resta un servizio esterno con uso nelle funzioni sospeso, anche quando l’account è collegato.</p>
-                <Link href="/settings/ai/fabric#chatgpt-account" className="underline">Gestisci ChatGPT in Intelligence Fabric</Link>
+                <p>Le preferenze locali restano sul computer. Per usare OpenAI, scegli il canale nella funzione e prepara una proposta: servono consenso sul contesto redatto, accesso dedicato e verifica dei modelli disponibili per quel tentativo.</p>
+                <Link href="/settings/ai/chatgpt" className="underline">Gestisci OpenAI · ChatGPT</Link>
             </aside>
             <FunctionPreferencesPanel onRead={syncPreferences} />
 
