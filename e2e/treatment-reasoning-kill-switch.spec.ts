@@ -34,7 +34,9 @@ test('treatment reasoning kill switch blocks new drafts on the Scheda', async ({
   const settingsPreview = page.getByRole('region', { name: 'Anteprima impostazioni' });
   await expect(settingsPreview).toContainText('Ragionamento terapeutico: spento');
   await settingsPreview.getByRole('button', { name: 'Applica alle impostazioni' }).click();
-  await expect(page.getByRole('status')).toContainText('Impostazioni salvate e rilette. Nessuna modifica clinica.');
+  await expect(page.getByTestId('function-preferences').getByRole('status').filter({
+    hasText: /^Impostazioni salvate e rilette\. Nessuna modifica clinica\.$/u,
+  })).toBeVisible();
 
   const patientId = await page.evaluate(async () => {
     const response = await fetch('/api/patients', {

@@ -48,7 +48,9 @@ test('[E2E fixture] smart import kill switch disables analysis on patient detail
     expect(await readEnabled()).toBe(true);
     await preferences.getByRole('region', { name: 'Anteprima impostazioni', exact: true })
       .getByRole('button', { name: 'Applica alle impostazioni', exact: true }).click();
-    await expect(preferences.getByRole('status')).toHaveText('Impostazioni salvate e rilette. Nessuna modifica clinica.');
+    await expect(preferences.getByRole('status').filter({
+      hasText: /^Impostazioni salvate e rilette\. Nessuna modifica clinica\.$/u,
+    })).toBeVisible();
     await expect(killSwitch).toHaveAttribute('aria-checked', 'false');
     await expect(card.getByText('Spento', { exact: true })).toBeVisible();
     expect(await readEnabled()).toBe(false);
