@@ -146,9 +146,9 @@ test('preparation HTTP timeout withdraws but does not release a pending owner', 
     pending.resolve(); await tick(); assert.equal(f.counts().takes, 0);
 });
 test('ready preparation expires before consent; a delayed click does not renew it', async t => {
-    let now = Date.now(); t.mock.method(Date, 'now', () => now);
+    t.mock.timers.enable({ apis: ['Date'], now: Date.now() });
     const f = fixture(t), ready = await f.request('prepare');
-    now = ready.snapshot.preparation.expiresAt! + 1;
+    t.mock.timers.tick(ready.snapshot.preparation.expiresAt! - Date.now() + 1);
     const status = await f.request('status');
     assert.equal(status.snapshot.state, 'error'); assert.equal(f.signal()?.aborted, true);
     assert.notEqual((await f.call('consent', f.grant(ready))).status, 200);
