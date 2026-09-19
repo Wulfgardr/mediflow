@@ -94,16 +94,20 @@ for (const scenario of ['text', 'scan', 'mixed', 'image'] as const) {
     void responsePromise.catch(() => {}); // An acquire failure still reports its own assertion.
     await page.getByRole('button', { name: `Estrai testo localmente da ${attachment.name}` }).click();
     const acquired = await acquirePromise;
+    // Chromium can expose the acquire response headers after the client has consumed and aborted its body.
+    // The project envelope is the completed client-visible result, so assert its canonical source there.
     expect(acquired.status()).toBe(200);
-    const grant = await acquired.json();
-    expect(grant.canonicalSource.sourceRef).toMatch(/^[a-f0-9]{64}$/);
-    expect(grant.canonicalSource.revision).toBeGreaterThan(0);
-    expect(grant.canonicalSource.freshnessEpoch).toBeGreaterThan(0);
     const response = await responsePromise;
     expect(response.status()).toBe(200);
     const envelope = await response.json();
     expect(envelope).toMatchObject({ schemaVersion: 'mediflow.attachment_extraction_projection.v1',
-      acquisition: { origin: 'authenticated_client_decryption', ciphertextEquality: 'not_attested', canonicalSource: grant.canonicalSource } });
+      acquisition: { origin: 'authenticated_client_decryption', ciphertextEquality: 'not_attested' } });
+    expect(envelope.acquisition.canonicalSource).toMatchObject({
+      sourceRef: expect.stringMatching(/^[a-f0-9]{64}$/),
+      revision: expect.any(Number), freshnessEpoch: expect.any(Number),
+    });
+    expect(envelope.acquisition.canonicalSource.revision).toBeGreaterThan(0);
+    expect(envelope.acquisition.canonicalSource.freshnessEpoch).toBeGreaterThan(0);
     const result = envelope.extraction;
     expect(result).toMatchObject({
       provenance: { attachmentId: attachment.id, sourceSha256: createHash('sha256').update(bytes).digest('hex'), byteLength: bytes.byteLength },
