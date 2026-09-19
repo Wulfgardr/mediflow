@@ -310,4 +310,12 @@ test('preparation diagnostic keeps only an allowlisted local stage', () => {
     assert.doesNotMatch(JSON.stringify(events), /PRIVATE_|path|source/u);
     reportExecutionDiagnostic(observe, { ...input, stage: 'PRIVATE_PROVIDER_SENTINEL' } as unknown as import('./execution-transport').ExecutionDiagnostic);
     assert.equal(events.length, 1);
+    reportExecutionDiagnostic(observe, { ...input, stage: 'platform_qualification', closedQualificationStage: 'readback' } as unknown as import('./execution-transport').ExecutionDiagnostic);
+    assert.deepEqual(events[1], { event: 'preparation_failed', method: null, errorCode: 'upstream_error', rpcCode: null,
+        httpStatus: null, tls: false, network: false, device: false, experimental: false, permission: false,
+        stage: 'platform_qualification', closedQualificationStage: 'readback' });
+    reportExecutionDiagnostic(observe, { ...input, stage: 'platform_qualification', closedQualificationStage: 'PRIVATE_PROVIDER_SENTINEL' } as unknown as import('./execution-transport').ExecutionDiagnostic);
+    assert.deepEqual(events[2], { event: 'preparation_failed', method: null, errorCode: 'upstream_error', rpcCode: null,
+        httpStatus: null, tls: false, network: false, device: false, experimental: false, permission: false,
+        stage: 'platform_qualification' });
 });
