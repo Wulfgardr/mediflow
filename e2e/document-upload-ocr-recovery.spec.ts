@@ -20,12 +20,12 @@ async function fixture(page: Page, bytes = RTF, extension = 'rtf') {
   const patientId = (await patient.json()).id as string;
   const id = `ocr-recovery-${marker}`; const name = `synthetic-recovery.${extension}`;
   const type = extension === 'pdf' ? 'application/pdf' : 'application/rtf';
+  const url = `/patients/${patientId}/modules`;
   const response = await page.request.post('/api/attachments', { data: {
     id, patientId, name, type, size: bytes.byteLength, path: `uploads/${name}`,
     data: `data:${type};base64,${bytes.toString('base64')}`,
   } });
   expect(response.ok()).toBe(true);
-  const url = `/patients/${patientId}/modules`;
   await openArchive(page, url);
   return { id, name, patientId, url, endpoint: `**/api/attachments/${id}/local-extraction` };
 }
@@ -51,14 +51,14 @@ for (const failure of ['engine_absent', 'timeout', 'crash', 'transport_interrupt
     });
     const extract = page.getByRole('button', { name: `Estrai testo localmente da ${file.name}` });
     await extract.click();
-    await expect(page.getByText(/revisione manuale necessaria/).first()).toBeVisible();
+    await expect(page.getByText(/Revisione manuale necessaria/).first()).toBeVisible();
     await expect(page.getByTestId('anydoc-local-extraction-preview')).toHaveCount(0);
     await expect(page.getByRole('button', { name: `Visualizza ${file.name}`, exact: true })).toBeEnabled();
     await expect(extract).toBeEnabled();
     await extract.click();
     await expect(page.getByTestId('anydoc-local-extraction-preview')).toContainText(TEXT);
     expect(calls).toBe(2);
-    await expect(page.getByText(/revisione manuale necessaria/)).toHaveCount(0);
+    await expect(page.getByText(/Revisione manuale necessaria/)).toHaveCount(0);
   });
 }
 
@@ -77,7 +77,7 @@ for (const input of ['protected', 'corrupt'] as const) {
         detail: input === 'protected' ? 'encrypted_document' : 'malformed_document', review: 'required', writes: 0, apply: 'none' });
       expect(result.receipt.ocrProvenance).toBeUndefined();
       await expect(page.getByTestId('anydoc-local-extraction-preview')).toHaveCount(0);
-      await expect(page.getByText(/revisione manuale necessaria/).first()).toBeVisible();
+      await expect(page.getByText(/Revisione manuale necessaria/).first()).toBeVisible();
       await expect(page.getByRole('button', { name: `Visualizza ${file.name}`, exact: true })).toBeEnabled();
     }
   });
@@ -109,7 +109,7 @@ test('OCR recovery UI: interrupt waiting, ignore late result and recover with a 
     await page.getByRole('button', { name: 'Interrompi attesa', exact: true }).click({ timeout: 3000 });
     await expect(extract).toBeEnabled();
     await expect(page.getByTestId('anydoc-local-extraction-preview')).toHaveCount(0);
-    await expect(page.getByText(/revisione manuale necessaria/).first()).toBeVisible();
+    await expect(page.getByText(/Revisione manuale necessaria/).first()).toBeVisible();
     await page.screenshot({ path: testInfo.outputPath('interrupted-synthetic.png'), fullPage: true });
     await extract.click();
     await retryReady.promise;
