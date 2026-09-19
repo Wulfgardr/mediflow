@@ -65,6 +65,6 @@ test('composition and production boundary exclude routes, provider, lifecycle, p
     const core = readFileSync(new URL('./server-session-authenticated-smart-import-attachment-ingest.ts', import.meta.url), 'utf8');
     const production = readFileSync(new URL('./server-session-authenticated-smart-import-attachment-ingest-production.ts', import.meta.url), 'utf8');
 
-    assert.match(production, /acquireAuthenticatedWebSessionProjectionOwnerContext/u);
+    assert.match(production, /acquireOrdinaryApplicationContext/u);
     assert.doesNotMatch(`${core}\n${production}`, /(?:route|provider|lifecycle|preview|apply|issueSelection|\.lookup\()/u);
 });

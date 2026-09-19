@@ -212,7 +212,7 @@ test('keeps callbacks, AnyDoc, routes, logging, and persistence outside the auth
     assert.doesNotMatch(source, /\bsourcePort\b|hook|caller.*function|Promise\.|async\s|await\s/iu);
     assert.match(source, /mintResourcePort[\s\S]*beginResourceUse[\s\S]*commitResourceUse/iu);
     assert.doesNotMatch(source, /ownerValue|registryValue|sourceRegistry|createServerSessionProjectionOwnerRegistry/iu);
-    assert.match(source, /createAttachmentExtractionSourceAuthority\(sessionValue: ServerSession\)/u);
+    assert.match(source, /createAttachmentExtractionSourceAuthority\(session: ServerSession\)/u);
     assert.match(source, /serverSessionProjectionOwnerRegistry\.acquire\(session\)/u);
     const revocation = fs.readFileSync(new URL('./attachment-extraction-locator-revocation.ts', import.meta.url), 'utf8');
     assert.doesNotMatch(revocation, /Promise|async|await|callback|dbServer|schema|transaction|\.then|Symbol\.iterator/iu);

@@ -10,8 +10,8 @@ test('roots Treatment Reasoning in authenticated selection, scoped revision, ATH
     assert.match(root, /^import 'server-only';/u);
     for (const required of [
         'createTreatmentReasoningAuthenticatedProjectionBroker',
-        'acquireAuthenticatedWebSessionProjectionOwnerContext',
-        'registerServerSessionResource',
+        'acquireOrdinaryApplicationContext',
+        'registerOrdinaryApplicationResource',
         'patientsToAmbulatories',
         "createHostProviderLifecycleService({ provider: 'athena_mlx' })",
         'isAthenaMlxModelAvailable',

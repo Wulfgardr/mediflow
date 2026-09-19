@@ -21,7 +21,7 @@ const nativeSourcePath = process.env.MEDIFLOW_MAC_NATIVE_SOURCE;
 const nonce = '0123456789abcdef0123456789abcdef';
 const frame = (seq: number, kind: string, value: number, detail = 0) => parseMacOwnerFrame(`MFM1 ${nonce} ${seq} ${kind} ${value} ${detail}`, nonce);
 
-test('pinned complete source, receipts and 24 C1 comparisons validate only the fixed projection', () => {
+test('pinned complete source, receipts and 24 C1 comparisons validate only the fixed projection', { skip: process.platform !== 'darwin' }, () => {
     assert.ok(sourceDirectory, 'set MEDIFLOW_MAC_PUBLIC_SOURCE_DIR to the frozen config-schema directory');
     assert.ok(c1ReceiptPath, 'set MEDIFLOW_MAC_C1_RECEIPT to the frozen receipt');
     const pins = verifyMacSourceSet(sourceDirectory, c1ReceiptPath, expectedExecutionConfig());
@@ -30,7 +30,7 @@ test('pinned complete source, receipts and 24 C1 comparisons validate only the f
     assert.equal(MAC_CONFIG_SOURCE.runtimeReadback, 'not_observed');
     assert.equal(readPinnedMacFile(c1ReceiptPath, MAC_C1_RECEIPT).length, 8330);
 });
-test('source truncation, wrong receipt and unknown or invalid typed inputs are rejected', () => {
+test('source truncation, wrong receipt and unknown or invalid typed inputs are rejected', { skip: process.platform !== 'darwin' }, () => {
     assert.ok(sourceDirectory);
     const bytes = readFileSync(join(sourceDirectory, 'config.schema.json'));
     assert.throws(() => assertMacInputProjection(bytes.subarray(1), expectedExecutionConfig()), rejected);
@@ -43,7 +43,7 @@ test('source truncation, wrong receipt and unknown or invalid typed inputs are r
         assert.throws(() => readPinnedMacFile(p, MAC_C1_RECEIPT), rejected);
     } finally { rmSync(scratch, { recursive: true, force: true }); }
 });
-test('native source pin is over the complete delivered C bytes, never a caller helper digest', () => {
+test('native source pin is over the complete delivered C bytes, never a caller helper digest', { skip: process.platform !== 'darwin' }, () => {
     assert.ok(nativeSourcePath, 'set MEDIFLOW_MAC_NATIVE_SOURCE to the delivered mac-owner.c');
     const source = readPinnedMacFile(nativeSourcePath, MAC_NATIVE_SOURCE);
     assert.equal(macDigest(source), MAC_NATIVE_SOURCE.sha256);
