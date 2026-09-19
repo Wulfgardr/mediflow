@@ -37,7 +37,11 @@ test('locking retires the pending model footer read before its response or fallb
     const errors: string[] = [];
     let locked = false;
     const lateReads: string[] = [];
-    page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+    page.on('console', message => {
+        // A lock intentionally retires in-flight session reads, which Chromium
+        // reports as a console 401. Model reads are asserted separately below.
+        if (message.type() === 'error' && !/401 \(Unauthorized\)/u.test(message.text())) errors.push(message.text());
+    });
     page.on('pageerror', error => errors.push(error.message));
     page.on('request', request => {
         const pathname = new URL(request.url()).pathname;

@@ -89,9 +89,8 @@ test('settings warns when selected AI model is still on hold in rollout readines
 
   await expect(guardNotice).toBeVisible();
   await expect(guardNotice).toContainText('gemma4:e4b');
-  // WUL-297: the "hold" status is rendered in Italian as "in attesa"
-  // (rollback-required renders as "rollback richiesto").
-  await expect(guardNotice).toContainText('in attesa');
+  // The hold state remains explicit while a different model is selected.
+  await expect(guardNotice).toContainText('In attesa di verifica');
   await expect(guardNotice).toContainText('Generative Challenger');
   await expect(guardNotice).toContainText('therapyStateRecall 0.7 < 0.95');
   await expect(guardNotice).toContainText('Patient Insight');
