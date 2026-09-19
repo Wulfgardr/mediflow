@@ -128,16 +128,20 @@ test('runs the explicit context, confirmed selection, minimized ingest, and prop
     assert.deepEqual(calls.map(({ path, method }) => `${method}:${path}`), [
         `GET:/api/patients/${PATIENT_ID}`,
         'GET:/api/ambulatories',
+        'GET:/api/ai/smart-import/selection',
         `GET:/api/patients/${PATIENT_ID}`,
         'GET:/api/ambulatories',
-        'GET:/api/ai/smart-import/selection',
         'POST:/api/ai/smart-import/selection',
+        `GET:/api/patients/${PATIENT_ID}`,
+        'GET:/api/ambulatories',
         'POST:/api/ai/treatment-reasoning/ingest',
+        `GET:/api/patients/${PATIENT_ID}`,
+        'GET:/api/ambulatories',
         'POST:/api/ai/treatment-reasoning/preview',
     ]);
-    assert.deepEqual(calls[6]?.body && Object.keys(calls[6].body as object), ['projection', 'requestId']);
-    assert.deepEqual(calls[7]?.body, { handle: HANDLE, requestId: IDS[1] });
-    const ingestJson = JSON.stringify(calls[6]?.body);
+    assert.deepEqual(calls[8]?.body && Object.keys(calls[8].body as object), ['projection', 'requestId']);
+    assert.deepEqual(calls[11]?.body, { handle: HANDLE, requestId: IDS[1] });
+    const ingestJson = JSON.stringify(calls[8]?.body);
     assert.doesNotMatch(ingestJson, /Persona|Sintetica|SYNTHETIC0000000|Indirizzo sintetico|0000000000/u);
     assert.doesNotMatch(ingestJson, /patientId|ambulatoryId|provider|model|prompt|question|apply/u);
 });
@@ -280,6 +284,55 @@ test('rejects changed patient or ambulatory facts before selection and ingest', 
             (error: unknown) => error instanceof TreatmentReasoningBrowserControllerError && error.code === 'proposal_stale',
         );
         assert.deepEqual(posts, []);
+    }
+});
+
+test('rejects caller patient identity drift before selection dispatch', async () => {
+    for (const field of ['version', 'firstName', 'lastName'] as const) {
+        const posts: string[] = [];
+        const controller = createTreatmentReasoningBrowserController({ fetch: async (input, init) => {
+            if (init?.method === 'POST') posts.push(String(input));
+            return contextResponse(String(input)) ?? response({ selectionEpoch: 0 });
+        } });
+        const proposal = await controller.readProposal(PATIENT_ID); const input = contextInput();
+        if (field === 'version') input.patient.version -= 1; else input.patient[field] = 'Valore sintetico obsoleto';
+        await assert.rejects(
+            () => controller.run({ patientId: PATIENT_ID, proposal, ambulatory: proposal.ambulatories[0], contextInput: input }, true),
+            (error: unknown) => error instanceof TreatmentReasoningBrowserControllerError && error.code === 'proposal_stale',
+        );
+        assert.deepEqual(posts, []);
+    }
+});
+
+test('revalidates host-owned facts before ingest and preview dispatch', async () => {
+    for (const boundary of ['ingest', 'preview'] as const) {
+        let patientVersion = 7; let ambulatoryVersion = 3; const posts: string[] = [];
+        const controller = createTreatmentReasoningBrowserController({
+            clock: () => new Date('2026-09-01T10:00:00.000Z'), requestId: (() => { let id = 0; return () => IDS[id++]; })(),
+            fetch: async (input, init) => {
+                const path = String(input); const method = init?.method ?? 'GET';
+                if (path === `/api/patients/${PATIENT_ID}`) return contextResponse(path, patientVersion, ambulatoryVersion)!;
+                if (path === '/api/ambulatories') return contextResponse(path, patientVersion, ambulatoryVersion)!;
+                if (path.endsWith('/selection') && method === 'GET') return response({ selectionEpoch: 0 });
+                if (method === 'POST') posts.push(path);
+                if (path.endsWith('/selection')) {
+                    if (boundary === 'ingest') patientVersion += 1;
+                    return response({ selection: LEASE });
+                }
+                if (path.endsWith('/ingest')) {
+                    if (boundary === 'preview') ambulatoryVersion += 1;
+                    return response({ handle: HANDLE });
+                }
+                if (path.endsWith('/preview')) return response(publication());
+                throw new Error('unexpected request');
+            },
+        });
+        const proposal = await controller.readProposal(PATIENT_ID);
+        await assert.rejects(
+            () => controller.run({ patientId: PATIENT_ID, proposal, ambulatory: proposal.ambulatories[0], contextInput: contextInput() }, true),
+            (error: unknown) => error instanceof TreatmentReasoningBrowserControllerError && error.code === 'proposal_stale',
+        );
+        assert.equal(posts.some((path) => path.endsWith(`/${boundary}`)), false);
     }
 });
 
