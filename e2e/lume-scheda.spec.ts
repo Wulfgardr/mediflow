@@ -147,15 +147,15 @@ test('il controllo back della Scheda torna alla lista pazienti', async ({ page }
   await expect(page.getByTestId('lume-worklist')).toBeVisible();
 });
 
-test('le tredici sezioni restano raggiungibili con una sola destinazione corrente', async ({ page }) => {
+test('le quindici sezioni restano raggiungibili con una sola destinazione corrente', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
   const patient = await createFixture(page);
   await page.goto(`/patients/${patient.id}/modules`);
   const nav = page.getByRole('navigation', { name: 'Sezioni della vista' });
-  const sections = ['quadro', 'attenzione', 'identita', 'parametri', 'terapie', 'prestazioni',
+  const sections = ['quadro', 'attenzione', 'identita', 'clinica', 'amministrazione', 'parametri', 'terapie', 'prestazioni',
     'protesica', 'scale', 'documenti', 'siss', 'timeline', 'diario', 'follow-up'];
-  await expect(nav.locator('a')).toHaveCount(13);
+  await expect(nav.locator('a')).toHaveCount(sections.length);
   expect((await nav.locator('a').evaluateAll(links => links.map(link => link.getAttribute('href')))).sort())
     .toEqual(sections.map(id => `#${id}`).sort());
   await expectCurrentSection(page, 'diario');

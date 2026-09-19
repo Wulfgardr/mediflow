@@ -247,12 +247,12 @@ async function verifySettings(page: Page, viewCase: ViewCase): Promise<void> {
   await expect(networkValue).toHaveText('Stato Locale', { useInnerText: true });
 
   const preview = page.getByTestId('settings-preview-section');
-  const initialBackground = await preview.evaluate((element) => getComputedStyle(element).backgroundColor);
+  // @Codex: proposal overview sections deliberately retain a transparent surface.
+  await expect(preview).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   const oppositeTheme = viewCase.register === 'grafite' ? 'Chiaro' : 'Scuro';
   await page.getByRole('button', { name: `Tema ${oppositeTheme}` }).click();
   await expect(page.locator('html')).toHaveClass(viewCase.register === 'grafite' ? /light/ : /dark/);
-  const changedBackground = await preview.evaluate((element) => getComputedStyle(element).backgroundColor);
-  expect(changedBackground).not.toBe(initialBackground);
+  await expect(preview).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   const originalTheme = viewCase.register === 'grafite' ? 'Scuro' : 'Chiaro';
   await page.getByRole('button', { name: `Tema ${originalTheme}` }).click();
   await expect(page.locator('html')).toHaveClass(viewCase.register === 'grafite' ? /dark/ : /light/);

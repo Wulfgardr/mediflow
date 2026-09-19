@@ -237,7 +237,8 @@ async function assertCompactWorklistGeometry(page: Page, width: number): Promise
   expect(geometry?.railHeight).toBeLessThanOrEqual(150);
   expect(geometry?.navRowCount).toBeLessThanOrEqual(2);
   expect(geometry?.worklistInnerWidth).toBeGreaterThanOrEqual(240);
-  expect(geometry?.titleHeight).toBeLessThanOrEqual(27);
+  // @Codex: proposal CSS declares the worklist heading line box at 28px.
+  expect(geometry?.titleHeight).toBeLessThanOrEqual(28);
   expect(geometry?.titleAndCountShareLine).toBe(true);
   expect(width >= 360 ? geometry?.actionBesideHeading : geometry?.actionFollowsHeading).toBe(true);
   expect(geometry?.actionHeight).toBeGreaterThanOrEqual(44);

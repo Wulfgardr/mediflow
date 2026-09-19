@@ -23,6 +23,8 @@ export async function openPatientSection(page: Page, id: string): Promise<void> 
   await expect(navigation).toBeVisible();
   await expect(link).toHaveCount(1);
   if (!(await link.isVisible())) await navigation.locator('summary').click();
+  // @Codex: a visible link can still be below the compact navigation viewport.
+  await link.scrollIntoViewIfNeeded();
   await link.click();
   await expect(link).toHaveAttribute('aria-current', 'location');
   // @Codex: ordinary sections use navigation state and visibility; the twin-only
