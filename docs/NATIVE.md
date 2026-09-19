@@ -401,6 +401,59 @@ graph LR
 
 ---
 
+
+### Headless MCP nel bundle — WUL-697 (candidato)
+
+<!-- @Codex -->
+Il builder aggiunge `Contents/Resources/mediflow-headless-supervisor.mjs` e
+`WebRuntime/HeadlessRuntime`: file sorgenti tracciati dal Supervisor/MCP esistente,
+non copie indiscriminate di `lib` o `packages`. Condivide il Web standalone e il
+loader SQLite già normalizzato; non aggiunge Mach-O, listener o installer.
+Il tracing usa Next/TypeScript già installati nel checkout completo e fallisce su
+file mancanti, risoluzioni non chiuse o dipendenze non fisiche. Il roster fissa
+SHA-256, byte e modi dopo la firma dei payload nativi, prima del sigillo esterno.
+Sidecar, revisione canonica e pin del helper restano invariati; i controlli dopo
+il sigillo sono in sola lettura.
+
+L'interprete non è incluso: occorre il **medesimo eseguibile fisico Node 24**
+attestato al packaging (hash, byte, modo, versione, ABI e architettura), già
+provisionato sull'host, senza alias o symlink negli antenati. Aggiornare Node
+richiede un nuovo packaging, non la riscrittura del roster nell'app sigillata.
+Anche app e directory dati devono avere percorsi fisici assoluti; la directory
+dati deve esistere ed essere esterna all'app. Invocazione esemplificativa, da
+adattare ai percorsi provisionati, con ambiente pulito:
+
+```sh
+/usr/bin/env -i MEDIFLOW_DATA_DIR='/percorso/fisico/dati' \
+  /percorso/fisico/node24 \
+  /percorso/fisico/MediFlow.app/Contents/Resources/mediflow-headless-supervisor.mjs
+```
+
+Nessun argomento oppure il solo `--mcp`. Mini (`--mini`), argomenti aggiuntivi,
+preload e variabili di ricerca Node sono rifiutati. Il launcher non cerca Node in
+PATH, non usa una shell e non conserva override di autorità del chiamante.
+Avvia nello stesso PID il Supervisor di produzione: authority, IPC ereditato,
+lease, revoca e cleanup restano nei contratti esistenti. stdout è riservato al
+protocollo. Roster e hook verificano i moduli caricati; non sono una sandbox
+contro sorgenti ostili già fidati o un interprete manomesso prima dell'avvio.
+La fiducia iniziale resta nell'app distribuita e nel Node provisionato: un
+launcher sostituibile insieme al proprio roster non è auto-autenticante.
+
+Lo smoke reale, con dati soltanto sintetici e porta esistente libera, usa:
+
+```sh
+/percorso/fisico/node24 scripts/mediflow-headless-supervisor-standalone-smoke.mjs \
+  --app /percorso/fisico/estratto/MediFlow.app
+```
+
+Il test avvia l'entrypoint estratto da cwd estraneo/PATH ostile, esegue il percorso
+Web autenticato già esistente, verifica stdout JSON-RPC, revoca/logout,
+EOF/SIGTERM, assenza di figli residui e invarianza dell'app. I test dei guard su
+layout sintetico e dei contratti IPC non lo sostituiscono. Questa slice è un
+candidato da qualificare sul checkout completo/macOS: non attesta smoke reale,
+firma, notarizzazione, release o chiusura complessiva WUL-697. Mini WUL-696 resta
+fuori da questo entrypoint.
+
 ## Come contribuire
 
 Se vuoi aggiungere una vista:

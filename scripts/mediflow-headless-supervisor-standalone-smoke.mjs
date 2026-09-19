@@ -1,13 +1,88 @@
 #!/usr/bin/env node
 /* @Codex */
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import Database from 'better-sqlite3';
 import { loginWithWebAuthControl } from './web-auth-control-test-client.mjs';
-const ROOT = process.cwd(), BASE_URL = 'http://127.0.0.1:3000';
+import { appLayout, checkHeadlessRuntime } from './stage-headless-runtime.mjs';
+const ROOT = fileURLToPath(new URL('..', import.meta.url)), BASE_URL = 'http://127.0.0.1:3000';
+// @Codex: the same real authenticated smoke, now against an extracted app.
+const args = process.argv.slice(2);
+assert.ok(args.length === 0 || (args.length === 2 && args[0] === '--app'),
+  'Usage: mediflow-headless-supervisor-standalone-smoke.mjs [--app <physical.app>]');
+const APP = args[1] ?? null;
+const layout = APP ? appLayout(APP) : null;
+const ownedPids = new Set();
+function snapshotApp() {
+  if (!APP) return null;
+  const records = [];
+  const walk = directory => {
+    for (const name of fs.readdirSync(directory).sort()) {
+      const file = path.join(directory, name), stat = fs.lstatSync(file);
+      const value = stat.isSymbolicLink() ? fs.readlinkSync(file) : stat.isFile()
+        ? createHash('sha256').update(fs.readFileSync(file)).digest('hex') : null;
+      records.push([path.relative(APP, file), stat.mode, value]);
+      if (stat.isDirectory() && !stat.isSymbolicLink()) walk(file);
+    }
+  };
+  walk(APP); return records;
+}
+function rememberDescendants(pid) {
+  const result = spawnSync('/bin/ps', ['-axo', 'pid=,ppid='], { encoding: 'utf8', env: {}, timeout: 5_000 });
+  assert.equal(result.status, 0, 'Cannot observe child cleanup');
+  const rows = result.stdout.trim().split('\n').map(line => line.trim().split(/\s+/u).map(Number));
+  const found = new Set([pid]);
+  for (;;) {
+    const before = found.size;
+    for (const [child, parent] of rows) if (found.has(parent)) found.add(child);
+    if (found.size === before) break;
+  }
+  found.delete(pid); for (const child of found) ownedPids.add(child);
+  return found.size;
+}
+function alive(pid) {
+  try { process.kill(pid, 0); return true; } catch (error) { if (error.code === 'ESRCH') return false; throw error; }
+}
+async function assertReaped() {
+  for (let attempt = 0; attempt < 200 && [...ownedPids].some(alive); attempt += 1) {
+    await new Promise(resolve => setTimeout(resolve, 10));
+  }
+  assert.ok(![...ownedPids].some(alive), 'Supervisor left a live child after revocation/cleanup');
+  ownedPids.clear();
+}
+function launch(dataDir, foreignCwd) {
+  return spawn(process.execPath, layout ? [layout.launcher] : [path.join(ROOT, 'scripts/run-strip-types.mjs'),
+    path.join(ROOT, 'scripts/mediflow-headless-supervisor.mjs')], {
+    cwd: layout ? foreignCwd : ROOT,
+    env: layout ? { MEDIFLOW_DATA_DIR: dataDir, PATH: foreignCwd,
+      MEDIFLOW_NODE_BINARY: path.join(foreignCwd, 'node'),
+      MEDIFLOW_STRIP_TYPES_NODE: path.join(foreignCwd, 'node'), MEDIFLOW_APP_REVISION: 'caller-must-not-win' }
+      : { ...process.env, MEDIFLOW_DATA_DIR: dataDir,
+        MEDIFLOW_PROVIDER_V2_ENABLED: '0', MEDIFLOW_PROVIDER_V2_NETWORK: '0' },
+    stdio: ['pipe', 'pipe', 'pipe'],
+  });
+}
+async function prebindShutdown(dataDir, foreignCwd, kind) {
+  const child = launch(dataDir, foreignCwd);
+  const exit = new Promise(resolve => child.once('exit', resolve));
+  let stderr = ''; child.stderr.setEncoding('utf8'); child.stderr.on('data', chunk => { stderr += chunk; });
+  const rpc = rpcClient(child);
+  try {
+    await waitForReady(() => stderr, child);
+    assert.ok(rememberDescendants(child.pid) >= 2, 'Expected real Web and MCP children');
+    await rpc.send('server/discover');
+    const denied = await rpc.send('tools/call', tool('mediflow.system.headless_status.v1'));
+    assert.equal(denied.result.content[0].text, 'MediFlow operation denied: host_unbound.');
+    if (kind === 'EOF') child.stdin.end(); else child.kill('SIGTERM');
+    assert.equal(await withTimeout(exit, kind + ' cleanup'), 0);
+    await assertReaped(); rpc.assertHealthy(); assert.equal(rpc.remainder(), '');
+  } finally { await terminateChild(child); }
+}
 const USERNAME = 'synthetic-supervisor-smoke', PATIENT_ID = 'patient.synthetic.supervisor-smoke';
 const CHECKUP_ID = 'checkup.synthetic.supervisor-smoke', CHECKUP_TITLE = 'Synthetic bounded checkup';
 const META = Object.freeze({
@@ -202,20 +277,19 @@ function verifyCommittedTransition(dataDir, receipt) {
 function tool(name, argumentsValue = {}) { return { name, arguments: argumentsValue }; }
 async function main() {
   const dataDir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-production-smoke-')));
-  let child = null, stderr = ''; try {
+  const foreignCwd = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-extracted-cwd-')));
+  const marker = path.join(foreignCwd, 'substitution-was-executed');
+  fs.writeFileSync(path.join(foreignCwd, 'node'), `#!/bin/sh\n: > '${marker}'\nexit 99\n`, { mode: 0o755 });
+  let child = null, stderr = '', before = null; try {
+    if (APP) { await checkHeadlessRuntime(APP); before = snapshotApp(); }
     prepareSyntheticDatabase(dataDir);
-    child = spawn(process.execPath,
-      [path.join(ROOT, 'scripts', 'run-strip-types.mjs'),
-        path.join(ROOT, 'scripts', 'mediflow-headless-supervisor.mjs')], {
-        cwd: ROOT, env: { ...process.env, MEDIFLOW_DATA_DIR: dataDir,
-          MEDIFLOW_PROVIDER_V2_ENABLED: '0', MEDIFLOW_PROVIDER_V2_NETWORK: '0' },
-        stdio: ['pipe', 'pipe', 'pipe'],
-      });
+    child = launch(dataDir, foreignCwd);
     const exit = new Promise((resolve) => child.once('exit', (code) => resolve(code)));
     child.stderr.setEncoding('utf8');
     child.stderr.on('data', (chunk) => { stderr += chunk; });
     const rpc = rpcClient(child);
     await waitForReady(() => stderr, child);
+    if (APP) assert.ok(rememberDescendants(child.pid) >= 2, 'Expected real Web and MCP children');
     const discovery = await rpc.send('server/discover');
     assert.deepEqual(discovery.result.supportedVersions, ['2026-07-28']);
     const prebind = await rpc.send('tools/call', tool('mediflow.system.headless_status.v1'));
@@ -331,6 +405,7 @@ async function main() {
     assert.equal(logout.status, 204);
     assert.equal(await withTimeout(exit, 'Supervisor terminal exit'), 0);
     verifyCommittedTransition(dataDir, receipt);
+    if (APP) await assertReaped();
     rpc.assertHealthy();
     assert.equal(rpc.pending.size, 0);
     assert.equal(rpc.remainder(), '');
@@ -340,13 +415,24 @@ async function main() {
     assert.doesNotMatch(rpc.lines.join('\n'), forbidden);
     assert.doesNotMatch(stderr, forbidden);
     assert.doesNotMatch(JSON.stringify(receipt), forbidden);
-    process.stdout.write('Production Supervisor smoke passed: five operations, governed checkup, one update/audit, revoke and clean exit.\n');
+    if (APP) {
+      await prebindShutdown(dataDir, foreignCwd, 'EOF');
+      await prebindShutdown(dataDir, foreignCwd, 'SIGTERM');
+      assert.equal(fs.existsSync(marker), false, 'cwd/PATH substitution executed');
+      await checkHeadlessRuntime(APP);
+      assert.deepEqual(snapshotApp(), before, 'The extracted app changed during smoke');
+    }
+    process.stdout.write(`${APP ? 'Extracted-app MCP' : 'Production Supervisor'} smoke passed: five operations, governed checkup, one update/audit, revoke and clean exit${APP ? ', EOF/SIGTERM child cleanup and immutable app' : ''}.\n`);
   } catch (error) {
     if (stderr) process.stderr.write(stderr);
     throw error;
   } finally {
+    if (APP && child && !hasExited(child)) rememberDescendants(child.pid);
     await terminateChild(child);
+    // Recovery does not turn a failed cleanup assertion into a PASS.
+    for (const pid of ownedPids) if (alive(pid)) process.kill(pid, 'SIGKILL');
     fs.rmSync(dataDir, { recursive: true, force: true });
+    fs.rmSync(foreignCwd, { recursive: true, force: true });
   }
 }
 await main();

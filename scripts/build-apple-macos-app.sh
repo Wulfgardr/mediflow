@@ -140,9 +140,10 @@ for (const name of ['_CodeSignature', 'CodeResources']) {
   throw new Error('Refusing to mutate a sealed app. Build in fresh, unsigned DerivedData.');
 }
 for (const name of ['Resources', 'Resources/WebRuntime', 'Resources/WebRuntime/.next',
-  'Resources/WebRuntime/.next/static', 'Resources/WebRuntime/public', 'Frameworks', 'Helpers']) physical(path.join(app, 'Contents', name), true);
+  'Resources/WebRuntime/.next/static', 'Resources/WebRuntime/public', 'Resources/WebRuntime/HeadlessRuntime', 'Frameworks', 'Helpers']) physical(path.join(app, 'Contents', name), true);
 for (const [relative, message] of [
   ['Resources/local-api-tls-proxy.mjs', 'Nonphysical proxy destination'],
+  ['Resources/mediflow-headless-supervisor.mjs', 'Nonphysical Headless launcher destination'],
   ['Resources/WebRuntime/native-first-install.mjs', 'Nonphysical native first-install destination'],
 ]) {
   const destination = path.join(app, 'Contents', relative);
@@ -309,11 +310,18 @@ if [[ -n "${MEDIFLOW_CODESIGN_IDENTITY:-}" ]]; then
   fi
   # @Codex: sign only the six rewritten Web dependencies. The independently
   # signed, pinned Codex helper is already verified and MUST NOT be re-signed.
-  # --deep is verification-only; no staging or normalization follows this seal.
+  # --deep is verification-only. No mutation follows the OUTER app seal below.
   for native_code in "${WEB_NATIVE_TARGETS[@]}"; do
     codesign "${SIGN_ARGS[@]}" "$native_code"
     codesign --verify --strict "$native_code"
   done
+fi
+
+# @Codex WUL-697: exact file closure only; consume final inner-signature bytes.
+# The roster/launcher are committed before the outer seal and never repaired after it.
+node "$ROOT_DIR/scripts/stage-headless-runtime.mjs" --stage --app "$APP"
+assert_checkout_unchanged
+if [[ -n "${MEDIFLOW_CODESIGN_IDENTITY:-}" ]]; then
   codesign "${SIGN_ARGS[@]}" "$APP"
   codesign --verify --deep --strict "$APP"
 fi
@@ -324,5 +332,7 @@ node "$ROOT_DIR/scripts/run-strip-types.mjs" "$STAGE_EXECUTION_MAC_ASSETS" \
   --check --installation-root "$WEB"
 codesign --verify --strict "$EXECUTION_MAC_HELPER"
 "$ROOT_DIR/scripts/check-macos-web-runtime-native-payload.sh" --web-runtime "$WEB" --frameworks "$FRAMEWORKS"
+node "$ROOT_DIR/scripts/stage-headless-runtime.mjs" --check --app "$APP"
 echo "Runnable macOS app candidate (runtime smoke still required): $APP"
 echo "WebRuntime: $WEB/server.js"
+echo "Headless MCP (explicit Node 24 required): $RES/mediflow-headless-supervisor.mjs"

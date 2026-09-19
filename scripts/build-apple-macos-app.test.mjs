@@ -1,6 +1,7 @@
-/* @Codex — executes the REAL builder, stager and Resources guard with synthetic
- * inputs and mocked Apple tools. This is an ordering/layout test, NOT Xcode,
- * codesign, Gatekeeper, notarization or runtime-smoke evidence. No downloads. */
+/* @Codex — real builder, native stager and Resources guard, synthetic Apple tools.
+ * Headless tracing is intercepted ONLY to assert signing order; its actual guard
+ * has separate tests and its real runtime requires the extracted-app smoke.
+ * NOT Xcode, codesign, Gatekeeper, notarization or runtime-smoke evidence. */
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -55,6 +56,10 @@ switch (command) {
     } else if (args.join(' ') !== 'run check:standalone-runtime-bundle') throw new Error('Unexpected npm invocation');
     break;
   case 'generate': case 'record-stager': break;
+  case 'headless-order-only':
+    if (!['--stage', '--check'].includes(args[0]) || args[1] !== '--app') throw new Error('Bad Headless call');
+    if (args[0] === '--stage' && fs.existsSync(path.join(target, 'Contents/_CodeSignature'))) throw new Error('Headless write after seal');
+    break; // No fake runtime, roster or successful MCP execution is produced here.
   case 'xcodebuild': {
     const fixture = appRoot(path.join(process.env.MEDIFLOW_MAC_DERIVED_DATA, 'Build/Products', process.env.MEDIFLOW_MAC_CONFIG));
     const plist = path.join(fixture.contents, 'Info.plist');
@@ -124,6 +129,10 @@ function buildFixture(t) {
   }
   write(path.join(bin, 'git'), '#!/bin/bash\nunset DEVELOPER_DIR\nexec /usr/bin/git "$@"\n', 0o755);
   write(path.join(bin, 'node'), `#!/bin/bash
+if [[ "\${1:-}" == */scripts/stage-headless-runtime.mjs ]]; then
+  shift
+  exec "${process.execPath}" "${driverPath}" headless-order-only "$@"
+fi
 if [[ "\${1:-}" == */scripts/run-strip-types.mjs && "\${2:-}" == */stage-chatgpt-execution-mac-assets.ts ]]; then
   "${process.execPath}" "${driverPath}" record-stager "$@"
   script="$2"; shift 2
@@ -198,8 +207,18 @@ for (const identity of ['', '-', 'Synthetic Developer ID']) {
     assert.ok(helperEvents.length >= 2);
     assert.ok(helperEvents.every(e => e.command === 'codesign' && e.args.join(' ').startsWith('--verify --strict ')));
     const seal = events.findIndex(e => e.command === 'codesign' && e.args[0] === '--force' && e.args.at(-1) === input.app);
+    const stages = events.flatMap((event, index) => event.command === 'headless-order-only' ? [{ event, index }] : []);
+    assert.deepEqual(stages.map(({ event }) => event.args), [['--stage', '--app', input.app], ['--check', '--app', input.app]]);
+    const [headlessStage, headlessCheck] = stages.map(({ index }) => index);
+    assert.ok(headlessCheck > headlessStage);
     if (identity) {
-      assert.ok(seal > 0);
+      assert.ok(headlessStage < seal && headlessCheck > seal);
+      const innerSigns = events.flatMap((e, index) => e.command === 'codesign' && e.args[0] === '--force'
+        && e.args.at(-1).includes('/Contents/Frameworks/') ? [{ index, target: e.args.at(-1) }] : []);
+      assert.equal(innerSigns.length, 12); // normalization ad-hoc + requested final identity
+      assert.deepEqual([...new Set(innerSigns.map(({ target }) => target))].sort(),
+        targets.map(name => path.join(input.app, 'Contents/Frameworks', name)));
+      assert.ok(innerSigns.every(({ index }) => index < headlessStage));
       assert.ok(events.slice(seal + 1).filter(e => e.command === 'record-stager').every(e => e.args.includes('--check')));
       assert.equal(events.slice(seal + 1).some(e => e.command === 'install_name_tool' || e.command === 'codesign' && e.args[0] === '--force'), false);
       const before = snapshot(input.app), count = events.length;
