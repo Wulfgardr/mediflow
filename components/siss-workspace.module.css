@@ -1,0 +1,42 @@
+/* @Codex: local SISS/FSE hierarchy; no changes to shared cartella chrome. */
+.workspace { display: grid; gap: 24px; min-width: 0; color: var(--lume-ink); overflow-wrap: anywhere; }
+.heading { margin: 0; font-size: 1.0625rem; font-weight: 600; line-height: 1.5; }
+.caption { margin: 6px 0 12px; color: var(--lume-ink-muted); font-size: .9375rem; line-height: 1.6; }
+.actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.control, .workspace :global(button), .panel :global(button) {
+    display: inline-flex; align-items: center; justify-content: center; gap: 12px;
+    min-height: 44px; height: auto; min-width: 0; max-width: 100%;
+    padding: 10px 14px; border: 1px solid color-mix(in srgb, var(--lume-ink) 24%, transparent);
+    border-radius: 12px; background: transparent; color: var(--lume-ink);
+    box-shadow: none; font: inherit; font-size: .9375rem; line-height: 1.5;
+    white-space: normal; text-align: left; cursor: pointer;
+}
+.workspace :global(button:disabled), .panel :global(button:disabled) { opacity: .55; cursor: not-allowed; }
+.workspace :global(button:hover:not(:disabled)), .panel :global(button:hover:not(:disabled)) { background: var(--lume-surface-field); }
+.workspace :global(button:focus-visible), .workspace :global(summary:focus-visible), .workspace :global(input:focus-visible), .workspace :global(select:focus-visible), .workspace :global(textarea:focus-visible), .panel :global(button:focus-visible), .panel :global(summary:focus-visible) { outline: 2px solid var(--lume-accent); outline-offset: 3px; }
+.panel { display: grid; gap: 16px; min-width: 0; }
+.services { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr)); }
+.services :global(button) { justify-content: space-between; width: 100%; }
+.services :global(button span) { flex: 1; min-width: 0; }
+.services :global(svg), .actions :global(svg) { flex-shrink: 0; }
+.disclosure { min-width: 0; border-top: 1px solid color-mix(in srgb, var(--lume-ink) 16%, transparent); }
+.disclosure > summary, .workspace :global(details > summary) { min-height: 44px; padding: 10px 0; color: var(--lume-ink); font-size: .9375rem; line-height: 1.5; cursor: pointer; }
+.support { display: grid; gap: 20px; padding-block: 12px; }
+.panel :global(.graphite-block), .panel :global(.siss-blocked-item) { padding: 0; border: 0; background: transparent; box-shadow: none; border-radius: 0; }
+.panel :global(.graphite-row) { display: flex; flex-wrap: wrap; gap: 12px; padding: 12px 0; border: 0; border-bottom: 1px solid color-mix(in srgb, var(--lume-ink) 12%, transparent); background: transparent; box-shadow: none; border-radius: 0; }
+.panel :global(.graphite-row dd) { margin: 0; text-align: left; }
+.panel :global(.truncate) { white-space: normal; overflow: visible; text-overflow: clip; }
+.diary :global(form), .diary :global(section > div) { border: 0; background: transparent; box-shadow: none; border-radius: 0; }
+.diary :global(input), .diary :global(select), .diary :global(textarea) { min-height: 44px; max-width: 100%; border-radius: 12px; font-size: .9375rem; }
+.notice { margin: 0; color: var(--lume-signal-warning); font-size: .9375rem; line-height: 1.6; }
+/* @Codex: expanded support remains readable, on the same surface. */
+.panel :global(.graphite-block h3), .panel :global(.graphite-block h4) { font-size: 1rem; text-transform: none; letter-spacing: normal; }
+.panel :global(.graphite-block > p), .panel :global(.graphite-row p), .panel :global(.graphite-row dt), .panel :global(.graphite-row dd) { font-size: .9375rem; line-height: 1.6; }
+.panel > details > summary { border: 0; border-radius: 12px; background: transparent; box-shadow: none; }
+.disclosure > summary { border-radius: 12px; }
+/* @Codex: prevent legacy portal tiles from stacking their icon and action. */
+.services :global(button) { flex-direction: row; }
+.workspace :global(button), .panel :global(button) { flex-shrink: 0; overflow-wrap: normal; }
+/* @Codex: override the legacy dark surface specificity within this workspace. */
+.workspace .panel :global(.graphite-block), .workspace .panel :global(.graphite-row), .workspace .panel :global(.siss-blocked-item) { background: transparent; box-shadow: none; }
+.workspace .panel :global(.siss-action-btn) { background: transparent; color: var(--lume-ink); gap: 12px; }

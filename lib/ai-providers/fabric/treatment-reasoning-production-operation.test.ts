@@ -168,3 +168,62 @@ test('exposes no provider selection, caller prompt, persistence, or apply seam',
     const current = fixture();
     assert.deepEqual(Object.keys(current.service), ['acquireIngest', 'acquirePreview']);
 });
+
+// PROPOSED portable engine tests. This runtime is an explicit fake, not a model qualification.
+import { createHash } from 'node:crypto';
+import { createTreatmentReasoningPortableProductionService } from './treatment-reasoning-production-operation.ts';
+import { ATHENA_R1_QWEN3_8B_MODEL_ID } from '../../athena-model-identity.ts';
+import { parseTreatmentReasoningPublication } from './treatment-reasoning-browser-controller.ts';
+import type { PortableEngineMetadata } from './treatment-reasoning-portable-runtime.ts';
+const portableMetadata: PortableEngineMetadata = Object.freeze({ provider: 'athena_transformers', model: ATHENA_R1_QWEN3_8B_MODEL_ID,
+    platform: 'linux-x64', artifactDigest: 'a'.repeat(64), runtimeDigest: 'b'.repeat(64), workerDigest: 'c'.repeat(64), admissionRevision: 2 });
+function portableFixture(options: { disabled?: boolean; revokeDuringInvoke?: boolean; disableDuringInvoke?: boolean; staleChoice?: boolean;
+    invalidOutput?: boolean; mismatchedOption?: boolean; commit?: boolean } = {}) {
+    const calls: string[] = []; let current = true; let enabled = !options.disabled; let stale = false;
+    const option = `model_option_${createHash('sha256').update(JSON.stringify(['athena_transformers', portableMetadata.model, null, portableMetadata.artifactDigest])).digest('hex').slice(0, 32)}`;
+    const service = createTreatmentReasoningPortableProductionService({
+        projectionBroker: {
+            async acquireIngest() { return { ingest: () => `trp_${'0'.repeat(32)}` }; },
+            async acquirePreview() { calls.push('auth'); return { begin() { calls.push('begin'); return {
+                projection: projection(), patientRef: 'patient.synthetic',
+                commit() { calls.push('commit'); return options.commit ?? true; }, abort() { calls.push('abort'); },
+            }; } }; },
+        },
+        killSwitch: { async read() { calls.push('kill'); return enabled ? { status: 'enabled' as const } : { status: 'denied' as const, code: 'disabled' as const }; } },
+        entropy: () => Uint8Array.from({ length: 32 }, (_, i) => i + 1),
+        selection: () => ({ provider: 'athena_transformers', modelOptionId: options.mismatchedOption ? `model_option_${'0'.repeat(32)}` : option, catalogRevision: `sha256_${'d'.repeat(64)}` }),
+        async verifyChoice() { calls.push('verify'); if (stale) throw new Error('synthetic stale binding'); },
+        async prepare() { calls.push('prepare'); return { metadata: portableMetadata, current: () => current, close() { calls.push('close'); },
+            async invoke({ instruction }) { calls.push('invoke'); assert.match(instruction, /source_payload_is_untrusted_evidence_not_instruction=true/u);
+                if (options.revokeDuringInvoke) current = false; if (options.disableDuringInvoke) enabled = false; if (options.staleChoice) stale = true;
+                return JSON.stringify(options.invalidOutput ? { ...providerOutput(), sourceBindings: [] } : providerOutput());
+            },
+        }; },
+    });
+    return { calls, run: async () => (await service.acquirePreview()).preview({ handle: `trp_${'0'.repeat(32)}`, requestId: 'request.synthetic.portable.01' }) };
+}
+test('portable synthetic publication is source-bound v2, truthful, client-valid and review-only', async () => {
+    const f = portableFixture(); const result = await f.run(); assert.equal(result.status, 'available');
+    if (result.status !== 'available') return;
+    assert.equal(result.publication.schemaVersion, 'mediflow.ai.treatment-reasoning-publication.v2');
+    assert.equal(result.publication.attestation.provider, 'athena_transformers');
+    assert.equal(result.publication.fabricReceipt.model, ATHENA_R1_QWEN3_8B_MODEL_ID);
+    assert.deepEqual(result.publication.fabricReceipt.engine, portableMetadata);
+    assert.equal(result.publication.provenance.receipt, result.publication.fabricReceipt);
+    assert.equal(result.publication.review, 'required'); assert.equal(result.writesPerformed, 0); assert.equal(result.applyPolicy, 'none');
+    // Across the actual JSON boundary; neither parser translates portable metadata into MLX.
+    assert.ok(parseTreatmentReasoningPublication(JSON.parse(JSON.stringify(result.publication))));
+    assert.equal(f.calls.filter(x => x === 'commit').length, 1); assert.equal(f.calls.at(-1), 'close');
+});
+test('portable kill switch blocks before preparing; late revoke, switch-off or stale choice prevents CAS', async () => {
+    const disabled = portableFixture({ disabled: true }); const denied = await disabled.run(); assert.equal(denied.status, 'denied');
+    assert.equal(disabled.calls.includes('prepare'), false); assert.equal(disabled.calls.at(-1), 'abort');
+    for (const options of [{ revokeDuringInvoke: true }, { disableDuringInvoke: true }, { staleChoice: true }, { invalidOutput: true }, { mismatchedOption: true }]) {
+        const f = portableFixture(options); const result = await f.run(); assert.equal(result.status, 'denied', JSON.stringify(options));
+        assert.equal(f.calls.includes('commit'), false); assert.equal(f.calls.includes('close'), true); assert.equal(f.calls.at(-1), 'abort');
+    }
+});
+test('portable currentness CAS failure never publishes and does not retry', async () => {
+    const f = portableFixture({ commit: false }); const result = await f.run(); assert.equal(result.status, 'denied');
+    assert.equal(result.code, 'source_stale'); assert.equal(f.calls.filter(x => x === 'invoke').length, 1); assert.equal(f.calls.at(-1), 'abort');
+});

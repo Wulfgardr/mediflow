@@ -1,4 +1,6 @@
 /* @Codex */
+import { readNativeNetworkJson, jsonBodyTooLargeResponse } from '@/lib/native-network-json-body';
+/* @Codex */
 import { cookies } from 'next/headers';
 /* @Codex */
 import { NextResponse } from 'next/server';
@@ -21,10 +23,12 @@ import {
 } from '@/lib/network-patient-write';
 import { getNetworkModeGateResponse, requireNetworkCapabilityContext } from '@/lib/network-write-context';
 /* @Codex */
-import { forbiddenResponse, requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
+import { forbiddenResponse, unauthorizedResponse } from '@/lib/security/server-auth';
+/* @Codex */
+import { requireAccountSession } from '@/lib/security/paired-native-session';
 
 /* @Codex */
-async function resolveNetworkScope(session: Awaited<ReturnType<typeof requireSession>>) {
+async function resolveNetworkScope(session: Awaited<ReturnType<typeof requireAccountSession>>) {
     const cookieStore = await cookies();
     const activeAmbulatoryId = cookieStore.get('ambulatory_id')?.value ?? null;
     const identity = await getNetworkIdentitySummary(session, activeAmbulatoryId);
@@ -50,7 +54,7 @@ async function requireNetworkPatientWriteContext(
         return { ok: false, response: forbiddenResponse() };
     }
 
-    const session = await requireSession();
+    const session = await requireAccountSession(request);
     if (!session) return { ok: false, response: unauthorizedResponse() };
 
     const scopeAmbulatoryId = await resolveNetworkScope(session);
@@ -86,7 +90,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         return forbiddenResponse();
     }
 
-    const session = await requireSession();
+    const session = await requireAccountSession(request);
     if (!session) return unauthorizedResponse();
 
     try {
@@ -115,10 +119,13 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         const resolved = await requireNetworkPatientWriteContext(request, id);
         if (!resolved.ok) return resolved.response;
 
-        const body = await request.json() as Record<string, unknown>;
+        const body = await readNativeNetworkJson(request) as Record<string, unknown>;
         const result = await updateNetworkScopedPatient(resolved.context, body);
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
+        /* @Codex */
+        const sizeError = jsonBodyTooLargeResponse(error);
+        if (sizeError) return sizeError;
         console.error('API PUT /api/v1/network/patients/[id] error:', error);
         return NextResponse.json({ error: 'Failed to update patient' }, { status: 500 });
     }
@@ -131,7 +138,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
         const resolved = await requireNetworkCapabilityContext(request, NETWORK_PATIENT_LIFECYCLE_CAPABILITY);
         if (!resolved.ok) return resolved.response;
 
-        const body = await request.json() as Record<string, unknown>;
+        const body = await readNativeNetworkJson(request) as Record<string, unknown>;
         const result = await deleteNetworkScopedPatient(
             {
                 ...resolved.context,
@@ -141,6 +148,9 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
         );
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
+        /* @Codex */
+        const sizeError = jsonBodyTooLargeResponse(error);
+        if (sizeError) return sizeError;
         console.error('API DELETE /api/v1/network/patients/[id] error:', error);
         return NextResponse.json({ error: 'Failed to delete patient' }, { status: 500 });
     }

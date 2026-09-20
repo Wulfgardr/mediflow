@@ -1,0 +1,50 @@
+[
+  {
+    "platform": "darwin",
+    "arch": "arm64",
+    "libc": null,
+    "package": "@napi-rs/canvas-darwin-arm64",
+    "version": "0.1.100",
+    "integrity": "sha512-2PcswRaC7Ly645DGt88///zuFDhJxJYdKAs1uU3mfk1atYkXufgcgLfBpk6Tm12nCQBaNt1wpybuPZ4qOhTo8A==",
+    "tarballSha256": "c7c8dcb69aae6ddb58fe23e5f20d1c772a8065b077560f5a18336307779add91",
+    "binary": "skia.darwin-arm64.node",
+    "binaryByteLength": 26297696,
+    "binarySha256": "a9c429727b4a133e34e60c5ffa7f701541ffe941afa9574abe6273a1648c342d"
+  },
+  {
+    "platform": "win32",
+    "arch": "x64",
+    "libc": null,
+    "package": "@napi-rs/canvas-win32-x64-msvc",
+    "version": "0.1.100",
+    "integrity": "sha512-MyT1j3mHC2+Lu4pBi9mKyMJhtP6U7k7EldY7sj/uS5gJA65gTXt8MefJQXLJo5d/vZbuWmfxzkEUNc/urV3pHA==",
+    "tarballSha256": "a918366995d85d6989bd85c1c82f21eae90479cb1df40c2d6867ccb00338595b",
+    "binary": "skia.win32-x64-msvc.node",
+    "binaryByteLength": 27294720,
+    "binarySha256": "0f76fb0648fbff832856f6ce202059fc3fa38be7ad925300e96935906ea11132"
+  },
+  {
+    "platform": "linux",
+    "arch": "x64",
+    "libc": "glibc",
+    "package": "@napi-rs/canvas-linux-x64-gnu",
+    "version": "0.1.100",
+    "integrity": "sha512-1eCvkDCazm7FFhsT7DfGOdSaHgZVK3bt/dSBl5EWHOWmnz+I7j8tPseJqqD81NF+MH21jKUK4wQSDjN0mdhnTg==",
+    "tarballSha256": "fbb244fcf0e38fed930914fc732a84369eada961e6cd1c034a7ce2f1ca55c7ef",
+    "binary": "skia.linux-x64-gnu.node",
+    "binaryByteLength": 33393024,
+    "binarySha256": "059a0873c1114a8a59195f6c4bc76eab9c4e928251003cd501b59bc8aaaf3fa0"
+  },
+  {
+    "platform": "linux",
+    "arch": "arm64",
+    "libc": "glibc",
+    "package": "@napi-rs/canvas-linux-arm64-gnu",
+    "version": "0.1.100",
+    "integrity": "sha512-rDxgxRu69RvDlX/bh9o22DxLsGr8EqsNgotL9+RwQE1S0b0cqeatqsw6aW45mukm0B42DIAaAacKaYQ8cqS1nw==",
+    "tarballSha256": "a2e623648a0abac073f0b488770a650f889fa8be10f2a05adc0712087371264c",
+    "binary": "skia.linux-arm64-gnu.node",
+    "binaryByteLength": 27711392,
+    "binarySha256": "03e173f76f574969cc8cc945bfbb9ddb050a961350564467136045465827628f"
+  }
+]

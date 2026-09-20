@@ -36,6 +36,14 @@ destinazione di export. Dati e artifact sensibili restano fuori da Git secondo
 - Apple Silicon, artifact locale ATHENA e toolchain MLX (opzionali, solo per
   Treatment Reasoning)
 
+Per `scripts/run-strip-types.mjs --test` (anche tramite npm) impostare
+`MEDIFLOW_DATA_DIR` su una directory sintetica posseduta dal run e pulirla
+dopo la fine dei processi figli. Se assente o vuoto il launcher termina prima
+del target con `MEDIFLOW_TEST_DATA_DIR_REQUIRED` (ADR 0130). Non usare il
+data-dir applicativo reale: un import statico può aprire il DB prima dei hook
+della fixture. Il launcher preserva il percorso esplicito senza gestirne il
+cleanup.
+
 Nota documentale 0.8.5: AnyDoc resta il primo passaggio automatico locale. Il
 tree include routing, manifest, materializzazione e rendering delle sole pagine
 `needsOcr`, quindi usa Apple Vision localmente sul Mac e ricompone il risultato
@@ -219,8 +227,11 @@ npm run test:fabric-generative-runtime-crosswalk
 ```
 
 I quattro path sono Patient Insight, Smart Import, Document Synthesis e
-Treatment Reasoning. Il caller non deve scegliere provider, modello, endpoint,
-venue, prompt, fallback o apply. I production root host-owned devono mantenere
+Treatment Reasoning. Il caller non deve scegliere provider, modello libero,
+endpoint, venue, prompt, fallback o apply. ADR 0129 ammette soltanto un
+`modelOptionId` opaco del catalogo host con `expectedCatalogRevision`, risolto
+nel servizio nominato `FunctionModelDispatch`. Preferenze e preset non ammettono
+provider; per questo confine eseguire anche `npm run test:function-models`. I production root host-owned devono mantenere
 lo stadio massimo `proposal_only`.
 
 ### Gate del modello provider F7
@@ -247,9 +258,10 @@ Mantieni inoltre separate le due modalità architetturali: un provider eseguito
 dentro MediFlow e MediFlow invocato come servizio governato da un host
 intelligente. Il Supervisor Node locale avvia Web standalone e MCP `stdio` come
 figli distinti su IPC ereditato. MCP usa soltanto RPC AIP e Application Services
-nominate, senza listener proprio o accesso diretto a SQLite. Mini condivide il
-catalogo e la foundation CLI ma, senza un callsite production del Supervisor,
-deve fallire chiuso in assenza del parent AIP. Mantieni
+nominate, senza listener proprio o accesso diretto a SQLite. La lane Mini
+WUL-696 aggiunge `mini:production`: Web e Mini figli, sessione
+NDJSON con gli stessi comandi della CLI e attivazione Web obbligatoria. Mini deve
+fallire chiuso in assenza del parent AIP. Mantieni
 fuori dal claim installer, onboarding e compatibilità con host MCP esterni; non
 introdurre broker residente o UDS nella `0.8.5`.
 
@@ -392,6 +404,12 @@ Una PR è considerata conclusa quando:
 - Nessun PHI/PII introdotto in repo, fixture, log o screenshot
 - Se una feature è user-facing e interagibile, deve avere una UI/UX esplicita e coerente
   (CTA/pulsante, label comprensibile, percorso utente verificabile).
+- Per ogni modifica all'interfaccia, verificare sul percorso interessato che
+  etichette, descrizioni, azioni e stati siano comprensibili a un medico senza
+  conoscenze tecniche, secondo [DESIGN.md](./DESIGN.md#plain-language-for-physicians).
+  Il medico deve capire significato, scelta richiesta e conseguenze senza una
+  spiegazione dello sviluppatore; gergo non spiegato o azioni ambigue impediscono
+  l'accettazione anche con test verdi.
 - Se cambia `/api/v1/*`, la documentazione contrattuale (spec OpenAPI o nota esplicita
   `no contract impact`) deve stare nello stesso diff.
 - Se cambiano comportamenti/contratti, documentazione aggiornata:

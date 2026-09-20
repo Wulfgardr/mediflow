@@ -9,14 +9,34 @@ final class PatientFieldCryptoTests: XCTestCase {
 
     private var key: SymmetricKey { SymmetricKey(data: Data(base64Encoded: rawKeyB64)!) }
 
-    private func detail(address: String?, diagnoses: String?, notes: String?) -> HomeBasePatientDetail {
+    private func detail(address: String?, diagnoses: String?, notes: String?, archiveReason: String? = nil, archiveNote: String? = nil) -> HomeBasePatientDetail {
         HomeBasePatientDetail(
             id: "p1", firstName: "Mario", lastName: "Rossi", birthDate: nil, taxCode: "RSSMRA",
             address: address, phone: nil, caregiver: nil, exemptions: nil, diagnoses: diagnoses,
             monitoringProfile: nil, statusReason: nil, notes: notes, aiSummary: nil,
             documentInsights: nil, isAdi: false, isArchived: false, version: 1,
-            ambulatoryId: "AMB-1", createdAt: nil, updatedAt: nil
+            ambulatoryId: "AMB-1", createdAt: nil, updatedAt: nil,
+            archiveReason: archiveReason, archiveNote: archiveNote
         )
+    }
+
+    /* @Codex */
+    func testArchiveDetailDecryptsJSONStringFieldsAndHidesUnreadableValues() throws {
+        let reason = try XCTUnwrap(CryptoService.encryptField(CryptoService.jsonEncode("other")!, masterKey: key))
+        let note = try XCTUnwrap(CryptoService.encryptField(CryptoService.jsonEncode("Trasferimento sintetico")!, masterKey: key))
+        let raw = detail(address: nil, diagnoses: nil, notes: nil, archiveReason: reason, archiveNote: note)
+        let decrypted = PatientFieldCrypto.decryptDetail(raw, masterKey: key)
+        XCTAssertEqual(decrypted.archiveReason, "other")
+        XCTAssertEqual(decrypted.archiveNote, "Trasferimento sintetico")
+        for unavailableKey in [nil, SymmetricKey(data: Data(repeating: 9, count: 32))] {
+            let hidden = PatientFieldCrypto.decryptDetail(raw, masterKey: unavailableKey)
+            XCTAssertNil(hidden.archiveReason)
+            XCTAssertNil(hidden.archiveNote)
+            XCTAssertEqual(PatientFieldCrypto.resolveStringField(raw.archiveReason, masterKey: unavailableKey), .locked(ciphertext: reason))
+        }
+        XCTAssertEqual(PatientFieldCrypto.decryptDetail(
+            detail(address: nil, diagnoses: nil, notes: nil, archiveReason: "future_reason", archiveNote: "Nota storica"),
+            masterKey: key).archiveReason, "future_reason")
     }
 
     func testDecryptStringFieldDecryptsEncAndUnwrapsJson() {

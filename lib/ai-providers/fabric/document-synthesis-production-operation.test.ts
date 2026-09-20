@@ -7,9 +7,6 @@ import path from 'node:path';
 import { after, afterEach, test } from 'node:test';
 import Database from 'better-sqlite3';
 
-import { createServerSessionProjectionOwnerRegistry } from '../../security/server-session-projection-owner.ts';
-import { clearAllSessions, createSession } from '../../security/server-session.ts';
-
 const DATA_DIRECTORY = mkdtempSync(path.join(os.tmpdir(), 'mediflow-ds-operation-'));
 process.env.MEDIFLOW_DATA_DIR = DATA_DIRECTORY;
 const bootstrap = new Database(path.join(DATA_DIRECTORY, 'medical.db'));
@@ -17,10 +14,18 @@ for (const file of readdirSync(path.resolve('drizzle')).filter((name) => name.en
     bootstrap.exec(readFileSync(path.join(path.resolve('drizzle'), file), 'utf8').replace(/^-->\s+statement-breakpoint\s*$/gmu, ''));
 }
 bootstrap.close();
+const { createFullPortProjectionOwnerFactory } = await import('../../security/server-session-projection-owner.ts');
+const { clearAllSessions } = await import('../../security/server-session.ts');
 const {
     createDocumentSynthesisProductionOperationForTest,
     resolveDocumentSynthesisAnyDocProjection,
 } = await import('./document-synthesis-production-operation.ts');
+const { composeAnyDocCurrentSelectionClientProjectionExtraction } = await import('../../domain/documents/anydoc-current-source-composition.ts');
+const { serverSessionProjectionOwnerRegistry } = await import('../../security/server-session-projection-owner-production.ts');
+
+import { issueSyntheticWebSession, issueSyntheticWebSessionContext, retireSyntheticWebSession } from '../../security/web-auth-lifecycle-owner-test-fixture.ts';
+import { resolve, retire } from '../../security/web-auth-lifecycle-owner-adapter.ts';
+const webSessions: ReturnType<typeof issueSyntheticWebSession>[] = [];
 
 const USER = Object.freeze({ id: 'user.synthetic.document.synthesis', username: 'clinician.synthetic', role: 'clinician' as const });
 const PAIR = Object.freeze({ patientId: 'patient.synthetic.document.synthesis', ambulatoryId: 'ambulatory.synthetic.document.synthesis' });
@@ -75,20 +80,118 @@ function extractedWithAppleVision(attachmentId: string, markdown = 'Fonte sintet
     });
 }
 
-afterEach(() => clearAllSessions());
+afterEach(() => { for (const session of webSessions.splice(0)) retireSyntheticWebSession(session); clearAllSessions(); });
 after(() => rmSync(DATA_DIRECTORY, { recursive: true, force: true }));
 
-function context() {
-    const registry = createServerSessionProjectionOwnerRegistry({
-        clock: () => 1_000,
+function context(registry = createFullPortProjectionOwnerFactory({
+        clock: () => Date.now(),
         entropy: () => Uint8Array.from({ length: 16 }, (_, index) => index + 1),
         resolve: (_session, pair) => Object.freeze({ ...pair, patientVersion: 1 }),
-    });
-    const session = createSession(USER, 'web');
+    })) {
+    const web = issueSyntheticWebSessionContext(USER, `document-synthesis-${webSessions.length}`);
+    const session = web.session;
+    webSessions.push(session);
     const owner = registry.acquire(session);
     owner.issueSelection({ expectedEpoch: 0, ...PAIR });
-    return Object.freeze({ session, owner });
+    let previous = session;
+    const resolveContext = () => {
+        const resolution = resolve(session.id, web.controlId);
+        assert.equal(resolution.status, 'active');
+        if (resolution.status !== 'active') throw new Error('Synthetic Web projection unavailable');
+        const current = resolution.projection;
+        assert.notEqual(current, previous);
+        assert.equal(current.id, session.id);
+        previous = current;
+        const currentOwner = registry.acquire(current);
+        assert.equal(currentOwner, owner);
+        return Object.freeze({ session: current, owner: currentOwner });
+    };
+    return Object.freeze({ session, owner, web, resolveContext });
 }
+
+test('preserves the confirmed selection through encrypted client bytes, real AnyDoc, and DS preview', async () => {
+    const attachmentId = 'attachment.synthetic.document';
+    const bytes = Buffer.from('{\\rtf1\\ansi Fonte sintetica da composizione reale.}');
+    const database = new Database(path.join(DATA_DIRECTORY, 'medical.db'));
+    try {
+        database.prepare('INSERT INTO ambulatories (id, name, type) VALUES (?, ?, ?)')
+            .run(PAIR.ambulatoryId, 'Ambulatorio sintetico', 'test');
+        database.prepare('INSERT INTO patients (id, first_name, last_name, tax_code, version) VALUES (?, ?, ?, ?, 1)')
+            .run(PAIR.patientId, 'Persona', 'Sintetica', 'SYNTHETICDS000001');
+        database.prepare('INSERT INTO patients_to_ambulatories (patient_id, ambulatory_id) VALUES (?, ?)')
+            .run(PAIR.patientId, PAIR.ambulatoryId);
+        database.prepare('INSERT INTO attachments (id, patient_id, name, type, size, path, data, document_source_ref, document_revision, document_freshness_epoch) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+            .run(attachmentId, PAIR.patientId, 'synthetic.rtf', 'application/rtf', bytes.length, 'synthetic.rtf', `ENC:${bytes.toString('base64')}`,
+                CURRENT.documentSourceRef, CURRENT.documentRevision, CURRENT.documentFreshnessEpoch);
+    } finally { database.close(); }
+    const selected = context(serverSessionProjectionOwnerRegistry);
+    const epochs = () => [selected.owner.snapshotSelectionEpoch(selected.session), selected.owner.snapshotReviewContextEpoch(selected.session)];
+    assert.deepEqual(epochs(), [1, 1]);
+    let entropy = 0; let executions = 0;
+    const factory = createDocumentSynthesisProductionOperationForTest({
+        acquireContext: async () => selected.resolveContext(),
+        readCurrentness: () => CURRENT,
+        readLaneEnabled: () => true,
+        extract: (session, id, request) => composeAnyDocCurrentSelectionClientProjectionExtraction(session, { attachmentId: id }, request),
+        execute: async () => { executions++; return Object.freeze({ publication: 'synthetic' }); },
+        entropy: () => Uint8Array.from({ length: 16 }, () => ++entropy),
+    });
+    const acquire = async () => { const operation = await factory.acquire(); assert.ok(operation); return operation; };
+    const captured = await (await acquire()).capture({ attachmentId });
+    assert.equal(captured.status, 'available');
+    const ingested = await (await acquire()).ingest({ captureHandle: captured.captureHandle }, new Request('http://localhost/api/ai/document-synthesis/ingest', {
+        method: 'POST', headers: { 'content-type': 'application/octet-stream' }, body: bytes,
+    }));
+    assert.equal(ingested.code, null);
+    assert.equal(ingested.status, 'available');
+    assert.deepEqual(epochs(), [1, 1]);
+    assert.deepEqual(await (await acquire()).preview({ previewHandle: ingested.previewHandle }),
+        { status: 'available', code: null, publication: { publication: 'synthetic' } });
+    assert.deepEqual(epochs(), [1, 1]);
+    assert.equal((await (await acquire()).ingest({ captureHandle: captured.captureHandle })).code, 'capture_consumed');
+    assert.equal((await (await acquire()).preview({ previewHandle: ingested.previewHandle })).code, 'preview_consumed');
+    assert.equal(executions, 1);
+});
+
+test('shares DS handles across fresh authentic projections only within their canonical owner', async () => {
+    const selected = context(); const other = context();
+    assert.notEqual(selected.owner, other.owner);
+    let active = selected; let entropy = 0; let extractions = 0; let executions = 0;
+    const factory = createDocumentSynthesisProductionOperationForTest({
+        acquireContext: async () => active.resolveContext(),
+        readCurrentness: () => CURRENT,
+        readLaneEnabled: () => true,
+        extract: async (session, attachmentId) => {
+            assert.notEqual(session, selected.session);
+            assert.equal(session.id, selected.session.id);
+            extractions++;
+            return extracted(attachmentId);
+        },
+        execute: async () => { executions++; return Object.freeze({ publication: 'synthetic' }); },
+        entropy: () => Uint8Array.from({ length: 16 }, () => ++entropy),
+    });
+    const acquire = async () => { const operation = await factory.acquire(); assert.ok(operation); return operation; };
+    const captureOperation = await acquire();
+    const captured = await captureOperation.capture({ attachmentId: 'attachment.synthetic.document' });
+    assert.equal(captured.status, 'available');
+
+    active = other;
+    assert.equal((await (await acquire()).ingest({ captureHandle: captured.captureHandle })).code, 'capture_consumed');
+    assert.equal(extractions, 0);
+    active = selected;
+    const ingested = await (await acquire()).ingest({ captureHandle: captured.captureHandle });
+    assert.equal(ingested.status, 'available');
+    assert.equal((await captureOperation.ingest({ captureHandle: captured.captureHandle })).code, 'capture_consumed');
+
+    active = other;
+    assert.equal((await (await acquire()).preview({ previewHandle: ingested.previewHandle })).code, 'preview_consumed');
+    assert.equal(executions, 0);
+    active = selected;
+    assert.deepEqual(await (await acquire()).preview({ previewHandle: ingested.previewHandle }),
+        { status: 'available', code: null, publication: { publication: 'synthetic' } });
+    assert.equal((await (await acquire()).preview({ previewHandle: ingested.previewHandle })).code, 'preview_consumed');
+    assert.equal(extractions, 1); assert.equal(executions, 1);
+});
 
 test('classifies Apple Vision AnyDoc evidence as OCR text and keeps native extraction distinct', () => {
     const native = resolveDocumentSynthesisAnyDocProjection(extracted('attachment.synthetic.document'),
@@ -157,4 +260,34 @@ test('suppresses drift and denies caller source injection, unsupported extractio
     const third = await operation.capture({ attachmentId: 'attachment.synthetic.document' });
     assert.equal(third.code, 'lane_disabled');
     assert.equal(executions, 1);
+});
+
+/* @Codex */
+test('production registration completes Web retirement and disposes capture and preview handles', async () => {
+    for (const reason of ['dispose', 'lock', 'delete'] as const) {
+        const selected = context(); let entropy = 0; let extractions = 0;
+        const factory = createDocumentSynthesisProductionOperationForTest({
+            acquireContext: async () => selected.resolveContext(),
+            readCurrentness: () => CURRENT,
+            readLaneEnabled: () => true,
+            extract: async (_session, attachmentId) => { extractions++; return extracted(attachmentId); },
+            execute: async () => null,
+            entropy: () => Uint8Array.from({ length: 16 }, () => ++entropy),
+        });
+        const operation = await factory.acquire();
+        assert.ok(operation, 'production DS registration must accept the authentic Web projection');
+        const captured = await operation.capture({ attachmentId: 'attachment.synthetic.document' });
+        assert.equal(captured.status, 'available');
+        const ingested = await operation.ingest({ captureHandle: captured.captureHandle });
+        assert.equal(ingested.status, 'available');
+        const pending = await operation.capture({ attachmentId: 'attachment.synthetic.document' });
+        assert.equal(pending.status, 'available');
+        const retired = retire(selected.resolveContext().session, reason,
+            reason === 'lock' ? { controlId: selected.web.controlId, ifMatch: selected.web.etag, idempotencyKey: 'synthetic-ds-lock' } : undefined);
+        assert.equal(retired.outcome, 'completed', reason);
+        assert.equal((await operation.ingest({ captureHandle: pending.captureHandle })).code, 'capture_consumed');
+        assert.equal((await operation.preview({ previewHandle: ingested.previewHandle })).code, 'preview_consumed');
+        assert.equal(extractions, 1);
+        assert.equal(await factory.acquire(), null);
+    }
 });

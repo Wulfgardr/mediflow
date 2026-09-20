@@ -1,4 +1,8 @@
 import { types } from 'node:util';
+/* @Codex */
+import { assertExemptionImportReceiptRows } from './exemption-import-receipt';
+/* @Codex */
+import { assertProstheticsCatalogBackup } from './reference-data/prosthetics-catalog-backup';
 
 import { validateHeadlessSoapEntryCommitSemanticChain } from './security/headless-soap-entry-commit-semantic-validator';
 
@@ -19,6 +23,9 @@ export const BACKUP_COLLECTIONS = [
     'drugs',
     'entries',
     'exemptions',
+    'exemptionImportReceipts',
+    'prostheticsCatalogEntries',
+    'prostheticsCatalogReceipts',
     'messages',
     'observations',
     'patients',
@@ -36,7 +43,7 @@ export const BACKUP_COLLECTIONS = [
 
 export type BackupCollectionName = (typeof BACKUP_COLLECTIONS)[number];
 export type BackupRecord = Record<string, unknown>;
-type AdditiveBackupCollection = 'durableReviewCommandStates' | 'durableReviewCommandOperations' | 'headlessSoapEntryCommits';
+type AdditiveBackupCollection = 'prostheticsCatalogEntries' | 'prostheticsCatalogReceipts' | 'exemptionImportReceipts' | 'durableReviewCommandStates' | 'durableReviewCommandOperations' | 'headlessSoapEntryCommits';
 export type BackupDataset = Record<Exclude<BackupCollectionName, AdditiveBackupCollection>, BackupRecord[]>
     & Partial<Record<AdditiveBackupCollection, BackupRecord[]>>;
 
@@ -72,7 +79,7 @@ const LEGACY_OMITTED_COLLECTION_SETS: readonly (readonly BackupCollectionName[])
     ['documentDiagnosisProposals', 'durableReviewRecords', 'durableReviewOperations', 'durableReviewCommandStates', 'durableReviewCommandOperations'],
 ];
 /* @Codex v1 recognizes both the authority-era and pre-authority collection generations. */
-const LEGACY_COLLECTION_SETS: readonly (readonly BackupCollectionName[])[] = [
+const PRE_EXEMPTION_LEGACY_COLLECTION_SETS: readonly (readonly BackupCollectionName[])[] = [
     WITHOUT_HEADLESS_SOAP_ATTESTATION_COLLECTIONS,
     PRE_HEADLESS_SOAP_COMMIT_COLLECTIONS,
     PRE_HEADLESS_SOAP_ATTESTATION_COLLECTIONS,
@@ -82,6 +89,18 @@ const LEGACY_COLLECTION_SETS: readonly (readonly BackupCollectionName[])[] = [
     ...LEGACY_OMITTED_COLLECTION_SETS.map((omitted) => WITHOUT_DURABLE_REVIEW_AUTHORITY_COLLECTIONS.filter((collection) => !omitted.includes(collection))),
     ...LEGACY_OMITTED_COLLECTION_SETS.map((omitted) => PRE_HEADLESS_SOAP_ATTESTATION_COLLECTIONS.filter((collection) => !omitted.includes(collection))),
     ...LEGACY_OMITTED_COLLECTION_SETS.map((omitted) => PRE_DURABLE_REVIEW_AUTHORITY_COLLECTIONS.filter((collection) => !omitted.includes(collection))),
+];
+/* @Codex Preserve every previously recognized v1 generation, with or without import receipts. */
+const PRE_PROSTHETICS_LEGACY_COLLECTION_SETS: readonly (readonly BackupCollectionName[])[] = [
+    ...PRE_EXEMPTION_LEGACY_COLLECTION_SETS,
+    BACKUP_COLLECTIONS.filter((collection) => collection !== 'exemptionImportReceipts'),
+    ...PRE_EXEMPTION_LEGACY_COLLECTION_SETS.map((collections) => collections.filter((collection) => collection !== 'exemptionImportReceipts')),
+];
+/* @Codex Both repertory collections form one additive generation; partial omission is invalid. */
+const LEGACY_COLLECTION_SETS: readonly (readonly BackupCollectionName[])[] = [
+    ...PRE_PROSTHETICS_LEGACY_COLLECTION_SETS,
+    ...[BACKUP_COLLECTIONS, ...PRE_PROSTHETICS_LEGACY_COLLECTION_SETS].map(collections => collections.filter(
+        collection => collection !== 'prostheticsCatalogEntries' && collection !== 'prostheticsCatalogReceipts')),
 ];
 const PATIENT_DEPENDENT_COLLECTIONS: readonly BackupCollectionName[] = [
     'attachments',
@@ -730,6 +749,12 @@ async function assertCollectionReferences(
         }
     }
 
+    /* @Codex Reject unsupported or inconsistent exemption receipts before restore/export. */
+    try { assertExemptionImportReceiptRows(payload.exemptionImportReceipts ?? []); }
+    catch { throw new BackupArtifactError('invalid-manifest', 'Exemption import receipts are invalid or unsupported.'); }
+    /* @Codex */
+    try { assertProstheticsCatalogBackup(payload.prostheticsCatalogEntries ?? [], payload.prostheticsCatalogReceipts ?? []); }
+    catch { throw new BackupArtifactError('invalid-manifest', 'Prosthetics catalog or provenance is invalid or unsupported.'); }
     await assertDurableReviewLedger(payload);
     assertDurableReviewAuthorityRows(payload, durableReviewIds, patientIds);
     assertHeadlessSoapActiveRoleAttestationRows(payload, serialized);
@@ -756,6 +781,7 @@ export async function createBackupArtifact(payload: BackupDataset, createdAt = n
     await assertCollectionReferences(currentPayload);
     const canonicalPayload = {
         ...currentPayload,
+        exemptionImportReceipts: [...(currentPayload.exemptionImportReceipts ?? [])].sort((a, b) => Number(a.id) - Number(b.id)),
         headlessSoapActiveRoleAttestations: sortHeadlessSoapActiveRoleAttestations(currentPayload.headlessSoapActiveRoleAttestations),
         headlessSoapEntryCommits: sortHeadlessSoapEntryCommits(currentPayload.headlessSoapEntryCommits ?? []),
     } as BackupDataset;

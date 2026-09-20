@@ -56,52 +56,52 @@
     {
       "area": "pazienti",
       "feature": "Anagrafica paziente: lista, ricerca, view, create, update",
-      "web": "Lista/ricerca/CRUD completo + assign/unassign/move/duplicate/soft-delete/archivia/ripristina (list/create: app/api/patients/route.ts; azioni bulk: app/api/patients/{assign,unassign,move,duplicate}/route.ts, MA il consumer web e' un hook orfano non cablato a UI e move non ha consumer: escluse da W2-finale finche' la web non le espone, decisione spec W2-finale)",
-      "native": "partial: lista+ricerca+view+update+create ANCHE via wire dietro capability lifecycle (HomeBasePatientsClient.createPatient POST network/patients; stub 405 rimosso); soft-delete/archivia/ripristina ora flussi dedicati (vedi riga archivia); mancano assign/unassign/move/duplicate",
-      "boundary": "partial: GET list (+includeDeleted gated), GET/PUT [id], POST create con guardia ENC sui sensibili, DELETE soft-delete, POST restore (app/api/v1/network/patients/route.ts; [id]/route.ts; [id]/restore/route.ts; lib/network-patient-lifecycle.ts); mancano assign/unassign/move/duplicate",
+      "web": "Lista/ricerca/CRUD completo + assign/unassign/move/duplicate/soft-delete/archivia/ripristina (list/create: app/api/patients/route.ts; azioni bulk: app/api/patients/{assign,unassign,move,duplicate}/route.ts, ma il consumer web è un hook orfano non cablato a UI e move non ha consumer: assign/unassign/move/duplicate restano esclusi dall'obbligo W2-finale finché la web non li espone)",
+      "native": "partial: lista+ricerca+view+update+create anche via wire dietro capability lifecycle (HomeBasePatientsClient.createPatient POST network/patients; stub 405 rimosso); editPatientBirthDate/setPatientBirthDatePresent usano patientBirthDatePatch e HomeBasePatientUpdatePayload.birthDate come PatchValue<Date> omit/value/null su giorno civile Gregorian UTC; soft-delete/archivia/ripristina restano flussi dedicati; assign/unassign/move/duplicate restano fuori dall'obbligo W2-finale",
+      "boundary": "partial: GET list (+includeDeleted gated), GET/PUT [id], POST create con guardia ENC sui sensibili, PUT [id] con birthDate PatchValue<Date> omit/value/null in giorno civile UTC, DELETE soft-delete, POST restore (app/api/v1/network/patients/route.ts; [id]/route.ts; [id]/restore/route.ts; lib/network-patient-lifecycle.ts); assign/unassign/move/duplicate restano fuori dall'obbligo W2-finale",
       "gap": "partial",
       "wave": "W1-mobile-core",
-      "evidence": "wave2b commits 984f16474; smoke scripts/network-home-base-patient-lifecycle-write.test.mjs (crypto round-trip byte-identico); residuo: assign/unassign/move/duplicate"
+      "evidence": "wave2b commit 984f16474 e smoke scripts/network-home-base-patient-lifecycle-write.test.mjs (crypto round-trip byte-identico); sorgente DOB integrata in 4a94a6bde con PairedPatientDetailSection e PairedPatientsWorkspaceModel.patientBirthDatePatch; proof UI/interop del candidato resta pending; assign/unassign/move/duplicate sono fuori dall'obbligo W2-finale"
     },
     {
       "area": "pazienti",
       "feature": "Archivia / soft-delete / ripristina paziente (stato scheda)",
       "web": "Archivia(MMG/decesso/altro), soft-delete verso cestino con motivazione ripristinabile 30gg, ripristina (components/patient-action-modal.tsx; edit/page.tsx:117-219)",
-      "native": "full: sheet dedicate archivia/riattiva (PUT minimale version+isArchived) ed elimina con motivazione facoltativa sigillata; vista Cestino (PatientListViewMode.trash) su includeDeleted con Ripristina; guardie can* sul model (PairedPatientArchiveSheet.swift; PairedPatientDeleteSheet.swift; PatientsFiltering.swift; PairedPatientsWorkspaceModel lifecycle)",
-      "boundary": "full: DELETE [id] con version+deletionReason sigillata (default paired-delete), POST [id]/restore con version check, GET ?includeDeleted=true gated dalla capability lifecycle (lib/network-patient-lifecycle.ts; OpenAPI 1.15.0)",
+      "native": "full: sheet dedicate archivia/riattiva (PUT minimale version+isArchived) ed elimina con motivazione sigillata; motivo/nota usano i tre codici PatientArchiveReason (assigned_mmg/deceased/other) e il form condiviso PatientArchiveFields, con versioning, sealing e persistenza SQLite; vista Cestino (PatientListViewMode.trash) su includeDeleted con Ripristina; guardie can* sul model. La prova SwiftPM è PASS sul commit indicato nelle evidenze; UI/interop finale resta da completare.",
+      "boundary": "full: DELETE [id] con version+deletionReason sigillata (default paired-delete), PUT [id] con archiveReason/archiveNote versionati e sigillati, POST [id]/restore con version check, GET ?includeDeleted=true gated dalla capability lifecycle (lib/network-patient-lifecycle.ts; OpenAPI 1.15.0)",
       "gap": "full-parity",
       "wave": "W2-boundary",
-      "evidence": "wave2b commits 984f16474; smoke lifecycle 1/1 pass; swift test 94 Core + 242 AppleShared 0 failure. Nota: il branch fix/patient-archive-delete-reasons fara' persistere archiveReason/archiveNote sulla web; il client nativo per scelta (spec D7) non li raccoglie finche' quel fix non atterra"
+      "evidence": "wave2b commit 984f16474; smoke lifecycle 1/1 pass; sorgente integrata in d20b8d25a: PatientArchiveFields, PatientArchiveReason, HomeBasePatientUpdatePayload.archiveReason/archiveNote, PatientFieldCrypto e SQLitePatientStore; il precedente rinvio D7 è obsoleto. Prove circoscritte: SwiftPM af1391e678, 822 PASS e uno skip benchmark su 823 test; build generiche macOS/iOS su f512643ee, native tree identico a 5ced339e9, PASS senza avvio. I 158 test mirati su B38321deb9/Xcode 27 restano una prova separata. Dettagli nel verbale integrato 0.8.6; UI/interop finale ancora da completare."
     },
     {
       "area": "diario",
       "feature": "Diario clinico: view/list, create, update, soft-delete+restore, filtri",
       "web": "list+add+soft-delete con motivazione+restore da cestino+toggle eliminati+view allegati+metadata scala (components/timeline.tsx; entries/new/page.tsx)",
-      "native": "partial(quasi-piena): list+create+update+soft-delete con motivazione libera+restore+toggle mostra eliminate+filtro tipo (PairedDiaryDeleteSheet.swift; PairedPatientsWorkspaceModel.restoreEntry; EntryFiltering includeDeleted). Residuo: view allegati (W5)",
+      "native": "partial: list+create+update+soft-delete con motivazione+restore+toggle eliminate+filtro tipo. Gli allegati per-record sono già referenziati e mostrati da PairedPatientDiarySection tramite PairedPatientsWorkspaceModel.referencedAttachments; softDeleteEntry/restoreEntry sono presenti. PairedDiaryDeleteSheet esclude intenzionalmente l'hard DELETE. Restano da completare le prove UI/interop sul candidato 0.8.6; AI e document-derived write restano fuori dal writer manuale.",
       "boundary": "partial: GET/POST/PUT su .../entries; manca DELETE paired (capability write-clinical-diary esclude hard delete/AI/document-derived) (app/api/v1/network/patients/[id]/entries)",
       "gap": "partial",
       "wave": "W1-mobile-core",
-      "evidence": "web-scheda.diario; native-ui.diario; api-boundary.entries | wave1 slice1 commit 984f16474; residuo allegati -> W5"
+      "evidence": "web-scheda.diario; native-ui.diario; api-boundary.entries | wave1 slice1 commit 984f16474. Sorgente 0.8.6: PairedPatientDiarySection entry-row-attachments, PairedPatientsWorkspaceModel.referencedAttachments/softDeleteEntry/restoreEntry e HomeBaseEntryAttachmentReferencesCodec; PairedDiaryDeleteSheet mantiene escluso l'hard DELETE. Disponibilità sorgente distinta dalla prova interop finale."
     },
     {
       "area": "diario",
       "feature": "Nuova voce clinica avanzata (S/O/A/P, allegati OCR, sessione visita, elabora bozza AI)",
       "web": "editor rich-text S/O/A/P, upload allegati con OCR+sintesi, transcript dettato, POST /api/visit-session/draft per ripulire+estrarre farmaci (entries/new/page.tsx)",
-      "native": "partial: editor WYSIWYG a blocchi bindato al transcoder ClinicalRichText (grassetto/corsivo/sottolineato/barrato, heading, liste, blockquote, template S/O/A/P), content sigillato = render del transcoder (parita byte-esatta col sanitizer web su 40 fixture); allegati referenziati in voce con validazione ownership client-side prima del sigillo; flusso bozza visita (dettatura, compute deterministico, revisione obbligatoria). Residuo: OCR/sintesi inline degli allegati resta host (Classe C); stile misto inline non creabile (fallback a blocchi)",
+      "native": "partial: editor inline WYSIWYG in ClinicalRichTextEditorView/ClinicalInlineEditorSession, con stili inline e template S/O/A/P via insertNewEntrySOAPTemplate; gli allegati referenziati passano da EntryAttachmentReferencePicker e HomeBaseEntryAttachmentReferencesCodec con controllo ownership. computeVisitDraftForNewEntry/insertVisitDraftIntoNewEntry espongono la bozza visita deterministica con revisione obbligatoria. Indent/outdent e strutture complesse non rappresentate restano limitati/opachi; OCR/sintesi inline resta host (Classe C); la prova SwiftPM è PASS sul commit indicato nelle evidenze e UI/interop finale resta da completare.",
       "boundary": "partial: POST /api/v1/network/visit-draft compute-only (capability network.compute.visit-draft, lib condivisa con la route web); entries.attachments accetta valori sigillati ENC (guardia sigillo al posto del 403). OCR/sintesi document-derived restano host (ADR 0076 Classe C)",
       "gap": "partial",
       "wave": "W5-ai-avanzate",
-      "evidence": "PR #16 (Wave 5) + PR #17 (gate XCUITest), CI GitHub pubblica; ClinicalRichText round-trip + PairedPatientsWorkspaceModelS7Tests"
+      "evidence": "PR #16 (Wave 5) + PR #17 (gate XCUITest), CI GitHub pubblica; sorgente attuale in ClinicalRichTextEditorView.swift, ClinicalInlineEditorSession.swift, PairedDiaryComposerView.swift e PairedPatientsWorkspaceModel.swift (insertNewEntrySOAPTemplate/computeVisitDraftForNewEntry); HomeBaseEntryAttachmentReferencesCodec e controllo review sono presenti. Prove circoscritte: SwiftPM af1391e678, 822 PASS e uno skip benchmark su 823 test; build generiche macOS/iOS su f512643ee, native tree identico a 5ced339e9, PASS senza avvio. I 158 test mirati su B38321deb9/Xcode 27 restano una prova separata. Dettagli nel verbale integrato 0.8.6; UI/interop finale ancora da completare."
     },
     {
       "area": "diario",
       "feature": "Editor rich-text clinico (formattazione S/O/A/P)",
       "web": "toolbar contentEditable completa (grassetto/liste/indent/paste sanitize) (components/clinical-rich-text-editor.tsx)",
-      "native": "partial: resa formattata HTML in lettura (ClinicalContentRendering, fallback testo piano) + template S/O/A/P identico allo skeleton web alla creazione. Residuo: editing WYSIWYG (in modifica il contenuto resta testo grezzo, markup mai degradato)",
+      "native": "partial: lettura formattata e modifica inline WYSIWYG a blocchi con quattro stili inline, selezione UTF-16 rispettosa dei grafemi, typing, undo locale e incolla testo semplice. ClinicalRichTextEditorView/ClinicalInlineEditorSession sono presenti; indent/outdent e strutture HTML complesse non rappresentabili restano opache, senza riscrittura senza edit. La verifica UI, tastiera e interop completa resta aperta.",
       "boundary": "n-a: contenuto è testo già supportato dal boundary entries",
       "gap": "partial",
       "wave": "W1-mobile-core",
-      "evidence": "web-scheda.diario(editor); native-ui.diario | wave1 slice2 commit 984f16474"
+      "evidence": "web-scheda.diario(editor); native-ui.diario. Sorgente richtext 9b2804735 integrata in 8f4dec590 con ClinicalRichTextEditorView e ClinicalInlineEditorSession; parent cf1a13c30: 55 test Swift transcoder/inline/binding/S7 PASS. Questo conteggio non attesta interazione UI, tastiera, indent/outdent o pairing reale."
     },
     {
       "area": "scale",
@@ -127,11 +127,11 @@
       "area": "terapie",
       "feature": "Gestione terapie farmacologiche (CRUD + stato + collegamento diagnosi)",
       "web": "add/edit/soft-delete/status transition, autocomplete AIFA, principio attivo, posologia, collegamento diagnosi, campi AIC/ATC (components/therapy-manager.tsx)",
-      "native": "partial: CRUD+soft-delete+stato+campi AIC/ATC/principio attivo, autocomplete AIFA e fallback manuale onesto. Residuo: equivalenza completa del collegamento diagnosi e validazione manuale P6 della flessibilita del form",
+      "native": "partial: CRUD+soft-delete+stato+AIC/ATC/principio attivo, autocomplete AIFA e fallback manuale. Collegamento diagnosi presente in creazione e modifica (newTherapyDiagnosisCode/editTherapyDiagnosisCode e payload diagnosisCode). Restano le prove finali del form e del round-trip app/home-base; hard delete e derivazione AI non fanno parte del writer manuale.",
       "boundary": "partial: GET/POST/PUT therapies; manca DELETE (write-therapies esclude hard delete/AI/document-derived)",
       "gap": "partial",
       "wave": "W1-mobile-core",
-      "evidence": "web-scheda.terapie; native-ui.terapie; api-boundary.therapies | wave1 slice4 commit 984f16474; boundary aic/atc whitelist verificata (lib/api-v1-clinical-write-normalization.ts:534-617)"
+      "evidence": "web-scheda.terapie; native-ui.terapie; api-boundary.therapies | wave1 slice4 commit 984f16474; PairedPatientTherapiesSection espone diagnosisCode/newTherapyDiagnosisCode/editTherapyDiagnosisCode e le azioni soft-delete, PairedPatientsWorkspaceModel.softDeleteTherapy è presente; boundary AIC/ATC whitelist verificata (lib/api-v1-clinical-write-normalization.ts:534-617). Prove finali UI/round-trip restano pending"
     },
     {
       "area": "terapie",
@@ -147,11 +147,11 @@
       "area": "controlli",
       "feature": "Controlli/checkup follow-up (CRUD + stato)",
       "web": "view lista pending, gestione via edit form (date/title/notes/status/source) + suggerimenti follow-up da documenti (modules/page.tsx:727-769; followup-suggestions.tsx)",
-      "native": "partial(più ricca su CRUD): list+create+update+soft-delete+filtro stato+note operative; no suggerimenti da documenti (PairedPatientsWorkspaceView.swift:1349-1429)",
+      "native": "partial: list+create+update+soft-delete+filtro stato+note operative. I suggerimenti gia persistiti nei documenti sono proiettati, deduplicati rispetto ai controlli e aprono una precompilazione manuale (PairedPatientDocumentsSection; prefillNewCheckupFromFollowup). La conferma resta esplicita, senza generazione nativa o salvataggio automatico; prove finali UI/interop ancora aperte.",
       "boundary": "partial: GET/POST/PUT checkups; manca DELETE (write-checkups esclude hard delete/AI/document-derived)",
       "gap": "partial",
       "wave": "W1-mobile-core",
-      "evidence": "web-scheda.follow-up; native-ui.controlli; api-boundary.checkups; docs-plan.gap-legacy(checkups asimmetria)"
+      "evidence": "web-scheda.follow-up; native-ui.controlli; api-boundary.checkups; PatientFollowupProjection.project e PairedPatientDocumentsSection.followupSuggestionsSection/prefillNewCheckupFromFollowup mostrano dedup e prefill manuale; PairedPatientsWorkspaceModel.softDeleteCheckup è presente. Prove finali UI/interop restano pending"
     },
     {
       "area": "controlli",
@@ -167,11 +167,11 @@
       "area": "parametri",
       "feature": "Osservazioni/parametri clinici (CRUD LOINC/UCUM + trend/sparkline)",
       "web": "add LOINC+UCUM+range+note, delete, view per parametro/data, sparkline+trend+badge fuori-range (components/observation-manager.tsx)",
-      "native": "full-parity(non-AI): CRUD+trend freccia+sparkline Chart+LOINC/UCUM manuali; no estrazione automatica/HealthKit (PairedPatientsWorkspaceView.swift:1432-1495)",
+      "native": "full-parity(non-AI): CRUD+soft-delete+trend freccia+sparkline Chart+LOINC/UCUM manuali; no estrazione automatica/HealthKit (PairedPatientClinicalSections, ObservationTrendComputer, PairedPatientsWorkspaceModel.softDeleteObservation)",
       "boundary": "partial: GET/POST/PUT observations; manca DELETE (write-observations esclude hard delete/AI)",
       "gap": "partial",
       "wave": "W1-mobile-core",
-      "evidence": "web-scheda.parametri; native-ui.osservazioni; api-boundary.observations; native-core.ObservationTrend"
+      "evidence": "web-scheda.parametri; native-ui.osservazioni; api-boundary.observations; PairedPatientClinicalSections mostra observation-sparkline e stato non-deleted, ObservationTrendComputer calcola il trend e PairedPatientsWorkspaceModel.softDeleteObservation mantiene il soft-delete; native-core.ObservationTrend"
     },
     {
       "area": "prestazioni",
@@ -197,21 +197,21 @@
       "area": "documenti",
       "feature": "Upload documenti + OCR + sintesi clinica (Archivio documenti)",
       "web": "drag&drop multi-file, OCR automatico, sintesi, coda OCR-needed, riprova OCR, preview, delete (components/document-upload.tsx)",
-      "native": "partial nella riga aggregata: upload nativo (fileImporter + PhotosPicker) con sigillo ENC client-side, precheck dimensione wire, archivio, dettaglio on-demand, preview e condivisione. OCR e sintesi restano intenzionalmente host/web per ADR 0076 Classe C; questa divisione di ruolo non è una equivalenza UI mancante",
-      "boundary": "partial nella riga aggregata: famiglia documenti network con create Classe A sigillata ENC; PUT/DELETE e OCR restano host per ADR 0076. Il boundary è platform-specific-documented",
+      "native": "partial nella riga aggregata: upload nativo con picker singolo (fileImporter allowsMultipleSelection:false e PhotosPickerItem?) e sigillo ENC client-side, precheck dimensione wire, archivio, dettaglio on-demand, preview e condivisione. Il multi-file web è una differenza operativa del picker; OCR, sintesi e curation restano intenzionalmente host/web per ADR 0076 Classe C; SPM/UI/interop del percorso nativo resta pending",
+      "boundary": "partial nella riga aggregata: famiglia documenti network con create Classe A sigillata ENC; PUT/DELETE e OCR/sintesi/curation restano host per ADR 0076. Il boundary è platform-specific-documented",
       "gap": "partial",
       "wave": "W5-ai-avanzate",
-      "evidence": "PR #16 + PR #17; lib/network-attachment-{read,write}; smoke home-base-documents-write; Evidence Stack web E2E 2/2 su base 9ee798887 con PIN sintetico 0000"
+      "evidence": "PR #16 + PR #17; PairedPatientDocumentsSection (fileImporter allowsMultipleSelection:false, PhotosPickerItem?, uploadAttachmentForSelectedPatient), PairedAttachmentDetailView e PairedAttachmentPreview; lib/network-attachment-{read,write}; smoke home-base-documents-write; Evidence Stack web E2E 2/2 su base 9ee798887 con PIN sintetico 0000. OCR/sintesi/curation restano host ADR 0076; prova UI/interop nativa pending"
     },
     {
       "area": "documenti",
       "feature": "Archivio Intelligente / Document Insights (view estrazioni + delete)",
       "web": "view/expand diagnosi/terapie estratte, quality reason, sintesi markdown, delete/svuota (components/document-insights-panel.tsx)",
-      "native": "partial nella riga aggregata: Archivio Intelligente completo in lettura. Delete/svuota resta intenzionalmente web per ADR 0076 Classe C; la differenza è platform-specific-documented",
+      "native": "partial nella riga aggregata: Archivio Intelligente read è presente tramite DocumentInsightsCodec, PairedPatientDocumentsSection.documentInsightsSection e PairedPatientsWorkspaceModel.documentInsights. Delete/svuota resta intenzionalmente web/host per ADR 0076 Classe C; la differenza è platform-specific-documented",
       "boundary": "partial nella riga aggregata: lettura insight dal dettaglio paziente; curation host-only per ADR 0076, non equivalenza mancante",
       "gap": "partial",
       "wave": "W5-ai-avanzate",
-      "evidence": "PR #16 + PR #17; DocumentInsightsCodec; PR #15; Evidence Stack web E2E 2/2 su base 9ee798887: popolato, curation, empty, loading ed errore conservativo"
+      "evidence": "PR #16 + PR #17; DocumentInsightsCodec, PairedPatientDocumentsSection.documentInsightsSection e PairedPatientsWorkspaceModel.documentInsights; PR #15; Evidence Stack web E2E 2/2 su base 9ee798887: popolato, curation, empty, loading ed errore conservativo. La lettura nativa è source-present; delete/curation e prova UI/interop restano host/pending"
     },
     {
       "area": "documenti",
@@ -247,11 +247,11 @@
       "area": "cockpit",
       "feature": "Foglio sinottico / Identity Lens / Review Queue (viste sintetiche cockpit)",
       "web": "synoptic sheet, identity lens, review queue summary, clinical river timeline (patient-synoptic-sheet.tsx; patient-identity-lens.tsx; clinical-river-timeline.tsx)",
-      "native": "partial: segnali clinici calcolati su liste piene fino al limite boundary (100, costante condivisa) con resa onesta N+ al cap (ClinicalSignalCount). Residuo: review queue e aggregati server-side (W2)",
-      "boundary": "partial: dati grezzi via boundary, ma nessun aggregate server-side dedicato",
+      "native": "partial: review overview read-only in PairedPatientDetailSection.patientReviewOverview con PatientReviewQueueProjection.project; i conteggi persistiti usano N+ al limite di lettura, mentre idle/loading/failed/unavailable mantengono uno stato di lettura onesto senza zero inventati. Da rivedere riunisce la qualità documentale non-green, gli spunti già proiettati e gli stati espliciti di revisione/fallimento degli allegati caricati per il paziente corrente. Apre Documenti senza nuovi writer; gli spunti mantengono il limite dichiarato di quattro. La verifica UI della nuova sintesi resta aperta; gli stati host-only AI/Smart Import/currentness non sono inclusi.",
+      "boundary": "Lettura dei contratti paziente e allegati esistenti; nessun aggregate server-side aggiunto. Le classi C/D di ADR 0076 restano host/web.",
       "gap": "partial",
       "wave": "W1-mobile-core",
-      "evidence": "web-scheda.cockpit; web-scheda.timeline; native-ui.pazienti(segnali clinici) | wave1 slice6 commit 984f16474"
+      "evidence": "Segnali clinici: wave1 slice6 984f16474. Da rivedere: candidato 13da005e52b2769bc27de3b3afec913b87d746ca integrato in 8db0bd190; 10 Core test e build generiche macOS/iOS Xcode 27 PASS restano evidenza storica source-pinned. PatientReviewQueueProjection e PatientReviewDocumentReadState sono source-present; nessuna prova UI o del freeze finale combinato."
     },
     {
       "area": "scheda",
@@ -297,21 +297,21 @@
       "area": "diagnosi/icd",
       "feature": "Ricerca ICD in-app per codifica diagnosi",
       "web": "ICDAutocomplete nel patient-form/edit (systems ICD-9/10/11), /api/v1/terminology + /api/icd/proxy (components/patient-form.tsx)",
-      "native": "full-parity: ricerca ICD in-app (ICDCatalog, A14 in-app table) nel form edit diagnosi (PairedPatientsWorkspaceView.swift:627-753)",
-      "boundary": "n-a: catalogo ICD in-app on-device, non richiede boundary; terminology non esposta ma non necessaria",
+      "native": "full-parity nel perimetro dichiarato: ricerca ICD in-app tramite ICDCatalog/A14 nel form edit diagnosi; il catalogo è ICD-10 curato e il sorgente lo dichiara un subset, non un catalogo WHO ICD-11 completo né un'equivalenza full-catalog (PairedPatientDetailSection.swift)",
+      "boundary": "n-a: catalogo ICD-10 curato in-app on-device; non è un boundary WHO ICD-11 full-catalog",
       "gap": "full-parity",
       "wave": "W1-mobile-core",
-      "evidence": "native-core.ICDCatalog; native-ui.pazienti(update diagnosi); api-boundary.terminology"
+      "evidence": "native-core.ICDCatalog.swift (commento esplicito: ICD-10 curato, non full ICD-11); native-ui PairedPatientDetailSection (ICDCatalog.search); api-boundary.terminology. La classificazione di riga resta invariata e non promuove equivalenza WHO ICD-11"
     },
     {
       "area": "terminologia",
       "feature": "Ricerca terminologica generale (ICD/systems oltre in-app)",
       "web": "/api/v1/terminology/search/resolve/systems + /api/icd/proxy verso ICD-11 API",
-      "native": "full: autocomplete LOINC/UCUM nel form osservazioni via boundary terminology con fallback manuale; copre e supera il consumo web reale (libreria statica in-memory, nessuna chiamata HTTP dalla web UI)",
-      "boundary": "exposed: GET /api/v1/network/terminology/search|resolve|systems con capability network.catalogs.readonly",
+      "native": "full nel perimetro consumato: autocomplete LOINC/UCUM via terminology paired con fallback manuale; RepertoriWorkspaceView richiede system=icd10 ma il server non serve quel catalogo, quindi la ricerca ICD-10 effettiva resta l'ICDCatalog curato locale della scheda paziente; nessuna parità con un catalogo WHO ICD-11 completo",
+      "boundary": "exposed: GET /api/v1/network/terminology/search|resolve|systems con capability network.catalogs.readonly; searchTerminologyCatalog serve ATC/LOINC/UCUM, restituisce [] per icd10 e resolve rifiuta sistemi non supportati: la richiesta client system=icd10 non equivale a lookup servito",
       "gap": "full-parity",
       "wave": "W2-boundary",
-      "evidence": "w2-final commits 984f16474; smoke prescriptions-write e discovery-read verdi; swift 110 Core + 257 AppleShared 0 failure; web usa lib/terminology statica (nessun consumer HTTP)"
+      "evidence": "w2-final commit 984f16474; lib/network-catalog-read.ts::searchTerminologyCatalog serve solo ATC/LOINC/UCUM e restituisce [] per icd10; HomeBasePatientsClient.searchTerminology e RepertoriWorkspaceView inviano system=icd10; ICDCatalog.swift resta il catalogo ICD-10 curato locale della scheda paziente. Smoke prescriptions-write/discovery-read e suite Swift sono prove storiche della baseline; nessuna equivalenza WHO ICD-11 full-catalog"
     },
     {
       "area": "ambulatori",
@@ -367,11 +367,11 @@
       "area": "shell-globale",
       "feature": "Cockpit shell / rail navigazione globale + toolbar + deep-link",
       "web": "Kree8 cockpit shell con 5 aree, toolbar ricerca/filtri, deep-link query string, sub-area tabs (components/kree8/kree8-clinical-cockpit.tsx)",
-      "native": "partial: NavigationSplitView (macOS/iPad) / TabView (iPhone) con sezioni cliniche Pazienti/Agenda/Diario/Analytics/Scale e gruppo Progetto separato. Su macOS WUL-566 isola stato e comandi per finestra; WUL-567 aggiunge un inspector paziente status-only su colori neutrali nativi adattivi. Carta resta grammatica documentale e non introduce crema, beige, avorio, parchment o skeuomorfismo. Solo la major esatta macOS 27 usa lo sheet compatibile; macOS 28+ torna all'inspector nativo. Residui: nessun deep-link/URL scheme equivalente alla query string web ?area=&paziente=; focus, resize e VoiceOver interattivi della nuova slice inspector restano partial.",
+      "native": "partial: NavigationSplitView (macOS/iPad) / TabView (iPhone) con sezioni cliniche Pazienti/Agenda/Diario/Analytics/Scale e gruppo Progetto separato. 0.8.6 row32: ClinicalNavigationURL.parse e ClinicalNavigationRouter gestiscono mediflow://navigate?area=&paziente=&section= con reader ordinario nella sessione sbloccata; bloccano bozze, operazioni, conflitti e intenti superati, senza comandi o credenziali nel link. Registrazione URL Mac/iOS e dettaglio compatto collegati. Residui: apertura OS, focus, resize, VoiceOver e app-freeze proof della slice restano da attestare; i test con trasporto sostituito non provano pairing reale.",
       "boundary": "n-a: chrome UI locale. Il manifest Mini PR #184 a 3fd988bafe71a058fdd7d3c25ea569793dcba903 mantiene sourceRow 32 a manual_only, miniCommands [], reason NOT_IN_MINI_PILOT: nessun comando Mini o claim di parity.",
       "gap": "partial",
       "wave": "W3-macos-clinical-shell",
-      "evidence": "web-global.shell query string in components/kree8/kree8-clinical-cockpit.tsx:204-219; native-ui.navigazione; W3 S5 f01346656 AppleFoundationViews.swift; WUL-566 520f8b9f15a3b7f9f198c0e096aadf9cf764a6e7; WUL-567 556f06d3fa6a950bb8a6423dcdb00ef000a4f576; manifest Mini PR #184 3fd988bafe71a058fdd7d3c25ea569793dcba903 sourceRow 32"
+      "evidence": "web-global.shell query string in components/kree8/kree8-clinical-cockpit.tsx:204-219; native-ui.navigazione; ClinicalNavigationURL.swift, ClinicalNavigationRouter.swift, MacWorkspaceRootView.swift; W3 S5 f01346656; WUL-566 520f8b9f15a3b7f9f198c0e096aadf9cf764a6e7; WUL-567 556f06d3fa6a950bb8a6423dcdb00ef000a4f576. Source/router presenti; prova OS/focus/VoiceOver/app-freeze UI resta pending. Manifest Mini PR #184 mantiene sourceRow 32 manual_only"
     },
     {
       "area": "turno",
@@ -397,31 +397,31 @@
       "area": "repertori",
       "feature": "Cruscotto repertori clinici (AIFA/esenzioni/ICD freschezza)",
       "web": "card freschezza, conteggi drugs/exemptions, stato ICD locale, link import/diagnostica (components/kree8/areas/repertori-area.tsx)",
-      "native": "missing: nessun cruscotto repertori (solo ICD in-app usato silenziosamente)",
-      "boundary": "missing: drugs/exemptions non esposti al paired; catalogs.sync planned",
+      "native": "host-only per import, refresh e stato del repertorio, ma lookup network presente: RepertoriWorkspaceView usa searchDrugs/searchExemptions/searchTerminology dal paired; non è presente un cruscotto host-status completo nel client",
+      "boundary": "exposed per lookup: HomeBasePatientsClient e /api/v1/network/drugs|exemptions|terminology servono ricerche con capability network.catalogs.readonly; import, refresh e status restano host-only",
       "gap": "host-only",
       "wave": "W4-settings",
-      "evidence": "web-global.repertori; api-boundary.drugs/exemptions; web-settings.repertori"
+      "evidence": "web-global.repertori; RepertoriWorkspaceView.swift e HomeBasePatientsClient.searchDrugs/searchExemptions/searchTerminology; api-boundary.drugs/exemptions/terminology. Import e stato/freschezza del repertorio restano host-only"
     },
     {
       "area": "pazienti-nuovo",
       "feature": "Wizard nuova scheda da documento (PdfImporter + review + form)",
       "web": "3 sezioni: PdfImporter OCR, review import, PatientForm, check duplicato CF (app/patients/new/page.tsx:99-350)",
-      "native": "partial: create paziente solo anagrafica base (local authority), nessun import documento/OCR/review",
-      "boundary": "partial: POST create paziente ora presente sul boundary con guardia ENC (era 405); document import assente (W5)",
+      "native": "partial: create paziente paired via HomeBasePatientsClient.createPatient e PairedPatientsWorkspaceModel, quindi non più solo local authority; il wizard OCR/import/review da documento resta host-only ed escluso",
+      "boundary": "partial: POST /api/v1/network/patients create paired presente con guardia ENC (era 405); wizard document import/OCR/review host-only ed escluso (W5)",
       "gap": "partial",
       "wave": "W2-boundary",
-      "evidence": "web-global.pazienti-nuovo; wave2b commit 984f16474; residuo import documento -> W5"
+      "evidence": "web-global.pazienti-nuovo; HomeBasePatientsClient.createPatient e PairedPatientsWorkspaceModel.createPatient; wave2b commit 984f16474. La sorgente create è presente; residuo wizard OCR/import/review host-only -> W5"
     },
     {
       "area": "auth",
       "feature": "Pairing + login operatore + PIN (deriva master key)",
       "web": "login/logout/check/setup + change-pin lato web session locale (app/api/auth/*)",
       "native": "full-parity(paired model): card pairing HTTPS+fingerprint+Bonjour+client ID/token, login operatore, PIN deriva KEK RAM-only, dissocia (PairedPatientsWorkspaceView.swift:201-306)",
-      "boundary": "exposed(modello paired): pairing intent/confirm + token headers + sessionCookie; NON usa /api/auth/* (lib/network-contract; network-paired-client-auth)",
+      "boundary": "exposed(modello paired): pairing intent/confirm + token headers + sessionCookie; login/logout nativi reali su POST /api/auth/native/login e POST /api/auth/native/logout, distinti dalle route web (lib/network-contract; network-paired-client-auth)",
       "gap": "full-parity",
       "wave": "W4-settings",
-      "evidence": "native-ui.auth; api-boundary.auth; api-boundary.boundary(pairing)"
+      "evidence": "native-ui.auth; app/api/auth/native/login/route.ts; app/api/auth/native/logout/route.ts; api-boundary.auth e api-boundary.boundary(pairing). Route native presenti nella sorgente; prova UI/interop resta separata"
     },
     {
       "area": "accesso",
@@ -437,11 +437,11 @@
       "area": "accesso",
       "feature": "Blocco sessione immediato / stato sessione",
       "web": "mostra operatore/ambulatorio, 'Blocca sessione adesso' lock() (app/settings/accesso/page.tsx:148-179)",
-      "native": "full-parity: bottone Blocca sessione adesso, logout e azzeramento locale di cookie e master key",
-      "boundary": "n-a: gestione sessione locale al client",
+      "native": "full-parity: bottone Blocca sessione adesso; clearOperatorSessionPresentation azzera localmente cookie, master key e presentation prima del primo await; il receipt/ack del logout remoto è valutato dopo e non può riaprire la sessione locale",
+      "boundary": "n-a per il clear locale; receipt remoto distinto via HomeBasePatientsClient.logout e /api/auth/native/logout",
       "gap": "full-parity",
       "wave": "W4-settings",
-      "evidence": "commit bf4f64dfc (logout+lockSessionNow) + cd8c05c42 (UI); Core e AppleShared Swift verdi nella wave"
+      "evidence": "commit bf4f64dfc (logout+lockSessionNow) + cd8c05c42 (UI); PairedPatientsWorkspaceModel.lockSessionNow/clearOperatorSessionPresentation separano clear locale e remoteLogoutConfirmed. Le prove Swift restano evidenza della baseline; nessuna nuova prova UI richiesta in questa lane"
     },
     {
       "area": "profilo",
@@ -497,11 +497,11 @@
       "area": "cache-offline",
       "feature": "Cache pazienti cifrata offline (consultazione degradata)",
       "web": "n-a (web è online contro DB locale)",
-      "native": "partial: iPhone/iPad mostrano loading/error/online/cache/offline/sessione scaduta con azione accessibile e snapshot cifrato AES-GCM lista pazienti (Keychain, TTL 24h, scoping server+ambulatorio); restore offline-degraded in sola lettura. Lo stato visuale stale e coperto da preview/test sintetici, ma il runtime scarta ancora lo snapshot oltre TTL perche il contratto non espone metadata separati. SOLO lista, no dettaglio/sotto-risorse, NO write queue (MobilePairedStatusView.swift; HomeBasePatientCacheStore.swift)",
+      "native": "partial: candidato WUL-676 0.8.6 con lista AES-GCM/Keychain, metadata live di acquisizione/scadenza/motivo e TTL massimo 24h. Alla scadenza restano solo metadata non identificativi. Provenienza vincolata a sessione operatore sbloccata, pairing, scope e pin TLS; fallback solo per rete indisponibile/timeout. Store e modello coprono l’ultimo profilo manuale read-only entro TTL; CachedPatientProfileView e montata nelle destinazioni compatta e affiancata, separata dalla cartella modificabile. Sotto-risorse, AI/artifact, export e write queue esclusi per contratto (ADR 0048).",
       "boundary": "n-a: derivata dal boundary, mai autorevole (vincolo docs-plan: no seconda source of truth)",
       "gap": "partial",
       "wave": "W1-mobile-core",
-      "evidence": "WUL-556 candidate: MobilePairedStatusPresentationTests e XCUITest iPhone/iPad con fixture sintetiche; WUL-403 resta aperta per metadata stale live; nessuna offline write queue"
+      "evidence": "WUL-676 candidato locale: HomeBasePatientCacheStore, CachedPatientProfileView, restoreCachedPatientList/restoreCachedPatientProfile e test di cache/presentazione già presenti; lista e ultimo profilo sono encrypted, TTL massimo 24h e renderer read-only. WUL-403 resta aperta per workflow offline ordinario e verifica UI/device del candidato integrato."
     },
     {
       "area": "settings-host",
@@ -746,7 +746,7 @@
       "wul556Rows": [
         {"sourceRow": 1, "webCapabilityId": "web-01-anagrafica-paziente-lista-ricerca-view-create-update", "miniCommands": ["patient search", "patient show"], "miniDisposition": "available", "reason": null, "appleGap": "partial", "interpretation": "Mini covers search/show only; broader Apple row residues remain."},
         {"sourceRow": 39, "webCapabilityId": "web-39-blocco-sessione-immediato-stato-sessione", "miniCommands": ["whoami"], "miniDisposition": "available", "reason": null, "appleGap": "full-parity", "interpretation": "Session identity is observable; pairing and local tokens are not agentic grants."},
-        {"sourceRow": 45, "webCapabilityId": "web-45-cache-pazienti-cifrata-offline-consultazione-degradata", "miniCommands": [], "miniDisposition": "manual_only", "reason": "NOT_IN_MINI_PILOT", "appleGap": "partial", "interpretation": "Encrypted read-only list exists; live stale metadata, offline detail and write queue remain absent."},
+        {"sourceRow": 45, "webCapabilityId": "web-45-cache-pazienti-cifrata-offline-consultazione-degradata", "miniCommands": [], "miniDisposition": "manual_only", "reason": "NOT_IN_MINI_PILOT", "appleGap": "partial", "interpretation": "Bounded WUL-676 candidate exposes live freshness metadata and encrypted read-only list/profile storage. Profile renderer is mounted in both destinations; UI/device verification remains pending. Offline write queue and sub-resources are intentionally excluded by ADR 0048, not parity defects."},
         {"sourceRow": 63, "webCapabilityId": "web-63-get-api-v1-network-capabilities-api-v1-network-identity-api-v1-n", "miniCommands": ["capabilities"], "miniDisposition": "available", "reason": null, "appleGap": "full-parity", "interpretation": "Capability discovery does not authorize clinical operations."}
       ],
       "excludedAvailableRow": {"sourceRow": 11, "miniCommands": ["open-loops"], "reason": "Outside WUL-556 slice."},
@@ -780,7 +780,7 @@
       "webScreenReader": "Current bounded evidence: PASS_BOUNDED on runtime 29b2c94b6a044b1639137403a2228ff172ea3d0f, tree 5706ade800d6a8caf2ab875882f61fe0881b3dd5. Chrome production was foreground, VoiceOver was active and native macOS keyboard input reached the declared focus targets with synthetic data. This does not test the native macOS app or iPhone/iPad VoiceOver; the documenting successor is docs-only.",
       "macOS": "Historical baseline: clipping code integrated; built Xcode 27 bundle PASS at 1100, 1300 and 1600 points; click-map, focus, arrow input and real VoiceOver active before and after",
       "axProbe": "corrected to select native List rows, bind patient-specific detail content and avoid terminating external MediFlow sessions; typecheck and 6/6 tests PASS",
-      "offline": "WUL-556 candidate makes loading/error/online/cache/offline/session-expired visible on iPhone/iPad and defines the stale presentation contract. WUL-403 remains open for live TTL metadata and stale-state wiring."
+      "offline": "WUL-676 candidate wires live TTL/stale metadata and session-bound encrypted cache. The read-only profile renderer is mounted; WUL-403 remains open for UI/device verification. Offline writes and sub-resource caching remain excluded."
     },
     "controlToActionReference": {
       "canonicalDocument": "docs/parity-matrix.md#control-to-action-map",
@@ -793,7 +793,7 @@
     },
     "verdict": "PARTIAL / HOLD_PROMOTION"
   },
-  "updated": "2026-09-04: closed only the bounded web screen-reader gate on runtime 29b2c94b6a04/tree 5706ade800d6; macOS exact-SHA remains pending and the iPhone/iPad VoiceOver limitation remains accepted, not PASS. Previous: 2026-09-03 corrected the stale capability narrative to 66/30/13/23 and recorded that exact-SHA Xcode proof is release-boundary evidence outside this static manifest. Previous: 2026-08-22 consumed the byte-identical Mini parity manifest from PR #184 head 3fd988b and PR #190 head 1e35733 without changing Apple gap classifications.",
+  "updated": "2026-09-06: riconciliazione testuale delle sorgenti integrate 4a94a6bde/d20b8d25a e delle superfici native collegate; DOB, archivio, allegati, editor, review, router, cataloghi, auth, lock e cache ora separano claim di sorgente da prova UI/interop pending. Gap, wave, status, array reconciliation e conteggi 66/30/13/23 invariati; nessuna delle 6 celle UI è promossa. Previous: 2026-09-06: WUL-676 local native-cache candidate records live TTL/stale metadata and bounded encrypted profile storage; row 45 remains partial with renderer mounted and UI/device validation pending. Previous: 2026-09-04: closed only the bounded web screen-reader gate on runtime 29b2c94b6a04/tree 5706ade800d6; macOS exact-SHA remains pending and the iPhone/iPad VoiceOver limitation remains accepted, not PASS. Previous: 2026-09-03 corrected the stale capability narrative to 66/30/13/23 and recorded that exact-SHA Xcode proof is release-boundary evidence outside this static manifest. Previous: 2026-08-22 consumed the byte-identical Mini parity manifest from PR #184 head 3fd988b and PR #190 head 1e35733 without changing Apple gap classifications.",
   "version": 2,
   "summary": {
     "total": 66,

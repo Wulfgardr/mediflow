@@ -10,6 +10,40 @@ const dbChangeBus = createDbChangeBus();
 /* @Codex */
 export const notifyDbChange = dbChangeBus.notify;
 
+/* @Codex: Full document navigation does not unmount React before pending
+   fetches reject. Retire that document's reads at pagehide, including results,
+   errors and loading updates. A bfcache restoration needs a new query; the
+   previous generation must never become current again. beforeunload can be
+   cancelled and visibilitychange also means switching tabs, so neither retires
+   reads belonging to an otherwise active document. */
+function useLiveQueryDocument() {
+    const readDocument = useRef({ active: true, generation: 0 });
+    const [documentRevision, setDocumentRevision] = useState(0);
+
+    useEffect(() => {
+        const lifecycle = readDocument.current;
+        lifecycle.active = true;
+        const retire = () => {
+            lifecycle.active = false;
+            lifecycle.generation += 1;
+        };
+        const restore = () => {
+            if (lifecycle.active) return;
+            lifecycle.active = true;
+            setDocumentRevision(previous => previous + 1);
+        };
+        window.addEventListener('pagehide', retire);
+        window.addEventListener('pageshow', restore);
+        return () => {
+            retire();
+            window.removeEventListener('pagehide', retire);
+            window.removeEventListener('pageshow', restore);
+        };
+    }, []);
+
+    return { readDocument, documentRevision };
+}
+
 /* @Codex */
 export function useLiveQuery<T, TDefault = undefined>(
     querier: () => Promise<T> | T,
@@ -20,6 +54,7 @@ export function useLiveQuery<T, TDefault = undefined>(
     const querierRef = useRef(querier);
     const [result, setResult] = useState<T | TDefault | undefined>(defaultResult);
     const [revision, setRevision] = useState(0);
+    const { readDocument, documentRevision } = useLiveQueryDocument();
     /* @Codex */
     const tablesRef = useRef(tables);
 
@@ -36,14 +71,18 @@ export function useLiveQuery<T, TDefault = undefined>(
     }, () => tablesRef.current), []);
 
     useEffect(() => {
+        const lifecycle = readDocument.current;
+        if (!lifecycle.active) return;
+        const generation = lifecycle.generation;
         let cancelled = false;
+        const isCurrent = () => !cancelled && lifecycle.active && lifecycle.generation === generation;
 
         const runQuery = async () => {
             try {
                 const value = await querierRef.current();
-                if (!cancelled) setResult(value);
+                if (isCurrent()) setResult(value);
             } catch (error) {
-                console.error('useLiveQuery failed', error);
+                if (isCurrent()) console.error('useLiveQuery failed', error);
             }
         };
 
@@ -53,7 +92,7 @@ export function useLiveQuery<T, TDefault = undefined>(
             cancelled = true;
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [revision, ...(deps ?? [])]);
+    }, [revision, documentRevision, ...(deps ?? [])]);
 
     return result;
 }
@@ -82,6 +121,7 @@ export function useLiveQueryState<T, TDefault = undefined>(
     const [error, setError] = useState<unknown>(null);
     const [loading, setLoading] = useState(true);
     const [revision, setRevision] = useState(0);
+    const { readDocument, documentRevision } = useLiveQueryDocument();
     const refresh = useCallback(() => setRevision((previous) => previous + 1), []);
     /* @Codex */
     const tablesRef = useRef(tables);
@@ -99,21 +139,27 @@ export function useLiveQueryState<T, TDefault = undefined>(
     }, () => tablesRef.current), []);
 
     useEffect(() => {
+        const lifecycle = readDocument.current;
+        if (!lifecycle.active) return;
+        const generation = lifecycle.generation;
         let cancelled = false;
+        const isCurrent = () => !cancelled && lifecycle.active && lifecycle.generation === generation;
         setLoading(true);
 
         const runQuery = async () => {
             try {
                 const value = await querierRef.current();
-                if (!cancelled) {
+                if (isCurrent()) {
                     setData(value);
                     setError(null);
                 }
             } catch (err) {
-                if (!cancelled) setError(err);
-                console.error('useLiveQueryState failed', err);
+                if (isCurrent()) {
+                    setError(err);
+                    console.error('useLiveQueryState failed', err);
+                }
             } finally {
-                if (!cancelled) setLoading(false);
+                if (isCurrent()) setLoading(false);
             }
         };
 
@@ -123,7 +169,7 @@ export function useLiveQueryState<T, TDefault = undefined>(
             cancelled = true;
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [revision, ...(deps ?? [])]);
+    }, [revision, documentRevision, ...(deps ?? [])]);
 
     return { data, error, loading, refresh };
 }

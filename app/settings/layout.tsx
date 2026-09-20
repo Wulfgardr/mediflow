@@ -3,12 +3,19 @@
 // WUL-297 settings shell: persistent sidebar + sub-routes.
 
 import type { ReactNode } from 'react';
+/* @Codex: an explicit local return, never browser-history navigation. */
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { ArrowLeft } from 'lucide-react';
+import styles from '@/components/settings/settings-lume.module.css';
 
 import { Kree8WorkspaceShell } from '@/components/kree8/kree8-workspace-shell';
 import { SettingsNavSidebar } from '@/components/settings/settings-nav-sidebar';
 import { SettingsSearchOverlay, useSettingsSearch } from '@/components/settings/settings-search';
 
 export default function SettingsLayout({ children }: { children: ReactNode }) {
+    const pathname = usePathname();
+    const isSubroute = pathname?.startsWith('/settings/') && pathname !== '/settings/';
     const { isSearchOpen, openSearch, closeSearch } = useSettingsSearch();
 
     return (
@@ -21,11 +28,18 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
             statusLabel="I dati clinici e i servizi restano locali."
         >
             {/* <lg: la sidebar collassa in una barra compatta (vedi SettingsNavSidebar). */}
-            <div className="grid gap-4 lg:grid-cols-[230px_minmax(0,1fr)] lg:items-start lg:gap-6">
+            {/* @Codex: stable scope for the optional full-runtime design comparison. */}
+            <div data-runtime-settings className="grid gap-4 lg:grid-cols-[230px_minmax(0,1fr)] lg:items-start lg:gap-6">
                 <aside className="lg:sticky lg:top-2">
                     <SettingsNavSidebar onSearchRequest={openSearch} />
                 </aside>
                 <div className="min-w-0 space-y-8" data-testid="settings-subroute-content">
+                    {isSubroute ? (
+                        <Link href="/settings" className={styles.returnLink}>
+                            <ArrowLeft size={16} aria-hidden="true" />
+                            Torna alle impostazioni
+                        </Link>
+                    ) : null}
                     {children}
                 </div>
             </div>

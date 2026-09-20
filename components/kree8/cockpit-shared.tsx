@@ -669,6 +669,7 @@ const PILL_VARIANT_CLASS: Record<SemanticSignal, string> = {
   plum: styles.pillPlum,
 };
 
+/* @Codex: shared status geometry also applies to cockpit labels. */
 function PillBadge({
   variant,
   children,
@@ -681,6 +682,7 @@ function PillBadge({
   return (
     <span
       key={commitKey}
+      data-lume-status=""
       className={classNames(
         styles.pill,
         PILL_VARIANT_CLASS[resolveSemanticSignal(variant)],
@@ -701,6 +703,7 @@ function DiagnosisPill({ diagnosis }: { diagnosis: string }) {
   return (
     <span
       className={classNames(styles.pill, styles.diagnosisPill)}
+      data-lume-status=""
       title={diagnosis}
     >
       {code ? <span className={styles.diagnosisCode}>{code}</span> : null}

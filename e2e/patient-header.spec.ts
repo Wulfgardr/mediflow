@@ -1,6 +1,6 @@
 /* @Codex */
 import { expect, test, type Page } from '@playwright/test';
-import { bootstrapUnlockedSession } from './utils';
+import { bootstrapUnlockedSession, openPatientSection } from './utils';
 
 async function createPatient(
   page: Page,
@@ -23,8 +23,8 @@ async function createPatient(
 }
 
 // WUL-560: the canonical patient view is /patients/:id/modules. Its Scheda semantics
-// expose the lead diagnosis separately in the Quadro region and the secondary coding
-// in the Identita region. Keep every code, description and system assertion scoped to
+// expose the lead diagnosis in Riepilogo clinico and the secondary coding in
+// Clinica. Keep every code, description and system assertion scoped to
 // the current region so a duplicated or stale aggregate string cannot satisfy the test.
 test('Scheda paziente renders coded diagnoses and an explicit no-diagnosis state', async ({ page }) => {
   const pin = process.env.E2E_PIN || '1234';
@@ -68,51 +68,66 @@ test('Scheda paziente renders coded diagnoses and an explicit no-diagnosis state
   });
 
   await page.goto(`/patients/${patientWithDiagnosisId}/modules`);
-  await expect(page.getByText('Scheda clinica', { exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: `Header${suffix} Icd${suffix}`, exact: true })).toBeVisible();
+  const summaryLink = page.getByRole('navigation', { name: 'Sezioni della vista', exact: true })
+    .getByRole('link', { name: 'Riepilogo', exact: true });
+  await summaryLink.click();
+  await expect(summaryLink).toHaveAttribute('aria-current', 'location');
 
   const quadro = page.getByRole('region', {
-    name: 'Baseline e dati verificabili',
+    name: 'Riepilogo clinico',
     exact: true,
   });
   await expect(quadro).toHaveCount(1);
-  await expect(quadro.getByText('Problema guida', { exact: true })).toBeVisible();
-  await expect(quadro.getByText('EF00', { exact: true })).toHaveCount(1);
+  await expect(quadro).toBeVisible();
+  await expect(quadro.getByRole('heading', { name: 'Quadro clinico', exact: true })).toBeVisible();
+  await expect(quadro.getByText('EF00 · ICD-11 · altre 1 diagnosi', { exact: true })).toHaveCount(1);
   await expect(quadro.getByText(diagnosisDescription, { exact: true })).toHaveCount(1);
-  await expect(quadro.getByText('ICD-11', { exact: true })).toHaveCount(1);
 
-  const identitySection = page.locator('#identita');
-  const leadDiagnosisCard = identitySection.locator('.patient-diagnosis-card');
-  await expect(identitySection).toHaveCount(1);
-  await expect(identitySection.getByRole('heading', { name: 'Quadro clinico', exact: true })).toHaveCount(1);
-  await expect(leadDiagnosisCard).toHaveCount(1);
-  await expect(leadDiagnosisCard.getByText('EF00', { exact: true })).toHaveCount(1);
-  await expect(leadDiagnosisCard.getByText(diagnosisDescription, { exact: true })).toHaveCount(1);
-  await expect(leadDiagnosisCard.getByText('ICD-11', { exact: true })).toHaveCount(1);
-
-  /* @Codex: la lista secondaria espone ciascun codice come item autonomo e
-     conserva codice, descrizione e sistema nel nome accessibile. */
-  const secondaryDiagnosisList = page.getByRole('list', {
-    name: 'Diagnosi codificate secondarie',
+  await openPatientSection(page, 'clinica');
+  const clinicalSection = page.locator('#clinica');
+  const diagnosesList = clinicalSection.getByRole('list', {
+    name: 'Diagnosi registrate',
     exact: true,
   });
-  const secondaryDiagnosisItem = secondaryDiagnosisList
+  const leadDiagnosis = diagnosesList.getByRole('listitem').filter({
+    hasText: diagnosisDescription,
+  });
+  await expect(clinicalSection).toHaveCount(1);
+  await expect(diagnosesList).toHaveCount(1);
+  await expect(leadDiagnosis).toHaveCount(1);
+  await expect(leadDiagnosis).toContainText(diagnosisDescription);
+  await expect(leadDiagnosis).toContainText('EF00 · ICD-11');
+
+  /* @Codex: la lista clinica espone ciascun codice come item autonomo e
+     conserva codice, descrizione e sistema nel suo contenuto. */
+  const secondaryDiagnosisItem = diagnosesList
     .getByRole('listitem')
     .filter({ hasText: secondaryDiagnosisDescription });
-  await expect(secondaryDiagnosisList).toHaveCount(1);
   await expect(secondaryDiagnosisItem).toHaveCount(1);
+  await expect(secondaryDiagnosisItem).toContainText(secondaryDiagnosisDescription);
+  await expect(secondaryDiagnosisItem).toContainText('BA00 · ICD-11');
   await expect(secondaryDiagnosisItem).not.toHaveAttribute('title');
   await expect(secondaryDiagnosisItem).toMatchAriaSnapshot(
-    `- listitem: BA00 ${secondaryDiagnosisDescription} ICD-11`
+    `- listitem:
+  - strong: ${secondaryDiagnosisDescription}
+  - text: BA00 · ICD-11`
   );
 
   await page.goto(`/patients/${patientWithoutDiagnosisId}/modules`);
+  await summaryLink.click();
+  await expect(summaryLink).toHaveAttribute('aria-current', 'location');
   const emptyQuadro = page.getByRole('region', {
-    name: 'Baseline e dati verificabili',
+    name: 'Riepilogo clinico',
     exact: true,
   });
   await expect(emptyQuadro).toHaveCount(1);
-  await expect(emptyQuadro.getByText('Problema guida', { exact: true })).toBeVisible();
-  await expect(emptyQuadro.getByText('Nessuna diagnosi codificata in scheda.', { exact: true })).toHaveCount(1);
-  await expect(emptyQuadro.getByText('EF00', { exact: true })).toHaveCount(0);
+  await expect(emptyQuadro).toBeVisible();
+  await expect(emptyQuadro.getByRole('heading', { name: 'Quadro clinico', exact: true })).toBeVisible();
+  await expect(emptyQuadro).toContainText('Diagnosi non registrata.');
+  await expect(emptyQuadro.getByRole('link', { name: 'Consulta le diagnosi', exact: true }))
+    .toHaveAttribute('href', '#clinica');
+  await expect(emptyQuadro).not.toContainText('EF00');
+  await expect(emptyQuadro).not.toContainText(diagnosisDescription);
+  await expect(emptyQuadro).not.toContainText('ICD-11');
 });

@@ -1,0 +1,2479 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "MediFlow native Mac ordinary OpenAI supplemental contract",
+    "version": "0.8.6-native-ordinary.2",
+    "description": "Supplement to the canonical v1 spec, not a reconstruction of files absent from the supplied snapshot. ADR0134 / ADR0076 Mac addendum. Source/logic candidate, not OS qualification, release or clinical apply."
+  },
+  "paths": {
+    "/api/v1/network/ai/chatgpt/ordinary/prepare": {
+      "post": {
+        "operationId": "nativeOrdinaryPrepare",
+        "summary": "Selector-only source capture; return a pre-attempt plan only when client decryption is required",
+        "security": [
+          {
+            "NativeOrdinarySession": [],
+            "NativeOrdinaryClientId": [],
+            "NativeOrdinaryClientToken": []
+          }
+        ],
+        "x-authority-ceiling": "scoped_local_candidate",
+        "x-native-only": "macos",
+        "responses": {
+          "202": {
+            "description": "No-store response; no clinical apply authority. Cleanup false blocks reuse.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Referrer-Policy": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-referrer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/NativeOrdinarySourceProjection"
+                    },
+                    {
+                      "$ref": "#/components/schemas/NativeOrdinaryState"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid body/path/method",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Native session or current inference authority absent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale context, busy operation or revoked resource",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Unavailable/closed runtime, redaction, governance or cleanup; no fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NativeOrdinaryPreparation"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/network/ai/chatgpt/ordinary/status": {
+      "get": {
+        "operationId": "nativeOrdinaryStatus",
+        "summary": "Read phase only; never return a proposal",
+        "security": [
+          {
+            "NativeOrdinarySession": [],
+            "NativeOrdinaryClientId": [],
+            "NativeOrdinaryClientToken": []
+          }
+        ],
+        "x-authority-ceiling": "scoped_local_candidate",
+        "x-native-only": "macos",
+        "responses": {
+          "200": {
+            "description": "No-store response; no clinical apply authority. Cleanup false blocks reuse.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Referrer-Policy": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-referrer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/NativeOrdinaryState"
+                    },
+                    {
+                      "$ref": "#/components/schemas/NativeOrdinaryClosed"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid body/path/method",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Native session or current inference authority absent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale context, busy operation or revoked resource",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Unavailable/closed runtime, redaction, governance or cleanup; no fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/network/ai/chatgpt/ordinary/consent": {
+      "post": {
+        "operationId": "nativeOrdinaryConsent",
+        "summary": "Consent to exact frozen UTF-8 bytes",
+        "security": [
+          {
+            "NativeOrdinarySession": [],
+            "NativeOrdinaryClientId": [],
+            "NativeOrdinaryClientToken": []
+          }
+        ],
+        "x-authority-ceiling": "scoped_local_candidate",
+        "x-native-only": "macos",
+        "responses": {
+          "200": {
+            "description": "No-store response; no clinical apply authority. Cleanup false blocks reuse.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Referrer-Policy": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-referrer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryState"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid body/path/method",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Native session or current inference authority absent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale context, busy operation or revoked resource",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Unavailable/closed runtime, redaction, governance or cleanup; no fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NativeOrdinaryConsent"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/network/ai/chatgpt/ordinary/login/start": {
+      "post": {
+        "operationId": "nativeOrdinaryLoginStart",
+        "summary": "Start dedicated execution login",
+        "security": [
+          {
+            "NativeOrdinarySession": [],
+            "NativeOrdinaryClientId": [],
+            "NativeOrdinaryClientToken": []
+          }
+        ],
+        "x-authority-ceiling": "scoped_local_candidate",
+        "x-native-only": "macos",
+        "responses": {
+          "200": {
+            "description": "No-store response; no clinical apply authority. Cleanup false blocks reuse.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Referrer-Policy": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-referrer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryState"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid body/path/method",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Native session or current inference authority absent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale context, busy operation or revoked resource",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Unavailable/closed runtime, redaction, governance or cleanup; no fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NativeOrdinaryCommand"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/network/ai/chatgpt/ordinary/login/complete": {
+      "post": {
+        "operationId": "nativeOrdinaryLoginComplete",
+        "summary": "Verify dedicated execution login",
+        "security": [
+          {
+            "NativeOrdinarySession": [],
+            "NativeOrdinaryClientId": [],
+            "NativeOrdinaryClientToken": []
+          }
+        ],
+        "x-authority-ceiling": "scoped_local_candidate",
+        "x-native-only": "macos",
+        "responses": {
+          "200": {
+            "description": "No-store response; no clinical apply authority. Cleanup false blocks reuse.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Referrer-Policy": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-referrer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryState"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid body/path/method",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Native session or current inference authority absent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale context, busy operation or revoked resource",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Unavailable/closed runtime, redaction, governance or cleanup; no fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NativeOrdinaryCommand"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/network/ai/chatgpt/ordinary/models": {
+      "post": {
+        "operationId": "nativeOrdinaryModels",
+        "summary": "Read the live execution catalog, not informational account models",
+        "security": [
+          {
+            "NativeOrdinarySession": [],
+            "NativeOrdinaryClientId": [],
+            "NativeOrdinaryClientToken": []
+          }
+        ],
+        "x-authority-ceiling": "scoped_local_candidate",
+        "x-native-only": "macos",
+        "responses": {
+          "200": {
+            "description": "No-store response; no clinical apply authority. Cleanup false blocks reuse.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Referrer-Policy": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-referrer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryState"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid body/path/method",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Native session or current inference authority absent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale context, busy operation or revoked resource",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Unavailable/closed runtime, redaction, governance or cleanup; no fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NativeOrdinaryCommand"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/network/ai/chatgpt/ordinary/generate": {
+      "post": {
+        "operationId": "nativeOrdinaryGenerate",
+        "summary": "Generate and publish through the original function owner after confirmed cleanup",
+        "security": [
+          {
+            "NativeOrdinarySession": [],
+            "NativeOrdinaryClientId": [],
+            "NativeOrdinaryClientToken": []
+          }
+        ],
+        "x-authority-ceiling": "scoped_local_candidate",
+        "x-native-only": "macos",
+        "responses": {
+          "200": {
+            "description": "No-store response; no clinical apply authority. Cleanup false blocks reuse.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Referrer-Policy": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-referrer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryCompleted"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid body/path/method",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Native session or current inference authority absent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale context, busy operation or revoked resource",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Unavailable/closed runtime, redaction, governance or cleanup; no fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NativeOrdinaryGenerate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/network/ai/chatgpt/ordinary/cancel": {
+      "post": {
+        "operationId": "nativeOrdinaryCancel",
+        "summary": "Revoke and verify cleanup; no implicit fallback",
+        "security": [
+          {
+            "NativeOrdinarySession": [],
+            "NativeOrdinaryClientId": [],
+            "NativeOrdinaryClientToken": []
+          }
+        ],
+        "x-authority-ceiling": "scoped_local_candidate",
+        "x-native-only": "macos",
+        "responses": {
+          "200": {
+            "description": "No-store response; no clinical apply authority. Cleanup false blocks reuse.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Referrer-Policy": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-referrer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryClosed"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid body/path/method",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Native session or current inference authority absent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale context, busy operation or revoked resource",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Unavailable/closed runtime, redaction, governance or cleanup; no fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NativeOrdinaryCommand"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/network/ai/chatgpt/ordinary/project": {
+      "post": {
+        "operationId": "nativeOrdinaryProject",
+        "summary": "Claim the authentic one-use grant before reading bounded client-decrypted content",
+        "security": [
+          {
+            "NativeOrdinarySession": [],
+            "NativeOrdinaryClientId": [],
+            "NativeOrdinaryClientToken": []
+          }
+        ],
+        "x-authority-ceiling": "scoped_local_candidate",
+        "x-native-only": "macos",
+        "responses": {
+          "202": {
+            "description": "No-store response; no clinical apply authority. Cleanup false blocks reuse.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Referrer-Policy": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-referrer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryState"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid body/path/method",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Native session or current inference authority absent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale context, busy operation or revoked resource",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Unavailable/closed runtime, redaction, governance or cleanup; no fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-MediFlow-Ordinary-Projection",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "description": "Opaque host-owned one-use address. Header, function, MIME and ids never create source authority."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NativeOrdinaryProjectionBody"
+              }
+            },
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary",
+                "description": "DS only: decoded selected attachment bytes, 1..26214400 bytes. No JSON, source paths or parser settings."
+              }
+            }
+          }
+        },
+        "x-maximum-json-bytes": 2097152,
+        "x-maximum-binary-bytes": 26214400,
+        "x-content-encoding": "forbidden",
+        "x-source-checkpoints": [
+          "before_body",
+          "after_minimization_or_AnyDoc",
+          "before_dispatch",
+          "before_publication"
+        ],
+        "description": "Native paired session only. JSON UTF-8, duplicate keys denied; exact content-type required. DS uses the already-issued native AnyDoc locator and existing binary parser/OCR pipeline. Processing bound 120s, original source lifetime at most 300s; lock/logout/selection changes revoke synchronously. No keys, PINs, server decrypt, writes or automatic consent."
+      },
+      "delete": {
+        "operationId": "nativeOrdinaryProjectionCancel",
+        "summary": "Revoke the exact retained grant and reconcile only its corresponding attempt",
+        "security": [
+          {
+            "NativeOrdinarySession": [],
+            "NativeOrdinaryClientId": [],
+            "NativeOrdinaryClientToken": []
+          }
+        ],
+        "x-authority-ceiling": "scoped_local_candidate",
+        "x-native-only": "macos",
+        "responses": {
+          "400": {
+            "description": "Invalid body/path/method",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Native session or current inference authority absent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale context, busy operation or revoked resource",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Unavailable/closed runtime, redaction, governance or cleanup; no fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryError"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "No-store response; no clinical apply authority. Cleanup false blocks reuse.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Referrer-Policy": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-referrer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeOrdinaryClosed"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-MediFlow-Ordinary-Projection",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "description": "Opaque host-owned one-use address. Header, function, MIME and ids never create source authority."
+          }
+        ],
+        "x-maximum-json-bytes": 2097152,
+        "x-maximum-binary-bytes": 26214400,
+        "x-content-encoding": "forbidden",
+        "x-source-checkpoints": [
+          "before_body",
+          "after_minimization_or_AnyDoc",
+          "before_dispatch",
+          "before_publication"
+        ],
+        "description": "Empty body. Idempotent absent grant; cannot cancel a different active attempt. Cleanup failure returns cleanupConfirmed=false and must block UI reuse. Revocation is performed even when the submitted empty-body contract is invalid."
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "NativeOrdinarySession": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "mediflow_session"
+      },
+      "NativeOrdinaryClientId": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-mediflow-paired-client-id"
+      },
+      "NativeOrdinaryClientToken": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-mediflow-paired-client-token"
+      }
+    },
+    "schemas": {
+      "NativeOrdinaryFunction": {
+        "type": "string",
+        "enum": [
+          "patient_insight",
+          "smart_import",
+          "document_synthesis",
+          "treatment_reasoning"
+        ]
+      },
+      "NativePatientInsightInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "selector"
+        ],
+        "properties": {
+          "selector": {
+            "type": "string",
+            "const": "current_patient_insight"
+          }
+        },
+        "description": "Selettore passivo. Le fonti sono acquisite e ricostruite esclusivamente dall’Application Service host; nessun testo o proiezione dal client."
+      },
+      "NativeSmartImportInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "selector"
+        ],
+        "properties": {
+          "selector": {
+            "type": "string",
+            "const": "current_smart_import"
+          }
+        },
+        "description": "Selettore passivo. Le fonti sono acquisite e ricostruite esclusivamente dall’Application Service host; nessun testo o proiezione dal client."
+      },
+      "NativeTreatmentReasoningInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "selector"
+        ],
+        "properties": {
+          "selector": {
+            "type": "string",
+            "const": "current_treatment_reasoning"
+          }
+        },
+        "description": "Selettore passivo. Le fonti sono acquisite e ricostruite esclusivamente dall’Application Service host; nessun testo o proiezione dal client."
+      },
+      "NativeDocumentSynthesisInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "attachmentId"
+        ],
+        "properties": {
+          "attachmentId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "^(?!\\s)(?![\\s\\S]*\\s$)[^\\u0000-\\u001f\\u007f]+$"
+          }
+        }
+      },
+      "NativeOrdinaryError": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "error",
+          "code"
+        ],
+        "properties": {
+          "error": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048
+          },
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        }
+      },
+      "NativeOrdinaryCommand": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "attemptId"
+        ],
+        "properties": {
+          "attemptId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        }
+      },
+      "NativeOrdinaryConsent": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "attemptId",
+          "expectedDisclosureRevision"
+        ],
+        "properties": {
+          "attemptId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "expectedDisclosureRevision": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        }
+      },
+      "NativeOrdinaryGenerate": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "attemptId",
+          "modelOptionId",
+          "expectedCatalogRevision"
+        ],
+        "properties": {
+          "attemptId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "modelOptionId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "expectedCatalogRevision": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        }
+      },
+      "NativeOrdinaryDisclosure": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schema",
+          "revision",
+          "operation",
+          "profileVersion",
+          "contextRevision",
+          "attemptRevision",
+          "qualificationRevision",
+          "sourceSha256",
+          "payloadSha256",
+          "payloadBytes",
+          "egress",
+          "proposalOnly",
+          "clinicalWrites"
+        ],
+        "properties": {
+          "schema": {
+            "type": "string",
+            "const": "mediflow.chatgpt-ordinary-disclosure.v1"
+          },
+          "revision": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operation": {
+            "$ref": "#/components/schemas/NativeOrdinaryFunction"
+          },
+          "profileVersion": {
+            "type": "string",
+            "const": "mediflow.ordinary-redacted-profile.v1"
+          },
+          "contextRevision": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "attemptRevision": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "qualificationRevision": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "sourceSha256": {
+            "type": "string",
+            "pattern": "^sha256_[0-9a-f]{64}$"
+          },
+          "payloadSha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "payloadBytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "egress": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": {
+              "enum": [
+                "auth.openai.com:443",
+                "chatgpt.com:443"
+              ]
+            }
+          },
+          "proposalOnly": {
+            "const": true
+          },
+          "clinicalWrites": {
+            "const": 0
+          }
+        }
+      },
+      "NativeOrdinaryCatalog": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "revision",
+          "choices"
+        ],
+        "properties": {
+          "revision": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "choices": {
+            "type": "array",
+            "maxItems": 512,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "optionId",
+                "model",
+                "effort"
+              ],
+              "properties": {
+                "optionId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "model": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                },
+                "effort": {
+                  "enum": [
+                    "none",
+                    "minimal",
+                    "low",
+                    "medium",
+                    "high",
+                    "xhigh",
+                    "max",
+                    "ultra"
+                  ]
+                }
+              }
+            },
+            "minItems": 1
+          }
+        }
+      },
+      "NativeOrdinaryChallenge": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "verificationUrl",
+          "userCode"
+        ],
+        "properties": {
+          "verificationUrl": {
+            "type": "string",
+            "format": "uri",
+            "pattern": "^https://(auth\\.openai\\.com|chatgpt\\.com)(:443)?/"
+          },
+          "userCode": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        }
+      },
+      "NativeOrdinaryCompleted": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schema",
+          "phase",
+          "attemptId",
+          "functionId",
+          "cleanupConfirmed",
+          "result"
+        ],
+        "properties": {
+          "schema": {
+            "type": "string",
+            "const": "mediflow.native-ordinary.v1"
+          },
+          "phase": {
+            "type": "string",
+            "const": "completed"
+          },
+          "attemptId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "functionId": {
+            "$ref": "#/components/schemas/NativeOrdinaryFunction"
+          },
+          "cleanupConfirmed": {
+            "const": true
+          },
+          "result": {
+            "type": "object",
+            "description": "Original function wire, unmodified: Patient Insight/Smart Import preview, Document Synthesis publication or Treatment Reasoning publication. Proposal-only; original parser, receipt and final owner commit remain mandatory.",
+            "additionalProperties": true
+          }
+        }
+      },
+      "NativeOrdinaryClosed": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schema",
+          "phase",
+          "cleanupConfirmed"
+        ],
+        "properties": {
+          "schema": {
+            "type": "string",
+            "const": "mediflow.chatgpt-ordinary-flow.v1"
+          },
+          "phase": {
+            "type": "string",
+            "const": "closed"
+          },
+          "cleanupConfirmed": {
+            "type": "boolean"
+          },
+          "attemptId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "functionId": {
+            "$ref": "#/components/schemas/NativeOrdinaryFunction"
+          }
+        }
+      },
+      "NativeOrdinaryPreparation": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "functionId",
+              "patientId",
+              "ambulatoryId",
+              "patientRevision",
+              "input"
+            ],
+            "properties": {
+              "functionId": {
+                "type": "string",
+                "const": "patient_insight"
+              },
+              "patientId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160,
+                "pattern": "^(?!\\s)(?![\\s\\S]*\\s$)[^\\u0000-\\u001f\\u007f]+$"
+              },
+              "ambulatoryId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160,
+                "pattern": "^(?!\\s)(?![\\s\\S]*\\s$)[^\\u0000-\\u001f\\u007f]+$"
+              },
+              "patientRevision": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "input": {
+                "$ref": "#/components/schemas/NativePatientInsightInput"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "functionId",
+              "patientId",
+              "ambulatoryId",
+              "patientRevision",
+              "input"
+            ],
+            "properties": {
+              "functionId": {
+                "type": "string",
+                "const": "smart_import"
+              },
+              "patientId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160,
+                "pattern": "^(?!\\s)(?![\\s\\S]*\\s$)[^\\u0000-\\u001f\\u007f]+$"
+              },
+              "ambulatoryId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160,
+                "pattern": "^(?!\\s)(?![\\s\\S]*\\s$)[^\\u0000-\\u001f\\u007f]+$"
+              },
+              "patientRevision": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "input": {
+                "$ref": "#/components/schemas/NativeSmartImportInput"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "functionId",
+              "patientId",
+              "ambulatoryId",
+              "patientRevision",
+              "input"
+            ],
+            "properties": {
+              "functionId": {
+                "type": "string",
+                "const": "document_synthesis"
+              },
+              "patientId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160,
+                "pattern": "^(?!\\s)(?![\\s\\S]*\\s$)[^\\u0000-\\u001f\\u007f]+$"
+              },
+              "ambulatoryId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160,
+                "pattern": "^(?!\\s)(?![\\s\\S]*\\s$)[^\\u0000-\\u001f\\u007f]+$"
+              },
+              "patientRevision": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "input": {
+                "$ref": "#/components/schemas/NativeDocumentSynthesisInput"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "functionId",
+              "patientId",
+              "ambulatoryId",
+              "patientRevision",
+              "input"
+            ],
+            "properties": {
+              "functionId": {
+                "type": "string",
+                "const": "treatment_reasoning"
+              },
+              "patientId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160,
+                "pattern": "^(?!\\s)(?![\\s\\S]*\\s$)[^\\u0000-\\u001f\\u007f]+$"
+              },
+              "ambulatoryId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160,
+                "pattern": "^(?!\\s)(?![\\s\\S]*\\s$)[^\\u0000-\\u001f\\u007f]+$"
+              },
+              "patientRevision": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "input": {
+                "$ref": "#/components/schemas/NativeTreatmentReasoningInput"
+              }
+            }
+          }
+        ],
+        "description": "Ingress esatto per functionId, massimo 4096 byte UTF-8; ulteriori vincoli runtime: stringhe ben formate, limiti UTF-16, soli oggetti ordinari enumerabili senza proxy/accessor/simboli. Nessuna autorità di sorgente dal DTO."
+      },
+      "NativeOrdinaryState": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schema",
+          "phase",
+          "attemptId",
+          "functionId",
+          "expiresAt"
+        ],
+        "properties": {
+          "schema": {
+            "type": "string",
+            "const": "mediflow.chatgpt-ordinary-flow.v1"
+          },
+          "phase": {
+            "enum": [
+              "preparing",
+              "needs_consent",
+              "consented",
+              "awaiting_login",
+              "connected",
+              "ready",
+              "generating"
+            ]
+          },
+          "attemptId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "functionId": {
+            "$ref": "#/components/schemas/NativeOrdinaryFunction"
+          },
+          "expiresAt": {
+            "type": "integer",
+            "description": "Absolute Unix milliseconds; never renewed by commands."
+          },
+          "disclosure": {
+            "$ref": "#/components/schemas/NativeOrdinaryDisclosure"
+          },
+          "catalog": {
+            "$ref": "#/components/schemas/NativeOrdinaryCatalog"
+          },
+          "challenge": {
+            "$ref": "#/components/schemas/NativeOrdinaryChallenge"
+          },
+          "acquisition": {
+            "$ref": "#/components/schemas/NativeOrdinaryAcquisition"
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "required": [
+                "acquisition"
+              ]
+            },
+            "then": {
+              "properties": {
+                "phase": {
+                  "type": "string",
+                  "const": "needs_consent"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "NativeOrdinaryPatientSelector": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "entity",
+          "id",
+          "fields"
+        ],
+        "properties": {
+          "entity": {
+            "type": "string",
+            "const": "patient"
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "^[^\\u0000-\\u001f\\u007f]+$"
+          },
+          "fields": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 2,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "enum": [
+                "notes",
+                "diagnoses"
+              ]
+            },
+            "description": "Exactly the encrypted fields in host whitelist order; no non-encrypted field can be rewritten."
+          }
+        }
+      },
+      "NativeOrdinaryPatientRow": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "entity",
+          "id",
+          "fields"
+        ],
+        "properties": {
+          "entity": {
+            "type": "string",
+            "const": "patient"
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "^[^\\u0000-\\u001f\\u007f]+$"
+          },
+          "fields": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 2,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "value"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "enum": [
+                    "notes",
+                    "diagnoses"
+                  ]
+                },
+                "value": {
+                  "type": "string",
+                  "maxLength": 262144,
+                  "description": "Readable client-decrypted text. ENC:, [LOCKED DATA], NUL and lone surrogates are denied."
+                }
+              }
+            },
+            "description": "Exact order/cardinality/name equality with the private grant roster, including empty successfully decrypted strings."
+          }
+        }
+      },
+      "NativeOrdinaryEntriesSelector": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "entity",
+          "id",
+          "fields"
+        ],
+        "properties": {
+          "entity": {
+            "type": "string",
+            "const": "entries"
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "^[^\\u0000-\\u001f\\u007f]+$"
+          },
+          "fields": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 2,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "enum": [
+                "title",
+                "content"
+              ]
+            },
+            "description": "Exactly the encrypted fields in host whitelist order; no non-encrypted field can be rewritten."
+          }
+        }
+      },
+      "NativeOrdinaryEntriesRow": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "entity",
+          "id",
+          "fields"
+        ],
+        "properties": {
+          "entity": {
+            "type": "string",
+            "const": "entries"
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "^[^\\u0000-\\u001f\\u007f]+$"
+          },
+          "fields": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 2,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "value"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "enum": [
+                    "title",
+                    "content"
+                  ]
+                },
+                "value": {
+                  "type": "string",
+                  "maxLength": 262144,
+                  "description": "Readable client-decrypted text. ENC:, [LOCKED DATA], NUL and lone surrogates are denied."
+                }
+              }
+            },
+            "description": "Exact order/cardinality/name equality with the private grant roster, including empty successfully decrypted strings."
+          }
+        }
+      },
+      "NativeOrdinaryTherapiesSelector": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "entity",
+          "id",
+          "fields"
+        ],
+        "properties": {
+          "entity": {
+            "type": "string",
+            "const": "therapies"
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "^[^\\u0000-\\u001f\\u007f]+$"
+          },
+          "fields": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 5,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "enum": [
+                "drugName",
+                "dosage",
+                "activePrinciple",
+                "aic",
+                "atc"
+              ]
+            },
+            "description": "Exactly the encrypted fields in host whitelist order; no non-encrypted field can be rewritten."
+          }
+        }
+      },
+      "NativeOrdinaryTherapiesRow": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "entity",
+          "id",
+          "fields"
+        ],
+        "properties": {
+          "entity": {
+            "type": "string",
+            "const": "therapies"
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "^[^\\u0000-\\u001f\\u007f]+$"
+          },
+          "fields": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 5,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "value"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "enum": [
+                    "drugName",
+                    "dosage",
+                    "activePrinciple",
+                    "aic",
+                    "atc"
+                  ]
+                },
+                "value": {
+                  "type": "string",
+                  "maxLength": 262144,
+                  "description": "Readable client-decrypted text. ENC:, [LOCKED DATA], NUL and lone surrogates are denied."
+                }
+              }
+            },
+            "description": "Exact order/cardinality/name equality with the private grant roster, including empty successfully decrypted strings."
+          }
+        }
+      },
+      "NativeOrdinaryObservationsSelector": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "entity",
+          "id",
+          "fields"
+        ],
+        "properties": {
+          "entity": {
+            "type": "string",
+            "const": "observations"
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "^[^\\u0000-\\u001f\\u007f]+$"
+          },
+          "fields": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 3,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "enum": [
+                "display",
+                "value",
+                "unitCode"
+              ]
+            },
+            "description": "Exactly the encrypted fields in host whitelist order; no non-encrypted field can be rewritten."
+          }
+        }
+      },
+      "NativeOrdinaryObservationsRow": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "entity",
+          "id",
+          "fields"
+        ],
+        "properties": {
+          "entity": {
+            "type": "string",
+            "const": "observations"
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "^[^\\u0000-\\u001f\\u007f]+$"
+          },
+          "fields": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 3,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "value"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "enum": [
+                    "display",
+                    "value",
+                    "unitCode"
+                  ]
+                },
+                "value": {
+                  "type": "string",
+                  "maxLength": 262144,
+                  "description": "Readable client-decrypted text. ENC:, [LOCKED DATA], NUL and lone surrogates are denied."
+                }
+              }
+            },
+            "description": "Exact order/cardinality/name equality with the private grant roster, including empty successfully decrypted strings."
+          }
+        }
+      },
+      "NativeOrdinaryAttachmentsSelector": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "entity",
+          "id",
+          "fields"
+        ],
+        "properties": {
+          "entity": {
+            "type": "string",
+            "const": "attachments"
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "^[^\\u0000-\\u001f\\u007f]+$"
+          },
+          "fields": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 2,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "enum": [
+                "name",
+                "summarySnapshot"
+              ]
+            },
+            "description": "Exactly the encrypted fields in host whitelist order; no non-encrypted field can be rewritten."
+          }
+        }
+      },
+      "NativeOrdinaryAttachmentsRow": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "entity",
+          "id",
+          "fields"
+        ],
+        "properties": {
+          "entity": {
+            "type": "string",
+            "const": "attachments"
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "^[^\\u0000-\\u001f\\u007f]+$"
+          },
+          "fields": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 2,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "value"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "enum": [
+                    "name",
+                    "summarySnapshot"
+                  ]
+                },
+                "value": {
+                  "type": "string",
+                  "maxLength": 262144,
+                  "description": "Readable client-decrypted text. ENC:, [LOCKED DATA], NUL and lone surrogates are denied."
+                }
+              }
+            },
+            "description": "Exact order/cardinality/name equality with the private grant roster, including empty successfully decrypted strings."
+          }
+        }
+      },
+      "NativeOrdinaryAttachmentBytesSelector": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "entity",
+          "id",
+          "fields"
+        ],
+        "properties": {
+          "entity": {
+            "type": "string",
+            "const": "attachment_bytes"
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "^[^\\u0000-\\u001f\\u007f]+$"
+          },
+          "fields": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "enum": [
+                "data"
+              ]
+            },
+            "description": "Exactly the encrypted fields in host whitelist order; no non-encrypted field can be rewritten."
+          }
+        }
+      },
+      "NativeOrdinaryPatientInsightProjectionPlan": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schemaVersion",
+          "grantId",
+          "functionId",
+          "expiresAt",
+          "roster"
+        ],
+        "properties": {
+          "schemaVersion": {
+            "type": "string",
+            "const": "mediflow.native-ordinary.source-projection.v1"
+          },
+          "grantId": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "functionId": {
+            "type": "string",
+            "const": "patient_insight"
+          },
+          "expiresAt": {
+            "type": "integer",
+            "description": "Absolute Unix milliseconds. Pending grant TTL at most 30s and bounded by the original native selection; no caller renewal."
+          },
+          "roster": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 25,
+            "items": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/NativeOrdinaryPatientSelector"
+                },
+                {
+                  "$ref": "#/components/schemas/NativeOrdinaryEntriesSelector"
+                },
+                {
+                  "$ref": "#/components/schemas/NativeOrdinaryTherapiesSelector"
+                }
+              ]
+            },
+            "x-entity-maximums": {
+              "patient": 1,
+              "entries": 12,
+              "therapies": 12
+            },
+            "description": "Exact ordered encrypted subset chosen by the host; ids unique per entity. No source text, ciphertext, path or client currentness authority."
+          }
+        }
+      },
+      "NativeOrdinaryPatientInsightProjectionBody": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schemaVersion",
+          "functionId",
+          "rows"
+        ],
+        "properties": {
+          "schemaVersion": {
+            "type": "string",
+            "const": "mediflow.native-ordinary.source-projection.v1"
+          },
+          "functionId": {
+            "type": "string",
+            "const": "patient_insight"
+          },
+          "rows": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 25,
+            "items": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/NativeOrdinaryPatientRow"
+                },
+                {
+                  "$ref": "#/components/schemas/NativeOrdinaryEntriesRow"
+                },
+                {
+                  "$ref": "#/components/schemas/NativeOrdinaryTherapiesRow"
+                }
+              ]
+            },
+            "x-entity-maximums": {
+              "patient": 1,
+              "entries": 12,
+              "therapies": 12
+            },
+            "description": "Every row/field must match the private plan, in order. Omission, duplication, substitution, non-ENC rewrite and caller revision metadata deny the entire grant."
+          }
+        }
+      },
+      "NativeOrdinarySmartImportProjectionPlan": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schemaVersion",
+          "grantId",
+          "functionId",
+          "expiresAt",
+          "roster"
+        ],
+        "properties": {
+          "schemaVersion": {
+            "type": "string",
+            "const": "mediflow.native-ordinary.source-projection.v1"
+          },
+          "grantId": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "functionId": {
+            "type": "string",
+            "const": "smart_import"
+          },
+          "expiresAt": {
+            "type": "integer",
+            "description": "Absolute Unix milliseconds. Pending grant TTL at most 30s and bounded by the original native selection; no caller renewal."
+          },
+          "roster": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 74,
+            "items": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/NativeOrdinaryPatientSelector"
+                },
+                {
+                  "$ref": "#/components/schemas/NativeOrdinaryEntriesSelector"
+                },
+                {
+                  "$ref": "#/components/schemas/NativeOrdinaryTherapiesSelector"
+                },
+                {
+                  "$ref": "#/components/schemas/NativeOrdinaryAttachmentsSelector"
+                }
+              ]
+            },
+            "x-entity-maximums": {
+              "patient": 1,
+              "entries": 6,
+              "therapies": 64,
+              "attachments": 3
+            },
+            "description": "Exact ordered encrypted subset chosen by the host; ids unique per entity. No source text, ciphertext, path or client currentness authority."
+          }
+        }
+      },
+      "NativeOrdinarySmartImportProjectionBody": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schemaVersion",
+          "functionId",
+          "rows"
+        ],
+        "properties": {
+          "schemaVersion": {
+            "type": "string",
+            "const": "mediflow.native-ordinary.source-projection.v1"
+          },
+          "functionId": {
+            "type": "string",
+            "const": "smart_import"
+          },
+          "rows": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 74,
+            "items": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/NativeOrdinaryPatientRow"
+                },
+                {
+                  "$ref": "#/components/schemas/NativeOrdinaryEntriesRow"
+                },
+                {
+                  "$ref": "#/components/schemas/NativeOrdinaryTherapiesRow"
+                },
+                {
+                  "$ref": "#/components/schemas/NativeOrdinaryAttachmentsRow"
+                }
+              ]
+            },
+            "x-entity-maximums": {
+              "patient": 1,
+              "entries": 6,
+              "therapies": 64,
+              "attachments": 3
+            },
+            "description": "Every row/field must match the private plan, in order. Omission, duplication, substitution, non-ENC rewrite and caller revision metadata deny the entire grant."
+          }
+        }
+      },
+      "NativeOrdinaryTreatmentReasoningProjectionPlan": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schemaVersion",
+          "grantId",
+          "functionId",
+          "expiresAt",
+          "roster"
+        ],
+        "properties": {
+          "schemaVersion": {
+            "type": "string",
+            "const": "mediflow.native-ordinary.source-projection.v1"
+          },
+          "grantId": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "functionId": {
+            "type": "string",
+            "const": "treatment_reasoning"
+          },
+          "expiresAt": {
+            "type": "integer",
+            "description": "Absolute Unix milliseconds. Pending grant TTL at most 30s and bounded by the original native selection; no caller renewal."
+          },
+          "roster": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 11,
+            "items": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/NativeOrdinaryPatientSelector"
+                },
+                {
+                  "$ref": "#/components/schemas/NativeOrdinaryEntriesSelector"
+                },
+                {
+                  "$ref": "#/components/schemas/NativeOrdinaryTherapiesSelector"
+                },
+                {
+                  "$ref": "#/components/schemas/NativeOrdinaryObservationsSelector"
+                },
+                {
+                  "$ref": "#/components/schemas/NativeOrdinaryAttachmentsSelector"
+                }
+              ]
+            },
+            "x-entity-maximums": {
+              "patient": 1,
+              "entries": 2,
+              "therapies": 4,
+              "observations": 3,
+              "attachments": 1
+            },
+            "description": "Exact ordered encrypted subset chosen by the host; ids unique per entity. No source text, ciphertext, path or client currentness authority."
+          }
+        }
+      },
+      "NativeOrdinaryTreatmentReasoningProjectionBody": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schemaVersion",
+          "functionId",
+          "rows"
+        ],
+        "properties": {
+          "schemaVersion": {
+            "type": "string",
+            "const": "mediflow.native-ordinary.source-projection.v1"
+          },
+          "functionId": {
+            "type": "string",
+            "const": "treatment_reasoning"
+          },
+          "rows": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 11,
+            "items": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/NativeOrdinaryPatientRow"
+                },
+                {
+                  "$ref": "#/components/schemas/NativeOrdinaryEntriesRow"
+                },
+                {
+                  "$ref": "#/components/schemas/NativeOrdinaryTherapiesRow"
+                },
+                {
+                  "$ref": "#/components/schemas/NativeOrdinaryObservationsRow"
+                },
+                {
+                  "$ref": "#/components/schemas/NativeOrdinaryAttachmentsRow"
+                }
+              ]
+            },
+            "x-entity-maximums": {
+              "patient": 1,
+              "entries": 2,
+              "therapies": 4,
+              "observations": 3,
+              "attachments": 1
+            },
+            "description": "Every row/field must match the private plan, in order. Omission, duplication, substitution, non-ENC rewrite and caller revision metadata deny the entire grant."
+          }
+        }
+      },
+      "NativeOrdinaryDocumentSynthesisProjectionPlan": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schemaVersion",
+          "grantId",
+          "functionId",
+          "expiresAt",
+          "roster"
+        ],
+        "properties": {
+          "schemaVersion": {
+            "type": "string",
+            "const": "mediflow.native-ordinary.source-projection.v1"
+          },
+          "grantId": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "functionId": {
+            "type": "string",
+            "const": "document_synthesis"
+          },
+          "expiresAt": {
+            "type": "integer",
+            "description": "Absolute Unix milliseconds. Pending grant TTL at most 30s and bounded by the original native selection; no caller renewal."
+          },
+          "roster": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 1,
+            "items": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/NativeOrdinaryAttachmentBytesSelector"
+                }
+              ]
+            },
+            "x-entity-maximums": {
+              "attachment_bytes": 1
+            },
+            "description": "Exact ordered encrypted subset chosen by the host; ids unique per entity. No source text, ciphertext, path or client currentness authority."
+          }
+        }
+      },
+      "NativeOrdinaryProjectionPlan": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/NativeOrdinaryPatientInsightProjectionPlan"
+          },
+          {
+            "$ref": "#/components/schemas/NativeOrdinarySmartImportProjectionPlan"
+          },
+          {
+            "$ref": "#/components/schemas/NativeOrdinaryTreatmentReasoningProjectionPlan"
+          },
+          {
+            "$ref": "#/components/schemas/NativeOrdinaryDocumentSynthesisProjectionPlan"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "functionId"
+        }
+      },
+      "NativeOrdinaryProjectionBody": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/NativeOrdinaryPatientInsightProjectionBody"
+          },
+          {
+            "$ref": "#/components/schemas/NativeOrdinarySmartImportProjectionBody"
+          },
+          {
+            "$ref": "#/components/schemas/NativeOrdinaryTreatmentReasoningProjectionBody"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "functionId"
+        }
+      },
+      "NativeOrdinarySourceProjection": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schema",
+          "phase",
+          "functionId",
+          "expiresAt",
+          "sourceProjection"
+        ],
+        "properties": {
+          "schema": {
+            "type": "string",
+            "const": "mediflow.native-ordinary.v1"
+          },
+          "phase": {
+            "type": "string",
+            "const": "needs_source_projection"
+          },
+          "functionId": {
+            "$ref": "#/components/schemas/NativeOrdinaryFunction"
+          },
+          "expiresAt": {
+            "type": "integer"
+          },
+          "sourceProjection": {
+            "$ref": "#/components/schemas/NativeOrdinaryProjectionPlan"
+          }
+        },
+        "description": "Pre-attempt only: no attemptId, disclosure or clinical text. Function and expiry must equal the nested plan. Old clients must fail closed."
+      },
+      "NativeOrdinaryAcquisition": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "origin",
+          "ciphertextEquality"
+        ],
+        "properties": {
+          "origin": {
+            "type": "string",
+            "const": "authenticated_client_decryption"
+          },
+          "ciphertextEquality": {
+            "type": "string",
+            "const": "not_attested"
+          }
+        }
+      }
+    }
+  }
+}

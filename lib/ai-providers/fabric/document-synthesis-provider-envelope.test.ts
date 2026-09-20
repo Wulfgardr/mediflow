@@ -6,7 +6,7 @@ import { types } from 'node:util';
 
 import { parseDocumentSynthesisProviderEnvelope, resolveDocumentSynthesisProviderEnvelope } from './document-synthesis-provider-envelope.ts';
 
-const body = (value: Record<string, unknown> = {}) => JSON.stringify({ output: { summary: 'synthetic' }, citations: [{ ref: 'S1' }], claims: { safe: true }, ...value });
+const body = (value: Record<string, unknown> = {}) => JSON.stringify({ schemaVersion: 'mediflow.document-synthesis.provider-envelope.v2', output: { summary: 'synthetic' }, citations: [{ ref: 'S1' }], claims: { safe: true }, ...value });
 const response = (content = body()) => ({ content });
 function denied(value: unknown): void { const result = parseDocumentSynthesisProviderEnvelope(value); assert.deepEqual({ ...result }, { status: 'denied', code: 'response_invalid', token: null, reviewOnly: true, writesPerformed: 0, applyPolicy: 'none' }); }
 
@@ -27,10 +27,10 @@ test('frames one exact raw provider object into an opaque review-only token', ()
 });
 
 test('rejects malformed framing, duplicate keys at every depth, root drift, and hostile sizes', () => {
-    const duplicateEscaped = '{"output":{},"citations":[],"claims":{"x":1,"\\u0078":2}}';
-    const nested = '{"output":{"a":{"x":1,"x":2}},"citations":[],"claims":{}}';
+    const duplicateEscaped = '{"schemaVersion":"mediflow.document-synthesis.provider-envelope.v2","output":{},"citations":[],"claims":{"x":1,"\\u0078":2}}';
+    const nested = '{"schemaVersion":"mediflow.document-synthesis.provider-envelope.v2","output":{"a":{"x":1,"x":2}},"citations":[],"claims":{}}';
     for (const content of ['', ' ', '{', '[]', 'null', `${body()}${body()}`, `${body()} trailing`, 'leading ' + body(), duplicateEscaped, nested,
-        '{"output":{},"output":{},"citations":[],"claims":{}}', body({ extra: true }), JSON.stringify({ output: {}, citations: [] }), ' '.repeat(262_145), body({ output: Array.from({ length: 16_385 }, () => 0) })]) denied(response(content));
+        '{"schemaVersion":"mediflow.document-synthesis.provider-envelope.v2","output":{},"output":{},"citations":[],"claims":{}}', body({ extra: true }), JSON.stringify({ output: {}, citations: [] }), ' '.repeat(262_145), body({ output: Array.from({ length: 16_385 }, () => 0) })]) denied(response(content));
 });
 
 test('rejects accessors, inherited/custom/null prototypes, symbols, proxies, arrays, thenables, and does not trigger traps', () => {
@@ -45,7 +45,7 @@ test('rejects accessors, inherited/custom/null prototypes, symbols, proxies, arr
 test('accepts no forged, cloned, spread, structured-cloned, proxied, or cross-module token', async () => {
     const result = parseDocumentSynthesisProviderEnvelope(response()); assert.equal(result.status, 'available'); if (result.status !== 'available') return;
     for (const token of [{}, { ...result.token }, structuredClone(result.token), new Proxy(result.token, {}), Object.create(null)]) assert.equal(resolveDocumentSynthesisProviderEnvelope(token), null);
-    const source = readFileSync(new URL('./document-synthesis-provider-envelope.ts', import.meta.url), 'utf8').replace("import 'server-only';", ''); const typescript = await import('typescript');
+    const source = readFileSync(new URL('./document-synthesis-provider-envelope.ts', import.meta.url), 'utf8').replace("import 'server-only';", '').replace("'../../ai-json-lexical'", JSON.stringify(new URL('../../ai-json-lexical.ts', import.meta.url).href)); const typescript = await import('typescript');
     const code = typescript.transpileModule(source, { compilerOptions: { module: typescript.ModuleKind.ESNext, target: typescript.ScriptTarget.ESNext } }).outputText; const foreign = await import(`data:text/javascript;base64,${Buffer.from(code).toString('base64')}`); const foreignResult = foreign.parseDocumentSynthesisProviderEnvelope(response());
     assert.equal(foreignResult.status, 'available'); if (foreignResult.status === 'available') { assert.equal(resolveDocumentSynthesisProviderEnvelope(foreignResult.token), null); assert.equal(foreign.resolveDocumentSynthesisProviderEnvelope(result.token), null); }
     assert.notEqual(resolveDocumentSynthesisProviderEnvelope(result.token), null);
@@ -81,4 +81,14 @@ test('uses captured parser and token intrinsics after poisoning without getter, 
     for (const [target, key, descriptor] of descriptors) defineProperty(target, key, { ...descriptor, value: poison });
     let result: ReturnType<typeof parseDocumentSynthesisProviderEnvelope>; try { result = parseDocumentSynthesisProviderEnvelope(response()); } finally { for (let index = descriptors.length - 1; index >= 0; index -= 1) defineProperty(descriptors[index]![0], descriptors[index]![1], descriptors[index]![2]); }
     await new Promise<void>((resolve) => setImmediate(resolve)); assert.equal(reads, 0); assert.equal(result!.status, 'available');
+});
+
+/* @Codex */
+test('requires the explicit v2 envelope without a legacy or unknown version fallback', () => {
+    const parsed = parseDocumentSynthesisProviderEnvelope(response());
+    assert.equal(parsed.status, 'available');
+    if (parsed.status !== 'available') return;
+    assert.equal(resolveDocumentSynthesisProviderEnvelope(parsed.token)?.schemaVersion, 'mediflow.document-synthesis.provider-envelope.v2');
+    const legacy = { output: {}, citations: [], claims: [] };
+    for (const content of [JSON.stringify(legacy), body({ schemaVersion: 'mediflow.document-synthesis.provider-envelope.v1' }), body({ schemaVersion: 'v2' }), body({ schemaVersion: 2 }), body({ version: 'mediflow.document-synthesis.provider-envelope.v2' })]) denied(response(content));
 });

@@ -1,4 +1,6 @@
 /* @Codex */
+import { readNativeNetworkJson, jsonBodyTooLargeResponse } from '@/lib/native-network-json-body';
+/* @Codex */
 import { NextResponse } from 'next/server';
 /* @Codex */
 import {
@@ -45,13 +47,16 @@ export async function PUT(
         const resolved = await requireNetworkWriteContext(request, NETWORK_THERAPY_WRITE_CAPABILITY);
         if (!resolved.ok) return resolved.response;
 
-        const body = await request.json() as Record<string, unknown>;
+        const body = await readNativeNetworkJson(request) as Record<string, unknown>;
         const result = await updateNetworkScopedTherapy(
             { ...resolved.context, patientId: id, therapyId },
             body,
         );
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
+        /* @Codex */
+        const sizeError = jsonBodyTooLargeResponse(error);
+        if (sizeError) return sizeError;
         console.error('API PUT /api/v1/network/patients/[id]/therapies/[therapyId] error:', error);
         return NextResponse.json({ error: 'Failed to update therapy' }, { status: 500 });
     }

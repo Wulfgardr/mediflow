@@ -1,0 +1,34 @@
+/* @Codex WUL-676: section titles and explanatory text use the shared proposal scale. */
+:global(html[data-runtime-twin-design='proposal']) .sectionHeading h2 {
+    margin: 0;
+    font-size: var(--twin-type-section);
+    font-weight: var(--twin-heading-weight);
+    line-height: var(--twin-heading-leading);
+    letter-spacing: -0.02em;
+}
+:global(html[data-runtime-twin-design='proposal']) .sectionHeading p {
+    margin: 6px 0 0;
+    color: var(--lume-ink-muted);
+    font-size: var(--twin-type-body);
+    line-height: var(--twin-body-leading);
+}
+:global(html[data-runtime-twin-design='proposal']) .categoryTitle {
+    padding: 0;
+    color: var(--lume-ink);
+    font-size: var(--twin-type-subsection);
+    font-weight: var(--twin-heading-weight);
+    line-height: var(--twin-heading-leading);
+    letter-spacing: -0.01em;
+    text-transform: none;
+}
+.catalogCount {
+    padding-top: 4px;
+    color: var(--lume-ink-muted);
+    font-size: var(--twin-type-caption);
+    line-height: var(--twin-body-leading);
+    font-variant-numeric: tabular-nums;
+}
+
+/* @Codex WUL-678: catalogue and patient choice share the workspace plane. */
+.catalogSection, .patientSection { display: grid; gap: 24px; scroll-margin-top: 10rem; }
+.patientSection { padding-top: 24px; border-top: 1px solid color-mix(in srgb, var(--lume-ink) 16%, transparent); }

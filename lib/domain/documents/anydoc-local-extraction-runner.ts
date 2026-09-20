@@ -138,10 +138,16 @@ async function runWorker(bytes: Buffer): Promise<WorkerResult> {
         let diagnosticBytes = 0;
         let forcedSignal: AnyDocLocalFailureSignal | undefined;
         let settled = false;
+        const outputText = (): string => {
+            const joined = Buffer.concat(output, outputBytes);
+            try { return joined.toString('utf8'); } finally { joined.fill(0); }
+        };
         const finish = (value: WorkerResult) => {
             if (settled) return;
             settled = true;
             clearTimeout(timer);
+            // @Codex: owned byte copies do not outlive the parsed result. Strings remain GC-managed.
+            for (const chunk of output) chunk.fill(0); output.length = 0;
             resolve(value);
         };
         const stop = (signal: AnyDocLocalFailureSignal) => {
@@ -164,11 +170,11 @@ async function runWorker(bytes: Buffer): Promise<WorkerResult> {
         child.once('close', (code) => {
             if (forcedSignal) return finish({ signal: forcedSignal });
             if (code === 21) {
-                const pageRouting = parseAnyDocPageRoutingEnvelope(Buffer.concat(output, outputBytes).toString('utf8'));
+                const pageRouting = parseAnyDocPageRoutingEnvelope(outputText());
                 return finish(pageRouting ? { signal: 'needsOcr', pageRouting } : { signal: 'io' });
             }
             if (code !== 0) return finish({ signal: EXIT_SIGNAL.get(code ?? -1) ?? 'io' });
-            return finish({ markdown: Buffer.concat(output, outputBytes).toString('utf8') });
+            return finish({ markdown: outputText() });
         });
         child.stdin.on('error', () => undefined);
         child.stdin.end(bytes);
@@ -180,11 +186,12 @@ export async function extractAnyDocPageRoutingBytes(input: unknown): Promise<Any
     if (types.isProxy(input) || !(input instanceof Uint8Array)) return null;
     let bytes: Buffer;
     try { bytes = Buffer.from(input); } catch { return null; }
-    if (bytes.byteLength < 1 || bytes.byteLength > ANYDOC_LOCAL_EXTRACTION_MAX_SOURCE_BYTES) return null;
+    if (bytes.byteLength < 1 || bytes.byteLength > ANYDOC_LOCAL_EXTRACTION_MAX_SOURCE_BYTES) { bytes.fill(0); return null; }
     try {
         const result = await runWorker(bytes);
         return result.signal === 'needsOcr' ? result.pageRouting ?? null : null;
     } catch { return null; }
+    finally { bytes.fill(0); }
 }
 
 /** Converts one host-resolved byte snapshot without accepting caller-supplied digest, path, version, or parser options. */
@@ -192,9 +199,11 @@ export async function extractAnyDocLocalBytes(attachmentId: unknown, input: unkn
     if (!validAttachmentId(attachmentId) || types.isProxy(input) || !(input instanceof Uint8Array)) return deniedSource();
     let bytes: Buffer;
     try { bytes = Buffer.from(input); } catch { return deniedSource(); }
-    if (bytes.byteLength < 1 || bytes.byteLength > ANYDOC_LOCAL_EXTRACTION_MAX_SOURCE_BYTES) return deniedSource();
+    if (bytes.byteLength < 1 || bytes.byteLength > ANYDOC_LOCAL_EXTRACTION_MAX_SOURCE_BYTES) { bytes.fill(0); return deniedSource(); }
     const source = sourceEvidence(attachmentId, bytes);
-    let result: Awaited<ReturnType<typeof runWorker>>;
-    try { result = await runWorker(bytes); } catch { return mapAnyDocLocalFailure(source, 'io'); }
-    return result.signal ? mapAnyDocLocalFailure(source, result.signal) : buildAnyDocLocalExtraction(source, result.markdown);
+    try {
+        const result = await runWorker(bytes);
+        return result.signal ? mapAnyDocLocalFailure(source, result.signal) : buildAnyDocLocalExtraction(source, result.markdown);
+    } catch { return mapAnyDocLocalFailure(source, 'io'); }
+    finally { bytes.fill(0); }
 }

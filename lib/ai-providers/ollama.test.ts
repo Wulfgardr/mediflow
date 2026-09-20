@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+/* @Codex */
+import { DOCUMENT_SYNTHESIS_V2_JSON_SCHEMA } from './document-synthesis-json-schema.ts';
 import { normalizeOllamaBaseUrl, resolveOllamaBaseUrl } from './base-url.ts';
 import { buildOllamaChatPayload, OllamaProviderAdapter, toOllamaMessages } from './ollama.ts';
 
@@ -43,6 +45,7 @@ test('costruisce il payload con think:false solo per task testuali', () => {
     assert.equal(textualPayload.options.num_predict, 512);
     assert.equal(textualPayload.options.num_ctx, 8192);
     assert.equal(textualPayload.format, 'json');
+    assert.equal('format' in ocrPayload, false);
     assert.equal('think' in ocrPayload, false);
     assert.equal('num_ctx' in ocrPayload.options, false);
 });
@@ -81,8 +84,16 @@ test('attesta e invoca la chat sullo stesso loopback canonico', async (t) => {
         model: 'qwen-local',
         chatTimeoutMs: 1000,
     });
-    const result = await adapter.chat([{ role: 'user', content: 'fixture sintetica' }]);
+    /* @Codex — inspect the serialized request at the fake transport boundary. */
+    const result = await adapter.chat([{ role: 'user', content: 'fixture sintetica' }], undefined, 1400, { responseFormat: 'document_synthesis_v2' });
 
+    const payload = JSON.parse(String(calls.find(({ url }) => url.endsWith('/api/chat'))?.init?.body));
+    assert.deepEqual(payload.format, DOCUMENT_SYNTHESIS_V2_JSON_SCHEMA);
+    assert.equal(typeof payload.format, 'object');
+    assert.equal(payload.options.num_predict, 1400);
+    assert.equal(payload.options.temperature, 0.4);
+    assert.equal(payload.format.properties.output.properties.schemaVersion.const, 'mediflow.ai.extract.v1');
+    assert.equal(payload.format.properties.output.required.includes('schemaVersion'), true);
     assert.equal(result.content, 'risposta sintetica');
     assert.equal(calls.length, 6);
     assert.equal(calls.every(({ url }) => url.startsWith('http://127.0.0.1:11434/')), true);
@@ -131,4 +142,16 @@ test('distingue il timeout dall annullamento utente', async (t) => {
     const request = userAbortAdapter.chat([{ role: 'user', content: 'ciao' }], controller.signal);
     controller.abort(new Error('annullamento utente'));
     await assert.rejects(request, /annullamento utente/);
+});
+
+/* @Codex */
+test('only the internal DS name selects a static schema independent of message content', () => {
+    const first = buildOllamaChatPayload('qwen', [{ role: 'user', content: 'synthetic one' }], 1400, { responseFormat: 'document_synthesis_v2' });
+    const second = buildOllamaChatPayload('qwen', [{ role: 'user', content: 'synthetic two' }], 1400, { responseFormat: 'document_synthesis_v2' });
+    assert.strictEqual(first.format, DOCUMENT_SYNTHESIS_V2_JSON_SCHEMA);
+    assert.strictEqual(first.format, second.format);
+    const arbitrary = { type: 'object', properties: { injected: { type: 'string' } } };
+    const invalid = buildOllamaChatPayload('qwen', [], 1400, { responseFormat: arbitrary as unknown as 'json' });
+    assert.equal('format' in invalid, false);
+    assert.equal(buildOllamaChatPayload('qwen', [], 1400, { responseFormat: 'json' }).format, 'json');
 });

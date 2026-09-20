@@ -93,6 +93,7 @@ export function Badge({
 }: BadgeProps) {
     return (
         <span
+            data-lume-status=""
             title={title}
             data-testid={dataTestId}
             className={cn(

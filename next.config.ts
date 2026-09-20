@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { anyDocDesktopRendererTrace } from './scripts/anydoc-desktop-renderer-trace.mjs'; // @Codex
 
 /* @Codex */
 const distDir = process.env.MEDIFLOW_NEXT_DIST_DIR || '.next';
@@ -67,8 +68,19 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     "/*": [
       "./package.json",
+      // @Codex: capability-local offline CLI/worker closure; no model/runtime payloads.
+      "./scripts/treatment-reasoning-portable-worker.py",
+      "./scripts/gliner-redaction-worker.py", // @Codex: code only; model stays outside the bundle.
+      "./scripts/treatment-reasoning-portable-setup.mjs",
+      "./lib/ai-providers/fabric/treatment-reasoning-portable-provisioning.ts",
+      "./lib/athena-model-identity.ts",
+      "./scripts/node-runtime-contract.mjs",
+      "./.nvmrc",
       "./scripts/anydoc-local-extraction-worker.mjs",
       "./scripts/anydoc-pdf-page-worker.mjs",
+      "./scripts/anydoc-tesseract-artifacts.json", // @Codex
+      "./scripts/anydoc-pdf-renderer-profiles.json", // @Codex
+      "./node_modules/mediflow-ocr-tesseract/**/*", // @Codex: optional offline artifacts
       "./scripts/apple-vision-ocr.swift",
       "./node_modules/pdf-lib/**/*",
       "./node_modules/@pdf-lib/**/*",
@@ -82,11 +94,22 @@ const nextConfig: NextConfig = {
       "./node_modules/@mediflow/web-auth-lifecycle-owner/**/*",
       "./node_modules/@napi-rs/canvas/**/*",
       "./node_modules/@napi-rs/canvas-darwin-arm64/**/*",
+      ...anyDocDesktopRendererTrace(process.platform, process.arch), // @Codex: explicit target binding closure
     ],
   },
   /* @Codex */
   outputFileTracingExcludes: {
     "/*": [
+      // @Codex: Treatment runtime/model data are external, explicitly provisioned objects.
+      "./**/treatment-reasoning-portable/**",
+      "./**/*.safetensors",
+      "./**/*.gguf",
+      "./**/.venv/**",
+      "./**/site-packages/**",
+      "./**/__pycache__/**",
+      "./**/.env*",
+      // @Codex ADR 0123: synthetic fixture tools never belong to the product bundle.
+      "./tools/runtime-twin-086/**/*",
       "./*.db",
       "./*.sqlite",
       "./*.sqlite3",

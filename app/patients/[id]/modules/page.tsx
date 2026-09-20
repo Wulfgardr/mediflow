@@ -1,18 +1,19 @@
 'use client';
 
 import Link from 'next/link';
+import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
 import { useParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { Accessibility, Activity, ChevronRight, FileText, Pill, Plus, ShieldCheck, Stethoscope } from 'lucide-react';
 
-import AIPatientInsight from '@/components/ai-patient-insight';
+import { PatientClinicalSupport } from '@/components/patient-clinical-support';
 import { AttentionGroup } from '@/components/attention-group';
 import { ClinicalRiverTimeline } from '@/components/clinical-river-timeline';
 import { PatientSynopticSheet, type SynopticMeasure, type SynopticSignal, type SynopticTherapyLine } from '@/components/patient-synoptic-sheet';
 import { CollapsibleSection } from '@/components/kree8/collapsible-section';
 import DocumentInsightsPanel from '@/components/document-insights-panel';
 import DocumentUpload from '@/components/document-upload';
-import { EvidenceStackTile } from '@/components/evidence-stack-tile';
+import disclosure from '@/components/patient-disclosure.module.css';
 import ObservationManager from '@/components/observation-manager';
 import type { ObservationPrefill } from '@/lib/observation-prefill';
 import PatientActionModal from '@/components/patient-action-modal';
@@ -23,13 +24,14 @@ import PatientReviewQueueSummaryPanel from '@/components/patient-review-queue-su
 import { PatientSmartImportFabricPreviewCard } from '@/components/patient-smart-import-fabric-preview-card';
 import ProstheticPrescriptionManager from '@/components/prosthetic-prescription-manager';
 import ServicePrescriptionManager from '@/components/service-prescription-manager';
-import SissHandoffDiary from '@/components/siss-handoff-diary';
-import SissPatientContextPanel from '@/components/siss-patient-context-panel';
+import SissWorkspace from '@/components/siss-workspace';
 import TherapyManager from '@/components/therapy-manager';
 import TreatmentReasoningPanel from '@/components/treatment-reasoning-panel';
 import Timeline from '@/components/timeline';
 import { Kree8WorkspaceShell, type Kree8WorkspaceNavItem } from '@/components/kree8/kree8-workspace-shell';
 import workspaceStyles from '@/components/kree8/kree8-workspace-shell.module.css';
+/* @Codex WUL-678: scoped to the new-scale targets below. */
+import scaleStyles from '@/components/scales/scale-workspace.module.css';
 import { AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY, isAiDocumentSynthesisEnabledValue } from '@/lib/ai-document-synthesis-kill-switch';
 import { AI_PATIENT_INSIGHT_KILL_SWITCH_KEY, isAiPatientInsightEnabledValue } from '@/lib/ai-patient-insight-kill-switch';
 import { AI_SMART_IMPORT_KILL_SWITCH_KEY, isAiSmartImportEnabledValue } from '@/lib/ai-smart-import-kill-switch';
@@ -66,6 +68,7 @@ function navigateToObservationForm(): void {
 }
 
 export default function PatientDetailPage() {
+    const { proposal } = useRuntimeTwinDesign();
     const params = useParams();
     const id = params.id as string;
     const [isExportModalOpen, setIsExportModalOpen] = useState(false);
@@ -80,7 +83,6 @@ export default function PatientDetailPage() {
         const probe = new File(['{}'], 'probe.json', { type: 'application/json' });
         setCanShareFhirFile(navigator.canShare({ files: [probe] }));
     }, []);
-    const [isDocumentUploadOpen, setIsDocumentUploadOpen] = useState(false);
     const [observationPrefill, setObservationPrefill] = useState<ObservationPrefill | undefined>();
     /* @Codex One stable clock sample is sufficient for this read-only staleness
        projection; it must not change as a side effect of an unrelated render. */
@@ -114,7 +116,7 @@ export default function PatientDetailPage() {
         ['checkups'],
     );
     /* WUL-262: same data the archive and Smart Import panels already read. */
-    const attachments = useLiveQuery(
+    const { data: attachments, error: attachmentsError } = useLiveQueryState(
         async () => db.attachments.query({ patientId: id }).toArray(),
         [id],
         undefined,
@@ -362,11 +364,12 @@ export default function PatientDetailPage() {
     const activeEntries = (entries ?? []).filter((entry) => !entry.deletedAt);
     const nonScaleEntries = activeEntries.filter((entry) => entry.type !== 'scale');
     const scaleEntries = activeEntries.filter((entry) => entry.type === 'scale');
+    // @Codex: Keep deleted evaluations available to the existing audited restore flow.
+    const scaleHistoryEntries = (entries ?? []).filter((entry) => entry.type === 'scale');
     /* @Codex WUL-UIUX: il Diario non deve mostrare le compilazioni scala (hanno
        la loro sezione). Manteniamo le voci cancellate per il toggle audit interno
        di Timeline; filtriamo solo il tipo scala, cosi il conteggio del chip torna. */
     const timelineEntries = (entries ?? []).filter((entry) => entry.type !== 'scale');
-    const recentEvidence = documentInsights.slice(0, 4);
     const leadDiagnosis = diagnosisItems[0];
     const nextCheckup = (checkups ?? [])[0];
     // Proiezione read-only dei follow-up suggeriti dai documenti (nessun auto-write).
@@ -418,16 +421,6 @@ export default function PatientDetailPage() {
         setObservationPrefill(prefill);
         navigateToObservationForm();
     };
-    const summaryText = leadDiagnosis
-        ? `${leadDiagnosis.code} · ${leadDiagnosis.description}${patient.isAdi ? ' con continuita territoriale attiva.' : '.'}`
-        : 'Nessuna diagnosi codificata nella scheda.';
-    const nextStepText = nextCheckup
-        ? `Preparare "${nextCheckup.title}" e riallineare il diario prima del ${new Date(nextCheckup.date).toLocaleDateString('it-IT')}.`
-        : documentInsights.length > 0
-            ? `Rivedere ${documentInsights[0].fileName} e verificare se va promosso nel quadro clinico.`
-            : patient.isArchived
-                ? 'Confermare chiusura o riaprire il percorso se torna attivo.'
-                : 'Aprire il diario clinico e fissare il prossimo passaggio operativo.';
     /* WUL-262: review-queue summary derived from the same data the panels
        below already receive: read-only aggregation, no automatic write. */
     const attachmentItems = attachments ?? [];
@@ -454,7 +447,7 @@ export default function PatientDetailPage() {
     const insightStale = Boolean(patient.aiSummary?.trim())
         && insightGeneratedAt !== null
         && maxClinicalTimestamp > insightGeneratedAt + 5000;
-    const reviewQueueSummary = buildPatientReviewQueueSummary({
+    const reviewQueueProjection = buildPatientReviewQueueSummary({
         insight: {
             enabled: isAiPatientInsightEnabledValue(patientInsightKillSwitch?.value),
             hasSummary: Boolean(patient.aiSummary?.trim()),
@@ -474,6 +467,15 @@ export default function PatientDetailPage() {
             missingTextCount: attachmentItems.length - attachmentsWithTextCount,
         },
     });
+    /* @Codex WUL-678: route existing review actions to their presented domain, without changing queue state. */
+    const reviewQueueSummary = {
+        ...reviewQueueProjection,
+        rows: reviewQueueProjection.rows.map((row) => row.anchor && (row.id === 'insight' || row.id === 'smart-import')
+            ? { ...row, anchor: row.id === 'insight' ? '#patient-insight' : '#smart-import' }
+            : row.anchor && row.id === 'evidence' && documentInsights.length > 0
+                ? { ...row, anchor: '#document-insights' }
+                : row),
+    };
     const reviewQueueAttentionRows = reviewQueueSummary.rows.filter((row) =>
         ['da-rivedere', 'bloccato', 'serve-testo'].includes(row.state),
     );
@@ -533,12 +535,14 @@ export default function PatientDetailPage() {
     const workspaceNavItems: Kree8WorkspaceNavItem[] = [
         { href: '#quadro', label: 'Quadro' },
         { href: '#attenzione', label: 'Attenzione', meta: String(reviewQueueSummary.attentionCount + openLoopCount) },
-        { href: '#identita', label: 'Identità' },
+        { href: '#identita', label: 'Anagrafica' },
+        { href: '#clinica', label: 'Diagnosi' },
+        { href: '#amministrazione', label: 'Amministrazione' },
         { href: '#parametri', label: 'Parametri', meta: workspace ? String(workspace.observationsCount) : undefined },
         { href: '#terapie', label: 'Terapie', meta: workspace ? String(workspace.activeTherapiesCount) : undefined },
         { href: '#prestazioni', label: 'Prestazioni', meta: prestazioniCount !== undefined ? String(prestazioniCount) : undefined },
         { href: '#protesica', label: 'Protesica', meta: protesicaCount !== undefined ? String(protesicaCount) : undefined },
-        { href: '#scale', label: 'Scale' },
+        { href: '#scale', label: 'Scale', meta: String(scaleEntries.length) },
         { href: '#documenti', label: 'Documenti', meta: String(attachmentItems.length) },
         { href: '#siss', label: 'SISS/FSE' },
         { href: '#timeline', label: 'Timeline', meta: String(nonScaleEntries.length + (checkups ?? []).length + documentInsights.length) },
@@ -665,12 +669,12 @@ export default function PatientDetailPage() {
             )}
         >
             <div className={workspaceStyles.clinicalStack}>
-                <section id="attenzione" className={workspaceStyles.attentionBand} aria-labelledby="attention-title" data-testid="lume-scheda-attention">
+                <section id="attenzione" className={workspaceStyles.attentionBand} data-has-attention={reviewQueueSummary.attentionCount + openLoopCount > 0} aria-labelledby="attention-title" data-testid="lume-scheda-attention">
                     <div className={workspaceStyles.attentionHead}>
                         <div>
-                            <p className={workspaceStyles.sectionLabel}>Attenzione</p>
-                            <h2 id="attention-title" className={workspaceStyles.sectionTitle}>Cosa fare adesso</h2>
-                            <p className={workspaceStyles.sectionCopy}>Decisioni e attese aperte prima del resto della scheda.</p>
+                            {!proposal ? <p className={workspaceStyles.sectionLabel}>Attenzione</p> : null}
+                            <h2 id="attention-title" className={workspaceStyles.sectionTitle}>{proposal ? 'Da rivedere' : 'Cosa fare adesso'}</h2>
+                            {!proposal ? <p className={workspaceStyles.sectionCopy}>Decisioni e attese aperte prima del resto della scheda.</p> : null}
                         </div>
                     </div>
                     <div className={workspaceStyles.attentionContent}>
@@ -725,6 +729,13 @@ export default function PatientDetailPage() {
                 </section>
 
                 <PatientSynopticSheet
+                    clinicalSupport={<PatientClinicalSupport patient={patient} stale={insightStale}
+                        smartImport={smartImportSourceCount > 0 && smartImportFabricCaptureInput ? (
+                            <PatientSmartImportFabricPreviewCard patientId={patient.id}
+                                captureInput={smartImportFabricCaptureInput}
+                                enabled={isAiSmartImportEnabledValue(smartImportKillSwitch?.value)} />
+                        ) : null} />}
+                    notes={patient.notes}
                     leadDiagnosis={leadDiagnosis}
                     otherProblemsCount={otherProblemsCount}
                     signals={synopticSignals}
@@ -735,19 +746,16 @@ export default function PatientDetailPage() {
                     nextCheckupTitle={nextCheckup?.title}
                 />
 
-                <CollapsibleSection id="identita" kicker="Identità" title="Identità, diagnosi ed esenzioni" surfaceClassName={workspaceStyles.clinicalSection} defaultOpen>
-                    <PatientIdentityLens
-                        variant="reader"
-                        patient={patient}
-                        ageLabel={ageLabel}
-                        birthDateLabel={birthDateLabel}
-                        diagnoses={diagnosisItems}
-                        exemptions={exemptionCodes}
-                        exemptionDetails={exemptionDetails ?? []}
-                        summary={summaryText}
-                        nextStep={nextStepText}
-                    />
-                </CollapsibleSection>
+                {/* @Codex WUL-678: three actual folder destinations; #identita remains an identity-only alias. */}
+                {(['anagrafica', 'clinica', 'amministrazione'] as const).map((domain) => (
+                    <CollapsibleSection key={domain} id={domain === 'anagrafica' ? 'identita' : domain}
+                        title={domain === 'anagrafica' ? 'Anagrafica' : domain === 'clinica' ? 'Clinica' : 'Amministrazione'}
+                        surfaceClassName={`${workspaceStyles.clinicalSection} ${disclosure.domainSection}`} defaultOpen={domain === 'anagrafica'}>
+                        <PatientIdentityLens variant="reader" domain={domain} patient={patient}
+                            ageLabel={ageLabel} birthDateLabel={birthDateLabel} diagnoses={diagnosisItems}
+                            exemptions={exemptionCodes} exemptionDetails={exemptionDetails ?? []} />
+                    </CollapsibleSection>
+                ))}
 
                 <CollapsibleSection
                     id="timeline"
@@ -843,21 +851,24 @@ export default function PatientDetailPage() {
                         summary="Apertura assistita dei portali regionali e diario dei passaggi."
                         surfaceClassName={workspaceStyles.clinicalSection}
                     >
-                        <div className="space-y-4">
-                            <SissPatientContextPanel
-                                patientId={id}
-                                patientTaxCode={patient.taxCode}
-                                embedded
-                            />
-                            <SissHandoffDiary patientId={id} embedded />
-                        </div>
+                        {/* @Codex: SISS presentation reuses the existing export/share gates. */}
+                        <SissWorkspace
+                            patientId={id}
+                            patientTaxCode={patient.taxCode}
+                            canShareFhirFile={canShareFhirFile}
+                            onExportFhir={() => setIsExportModalOpen(true)}
+                            onShareFhir={handleShareFhir}
+                        />
                     </CollapsibleSection>
                 <CollapsibleSection
                     id="documenti"
+                    keepMounted
                     kicker="Documenti"
                     title="Archivio documenti ed evidenze"
-                    count={attachmentItems.length > 0 ? `${attachmentItems.length} file` : undefined}
-                    summary={attachmentItems.length > 0 ? 'Apri evidenze, insight e archivio.' : 'Nessun documento ancora caricato.'}
+                    count={attachmentsError || attachments === undefined ? undefined : `${attachments.length} file`}
+                    summary={attachmentsError ? 'Conteggio non disponibile. Apri Documenti per consultare o rileggere l’elenco.'
+                        : attachments === undefined ? 'Caricamento documenti…'
+                        : attachments.length > 0 ? 'Carica, consulta e rivedi i documenti.' : 'Nessun documento ancora caricato.'}
                     surfaceClassName={workspaceStyles.clinicalSection}
                     defaultOpen={!documentSynthesisKillSwitchLoading
                         && !patientInsightKillSwitchLoading
@@ -866,37 +877,15 @@ export default function PatientDetailPage() {
                             || smartImportSourceCount > 0
                             || reviewQueueSummary.rows.some((row) => row.id === 'insight' && row.state === 'bloccato'))}
                 >
-                    <div className="space-y-5">
-                        <AIPatientInsight patient={patient} stale={insightStale} />
-                        <div>
-                            <p className={workspaceStyles.sectionLabel}>Referti recenti</p>
-                        {recentEvidence.length > 0 ? (
-                            <div className={workspaceStyles.evidenceList}>
-                                {recentEvidence.map((insight) => (
-                                    <EvidenceStackTile key={insight.id} insight={insight} />
-                                ))}
-                            </div>
-                        ) : (
-                            <p className={workspaceStyles.emptyState}>Nessuna evidenza documentale in primo piano.</p>
-                        )}
-                        </div>
-                        {smartImportSourceCount > 0 && smartImportFabricCaptureInput ? (
-                            <PatientSmartImportFabricPreviewCard
-                                patientId={patient.id}
-                                captureInput={smartImportFabricCaptureInput}
-                                enabled={isAiSmartImportEnabledValue(smartImportKillSwitch?.value)}
-                            />
+                    {/* @Codex WUL-678: upload, source list, then review; no duplicated evidence tiles. */}
+                    <DocumentUpload patientId={id}>
+                        {documentInsights.length > 0 ? (
+                            <details id="document-insights" className={disclosure.disclosure}>
+                                <summary>Sintesi archiviate · {documentInsights.length}</summary>
+                                <DocumentInsightsPanel patient={patient} />
+                            </details>
                         ) : null}
-                        <DocumentInsightsPanel patient={patient} />
-                        <div>
-                            <p className={workspaceStyles.sectionLabel}>Archivio</p>
-                            {patient.aiSummary?.trim() && !isDocumentUploadOpen ? (
-                                <button type="button" className={workspaceStyles.rowLink} onClick={() => setIsDocumentUploadOpen(true)}>
-                                    Apri caricamento documenti
-                                </button>
-                            ) : <DocumentUpload patientId={id} />}
-                        </div>
-                    </div>
+                    </DocumentUpload>
                 </CollapsibleSection>
 
                     <CollapsibleSection
@@ -905,32 +894,40 @@ export default function PatientDetailPage() {
                         title="Scale di valutazione"
                         icon={Activity}
                         surfaceClassName={workspaceStyles.clinicalSection}
-                        summary="Tinetti POMA-28 v1, MMSE, ADL (Katz), GDS e libreria completa."
+                        count={scaleEntries.length > 0 ? `${scaleEntries.length} registrate` : undefined}
+                        summary="Risultati registrati e nuove valutazioni."
                     >
-                        <div className="space-y-3">
-                            {/* @Codex MF085-002: distinct new instrument, never a legacy alias. */}
-                            <Link href={`/patients/${id}/scales/tinetti-poma28-v1`} className={workspaceStyles.rowLink}>
-                                <span>Tinetti POMA-28 (v1)</span>
-                                <Plus className="h-4 w-4 text-[color:var(--lume-ink-muted)]" />
-                            </Link>
-                            <Link href={`/patients/${id}/scales/mmse`} className={workspaceStyles.rowLink}>
-                                <span>MMSE</span>
-                                <Plus className="h-4 w-4 text-[color:var(--lume-ink-muted)]" />
-                            </Link>
-                            <Link href={`/patients/${id}/scales/adl`} className={workspaceStyles.rowLink}>
-                                <span>ADL (Katz)</span>
-                                <Plus className="h-4 w-4 text-[color:var(--lume-ink-muted)]" />
-                            </Link>
-                            <Link href={`/patients/${id}/scales/gds`} className={workspaceStyles.rowLink}>
-                                <span>GDS</span>
-                                <Plus className="h-4 w-4 text-[color:var(--lume-ink-muted)]" />
-                            </Link>
-                            <Link href={`/patients/${id}/scales`} className={workspaceStyles.rowLink}>
+                        {/* @Codex: Read stored results without rescoring historical instruments. */}
+                        <div className="mb-8 space-y-4">
+                            <h4 className="text-base font-semibold text-[color:var(--lume-ink)]">Valutazioni registrate</h4>
+                            {entries ? (
+                                <Timeline
+                                    entries={scaleHistoryEntries}
+                                    label="Storico delle scale del paziente"
+                                    emptyMessage="Nessuna valutazione registrata."
+                                />
+                            ) : <p className={workspaceStyles.mutedText}>Valutazioni in caricamento.</p>}
+                        </div>
+                        {/* @Codex WUL-678: one target per scale, with explicit spacing. */}
+                        <div className={scaleStyles.quickStart}>
+                            <h4 className="text-base font-semibold text-[color:var(--lume-ink)]">Nuova valutazione</h4>
+                            <div className={scaleStyles.catalog}>
+                                {[
+                                    ['tinetti-poma28-v1', 'Tinetti POMA-28 (v1)'],
+                                    ['mmse', 'MMSE'], ['adl', 'ADL (Katz)'], ['gds', 'GDS'],
+                                ].map(([scaleId, label]) => (
+                                    <Link key={scaleId} href={`/patients/${id}/scales/${scaleId}`} className={scaleStyles.catalogLink}>
+                                        <span>{label}</span><Plus size={18} aria-hidden="true" />
+                                    </Link>
+                                ))}
+                            </div>
+                            <Link href={`/patients/${id}/scales`} className={scaleStyles.control}>
                                 Apri libreria scale
                             </Link>
                         </div>
                     </CollapsibleSection>
 
+                {/* @Codex WUL-678: connect the folder follow-up action to the existing planner. */}
                 <CollapsibleSection
                     id="follow-up"
                     kicker="Pianificazione"
@@ -942,7 +939,8 @@ export default function PatientDetailPage() {
                         {!checkups || checkups.length === 0 ? (
                             <div>
                                 <p className={workspaceStyles.emptyState}>Nessun follow-up pianificato.</p>
-                                <Link href={`/patients/${id}/edit`} className={workspaceStyles.rowLink}>
+                                <Link href={`/patients/${id}/edit#pianificazione`} className={workspaceStyles.followupAction}>
+                                    <Plus className="h-4 w-4" aria-hidden="true" />
                                     Aggiungi follow-up
                                 </Link>
                             </div>
@@ -961,8 +959,9 @@ export default function PatientDetailPage() {
                                         </div>
                                     </div>
                                 ))}
-                                <Link href={`/patients/${id}/edit`} className={workspaceStyles.rowLink}>
-                                    Gestisci follow-up
+                                <Link href={`/patients/${id}/edit#pianificazione`} className={workspaceStyles.followupAction}>
+                                    <Plus className="h-4 w-4" aria-hidden="true" />
+                                    Aggiungi follow-up
                                 </Link>
                             </div>
                         )}

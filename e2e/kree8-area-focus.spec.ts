@@ -31,9 +31,11 @@ test('le CTA Agenda portano tastiera e focus al titolo della destinazione', asyn
     page.getByRole('heading', { name: /Pazienti in carico/, level: 1 }),
   );
 
-  const agendaNavigation = page.getByRole('button', { name: 'Agenda', exact: true });
+  const agendaNavigation = page.getByRole('navigation', { name: 'Navigazione principale', exact: true })
+    .getByRole('link', { name: 'Agenda', exact: true });
   await agendaNavigation.focus();
   await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(/\?area=turno(?:&|$)/);
   await expectAreaHeadingFocused(
     page,
     'turno',

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 /* @Codex */
-import { forbiddenResponse, requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
+import { forbiddenResponse, unauthorizedResponse } from '@/lib/security/server-auth';
+import { requireAccountSession } from '@/lib/security/paired-native-session';
 /* @Codex */
 import { authProfileUpdateSchema } from '@/lib/api-schemas/auth';
 /* @Codex */
@@ -10,7 +11,7 @@ import { updateProfile } from '@/lib/security/profile-update-service';
 
 export async function PUT(request: Request) {
     /* @Codex */
-    const session = await requireSession();
+    const session = await requireAccountSession(request);
     if (!session) return unauthorizedResponse();
 
     try {

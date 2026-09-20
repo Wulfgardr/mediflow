@@ -19,6 +19,10 @@ is_loopback_host() {
   esac
 }
 
+# @Codex: decide fresh installation before TLS/token/runtime files populate the directory.
+MEDIFLOW_DATA_DIR="$DATA_DIR" MEDIFLOW_DB_PATH="$DB_PATH" \
+  node "$ROOT_DIR/scripts/run-strip-types.mjs" "$ROOT_DIR/scripts/native-first-install.mjs"
+
 mkdir -p "$CERT_DIR"
 
 if [[ ! -f "$CERT_PATH" || ! -f "$KEY_PATH" ]]; then

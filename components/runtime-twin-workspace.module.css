@@ -1,0 +1,64 @@
+/* @Codex WUL-676: a workbench, with one application rail and one working plane. */
+.workspace { --twin-rail: 184px; --twin-border: color-mix(in srgb, var(--lume-ink) 13%, transparent); display: grid; grid-template-columns: var(--twin-rail) minmax(0, 1fr); position: fixed; inset: var(--runtime-twin-inset, 0px) 0 0; background: var(--lume-surface-focal); color: var(--lume-ink); font-family: var(--lume-font-sans); }
+.rail { display: flex; flex-direction: column; min-height: 0; padding: 22px 12px 14px; background: var(--lume-surface-chrome); border-right: 1px solid var(--twin-border); }
+.brand { display: flex; align-items: center; gap: 9px; padding: 0 9px 26px; font-size: 17px; letter-spacing: -.035em; }
+.brandMark { display: grid; place-items: center; width: 25px; height: 25px; border-radius: 7px; background: var(--lume-ink); color: var(--lume-surface-focal); }
+.navigation { display: grid; gap: 3px; }
+.navigation a, .railBottom a, .railBottom button { display: flex; align-items: center; gap: 11px; min-height: 40px; border-radius: 7px; padding: 8px 11px; color: var(--lume-ink-muted); font-size: 13px; text-align: left; }
+.navigation a:hover, .railBottom a:hover, .railBottom button:hover { background: var(--lume-surface-field); color: var(--lume-ink); }
+.railBottom { margin-top: auto; display: grid; gap: 3px; }
+.workarea { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.workspaceBar { height: 48px; flex: 0 0 48px; display: flex; align-items: center; gap: 8px; padding: 0 14px; border-bottom: 1px solid var(--twin-border); }
+.iconButton { flex: none; width: 34px; height: 34px; display: grid; place-items: center; border-radius: 7px; color: var(--lume-ink-muted); }
+.openRecords { display: flex; min-width: 0; gap: 4px; align-self: stretch; align-items: center; overflow-x: auto; flex: 1; scrollbar-width: thin; }
+.directoryTab { padding: 9px 12px; font-size: 12px; color: var(--lume-ink-muted); }
+.recordTab { display: flex; align-items: center; flex: none; gap: 2px; border-radius: 6px; padding-right: 4px; color: var(--lume-ink-muted); }
+.recordTab > a:first-child { font-size: 12px; padding: 8px 7px 8px 12px; max-width: 190px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.recordTab > :last-child { display: grid; place-items: center; width: 28px; height: 28px; }
+.recordTab[data-active='true'] { color: var(--lume-ink); background: var(--lume-surface-field); }
+/* @Codex: preserve the shared toggle's touch target inside the 48px header. */
+.privacy { width: 44px !important; height: 44px !important; min-width: 44px !important; border-radius: 7px !important; border: 0 !important; padding: 0 !important; flex: none; }
+.page { position: relative; flex: 1; min-height: 0; overflow: auto; scrollbar-width: thin; }
+.workspace :is(a, button, summary):focus-visible { outline: 2px solid var(--lume-accent); outline-offset: 2px; }
+.workspace :is(a, button) { cursor: pointer; }
+.workspace svg { flex: none; }
+.workspace[data-rail-open='false'] { --twin-rail: 60px; }
+.workspace[data-rail-open='false'] .rail { padding-inline: 8px; }
+.workspace[data-rail-open='false'] :is(.brand strong, .navigation span, .railBottom span) { display: none; }
+.workspace[data-rail-open='false'] .brand { padding-inline: 8px; }
+.patientNavigation { display: flex; align-items: center; gap: 5px; padding: 0 32px; border-bottom: 1px solid var(--twin-border, color-mix(in srgb, var(--lume-ink) 13%, transparent)); flex-wrap: wrap; }
+.patientNavigation > a, .moreSections summary { display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 13px 10px; font-size: 13px; color: var(--lume-ink-muted); cursor: pointer; list-style: none; }
+.patientNavigation > a[aria-current], .moreSections summary[aria-current] { color: var(--lume-ink); box-shadow: inset 0 -2px var(--lume-ink); font-weight: 600; }
+.patientNavigation a > span:not(:first-child) { font-size: 11px; color: var(--lume-ink-muted); }
+.moreSections { position: relative; }
+.moreSections summary::-webkit-details-marker { display: none; }
+.sectionMenu { position: absolute; top: 100%; right: 0; width: 258px; z-index: 30; background: var(--lume-surface-focal); box-shadow: 0 8px 28px color-mix(in srgb, var(--lume-ink) 18%, transparent); border-radius: 10px; padding: 6px; max-height: min(65dvh, 500px); overflow: auto; }
+.sectionMenu a { display: flex; align-items: center; justify-content: space-between; min-height: 40px; gap: 12px; padding: 8px 11px; border-radius: 5px; font-size: 13px; }
+.sectionMenu a:hover, .sectionMenu a[aria-current] { background: var(--lume-surface-field); }
+.sectionMenu small { color: var(--lume-ink-muted); font-size: 11px; }
+.workspace[data-composition='stream'] { --twin-rail: 0px; grid-template-columns: minmax(0, 1fr); }
+.workspace[data-composition='stream'] .rail { border-right: 0; padding: 0 20px; height: 48px; flex-direction: row; align-items: center; border-bottom: 1px solid var(--twin-border); gap: 25px; }
+.workspace[data-composition='stream'] .brand { padding: 0; }
+.workspace[data-composition='stream'] .navigation { display: flex; flex: 1; }
+.workspace[data-composition='stream'] .navigation a { min-height: 36px; }
+.workspace[data-composition='stream'] .railBottom { display: flex; margin: 0; }
+.workspace[data-composition='stream'] .iconButton { display: none; }
+.workspace[data-composition='stream'] { grid-template-rows: 48px minmax(0, 1fr); }
+@media (max-width: 1100px) { .workspace { --twin-rail: 60px; } .rail { padding-inline: 8px; } .brand { padding-inline: 8px; } .brand strong, .navigation span, .railBottom span { display: none; } .workspace[data-composition='stream'] .brand strong { display: block; } }
+@media (max-width: 700px) { .workspace { display: flex; flex-direction: column; } .rail { flex-direction: row; align-items: center; padding: 0 8px; height: 48px; flex: none; gap: 3px; border-right: 0; border-bottom: 1px solid var(--twin-border); } .brand { display: none; } .navigation { display: flex; flex: 1; justify-content: space-between; } .navigation a, .railBottom a, .railBottom button { width: 40px; height: 44px; padding: 10px; } .navigation a, .railBottom a, .railBottom button { width: 36px; padding-inline: 8px; } .railBottom { display: flex; margin: 0; } .workarea { flex: 1; } .workspaceBar { padding-inline: 8px; } .iconButton { display: none; } .patientNavigation { padding-inline: 14px; gap: 0; } .patientNavigation > a, .moreSections summary { padding: 12px 8px; font-size: 12px; } .workspace[data-composition='stream'] .rail { padding: 0 8px; gap: 3px; } .workspace[data-composition='stream'] .brand { display: none; } .workspace[data-composition='stream'] .navigation a { padding: 10px; } .sectionMenu { left: 0; right: auto; max-width: calc(100vw - 40px); } }
+.workspace[data-active='false'], .workspace[data-active='false'] .workarea, .workspace[data-active='false'] .page { display: contents; }
+.workspace[data-active='false'] .rail, .workspace[data-active='false'] .workspaceBar { display: none; }
+.navigation a[aria-current], .railBottom a[aria-current] { background: var(--lume-surface-field); color: var(--lume-ink); font-weight: 550; }
+@media (max-width: 700px) {
+  .sectionMenu {
+    position: fixed;
+    left: 14px;
+    right: 14px;
+    top: auto;
+    bottom: max(12px, env(safe-area-inset-bottom));
+    width: auto;
+    max-width: none;
+    max-height: min(65dvh, calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 24px));
+    overflow: auto;
+  }
+}

@@ -20,6 +20,18 @@ struct ClinicalTextFieldStyle: TextFieldStyle {
     // swiftlint:disable:next identifier_name
     func _body(configuration: TextField<Self._Label>) -> some View {
         let palette = LumePalette.palette(for: colorScheme, isGuardia: isGuardia)
+        #if os(iOS)
+        // @Codex: A text field is a writing surface, with room for touch and text.
+        let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
+        configuration
+            .textFieldStyle(.plain)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .frame(minHeight: 44)
+            .background(palette.field.opacity(isEnabled ? 1 : 0.5), in: shape)
+            .overlay(shape.strokeBorder(palette.inkMuted.opacity(0.22), lineWidth: 0.5))
+            .contentShape(Rectangle())
+        #else
         configuration
             .textFieldStyle(.plain)
             .padding(.horizontal, 14)
@@ -31,6 +43,7 @@ struct ClinicalTextFieldStyle: TextFieldStyle {
             // A tap anywhere on the pill puts the caret in the field, not only on
             // the glyphs. The plain style's hit area is the text itself.
             .contentShape(Capsule())
+        #endif
     }
 }
 

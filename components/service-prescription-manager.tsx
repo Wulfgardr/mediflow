@@ -26,6 +26,7 @@ import { notifyDbChange, useLiveQuery } from '@/lib/live-query';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { DocumentReferenceChip } from '@/components/document-reference-chip';
 import { Badge } from '@/components/ui/badge';
+import { useRuntimeTwinPendingForm } from '@/components/runtime-twin-design';
 import {
     catalogMatchStatusSignal,
     type SemanticSignal,
@@ -85,7 +86,9 @@ const PRIORITY_OPTIONS: Array<{ value: ServicePrescriptionPriority; label: strin
 ];
 
 function todayInputValue(): string {
-    return new Date().toISOString().slice(0, 10);
+    // @Codex: the form asks for the operator's calendar day, not the UTC day.
+    const today = new Date();
+    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 }
 
 function emptyForm(): FormState {
@@ -193,6 +196,9 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [form, setForm] = useState<FormState>(() => emptyForm());
+
+    /* @Codex: the conditional form's open state is the pending-form signal. */
+    useRuntimeTwinPendingForm(isFormOpen);
 
     /* @Codex */
     const prescriptions = useLiveQuery(

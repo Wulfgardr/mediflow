@@ -1,157 +1,46 @@
 /* @Codex */
-import { db, ExemptionCode } from './db';
+import { EXEMPTION_MAX_BYTES, type ExemptionCatalogStatus, type ExemptionImportPreview, type ExemptionImportReceipt } from './exemption-import-contract';
 
-type ProgressCallback = (processed: number, total: number) => void;
-
-type ImportSummary = {
-    imported: number;
-    processedLines: number;
-    files: number;
-};
-
-function cleanValue(value: string | undefined): string {
-    if (!value) return '';
-    const trimmed = value.trim();
-    if (!trimmed || trimmed === '\\N') return '';
-    return trimmed;
+export type ExemptionImportSource = { sourceName: string; base64: string };
+export class ExemptionImportClientError extends Error {
+    readonly code: string;
+    constructor(code: string, message: string) { super(message); this.code = code; }
 }
-
-function parseCompactDate(value: string): Date | null {
-    if (!/^\d{8}$/.test(value)) return null;
-    const year = Number(value.slice(0, 4));
-    const month = Number(value.slice(4, 6));
-    const day = Number(value.slice(6, 8));
-    if (!year || !month || !day) return null;
-    const date = new Date(Date.UTC(year, month - 1, day));
-    return Number.isNaN(date.getTime()) ? null : date;
+async function readResponse<T>(response: Response): Promise<T> {
+    const body = await response.json();
+    if (!response.ok) throw new ExemptionImportClientError(body.error ?? 'IMPORT_FAILED', body.message ?? 'Operazione non riuscita. Rileggi lo stato e riprova.');
+    return body as T;
 }
-
-function parseFlag(value: string): boolean | undefined {
-    if (!value) return undefined;
-    const normalized = value.toUpperCase();
-    if (normalized === 'S' || normalized === 'Y' || normalized === 'TRUE' || normalized === '1') return true;
-    if (normalized === 'N' || normalized === 'FALSE' || normalized === '0') return false;
-    return undefined;
+export async function readExemptionImportSource(file: File): Promise<ExemptionImportSource> {
+    if (!file.size || file.size > EXEMPTION_MAX_BYTES) throw new Error('Seleziona un file non vuoto, massimo 2 MiB.');
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    let binary = '';
+    for (let i = 0; i < bytes.length; i += 8192) binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
+    return { sourceName: file.name, base64: btoa(binary) };
 }
-
-function isActive(record: ExemptionCode, now: Date): boolean {
-    if (!record.endDate) return true;
-    return new Date(record.endDate).getTime() >= now.getTime();
+export async function previewExemptionFile(source: ExemptionImportSource): Promise<ExemptionImportPreview> {
+    return readResponse(await fetch('/api/exemptions/import/preview', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(source),
+    }));
 }
-
-function shouldReplace(current: ExemptionCode, candidate: ExemptionCode, now: Date): boolean {
-    const currentActive = isActive(current, now);
-    const candidateActive = isActive(candidate, now);
-
-    if (currentActive !== candidateActive) return candidateActive;
-
-    const currentStart = current.startDate ? new Date(current.startDate).getTime() : 0;
-    const candidateStart = candidate.startDate ? new Date(candidate.startDate).getTime() : 0;
-    if (currentStart !== candidateStart) return candidateStart > currentStart;
-
-    return candidate.description.length > current.description.length;
+export async function commitExemptionFile(source: ExemptionImportSource, proof: string): Promise<{ receipt: ExemptionImportReceipt; replayed: boolean }> {
+    return readResponse(await fetch('/api/exemptions/import/commit', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...source, proof, acceptSubset: true }),
+    }));
 }
-
-function parseFile(text: string, source: string): ExemptionCode[] {
-    const lines = text.split(/\r?\n/);
-    if (lines.length <= 1) return [];
-
-    const header = lines[0].split('|').map((col) => col.trim().toUpperCase());
-    const idx = {
-        code: header.indexOf('CD_ESENZIONE'),
-        description: header.indexOf('DS_ESENZIONE'),
-        type: header.indexOf('CD_TIPO_ESENZIONE'),
-        startDate: header.indexOf('DT_INIZIO_VALIDITA'),
-        endDate: header.indexOf('DT_FINE_VALIDITA'),
-        pharma: header.indexOf('FL_AMBITO_FARMACEUTICO'),
-        specialist: header.indexOf('FL_AMBITO_SPECIALISTICO'),
-        national: header.indexOf('FL_NAZIONALE'),
-    };
-
-    if (idx.code < 0 || idx.description < 0) return [];
-
-    const parsed: ExemptionCode[] = [];
-    for (let i = 1; i < lines.length; i += 1) {
-        const row = lines[i].trim();
-        if (!row) continue;
-
-        const cols = row.split('|');
-        const code = cleanValue(cols[idx.code]).toUpperCase();
-        const description = cleanValue(cols[idx.description]);
-        if (!code || !description) continue;
-
-        const startDateRaw = idx.startDate >= 0 ? cleanValue(cols[idx.startDate]) : '';
-        const endDateRaw = idx.endDate >= 0 ? cleanValue(cols[idx.endDate]) : '';
-
-        parsed.push({
-            code,
-            description,
-            type: idx.type >= 0 ? cleanValue(cols[idx.type]) : undefined,
-            source,
-            startDate: parseCompactDate(startDateRaw) || undefined,
-            endDate: parseCompactDate(endDateRaw) || undefined,
-            isPharma: idx.pharma >= 0 ? parseFlag(cleanValue(cols[idx.pharma])) : undefined,
-            isSpecialist: idx.specialist >= 0 ? parseFlag(cleanValue(cols[idx.specialist])) : undefined,
-            isNational: idx.national >= 0 ? parseFlag(cleanValue(cols[idx.national])) : undefined,
-            updatedAt: new Date(),
-        });
-    }
-
-    return parsed;
+export async function getExemptionImportStatus(): Promise<ExemptionCatalogStatus> {
+    return readResponse(await fetch('/api/exemptions/import/status', { cache: 'no-store' }));
 }
-
-export async function importExemptionFiles(files: File[], onProgress?: ProgressCallback): Promise<ImportSummary> {
-    if (!files.length) {
-        return { imported: 0, processedLines: 0, files: 0 };
-    }
-
-    const merged = new Map<string, ExemptionCode>();
-    const now = new Date();
-
-    let processedLines = 0;
-    let totalLines = 0;
-
-    for (const file of files) {
-        const content = await file.text();
-        const parsed = parseFile(content, file.name);
-        totalLines += parsed.length;
-        for (const candidate of parsed) {
-            processedLines += 1;
-            const existing = merged.get(candidate.code);
-            if (!existing || shouldReplace(existing, candidate, now)) {
-                merged.set(candidate.code, candidate);
-            }
-            if (onProgress && processedLines % 100 === 0) {
-                onProgress(processedLines, Math.max(totalLines, processedLines));
-            }
-        }
-    }
-
-    const records = Array.from(merged.values());
-    const batchSize = 60;
-    for (let i = 0; i < records.length; i += batchSize) {
-        const batch = records.slice(i, i + batchSize);
-        await db.exemptions.bulkPut(batch);
-    }
-
-    if (onProgress) {
-        onProgress(processedLines, Math.max(totalLines, processedLines));
-    }
-
-    return {
-        imported: records.length,
-        processedLines,
-        files: files.length,
-    };
+/** Retired batch entrypoint: retained as an explicit failure for old callers. */
+export async function importExemptionFiles(_files: File[], _onProgress?: (processed: number, total: number) => void): Promise<never> {
+    void _files; void _onProgress;
+    throw new Error('EXEMPTION_IMPORT_PREVIEW_REQUIRED');
 }
-
 export async function clearExemptionDatabase() {
-    return db.exemptions.clear();
+    return readResponse(await fetch('/api/exemptions', { method: 'DELETE' }));
 }
-
 export async function getExemptionStats(): Promise<number> {
-    const response = await fetch('/api/exemptions?count=1');
-    if (!response.ok) throw new Error('Failed to fetch exemption stats');
-    const payload = await response.json();
-    return Number(payload.count || 0);
+    const payload = await readResponse<{ count: number }>(await fetch('/api/exemptions?count=1', { cache: 'no-store' }));
+    return payload.count;
 }

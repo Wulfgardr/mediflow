@@ -10,6 +10,10 @@ import {
 } from './treatment-reasoning-projection';
 import {
     createTreatmentReasoningAthenaOutputContractV2,
+    createTreatmentReasoningPortableOutputContractV2,
+    snapshotTreatmentReasoningPortableAttestation,
+    type TreatmentReasoningPortableAttestation,
+    type TreatmentReasoningPortableOutputResult,
     type TreatmentReasoningAthenaV2Attestation,
     type TreatmentReasoningAthenaV2SourceBinding,
     type TreatmentReasoningAthenaV2Value,
@@ -210,5 +214,33 @@ export function createTreatmentReasoningAthenaExecution(value: unknown): Readonl
                     : denied('provider_invalid');
             } catch { return denied('provider_invalid'); }
         });
+    } });
+}
+
+export type TreatmentReasoningPortableExecutionResult =
+    | (Omit<Completed, 'attestation'> & Readonly<{ attestation: TreatmentReasoningPortableAttestation }>)
+    | Denied;
+/** Portable engine metadata is validated separately; projection, prompt and V2 clinical rules are identical. */
+export function createTreatmentReasoningPortableExecution(value: unknown) {
+    const config = configuration(value);
+    if (!config) throw new TreatmentReasoningAthenaExecutionConfigurationError();
+    return freeze({ async execute(value: unknown): Promise<TreatmentReasoningPortableExecutionResult> {
+        const input = snapshot(value);
+        if (!input) return denied('input_invalid');
+        let attestation: TreatmentReasoningPortableAttestation | null;
+        try { attestation = snapshotTreatmentReasoningPortableAttestation(config.host.policy()); } catch { attestation = null; }
+        if (!attestation || attestation.receiptRef !== input.receiptRef || attestation.provenanceRef !== input.provenanceRef) return denied('host_invalid');
+        const outcome = await invokeOnce(config.host, config.timeoutMs, input);
+        if (outcome.kind === 'timeout') return denied('execution_timeout');
+        if (outcome.kind === 'failed') return denied('provider_failed');
+        try {
+            const normalized: TreatmentReasoningPortableOutputResult = createTreatmentReasoningPortableOutputContractV2({
+                allowedEvidenceRefs: input.evidenceRefs, attestation,
+            }).normalize(providerValue(outcome.value));
+            return normalized.status === 'accepted'
+                ? freeze({ status: 'completed' as const, code: null, resultSchema: normalized.resultSchema,
+                    value: normalized.value, sourceBindings: normalized.sourceBindings, attestation: normalized.attestation, ...COMMON })
+                : denied('provider_invalid');
+        } catch { return denied('provider_invalid'); }
     } });
 }

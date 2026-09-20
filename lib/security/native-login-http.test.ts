@@ -19,7 +19,7 @@ import {
 
 const pin = ['2', '4', '6', '8'].join(''); const wrongPin = ['w', 'r', 'o', 'n', 'g'].join('');
 const user = Object.freeze({ id: 'user.synthetic.native', username: ['native', 'user'].join('-'), role: 'admin', displayName: 'Synthetic', ambulatoryName: 'Synthetic Clinic', encryptedMasterKey: 'wrapped', salt: 'salt' });
-const binding = Object.freeze({ clientId: 'client.synthetic.a', clientPlatform: 'ipados' as const });
+const binding = Object.freeze({ clientId: 'client.synthetic.a', clientPlatform: 'ipados' as const, tokenHash: 'a'.repeat(64) });
 const request = (headers: HeadersInit = {}) => new Request('http://127.0.0.1/api/auth/native/login', { method: 'POST', headers });
 const deferred = <T>() => { let resolve!: (value: T) => void; const promise = new Promise<T>((done) => { resolve = done; }); return { promise, resolve }; };
 
@@ -129,6 +129,8 @@ test('native predicate accepts only server-tagged, exact paired sessions', () =>
     const native = createNativeServerSession(user, binding); const web = createSession(user, 'web'); const legacyNative = createSession(user, 'native');
     assert.equal(isPairedNativeServerSession(native, binding), true);
     assert.equal(isPairedNativeServerSession(native, { ...binding, clientId: 'client.synthetic.b' }), false);
+    assert.equal(isPairedNativeServerSession(native, { ...binding, tokenHash: 'b'.repeat(64) }), false);
+    assert.equal(isPairedNativeServerSession(native, { clientId: binding.clientId, clientPlatform: binding.clientPlatform }), false);
     assert.equal(isPairedNativeServerSession(web, binding), false); assert.equal(isPairedNativeServerSession(legacyNative, binding), false);
     assert.equal(isPairedNativeServerSession({ ...native }, binding), false); assert.equal(isPairedNativeServerSession(new Proxy(native, {}), binding), false);
     clearAllSessions(); assert.equal(isPairedNativeServerSession(native, binding), false);
@@ -138,7 +140,7 @@ test('route accepts only credentials and the commit has no await between final c
     const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..', '..');
     const route = fs.readFileSync(path.join(root, 'app/api/auth/native/login/route.ts'), 'utf8');
     const source = fs.readFileSync(path.join(root, 'lib/security/native-login-http.ts'), 'utf8');
-    assert.match(route, /admitNativeBootstrap\(\{ request \}\)/u); assert.match(route, /body\?\.username|body\?\.password/u);
+    assert.match(route, /admitNativeBootstrapRouteRequest\(request\)/u); assert.match(route, /body\?\.username|body\?\.password/u);
     assert.doesNotMatch(route, /authorization|cookie|source-surface|paired-client/u);
     const commit = source.match(/const paired = await consume\(admission\); consumed = true;([\s\S]*?)response\.cookies\.set\(SESSION_COOKIE_NAME/u)?.[1];
     assert.match(source, /const paired = await consume\(admission\); consumed = true;[\s\S]*?const session = createNativeSession[\s\S]*?response\.cookies\.set\(SESSION_COOKIE_NAME/u);

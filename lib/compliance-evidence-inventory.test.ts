@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
+import { isExternalUrlLiteralAllowed } from '../scripts/check-never-regress.mjs';
 import { COMPLIANCE_EVIDENCE_INVENTORY } from './compliance-evidence-inventory.ts';
 
 test('espone un inventario tecnico con un claim ceiling non legale', () => {
@@ -46,11 +47,16 @@ test('mantiene i riferimenti normativi come input esterni senza classificare il 
     assert.deepEqual(
         legal?.externalReferences.map(({ href }) => href),
         [
-            'https://eur-lex.europa.eu/eli/reg/2016/679/art_25/oj/eng',
-            'https://eur-lex.europa.eu/eli/reg/2016/679/art_32/oj/eng',
-            'https://eur-lex.europa.eu/eli/reg/2024/1689/oj?locale=en',
+            'https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02016R0679-20160504',
+            'https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02024R1689-20260727',
+            'https://digital-strategy.ec.europa.eu/en/policies/regulatory-framework-ai',
         ],
     );
+    assert.match(legal?.externalReferences[0].label ?? '', /consolidato 04\/05\/2016/u);
+    assert.match(legal?.externalReferences[1].label ?? '', /consolidato 27\/07\/2026/u);
+    assert.match(legal?.externalReferences[2].label ?? '', /pagina aggiornata 03\/08\/2026/u);
+    assert.match(legal?.summary ?? '', /consultate il 06\/09\/2026/u);
+    assert.ok(legal?.evidence.includes('docs/analysis/2026-09-06-086-regulatory-evidence.md'));
     assert.equal(legal?.owner, 'Organizzazione, referente legale e DPO');
 
     const serialized = JSON.stringify(COMPLIANCE_EVIDENCE_INVENTORY).toLowerCase();
@@ -62,6 +68,20 @@ test('mantiene i riferimenti normativi come input esterni senza classificare il 
     ]) {
         assert.equal(serialized.includes(forbidden), false, forbidden);
     }
+});
+
+test('le eccezioni URL restano limitate ai riferimenti e ai file dell’inventario', () => {
+    const legal = COMPLIANCE_EVIDENCE_INVENTORY.records.at(-1)!;
+    for (const { href } of legal.externalReferences) {
+        for (const file of ['lib/compliance-evidence-inventory.ts', 'lib/compliance-evidence-inventory.test.ts']) {
+            assert.equal(isExternalUrlLiteralAllowed(file, href, `href: '${href}',`), true);
+            const unreviewed = `${href}/unreviewed`;
+            assert.equal(isExternalUrlLiteralAllowed(file, unreviewed, `href: '${unreviewed}',`), false);
+        }
+        assert.equal(isExternalUrlLiteralAllowed('lib/unrelated.ts', href, `href: '${href}',`), false);
+    }
+    const source = readFileSync('lib/compliance-evidence-inventory.ts', 'utf8');
+    assert.doesNotMatch(source, /\b(?:fetch|XMLHttpRequest|WebSocket)\s*\(/u);
 });
 
 test('la superficie Impostazioni e statica, sola lettura e dichiara il proprio limite', () => {

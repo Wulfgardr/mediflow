@@ -6,6 +6,16 @@ Questa cartella contiene le decisioni di MediFlow (web + native).
 
 ## ADR piu recente
 
+- [0125-explicit-aifa-catalog-download.md](./0125-explicit-aifa-catalog-download.md): proposta di aggiornamento AIFA esplicito dalla fonte ufficiale.
+
+- [0123-official-web-ui-navigation-compositions.md](./0123-official-web-ui-navigation-compositions.md): promozione della UI web con B predefinita, A selezionabile e confronto sintetico separato.
+
+- [0122-local-provider-host-setup.md](./0122-local-provider-host-setup.md): comando host esplicito per ammissione, recupero e revoca di Ollama, separato dai consumer.
+- [0121-function-status-projection.md](./0121-function-status-projection.md): stato readonly delle funzioni senza inferenza, credenziali o falsa disponibilità.
+- [0120-local-work-profile-onboarding.md](./0120-local-work-profile-onboarding.md): guida deterministica locale, anteprima e rollback del profilo della postazione.
+
+- [0119-anydoc-apple-vision-current-source.md](./0119-anydoc-apple-vision-current-source.md): fissa la precedenza del fallback PDF AnyDoc + Apple Vision, distinto da Fabric, con matrice e provenienza della preview.
+
 <!-- @Codex MF085-002/003: bounded source-bound scale contract. -->
 - [0118-tinetti-poma28-source-bound-submission.md](./0118-tinetti-poma28-source-bound-submission.md): propone POMA-28 versionata e source-bound, separazione dello storico, validazione completa e gate dei writer Web/Swift; nessuna validazione clinica o nuova soglia dichiarata.
 
@@ -91,3 +101,7 @@ Mantieni gli ADR brevi e ordinati:
 2. Discuti in PR/issue
 3. Al merge, aggiorna lo stato a **Accepted**
 4. Se sostituito, marca **Superseded** e linka il nuovo ADR
+
+- [0129-function-model-catalog-preferences.md](./0129-function-model-catalog-preferences.md): catalogo host, default per esperienza e override occasionale senza ammissione UI.
+
+- [0130-node-test-data-dir-preflight.md](./0130-node-test-data-dir-preflight.md): preflight fail-closed del data-dir per il launcher dei test Node.

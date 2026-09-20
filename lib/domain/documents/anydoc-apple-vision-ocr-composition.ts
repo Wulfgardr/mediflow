@@ -2,12 +2,14 @@
 import { createHash } from 'node:crypto';
 import { types } from 'node:util';
 
+import { runAnyDocTesseractDocument, ANYDOC_TESSERACT_ARTIFACT_SET_SHA256, type AnyDocTesseractDocumentResult } from './anydoc-pdf-child-process-owner';
 import { buildAnyDocPageManifest } from './anydoc-page-manifest';
 import { materializeAnyDocPdfPages } from './anydoc-pdf-page-materializer';
 import { ANYDOC_PDF_PAGE_RENDERER_MAX_PAGES, renderAnyDocNeedsOcrPages } from './anydoc-pdf-page-renderer';
 import {
     ANYDOC_APPLE_VISION_OCR_SCRIPT_SHA256,
     extractAnyDocAppleVisionDocument,
+    type AnyDocAppleVisionOcrDocumentResult,
 } from './anydoc-apple-vision-ocr';
 import {
     ANYDOC_LOCAL_EXTRACTION_MAX_MARKDOWN_BYTES,
@@ -20,31 +22,39 @@ import {
 import { extractAnyDocLocalBytes, extractAnyDocPageRoutingBytes } from './anydoc-local-extraction-runner';
 
 const sha256 = (value: Uint8Array | string) => createHash('sha256').update(value).digest('hex');
-let activeAppleVisionDocument = false;
+type Recognizer = (input: readonly Buffer[]) => Promise<AnyDocAppleVisionOcrDocumentResult | AnyDocTesseractDocumentResult>;
+const recognizeForHost: Recognizer = (input) => process.platform === 'darwin'
+    ? extractAnyDocAppleVisionDocument(input) : runAnyDocTesseractDocument(input);
+let activeLocalOcrDocument = false;
 function originalFailure(input: LocalExtractionResult): input is LocalExtractionFailure {
     return input.status === 'review_required' && input.detail === 'image_or_scan'
         && input.receipt.outcome === 'review_required:image_or_scan';
 }
 
 /** Continues only an AnyDoc image_or_scan result; the outer source authority retains final currentness. */
-export async function continueAnyDocImageOrScanWithAppleVision(
+export async function continueAnyDocImageOrScanWithLocalOcr(
     attachmentId: string, input: unknown, initial: LocalExtractionResult,
 ): Promise<LocalExtractionResult> {
+    return continueWithRecognizer(attachmentId, input, initial, recognizeForHost);
+}
+
+async function continueWithRecognizer(attachmentId: string, input: unknown, initial: LocalExtractionResult,
+    recognize: Recognizer): Promise<LocalExtractionResult> {
     if (!originalFailure(initial) || initial.provenance.attachmentId !== attachmentId
         || types.isProxy(input) || !(input instanceof Uint8Array)) return initial;
     let bytes: Buffer; try { bytes = Buffer.from(input); } catch { return initial; }
     const sourceSha256 = sha256(bytes);
     if (bytes.byteLength !== initial.provenance.byteLength || sourceSha256 !== initial.provenance.sourceSha256) return initial;
     const source = { attachmentId, sourceSha256, byteLength: bytes.byteLength };
-    if (activeAppleVisionDocument) return mapAnyDocLocalFailure(source, 'resourceLimit');
-    activeAppleVisionDocument = true;
-    try { return await continueAdmittedAppleVisionDocument(bytes, initial, source, sourceSha256); }
-    finally { activeAppleVisionDocument = false; }
+    if (activeLocalOcrDocument) return mapAnyDocLocalFailure(source, 'resourceLimit');
+    activeLocalOcrDocument = true;
+    try { return await continueAdmittedLocalOcrDocument(bytes, initial, source, sourceSha256, recognize); }
+    finally { activeLocalOcrDocument = false; }
 }
 
-async function continueAdmittedAppleVisionDocument(bytes: Buffer, initial: LocalExtractionResult,
+async function continueAdmittedLocalOcrDocument(bytes: Buffer, initial: LocalExtractionResult,
     source: Readonly<{ attachmentId: string; sourceSha256: string; byteLength: number }>,
-    sourceSha256: string): Promise<LocalExtractionResult> {
+    sourceSha256: string, recognize: Recognizer): Promise<LocalExtractionResult> {
     const routing = await extractAnyDocPageRoutingBytes(bytes);
     if (!routing || routing.pageCount > ANYDOC_PDF_PAGE_RENDERER_MAX_PAGES) return initial;
     const materialization = await materializeAnyDocPdfPages(bytes, sourceSha256, routing);
@@ -57,12 +67,12 @@ async function continueAdmittedAppleVisionDocument(bytes: Buffer, initial: Local
     const rendering = await renderAnyDocNeedsOcrPages(manifest, materialization);
     if (rendering.status !== 'rendered') return initial;
     const rendered = new Map(rendering.pages.map((page) => [page.page, page] as const));
-    const recognition = await extractAnyDocAppleVisionDocument(rendering.pages.map((page) => page.pngBytes));
+    const recognition = await recognize(rendering.pages.map((page) => page.pngBytes));
     if (recognition.status !== 'recognized') {
         return recognition.reason === 'empty_output'
             ? buildAnyDocLocalExtraction(source, '')
             : mapAnyDocLocalFailure(source,
-                recognition.reason === 'resource_limit' || recognition.reason === 'timeout' ? 'resourceLimit' : 'io');
+                recognition.reason === 'busy' || recognition.reason === 'resource_limit' || recognition.reason === 'timeout' ? 'resourceLimit' : 'io');
     }
     if (recognition.pages.length !== rendering.pages.length) return initial;
     const recognized = new Map(rendering.pages.map((page, index) => [page.page, recognition.pages[index]] as const));
@@ -78,7 +88,9 @@ async function continueAdmittedAppleVisionDocument(bytes: Buffer, initial: Local
             if (pageRecognition.receipt.inputSha256 !== raster.receipt.rasterSha256
                 || pageRecognition.receipt.inputByteLength !== raster.receipt.rasterByteLength) return initial;
             ocrReceiptBindings.push([
-                'mediflow.anydoc_apple_vision_page_receipt.v1', page.page,
+                pageRecognition.receipt.engine === 'apple_vision'
+                    ? 'mediflow.anydoc_apple_vision_page_receipt.v1' : 'mediflow.anydoc_tesseract_page_receipt.v1', page.page,
+                ...(pageRecognition.receipt.engine === 'tesseract_wasm' ? [ANYDOC_TESSERACT_ARTIFACT_SET_SHA256] : []),
                 pageRecognition.receipt.scriptSha256, pageRecognition.receipt.inputSha256,
                 pageRecognition.receipt.inputByteLength, pageRecognition.receipt.outputSha256,
                 pageRecognition.receipt.outputByteLength, pageRecognition.receipt.averageConfidence,
@@ -98,10 +110,18 @@ async function continueAdmittedAppleVisionDocument(bytes: Buffer, initial: Local
         ? mapAnyDocLocalFailure(source, 'resourceLimit')
         : buildAnyDocLocalExtraction(source, markdown, Object.freeze({
             schemaVersion: ANYDOC_LOCAL_OCR_PROVENANCE_SCHEMA_VERSION,
-            engine: 'apple_vision' as const,
-            scriptSha256: ANYDOC_APPLE_VISION_OCR_SCRIPT_SHA256,
+            engine: recognition.pages[0].receipt.engine,
+            scriptSha256: recognition.pages[0].receipt.engine === 'apple_vision'
+                ? ANYDOC_APPLE_VISION_OCR_SCRIPT_SHA256 : recognition.pages[0].receipt.scriptSha256,
             pageCount: manifest.pageCount,
             ocrPageCount: ocrReceiptBindings.length,
             receiptSetSha256: sha256(ocrReceiptBindings.join('\n')),
         }));
+}
+
+/* @Codex: real WASM composition smoke on the development host; no platform impersonation. */
+export async function continueAnyDocWithTesseractForTest(attachmentId: string, input: unknown,
+    initial: LocalExtractionResult): Promise<LocalExtractionResult> {
+    if (!process.execArgv.some((arg) => arg === '--test' || arg.startsWith('--test-'))) return initial;
+    return continueWithRecognizer(attachmentId, input, initial, runAnyDocTesseractDocument);
 }

@@ -1,6 +1,104 @@
 /* @Codex */
-import { expect, test } from '@playwright/test';
-import { bootstrapUnlockedSession } from './utils';
+import { expect, test, type Page } from '@playwright/test';
+import { randomUUID } from 'node:crypto';
+import { bootstrapUnlockedSession, openPatientSection } from './utils';
+
+/* @Codex: ordinary UI smoke observes every console error and uncaught page error. */
+type ObservedConsoleError = Readonly<{ text: string; url: string }>;
+const errorsByPage = new WeakMap<Page, ObservedConsoleError[]>();
+const authLockReceiptsByPage = new WeakMap<Page, Array<Promise<{
+  status: number;
+  state: string | null;
+  requestEtag: string | null;
+  responseEtag: string | null;
+}>>>();
+const AUTH_LOCK_CONFLICT_CONSOLE = 'Failed to load resource: the server responded with a status of 409 (Conflict)';
+test.beforeEach(async ({ page }) => {
+  const errors: ObservedConsoleError[] = [];
+  const authLockReceipts: Array<Promise<{
+    status: number;
+    state: string | null;
+    requestEtag: string | null;
+    responseEtag: string | null;
+  }>> = [];
+  errorsByPage.set(page, errors);
+  authLockReceiptsByPage.set(page, authLockReceipts);
+  page.on('console', message => {
+    if (message.type() === 'error') errors.push({ text: message.text(), url: message.location().url });
+  });
+  page.on('response', response => {
+    if (new URL(response.url()).pathname !== '/api/auth/lock') return;
+    // @Codex: retain only the control-fence facts needed to prove the one
+    // permitted stale-fence retry; no credential or response payload is kept.
+    authLockReceipts.push(response.text().then((text) => {
+      let state: string | null = null;
+      try {
+        const payload = JSON.parse(text) as { state?: unknown };
+        state = typeof payload.state === 'string' ? payload.state : null;
+      } catch { /* An unparsable receipt remains unreconciled and therefore fails. */ }
+      return {
+        status: response.status(),
+        state,
+        requestEtag: response.request().headers()['if-match'] ?? null,
+        responseEtag: response.headers().etag ?? null,
+      };
+    }).catch(() => ({
+      status: response.status(), state: null,
+      requestEtag: response.request().headers()['if-match'] ?? null,
+      responseEtag: response.headers().etag ?? null,
+    })));
+  });
+  page.on('pageerror', error => errors.push({ text: error.message, url: '' }));
+});
+test.afterEach(async ({ page }, testInfo) => {
+  if (testInfo.status !== 'passed') {
+    await testInfo.attach('smoke-focus-context.json', {
+      contentType: 'application/json',
+      body: JSON.stringify(await page.evaluate(() => ({
+        route: location.pathname + location.search + location.hash,
+        viewport: { width: innerWidth, height: innerHeight },
+        activeElement: document.activeElement ? {
+          tag: document.activeElement.tagName,
+          id: document.activeElement.id,
+          role: document.activeElement.getAttribute('role'),
+          label: document.activeElement.getAttribute('aria-label'),
+        } : null,
+        headings: Array.from(document.querySelectorAll('h1')).map(element => ({
+          text: element.textContent, tabIndex: element.tabIndex,
+          focused: element === document.activeElement, rect: element.getBoundingClientRect().toJSON(),
+        })),
+      }))),
+    });
+  }
+  const authLockReceipts = await Promise.all(authLockReceiptsByPage.get(page) ?? []);
+  const recoveredAuthLockConflicts = authLockReceipts.filter((receipt, index) => {
+    const retry = authLockReceipts[index + 1];
+    return receipt.status === 409
+      && receipt.state === 'server_invalidation_unconfirmed'
+      && !!receipt.responseEtag
+      && retry?.status === 200
+      && retry.state === 'server_invalidation_confirmed'
+      && retry.requestEtag === receipt.responseEtag;
+  }).length;
+  const authLockConflicts = authLockReceipts.filter(receipt => receipt.status === 409).length;
+  const errors = errorsByPage.get(page) ?? [];
+  // @Codex: Chromium reports a handled fetch 409 as a console error. Admit it
+  // only after the immediately chained, ETag-matched lock retry is confirmed.
+  const pageOrigin = new URL(page.url()).origin;
+  const isReconciledAuthLockConsole = (error: ObservedConsoleError) => {
+    if (error.text !== AUTH_LOCK_CONFLICT_CONSOLE) return false;
+    try {
+      const url = new URL(error.url);
+      return url.origin === pageOrigin && url.pathname === '/api/auth/lock';
+    } catch { return false; }
+  };
+  const lockConsoleConflicts = errors.filter(isReconciledAuthLockConsole).length;
+  const remainingErrors = authLockConflicts === recoveredAuthLockConflicts
+    && lockConsoleConflicts === recoveredAuthLockConflicts
+    ? errors.filter(error => !isReconciledAuthLockConsole(error))
+    : errors;
+  expect(remainingErrors).toEqual([]);
+});
 
 test('web smoke: unlock/setup + patients filters + settings navigation', async ({ page }) => {
   const pin = process.env.E2E_PIN || '1234';
@@ -27,33 +125,41 @@ test('web smoke: unlock/setup + patients filters + settings navigation', async (
 
   // Scope chips ("Attivi" / "Archivio") replaced the old view-mode toggles.
   await page.getByRole('button', { name: 'Archivio' }).click();
+  await expect(page.getByRole('button', { name: 'Archivio' })).toHaveAttribute('aria-pressed', 'true');
   await page.getByRole('button', { name: 'Attivi' }).click();
+  await expect(page.getByRole('button', { name: 'Attivi' })).toHaveAttribute('aria-pressed', 'true');
   await patientsSearch.fill('smoke');
   await patientsSearch.fill('');
 
-  // WUL-274/Kree8: "Impostazioni" is an in-cockpit governance area reached via the
-  // nav rail, which reflects the state into the query string as ?area=governance.
-  const settingsNav = page.getByRole('button', { name: 'Impostazioni' }).first();
+  // @Codex ADR 0123: the ordinary settings link owns the canonical /settings route.
+  const settingsNav = page.getByRole('link', { name: 'Impostazioni', exact: true });
   await expect(settingsNav).toBeVisible();
-  await settingsNav.click();
-  await expect(page).toHaveURL(/[?&]area=governance/);
-  await expect(page.getByText('Sistema e impostazioni')).toBeVisible();
+  await expect(settingsNav).toHaveAttribute('href', '/settings');
+  await settingsNav.focus();
+  await expect(settingsNav).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(/\/settings$/);
+  await expect(page.getByRole('heading', { name: 'Impostazioni', level: 1, exact: true })).toBeVisible();
+  await expect(page.getByTestId('settings-overview-section')).toBeVisible();
 
   // WUL-297: the detailed appearance controls still live on the /settings/aspetto route.
-  await page.goto('/settings/aspetto');
+  await page.getByRole('link', { name: 'Apri aspetto', exact: true }).click();
   await expect(page).toHaveURL(/\/settings\/aspetto$/);
   await expect(page.getByTestId('settings-nav-sidebar')).toBeVisible();
   await expect(page.getByTestId('settings-appearance-section')).toBeVisible();
   await expect(page.getByTestId('ui-style-runtime-notice')).toBeVisible();
   await expect(page.getByTestId('ui-accessibility-controls')).toBeVisible();
 
-  // WUL-297: settings returns to the cockpit via "Torna ai pazienti" (-> /?area=incarico),
-  // which lands directly on the patients list with the search field mounted.
-  await page.getByRole('link', { name: 'Torna ai pazienti' }).click();
+  // @Codex ADR 0123: the persistent primary navigation owns the return to patients.
+  const returnToPatients = page.getByRole('navigation', { name: 'Navigazione principale', exact: true })
+    .getByRole('link', { name: 'Pazienti', exact: true });
+  await expect(returnToPatients).toHaveAttribute('href', '/?area=incarico');
+  await returnToPatients.focus();
+  await expect(returnToPatients).toBeFocused();
+  await page.keyboard.press('Enter');
   await expect(page).toHaveURL(/[?&]area=incarico/);
-  await expect(
-    page.getByRole('button', { name: 'Cerca nella lista pazienti' })
-  ).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Pazienti in carico', level: 1, exact: true })).toBeVisible();
+  await expect(patientsSearch).toBeVisible();
 });
 
 /* @Codex */
@@ -62,7 +168,7 @@ test('web smoke: Rivedi agenda focuses its controlled heading without leaving tu
   await page.goto('/?area=turno');
 
   const reviewAgenda = page.getByRole('button', { name: 'Rivedi agenda', exact: true });
-  const agendaHeading = page.getByRole('heading', { name: 'Agenda di oggi', exact: true, level: 2 });
+  const agendaHeading = page.getByRole('heading', { name: 'Appuntamenti', exact: true, level: 2 });
 
   await expect(reviewAgenda).toBeVisible();
   await expect(reviewAgenda).toHaveAttribute('aria-controls', 'turno-agenda-heading');
@@ -78,34 +184,97 @@ test('web smoke: Rivedi agenda focuses its controlled heading without leaving tu
   await expect(page).toHaveURL(/[?&]area=turno(?:&|$)/);
 });
 
-/* @Codex */
-test('web smoke: synthetic agenda decision CTAs always open their declared context', async ({ page }) => {
+/* @Codex ADR 0123: exercise the declared live destinations with API-created
+   identities; the standalone review's AI queue and hidden lens are not product controls. */
+test('web smoke: live decision CTAs always open their declared patient context', async ({ page }) => {
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
-  await page.goto('/mockups/kree8');
+  const marker = randomUUID().replaceAll('-', '').slice(0, 10).toUpperCase();
+  const createPatient = async (firstName: string, exemptions: string[]) => {
+    const lastName = `Smoke${marker}`;
+    const taxCode = `SMK${firstName[0]}${marker}00`;
+    const response = await page.request.post('/api/patients', { data: {
+      firstName, lastName, taxCode, birthDate: '1980-01-01T00:00:00.000Z', exemptions,
+      notes: `Contesto sintetico ${firstName}. Nessun dato reale.`, diagnoses: [],
+    } });
+    expect(response.status()).toBe(201);
+    const patient = await response.json() as { id: string };
+    return { id: patient.id, name: `${lastName} ${firstName}`, taxCode };
+  };
+  const quadroPatient = await createPatient('Quadro', []);
+  const documentsPatient = await createPatient('Documenti', ['031']);
+  // Put the fixture within the ordinary 50-row diary window without changing any clock.
+  const latest = await page.request.get('/api/entries?limit=1&orderBy=date&orderDir=desc');
+  expect(latest.status()).toBe(200);
+  const rows = await latest.json() as Array<{ date: string }>;
+  const date = new Date(Math.max(Date.now(), ...rows.map(row => Date.parse(row.date)).filter(Number.isFinite)) + 1_000).toISOString();
+  const entryTitle = `Follow-up sintetico ${marker}`;
+  const entryResponse = await page.request.post('/api/entries', { data: {
+    patientId: quadroPatient.id, type: 'note', title: entryTitle,
+    content: 'Voce sintetica per verificare la destinazione della CTA.', date, setting: 'ambulatory',
+  } });
+  expect(entryResponse.status()).toBe(201);
+  const entry = await entryResponse.json() as { id: string; version: number };
 
-  const agendaNav = page.getByRole('button', { name: /Agenda/ }).first();
-
+  await page.goto(`/?area=turno&paziente=${documentsPatient.id}`);
+  const navigation = page.getByRole('navigation', { name: 'Navigazione principale', exact: true });
   await expect(page.getByRole('button', { name: 'Vai alla revisione', exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Apri esenzioni', exact: true })).toHaveCount(0);
 
-  await page.getByRole('button', { name: 'Apri documenti', exact: true }).click();
-  await expect(
-    page.getByRole('heading', { name: /Referto cardiologico/, level: 1 }),
-  ).toBeFocused();
-  await expect(
-    page.getByRole('button', { name: 'Documenti', exact: true }),
-  ).toHaveAttribute('aria-current', 'page');
+  const review = page.getByRole('button', { name: 'Apri revisione', exact: true });
+  await review.focus();
+  await expect(review).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('heading', { name: 'Evidenza, decisione e prossimo passo', level: 1, exact: true })).toBeFocused();
+  await expect(page).toHaveURL(new RegExp(`[?&]area=revisione&.*paziente=${documentsPatient.id}`));
+  await expect(page.getByTestId('lume-review-case').getByRole('heading', { name: documentsPatient.name, exact: true })).toBeVisible();
+  const documents = page.getByRole('link', { name: 'Apri documenti', exact: true });
+  await expect(documents).toHaveAttribute('href', `/patients/${documentsPatient.id}/modules#documenti`);
+  await documents.focus();
+  await expect(documents).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(new RegExp(`/patients/${documentsPatient.id}/modules#documenti$`));
+  await expect(page.locator('#documenti')).toHaveAttribute('data-folder-active', 'true');
+  await expect(page.getByRole('heading', { name: documentsPatient.name, level: 1, exact: true })).toBeVisible();
 
-  await agendaNav.click();
-  await page.getByRole('button', { name: 'Apri paziente', exact: true }).click();
-  const patientLens = page.getByRole('complementary', { name: 'Lente paziente: C. D.' });
-  await expect(patientLens).toBeVisible();
-  await expect(patientLens.getByRole('heading', { name: 'C. D.', exact: true })).toBeVisible();
-  await expect(patientLens.getByText('Esenzione 031', { exact: true })).toBeVisible();
+  await navigation.getByRole('link', { name: 'Agenda', exact: true }).click();
+  await page.getByRole('button', { name: 'Vai ai pazienti', exact: true }).click();
+  await expect(navigation.getByRole('link', { name: 'Pazienti', exact: true })).toHaveAttribute('aria-current', 'page');
+  const patientsSearch = page.getByRole('searchbox', { name: 'Cerca nella lista pazienti' });
+  await patientsSearch.fill(documentsPatient.taxCode);
+  const patientRow = page.getByRole('option').filter({ has: page.getByText(documentsPatient.name, { exact: true }) });
+  await expect(patientRow).toBeVisible();
+  await patientRow.focus();
+  await expect(patientRow).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(new RegExp(`/patients/${documentsPatient.id}/modules$`));
+  await expect(page.getByTestId('lume-scheda-header')).toContainText(documentsPatient.taxCode);
+  await openPatientSection(page, 'amministrazione');
+  const exemptions = page.locator('#amministrazione').getByRole('list', { name: 'Esenzioni registrate' });
+  await expect(exemptions).toContainText('031');
 
-  await agendaNav.click();
-  await page.getByRole('button', { name: 'Apri quadro', exact: true }).click();
-  await expect(page.getByRole('navigation', { name: 'Sezioni del paziente' })).toContainText('M. R.');
-  await expect(page.getByTestId('lume-quadro')).toContainText('AB-2026-014');
-  await expect(page.getByRole('heading', { name: 'M. R.', exact: true, level: 1 })).toBeFocused();
+  // The diary row selects its own patient even though the previous record was different.
+  await navigation.getByRole('link', { name: 'Diario', exact: true }).click();
+  const diaryEntry = page.getByTestId('lume-diario-entry').filter({ has: page.getByRole('heading', { name: entryTitle, exact: true }) });
+  await expect(diaryEntry).toContainText(quadroPatient.name);
+  const openQuadro = diaryEntry.getByRole('button', { name: 'Apri quadro', exact: true });
+  await openQuadro.focus();
+  await expect(openQuadro).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(new RegExp(`/patients/${quadroPatient.id}/modules#quadro$`));
+  await expect(page.locator('#quadro')).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Sezioni della vista', exact: true }).getByRole('link', { name: 'Riepilogo', exact: true })).toHaveAttribute('aria-current', 'location');
+  await expect(page.getByRole('heading', { name: quadroPatient.name, level: 1, exact: true })).toBeFocused();
+  await expect(page.getByTestId('lume-scheda-header')).toContainText(quadroPatient.taxCode);
+  await expect(page.getByRole('region', { name: 'Riepilogo clinico', exact: true })).toContainText('Contesto sintetico Quadro.');
+
+  // Retire only records created here through the versioned, supported endpoints.
+  const removedEntry = await page.request.delete(`/api/entries/${entry.id}`, { data: { version: entry.version } });
+  expect(removedEntry.status()).toBe(200);
+  for (const resource of [`/api/patients/${documentsPatient.id}`, `/api/patients/${quadroPatient.id}`]) {
+    const current = await page.request.get(resource);
+    expect(current.status()).toBe(200);
+    const { version } = await current.json() as { version: number };
+    const removed = await page.request.delete(resource, { data: { version } });
+    expect(removed.status()).toBe(200);
+  }
 });

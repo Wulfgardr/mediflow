@@ -35,23 +35,21 @@ SIMULATOR_NAME="${MEDIFLOW_MOBILE_SMOKE_SIMULATOR_NAME:-}"
 BONJOUR_PID=""
 TLS_PROXY_WAS_RUNNING=0
 
-mkdir -p "$ARTIFACT_DIR"
-: > "$HTTP_AUTH_COOKIE_JAR"
-: > "$HTTPS_AUTH_COOKIE_JAR"
-chmod 600 "$HTTP_AUTH_COOKIE_JAR" "$HTTPS_AUTH_COOKIE_JAR"
 [[ -n "$OPERATOR_PIN" ]] || { echo "Missing MEDIFLOW_MOBILE_SMOKE_OPERATOR_PIN."; exit 1; }
 [[ -f "$DB_PATH" ]] || { echo "Database not found at $DB_PATH"; exit 1; }
 [[ -f "$TOKEN_FILE" ]] || { echo "Local API token not found at $TOKEN_FILE"; exit 1; }
 
 SIM_INFO="$(
-  xcrun simctl list devices -j | node -e '
+  xcrun simctl list devices available -j | node -e '
     const fs = require("fs");
     const target = process.argv[1];
-    const devices = Object.values(JSON.parse(fs.readFileSync(0, "utf8")).devices || {}).flat();
+    const devices = Object.entries(JSON.parse(fs.readFileSync(0, "utf8")).devices || {})
+      .filter(([runtime]) => runtime.includes(".SimRuntime.iOS-"))
+      .flatMap(([, items]) => items)
+      .filter((item) => item.isAvailable === true && item.state === "Booted");
     const match = target
       ? devices.find((item) => item.udid === target)
-      : devices.filter((item) => item.state === "Booted").find((item) => item.name.includes("iPad"))
-        ?? devices.find((item) => item.state === "Booted");
+      : devices.find((item) => item.name.includes("iPad")) ?? devices[0];
     if (!match) process.exit(1);
     process.stdout.write(`${match.udid}\t${match.name}`);
   ' "$SIMULATOR_ID"
@@ -59,6 +57,16 @@ SIM_INFO="$(
 
 SIMULATOR_ID="${SIM_INFO%%$'\t'*}"
 SIMULATOR_NAME="${SIMULATOR_NAME:-${SIM_INFO#*$'\t'}}"
+
+# @Codex: finish build/install before backend setup or temporary pairing changes.
+echo "Building and installing simulator app for $SIMULATOR_NAME ..."
+APP_PATH="$(MEDIFLOW_IOS_SIMULATOR_ID="$SIMULATOR_ID" bash scripts/build-mobile-sim-app.sh --install)"
+echo "Simulator app: $APP_PATH"
+
+mkdir -p "$ARTIFACT_DIR"
+: > "$HTTP_AUTH_COOKIE_JAR"
+: > "$HTTPS_AUTH_COOKIE_JAR"
+chmod 600 "$HTTP_AUTH_COOKIE_JAR" "$HTTPS_AUTH_COOKIE_JAR"
 
 restore_network_settings() {
   [[ -f "$SETTINGS_SNAPSHOT_PATH" ]] || return
@@ -168,9 +176,6 @@ done
 TLS_PIN="$(openssl x509 -in "$CERT_PATH" -outform der | shasum -a 256 | awk '{print $1}')"
 CLIENT_PLATFORM="${MEDIFLOW_MOBILE_SMOKE_CLIENT_PLATFORM:-ios}"
 [[ "$SIMULATOR_NAME" == *"iPad"* ]] && CLIENT_PLATFORM="${MEDIFLOW_MOBILE_SMOKE_CLIENT_PLATFORM:-ipados}"
-
-echo "Building simulator app for $SIMULATOR_NAME ..."
-MEDIFLOW_IOS_SIMULATOR_ID="$SIMULATOR_ID" bash scripts/build-mobile-sim-app.sh >/dev/null
 
 echo "Minting temporary paired credentials ..."
 MEDIFLOW_MOBILE_SMOKE_ENV_FILE="$ENV_FILE" \

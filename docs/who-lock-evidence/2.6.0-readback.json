@@ -1,0 +1,10 @@
+{
+  "observedAt": "2026-09-07T20:07:46.987832+00:00",
+  "repository": "whoicd/icd-api",
+  "tag": "2.6.0",
+  "platform": "linux/arm64",
+  "indexDigest": "sha256:1b77eb6dc43e0c65a12e9e9340ad178493c93488e728d0d936507cc57ada1b7c",
+  "imageDigest": "sha256:7555e43478202d3f9a25eeb2914cc5053414c9464ec6a9a7628c01375d5b0a5e",
+  "compressedLayerBytes": 94789602,
+  "imageAcquired": false
+}

@@ -83,7 +83,8 @@ for (const [relative, name] of [
   ['portable-supervisor-semantic-audit-port.ts', 'createPortableSupervisorSemanticAuditPortV1'],
 ]) stub(`../lib/security/${relative}`, `export const ${name} = () => () => { throw new Error('synthetic DB port must not be used'); };`);
 stub('../lib/security/authenticated-headless-agent-launcher-production.ts',
-  "export const createProductionMcpAgentLauncherWithPreSpawnedChildV1 = () => { throw new Error('no authority in process-contract tests'); };");
+  "export const createProductionMcpAgentLauncherWithPreSpawnedChildV1 = () => { throw new Error('no authority in process-contract tests'); };"
+  + "export const createProductionMiniAgentLauncherWithPreSpawnedChildV1 = createProductionMcpAgentLauncherWithPreSpawnedChildV1;");
 const hooks = registerHooks({
   resolve(specifier, context, nextResolve) {
     if (specifier.startsWith('.') && context.parentURL?.startsWith('file:')) {
@@ -201,6 +202,13 @@ for (const failedChild of [0, 1]) test(`asynchronous child ${failedChild} spawn 
 
 // @Codex Test-only observation boundary: never add platform keys to spawnOptions.env.
 const CF_ENCODING_KEY = '__CF_USER_TEXT_ENCODING';
+// @Codex Node 24 libuv supplies these Windows bootstrap variables even for env: {}.
+// PROCESSOR_ARCHITECTURE is also observed in the independent Windows control.
+// This is an observation ceiling, never the environment passed to spawn.
+const WINDOWS_BOOTSTRAP_KEYS = Object.freeze([
+  'HOMEDRIVE', 'HOMEPATH', 'LOGONSERVER', 'PATH', 'PROCESSOR_ARCHITECTURE',
+  'SYSTEMDRIVE', 'SYSTEMROOT', 'TEMP', 'USERDOMAIN', 'USERNAME', 'USERPROFILE', 'WINDIR',
+]);
 function measureEmptyEnvironmentKeys() {
   // Independent of the Supervisor, its loader and its spawn seam. Absolute Node,
   // no inherited execArgv/env, no shell. spawnSync reaps this bounded control child.
@@ -216,9 +224,10 @@ function measureEmptyEnvironmentKeys() {
 }
 function assertObservedKeys(keys, expectedEnvironment, controlKeys, platform = process.platform) {
   // Do not subtract unknown keys or trust the whole control as an allowlist.
-  // Darwin alone may add this one key, and only if the empty-env control proved it.
-  const platformKeys = platform === 'darwin' && controlKeys.includes(CF_ENCODING_KEY)
-    ? [CF_ENCODING_KEY] : [];
+  // Admit only a closed platform list, and only keys independently measured here.
+  const candidates = platform === 'darwin' ? [CF_ENCODING_KEY]
+    : platform === 'win32' ? WINDOWS_BOOTSTRAP_KEYS : [];
+  const platformKeys = candidates.filter((key) => controlKeys.includes(key)).sort();
   assert.deepEqual(controlKeys, platformKeys, 'empty-env control contains unapproved keys');
   assert.deepEqual(keys, [...Object.keys(expectedEnvironment), ...platformKeys].sort());
 }
@@ -236,6 +245,37 @@ test('only measured Darwin CF encoding is admitted at the observed child boundar
   assertObservedKeys(keys, MCP_ENV, measured, 'darwin');
   for (const platform of ['linux', 'win32']) {
     assert.throws(() => assertObservedKeys(keys, MCP_ENV, measured, platform), { code: 'ERR_ASSERTION' });
+  }
+});
+test('only independently measured Windows bootstrap keys are admitted on Windows', () => {
+  for (const measured of [[], ['SYSTEMROOT'], [...WINDOWS_BOOTSTRAP_KEYS]]) {
+    const keys = [...Object.keys(MCP_ENV), ...measured].sort();
+    assertObservedKeys(keys, MCP_ENV, measured, 'win32');
+    for (const unmeasured of WINDOWS_BOOTSTRAP_KEYS.filter((key) => !measured.includes(key))) {
+      assert.throws(() => assertObservedKeys([...keys, unmeasured].sort(), MCP_ENV,
+        measured, 'win32'), { code: 'ERR_ASSERTION' });
+    }
+    for (const platform of ['darwin', 'linux']) {
+      if (measured.length) assert.throws(() => assertObservedKeys(keys, MCP_ENV,
+        measured, platform), { code: 'ERR_ASSERTION' });
+    }
+  }
+});
+test('Windows observation rejects unknown control keys, missing keys and application inheritance', () => {
+  const measured = [...WINDOWS_BOOTSTRAP_KEYS];
+  for (const environment of [MCP_ENV, BASE_WEB_ENV, { ...BASE_WEB_ENV, [KEY]: runner }]) {
+    const expectedKeys = [...Object.keys(environment), ...measured].sort();
+    assertObservedKeys(expectedKeys, environment, measured, 'win32');
+    for (const key of ['HOME', 'NODE_OPTIONS', 'MEDIFLOW_UNEXPECTED', 'MEDIFLOW_ATHENA_MODEL_DIR', CF_ENCODING_KEY]) {
+      assert.throws(() => assertObservedKeys([...expectedKeys, key].sort(), environment,
+        measured, 'win32'), { code: 'ERR_ASSERTION' });
+      assert.throws(() => assertObservedKeys(expectedKeys, environment,
+        [...measured, key].sort(), 'win32'), { code: 'ERR_ASSERTION' });
+    }
+    for (const missing of expectedKeys) {
+      assert.throws(() => assertObservedKeys(expectedKeys.filter((key) => key !== missing),
+        environment, measured, 'win32'), { code: 'ERR_ASSERTION' });
+    }
   }
 });
 test('unexpected control or child keys never become allowed, even alongside measured Darwin CF encoding', () => {
@@ -267,9 +307,11 @@ test('platform observation allowance never relaxes either exact spawnOptions.env
   fixture(runner, (ctx) => {
     ctx.runtime = createProduction(); assertEnvironments(ctx, runner);
     for (const call of ctx.calls) {
-      call.options.env[CF_ENCODING_KEY] = 'synthetic-not-allowed-at-spawn';
-      try { assert.throws(() => assertEnvironments(ctx, runner), { code: 'ERR_ASSERTION' }); }
-      finally { delete call.options.env[CF_ENCODING_KEY]; }
+      for (const key of [CF_ENCODING_KEY, ...WINDOWS_BOOTSTRAP_KEYS]) {
+        call.options.env[key] = 'synthetic-not-allowed-at-spawn';
+        try { assert.throws(() => assertEnvironments(ctx, runner), { code: 'ERR_ASSERTION' }); }
+        finally { delete call.options.env[key]; }
+      }
     }
     assertEnvironments(ctx, runner);
   }));

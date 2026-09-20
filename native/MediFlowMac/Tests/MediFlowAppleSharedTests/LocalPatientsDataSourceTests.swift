@@ -118,7 +118,7 @@ final class LocalPatientsDataSourceTests: XCTestCase {
         XCTAssertEqual(requests, [
             "POST /api/auth/change-pin",
             "PUT /api/auth/profile",
-            "POST /api/auth/logout",
+            "POST /api/auth/native/logout",
         ])
     }
 

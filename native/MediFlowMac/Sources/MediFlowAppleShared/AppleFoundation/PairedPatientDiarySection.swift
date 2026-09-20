@@ -12,53 +12,44 @@ struct PairedPatientDiarySection: View {
     @Binding var presentingScale: ClinicalScaleDefinition?
     @Binding var attachmentDetailCandidate: HomeBaseAttachmentSummary?
 
-    /// Title on one line, controls on one line, and the two only share a row when
-    /// the column is actually wide enough. Forced into a single row the header had
-    /// to sacrifice something: first the title wrapped onto two lines, then
-    /// "Aggiorna" and "Valutazione" truncated to "Aggior..." and "Valuta...".
-    /// Neither is a decision worth taking on the reader's behalf.
+    /* @Codex: the final layout keeps labels visible at narrow and AX widths. */
     @ViewBuilder
     private var diaryHeader: some View {
-        if dynamicTypeSize >= .accessibility1 {
-            VStack(alignment: .leading, spacing: 8) {
+        if dynamicTypeSize.isAccessibilitySize {
+            VStack(alignment: .leading, spacing: 12) {
                 diaryHeaderTitle
-                diaryHeaderControls
+                diaryRefreshButton
+                diaryScaleMenu
+                diaryTypeFilter
+                diaryDeletedToggle
             }
         } else {
             ViewThatFits(in: .horizontal) {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                HStack(alignment: .firstTextBaseline, spacing: 12) {
                     diaryHeaderTitle
                     Spacer(minLength: 8)
                     diaryHeaderControls
                 }
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 12) {
                     diaryHeaderTitle
-                    diaryHeaderControls
-                }
-                // Last rung, and the one a phone actually lands on. "Valutazione"
-                // stays in view with the filter: it is the diary's own way of
-                // adding a record, and the first arrangement of this rung hid it
-                // in the overflow — which the scale test caught immediately.
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    diaryHeaderTitle
-                    Spacer(minLength: 8)
-                    diaryScaleMenu
-                    diaryOverflowMenu
-                    diaryTypeFilter
-                }
-                // And a floor beneath it. `ViewThatFits` keeps its *last*
-                // candidate whatever the width, so the last one must be the one
-                // that cannot overflow — otherwise a rung that nearly fits takes
-                // the whole card off the screen with it, which is the failure
-                // this ladder exists to prevent.
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    diaryHeaderTitle
-                    Spacer(minLength: 8)
-                    diaryScaleMenu
-                        .labelStyle(.iconOnly)
-                    diaryOverflowMenu
-                    diaryTypeFilter
-                        .labelStyle(.iconOnly)
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 12) {
+                            diaryScaleMenu
+                            diaryTypeFilter
+                            diaryOverflowMenu
+                        }
+                        .fixedSize(horizontal: true, vertical: false)
+                        VStack(alignment: .leading, spacing: 8) {
+                            diaryScaleMenu
+                            diaryTypeFilter
+                            diaryOverflowMenu
+                        }
+                    }
+                    if showsDeletedDiaryEntries {
+                        Text("Incluse le voci eliminate")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
         }
@@ -70,7 +61,7 @@ struct PairedPatientDiarySection: View {
             Text("Ultime \(PairedPatientsWorkspaceSupport.clinicalPreviewCap) voci")
                 .chartMetadata()
         }
-        .fixedSize(horizontal: true, vertical: false)
+        .fixedSize(horizontal: false, vertical: true)
     }
 
     @ViewBuilder
@@ -84,26 +75,15 @@ struct PairedPatientDiarySection: View {
         .fixedSize(horizontal: true, vertical: false)
     }
 
-    /// Housekeeping, folded into one button. Reloading the list and revealing
-    /// deleted entries are things you do to the view; starting a scale writes a
-    /// clinical record, and an action that writes to the chart does not belong
-    /// behind an ellipsis.
-    ///
-    /// `.fixedSize` on the controls row above is what makes the ladder honest —
-    /// it stops the row compressing and reports its true width so `ViewThatFits`
-    /// can judge. But with four controls, one of them a labelled Toggle, that
-    /// width is about 430 points and no rung fitted a phone. `ViewThatFits` then
-    /// kept its last candidate at full width, the header widened the whole diary
-    /// card, and every row in it was clipped at the screen edge: dates lost their
-    /// minutes, the segmented control lost "Altro", the formatting bar ran off
-    /// into nothing.
+    // Refresh and deleted visibility remain view actions; scales stay visible.
     private var diaryOverflowMenu: some View {
         Menu {
             diaryRefreshButton
             diaryDeletedToggle
         } label: {
             Label("Azioni diario", systemImage: "ellipsis.circle")
-                .font(.caption)
+                .font(.subheadline)
+                .modifier(PairedDiaryControlLabel())
         }
         .labelStyle(.iconOnly)
         .accessibilityLabel("Azioni diario")
@@ -115,9 +95,12 @@ struct PairedPatientDiarySection: View {
             Task { await model.loadSelectedPatientEntries() }
         } label: {
             Label("Aggiorna", systemImage: "arrow.clockwise")
+                .modifier(PairedDiaryControlLabel())
         }
-        .font(.caption)
-        .disabled(model.isWorking || model.selectedPatient == nil)
+        .font(.subheadline)
+        // @Codex: The ordinary refresh closes the editor. Conflict recovery uses
+        // the dedicated comparison action in the composer, preserving its draft.
+        .disabled(model.isWorking || model.selectedPatient == nil || model.isEditingEntry)
         .accessibilityIdentifier("homebase-refresh-entries-button")
     }
 
@@ -133,7 +116,8 @@ struct PairedPatientDiarySection: View {
             }
         } label: {
             Label("Valutazione", systemImage: "checklist")
-                .font(.caption)
+                .font(.subheadline)
+                .modifier(PairedDiaryControlLabel())
         }
         .disabled(model.selectedPatient == nil)
         .accessibilityIdentifier("new-scale-button")
@@ -150,38 +134,58 @@ struct PairedPatientDiarySection: View {
             }
         } label: {
             Label(entryTypeFilter.title, systemImage: "line.3.horizontal.decrease.circle")
-                .font(.caption)
+                .font(.subheadline)
+                .modifier(PairedDiaryControlLabel())
         }
         .accessibilityIdentifier("entry-type-filter")
     }
 
     private var diaryDeletedToggle: some View {
         Toggle("Mostra eliminate", isOn: $showsDeletedDiaryEntries)
-            .font(.caption)
+            .font(.subheadline)
             .disabled(model.entries.allSatisfy { $0.deletedAt == nil })
             .accessibilityIdentifier("show-deleted-entries-toggle")
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: ClinicalChartMetrics.groupSpacing) {
             diaryHeader
+
+            PairedDiaryComposerView(
+                model: model,
+                capabilities: capabilities,
+                confirmsReplacingEntryTemplate: $confirmsReplacingEntryTemplate
+            )
+
+            Divider()
 
             if model.entries.isEmpty {
                 Text("Nessuna voce diario caricata.")
-                    .font(.caption)
+                    .font(.body)
                     .foregroundStyle(.secondary)
             } else if filteredDiaryEntries.isEmpty {
                 Text("Nessuna voce per questo filtro.")
-                    .font(.caption)
+                    .font(.body)
                     .foregroundStyle(.secondary)
             } else {
                 VStack(alignment: .leading, spacing: 0) {
                     ForEach(filteredDiaryEntries) { entry in
-                    VStack(alignment: .leading, spacing: 4) {
-                        let rowHeaderLayout = dynamicTypeSize >= .accessibility1
-                            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4))
-                            : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 6))
-                        rowHeaderLayout {
+                    VStack(alignment: .leading, spacing: 8) {
+                        /* @Codex: give chronology its own line, preserving the native Registro. */
+                        #if os(iOS)
+                        // @Codex: A full year and named month make chronology readable.
+                        Text(entry.date, format: .dateTime.day().month(.abbreviated).year().hour().minute())
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("entry-date-\(entry.id)")
+                        #else
+                        Text(PairedPatientsWorkspaceSupport.entryDateFormatter.string(from: entry.date))
+                            .font(.subheadline.weight(.medium))
+                            .registro()
+                            .fixedSize(horizontal: false, vertical: true)
+                        #endif
+                        VStack(alignment: .leading, spacing: 6) {
                             if entry.lockedFields.contains(.title) {
                                 Label("Titolo non leggibile", systemImage: "lock")
                                     .chartRowTitle()
@@ -192,35 +196,31 @@ struct PairedPatientDiarySection: View {
                                     .strikethrough(entry.deletedAt != nil, color: .secondary)
                                     .fixedSize(horizontal: false, vertical: true)
                             }
-                            if let type = PairedDiaryEntryType(rawValue: entry.type) {
-                                PairedPatientFlagChip(type.title, tone: .info)
+                            let metadataLayout = dynamicTypeSize.isAccessibilitySize
+                                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 6))
+                                : AnyLayout(HStackLayout(spacing: 8))
+                            metadataLayout {
+                                if let type = PairedDiaryEntryType(rawValue: entry.type) {
+                                    PairedPatientFlagChip(type.title, tone: .info)
+                                }
+                                if entry.deletedAt != nil {
+                                    PairedPatientFlagChip("Eliminata", tone: .attention)
+                                }
                             }
-                            if entry.deletedAt != nil {
-                                PairedPatientFlagChip("Eliminata", tone: .attention)
-                            }
-                            if dynamicTypeSize < .accessibility1 {
-                                Spacer(minLength: 8)
-                            }
-                            Text(PairedPatientsWorkspaceSupport.entryDateFormatter.string(from: entry.date))
-                                .font(.caption2)
-                                .registro()
-                                .foregroundStyle(.secondary)
                         }
                         if entry.lockedFields.contains(.content) {
                             // Says what is true: the note exists on the host, this
                             // device cannot read it. A blank line here reads as a
                             // visit with nothing written down.
                             Text("Contenuto cifrato non leggibile con la chiave di questa sessione. La voce esiste sull'home-base.")
-                                .font(.caption)
+                                .font(.callout)
                                 .foregroundStyle(.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
                                 .accessibilityIdentifier("entry-content-locked-\(entry.id)")
                         } else {
                             Text(ClinicalContentRendering.attributedString(from: entry.content))
-                                .font(.caption)
+                                .chartProse()
                                 .foregroundStyle(entry.deletedAt == nil ? .primary : .secondary)
-                                .lineLimit(dynamicTypeSize >= .accessibility1 ? nil : 4)
-                                .fixedSize(horizontal: false, vertical: true)
                         }
                         // S7 (D4): resolves the entry's referenced attachment ids
                         // against the loaded patient attachment list (S6), same
@@ -229,28 +229,18 @@ struct PairedPatientDiarySection: View {
                         // attachment is gone) is simply omitted, never shown raw.
                         let entryAttachments = model.referencedAttachments(for: entry)
                         if !entryAttachments.isEmpty {
-                            let attachmentLayout = dynamicTypeSize >= .accessibility1
-                                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 6))
-                                : AnyLayout(HStackLayout(spacing: 6))
-                            attachmentLayout {
-                                Image(systemName: "paperclip")
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                                Filo(axis: .horizontal, isConnected: true, tone: .inkMuted)
-                                    .frame(width: 18, height: 2)
+                            VStack(alignment: .leading, spacing: 6) {
                                 ForEach(entryAttachments) { attachment in
                                     /* @Codex */
                                     Button {
                                         attachmentDetailCandidate = attachment
                                         Task { await model.openAttachmentDetail(attachment) }
                                     } label: {
-                                        Text("\(attachment.name.isEmpty ? "Documento" : attachment.name) (\(attachment.type))")
-                                            .font(.caption2)
-                                            .foregroundStyle(.secondary)
-                                            .lineLimit(dynamicTypeSize >= .accessibility1 ? nil : 1)
+                                        Label("\(attachment.name.isEmpty ? "Documento" : attachment.name) (\(attachment.type))", systemImage: "paperclip")
+                                            .font(.subheadline)
                                             .fixedSize(horizontal: false, vertical: true)
+                                            .modifier(PairedDiaryControlLabel())
                                     }
-                                    .buttonStyle(.plain)
                                     .accessibilityIdentifier("entry-row-attachment-\(entry.id)-\(attachment.id)")
                                 }
                             }
@@ -259,12 +249,15 @@ struct PairedPatientDiarySection: View {
                         if let deletedAt = entry.deletedAt {
                             VStack(alignment: .leading, spacing: 3) {
                                 Text("Eliminata il \(PairedPatientsWorkspaceSupport.entryDateFormatter.string(from: deletedAt))")
-                                    .font(.caption2.weight(.semibold))
-                                    .foregroundStyle(.orange)
+                                    .font(.footnote.weight(.semibold))
+                                    .registro()
+                                    .foregroundStyle(LumePalette.warning)
+                                    .fixedSize(horizontal: false, vertical: true)
                                 if let reason = entry.deletionReason?.trimmedOrNil {
                                     Text("Motivo: \(reason)")
-                                        .font(.caption2)
+                                        .font(.callout)
                                         .foregroundStyle(.secondary)
+                                        .fixedSize(horizontal: false, vertical: true)
                                 }
                             }
                             if model.canRestoreEntry(entry) {
@@ -272,34 +265,42 @@ struct PairedPatientDiarySection: View {
                                     Task { await model.restoreEntry(id: entry.id) }
                                 } label: {
                                     Label("Ripristina", systemImage: "arrow.uturn.backward.circle")
+                                        .modifier(PairedDiaryControlLabel())
                                 }
-                                .font(.caption)
+                                .font(.subheadline)
                                 .accessibilityIdentifier("homebase-restore-entry-button-\(entry.id)")
                             }
                         } else if model.canMutateEntry(entry) {
-                            let actionLayout = dynamicTypeSize >= .accessibility1
-                                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
-                                : AnyLayout(HStackLayout(spacing: 8))
-                            actionLayout {
+                            PairedDiaryActions {
                                 Button {
                                     model.startEditingEntry(entry)
                                 } label: {
                                     Label("Modifica", systemImage: "pencil")
+                                        .modifier(PairedDiaryControlLabel())
                                 }
-                                .font(.caption)
+                                .font(.subheadline)
                                 .accessibilityIdentifier("homebase-edit-entry-button-\(entry.id)")
 
                                 Button(role: .destructive) {
                                     entryDeletionCandidate = entry
                                 } label: {
-                                    Label("Annulla", systemImage: "xmark.circle")
+                                    Label("Elimina", systemImage: "trash")
+                                        .modifier(PairedDiaryControlLabel())
                                 }
-                                .font(.caption)
+                                .font(.subheadline)
                                 .accessibilityIdentifier("homebase-delete-entry-button-\(entry.id)")
                             }
                         }
                     }
-                        .padding(.vertical, 6)
+                        #if os(iOS)
+                        // @Codex: Each dated entry is a readable document block.
+                        .padding(.vertical, 20)
+                        .padding(.horizontal, 16)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .overlay(alignment: .bottom) { Divider() }
+                        .padding(.leading, 14)
+                        #else
+                        .padding(.vertical, 10)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .modifier(LumeRigaListaModifier(isSelected: false))
                         // The leading inset goes *outside* the row surface, so the
@@ -308,6 +309,7 @@ struct PairedPatientDiarySection: View {
                         // left it showing only in the gaps — a continuous
                         // connector rendered as a column of stubs.
                         .padding(.leading, 14)
+                        #endif
                         .accessibilityIdentifier("entry-row-\(entry.id)")
                     }
                 }
@@ -318,120 +320,6 @@ struct PairedPatientDiarySection: View {
                         .accessibilityHidden(true)
                 }
             }
-
-            if model.isEditingEntry {
-                Divider()
-                VStack(alignment: .leading, spacing: 8) {
-                    Label("Modifica voce online", systemImage: "pencil")
-                        .chartGroupHeading()
-                    TextField("Titolo", text: $model.editEntryTitle)
-                        .accessibilityIdentifier("homebase-edit-entry-title-field")
-                    Picker("Tipo", selection: $model.editEntryType) {
-                        ForEach(PairedDiaryEntryType.allCases) { type in
-                            Text(type.title).tag(type)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .accessibilityIdentifier("homebase-edit-entry-type-picker")
-                    ClinicalRichTextEditorView(
-                        document: $model.editEntryEditorDocument,
-                        accessibilityPrefix: "homebase-edit-entry-content"
-                    )
-                    .accessibilityIdentifier("homebase-edit-entry-content-field")
-                    if capabilities.hasCapability("network.replica.readonly-documents") {
-                        EntryAttachmentReferencePicker(
-                            attachments: model.attachments,
-                            selectedIds: $model.editEntryAttachmentIds,
-                            accessibilityPrefix: "homebase-edit-entry-attachments"
-                        )
-                    }
-                    HStack(spacing: 8) {
-                        Spacer(minLength: 8)
-                        Button("Annulla") {
-                            model.cancelEditingEntry()
-                        }
-                        .font(.caption)
-                        .accessibilityIdentifier("homebase-cancel-edit-entry-button")
-                        Button {
-                            Task { await model.updateEditingEntry() }
-                        } label: {
-                            Label("Salva modifiche", systemImage: "checkmark.circle")
-                        }
-                        .font(.caption)
-                        .disabled(!model.canUpdateEditingEntry)
-                        .accessibilityIdentifier("homebase-update-entry-button")
-                    }
-                    Text("Disponibile solo online. Se la versione non coincide, ricarica il diario prima di riprovare.")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            Divider()
-
-            VStack(alignment: .leading, spacing: 8) {
-                Label("Nuova voce online", systemImage: "square.and.pencil")
-                    .chartGroupHeading()
-                TextField("Titolo (opzionale)", text: $model.newEntryTitle)
-                    .accessibilityIdentifier("homebase-new-entry-title-field")
-                Picker("Tipo", selection: $model.newEntryType) {
-                    ForEach(PairedDiaryEntryType.allCases) { type in
-                        Text(type.title).tag(type)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .accessibilityIdentifier("homebase-new-entry-type-picker")
-                Button {
-                    if model.newEntryEditorDocument.isEffectivelyEmpty {
-                        model.insertNewEntrySOAPTemplate()
-                    } else {
-                        confirmsReplacingEntryTemplate = true
-                    }
-                } label: {
-                    Label("Template S/O/A/P", systemImage: "doc.text")
-                }
-                .font(.caption)
-                .disabled(model.isWorking)
-                .accessibilityIdentifier("homebase-new-entry-soap-template-button")
-                ClinicalRichTextEditorView(
-                    document: $model.newEntryEditorDocument,
-                    accessibilityPrefix: "homebase-new-entry-content"
-                )
-                .accessibilityIdentifier("homebase-new-entry-content-field")
-                if capabilities.hasCapability("network.replica.readonly-documents") {
-                    Divider()
-                    EntryAttachmentReferencePicker(
-                        attachments: model.attachments,
-                        selectedIds: $model.newEntryAttachmentIds,
-                        accessibilityPrefix: "homebase-new-entry-attachments"
-                    )
-                }
-                if capabilities.hasCapability("network.compute.visit-draft") {
-                    Divider()
-                    VisitDraftComposerView(model: model)
-                } else if let message = capabilities.unavailableMessage(for: "network.compute.visit-draft") {
-                    Text(message)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-                Button {
-                    Task { await model.createEntryForSelectedPatient() }
-                } label: {
-                    Label("Salva voce", systemImage: "checkmark.circle")
-                }
-                .disabled(!model.canCreateEntry)
-                .accessibilityIdentifier("homebase-create-entry-button")
-                Text("Disponibile solo online: se il Mac non risponde, la voce non viene accodata.")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        // S7 (D4): loads the patient's attachment list so the reference picker
-        // and the entry rows' resolved attachment chips have names to show,
-        // even if the operator never opens the separate Documenti section.
-        .task(id: model.selectedPatient?.id) {
-            guard capabilities.hasCapability("network.replica.readonly-documents") else { return }
-            await model.loadSelectedPatientAttachments()
         }
     }
 

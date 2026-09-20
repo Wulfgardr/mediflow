@@ -39,8 +39,8 @@ assert.equal(Object.isFrozen(entry), true);
 assert.deepEqual(Reflect.ownKeys(entry).slice().sort(), [
     'abort', 'abortAdminReset', 'abortResourceUse', 'abortUserRetirement', 'begin', 'beginResourceUse',
     'bootstrapControl', 'commitAdminReset', 'commitResourceUse', 'commitUserRetirement', 'issue',
-    'mintResourcePort', 'prepareAdminReset', 'prepareUserRetirement', 'registerPrivateResource',
-    'releaseResourcePort', 'resolve', 'retire', 'retireForUser',
+    'mintResourcePort', 'prepareAdminReset', 'prepareNativeUserRetirement', 'prepareUserRetirement', 'registerPrivateResource',
+    'releaseResourcePort', 'resolve', 'retire', 'retireForUser', 'serverSessions',
     'unregisterPrivateResource', 'withCurrentResourceBinding',
 ]);
 assert.equal('createOwner' in entry, false);

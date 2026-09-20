@@ -47,8 +47,7 @@ async function createPatient(page: Page): Promise<string> {
 }
 
 /* @Codex The global diary lists non-deleted entries independently from the
-   patient list. Delete each synthetic entry before its patient so a serial
-   retry starts from the asserted zero-entry state. */
+   patient list. Delete only this spec's entries before their patients; unrelated diary rows stay intact. */
 async function cleanupCreatedPatients(page: Page): Promise<void> {
   for (const patientId of createdPatientIds.splice(0).reverse()) {
     const entriesResponse = await page.evaluate(async (id) => {
@@ -111,38 +110,78 @@ async function createEntry(
   }, { patientId, fixture });
 }
 
-async function createSequence(page: Page): Promise<void> {
+/* @Codex: a full collector can already contain other patients/scales.
+   Capture the ordinary global window and keep every row still within its
+   50-entry limit. New fixture dates follow that window, without changing clocks. */
+type DiaryBaseline = { signatures: string[]; nextDate: number };
+
+async function readGlobalWindow(page: Page): Promise<Array<{ date: string }>> {
+  const response = await page.request.get('/api/entries?limit=50&orderBy=date&orderDir=desc');
+  expect(response.status()).toBe(200);
+  return response.json();
+}
+
+async function diarySignatures(entries: Locator): Promise<string[]> {
+  return entries.evaluateAll((elements) => elements.map((element) => JSON.stringify([
+    element.querySelector<HTMLAnchorElement>('a[href$="/entries/new"]')?.getAttribute('href'),
+    element.querySelector('h3')?.textContent,
+  ])));
+}
+
+function ownEntries(page: Page, diary: Locator, patientId: string): Locator {
+  return diary.getByTestId('lume-diario-entry').filter({
+    has: page.locator(`a[href="/patients/${patientId}/entries/new"]`),
+  });
+}
+
+async function captureBaseline(page: Page): Promise<DiaryBaseline> {
+  const rows = await readGlobalWindow(page);
+  await page.goto('/diary');
+  const cards = page.getByTestId('lume-diario').getByTestId('lume-diario-entry');
+  await expect(cards).toHaveCount(rows.length);
+  const lastDate = Math.max(Date.now(), ...rows.map((row) => Date.parse(row.date)).filter(Number.isFinite));
+  return { signatures: await diarySignatures(cards), nextDate: lastDate + 1000 };
+}
+
+async function assertWindowPreserved(
+  page: Page, diary: Locator, patientId: string, ownCount: number, baseline: DiaryBaseline,
+): Promise<number> {
+  const total = Math.min(50, baseline.signatures.length + ownCount);
+  const cards = diary.getByTestId('lume-diario-entry');
+  await expect(cards).toHaveCount(total);
+  await expect(ownEntries(page, diary, patientId)).toHaveCount(ownCount);
+  const otherCards = cards.filter({ hasNot: page.locator(`a[href="/patients/${patientId}/entries/new"]`) });
+  expect(await diarySignatures(otherCards)).toEqual(baseline.signatures.slice(0, 50 - ownCount));
+  await expect(diary.locator('[data-lume-filo="spina"]')).toHaveCount(total > 1 ? 1 : 0);
+  if (total > 1) {
+    await expect(diary.locator('[data-lume-filo="spina"]')).toHaveAttribute('data-lume-filo-node-count', String(total));
+  }
+  return total;
+}
+
+async function createSequence(page: Page, nextDate: number): Promise<string> {
   const patientId = await createPatient(page);
   await createEntry(page, patientId, {
     title: `${FIXTURE_PREFIX} 1`,
-    date: '2026-07-14T08:15:00.000Z',
+    date: new Date(nextDate).toISOString(),
     status: 'signed',
     source: 'Ambulatorio sintetico',
     author: 'Dr.ssa Demo',
   });
   await createEntry(page, patientId, {
     title: `${FIXTURE_PREFIX} 2`,
-    date: '2026-07-15T10:30:00.000Z',
+    date: new Date(nextDate + 1000).toISOString(),
     status: 'signed',
     source: 'Referto sintetico',
   });
   await createEntry(page, patientId, {
     title: `${FIXTURE_PREFIX} 3`,
-    date: '2026-07-16T09:40:00.000Z',
+    date: new Date(nextDate + 2000).toISOString(),
     status: 'draft',
     source: 'Dettatura sintetica',
     author: 'Dr.ssa Demo',
   });
-}
-
-async function ensureSequence(page: Page): Promise<void> {
-  const exists = await page.evaluate(async (prefix) => {
-    const response = await fetch('/api/entries?limit=50&orderBy=date&orderDir=desc');
-    if (!response.ok) return false;
-    const entries = await response.json() as Array<{ title?: string }>;
-    return entries.some((entry) => entry.title?.startsWith(prefix));
-  }, FIXTURE_PREFIX);
-  if (!exists) await createSequence(page);
+  return patientId;
 }
 
 async function setRegister(page: Page, register: DiaryCase['register']): Promise<void> {
@@ -155,13 +194,14 @@ async function setRegister(page: Page, register: DiaryCase['register']): Promise
 async function openDiary(page: Page, diaryCase?: DiaryCase): Promise<Locator> {
   if (diaryCase) await page.setViewportSize({ width: diaryCase.width, height: diaryCase.height });
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
-  await ensureSequence(page);
+  const baseline = await captureBaseline(page);
+  const patientId = await createSequence(page, baseline.nextDate);
   if (diaryCase) await setRegister(page, diaryCase.register);
   await page.goto('/diary');
   await page.waitForLoadState('domcontentloaded');
   const diary = page.getByTestId('lume-diario');
   await expect(diary).toBeVisible();
-  await expect(diary.getByTestId('lume-diario-entry')).toHaveCount(3);
+  await assertWindowPreserved(page, diary, patientId, 3, baseline);
   return diary;
 }
 
@@ -231,16 +271,40 @@ async function assertContrastAndFocus(
   register: DiaryCase['register'],
 ): Promise<void> {
   const ratios = await page.evaluate(() => {
-    const parse = (value: string) => value.match(/[\d.]+/g)?.slice(0, 3).map(Number) ?? [0, 0, 0];
+    type Rgba = readonly [number, number, number, number];
+    const parse = (value: string): Rgba => {
+      const channels = value.match(/[\d.]+/g)?.map(Number) ?? [];
+      return [channels[0] ?? 0, channels[1] ?? 0, channels[2] ?? 0, channels[3] ?? 1];
+    };
+    const compose = (foreground: Rgba, background: Rgba): Rgba => {
+      const alpha = foreground[3] + background[3] * (1 - foreground[3]);
+      if (alpha === 0) return [0, 0, 0, 0];
+      return [
+        (foreground[0] * foreground[3] + background[0] * background[3] * (1 - foreground[3])) / alpha,
+        (foreground[1] * foreground[3] + background[1] * background[3] * (1 - foreground[3])) / alpha,
+        (foreground[2] * foreground[3] + background[2] * background[3] * (1 - foreground[3])) / alpha,
+        alpha,
+      ];
+    };
+    // @Codex: a transparent entry inherits the first painted ancestor; evaluating
+    // its own computed background as black would measure a non-existent surface.
+    const paintedBackground = (element: HTMLElement): Rgba => {
+      const ancestors: HTMLElement[] = [];
+      for (let current: HTMLElement | null = element; current; current = current.parentElement) ancestors.push(current);
+      return ancestors.reverse().reduce<Rgba>(
+        (background, ancestor) => compose(parse(getComputedStyle(ancestor).backgroundColor), background),
+        [255, 255, 255, 1],
+      );
+    };
     const channel = (value: number) => {
       const normalized = value / 255;
       return normalized <= 0.04045 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
     };
-    const luminance = (value: string) => {
-      const [red, green, blue] = parse(value).map(channel);
+    const luminance = (value: Rgba) => {
+      const [red, green, blue] = value.map(channel);
       return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
     };
-    const ratio = (foreground: string, background: string) => {
+    const ratio = (foreground: Rgba, background: Rgba) => {
       const light = Math.max(luminance(foreground), luminance(background));
       const dark = Math.min(luminance(foreground), luminance(background));
       return (light + 0.05) / (dark + 0.05);
@@ -252,8 +316,8 @@ async function assertContrastAndFocus(
     const signedText = signed.querySelector<HTMLElement>('p');
     if (!draftText || !signedText) return null;
     return {
-      draft: ratio(getComputedStyle(draftText).color, getComputedStyle(draft).backgroundColor),
-      signed: ratio(getComputedStyle(signedText).color, getComputedStyle(signed).backgroundColor),
+      draft: ratio(parse(getComputedStyle(draftText).color), paintedBackground(draft)),
+      signed: ratio(parse(getComputedStyle(signedText).color), paintedBackground(signed)),
     };
   });
   expect(ratios).not.toBeNull();
@@ -262,9 +326,11 @@ async function assertContrastAndFocus(
 
   await expect(entries.filter({ hasText: `${FIXTURE_PREFIX} 3` })).toHaveAttribute('data-active', 'true');
   await expect(page.locator('[data-testid="lume-diario-entry"][data-active="true"]')).toHaveCount(1);
-  const shadows = await entries.evaluateAll((elements) => elements.map((element) => getComputedStyle(element).boxShadow));
-  expect(shadows[0]).not.toBe('none');
-  expect(shadows.slice(1).every((shadow) => shadow === 'none')).toBe(true);
+  // The focused diary row stays in the flat register: active state is the
+  // deliberate ink-tint background, while a shadow remains reserved for focus.
+  const backgrounds = await entries.evaluateAll((elements) => elements.map((element) => getComputedStyle(element).backgroundColor));
+  expect(backgrounds[0]).not.toBe(backgrounds[1]);
+  expect(backgrounds.slice(1).every((background) => background === backgrounds[1])).toBe(true);
 }
 
 async function assertReflowStack(diary: Locator): Promise<void> {
@@ -285,34 +351,36 @@ test.describe.serial('Diario globale Lume', () => {
     await cleanupCreatedPatients(page);
   });
 
-  test('Filo assente con zero o una voce, unico con una sequenza reale', async ({ page }) => {
+  test('Filo coerente con la sequenza reale e le voci globali preesistenti', async ({ page }) => {
     await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
-    await page.goto('/diary');
+    const baseline = await captureBaseline(page);
     const diary = page.getByTestId('lume-diario');
-    await expect(diary).toContainText('Nessuna voce clinica nel diario locale.');
-    await expect(diary.locator('[data-lume-filo="spina"]')).toHaveCount(0);
-
+    if (baseline.signatures.length === 0) {
+      await expect(diary).toContainText('Nessuna voce clinica nel diario locale.');
+    } else {
+      await expect(diary).not.toContainText('Nessuna voce clinica nel diario locale.');
+    }
     const patientId = await createPatient(page);
+    await assertWindowPreserved(page, diary, patientId, 0, baseline);
     await createEntry(page, patientId, {
       title: `${FIXTURE_PREFIX} 1`,
-      date: '2026-07-14T08:15:00.000Z',
+      date: new Date(baseline.nextDate).toISOString(),
       status: 'signed',
       source: 'Ambulatorio sintetico',
       author: 'Dr.ssa Demo',
     });
     await page.reload();
-    await expect(diary.getByTestId('lume-diario-entry')).toHaveCount(1);
-    await expect(diary.locator('[data-lume-filo="spina"]')).toHaveCount(0);
+    await assertWindowPreserved(page, diary, patientId, 1, baseline);
 
     await createEntry(page, patientId, {
       title: `${FIXTURE_PREFIX} 2`,
-      date: '2026-07-15T10:30:00.000Z',
+      date: new Date(baseline.nextDate + 1000).toISOString(),
       status: 'signed',
       source: 'Referto sintetico',
     });
     await createEntry(page, patientId, {
       title: `${FIXTURE_PREFIX} 3`,
-      date: '2026-07-16T09:40:00.000Z',
+      date: new Date(baseline.nextDate + 2000).toISOString(),
       status: 'draft',
       source: 'Dettatura sintetica',
       author: 'Dr.ssa Demo',
@@ -322,20 +390,30 @@ test.describe.serial('Diario globale Lume', () => {
     const entries = diary.getByTestId('lume-diario-entry');
     const feed = page.getByRole('feed', { name: 'Diario clinico globale' });
     await expect(feed).toBeVisible();
-    await expect(entries).toHaveCount(3);
-    await expect(diary.locator('[data-lume-filo="spina"]')).toHaveCount(1);
-    await expect(diary.locator('[data-lume-filo="spina"]')).toHaveAttribute('data-lume-filo-node-count', '3');
-    await expect(diary.locator('[data-lume-diary-node]')).toHaveCount(3);
+    const total = await assertWindowPreserved(page, diary, patientId, 3, baseline);
+    await expect(diary.locator('[data-lume-diary-node]')).toHaveCount(total);
     await expect(entries.first()).toContainText('Bozza');
     await expect(entries.first()).toContainText('Fonte: Dettatura sintetica');
     await expect(entries.first()).toContainText('Autore: Dr.ssa Demo');
     await assertNoSideStripe(diary, entries);
 
     const registerFamily = await resolvedRegisterFamily(page);
-    const metaFamilies = await diary.locator('[data-lume-entry-part="date"], [data-lume-entry-part="provenance"]').evaluateAll(
+    // @Codex: dates orient chronology in the ordinary text face; provenance
+    // remains Registro. Both retain their distinct, observable presentation.
+    const metaFamilies = await diary.locator('[data-lume-entry-part="provenance"]').evaluateAll(
       (elements) => elements.map((element) => getComputedStyle(element).fontFamily),
     );
     expect(new Set(metaFamilies)).toEqual(new Set([registerFamily]));
+    const diaryFamily = await diary.evaluate((element) => getComputedStyle(element).fontFamily);
+    const dates = await diary.locator('[data-lume-entry-part="date"]').evaluateAll((elements) =>
+      elements.map((element) => ({
+        family: getComputedStyle(element).fontFamily,
+        numeric: getComputedStyle(element).fontVariantNumeric,
+      })),
+    );
+    expect(dates).toHaveLength(total);
+    expect(new Set(dates.map((date) => date.family))).toEqual(new Set([diaryFamily]));
+    expect(dates.every((date) => date.numeric === 'tabular-nums')).toBe(true);
     await assertContrastAndFocus(page, entries, 'giorno');
 
     const firstEntry = entries.first();

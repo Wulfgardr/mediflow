@@ -1,0 +1,168 @@
+/* @Codex WUL-676: proposal-only copy and presentation variants. */
+.inlineOriginal {
+    display: inline;
+}
+
+.inlineProposal {
+    display: none;
+}
+
+.blockOriginal {
+    display: block;
+}
+
+.originalOnly {
+    --settings-original-only: 1;
+}
+
+.proposalDescription {
+    display: none;
+}
+
+.originalDescription {
+    display: block;
+}
+
+.proposalDetail {
+    display: none;
+    margin-top: 0.65rem;
+    color: var(--lume-ink-muted);
+    font-size: 0.78rem;
+    line-height: 1.5;
+}
+
+.proposalDetail summary {
+    width: fit-content;
+    min-height: var(--lume-control-height);
+    padding: 12px 0;
+    cursor: pointer;
+    color: var(--lume-ink);
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 20px;
+}
+
+.proposalDetail summary:focus-visible {
+    outline: 2px solid var(--lume-accent);
+    outline-offset: 3px;
+    border-radius: var(--lume-control-radius);
+}
+
+.proposalDetail p {
+    margin: 0.45rem 0 0;
+}
+
+.proposalQuickLinks {
+    display: none;
+}
+
+.previewSectionProposal {
+    --settings-preview-proposal: 1;
+}
+
+.proposalOverviewFocus,
+.proposalFocusActions,
+.proposalAction,
+.proposalNetworkStatus {
+    --settings-proposal-presentation: 1;
+}
+
+.proposalStatusLabel {
+    display: none;
+}
+
+:global(html[data-runtime-twin-design='proposal']) .inlineOriginal {
+    display: none;
+}
+
+:global(html[data-runtime-twin-design='proposal']) .inlineProposal {
+    display: inline;
+}
+
+:global(html[data-runtime-twin-design='proposal']) .blockOriginal {
+    display: none;
+}
+
+:global(html[data-runtime-twin-design='proposal']) .originalOnly {
+    display: none;
+}
+
+:global(html[data-runtime-twin-design='proposal']) .proposalDescription {
+    display: block;
+}
+
+:global(html[data-runtime-twin-design='proposal']) .originalDescription {
+    display: none;
+}
+
+:global(html[data-runtime-twin-design='proposal']) .proposalDetail {
+    display: block;
+}
+
+:global(html[data-runtime-twin-design='proposal']) .proposalQuickLinks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--lume-control-gap);
+    align-items: center;
+}
+
+:global(html[data-runtime-twin-design='proposal']) .proposalOverviewFocus {
+    gap: 1rem;
+    padding: 0 0 1rem;
+}
+
+:global(html[data-runtime-twin-design='proposal']) .proposalFocusActions {
+    min-width: 9.5rem;
+    gap: var(--lume-control-gap);
+}
+
+:global(html[data-runtime-twin-design='proposal']) .proposalAction {
+    min-height: var(--lume-control-height);
+    padding: 10px 14px;
+    font-size: 14px;
+    line-height: 22px;
+}
+
+:global(html[data-runtime-twin-design='proposal']) .proposalNetworkStatus {
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+    margin: 0.55rem 0 0;
+    font-family: var(--lume-font-sans, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
+    font-size: 1rem;
+    font-variant-numeric: normal;
+    letter-spacing: normal;
+    line-height: 1.3;
+}
+
+:global(html[data-runtime-twin-design='proposal']) .proposalStatusLabel {
+    display: inline;
+    color: var(--lume-ink-muted);
+    font-family: inherit;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+:global(html[data-runtime-twin-design='proposal']) .proposalNetworkStatusValue {
+    color: var(--lume-ink);
+    font-family: inherit;
+    font-size: clamp(1.125rem, 2vw, 1.375rem);
+    font-variant-numeric: normal;
+    font-weight: 650;
+    letter-spacing: -0.015em;
+    line-height: 1.25;
+}
+
+:global(html[data-runtime-twin-design='proposal']) .previewSectionProposal {
+    grid-template-columns: minmax(0, 1fr) auto;
+}
+
+@media (max-width: 767px) {
+    :global(html[data-runtime-twin-design='proposal']) .previewSectionProposal {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    :global(html[data-runtime-twin-design='proposal']) .proposalFocusActions {
+        min-width: 0;
+    }
+}

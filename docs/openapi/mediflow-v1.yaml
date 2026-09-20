@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: MediFlow Local API v1
-  version: 1.23.0
+  version: 1.26.0
   summary: Stable patient contract plus executable home-base network slice with explicit pairing review, paired-client auth boundary, ambulatory scope options, scoped remote patient, cross-patient agenda and diary reads, therapy, checkup, observation, and catalog read boundaries, replica planning state, explicit identity summary, and declarative AI runtime summary for the local `/api/v1` surface.
   description: |
     OpenAPI contract for the client-facing local API defined by ADR 0010.
@@ -30,6 +30,14 @@ info:
     remote hard delete, remote attachment/document writes, remote inference
     routing, remote therapy/checkup/observation hard delete, and advanced
     identity scoping remain follow-up workstreams.
+    ADR 0124 bounds serialized network JSON bodies in UTF-8 bytes: 64 KiB for
+    pairing intents, 4 MiB for other JSON operations, and the attachment formula
+    declared on its operation (29 MiB by default). Oversize bodies return 413
+    JSON_BODY_TOO_LARGE. These are new input-size restrictions; fields are not
+    truncated. Existing admission/auth and separate field limits still apply.
+    The reader bounds consumed bytes, not global memory. Only attachment POST
+    also limits admission to one operation per module instance and body reading
+    to a total 30-second deadline (ADR 0124).
 servers:
   - url: https://127.0.0.1:3443
     description: Local HTTPS endpoint for native clients via TLS proxy.
@@ -41,6 +49,115 @@ tags:
   - name: Network
     description: Home-base network contract for explicit pairing, capability discovery, and PHI-safe session gating.
 paths:
+  /api/v1/network/ai/functions:
+    get:
+      operationId: ReadNativeFunctionPreferences
+      tags: [Native AI configuration]
+      summary: ReadNativeFunctionPreferences
+      description: >-
+        ADR0135. Host-wide configuration only. Requires current native operator
+        session bound to this paired device, home-base mode, current admin role
+        and explicit unexpired native.ai.configure host grant. No Web authority,
+        provider admission, inference or clinical apply. No query parameters.
+        Responses are no-store. Revalidate after ambiguous outcomes; no auto-retry.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      responses:
+        '200':
+          description: Configuration snapshot or read-only preview; never inference readiness.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NativeFunctionPreferences'
+        '400':
+          description: Invalid or bounded-body violation.
+        '401':
+          description: Pairing or native session missing, changed, expired or revoked.
+        '403':
+          description: Explicit host configuration grant absent or revoked, or role denied.
+        '409':
+          description: Catalog, preference revision, command or binding conflict. Reread before a new command.
+        '503':
+          description: Configuration unavailable or corrupt; no fallback.
+    post:
+      operationId: ApplyNativeFunctionPreferences
+      tags: [Native AI configuration]
+      summary: ApplyNativeFunctionPreferences
+      description: >-
+        ADR0135. Host-wide configuration only. Requires current native operator
+        session bound to this paired device, home-base mode, current admin role
+        and explicit unexpired native.ai.configure host grant. No Web authority,
+        provider admission, inference or clinical apply. No query parameters.
+        Responses are no-store. Revalidate after ambiguous outcomes; no auto-retry.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      requestBody:
+        required: true
+        description: Strict JSON, no extra keys, maximum 4096 bytes and one second body deadline.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NativeFunctionCommand'
+      responses:
+        '200':
+          description: Configuration snapshot or read-only preview; never inference readiness.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NativeFunctionPreferences'
+        '400':
+          description: Invalid or bounded-body violation.
+        '401':
+          description: Pairing or native session missing, changed, expired or revoked.
+        '403':
+          description: Explicit host configuration grant absent or revoked, or role denied.
+        '409':
+          description: Catalog, preference revision, command or binding conflict. Reread before a new command.
+        '503':
+          description: Configuration unavailable or corrupt; no fallback.
+  /api/v1/network/ai/functions/preview:
+    post:
+      operationId: PreviewNativeFunctionPreferences
+      tags: [Native AI configuration]
+      summary: PreviewNativeFunctionPreferences
+      description: >-
+        ADR0135. Host-wide configuration only. Requires current native operator
+        session bound to this paired device, home-base mode, current admin role
+        and explicit unexpired native.ai.configure host grant. No Web authority,
+        provider admission, inference or clinical apply. No query parameters.
+        Responses are no-store. Revalidate after ambiguous outcomes; no auto-retry.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      requestBody:
+        required: true
+        description: Strict JSON, no extra keys, maximum 4096 bytes and one second body deadline.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NativeFunctionCommand'
+      responses:
+        '200':
+          description: Configuration snapshot or read-only preview; never inference readiness.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NativeFunctionPreview'
+        '400':
+          description: Invalid or bounded-body violation.
+        '401':
+          description: Pairing or native session missing, changed, expired or revoked.
+        '403':
+          description: Explicit host configuration grant absent or revoked, or role denied.
+        '409':
+          description: Catalog, preference revision, command or binding conflict. Reread before a new command.
+        '503':
+          description: Configuration unavailable or corrupt; no fallback.
   /api/v1/patients:
     get:
       tags:
@@ -367,6 +484,7 @@ paths:
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/visit-draft:
     post:
+      x-mediflow-json-max-bytes: 4194304
       tags:
         - Network
       operationId: computeNetworkVisitDraft
@@ -439,6 +557,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
     post:
+      x-mediflow-json-max-bytes: 65536
       tags:
         - Network
       operationId: createNetworkPairingIntent
@@ -473,6 +592,8 @@ paths:
           $ref: '#/components/responses/InvalidNetworkPairingIntent'
         '409':
           $ref: '#/components/responses/NetworkModeDisabled'
+        '413':
+          $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/pairing-intents/{intentId}/confirm:
@@ -615,6 +736,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
     post:
+      x-mediflow-json-max-bytes: 4194304
       tags:
         - Network
       operationId: createNetworkAmbulatory
@@ -641,10 +763,13 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '409':
           $ref: '#/components/responses/VersionConflict'
+        '413':
+          $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/ambulatories/{id}:
     put:
+      x-mediflow-json-max-bytes: 4194304
       tags:
         - Network
       operationId: updateNetworkAmbulatory
@@ -675,9 +800,12 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/VersionConflict'
+        '413':
+          $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
           $ref: '#/components/responses/InternalServerError'
     delete:
+      x-mediflow-json-max-bytes: 4194304
       tags:
         - Network
       operationId: deleteNetworkAmbulatory
@@ -714,10 +842,13 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/VersionConflict'
+        '413':
+          $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/ambulatories/clear:
     post:
+      x-mediflow-json-max-bytes: 4194304
       tags:
         - Network
       operationId: clearNetworkTestAmbulatory
@@ -754,6 +885,8 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/VersionConflict'
+        '413':
+          $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/drugs:
@@ -877,6 +1010,208 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '500':
           $ref: '#/components/responses/InternalServerError'
+  /api/v1/network/terminology/who/readiness:
+    get:
+      tags:
+      - Network
+      operationId: readNetworkWhoReadiness
+      summary: Read observed local WHO readiness
+      description: Read-only WHO local service; requires network.catalogs.readonly, paired-device credentials and
+        a current operator session with an effective ambulatory. Native sessions remain native. Reauthenticates the
+        original session/device/token/role/scope before work and after awaits; abort or changed authority denies delivery.
+        No patient write, automatic setup, retry, fallback or direct WHO access by the client. All responses are no-store.
+        Release 2026-01, MMS, en; upstream and paired envelope maximum 65536 UTF-8 bytes. Readiness is passive, not
+        a probe.
+      security:
+      - pairedClientId: []
+        pairedClientToken: []
+        sessionCookieAuth: []
+      responses:
+        '200':
+          description: Observed available (not a new live probe).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WhoLocalReadiness'
+        '400':
+          description: Invalid, duplicate, missing or unknown query parameter.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WhoNetworkError'
+        '401':
+          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Home-base network mode disabled.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                - $ref: '#/components/schemas/NetworkErrorResponse'
+        '502':
+          description: Invalid or over-bound upstream/paired response. Narrow the search or check the service.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WhoNetworkError'
+        '503':
+          description: Service unavailable (not necessarily an over-bound response). For readiness, a valid non-available
+            readiness v2 may be returned.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                - $ref: '#/components/schemas/WhoNetworkError'
+                - $ref: '#/components/schemas/WhoLocalReadiness'
+        '504':
+          description: WHO request timeout.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WhoNetworkError'
+  /api/v1/network/terminology/who/search:
+    get:
+      tags:
+      - Network
+      operationId: searchNetworkWhoIcd11
+      summary: Search local WHO ICD-11
+      description: Read-only WHO local service; requires network.catalogs.readonly, paired-device credentials and
+        a current operator session with an effective ambulatory. Native sessions remain native. Reauthenticates the
+        original session/device/token/role/scope before work and after awaits; abort or changed authority denies delivery.
+        No patient write, automatic setup, retry, fallback or direct WHO access by the client. All responses are no-store.
+        Release 2026-01, MMS, en; upstream and paired envelope maximum 65536 UTF-8 bytes. Readiness is passive, not
+        a probe.
+      security:
+      - pairedClientId: []
+        pairedClientToken: []
+        sessionCookieAuth: []
+      responses:
+        '200':
+          description: Matching entries, including an empty or partial result with provenance.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WhoLocalSearchResponse'
+        '400':
+          description: Invalid, duplicate, missing or unknown query parameter.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WhoNetworkError'
+        '401':
+          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Home-base network mode disabled.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                - $ref: '#/components/schemas/NetworkErrorResponse'
+        '502':
+          description: Invalid or over-bound upstream/paired response. Narrow the search or check the service.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WhoNetworkError'
+        '503':
+          description: Service unavailable (not necessarily an over-bound response). For readiness, a valid non-available
+            readiness v2 may be returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WhoNetworkError'
+        '504':
+          description: WHO request timeout.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WhoNetworkError'
+      parameters:
+      - name: q
+        in: query
+        required: true
+        description: Exactly one nonempty normalized terminology query, at most 160 UTF-8 bytes; no patient context.
+          No paging or limit parameter.
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 160
+  /api/v1/network/terminology/who/code-check:
+    get:
+      tags:
+      - Network
+      operationId: checkNetworkWhoIcd11Code
+      summary: Check a code in local WHO ICD-11
+      description: Read-only WHO local service; requires network.catalogs.readonly, paired-device credentials and
+        a current operator session with an effective ambulatory. Native sessions remain native. Reauthenticates the
+        original session/device/token/role/scope before work and after awaits; abort or changed authority denies delivery.
+        No patient write, automatic setup, retry, fallback or direct WHO access by the client. All responses are no-store.
+        Release 2026-01, MMS, en; upstream and paired envelope maximum 65536 UTF-8 bytes. Readiness is passive, not
+        a probe.
+      security:
+      - pairedClientId: []
+        pairedClientToken: []
+        sessionCookieAuth: []
+      responses:
+        '200':
+          description: Found or not_found with a live check receipt; not a clinical validation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WhoCodeCheckResponse'
+        '400':
+          description: Invalid, duplicate, missing or unknown query parameter.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WhoNetworkError'
+        '401':
+          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Home-base network mode disabled; or release unsupported.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                - $ref: '#/components/schemas/NetworkErrorResponse'
+                - $ref: '#/components/schemas/WhoNetworkError'
+        '502':
+          description: Invalid or over-bound upstream/paired response. Narrow the search or check the service.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WhoNetworkError'
+        '503':
+          description: Service unavailable (not necessarily an over-bound response). For readiness, a valid non-available
+            readiness v2 may be returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WhoNetworkError'
+        '504':
+          description: WHO request timeout.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WhoNetworkError'
+      parameters:
+      - name: code
+        in: query
+        required: true
+        schema:
+          $ref: '#/components/schemas/WhoCheckCode'
+      - name: release
+        in: query
+        required: true
+        schema:
+          type: string
+          const: 2026-01
   /api/v1/network/terminology/search:
     get:
       tags:
@@ -1049,6 +1384,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
     post:
+      x-mediflow-json-max-bytes: 4194304
       tags:
         - Network
       operationId: createNetworkServicePrescription
@@ -1082,10 +1418,13 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '413':
+          $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/service-prescriptions/{id}:
     put:
+      x-mediflow-json-max-bytes: 4194304
       tags:
         - Network
       operationId: updateNetworkServicePrescription
@@ -1128,6 +1467,8 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/PrescriptionVersionConflict'
+        '413':
+          $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/service-prescription-items:
@@ -1177,6 +1518,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
     post:
+      x-mediflow-json-max-bytes: 4194304
       tags:
         - Network
       operationId: createNetworkServicePrescriptionItem
@@ -1210,10 +1552,13 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '413':
+          $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/service-prescription-items/{id}:
     put:
+      x-mediflow-json-max-bytes: 4194304
       tags:
         - Network
       operationId: updateNetworkServicePrescriptionItem
@@ -1257,6 +1602,8 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/PrescriptionVersionConflict'
+        '413':
+          $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/service-catalog:
@@ -1358,6 +1705,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
     post:
+      x-mediflow-json-max-bytes: 4194304
       tags:
         - Network
       operationId: createNetworkProstheticPrescription
@@ -1391,10 +1739,13 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '413':
+          $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/prosthetic-prescriptions/{id}:
     put:
+      x-mediflow-json-max-bytes: 4194304
       tags:
         - Network
       operationId: updateNetworkProstheticPrescription
@@ -1438,6 +1789,8 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/PrescriptionVersionConflict'
+        '413':
+          $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/patients:
@@ -1487,6 +1840,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
     post:
+      x-mediflow-json-max-bytes: 4194304
       tags:
         - Network
       operationId: createNetworkPatient
@@ -1531,6 +1885,8 @@ paths:
           $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '413':
+          $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/checkups:
@@ -1692,6 +2048,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
     put:
+      x-mediflow-json-max-bytes: 4194304
       tags:
         - Network
       operationId: updateNetworkPatient
@@ -1748,9 +2105,12 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/PatientVersionConflict'
+        '413':
+          $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
           $ref: '#/components/responses/InternalServerError'
     delete:
+      x-mediflow-json-max-bytes: 4194304
       tags:
         - Network
       operationId: deleteNetworkPatient
@@ -1799,10 +2159,13 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/PatientVersionConflict'
+        '413':
+          $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/patients/{id}/restore:
     post:
+      x-mediflow-json-max-bytes: 4194304
       tags:
         - Network
       operationId: restoreNetworkPatient
@@ -1850,6 +2213,8 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/PatientVersionConflict'
+        '413':
+          $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/patients/{id}/entries:
@@ -1914,6 +2279,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
     post:
+      x-mediflow-json-max-bytes: 4194304
       tags:
         - Network
       operationId: createNetworkPatientEntry
@@ -1964,6 +2330,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '413':
+          $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/patients/{id}/entries/{entryId}:
@@ -2009,6 +2377,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
     put:
+      x-mediflow-json-max-bytes: 4194304
       tags:
         - Network
       operationId: updateNetworkPatientEntry
@@ -2071,6 +2440,8 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/EntryVersionConflict'
+        '413':
+          $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/patients/{id}/therapies:
@@ -2135,6 +2506,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
     post:
+      x-mediflow-json-max-bytes: 4194304
       tags:
         - Network
       operationId: createNetworkPatientTherapy
@@ -2184,6 +2556,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '413':
+          $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/patients/{id}/therapies/{therapyId}:
@@ -2229,6 +2603,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
     put:
+      x-mediflow-json-max-bytes: 4194304
       tags:
         - Network
       operationId: updateNetworkPatientTherapy
@@ -2290,6 +2665,8 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/TherapyVersionConflict'
+        '413':
+          $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/patients/{id}/checkups:
@@ -2354,6 +2731,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
     post:
+      x-mediflow-json-max-bytes: 4194304
       tags:
         - Network
       operationId: createNetworkPatientCheckup
@@ -2403,6 +2781,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '413':
+          $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/patients/{id}/checkups/{checkupId}:
@@ -2448,6 +2828,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
     put:
+      x-mediflow-json-max-bytes: 4194304
       tags:
         - Network
       operationId: updateNetworkPatientCheckup
@@ -2509,6 +2890,8 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/CheckupVersionConflict'
+        '413':
+          $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/patients/{id}/observations:
@@ -2573,6 +2956,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
     post:
+      x-mediflow-json-max-bytes: 4194304
       tags:
         - Network
       operationId: createNetworkPatientObservation
@@ -2627,6 +3011,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '413':
+          $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/patients/{id}/observations/{observationId}:
@@ -2672,6 +3058,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
     put:
+      x-mediflow-json-max-bytes: 4194304
       tags:
         - Network
       operationId: updateNetworkPatientObservation
@@ -2733,6 +3120,8 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/ObservationVersionConflict'
+        '413':
+          $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/patients/{id}/attachments:
@@ -2775,6 +3164,8 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
     post:
+      x-mediflow-json-max-bytes: 30408704
+      x-mediflow-json-max-bytes-formula: "resolveMaxAttachmentBytes() + 4194304; default shown above"
       tags:
         - Network
       operationId: createNetworkPatientAttachment
@@ -2795,6 +3186,26 @@ paths:
         queues the created attachment with `ocrQueueState: pending` and
         `ocrQueueReason: paired_upload`. There is no paired update or delete
         for attachments.
+        The inclusive serialized JSON cap is the configured wire limit
+        (`resolveMaxAttachmentBytes()`, host override `MEDIFLOW_ATTACHMENT_MAX_BYTES`)
+        plus 4 MiB for the envelope and metadata: 29 MiB (30,408,704 bytes)
+        by default. Canonical client serialization leaves ENC ASCII and slashes
+        unescaped; arbitrary whitespace or escaping is not guaranteed to fit.
+        The separate attachment data wire limit remains 25 MiB by default.
+        After existing admission/auth, mode, capability, session and scope gates,
+        one operation per server module instance reserves a slot before reading
+        headers or body. There is no queue: another admitted POST returns
+        503 ATTACHMENT_OPERATION_BUSY with Retry-After: 1 without reading its body.
+        The slot covers reading, parsing, validation, asynchronous service and
+        response construction, and is released only when that work ends or fails.
+        The body read has a total 30-second deadline, not renewed by chunks:
+        expiry returns 408 ATTACHMENT_BODY_READ_TIMEOUT and client abort during
+        reading returns 400 ATTACHMENT_BODY_READ_ABORTED. Reader cancellation is
+        best-effort; an already determined 413 retains precedence. The deadline
+        is cooperative with the event loop and does not bound the service;
+        client abort during service does not release the slot early. A stalled
+        service retains it. Slots do not coordinate processes, workers or module
+        copies, and do not bound transport allocations or global memory.
       security:
         - pairedClientId: []
           pairedClientToken: []
@@ -2828,15 +3239,52 @@ paths:
               schema:
                 $ref: '#/components/schemas/AttachmentCreateResponse'
         '400':
-          $ref: '#/components/responses/BadRequest'
+          description: Invalid request, or client abort during attachment body reading.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                bodyReadAborted:
+                  value:
+                    error: Attachment body read aborted
+                    code: ATTACHMENT_BODY_READ_ABORTED
         '401':
           $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '408':
+          description: Total 30-second attachment body read deadline expired before materialization.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                bodyReadTimeout:
+                  value:
+                    error: Attachment body read timeout
+                    code: ATTACHMENT_BODY_READ_TIMEOUT
         '413':
           $ref: '#/components/responses/PayloadTooLarge'
+        '503':
+          description: An attachment operation already occupies this module instance; request body not read.
+          headers:
+            Retry-After:
+              description: Retry delay in seconds.
+              schema:
+                type: string
+                const: '1'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                operationBusy:
+                  value:
+                    error: Attachment operation busy
+                    code: ATTACHMENT_OPERATION_BUSY
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/patients/{id}/attachments/{attachmentId}:
@@ -2923,6 +3371,7 @@ paths:
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/fse/validate-document:
     post:
+      x-mediflow-json-max-bytes: 4194304
       tags:
         - Network
       operationId: validateNetworkFseDocument
@@ -2954,6 +3403,8 @@ paths:
           $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '413':
+          $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
           $ref: '#/components/responses/InternalServerError'
 components:
@@ -3052,7 +3503,7 @@ components:
               value:
                 error: Not found
     PayloadTooLarge:
-      description: Attachment payload exceeds the configured wire size limit shared with the host attachment upload.
+      description: The serialized JSON body or a separately bounded field exceeds its operation limit. Attachment data retains its configured wire size limit; visit transcripts retain their character limit.
       content:
         application/json:
           schema:
@@ -3061,6 +3512,21 @@ components:
             tooLarge:
               value:
                 error: Attachment payload too large
+            jsonBodyTooLarge:
+              value:
+                error: JSON payload too large
+                code: JSON_BODY_TOO_LARGE
+    NetworkJsonBodyTooLarge:
+      description: Serialized JSON body exceeds the inclusive UTF-8 byte limit declared by the operation (ADR 0124). No partial payload is applied.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            jsonBodyTooLarge:
+              value:
+                error: JSON payload too large
+                code: JSON_BODY_TOO_LARGE
     VersionConflict:
       description: Ambulatory compare-on-write conflict. Refresh the returned PHI-safe snapshot before retrying.
       content:
@@ -3327,6 +3793,387 @@ components:
               value:
                 error: Failed to fetch patient
   schemas:
+    WhoArtifactDigest:
+      type: string
+      pattern: ^sha256:[a-f0-9]{64}$
+    WhoCheckCode:
+      type: string
+      minLength: 1
+      maxLength: 32
+      pattern: ^[A-Z0-9][A-Z0-9.-]*(?:[&/][A-Z0-9][A-Z0-9.-]*)*$
+      not:
+        const: N/A
+    WhoNetworkError:
+      type: object
+      additionalProperties: false
+      required:
+      - schemaVersion
+      - code
+      properties:
+        schemaVersion:
+          type: string
+          const: mediflow.reference-data.icd11-error.v1
+        code:
+          type: string
+          enum:
+          - request_invalid
+          - release_not_supported
+          - service_unavailable
+          - upstream_response_invalid
+          - upstream_timeout
+    WhoLocalEntry:
+      type: object
+      additionalProperties: false
+      required:
+      - code
+      - description
+      - system
+      - canonicalUri
+      properties:
+        code:
+          $ref: '#/components/schemas/WhoCheckCode'
+        description:
+          type: string
+          minLength: 1
+          maxLength: 4096
+          description: Normalized plain English WHO title; no markup, controls or bidi overrides.
+        system:
+          type: string
+          const: ICD-11
+        canonicalUri:
+          type: string
+          description: Exact WHO MMS 2026-01 entity URI for simple codes, or exact percent-encoded CodeInfo URI matching
+            a combination. Data only, never dereferenced.
+          pattern: ^http://id\.who\.int/icd/release/11/2026-01/mms/(?:[1-9][0-9]{0,19}(?:/(?:other|unspecified))?|codeinfo/[A-Z0-9.%-]+)$
+    WhoLocalSearchReceipt:
+      type: object
+      additionalProperties: false
+      required:
+      - schemaVersion
+      - operation
+      - releaseId
+      - language
+      - bindingId
+      - imageDigest
+      - datasetSnapshotId
+      - deployment
+      - source
+      - resultCount
+      - latencyMs
+      - fetchedAt
+      - expiresAt
+      - completedAt
+      properties:
+        schemaVersion:
+          type: string
+          const: mediflow.reference-data.icd11-search-receipt.v2
+        operation:
+          type: string
+          const: mediflow.reference_data.icd11.search.v2
+        releaseId:
+          type: string
+          const: 2026-01
+        language:
+          type: string
+          const: en
+        bindingId:
+          type: string
+          const: who.icd11.v2.2026-01.mms.en.local.v1
+        imageDigest:
+          $ref: '#/components/schemas/WhoArtifactDigest'
+        datasetSnapshotId:
+          $ref: '#/components/schemas/WhoArtifactDigest'
+        deployment:
+          type: string
+          const: local
+        source:
+          type: string
+          enum:
+          - live
+          - cache
+        resultCount:
+          type: integer
+          minimum: 0
+          maximum: 25
+        latencyMs:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+        fetchedAt:
+          type: string
+          format: date-time
+          pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$
+        expiresAt:
+          type: string
+          format: date-time
+          pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$
+        completedAt:
+          type: string
+          format: date-time
+          pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$
+      description: Exact 24-hour TTL; fetchedAt <= completedAt < expiresAt. For live, completedAt-fetchedAt <= latencyMs.
+        Count equals entries length; cache is not a new live observation.
+    WhoLocalSearchResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - schemaVersion
+      - entries
+      - partial
+      - receipt
+      properties:
+        schemaVersion:
+          type: string
+          const: mediflow.reference-data.icd11-search-response.v2
+        entries:
+          type: array
+          maxItems: 25
+          items:
+            $ref: '#/components/schemas/WhoLocalEntry'
+        partial:
+          type: boolean
+        receipt:
+          $ref: '#/components/schemas/WhoLocalSearchReceipt'
+    WhoLocalReadiness:
+      type: object
+      additionalProperties: false
+      required:
+      - schemaVersion
+      - status
+      - releaseId
+      - language
+      - bindingId
+      - imageDigest
+      - datasetSnapshotId
+      - deployment
+      - lastLiveObservedAt
+      - lastResultSource
+      properties:
+        schemaVersion:
+          type: string
+          const: mediflow.reference-data.icd11-who-readiness.v2
+        status:
+          type: string
+          enum:
+          - disabled
+          - configuration_required
+          - configured
+          - available
+          - unavailable
+        releaseId:
+          type: string
+          const: 2026-01
+        language:
+          type: string
+          const: en
+        bindingId:
+          type: string
+          const: who.icd11.v2.2026-01.mms.en.local.v1
+        imageDigest:
+          oneOf:
+          - $ref: '#/components/schemas/WhoArtifactDigest'
+          - type: 'null'
+        datasetSnapshotId:
+          oneOf:
+          - $ref: '#/components/schemas/WhoArtifactDigest'
+          - type: 'null'
+        deployment:
+          type: string
+          const: local
+        lastLiveObservedAt:
+          oneOf:
+          - type: string
+            format: date-time
+            pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$
+          - type: 'null'
+        lastResultSource:
+          type:
+          - string
+          - 'null'
+          enum:
+          - live
+          - cache
+          - null
+      description: Image/dataset may be null only for disabled/configuration_required; available requires lastLiveObservedAt.
+        Configured is not available; cache never promotes status to available.
+    WhoCodeCheckReceipt:
+      type: object
+      additionalProperties: false
+      required:
+      - schemaVersion
+      - operation
+      - releaseId
+      - language
+      - bindingId
+      - imageDigest
+      - datasetSnapshotId
+      - source
+      - found
+      - checkedAt
+      - latencyMs
+      properties:
+        schemaVersion:
+          type: string
+          const: mediflow.reference-data.icd11-code-check-receipt.v1
+        operation:
+          type: string
+          const: mediflow.reference_data.icd11.code_check.v1
+        releaseId:
+          type: string
+          const: 2026-01
+        language:
+          type: string
+          const: en
+        bindingId:
+          type: string
+          const: who.icd11.v2.2026-01.mms.en.local.v1
+        imageDigest:
+          $ref: '#/components/schemas/WhoArtifactDigest'
+        datasetSnapshotId:
+          $ref: '#/components/schemas/WhoArtifactDigest'
+        source:
+          type: string
+          const: live
+        found:
+          type: boolean
+        checkedAt:
+          type: string
+          format: date-time
+          pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$
+        latencyMs:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+    WhoCheckedCode:
+      type: object
+      additionalProperties: false
+      required:
+      - canonicalUri
+      - stemUri
+      - stemCode
+      - stemTitle
+      properties:
+        canonicalUri:
+          type: string
+          description: Exact CodeInfo URI ending in encodeURIComponent(requested code).
+        stemUri:
+          type: string
+          pattern: ^http://id\.who\.int/icd/release/11/2026-01/mms/[1-9][0-9]{0,19}(?:/(?:other|unspecified))?$
+        stemCode:
+          $ref: '#/components/schemas/WhoCheckCode'
+        stemTitle:
+          type: string
+          minLength: 1
+          maxLength: 4096
+    WhoCodeCheckResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - schemaVersion
+      - code
+      - status
+      - entry
+      - receipt
+      properties:
+        schemaVersion:
+          type: string
+          const: mediflow.reference-data.icd11-code-check.v1
+        code:
+          $ref: '#/components/schemas/WhoCheckCode'
+        status:
+          type: string
+          enum:
+          - found
+          - not_found
+        entry:
+          oneOf:
+          - $ref: '#/components/schemas/WhoCheckedCode'
+          - type: 'null'
+        receipt:
+          $ref: '#/components/schemas/WhoCodeCheckReceipt'
+      description: Code must equal the request; found iff entry is present and receipt.found is true. not_found requires
+        a null entry. stemCode equals the first code component. This is terminology existence, not diagnostic validation.
+    NativeFunctionCommand:
+      oneOf:
+        - $ref: '#/components/schemas/NativeFunctionSetCommand'
+        - $ref: '#/components/schemas/NativeFunctionPresetCommand'
+    NativeFunctionSetCommand:
+      type: object
+      additionalProperties: false
+      required: [schemaVersion, commandId, expectedRevision, expectedCatalogRevision, action, functionId, enabled, defaultModelOptionId]
+      properties:
+        schemaVersion: {type: string, enum: [mediflow.function-preferences-command.v1]}
+        commandId: {type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]{15,95}$'}
+        expectedRevision: {type: string, pattern: '^sha256_[0-9a-f]{64}$'}
+        expectedCatalogRevision: {type: string, pattern: '^sha256_[0-9a-f]{64}$'}
+        action: {type: string, enum: [set]}
+        functionId: {type: string, enum: [patient_insight, smart_import, document_synthesis, treatment_reasoning]}
+        enabled: {type: boolean}
+        defaultModelOptionId: {type: [string, 'null'], pattern: '^model_option_[0-9a-f]{32}$'}
+    NativeFunctionPresetCommand:
+      type: object
+      additionalProperties: false
+      required: [schemaVersion, commandId, expectedRevision, expectedCatalogRevision, action, presetId]
+      properties:
+        schemaVersion: {type: string, enum: [mediflow.function-preferences-command.v1]}
+        commandId: {type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]{15,95}$'}
+        expectedRevision: {type: string, pattern: '^sha256_[0-9a-f]{64}$'}
+        expectedCatalogRevision: {type: string, pattern: '^sha256_[0-9a-f]{64}$'}
+        action: {type: string, enum: [preset]}
+        presetId: {type: string, enum: [host_defaults, all_off]}
+    NativeFunctionPreferences:
+      type: object
+      additionalProperties: false
+      required: [schemaVersion, revision, catalogRevision, check, functions, presets, apply]
+      properties:
+        schemaVersion: {type: string, enum: [mediflow.function-preferences.v1]}
+        revision: {type: string, pattern: '^sha256_[0-9a-f]{64}$'}
+        catalogRevision: {type: string, pattern: '^sha256_[0-9a-f]{64}$'}
+        check: {type: string, enum: [configuration_only]}
+        apply:
+          type: string
+          enum: [denied]
+          description: Clinical apply is denied; this is not the configuration grant.
+        presets:
+          type: array
+          minItems: 2
+          maxItems: 2
+          uniqueItems: true
+          items: {type: string, enum: [host_defaults, all_off]}
+        functions:
+          type: array
+          minItems: 4
+          maxItems: 4
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, enabled, defaultModelOptionId, defaultSource, bindingState, options]
+            properties:
+              id: {type: string, enum: [patient_insight, smart_import, document_synthesis, treatment_reasoning]}
+              enabled: {type: boolean}
+              defaultModelOptionId: {type: [string, 'null']}
+              defaultSource: {type: string, enum: [saved_preference, host_configuration]}
+              bindingState: {type: string, enum: [stale, unsupported, current]}
+              options:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: false
+                  required: [modelOptionId, label, provider, state]
+                  properties:
+                    modelOptionId: {type: string, pattern: '^model_option_[0-9a-f]{32}$'}
+                    label: {type: string}
+                    provider: {type: string, enum: [ollama, athena_mlx]}
+                    state: {type: string, enum: [available_unqualified, unavailable]}
+    NativeFunctionPreview:
+      type: object
+      additionalProperties: false
+      required: [schemaVersion, command, proposed, writesPerformed]
+      properties:
+        schemaVersion: {type: string, enum: [mediflow.function-preferences-preview.v1]}
+        command: {$ref: '#/components/schemas/NativeFunctionCommand'}
+        proposed: {$ref: '#/components/schemas/NativeFunctionPreferences'}
+        writesPerformed: {type: integer, enum: [0]}
     ErrorResponse:
       type: object
       additionalProperties: false

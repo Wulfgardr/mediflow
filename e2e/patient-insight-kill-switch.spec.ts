@@ -1,6 +1,6 @@
 /* @Codex */
 import { expect, test } from '@playwright/test';
-import { bootstrapUnlockedSession, openAiFunzioniSettings, setAiLaneKillSwitch } from './utils';
+import { bootstrapUnlockedSession, openAiFunzioniSettings, openPatientSection, setAiLaneKillSwitch } from './utils';
 
 // This DB is shared across specs; leaving Patient Insight disabled would break
 // specs that expect it enabled. Restore the switch after the test.
@@ -28,14 +28,18 @@ test('patient insight kill switch disables generation on patient detail', async 
   // values and would otherwise undo a click that landed too early.
   await openAiFunzioniSettings(page);
 
-  const killSwitch = page.getByRole('switch', { name: 'Patient Insight locale' });
+  const killSwitch = page.getByRole('switch', { name: 'Quadro paziente nella proposta' });
   await expect(killSwitch).toHaveAttribute('aria-checked', 'true');
   await killSwitch.click();
   await expect(killSwitch).toHaveAttribute('aria-checked', 'false');
-  const saveButton = page.getByRole('button', { name: 'Salva Configurazione' });
-  await saveButton.click();
-  await expect(page.getByRole('button', { name: 'Salvataggio...' })).toHaveCount(0);
-  await expect(saveButton).toBeEnabled();
+  const preferenceCard = killSwitch.locator('xpath=ancestor::article');
+  await preferenceCard.getByRole('button', { name: 'Anteprima modifica' }).click();
+  const settingsPreview = page.getByRole('region', { name: 'Anteprima impostazioni' });
+  await expect(settingsPreview).toContainText('Quadro paziente: spento');
+  await settingsPreview.getByRole('button', { name: 'Applica alle impostazioni' }).click();
+  await expect(page.getByTestId('function-preferences').getByRole('status').filter({
+    hasText: /^Impostazioni salvate e rilette\. Nessuna modifica clinica\.$/u,
+  })).toBeVisible();
 
   const patientId = await page.evaluate(async () => {
     const response = await fetch('/api/patients', {
@@ -62,6 +66,10 @@ test('patient insight kill switch disables generation on patient detail', async 
   // route (/modules), not the cockpit "Quadro" landing at /patients/:id.
   await page.goto(`/patients/${patientId}/modules`);
   await expect(page).toHaveURL(new RegExp(`/patients/${patientId}/modules$`));
+  await openPatientSection(page, 'quadro');
+  const insightDisclosure = page.locator('#patient-insight');
+  await insightDisclosure.locator(':scope > summary').click();
+  await expect(insightDisclosure).toHaveAttribute('open', '');
 
   const disabledCard = page.getByTestId('patient-insight-disabled-card');
   await expect(disabledCard).toBeVisible();

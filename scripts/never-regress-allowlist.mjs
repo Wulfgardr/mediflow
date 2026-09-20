@@ -1,6 +1,29 @@
 /* @Codex */
 export const NEVER_REGRESS_ALLOWLIST = {
     credentialLiterals: [
+        /* @Codex: exact WUL-673 reference and fixture lines. */
+        {"path": "lib/reference-data/icd11-who-network-route.test.ts", "pattern": "^\\ \\ \\ \\ const\\ session\\ =\\ \\{\\ id:\\ 'synthetic\\-session',\\ userId:\\ 'synthetic\\-user',\\ username:\\ 'synthetic',\\ role:\\ 'user',\\ authChannel:\\ 'native'\\ \\};$", "reason": "WUL-673: exact canonical WHO URI comparison or inert synthetic fixture line; no network permission or live credential."},
+        {"path": "native/MediFlowMac/Tests/MediFlowAppleSharedTests/RepertoriWHOStoreTests.swift", "pattern": "^\\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ case\\ \"pin\":\\ current\\ =\\ connection\\(source,\\ pin:\\ \"synthetic\\-new\\-pin\"\\)$", "reason": "WUL-673: exact canonical WHO URI comparison or inert synthetic fixture line; no network permission or live credential."},
+        {
+            path: 'lib/ai-providers/fabric/chatgpt-synthetic-synthesis-binding.test.ts',
+            pattern: "username:\\s*'synthetic'",
+            reason: 'ADR 0134 owner-binding tests use only the synthetic Web session fixture; no live credential or runtime default.',
+        },
+        {
+            path: 'lib/ai-providers/fabric/function-model-preferences.test.ts',
+            pattern: "username:\\s*'synthetic'",
+            reason: 'Function-preferences HTTP tests use process-local synthetic Web sessions for cancellation and retirement; no live credential is used.',
+        },
+        {
+            path: 'lib/security/portable-supervisor-mini-production.test.ts',
+            pattern: "username:\\s*'synthetic-mini-clinician'",
+            reason: 'Mini production composition uses only a synthetic Web lifecycle owner in a temporary fixture; no live credential or runtime default.',
+        },
+        {
+            path: 'lib/aifa-catalog-server.test.ts',
+            pattern: "username:\\s*'synthetic-aifa'",
+            reason: 'AIFA route tests use a synthetic clinician session to verify authentication, cancellation and atomic replacement; no live credential is used.',
+        },
         {
             path: 'lib/security/audit.test.ts',
             pattern: "username:\\s*'admin'",
@@ -221,8 +244,113 @@ export const NEVER_REGRESS_ALLOWLIST = {
             pattern: "username:\\s*'synthetic-logout-operator'",
             reason: 'Logout server tests use a synthetic operator identity against an isolated local session store.',
         },
+        {
+            path: 'app/api/patients/route.test.ts',
+            pattern: "username:\\s*'synthetic-route-user'",
+            reason: 'Patient route tests use a synthetic Web owner identity with in-memory SQL and no live credential.',
+        },
+        {
+            path: 'lib/chatgpt-account/account-product-integration.test.ts',
+            pattern: "username:\\s*'invented'",
+            reason: 'ChatGPT account integration tests use a synthetic owner identity and transport with no live login.',
+        },
+        {
+            path: 'lib/chatgpt-product/product-production.test.ts',
+            pattern: "username:\\s*'synthetic'",
+            reason: 'ChatGPT product production tests use a synthetic Web owner identity with a local transport fixture.',
+        },
+        /* @Codex — exact synthetic test identity, no runtime exemption. */
+        {
+            path: 'lib/chatgpt-product/product-preparation.test.ts',
+            pattern: "username:\\s*'synthetic'",
+            reason: 'Preparation lifecycle tests use only the synthetic Web owner fixture; no live credential or runtime default.',
+        },
+        {
+            path: 'lib/chatgpt-product/product-session.test.ts',
+            pattern: "username:\\s*'synthetic'",
+            reason: 'ChatGPT product session tests use a synthetic owner identity for isolated lifecycle cases.',
+        },
+        {
+            path: 'lib/patient-create-service.test.ts',
+            pattern: "username:\\s*'synthetic-sql-user'",
+            reason: 'Patient service tests use a synthetic owner identity with an in-memory SQL fixture.',
+        },
     ],
     externalUrls: [
+        /* @Codex: scoped ordinary integration test peer. */
+        {"path": "lib/chatgpt-execution/ordinary-integration.test.ts", "pattern": "^\\ \\ \\ \\ \\ \\ \\ \\ if\\ \\(method\\ ===\\ 'account/login/start'\\)\\ return\\ \\{\\ type:\\ 'chatgptDeviceCode',\\ loginId:\\ 'fixture\\-login',\\ userCode:\\ 'FAKE\\-ONLY',\\ verificationUrl:\\ 'https://auth\\.openai\\.com/fixture\\-never\\-navigate'\\ \\};$", "reason": "WUL-689/691: exact inert device-login response in the synthetic ordinary integration peer; never navigated or fetched."},
+        /* @Codex: exact WUL-673 reference and fixture lines. */
+        {"path": "lib/reference-data/icd11-who-network-route.test.ts", "pattern": "^const\\ URI\\ =\\ 'http://id\\.who\\.int/icd/release/11/2026\\-01/mms/1000000001';$", "reason": "WUL-673: exact canonical WHO URI comparison or inert synthetic fixture line; no network permission or live credential."},
+        {"path": "lib/reference-data/icd11-who-network-route.test.ts", "pattern": "^\\ \\ \\ \\ \\ \\ \\ \\ new\\ Request\\(`https://synthetic\\.invalid/api/v1/network/terminology/who/\\$\\{op\\}\\$\\{suffix\\}`,\\ \\{\\ signal\\ \\}\\);$", "reason": "WUL-673: exact canonical WHO URI comparison or inert synthetic fixture line; no network permission or live credential."},
+        {"path": "lib/reference-data/icd11-who-network-route.test.ts", "pattern": "^\\ \\ \\ \\ \\ \\ \\ \\ \\{\\ \\.\\.\\.valid,\\ entries:\\ \\[\\{\\ \\.\\.\\.valid\\.entries\\[0\\],\\ canonicalUri:\\ 'https://example\\.invalid/'\\ \\}\\]\\ \\},$", "reason": "WUL-673: exact canonical WHO URI comparison or inert synthetic fixture line; no network permission or live credential."},
+        {"path": "native/MediFlowMac/Sources/MediFlowAppleShared/HomeBaseWHOModels.swift", "pattern": "^\\ \\ \\ \\ private\\ static\\ let\\ mms\\ =\\ \"http://id\\.who\\.int/icd/release/11/2026\\-01/mms/\"$", "reason": "WUL-673: exact canonical WHO URI comparison or inert synthetic fixture line; no network permission or live credential."},
+        {"path": "native/MediFlowMac/Tests/MediFlowAppleSharedTests/HomeBaseWHOContractTests.swift", "pattern": "^\\ \\ \\ \\ static\\ let\\ uri\\ =\\ \"http://id\\.who\\.int/icd/release/11/2026\\-01/mms/1000000001\"$", "reason": "WUL-673: exact canonical WHO URI comparison or inert synthetic fixture line; no network permission or live credential."},
+        {"path": "native/MediFlowMac/Tests/MediFlowAppleSharedTests/HomeBaseWHOContractTests.swift", "pattern": "^\\ \\ \\ \\ \\ \\ \\ \\ \"http://id\\.who\\.int/icd/release/11/2026\\-01/mms/codeinfo/\"\\ \\+\\ code\\.replacingOccurrences\\(of:\\ \"\\&\",\\ with:\\ \"%26\"\\)\\.replacingOccurrences\\(of:\\ \"/\",\\ with:\\ \"%2F\"\\)$", "reason": "WUL-673: exact canonical WHO URI comparison or inert synthetic fixture line; no network permission or live credential."},
+        {"path": "native/MediFlowMac/Tests/MediFlowAppleSharedTests/HomeBaseWHOContractTests.swift", "pattern": "^\\ \\ \\ \\ \\ \\ \\ \\ for\\ \\(key,\\ value\\)\\ in\\ \\[\\(\"code\",\\ \"N/A\"\\),\\ \\(\"code\",\\ \"AA00\\&\\&XA00\"\\),\\ \\(\"canonicalUri\",\\ \"https://example\\.invalid/\"\\),\\ \\(\"canonicalUri\",\\ WHOSyntheticFixtures\\.uri\\.replacingOccurrences\\(of:\\ \"2026\\-01\",\\ with:\\ \"2025\\-01\"\\)\\),\\ \\(\"description\",\\ \"<b>term</b>\"\\),\\ \\(\"description\",\\ \"\\ term\"\\),\\ \\(\"description\",\\ \"term\\\\u\\{200f\\}\"\\),\\ \\(\"system\",\\ \"ICD\\-10\"\\),\\ \\(\"vendor\",\\ \"unexpected\"\\)\\]\\ \\{$", "reason": "WUL-673: exact canonical WHO URI comparison or inert synthetic fixture line; no network permission or live credential."},
+        {"path": "native/MediFlowMac/Tests/MediFlowAppleSharedTests/RepertoriWHOStoreTests.swift", "pattern": "^\\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ token:\\ String\\ =\\ \"synthetic\\-token\",\\ server:\\ String\\ =\\ \"https://synthetic\\.invalid\",$", "reason": "WUL-673: exact canonical WHO URI comparison or inert synthetic fixture line; no network permission or live credential."},
+        {"path": "native/MediFlowMac/Tests/MediFlowAppleSharedTests/RepertoriWHOStoreTests.swift", "pattern": "^\\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ case\\ \"server\":\\ current\\ =\\ connection\\(source,\\ server:\\ \"https://new\\-synthetic\\.invalid\"\\)$", "reason": "WUL-673: exact canonical WHO URI comparison or inert synthetic fixture line; no network permission or live credential."},
+        /* @Codex — exact inert login responses; no runtime or directory-wide exemption. */
+        ...['lib/chatgpt-execution/fixtures/login-peer.ts',
+            'lib/chatgpt-execution/fixtures/mac-login-harness.mjs'].map(path => ({
+            path,
+            pattern: '^(?!.*https?://.*https?://).*https://auth\\.openai\\.com/fixture(?=["\\x27`]).*$',
+            reason: 'Synthetic login peers return this exact URL as inert RPC data; they never open or fetch it.',
+        })),
+        {
+            path: 'lib/chatgpt-execution/execution-mac-config.ts',
+            pattern: "^\\ \\ \\ \\ \\ \\ \\ \\ chatgpt_base_url:\\ 'https://chatgpt\\.com/backend\\-api/',\\ file_opener:\\ 'vscode',$",
+            reason: 'ADR 0134 exact typed readback expectation for the pinned official Codex default; comparison only, no request or egress permission.',
+        },
+        {
+            path: 'lib/chatgpt-account/account-browser.test.ts',
+            pattern: 'https://auth\\.openai\\.com/oauth/authorize\\?state=synthetic-test',
+            reason: 'Synthetic browser lifecycle payload only; the injected fetcher never sends this URL.',
+        },
+        {
+            path: 'lib/chatgpt-account/account-service.test.ts',
+            pattern: 'https://auth\\.openai\\.com/oauth/authorize\\?state=synthetic-test',
+            reason: 'Synthetic account transport response only; no real login or network request.',
+        },
+        {
+            path: 'lib/chatgpt-execution/execution-egress-proxy.test.ts',
+            pattern: "^\\s*'(?:GET http://auth\\.openai\\.com:443/|CONNECT https://auth\\.openai\\.com:443/) HTTP/1\\.1",
+            reason: 'ADR 0134 negative CONNECT tests submit these invalid request targets only to an owned loopback listener and assert no DNS or upstream connection.',
+        },
+        {
+            path: 'lib/chatgpt-execution/execution-transport.test.ts',
+            pattern: "if \\(mode === 'diagnostic'\\) return send.*https://auth\\.openai\\.com/private\\?token=PRIVATE_PROVIDER_SENTINEL",
+            reason: 'ADR 0134 fake child emits a synthetic error URL to verify diagnostic minimization; no URL is fetched and no token is real.',
+        },
+        {
+            path: 'lib/reference-data/icd11-who-code-check-contract.ts',
+            pattern: 'http://id\\.who\\.int/icd/release/11/2026-01/mms/(?=["\\x27`])',
+            reason: 'ADR0115: canonical WHO identifier namespace, compared as data only; CodeInfo transport always targets fixed loopback.',
+        },
+        {
+            path: 'lib/reference-data/icd11-who-code-check.test.ts',
+            pattern: 'http://id\\.who\\.int/icd/release/11/2026-01/mms/1000000001(?=["\\x27`])',
+            reason: 'Synthetic identifier in in-memory CodeInfo and entity response fixtures; no external request.',
+        },
+        {
+            path: 'lib/reference-data/icd11-who-local-node-transport.ts',
+            pattern: 'http://id\\.who\\.int(?=["\\x27`])',
+            reason: 'ADR0115: remove the already validated identifier prefix to construct a local path; never fetch this URI or its host.',
+        },
+        {
+            path: 'lib/aifa-catalog-download.ts',
+            pattern: 'https://drive\\.aifa\\.gov\\.it/farmaci/confezioni_fornitura\\.csv(?=["\\x27`])',
+            reason: 'ADR0125 fixes this official AIFA feed for an explicit authenticated update, without caller URL, redirects, cookies or clinical data; no automatic download on startup.',
+        },
+        {
+            path: 'lib/aifa-catalog-server.test.ts',
+            pattern: 'https://drive\\.aifa\\.gov\\.it/farmaci/confezioni_fornitura\\.csv(?=["\\x27`])',
+            reason: 'The AIFA route test verifies exact official-source provenance with a synthetic transport and no external download.',
+        },
+        {
+            path: 'native/MediFlowMac/Tests/MediFlowCoreTests/DiagnosesCodecProvenanceTests.swift',
+            pattern: 'http://id\\.who\\.int/icd/release/11/2026-01/mms/1000000001(?=["\\x27`])',
+            reason: 'One inert synthetic canonical URI is round-tripped as diagnosis data by the Core codec fixture; no transport or URI dereference occurs.',
+        },
         {
             path: 'lib/ai-providers/v2/openai-responses-official-transport.ts',
             pattern: 'https://api\\.openai\\.com/v1/responses',
@@ -305,13 +433,13 @@ export const NEVER_REGRESS_ALLOWLIST = {
         },
         {
             path: 'lib/compliance-evidence-inventory.ts',
-            pattern: 'https://eur-lex\\.europa\\.eu/eli/(?:reg/2016/679/art_(?:25|32)|reg/2024/1689)/',
-            reason: 'Official EUR-Lex URLs are read-only legal provenance rendered for explicit user review; the inventory performs no fetch or background egress.',
+            pattern: '(?:https://eur-lex\\.europa\\.eu/legal-content/EN/TXT/\\?uri=CELEX:(?:02016R0679-20160504|02024R1689-20260727)|https://digital-strategy\\.ec\\.europa\\.eu/en/policies/regulatory-framework-ai)(?=[\'\"]|$)',
+            reason: 'The two consolidated EUR-Lex versions and the Commission overview consulted on 2026-09-06 are read-only legal provenance for explicit user review; the inventory performs no fetch or background egress.',
         },
         {
             path: 'lib/compliance-evidence-inventory.test.ts',
-            pattern: 'https://eur-lex\\.europa\\.eu/eli/(?:reg/2016/679/art_(?:25|32)|reg/2024/1689)/',
-            reason: 'Compliance inventory tests assert official EUR-Lex provenance strings without issuing network requests.',
+            pattern: '(?:https://eur-lex\\.europa\\.eu/legal-content/EN/TXT/\\?uri=CELEX:(?:02016R0679-20160504|02024R1689-20260727)|https://digital-strategy\\.ec\\.europa\\.eu/en/policies/regulatory-framework-ai)(?=[\'\"]|$)',
+            reason: 'Compliance inventory tests assert these exact official provenance strings and the bounded URL exceptions without issuing network requests.',
         },
         {
             path: 'lib/aifa-catalog.ts',
@@ -414,6 +542,11 @@ export const NEVER_REGRESS_ALLOWLIST = {
             reason: 'PRREG handoff tests assert the portal dashboard URL against a spy; no runtime egress.',
         },
         {
+            path: 'native/MediFlowMac/Tests/MediFlowAppleSharedTests/PairedPatientsWorkspaceSelectionTests.swift',
+            pattern: 'https://\\\\\\(host\\)',
+            reason: 'Selection tests use UUID-scoped reserved .invalid hosts; a private ephemeral URLProtocol intercepts every request and rejects unregistered hosts, with no network fallback.',
+        },
+        {
             path: 'native/MediFlowMac/Sources/MediFlowAppleShared/HomeBaseBonjourDiscovery.swift',
             pattern: 'https://\\\\\\(hostName\\):\\\\\\(port\\)',
             reason: 'Bonjour discovery assembles a paired local server URL from the discovered host and port at runtime; it is not a hardcoded external endpoint.',
@@ -497,6 +630,86 @@ export const NEVER_REGRESS_ALLOWLIST = {
             path: 'native/MediFlowMac/Sources/MediFlowMac/Models/OncologyPrototype.swift',
             pattern: 'https://interactiveguidelines.esmo.org/esmo-web-app/home/',
             reason: 'The oncology prototype exposes clinician-invoked guidance links and does not perform background egress or runtime API calls.',
+        },
+        {
+            path: 'app/api/patients/route.test.ts',
+            pattern: '^(?!.*https?://.*https?://).*http://synthetic\\.invalid/api/patients(?=["\\x27`]).*$',
+            reason: 'Patient route tests construct synthetic Request objects only; no request is sent to the reserved invalid host.',
+        },
+        {
+            path: 'lib/aifa-update-guide-route.test.ts',
+            pattern: '^(?!.*https?://.*https?://).*https://www\\.aifa\\.gov\\.it/open-data(?=["\\x27`]).*$',
+            reason: 'AIFA update-guide tests store official Open Data provenance in a synthetic manifest; no provenance URL is fetched.',
+        },
+        {
+            path: 'lib/aifa-update-guide-route.test.ts',
+            pattern: '^(?!.*https?://.*https?://).*https://drive\\.aifa\\.gov\\.it/farmaci/confezioni_fornitura\\.csv(?=["\\x27`]).*$',
+            reason: 'AIFA update-guide tests observe the fixed feed through a synthetic fetch seam and perform no external download.',
+        },
+        {
+            path: 'lib/aifa-update-guide.test.ts',
+            pattern: '^(?!.*https?://.*https?://).*https://example\\.invalid/synthetic\\.csv(?=["\\x27`]).*$',
+            reason: 'AIFA update-guide tests use a reserved invalid source URL as synthetic manifest metadata only.',
+        },
+        {
+            path: 'lib/aifa-update-guide.test.ts',
+            pattern: '^(?!.*https?://.*https?://).*https://www\\.aifa\\.gov\\.it/copyright(?=["\\x27`]).*$',
+            reason: 'AIFA update-guide tests retain the official reuse-terms URL as synthetic metadata and never fetch it.',
+        },
+        {
+            path: 'lib/chatgpt-account/account-product-integration.test.ts',
+            pattern: '^(?!.*https?://.*https?://).*https://auth\\.openai\\.com/oauth/authorize\\?state=synthetic-product(?=["\\x27`]).*$',
+            reason: 'ChatGPT account integration tests return a synthetic authorization payload; the URL is never opened or sent.',
+        },
+        {
+            path: 'lib/chatgpt-account/account-product.browser.test.mjs',
+            pattern: '^(?!.*https?://.*https?://).*https://auth\\.openai\\.com/oauth/authorize\\?state=synthetic-fixture(?=["\\x27`]).*$',
+            reason: 'ChatGPT browser tests return a synthetic authorization payload through an injected fetcher with no navigation.',
+        },
+        {
+            path: 'lib/chatgpt-execution/execution-login.test.ts',
+            pattern: "^\\s*for \\(const url of \\['http://auth\\.openai\\.com/fixture', 'https://other\\.invalid/fixture', 'https://auth\\.openai\\.com:444/fixture', 'https://user@auth\\.openai\\.com/fixture', 'https://auth\\.openai\\.com/fixture#secret'\\]\\) test\\('device URL is only a validated official server response, not arbitrary navigation', async t => \\{\\s*$",
+            reason: 'Execution login tests retain five exact hostile URLs on one synthetic fixture line; the complete line is allowlisted and no URL is opened or fetched.',
+        },
+        {
+            path: 'lib/chatgpt-execution/execution-mac-config.ts',
+            pattern: '^(?!.*https?://.*https?://).*https://raw\\.githubusercontent\\.com/openai/codex/3d2ee51ca2d5db578f328aa75e20aa22c0197c9a/codex-rs/core/config\\.schema\\.json(?=["\\x27`]).*$',
+            reason: 'Mac execution keeps this exact reviewed source URL pinned to commit 3d2ee51ca2d5db578f328aa75e20aa22c0197c9a; local bytes and SHA-256 are verified and no fetch occurs.',
+        },
+        {
+            path: 'lib/chatgpt-execution/execution-mac-config.ts',
+            pattern: '^(?!.*https?://.*https?://).*https://raw\\.githubusercontent\\.com/openai/codex/3d2ee51ca2d5db578f328aa75e20aa22c0197c9a/codex-rs/config/src/loader/mod\\.rs(?=["\\x27`]).*$',
+            reason: 'Mac execution keeps this exact reviewed loader source URL pinned to commit 3d2ee51ca2d5db578f328aa75e20aa22c0197c9a; local bytes and SHA-256 are verified and no fetch occurs.',
+        },
+        {
+            path: 'lib/chatgpt-product/product-browser.test.ts',
+            pattern: '^(?!.*https?://.*https?://).*https://other\\.invalid(?=["\\x27`]).*$',
+            reason: 'ChatGPT product browser tests use a reserved invalid URL only in a synthetic disclosure-corruption fixture.',
+        },
+        {
+            path: 'lib/chatgpt-product/product-production.test.ts',
+            pattern: '^(?!.*https?://.*https?://).*https://auth\\.openai\\.com/fixture-only-not-opened(?=["\\x27`]).*$',
+            reason: 'ChatGPT product tests use a synthetic verification URL in a mocked response and never open or fetch it.',
+        },
+        {
+            path: 'lib/chatgpt-product/product-production.test.ts',
+            pattern: '^(?!.*https?://.*https?://).*https://example\\.invalid(?=["\\x27`]).*$',
+            reason: 'ChatGPT product tests use a reserved invalid URL only as a synthetic forbidden-egress fixture.',
+        },
+        {
+            path: 'lib/patient-create-service.test.ts',
+            pattern: '^(?!.*https?://.*https?://).*http://synthetic\\.invalid/api/patients(?=["\\x27`]).*$',
+            reason: 'Patient service tests construct a synthetic Request object only; no request is sent to the reserved invalid host.',
+        },
+        {
+            path: 'lib/reference-data/repertory-guides-ui.test.ts',
+            pattern: '^(?!.*https?://.*https?://).*https://example\\.invalid/invented\\.csv(?=["\\x27`]).*$',
+            reason: 'Repertory guide UI tests use a reserved invalid source URL as synthetic metadata only.',
+        },
+        {
+            path: 'lib/reference-data/repertory-guides-ui.test.ts',
+            pattern: '^(?!.*https?://.*https?://).*https://www\\.aifa\\.gov\\.it/copyright(?=["\\x27`]).*$',
+            reason: 'Repertory guide UI tests retain the official AIFA reuse-terms URL as synthetic metadata and never fetch it.',
         },
     ],
 };

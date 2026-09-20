@@ -3,6 +3,10 @@
 Date: 2026-05-15
 Status: Accepted
 
+> Aggiornamento 0.8.6: [ADR 0123](./0123-official-web-ui-navigation-compositions.md)
+> promuove la UI scelta con due disposizioni di navigazione della stessa shell.
+> Originale resta limitato al confronto locale esplicito.
+
 Supersedes for the web root entry: [ADR 0047](./0047-graphite-workbench-single-official-web-shell.md).
 
 ## Problema

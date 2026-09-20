@@ -8,6 +8,9 @@
 
 import { type FocusEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
+import { useRuntimeWorkspaceArea } from '@/components/runtime-twin-workspace';
 import { X } from 'lucide-react';
 
 import {
@@ -110,6 +113,7 @@ function AreaContent({
   patientSearchFocusSignal,
   isReview,
   onSelectPatient,
+  onAlignPatient,
   onOpenArea,
   onRetryPatients,
 }: {
@@ -125,6 +129,7 @@ function AreaContent({
   patientSearchFocusSignal: number;
   isReview: boolean;
   onSelectPatient: (patientId: string) => void;
+  onAlignPatient: (patientId: string) => void;
   onOpenArea: (area: AreaId) => void;
   onRetryPatients: () => void;
 }) {
@@ -149,6 +154,7 @@ function AreaContent({
           selectedPatientId={selectedPatientId}
           searchFocusSignal={patientSearchFocusSignal}
           onSelectPatient={onSelectPatient}
+          onAlignPatient={onAlignPatient}
           onOpenArea={onOpenArea}
           onRetryPatients={onRetryPatients}
           isReview={isReview}
@@ -206,10 +212,14 @@ export function Kree8ClinicalCockpit({
   initialPatientId,
   operatorName: operatorNameProp,
 }: Kree8ClinicalCockpitProps) {
+  const { proposal } = useRuntimeTwinDesign();
+  const router = useRouter();
   const isReview = surface === 'review';
   const operatorName = operatorNameProp || (isReview ? 'Review design' : 'Sessione locale');
   const [area, setArea] = useState<AreaId>(() => (isReview ? 'turno' : initialArea));
+  useRuntimeWorkspaceArea(isReview ? null : area);
   const [areaFocusRequest, setAreaFocusRequest] = useState(0);
+  const previousRouteArea = useRef(initialArea);
   const focusSurfaceRef = useRef<HTMLElement>(null);
   const [filter, setFilter] = useState<StatusFilter>('all');
   const [patientSearchFocusSignal, setPatientSearchFocusSignal] = useState(0);
@@ -231,12 +241,45 @@ export function Kree8ClinicalCockpit({
     isReview ? REVIEW_PATIENT_LIST[0]?.id : initialPatientId
   ));
 
+  /* @Codex: Next keeps the cockpit mounted when only the query changes. */
+  useEffect(() => {
+    if (!isReview && previousRouteArea.current !== initialArea) {
+      // @Codex: Our own URL reflection already changed area and placed focus.
+      // Only navigation to another area schedules a new heading focus request.
+      if (area !== initialArea) {
+        setArea(initialArea);
+        setAreaFocusRequest((current) => current + 1);
+      }
+    }
+    previousRouteArea.current = initialArea;
+  }, [area, initialArea, isReview, proposal]);
+  useEffect(() => {
+    if (!isReview && initialPatientId) setSelectedPatientId(initialPatientId);
+  }, [initialPatientId, isReview, proposal]);
+
+  /* @Codex: only an explicit command writes the URL. Deriving a default or
+     filtered selection from a late read must not cancel a pending Next link.
+     Patch only the command's field so batched selection + navigation compose. */
+  const updateLocation = useCallback((change: { area?: AreaId; patientId?: string }) => {
+    if (isReview || window.location.pathname !== '/') return;
+    const url = new URL(window.location.href);
+    if (change.area) url.searchParams.set('area', change.area);
+    if (change.patientId) url.searchParams.set('paziente', change.patientId);
+    if (url.href !== window.location.href) window.history.replaceState(null, '', url);
+  }, [isReview]);
+  const selectPatient = useCallback((patientId: string) => {
+    setSelectedPatientId(patientId);
+    updateLocation({ patientId });
+  }, [updateLocation]);
+
   /* @Codex: ogni CTA interna termina sul titolo semantico della nuova area.
      La ricerca conserva invece il proprio target di focus dedicato. */
   const openArea = useCallback((nextArea: AreaId, focusDestination = true) => {
     setArea(nextArea);
+    // @Codex: preserve the originating area for Back from the patient folder.
+    if (!(proposal && !isReview && nextArea === 'scheda')) updateLocation({ area: nextArea });
     if (focusDestination) setAreaFocusRequest((current) => current + 1);
-  }, []);
+  }, [isReview, proposal, updateLocation]);
 
   /* @Codex: il contatore rende osservabile anche una richiesta verso l'area
      gia attiva; requestAnimationFrame lascia completare render e cleanup di
@@ -244,6 +287,19 @@ export function Kree8ClinicalCockpit({
   useEffect(() => {
     if (areaFocusRequest === 0) return;
     const animationFrame = window.requestAnimationFrame(() => {
+      // @Codex: A modal may open after navigation scheduled this frame. Its
+      // focus owns keyboard input until close, including Escape and Tab.
+      const visibleModal = Array.from(document.querySelectorAll<HTMLElement>(
+        '[role="dialog"][aria-modal="true"]',
+      )).some((dialog) => dialog.getClientRects().length > 0);
+      if (visibleModal) return;
+      // @Codex: Typing or the search shortcut may take focus before this
+      // deferred navigation frame. Preserve that newer editing intent.
+      const active = document.activeElement;
+      if (active instanceof HTMLElement && (
+        active.matches('input, textarea, select, [role="textbox"], [role="combobox"]')
+        || active.isContentEditable
+      )) return;
       const focusSurface = focusSurfaceRef.current;
       if (!focusSurface) return;
       const focusTarget = focusSurface.querySelector<HTMLElement>(
@@ -281,23 +337,6 @@ export function Kree8ClinicalCockpit({
     return () => window.removeEventListener('keydown', handleGlobalCommand);
   }, []);
 
-  /* @Codex WUL-UIUX: riflette area e paziente selezionato nella query string di
-     '/', cosi refresh e back del browser non perdono il punto di lavoro. Solo
-     sulla home (le route dedicate come /diary restano canoniche) e solo in live.
-     replaceState conserva history.state per non disturbare il router Next. */
-  useEffect(() => {
-    if (isReview || typeof window === 'undefined') return;
-    if (window.location.pathname !== '/') return;
-    const url = new URL(window.location.href);
-    url.searchParams.set('area', area);
-    if (selectedPatientId) {
-      url.searchParams.set('paziente', selectedPatientId);
-    } else {
-      url.searchParams.delete('paziente');
-    }
-    window.history.replaceState(window.history.state, '', url);
-  }, [area, selectedPatientId, isReview]);
-
   const selectedPatient = useMemo(
     () => {
       const selected = patientState.patients.find((patient) => patient.id === selectedPatientId);
@@ -307,6 +346,19 @@ export function Kree8ClinicalCockpit({
     },
     [initialPatientId, isReview, patientState.patients, selectedPatientId],
   );
+
+  /* @Codex: a single owner resolves batched patient selection + Apri quadro.
+     A child redirect must not replace the explicit hash with a generic folder.
+     The original comparison keeps its existing replace navigation. */
+  const folderPatientId = selectedPatientId ?? selectedPatient?.id;
+  const liveSchedaHref = isReview || area !== 'scheda' ? null
+    : proposal && folderPatientId ? `/patients/${folderPatientId}/modules#quadro`
+      : selectedPatient?.modulesHref ?? null;
+  useEffect(() => {
+    if (!liveSchedaHref) return;
+    if (proposal) router.push(liveSchedaHref);
+    else router.replace(liveSchedaHref);
+  }, [liveSchedaHref, proposal, router]);
 
   /* @Codex */
   const {
@@ -402,12 +454,6 @@ export function Kree8ClinicalCockpit({
 
     return () => controller.abort();
   }, [isReview]);
-
-  useEffect(() => {
-    if (isReview || !initialPatientId) return;
-    setSelectedPatientId(initialPatientId);
-    setArea(initialArea);
-  }, [initialArea, initialPatientId, isReview]);
 
   useEffect(() => {
     if (isReview) return;
@@ -603,7 +649,8 @@ export function Kree8ClinicalCockpit({
                 patientWorkspace={patientWorkspace}
                 patientSearchFocusSignal={patientSearchFocusSignal}
                 isReview={isReview}
-                onSelectPatient={setSelectedPatientId}
+                onSelectPatient={selectPatient}
+                onAlignPatient={setSelectedPatientId}
                 onOpenArea={openArea}
                 onRetryPatients={refreshPatients}
               />

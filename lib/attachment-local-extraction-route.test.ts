@@ -70,11 +70,11 @@ const deniedResult = Object.freeze({
 
 after(() => fs.rmSync(dataDir, { recursive: true, force: true }));
 
-async function invoke(request: Request, params: Promise<{ id: string }>, authenticated: unknown, result: unknown) {
+async function invoke(request: Request, params: Promise<{ id: string }>, authenticated: unknown, result: unknown, onCompose?: () => void) {
     const originalAuth = serverAuth.requireSession;
     const originalCompose = composition.composeAnyDocCurrentSourceExtraction;
     serverAuth.requireSession = async () => authenticated;
-    composition.composeAnyDocCurrentSourceExtraction = async () => result;
+    composition.composeAnyDocCurrentSourceExtraction = async () => { onCompose?.(); return result; };
     try {
         return await post(request, { params });
     } finally {
@@ -96,11 +96,10 @@ test('authenticates before observing request or params and returns a sanitized n
     assert.equal(reads, 0);
 });
 
-test('returns the exact strict extracted result while ignoring body, query, and caller authority fields', async () => {
+test('returns the exact strict extracted result only for the authenticated empty legacy POST', async () => {
     const expected = extractedResult();
     const request = new Request(`http://localhost/api/attachments/${ATTACHMENT}/local-extraction?patientId=patient.other&provider=hosted&path=/raw&digest=${'f'.repeat(64)}&currentness=99`, {
-        method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ patientId: 'patient.other', provider: 'hosted', path: '/raw', digest: 'f'.repeat(64), currentness: 99 }),
+        method: 'POST',
     });
 
     const response = await invoke(request, Promise.resolve({ id: ATTACHMENT }), session, expected);
@@ -108,6 +107,21 @@ test('returns the exact strict extracted result while ignoring body, query, and 
     assert.equal(response.status, 200);
     assert.equal(response.headers.get('cache-control'), 'no-store');
     assert.deepEqual(await response.json(), expected);
+});
+
+test('rejects caller authority fields in a legacy POST body before composition', async () => {
+    const request = new Request(`http://localhost/api/attachments/${ATTACHMENT}/local-extraction`, {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ patientId: 'patient.other', provider: 'hosted', path: '/raw', digest: 'f'.repeat(64), currentness: 99 }),
+    });
+
+    let compositions = 0;
+    const response = await invoke(request, Promise.resolve({ id: ATTACHMENT }), session, extractedResult(), () => { compositions += 1; });
+
+    assert.equal(response.status, 409);
+    assert.equal(response.headers.get('cache-control'), 'no-store');
+    assert.deepEqual(await response.json(), { error: 'Local extraction unavailable' });
+    assert.equal(compositions, 0);
 });
 
 test('returns the exact strict finalized review-required result', async () => {

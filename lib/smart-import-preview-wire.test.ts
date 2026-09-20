@@ -38,7 +38,7 @@ test('does not retain mutable domain references in a preview wire snapshot', () 
     const providerReceipt: Record<string, unknown> = { ...PROVIDER_RECEIPT }; const receipt = { ...RECEIPT, egressProfile: { ...RECEIPT.egressProfile }, providerReceipt };
     const provenance = { ...PROVENANCE, receipt }; const input = { ...AVAILABLE, proposal, receipt, provenance };
     const output = serializeSmartImportPreviewWire(input);
-    assert.ok(output && output.status === 'available'); assert.notEqual(output.proposal, proposal); assert.notEqual(output.receipt, receipt);
+    assert.ok(output && output.status === 'available'); assert.equal(output.receipt.provider, 'ollama'); if (output.receipt.provider !== 'ollama') throw new Error('Expected local receipt'); assert.notEqual(output.proposal, proposal); assert.notEqual(output.receipt, receipt);
     assert.equal(Object.isFrozen(output.proposal.diagnoses), true); assert.equal(Object.isFrozen(output.provenance.receipt), true);
     diagnosis.label = 'changed'; providerReceipt.model = 'changed/local';
     assert.equal(output.proposal.diagnoses[0].label, 'Synthetic'); assert.equal(output.receipt.providerReceipt.model, MODEL);

@@ -1,4 +1,6 @@
 /* @Codex */
+import { readNativeNetworkJson, jsonBodyTooLargeResponse } from '@/lib/native-network-json-body';
+/* @Codex */
 import { NextResponse } from 'next/server';
 import { createVisitDraft, type VisitDraftRouteBody } from '@/lib/visit-draft-service';
 import { requireNetworkCapabilityContext } from '@/lib/network-write-context';
@@ -14,7 +16,7 @@ export async function POST(request: Request) {
     if (!auth.ok) return auth.response;
 
     try {
-        const body = await request.json() as VisitDraftRouteBody & Record<string, unknown>;
+        const body = await readNativeNetworkJson(request) as VisitDraftRouteBody & Record<string, unknown>;
         if (hasOwn(body, 'patientId')) {
             return NextResponse.json({ error: 'Network visit draft does not accept patientId' }, { status: 400 });
         }
@@ -23,6 +25,9 @@ export async function POST(request: Request) {
         if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status });
         return NextResponse.json(result.value);
     } catch (error) {
+        /* @Codex */
+        const sizeError = jsonBodyTooLargeResponse(error);
+        if (sizeError) return sizeError;
         console.error('API POST /api/v1/network/visit-draft error:', error);
         return NextResponse.json({ error: 'Visit transcript draft failed' }, { status: 500 });
     }

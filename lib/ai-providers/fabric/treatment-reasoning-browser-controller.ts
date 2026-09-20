@@ -1,8 +1,14 @@
 /* @Codex */
 'use client';
+import { parseOrdinaryRemoteReceipt, parseOrdinaryRemoteProvenance, type OrdinaryRemoteReceipt, type OrdinaryRemoteProvenance } from '../../chatgpt-product/ordinary-wire';
 
+
+import { ATHENA_R1_QWEN3_8B_MODEL_ID } from '../../athena-model-identity';
+import type { PortableEngineMetadata } from './treatment-reasoning-portable-runtime';
+import type { TreatmentReasoningPortableAttestation } from './treatment-reasoning-athena-output-contract-v2';
+import type { PortableTreatmentResolutionReceipt } from './treatment-reasoning-production-operation';
 import type { TreatmentReasoningContextInput } from '../../treatment-reasoning-context';
-import { createSmartImportContextProposalBrowserAdapter, type SmartImportContextProposal } from '../../security/smart-import-context-proposal-browser-adapter';
+import { createSmartImportContextProposalBrowserAdapter, type SmartImportAmbulatoryChoice, type SmartImportContextProposal } from '../../security/smart-import-patient-context-browser-adapter';
 import { createSmartImportSelectionBrowserAdapter } from '../../security/smart-import-selection-browser-adapter';
 import { EGRESS_PROFILE_VERSION } from './contract';
 import { buildTreatmentReasoningProjectionAttachment } from './treatment-reasoning-projection';
@@ -15,13 +21,25 @@ export type TreatmentReasoningPublicationFabricReceipt = Readonly<{ schemaVersio
 type KeyEvidence = Readonly<{ id: string; statement: string; evidenceRefs: RefList }>;
 type SafetyFlag = Readonly<{ id: string; severity: 'info' | 'caution' | 'urgent_review'; label: string; rationale: string; evidenceRefs: RefList }>;
 type SuggestedAction = Readonly<{ id: string; intent: 'no_action' | 'review_only' | 'open_therapy_form_prefill' | 'open_monitoring_form_prefill' | 'open_diagnosis_review'; label: string; rationale: string; writePolicy: 'no_write' | 'review_only' | 'form_prefill_only'; evidenceRefs: RefList }>;
-export type TreatmentReasoningPublicationValue = Readonly<{ schemaVersion: 'mediflow.treatment_reasoning.v1'; task: 'treatment_reasoning'; summary: string; data: Readonly<{ recommendation: string; keyEvidence: readonly KeyEvidence[]; reasoning: readonly string[]; caveats: readonly string[]; safetyFlags: readonly SafetyFlag[]; suggestedActions: readonly SuggestedAction[]; trace: Readonly<{ mode: 'local_model'; toolsUsed: RefList; limitations: readonly string[] }> }> }>;
-export type TreatmentReasoningPublication = Readonly<{
+export type TreatmentReasoningPublicationValue = Readonly<{ schemaVersion: 'mediflow.treatment_reasoning.v1'; task: 'treatment_reasoning'; summary: string; data: Readonly<{ recommendation: string; keyEvidence: readonly KeyEvidence[]; reasoning: readonly string[]; caveats: readonly string[]; safetyFlags: readonly SafetyFlag[]; suggestedActions: readonly SuggestedAction[]; trace: Readonly<{ mode: 'local_model' | 'chatgpt_subscription'; toolsUsed: RefList; limitations: readonly string[] }> }> }>;
+export type MlxTreatmentReasoningPublication = Readonly<{
     schemaVersion: typeof TREATMENT_REASONING_PUBLICATION_SCHEMA_VERSION; capability: 'treatment_reasoning'; stage: 'preview'; review: 'required'; status: 'available';
     value: TreatmentReasoningPublicationValue; sourceBindings: readonly TreatmentReasoningPublicationSourceBinding[]; attestation: TreatmentReasoningPublicationAttestation;
     fabricReceipt: TreatmentReasoningPublicationFabricReceipt; provenance: Readonly<{ schemaVersion: 'mediflow.ai.fabric-provenance.v1'; capability: 'treatment_reasoning'; venue: 'local_process'; provider: 'athena_mlx'; model: null; preprocessing: readonly ['context_minimization', 'envelope_validation']; receipt: TreatmentReasoningPublicationFabricReceipt }>;
     sourceRevision: string; capturedAt: string; writesPerformed: 0; applyPolicy: 'none';
 }>;
+
+export type PortableBrowserPublication = Omit<MlxTreatmentReasoningPublication, 'schemaVersion' | 'attestation' | 'fabricReceipt' | 'provenance'> & Readonly<{
+    schemaVersion: 'mediflow.ai.treatment-reasoning-publication.v2'; attestation: TreatmentReasoningPortableAttestation;
+    fabricReceipt: PortableTreatmentResolutionReceipt;
+    provenance: Readonly<{ schemaVersion: 'mediflow.ai.treatment-reasoning-engine-provenance.v2'; capability: 'treatment_reasoning';
+        venue: 'local_process'; provider: 'athena_transformers'; model: typeof ATHENA_R1_QWEN3_8B_MODEL_ID;
+        preprocessing: readonly ['context_minimization', 'envelope_validation']; receipt: PortableTreatmentResolutionReceipt }>;
+}>;
+export type RemoteTreatmentReasoningPublication = Omit<MlxTreatmentReasoningPublication, 'schemaVersion' | 'attestation' | 'fabricReceipt' | 'provenance'> & Readonly<{
+    schemaVersion: 'mediflow.ai.treatment-reasoning-publication.chatgpt.v1'; attestation: OrdinaryRemoteReceipt; fabricReceipt: OrdinaryRemoteReceipt; provenance: OrdinaryRemoteProvenance;
+}>;
+export type TreatmentReasoningPublication = MlxTreatmentReasoningPublication | PortableBrowserPublication | RemoteTreatmentReasoningPublication;
 
 const ROOT_KEYS = ['schemaVersion', 'capability', 'stage', 'review', 'status', 'value', 'sourceBindings', 'attestation', 'fabricReceipt', 'provenance', 'sourceRevision', 'capturedAt', 'writesPerformed', 'applyPolicy'] as const;
 const REFERENCE = /^[A-Za-z][A-Za-z0-9._:-]{2,159}$/u;
@@ -80,13 +98,13 @@ function actions(value: unknown): readonly SuggestedAction[] | null {
     for (const candidate of input) { const item = record(candidate, ['id', 'intent', 'label', 'rationale', 'writePolicy', 'evidenceRefs']); const id = item && ref(item.id); const label = item && text(item.label, 180); const rationale = item && text(item.rationale, 400); const evidenceRefs = item && refs(item.evidenceRefs, true); if (!item || !id || !label || !rationale || !evidenceRefs || !intents.includes(item.intent as string) || !policies.includes(item.writePolicy as string) || seen.has(id)) return null; seen.add(id); output.push(Object.freeze({ id, intent: item.intent as SuggestedAction['intent'], label, rationale, writePolicy: item.writePolicy as SuggestedAction['writePolicy'], evidenceRefs })); }
     return Object.freeze(output);
 }
-function publicationValue(value: unknown): TreatmentReasoningPublicationValue | null {
+function publicationValue(value: unknown, expectedMode: 'local_model' | 'chatgpt_subscription' = 'local_model'): TreatmentReasoningPublicationValue | null {
     const root = record(value, ['schemaVersion', 'task', 'summary', 'data']); const summary = root && text(root.summary, 480);
     const data = root && record(root.data, ['recommendation', 'keyEvidence', 'reasoning', 'caveats', 'safetyFlags', 'suggestedActions', 'trace']); const recommendation = data && text(data.recommendation, 900);
     const evidence = data && keyEvidence(data.keyEvidence); const reasoning = data && strings(data.reasoning, 8, 400); const caveats = data && strings(data.caveats, 8, 400); const flags = data && safetyFlags(data.safetyFlags); const suggested = data && actions(data.suggestedActions);
     const trace = data && record(data.trace, ['mode', 'toolsUsed', 'limitations']); const tools = trace && refs(trace.toolsUsed); const limitations = trace && strings(trace.limitations, 8, 180);
-    if (!root || root.schemaVersion !== 'mediflow.treatment_reasoning.v1' || root.task !== 'treatment_reasoning' || !summary || !data || !recommendation || !evidence || !reasoning || !caveats || !flags || !suggested || !trace || trace.mode !== 'local_model' || !tools || !limitations) return null;
-    return Object.freeze({ schemaVersion: root.schemaVersion, task: root.task, summary, data: Object.freeze({ recommendation, keyEvidence: evidence, reasoning, caveats, safetyFlags: flags, suggestedActions: suggested, trace: Object.freeze({ mode: 'local_model' as const, toolsUsed: tools, limitations }) }) }) as TreatmentReasoningPublicationValue;
+    if (!root || root.schemaVersion !== 'mediflow.treatment_reasoning.v1' || root.task !== 'treatment_reasoning' || !summary || !data || !recommendation || !evidence || !reasoning || !caveats || !flags || !suggested || !trace || trace.mode !== expectedMode || !tools || (expectedMode === 'chatgpt_subscription' && tools.length !== 0) || !limitations) return null;
+    return Object.freeze({ schemaVersion: root.schemaVersion, task: root.task, summary, data: Object.freeze({ recommendation, keyEvidence: evidence, reasoning, caveats, safetyFlags: flags, suggestedActions: suggested, trace: Object.freeze({ mode: expectedMode, toolsUsed: tools, limitations }) }) }) as TreatmentReasoningPublicationValue;
 }
 function sourceBindings(value: unknown, publication: TreatmentReasoningPublicationValue): readonly TreatmentReasoningPublicationSourceBinding[] | null {
     const claims = [{ claimPath: 'summary', claim: publication.summary }, { claimPath: 'data.recommendation', claim: publication.data.recommendation }, ...publication.data.reasoning.map((claim, index) => ({ claimPath: `data.reasoning.${index}`, claim })), ...publication.data.caveats.map((claim, index) => ({ claimPath: `data.caveats.${index}`, claim }))];
@@ -115,11 +133,87 @@ function publicationUsesOnly(value: TreatmentReasoningPublication, allowedRefs: 
 }
 
 /** Strict client projection of the only review-only Treatment Reasoning success wire. */
-export function parseTreatmentReasoningPublication(value: unknown): TreatmentReasoningPublication | null {
+function parseMlxPublication(value: unknown): MlxTreatmentReasoningPublication | null {
     const root = record(value, ROOT_KEYS); const parsedValue = root && publicationValue(root.value); const bindings = root && parsedValue && sourceBindings(root.sourceBindings, parsedValue); const hostAttestation = root && attestation(root.attestation); const receipt = root && fabricReceipt(root.fabricReceipt);
     const provenance = root && record(root.provenance, ['schemaVersion', 'capability', 'venue', 'provider', 'model', 'preprocessing', 'receipt']); const preprocessing = provenance && array(provenance.preprocessing, 2); const provenanceReceipt = provenance && fabricReceipt(provenance.receipt); const sourceRevision = root && ref(root.sourceRevision); const capturedAt = root && iso(root.capturedAt);
     if (!root || root.schemaVersion !== TREATMENT_REASONING_PUBLICATION_SCHEMA_VERSION || root.capability !== 'treatment_reasoning' || root.stage !== 'preview' || root.review !== 'required' || root.status !== 'available' || !parsedValue || !bindings || !hostAttestation || !receipt || !provenance || provenance.schemaVersion !== 'mediflow.ai.fabric-provenance.v1' || provenance.capability !== 'treatment_reasoning' || provenance.venue !== 'local_process' || provenance.provider !== 'athena_mlx' || provenance.model !== null || !preprocessing || preprocessing[0] !== 'context_minimization' || preprocessing[1] !== 'envelope_validation' || !provenanceReceipt || !receiptMatches(receipt, provenanceReceipt) || !sourceRevision || !capturedAt || root.writesPerformed !== 0 || root.applyPolicy !== 'none') return null;
-    return Object.freeze({ schemaVersion: root.schemaVersion, capability: root.capability, stage: root.stage, review: root.review, status: root.status, value: parsedValue, sourceBindings: bindings, attestation: hostAttestation, fabricReceipt: receipt, provenance: Object.freeze({ schemaVersion: provenance.schemaVersion, capability: provenance.capability, venue: provenance.venue, provider: provenance.provider, model: null, preprocessing: Object.freeze(['context_minimization', 'envelope_validation'] as const), receipt: provenanceReceipt }), sourceRevision, capturedAt, writesPerformed: 0, applyPolicy: 'none' }) as TreatmentReasoningPublication;
+    return Object.freeze({ schemaVersion: root.schemaVersion, capability: root.capability, stage: root.stage, review: root.review, status: root.status, value: parsedValue, sourceBindings: bindings, attestation: hostAttestation, fabricReceipt: receipt, provenance: Object.freeze({ schemaVersion: provenance.schemaVersion, capability: provenance.capability, venue: provenance.venue, provider: provenance.provider, model: null, preprocessing: Object.freeze(['context_minimization', 'envelope_validation'] as const), receipt: provenanceReceipt }), sourceRevision, capturedAt, writesPerformed: 0, applyPolicy: 'none' }) as MlxTreatmentReasoningPublication;
+}
+
+const ENGINE_KEYS = ['provider', 'model', 'platform', 'artifactDigest', 'runtimeDigest', 'workerDigest', 'admissionRevision'] as const;
+const ATTESTATION_KEYS = [...ENGINE_KEYS, 'schema', 'readiness', 'venue', 'egress', 'receiptRef', 'provenanceRef'] as const;
+const DIGEST = /^[0-9a-f]{64}$/u;
+function portableEngine(value: unknown): PortableEngineMetadata | null {
+    const item = record(value, ENGINE_KEYS);
+    if (!item || item.provider !== 'athena_transformers' || item.model !== ATHENA_R1_QWEN3_8B_MODEL_ID
+        || !['win32-x64', 'win32-arm64', 'linux-x64', 'linux-arm64'].includes(item.platform as string)
+        || !['artifactDigest', 'runtimeDigest', 'workerDigest'].every(key => typeof item[key] === 'string' && DIGEST.test(item[key] as string))
+        || !Number.isSafeInteger(item.admissionRevision) || (item.admissionRevision as number) < 1) return null;
+    return Object.freeze({ provider: item.provider, model: item.model, platform: item.platform as PortableEngineMetadata['platform'],
+        artifactDigest: item.artifactDigest as string, runtimeDigest: item.runtimeDigest as string, workerDigest: item.workerDigest as string,
+        admissionRevision: item.admissionRevision as number });
+}
+function portableAttestation(value: unknown): TreatmentReasoningPortableAttestation | null {
+    const item = record(value, ATTESTATION_KEYS); if (!item) return null;
+    const engine = portableEngine(Object.fromEntries(ENGINE_KEYS.map(key => [key, item[key]])));
+    const receiptRef = ref(item.receiptRef); const provenanceRef = ref(item.provenanceRef);
+    if (!engine || !receiptRef || !provenanceRef || item.schema !== 'mediflow.ai.treatment-reasoning-engine-attestation.v2'
+        || item.readiness !== 'available_unqualified' || item.venue !== 'local_process' || item.egress !== 'none') return null;
+    return Object.freeze({ ...engine, schema: item.schema, readiness: item.readiness, venue: item.venue, egress: item.egress, receiptRef, provenanceRef });
+}
+function portableReceipt(value: unknown): PortableTreatmentResolutionReceipt | null {
+    const item = record(value, ['schemaVersion', 'capability', 'class', 'venue', 'egressProfile', 'provider', 'model', 'providerReceipt', 'fallbackCount', 'engine', 'modelOptionId', 'catalogRevision']);
+    const profile = item && record(item.egressProfile, ['id', 'version', 'egress']); const engine = item && portableEngine(item.engine);
+    if (!item || !profile || !engine || item.schemaVersion !== 'mediflow.ai.treatment-reasoning-engine-receipt.v2'
+        || item.capability !== 'treatment_reasoning' || item.class !== 'generative' || item.venue !== 'local_process'
+        || profile.id !== 'local_only' || profile.version !== EGRESS_PROFILE_VERSION || profile.egress !== 'none'
+        || item.provider !== engine.provider || item.model !== engine.model || item.providerReceipt !== null || item.fallbackCount !== 0
+        || typeof item.modelOptionId !== 'string' || !/^model_option_[0-9a-f]{32}$/u.test(item.modelOptionId)
+        || typeof item.catalogRevision !== 'string' || !/^sha256_[0-9a-f]{64}$/u.test(item.catalogRevision)) return null;
+    return Object.freeze({ schemaVersion: item.schemaVersion, capability: item.capability, class: item.class, venue: item.venue,
+        egressProfile: Object.freeze({ id: profile.id, version: profile.version, egress: profile.egress }), provider: engine.provider,
+        model: engine.model, providerReceipt: null, fallbackCount: 0, engine, modelOptionId: item.modelOptionId, catalogRevision: item.catalogRevision });
+}
+function parsePortablePublication(value: unknown): PortableBrowserPublication | null {
+    const root = record(value, ROOT_KEYS); const parsedValue = root && publicationValue(root.value);
+    const bindings = root && parsedValue && sourceBindings(root.sourceBindings, parsedValue);
+    const hostAttestation = root && portableAttestation(root.attestation); const receipt = root && portableReceipt(root.fabricReceipt);
+    const provenance = root && record(root.provenance, ['schemaVersion', 'capability', 'venue', 'provider', 'model', 'preprocessing', 'receipt']);
+    const preprocessing = provenance && array(provenance.preprocessing, 2); const provenanceReceipt = provenance && portableReceipt(provenance.receipt);
+    const sourceRevision = root && ref(root.sourceRevision); const capturedAt = root && iso(root.capturedAt);
+    if (!root || root.schemaVersion !== 'mediflow.ai.treatment-reasoning-publication.v2' || root.capability !== 'treatment_reasoning'
+        || root.stage !== 'preview' || root.review !== 'required' || root.status !== 'available' || !parsedValue || !bindings
+        || !hostAttestation || !receipt || !provenance || provenance.schemaVersion !== 'mediflow.ai.treatment-reasoning-engine-provenance.v2'
+        || provenance.capability !== 'treatment_reasoning' || provenance.venue !== 'local_process' || provenance.provider !== receipt.provider
+        || provenance.model !== receipt.model || !preprocessing || preprocessing.length !== 2 || preprocessing[0] !== 'context_minimization'
+        || preprocessing[1] !== 'envelope_validation' || !provenanceReceipt || JSON.stringify(receipt) !== JSON.stringify(provenanceReceipt)
+        || !ENGINE_KEYS.every(key => receipt.engine[key] === hostAttestation[key]) || !sourceRevision || !capturedAt
+        || root.writesPerformed !== 0 || root.applyPolicy !== 'none') return null;
+    return Object.freeze({ schemaVersion: root.schemaVersion, capability: root.capability, stage: root.stage, review: root.review,
+        status: root.status, value: parsedValue, sourceBindings: bindings, attestation: hostAttestation, fabricReceipt: receipt,
+        provenance: Object.freeze({ schemaVersion: provenance.schemaVersion, capability: root.capability, venue: 'local_process' as const,
+            provider: receipt.provider, model: receipt.model, preprocessing: Object.freeze(['context_minimization', 'envelope_validation'] as const), receipt: provenanceReceipt }),
+        sourceRevision, capturedAt, writesPerformed: 0 as const, applyPolicy: 'none' as const });
+}
+function parseRemotePublication(value: unknown): RemoteTreatmentReasoningPublication | null {
+    const root = record(value, ROOT_KEYS);
+    const parsed = root && publicationValue(root.value, 'chatgpt_subscription');
+    const bindings = root && parsed && sourceBindings(root.sourceBindings, parsed);
+    const receipt = root && parseOrdinaryRemoteReceipt(root.fabricReceipt, 'treatment_reasoning');
+    const observed = root && parseOrdinaryRemoteReceipt(root.attestation, 'treatment_reasoning');
+    const provenance = root && receipt && parseOrdinaryRemoteProvenance(root.provenance, receipt);
+    const revision = root && ref(root.sourceRevision), captured = root && iso(root.capturedAt);
+    if (!root || root.schemaVersion !== 'mediflow.ai.treatment-reasoning-publication.chatgpt.v1' || root.capability !== 'treatment_reasoning'
+        || root.stage !== 'preview' || root.review !== 'required' || root.status !== 'available' || !parsed || !bindings || !receipt || !observed
+        || JSON.stringify(observed) !== JSON.stringify(receipt) || !provenance || !revision || !captured || root.writesPerformed !== 0 || root.applyPolicy !== 'none') return null;
+    return Object.freeze({ schemaVersion: root.schemaVersion, capability: 'treatment_reasoning', stage: 'preview', review: 'required', status: 'available',
+        value: parsed, sourceBindings: bindings, attestation: observed, fabricReceipt: receipt, provenance, sourceRevision: revision, capturedAt: captured,
+        writesPerformed: 0, applyPolicy: 'none' });
+}
+/** Versions are disjoint: a portable engine is never accepted by the legacy MLX parser. */
+export function parseTreatmentReasoningPublication(value: unknown): TreatmentReasoningPublication | null {
+    const root = record(value, ROOT_KEYS);
+    return root?.schemaVersion === 'mediflow.ai.treatment-reasoning-publication.chatgpt.v1' ? parseRemotePublication(value) : root?.schemaVersion === 'mediflow.ai.treatment-reasoning-publication.v2' ? parsePortablePublication(value) : parseMlxPublication(value);
 }
 
 type Sources = Readonly<{ fetch?: typeof fetch; clock?: () => Date; requestId?: () => unknown }>;
@@ -152,27 +246,49 @@ export function createTreatmentReasoningBrowserController(sources: Sources = {})
     const reset = () => { generation += 1; operation += 1; readOperation += 1; proposal = null; selection.reset(); };
     return Object.freeze({
         reset,
-        async readProposal(): Promise<SmartImportContextProposal> {
+        async readProposal(patientId: string): Promise<SmartImportContextProposal> {
             proposal = null; const token = generation; const currentRead = ++readOperation;
-            try { const value = await context.read(); if (token !== generation || currentRead !== readOperation) return fail('operation_superseded'); proposal = value; return value; }
+            try { const value = await context.read(patientId); if (token !== generation || currentRead !== readOperation) return fail('operation_superseded'); proposal = value; return value; }
             catch (error) { if (token !== generation || currentRead !== readOperation) return fail('operation_superseded'); throw error; }
         },
         async run(value: unknown, confirmed: true): Promise<TreatmentReasoningPublication> {
-            if (confirmed !== true) return fail('confirmation_required'); const input = record(value, ['patientId', 'proposal', 'contextInput']);
+            if (confirmed !== true) return fail('confirmation_required'); const input = record(value, ['patientId', 'proposal', 'ambulatory', 'contextInput']);
             if (!input || typeof input.patientId !== 'string' || !PATIENT_ID.test(input.patientId)) return fail('input_invalid');
-            if (proposal === null || input.proposal !== proposal) return fail('proposal_stale'); const selectedProposal = proposal; proposal = null; readOperation += 1;
+            if (proposal === null || input.proposal !== proposal || input.patientId !== proposal.patientId) return fail('proposal_stale');
+            if (!proposal.ambulatories.includes(input.ambulatory as SmartImportAmbulatoryChoice)) return fail('selection_invalid');
+            const selectedProposal = proposal; const ambulatory = input.ambulatory as SmartImportAmbulatoryChoice; proposal = null; readOperation += 1;
             const clinicalContext = inputContext(input.contextInput, input.patientId); if (!clinicalContext) return fail('input_invalid');
             const token = generation; const currentOperation = ++operation; let selected: unknown = null;
-            const current = () => { if (token !== generation || currentOperation !== operation) return fail('operation_superseded'); if (selected && !selection.isCurrent(selected)) return fail('selection_invalid'); };
+            // @Codex: caller facts and host-owned directory facts must remain bound to the accepted proposal.
+            const patientCurrent = () => {
+                const patient = clinicalContext.patient;
+                if (patient.id !== selectedProposal.patientId || patient.version !== selectedProposal.patientVersion
+                    || typeof patient.firstName !== 'string' || typeof patient.lastName !== 'string'
+                    || `${patient.firstName.trim()} ${patient.lastName.trim()}` !== selectedProposal.patientName) return fail('proposal_stale');
+            };
+            const current = () => { if (token !== generation || currentOperation !== operation) return fail('operation_superseded'); if (selected && !selection.isCurrent(selected)) return fail('selection_invalid'); patientCurrent(); };
+            const revalidate = async () => {
+                current();
+                const latest = await context.read(selectedProposal.patientId); current();
+                const latestAmbulatory = latest.ambulatories.find((row) => row.ambulatoryId === ambulatory.ambulatoryId);
+                if (latest.patientVersion !== selectedProposal.patientVersion || latest.patientName !== selectedProposal.patientName
+                    || !latestAmbulatory || latestAmbulatory.version !== ambulatory.version || latestAmbulatory.name !== ambulatory.name
+                    || latestAmbulatory.address !== ambulatory.address) return fail('proposal_stale');
+            };
             try {
-                await selection.initialize(); current(); selected = await selection.select({ patientId: input.patientId, ambulatoryId: selectedProposal.ambulatoryId }, true); current();
+                patientCurrent();
+                await selection.initialize(); current();
+                await revalidate(); current();
+                selected = await selection.select({ patientId: input.patientId, ambulatoryId: ambulatory.ambulatoryId }, true); current();
                 let now: Date; try { now = clock(); if (!(now instanceof Date) || !Number.isFinite(now.getTime())) return fail('input_invalid'); } catch { return fail('input_invalid'); }
                 let projection: ReturnType<typeof buildTreatmentReasoningProjectionAttachment>; try { projection = buildTreatmentReasoningProjectionAttachment({ ...clinicalContext, now }); } catch { return fail('input_invalid'); } current();
                 let ingestId: unknown; let previewId: unknown; try { ingestId = nextId(); previewId = nextId(); } catch { return fail('input_invalid'); }
                 if (typeof ingestId !== 'string' || typeof previewId !== 'string' || ingestId === previewId || RAW_UUID.test(ingestId) || RAW_UUID.test(previewId) || !REQUEST_ID.test(ingestId) || !REQUEST_ID.test(previewId)) return fail('input_invalid');
+                await revalidate(); current();
                 const ingestResponse = await post(request, '/api/ai/treatment-reasoning/ingest', { projection, requestId: ingestId }, 'ingest_outcome_unknown', 'ingest_unavailable'); current();
                 let ingestBody: unknown; try { ingestBody = await ingestResponse.json(); } catch { return fail('response_invalid'); } current();
                 const ingested = record(ingestBody, ['handle']); if (!ingested || typeof ingested.handle !== 'string' || !/^trp_[0-9a-f]{32}$/u.test(ingested.handle)) return fail('response_invalid');
+                await revalidate(); current();
                 const previewResponse = await post(request, '/api/ai/treatment-reasoning/preview', { handle: ingested.handle, requestId: previewId }, 'preview_outcome_unknown', 'preview_unavailable'); current();
                 let previewBody: unknown; try { previewBody = await previewResponse.json(); } catch { return fail('response_invalid'); } current();
                 const publication = parseTreatmentReasoningPublication(previewBody); if (!publication || publication.sourceRevision !== projection.sourceRevision || publication.capturedAt !== projection.capturedAt || !publicationUsesOnly(publication, projection.evidenceRefs)) return fail('response_invalid'); current(); return publication;

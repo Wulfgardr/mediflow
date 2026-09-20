@@ -122,7 +122,14 @@ Aggiorna la spec:
 
 ## Baseline attuale
 
-Versione contratto: `1.23.0`.
+Versione contratto: `1.24.0`.
+
+[ADR 0124](../adr/0124-bounded-native-network-json.md) introduce limiti in byte
+UTF-8 per 26 operazioni JSON network e la risposta 413 `JSON_BODY_TOO_LARGE`.
+I massimi sono indicati dalle estensioni `x-mediflow-json-max-bytes`; gli
+allegati hanno un budget derivato dal limite wire configurato. Sono restrizioni
+dimensionali nuove, senza troncamento dei campi. Il login native (fuori dalla
+slice `/api/v1`) applica lo stesso contratto a 64 KiB, documentato nell’ADR.
 
 La baseline pubblicata oggi copre:
 

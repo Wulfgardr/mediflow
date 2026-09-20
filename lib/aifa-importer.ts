@@ -48,3 +48,11 @@ export async function getDrugCatalogStatus(): Promise<AifaCatalogClientStatus> {
 export async function getDrugStats(): Promise<number> {
     return (await getDrugCatalogStatus()).count;
 }
+
+/* @Codex */
+export async function updateAifaCatalog(signal: AbortSignal): Promise<AifaImportClientResult> {
+    const response = await fetch('/api/drugs/update', { method: 'POST', signal });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload?.error || 'Aggiornamento AIFA non riuscito');
+    return payload as AifaImportClientResult;
+}

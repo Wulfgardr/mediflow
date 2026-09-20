@@ -83,6 +83,11 @@ public protocol HomeBasePatientsDataSource: Sendable {
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
     ) async throws -> [HomeBaseExemptionSummary]
 
+    /* @Codex: WHO is an explicit service, never a generic ICD fallback. */
+    func searchWHO(query: String, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?) async throws -> HomeBaseWHOSearchResponse
+    func readWHOReadiness(credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?) async throws -> HomeBaseWHOReadiness
+    func checkWHOCode(code: String, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?) async throws -> HomeBaseWHOCodeCheckResponse
+
     /* @Codex */
     func searchTerminology(
         system: String, query: String, limit: Int,
@@ -323,6 +328,17 @@ public protocol HomeBasePatientsDataSource: Sendable {
 // Restore the clinical-list boundary default the call sites rely on (the concrete
 // client keeps its own default; this covers calls made through the existential).
 public extension HomeBasePatientsDataSource {
+    /* @Codex: preserves existing/local conformers without claiming WHO support. */
+    func searchWHO(query: String, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?) async throws -> HomeBaseWHOSearchResponse {
+        throw HomeBaseWHOError.unsupported
+    }
+    func readWHOReadiness(credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?) async throws -> HomeBaseWHOReadiness {
+        throw HomeBaseWHOError.unsupported
+    }
+    func checkWHOCode(code: String, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?) async throws -> HomeBaseWHOCodeCheckResponse {
+        throw HomeBaseWHOError.unsupported
+    }
+
     func fetchPatients(
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
     ) async throws -> [HomeBasePatientSummary] {

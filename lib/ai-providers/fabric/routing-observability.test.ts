@@ -12,12 +12,18 @@ import { GENERATIVE_CAPABILITY_DESCRIPTORS } from './generative-catalog.ts';
 import {
     buildObservabilitySnapshot,
     observeAndResolve,
+    observeHomeBaseConfiguration,
     observeVenue,
     type VenueObservation,
 } from './routing-observability.ts';
 
 const deterministic = DETERMINISTIC_CAPABILITY_DESCRIPTORS.icd_lookup;
 const generative = GENERATIVE_CAPABILITY_DESCRIPTORS.patient_insight;
+
+test('Home-base mode never substitutes a successful connection probe', () => {
+    assert.deepEqual(observeHomeBaseConfiguration(true), { venue: 'home_base', state: 'unknown', reason: 'not_probed' });
+    assert.deepEqual(observeHomeBaseConfiguration(false), { venue: 'home_base', state: 'offline', reason: 'mode_disabled' });
+});
 
 function policyFor(descriptor: FabricCapabilityDescriptor): FabricExecutionPolicy {
     return {

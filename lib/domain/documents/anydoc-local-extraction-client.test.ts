@@ -31,14 +31,17 @@ test('requests one encoded host attachment without a caller payload and returns 
     assert.deepEqual(calls, [['/api/attachments/attachment%2Fsynthetic%20l1d/local-extraction', { method: 'POST', cache: 'no-store' }]]);
     assert.equal(preview?.status, 'available');
     assert.equal(preview?.markdown, 'Referto sintetico locale.');
+    assert.equal(preview?.ocr, undefined);
     assert.equal(Object.isFrozen(preview), true);
     assert.equal(Object.getPrototypeOf(preview), null);
 });
 
 test('accepts exact Apple Vision provenance and rejects malformed OCR provenance', async () => {
     const valid = extracted('attachment.synthetic.l1d', 'Testo sintetico OCR.', true);
-    assert.equal((await requestAnyDocLocalExtractionPreview('attachment.synthetic.l1d', async () => response(valid)))?.markdown,
-        'Testo sintetico OCR.');
+    const preview = await requestAnyDocLocalExtractionPreview('attachment.synthetic.l1d', async () => response(valid));
+    assert.equal(preview?.markdown, 'Testo sintetico OCR.');
+    assert.deepEqual(preview?.ocr, { pageCount: 2, ocrPageCount: 1 });
+    assert.equal(Object.isFrozen(preview?.ocr), true);
     for (const ocrProvenance of [
         { ...valid.receipt.ocrProvenance!, engine: 'caller_selected' },
         { ...valid.receipt.ocrProvenance!, ocrPageCount: 3 },
@@ -87,8 +90,51 @@ test('accepts only canonical bounded raw JSON and leaves no object parser expose
 
 test('connects only the existing attachment retry control to the read-only local preview boundary', () => {
     const source = readFileSync(new URL('../../../components/document-upload.tsx', import.meta.url), 'utf8');
-    assert.match(source, /requestAnyDocLocalExtractionPreview/u);
-    assert.match(source, /Anteprima AnyDoc locale · sola lettura/u);
+    assert.match(source, /requestAnyDocDecryptedLocalExtractionPreview/u);
+    assert.match(source, /db\.attachments\.get\(file\.id, \{ signal \}\)/u);
+    assert.match(source, /db\.getSessionReadSignal\(\)/u);
+    assert.match(source, /Testo estratto localmente · da rivedere/u);
     assert.doesNotMatch(source, /\/ocr-replay|documentSha256|Replay OCR/u);
     assert.doesNotMatch(source, /body:\s*JSON\.stringify/u);
+});
+
+test('interruption cancels transport, suppresses late content and allows a fresh request', async () => {
+    const controller = new AbortController();
+    const held = Promise.withResolvers<Response>();
+    let passedSignal: AbortSignal | null | undefined;
+    const pending = requestAnyDocLocalExtractionPreview('attachment.synthetic.l1d', async (_url, init) => {
+        passedSignal = init?.signal;
+        return held.promise;
+    }, controller.signal);
+    controller.abort();
+    held.resolve(response(extracted()));
+    assert.equal(await pending, null, 'a late successful response must not revive an interrupted preview');
+    assert.equal(passedSignal, controller.signal);
+    assert.equal((await requestAnyDocLocalExtractionPreview('attachment.synthetic.l1d', async () => response(extracted())))?.status, 'available');
+    let calls = 0;
+    assert.equal(await requestAnyDocLocalExtractionPreview('attachment.synthetic.l1d', async () => {
+        calls += 1; return response(extracted());
+    }, controller.signal), null);
+    assert.equal(calls, 0, 'an already interrupted request must not start');
+});
+
+test('interruption while reading the response body cannot publish the completed preview', async () => {
+    const controller = new AbortController();
+    const reading = Promise.withResolvers<void>(); const body = Promise.withResolvers<string>();
+    const pending = requestAnyDocLocalExtractionPreview('attachment.synthetic.l1d', async () => ({
+        ok: true, text() { reading.resolve(); return body.promise; },
+    }) as Response, controller.signal);
+    await reading.promise;
+    controller.abort(); body.resolve(JSON.stringify(extracted()));
+    assert.equal(await pending, null);
+});
+
+/* @Codex */
+test('accepts Tesseract provenance without treating an unknown engine as desktop OCR', async () => {
+    const valid = extracted('attachment.synthetic.desktop', 'Testo OCR sintetico.', true);
+    valid.receipt.ocrProvenance!.engine = 'tesseract_wasm';
+    const preview = await requestAnyDocLocalExtractionPreview('attachment.synthetic.desktop', async () => response(valid));
+    assert.deepEqual(preview?.ocr, { pageCount: 2, ocrPageCount: 1 });
+    valid.receipt.ocrProvenance!.engine = 'tesseract_native_unqualified';
+    assert.equal(await requestAnyDocLocalExtractionPreview('attachment.synthetic.desktop', async () => response(valid)), null);
 });

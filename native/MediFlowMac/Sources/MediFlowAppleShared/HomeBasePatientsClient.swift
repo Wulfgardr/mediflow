@@ -22,6 +22,79 @@ public actor HomeBasePatientsClient {
         self.session = URLSession(configuration: sessionConfiguration, delegate: delegate, delegateQueue: nil)
     }
 
+    /* @Codex: named ADR0135 configuration services, native credentials only. */
+    #if os(macOS)
+    /* @Codex — named paired Mac ordinary routes, distinct from account/configuration. */
+    public func prepareNativeOrdinary(_ preparation: NativeOrdinaryPreparation, credentials: HomeBasePairedCredentials,
+                                      sessionCookie: String) async throws -> NativeOrdinaryResponse {
+        let url = try configuration.apiBaseURL().appendingPathComponent("network/ai/chatgpt/ordinary/prepare")
+        let (data, _) = try await send(to: url, method: "POST",
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: preparation.ambulatoryId),
+            body: encode(preparation))
+        return try decode(NativeOrdinaryResponse.self, from: data)
+    }
+    /* @Codex — only the named pre-attempt projection endpoint accepts these bounded bytes. */
+    public func projectNativeOrdinary(_ plan: NativeOrdinaryProjectionPlan, body: Data,
+                                      credentials: HomeBasePairedCredentials, sessionCookie: String,
+                                      ambulatoryId: String?) async throws -> NativeOrdinaryResponse {
+        let maximum = plan.functionId == .documentSynthesis ? 25 * 1024 * 1024 : 2 * 1024 * 1024
+        guard NativeOrdinaryDisclosure.matches(plan.grantId, "^[a-f0-9]{64}$"), !body.isEmpty, body.count <= maximum else { throw NativeOrdinaryContractError.invalid }
+        let url = try configuration.apiBaseURL().appendingPathComponent("network/ai/chatgpt/ordinary/project")
+        let headers = pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId).merging([
+            "X-MediFlow-Ordinary-Projection": plan.grantId, "Cache-Control": "no-store",
+            "Content-Type": plan.functionId == .documentSynthesis ? "application/octet-stream" : "application/json"
+        ]) { _, new in new }
+        let (data, _) = try await send(to: url, method: "POST", headers: headers, body: body)
+        return try decode(NativeOrdinaryResponse.self, from: data)
+    }
+    public func cancelNativeOrdinaryProjection(_ plan: NativeOrdinaryProjectionPlan, credentials: HomeBasePairedCredentials,
+                                               sessionCookie: String, ambulatoryId: String?) async throws -> NativeOrdinaryResponse {
+        guard NativeOrdinaryDisclosure.matches(plan.grantId, "^[a-f0-9]{64}$") else { throw NativeOrdinaryContractError.invalid }
+        let url = try configuration.apiBaseURL().appendingPathComponent("network/ai/chatgpt/ordinary/project")
+        let headers = pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId).merging([
+            "X-MediFlow-Ordinary-Projection": plan.grantId, "Cache-Control": "no-store"
+        ]) { _, new in new }
+        let (data, _) = try await send(to: url, method: "DELETE", headers: headers)
+        return try decode(NativeOrdinaryResponse.self, from: data)
+    }
+    public func commandNativeOrdinary(_ command: NativeOrdinaryCommand, credentials: HomeBasePairedCredentials,
+                                      sessionCookie: String, ambulatoryId: String?) async throws -> NativeOrdinaryResponse {
+        let url = try configuration.apiBaseURL().appendingPathComponent("network/ai/chatgpt/ordinary/\(command.path)")
+        let (data, _) = try await send(to: url, method: "POST",
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId),
+            body: encode(command.body))
+        return try decode(NativeOrdinaryResponse.self, from: data)
+    }
+    public func statusNativeOrdinary(credentials: HomeBasePairedCredentials, sessionCookie: String,
+                                     ambulatoryId: String?) async throws -> NativeOrdinaryResponse {
+        let url = try configuration.apiBaseURL().appendingPathComponent("network/ai/chatgpt/ordinary/status")
+        let (data, _) = try await send(to: url,
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId))
+        return try decode(NativeOrdinaryResponse.self, from: data)
+    }
+    #endif
+
+    public func readNativeFunctionPreferences(credentials: HomeBasePairedCredentials, sessionCookie: String) async throws -> NativeAIFunctionPreferences {
+        let url = try configuration.apiBaseURL().appendingPathComponent("network/ai/functions")
+        let (data, _) = try await send(to: url, headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: nil).merging(["Cache-Control": "no-store"]) { _, new in new })
+        let value = try decode(NativeAIFunctionPreferences.self, from: data)
+        try value.validate(); return value
+    }
+
+    public func previewNativeFunctionPreferences(_ command: NativeAIFunctionCommand, credentials: HomeBasePairedCredentials, sessionCookie: String) async throws -> NativeAIFunctionPreview {
+        let url = try configuration.apiBaseURL().appendingPathComponent("network/ai/functions/preview")
+        let (data, _) = try await send(to: url, method: "POST", headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: nil), body: encode(command))
+        let value = try decode(NativeAIFunctionPreview.self, from: data)
+        try value.validate(command: command); return value
+    }
+
+    public func applyNativeFunctionPreferences(_ command: NativeAIFunctionCommand, credentials: HomeBasePairedCredentials, sessionCookie: String) async throws -> NativeAIFunctionPreferences {
+        let url = try configuration.apiBaseURL().appendingPathComponent("network/ai/functions")
+        let (data, _) = try await send(to: url, method: "POST", headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: nil), body: encode(command))
+        let value = try decode(NativeAIFunctionPreferences.self, from: data)
+        try value.validate(); return value
+    }
+
     /* @Codex */
     public func login(
         username: String?, password: String, credentials: HomeBasePairedCredentials
@@ -89,6 +162,7 @@ public actor HomeBasePatientsClient {
         let url = try configuration.serverURL()
             .appendingPathComponent("api")
             .appendingPathComponent("auth")
+            .appendingPathComponent("native")
             .appendingPathComponent("logout")
         let (data, response) = try await send(
             to: url,
@@ -312,6 +386,65 @@ public actor HomeBasePatientsClient {
         return try decode([HomeBaseExemptionSummary].self, from: data)
     }
 
+    /* @Codex: WUL-673. Named local WHO contracts on the canonical paired channel. */
+    public func searchWHO(query: String, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?) async throws -> HomeBaseWHOSearchResponse {
+        let query = try HomeBaseWHODecoder.normalizedQuery(query)
+        let (data, status) = try await sendWHO(path: "search", parameters: [URLQueryItem(name: "q", value: query)], credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        guard status == 200 else { throw HomeBaseWHODecoder.error(data, status: status) }
+        let result = try HomeBaseWHODecoder.search(data)
+        try Task.checkCancellation()
+        return result
+    }
+
+    public func readWHOReadiness(credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?) async throws -> HomeBaseWHOReadiness {
+        let (data, status) = try await sendWHO(path: "readiness", parameters: [], credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        if status == 200 || status == 503, let result = try? HomeBaseWHODecoder.readiness(data) {
+            guard (status == 200) == (result.status == .available) else { throw HomeBaseWHOError.invalidResponse }
+            try Task.checkCancellation()
+            return result
+        }
+        throw HomeBaseWHODecoder.error(data, status: status)
+    }
+
+    public func checkWHOCode(code: String, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?) async throws -> HomeBaseWHOCodeCheckResponse {
+        guard HomeBaseWHODecoder.isCheckCode(code) else { throw HomeBaseWHOError.invalidRequest }
+        let (data, status) = try await sendWHO(path: "code-check", parameters: [URLQueryItem(name: "code", value: code), URLQueryItem(name: "release", value: HomeBaseWHODecoder.release)], credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        guard status == 200 else { throw HomeBaseWHODecoder.error(data, status: status) }
+        let result = try HomeBaseWHODecoder.checkCode(data, requestedCode: code)
+        try Task.checkCancellation()
+        return result
+    }
+
+    private func sendWHO(path: String, parameters: [URLQueryItem], credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?) async throws -> (Data, Int) {
+        try Task.checkCancellation()
+        guard Self.hasPairedCredentials(credentials), !sessionCookie.isEmpty,
+              ["readiness", "search", "code-check"].contains(path) else { throw HomeBaseWHOError.unauthorized }
+        let url = try configuration.apiBaseURL().appendingPathComponent("network/terminology/who")
+            .appendingPathComponent(path).appending(queryItems: parameters)
+        var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData)
+        request.httpMethod = "GET"
+        request.httpShouldHandleCookies = false
+        request.setValue("native", forHTTPHeaderField: "X-MediFlow-Source-Surface")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("no-store", forHTTPHeaderField: "Cache-Control")
+        for (name, value) in pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId) {
+            request.setValue(value, forHTTPHeaderField: name)
+        }
+        do {
+            // Same ephemeral URLSession and TLS delegate; no alternate transport.
+            let (data, response) = try await session.data(for: request)
+            try Task.checkCancellation()
+            guard let response = response as? HTTPURLResponse,
+                  data.count <= HomeBaseWHODecoder.maximumBytes,
+                  response.mimeType?.lowercased() == "application/json"
+            else { throw HomeBaseWHOError.invalidResponse }
+            return (data, response.statusCode)
+        } catch let error as URLError {
+            if error.code == .cancelled || Task.isCancelled { throw CancellationError() }
+            throw HomeBaseClientError.transport(Self.mapTransportError(error))
+        }
+    }
+
     /* @Codex */
     public func searchTerminology(
         system: String,
@@ -383,6 +516,18 @@ public actor HomeBasePatientsClient {
         sessionCookie: String,
         ambulatoryId: String?
     ) async throws -> HomeBasePatientDetail {
+        // @Codex: preserve the data-source protocol witness; native projection opts into a fresh read explicitly.
+        try await fetchPatient(id: id, credentials: credentials, sessionCookie: sessionCookie,
+                               ambulatoryId: ambulatoryId, fresh: false)
+    }
+
+    public func fetchPatient(
+        id: String,
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?,
+        fresh: Bool
+    ) async throws -> HomeBasePatientDetail {
         let url = try configuration.apiBaseURL()
             .appendingPathComponent("network")
             .appendingPathComponent("patients")
@@ -393,7 +538,7 @@ public actor HomeBasePatientsClient {
                 "x-mediflow-paired-client-id": credentials.clientId,
                 "x-mediflow-paired-client-token": credentials.clientToken,
                 "Cookie": Self.cookieHeader(sessionCookie: sessionCookie, ambulatoryId: ambulatoryId),
-            ]
+            ].merging(fresh ? ["Cache-Control": "no-store"] : [:]) { _, new in new }
         )
         return try decode(HomeBasePatientDetail.self, from: data)
     }
@@ -469,6 +614,19 @@ public actor HomeBasePatientsClient {
         ambulatoryId: String?,
         limit: Int = HomeBaseClinicalListLimit.boundaryMaximum
     ) async throws -> [HomeBaseEntrySummary] {
+        // @Codex: preserve the protocol witness while keeping cache bypass explicit at the projection boundary.
+        try await fetchEntries(patientId: patientId, credentials: credentials, sessionCookie: sessionCookie,
+                               ambulatoryId: ambulatoryId, limit: limit, fresh: false)
+    }
+
+    public func fetchEntries(
+        patientId: String,
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?,
+        limit: Int = HomeBaseClinicalListLimit.boundaryMaximum,
+        fresh: Bool
+    ) async throws -> [HomeBaseEntrySummary] {
         let url = try configuration.apiBaseURL()
             .appendingPathComponent("network")
             .appendingPathComponent("patients")
@@ -479,7 +637,7 @@ public actor HomeBasePatientsClient {
             ])
         let (data, _) = try await send(
             to: url,
-            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId).merging(fresh ? ["Cache-Control": "no-store"] : [:]) { _, new in new }
         )
         return try decode([HomeBaseEntrySummary].self, from: data)
     }
@@ -575,6 +733,19 @@ public actor HomeBasePatientsClient {
         sessionCookie: String,
         ambulatoryId: String?
     ) async throws -> HomeBaseAttachmentDetail {
+        // @Codex: preserve the data-source protocol witness; sensitive projection reads pass fresh explicitly.
+        try await fetchAttachment(patientId: patientId, attachmentId: attachmentId, credentials: credentials,
+                                  sessionCookie: sessionCookie, ambulatoryId: ambulatoryId, fresh: false)
+    }
+
+    public func fetchAttachment(
+        patientId: String,
+        attachmentId: String,
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?,
+        fresh: Bool
+    ) async throws -> HomeBaseAttachmentDetail {
         let url = try configuration.apiBaseURL()
             .appendingPathComponent("network")
             .appendingPathComponent("patients")
@@ -583,7 +754,7 @@ public actor HomeBasePatientsClient {
             .appendingPathComponent(attachmentId)
         let (data, _) = try await send(
             to: url,
-            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId).merging(fresh ? ["Cache-Control": "no-store"] : [:]) { _, new in new }
         )
         return try decode(HomeBaseAttachmentDetail.self, from: data)
     }
@@ -650,6 +821,19 @@ public actor HomeBasePatientsClient {
         ambulatoryId: String?,
         limit: Int = HomeBaseClinicalListLimit.boundaryMaximum
     ) async throws -> [HomeBaseTherapySummary] {
+        // @Codex: preserve the protocol witness while keeping cache bypass explicit at the projection boundary.
+        try await fetchTherapies(patientId: patientId, credentials: credentials, sessionCookie: sessionCookie,
+                                 ambulatoryId: ambulatoryId, limit: limit, fresh: false)
+    }
+
+    public func fetchTherapies(
+        patientId: String,
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?,
+        limit: Int = HomeBaseClinicalListLimit.boundaryMaximum,
+        fresh: Bool
+    ) async throws -> [HomeBaseTherapySummary] {
         let url = try configuration.apiBaseURL()
             .appendingPathComponent("network")
             .appendingPathComponent("patients")
@@ -660,7 +844,7 @@ public actor HomeBasePatientsClient {
             ])
         let (data, _) = try await send(
             to: url,
-            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId).merging(fresh ? ["Cache-Control": "no-store"] : [:]) { _, new in new }
         )
         return try decode([HomeBaseTherapySummary].self, from: data)
     }
@@ -854,6 +1038,19 @@ public actor HomeBasePatientsClient {
         ambulatoryId: String?,
         limit: Int = HomeBaseClinicalListLimit.boundaryMaximum
     ) async throws -> [HomeBaseObservationSummary] {
+        // @Codex: preserve the protocol witness while keeping cache bypass explicit at the projection boundary.
+        try await fetchObservations(patientId: patientId, credentials: credentials, sessionCookie: sessionCookie,
+                                    ambulatoryId: ambulatoryId, limit: limit, fresh: false)
+    }
+
+    public func fetchObservations(
+        patientId: String,
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String,
+        ambulatoryId: String?,
+        limit: Int = HomeBaseClinicalListLimit.boundaryMaximum,
+        fresh: Bool
+    ) async throws -> [HomeBaseObservationSummary] {
         let url = try configuration.apiBaseURL()
             .appendingPathComponent("network")
             .appendingPathComponent("patients")
@@ -864,7 +1061,7 @@ public actor HomeBasePatientsClient {
             ])
         let (data, _) = try await send(
             to: url,
-            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId).merging(fresh ? ["Cache-Control": "no-store"] : [:]) { _, new in new }
         )
         return try decode([HomeBaseObservationSummary].self, from: data)
     }
@@ -1307,16 +1504,39 @@ public actor HomeBasePatientsClient {
         for (key, value) in headers {
             request.setValue(value, forHTTPHeaderField: key)
         }
-        if body != nil {
+        if body != nil && request.value(forHTTPHeaderField: "Content-Type") == nil {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         }
 
+        if request.value(forHTTPHeaderField: "Cache-Control") == "no-store" {
+            request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+        }
         do {
-            let (data, response) = try await session.data(for: request)
+            try Task.checkCancellation()
+            let sensitive = request.value(forHTTPHeaderField: "Cache-Control") == "no-store"
+                || url.path.hasPrefix("/api/v1/network/ai/chatgpt/ordinary/")
+            let (data, response) = try await session.data(for: request,
+                delegate: sensitive ? NativeOrdinaryNoRedirectDelegate() : nil)
             guard let httpResponse = response as? HTTPURLResponse else {
                 throw HomeBaseClientError.contract
             }
             guard 200..<300 ~= httpResponse.statusCode else {
+                #if os(macOS)
+                // Only this exact native operation may preserve a pending device login.
+                if method == "POST", url.path == "/api/v1/network/ai/chatgpt/ordinary/login/complete",
+                   httpResponse.statusCode == 503,
+                   let payload = try? JSONDecoder().decode(APIErrorPayload.self, from: data), payload.code == "login_pending" {
+                    throw NativeOrdinaryContractError.loginPending
+                }
+                if url.path.hasPrefix("/api/v1/network/ai/chatgpt/ordinary/"),
+                   let payload = try? JSONDecoder().decode(APIErrorPayload.self, from: data),
+                   let rawCode = payload.code, let code = NativeOrdinaryFailureCode(rawValue: rawCode) {
+                    throw NativeOrdinaryServerFailure(status: httpResponse.statusCode, code: code)
+                }
+                if url.path.hasPrefix("/api/v1/network/ai/chatgpt/ordinary/") {
+                    throw HomeBaseClientError.httpStatus(httpResponse.statusCode, nil)
+                }
+                #endif
                 // WUL-308: a 409 carries a structured VERSION_CONFLICT body; surface
                 // it as a typed error so the UI can show expected-vs-current version.
                 if httpResponse.statusCode == 409,
@@ -1504,4 +1724,12 @@ private struct AmbulatoryClearRequest: Encodable {
 public struct HomeBaseCreatedResource: Decodable, Equatable, Sendable {
     public let id: String
     public let version: Int?
+}
+
+/* @Codex — the paired source/ordinary operation cannot redirect its credentials or projection. */
+private final class NativeOrdinaryNoRedirectDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+    func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
+                    newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
+        completionHandler(nil)
+    }
 }

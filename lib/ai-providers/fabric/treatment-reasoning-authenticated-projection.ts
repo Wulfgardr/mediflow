@@ -1,5 +1,6 @@
 /* @Codex */
 import 'server-only';
+import { isOrdinaryFunctionSelected, bindOrdinaryApplicationContext } from '../../chatgpt-product/ordinary-flow';
 
 import { types } from 'node:util';
 
@@ -43,7 +44,7 @@ type Sources = Readonly<{
     clock(): string;
     entropy(): Uint8Array;
     readPatientVersion(patientId: string, ambulatoryId: string): number | null;
-    registerResource(sessionId: string, dispose: () => void): (() => void) | null;
+    registerResource(context: AuthenticatedWebSessionProjectionOwnerContext, dispose: () => void): (() => void) | null;
 }>;
 type State = Readonly<{
     projection: TreatmentReasoningProjectionAttachment;
@@ -66,7 +67,7 @@ const INGEST_KEYS = ['projection', 'requestId'] as const;
 const PREVIEW_KEYS = ['handle', 'requestId'] as const;
 const HANDLE = /^trp_[0-9a-f]{32}$/u;
 const REQUEST = /^[A-Za-z][A-Za-z0-9._:-]{15,159}$/u;
-const OWNER_BROKERS = new WeakMap<object, WeakMap<object, Broker>>();
+const OWNER_BROKERS = new WeakMap<object, Broker>();
 
 function fail(code: TreatmentReasoningAuthenticatedProjectionErrorCode): never {
     throw new TreatmentReasoningAuthenticatedProjectionError(code);
@@ -104,12 +105,10 @@ function positive(value: unknown, code: TreatmentReasoningAuthenticatedProjectio
 }
 
 function brokerFor(context: AuthenticatedWebSessionProjectionOwnerContext): Broker {
-    let sessions = OWNER_BROKERS.get(context.owner);
-    if (!sessions) { sessions = new WeakMap<object, Broker>(); OWNER_BROKERS.set(context.owner, sessions); }
-    let broker = sessions.get(context.session);
+    let broker = OWNER_BROKERS.get(context.owner);
     if (broker && !broker.disposed) return broker;
     broker = { records: new Map(), requests: new Set(), executions: new Set(), unregister: null, disposed: false };
-    sessions.set(context.session, broker);
+    OWNER_BROKERS.set(context.owner, broker);
     return broker;
 }
 
@@ -128,7 +127,7 @@ function register(broker: Broker, context: AuthenticatedWebSessionProjectionOwne
     if (broker.disposed) fail('session_unavailable');
     if (broker.unregister) return;
     let unregister: (() => void) | null;
-    try { unregister = sources.registerResource(context.session.id, () => disposeBroker(broker)); }
+    try { unregister = sources.registerResource(context, () => disposeBroker(broker)); }
     catch { unregister = null; }
     if (!unregister) fail('session_unavailable');
     broker.unregister = unregister;
@@ -196,27 +195,48 @@ export function createTreatmentReasoningAuthenticatedProjectionBroker(sources: S
                     let projection: TreatmentReasoningProjectionAttachment;
                     try { projection = snapshotTreatmentReasoningProjectionAttachment(input.projection, clock(sources)); }
                     catch { return fail('input_invalid'); }
-                    return selection(context, (pair) => {
+                    // @Codex — never mint/read a lease port inside the owner's critical section.
+                    // The original anti-reentry guard remains intact for Web and native callers.
+                    const selected = selection(context, (pair) => {
                         const version = patientVersion(sources, pair.patientId, pair.ambulatoryId);
                         if (version !== projection.patientRevision) return fail('projection_stale');
-                        const selectionEpoch = positive(context.owner.snapshotSelectionEpoch(context.session), 'selection_unavailable');
-                        let port: TreatmentReasoningLeaseCommitPort;
-                        try { port = context.owner.mintTreatmentReasoningLeaseCommitPort(context.session); }
-                        catch { return fail('lease_unavailable'); }
-                        const snapshot = port.snapshot();
-                        if (!snapshot || snapshot.terminal || snapshot.stagedRef !== null) { port.dispose(); return fail('lease_unavailable'); }
-                        const projectionHandle = handle(sources);
-                        if (broker.records.has(projectionHandle)) { port.dispose(); return fail('source_invalid'); }
-                        register(broker, context, sources);
-                        broker.records.set(projectionHandle, frozen({ projection, patientRef: pair.patientId, ambulatoryRef: pair.ambulatoryId,
-                            selectionEpoch, patientVersion: version, port, expected: snapshot.currentRef }) as State);
-                        return projectionHandle;
+                        return { ...pair, version,
+                            epoch: positive(context.owner.snapshotSelectionEpoch(context.session), 'selection_unavailable'),
+                            reviewEpoch: context.owner.snapshotReviewContextEpoch(context.session) };
                     });
+                    let port: TreatmentReasoningLeaseCommitPort;
+                    try { port = context.owner.mintTreatmentReasoningLeaseCommitPort(context.session); }
+                    catch { return fail('lease_unavailable'); }
+                    let projectionHandle: string | null = null, installed = false;
+                    try {
+                        const snapshot = port.snapshot();
+                        if (!snapshot || snapshot.terminal || snapshot.stagedRef !== null) return fail('lease_unavailable');
+                        projectionHandle = handle(sources);
+                        if (broker.records.has(projectionHandle)) return fail('source_invalid');
+                        register(broker, context, sources);
+                        selection(context, (pair) => {
+                            if (pair.patientId !== selected.patientId || pair.ambulatoryId !== selected.ambulatoryId
+                                || context.owner.snapshotSelectionEpoch(context.session) !== selected.epoch
+                                || context.owner.snapshotReviewContextEpoch(context.session) !== selected.reviewEpoch
+                                || patientVersion(sources, pair.patientId, pair.ambulatoryId) !== selected.version) return fail('selection_changed');
+                        });
+                        const current = port.snapshot();
+                        if (!current || current.terminal || current.stagedRef !== null || current.currentRef !== snapshot.currentRef)
+                            return fail('lease_unavailable');
+                        broker.records.set(projectionHandle, frozen({ projection, patientRef: selected.patientId, ambulatoryRef: selected.ambulatoryId,
+                            selectionEpoch: selected.epoch, patientVersion: selected.version, port, expected: current.currentRef }) as State);
+                        installed = true; return projectionHandle;
+                    } catch (error) {
+                        if (installed && projectionHandle) broker.records.delete(projectionHandle);
+                        try { port.dispose(); } catch { /* no authority is returned */ }
+                        releaseIfIdle(broker); throw error;
+                    }
                 },
             });
         },
         async acquirePreview() {
             const { context, broker } = await acquire();
+            if (isOrdinaryFunctionSelected('treatment_reasoning')) await bindOrdinaryApplicationContext('treatment_reasoning', context.owner, context.session);
             return Object.freeze({
                 begin(value: unknown): TreatmentReasoningProjectionExecution {
                     const input = exact(value, PREVIEW_KEYS); acceptRequest(broker, input.requestId);

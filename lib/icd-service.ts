@@ -1,5 +1,7 @@
 /* @Codex */
 import type { ICDCode } from './icd-codes';
+import { parseWhoLocalReadiness, parseWhoLocalSearchResponse,
+    type WhoLocalReadiness, type WhoLocalReceipt, type WhoLocalReference } from './reference-data/icd11-who-local-contract';
 
 const ICD_PROXY_URL = '/api/icd/proxy';
 const QUERY_MAX_BYTES = 160;
@@ -17,19 +19,24 @@ const READINESS_KEYS = ['schemaVersion', 'status', 'releaseId', 'language'] as c
 
 export interface ICDSearchResult extends ICDCode {
     isLegacy: false;
+    canonicalUri?: string;
+    partial?: boolean;
+    reference?: WhoLocalReference;
 }
 
 export type ICDReadinessStatus = 'disabled' | 'credentials_absent' | 'offline'
-    | 'configured' | 'available' | 'unavailable';
+    | 'configuration_required' | 'configured' | 'available' | 'unavailable';
 
-export type ICDReadiness = Readonly<{
+type LegacyICDReadiness = Readonly<{
     schemaVersion: 'mediflow.reference-data.icd11-who-readiness.v1';
     status: ICDReadinessStatus;
     releaseId: '2026-01';
     language: 'en';
 }>;
 
-export type ICDSearchReceipt = Readonly<{
+export type ICDReadiness = LegacyICDReadiness | WhoLocalReadiness;
+
+type LegacyICDSearchReceipt = Readonly<{
     schemaVersion: 'mediflow.reference-data.icd11-search-receipt.v1';
     operation: 'mediflow.reference_data.icd11.search.v1';
     releaseId: '2026-01';
@@ -39,6 +46,8 @@ export type ICDSearchReceipt = Readonly<{
     latencyMs: number;
     completedAt: string;
 }>;
+
+export type ICDSearchReceipt = LegacyICDSearchReceipt | WhoLocalReceipt;
 
 export type ICDClientErrorCode = 'unauthorized' | 'request_invalid' | 'service_unavailable'
     | 'upstream_response_invalid' | 'upstream_timeout' | 'response_invalid' | 'transport_unavailable';
@@ -107,6 +116,14 @@ function searchResponse(value: unknown): Readonly<{
     entries: ICDSearchResult[];
     receipt: ICDSearchReceipt;
 }> | null {
+    const local = parseWhoLocalSearchResponse(value);
+    if (local) return Object.freeze({
+        entries: local.entries.map(entry => Object.freeze({ ...entry, isLegacy: false as const,
+            partial: local.partial, reference: Object.freeze({ releaseId: local.receipt.releaseId,
+                language: local.receipt.language, bindingId: local.receipt.bindingId,
+                imageDigest: local.receipt.imageDigest, datasetSnapshotId: local.receipt.datasetSnapshotId }) })),
+        receipt: local.receipt,
+    });
     const root = exactRecord(value, SEARCH_ROOT_KEYS);
     if (!root || root.schemaVersion !== 'mediflow.reference-data.icd11-search-response.v1'
         || !Array.isArray(root.entries) || root.entries.length > RESULT_LIMIT) return null;
@@ -133,6 +150,8 @@ function searchResponse(value: unknown): Readonly<{
 }
 
 function readiness(value: unknown): ICDReadiness | null {
+    const local = parseWhoLocalReadiness(value);
+    if (local) return local;
     const candidate = exactRecord(value, READINESS_KEYS);
     if (!candidate || candidate.schemaVersion !== 'mediflow.reference-data.icd11-who-readiness.v1'
         || !['disabled', 'credentials_absent', 'offline', 'configured', 'available', 'unavailable']
@@ -161,6 +180,7 @@ export function createICDReferenceDataClient(fetchImpl: typeof fetch): ICDRefere
         } catch { throw new ICDClientError('transport_unavailable'); }
     };
     const search = async (queryValue: string): Promise<ICDSearchResult[]> => {
+        observedReceipt = null;
         const query = normalizedQuery(queryValue);
         const response = await request(`${ICD_PROXY_URL}?q=${encodeURIComponent(query)}`);
         if (!response.ok) throw httpError(response.status);
@@ -194,8 +214,12 @@ export async function checkApiStatus(client: ICDReferenceDataClient = browserCli
     catch { return false; }
 }
 
-export function icdClientErrorMessage(error: unknown): string {
+export function icdClientErrorMessage(error: unknown, context: 'status' | 'search' = 'status'): string {
     if (!(error instanceof ICDClientError)) return 'Il servizio WHO ICD-11 non è disponibile.';
+    // @Codex: a rejected search does not establish that the local service is down.
+    if (context === 'search' && ['service_unavailable', 'upstream_response_invalid', 'response_invalid'].includes(error.code)) {
+        return 'Ricerca WHO non riuscita. Prova termini più specifici; se l’errore persiste, verifica il servizio locale.';
+    }
     switch (error.code) {
         case 'unauthorized': return 'Sessione non valida: accedi di nuovo per consultare ICD-11.';
         case 'request_invalid': return 'La ricerca ICD-11 non è valida.';
@@ -212,9 +236,10 @@ export function icdReadinessMessage(status: ICDReadinessStatus): string {
     switch (status) {
         case 'disabled': return 'Servizio WHO ICD-11 disattivato.';
         case 'credentials_absent': return 'Credenziali WHO ICD-11 non configurate.';
+        case 'configuration_required': return 'Completa il provisioning del servizio WHO locale e i riferimenti agli artifact.';
         case 'offline': return 'Accesso di rete WHO ICD-11 disattivato.';
         case 'configured': return 'WHO ICD-11 configurato; disponibilità non ancora verificata.';
-        case 'available': return 'WHO ICD-11 disponibile e verificato.';
+        case 'available': return 'Ultima interrogazione WHO ICD-11 riuscita.';
         case 'unavailable': return 'Servizio WHO ICD-11 non disponibile.';
         default: {
             const exhaustive: never = status;

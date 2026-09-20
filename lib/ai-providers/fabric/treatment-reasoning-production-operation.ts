@@ -2,6 +2,12 @@ import 'server-only';
 
 /* @Codex */
 import { types } from 'node:util';
+import { createHash } from 'node:crypto';
+import { EGRESS_PROFILE_VERSION } from './contract';
+import type { PortableEngineMetadata, PreparedPortableRuntime } from './treatment-reasoning-portable-runtime';
+import type { TreatmentReasoningPortableAttestation } from './treatment-reasoning-athena-output-contract-v2';
+import { createTreatmentReasoningPortableExecution } from './treatment-reasoning-athena-execution';
+import { buildTreatmentReasoningReviewProposal } from './treatment-reasoning-host-boundary';
 
 import { ATHENA_R1_QWEN3_8B_MODEL_ID } from '../../athena-model-identity';
 import type { FabricExecutionPolicy, FabricProvenanceRecord, FabricResolutionReceipt } from './contract';
@@ -245,6 +251,93 @@ export function createTreatmentReasoningProductionService(sources: Sources) {
                     }
                 },
             });
+        },
+    });
+}
+
+/** PROPOSED engine metadata v2; generic Fabric v1 and MLX resolution remain unchanged. */
+export type PortableTreatmentResolutionReceipt = Readonly<{
+    schemaVersion: 'mediflow.ai.treatment-reasoning-engine-receipt.v2'; capability: 'treatment_reasoning';
+    class: 'generative'; venue: 'local_process'; egressProfile: Readonly<{ id: 'local_only'; version: typeof EGRESS_PROFILE_VERSION; egress: 'none' }>;
+    provider: 'athena_transformers'; model: typeof ATHENA_R1_QWEN3_8B_MODEL_ID; providerReceipt: null; fallbackCount: 0;
+    engine: PortableEngineMetadata; modelOptionId: string; catalogRevision: string;
+}>;
+export type PortableTreatmentPublication = Omit<TreatmentReasoningPublication, 'schemaVersion' | 'attestation' | 'fabricReceipt' | 'provenance'> & Readonly<{
+    schemaVersion: 'mediflow.ai.treatment-reasoning-publication.v2';
+    attestation: TreatmentReasoningPortableAttestation;
+    fabricReceipt: PortableTreatmentResolutionReceipt;
+    provenance: Readonly<{ schemaVersion: 'mediflow.ai.treatment-reasoning-engine-provenance.v2'; capability: 'treatment_reasoning';
+        venue: 'local_process'; provider: 'athena_transformers'; model: typeof ATHENA_R1_QWEN3_8B_MODEL_ID;
+        preprocessing: readonly ['context_minimization', 'envelope_validation']; receipt: PortableTreatmentResolutionReceipt }>;
+}>;
+export type PortableTreatmentProductionResult = Extract<TreatmentReasoningProductionResult, { status: 'denied' }>
+    | Readonly<{ status: 'available'; code: null; publication: PortableTreatmentPublication; writesPerformed: 0; applyPolicy: 'none' }>;
+type PortableProductionSources = Pick<Sources, 'projectionBroker' | 'killSwitch' | 'entropy'> & Readonly<{
+    prepare(): Promise<PreparedPortableRuntime>;
+    selection(): Readonly<{ provider: 'athena_transformers'; modelOptionId: string; catalogRevision: string }>;
+    verifyChoice(): Promise<void>;
+}>;
+
+/** A named, capability-specific local resolver. It cannot mint a generic Fabric v1 receipt. */
+function portableReceipt(metadata: PortableEngineMetadata, selection: ReturnType<PortableProductionSources['selection']>): PortableTreatmentResolutionReceipt {
+    if (metadata.provider !== 'athena_transformers' || metadata.model !== ATHENA_R1_QWEN3_8B_MODEL_ID
+        || selection.provider !== 'athena_transformers' || !/^model_option_[0-9a-f]{32}$/u.test(selection.modelOptionId)
+        || !/^sha256_[0-9a-f]{64}$/u.test(selection.catalogRevision)
+        || selection.modelOptionId !== `model_option_${createHash('sha256').update(JSON.stringify(['athena_transformers', metadata.model, null, metadata.artifactDigest])).digest('hex').slice(0, 32)}`) throw new Error('Treatment portable resolution rejected');
+    return Object.freeze({ schemaVersion: 'mediflow.ai.treatment-reasoning-engine-receipt.v2', capability: 'treatment_reasoning',
+        class: 'generative', venue: 'local_process', egressProfile: Object.freeze({ id: 'local_only', version: EGRESS_PROFILE_VERSION, egress: 'none' }),
+        provider: 'athena_transformers', model: ATHENA_R1_QWEN3_8B_MODEL_ID, providerReceipt: null, fallbackCount: 0,
+        engine: metadata, modelOptionId: selection.modelOptionId, catalogRevision: selection.catalogRevision });
+}
+
+/** Host-owned one-shot lease, explicit engine choice, manual publication, zero clinical writers. */
+export function createTreatmentReasoningPortableProductionService(sources: PortableProductionSources) {
+    return Object.freeze({
+        acquireIngest: sources.projectionBroker.acquireIngest,
+        async acquirePreview() {
+            const operation = await sources.projectionBroker.acquirePreview();
+            return Object.freeze({ async preview(value: unknown): Promise<PortableTreatmentProductionResult> {
+                const request = previewRequest(value); if (!request) return deny('input_invalid') as Extract<TreatmentReasoningProductionResult, { status: 'denied' }>;
+                const lease = operation.begin(value); let committed = false; let runtime: PreparedPortableRuntime | null = null;
+                const denied = (code: TreatmentReasoningProductionDenialCode) => deny(code) as Extract<TreatmentReasoningProductionResult, { status: 'denied' }>;
+                try {
+                    const enabled = await sources.killSwitch.read();
+                    if (enabled.status !== 'enabled') return denied(enabled.code === 'disabled' ? 'lane_disabled' : 'lane_unavailable');
+                    await sources.verifyChoice();
+                    const refs = references(sources.entropy); if (!refs) return denied('fabric_denied');
+                    try { runtime = await sources.prepare(); } catch { return denied('runtime_unavailable'); }
+                    const receipt = portableReceipt(runtime.metadata, sources.selection());
+                    const attestation = Object.freeze({ ...runtime.metadata, schema: 'mediflow.ai.treatment-reasoning-engine-attestation.v2' as const,
+                        readiness: 'available_unqualified' as const, venue: 'local_process' as const, egress: 'none' as const, ...refs });
+                    // Same minimized projection and uncertainty semantics as the MLX preview.
+                    const proposal = buildTreatmentReasoningReviewProposal({ projection: {
+                        schema: 'mediflow.ai.treatment-reasoning-projection.v1', capability: 'treatment_reasoning', stage: 'preview',
+                        sourceRevision: lease.projection.sourceRevision, therapyRefs: lease.projection.therapyRefs, evidenceRefs: lease.projection.evidenceRefs,
+                    }, ...refs });
+                    const preview = Object.freeze({ schema: 'mediflow.ai.treatment-reasoning-preview-envelope.v1' as const,
+                        capability: proposal.capability, stage: proposal.stage, review: proposal.review, uncertainty: proposal.uncertainty,
+                        evidence: Object.freeze({ source: 'host_minimized' as const, count: lease.projection.evidenceRefs.length }), ...refs });
+                    const execution = await createTreatmentReasoningPortableExecution({ host: Object.freeze({
+                        policy: () => attestation, invoke: runtime.invoke,
+                    }), timeoutMs: EXECUTION_TIMEOUT_MS }).execute({ preview, evidenceRefs: lease.projection.evidenceRefs, projection: lease.projection });
+                    if (execution.status !== 'completed') return denied(execution.code === 'host_invalid' ? 'fabric_denied' : execution.code);
+                    // Reread both kill switch and request/lifecycle currentness before the existing CAS.
+                    const finalSwitch = await sources.killSwitch.read();
+                    if (finalSwitch.status !== 'enabled') return denied(finalSwitch.code === 'disabled' ? 'lane_disabled' : 'lane_unavailable');
+                    await sources.verifyChoice();
+                    if (!runtime.current()) return denied('lifecycle_not_available');
+                    if (!lease.commit()) return denied('source_stale'); committed = true;
+                    const provenance = Object.freeze({ schemaVersion: 'mediflow.ai.treatment-reasoning-engine-provenance.v2' as const,
+                        capability: 'treatment_reasoning' as const, venue: 'local_process' as const, provider: 'athena_transformers' as const,
+                        model: ATHENA_R1_QWEN3_8B_MODEL_ID, preprocessing: Object.freeze(['context_minimization', 'envelope_validation'] as const), receipt });
+                    const publication: PortableTreatmentPublication = Object.freeze({ schemaVersion: 'mediflow.ai.treatment-reasoning-publication.v2',
+                        capability: 'treatment_reasoning', stage: 'preview', review: 'required', status: 'available', value: execution.value,
+                        sourceBindings: execution.sourceBindings, attestation: execution.attestation, fabricReceipt: receipt, provenance,
+                        sourceRevision: lease.projection.sourceRevision, capturedAt: lease.projection.capturedAt, ...COMMON });
+                    return Object.freeze({ status: 'available', code: null, publication, ...COMMON });
+                } catch { return denied('lane_unavailable'); }
+                finally { runtime?.close(); if (!committed) lease.abort(); }
+            } });
         },
     });
 }

@@ -212,10 +212,57 @@ test('keeps callbacks, AnyDoc, routes, logging, and persistence outside the auth
     assert.doesNotMatch(source, /\bsourcePort\b|hook|caller.*function|Promise\.|async\s|await\s/iu);
     assert.match(source, /mintResourcePort[\s\S]*beginResourceUse[\s\S]*commitResourceUse/iu);
     assert.doesNotMatch(source, /ownerValue|registryValue|sourceRegistry|createServerSessionProjectionOwnerRegistry/iu);
-    assert.match(source, /createAttachmentExtractionSourceAuthority\(sessionValue: ServerSession\)/u);
-    assert.match(source, /serverSessionProjectionOwnerRegistry\.acquire\(session\)/u);
+    assert.match(source, /function validSession[\s\S]*?typeof fields\.role === 'string'[\s\S]*?fields\.authChannel === \(native \? 'native' : 'web'\)/u);
+    assert.match(source, /const owner = \(native \? nativeSessionProjectionOwnerRegistry : serverSessionProjectionOwnerRegistry\)\.acquire\(session\);/u);
+    assert.match(source, /createAttachmentExtractionSourceAuthority\(session: ServerSession\)[\s\S]*?createSourceAuthority\(session, false\)[\s\S]*?createNativeAttachmentExtractionSourceAuthority\(session: ServerSession\)[\s\S]*?createSourceAuthority\(session, true\)/u);
     const revocation = fs.readFileSync(new URL('./attachment-extraction-locator-revocation.ts', import.meta.url), 'utf8');
     assert.doesNotMatch(revocation, /Promise|async|await|callback|dbServer|schema|transaction|\.then|Symbol\.iterator/iu);
     const restore = fs.readFileSync(new URL('../../backup-restore-executor.ts', import.meta.url), 'utf8');
     assert.match(restore, /revokeAttachmentExtractionLocatorGeneration\(\);\s*runDbServerImmediateTransaction/iu);
+});
+
+/* @Codex */
+test('encrypted projection capability copies local bytes, never decodes ENC on the server and wipes its own operation only', () => {
+    seed('ENC:synthetic:sealed'); const { authority, session } = fixture();
+    const legacy = authority.issue({ attachmentId: ATTACHMENT }); assert.ok(legacy);
+    assert.equal(authority.consume(legacy).status, 'denied');
+    const first = authority.issueProjection({ attachmentId: ATTACHMENT }); assert.ok(first);
+    const second = authority.issueProjection({ attachmentId: ATTACHMENT }); assert.ok(second);
+    const source = new Uint8Array([1, 2, 3]);
+    const a = authority.consumeProjection(first.locator, source); const b = authority.consumeProjection(second.locator, source);
+    assert.equal(a.status, 'begun'); assert.equal(b.status, 'begun');
+    if (a.status !== 'begun' || b.status !== 'begun') return;
+    source.fill(0); assert.deepEqual([...a.bytes], [1, 2, 3]);
+    assert.equal(authority.consumeProjection(first.locator, source).status, 'denied');
+    assert.equal(authority.finalize(a.operation).status, 'spent'); assert.deepEqual([...a.bytes], [0, 0, 0]);
+    assert.deepEqual([...b.bytes], [1, 2, 3]);
+    retireSyntheticWebSession(session); assert.equal(authority.signal.aborted, true); assert.deepEqual([...b.bytes], [0, 0, 0]);
+    authority.dispose();
+});
+
+test('projection digest is host-derived: ciphertext mutation without revision change still denies consume and finalize', () => {
+    seed('ENC:synthetic:sealed'); const { authority } = fixture();
+    const first = authority.issueProjection({ attachmentId: ATTACHMENT }); assert.ok(first);
+    const second = authority.issueProjection({ attachmentId: ATTACHMENT }); assert.ok(second);
+    const begun = authority.consumeProjection(first.locator, new Uint8Array([1, 2, 3])); assert.equal(begun.status, 'begun');
+    if (begun.status !== 'begun') return;
+    const db = new Database(dbPath);
+    try { db.prepare('UPDATE attachments SET data = ? WHERE id = ?').run('ENC:synthetic:replacement', ATTACHMENT); }
+    finally { db.close(); }
+    assert.equal(authority.consumeProjection(second.locator, new Uint8Array([1, 2, 3])).status, 'denied');
+    assert.equal(authority.finalize(begun.operation).status, 'denied'); assert.ok(begun.bytes.every(byte => byte === 0));
+    authority.dispose();
+});
+
+test('malformed projection types and lengths cannot choose authority, parser or ciphertext equality', () => {
+    seed('ENC:synthetic:sealed'); const { authority } = fixture(); let reads = 0;
+    const accessor = Object.defineProperty({}, 'bytes', { get() { reads += 1; return new Uint8Array([1]); } });
+    for (const value of [undefined, null, 'plaintext', [], new Uint8Array(), new Uint8Array(25 * 1024 * 1024 + 1),
+        accessor, new Proxy(new Uint8Array([1]), { get() { reads += 1; throw Error('synthetic'); } }),
+        { bytes: new Uint8Array([1]), sourceSha256: REF, revision: 1, provider: 'caller' }]) {
+        const grant = authority.issueProjection({ attachmentId: ATTACHMENT }); assert.ok(grant);
+        assert.equal(authority.consumeProjection(grant.locator, value).status, 'denied');
+        assert.equal(authority.consumeProjection(grant.locator, new Uint8Array([1])).status, 'denied');
+    }
+    assert.equal(reads, 0); authority.dispose();
 });

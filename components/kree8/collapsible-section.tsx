@@ -7,6 +7,7 @@
 
 import { useEffect, useId, useState, type ReactNode } from 'react';
 import { ChevronDown, type LucideIcon } from 'lucide-react';
+import { useRuntimeTwinDesign, useRuntimeTwinFolder } from '@/components/runtime-twin-design';
 
 interface CollapsibleSectionProps {
     id?: string;
@@ -45,6 +46,13 @@ export function CollapsibleSection({
     const [open, setOpen] = useState(defaultOpen);
     const reactId = useId();
     const regionId = `${reactId}-region`;
+    const { composition } = useRuntimeTwinDesign();
+    const folderSection = useRuntimeTwinFolder();
+    const folderActive = folderSection === id || (composition === 'stream' && folderSection === 'quadro' && id === 'timeline');
+    const expanded = open || folderActive;
+    // A visited proposal pane retains its form even when navigating elsewhere.
+    const [visited, setVisited] = useState(false);
+    if (folderActive && !visited) setVisited(true);
 
     /* @Codex WUL-UIUX: defaultOpen puo diventare true dopo il caricamento dati
        (es. attentionCount 0 -> N): useState lo legge solo al mount. Apriamo sul
@@ -71,40 +79,41 @@ export function CollapsibleSection({
         return () => window.removeEventListener('hashchange', openIfTargeted);
     }, [id]);
 
+    const HeadingControl = folderActive ? 'div' : 'button';
     return (
-        <section id={id} className={`${surfaceClassName} scroll-mt-28`}>
+        <section id={id} data-folder-pane={id} data-folder-active={folderActive} className={`${surfaceClassName} scroll-mt-28`}>
             {/* @Codex WUL-UIUX: il titolo è un heading che contiene il controllo
                 di disclosure — pattern W3C APG. Gli screen reader possono saltare
                 di sezione in sezione per livello, non solo per anchor. */}
             <h3 className="m-0">
-                <button
-                    type="button"
-                    onClick={() => setOpen((value) => !value)}
-                    aria-expanded={open}
-                    aria-controls={regionId}
+                <HeadingControl
+                    type={folderActive ? undefined : "button"}
+                    onClick={folderActive ? undefined : () => setOpen((value) => !value)}
+                    aria-expanded={folderActive ? undefined : expanded}
+                    aria-controls={folderActive ? undefined : regionId}
                     className="flex w-full items-center gap-3 rounded-[inherit] p-5 text-left md:p-6"
                 >
                     <span className="min-w-0 flex-1">
-                        {kicker ? <span className="section-kicker">{kicker}</span> : null}
+                        {kicker && !folderSection ? <span className="section-kicker">{kicker}</span> : null}
                         <span className="mt-1 flex items-center gap-2 text-lg font-semibold text-ink">
                             {Icon ? <Icon className="h-5 w-5 text-muted" /> : null}
                             {title}
                         </span>
-                        {!open && summary ? (
+                        {!expanded && summary ? (
                             <span className="mt-1 block truncate text-sm text-muted">{summary}</span>
                         ) : null}
                     </span>
                     {count !== undefined && count !== '' ? (
                         <span className="apple-chip shrink-0">{count}</span>
                     ) : null}
-                    <ChevronDown
-                        className={`h-5 w-5 shrink-0 text-muted transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+                    {!folderActive ? <ChevronDown
+                        className={`h-5 w-5 shrink-0 text-muted transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
                         aria-hidden
-                    />
-                </button>
+                    /> : null}
+                </HeadingControl>
             </h3>
-            <div id={regionId} hidden={!open} className="px-5 pb-5 md:px-6 md:pb-6">
-                {keepMounted || open ? children : null}
+            <div id={regionId} hidden={!expanded} className="px-5 pb-5 md:px-6 md:pb-6">
+                {keepMounted || expanded || visited ? children : null}
             </div>
         </section>
     );

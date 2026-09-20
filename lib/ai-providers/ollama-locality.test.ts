@@ -50,13 +50,13 @@ test('limita il riferimento modello locale a 674 byte UTF-8 dopo trim senza ripa
     );
 });
 
-test('attesta il modello locale senza inviare un prompt', async (t) => {
+for (const serverVersion of ['0.32.5', '0.33.3', '0.34.2']) test(`attesta ${serverVersion} senza inviare un prompt`, async (t) => {
     const originalFetch = globalThis.fetch;
     const calls: Array<{ url: string; init?: RequestInit }> = [];
     globalThis.fetch = (async (input, init) => {
         const url = String(input);
         calls.push({ url, init });
-        if (url.endsWith('/api/version')) return Response.json({ version: '0.32.5' });
+        if (url.endsWith('/api/version')) return Response.json({ version: serverVersion });
         if (url.endsWith('/api/tags')) return Response.json({ models: [LOCAL_MODEL] });
         if (url.endsWith('/api/show')) return Response.json({ details: LOCAL_MODEL.details });
         if (url.endsWith('/api/generate')) return Response.json({ model: LOCAL_MODEL.model });
@@ -72,6 +72,7 @@ test('attesta il modello locale senza inviare un prompt', async (t) => {
         'qwen-local',
     );
 
+    assert.equal(attestation.serverVersion, serverVersion);
     assert.equal(attestation.executionMode, 'local');
     assert.equal(attestation.canonicalModel, LOCAL_MODEL.name);
     assert.equal(calls.length, 5);
@@ -107,9 +108,9 @@ test('rifiuta un modello remoto prima della chiamata show', async (t) => {
     assert.equal(urls.some((url) => url.endsWith('/api/show')), false);
 });
 
-test('richiede una versione Ollama qualificata per il contratto locality', async (t) => {
+for (const unqualified of ['0.33.0', '0.33.4', '0.34.0', '0.34.1', '0.34.3', '0.33.3-preview', '0.34.2-preview', 'unknown']) test(`nega versione non qualificata ${unqualified}`, async (t) => {
     const originalFetch = globalThis.fetch;
-    globalThis.fetch = (async () => Response.json({ version: '0.33.0' })) as typeof fetch;
+    globalThis.fetch = (async () => Response.json({ version: unqualified })) as typeof fetch;
     t.after(() => {
         globalThis.fetch = originalFetch;
     });

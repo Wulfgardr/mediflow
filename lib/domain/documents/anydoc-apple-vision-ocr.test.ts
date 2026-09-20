@@ -10,6 +10,7 @@ import { createCanvas } from '@napi-rs/canvas';
 
 import {
     ANYDOC_APPLE_VISION_OCR_DOCUMENT_TIMEOUT_MS,
+    ANYDOC_APPLE_VISION_OCR_INTERNAL_TEST_SEAM,
     ANYDOC_APPLE_VISION_OCR_SCRIPT_SHA256,
     ANYDOC_APPLE_VISION_OCR_TIMEOUT_MS,
     createAnyDocAppleVisionDocumentExtractorForTest,
@@ -194,4 +195,25 @@ test('pins the owned script and contains no path input or network API', () => {
         ANYDOC_APPLE_VISION_OCR_SCRIPT_SHA256);
     assert.doesNotMatch(source, /CommandLine\.arguments\[[1-9]|URLSession|Network|http:|https:|fileURLWithPath|\.path\b/u);
     assert.match(source, /standardInput/u);
+});
+
+test('resolves only the staged package script when a standalone chunk bakes a source path', () => {
+    const scope = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-vision-ocr-package-root-'));
+    const bundledRoot = path.join(scope, 'WebRuntime');
+    const bakedSourceRoot = path.join(scope, 'baked-source');
+    const sourceScript = path.join(process.cwd(), 'scripts', 'apple-vision-ocr.swift');
+    try {
+        for (const root of [bundledRoot, bakedSourceRoot]) {
+            fs.mkdirSync(path.join(root, 'scripts'), { recursive: true });
+            fs.writeFileSync(path.join(root, 'package.json'), '{"name":"medical-record-app"}\n');
+            fs.copyFileSync(sourceScript, path.join(root, 'scripts', 'apple-vision-ocr.swift'));
+        }
+        const resolved = ANYDOC_APPLE_VISION_OCR_INTERNAL_TEST_SEAM.resolveOwnedScriptFromPackageRoot(bundledRoot);
+        assert.equal(resolved, fs.realpathSync(path.join(bundledRoot, 'scripts', 'apple-vision-ocr.swift')));
+        assert.notEqual(resolved, fs.realpathSync(path.join(bakedSourceRoot, 'scripts', 'apple-vision-ocr.swift')));
+
+        fs.rmSync(path.join(bundledRoot, 'scripts', 'apple-vision-ocr.swift'));
+        fs.symlinkSync(path.join(bakedSourceRoot, 'scripts', 'apple-vision-ocr.swift'), path.join(bundledRoot, 'scripts', 'apple-vision-ocr.swift'));
+        assert.equal(ANYDOC_APPLE_VISION_OCR_INTERNAL_TEST_SEAM.resolveOwnedScriptFromPackageRoot(bundledRoot), null);
+    } finally { fs.rmSync(scope, { recursive: true, force: true }); }
 });

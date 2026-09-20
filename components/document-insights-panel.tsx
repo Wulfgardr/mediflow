@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { FileText, ChevronDown, ChevronUp, Calendar, Sparkles, AlertTriangle, Trash2, Loader2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, AlertTriangle, Trash2, Loader2 } from 'lucide-react';
 import { ApiConflictError, db, DocumentInsight, Patient } from '@/lib/db';
 import ReactMarkdown from 'react-markdown';
 import PrivacyBlur from '@/components/privacy-blur';
@@ -12,7 +12,7 @@ import { notifyDbChange } from '@/lib/live-query';
 import { persistDocumentInsightsArchive } from '@/lib/domain/documents/document-insights-archive';
 import { useToast } from '@/components/ui/toast-provider';
 import { useConfirm } from '@/components/ui/confirm-dialog';
-import { LumeFilo } from '@/components/ui/lume-filo';
+import disclosure from '@/components/patient-disclosure.module.css';
 
 interface DocumentInsightsPanelProps {
     patient: Patient;
@@ -21,13 +21,11 @@ interface DocumentInsightsPanelProps {
 export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanelProps) {
     const [expandedId, setExpandedId] = useState<string | null>(null);
     const [busyAction, setBusyAction] = useState<string | 'all' | null>(null);
-    // Modelli reali dalla config invece di nomi hardcoded nel footer.
-    const modelLabels = useAiModelLabels();
+    const insights = parsePatientDatedRecords<DocumentInsight>(patient.documentInsights);
+    // @Codex: an empty archive has no model footer and needs no model reads.
+    const modelLabels = useAiModelLabels(Boolean(patient.id) && insights.length > 0);
     const { showToast } = useToast();
     const confirm = useConfirm();
-
-    // Parse insights from patient
-    const insights = parsePatientDatedRecords<DocumentInsight>(patient.documentInsights);
 
     if (!patient.id || insights.length === 0) {
         return null; // Don't render if no insights
@@ -92,8 +90,8 @@ export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanel
     /* @Codex */
     const handleRemoveInsight = async (insightId: string, fileName: string) => {
         const { confirmed } = await confirm({
-            title: 'Rimuovere il documento?',
-            message: `"${fileName}" verrà rimosso dall'Archivio Intelligente del paziente.`,
+            title: 'Rimuovere la sintesi archiviata?',
+            message: `La sintesi di "${fileName}" verrà rimossa. Gli allegati della cartella restano disponibili.`,
             tone: 'danger',
             confirmLabel: 'Rimuovi'
         });
@@ -106,8 +104,8 @@ export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanel
     /* @Codex */
     const handleClearArchive = async () => {
         const { confirmed } = await confirm({
-            title: "Svuotare l'Archivio Intelligente?",
-            message: 'Tutti i documenti analizzati di questo paziente verranno rimossi.',
+            title: 'Svuotare le sintesi archiviate?',
+            message: 'Le sintesi archiviate verranno rimosse. Gli allegati della cartella restano disponibili.',
             tone: 'danger',
             confirmLabel: 'Svuota'
         });
@@ -117,168 +115,106 @@ export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanel
     };
 
     return (
-        <div className="patient-detail-side-section lume-panel border p-6">
-            <div className="mb-4 flex items-start justify-between gap-3">
-                <div className="flex items-center gap-2">
-                    <div className="rounded-2xl bg-[color:color-mix(in_srgb,var(--lume-ink)_6%,var(--lume-surface-field))] p-2 text-[color:var(--lume-ink-muted)]">
-                        <FileText className="w-5 h-5" />
-                    </div>
-                    <div>
-                        <p className="section-kicker">Archivio paziente</p>
-                        <h3 className="mt-1 text-lg font-semibold text-[color:var(--lume-ink)]">Archivio Intelligente</h3>
-                        <p className="text-xs text-[color:var(--lume-ink-muted)]">Ultimi {insights.length} documenti analizzati</p>
-                    </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                    {busyAction && (
-                        <div className="flex items-center gap-1 rounded-full border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] px-2 py-1 text-[11px] text-[color:var(--lume-ink-muted)]">
-                            <Loader2 className="w-3 h-3 animate-spin" />
-                            Aggiornamento...
-                        </div>
-                    )}
-                    <div className="flex items-center gap-1 rounded-full bg-[color:color-mix(in_srgb,var(--lume-ink)_6%,var(--lume-surface-field))] px-2 py-1 text-xs font-medium text-[color:var(--lume-ink-muted)]">
-                        <Sparkles className="w-3 h-3" />
-                        Estrazione locale + AI
-                    </div>
-                    <button
-                        type="button"
-                        onClick={() => void handleClearArchive()}
-                        disabled={busyAction !== null}
-                        className="inline-flex items-center gap-1 rounded-full border border-[color:color-mix(in_srgb,var(--lume-signal-critical)_30%,transparent)] px-2 py-1 text-xs font-medium text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))] transition-colors hover:bg-[color:color-mix(in_srgb,var(--lume-signal-critical)_11%,var(--lume-surface-field))] disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                        {busyAction === 'all' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
-                        Svuota archivio
-                    </button>
-                </div>
+        /* @Codex: archived summaries share the document plane; only the active row expands. */
+        <section className={disclosure.archive} aria-label="Sintesi archiviate" data-testid="document-insights-archive">
+            <div className={disclosure.archiveToolbar}>
+                <p className={disclosure.hint}>Rivedi le sintesi insieme al testo sorgente.</p>
+                {busyAction && <span className={disclosure.hint} role="status">Aggiornamento…</span>}
+                <button
+                    type="button"
+                    onClick={() => void handleClearArchive()}
+                    disabled={busyAction !== null}
+                    className={`${disclosure.documentAction} ${disclosure.removeAction}`}
+                >
+                    {busyAction === 'all' ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Trash2 className="h-4 w-4" aria-hidden="true" />}
+                    Svuota archivio
+                </button>
             </div>
 
-            <div className="space-y-3">
-                {insights.map((insight, index) => (
-                    <div
-                        key={insight.id}
-                        className={`rounded-xl border transition-[border-color,background-color] ${expandedId === insight.id
-                                ? 'border-[color:color-mix(in_srgb,var(--lume-accent)_30%,transparent)] bg-[color:var(--lume-surface-focal)]'
-                                : 'border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] hover:border-[color:color-mix(in_srgb,var(--lume-ink)_24%,transparent)]'
-                            }`}
-                    >
-                        <div className="flex items-start gap-2 p-3">
-                            <button
-                                type="button"
-                                onClick={() => setExpandedId(expandedId === insight.id ? null : insight.id)}
-                                className="flex-1 flex items-center justify-between text-left"
-                            >
-                                <div className="flex items-center gap-3">
-                                    <div className={`p-2 rounded-lg ${index === 0
-                                            ? 'bg-[color:color-mix(in_srgb,var(--lume-accent)_11%,var(--lume-surface-field))] text-[color:var(--lume-accent)]'
-                                            : 'bg-[color:color-mix(in_srgb,var(--lume-ink)_6%,var(--lume-surface-field))] text-[color:var(--lume-ink-muted)]'
-                                        }`}>
-                                        <FileText className="w-4 h-4" />
-                                    </div>
-                                    <div>
-                                        <p className="max-w-[200px] truncate text-sm font-medium text-[color:var(--lume-ink)]">
-                                            {insight.fileName}
-                                        </p>
-                                        <div className="flex flex-wrap items-center gap-1 text-xs text-[color:var(--lume-ink-muted)]">
-                                            <Calendar className="w-3 h-3" />
-                                            {formatDate(insight.date)}
-                                            {insight.quality?.level && (
-                                                <span className={`ml-1 inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase ${qualityTone(insight.quality.level)}`}>
-                                                    {qualityLabel(insight.quality.level)}
-                                                </span>
-                                            )}
-                                            {insight.routedClass?.classification && insight.routedClass.classification !== 'unknown' && (
-                                                <span className="ml-1 inline-flex items-center rounded-full border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] px-2 py-0.5 text-[10px] font-medium text-[color:var(--lume-ink-muted)]">
-                                                    {documentClassLabel(insight.routedClass.classification)}
-                                                </span>
-                                            )}
-                                            {insight.routedClass?.synthesis?.kind === 'deterministic' && (
-                                                <span
-                                                    className="ml-1 inline-flex items-center rounded-full border border-[color:color-mix(in_srgb,var(--lume-signal-success)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-success)_11%,var(--lume-surface-field))] px-2 py-0.5 text-[10px] font-medium text-[color:color-mix(in_srgb,var(--lume-signal-success)_60%,var(--lume-ink))]"
-                                                    title={insight.routedClass.synthesis.rationale}
-                                                >
-                                                    Sintesi senza modello: {documentClassLabel(insight.routedClass.classification)}
-                                                </span>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                                {expandedId === insight.id ? (
-                                    <ChevronUp className="w-4 h-4 text-[color:var(--lume-ink-muted)]" />
-                                ) : (
-                                    <ChevronDown className="w-4 h-4 text-[color:var(--lume-ink-muted)]" />
-                                )}
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => void handleRemoveInsight(insight.id, insight.fileName)}
-                                disabled={busyAction !== null}
-                                className="rounded-lg p-2 text-[color:var(--lume-ink-muted)] transition-colors hover:bg-[color:color-mix(in_srgb,var(--lume-signal-critical)_11%,var(--lume-surface-field))] hover:text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))] disabled:cursor-not-allowed disabled:opacity-50"
-                                title="Rimuovi dall'archivio intelligente"
-                                aria-label={`Rimuovi ${insight.fileName} dall'archivio intelligente`}
-                            >
-                                {busyAction === insight.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                            </button>
-                        </div>
+            {insights.map((insight) => (
+                <article key={insight.id} className={disclosure.archiveRow} data-expanded={expandedId === insight.id}>
+                    <div className={disclosure.archiveHead}>
+                        <button
+                            type="button"
+                            onClick={() => setExpandedId(expandedId === insight.id ? null : insight.id)}
+                            className={disclosure.archiveToggle}
+                            aria-expanded={expandedId === insight.id}
+                            aria-controls={`document-insight-${insight.id}`}
+                        >
+                            <span className={disclosure.archiveLabel}>
+                                <span className={disclosure.documentTitle}>{insight.fileName}</span>
+                                <span className={disclosure.hint}>Archiviata il {formatDate(insight.date)}</span>
+                                <span className={disclosure.archiveMetadata}>
+                                    {insight.quality?.level && (
+                                        <span className={`inline-flex rounded-md border px-2 py-0.5 text-[13px] font-medium ${qualityTone(insight.quality.level)}`}>
+                                            {qualityLabel(insight.quality.level)}
+                                        </span>
+                                    )}
+                                    {insight.routedClass?.classification && insight.routedClass.classification !== 'unknown' && (
+                                        <span className={disclosure.hint}>{documentClassLabel(insight.routedClass.classification)}</span>
+                                    )}
+                                    {insight.routedClass?.synthesis?.kind === 'deterministic' && (
+                                        <span className={disclosure.hint} title={insight.routedClass.synthesis.rationale}>Sintesi senza modello</span>
+                                    )}
+                                </span>
+                            </span>
+                            {expandedId === insight.id ? <ChevronUp className="h-4 w-4 shrink-0" aria-hidden="true" /> : <ChevronDown className="h-4 w-4 shrink-0" aria-hidden="true" />}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => void handleRemoveInsight(insight.id, insight.fileName)}
+                            disabled={busyAction !== null}
+                            className={`${disclosure.documentAction} ${disclosure.removeAction}`}
+                            title="Rimuovi la sintesi archiviata"
+                            aria-label={`Rimuovi ${insight.fileName} dall'archivio intelligente`}
+                        >
+                            {busyAction === insight.id ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Trash2 className="h-4 w-4" aria-hidden="true" />}
+                        </button>
+                    </div>
 
+                    <div id={`document-insight-${insight.id}`} hidden={expandedId !== insight.id}>
                         {expandedId === insight.id && (
-                            <div className="relative px-4 pb-4 pl-9">
-                                <LumeFilo variant="connettore" fill={100} className="absolute left-4 top-0 h-4 w-5" />
+                            <div className={disclosure.archiveContent}>
                                 {Array.isArray(insight.extractedData?.diagnoses) && insight.extractedData.diagnoses.length > 0 && (
-                                    <div className="mb-3 flex flex-wrap gap-2">
+                                    <div className="flex flex-wrap gap-2">
                                         {insight.extractedData.diagnoses.map((diagnosis) => (
-                                            <span
-                                                key={`${diagnosis.system}-${diagnosis.code}`}
-                                                className="inline-flex items-center rounded-full border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-ink)_6%,var(--lume-surface-field))] px-2.5 py-1 text-[11px] font-medium text-[color:var(--lume-ink)]"
-                                            >
+                                            <span key={`${diagnosis.system}-${diagnosis.code}`} className="text-sm text-[color:var(--lume-ink)]">
                                                 {diagnosis.system} {diagnosis.code} · {diagnosis.description}
                                             </span>
                                         ))}
                                     </div>
                                 )}
-
                                 {Array.isArray(insight.extractedData?.medications) && insight.extractedData.medications.length > 0 && (
-                                    <div className="mb-3 flex flex-wrap gap-2">
+                                    <div className="flex flex-wrap gap-2">
                                         {insight.extractedData.medications.map((medication) => (
-                                            <span
-                                                key={`${insight.id}:${medication}`}
-                                                className="inline-flex items-center rounded-full border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-ink)_6%,var(--lume-surface-field))] px-2.5 py-1 text-[11px] font-medium text-[color:var(--lume-ink)]"
-                                            >
-                                                Terapia · {medication}
-                                            </span>
+                                            <span key={`${insight.id}:${medication}`} className="text-sm text-[color:var(--lume-ink)]">Terapia · {medication}</span>
                                         ))}
                                     </div>
                                 )}
-
-                                {insight.quality?.reason && (
-                                    <p className="mb-3 text-xs text-[color:var(--lume-ink-muted)]">
-                                        Qualita documento: {insight.quality.reason}
-                                    </p>
-                                )}
-
+                                {insight.quality?.reason && <p className={disclosure.hint}>Qualità documento: {insight.quality.reason}</p>}
                                 {insight.autofill?.appliedDiagnoses && insight.autofill.appliedDiagnoses.length > 0 && (
-                                    <p className="mb-3 text-xs font-medium text-[color:color-mix(in_srgb,var(--lume-signal-success)_60%,var(--lume-ink))]">
-                                        Diagnosi aggiunte alla scheda: {insight.autofill.appliedDiagnoses.join(', ')}
-                                    </p>
+                                    <p className="text-sm font-medium text-[color:var(--lume-ink)]">Diagnosi aggiunte alla scheda: {insight.autofill.appliedDiagnoses.join(', ')}</p>
                                 )}
-
                                 <div className="prose prose-sm max-w-none text-[color:var(--lume-ink-muted)] prose-headings:text-[color:var(--lume-ink)] prose-strong:text-[color:var(--lume-ink)]">
-                                    <PrivacyBlur>
-                                        <ReactMarkdown>
-                                            {insight.summary}
-                                        </ReactMarkdown>
-                                    </PrivacyBlur>
+                                    <PrivacyBlur><ReactMarkdown>{insight.summary}</ReactMarkdown></PrivacyBlur>
                                 </div>
+                                {insight.rawMarkdown?.trim() && (
+                                    <details className={disclosure.disclosure}>
+                                        <summary>Testo sorgente archiviato</summary>
+                                        <p className={disclosure.hint}>Testo conservato con questa sintesi. Confrontalo con il documento originale.</p>
+                                        <pre className={disclosure.archivedSource}><PrivacyBlur>{insight.rawMarkdown}</PrivacyBlur></pre>
+                                    </details>
+                                )}
                             </div>
                         )}
                     </div>
-                ))}
-            </div>
+                </article>
+            ))}
 
-            <div className="mt-4 flex items-center gap-2 border-t border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] pt-3 text-[10px] text-[color:var(--lume-ink-muted)]">
-                <AlertTriangle className="w-3 h-3 text-[color:color-mix(in_srgb,var(--lume-signal-warning)_60%,var(--lume-ink))]" />
-                <span>{modelLabels ? `Sintesi generata da IA locale (${modelLabels.clinical}). Verificare sempre.` : 'Sintesi generata da IA locale. Verificare sempre.'}</span>
+            <div className={disclosure.archiveFooter}>
+                <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
+                <p>Verifica le sintesi prima di usarle. {modelLabels ? `Modello configurato ora: ${modelLabels.clinical}. ` : ''}Il modello usato per ciascuna sintesi non è registrato nell’archivio.</p>
             </div>
-        </div>
+        </section>
     );
 }

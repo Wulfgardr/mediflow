@@ -1,0 +1,42 @@
+/* @Codex — page-local geometry; the shared shell, tokens and palette stay intact. */
+.page {
+    display: grid;
+    gap: 1.5rem;
+    min-width: 0;
+    color: var(--lume-ink, CanvasText);
+    font-family: var(--lume-font-sans, system-ui, sans-serif);
+    font-size: 1rem;
+    line-height: 1.6;
+    overflow-wrap: anywhere;
+}
+.page p { margin: 0; }
+.header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; }
+.identity { display: flex; align-items: center; gap: .75rem; min-width: 0; }
+.identity > div { min-width: 0; }
+.logo { display: block; flex: 0 0 40px; width: 40px; height: 40px; object-fit: contain; background: white; }
+.identity h1 { margin: 0; font: inherit; font-size: clamp(1.5rem, 2.5vw, 1.875rem); font-weight: 650; line-height: 1.3; letter-spacing: -.02em; }
+.identity p { margin-top: .375rem; color: var(--lume-ink-muted, CanvasText); }
+.boundary { max-width: 70ch; }
+.page .returnLink {
+    box-sizing: border-box;
+    max-width: 100%;
+    min-height: max(44px, var(--lume-control-height, 44px));
+    border-radius: var(--lume-radius-control, 12px);
+    font: inherit;
+    font-weight: 600;
+    text-align: center;
+    white-space: normal;
+}
+.account { min-width: 0; border-top: 1px solid var(--lume-border-color, color-mix(in srgb, currentColor 16%, transparent)); }
+.account > summary {
+    box-sizing: border-box;
+    min-height: max(44px, var(--lume-control-height, 44px));
+    padding: .75rem 0;
+    border-radius: var(--lume-radius-control, 12px);
+    font-weight: 600;
+    cursor: pointer;
+}
+.accountBody { display: grid; gap: 1rem; padding-top: .5rem; }
+.page .returnLink:focus-visible, .account > summary:focus-visible { outline: 2px solid var(--lume-accent, Highlight); outline-offset: 3px; }
+@media (max-width: 560px) { .page .returnLink { width: 100%; } }
+@media (prefers-reduced-motion: reduce) { .page .returnLink { transition: none; } }

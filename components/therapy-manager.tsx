@@ -16,6 +16,7 @@ import DrugAutocomplete from './drug-autocomplete';
 import { AifaDrug } from '@/lib/db';
 import { useToast } from '@/components/ui/toast-provider';
 import { useConfirm } from '@/components/ui/confirm-dialog';
+import { useRuntimeTwinPendingForm } from '@/components/runtime-twin-design';
 
 const therapySchema = z.object({
     drugName: z.string().min(2, "Il nome del farmaco è richiesto"),
@@ -40,6 +41,7 @@ const chipClassName = 'inline-flex min-h-8 items-center gap-1.5 rounded-full bor
 
 export default function TherapyManager({ patientId, embedded = false }: { patientId: string; embedded?: boolean }) {
     const [isAdding, setIsAdding] = useState(false);
+    useRuntimeTwinPendingForm(isAdding);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [isGalenic, setIsGalenic] = useState(false); // Toggle for Free Text vs AIFA
     const [selectedDiagnosis, setSelectedDiagnosis] = useState<{ code: string; title: string } | null>(null);
@@ -432,9 +434,9 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
                 ) : (
                     <>
                         {activeTherapies.length > 0 && (
-                            <h5 className="section-kicker flex items-center gap-2">
-                                <span className="inline-block h-2 w-2 rounded-full bg-[color:var(--lume-ink-muted)]" aria-hidden />
-                                Terapie attive · {activeTherapies.length}
+                            <h5 className="flex flex-wrap items-baseline gap-2 text-base font-semibold text-[color:var(--lume-ink)]">
+                                {/* @Codex WUL-678: therapy counts use the heading baseline and UI type. */}
+                                Terapie attive <span className="tabular-nums">{activeTherapies.length}</span>
                             </h5>
                         )}
                         {/* ACTIVE */}
@@ -449,7 +451,7 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
                                         </span>
                                         {t.activePrinciple && <span className="rounded-full bg-[color:var(--lume-surface-focal)] px-2 py-0.5 text-xs font-medium text-[color:var(--lume-ink-muted)]">{t.activePrinciple}</span>}
                                     </div>
-                                    <p className="lume-registro mt-1 font-medium text-[color:var(--lume-ink)]">{t.dosage}</p>
+                                    <p className="mt-1 text-base leading-6 font-medium text-[color:var(--lume-ink)]">{t.dosage}</p>
                                     {t.startDate && (
                                         <p className="mt-0.5 text-xs text-[color:var(--lume-ink-muted)]">
                                             In corso dal <span className="lume-registro">{format(new Date(t.startDate), 'dd/MM/yyyy', { locale: it })}</span>
@@ -529,7 +531,7 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
                                                 <span className="font-semibold text-[color:var(--lume-ink)]">{t.drugName}</span>
                                                 <span className="rounded-full border border-[color:color-mix(in_srgb,var(--lume-ink)_18%,transparent)] bg-[color:var(--lume-surface-field)] px-2 py-0.5 text-xs font-semibold text-[color:var(--lume-ink-muted)]">Sospesa</span>
                                             </div>
-                                            <p className="lume-registro mt-0.5 text-xs text-[color:var(--lume-ink-muted)]">{t.dosage}</p>
+                                            <p className="mt-0.5 text-sm text-[color:var(--lume-ink-muted)]">{t.dosage}</p>
                                         </div>
                                         <div className="flex gap-2">
                                             <button

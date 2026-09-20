@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 2,
+  "synthetic": true,
+  "capture": "Authentic local Web runtime with invented patients and documents. No pixel editing, AI execution, native parity or release qualification is implied. Source and capture date are recorded per asset.",
+  "files": [
+    {
+      "file": "worklist.png",
+      "sourceFile": "patients.png",
+      "sha256": "05cdb48dbcdb244e2dd9bc538854e22f49f248842a3424cdffc6a12fb916eb1c",
+      "width": 1440,
+      "height": 1000,
+      "title": "Elenco pazienti",
+      "sourceCommit": "ddff0a929fbe4d60f144b64c55269892ec2419f6",
+      "capturedAt": "2026-09-07T23:58:59.652Z"
+    },
+    {
+      "file": "documents.png",
+      "sourceFile": "documents.png",
+      "sha256": "2bc3306f526c201e629dfa74aa0cfb70fc8df051a76b5a0ef5530137cd9842a1",
+      "width": 1440,
+      "height": 1000,
+      "title": "Documenti",
+      "sourceCommit": "ddff0a929fbe4d60f144b64c55269892ec2419f6",
+      "capturedAt": "2026-09-07T23:58:59.652Z"
+    },
+    {
+      "file": "diary.png",
+      "sourceFile": "diary.png",
+      "sha256": "32cc29ad8ae8e943cd0cd6639c97d5f0cc731672a60f0a2257178065f8739bb1",
+      "width": 1440,
+      "height": 1000,
+      "title": "Diario",
+      "sourceCommit": "ddff0a929fbe4d60f144b64c55269892ec2419f6",
+      "capturedAt": "2026-09-07T23:58:59.652Z"
+    },
+    {
+      "file": "record.png",
+      "sourceFile": "therapies.png",
+      "sha256": "1a9136ba0e250f3240a5ef7a8f1e15c8265256ea7a2290ad8f65b414d35807c1",
+      "width": 1440,
+      "height": 1000,
+      "title": "Terapie",
+      "sourceCommit": "ddff0a929fbe4d60f144b64c55269892ec2419f6",
+      "capturedAt": "2026-09-07T23:58:59.652Z"
+    },
+    {
+      "file": "access.png",
+      "sourceFile": "settings.png",
+      "sha256": "e45c2d19206f64390ddd650897fb13c9406e7ffc7b6c1826895dfaaee6ed0cd2",
+      "width": 1440,
+      "height": 1000,
+      "title": "Panoramica impostazioni",
+      "sourceCommit": "ddff0a929fbe4d60f144b64c55269892ec2419f6",
+      "capturedAt": "2026-09-07T23:58:59.652Z"
+    },
+    {
+      "file": "analytics.png",
+      "sha256": "1e07d520def16bc7b36fb67e37b9be5606b555b90f04457f249ddc1273f3115a",
+      "width": 2880,
+      "height": 1800,
+      "sourceCommit": "e7f8a555ac697c36adc60a36132a776e39d19a72",
+      "captureDate": "2026-09-07",
+      "status": "Earlier capture preserved; not part of the updated UI set."
+    }
+  ]
+}

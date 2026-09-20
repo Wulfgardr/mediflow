@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine // @Codex
 import CryptoKit
 import MediFlowCore  // CryptoService now lives in the platform-free core (ADR 0071)
 #if os(macOS)
@@ -8,7 +9,7 @@ import UIKit
 #endif
 
 @MainActor
-final class PairedPatientsWorkspaceModel: ObservableObject {
+final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWorkspace {
     /// The operator field-crypto master key, derived from the PIN at login and
     /// held only in memory (never @Published, never persisted in clear). nil until
     /// a successful login delivers and unwraps it.
@@ -21,7 +22,9 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         let displayName: String?
         let ambulatoryName: String?
     }
-    @Published private(set) var operatorIdentity: OperatorIdentity?
+    @Published private(set) var operatorIdentity: OperatorIdentity? {
+        didSet { if oldValue?.userId != operatorIdentity?.userId { discardCachedPatientPresentation() } } // @Codex
+    }
     @Published var serverURL = HomeBasePairedSettings.defaultServerURL {
         didSet { invalidateLoginIfChanged(oldValue, serverURL) }
     }
@@ -39,6 +42,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     @Published var ambulatoryId = "" {
         didSet {
             guard oldValue.trimmedOrNil != ambulatoryId.trimmedOrNil else { return }
+            discardCachedPatientPresentation() // @Codex
             invalidatePatientLoadContext()
             clearSelectedPatientWorkspace()
         } // @Codex
@@ -47,6 +51,8 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     @Published private(set) var patients: [HomeBasePatientSummary] = []
     /* @Codex */
     @Published private(set) var selectedPatientID: String?
+    // @Codex: Per-workspace presentation state, never persisted or sent to the API.
+    @Published var activePatientSection: PatientWorkspaceSection = .overview
     @Published private(set) var selectedPatient: HomeBasePatientDetail? {
         didSet {
             let previousID = oldValue?.id
@@ -58,6 +64,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             }
             guard previousID != currentID else { return }
             /* @Codex */
+            cancelEditingPatient()
             editablePatientFields = [:]
             lockedPatientFields = []
             invalidateAttachmentPatientState()
@@ -111,6 +118,10 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     private var newEntryVisitDraftTranscriptDigest: Data?
     @Published private(set) var editingEntryId: String?
     @Published private(set) var editingEntryVersion: Int?
+    // @Codex: A conflict/reloaded version never silently rebases the local draft.
+    @Published private(set) var editingEntryRequiresReconciliation = false
+    @Published private(set) var editingEntryRemoteReview: HomeBaseEntrySummary?
+    private var editingEntryDraftID = UUID()
     @Published var editEntryTitle = ""
     @Published var editEntryType: PairedDiaryEntryType = .note
     @Published var editEntryEditorDocument = ClinicalRichTextEditorDocument()
@@ -125,17 +136,49 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     @Published var editPatientFirstName = ""
     @Published var editPatientLastName = ""
     @Published var editPatientTaxCode = ""
+    /* @Codex: the wire day is Gregorian UTC, matching the web date-only editor. */
+    @Published var editPatientBirthDate: Date?
+    private var editingPatientBaseline: (id: String, version: Int, birthDate: Date?)?
+    private var patientEditGeneration = UUID()
+    static var patientBirthDateCalendar: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        return calendar
+    }
     @Published var editPatientAddress = ""
     @Published var editPatientPhone = ""
     @Published var editPatientCaregiver = ""
     @Published var editPatientNotes = ""
     @Published var editPatientIsArchived = false
+    /* @Codex: one archive draft/policy for the profile editor and archive sheet. */
+    enum PatientArchiveReason: String, CaseIterable {
+        case assignedMMG = "assigned_mmg", deceased, other
+        var label: String {
+            switch self {
+            case .assignedMMG: return "Assegnato a MMG"
+            case .deceased: return "Decesso"
+            case .other: return "Altro"
+            }
+        }
+    }
+    @Published var editPatientArchiveReason = ""
+    @Published var editPatientArchiveNote = ""
+    @Published private(set) var isEditingPatientArchive = false
+    private var patientArchiveGeneration = UUID()
+    private struct PatientArchiveBaseline {
+        let id: String
+        let version: Int
+        let isArchived: Bool
+        let reason: PatientFieldCrypto.EditableField
+        let note: PatientFieldCrypto.EditableField
+    }
+    private var patientArchiveBaseline: PatientArchiveBaseline?
     @Published private(set) var editPatientDiagnoses: [ClinicalDiagnosis] = []
     @Published var editPatientIsAdi = false
     @Published private(set) var editPatientExemptions: [String] = []
     /* @Codex */
     enum EncryptedPatientField: Hashable {
-        case address, phone, caregiver, notes, diagnoses, exemptions
+        case address, phone, caregiver, notes, diagnoses, exemptions, archiveReason, archiveNote
     }
     /* @Codex */
     @Published private(set) var lockedPatientFields: Set<EncryptedPatientField> = []
@@ -266,6 +309,10 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     // preview/share, upload with wire precheck, single-record FSE validation.
     @Published private(set) var attachments: [HomeBaseAttachmentSummary] = []
     @Published private(set) var attachmentsPatientId: String?
+    // @Codex: An empty array is not evidence that the archive has been read.
+    @Published private(set) var attachmentsLoadState: ClinicalWorkspaceLoadState = .idle
+    private var activeAttachmentsLoadID: UUID?
+    private var attachmentsLoadingPatientID: String?
     @Published private(set) var selectedAttachmentDetail: HomeBaseAttachmentDetail?
     @Published private(set) var attachmentShareURL: URL?
     @Published private(set) var fseDocumentValidationResult: HomeBaseFseDocumentValidationResponse?
@@ -296,9 +343,21 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     private let cacheStore: HomeBasePatientCacheStore
     private let automaticActions: AppleFoundationLaunchOverrides.AutomaticActions
     private var didPerformAutomaticActions = false
-    private var sessionCookie: String?
+    private var sessionCookie: String? {
+        didSet { if oldValue != sessionCookie { discardCachedPatientPresentation() } } // @Codex
+    }
+    /* @Codex */
+    @Published private(set) var cacheMetadata: HomeBasePatientCacheMetadata?
+    @Published private(set) var cachedPatientProfile: HomeBasePatientDetail?
+    @Published private(set) var cachedProfileMetadata: HomeBasePatientCacheMetadata?
+    @Published private(set) var cachedProfileLockedFields: Set<String> = []
+    private var cacheExpiryTask: Task<Void, Never>?
+    private var displayedCacheContext: HomeBasePatientCacheContext?
+    private var cacheReadsInvalidated = false
+    var cacheIsStale: Bool { cacheMetadata?.isStale == true || cachedProfileMetadata?.isStale == true }
     /* @Codex */
     private var loginGeneration: UInt = 0
+    private let clinicalSessionInvalidations = PassthroughSubject<Void, Never>() // @Codex
     private var newEntryDraftId = UUID().uuidString
     /* @Codex */
     private var newTherapyDrugCatalogTask: Task<Void, Never>?
@@ -352,6 +411,11 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     private var activePatientLoadRequestID: UUID?
     /* @Codex */
     private var workspaceGeneration: UInt = 0
+    // @Codex: A navigation read leaves the selected workspace editable until
+    // commit. It owns no clinical writer, selection lease or persisted intent.
+    private var navigationLoadRequestID: UUID?
+    private enum NavigationDraftForm: CaseIterable, Hashable { case therapy, checkup, observation, service, prosthetic }
+    private var navigationCleanDates: [NavigationDraftForm: [Date]] = [:]
     /* @Codex */
     private var exclusiveOperationIDs: Set<UUID> = []
     // S3 (D3, lane PRREG): injectable seam for the "Prescrittivo regionale"
@@ -395,6 +459,9 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         self.systemActions = systemActions
         let launchOverrides = AppleFoundationLaunchOverrides.load()
         self.automaticActions = launchOverrides.automaticActions
+        // @Codex: Exact defaults also protect date-only drafts, without treating
+        // the form's initial Date() values as user changes.
+        defer { for form in NavigationDraftForm.allCases { markNavigationDatesClean(form) } }
 
         #if DEBUG
         /* @Codex */
@@ -440,6 +507,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     func configurePairedOnlineForTests(
         credentials: HomeBasePairedCredentials = HomeBasePairedCredentials(clientId: "test-client", clientToken: "test-token"),
         sessionCookie: String = "sid=test",
+        operatorId: String? = nil,
         masterKey: SymmetricKey? = nil,
         patients: [HomeBasePatientSummary] = [],
         selectedPatient: HomeBasePatientDetail? = nil,
@@ -450,6 +518,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         self.pairedClientId = credentials.clientId
         self.pairedClientToken = credentials.clientToken
         self.sessionCookie = sessionCookie
+        self.operatorIdentity = operatorId.map { OperatorIdentity(userId: $0, displayName: nil, ambulatoryName: nil) }
         self.masterKey = masterKey
         self.patients = patients
         self.selectedPatient = selectedPatient
@@ -457,6 +526,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         self.therapies = therapies
         self.attachments = attachments
         self.attachmentsPatientId = attachments.isEmpty ? nil : selectedPatient?.id
+        self.attachmentsLoadState = attachments.isEmpty ? .idle : .loaded // @Codex
         self.connectionState = .pairedOnline
     }
 
@@ -765,50 +835,122 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             return
         }
 
+        // @Codex: ADR 0106 retires local authority on success or an ambiguous
+        // result. A reply from a retired generation cannot clear a newer login.
+        let generation = loginGeneration
         await runTask {
-            let acknowledgement = try await self.makeClient().changePin(
-                currentPin: currentPin,
-                newPin: newPin,
-                encryptedMasterKey: wrappedMasterKey,
-                salt: salt.base64EncodedString(),
-                credentials: credentials,
-                sessionCookie: sessionCookie
-            )
-            guard acknowledgement.success else { throw HomeBaseClientError.contract }
-            // Deliberately keep the exact same masterKey instance in RAM. A PIN
-            // rotation changes only the KEK + salt + wrapped blob on the home-base.
-            self.statusMessage = "PIN aggiornato. La chiave clinica in memoria resta invariata."
+            do {
+                let acknowledgement = try await self.makeClient().changePin(
+                    currentPin: currentPin,
+                    newPin: newPin,
+                    encryptedMasterKey: wrappedMasterKey,
+                    salt: salt.base64EncodedString(),
+                    credentials: credentials,
+                    sessionCookie: sessionCookie
+                )
+                guard self.loginGeneration == generation else { return }
+                guard acknowledgement.success else { throw HomeBaseClientError.contract }
+                self.clearOperatorSessionPresentation()
+                self.statusMessage = "PIN aggiornato. Accedi di nuovo con il nuovo PIN."
+            } catch {
+                guard self.loginGeneration == generation else { return }
+                switch error {
+                case HomeBaseClientError.pinChangeConflict, HomeBaseClientError.versionConflict:
+                    // These typed conflicts confirm that this credential CAS lost.
+                    throw error
+                case HomeBaseClientError.httpStatus(let status, _) where [400, 401, 403, 429].contains(status):
+                    // Confirmed admission/input denials keep their existing flow;
+                    // a current 401 still revokes through runTask.
+                    throw error
+                default:
+                    // Transport/cancellation, malformed ACK and untyped 409/5xx
+                    // cannot exclude a committed CAS. Never infer a safe retry.
+                    self.clearOperatorSessionPresentation()
+                    self.statusMessage = "Esito del cambio PIN non confermato. Sessione bloccata: accedi di nuovo."
+                }
+            }
         }
     }
 
     func lockSessionNow() async {
-        invalidateLoginGeneration()
+        // @Codex: capture only what the best-effort remote logout needs. Local
+        // revocation and presentation clearing must finish before the first await.
+        let logoutClient = makeClient()
+        let logoutCredentials = pairedCredentials
+        let logoutCookie = sessionCookie
         let operationID = beginExclusiveOperation()
-        errorMessage = nil
-        pendingConflict = nil
         defer { finishExclusiveOperation(operationID) }
+        clearOperatorSessionPresentation() // @Codex
+        let generation = loginGeneration
+
+        statusMessage = "Sessione bloccata localmente. Logout remoto non confermato; accedi di nuovo per continuare."
 
         var remoteLogoutConfirmed = false
-        if let sessionCookie, let credentials = pairedCredentials {
+        if let logoutCookie, let logoutCredentials {
             do {
-                let acknowledgement = try await makeClient().logout(
-                    credentials: credentials,
-                    sessionCookie: sessionCookie
+                let acknowledgement = try await logoutClient.logout(
+                    credentials: logoutCredentials,
+                    sessionCookie: logoutCookie
                 )
                 remoteLogoutConfirmed = acknowledgement.success
             } catch {
-                // D10: remote logout is best-effort. Local key/session destruction
-                // below is unconditional and must never be skipped by transport errors.
+                // D10: transport failure cannot undo the already completed lock.
             }
         }
 
-        sessionCookie = nil
-        masterKey = nil
-        operatorIdentity = nil
-        connectionState = .sessionExpired
+        // A newer login/lock owns its state, even if this logout finishes last.
+        guard loginGeneration == generation, sessionCookie == nil else { return }
         statusMessage = remoteLogoutConfirmed
             ? "Sessione bloccata. Accedi di nuovo per continuare."
             : "Sessione bloccata localmente. Logout remoto non confermato; accedi di nuovo per continuare."
+    }
+
+    // @Codex: explicit lock and a current 401 revoke the same local presentation.
+    // This synchronous helper never sends logout or changes device pairing/scope.
+    private func clearOperatorSessionPresentation() {
+        invalidateLoginGeneration()
+        invalidatePatientLoadContext()
+        errorMessage = nil
+        pendingConflict = nil
+        sessionCookie = nil
+        masterKey = nil
+        operatorIdentity = nil
+        password = ""
+        discardCachedPatientPresentation()
+        clearSelectedPatientWorkspace()
+        patients = []
+        availableAmbulatories = []
+        resetNewTherapyForm()
+        resetNewCheckupForm()
+        resetNewObservationForm()
+        resetNewServicePrescriptionForm()
+        resetNewProstheticPrescriptionForm()
+        cancelEditingPatient()
+        editPatientFirstName = ""
+        editPatientLastName = ""
+        editPatientTaxCode = ""
+        editPatientAddress = ""
+        editPatientPhone = ""
+        editPatientCaregiver = ""
+        editPatientNotes = ""
+        editPatientDiagnoses = []
+        editPatientExemptions = []
+        editPatientIsAdi = false
+        editPatientIsArchived = false
+        newDiagnosisCode = ""
+        newDiagnosisDescription = ""
+        newExemptionCode = ""
+        cancelCreatingPatient()
+        newPatientFirstName = ""
+        newPatientLastName = ""
+        newPatientTaxCode = ""
+        newPatientHasBirthDate = false
+        newPatientBirthDate = Date()
+        newPatientAddress = ""
+        newPatientPhone = ""
+        newPatientCaregiver = ""
+        connectionState = .sessionExpired
+        reconciliationLine = "Sessione bloccata. Accedi di nuovo per leggere o scrivere."
     }
 
     /// Keeps the in-memory operator identity aligned after a successful
@@ -834,6 +976,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         masterKey = CryptoService.unwrapMasterKeyVersioned(blob: wrapped, pin: pin, salt: salt)
     }
 
+    /* @Codex */
     func loadPatients(includeDeleted: Bool = false) async {
         guard let sessionCookie else {
             errorMessage = "Esegui prima la login operatore."
@@ -844,68 +987,83 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             return
         }
         let selectionBeforeRefresh = selectedPatientID
-        await runTask {
+        let scope = ambulatoryId.trimmedOrNil
+        let server = serverURL
+        let pin = tlsPin
+        let generation = loginGeneration
+        let cacheContext = patientCacheContext
+        let client = makeClient()
+        let requestIsCurrent = {
+            self.sessionCookie == sessionCookie && self.pairedCredentials == credentials
+                && self.ambulatoryId.trimmedOrNil == scope && self.serverURL == server
+                && self.tlsPin == pin && self.loginGeneration == generation
+                && self.patientCacheContext == cacheContext
+        }
+        await runTask({
+            let listGeneration = self.workspaceGeneration
+            let canPublishList = { requestIsCurrent() && self.workspaceGeneration == listGeneration }
+            let summaries: [HomeBasePatientSummary]
             do {
-                /* @Codex */
-                let summaries = if includeDeleted {
-                    try await self.makeClient().fetchPatients(
-                        credentials: credentials,
-                        sessionCookie: sessionCookie,
-                        ambulatoryId: self.ambulatoryId.trimmedOrNil,
-                        includeDeleted: true
-                    )
+                summaries = if includeDeleted {
+                    try await client.fetchPatients(credentials: credentials, sessionCookie: sessionCookie,
+                        ambulatoryId: scope, includeDeleted: true)
                 } else {
-                    try await self.makeClient().fetchPatients(
-                        credentials: credentials,
-                        sessionCookie: sessionCookie,
-                        ambulatoryId: self.ambulatoryId.trimmedOrNil,
-                        includeDiagnoses: true
-                    )
+                    try await client.fetchPatients(credentials: credentials, sessionCookie: sessionCookie,
+                        ambulatoryId: scope, includeDiagnoses: true)
                 }
-                self.patients = summaries
-                .map { PatientFieldCrypto.decryptSummary($0, masterKey: self.masterKey) }
             } catch {
-                if self.restoreCachedPatientList(markOffline: true) {
-                    self.errorMessage = error.localizedDescription
+                guard canPublishList() else { return }
+                if !includeDeleted, Self.permitsCacheFallback(for: error), self.restoreCachedPatientList(markOffline: true) {
+                    // The offline/stale banner carries the failure and freshness, instead of a generic error hiding it.
+                    self.errorMessage = nil
                     return
                 }
+                self.invalidateCacheAfterReadFailure(error)
                 throw error
             }
+            guard canPublishList() else { return }
+            self.discardCachedPatientPresentation()
+            self.patients = summaries.map { PatientFieldCrypto.decryptSummary($0, masterKey: self.masterKey) }
             self.reconcilePatientSelection(selectionBeforeRefresh, in: self.patients)
-            // Best-effort: populate the scope picker. A failure here must not
-            // break the patient load, so keep whatever list we already have.
-            self.availableAmbulatories = (try? await self.makeClient().fetchNetworkAmbulatories(
-                credentials: credentials,
-                sessionCookie: sessionCookie,
-                ambulatoryId: self.ambulatoryId.trimmedOrNil
-            )) ?? self.availableAmbulatories
+            do {
+                let ambulatories = try await client.fetchNetworkAmbulatories(
+                    credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: scope)
+                guard canPublishList() else { return }
+                self.availableAmbulatories = ambulatories
+            } catch {
+                guard canPublishList() else { return }
+                if case HomeBaseClientError.httpStatus(let status, _) = error, status == 401 || status == 403 {
+                    // A revoked session/scope cannot mint a fresh offline snapshot, even on this secondary read.
+                    self.invalidateCacheAfterReadFailure(error)
+                    if status == 401 {
+                        // @Codex: revoke while this read is known current. Clearing
+                        // the workspace invalidates runTask's later failure epoch.
+                        self.applyPatientLoadFailure(error)
+                    } else {
+                        self.patients = []
+                        self.clearSelectedPatientWorkspace()
+                    }
+                    throw error
+                }
+                // Other picker failures do not change the completed patient read.
+            }
+            guard canPublishList() else { return }
             do {
                 try self.persistPairing()
-                #if DEBUG
-                if !AppleFoundationDemoMode.skipsStoredPairing {
-                    try self.cacheStore.savePatientList(
-                        self.patients,
-                        serverURL: self.serverURL,
-                        ambulatoryId: self.ambulatoryId.trimmedOrNil
-                    )
+                if !includeDeleted, let cacheContext, self.patientCacheStorageEnabled {
+                    try self.cacheStore.savePatientList(summaries, context: cacheContext)
+                    self.cacheReadsInvalidated = false
                 }
-                #else
-                try self.cacheStore.savePatientList(
-                    self.patients,
-                    serverURL: self.serverURL,
-                    ambulatoryId: self.ambulatoryId.trimmedOrNil
-                )
-                #endif
             } catch {
                 self.errorMessage = "Pazienti caricati, ma il salvataggio locale non e riuscito: \(error.localizedDescription)"
             }
             self.connectionState = .pairedOnline
-            self.reconciliationLine = "Snapshot locale aggiornato. Scritture online con sessione operatore."
+            self.reconciliationLine = "Lettura online completata. Scritture con sessione operatore."
             let visibleCount = includeDeleted ? self.patients.filter { $0.deletedAt != nil }.count : self.patients.count
             self.statusMessage = visibleCount == 0
                 ? (includeDeleted ? "Nessun paziente nel cestino." : "Nessun paziente nello scope corrente.")
                 : "\(visibleCount) pazienti caricati in lettura."
-        }
+        }, canApplyFailure: requestIsCurrent)
     }
 
     /* @Codex */
@@ -937,6 +1095,11 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             return
         }
         #endif
+        // @Codex: Cached profiles use a separate read-only presentation, never the online workspace.
+        if connectionState == .cached || connectionState == .pairedOfflineDegraded {
+            restoreCachedPatientProfile(patientID: patient.id)
+            return
+        }
         guard let context = beginPatientLoad(patientID: patient.id, clearingWorkspace: true) else { return }
         errorMessage = nil
         pendingConflict = nil
@@ -949,8 +1112,144 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         } catch {
             guard canPublishPatientLoad(context) else { return }
             finishCurrentPatientLoad()
+            if Self.permitsCacheFallback(for: error), restoreCachedPatientList(markOffline: true) {
+                restoreCachedPatientProfile(patientID: patient.id)
+                return
+            }
+            invalidateCacheAfterReadFailure(error)
             applyPatientLoadFailure(error)
         }
+    }
+
+    /* @Codex */
+    var navigationAvailability: ClinicalNavigationAvailability {
+        guard connectionState == .pairedOnline, sessionCookie != nil,
+              pairedCredentials != nil, masterKey != nil else { return .locked }
+        guard !isWorking, canChangePatientSelection, pendingConflict == nil,
+              !hasNavigationBlockingDraft else { return .busy }
+        return .ready
+    }
+
+    /// Resolve only through the currently paired reader. In particular,
+    /// loadPatients()/beginPatientLoad(clearingWorkspace:) would clear the old
+    /// draft before the target has been validated, so neither is used here.
+    func openNavigationPatient(
+        id: String, section: ClinicalNavigationPatientSection,
+        isCurrent: @escaping @MainActor () -> Bool
+    ) async -> ClinicalNavigationPatientResult {
+        guard isCurrent(), !Task.isCancelled else { return .superseded }
+        guard ClinicalNavigationURL.isValidPatientID(id),
+              let targetSection = PatientWorkspaceSection(rawValue: section.rawValue) else { return .notFound }
+        guard navigationAvailability == .ready, let sessionCookie, let credentials = pairedCredentials else {
+            return .blocked
+        }
+        let requestID = UUID()
+        navigationLoadRequestID = requestID
+        let loginGeneration = self.loginGeneration
+        let selectedID = selectedPatientID
+        let selectedDetail = selectedPatient
+        let context = PatientLoadContext(
+            requestID: requestID, patientID: id, workspaceGeneration: workspaceGeneration,
+            sessionCookie: sessionCookie, credentials: credentials,
+            ambulatoryID: ambulatoryId.trimmedOrNil, serverURL: serverURL, tlsPin: tlsPin,
+            connectionState: connectionState, client: makeClient(), masterKey: masterKey
+        )
+        // Any intervening model mutation supersedes this optional intent. This
+        // includes draft A -> B -> A, a new operation, conflict or manual section
+        // change; comparing only the final draft text/selection would miss them.
+        var interveningMutation = false
+        let observation = objectWillChange.sink { interveningMutation = true }
+        defer {
+            observation.cancel()
+            if navigationLoadRequestID == requestID { navigationLoadRequestID = nil }
+        }
+        let canApply = {
+            isCurrent() && !Task.isCancelled && !interveningMutation
+                && self.navigationLoadRequestID == requestID
+                && self.loginGeneration == loginGeneration
+                && self.workspaceGeneration == context.workspaceGeneration
+                && self.sessionCookie == context.sessionCookie && self.pairedCredentials == context.credentials
+                && self.ambulatoryId.trimmedOrNil == context.ambulatoryID
+                && self.serverURL == context.serverURL && self.tlsPin == context.tlsPin
+                && self.selectedPatientID == selectedID && self.selectedPatient == selectedDetail
+                && self.navigationAvailability == .ready
+        }
+        do {
+            let payload = try await fetchPatientWorkspace(context, isCurrent: canApply)
+            guard canApply() else { return .superseded }
+            guard payload.detail.id == id else { return .failed }
+            // The entire read has completed. No await occurs between this last
+            // currentness check and the ordinary workspace publication.
+            observation.cancel()
+            invalidatePatientLoadContext()
+            clearSelectedPatientWorkspace(preservingSelectionID: id)
+            errorMessage = nil
+            publishPatientWorkspace(payload, context: context)
+            activePatientSection = targetSection
+            statusMessage = "Cartella aperta dal collegamento."
+            return .opened
+        } catch {
+            guard canApply() else { return .superseded }
+            if case HomeBaseClientError.httpStatus(let status, _) = error {
+                if status == 404 { return .notFound }
+                if status == 401 || status == 403 {
+                    // Retain the ordinary denial/session handling, without
+                    // creating an offline fallback or clearing a draft on a 404.
+                    invalidateCacheAfterReadFailure(error)
+                    applyPatientLoadFailure(error)
+                }
+            }
+            return .failed
+        }
+    }
+
+    /// Conservative navigation guard: an open editor, non-default choice,
+    /// date-only change or any text/reference is a draft, even before it can save.
+    private var hasNavigationBlockingDraft: Bool {
+        if isCreatingPatient || isEditingPatient || isEditingPatientArchive || editingEntryId != nil || editingTherapyId != nil
+            || editingCheckupId != nil || editingObservationId != nil || pendingFHIRWarningValidation != nil {
+            return true
+        }
+        // Patient creation/profile fields remain populated after save/cancel.
+        // Their active editors are guarded above; retained inactive values are
+        // not a new draft. Inline clinical composers remain guarded below.
+        if [
+            newEntryTitle, newEntryVisitTranscript,
+            newTherapyDrugName, newTherapyAIC, newTherapyATC, newTherapyActivePrinciple,
+            newTherapyDosage, newTherapyMotivation, newTherapyDiagnosisCode,
+            newCheckupTitle, newCheckupNotes, newObservationDisplay, newObservationCode,
+            newObservationValue, newObservationUnitCode, newObservationNotes,
+            newServiceCode, newServiceName, newServiceClinicalQuestion, newServiceProvider,
+            newServiceOutcomeNote, newServiceRequestReference, newServiceDocumentRefs,
+            newServiceNotes, newServiceItemsText, newProstheticISOCode, newProstheticDescription,
+            newProstheticMeasures, newProstheticClinicalReason, newProstheticRegionalPrescriptionId,
+            newProstheticSupplier, newProstheticCollaudoOutcome, newProstheticDocumentRefs, newProstheticNotes
+        ].contains(where: { !$0.isEmpty }) { return true }
+        if !newEntryEditorDocument.blocks.isEmpty || !newEntryAttachmentIds.isEmpty
+            || newEntryVisitDraftResponse != nil || newEntryVisitDraftReviewed
+            || newEntryType != .note
+            || newTherapyStatus != .active || newTherapyHasEndDate
+            || newCheckupStatus != .pending || newCheckupSource != "manual"
+            || newServiceStatus != .prescribed || newServiceCategory != .visit || newServicePriority != .routine
+            || newServiceCodeSystem != "NTR" || newServiceSource != .manual
+            || newServiceHasScheduledAt || newServiceHasPerformedAt || newServiceHasReportReceivedAt
+            || newProstheticStatus != .prescribed || newProstheticCategory != .standard
+            || newProstheticHasCollaudoAt || newProstheticSource != .manual { return true }
+        return NavigationDraftForm.allCases.contains { navigationDates($0) != navigationCleanDates[$0] }
+    }
+
+    private func navigationDates(_ form: NavigationDraftForm) -> [Date] {
+        switch form {
+        case .therapy: [newTherapyStartDate, newTherapyEndDate]
+        case .checkup: [newCheckupDate]
+        case .observation: [newObservationObservedAt]
+        case .service: [newServicePrescribedAt, newServiceScheduledAt, newServicePerformedAt, newServiceReportReceivedAt]
+        case .prosthetic: [newProstheticPrescribedAt, newProstheticCollaudoAt]
+        }
+    }
+
+    private func markNavigationDatesClean(_ form: NavigationDraftForm) {
+        navigationCleanDates[form] = navigationDates(form)
     }
 
     /// Refetch the selected patient and all sub-resources after a version conflict,
@@ -968,14 +1267,22 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             pendingConflict = nil
             return
         }
+        let editorID = editingEntryDraftID // @Codex
         guard let context = beginPatientLoad(patientID: current.id, clearingWorkspace: false) else { return }
         do {
             let payload = try await fetchPatientWorkspace(context)
             guard canPublishPatientLoad(context) else { return }
             publishPatientWorkspace(payload, context: context)
+            // @Codex: Refresh the comparison, never the operator's text or CAS
+            // version. Acceptance is a separate, local-only review action.
+            if editingEntryDraftID == editorID, editingEntryRequiresReconciliation {
+                prepareEditingEntryReview(from: payload.entries)
+            }
             pendingConflict = nil
             errorMessage = nil
-            statusMessage = "Dati aggiornati dall'home-base. Riapplica la modifica."
+            statusMessage = editingEntryRequiresReconciliation
+                ? "Dati aggiornati. Confronta la voce corrente con la bozza prima di salvare."
+                : "Dati aggiornati dall'home-base. Riapplica la modifica."
             finishCurrentPatientLoad()
         } catch {
             guard canPublishPatientLoad(context) else { return }
@@ -1033,15 +1340,22 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             errorMessage = "Apri prima un paziente con sessione paired online."
             return
         }
-        let title = newEntryTitle.trimmedOrNil
-        let type = newEntryType.rawValue
+        let submitted = newDiarySnapshot
+        let draftID = newEntryDraftId
+        let transcriptMutation = newEntryVisitTranscriptMutationReference
+        let scope = ambulatoryId.trimmedOrNil
+        let title = submitted.title.trimmedOrNil
+        let type = submitted.type.rawValue
         // Non-negotiable (D11): the sealed content is ALWAYS the transcoder's
         // render of the editor model, never raw operator input.
-        let content = newEntryEditorDocument.renderedHTML
-        let attachmentIds = Array(newEntryAttachmentIds)
+        let content = submitted.document.renderedHTML
+        let attachmentIds = Array(submitted.attachmentIDs)
         let patientAttachmentIds = Set(self.attachments.map(\.id))
         let attachmentCacheMatchesPatient = attachmentsPatientId == patientId
-        await runTask {
+        var isCurrent: () -> Bool = { false }
+        await runTask({
+            // Capture after runTask acquires its own workspace generation.
+            isCurrent = self.diaryWriteCurrentness(patientID: patientId, cookie: sessionCookie, credentials: credentials)
             guard let masterKey = self.masterKey else { throw PairedCryptoError.keyUnavailable }
             guard attachmentIds.isEmpty || attachmentCacheMatchesPatient else {
                 throw PairedCryptoError.attachmentCacheUnavailable
@@ -1054,7 +1368,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             _ = try await self.makeClient().createEntry(
                 patientId: patientId,
                 payload: HomeBaseEntryCreatePayload(
-                    id: self.newEntryDraftId,
+                    id: draftID,
                     type: type,
                     title: try self.sealField(title),
                     date: Date(),
@@ -1063,26 +1377,39 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
                 ),
                 credentials: credentials,
                 sessionCookie: sessionCookie,
-                ambulatoryId: self.ambulatoryId.trimmedOrNil
+                ambulatoryId: scope
             )
-            self.newEntryTitle = ""
-            self.newEntryType = .note
-            self.newEntryEditorDocument = ClinicalRichTextEditorDocument()
-            self.newEntryAttachmentIds = []
-            self.newEntryVisitDraftPatientId = nil
+            guard isCurrent(), self.newEntryDraftId == draftID else { return }
+            let unchanged = self.newDiarySnapshot == submitted
+                && self.newEntryVisitTranscriptMutationReference == transcriptMutation
+            if unchanged {
+                self.newEntryTitle = ""
+                self.newEntryType = .note
+                self.newEntryEditorDocument = ClinicalRichTextEditorDocument()
+                self.newEntryAttachmentIds = []
+                self.newEntryVisitDraftPatientId = nil
+            }
+            // The acknowledged ID belongs to the saved entry. Any later local
+            // text remains an explicitly unsaved new draft, never auto-submitted.
             self.newEntryDraftId = UUID().uuidString
-            self.statusMessage = "Voce diario inviata all'home-base."
+            self.statusMessage = unchanged ? "Voce diario inviata all'home-base."
+                : "Voce inviata. Le modifiche successive restano in una nuova bozza non salvata."
             do {
-                self.entries = try await self.fetchDecryptedEntries(
+                let entries = try await self.fetchDecryptedEntries(
                     patientId: patientId,
                     credentials: credentials,
                     sessionCookie: sessionCookie,
-                    ambulatoryId: self.ambulatoryId.trimmedOrNil
+                    ambulatoryId: scope
                 )
+                guard isCurrent() else { return }
+                self.entries = entries
             } catch {
+                guard isCurrent() else { return }
+                // @Codex: A confirmed save does not turn session expiry into a refresh-only warning.
+                if case HomeBaseClientError.httpStatus(401, _) = error { throw error }
                 self.errorMessage = "Voce inviata, ma aggiornamento diario non riuscito: \(error.localizedDescription)"
             }
-        }
+        }, canApplyFailure: { isCurrent() })
     }
 
     /// A10: submit a completed clinical scale as a `type:"scale"` diary entry whose
@@ -1149,6 +1476,11 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     /* @Codex */
     func startEditingEntry(_ entry: HomeBaseEntrySummary) {
         guard canMutateEntry(entry) else { return }
+        // @Codex: Reopening the same row is not consent to discard its draft.
+        guard editingEntryId != entry.id else { return }
+        editingEntryDraftID = UUID()
+        editingEntryRequiresReconciliation = false
+        editingEntryRemoteReview = nil
         editingEntryId = entry.id
         editingEntryVersion = entry.version
         editEntryTitle = entry.title
@@ -1168,6 +1500,10 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
 
     /* @Codex */
     func cancelEditingEntry() {
+        // Also used by privacy invalidation: never gate this clear on isWorking.
+        editingEntryDraftID = UUID() // @Codex
+        editingEntryRequiresReconciliation = false
+        editingEntryRemoteReview = nil
         editingEntryId = nil
         editingEntryVersion = nil
         editEntryTitle = ""
@@ -1180,6 +1516,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
 
     /* @Codex */
     func insertNewEntrySOAPTemplate() {
+        guard !isWorking else { return } // @Codex
         // Passes the template through the transcoder too (D11): parse it into
         // the same editor model as any other content, rather than assigning raw
         // HTML into what used to be a plain-text field.
@@ -1293,7 +1630,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     }
 
     var canInsertVisitDraftIntoNewEntry: Bool {
-        newEntryVisitDraftResponse != nil
+        !isWorking && newEntryVisitDraftResponse != nil
             && newEntryVisitDraftReviewed
             && newEntryVisitDraftPatientId == selectedPatient?.id
             && newEntryVisitDraftMutationReference == newEntryVisitTranscriptMutationReference
@@ -1331,15 +1668,43 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     // ADR 0071 update: patient CREATE still works through the on-device local
     // authority when available, and now also has a paired HTTP wire path gated by
     // network.replica.write-patient-lifecycle.
-    var canCreatePatient: Bool {
+    // @Codex: opening controls must not depend on the still-empty draft.
+    var canStartCreatingPatient: Bool {
         !isWorking
-        && !newPatientFirstName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        && !newPatientLastName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        && !newPatientTaxCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        && connectionState != .cached && connectionState != .pairedOfflineDegraded // @Codex
         && permitsCapability(NetworkCapabilityKey.writePatientLifecycle)
     }
 
+    var canCreatePatient: Bool {
+        canStartCreatingPatient
+        && !newPatientFirstName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        && !newPatientLastName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        && !newPatientTaxCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /* @Codex: lifecycle and exact manual draft of this create flow only. */
+    private var patientCreateGeneration = UUID()
+
+    private struct PatientCreateDraft: Equatable {
+        let firstName: String
+        let lastName: String
+        let taxCode: String
+        let hasBirthDate: Bool
+        let birthDate: Date
+        let address: String
+        let phone: String
+        let caregiver: String
+    }
+
+    private var patientCreateDraft: PatientCreateDraft {
+        PatientCreateDraft(firstName: newPatientFirstName, lastName: newPatientLastName,
+            taxCode: newPatientTaxCode, hasBirthDate: newPatientHasBirthDate,
+            birthDate: newPatientBirthDate, address: newPatientAddress,
+            phone: newPatientPhone, caregiver: newPatientCaregiver)
+    }
+
     func startCreatingPatient() {
+        patientCreateGeneration = UUID() // @Codex
         newPatientFirstName = ""
         newPatientLastName = ""
         newPatientTaxCode = ""
@@ -1353,6 +1718,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     }
 
     func cancelCreatingPatient() {
+        patientCreateGeneration = UUID() // @Codex
         isCreatingPatient = false
     }
 
@@ -1370,32 +1736,75 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             errorMessage = "Cifratura non disponibile: riaccedi con il PIN operatore prima di creare."
             return
         }
-        await runTask {
+        /* @Codex */
+        let draft = patientCreateDraft
+        let createGeneration = patientCreateGeneration
+        var formWasPresented = isCreatingPatient
+        let scope = ambulatoryId.trimmedOrNil
+        let client = makeClient()
+        var validateCurrent: () throws -> Void = { throw CancellationError() }
+        await runTask({
+            // Capture after runTask advances the exclusive-operation epoch.
+            let login = self.loginGeneration
+            let workspace = self.workspaceGeneration
+            let server = self.serverURL
+            let pin = self.tlsPin
+            validateCurrent = {
+                guard !Task.isCancelled, self.loginGeneration == login,
+                      self.workspaceGeneration == workspace,
+                      self.patientCreateGeneration == createGeneration,
+                      self.isCreatingPatient == formWasPresented,
+                      self.sessionCookie == sessionCookie, self.pairedCredentials == credentials,
+                      self.ambulatoryId.trimmedOrNil == scope,
+                      self.serverURL == server, self.tlsPin == pin,
+                      self.connectionState == .pairedOnline else { throw CancellationError() }
+            }
+            try validateCurrent()
             let payload = HomeBasePatientCreatePayload(
-                firstName: self.newPatientFirstName.trimmingCharacters(in: .whitespacesAndNewlines),
-                lastName: self.newPatientLastName.trimmingCharacters(in: .whitespacesAndNewlines),
-                taxCode: self.newPatientTaxCode.trimmingCharacters(in: .whitespacesAndNewlines),
-                birthDate: self.newPatientHasBirthDate ? self.newPatientBirthDate : nil,
-                address: try self.sealField(self.newPatientAddress.trimmedOrNil),
-                phone: try self.sealField(self.newPatientPhone.trimmedOrNil),
-                caregiver: try self.sealField(self.newPatientCaregiver.trimmedOrNil)
+                firstName: draft.firstName.trimmingCharacters(in: .whitespacesAndNewlines),
+                lastName: draft.lastName.trimmingCharacters(in: .whitespacesAndNewlines),
+                taxCode: draft.taxCode.trimmingCharacters(in: .whitespacesAndNewlines),
+                birthDate: draft.hasBirthDate ? draft.birthDate : nil,
+                address: try self.sealField(draft.address.trimmedOrNil),
+                phone: try self.sealField(draft.phone.trimmedOrNil),
+                caregiver: try self.sealField(draft.caregiver.trimmedOrNil)
             )
-            let created = try await self.makeClient().createPatient(
+            let created = try await client.createPatient(
                 payload: payload, credentials: credentials, sessionCookie: sessionCookie,
-                ambulatoryId: self.ambulatoryId.trimmedOrNil)
-            self.isCreatingPatient = false
-            /* @Codex */
-            self.patients = try await self.makeClient().fetchPatients(
-                credentials: credentials, sessionCookie: sessionCookie,
-                ambulatoryId: self.ambulatoryId.trimmedOrNil, includeDiagnoses: true)
-            .map { PatientFieldCrypto.decryptSummary($0, masterKey: self.masterKey) }
+                ambulatoryId: scope)
+            try validateCurrent()
+            let patients: [HomeBasePatientSummary]
+            do {
+                patients = try await client.fetchPatients(
+                    credentials: credentials, sessionCookie: sessionCookie,
+                    ambulatoryId: scope, includeDiagnoses: true)
+            } catch {
+                try validateCurrent()
+                // The POST succeeded: preserve the existing close-on-refresh-failure
+                // behavior, unless the operator has since changed the manual draft.
+                if self.patientCreateDraft == draft {
+                    self.isCreatingPatient = false
+                    formWasPresented = false // This operation owns the close; retain its failure report.
+                }
+                throw error
+            }
+            try validateCurrent()
+            self.patients = patients.map { PatientFieldCrypto.decryptSummary($0, masterKey: self.masterKey) }
+            let draftUnchanged = self.patientCreateDraft == draft
+            if draftUnchanged { self.cancelCreatingPatient() }
             self.statusMessage = "Paziente creato sull'home-base (id \(created.id))."
-        }
+                + (draftUnchanged ? "" : " Le modifiche successive nel modulo non sono state salvate.")
+        }, canApplyFailure: { (try? validateCurrent()) != nil })
     }
 
     // A4: edit patient anagrafica.
     func startEditingPatient() {
         guard let patient = selectedPatient else { return }
+        /* @Codex */
+        cancelPatientArchive()
+        patientEditGeneration = UUID()
+        editingPatientBaseline = (patient.id, patient.version, patient.birthDate)
+        editPatientBirthDate = patient.birthDate
         editPatientFirstName = patient.firstName
         editPatientLastName = patient.lastName
         editPatientTaxCode = patient.taxCode
@@ -1404,6 +1813,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         editPatientCaregiver = patient.caregiver ?? ""
         editPatientNotes = patient.notes ?? ""
         editPatientIsArchived = patient.isArchived ?? false
+        preparePatientArchiveFields(patient) // @Codex
         editPatientIsAdi = patient.isAdi ?? false
         editPatientDiagnoses = DiagnosesCodec.decode(patient.diagnoses)
         editPatientExemptions = ExemptionCodesCodec.decode(patient.exemptions)
@@ -1482,16 +1892,42 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
 
     func cancelEditingPatient() {
         isEditingPatient = false
+        /* @Codex */
+        patientEditGeneration = UUID()
+        editingPatientBaseline = nil
+        editPatientBirthDate = nil
+        cancelPatientArchive() // @Codex
         resetExemptionCatalogSearch(clearAvailability: false)
     }
 
+    /* @Codex */
+    func setPatientBirthDatePresent(_ present: Bool) {
+        editPatientBirthDate = present
+            ? (editingPatientBaseline?.birthDate ?? Self.patientBirthDateCalendar.startOfDay(for: Date()))
+            : nil
+    }
+
+    private var patientBirthDatePatch: PatchValue<Date> {
+        let original = editingPatientBaseline?.birthDate
+        guard let edited = editPatientBirthDate else { return original == nil ? .omit : .null }
+        let calendar = Self.patientBirthDateCalendar
+        if let original, calendar.isDate(original, inSameDayAs: edited) { return .omit }
+        return .value(calendar.startOfDay(for: edited))
+    }
+
     func savePatient() async {
-        guard let current = selectedPatient else { return }
+        /* @Codex: hold the editor's CAS version and reject stale completion. */
+        guard let current = selectedPatient, let baseline = editingPatientBaseline,
+              baseline.id == current.id, isEditingPatient, !isWorking else { return }
+        if let validation = patientArchiveValidationMessage(isArchived: editPatientIsArchived) {
+            errorMessage = validation
+            return
+        }
 
         #if DEBUG
         if Self.isUITestSeeded {
-            selectedPatient = editedPatientDetail(from: current)
-            isEditingPatient = false
+            setSelectedPatient(editedPatientDetail(from: current)) // @Codex: refresh the fixture's editable-field baseline too.
+            cancelEditingPatient()
             statusMessage = "Anagrafica aggiornata."
             return
         }
@@ -1509,13 +1945,16 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             return
         }
         /* @Codex */
+        let archivePatch: (reason: PatchValue<String>, note: PatchValue<String>) // @Codex
+        do { archivePatch = try patientArchivePatch(isArchived: editPatientIsArchived) }
+        catch { errorMessage = error.localizedDescription; return }
         let payload = HomeBasePatientUpdatePayload(
-            version: current.version,
+            version: baseline.version,
             firstName: editPatientFirstName.trimmingCharacters(in: .whitespacesAndNewlines),
             lastName: editPatientLastName.trimmingCharacters(in: .whitespacesAndNewlines),
             taxCode: editPatientTaxCode.trimmingCharacters(in: .whitespacesAndNewlines),
             isAdi: editPatientIsAdi,
-            isArchived: editPatientIsArchived,
+            isArchived: patientArchiveBaseline?.isArchived == editPatientIsArchived ? nil : editPatientIsArchived,
             address: encryptedPatientPatchValue(editPatientAddress.trimmedOrNil, field: .address, masterKey: masterKey),
             phone: encryptedPatientPatchValue(editPatientPhone.trimmedOrNil, field: .phone, masterKey: masterKey),
             caregiver: encryptedPatientPatchValue(editPatientCaregiver.trimmedOrNil, field: .caregiver, masterKey: masterKey),
@@ -1525,28 +1964,44 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
                 field: .diagnoses, masterKey: masterKey, structured: true),
             exemptions: encryptedPatientPatchValue(
                 ExemptionCodesCodec.encode(editPatientExemptions),
-                field: .exemptions, masterKey: masterKey, structured: true)
+                field: .exemptions, masterKey: masterKey, structured: true),
+            birthDate: patientBirthDatePatch,
+            archiveReason: archivePatch.reason,
+            archiveNote: archivePatch.note
         )
         let patientId = current.id
-        await runTask {
-            let acknowledgement = try await self.makeClient().updatePatient(
+        let editGeneration = patientEditGeneration
+        let scope = ambulatoryId.trimmedOrNil
+        let client = makeClient()
+        var validateCurrent: () throws -> Void = { throw CancellationError() }
+        await runTask({
+            let validate = self.patientReadValidator(patientId: patientId, credentials: credentials,
+                sessionCookie: sessionCookie, ambulatoryId: scope)
+            validateCurrent = {
+                try validate()
+                guard self.patientEditGeneration == editGeneration else { throw CancellationError() }
+            }
+            try validateCurrent()
+            let acknowledgement = try await client.updatePatient(
                 patientId: patientId,
                 payload: payload,
                 credentials: credentials,
                 sessionCookie: sessionCookie,
-                ambulatoryId: self.ambulatoryId.trimmedOrNil
+                ambulatoryId: scope
             )
+            try validateCurrent()
             guard acknowledgement.success else { throw HomeBaseClientError.contract }
-            self.isEditingPatient = false
-            let fetchedDetail = try await self.makeClient().fetchPatient(
+            let fetchedDetail = try await client.fetchPatient(
                 id: patientId,
                 credentials: credentials,
                 sessionCookie: sessionCookie,
-                ambulatoryId: self.ambulatoryId.trimmedOrNil
+                ambulatoryId: scope
             )
+            try validateCurrent()
             self.setSelectedPatient(fetchedDetail) // @Codex
+            self.cancelEditingPatient()
             self.statusMessage = "Anagrafica aggiornata sull'home-base."
-        }
+        }, canApplyFailure: { (try? validateCurrent()) != nil })
     }
 
     /* @Codex */
@@ -1563,6 +2018,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             && pairedCredentials != nil
             && connectionState == .pairedOnline
             && !isWorking
+            && !isEditingPatient // @Codex: finish the existing profile draft first.
             && permitsCapability(NetworkCapabilityKey.writePatientProfile)
     }
 
@@ -1575,6 +2031,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             && pairedCredentials != nil
             && connectionState == .pairedOnline
             && !isWorking
+            && !isEditingPatient // @Codex
             && permitsCapability(NetworkCapabilityKey.writePatientProfile)
     }
 
@@ -1599,41 +2056,138 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     }
 
     /* @Codex */
-    func setSelectedPatientArchived(_ isArchived: Bool) async {
-        guard let current = selectedPatient else { return }
-        guard (isArchived && canArchivePatient) || (!isArchived && canUnarchivePatient) else { return }
+    @discardableResult
+    func setSelectedPatientArchived(_ isArchived: Bool) async -> Bool {
+        guard let current = selectedPatient, let baseline = patientArchiveBaseline,
+              isEditingPatientArchive, baseline.id == current.id else { return false }
+        guard (isArchived && canArchivePatient) || (!isArchived && canUnarchivePatient) else { return false }
+        if let validation = patientArchiveValidationMessage(isArchived: isArchived) {
+            errorMessage = validation
+            return false
+        }
         guard let sessionCookie, let credentials = pairedCredentials else {
             errorMessage = "Apri prima un paziente con sessione paired online."
-            return
+            return false
         }
-        let payload = HomeBasePatientUpdatePayload(version: current.version, isArchived: isArchived)
-        await runTask {
-            let acknowledgement = try await self.makeClient().updatePatient(
+        let patch: (reason: PatchValue<String>, note: PatchValue<String>)
+        do { patch = try patientArchivePatch(isArchived: isArchived) }
+        catch { errorMessage = error.localizedDescription; return false }
+        let payload = HomeBasePatientUpdatePayload(version: baseline.version, isArchived: isArchived,
+            archiveReason: patch.reason, archiveNote: patch.note)
+        let generation = patientArchiveGeneration
+        let scope = ambulatoryId.trimmedOrNil
+        let client = makeClient()
+        var completed = false
+        var validateCurrent: () throws -> Void = { throw CancellationError() }
+        await runTask({
+            let validate = self.patientReadValidator(patientId: current.id, credentials: credentials,
+                sessionCookie: sessionCookie, ambulatoryId: scope)
+            validateCurrent = {
+                try validate()
+                guard self.patientArchiveGeneration == generation else { throw CancellationError() }
+            }
+            try validateCurrent()
+            let acknowledgement = try await client.updatePatient(
                 patientId: current.id,
                 payload: payload,
                 credentials: credentials,
                 sessionCookie: sessionCookie,
-                ambulatoryId: self.ambulatoryId.trimmedOrNil
+                ambulatoryId: scope
             )
+            try validateCurrent()
             guard acknowledgement.success else { throw HomeBaseClientError.contract }
-            let fetchedDetail = try await self.makeClient().fetchPatient(
+            let fetchedDetail = try await client.fetchPatient(
                 id: current.id,
                 credentials: credentials,
                 sessionCookie: sessionCookie,
-                ambulatoryId: self.ambulatoryId.trimmedOrNil
+                ambulatoryId: scope
             )
-            self.setSelectedPatient(fetchedDetail) // @Codex
-            self.patients = try await self.makeClient().fetchPatients(
+            try validateCurrent()
+            let fetchedPatients = try await client.fetchPatients(
                 credentials: credentials,
                 sessionCookie: sessionCookie,
-                ambulatoryId: self.ambulatoryId.trimmedOrNil,
+                ambulatoryId: scope,
                 includeDiagnoses: true
             )
-            .map { PatientFieldCrypto.decryptSummary($0, masterKey: self.masterKey) }
+            try validateCurrent()
+            self.setSelectedPatient(fetchedDetail)
+            self.patients = fetchedPatients.map { PatientFieldCrypto.decryptSummary($0, masterKey: self.masterKey) }
             self.statusMessage = isArchived
                 ? "Paziente archiviato sull'home-base."
                 : "Paziente riattivato sull'home-base."
+            completed = true
+            self.cancelPatientArchive()
+        }, canApplyFailure: { (try? validateCurrent()) != nil })
+        return completed
+    }
+
+    /* @Codex */
+    func startPatientArchive() {
+        guard let patient = selectedPatient, !isEditingPatient, !isWorking else { return }
+        // Reappearance (including rotation) must not replace an open draft.
+        guard !isEditingPatientArchive || patientArchiveBaseline?.id != patient.id else { return }
+        preparePatientArchiveFields(patient)
+        isEditingPatientArchive = true
+    }
+
+    func cancelPatientArchive() {
+        patientArchiveGeneration = UUID()
+        isEditingPatientArchive = false
+        patientArchiveBaseline = nil
+        editPatientArchiveReason = ""
+        editPatientArchiveNote = ""
+    }
+
+    private func preparePatientArchiveFields(_ patient: HomeBasePatientDetail) {
+        patientArchiveGeneration = UUID()
+        let reason = editablePatientFields[.archiveReason]
+            ?? PatientFieldCrypto.resolveStringField(patient.archiveReason, masterKey: masterKey)
+        let note = editablePatientFields[.archiveNote]
+            ?? PatientFieldCrypto.resolveStringField(patient.archiveNote, masterKey: masterKey)
+        patientArchiveBaseline = PatientArchiveBaseline(id: patient.id, version: patient.version,
+            isArchived: patient.isArchived == true, reason: reason, note: note)
+        editPatientArchiveReason = Self.archiveFieldText(reason)
+        editPatientArchiveNote = Self.archiveFieldText(note)
+    }
+
+    private static func archiveFieldText(_ field: PatientFieldCrypto.EditableField) -> String {
+        if case .plaintext(let text) = field { return text }
+        return ""
+    }
+
+    func patientArchiveValidationMessage(isArchived: Bool) -> String? {
+        guard let baseline = patientArchiveBaseline, baseline.id == selectedPatient?.id else {
+            return "Riapri il modulo del paziente prima di salvare."
         }
+        guard isArchived else { return nil }
+        let unchanged = editPatientArchiveReason == Self.archiveFieldText(baseline.reason)
+            && editPatientArchiveNote == Self.archiveFieldText(baseline.note)
+        // A DOB/contact edit must preserve historical, absent or unreadable
+        // archive provenance. Validation applies to a new/changed archive draft.
+        if baseline.isArchived && unchanged { return nil }
+        guard !baseline.reason.isLocked, !baseline.note.isLocked else {
+            return "I dati di archiviazione protetti non possono essere modificati."
+        }
+        guard let reason = PatientArchiveReason(rawValue: editPatientArchiveReason) else {
+            return "Scegli il motivo dell’archiviazione."
+        }
+        if reason == .other && editPatientArchiveNote.trimmedOrNil == nil {
+            return "Descrivi il motivo dell’archiviazione."
+        }
+        return nil
+    }
+
+    private func patientArchivePatch(isArchived: Bool) throws -> (reason: PatchValue<String>, note: PatchValue<String>) {
+        guard let baseline = patientArchiveBaseline else { throw HomeBaseClientError.contract }
+        guard isArchived else { return baseline.isArchived ? (.null, .null) : (.omit, .omit) }
+        func sealChanged(_ text: String, original: PatientFieldCrypto.EditableField) throws -> PatchValue<String> {
+            if original.isLocked || text == Self.archiveFieldText(original) { return .omit }
+            guard let value = text.trimmedOrNil else { return .null }
+            guard let sealed = try sealField(value) else { throw PairedCryptoError.sealFailed }
+            return .value(sealed)
+        }
+        return (try sealChanged(editPatientArchiveReason, original: baseline.reason),
+                try sealChanged(editPatientArchiveNote, original: baseline.note))
     }
 
     /* @Codex */
@@ -1751,6 +2305,8 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             .notes: PatientFieldCrypto.resolveStringField(raw.notes, masterKey: masterKey),
             .diagnoses: PatientFieldCrypto.resolveStructuredField(raw.diagnoses, masterKey: masterKey),
             .exemptions: PatientFieldCrypto.resolveStructuredField(raw.exemptions, masterKey: masterKey),
+            .archiveReason: PatientFieldCrypto.resolveStringField(raw.archiveReason, masterKey: masterKey),
+            .archiveNote: PatientFieldCrypto.resolveStringField(raw.archiveNote, masterKey: masterKey),
         ]
         selectedPatient = PatientFieldCrypto.decryptDetail(raw, masterKey: masterKey)
         editablePatientFields = fields
@@ -1770,11 +2326,17 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     }
 
     private func editedPatientDetail(from current: HomeBasePatientDetail) -> HomeBasePatientDetail {
-        HomeBasePatientDetail(
+        let birthDate: Date? // @Codex: fixture follows the same nullable patch.
+        switch patientBirthDatePatch {
+        case .omit: birthDate = current.birthDate
+        case .null: birthDate = nil
+        case .value(let value): birthDate = value
+        }
+        return HomeBasePatientDetail(
             id: current.id,
             firstName: editPatientFirstName.trimmingCharacters(in: .whitespacesAndNewlines),
             lastName: editPatientLastName.trimmingCharacters(in: .whitespacesAndNewlines),
-            birthDate: current.birthDate,
+            birthDate: birthDate,
             taxCode: editPatientTaxCode.trimmingCharacters(in: .whitespacesAndNewlines),
             address: editPatientAddress.trimmedOrNil,
             phone: editPatientPhone.trimmedOrNil,
@@ -1791,12 +2353,78 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             version: current.version + 1,
             ambulatoryId: current.ambulatoryId,
             createdAt: current.createdAt,
-            updatedAt: current.updatedAt
+            updatedAt: current.updatedAt,
+            archiveReason: editPatientIsArchived ? editPatientArchiveReason.trimmedOrNil : nil,
+            archiveNote: editPatientIsArchived ? editPatientArchiveNote.trimmedOrNil : nil
         )
     }
     #endif
 
     /* @Codex */
+    private struct DiaryEditorSnapshot: Equatable {
+        let title: String
+        let type: PairedDiaryEntryType
+        let document: ClinicalRichTextEditorDocument
+        let attachmentIDs: Set<String>
+    }
+
+    private var newDiarySnapshot: DiaryEditorSnapshot {
+        .init(title: newEntryTitle, type: newEntryType, document: newEntryEditorDocument, attachmentIDs: newEntryAttachmentIds)
+    }
+
+    private var editedDiarySnapshot: DiaryEditorSnapshot {
+        .init(title: editEntryTitle, type: editEntryType, document: editEntryEditorDocument, attachmentIDs: editEntryAttachmentIds)
+    }
+
+    /// Used only by these two diary writers, after their exclusive operation has
+    /// begun. The shared read/runTask invalidation policy remains unchanged.
+    private func diaryWriteCurrentness(
+        patientID: String, cookie: String, credentials: HomeBasePairedCredentials
+    ) -> () -> Bool {
+        let login = loginGeneration
+        let workspace = workspaceGeneration
+        let scope = ambulatoryId.trimmedOrNil
+        let server = serverURL
+        let pin = tlsPin
+        return { [weak self] in
+            guard let self else { return false }
+            return !Task.isCancelled && self.loginGeneration == login && self.workspaceGeneration == workspace
+                && self.selectedPatient?.id == patientID && self.selectedPatientID == patientID
+                && self.sessionCookie == cookie && self.pairedCredentials == credentials
+                && self.ambulatoryId.trimmedOrNil == scope && self.serverURL == server && self.tlsPin == pin
+                && self.connectionState == .pairedOnline
+        }
+    }
+
+    private func requireEditingEntryReconciliation() {
+        editingEntryRequiresReconciliation = true
+        editingEntryRemoteReview = nil
+    }
+
+    private func prepareEditingEntryReview(from entries: [HomeBaseEntrySummary]) {
+        guard editingEntryRequiresReconciliation, let entryID = editingEntryId else { return }
+        editingEntryRemoteReview = entries.first { $0.id == entryID && $0.patientId == selectedPatient?.id }
+    }
+
+    var canConfirmEditingEntryReconciliation: Bool {
+        guard editingEntryRequiresReconciliation, let latest = editingEntryRemoteReview,
+              latest.id == editingEntryId, latest.version > (editingEntryVersion ?? 0),
+              latest.lockedFields.isEmpty else { return false }
+        return canMutateEntry(latest)
+    }
+
+    /// A review gesture adopts a freshly read CAS version, not its clinical
+    /// contents. The following Save remains a distinct, ordinary versioned PUT.
+    func confirmEditingEntryReconciliation() {
+        guard canConfirmEditingEntryReconciliation, let latest = editingEntryRemoteReview else { return }
+        editingEntryVersion = latest.version
+        editingEntryOriginalContent = latest.content
+        editingEntryOriginalAttachmentIds = Set(HomeBaseEntryAttachmentReferencesCodec.decode(latest.attachments))
+        editingEntryRequiresReconciliation = false
+        editingEntryRemoteReview = nil
+        statusMessage = "Confronto confermato. Bozza conservata: Salva modifiche invia la tua versione."
+    }
+
     func updateEditingEntry() async {
         guard canUpdateEditingEntry else { return }
         guard let patientId = selectedPatient?.id,
@@ -1807,22 +2435,27 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             errorMessage = "Apri prima un paziente con sessione paired online."
             return
         }
-        let title = editEntryTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        let submitted = editedDiarySnapshot
+        let editorID = editingEntryDraftID
+        let scope = ambulatoryId.trimmedOrNil
+        let title = submitted.title.trimmingCharacters(in: .whitespacesAndNewlines)
         // Non-negotiable (D11): re-derive content from the transcoder's render
         // of the editor model, compared against the ORIGINAL decrypted HTML to
         // decide whether it actually changed (omit = untouched field).
-        let renderedContent = editEntryEditorDocument.renderedHTML
+        let renderedContent = submitted.document.renderedHTML
         let content = renderedContent == editingEntryOriginalContent ? nil : renderedContent
-        let type = editEntryType.rawValue
+        let type = submitted.type.rawValue
         // Only touch the sealed attachments field when the operator actually
         // changed the selection in this session (see
         // editingEntryOriginalAttachmentIds above): otherwise omit it so the
         // update never depends on model.attachments having been loaded.
-        let attachmentIdsChanged = editEntryAttachmentIds != (editingEntryOriginalAttachmentIds ?? [])
-        let attachmentIds = Array(editEntryAttachmentIds)
+        let attachmentIdsChanged = submitted.attachmentIDs != (editingEntryOriginalAttachmentIds ?? [])
+        let attachmentIds = Array(submitted.attachmentIDs)
         let patientAttachmentIds = Set(self.attachments.map(\.id))
         let attachmentCacheMatchesPatient = attachmentsPatientId == patientId
-        await runTask {
+        var isCurrent: () -> Bool = { false }
+        await runTask({
+            isCurrent = self.diaryWriteCurrentness(patientID: patientId, cookie: sessionCookie, credentials: credentials)
             let attachmentReferences: HomeBaseSealedEntryAttachmentReferences?
             if attachmentIdsChanged {
                 guard let masterKey = self.masterKey else { throw PairedCryptoError.keyUnavailable }
@@ -1837,30 +2470,57 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             } else {
                 attachmentReferences = nil
             }
-            let acknowledgement = try await self.makeClient().updateEntry(
-                patientId: patientId,
-                entryId: entryId,
-                payload: HomeBaseEntryUpdatePayload(
-                    version: version,
-                    type: type,
-                    title: try self.sealField(title),
-                    content: content == nil ? nil : try self.sealField(content),
-                    attachmentReferences: attachmentReferences
-                ),
-                credentials: credentials,
-                sessionCookie: sessionCookie,
-                ambulatoryId: self.ambulatoryId.trimmedOrNil
-            )
+            let acknowledgement: HomeBaseMutationAcknowledgement
+            do {
+                acknowledgement = try await self.makeClient().updateEntry(
+                    patientId: patientId,
+                    entryId: entryId,
+                    payload: HomeBaseEntryUpdatePayload(
+                        version: version,
+                        type: type,
+                        title: try self.sealField(title),
+                        content: content == nil ? nil : try self.sealField(content),
+                        attachmentReferences: attachmentReferences
+                    ),
+                    credentials: credentials,
+                    sessionCookie: sessionCookie,
+                    ambulatoryId: scope
+                )
+            } catch {
+                if isCurrent(), self.editingEntryDraftID == editorID {
+                    if case HomeBaseClientError.versionConflict = error {
+                        self.requireEditingEntryReconciliation()
+                    } else if case HomeBaseClientError.httpStatus(409, _) = error {
+                        self.requireEditingEntryReconciliation()
+                    }
+                }
+                throw error
+            }
+            guard isCurrent(), self.editingEntryDraftID == editorID else { return }
             guard acknowledgement.success else { throw HomeBaseClientError.contract }
-            self.cancelEditingEntry()
-            self.entries = try await self.fetchDecryptedEntries(
-                patientId: patientId,
-                credentials: credentials,
-                sessionCookie: sessionCookie,
-                ambulatoryId: self.ambulatoryId.trimmedOrNil
-            )
-            self.statusMessage = "Voce diario aggiornata sull'home-base."
-        }
+            let unchanged = self.editedDiarySnapshot == submitted
+            if unchanged {
+                self.cancelEditingEntry()
+            } else {
+                // The ACK has no version. Never guess version+1 or automatically
+                // rebase changes typed after the submitted snapshot.
+                self.requireEditingEntryReconciliation()
+            }
+            self.statusMessage = unchanged ? "Voce diario aggiornata sull'home-base."
+                : "Voce aggiornata. Le modifiche successive sono ancora nella bozza: confrontale prima di salvare."
+            do {
+                let entries = try await self.fetchDecryptedEntries(
+                    patientId: patientId, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: scope
+                )
+                guard isCurrent() else { return }
+                self.entries = entries
+                if self.editingEntryDraftID == editorID { self.prepareEditingEntryReview(from: entries) }
+            } catch {
+                guard isCurrent() else { return }
+                if case HomeBaseClientError.httpStatus(401, _) = error { throw error } // @Codex
+                self.errorMessage = "Voce aggiornata, ma rilettura diario non riuscita: \(error.localizedDescription)"
+            }
+        }, canApplyFailure: { isCurrent() })
     }
 
     /* @Codex */
@@ -2840,13 +3500,18 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
               let patient = selectedPatient,
               let sessionCookie,
               let credentials = pairedCredentials else { return }
+        let scope = ambulatoryId.trimmedOrNil // @Codex
         await runTask {
+            let validate = self.patientReadValidator(patientId: patient.id, credentials: credentials,
+                sessionCookie: sessionCookie, ambulatoryId: scope)
+            try validate()
             let validation = try await self.makeClient().fetchFseValidatePatient(
                 patientId: patient.id,
                 credentials: credentials,
                 sessionCookie: sessionCookie,
-                ambulatoryId: self.ambulatoryId.trimmedOrNil
+                ambulatoryId: scope
             )
+            try validate() // @Codex
             let errorCount = validation.totalErrorCount
             let warningCount = validation.totalWarningCount
             if validation.hasErrors {
@@ -2955,6 +3620,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         newCheckupNotes = "\(suggestion.excerpt)\nSuggerito da \(suggestion.citation.fileName)"
         newCheckupStatus = .pending
         newCheckupSource = "ai_suggestion"
+        activePatientSection = .clinical // @Codex: reveal the existing form without submitting it.
         statusMessage = "Controllo precompilato dal follow-up: rivedi e salva per confermare."
     }
 
@@ -2967,7 +3633,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     }
 
     /* @Codex */
-    func loadSelectedPatientAttachments() async {
+    func loadSelectedPatientAttachments(reportStatus: Bool = true) async {
         #if DEBUG
         // The deterministic demo has no document binary fixtures. Keep the
         // selected patient bound to an explicit empty attachment set instead
@@ -2976,33 +3642,73 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             guard let patientId = selectedPatient?.id else { return }
             attachments = []
             attachmentsPatientId = patientId
+            attachmentsLoadState = .loaded // @Codex
             selectedAttachmentDetail = nil
             attachmentShareURL = nil
             errorMessage = nil
-            statusMessage = "Nessun documento caricato per questo paziente."
+            if reportStatus { statusMessage = "Nessun documento caricato per questo paziente." }
             return
         }
         #endif
         guard let patientId = selectedPatient?.id, let sessionCookie, let credentials = pairedCredentials else {
             errorMessage = "Apri prima un paziente con sessione paired online."
+            attachmentsLoadState = .unavailable("Documenti non ancora letti: apri una sessione paired online.") // @Codex
             return
         }
-        await runTask {
-            let fetchedAttachments = try await self.fetchDecryptedAttachments(
-                patientId: patientId,
-                credentials: credentials,
-                sessionCookie: sessionCookie,
-                ambulatoryId: self.ambulatoryId.trimmedOrNil
-            )
-            guard self.selectedPatient?.id == patientId else { return }
-            self.attachments = fetchedAttachments
-            self.attachmentsPatientId = patientId
-            self.selectedAttachmentDetail = nil
-            self.attachmentShareURL = nil
-            self.statusMessage = self.attachments.isEmpty
-                ? "Nessun documento caricato per questo paziente."
-                : "\(self.attachments.count) documenti caricati."
+        // @Codex: Diary, Documents and the workspace can request the same list.
+        // Coalesce only an in-flight read; explicit refresh still refetches.
+        guard attachmentsLoadingPatientID != patientId || activeAttachmentsLoadID == nil else { return }
+        let requestID = UUID()
+        // This read must survive runTask's own exclusive-operation generation.
+        // The request identity is invalidated on patient changes, including A → B → A.
+        let scope = ambulatoryId.trimmedOrNil
+        let requestedServerURL = serverURL
+        let requestedTLSPin = tlsPin
+        activeAttachmentsLoadID = requestID
+        attachmentsLoadingPatientID = patientId
+        attachmentsLoadState = .loading
+        let isCurrent = {
+            self.activeAttachmentsLoadID == requestID
+                && self.selectedPatient?.id == patientId
+                && self.pairedCredentials == credentials
+                && self.sessionCookie == sessionCookie
+                && self.ambulatoryId.trimmedOrNil == scope
+                && self.serverURL == requestedServerURL
+                && self.tlsPin == requestedTLSPin
         }
+        defer {
+            if activeAttachmentsLoadID == requestID {
+                activeAttachmentsLoadID = nil
+                attachmentsLoadingPatientID = nil
+                if attachmentsLoadState == .loading {
+                    attachmentsLoadState = .unavailable("Contesto cambiato: ricarica i documenti.")
+                }
+            }
+        }
+        await runTask({
+            do {
+                let fetchedAttachments = try await self.fetchDecryptedAttachments(
+                    patientId: patientId,
+                    credentials: credentials,
+                    sessionCookie: sessionCookie,
+                    ambulatoryId: scope
+                )
+                guard isCurrent() else { return }
+                self.attachments = fetchedAttachments
+                self.attachmentsPatientId = patientId
+                self.attachmentsLoadState = .loaded
+                self.selectedAttachmentDetail = nil
+                self.attachmentShareURL = nil
+                if reportStatus {
+                    self.statusMessage = self.attachments.isEmpty
+                        ? "Nessun documento caricato per questo paziente."
+                        : "\(self.attachments.count) documenti caricati."
+                }
+            } catch {
+                if isCurrent() { self.attachmentsLoadState = .failed(error.localizedDescription) }
+                throw error
+            }
+        }, canApplyFailure: isCurrent)
     }
 
     /// On-demand detail fetch (D1: the list route never returns `data`). Preview
@@ -3012,14 +3718,19 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         guard let patientId = selectedPatient?.id, let sessionCookie, let credentials = pairedCredentials else { return }
         guard summary.patientId == patientId else { return }
         attachmentShareURL = nil
+        let scope = ambulatoryId.trimmedOrNil // @Codex
         await runTask {
+            let validate = self.patientReadValidator(patientId: patientId, credentials: credentials,
+                sessionCookie: sessionCookie, ambulatoryId: scope)
+            try validate()
             let detail = try await self.makeClient().fetchAttachment(
                 patientId: patientId,
                 attachmentId: summary.id,
                 credentials: credentials,
                 sessionCookie: sessionCookie,
-                ambulatoryId: self.ambulatoryId.trimmedOrNil
+                ambulatoryId: scope
             )
+            try validate() // @Codex
             guard self.selectedPatient?.id == patientId else { return }
             self.selectedAttachmentDetail = ClinicalFieldCrypto.decryptAttachmentDetail(detail, masterKey: self.masterKey)
         }
@@ -3124,6 +3835,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             guard self.selectedPatient?.id == patientId else { return }
             self.attachments = fetchedAttachments
             self.attachmentsPatientId = patientId
+            self.attachmentsLoadState = .loaded // @Codex
             self.statusMessage = "Documento caricato: in coda per elaborazione sull'home-base."
         }
     }
@@ -3131,6 +3843,10 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     private func invalidateAttachmentPatientState() {
         attachments = []
         attachmentsPatientId = nil
+        // @Codex
+        activeAttachmentsLoadID = nil
+        attachmentsLoadingPatientID = nil
+        attachmentsLoadState = .idle
         newEntryAttachmentIds = []
         editEntryAttachmentIds = []
         editingEntryOriginalAttachmentIds = nil
@@ -3158,8 +3874,12 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     private func fetchDecryptedAttachments(
         patientId: String, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
     ) async throws -> [HomeBaseAttachmentSummary] {
-        try await makeClient().fetchAttachments(patientId: patientId, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
-            .map { ClinicalFieldCrypto.decryptAttachment($0, masterKey: masterKey) }
+        let validate = patientReadValidator(patientId: patientId, credentials: credentials,
+            sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        try validate()
+        let rows = try await makeClient().fetchAttachments(patientId: patientId, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        try validate()
+        return rows.map { ClinicalFieldCrypto.decryptAttachment($0, masterKey: masterKey) }
     }
 
     /// D15: single-record FSE validation for an already-loaded therapy or
@@ -3200,17 +3920,22 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     }
 
     private func validateFseDocument(profile: PairedFseDocumentValidationProfile, label: String, document: HomeBaseJSONValue) async {
-        guard let sessionCookie, let credentials = pairedCredentials, connectionState == .pairedOnline else {
+        guard let patientId = selectedPatient?.id, let sessionCookie, let credentials = pairedCredentials, connectionState == .pairedOnline else {
             errorMessage = "Apri prima un paziente con sessione paired online."
             return
         }
+        let scope = ambulatoryId.trimmedOrNil // @Codex
         await runTask {
+            let validate = self.patientReadValidator(patientId: patientId, credentials: credentials,
+                sessionCookie: sessionCookie, ambulatoryId: scope)
+            try validate()
             let response = try await self.makeClient().validateFseDocument(
                 payload: HomeBaseFseDocumentValidationPayload(profile: profile.rawValue, document: document),
                 credentials: credentials,
                 sessionCookie: sessionCookie,
-                ambulatoryId: self.ambulatoryId.trimmedOrNil
+                ambulatoryId: scope
             )
+            try validate() // @Codex
             self.fseDocumentValidationResult = response
             self.fseDocumentValidationTargetLabel = label
             self.statusMessage = response.ok
@@ -3303,34 +4028,50 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
 
     /* @Codex */
     private func beginLoginGeneration() -> UInt {
-        loginGeneration &+= 1
+        invalidateLoginGeneration() // @Codex
         return loginGeneration
     }
 
     /* @Codex */
     private func invalidateLoginGeneration() {
         loginGeneration &+= 1
+        clinicalSessionInvalidations.send() // @Codex: clear retained cross-patient models synchronously.
     }
 
     /* @Codex */
     private func invalidateLoginIfChanged(_ oldValue: String, _ newValue: String) {
         guard oldValue != newValue else { return }
+        discardCachedPatientPresentation() // @Codex
         invalidateLoginGeneration()
     }
 
     /* @Codex */
+    // @Codex: subscribers discard clinical projections on every context transition,
+    // including A -> B -> A in one actor turn. No patient payload travels here.
+    var clinicalWorkspaceInvalidations: AnyPublisher<Void, Never> {
+        Publishers.Merge3(
+            clinicalSessionInvalidations.eraseToAnyPublisher(),
+            $connectionState.removeDuplicates().dropFirst().map { _ in () }.eraseToAnyPublisher(),
+            $ambulatoryId.map { $0.trimmedOrNil }.removeDuplicates().dropFirst().map { _ in () }.eraseToAnyPublisher()
+        ).eraseToAnyPublisher()
+    }
+
     var clinicalWorkspaceConnection: ClinicalWorkspaceConnection? {
-        guard connectionState == .pairedOnline,
-              let sessionCookie,
-              let credentials = pairedCredentials else {
-            return nil
-        }
+        guard connectionState == .pairedOnline else { return nil }
+        return nativeOperatorConnection
+    }
+
+    // @Codex: host configuration requires native login, not a patient-list read.
+    // This carries transport identity only; ADR0135 authority is checked by the host.
+    var nativeOperatorConnection: ClinicalWorkspaceConnection? {
+        guard let sessionCookie, let credentials = pairedCredentials else { return nil }
         return ClinicalWorkspaceConnection(
             dataSource: makeClient(),
             credentials: credentials,
             sessionCookie: sessionCookie,
             ambulatoryId: ambulatoryId.trimmedOrNil,
-            masterKey: masterKey
+            masterKey: masterKey,
+            serverURL: serverURL, tlsPin: tlsPin, sessionGeneration: loginGeneration
         )
     }
 
@@ -3748,32 +4489,43 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     }
 
     /* @Codex */
-    private func fetchPatientWorkspace(_ context: PatientLoadContext) async throws -> PatientWorkspacePayload {
+    private func fetchPatientWorkspace(
+        _ context: PatientLoadContext, isCurrent: () -> Bool = { true }
+    ) async throws -> PatientWorkspacePayload {
         let client = context.client
         let credentials = context.credentials
         let cookie = context.sessionCookie
         let scope = context.ambulatoryID
         guard let patientID = context.patientID else { throw HomeBaseClientError.contract }
+        guard isCurrent() else { throw CancellationError() } // @Codex
         let detail = try await client.fetchPatient(
             id: patientID, credentials: credentials, sessionCookie: cookie, ambulatoryId: scope)
+        guard isCurrent() else { throw CancellationError() } // @Codex
         let entries = try await client.fetchEntries(
             patientId: patientID, credentials: credentials, sessionCookie: cookie, ambulatoryId: scope)
             .map { ClinicalFieldCrypto.decryptEntry($0, masterKey: context.masterKey) }
+        guard isCurrent() else { throw CancellationError() } // @Codex
         let therapies = try await client.fetchTherapies(
             patientId: patientID, credentials: credentials, sessionCookie: cookie, ambulatoryId: scope)
             .map { ClinicalFieldCrypto.decryptTherapy($0, masterKey: context.masterKey) }
+        guard isCurrent() else { throw CancellationError() } // @Codex
         let checkups = try await client.fetchCheckups(
             patientId: patientID, credentials: credentials, sessionCookie: cookie, ambulatoryId: scope)
             .map { ClinicalFieldCrypto.decryptCheckup($0, masterKey: context.masterKey) }
+        guard isCurrent() else { throw CancellationError() } // @Codex
         let observations = try await client.fetchObservations(
             patientId: patientID, credentials: credentials, sessionCookie: cookie, ambulatoryId: scope)
             .map { ClinicalFieldCrypto.decryptObservation($0, masterKey: context.masterKey) }
+        guard isCurrent() else { throw CancellationError() } // @Codex
         let services = ServicePrescriptionFiltering.sorted(try await client.fetchServicePrescriptions(
             patientId: patientID, credentials: credentials, sessionCookie: cookie, ambulatoryId: scope))
+        guard isCurrent() else { throw CancellationError() } // @Codex
         let serviceItems = ServicePrescriptionFiltering.sortedItems(try await client.fetchServicePrescriptionItems(
             patientId: patientID, prescriptionId: nil, credentials: credentials, sessionCookie: cookie, ambulatoryId: scope))
+        guard isCurrent() else { throw CancellationError() } // @Codex
         let prosthetics = ProstheticPrescriptionFiltering.sorted(try await client.fetchProstheticPrescriptions(
             patientId: patientID, credentials: credentials, sessionCookie: cookie, ambulatoryId: scope))
+        guard isCurrent() else { throw CancellationError() } // @Codex
         return PatientWorkspacePayload(
             detail: detail, entries: entries, therapies: therapies, checkups: checkups,
             observations: observations, services: services, serviceItems: serviceItems,
@@ -3784,6 +4536,11 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     private func publishPatientWorkspace(
         _ payload: PatientWorkspacePayload, context: PatientLoadContext
     ) {
+        // @Codex: Only a current, fully completed read can refresh the bounded encrypted profile.
+        if let cacheContext = patientCacheContext, patientCacheStorageEnabled, !cacheReadsInvalidated {
+            do { try cacheStore.savePatientDetail(payload.detail, context: cacheContext) }
+            catch { errorMessage = "Profilo letto, ma cache locale non aggiornata: \(error.localizedDescription)" }
+        }
         setSelectedPatient(payload.detail, masterKey: context.masterKey)
         entries = payload.entries
         therapies = payload.therapies
@@ -3849,12 +4606,8 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     /* @Codex */
     private func applyPatientLoadFailure(_ error: Error) {
         if case HomeBaseClientError.httpStatus(let status, _) = error, status == 401 {
-            invalidatePatientLoadContext()
-            connectionState = .sessionExpired
-            sessionCookie = nil
-            masterKey = nil
-            operatorIdentity = nil
-            statusMessage = "Sessione operatore scaduta. Accedi di nuovo per scrivere sul Mac."
+            clearOperatorSessionPresentation() // @Codex
+            statusMessage = "Sessione operatore scaduta. Accedi di nuovo per continuare."
         } else if case HomeBaseClientError.httpStatus(let status, _) = error, status == 403 {
             statusMessage = "Operazione non autorizzata nello scope paired corrente."
         }
@@ -3868,48 +4621,95 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         return formatter.string(from: date)
     }
 
+    // @Codex: validate both before dispatch and after suspension. The epoch also
+    // rejects a scope/patient switch away and back to the same identifiers.
+    private func patientReadValidator(patientId: String, credentials: HomeBasePairedCredentials,
+                                      sessionCookie: String, ambulatoryId: String?) -> () throws -> Void {
+        let generation = loginGeneration
+        let readGeneration = workspaceGeneration
+        let server = serverURL
+        let pin = tlsPin
+        return {
+            guard !Task.isCancelled, self.loginGeneration == generation,
+                  self.workspaceGeneration == readGeneration,
+                  self.selectedPatient?.id == patientId, self.sessionCookie == sessionCookie,
+                  self.pairedCredentials == credentials, self.ambulatoryId.trimmedOrNil == ambulatoryId,
+                  self.serverURL == server, self.tlsPin == pin, self.connectionState == .pairedOnline else {
+                throw CancellationError()
+            }
+        }
+    }
+
     // Fetch + decrypt the clinical sub-resources so their encrypted fields display
     // as plaintext. Same signature as the client methods, so call sites swap the
     // client call for these verbatim.
     private func fetchDecryptedEntries(patientId: String, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?) async throws -> [HomeBaseEntrySummary] {
-        try await makeClient().fetchEntries(patientId: patientId, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
-            .map { ClinicalFieldCrypto.decryptEntry($0, masterKey: masterKey) }
+        let validate = patientReadValidator(patientId: patientId, credentials: credentials,
+            sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        try validate()
+        let rows = try await makeClient().fetchEntries(patientId: patientId, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        try validate()
+        return rows.map { ClinicalFieldCrypto.decryptEntry($0, masterKey: masterKey) }
     }
 
     private func fetchDecryptedTherapies(patientId: String, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?) async throws -> [HomeBaseTherapySummary] {
-        try await makeClient().fetchTherapies(patientId: patientId, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
-            .map { ClinicalFieldCrypto.decryptTherapy($0, masterKey: masterKey) }
+        let validate = patientReadValidator(patientId: patientId, credentials: credentials,
+            sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        try validate()
+        let rows = try await makeClient().fetchTherapies(patientId: patientId, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        try validate()
+        return rows.map { ClinicalFieldCrypto.decryptTherapy($0, masterKey: masterKey) }
     }
 
     private func fetchDecryptedCheckups(patientId: String, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?) async throws -> [HomeBaseCheckupSummary] {
-        try await makeClient().fetchCheckups(patientId: patientId, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
-            .map { ClinicalFieldCrypto.decryptCheckup($0, masterKey: masterKey) }
+        let validate = patientReadValidator(patientId: patientId, credentials: credentials,
+            sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        try validate()
+        let rows = try await makeClient().fetchCheckups(patientId: patientId, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        try validate()
+        return rows.map { ClinicalFieldCrypto.decryptCheckup($0, masterKey: masterKey) }
     }
 
     private func fetchDecryptedObservations(patientId: String, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?) async throws -> [HomeBaseObservationSummary] {
-        try await makeClient().fetchObservations(patientId: patientId, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
-            .map { ClinicalFieldCrypto.decryptObservation($0, masterKey: masterKey) }
+        let validate = patientReadValidator(patientId: patientId, credentials: credentials,
+            sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        try validate()
+        let rows = try await makeClient().fetchObservations(patientId: patientId, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        try validate()
+        return rows.map { ClinicalFieldCrypto.decryptObservation($0, masterKey: masterKey) }
     }
 
     /* @Codex */
     private func fetchServicePrescriptions(patientId: String, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?) async throws -> [HomeBaseServicePrescriptionSummary] {
+        let validate = patientReadValidator(patientId: patientId, credentials: credentials,
+            sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        try validate()
         let rows = try await makeClient().fetchServicePrescriptions(
             patientId: patientId, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        try validate()
         return ServicePrescriptionFiltering.sorted(rows)
     }
 
     /* @Codex */
     private func fetchServicePrescriptionItems(patientId: String, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?) async throws -> [HomeBaseServicePrescriptionItemSummary] {
+        let validate = patientReadValidator(patientId: patientId, credentials: credentials,
+            sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        try validate()
         let rows = try await makeClient().fetchServicePrescriptionItems(
             patientId: patientId, prescriptionId: nil,
             credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        try validate()
         return ServicePrescriptionFiltering.sortedItems(rows)
     }
 
     /* @Codex */
     private func fetchProstheticPrescriptions(patientId: String, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?) async throws -> [HomeBaseProstheticPrescriptionSummary] {
+        let validate = patientReadValidator(patientId: patientId, credentials: credentials,
+            sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        try validate()
         let rows = try await makeClient().fetchProstheticPrescriptions(
             patientId: patientId, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        try validate()
         return ProstheticPrescriptionFiltering.sorted(rows)
     }
 
@@ -4091,33 +4891,149 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         )
     }
 
-    @discardableResult
-    private func restoreCachedPatientList(markOffline: Bool = false) -> Bool {
+    /* @Codex */
+    private var patientCacheStorageEnabled: Bool {
         #if DEBUG
-        // The encrypted patient cache is a second Keychain item with its own
-        // authorization panel. A scratch session has nothing worth caching and no
-        // business reading a real one.
         if AppleFoundationDemoMode.skipsStoredPairing { return false }
         #endif
+        return !Self.localAuthorityEnabled
+    }
+
+    /* @Codex */
+    private var patientCacheContext: HomeBasePatientCacheContext? {
+        guard patientCacheStorageEnabled, masterKey != nil, let operatorIdentity,
+              let sessionCookie, let credentials = pairedCredentials else { return nil }
+        return HomeBasePatientCacheContext(serverURL: serverURL, ambulatoryId: ambulatoryId.trimmedOrNil,
+            tlsPin: tlsPin, credentials: credentials, operatorId: operatorIdentity.userId, sessionCookie: sessionCookie)
+    }
+
+    /* @Codex */
+    static func permitsCacheFallback(for error: Error) -> Bool {
+        switch error {
+        case HomeBaseClientError.transport(.unreachable), HomeBaseClientError.transport(.timeout): return true
+        default: return false
+        }
+    }
+
+    /* @Codex */
+    private func invalidateCacheAfterReadFailure(_ error: Error) {
+        if Self.permitsCacheFallback(for: error) {
+            discardCachedPatientPresentation()
+            clearSelectedPatientWorkspace()
+            patients = []
+            connectionState = .pairedOfflineDegraded
+            return
+        }
+        cacheReadsInvalidated = true
+        discardCachedPatientPresentation()
+        // Revocation, trust or contract failures must not revive an earlier grant on the next retry.
+        if patientCacheStorageEnabled { try? cacheStore.clear() }
+    }
+
+    /* @Codex */
+    private func discardCachedPatientPresentation() {
+        cacheExpiryTask?.cancel()
+        cacheExpiryTask = nil
+        if displayedCacheContext != nil {
+            patients = []
+            clearSelectedPatientWorkspace()
+        }
+        displayedCacheContext = nil
+        cacheMetadata = nil
+        cachedProfileMetadata = nil
+        cachedPatientProfile = nil
+    }
+
+    /* @Codex */
+    @discardableResult
+    private func restoreCachedPatientList(markOffline: Bool = false) -> Bool {
+        guard !cacheReadsInvalidated, let context = patientCacheContext else { return false }
         do {
-            guard let snapshot = try cacheStore.loadPatientList(
-                serverURL: serverURL,
-                ambulatoryId: ambulatoryId.trimmedOrNil
-            ) else {
-                return false
-            }
-            let selectionBeforeRefresh = selectedPatientID
-            patients = snapshot.patients
-            reconcilePatientSelection(selectionBeforeRefresh, in: patients)
+            guard let snapshot = try cacheStore.loadPatientList(context: context) else { return false }
+            let selection = selectedPatientID
+            clearSelectedPatientWorkspace()
+            displayedCacheContext = context
+            cacheMetadata = snapshot.metadata
+            patients = snapshot.patients.map { PatientFieldCrypto.decryptSummary($0, masterKey: masterKey) }
+            selectedPatientID = Self.reconciledPatientSelectionID(selection, in: patients)
             connectionState = markOffline ? .pairedOfflineDegraded : .cached
-            statusMessage = markOffline ? "\(snapshot.reviewLine) Home-base non raggiungibile." : snapshot.reviewLine
-            reconciliationLine = markOffline
-                ? "Offline degradato: sola consultazione locale. Nessuna scrittura mobile disponibile."
-                : "Snapshot locale pronto. Scritture online dopo accesso operatore."
+            statusMessage = markOffline ? "Home-base non raggiungibile. Copia locale in sola lettura." : "Copia locale in sola lettura."
+            reconciliationLine = snapshot.metadata.reviewLine
+            scheduleCacheExpiry()
             return true
         } catch {
             errorMessage = "Cache locale non leggibile: \(error.localizedDescription)"
             return false
+        }
+    }
+
+    /* @Codex */
+    private func restoreCachedPatientProfile(patientID: String) {
+        clearSelectedPatientWorkspace(preservingSelectionID: patientID)
+        errorMessage = nil
+        guard !cacheReadsInvalidated, let context = patientCacheContext, context == displayedCacheContext else {
+            discardCachedPatientPresentation()
+            return
+        }
+        do {
+            // Re-read TTL and membership on every selection; the displayed list is not a grant.
+            guard let list = try cacheStore.loadPatientList(context: context) else { return }
+            cacheMetadata = list.metadata
+            if list.metadata.isStale {
+                patients = []
+                selectedPatientID = nil
+                reconciliationLine = list.metadata.reviewLine
+                return
+            }
+            guard list.patients.contains(where: { $0.id == patientID }),
+                  let profile = try cacheStore.loadPatientDetail(patientID: patientID, context: context) else {
+                statusMessage = "Profilo non disponibile nella cache. Ricollega l’home-base per aprirlo."
+                return
+            }
+            cachedProfileMetadata = profile.metadata
+            if let raw = profile.patient {
+                let fields = [("Indirizzo", raw.address), ("Telefono", raw.phone), ("Caregiver", raw.caregiver),
+                    ("Diagnosi", raw.diagnoses), ("Esenzioni", raw.exemptions), ("Note", raw.notes)]
+                cachedProfileLockedFields = Set(fields.compactMap { label, value in
+                    PatientFieldCrypto.isLocked(value, masterKey: masterKey) ? label : nil
+                })
+            }
+            cachedPatientProfile = profile.patient.map { PatientFieldCrypto.decryptDetail($0, masterKey: masterKey) }
+            reconciliationLine = profile.metadata.reviewLine
+            statusMessage = profile.patient == nil
+                ? "Profilo locale scaduto. Ricollega l’home-base."
+                : "Profilo da cache, sola lettura. Le altre sezioni richiedono l’home-base collegato."
+            scheduleCacheExpiry()
+        } catch {
+            errorMessage = "Profilo locale non leggibile: \(error.localizedDescription)"
+        }
+    }
+
+    /* @Codex */
+    func refreshOfflineCacheIfNeeded() {
+        guard let displayedCacheContext else { return }
+        guard displayedCacheContext == patientCacheContext else {
+            discardCachedPatientPresentation()
+            return
+        }
+        let profileID = cachedPatientProfile?.id ?? selectedPatientID
+        guard restoreCachedPatientList(markOffline: connectionState == .pairedOfflineDegraded) else {
+            discardCachedPatientPresentation()
+            return
+        }
+        if let profileID, cacheMetadata?.isStale == false { restoreCachedPatientProfile(patientID: profileID) }
+    }
+
+    /* @Codex */
+    private func scheduleCacheExpiry() {
+        cacheExpiryTask?.cancel()
+        let expiries = [cacheMetadata, cachedProfileMetadata].compactMap { $0 }.filter { !$0.isStale }.map(\.expiresAt)
+        guard let expiry = expiries.min() else { return }
+        let delay = max(1, expiry.timeIntervalSinceNow)
+        cacheExpiryTask = Task { [weak self] in
+            do { try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000)) }
+            catch { return }
+            self?.refreshOfflineCacheIfNeeded()
         }
     }
 
@@ -4151,6 +5067,11 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
 
     /* @Codex */
     private func clearSelectedPatientWorkspace(preservingSelectionID: String? = nil) {
+        // @Codex: A refresh of the same chart keeps its section; a new context does not.
+        if selectedPatientID != preservingSelectionID { activePatientSection = .overview }
+        cachedPatientProfile = nil // @Codex
+        cachedProfileLockedFields = [] // @Codex
+        cachedProfileMetadata = nil // @Codex
         let needsDirectPatientStateInvalidation = selectedPatient == nil
         selectedPatient = nil
         selectedPatientID = preservingSelectionID
@@ -4179,21 +5100,21 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         canApplyFailure: @escaping () -> Bool = { true }
     ) async {
         let operationID = beginExclusiveOperation()
+        let generation = loginGeneration // @Codex
+        let readGeneration = workspaceGeneration // @Codex
         errorMessage = nil
         pendingConflict = nil
         defer { finishExclusiveOperation(operationID) }
         do {
             try await operation()
         } catch {
-            guard canApplyFailure() else { return }
+            // @Codex: old-session/scope failures cannot replace a lock or a new login.
+            guard !(error is CancellationError), loginGeneration == generation, workspaceGeneration == readGeneration,
+                  canApplyFailure() else { return }
             if case HomeBaseClientError.httpStatus(let status, _) = error,
                status == 401 {
-                invalidatePatientLoadContext()
-                connectionState = .sessionExpired
-                sessionCookie = nil
-                masterKey = nil
-                operatorIdentity = nil
-                statusMessage = "Sessione operatore scaduta. Accedi di nuovo per scrivere sul Mac."
+                applyPatientLoadFailure(error) // @Codex: reuse synchronous revocation and its error copy.
+                return
             } else if case HomeBaseClientError.httpStatus(let status, _) = error,
                       status == 403 {
                 statusMessage = "Operazione non autorizzata nello scope paired corrente."
@@ -4248,6 +5169,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         newTherapyHasEndDate = false
         newTherapyEndDate = Date()
         newTherapyDiagnosisCode = ""
+        markNavigationDatesClean(.therapy) // @Codex
         resetNewTherapyDrugCatalogSearch(clearAvailability: false)
     }
 
@@ -4258,6 +5180,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         newCheckupStatus = .pending
         newCheckupDate = Date()
         newCheckupSource = "manual"
+        markNavigationDatesClean(.checkup) // @Codex
     }
 
     /* @Codex */
@@ -4268,6 +5191,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         newObservationUnitCode = ""
         newObservationNotes = ""
         newObservationObservedAt = Date()
+        markNavigationDatesClean(.observation) // @Codex
         resetObservationTerminologySearch(target: .newCode)
         resetObservationTerminologySearch(target: .newUnit)
     }
@@ -4295,6 +5219,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         newServiceDocumentRefs = ""
         newServiceNotes = ""
         newServiceItemsText = ""
+        markNavigationDatesClean(.service) // @Codex
     }
 
     /* @Codex */
@@ -4314,6 +5239,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         newProstheticSource = .manual
         newProstheticDocumentRefs = ""
         newProstheticNotes = ""
+        markNavigationDatesClean(.prosthetic) // @Codex
     }
 
     /* @Codex */
@@ -4364,6 +5290,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     var canUpdateEditingEntry: Bool {
         editingEntryId != nil
             && editingEntryVersion != nil
+            && !editingEntryRequiresReconciliation // @Codex
             && selectedPatient != nil
             && sessionCookie != nil
             && pairedCredentials != nil

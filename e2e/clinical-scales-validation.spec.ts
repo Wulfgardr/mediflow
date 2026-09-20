@@ -25,17 +25,39 @@ test('Untouched/partial scales do not write; explicit zero and complete POMA-28 
     const form = page.locator('#scala');
     await expect(form.getByRole('button', { name: 'Avanti', exact: true })).toBeDisabled();
     expect(writes).toBe(0);
+    // @Codex: button cancellation must preserve a partial draft until the explicit leave decision.
+    const firstAnswer = form.getByRole('radio', { name: /^0\./ });
+    await firstAnswer.click();
+    await form.getByLabel('Contesto').selectOption('home');
+    await form.getByRole('button', { name: 'Annulla', exact: true }).click();
+    const leaveDialog = page.getByRole('dialog', { name: 'Lasciare la compilazione?', exact: true });
+    await expect(leaveDialog).toBeVisible();
+    await expect(page.getByRole('dialog')).toHaveCount(1);
+    await leaveDialog.getByRole('button', { name: 'Continua a scrivere', exact: true }).click();
+    await expect(firstAnswer).toBeChecked();
+    await expect(form.getByLabel('Contesto')).toHaveValue('home');
+    expect(writes).toBe(0);
+    await form.getByRole('button', { name: 'Annulla', exact: true }).click();
+    await leaveDialog.getByRole('button', { name: 'Esci senza salvare', exact: true }).click();
+    await expect(page).toHaveURL(new RegExp(`/patients/${patientId}/scales$`));
+    expect(writes).toBe(0);
+    await page.goto(`/patients/${patientId}/scales/adl`);
     for (let index = 0; index < 6; index++) {
         await expect(form.getByText(`Domanda ${index + 1} di 6`, { exact: true })).toBeVisible();
         const next = form.getByRole('button', { name: index === 5 ? 'Completa' : 'Avanti', exact: true });
         await expect(next).toBeDisabled();
         expect(writes).toBe(0);
-        await form.getByRole('button', { name: /^0\./ }).click();
+        await form.getByRole('radio', { name: /^0\./ }).click();
         await expect(next).toBeEnabled();
         await next.click();
     }
     await expect.poll(() => writes).toBe(1);
-    await expect(page).not.toHaveURL(/\/scales\/adl$/);
+    await expect(page).toHaveURL(new RegExp(`/patients/${patientId}/modules#scale$`));
+    // @Codex: A successful write must be independently readable in the patient chart.
+    const history = page.getByRole('feed', { name: 'Storico delle scale del paziente', exact: true });
+    await expect(history.getByRole('article')).toHaveCount(1);
+    await expect(history.getByRole('article').first()).toContainText('ADL (Indice di Katz)');
+    await expect(history.getByRole('article').first()).toContainText('Punteggio: 0');
 
     await page.goto(`/patients/${patientId}/scales/tinetti`);
     await expect(page.getByText(/Versione Tinetti precedente ritirata/)).toBeVisible();
@@ -49,9 +71,21 @@ test('Untouched/partial scales do not write; explicit zero and complete POMA-28 
         const next = form.getByRole('button', { name: index === 19 ? 'Completa' : 'Avanti', exact: true });
         await expect(next).toBeDisabled();
         expect(writes).toBe(1);
-        await form.getByRole('button', { name: new RegExp(`^${maxima[index]}\\.`) }).click();
+        await form.getByRole('radio', { name: new RegExp(`^${maxima[index]}\\.`) }).click();
         await next.click();
     }
     await expect.poll(() => writes).toBe(2);
-    await expect(page).not.toHaveURL(/\/scales\/tinetti-poma28-v1$/);
+    await expect(page).toHaveURL(new RegExp(`/patients/${patientId}/modules#scale$`));
+    await page.reload();
+    const records = history.getByRole('article');
+    await expect(records).toHaveCount(2);
+    // @Codex: same-day assessments can share a timestamp; verify identity, not tie order.
+    const poma = records.filter({ hasText: 'Tinetti POMA-28 (v1)' });
+    const adl = records.filter({ hasText: 'ADL (Indice di Katz)' });
+    await expect(poma).toHaveCount(1);
+    await expect(poma).toContainText('Punteggio: 28');
+    await expect(poma.getByTestId('scale-provenance-notice')).toContainText('NHS FPS 006 V1 (2012)');
+    await expect(adl).toHaveCount(1);
+    await expect(adl).toContainText('Punteggio: 0');
+    expect(writes).toBe(2);
 });

@@ -41,9 +41,8 @@ private struct MediFlowMacWindow: View {
 
     var body: some View {
         MediFlowMacRootView(snapshot: .live, scene: scene, appearance: appearance)
-            // Measured, not guessed: below ~1100pt the three panes (sections,
-            // worklist, chart) can no longer all be laid out and the chart
-            // starts to clip at the window edge.
+            // @Codex: Keep the existing supported floor while the new single
+            // sidebar layout is verified; wider windows give room to the chart.
             .frame(minWidth: 1100, minHeight: 680)
             .preferredColorScheme(appearance.theme.preferredColorScheme)
     }

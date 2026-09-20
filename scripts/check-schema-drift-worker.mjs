@@ -8,48 +8,15 @@
 // sqlite_master and compare the live tables / columns / indices against the
 // drizzle declarations in "@/lib/schema.ts". Drift => exit 1 with a diff.
 
-import fs from 'node:fs';
-import path from 'node:path';
 import Database from 'better-sqlite3';
 import { getTableConfig } from 'drizzle-orm/sqlite-core';
 
 import { resolveDataPath } from '@/lib/data-dir';
 import * as schema from '@/lib/schema';
 
-const ROOT_DIR = process.env.MEDIFLOW_SCHEMA_DRIFT_ROOT || process.cwd();
-
-// The REAL provisioning of a fresh MediFlow DB has two layers:
-//   1. the drizzle/*.sql migrations create the base (core) tables, and
-//   2. applySchemaGuards() in lib/db-server.ts then layers on additive columns,
-//      the newer tables it owns, and the secondary indices.
-// The guards alone never create the core tables, so a faithful bootstrap must
-// apply the SQL migrations first. We do that against the temp DB, then dynamically
-// import lib/db-server so its guards run on top (matching a real boot exactly).
-function applyBaseMigrations(dbPath) {
-    const migrationsDir = path.join(ROOT_DIR, 'drizzle');
-    const files = fs
-        .readdirSync(migrationsDir)
-        .filter((file) => file.endsWith('.sql'))
-        .sort((left, right) => left.localeCompare(right));
-    const db = new Database(dbPath);
-    db.pragma('foreign_keys = OFF');
-    try {
-        for (const fileName of files) {
-            const sqlText = fs
-                .readFileSync(path.join(migrationsDir, fileName), 'utf8')
-                .replace(/^-->\s+statement-breakpoint\s*$/gm, '');
-            if (sqlText.trim().length === 0) continue;
-            db.exec(sqlText);
-        }
-    } finally {
-        db.close();
-    }
-}
-
-applyBaseMigrations(resolveDataPath('medical.db'));
-
-// Importing db-server runs applySchemaGuards() against the temp DB (side effect),
-// layering the guard-owned tables, columns and indices on top of the base schema.
+// Importing db-server exercises the real brand-new database path: the empty
+// database receives its minimal base schema and then the runtime guards layer
+// on additive columns, guard-owned tables, constraints, and indices.
 const { hasCanonicalDurableReviewPatientLinkSchema, hasCanonicalHeadlessSoapActiveRoleAttestationSchema, hasCanonicalPhysicianReviewAttestationSchema } = await import('@/lib/db-server');
 
 function collectExpected() {
@@ -117,7 +84,7 @@ function main() {
     for (const [tableName, expectedCols] of expectedTables) {
         const liveCols = live.tables.get(tableName);
         if (!liveCols) {
-            problems.push(`MISSING TABLE: "${tableName}" is declared in lib/schema.ts but is absent from the bootstrapped runtime schema (drizzle migrations + guards).`);
+            problems.push(`MISSING TABLE: "${tableName}" is declared in lib/schema.ts but is absent from the fresh runtime bootstrap.`);
             continue;
         }
         for (const col of expectedCols) {
@@ -135,11 +102,11 @@ function main() {
     }
 
     if (problems.length > 0) {
-        console.error('[schema-drift] Drift detected between lib/schema.ts and the runtime bootstrap (drizzle migrations + applySchemaGuards in lib/db-server.ts):');
+        console.error('[schema-drift] Drift detected between lib/schema.ts and the fresh runtime bootstrap in lib/db-server.ts:');
         for (const problem of problems) {
             console.error(`  - ${problem}`);
         }
-        console.error('[schema-drift] Update the runtime bootstrap (drizzle/*.sql or applySchemaGuards) or lib/schema.ts so they agree.');
+        console.error('[schema-drift] Update the empty-database bootstrap, applySchemaGuards, or lib/schema.ts so they agree.');
         process.exit(1);
     }
 

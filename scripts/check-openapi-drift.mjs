@@ -6,6 +6,7 @@ import yaml from 'js-yaml';
 
 const ROOT = process.cwd();
 const SPEC_PATH = 'docs/openapi/mediflow-v1.yaml';
+const NATIVE_SPEC_PATH = 'docs/openapi/native-ordinary-v1.json';
 const POLICY_PATH = 'docs/openapi/contract-policy.json';
 const TYPES_PATH = 'lib/api/v1/types.ts';
 const ROUTE_ROOT = 'app/api/v1';
@@ -53,18 +54,41 @@ function extractMethods(source) {
     ));
 }
 
+function hasRecognizedApiV1AuthGuard(sourcePath, source) {
+    const hasLocalTokenGuard = source.includes('requireLocalApiToken(');
+    const hasPairedClientGuard = source.includes('authenticateNetworkPairedClient(')
+        || source.includes('requireNetworkCapabilityContext(')
+        || source.includes('requireNetworkWriteContext(')
+        || source.includes('requireNetworkDiscoveryAuth(');
+    // @Codex: ADR0135 delegates to one named native authority, not a Web adapter.
+    const nativeConfigurationRoutes = new Set([
+        'app/api/v1/network/ai/functions/route.ts',
+        'app/api/v1/network/ai/functions/preview/route.ts',
+    ]);
+    const hasNativeConfigurationGuard = nativeConfigurationRoutes.has(sourcePath)
+        && source.includes("import { nativeConfigurationHttp } from '@/lib/native-ai-configuration-production'")
+        && /return nativeConfigurationHttp\.(GET|POST|PREVIEW)\(request\)/u.test(source);
+    const nativeOperations = new Map([
+        ['prepare', 'POST'], ['project', 'POST,DELETE'], ['status', 'GET'], ['consent', 'POST'],
+        ['login/start', 'POST'], ['login/complete', 'POST'], ['models', 'POST'], ['generate', 'POST'], ['cancel', 'POST'],
+    ]);
+    const nativeOperation = [...nativeOperations].find(([operation]) =>
+        sourcePath === `app/api/v1/network/ai/chatgpt/ordinary/${operation}/route.ts`);
+    const hasNativeOrdinaryGuard = nativeOperation !== undefined
+        && source.includes("import { handleNativeOrdinaryHttp } from '@/lib/chatgpt-product/native-ordinary-http'")
+        && source.includes(`return handleNativeOrdinaryHttp(request, '${nativeOperation[0]}')`)
+        && extractMethods(source).join(',') === nativeOperation[1];
+    return hasLocalTokenGuard || hasPairedClientGuard || hasNativeConfigurationGuard || hasNativeOrdinaryGuard;
+}
+
 function buildCurrentRoutes() {
     const routes = new Map();
     const routeFiles = [];
     for (const filePath of walkRoutes(path.join(ROOT, ROUTE_ROOT))) {
         routeFiles.push(filePath);
         const source = fs.readFileSync(filePath, 'utf8');
-        const hasLocalTokenGuard = source.includes('requireLocalApiToken(');
-        const hasPairedClientGuard = source.includes('authenticateNetworkPairedClient(')
-            || source.includes('requireNetworkCapabilityContext(')
-            || source.includes('requireNetworkWriteContext(')
-            || source.includes('requireNetworkDiscoveryAuth(');
-        if (!hasLocalTokenGuard && !hasPairedClientGuard) {
+        const sourcePath = path.relative(ROOT, filePath).split(path.sep).join('/');
+        if (!hasRecognizedApiV1AuthGuard(sourcePath, source)) {
             throw new Error(
                 `${path.relative(ROOT, filePath)} is missing a recognized /api/v1 auth guard`
             );
@@ -452,10 +476,26 @@ function serializeOperations(operations) {
     return JSON.stringify([...operations.entries()].sort(([left], [right]) => left.localeCompare(right)));
 }
 
+// Additive namespace only. Conflicts or a supplement outside the named Mac lane fail closed.
+function mergeNativeSpec(main, native) {
+    if (!native) return main;
+    for (const key of Object.keys(native.paths ?? {})) {
+        if (!key.startsWith('/api/v1/network/ai/chatgpt/ordinary/') || main.paths?.[key]) throw new Error('Native OpenAPI namespace collision');
+    }
+    const components = { ...(main.components ?? {}) };
+    for (const [section, values] of Object.entries(native.components ?? {})) {
+        for (const name of Object.keys(values)) if (components[section]?.[name]) throw new Error('Native OpenAPI component collision');
+        components[section] = { ...(components[section] ?? {}), ...values };
+    }
+    return { ...main, paths: { ...(main.paths ?? {}), ...native.paths }, components };
+}
+
 function main() {
     const { baseRef } = parseArgs(process.argv.slice(2));
     const currentRoutes = buildCurrentRoutes();
-    const currentSpec = loadYamlFile(SPEC_PATH);
+    const currentMainSpec = loadYamlFile(SPEC_PATH);
+    const currentNativeSpec = JSON.parse(fs.readFileSync(path.join(ROOT, NATIVE_SPEC_PATH), 'utf8'));
+    const currentSpec = mergeNativeSpec(currentMainSpec, currentNativeSpec);
     const policy = JSON.parse(fs.readFileSync(path.join(ROOT, POLICY_PATH), 'utf8'));
     const documentedOperations = normalizeSpec(currentSpec);
     const { undocumented, overrides } = expandPolicy(policy);
@@ -481,7 +521,9 @@ function main() {
     }
 
     const baseRoutes = buildRefRoutes(baseRef);
-    const baseSpec = loadYamlFromRef(baseRef, SPEC_PATH);
+    const baseMainSpec = loadYamlFromRef(baseRef, SPEC_PATH);
+    const baseNativeSpec = loadYamlFromRef(baseRef, NATIVE_SPEC_PATH);
+    const baseSpec = baseMainSpec ? mergeNativeSpec(baseMainSpec, baseNativeSpec) : null;
     const changedFiles = collectChangedFiles(baseRef);
     const semanticSpecChanged = baseSpec
         ? serializeOperations(normalizeSpec(baseSpec)) !== serializeOperations(documentedOperations)
@@ -495,13 +537,16 @@ function main() {
 
     if (baseRoutes) {
         const routeInventoryChanged = JSON.stringify([...baseRoutes.keys()].sort()) !== JSON.stringify([...currentRoutes.routes.keys()].sort());
-        if (routeInventoryChanged && !changedFiles.has(SPEC_PATH) && !changedFiles.has(POLICY_PATH)) {
+        if (routeInventoryChanged && !changedFiles.has(SPEC_PATH) && !changedFiles.has(NATIVE_SPEC_PATH) && !changedFiles.has(POLICY_PATH)) {
             errors.push('Route inventory changed without updating the OpenAPI spec or contract policy');
         }
     }
 
     if (baseSpec && semanticSpecChanged) {
-        if ((baseSpec.info?.version ?? null) === (currentSpec.info?.version ?? null)) {
+        const mainChanged = serializeOperations(normalizeSpec(baseMainSpec)) !== serializeOperations(normalizeSpec(currentMainSpec));
+        const nativeChanged = !baseNativeSpec || serializeOperations(normalizeSpec(baseNativeSpec)) !== serializeOperations(normalizeSpec(currentNativeSpec));
+        if ((mainChanged && (baseMainSpec.info?.version ?? null) === (currentMainSpec.info?.version ?? null))
+            || (nativeChanged && baseNativeSpec && baseNativeSpec.info?.version === currentNativeSpec.info?.version)) {
             errors.push(`OpenAPI contract changed but info.version stayed at ${currentSpec.info?.version}`);
         }
 
@@ -558,6 +603,22 @@ const STR = { type: 'string' };
 
 function runSelfTest() {
     const cases = [
+        {
+            name: 'project native riconosce solo il wrapper autenticato con POST e DELETE',
+            run: () => hasRecognizedApiV1AuthGuard(
+                'app/api/v1/network/ai/chatgpt/ordinary/project/route.ts',
+                "import { handleNativeOrdinaryHttp } from '@/lib/chatgpt-product/native-ordinary-http';\nexport async function POST(request) { return handleNativeOrdinaryHttp(request, 'project'); }\nexport async function DELETE(request) { return handleNativeOrdinaryHttp(request, 'project'); }",
+            ),
+            expect: (recognized) => recognized === true,
+        },
+        {
+            name: 'project native senza wrapper autenticato resta rifiutato',
+            run: () => hasRecognizedApiV1AuthGuard(
+                'app/api/v1/network/ai/chatgpt/ordinary/project/route.ts',
+                "export async function POST(request) { return projectNativeOrdinary(request); }\nexport async function DELETE(request) { return cancelNativeOrdinaryProjection(request); }",
+            ),
+            expect: (recognized) => recognized === false,
+        },
         {
             name: 'campo di RISPOSTA nuovo e obbligatorio → breaking (la regressione WUL-542)',
             run: () => diffOf(

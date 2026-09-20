@@ -589,7 +589,7 @@ test('rejects alternate, unsafe, shadowed, and deferred logout audit writers', (
     assertLogoutMutationsRejected(mutations);
 });
 
-test('PIN guard accepts the final ordered retirement flow and rejects atomicity drift', () => {
+test('PIN guard accepts both canonical channels and rejects retirement/currentness drift', () => {
     const source = fs.readFileSync(path.join(process.cwd(), 'lib/security/pin-change-service.ts'), 'utf8');
     const config = {
         source,
@@ -602,8 +602,22 @@ test('PIN guard accepts the final ordered retirement flow and rejects atomicity 
         requirePinRetirementOrder: true,
     };
     assert.deepEqual(validateAuditWriterControlFlow(config), []);
-    const nativeCapability = 'const nativeRetirement = prepareNativeRetirement(user.id);';
-    const webCapability = 'const webRetirement = prepareWebRetirement(input.session);';
+    // @Codex: the post-CAS comment is explanatory, never the evidence of a commit.
+    assert.deepEqual(validateAuditWriterControlFlow({ ...config, source: source.replace(
+        '/* The credential CAS has committed: never abort its retirement fence. */',
+        '/* Retain the failed completion state. */',
+    ) }), []);
+    const nativeCapability = `const nativeRetirement = nativeSession
+        ? preparePairedNativePinRetirement(nativeSession)
+        : prepareNativeRetirement(user.id);`;
+    const webCapability = `const webRetirement = nativeSession
+        ? prepareNativeUserRetirement(nativeRetirement)
+        : prepareWebRetirement(input.session);`;
+    const nativeAdmission = "if (nativeSession && await readNativeSession(input.request) !== nativeSession) return { kind: 'unauthorized' };";
+    const nativeRevalidation = `if (nativeSession && await readNativeSession(input.request) !== nativeSession) {
+            abortPreparedRetirements();
+            return { kind: 'unauthorized' };
+        }`;
     const webCommit = `try {
         webRetirementOutcome = commitWebRetirement(webRetirement).outcome;
     } catch {
@@ -612,9 +626,20 @@ test('PIN guard accepts the final ordered retirement flow and rejects atomicity 
     const nativeCommit = `try {
         nativeRetirementOutcome = commitNativeRetirement(nativeRetirement).outcome;
     } catch {
-        try { abortNativeRetirement(nativeRetirement); } catch { /* fail-closed response below */ }
+        /* The credential CAS has committed: never abort its retirement fence. */
         nativeRetirementOutcome = 'failed';
     }`;
+    const completedGuard = `if (webRetirementOutcome !== 'completed' || nativeRetirementOutcome !== 'completed') {
+        return {
+            kind: 'failure',
+            status: 409,
+            code: PIN_CHANGE_AUTHORITY_RETIREMENT_UNCONFIRMED_CODE,
+            message: 'La rotazione delle credenziali non può essere confermata. Accedi di nuovo.',
+        };
+    }`;
+    const audit = source.slice(source.indexOf('try {\n        const context = auditContextFromSession'),
+        source.indexOf("\n\n    return { kind: 'success' };"));
+    assert.ok(audit.includes("eventType: 'settings.updated'"));
     const mutations = [
         ['old owner import', replaceOnce(
             source,
@@ -625,6 +650,47 @@ test('PIN guard accepts the final ordered retirement flow and rejects atomicity 
             source,
             'const prepareWebRetirement = dependencies.prepareWebSessionsForUserRetirement\n        ?? prepareUserRetirement;',
             'const prepareWebRetirement = () => null;',
+        )],
+        ['native prepare imported from a different owner', replaceOnce(
+            source,
+            '    preparePairedNativePinRetirement,',
+            '    prepareNativeLegacyUserRetirement as preparePairedNativePinRetirement,',
+        )],
+        ['native proof bridge imported from a different owner', replaceOnce(
+            source,
+            '    prepareNativeUserRetirement,',
+            '    prepareUserRetirement as prepareNativeUserRetirement,',
+        )],
+        ['native prepare shadowed locally', replaceOnce(
+            source, nativeCapability,
+            `const preparePairedNativePinRetirement = () => null;\n    ${nativeCapability}`,
+        )],
+        ['native resolver bypassed', replaceOnce(
+            source,
+            'const readNativeSession = dependencies.readPairedNativeSession ?? requirePairedNativeSession;',
+            'const readNativeSession = async () => nativeSession;',
+        )],
+        ['native channel disguised as Web', replaceOnce(
+            source,
+            "const nativeSession = input.session.authChannel === 'native' ? input.session : null;",
+            'const nativeSession = null;',
+        )],
+        ['native prepare loses exact session binding', replaceOnce(
+            source, 'preparePairedNativePinRetirement(nativeSession)', 'prepareNativeRetirement(user.id)',
+        )],
+        ['native Web bridge loses exact capability', replaceOnce(
+            source, 'prepareNativeUserRetirement(nativeRetirement)', 'prepareNativeUserRetirement(null)',
+        )],
+        ['Web prepare uses the native bridge', replaceOnce(
+            source, ': prepareWebRetirement(input.session);', ': prepareNativeUserRetirement(nativeRetirement);',
+        )],
+        ['native session not checked before prepare', replaceOnce(source, nativeAdmission, '')],
+        ['stale native admission reports success', replaceOnce(
+            source, nativeAdmission, nativeAdmission.replace("kind: 'unauthorized'", "kind: 'success'"),
+        )],
+        ['native session not rechecked before CAS', replaceOnce(source, nativeRevalidation, '')],
+        ['stale native session skips prepared aborts', replaceOnce(
+            source, nativeRevalidation, nativeRevalidation.replace('abortPreparedRetirements();', ''),
         )],
         ['capability order reversed', swapOnce(source, nativeCapability, webCapability)],
         ['native capability not aborted when Web prepare fails', replaceOnce(
@@ -677,6 +743,17 @@ test('PIN guard accepts the final ordered retirement flow and rejects atomicity 
             webCommit,
             nativeCommit,
         )],
+        ['audit before both completions', swapOnce(source, completedGuard, audit)],
+        ['native commit failure aborts a committed credential fence', replaceOnce(
+            source, nativeCommit, nativeCommit.replace("nativeRetirementOutcome = 'failed';",
+                "abortNativeRetirement(nativeRetirement);\n        nativeRetirementOutcome = 'failed';"),
+        )],
+        ['post-CAS tail aborts both fences', replaceOnce(
+            source, completedGuard, `abortPreparedRetirements();\n    ${completedGuard}`,
+        )],
+        ['post-CAS tail defers a Web abort', replaceOnce(
+            source, completedGuard, `queueMicrotask(() => abortWebRetirement(webRetirement));\n    ${completedGuard}`,
+        )],
         ['web completion not required', replaceOnce(
             source,
             "webRetirementOutcome !== 'completed' || nativeRetirementOutcome !== 'completed'",
@@ -691,6 +768,16 @@ test('PIN guard accepts the final ordered retirement flow and rejects atomicity 
             source,
             'nativeRetirementOutcome = commitNativeRetirement(nativeRetirement).outcome;',
             "nativeRetirementOutcome = 'completed';",
+        )],
+        ['comment impersonates a Web commit', replaceOnce(
+            source,
+            'webRetirementOutcome = commitWebRetirement(webRetirement).outcome;',
+            "/* webRetirementOutcome = commitWebRetirement(webRetirement).outcome; */\n        webRetirementOutcome = 'completed';",
+        )],
+        ['comment impersonates a native commit', replaceOnce(
+            source,
+            'nativeRetirementOutcome = commitNativeRetirement(nativeRetirement).outcome;',
+            "/* nativeRetirementOutcome = commitNativeRetirement(nativeRetirement).outcome; */\n        nativeRetirementOutcome = 'completed';",
         )],
     ];
     for (const [name, mutation] of mutations) {

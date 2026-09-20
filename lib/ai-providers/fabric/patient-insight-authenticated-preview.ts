@@ -1,5 +1,8 @@
 /* @Codex */
 import 'server-only';
+import { nativeOrdinaryHostSourcesAreCurrent, readNativeOrdinaryHostSource, type NativeOrdinaryHostSourceCapture } from '../../security/server-session-clinical-context-native-sources';
+import { getNativeOrdinaryApplicationContext } from '../../chatgpt-product/native-ordinary-composition';
+import { isOrdinaryFunctionSelected, bindOrdinaryApplicationContext } from '../../chatgpt-product/ordinary-flow';
 
 import { createHash } from 'node:crypto';
 import { NextResponse } from 'next/server';
@@ -75,31 +78,51 @@ export function createAuthenticatedPatientInsightPreviewService(sources: Sources
         if (!context) return fail('session_unavailable');
         return Object.freeze({
             async preview(value: unknown): Promise<PatientInsightHostCapabilityResult> {
-                const request = parsePatientInsightPreviewRequest(value); if (!request) return deny('input_invalid');
+                let request = parsePatientInsightPreviewRequest(value); if (!request) return deny('input_invalid');
+                let nativeSources: NativeOrdinaryHostSourceCapture | null = null;
+                let nativeSelection: ReturnType<SelectionOwner['issueSelection']> | null = null;
+                if (context.session.authChannel === 'native') {
+                    try {
+                        const native = getNativeOrdinaryApplicationContext();
+                        if (!native || native.owner !== context.owner || native.session !== context.session
+                            || native.request.functionId !== 'patient_insight' || !native.sources) return deny('source_stale');
+                        const captured = readNativeOrdinaryHostSource(native.sources, native.session, 'patient_insight');
+                        if (captured.functionId !== 'patient_insight' || digest(request) !== digest(captured.input)) return deny('input_invalid');
+                        // Even an internal native caller cannot substitute a projection: use the retained host value.
+                        request = captured.input; nativeSources = native.sources; nativeSelection = native.selection;
+                    } catch { return deny('source_stale'); }
+                }
+                const capturedRequest = request;
                 const verifiedAt = iso(sources.clock());
-                if (!verifiedAt || !freshCapture(request.capturedAt, verifiedAt)) return deny('source_stale');
+                if (!verifiedAt || !freshCapture(capturedRequest.capturedAt, verifiedAt)) return deny('source_stale');
                 let revision: number | null;
-                try { revision = sources.readPatientRevision(request.patientId); } catch { revision = null; }
-                if (revision !== request.patientRevision) return deny('source_stale');
-                const projection = createPatientInsightHostProjectionResolver().resolve(request.sources);
+                try { revision = sources.readPatientRevision(capturedRequest.patientId); } catch { revision = null; }
+                if (revision !== capturedRequest.patientRevision) return deny('source_stale');
+                const projection = createPatientInsightHostProjectionResolver().resolve(capturedRequest.sources);
                 if (!projection) return deny('projection_unavailable');
                 const projectionDigest = digest(projection); const refs = references(sources.entropy);
                 if (!refs) return deny('projection_unavailable');
                 let selection: ReturnType<SelectionOwner['issueSelection']>;
                 try {
-                    const expectedEpoch = context.owner.snapshotSelectionEpoch(context.session);
-                    selection = context.owner.issueSelection({ expectedEpoch, patientId: request.patientId, ambulatoryId: request.ambulatoryId });
+                    if (context.session.authChannel === 'native') {
+                        if (!nativeSelection) return deny('source_stale');
+                        selection = nativeSelection;
+                    } else {
+                        const expectedEpoch = context.owner.snapshotSelectionEpoch(context.session);
+                        selection = context.owner.issueSelection({ expectedEpoch, patientId: capturedRequest.patientId, ambulatoryId: capturedRequest.ambulatoryId });
+                    }
                 } catch { return deny('source_stale'); }
                 const live = (): boolean => {
                     try {
+                        if (nativeSources && !nativeOrdinaryHostSourcesAreCurrent(nativeSources)) return false;
                         const pair = context.owner.dereferenceSelection(context.session, dereferenceInput(selection));
-                        return pair.patientId === request.patientId && pair.ambulatoryId === request.ambulatoryId
-                            && sources.readPatientRevision(request.patientId) === request.patientRevision;
+                        return pair.patientId === capturedRequest.patientId && pair.ambulatoryId === capturedRequest.ambulatoryId
+                            && sources.readPatientRevision(capturedRequest.patientId) === capturedRequest.patientRevision;
                     } catch { return false; }
                 };
                 const currentness = Object.freeze({ verify: live });
                 const brokerCurrentness = (): PatientInsightBrokerCurrentness => Object.freeze({
-                    selectionEpoch: selection.selectionEpoch, revision: request.patientRevision, freshnessToken: projectionDigest,
+                    selectionEpoch: selection.selectionEpoch, revision: capturedRequest.patientRevision, freshnessToken: projectionDigest,
                     isRevoked: () => !live(),
                 });
                 let atomic: ReturnType<typeof createPatientInsightAtomicLease> | null = null;
@@ -112,14 +135,15 @@ export function createAuthenticatedPatientInsightPreviewService(sources: Sources
                             capability: 'patient_insight', receiptRef: refs.receipt },
                     });
                     const broker = createPatientInsightBroker(Object.freeze({ readCurrentness: brokerCurrentness,
-                        readSources: () => request.sources, boundary, clock: () => verifiedAt, entropy: sources.entropy as () => Uint8Array }));
+                        readSources: () => capturedRequest.sources, boundary, clock: () => verifiedAt, entropy: sources.entropy as () => Uint8Array }));
                     atomic = createPatientInsightAtomicLease(Object.freeze({ port: context.owner.mintPatientInsightLeaseCommitPort(context.session), broker }));
                     const handle = atomic.commit();
                     const hostProjection = consumePatientInsightProjection(broker, Object.freeze({ handle }));
+                    if (isOrdinaryFunctionSelected('patient_insight')) await bindOrdinaryApplicationContext('patient_insight', context.owner, context.session);
                     const capability = sources.createCapability(currentness);
-                    return await capability.preview(Object.freeze({ requestId: request.requestId, projection: hostProjection,
-                        currentness: Object.freeze({ selectionEpoch: selection.selectionEpoch, patientRevision: request.patientRevision,
-                            projectionDigest, capturedAt: request.capturedAt, verifiedAt }) }));
+                    return await capability.preview(Object.freeze({ requestId: capturedRequest.requestId, projection: hostProjection,
+                        currentness: Object.freeze({ selectionEpoch: selection.selectionEpoch, patientRevision: capturedRequest.patientRevision,
+                            projectionDigest, capturedAt: capturedRequest.capturedAt, verifiedAt }) }));
                 } catch { return deny(live() ? 'projection_unavailable' : 'source_stale'); }
                 finally { try { atomic?.dispose(); } catch { /* host authority already closed */ } }
             },

@@ -2240,7 +2240,7 @@ final class HomeBasePatientsClientTests: XCTestCase {
                 XCTAssertEqual(payload["encryptedMasterKey"] as? String, "v2:wrapped")
                 XCTAssertEqual(payload["salt"] as? String, "AAECAwQFBgcICQoLDA0ODw==")
                 return (response, Data(#"{"success":true,"message":"PIN aggiornato con successo."}"#.utf8))
-            case ("POST", "/api/auth/logout"):
+            case ("POST", "/api/auth/native/logout"):
                 XCTAssertEqual(request.value(forHTTPHeaderField: "Cookie"), self.cookie)
                 XCTAssertEqual(request.value(forHTTPHeaderField: "x-mediflow-paired-client-id"), "paired-client-1")
                 XCTAssertEqual(request.value(forHTTPHeaderField: "x-mediflow-paired-client-token"), "paired-token-1")
@@ -2419,7 +2419,7 @@ final class HomeBasePatientsClientTests: XCTestCase {
 
         XCTAssertEqual(requests, [
             "POST https://localhost:3443/api/auth/change-pin",
-            "POST https://localhost:3443/api/auth/logout",
+            "POST https://localhost:3443/api/auth/native/logout",
             "PUT https://localhost:3443/api/auth/profile",
             "POST https://localhost:3443/api/v1/network/ambulatories",
             "PUT https://localhost:3443/api/v1/network/ambulatories/amb-new",
@@ -2463,7 +2463,7 @@ final class HomeBasePatientsClientTests: XCTestCase {
 
     private func assertLogoutRequest(_ request: URLRequest) {
         XCTAssertEqual(request.httpMethod, "POST")
-        XCTAssertEqual(request.url?.absoluteString, "https://localhost:3443/api/auth/logout")
+        XCTAssertEqual(request.url?.absoluteString, "https://localhost:3443/api/auth/native/logout")
         XCTAssertEqual(request.value(forHTTPHeaderField: "X-MediFlow-Source-Surface"), "native")
         XCTAssertEqual(request.value(forHTTPHeaderField: "Cookie"), cookie)
         XCTAssertEqual(request.value(forHTTPHeaderField: "x-mediflow-paired-client-id"), "paired-client-1")
@@ -2472,6 +2472,134 @@ final class HomeBasePatientsClientTests: XCTestCase {
         XCTAssertNil(request.httpBody)
         XCTAssertNil(request.httpBodyStream)
     }
+
+    /* @Codex */
+    func testNativeConfigurationServicesUsePairedTransportAndExactCommand() async throws {
+        let ids = ["patient_insight", "smart_import", "document_synthesis", "treatment_reasoning"]
+        let object: [String: Any] = [
+            "schemaVersion": "mediflow.function-preferences.v1", "revision": "sha256_" + String(repeating: "a", count: 64),
+            "catalogRevision": "sha256_" + String(repeating: "b", count: 64), "check": "configuration_only", "apply": "denied",
+            "presets": ["host_defaults", "all_off"],
+            "functions": ids.map { ["id": $0, "enabled": false, "defaultModelOptionId": NSNull(), "defaultSource": "host_configuration", "bindingState": "unsupported", "options": []] as [String: Any] }
+        ]
+        let data = try JSONSerialization.data(withJSONObject: object)
+        let client = makeClient { request in
+            XCTAssertEqual(request.value(forHTTPHeaderField: "x-mediflow-paired-client-id"), "synthetic-mac")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "x-mediflow-paired-client-token"), "synthetic-token")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Cookie"), "mediflow_session=synthetic-native")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "X-MediFlow-Source-Surface"), "native")
+            XCTAssertNil(request.url?.query)
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+            if request.url?.path.hasSuffix("/preview") == true {
+                XCTAssertEqual(request.httpMethod, "POST")
+                let command = try self.requestObject(request)
+                XCTAssertTrue(command["defaultModelOptionId"] is NSNull)
+                XCTAssertNil(command["presetId"]); XCTAssertNil(command["provider"])
+                return (response, try JSONSerialization.data(withJSONObject: ["schemaVersion": "mediflow.function-preferences-preview.v1", "command": command, "proposed": object, "writesPerformed": 0]))
+            }
+            XCTAssertEqual(request.url?.path, "/api/v1/network/ai/functions")
+            return (response, data)
+        }
+        let credentials = HomeBasePairedCredentials(clientId: "synthetic-mac", clientToken: "synthetic-token")
+        let cookie = "mediflow_session=synthetic-native"
+        let snapshot = try await client.readNativeFunctionPreferences(credentials: credentials, sessionCookie: cookie)
+        let command = NativeAIFunctionCommand(snapshot: snapshot, functionId: "patient_insight", enabled: false, defaultModelOptionId: nil)
+        let preview = try await client.previewNativeFunctionPreferences(command, credentials: credentials, sessionCookie: cookie)
+        XCTAssertEqual(preview.command, command)
+        let applied = try await client.applyNativeFunctionPreferences(command, credentials: credentials, sessionCookie: cookie)
+        XCTAssertEqual(applied, snapshot)
+    }
+
+    #if os(macOS)
+    func testNativeOrdinaryPrepareKeepsPairedHeadersAndExactPassiveBody() async throws {
+        let input = NativeOrdinaryPreparation(functionId: .patientInsight, patientId: "synthetic-patient",
+            ambulatoryId: "synthetic-ambulatory", patientRevision: 1, input: .patientInsight)
+        let client = makeClient { request in
+            XCTAssertEqual(request.httpMethod, "POST")
+            XCTAssertEqual(request.url?.path, "/api/v1/network/ai/chatgpt/ordinary/prepare")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "x-mediflow-paired-client-id"), "synthetic-mac")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "x-mediflow-paired-client-token"), "synthetic-token")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Cookie"), "mediflow_session=synthetic-native; ambulatory_id=synthetic-ambulatory")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "X-MediFlow-Source-Surface"), "native")
+            let body = try self.requestObject(request)
+            XCTAssertEqual(Set(body.keys), Set(["functionId", "patientId", "ambulatoryId", "patientRevision", "input"]))
+            // @Codex: only the host selector crosses the native preparation ingress.
+            XCTAssertEqual(body["input"] as? [String: String], ["selector": "current_patient_insight"])
+            let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 202, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+            return (response, try JSONSerialization.data(withJSONObject: NativeOrdinaryTestFixtures.response(.patientInsight, "needs_consent")))
+        }
+        let response = try await client.prepareNativeOrdinary(input,
+            credentials: .init(clientId: "synthetic-mac", clientToken: "synthetic-token"), sessionCookie: "mediflow_session=synthetic-native")
+        try response.validate(function: .patientInsight)
+    }
+    func testNativeOrdinaryCommandsUseExactRoutesAndNeverCarryCapabilities() async throws {
+        for command in [NativeOrdinaryCommand.loginStart(attemptId: NativeOrdinaryTestFixtures.attempt),
+                        .generate(attemptId: NativeOrdinaryTestFixtures.attempt, optionId: NativeOrdinaryTestFixtures.option,
+                                  catalogRevision: NativeOrdinaryTestFixtures.revision), .cancel(attemptId: NativeOrdinaryTestFixtures.attempt)] {
+            let client = makeClient { request in
+                XCTAssertEqual(request.httpMethod, "POST")
+                XCTAssertEqual(request.url?.path, "/api/v1/network/ai/chatgpt/ordinary/" + command.path)
+                let body = try self.requestObject(request)
+                XCTAssertEqual(body["attemptId"] as? String, NativeOrdinaryTestFixtures.attempt)
+                XCTAssertNil(body["capability"]); XCTAssertNil(body["session"]); XCTAssertNil(body["provider"]); XCTAssertNil(body["apply"])
+                let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                return (response, try JSONSerialization.data(withJSONObject: NativeOrdinaryTestFixtures.response(.patientInsight, "closed")))
+            }
+            _ = try await client.commandNativeOrdinary(command, credentials: .init(clientId: "synthetic-mac", clientToken: "synthetic-token"),
+                sessionCookie: "mediflow_session=synthetic-native", ambulatoryId: "synthetic-ambulatory")
+        }
+        let client = makeClient { request in
+            XCTAssertEqual(request.httpMethod, "GET"); XCTAssertEqual(request.url?.path, "/api/v1/network/ai/chatgpt/ordinary/status")
+            XCTAssertNil(request.httpBody)
+            return (HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!,
+                Data(#"{"schema":"mediflow.chatgpt-ordinary-flow.v1","phase":"closed","cleanupConfirmed":true}"#.utf8))
+        }
+        _ = try await client.statusNativeOrdinary(credentials: .init(clientId: "synthetic-mac", clientToken: "synthetic-token"),
+            sessionCookie: "mediflow_session=synthetic-native", ambulatoryId: "synthetic-ambulatory")
+    }
+    func testNativeOrdinaryFailureKeepsOnlyAllowlistedCode() async throws {
+        let input = NativeOrdinaryPreparation(functionId: .patientInsight, patientId: "synthetic-patient",
+            ambulatoryId: "synthetic-ambulatory", patientRevision: 1, input: .patientInsight)
+        let client = makeClient { request in
+            let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 503, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+            return (response, Data(#"{"error":"host detail must not cross the boundary","code":"unqualified_boundary"}"#.utf8))
+        }
+        do {
+            _ = try await client.prepareNativeOrdinary(input, credentials: .init(clientId: "synthetic-mac", clientToken: "synthetic-token"), sessionCookie: "mediflow_session=synthetic-native")
+            XCTFail("expected bounded ordinary failure")
+        } catch let failure as NativeOrdinaryServerFailure {
+            XCTAssertEqual(failure, .init(status: 503, code: .unqualifiedBoundary))
+        }
+    }
+    func testNativeOrdinaryPreparationFailureKeepsOnlyNewAllowlistedCode() async throws {
+        let input = NativeOrdinaryPreparation(functionId: .patientInsight, patientId: "synthetic-patient",
+            ambulatoryId: "synthetic-ambulatory", patientRevision: 1, input: .patientInsight)
+        let client = makeClient { request in
+            let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 503, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+            return (response, Data(#"{"error":"host detail must not cross the boundary","code":"preparation_unavailable"}"#.utf8))
+        }
+        do {
+            _ = try await client.prepareNativeOrdinary(input, credentials: .init(clientId: "synthetic-mac", clientToken: "synthetic-token"), sessionCookie: "mediflow_session=synthetic-native")
+            XCTFail("expected bounded ordinary failure")
+        } catch let failure as NativeOrdinaryServerFailure {
+            XCTAssertEqual(failure, .init(status: 503, code: .preparationUnavailable))
+        }
+    }
+    func testNativeOrdinaryFailureRejectsUnknownCodeAndHostText() async throws {
+        let input = NativeOrdinaryPreparation(functionId: .patientInsight, patientId: "synthetic-patient",
+            ambulatoryId: "synthetic-ambulatory", patientRevision: 1, input: .patientInsight)
+        let client = makeClient { request in
+            let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 503, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+            return (response, Data(#"{"error":"host detail must not cross the boundary","code":"host_controlled_code"}"#.utf8))
+        }
+        do {
+            _ = try await client.prepareNativeOrdinary(input, credentials: .init(clientId: "synthetic-mac", clientToken: "synthetic-token"), sessionCookie: "mediflow_session=synthetic-native")
+            XCTFail("expected generic HTTP failure")
+        } catch let error as HomeBaseClientError {
+            XCTAssertEqual(error, .httpStatus(503, nil))
+        }
+    }
+    #endif
 
     private func makeClient(
         handler: @escaping (URLRequest) throws -> (HTTPURLResponse, Data)

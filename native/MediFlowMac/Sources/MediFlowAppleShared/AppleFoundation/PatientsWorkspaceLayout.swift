@@ -1,5 +1,37 @@
 import CoreGraphics
 
+/* @Codex */
+/// Patient-local navigation only. These values are not API routes or capability keys.
+enum PatientWorkspaceSection: String, CaseIterable, Identifiable {
+    case overview, diary, scales, therapies, clinical, prescriptions, documents
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .overview: "Scheda"
+        case .diary: "Diario clinico"
+        case .scales: "Scale cliniche"
+        case .therapies: "Terapie"
+        case .clinical: "Controlli e osservazioni"
+        case .prescriptions: "Prescrizioni"
+        case .documents: "Documenti"
+        }
+    }
+
+    var symbolName: String {
+        switch self {
+        case .overview: "person.text.rectangle"
+        case .diary: "list.bullet.clipboard"
+        case .scales: "list.clipboard"
+        case .therapies: "pills"
+        case .clinical: "heart.text.square"
+        case .prescriptions: "doc.text"
+        case .documents: "paperclip"
+        }
+    }
+}
+
 /// Layout rule for the patients workspace on iPhone and iPad.
 ///
 /// The arrangement is decided by the width the container actually offers, never
@@ -38,8 +70,14 @@ enum PatientsWorkspaceLayout {
     ///
     /// Accessibility text sizes always collapse to one column: two columns of
     /// accessibility-sized clinical text are two truncated columns.
-    static func usesSideBySide(containerWidth: CGFloat, isAccessibilitySize: Bool) -> Bool {
-        guard !isAccessibilitySize else { return false }
+    static func usesSideBySide(
+        containerWidth: CGFloat,
+        isAccessibilitySize: Bool,
+        isCompactHeight: Bool = false
+    ) -> Bool {
+        // @Codex: A wide, short viewport still needs one full clinical column.
+        // Size class describes available height here, never device identity.
+        guard !isAccessibilitySize, !isCompactHeight else { return false }
         guard containerWidth.isFinite, containerWidth > 0 else { return false }
         return detailWidth(forContainerWidth: containerWidth) >= minimumDetailWidth
     }

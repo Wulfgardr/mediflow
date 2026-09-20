@@ -1,0 +1,33 @@
+/* @Codex: compact Lume controls; 12px soft cards and 44px targets. */
+.panel { display:grid; gap:var(--lume-group-gap,16px); min-width:0; color:var(--lume-ink); }
+.grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr)); gap:12px; }
+.card { display:grid; align-content:start; gap:12px; min-width:0; border:1px solid var(--lume-border-color); border-radius:var(--lume-control-radius,12px); padding:var(--lume-group-gap,16px); background:var(--lume-surface-field); }
+.card h3,.card h4,.panel p { margin:0; }
+.card h3 { font-size:1rem; }
+.panel p,.card p { font-size:.875rem; line-height:1.5; overflow-wrap:anywhere; }
+.row { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; }
+.actions { display:flex; flex-wrap:wrap; gap:var(--lume-control-gap,8px); }
+.panel button,.picker button { min-height:var(--lume-control-height,44px); white-space:normal; }
+.panel label,.picker label { display:grid; gap:6px; min-width:0; font-size:.875rem; }
+.panel select,.picker select { width:100%; min-width:0; min-height:var(--lume-control-height,44px); border-radius:var(--lume-control-radius,12px); padding:8px 12px; background:var(--lume-surface-focal); color:var(--lume-ink); border:1px solid var(--lume-border-color); }
+.panel summary { min-height:var(--lume-control-height,44px); display:list-item; align-content:center; cursor:pointer; }
+.panel :is(button,select,summary):focus-visible,.picker :is(button,select):focus-visible { outline:2px solid var(--lume-accent); outline-offset:3px; }
+.hint { color:var(--lume-ink-muted); }
+.error { color:var(--lume-signal-critical); }
+.picker { display:grid; gap:var(--lume-control-gap,8px); min-width:0; max-width:100%; margin-block:12px; font-size:.8125rem; }
+.picker p { margin:0; overflow-wrap:anywhere; }
+.switch { min-width:80px; }
+
+/* @Codex: one compact selector; recovery is visible only when needed. */
+.pickerRow { display:flex; flex-wrap:wrap; align-items:center; gap:var(--lume-control-gap,8px); }
+.pickerRow select { flex:1 1 180px; max-width:100%; font-size:.8125rem; text-overflow:ellipsis; }
+.pickerDetails summary { min-height:var(--lume-control-height,44px); align-content:center; cursor:pointer; color:var(--lume-ink-muted); }
+.pickerDetailBody { display:grid; gap:8px; padding-bottom:8px; }
+.pickerDetails summary:focus-visible { outline:2px solid var(--lume-accent); outline-offset:3px; }
+
+.pickerDetails { flex:0 0 auto; }
+.pickerDetails[open] { flex:1 0 100%; }
+
+.pickerProvider { display:grid; gap:2px; font-size:.8125rem; color:var(--lume-ink-muted); white-space:nowrap; }
+
+.pickerProvider small { font-size:.6875rem; }

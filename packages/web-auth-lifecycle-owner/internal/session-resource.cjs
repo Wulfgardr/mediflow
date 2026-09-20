@@ -59,6 +59,40 @@ function weakDelete(map, value) {
     try { return reflectApply(weakMapDelete, map, [value]); } catch { return false; }
 }
 
+// Terminal records leave their intrusive lists immediately. No historical
+// head retains a released port, consumed use or removed registration.
+function forgetUse(state, record) {
+    const resource = record.owner;
+    if (record.previous) record.previous.next = record.next;
+    else if (resource?.useHead === record) resource.useHead = record.next;
+    if (record.next) record.next.previous = record.previous;
+    weakDelete(state.uses, record.use);
+    record.active = false;
+    record.previous = record.next = record.owner = record.cell = record.session = record.port = record.use = null;
+}
+
+function forgetRegistration(state, record) {
+    const resource = record.resource;
+    if (record.previous) record.previous.next = record.next;
+    else if (resource?.registrationHead === record) resource.registrationHead = record.next;
+    if (record.next) record.next.previous = record.previous;
+    weakDelete(state.registrations, record.registration);
+    record.active = false;
+    record.previous = record.next = record.resource = record.dispose = record.registration = null;
+}
+
+function forgetPort(state, record) {
+    while (record.useHead) forgetUse(state, record.useHead);
+    while (record.registrationHead) forgetRegistration(state, record.registrationHead);
+    if (record.previous) record.previous.next = record.next;
+    else if (record.cell?.resourcePortHead === record) record.cell.resourcePortHead = record.next;
+    if (record.next) record.next.previous = record.previous;
+    weakDelete(state.ports, record.port);
+    record.active = false;
+    record.revoked = true;
+    record.previous = record.next = record.cell = record.session = record.port = record.sessionId = null;
+}
+
 function resourceFor(state, port) {
     if (!trustedState(state)) return null;
     return weakGet(state.ports, port);
@@ -91,9 +125,6 @@ function createSessionResourceState() {
     state.uses = new WeakMap();
     state.registrations = new WeakMap();
     state.authenticationGenerations = new WeakMap();
-    state.portHead = null;
-    state.useHead = null;
-    state.registrationHead = null;
     state.cleanupComplete = new WeakMap();
     return state;
 }
@@ -151,10 +182,10 @@ function createResourcePort(state, cellState, cellPort, at) {
         || cell.session.authChannel !== 'web' || cell.session.expiresAt <= current) return null;
     const port = opaque();
     const record = { active: true, revoked: false, cell, session: cell.session,
-        sessionId: cell.sessionId, next: cell.resourcePortHead, useHead: null, registrationHead: null };
+        sessionId: cell.sessionId, port, previous: null, next: cell.resourcePortHead, useHead: null, registrationHead: null };
     if (!weakSet(state.ports, port, record)) return null;
+    if (record.next) record.next.previous = record;
     cell.resourcePortHead = record;
-    state.portHead = record;
     return port;
 }
 
@@ -165,11 +196,11 @@ function prepareResourceUse(state, port, at) {
     const record = resourceFor(state, port);
     if (current === null || !liveResource(record, current)) return null;
     const use = opaque();
-    const useRecord = { active: true, port, owner: record, cell: record.cell, session: record.session,
-        next: record.useHead };
+    const useRecord = { active: true, use, port, owner: record, cell: record.cell, session: record.session,
+        previous: null, next: record.useHead };
     if (!weakSet(state.uses, use, useRecord)) return null;
+    if (useRecord.next) useRecord.next.previous = useRecord;
     record.useHead = useRecord;
-    state.useHead = useRecord;
     return use;
 }
 
@@ -180,7 +211,7 @@ function consumeResourceUse(state, use, at) {
     const record = resourceUseFor(state, use);
     if (current === null || !record || !record.active || !liveResource(record.owner, current)
         || record.cell !== record.owner.cell) return false;
-    record.active = false;
+    forgetUse(state, record);
     return true;
 }
 
@@ -210,10 +241,10 @@ function registerResource(state, port, disposer, at) {
     if (current === null || !liveResource(resource, current)) return null;
     const registration = opaque();
     const record = { active: true, registration, resource, dispose: disposer,
-        next: resource.registrationHead };
+        previous: null, next: resource.registrationHead };
     if (!weakSet(state.registrations, registration, record)) return null;
+    if (record.next) record.next.previous = record;
     resource.registrationHead = record;
-    state.registrationHead = record;
     return registration;
 }
 
@@ -222,19 +253,7 @@ function releaseResourcePort(state, port) {
     if (!trustedState(state) || !isObjectLike(port) || isProxy(port)) return false;
     const resource = resourceFor(state, port);
     if (!resource || !resource.active) return false;
-    resource.active = false;
-    resource.revoked = true;
-    for (let use = resource.useHead; use; use = use.next) use.active = false;
-    let registration = resource.registrationHead;
-    resource.registrationHead = null;
-    while (registration) {
-        registration.active = false;
-        registration.dispose = null;
-        registration.resource = null;
-        weakDelete(state.registrations, registration.registration);
-        registration = registration.next;
-    }
-    weakDelete(state.ports, port);
+    forgetPort(state, resource);
     return true;
 }
 
@@ -245,10 +264,7 @@ function unregisterResource(state, port, registration) {
     const resource = resourceFor(state, port);
     const record = registrationFor(state, registration);
     if (!resource || !record || !record.active || record.resource !== resource) return false;
-    record.active = false;
-    record.dispose = null;
-    record.resource = null;
-    weakDelete(state.registrations, registration);
+    forgetRegistration(state, record);
     return true;
 }
 
@@ -268,11 +284,9 @@ function revokeCellResources(state, cell) {
     }
 }
 
-function disposeOne(record, reason) {
+function disposeOne(state, record, reason) {
     const dispose = record.dispose;
-    record.active = false;
-    record.dispose = null;
-    record.resource = null;
+    forgetRegistration(state, record);
     if (!dispose) return false;
     try {
         const outcome = reflectApply(dispose, undefined, [reason]);
@@ -294,24 +308,13 @@ function cleanupRetiredCellResources(state, cellState, cellOrPort, reason) {
     let failed = false;
     try {
         revokeCellResources(state, cell);
-        for (let resource = cell.resourcePortHead; resource; resource = resource.next) {
-            let registration = resource.registrationHead;
-            resource.registrationHead = null;
-            resource.useHead = null;
-            resource.active = false;
-            resource.revoked = true;
-            while (registration) {
-                const next = registration.next;
-                registration.next = null;
-                if (disposeOne(registration, reason)) failed = true;
-                weakDelete(state.registrations, registration.registration);
-                registration = next;
+        while (cell.resourcePortHead) {
+            const resource = cell.resourcePortHead;
+            while (resource.registrationHead) {
+                if (disposeOne(state, resource.registrationHead, reason)) failed = true;
             }
-            for (let use = resource.useHead; use; use = use.next) use.active = false;
-            resource.cell = null;
-            resource.session = null;
+            forgetPort(state, resource);
         }
-        cell.resourcePortHead = null;
         state.cleanupComplete.set(cell, failed ? 'failed' : 'completed');
         return objectFreeze({ outcome: failed ? 'failed' : 'completed' });
     } catch {

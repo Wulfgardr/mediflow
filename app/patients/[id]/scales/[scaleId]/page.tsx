@@ -8,10 +8,9 @@ import ScaleEngine from '@/components/scale-engine';
 import { SCALES } from '@/lib/scale-definitions';
 import { submitScale } from '@/lib/scale-submission';
 import { v4 as uuidv4 } from 'uuid';
-import { cn } from '@/lib/utils';
-import { Home, Building2, Activity, BookOpenCheck, Save } from 'lucide-react';
+import styles from '@/components/scales/scale-workspace.module.css';
 /* @Codex */
-import { Kree8WorkspaceShell, type Kree8WorkspaceNavItem } from '@/components/kree8/kree8-workspace-shell';
+import { Kree8WorkspaceShell } from '@/components/kree8/kree8-workspace-shell';
 import workspaceStyles from '@/components/kree8/kree8-workspace-shell.module.css';
 import { useToast } from '@/components/ui/toast-provider';
 
@@ -45,7 +44,8 @@ export default function ScaleRunnerPage() {
                 attachments: []
             }));
 
-            router.push(`/patients/${patientId}`);
+            // @Codex: Land on the independent reread of the saved evaluation.
+            router.push(`/patients/${patientId}/modules#scale`);
         } catch (error) {
             console.error("Failed to save scale", error);
             showToast({ tone: 'error', title: 'Errore nel salvataggio della valutazione', description: 'Il punteggio non è stato registrato. Riprova.' });
@@ -53,40 +53,35 @@ export default function ScaleRunnerPage() {
     };
 
     const handleCancel = () => {
-        router.back();
+        router.push(`/patients/${patientId}/scales`);
     };
-
-    const workspaceNavItems: Kree8WorkspaceNavItem[] = [
-        { href: '#scala', label: 'Scala', meta: scaleDef ? String(scaleDef.questions.length) : undefined },
-        { href: '#contesto', label: 'Contesto', meta: setting === 'home' ? 'domicilio' : 'ambulatorio' },
-        { href: '#salvataggio', label: 'Salvataggio' },
-    ];
 
     if (!scaleDef) {
         return (
-            <Kree8WorkspaceShell
+            <div className={styles.screen}><Kree8WorkspaceShell
                 eyebrow="Valutazioni"
                 title="Scala non disponibile"
-                subtitle={scaleId === 'tinetti'
-                    ? 'Versione Tinetti precedente ritirata. I risultati storici restano invariati; per una nuova valutazione scegliere POMA-28 v1.'
-                    : 'La scala richiesta non è presente nella libreria locale di MediFlow.'}
+                subtitle="Scegli una scala dalla libreria del paziente."
                 backHref={`/patients/${patientId}/scales`}
                 backLabel="Torna alle scale"
                 patientLabel={patient ? `${patient.lastName} ${patient.firstName}` : undefined}
                 statusLabel="Nessun dato è stato modificato."
                 navItems={[]}
             >
-                <div className={workspaceStyles.loadingCard}>
-                    Scegli una scala dalla libreria del paziente.
+                {/* @Codex: a retirement notice is clinical content, not optional header copy. */}
+                <div className={workspaceStyles.loadingCard} role="status">
+                    {scaleId === 'tinetti'
+                        ? 'Versione Tinetti precedente ritirata. I risultati storici restano invariati; per una nuova valutazione scegliere POMA-28 v1.'
+                        : 'La scala richiesta non è presente nella libreria locale di MediFlow.'}
                 </div>
-            </Kree8WorkspaceShell>
+            </Kree8WorkspaceShell></div>
         );
     }
 
     const patientLabel = patient ? `${patient.lastName} ${patient.firstName}` : undefined;
 
     return (
-        <Kree8WorkspaceShell
+        <div className={styles.screen}><Kree8WorkspaceShell
             eyebrow="Valutazione"
             title={scaleDef.title}
             subtitle="Compila la scala nel contesto della visita e salva il punteggio come voce del diario clinico."
@@ -94,90 +89,27 @@ export default function ScaleRunnerPage() {
             backLabel="Torna alle scale"
             patientLabel={patientLabel}
             statusLabel={patient ? 'Scrittura locale: il risultato resta nella cartella del paziente.' : 'Caricamento dati paziente...'}
-            navItems={workspaceNavItems}
+            navItems={[]}
         >
-            <div className={workspaceStyles.workspaceGrid}>
-                <section id="scala" className={workspaceStyles.primaryStack}>
-                    {!patient ? (
-                        <div className={workspaceStyles.loadingCard}>Caricamento paziente...</div>
-                    ) : (
-                        <ScaleEngine
-                            key={`${patientId}:${scaleDef.id}`}
-                            scale={scaleDef}
-                            onComplete={handleComplete}
-                            onCancel={handleCancel}
-                        />
-                    )}
-                </section>
-
-                <aside className={workspaceStyles.secondaryStack}>
-                    <section id="contesto" className="patient-detail-side-section border p-5">
-                        <p className="section-kicker">Contesto</p>
-                        <h3 className="mt-1 flex items-center gap-2 text-lg font-semibold text-[color:var(--lume-ink)]">
-                            <Activity className="h-5 w-5 text-[color:var(--lume-accent)]" />
-                            Dove viene somministrata
-                        </h3>
-
-                        <div className="mt-4 grid gap-3">
-                            <button
-                                type="button"
-                                onClick={() => setSetting('ambulatory')}
-                                className={cn(
-                                    'flex min-h-[54px] items-center justify-between gap-3 rounded-[16px] border px-4 text-sm font-semibold transition-[border-color,background-color,color]',
-                                    setting === 'ambulatory'
-                                        ? 'lume-focal border-[color:color-mix(in_srgb,var(--lume-ink)_24%,transparent)] bg-[color:var(--lume-surface-focal)] text-[color:var(--lume-ink)]'
-                                        : 'border-[color:rgba(112,106,100,0.14)] bg-white text-[color:var(--lume-ink-muted)] hover:border-[color:rgba(112,106,100,0.2)]'
-                                )}
-                            >
-                                <span className="inline-flex items-center gap-2">
-                                    <Building2 className="h-4 w-4" />
-                                    Ambulatorio
-                                </span>
-                                <span className="text-xs font-medium">studio</span>
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={() => setSetting('home')}
-                                className={cn(
-                                    'flex min-h-[54px] items-center justify-between gap-3 rounded-[16px] border px-4 text-sm font-semibold transition-[border-color,background-color,color]',
-                                    setting === 'home'
-                                        ? 'border-[color:rgba(182,106,60,0.24)] bg-[color:rgba(182,106,60,0.08)] text-[color:var(--lume-accent)] shadow-[0_12px_24px_rgba(182,106,60,0.08)]'
-                                        : 'border-[color:rgba(112,106,100,0.14)] bg-white text-[color:var(--lume-ink-muted)] hover:border-[color:rgba(112,106,100,0.2)]'
-                                )}
-                            >
-                                <span className="inline-flex items-center gap-2">
-                                    <Home className="h-4 w-4" />
-                                    Domicilio
-                                </span>
-                                <span className="text-xs font-medium">ADI</span>
-                            </button>
-                        </div>
-                    </section>
-
-                    <section id="salvataggio" className="patient-detail-side-section border p-5">
-                        <p className="section-kicker">Salvataggio</p>
-                        <h3 className="mt-1 flex items-center gap-2 text-lg font-semibold text-[color:var(--lume-ink)]">
-                            <Save className="h-5 w-5 text-[color:var(--lume-accent)]" />
-                            Voce diario automatica
-                        </h3>
-                        <p className="mt-3 text-sm leading-6 text-[color:var(--lume-ink-muted)]">
-                            Al completamento vengono salvati punteggio, interpretazione e risposte. Il risultato rientra nella timeline e nei report del paziente.
-                        </p>
-                    </section>
-
-                    <section className="patient-detail-side-section border p-5">
-                        <p className="section-kicker">Scala</p>
-                        <h3 className="mt-1 flex items-center gap-2 text-lg font-semibold text-[color:var(--lume-ink)]">
-                            <BookOpenCheck className="h-5 w-5 text-[color:var(--lume-accent)]" />
-                            {scaleDef.questions.length} domande
-                        </h3>
-                        <p className="mt-3 text-sm leading-6 text-[color:var(--lume-ink-muted)]">
-                            {scaleDef.description}
-                        </p>
-                    </section>
-                </aside>
-            </div>
-        </Kree8WorkspaceShell>
+            {/* @Codex WUL-678: context stays selectable without secondary panels. */}
+            <section id="scala" className={styles.workspace}>
+                <label className={styles.context}>
+                    Contesto
+                    <select value={setting} onChange={event => setSetting(event.target.value as 'ambulatory' | 'home')}>
+                        <option value="ambulatory">Ambulatorio</option>
+                        <option value="home">Domicilio</option>
+                    </select>
+                </label>
+                <details className={styles.details}>
+                    <summary>Informazioni sulla compilazione</summary>
+                    <p>{scaleDef.description}</p>
+                    <p>Con Completa salvi punteggio, interpretazione e risposte nel diario del paziente.</p>
+                </details>
+                {!patient ? <p role="status">Caricamento paziente…</p> : (
+                    <ScaleEngine key={`${patientId}:${scaleDef.id}`} scale={scaleDef} showHeading={false}
+                        onComplete={handleComplete} onCancel={handleCancel} />
+                )}
+            </section>
+        </Kree8WorkspaceShell></div>
     );
 }

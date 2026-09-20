@@ -21,6 +21,24 @@ consegnare registry e binding per ruolo, adapter locali alternativi, layer 2 di
 redazione, consenso e qualunque provider cloud. Il problema sotto conserva la
 fotografia precedente all'estrazione e non descrive lo stato runtime corrente.
 
+## Integrazione candidata 0.8.6: redazione locale
+
+Il runner GLiNER2-PII usa un artifact locale con revisione e digest fissati,
+versioni delle librerie verificate e caricamento offline, senza download o
+fallback automatici. Sul Mac il processo nasce con rete negata dal sandbox del
+sistema; errori di avvio, protocollo, timeout o annullamento invalidano il
+runner. Non si conservano testi o predizioni su disco. Una prova sui corpus
+sintetici qualifica quel runner e quei dati, non l'assenza universale di PII.
+
+La composizione mantiene Layer 1 obbligatorio, verifica gli offset neurali e
+produce pseudonimi coerenti nella sola sessione in RAM. La reidratazione di un
+risultato accede solo ai token della propria preparazione; la chiusura della
+sessione invalida anche i risultati precedenti. Questi moduli non rilasciano
+consenso o autorita di egress: il report di benchmark, il percorso del modello e
+l'esito della redazione non sostituiscono la governance e il chokepoint previsti
+sopra. Il gate ordinario resta chiuso finche la composizione completa non e
+collegata e verificata.
+
 ## Problema
 
 Il runtime AI di MediFlow e oggi monolitico su Ollama: `AIProvider = 'ollama'`
@@ -203,3 +221,32 @@ futuro):
 - Routing automatico tra provider in base al caso clinico.
 - Telemetria remota, registry remoti di modelli, download automatici.
 - Modifiche all'envelope `mediflow.ai.extract.v1` e ai contratti delle lane.
+
+
+## Raccordo ordinario candidato WUL-689/691
+
+Il canale `chatgpt_subscription` e consumato esclusivamente dalle quattro
+operazioni host nominate (Patient Insight, Smart Import, Document Synthesis e
+Treatment Reasoning), dopo acquisizione degli owner originali. La preparazione
+locale non concede egress. Il consenso si riferisce ai byte UTF-8 congelati del
+payload; esecuzione e pubblicazione ricontrollano owner, revisione e tentativo.
+La preferenza di modello/effort e intenzione persistente, non catalogo o autorita.
+Il catalogo e l'opzione eseguibile appartengono al singolo processo corrente.
+
+Il percorso positivo richiede opt-in esplicito (default OFF), dichiarazione
+non equivoca della retention del servizio ChatGPT, kill switch della funzione,
+report redaction completo e corrente legato al runner, al corpus e agli artifact
+realmente caricati. Il booleano storico `shadowReady` e il solo esito del
+rollout evaluator non sono sufficienti. La binding runtime estende la ricevuta
+tecnica esistente, non introduce una decisione di conformita. Nessuna scrittura
+automatica dei report o promozione basata su un test. Report o installazione
+mancanti/incoerenti negano l'invio, senza fallback. Il worker locale rimane
+offline nel sandbox Mac; il modello, la versione e i digest osservati devono
+corrispondere all'evidenza usata durante preparazione e invio.
+
+L'output remoto riporta il canale, il modello/effort osservati e la redazione:
+non riceve un'attestazione Ollama/ATHENA o `egress:none`. I parser e i commit
+originali rimangono necessari. Il processo Mac resta monouso, con chiusura
+verificata; nessuna modifica di C2, sandbox o finestra di drain. Il software
+candidato e le prove sintetiche non ammettono dati clinici reali; WUL-688
+conserva la review del deployment concreto.

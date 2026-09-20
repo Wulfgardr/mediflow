@@ -34,6 +34,17 @@ final class MobilePairedStatusPresentationTests: XCTestCase {
         XCTAssertTrue(presentation.detail.contains("Nessuna scrittura"))
     }
 
+    func testExpiryAndSessionBoundaryAreNotHiddenByRefreshErrors() {
+        let expired = MobilePairedStatusPresentation.make(connectionState: .pairedOfflineDegraded,
+            isWorking: false, errorMessage: "errore sintetico", reconciliationLine: "Acquisita ieri; scaduta oggi.", cacheIsStale: true)
+        XCTAssertEqual(expired.phase, .stale)
+        XCTAssertEqual(expired.detail, "Acquisita ieri; scaduta oggi.")
+        let locked = MobilePairedStatusPresentation.make(connectionState: .sessionExpired,
+            isWorking: false, errorMessage: "errore sintetico", reconciliationLine: "Cache precedente", cacheIsStale: true)
+        XCTAssertEqual(locked.phase, .sessionExpired)
+        XCTAssertEqual(locked.actionTitle, "Accedi")
+    }
+
     func testStaleCacheOverridesGenericCachedState() {
         let presentation = MobilePairedStatusPresentation.make(
             connectionState: .cached,

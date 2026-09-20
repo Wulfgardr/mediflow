@@ -1,6 +1,10 @@
 /* @Codex */
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import {
     createHostLocalProviderBindingService,
     type HostLocalProviderBindingDenialCode,
@@ -12,6 +16,21 @@ const VALID_SETTINGS = {
     aiModel_clinical: 'clinical-local:latest',
     aiUrl: 'http://localhost:11434/v1',
 } satisfies HostLocalProviderSettingsSnapshot;
+
+/* @Codex: verify the import boundary in a fresh process without opening any database. */
+test('a supplied settings reader never initializes the production data directory', () => {
+    const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-binding-import-'));
+    const dataDir = path.join(parent, 'must-remain-absent');
+    try {
+        const child = spawnSync(process.execPath, ['--import', './scripts/register-strip-types-loader.mjs', '--input-type=module', '-e', `
+            import { createHostLocalProviderBindingService } from './lib/ai-providers/host-local-provider-binding.ts';
+            const result = await createHostLocalProviderBindingService({ readSettings: async () => ({}) }).readClinical();
+            if (result.status !== 'available') process.exit(2);
+        `], { cwd: process.cwd(), env: { ...process.env, MEDIFLOW_DATA_DIR: dataDir }, encoding: 'utf8' });
+        assert.equal(child.status, 0, child.stderr);
+        assert.equal(fs.existsSync(dataDir), false);
+    } finally { fs.rmSync(parent, { recursive: true, force: true }); }
+});
 
 async function read(snapshot: HostLocalProviderSettingsSnapshot) {
     return createHostLocalProviderBindingService({ readSettings: async () => snapshot }).readClinical();

@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { createRequire } from 'node:module';
 import Database from 'better-sqlite3';
 import { AIFA_CATALOG_DEFAULT_SOURCE_URL } from './aifa-catalog';
 
@@ -157,4 +158,205 @@ test('runtime search applies cross-field tokens before the result cap', async ()
 
     const search = await catalog.searchAifaCatalog('alfa beta', 1);
     assert.deepEqual(search.rows.map((row) => row.aic), ['TARGET']);
+});
+
+/* @Codex */
+test('guarded replacement detects legacy changes and rolls back actual SQLite write failures', async () => {
+    const catalog = await loadCatalogModules();
+    const { getAifaCatalogSnapshot } = await import('./aifa-catalog-server.ts');
+    const csv = 'CODICE_AIC;DENOMINAZIONE;CODICE_ATC;PA_ASSOCIATI\n000000101;SINTETICO UNO;A01AA01;Principio sintetico\n000000102;SINTETICO DUE;A01AA02;Principio secondo\n000000103;SINTETICO TRE;A01AA03;Principio terzo';
+    const file = () => new File([csv], 'synthetic.csv');
+    const manifest = { sourceUrl: AIFA_CATALOG_DEFAULT_SOURCE_URL, downloadedAt: '2026-09-07', version: 'synthetic-guard' };
+    catalog.replaceUnverifiedDrugCatalog([{ aic: '000000999', name: 'SINTETICO' }]);
+    const snapshot = getAifaCatalogSnapshot();
+    catalog.replaceUnverifiedDrugCatalog([{ aic: '000000999', name: 'MODIFICATO' }]);
+    await assert.rejects(catalog.replaceAifaCatalog(file(), manifest, { snapshot, assertCurrent() {} }), { status: 409 });
+    const before = getAifaCatalogSnapshot();
+    const sqlite = new Database(path.join(process.env.MEDIFLOW_DATA_DIR!, 'medical.db'));
+    try {
+        sqlite.exec("CREATE TRIGGER synthetic_aifa_fail BEFORE INSERT ON settings WHEN NEW.key = 'aifaCatalogManifest' BEGIN SELECT RAISE(ABORT, 'synthetic manifest failure'); END");
+        await assert.rejects(catalog.replaceAifaCatalog(file(), manifest, { snapshot: before, assertCurrent() {} }), /synthetic manifest failure/);
+        assert.equal(getAifaCatalogSnapshot(), before);
+    } finally {
+        sqlite.exec('DROP TRIGGER synthetic_aifa_fail');
+        sqlite.close();
+    }
+    let checks = 0;
+    await assert.rejects(catalog.replaceAifaCatalog(file(), manifest, { snapshot: before, assertCurrent() {
+        if (++checks === 2) throw new Error('synthetic session lost before commit');
+    } }), /session lost/);
+    assert.equal(checks, 2);
+    assert.equal(getAifaCatalogSnapshot(), before);
+    for (const invalid of [
+        'CODICE_AIC;DENOMINAZIONE\n000000101;VALIDO\ninvalid;INVALIDO',
+        'CODICE_AIC;DENOMINAZIONE\n000000101;VALIDO;extra',
+        'CODICE_AIC;DENOMINAZIONE\n000000101;VA"LI"DO',
+    ]) {
+        await assert.rejects(catalog.replaceAifaCatalog(new File([invalid], 'invalid.csv'), manifest, { snapshot: before, assertCurrent() {} }));
+        assert.equal(getAifaCatalogSnapshot(), before);
+    }
+    const result = await catalog.replaceAifaCatalog(file(), manifest, { snapshot: before, assertCurrent() {} });
+    assert.equal(result.count, 3);
+    for (const query of ['000000101', 'A01AA01', 'principio']) {
+        assert.ok((await catalog.searchAifaCatalog(query, 10)).rows.length > 0, query);
+    }
+});
+
+/* @Codex Uses the actual lifecycle owner and SQLite; only the HTTP cookie reader and external transport are synthetic. */
+test('update route guards streamed bodies and cancels on actual session retirement', { timeout: 10_000 }, async (t) => {
+    await loadCatalogModules();
+    const load = createRequire(import.meta.url);
+    const auth = load('./security/server-auth.ts') as typeof import('./security/server-auth');
+    const owner = load('./security/web-auth-lifecycle-owner-adapter.ts') as typeof import('./security/web-auth-lifecycle-owner-adapter');
+    const { POST } = load('../app/api/drugs/update/route.ts') as typeof import('../app/api/drugs/update/route');
+    const { getAifaCatalogSnapshot } = await import('./aifa-catalog-server.ts');
+    let current: Awaited<ReturnType<typeof auth.requireSession>> = null;
+    t.mock.method(auth, 'requireSession', async () => current);
+    let calls = 0;
+    t.mock.method(globalThis, 'fetch', async () => { calls++; throw new Error('unexpected network'); });
+    const request = () => new Request('http://localhost/api/drugs/update', { method: 'POST' });
+    assert.equal((await POST(request())).status, 401);
+    assert.equal(calls, 0);
+    const control = owner.bootstrapControl()!;
+    const attempt = owner.begin('login', { controlId: control.controlId, ifMatch: control.etag, idempotencyKey: 'synthetic-aifa-login-0001' });
+    const principal = { id: 'synthetic-aifa-user', username: 'synthetic-aifa', role: 'clinician' };
+    const issued = owner.issue(attempt, principal)!;
+    const resolved = owner.resolve(issued.sessionId, control.controlId);
+    assert.equal(resolved.status, 'active');
+    if (resolved.status !== 'active') throw new Error('synthetic session setup failed');
+    current = resolved.projection;
+    assert.equal((await POST(new Request('http://localhost/api/drugs/update?url=https://invalid.example', { method: 'POST' }))).status, 400);
+    assert.equal((await POST(new Request('http://localhost/api/drugs/update', { method: 'POST', body: '{}' }))).status, 400);
+    assert.equal(calls, 0);
+    /* @Codex Body guards run before transport and leave the catalog intact. */
+    const bodySnapshot = getAifaCatalogSnapshot();
+    const streamed = (body: ReadableStream<Uint8Array>, signal?: AbortSignal) => new Request('http://localhost/api/drugs/update', {
+        method: 'POST', body, signal, duplex: 'half',
+    } as RequestInit);
+    for (const bytes of [new Uint8Array([0]), new TextEncoder().encode(' '), new TextEncoder().encode('{}')]) {
+        let cancelled = false;
+        const response = await POST(streamed(new ReadableStream({
+            start(controller) { controller.enqueue(new Uint8Array(0)); controller.enqueue(bytes); },
+            cancel() { cancelled = true; return new Promise<void>(() => {}); },
+        })));
+        assert.equal(response.status, 400);
+        assert.equal(cancelled, true, 'nonempty stream cancellation must not block response');
+    }
+    let emptyReads = 0;
+    let floodCancelled = false;
+    assert.equal((await POST(streamed(new ReadableStream({
+        pull(controller) { emptyReads++; controller.enqueue(new Uint8Array(0)); },
+        cancel() { floodCancelled = true; },
+    })))).status, 400);
+    assert.ok(emptyReads <= 33, 'empty chunk processing must be bounded');
+    assert.equal(floodCancelled, true);
+    for (const alreadyAborted of [false, true]) {
+        const abort = new AbortController();
+        let cancelled = false;
+        let started!: () => void;
+        const reading = new Promise<void>((resolve) => { started = resolve; });
+        const body = new ReadableStream<Uint8Array>({
+            pull() { started(); },
+            cancel() { cancelled = true; return new Promise<void>(() => {}); },
+        });
+        if (alreadyAborted) abort.abort();
+        const pending = POST(streamed(body, abort.signal));
+        await reading;
+        abort.abort();
+        assert.equal((await pending).status, 499);
+        if (!alreadyAborted) assert.equal(cancelled, true);
+    }
+    let stalledCancelled = false;
+    assert.equal((await POST(streamed(new ReadableStream({
+        cancel() { stalledCancelled = true; return Promise.reject(new Error('synthetic cancellation failure')); },
+    })))).status, 400, 'stalled body must time out before transport');
+    assert.equal(stalledCancelled, true);
+    const failedBody = await POST(streamed(new ReadableStream({
+        start(controller) { controller.error(new Error('synthetic body read failure')); },
+    })));
+    assert.equal(failedBody.status, 422);
+    /* @Codex Unexpected errors never expose raw exception text through the domain-error branch. */
+    assert.deepEqual(await failedBody.json(), { error: 'Aggiornamento AIFA non riuscito; catalogo conservato' });
+    assert.equal(calls, 0);
+    assert.equal(getAifaCatalogSnapshot(), bodySnapshot);
+    const validCsv = 'CODICE_AIC;DENOMINAZIONE;CODICE_ATC;PA_ASSOCIATI\n000000401;TEST ROUTE;A01AA01;Principio route';
+    t.mock.method(globalThis, 'fetch', async () => new Response(validCsv, { headers: { 'Content-Type': 'text/csv' } }));
+    /* @Codex Regression: a zero-byte POST can still expose a ReadableStream. */
+    for (const emptyChunks of [0, 1]) {
+        const streamedEmpty = streamed(new ReadableStream({ start(controller) {
+            if (emptyChunks) controller.enqueue(new Uint8Array(0));
+            controller.close();
+        } }));
+        assert.notEqual(streamedEmpty.body, null);
+        assert.equal((await POST(streamedEmpty)).status, 200, 'streamed empty POST must succeed');
+    }
+    const success = await POST(request());
+    assert.equal(success.status, 200);
+    const payload = await success.json();
+    const { createHash } = await import('node:crypto');
+    assert.equal(payload.manifest.sha256, createHash('sha256').update(validCsv).digest('hex'));
+    assert.equal(payload.manifest.sourceUrl, 'https://drive.aifa.gov.it/farmaci/confezioni_fornitura.csv');
+    assert.equal(payload.count, 1);
+    const committed = getAifaCatalogSnapshot();
+    for (const bytes of [new Uint8Array([0xff]), new TextEncoder().encode('not a csv')]) {
+        t.mock.method(globalThis, 'fetch', async () => new Response(bytes, { headers: { 'Content-Type': 'text/csv' } }));
+        assert.equal((await POST(request())).status, 422);
+        assert.equal(getAifaCatalogSnapshot(), committed);
+    }
+    t.mock.method(globalThis, 'fetch', async () => { throw new Error('synthetic network failure'); });
+    assert.equal((await POST(request())).status, 422);
+    assert.equal(getAifaCatalogSnapshot(), committed);
+    const catalog = await loadCatalogModules();
+    t.mock.method(globalThis, 'fetch', async () => {
+        catalog.replaceUnverifiedDrugCatalog([{ aic: '000000999', name: 'CONCURRENT SYNTHETIC', nameSearch: 'concurrent synthetic' }]);
+        return new Response(validCsv, { headers: { 'Content-Type': 'text/csv' } });
+    });
+    assert.equal((await POST(request())).status, 409);
+    assert.equal((await catalog.searchAifaCatalog('concurrent', 1)).rows[0].aic, '000000999');
+    const changed = getAifaCatalogSnapshot();
+    t.mock.method(globalThis, 'fetch', async () => {
+        current = null;
+        return new Response(validCsv, { headers: { 'Content-Type': 'text/csv' } });
+    });
+    assert.equal((await POST(request())).status, 401);
+    assert.equal(getAifaCatalogSnapshot(), changed);
+    current = resolved.projection;
+    let began!: () => void;
+    const started = new Promise<void>((resolve) => { began = resolve; });
+    let transportSignal: AbortSignal | null = null;
+    t.mock.method(globalThis, 'fetch', async (_url: unknown, init: RequestInit) => {
+        transportSignal = init.signal!;
+        began();
+        return new Promise<Response>((_resolve, reject) => init.signal!.addEventListener('abort', () => reject(init.signal!.reason), { once: true }));
+    });
+    const before = getAifaCatalogSnapshot();
+    const pending = POST(request());
+    await started;
+    assert.equal((await POST(request())).status, 409);
+    assert.equal(owner.retire(current, 'dispose').outcome, 'completed');
+    assert.equal((transportSignal as AbortSignal | null)?.aborted, true);
+    assert.equal((await pending).status, 401);
+    assert.equal(getAifaCatalogSnapshot(), before);
+
+    /* @Codex Session retirement must also interrupt body validation before network. */
+    const nextControl = owner.bootstrapControl()!;
+    const nextAttempt = owner.begin('login', { controlId: nextControl.controlId, ifMatch: nextControl.etag, idempotencyKey: 'synthetic-aifa-login-0002' });
+    const nextIssued = owner.issue(nextAttempt, principal)!;
+    const nextResolved = owner.resolve(nextIssued.sessionId, nextControl.controlId);
+    if (nextResolved.status !== 'active') throw new Error('synthetic session setup failed');
+    current = nextResolved.projection;
+    let bodyStarted!: () => void;
+    const bodyReading = new Promise<void>((resolve) => { bodyStarted = resolve; });
+    let bodyCancelled = false;
+    t.mock.method(globalThis, 'fetch', async () => { calls++; throw new Error('unexpected network'); });
+    const bodyPending = POST(streamed(new ReadableStream({
+        pull() { bodyStarted(); },
+        cancel() { bodyCancelled = true; },
+    }, { highWaterMark: 0 })));
+    await bodyReading;
+    assert.equal(owner.retire(current, 'dispose').outcome, 'completed');
+    assert.equal((await bodyPending).status, 401);
+    assert.equal(bodyCancelled, true);
+    assert.equal(calls, 0);
+    assert.equal(getAifaCatalogSnapshot(), before);
 });

@@ -573,6 +573,32 @@
 
 .ghostBtnSm:hover { background: var(--surface-soft); transform: translateY(-1px); }
 
+/* @Codex: primary and secondary actions share the same control geometry. */
+:global(html[data-runtime-twin-design='proposal']) :is(.primaryBtn, .ghostBtn, .ghostBtnSm) {
+  box-sizing: border-box;
+  min-width: var(--lume-control-height);
+  min-height: var(--lume-control-height);
+  padding: 10px 14px;
+  border-radius: var(--lume-control-radius);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 22px;
+  gap: 8px;
+}
+
+/* @Codex: related actions and state controls follow the same spacing scale. */
+:global(html[data-runtime-twin-design='proposal']) :is(.headerActions, .panelActions, .identityChips, .dockActions, .segmented) {
+  gap: var(--lume-control-gap);
+}
+:global(html[data-runtime-twin-design='proposal']) .segItem {
+  min-height: var(--lume-control-height);
+  border-radius: var(--lume-control-radius);
+  padding: 10px 14px;
+  font-size: 14px;
+  line-height: 22px;
+  font-weight: 600;
+}
+
 /* ───────────── identity dock (patient detail) ───────────── */
 
 .identityDock {
@@ -809,3 +835,21 @@
     border: 0;
   }
 }
+
+/* @Codex WUL-676: clear directory heading, one working plane. */
+:global(html[data-runtime-twin-design='proposal']) .areaCaption { display: none; }
+:global(html[data-runtime-twin-design='proposal']) .areaTitle { font-size: 30px; font-weight: 550; letter-spacing: -0.035em; }
+:global(html[data-runtime-twin-design='proposal']) .areaTitle em { display: none; }
+:global(html[data-runtime-twin-design='proposal']) .areaHeader { padding: 14px 0 24px; }
+/* @Codex: page, section, subsection and supporting copy retain distinct roles. */
+:global(html[data-runtime-twin-design='proposal']) h2.panelTitle {
+  font-size: var(--twin-type-section);
+  font-weight: var(--twin-heading-weight);
+  line-height: var(--twin-heading-leading);
+  letter-spacing: -0.02em;
+}
+:global(html[data-runtime-twin-design='proposal']) h3.panelTitle { font-size: var(--twin-type-subsection); line-height: var(--twin-heading-leading); }
+:global(html[data-runtime-twin-design='proposal']) .areaSubtitle,
+:global(html[data-runtime-twin-design='proposal']) .panelSubtitle { font-size: var(--twin-type-body); line-height: var(--twin-body-leading); }
+:global(html[data-runtime-twin-design='proposal']) .statLabel { font-size: var(--twin-type-caption); text-transform: none; letter-spacing: 0; }
+:global(html[data-runtime-twin-design='proposal']) .panelHeader { flex-wrap: wrap; }

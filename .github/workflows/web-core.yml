@@ -25,4 +25,29 @@ jobs:
       - run: npm run check:lume-tokens
       - run: npm run test:lume-tokens
       - run: npm run check:motion-budget
+      # @Codex: component tests in test:unit launch Chromium as well as Node.
+      - name: Install Chromium for component tests
+        run: npx playwright install --with-deps chromium
+      - name: Allocate synthetic test data directory
+        run: |
+          DATA_DIR="$(mktemp -d "${RUNNER_TEMP}/mediflow-web-core.XXXXXX")"
+          export MEDIFLOW_DATA_DIR="${DATA_DIR}"
+          export MEDIFLOW_WEB_CORE_DATA_DIR="${DATA_DIR}"
+          {
+            printf 'MEDIFLOW_DATA_DIR=%s\n' "${DATA_DIR}"
+            printf 'MEDIFLOW_WEB_CORE_DATA_DIR=%s\n' "${DATA_DIR}"
+          } >> "${GITHUB_ENV}"
       - run: npm run test:unit
+      - name: Cleanup synthetic test data directory
+        if: always()
+        run: |
+          case "${MEDIFLOW_WEB_CORE_DATA_DIR:-}" in
+            '') exit 0 ;;
+            "${RUNNER_TEMP}"/mediflow-web-core.*)
+              rm -rf -- "${MEDIFLOW_WEB_CORE_DATA_DIR}"
+              ;;
+            *)
+              printf 'Refusing to clean an unexpected test data directory: %s\n' "${MEDIFLOW_WEB_CORE_DATA_DIR}" >&2
+              exit 1
+              ;;
+          esac

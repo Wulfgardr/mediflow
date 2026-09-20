@@ -78,8 +78,8 @@ public struct HomeBasePatientSummary: Identifiable, Codable, Hashable, Sendable 
 }
 
 public struct HomeBasePatientDetail: Identifiable, Codable, Hashable, Sendable {
-    public init(id: String, firstName: String, lastName: String, birthDate: Date?, taxCode: String, address: String?, phone: String?, caregiver: String?, exemptions: String?, diagnoses: String?, monitoringProfile: String?, statusReason: String?, notes: String?, aiSummary: String?, documentInsights: String?, isAdi: Bool?, isArchived: Bool?, version: Int, ambulatoryId: String?, createdAt: Date?, updatedAt: Date?, deletedAt: Date? = nil, deletionReason: String? = nil) {
-        self.id = id; self.firstName = firstName; self.lastName = lastName; self.birthDate = birthDate; self.taxCode = taxCode; self.address = address; self.phone = phone; self.caregiver = caregiver; self.exemptions = exemptions; self.diagnoses = diagnoses; self.monitoringProfile = monitoringProfile; self.statusReason = statusReason; self.notes = notes; self.aiSummary = aiSummary; self.documentInsights = documentInsights; self.isAdi = isAdi; self.isArchived = isArchived; self.version = version; self.ambulatoryId = ambulatoryId; self.createdAt = createdAt; self.updatedAt = updatedAt; self.deletedAt = deletedAt; self.deletionReason = deletionReason
+    public init(id: String, firstName: String, lastName: String, birthDate: Date?, taxCode: String, address: String?, phone: String?, caregiver: String?, exemptions: String?, diagnoses: String?, monitoringProfile: String?, statusReason: String?, notes: String?, aiSummary: String?, documentInsights: String?, isAdi: Bool?, isArchived: Bool?, version: Int, ambulatoryId: String?, createdAt: Date?, updatedAt: Date?, deletedAt: Date? = nil, deletionReason: String? = nil, archiveReason: String? = nil, archiveNote: String? = nil) {
+        self.id = id; self.firstName = firstName; self.lastName = lastName; self.birthDate = birthDate; self.taxCode = taxCode; self.address = address; self.phone = phone; self.caregiver = caregiver; self.exemptions = exemptions; self.diagnoses = diagnoses; self.monitoringProfile = monitoringProfile; self.statusReason = statusReason; self.notes = notes; self.aiSummary = aiSummary; self.documentInsights = documentInsights; self.isAdi = isAdi; self.isArchived = isArchived; self.version = version; self.ambulatoryId = ambulatoryId; self.createdAt = createdAt; self.updatedAt = updatedAt; self.deletedAt = deletedAt; self.deletionReason = deletionReason; self.archiveReason = archiveReason; self.archiveNote = archiveNote
     }
     public let id: String
     public let firstName: String
@@ -104,6 +104,9 @@ public struct HomeBasePatientDetail: Identifiable, Codable, Hashable, Sendable {
     public let updatedAt: Date?
     public let deletedAt: Date?
     public let deletionReason: String?
+    /* @Codex: existing encrypted profile fields, optional for older readers. */
+    public let archiveReason: String?
+    public let archiveNote: String?
 }
 
 /* @Codex */
@@ -1039,6 +1042,9 @@ public struct HomeBasePatientUpdatePayload: Encodable, Sendable {
     // as diagnoses). birthDate: omit/null/value, matching normalizeBirthDateForUpdate.
     public let exemptions: PatchValue<String>
     public let birthDate: PatchValue<Date>
+    /* @Codex */
+    public let archiveReason: PatchValue<String>
+    public let archiveNote: PatchValue<String>
 
     public init(
         version: Int,
@@ -1055,7 +1061,9 @@ public struct HomeBasePatientUpdatePayload: Encodable, Sendable {
         statusReason: PatchValue<String> = .omit,
         diagnoses: PatchValue<String> = .omit,
         exemptions: PatchValue<String> = .omit,
-        birthDate: PatchValue<Date> = .omit
+        birthDate: PatchValue<Date> = .omit,
+        archiveReason: PatchValue<String> = .omit,
+        archiveNote: PatchValue<String> = .omit
     ) {
         self.version = version
         self.firstName = firstName
@@ -1072,12 +1080,14 @@ public struct HomeBasePatientUpdatePayload: Encodable, Sendable {
         self.diagnoses = diagnoses
         self.exemptions = exemptions
         self.birthDate = birthDate
+        self.archiveReason = archiveReason
+        self.archiveNote = archiveNote
     }
 
     private enum CodingKeys: String, CodingKey {
         case version, firstName, lastName, taxCode, isAdi, isArchived
         case address, phone, caregiver, notes, monitoringProfile, statusReason, diagnoses
-        case exemptions, birthDate
+        case exemptions, birthDate, archiveReason, archiveNote
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -1097,6 +1107,8 @@ public struct HomeBasePatientUpdatePayload: Encodable, Sendable {
         try container.encodePatch(diagnoses, forKey: .diagnoses)
         try container.encodePatch(exemptions, forKey: .exemptions)
         try container.encodePatch(birthDate, forKey: .birthDate)
+        try container.encodePatch(archiveReason, forKey: .archiveReason)
+        try container.encodePatch(archiveNote, forKey: .archiveNote)
     }
 }
 

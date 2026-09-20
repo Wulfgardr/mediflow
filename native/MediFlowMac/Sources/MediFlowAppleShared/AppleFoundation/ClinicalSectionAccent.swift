@@ -72,6 +72,12 @@ struct ClinicalSectionTitle: View {
     }
 
     var body: some View {
+        #if os(macOS)
+        // @Codex: A document heading carries the hierarchy without a badge.
+        Text(title)
+            .chartCardTitle()
+            .accessibilityAddTraits(.isHeader)
+        #else
         let tint = accent.tint(for: colorScheme)
         HStack(spacing: 10) {
             Image(systemName: systemImage)
@@ -90,5 +96,6 @@ struct ClinicalSectionTitle: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(title)
         .accessibilityAddTraits(.isHeader)
+        #endif
     }
 }

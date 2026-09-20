@@ -90,8 +90,10 @@ host-owned `MEDIFLOW_ATHENA_MLX_GENERATE_BIN` accetta un eseguibile assoluto
 offline e fallisce chiuso se la cache richiesta non è disponibile; non prova
 readiness universale.
 
-Il caller presenta soltanto input applicativo tipizzato. Non sceglie provider,
-modello, endpoint, venue, prompt, fallback o apply. Ogni smart path restituisce
+Il caller presenta input applicativo tipizzato. ADR 0129 consente soltanto la
+preferenza di un ID opaco presente nel catalogo host corrente, risolta dal
+servizio nominato FunctionModelDispatch. Non sceglie provider, modello libero,
+endpoint, venue, prompt, fallback o apply e non ammette provider. Ogni smart path restituisce
 una proposta review-only con receipt, provenienza e currentness; il production
 root host-owned resta l'unico punto di composizione.
 

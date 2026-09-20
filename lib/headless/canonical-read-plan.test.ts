@@ -262,12 +262,54 @@ test('publishes an exact deeply immutable non-authorizing graph', () => {
   assert.equal(visited.size > 250, true);
 });
 
-test('accounts for all 32 OpenAPI GETs as non-integrated evidence and preserves ambiguity', () => {
+test('classifies all 36 OpenAPI GETs without admitting separate native authority to the 32 read candidates', () => {
+  // @Codex ADR 0135 keeps host-wide configuration under native authority. ADR 0115
+  // authorizes WHO only as paired consultation and leaves its Headless packet separate.
+  const excludedPrimaryOpenApiAuthority = [
+    {
+      route: '/api/v1/network/ai/functions',
+      openApiOperationId: 'ReadNativeFunctionPreferences',
+      runtimeRef: 'app/api/v1/network/ai/functions/route.ts',
+    },
+    {
+      route: '/api/v1/network/terminology/who/readiness',
+      openApiOperationId: 'readNetworkWhoReadiness',
+      runtimeRef: 'app/api/v1/network/terminology/who/readiness/route.ts',
+    },
+    {
+      route: '/api/v1/network/terminology/who/search',
+      openApiOperationId: 'searchNetworkWhoIcd11',
+      runtimeRef: 'app/api/v1/network/terminology/who/search/route.ts',
+    },
+    {
+      route: '/api/v1/network/terminology/who/code-check',
+      openApiOperationId: 'checkNetworkWhoIcd11Code',
+      runtimeRef: 'app/api/v1/network/terminology/who/code-check/route.ts',
+    },
+  ] as const;
+  // ADR 0134 publishes this native-only status route in a supplemental OpenAPI
+  // document. It is not a primary /api/v1 read-plan candidate.
+  const excludedSupplementalNativeAuthority = [
+    {
+      route: '/api/v1/network/ai/chatgpt/ordinary/status',
+      runtimeRef: 'app/api/v1/network/ai/chatgpt/ordinary/status/route.ts',
+    },
+  ] as const;
   const observed = openApiNetworkGets();
-  assert.equal(observed.length, 32);
-  assert.deepEqual(candidates().map(({ route, openApiOperationId }) => [route, openApiOperationId]), observed);
+  assert.equal(observed.length, 36);
+  for (const excluded of excludedPrimaryOpenApiAuthority) {
+    assert.deepEqual(observed.filter(([route]) => route === excluded.route), [
+      [excluded.route, excluded.openApiOperationId],
+    ]);
+    assert.equal(candidates().some(({ route, openApiOperationId }) => route === excluded.route
+      || openApiOperationId === excluded.openApiOperationId), false);
+  }
+  assert.deepEqual(candidates().map(({ route, openApiOperationId }) => [route, openApiOperationId]),
+    observed.filter(([route]) => !excludedPrimaryOpenApiAuthority.some(({ route: excludedRoute }) => route === excludedRoute)));
   assert.deepEqual(
-    candidates().map(({ route, runtimeRef }) => [route, runtimeRef]).sort(([left], [right]) => left.localeCompare(right)),
+    [...candidates(), ...excludedPrimaryOpenApiAuthority, ...excludedSupplementalNativeAuthority]
+      .map(({ route, runtimeRef }) => [route, runtimeRef])
+      .sort(([left], [right]) => left.localeCompare(right)),
     runtimeNetworkGets(),
   );
   assert.equal(new Set(candidates().map(({ route }) => route)).size, 32);

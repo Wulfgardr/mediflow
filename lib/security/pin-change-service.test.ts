@@ -16,13 +16,16 @@ import {
 } from './pin-change-service';
 import {
     abortNativeLegacyUserRetirement,
+    captureNativeLoginSessionFence,
     clearAllSessions,
     commitNativeLegacyUserRetirement,
     createNativeServerSession,
     getSession,
+    isPairedNativeServerSession,
     prepareNativeLegacyUserRetirement,
     registerServerSessionResource,
 } from './server-session';
+import * as physicalWebOwner from './web-auth-lifecycle-owner-adapter';
 import type {
     WebAuthAttempt,
     WebAuthIssue,
@@ -200,6 +203,79 @@ async function seedUser(db: TestDatabase, userId = 'user-1') {
         createdAt: new Date(),
     }).run();
 }
+
+/* @Codex: service tests use the real shared owner, with a bounded request-reader seam. */
+function nativePinSession(userId = 'user-1') {
+    const binding = { clientId: 'synthetic-pin-ios', clientPlatform: 'ios' as const, tokenHash: 'a'.repeat(64) };
+    const native = createNativeServerSession(
+        { id: userId, username: TEST_USERNAME, role: 'admin' }, binding, captureNativeLoginSessionFence(),
+    );
+    assert.ok(isPairedNativeServerSession(native, binding));
+    return native;
+}
+
+test('native PIN rotation retires both real channel owners and preserves another user', async () => {
+    const { sqlite, db } = makeDatabase();
+    const web = issueSourceWebSession(physicalWebOwner, 'native-pin-web', 'user-1');
+    const other = issueSourceWebSession(physicalWebOwner, 'native-pin-other', 'other-user');
+    try {
+        await seedUser(db);
+        const native = nativePinSession(); const sibling = nativePinSession();
+        const result = await changePin({
+            session: native, request: new Request('http://127.0.0.1/api/auth/change-pin'),
+            currentPin: '1234', newPin: '5678', encryptedMasterKey: 'v2:native-rewrap', salt: 'native-salt',
+        }, { db, readPairedNativeSession: async () => native, writeAuditEvent: testAuditWriter(db) });
+        assert.deepEqual(result, { kind: 'success' });
+        assert.equal(getSession(native.id), null); assert.equal(getSession(sibling.id), null);
+        assert.notEqual(physicalWebOwner.resolve(web.issued.sessionId, web.control.controlId).status, 'active');
+        assert.equal(physicalWebOwner.resolve(other.issued.sessionId, other.control.controlId).status, 'active');
+        const stored = db.select().from(users).where(eq(users.id, 'user-1')).get(); assert.ok(stored);
+        assert.equal(await bcrypt.compare('5678', stored.passwordHash), true);
+        assert.equal(stored.encryptedMasterKey, 'v2:native-rewrap');
+    } finally {
+        physicalWebOwner.retire(other.projection, 'delete');
+        physicalWebOwner.retire(web.projection, 'delete');
+        sqlite.close();
+    }
+});
+
+test('a native request becoming stale during hashing aborts both preparations before credential CAS', async () => {
+    const { sqlite, db } = makeDatabase();
+    const web = issueSourceWebSession(physicalWebOwner, 'native-pin-stale', 'user-1');
+    try {
+        await seedUser(db); const native = nativePinSession(); let reads = 0;
+        const result = await changePin({
+            session: native, request: new Request('http://127.0.0.1/api/auth/change-pin'),
+            currentPin: '1234', newPin: '5678', encryptedMasterKey: 'v2:must-not-save', salt: 'must-not-save',
+        }, { db, readPairedNativeSession: async () => ++reads === 1 ? native : null });
+        assert.deepEqual(result, { kind: 'unauthorized' });
+        assert.equal(reads, 2);
+        assert.equal(getSession(native.id), native);
+        assert.equal(physicalWebOwner.resolve(web.issued.sessionId, web.control.controlId).status, 'active');
+        assert.equal(db.select().from(users).where(eq(users.id, 'user-1')).get()?.encryptedMasterKey, 'blob-before');
+    } finally { physicalWebOwner.retire(web.projection, 'delete'); sqlite.close(); }
+});
+
+test('native PIN CAS conflict preserves the winning credential and existing channel sessions', async () => {
+    const { sqlite, db } = makeDatabase();
+    const web = issueSourceWebSession(physicalWebOwner, 'native-pin-conflict', 'user-1');
+    try {
+        await seedUser(db); const native = nativePinSession(); let reads = 0;
+        const result = await changePin({
+            session: native, request: new Request('http://127.0.0.1/api/auth/change-pin'),
+            currentPin: '1234', newPin: '5678', encryptedMasterKey: 'v2:loser', salt: 'loser',
+        }, { db, readPairedNativeSession: async () => {
+            if (++reads === 2) db.update(users).set({ passwordHash: 'synthetic-winner-hash', encryptedMasterKey: 'v2:winner' })
+                .where(eq(users.id, 'user-1')).run();
+            return native;
+        } });
+        assert.equal(result.kind, 'failure');
+        if (result.kind === 'failure') assert.equal(result.code, 'PIN_CHANGE_CONFLICT');
+        assert.equal(getSession(native.id), native);
+        assert.equal(physicalWebOwner.resolve(web.issued.sessionId, web.control.controlId).status, 'active');
+        assert.equal(db.select().from(users).where(eq(users.id, 'user-1')).get()?.encryptedMasterKey, 'v2:winner');
+    } finally { physicalWebOwner.retire(web.projection, 'delete'); sqlite.close(); }
+});
 
 test('changePin persists the client re-wrap, resets lockout, and writes a redacted audit record', async () => {
     const { sqlite, db } = makeDatabase();

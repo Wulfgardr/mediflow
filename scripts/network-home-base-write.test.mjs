@@ -16,6 +16,17 @@ const REPORT_PATH = resolveReportPath();
 const READ_CAPABILITY = 'network.replica.readonly-patients';
 const WRITE_CAPABILITY = 'network.replica.write-patient-profile';
 
+/* @Codex: this keyless-host regression needs real opaque envelopes, not ENC-prefixed plaintext. */
+function syntheticSealedPhone(label) {
+    const iv = crypto.randomBytes(12);
+    const cipher = crypto.createCipheriv('aes-256-gcm', crypto.randomBytes(32), iv);
+    const encrypted = Buffer.concat([cipher.update(JSON.stringify(label)), cipher.final(), cipher.getAuthTag()]);
+    return `ENC:${iv.toString('base64')}:${encrypted.toString('base64')}`;
+}
+const PHONE_ONE = syntheticSealedPhone('synthetic-phone-one');
+const PHONE_TWO = syntheticSealedPhone('synthetic-phone-two');
+const PHONE_NINE = syntheticSealedPhone('synthetic-phone-nine');
+
 const scenarioResults = [];
 
 after(() => {
@@ -52,7 +63,7 @@ test('paired patient profile write requires write capability, session, scope, an
             },
             body: {
                 version: 1,
-                phone: 'ENC:smoke:phone-1',
+                phone: PHONE_ONE,
             },
         });
         assert.equal(readOnlyWrite.response.status, 403);
@@ -61,7 +72,7 @@ test('paired patient profile write requires write capability, session, scope, an
             headers: pairedHeaders(writeClient),
             body: {
                 version: 1,
-                phone: 'ENC:smoke:phone-1',
+                phone: PHONE_ONE,
             },
         });
         assert.equal(missingSession.response.status, 401);
@@ -73,7 +84,7 @@ test('paired patient profile write requires write capability, session, scope, an
             },
             body: {
                 version: 1,
-                phone: 'ENC:smoke:phone-1',
+                phone: PHONE_ONE,
                 isArchived: true,
             },
         });
@@ -87,7 +98,7 @@ test('paired patient profile write requires write capability, session, scope, an
             },
         });
         assert.equal(detail.response.status, 200);
-        assert.equal(detail.json?.phone, 'ENC:smoke:phone-1');
+        assert.equal(detail.json?.phone, PHONE_ONE);
         assert.equal(detail.json?.isArchived, true);
         assert.equal(detail.json?.version, 2);
 
@@ -98,7 +109,7 @@ test('paired patient profile write requires write capability, session, scope, an
             },
             body: {
                 version: 1,
-                phone: 'ENC:smoke:phone-2',
+                phone: PHONE_TWO,
             },
         });
         assert.equal(conflict.response.status, 409);
@@ -172,7 +183,7 @@ test('disabling home-base mode makes paired-client tokens inert until re-enabled
             },
             body: {
                 version: 1,
-                phone: 'ENC:smoke:phone-9',
+                phone: PHONE_NINE,
             },
         });
         assert.equal(gatedWrite.response.status, 403);
@@ -196,7 +207,7 @@ test('disabling home-base mode makes paired-client tokens inert until re-enabled
             },
             body: {
                 version: 1,
-                phone: 'ENC:smoke:phone-9',
+                phone: PHONE_NINE,
             },
         });
         assert.equal(update.response.status, 200);

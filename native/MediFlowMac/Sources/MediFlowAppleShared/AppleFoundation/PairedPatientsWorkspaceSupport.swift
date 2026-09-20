@@ -184,6 +184,7 @@ struct PairedPatientSectionHeader: View {
     let subtitle: String
     let systemImage: String
     let refreshIdentifier: String
+    var itemCount: Int? = nil // @Codex: nil means unread, never an invented zero.
     /// Wayfinding hue for this section. See `ClinicalSectionAccent` for why it
     /// tints the glyph and nothing else.
     var accent: ClinicalSectionAccent = .anagrafica
@@ -209,10 +210,22 @@ struct PairedPatientSectionHeader: View {
 
     private var heading: some View {
         VStack(alignment: .leading, spacing: 2) {
-            ClinicalSectionTitle(title, systemImage: systemImage, accent: accent)
-            Text(subtitle)
-                .chartMetadata()
-                .fixedSize(horizontal: false, vertical: true)
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                ClinicalSectionTitle(title, systemImage: systemImage, accent: accent)
+                if let itemCount {
+                    Text("\(itemCount)")
+                        .font(.headline)
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                        .accessibilityLabel("\(title): \(itemCount) nell'elenco caricato")
+                        .accessibilityIdentifier("\(refreshIdentifier)-count")
+                }
+            }
+            if !subtitle.isEmpty {
+                Text(subtitle)
+                    .chartMetadata()
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 
