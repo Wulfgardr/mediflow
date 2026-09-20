@@ -447,6 +447,7 @@ export default function Page(){const [active,setActive]=useState(true);return <m
                 assert.equal(f.created(), 0); assert.equal(f.transport.calls.length, 0);
             }, async () => { partial.destroy(); await within(partialClosed, WIRE_CLOSE_MS, 'PARTIAL_PROBE_CLOSE_UNCONFIRMED'); partial.removeAllListeners(); }, `${name}/partial-probe`);
             context = await browser.newContext({ viewport: { width, height: 900 }, serviceWorkers: 'block', acceptDownloads: false });
+            await probe.arm(context);
             // This is only an egress deny-list. No local API interception/fulfill,
             // header override, fetch replacement or Playwright metadata projection.
             // Unmatched same-origin requests really cross the loopback HTTP wire.

@@ -44,6 +44,18 @@ test('scenario diagnostics are re-whitelisted; no arbitrary messages or challeng
     assert.equal(JSON.stringify(out).includes('NEVER_LOG_ME'),false); assert.equal(out[1].failure,'cdp-body-resource-missing');
     assert.equal(p.finish().malformed,1);
 });
+test('page lifetime console diagnostics retain only allowlisted stream metadata', () => {
+    const {out,p}=fixture();
+    p.line('debug '+JSON.stringify({schema:'mediflow.synthetic-response-lifetime-page.v1',event:'reader/read-settled',operation:'consent',counter:2,read:1,done:true,bytes:27,callSite:'readResponse',secret:'NEVER_LOG_ME'}));
+    p.line('debug '+JSON.stringify({schema:'mediflow.synthetic-response-lifetime-page.v1',event:'signal/abort',operation:'consent',counter:2,doneSeen:true,bytesRead:27,callSite:'setActive',reason:'NEVER_LOG_ME'}));
+    p.line('debug '+JSON.stringify({schema:'mediflow.synthetic-response-lifetime-page.v1',event:'NEVER_LOG_ME',operation:'consent'}));
+    assert.deepEqual(out.map(({kind,event,operation,counter,read,done,bytes,doneSeen,bytesRead,callSite}) =>
+        ({kind,event,operation,counter,read,done,bytes,doneSeen,bytesRead,callSite})), [
+        {kind:'page-probe',event:'reader/read-settled',operation:'consent',counter:2,read:1,done:true,bytes:27,doneSeen:undefined,bytesRead:undefined,callSite:'readResponse'},
+        {kind:'page-probe',event:'signal/abort',operation:'consent',counter:2,read:undefined,done:undefined,bytes:undefined,doneSeen:true,bytesRead:27,callSite:'setActive'},
+    ]);
+    assert.equal(JSON.stringify(out).includes('NEVER_LOG_ME'),false); assert.equal(p.finish().malformed,1);
+});
 test('stream filter handles split UTF-8 and oversized lines without outputting raw text', async () => {
     const valid=format('SEND',{sessionId:'s',id:1,method:'Network.getResponseBody',params:{requestId:'r'}})+'\n';
     const reply=format('RECV',{sessionId:'s',id:1,result:{body:'é漢',base64Encoded:false}})+'\n';
@@ -59,6 +71,9 @@ test('execution context reset, loader commits, cancellation and detach are obser
     recv({sessionId:'s',method:'Page.frameNavigated',params:{frame:{id:'f',loaderId:'new-loader',url:'http://127.0.0.1:4567/'}}});
     recv({sessionId:'s',method:'Runtime.executionContextsCleared',params:{}});
     recv({sessionId:'s',method:'Network.loadingFailed',params:{requestId:'r',canceled:true,errorText:'net::ERR_ABORTED'}});
+    recv({sessionId:'s',method:'Network.webSocketCreated',params:{requestId:'ws',url:'ws://127.0.0.1:4567/_next/hmr'}});
+    recv({sessionId:'s',method:'Network.webSocketFrameReceived',params:{requestId:'ws',response:{payloadData:JSON.stringify({type:'reloadPage',secret:'NEVER_LOG_ME'})}}});
     recv({method:'Target.detachedFromTarget',params:{sessionId:'s',targetId:'t'}}); p.finish();
-    assert.equal(out[0].main,true); assert.equal(out[2].failure,'aborted'); assert.equal(out[3].detachedSession,out[0].session);
+    assert.equal(out[0].main,true); assert.equal(out[2].failure,'aborted'); assert.equal(out[4].action,'reloadPage');
+    assert.equal(out[5].detachedSession,out[0].session); assert.equal(JSON.stringify(out).includes('NEVER_LOG_ME'),false);
 });

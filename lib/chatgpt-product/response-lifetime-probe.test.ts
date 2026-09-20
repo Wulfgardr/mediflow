@@ -2,8 +2,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { EventEmitter } from 'node:events';
+import { runInNewContext } from 'node:vm';
 import type { Page, Request as BrowserRequest, Response as BrowserResponse, WebSocket } from '@playwright/test';
-import { createResponseLifetimeProbe } from '../../e2e/chatgpt-response-lifetime-probe.ts';
+import { createResponseLifetimeProbe, installPageResponseLifetimeProbe } from '../../e2e/chatgpt-response-lifetime-probe.ts';
 
 const origin = 'http://127.0.0.1:3987';
 const path = '/api/settings/ai/chatgpt/synthesis/consent';
@@ -101,7 +102,7 @@ test('no body, header, URL, challenge or arbitrary HMR/console text enters the t
     f.page.emit('response', f.response); await p.json(f.response);
     const socket = Object.assign(new EventEmitter(), { url: () => origin.replace('http:', 'ws:') + '/_next/hmr?id=DO_NOT_LOG' });
     f.page.emit('websocket', socket as unknown as WebSocket);
-    socket.emit('framereceived', { payload: JSON.stringify({ action: 'reloadPage', secret: 'DO_NOT_LOG' }) });
+    socket.emit('framereceived', { payload: JSON.stringify({ type: 'reloadPage', secret: 'DO_NOT_LOG' }) });
     socket.emit('framereceived', { payload: JSON.stringify({ action: 'DO_NOT_LOG' }) });
     socket.emit('framereceived', { payload: 'DO_NOT_LOG'.repeat(10000) });
     f.page.emit('console', { text: () => '[Fast Refresh] rebuilding DO_NOT_LOG' });
@@ -135,4 +136,67 @@ test('dispose removes only owned listeners and is idempotent after close', () =>
     assert.equal(f.context.eventNames().length, 0); assert.equal(f.browser.eventNames().length, 0);
     p.phase('scenario-failed'); assert.deepEqual(p.snapshot(), before);
     const copy = p.snapshot(); copy.events[0].event = 'edited-copy'; assert.notEqual(p.snapshot().events[0].event, 'edited-copy');
+});
+
+test('page probe forwards original fetch/read/cancel promises and objects exactly once', async () => {
+    const messages: string[] = []; let fetchCalls = 0; let bodyReads = 0; let readerCalls = 0; let cancelCalls = 0; let abortCalls = 0;
+    const signal = new EventTarget() as EventTarget & { aborted: boolean }; signal.aborted = false;
+    class AbortControllerFixture { signal = signal; abort() { abortCalls++; signal.aborted = true; signal.dispatchEvent(new Event('abort')); } }
+    const readPromises = [Promise.resolve({ value: new Uint8Array([1, 2, 3]), done: false }), Promise.resolve({ value: undefined, done: true })];
+    const cancelPromise = Promise.resolve();
+    class ReaderFixture { read() { return readPromises[readerCalls++]; } cancel() { cancelCalls++; return cancelPromise; } }
+    const reader = new ReaderFixture();
+    class StreamFixture { getReader() { return reader; } cancel() { return cancelPromise; } }
+    const stream = new StreamFixture();
+    class ResponseFixture { get body() { bodyReads++; return stream; } }
+    const response = new ResponseFixture(); const fetchPromise = Promise.resolve(response);
+    const input = { url: origin + path }; const init = { signal };
+    const realm = { fetch(this: unknown, actualInput: unknown, actualInit: unknown) {
+        assert.strictEqual(this, realm); assert.strictEqual(actualInput, input); assert.strictEqual(actualInit, init); fetchCalls++; return fetchPromise;
+    }, URL, Request, DOMException, Response: ResponseFixture, ReadableStream: StreamFixture, ReadableStreamDefaultReader: ReaderFixture, AbortController: AbortControllerFixture,
+    console: { debug(value: string) { messages.push(value); } } };
+
+    const isolatedInstall = runInNewContext(`(${installPageResponseLifetimeProbe.toString()})`) as typeof installPageResponseLifetimeProbe;
+    isolatedInstall(realm as never);
+    const returnedFetch = realm.fetch(input, init); assert.strictEqual(returnedFetch, fetchPromise); assert.equal(fetchCalls, 1);
+    await fetchPromise; await Promise.resolve(); assert.equal(bodyReads, 0, 'probe must not eagerly access Response.body');
+    const returnedStream = response.body; assert.strictEqual(returnedStream, stream);
+    const returnedReader = returnedStream.getReader(); assert.strictEqual(returnedReader, reader);
+    function readResponse() { return returnedReader.read(); }
+    const returnedRead = readResponse(); assert.strictEqual(returnedRead, readPromises[0]); assert.equal(readerCalls, 1);
+    await readPromises[0]; await Promise.resolve();
+    const returnedDone = readResponse(); assert.strictEqual(returnedDone, readPromises[1]); assert.equal(readerCalls, 2);
+    await readPromises[1]; await Promise.resolve();
+    function setActive() { return returnedReader.cancel(); }
+    assert.strictEqual(setActive(), cancelPromise);
+    function run() { new realm.AbortController().abort(); } run();
+    assert.equal(cancelCalls, 1); assert.equal(abortCalls, 1);
+    const events = messages.map(line => JSON.parse(line.slice(line.indexOf('{'))));
+    assert.deepEqual(events.filter(event => event.event === 'reader/read-settled').map(event => ({ done: event.done, bytes: event.bytes })),
+        [{ done: false, bytes: 3 }, { done: true, bytes: 0 }]);
+    assert.deepEqual(events.filter(event => event.event === 'reader/cancel-call').map(event => ({ doneSeen: event.doneSeen, bytesRead: event.bytesRead })),
+        [{ doneSeen: true, bytesRead: 3 }]);
+    assert.equal(events.filter(event => event.event === 'signal/abort').length, 1);
+    assert.ok(events.filter(event => event.event === 'reader/read-call').every(event => event.callSite === 'readResponse'));
+    assert.equal(events.find(event => event.event === 'reader/cancel-call')?.callSite, 'setActive');
+    assert.equal(events.find(event => event.event === 'signal/abort')?.callSite, 'run');
+    assert.equal(JSON.stringify(events).includes(origin), false);
+});
+
+test('page probe returns the original rejected read promise and records only bounded error metadata', async () => {
+    const messages: string[] = []; const original = new Error('DO_NOT_LOG');
+    const readPromise = Promise.reject(original); readPromise.catch(() => {});
+    class ReaderFixture { read() { return readPromise; } cancel() { return Promise.resolve(); } }
+    const reader = new ReaderFixture();
+    class StreamFixture { getReader() { return reader; } cancel() { return Promise.resolve(); } }
+    const stream = new StreamFixture();
+    class ResponseFixture { get body() { return stream; } }
+    const response = new ResponseFixture(); const fetchPromise = Promise.resolve(response);
+    const realm = { fetch: (input?: unknown) => { void input; return fetchPromise; }, URL, Request, DOMException, Response: ResponseFixture, ReadableStream: StreamFixture, ReadableStreamDefaultReader: ReaderFixture,
+        AbortController: class { signal = new EventTarget(); abort() {} }, console: { debug(value: string) { messages.push(value); } } };
+    installPageResponseLifetimeProbe(realm as never); await realm.fetch(origin + path); await Promise.resolve();
+    const returned = response.body.getReader().read(); assert.strictEqual(returned, readPromise);
+    await assert.rejects(returned, error => error === original); await Promise.resolve();
+    assert.equal(messages.some(line => line.includes('DO_NOT_LOG')), false);
+    assert.equal(messages.some(line => line.includes('reader/read-rejected')), true);
 });

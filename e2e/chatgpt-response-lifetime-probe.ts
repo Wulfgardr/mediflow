@@ -3,13 +3,14 @@
  * Keep the first bounded event prefix: overflow is explicit, not a clean trace.
  */
 import { createHash } from 'node:crypto';
-import type { Page, ConsoleMessage, Request as BrowserRequest, Response as BrowserResponse, WebSocket } from '@playwright/test';
+import type { Page, BrowserContext, ConsoleMessage, Request as BrowserRequest, Response as BrowserResponse, WebSocket } from '@playwright/test';
 
 const EVENT_LIMIT = 512;
 const LISTENER_LIMIT = 128;
 const namespace = '/api/settings/ai/chatgpt/synthesis/';
 const operations = new Set(['status', 'prepare', 'consent', 'login/start', 'login/complete', 'login/cancel', 'read', 'models', 'generate', 'cancel', 'logout']);
 const hmrActions = new Set(['sync', 'building', 'built', 'reloadPage', 'serverComponentChanges', 'serverOnlyChanges', 'serverError']);
+const pageProbePrefix = '[mediflow-response-lifetime]';
 type Fields = Record<string, string | number | boolean | null>;
 type Entry = Fields & { sequence: number; milliseconds: number; event: string };
 type Phase = 'scenario-start' | 'ui-ready' | 'consent-wait-armed' | 'consent-http-asserted'
@@ -33,12 +34,114 @@ function failureClass(text: string | undefined): string {
     return text ? 'other' : 'none';
 }
 
+/** Runs before application code. It observes only existing reads/cancels/aborts,
+ * returns every original object and promise, and never accesses Response.body.
+ * Response.body/getReader are observable only when application code uses those
+ * public getters; native internal consumption is outside this probe's view. */
+export function installPageResponseLifetimeProbe(realm: typeof globalThis = globalThis) {
+    const PREFIX = '[mediflow-response-lifetime]';
+    const marker = Symbol.for('mediflow.synthetic-response-lifetime-page.v1');
+    const owned = realm as typeof globalThis & { [marker]?: boolean };
+    if (owned[marker]) return; owned[marker] = true;
+    const NS = '/api/settings/ai/chatgpt/synthesis/';
+    const OPS = new Set(['status', 'prepare', 'consent', 'login/start', 'login/complete', 'login/cancel', 'read', 'models', 'generate', 'cancel', 'logout']);
+    const LIMIT = 256, statesByResponse = new WeakMap<Response, State>(), statesByStream = new WeakMap<ReadableStream, State>();
+    const statesByReader = new WeakMap<object, State>(), statesBySignal = new WeakMap<AbortSignal, Set<State>>();
+    let emitted = 0, counter = 0;
+    type State = { counter: number; operation: string; reads: number; bytesRead: number; doneSeen: boolean };
+    const site = () => { const stack = new Error().stack ?? ''; return stack.includes('readResponse') ? 'readResponse'
+        : stack.includes('setActive') ? 'setActive' : /(?:\bat |@)run\b/u.test(stack) ? 'run' : 'other'; };
+    const emit = (event: string, state: State | null, fields: Record<string, string | number | boolean> = {}) => {
+        if (emitted >= LIMIT) {
+            if (emitted++ === LIMIT) try { realm.console.debug(PREFIX + JSON.stringify({ schema: 'mediflow.synthetic-response-lifetime-page.v1', event: 'probe/overflow' })); } catch { /* diagnostic only */ }
+            return;
+        }
+        emitted++;
+        try { realm.console.debug(PREFIX + JSON.stringify({ schema: 'mediflow.synthetic-response-lifetime-page.v1', event,
+            ...(state ? { operation: state.operation, counter: state.counter } : {}), ...fields })); } catch { /* diagnostic only */ }
+    };
+    const operation = (input: RequestInfo | URL): string | null => {
+        try {
+            const raw = typeof input === 'string' ? input : input instanceof realm.URL ? input.href : input.url;
+            const pathname = new realm.URL(raw, realm.location?.href ?? 'http://localhost').pathname;
+            const suffix = pathname.slice(NS.length); return pathname.startsWith(NS) && OPS.has(suffix) ? suffix : null;
+        } catch { return null; }
+    };
+    const observeSignal = (signal: AbortSignal | null | undefined, state: State) => {
+        if (!signal) return;
+        let states = statesBySignal.get(signal);
+        if (!states) { states = new Set(); statesBySignal.set(signal, states); }
+        states.add(state);
+        const aborted = () => emit('signal/abort', state, { doneSeen: state.doneSeen, bytesRead: state.bytesRead, callSite: site() });
+        signal.addEventListener('abort', aborted, { once: true });
+        if (signal.aborted) aborted();
+    };
+    const originalFetch = realm.fetch;
+    realm.fetch = function(this: typeof globalThis, input: RequestInfo | URL, init?: RequestInit) {
+        const op = operation(input); const pending = originalFetch.call(this, input, init);
+        if (!op) return pending;
+        const state: State = { counter: ++counter, operation: op, reads: 0, bytesRead: 0, doneSeen: false };
+        const signal = init?.signal ?? (realm.Request && input instanceof realm.Request ? input.signal : null);
+        observeSignal(signal, state); emit('fetch/call', state, { signal: !!signal, signalAborted: signal?.aborted === true, callSite: site() });
+        void pending.then(response => { statesByResponse.set(response, state); emit('fetch/resolved', state); }, error => {
+            emit('fetch/rejected', state, { failure: error instanceof realm.DOMException && error.name === 'AbortError' ? 'abort' : 'other' });
+        });
+        return pending;
+    } as typeof fetch;
+    const responseBody = Object.getOwnPropertyDescriptor(realm.Response.prototype, 'body');
+    if (responseBody?.get) Object.defineProperty(realm.Response.prototype, 'body', { ...responseBody, get() {
+        const stream = responseBody.get!.call(this) as ReadableStream | null, state = statesByResponse.get(this as Response);
+        if (stream && state) { statesByStream.set(stream, state); emit('response/body', state, { callSite: site() }); }
+        return stream;
+    } });
+    const getReader = realm.ReadableStream && Object.getOwnPropertyDescriptor(realm.ReadableStream.prototype, 'getReader')?.value;
+    if (typeof getReader === 'function') realm.ReadableStream.prototype.getReader = function(this: ReadableStream, ...args: Parameters<ReadableStream['getReader']>) {
+        const reader = getReader.apply(this, args), state = statesByStream.get(this);
+        if (state) { statesByReader.set(reader, state); emit('stream/get-reader', state, { callSite: site() }); }
+        return reader;
+    } as ReadableStream['getReader'];
+    const patchReader = (prototype: object | undefined) => {
+        if (!prototype) return;
+        const originalRead = Object.getOwnPropertyDescriptor(prototype, 'read')?.value;
+        if (typeof originalRead === 'function') Object.defineProperty(prototype, 'read', { configurable: true, writable: true, value: function(...args: unknown[]) {
+            const state = statesByReader.get(this as object), pending = originalRead.apply(this, args);
+            if (!state) return pending;
+            const read = ++state.reads; emit('reader/read-call', state, { read, callSite: site() });
+            void pending.then((result: { done?: unknown; value?: unknown }) => {
+                const done = result?.done === true; let bytes = 0;
+                try { const size = (result?.value as { byteLength?: unknown } | null)?.byteLength; if (Number.isSafeInteger(size) && (size as number) >= 0) bytes = size as number; } catch { /* metadata unavailable */ }
+                state.doneSeen ||= done; state.bytesRead = Math.min(Number.MAX_SAFE_INTEGER, state.bytesRead + bytes);
+                emit('reader/read-settled', state, { read, done, bytes, bytesRead: state.bytesRead });
+            }, (error: unknown) => emit('reader/read-rejected', state, { read, failure: error instanceof realm.DOMException && error.name === 'AbortError' ? 'abort' : 'other' }));
+            return pending;
+        } });
+        const originalCancel = Object.getOwnPropertyDescriptor(prototype, 'cancel')?.value;
+        if (typeof originalCancel === 'function') Object.defineProperty(prototype, 'cancel', { configurable: true, writable: true, value: function(...args: unknown[]) {
+            const state = statesByReader.get(this as object);
+            if (state) emit('reader/cancel-call', state, { doneSeen: state.doneSeen, bytesRead: state.bytesRead, callSite: site() });
+            return originalCancel.apply(this, args);
+        } });
+    };
+    patchReader(realm.ReadableStreamDefaultReader?.prototype); patchReader(realm.ReadableStreamBYOBReader?.prototype);
+    const streamCancel = realm.ReadableStream && Object.getOwnPropertyDescriptor(realm.ReadableStream.prototype, 'cancel')?.value;
+    if (typeof streamCancel === 'function') realm.ReadableStream.prototype.cancel = function(...args: Parameters<ReadableStream['cancel']>) {
+        const state = statesByStream.get(this); if (state) emit('stream/cancel-call', state, { doneSeen: state.doneSeen, bytesRead: state.bytesRead, callSite: site() });
+        return streamCancel.apply(this, args);
+    };
+    const abort = Object.getOwnPropertyDescriptor(realm.AbortController.prototype, 'abort')?.value;
+    if (typeof abort === 'function') realm.AbortController.prototype.abort = function(...args: Parameters<AbortController['abort']>) {
+        const states = statesBySignal.get(this.signal); if (states) for (const state of states) emit('abort-controller/call', state,
+            { doneSeen: state.doneSeen, bytesRead: state.bytesRead, callSite: site() });
+        return abort.apply(this, args);
+    };
+}
+
 export function createResponseLifetimeProbe() {
     const startedAtUnixMs = Date.now(), started = performance.now();
     const events: Entry[] = [], remove: (() => void)[] = [];
     const requests = new WeakMap<BrowserRequest, number>();
     let sequence = 0, dropped = 0, requestSequence = 0, wireSequence = 0, documentSequence = 0;
-    let disposed = false, listenerOverflow = false, base = '', hmrFrames = 0, gatewayPort = 0;
+    let disposed = false, listenerOverflow = false, pageProbeOverflow = false, base = '', hmrFrames = 0, gatewayPort = 0;
     function record(event: string, fields: Fields = {}) {
         if (disposed) return;
         sequence++;
@@ -92,7 +195,26 @@ export function createResponseLifetimeProbe() {
             // Avoid retaining text, URLs, errors, source contents or login challenges.
             if ('text' in message && typeof message.text === 'function') {
                 const text = message.text();
-                if (text.includes('[Fast Refresh]') || text.includes('[HMR]')) record('browser/hmr-console', {
+                if (text.startsWith(pageProbePrefix)) {
+                    try {
+                        const value: unknown = JSON.parse(text.slice(pageProbePrefix.length));
+                        if (value && typeof value === 'object' && 'schema' in value && value.schema === 'mediflow.synthetic-response-lifetime-page.v1'
+                            && 'event' in value && typeof value.event === 'string') {
+                            const scalars = value as Record<string, unknown>;
+                            const allowedEvents = new Set(['probe/overflow', 'fetch/call', 'fetch/resolved', 'fetch/rejected', 'response/body', 'stream/get-reader',
+                                'stream/cancel-call', 'reader/read-call', 'reader/read-settled', 'reader/read-rejected', 'reader/cancel-call',
+                                'abort-controller/call', 'signal/abort']);
+                            const operation = 'operation' in value && typeof value.operation === 'string' && operations.has(value.operation) ? value.operation : 'other';
+                            const callSite = 'callSite' in value && ['readResponse', 'setActive', 'run', 'other'].includes(String(value.callSite)) ? String(value.callSite) : 'other';
+                            if (allowedEvents.has(value.event)) { if (value.event === 'probe/overflow') pageProbeOverflow = true; record(`page/${value.event}`, { operation, callSite,
+                                ...(['counter', 'read', 'bytes', 'bytesRead'] as const).reduce<Fields>((fields, key) => {
+                                    const current = scalars[key]; if (typeof current === 'number' && Number.isSafeInteger(current) && current >= 0) fields[key] = current; return fields;
+                                }, {}), ...(['done', 'doneSeen', 'signal', 'signalAborted'] as const).reduce<Fields>((fields, key) => {
+                                    const current = scalars[key]; if (typeof current === 'boolean') fields[key] = current; return fields;
+                                }, {}), ...('failure' in value && ['abort', 'other'].includes(String(value.failure)) ? { failure: String(value.failure) } : {}) }); }
+                        }
+                    } catch { /* Untrusted console text is discarded. */ }
+                } else if (text.includes('[Fast Refresh]') || text.includes('[HMR]')) record('browser/hmr-console', {
                     reload: /reload/i.test(text), rebuilding: /rebuild|building/i.test(text) });
             }
         };
@@ -105,7 +227,11 @@ export function createResponseLifetimeProbe() {
                 if (Buffer.byteLength(payload) <= 65536) {
                     try {
                         const value: unknown = JSON.parse(typeof payload === 'string' ? payload : payload.toString('utf8'));
-                        if (value && typeof value === 'object' && 'action' in value && typeof value.action === 'string' && hmrActions.has(value.action)) action = value.action;
+                        if (value && typeof value === 'object') {
+                            const candidate = 'type' in value && typeof value.type === 'string' ? value.type
+                                : 'action' in value && typeof value.action === 'string' ? value.action : null;
+                            if (candidate && hmrActions.has(candidate)) action = candidate;
+                        }
                     } catch { /* Non-JSON HMR frames are recorded, never forwarded or changed here. */ }
                 }
                 record('browser/hmr-frame', { action });
@@ -129,6 +255,7 @@ export function createResponseLifetimeProbe() {
         if (browser) own(() => browser.on('disconnected', disconnected), () => browser.off('disconnected', disconnected));
     }
     return {
+        async arm(context: BrowserContext): Promise<void> { await context.addInitScript(installPageResponseLifetimeProbe as () => void); },
         attach,
         phase(phase: Phase) { record(phase); },
         wireRequest(operation: string, method: string, received: Headers, origin: string): number {
@@ -162,7 +289,7 @@ export function createResponseLifetimeProbe() {
         },
         snapshot() {
             return { schema: 'mediflow.synthetic-response-lifetime.v1', observation: 'passive-public-events-not-cdp-session-storage',
-                startedAtUnixMs, gatewayPort, complete: dropped === 0 && !listenerOverflow, dropped, listenerOverflow, hmrFrames,
+                startedAtUnixMs, gatewayPort, complete: dropped === 0 && !listenerOverflow && !pageProbeOverflow, dropped, listenerOverflow, pageProbeOverflow, hmrFrames,
                 // Zero frames does NOT exclude HMR: routeWebSocket may hide its
                 // underlying socket from Page events. Main-frame commits still count.
                 hmrFrameAbsenceExcludesRefresh: false, events: events.map(event => ({ ...event })) };

@@ -50,22 +50,33 @@ export function createReducer(emit, { recordLimit = 12000, mapLimit = 4096 } = {
         // as whitelisted scalar fields; never trust arbitrary TAP JSON wholesale.
         if (marker < 0) {
             const start = raw.indexOf('{');
-            if (start < 0 || !raw.includes('mediflow.synthetic-response-lifetime.v1')) return;
+            if (start < 0 || !raw.includes('mediflow.synthetic-response-lifetime')) return;
             try {
                 const p = JSON.parse(raw.slice(start));
+                if (p.schema === 'mediflow.synthetic-response-lifetime-page.v1') {
+                    const events = new Set(['probe/overflow','fetch/call','fetch/resolved','fetch/rejected','response/body','stream/get-reader','stream/cancel-call',
+                        'reader/read-call','reader/read-settled','reader/read-rejected','reader/cancel-call','abort-controller/call','signal/abort']);
+                    if (!events.has(p.event) || p.event !== 'probe/overflow' && !OPS.has(p.operation)) { malformed++; return; }
+                    const v = { kind:'page-probe', event:p.event, ...(OPS.has(p.operation) ? {operation:p.operation} : {}) };
+                    for (const k of ['counter','read','bytes','bytesRead']) if (Number.isSafeInteger(p[k]) && p[k] >= 0) v[k] = p[k];
+                    for (const k of ['done','doneSeen','signal','signalAborted']) if (typeof p[k] === 'boolean') v[k] = p[k];
+                    if (['readResponse','setActive','run','other'].includes(p.callSite)) v.callSite = p.callSite;
+                    if (['abort','other'].includes(p.failure)) v.failure = p.failure;
+                    output(v); return;
+                }
                 if (p.schema !== 'mediflow.synthetic-response-lifetime.v1' || !Array.isArray(p.events)) return;
                 if (p.complete !== true) originalProbeIncomplete = true;
                 output({ kind: 'scenario', startedAtUnixMs: Number(p.startedAtUnixMs), port: Number(p.gatewayPort), complete: p.complete === true });
-                const eventNames = /^(?:scenario-(?:start|work-succeeded|cleanup-start|succeeded|failed)|ui-ready|consent-(?:wait-armed|http-asserted)|(?:context|gateway)-close-start|body\/read-(?:start|succeeded|failed)|wire\/(?:request|root-body-ready|finish|close|abort|error|hmr-upgrade)|browser\/(?:request|response|requestfinished|requestfailed|main-frame-commit|frame-detached|page-closed|page-crashed|context-closed|disconnected|hmr-console|hmr-socket|hmr-frame|hmr-closed))$/u;
-                const numbers = ['sequence','milliseconds','request','wire','status','bytes','document'];
-                const bools = ['originMatches','fetchSameOrigin','json','finished','noStore','serviceWorker','navigation','redirected','main','reload','rebuilding'];
-                const allowedStrings = new Set([...OPS,...HMR,'unknown','document','next-static','hmr','other-local','external','invalid-url','other','GET','POST','aborted','failed','connection','incomplete-body','none','cdp-body-resource-missing','cdp-body-evicted','target-closed','cdp-body-other','invalid-json']);
+                const eventNames = /^(?:scenario-(?:start|work-succeeded|cleanup-start|succeeded|failed)|ui-ready|consent-(?:wait-armed|http-asserted)|(?:context|gateway)-close-start|body\/read-(?:start|succeeded|failed)|wire\/(?:request|root-body-ready|finish|close|abort|error|hmr-upgrade)|browser\/(?:request|response|requestfinished|requestfailed|main-frame-commit|frame-detached|page-closed|page-crashed|context-closed|disconnected|hmr-console|hmr-socket|hmr-frame|hmr-closed)|page\/(?:probe\/overflow|fetch\/(?:call|resolved|rejected)|response\/body|stream\/(?:get-reader|cancel-call)|reader\/(?:read-call|read-settled|read-rejected|cancel-call)|abort-controller\/call|signal\/abort))$/u;
+                const numbers = ['sequence','milliseconds','request','wire','status','bytes','document','counter','read','bytesRead'];
+                const bools = ['originMatches','fetchSameOrigin','json','finished','noStore','serviceWorker','navigation','redirected','main','reload','rebuilding','done','doneSeen','signal','signalAborted'];
+                const allowedStrings = new Set([...OPS,...HMR,'unknown','document','next-static','hmr','other-local','external','invalid-url','other','GET','POST','abort','aborted','failed','connection','incomplete-body','none','cdp-body-resource-missing','cdp-body-evicted','target-closed','cdp-body-other','invalid-json']);
                 for (const e of p.events.slice(0,512)) {
                     if (!eventNames.test(e.event)) { malformed++; continue; }
                     const v = { kind: 'scenario-event', event: e.event, port: Number(p.gatewayPort), startedAtUnixMs: Number(p.startedAtUnixMs) };
                     for (const k of numbers) if (typeof e[k] === 'number' && Number.isFinite(e[k])) v[k] = e[k];
                     for (const k of bools) if (typeof e[k] === 'boolean') v[k] = e[k];
-                    for (const k of ['route','method','failure','action']) if (allowedStrings.has(e[k])) v[k] = e[k];
+                    for (const k of ['route','method','failure','action','operation','callSite']) if (allowedStrings.has(e[k]) || OPS.has(e[k]) || ['readResponse','setActive','run'].includes(e[k])) v[k] = e[k];
                     if (typeof e.sha256 === 'string' && /^[a-f0-9]{64}$/u.test(e.sha256)) v.sha256 = e.sha256;
                     output(v);
                 }
@@ -134,7 +145,7 @@ export function createReducer(emit, { recordLimit = 12000, mapLimit = 4096 } = {
             case 'Network.webSocketFrameReceived': {
                 if (!websockets.has(`${session}:${p.requestId}`)) return;
                 let action = 'unknown';
-                try { const x = JSON.parse(p.response?.payloadData); if (HMR.has(x.action)) action = x.action; } catch { /* No payload retained. */ }
+                try { const x = JSON.parse(p.response?.payloadData); const candidate = typeof x.type === 'string' ? x.type : x.action; if (HMR.has(candidate)) action = candidate; } catch { /* No payload retained. */ }
                 v = { request: request(), action }; break;
             }
             case 'Network.webSocketClosed': if (!websockets.delete(`${session}:${p.requestId}`)) return; v = { request: request() }; break;
