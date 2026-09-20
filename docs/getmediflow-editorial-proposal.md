@@ -1,71 +1,89 @@
 # getmediflow: prodotto in vista, dettagli a scelta
 
-[Get MediFlow](https://getmediflow.dev) è il sito di presentazione
-ufficiale del progetto, approvato il 5 settembre 2026 e ospitato su ChatGPT Sites.
-È il primo riferimento per conoscere il prodotto; GitHub conserva codice,
-contributi e contratti tecnici. Il sito non ospita la cartella e non riceve dati
-del runtime. L’accesso è pubblico: chi visita il sito personale può aprire la presentazione.
-L’indirizzo pubblico corrente è `getmediflow.dev`.
+[Get MediFlow](https://getmediflow.dev) è il sito pubblico di presentazione
+del progetto, approvato il 5 settembre 2026 e ospitato su ChatGPT Sites. Da qui
+si può conoscere il prodotto; su GitHub si trovano codice, contributi e
+contratti tecnici. Il sito non ospita la cartella e non riceve dati del runtime.
+Chi arriva dal sito personale può accedere liberamente alla presentazione,
+all’indirizzo `getmediflow.dev`.
 
-Per la candidata 0.8.6 la presentazione descrive il runtime locale/headless
-sul Mac, il browser localhost, il backend e Intelligence Fabric.
-Gli agenti usano soltanto comandi MediFlow nominati e mediati, senza accesso
-diretto a SQLite. L’adapter OpenAI è spento per default; le funzioni AI sono
-opzionali, proposal-only e soggette ai controlli del prodotto. L'app nativa è
-un follow-up separato. La presentazione non anticipa una release, validazione
-clinica o disponibilità multipiattaforma.
+La 0.8.6 è ora pubblicata come sorgente. Il racconto riguarda il runtime
+locale/headless sul Mac, il browser localhost, il backend e la Fabric; l’app
+nativa rimane uno sviluppo separato. Gli agenti raggiungono soltanto comandi
+MediFlow nominati e mediati, senza accedere direttamente a SQLite. Le funzioni
+AI sono facoltative e producono proposte da rivedere. I servizi esterni,
+compresa l’integrazione ChatGPT, sono spenti per default: la presenza del
+percorso non attesta funzionamento live, disponibilità multipiattaforma o
+idoneità clinica.
 
 ## Il filo del racconto
 
-**Ritrova il filo.** MediFlow è il gestionale open source per i pazienti
-dell’ambulatorio. Informazioni, fonti e prossimi passi diventano più facili
-da ritrovare. Il prodotto deve essere visibile dall’apertura.
+**Ritrova il filo.** La presentazione comincia dal gestionale e dal lavoro che
+permette di organizzare, non dalla tecnologia usata per costruirlo. Una
+cartella, una fonte consultabile e un’attività da seguire rendono comprensibile
+il progetto prima che sia necessario nominarne l’architettura.
 
-| Passaggio | Cosa mostra |
+| Passaggio | Che cosa deve diventare comprensibile |
 | --- | --- |
-| Il gestionale | Cartella in vista e schede esplorabili; lavoro possibile anche senza AI. |
-| Dati organizzati | Codifiche, scale, farmaci, documenti ed esportazione FHIR. |
-| Il contesto | Informazioni distribuite tra referti, allegati e attività. |
-| Intelligence Fabric | Quattro percorsi selezionabili, con dettagli sulla revisione. |
-| Scelta dei runtime | Locale, provider esterni in prova e offuscamento in sviluppo. |
-| Aprire il cofano | Tre letture: generale, professionale e tecnica; Headless mediato sul Mac con i suoi limiti. |
-| Responsabilità | GDPR e AI Act con approfondimenti e fonti, senza claim di certificazione. |
+| Il gestionale | Cartella e schede esplorabili; il lavoro resta possibile anche senza AI. |
+| Dati organizzati | Codifiche, scale, farmaci, documenti ed esportazione FHIR, con i rispettivi limiti. |
+| Il contesto | Perché occorra ritrovare informazioni distribuite fra referti, allegati e attività. |
+| Intelligence Fabric | Una struttura di supporto per quattro percorsi selezionabili, sempre da rivedere. |
+| Scelta dei runtime | Strumenti locali, condizioni per i provider esterni e limiti dell’oscuramento dei dati identificativi, senza implicare una disponibilità universale. |
+| Aprire il cofano | Letture generale, professionale e tecnica; accesso headless mediato sul Mac, non autorità generale degli agenti. |
+| Responsabilità | GDPR e AI Act, con fonti e approfondimenti ma senza affermazioni di certificazione. |
+
+La voce segue questo stesso ordine: prima l’esigenza, poi la ragione della
+scelta, infine ciò che consente e ciò che esclude. La Fabric si spiega come
+un’impalcatura per usare strumenti diversi quando servano; non come un elenco
+di modelli. La vocazione aperta e gratuita riguarda la possibilità di studiare
+e discutere MediFlow, non la gratuità dell’hardware o dei servizi esterni.
+Nel prodotto si parla di «integrazione ChatGPT»; OpenAI resta il nome corretto
+per l’azienda, le sue API, gli adapter distinti e le attribuzioni.
 
 ## Forma e interazioni
 
-Un sito semplice, un po’ giocoso, con il prodotto come soggetto. Tipografia
-leggibile, pannelli morbidi e piccoli movimenti accompagnano l’esplorazione.
-La palette riprende Lume: carta, grafite e blu minerale. Il contrasto scuro e
-verde acceso distingue Fabric. Nessun accento arancio decorativo.
+Il prodotto resta il soggetto di un sito semplice, con una componente giocosa
+che non ostacoli la lettura. Tipografia leggibile, pannelli morbidi e piccoli
+movimenti accompagnano l’esplorazione. La palette Lume usa carta, grafite e
+blu minerale; contrasto scuro e verde acceso distinguono Fabric. Non si
+aggiungono accenti arancio decorativi.
 
-Le schermate reali provengono esclusivamente da un runtime con fixture
-sintetiche. Le ricostruzioni interattive sono dichiarate illustrative e non
-simulano un servizio AI live. Se incluse, le schermate Headless devono mostrare
-solo comandi MediFlow realmente disponibili, i controlli applicati e i relativi
-limiti, senza promettere compatibilità con qualunque agente.
+Le schermate reali devono provenire esclusivamente da un runtime con fixture
+sintetiche. Le ricostruzioni interattive vanno dichiarate illustrative e non
+devono simulare un servizio AI live. Le eventuali schermate headless mostrano
+solo comandi MediFlow realmente disponibili, controlli e limiti, senza
+promettere compatibilità con qualunque agente.
 
-Nessuna etichetta di capitolo superflua, contatore, firma Ordito/Concilio o
-freccia senza funzione. Gli approfondimenti rispondono a domande concrete.
-Il movimento rispetta la preferenza di riduzione ed è disattivabile.
+Ogni approfondimento risponde a una domanda concreta. Non servono etichette
+di capitolo superflue, contatori, firme Ordito/Concilio o frecce senza funzione.
+Il movimento deve rispettare la preferenza di riduzione ed essere disattivabile.
 
 ## La stessa progressione nella documentazione
 
-Il README parte dal gestionale, presenta le capacità e porta a fonti e avvio.
-Mantiene i badge Codex, Claude Code, versione sorgente, release, licenza e
-piattaforme, distinguendo candidata sorgente 0.8.6 e release pubblica.
+Il README parte dal lavoro ordinario, presenta le funzioni e accompagna verso
+fonti e avvio. Conserva i badge Codex, Claude Code, versione sorgente, release,
+licenza e piattaforme, distinguendo la release sorgente 0.8.6 dalla revisione
+editoriale e da una distribuzione binaria.
 
-`start-here.md` accompagna il lettore dal prodotto al lavoro clinico e alla
-costruzione tecnica. Le topologie iniziano con una spiegazione accessibile,
-poi conservano diagrammi, contratti e confini. La guida privacy rende leggibili
-le scelte senza sostituire SECURITY, ADR o matrice dei runtime.
+`start-here.md` collega prodotto, lavoro clinico e costruzione tecnica. Le
+topologie introducono il significato dei percorsi prima di diagrammi e
+contratti; la guida privacy rende leggibili le scelte senza sostituire
+SECURITY, ADR o matrice dei runtime. Prove di candidatura e condizioni aperte
+restano negli approfondimenti pertinenti, con date e revisioni originali.
 
-La candidatura e i gate aperti stanno negli approfondimenti pertinenti. Gli
-adapter cloud, la parità FHIRv2 e la distribuzione Apple non diventano promesse
-commerciali per effetto della revisione editoriale.
+Una riscrittura più naturale non promuove gli adapter cloud, la parità FHIRv2
+o la distribuzione Apple a capacità qualificate. Gli esempi di scelta dei
+modelli spiegano un principio, non aggiungono combinazioni ammesse dal sistema.
 
 ## Pubblicazione
 
-La versione approvata è ospitata su ChatGPT Sites. Il sito personale rimanda
-qui per le informazioni di prodotto. La repository pubblica resta la fonte
-canonica del codice; l’aggiornamento del branch non equivale a un merge su main
-o a una release. Le ricevute di consegna identificano le versioni pubblicate.
+Il sito e la repository hanno compiti diversi: il primo presenta il prodotto,
+la seconda permette di studiarne il codice, ricostruire le decisioni e
+contribuire allo sviluppo. Il sito personale rimanda a Get MediFlow per
+questa presentazione.
+
+I testi pubblicati devono restare coerenti con la versione disponibile e con
+le prove che la riguardano. Le ricevute identificano le versioni del sito
+effettivamente pubblicate; branch, merge e release del codice conservano i
+propri riferimenti. Una revisione editoriale non sposta il tag della 0.8.6.
