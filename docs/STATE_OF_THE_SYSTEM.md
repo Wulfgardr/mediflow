@@ -6,7 +6,13 @@ read_when:
 ---
 
 <!-- reconciliation-20260912 -->
-> **Candidata riallineata il 20 settembre 2026, non release.** Il perimetro vigente della 0.8.6 è il runtime locale/headless sul Mac con interfaccia browser localhost. Gli agenti usano soltanto comandi MediFlow nominati, soggetti a capability, autenticazione, currentness, conferma delle scritture cliniche, audit e ricevute; non accedono direttamente a SQLite. I provider restano spenti per default e le funzioni AI sono opzionali e proposal-only. L'app nativa è un follow-up separato e non un gate della 0.8.6. Le prove storiche sotto conservano i propri SHA e non qualificano automaticamente questa ricostruzione. Il coordinamento resta [WUL-669](https://linear.app/wulfgardr/issue/WUL-669); proposte recuperate e servizi configurati non attestano funzionamento reale.
+> **MediFlow 0.8.6 è disponibile come [codice sorgente](https://github.com/Wulfgardr/mediflow/releases/tag/v0.8.6), pubblicato il 20 settembre 2026.** Questa versione funziona in locale sul Mac e si usa dal browser, all’indirizzo localhost. Può essere eseguita anche senza interfaccia grafica, per consentire l’accesso a client e agenti autorizzati.
+>
+> Gli agenti usano i comandi previsti da MediFlow, dopo l’autenticazione e nei limiti dei permessi assegnati. Il sistema verifica che dati e autorizzazioni siano ancora validi per l’operazione, richiede conferma prima di modificare i dati clinici e registra le operazioni, restituendo una ricevuta del loro esito. Gli agenti non accedono direttamente al database.
+>
+> Le funzioni AI sono facoltative e producono proposte da rivedere. I servizi esterni sono disattivati per impostazione predefinita. L’app nativa segue un percorso di sviluppo separato e non è necessaria per usare questa versione.
+>
+> Le verifiche precedenti restano riferite alle versioni su cui sono state eseguite. Non vanno estese automaticamente alla 0.8.6: la sola configurazione di un servizio non ne dimostra il corretto funzionamento. Il coordinamento del lavoro è in [WUL-669](https://linear.app/wulfgardr/issue/WUL-669).
 
 # Stato del Sistema MediFlow
 
@@ -21,7 +27,7 @@ read_when:
 > prevalgono [AGENTS.md](../AGENTS.md) e
 > [docs/repository-topology.md](./repository-topology.md).
 
-Ultimo aggiornamento: 2026-09-20 (v0.8.6: candidato locale verificato in parte, programma e rilascio aperti)
+Ultimo aggiornamento: 2026-09-20 (v0.8.6: release sorgente pubblicata; decisione sul deployment clinico ancora aperta)
 
 La [verifica notturna dell'8 settembre](./analysis/2026-09-07-086-release-verification.md#verifica-notturna-dell8-settembre-programma-ancora-aperto)
 registra build produzione 11b9, suite aggregata 4c99 senza fallimenti con
@@ -38,11 +44,12 @@ non sono verifiche della release 0.8.6.
 
 
 > [!NOTE]
-> Questo documento distingue il candidato sorgente `0.8.6` dalle prove storiche.
-> Check CI su
-> exact SHA, artifact firmati, tag, GitHub Release e installazione esterna sono
-> evidenze di confine e non si deducono dal solo tree. Lo storico delle versioni
-> vive nel [CHANGELOG](../CHANGELOG.md).
+> La release sorgente `0.8.6` corrisponde al commit `46296266c0a8ff4d4ab19216af7e761cddec7d78`.
+> La [CI sul commit pubblicato](https://github.com/Wulfgardr/mediflow/actions/runs/35530827079)
+> e la [release su GitHub](https://github.com/Wulfgardr/mediflow/releases/tag/v0.8.6)
+> ne documentano verifica e pubblicazione. Le prove storiche mantengono le proprie
+> revisioni; firma degli installer e installazioni esterne richiedono prove distinte.
+> Lo storico delle versioni è nel [CHANGELOG](../CHANGELOG.md).
 
 ---
 

@@ -1,5 +1,11 @@
 <!-- reconciliation-20260912 -->
-> **Candidata riallineata il 20 settembre 2026, non release.** Il perimetro vigente della 0.8.6 è il runtime locale/headless sul Mac con interfaccia browser localhost. Gli agenti usano soltanto comandi MediFlow nominati, soggetti a capability, autenticazione, currentness, conferma delle scritture cliniche, audit e ricevute; non accedono direttamente a SQLite. I provider restano spenti per default e le funzioni AI sono opzionali e proposal-only. L'app nativa è un follow-up separato e non un gate della 0.8.6. Le prove storiche sotto conservano i propri SHA e non qualificano automaticamente questa ricostruzione. Il coordinamento resta [WUL-669](https://linear.app/wulfgardr/issue/WUL-669); proposte recuperate e servizi configurati non attestano funzionamento reale.
+> **MediFlow 0.8.6 è disponibile come [codice sorgente](https://github.com/Wulfgardr/mediflow/releases/tag/v0.8.6), pubblicato il 20 settembre 2026.** Questa versione funziona in locale sul Mac e si usa dal browser, all’indirizzo localhost. Può essere eseguita anche senza interfaccia grafica, per consentire l’accesso a client e agenti autorizzati.
+>
+> Gli agenti usano i comandi previsti da MediFlow, dopo l’autenticazione e nei limiti dei permessi assegnati. Il sistema verifica che dati e autorizzazioni siano ancora validi per l’operazione, richiede conferma prima di modificare i dati clinici e registra le operazioni, restituendo una ricevuta del loro esito. Gli agenti non accedono direttamente al database.
+>
+> Le funzioni AI sono facoltative e producono proposte da rivedere. I servizi esterni sono disattivati per impostazione predefinita. L’app nativa segue un percorso di sviluppo separato e non è necessaria per usare questa versione.
+>
+> Le verifiche precedenti restano riferite alle versioni su cui sono state eseguite. Non vanno estese automaticamente alla 0.8.6: la sola configurazione di un servizio non ne dimostra il corretto funzionamento. Il coordinamento del lavoro è in [WUL-669](https://linear.app/wulfgardr/issue/WUL-669).
 
 <div align="center">
 <img src="./docs/design/lume/icona/mediflow-icon-giorno.svg" width="100" height="100" alt="MediFlow: il filo della storia clinica">
@@ -18,7 +24,7 @@ Informazioni, fonti e prossimi passi. Un po’ più facili da ritrovare.
 [![Release pubblica](https://img.shields.io/github/v/release/Wulfgardr/mediflow?label=release&style=flat)](https://github.com/Wulfgardr/mediflow/releases/latest)
 [![Licenza](https://img.shields.io/badge/license-MIT-2ea043?style=flat)](./LICENSE)
 [![Local-first](https://img.shields.io/badge/data-local--first-8957e5?style=flat)](#dove-stanno-i-dati)
-[![Candidata 0.8.6](https://img.shields.io/badge/candidata-Headless%20%7C%20localhost-6e7681?style=flat)](./docs/analysis/2026-09-07-086-release-verification.md)
+[![Uso locale su Mac](https://img.shields.io/badge/0.8.6-Mac%20%7C%20localhost-6e7681?style=flat)](https://github.com/Wulfgardr/mediflow/releases/tag/v0.8.6)
 
 [**Scopri Get MediFlow**](https://getmediflow.dev) · [Perché nasce](#perché-nasce) · [Cosa puoi fare](#cosa-puoi-fare) · [Provalo](#provalo) · [Per chi sviluppa](#per-chi-sviluppa) · [Documentazione](#documentazione)
 
@@ -31,15 +37,13 @@ Informazioni, fonti e prossimi passi. Un po’ più facili da ritrovare.
 <details>
 <summary><strong>Versione sorgente, verifiche e distribuzione</strong></summary>
 
-> **0.8.6: candidata locale/headless sul Mac con browser localhost.**
-> Backend, Intelligence Fabric e Headless operano sul Mac locale. Gli agenti
-> possono usare solo comandi MediFlow nominati e mediati; l'app nativa resta un
-> follow-up separato. L’adapter
-> OpenAI è spento per default; se autorizzato, invia il contenuto preparato al
-> servizio esterno. Le immagini usano soltanto
-> dati sintetici. Gli altri sistemi operativi e i client nativi non sono
-> qualificati in questa candidata; ATHENA è opzionale. Una candidata, una build o una prova locale non equivalgono
-> a release pubblicata, validazione clinica o disponibilità su altri sistemi.
+> **0.8.6: codice sorgente per l’uso locale sul Mac, dal browser o tramite client autorizzati.**
+> La [release è pubblicata su GitHub](https://github.com/Wulfgardr/mediflow/releases/tag/v0.8.6).
+> I servizi esterni, compreso OpenAI, richiedono un’attivazione esplicita;
+> le funzioni AI sono facoltative e i risultati vanno rivisti prima dell’uso.
+> Le immagini mostrano soltanto dati sintetici. Questa distribuzione non include
+> un installer dell’app nativa e non attesta la disponibilità su altri sistemi
+> operativi o una validazione clinica.
 > [Verifiche e limiti](./docs/analysis/2026-09-07-086-release-verification.md).
 
 </details>
