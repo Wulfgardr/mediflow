@@ -15,6 +15,7 @@ name: E2E (Playwright)
 # 3 consecutive local runs before this workflow landed, so this is a normal blocking job.
 
 on:
+  workflow_dispatch:
   pull_request:
   push:
     branches:
@@ -29,7 +30,40 @@ defaults:
     shell: bash
 
 jobs:
+  # @Codex: temporary diagnostic job on this draft branch only. It is not a
+  # release gate. The original attempt never reached the browser-only harness.
+  cdp-diagnostic:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/codex/WUL-680-cdp-consent-body'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Install Playwright chromium
+        run: npx playwright install --with-deps chromium
+      - name: Capture one canonical synthetic browser run
+        run: |
+          bash scripts/chatgpt-cdp-diagnostic/run-capture.sh \
+            "$GITHUB_WORKSPACE" "${RUNNER_TEMP}/chatgpt-cdp-diagnostic"
+      - name: Upload synthetic CDP diagnostic metadata
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chatgpt-cdp-diagnostic
+          path: |
+            ${{ runner.temp }}/chatgpt-cdp-diagnostic/metadata.jsonl
+            ${{ runner.temp }}/chatgpt-cdp-diagnostic/status.json
+          if-no-files-found: error
+          retention-days: 7
+
   e2e:
+    if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     env:
