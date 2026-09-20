@@ -1,5 +1,5 @@
 <!-- reconciliation-20260912 -->
-> **Candidata ricostruita il 12 settembre 2026, non release.** Il perimetro vigente della 0.8.6 è Mac, localhost, backend, WHO/OpenAI e Headless sul Mac. Windows, Linux, Mini, iPhone e iPad sono rinviati alla 1.0; ATHENA è opzionale. Le prove storiche sotto conservano i propri SHA e non qualificano automaticamente questa ricostruzione. Il coordinamento resta [WUL-669](https://linear.app/wulfgardr/issue/WUL-669); proposte recuperate e servizi configurati non attestano funzionamento reale.
+> **Candidata riallineata il 20 settembre 2026, non release.** Il perimetro vigente della 0.8.6 è il runtime locale/headless sul Mac con interfaccia browser localhost. Gli agenti usano soltanto comandi MediFlow nominati, soggetti a capability, autenticazione, currentness, conferma delle scritture cliniche, audit e ricevute; non accedono direttamente a SQLite. I provider restano spenti per default e le funzioni AI sono opzionali e proposal-only. L'app nativa è un follow-up separato e non un gate della 0.8.6. Le prove storiche sotto conservano i propri SHA e non qualificano automaticamente questa ricostruzione. Il coordinamento resta [WUL-669](https://linear.app/wulfgardr/issue/WUL-669); proposte recuperate e servizi configurati non attestano funzionamento reale.
 
 <div align="center">
 <img src="./docs/design/lume/icona/mediflow-icon-giorno.svg" width="100" height="100" alt="MediFlow: il filo della storia clinica">
@@ -18,7 +18,7 @@ Informazioni, fonti e prossimi passi. Un po’ più facili da ritrovare.
 [![Release pubblica](https://img.shields.io/github/v/release/Wulfgardr/mediflow?label=release&style=flat)](https://github.com/Wulfgardr/mediflow/releases/latest)
 [![Licenza](https://img.shields.io/badge/license-MIT-2ea043?style=flat)](./LICENSE)
 [![Local-first](https://img.shields.io/badge/data-local--first-8957e5?style=flat)](#dove-stanno-i-dati)
-[![Candidata 0.8.6](https://img.shields.io/badge/candidata-macOS%20%7C%20localhost-6e7681?style=flat)](./docs/analysis/2026-09-07-086-release-verification.md)
+[![Candidata 0.8.6](https://img.shields.io/badge/candidata-Headless%20%7C%20localhost-6e7681?style=flat)](./docs/analysis/2026-09-07-086-release-verification.md)
 
 [**Scopri Get MediFlow**](https://getmediflow.dev) · [Perché nasce](#perché-nasce) · [Cosa puoi fare](#cosa-puoi-fare) · [Provalo](#provalo) · [Per chi sviluppa](#per-chi-sviluppa) · [Documentazione](#documentazione)
 
@@ -31,12 +31,14 @@ Informazioni, fonti e prossimi passi. Un po’ più facili da ritrovare.
 <details>
 <summary><strong>Versione sorgente, verifiche e distribuzione</strong></summary>
 
-> **0.8.6: candidata locale per Mac e browser localhost.**
-> Backend, Intelligence Fabric e Headless operano sul Mac locale. L’adapter
+> **0.8.6: candidata locale/headless sul Mac con browser localhost.**
+> Backend, Intelligence Fabric e Headless operano sul Mac locale. Gli agenti
+> possono usare solo comandi MediFlow nominati e mediati; l'app nativa resta un
+> follow-up separato. L’adapter
 > OpenAI è spento per default; se autorizzato, invia il contenuto preparato al
 > servizio esterno. Le immagini usano soltanto
-> dati sintetici. Windows, Linux, Mini, iPhone e iPad sono rinviati alla 1.0;
-> ATHENA è opzionale. Una candidata, una build o una prova locale non equivalgono
+> dati sintetici. Gli altri sistemi operativi e i client nativi non sono
+> qualificati in questa candidata; ATHENA è opzionale. Una candidata, una build o una prova locale non equivalgono
 > a release pubblicata, validazione clinica o disponibilità su altri sistemi.
 > [Verifiche e limiti](./docs/analysis/2026-09-07-086-release-verification.md).
 
@@ -87,7 +89,7 @@ La parità FHIRv2 resta da verificare.
 | Ritrovare l'evidenza | Documenti collegati alla cartella e alle fonti | Estrazione locale dei formati supportati; errori espliciti. |
 | Preparare il seguito | Checkup, appuntamenti e attese aperte | Una proposta di follow-up non attesta che l'azione sia stata eseguita. |
 | Dare struttura alle parole | Ricerca terminologica e cataloghi | Il servizio WHO ICD-11 è opzionale e richiede configurazione esplicita. |
-| Registrare una misura | Scale Web/native con risposte esplicite | Zero e risposta mancante sono distinti; fonte e versione restano nello storico. |
+| Registrare una misura | Scale con risposte esplicite | Zero e risposta mancante sono distinti; fonte e versione restano nello storico. |
 | Rivedere informazioni complesse | Quattro percorsi Intelligence Fabric | Output da rivedere, senza scrittura clinica automatica. |
 | Usare capacità senza ogni schermata | Supervisor, AIP e MCP | Accessi delimitati; nessun accesso diretto al database per gli adapter. |
 
@@ -160,13 +162,12 @@ la conformità; la presenza di supervisione umana non è una certificazione.
 ## Dove stanno i dati
 
 Il Mac è il nodo autorevole della candidata 0.8.6: conserva SQLite e ospita
-servizi e API. Browser localhost e app Mac sono le interfacce nel perimetro
-attuale. iPhone, iPad e gli altri sistemi restano rinviati alla 1.0.
+servizi e API. Il browser localhost è l'interfaccia di riferimento nel perimetro
+attuale; l'app Mac resta un follow-up separato.
 
 ```mermaid
 flowchart LR
     web[Browser locale] --> host[Host MediFlow: servizi e API]
-    mac[App Mac] --> host
     host --> db[(SQLite locale)]
     mcp[MCP: capacità delimitate] --> broker[AIP e policy host]
     broker --> host
@@ -199,8 +200,8 @@ il tuo gestore. `better-sqlite3` deve corrispondere all'ABI del Node attivo.
 | macOS | `./Start_MediFlow.command` |
 
 Apri `http://localhost:3000`. Il launcher verifica checkout e porta per evitare
-di aprire un'altra istanza. Windows e Linux, Mini, iPhone e iPad non fanno parte
-della candidata 0.8.6: sono rinviati alla 1.0.
+di aprire un'altra istanza. Gli altri sistemi operativi e i client nativi non
+fanno parte della candidata 0.8.6.
 
 I provider AI, il servizio WHO e gli altri connettori opzionali non si
 attivano con questi comandi. La clone segue il ramo predefinito pubblico:
@@ -210,7 +211,8 @@ non è un'istruzione per ottenere una candidatura non ancora pubblicata.
 <summary><strong>Apple: account gratuito, Xcode e distribuzione</strong></summary>
 
 Xcode completo serve per compilare e testare le applicazioni Apple; le sole
-Command Line Tools non coprono SwiftUI, XCTest e i relativi gate.
+Command Line Tools non coprono SwiftUI e XCTest. Queste prove riguardano il
+follow-up nativo e non sono un gate della candidata 0.8.6.
 Un Apple Account gratuito consente sviluppo e prove personali entro i limiti
 del Personal Team. Developer ID e notarizzazione Mac richiedono l'Apple
 Developer Program. Non sono prerequisiti per pubblicare il codice sorgente.
@@ -246,9 +248,9 @@ nell'interfaccia fidata. Revoca, logout, cambio di selezione o scadenza chiudono
 il grant.
 
 Headless non concede accesso generale al database né autorizza scritture
-cliniche fuori dai controlli applicabili. Mini non fa parte della candidata
-0.8.6 ed è rinviato alla 1.0. Il planner semantico resta limitato a strumenti
-approvati.
+cliniche fuori dai controlli applicabili. La candidata non richiede né qualifica
+un client agente specifico: l'integrazione usa soltanto i comandi MediFlow
+nominati. Il planner semantico resta limitato a strumenti approvati.
 
 </details>
 
