@@ -9,10 +9,18 @@
 # Env:
 #   MEDIFLOW_SKIP_WEB_BUILD=1     reuse a matching payload with recorded build identity
 #   MEDIFLOW_MAC_CONFIG=Release   build configuration (default Debug)
+#   MEDIFLOW_MAC_QA_NAMESPACE     explicit QA copy; exactly 32 lowercase hex digits
 #   MEDIFLOW_CODESIGN_IDENTITY    sign the bundle (incl. the injected runtime);
 #                                 "-" for ad-hoc, or a Developer ID. Unset = no sign
 #                                 (fine for a local run of a locally built app).
 set -euo pipefail
+
+# @Codex: reject an explicitly requested but invalid QA identity before any build.
+MAC_QA_NAMESPACE="${MEDIFLOW_MAC_QA_NAMESPACE-}"
+if [[ "${MEDIFLOW_MAC_QA_NAMESPACE+x}" == x && ! "$MAC_QA_NAMESPACE" =~ ^[0-9a-f]{32}$ ]]; then
+  echo "MEDIFLOW_MAC_QA_NAMESPACE deve contenere esattamente 32 caratteri esadecimali minuscoli." >&2
+  exit 1
+fi
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 NEXT_DIST_DIR="${MEDIFLOW_NEXT_DIST_DIR:-.next}"
@@ -233,6 +241,24 @@ assert_checkout_unchanged
 # canonical build identity in the app process environment before signing.
 PLIST="$APP/Contents/Info.plist"
 [[ -f "$PLIST" && ! -L "$PLIST" ]] || { echo "Info.plist del bundle mancante o non fisico." >&2; exit 1; }
+# @Codex: the persistent QA selection and separate app identity precede every seal.
+if [[ -n "$MAC_QA_NAMESPACE" ]]; then
+  for qa_key in MediFlowQAStorageNamespace CFBundleIdentifier CFBundleName CFBundleDisplayName; do
+    case "$qa_key" in
+      MediFlowQAStorageNamespace) qa_value="$MAC_QA_NAMESPACE" ;;
+      CFBundleIdentifier) qa_value="com.mediflow.qa.$MAC_QA_NAMESPACE" ;;
+      *) qa_value="MediFlow QA" ;;
+    esac
+    plutil -replace "$qa_key" -string "$qa_value" "$PLIST" 2>/dev/null \
+      || plutil -insert "$qa_key" -string "$qa_value" "$PLIST"
+  done
+  if plutil -extract CFBundleURLTypes raw "$PLIST" >/dev/null 2>&1; then
+    plutil -remove CFBundleURLTypes "$PLIST"
+  fi
+elif plutil -extract MediFlowQAStorageNamespace raw "$PLIST" >/dev/null 2>&1; then
+  echo "Metadata QA inattesi in una build ordinaria; usare una directory di build pulita." >&2
+  exit 1
+fi
 if ! plutil -extract LSEnvironment raw "$PLIST" >/dev/null 2>&1; then
   plutil -insert LSEnvironment -dictionary "$PLIST"
 fi
@@ -333,6 +359,12 @@ node "$ROOT_DIR/scripts/run-strip-types.mjs" "$STAGE_EXECUTION_MAC_ASSETS" \
 codesign --verify --strict "$EXECUTION_MAC_HELPER"
 "$ROOT_DIR/scripts/check-macos-web-runtime-native-payload.sh" --web-runtime "$WEB" --frameworks "$FRAMEWORKS"
 node "$ROOT_DIR/scripts/stage-headless-runtime.mjs" --check --app "$APP"
+# @Codex: read-back only; never repair QA metadata after signing.
+if [[ -n "$MAC_QA_NAMESPACE" ]]; then
+  [[ "$(plutil -extract MediFlowQAStorageNamespace raw "$PLIST")" == "$MAC_QA_NAMESPACE" \
+    && "$(plutil -extract CFBundleIdentifier raw "$PLIST")" == "com.mediflow.qa.$MAC_QA_NAMESPACE" ]] \
+    || { echo "Identita QA del bundle non verificata." >&2; exit 1; }
+fi
 echo "Runnable macOS app candidate (runtime smoke still required): $APP"
 echo "WebRuntime: $WEB/server.js"
 echo "Headless MCP (explicit Node 24 required): $RES/mediflow-headless-supervisor.mjs"
