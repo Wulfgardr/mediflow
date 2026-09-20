@@ -1,29 +1,11 @@
 import SwiftUI
 import MediFlowCore
 
-// S7 (Wave 5, D10/D11): the declared FALLBACK editor UI. A SwiftUI toolbar
-// operates on the ClinicalRichTextEditorDocument model (native/MediFlowCore/
-// ClinicalRichTextEditor.swift) rather than binding TextEditor directly to an
-// AttributedString: list/heading/blockquote paragraph structure is not
-// reliable enough to trust for a clinical record without an interactive
-// simulator to verify bidirectional AttributedString editing, which this
-// environment does not have. Every block still renders through
-// ClinicalRichText.render (document.renderedHTML) before it is ever sealed.
-
-/* @Codex */
+/* @Codex: Native inline text selection; the same document is rendered before sealing. */
 struct ClinicalRichTextEditorView: View {
     @Binding var document: ClinicalRichTextEditorDocument
     let accessibilityPrefix: String
-
-    /// Which block the caret is in. Drives whether that block shows its
-    /// formatting controls.
-    ///
-    /// Every block used to carry the full row — kind menu, bold, italic,
-    /// underline, strikethrough, delete — at all times. A four-paragraph note
-    /// therefore stacked four identical toolbars, and the S/O/A/P template, whose
-    /// whole point is four short lines, produced more chrome than content. The
-    /// controls act on one block at a time, so only one block needs them.
-    @FocusState private var focusedBlockID: UUID?
+    @StateObject private var inlineEditor = ClinicalInlineEditorController()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -34,28 +16,17 @@ struct ClinicalRichTextEditorView: View {
                     .accessibilityIdentifier("\(accessibilityPrefix)-empty-state")
             } else {
                 ForEach(document.blocks) { block in
-                    blockRow(block)
+                    if let kind = block.editableKind {
+                        editableBlockRow(block, kind: kind)
+                    } else {
+                        preservedBlockRow(block)
+                    }
                 }
             }
             addBlockToolbar
         }
     }
 
-    @ViewBuilder
-    private func blockRow(_ block: ClinicalRichTextEditorBlock) -> some View {
-        switch block.storage {
-        case .preserved:
-            preservedBlockRow(block)
-        case .editable(let kind, let span):
-            editableBlockRow(block, kind: kind, span: span)
-        }
-    }
-
-    // Degraded-but-safe mode (D11): existing structure this editor cannot
-    // represent losslessly (mixed inline styles, nested lists/blockquotes, an
-    // unclosed tag the web sanitizer preserved) shows as honest literal text,
-    // never silently rewritten. The only edit available is removing the whole
-    // block; the transcoder still writes it back byte-identical if left alone.
     private func preservedBlockRow(_ block: ClinicalRichTextEditorBlock) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline) {
@@ -66,9 +37,10 @@ struct ClinicalRichTextEditorView: View {
                 Button(role: .destructive) {
                     document.removeBlock(id: block.id)
                 } label: {
-                    Image(systemName: "trash")
+                    Image(systemName: "trash").frame(minWidth: 44, minHeight: 44)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Rimuovi blocco preservato")
                 .accessibilityIdentifier("\(accessibilityPrefix)-preserved-remove-\(block.id.uuidString)")
             }
             Text(block.preservedPreviewText ?? "")
@@ -81,55 +53,41 @@ struct ClinicalRichTextEditorView: View {
         }
         .padding(8)
         .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 6))
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("\(accessibilityPrefix)-preserved-block")
     }
 
     private func editableBlockRow(
-        _ block: ClinicalRichTextEditorBlock,
-        kind: ClinicalRichTextEditorBlock.EditableKind,
-        span: ClinicalRichTextTextRun
+        _ block: ClinicalRichTextEditorBlock, kind: ClinicalRichTextEditorBlock.EditableKind
     ) -> some View {
-        let isFocused = focusedBlockID == block.id
+        let isFocused = inlineEditor.focusedBlockID == block.id
         return VStack(alignment: .leading, spacing: 4) {
             if isFocused {
-                HStack(spacing: 6) {
-                    kindMenu(block: block, currentKind: kind)
-                    Spacer(minLength: 8)
-                    styleToggle(systemImage: "bold", isOn: span.isBold, identifier: "\(accessibilityPrefix)-bold-\(block.id.uuidString)") {
-                        document.toggleBold(id: block.id)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        kindMenu(block: block, currentKind: kind)
+                        styleToggle(.bold, symbol: "bold", label: "Grassetto", block: block)
+                        styleToggle(.italic, symbol: "italic", label: "Corsivo", block: block)
+                        styleToggle(.underline, symbol: "underline", label: "Sottolineato", block: block)
+                        styleToggle(.strikethrough, symbol: "strikethrough", label: "Barrato", block: block)
+                        Button(role: .destructive) {
+                            document.removeBlock(id: block.id)
+                        } label: {
+                            Image(systemName: "trash").frame(minWidth: 44, minHeight: 44)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Rimuovi blocco")
+                        .accessibilityIdentifier("\(accessibilityPrefix)-remove-\(block.id.uuidString)")
                     }
-                    styleToggle(systemImage: "italic", isOn: span.isItalic, identifier: "\(accessibilityPrefix)-italic-\(block.id.uuidString)") {
-                        document.toggleItalic(id: block.id)
-                    }
-                    styleToggle(systemImage: "underline", isOn: span.isUnderlined, identifier: "\(accessibilityPrefix)-underline-\(block.id.uuidString)") {
-                        document.toggleUnderline(id: block.id)
-                    }
-                    styleToggle(systemImage: "strikethrough", isOn: span.isStruckThrough, identifier: "\(accessibilityPrefix)-strikethrough-\(block.id.uuidString)") {
-                        document.toggleStrikethrough(id: block.id)
-                    }
-                    Button(role: .destructive) {
-                        document.removeBlock(id: block.id)
-                    } label: {
-                        Image(systemName: "trash")
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("\(accessibilityPrefix)-remove-\(block.id.uuidString)")
+                    .fixedSize(horizontal: true, vertical: false)
                 }
-                .transition(.opacity)
+                .accessibilityIdentifier("\(accessibilityPrefix)-format-toolbar")
             }
-            TextEditor(text: Binding(
-                get: { span.text },
-                set: { document.updateText(id: block.id, text: $0) }
-            ))
-            // TextEditor has no per-character rich rendering: bold/italic are
-            // reflected via the block's font, underline/strikethrough only via
-            // the toggle buttons' highlighted state above (this editor styles a
-            // whole block at once, not a text selection, see D11 fallback note).
-            .font(font(forKind: kind, isBold: span.isBold, isItalic: span.isItalic))
-            .scrollContentBackground(.hidden)
-            .frame(minHeight: 36)
-            .focused($focusedBlockID, equals: block.id)
-            .accessibilityIdentifier("\(accessibilityPrefix)-text-\(block.id.uuidString)")
+            ClinicalInlineTextView(
+                document: $document, blockID: block.id, controller: inlineEditor,
+                identifier: "\(accessibilityPrefix)-text-\(block.id.uuidString)"
+            )
+            .frame(minHeight: 44)
         }
         .padding(10)
         .background(
@@ -138,46 +96,51 @@ struct ClinicalRichTextEditorView: View {
         )
         .overlay(
             RoundedRectangle(cornerRadius: ClinicalChartMetrics.fieldRadius, style: .continuous)
-                .stroke(
-                    isFocused ? Color.accentColor : PlatformColors.separator,
-                    lineWidth: isFocused ? 1.5 : 1
-                )
+                .stroke(isFocused ? Color.accentColor : PlatformColors.separator, lineWidth: isFocused ? 1.5 : 1)
         )
-        .animation(.easeInOut(duration: 0.15), value: isFocused)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("\(accessibilityPrefix)-block-\(block.id.uuidString)")
+    }
+
+    // Kept for existing callers/tests. Every access resolves the current UUID;
+    // the native attributed editor uses the same rule through its session.
+    func textBinding(for blockID: UUID) -> Binding<String> {
+        Binding(
+            get: {
+                guard let runs = document.blocks.first(where: { $0.id == blockID })?.runs else { return "" }
+                return ClinicalInlineEditing.plainText(runs)
+            },
+            set: { document.updateText(id: blockID, text: $0) }
+        )
     }
 
     private func kindMenu(block: ClinicalRichTextEditorBlock, currentKind: ClinicalRichTextEditorBlock.EditableKind) -> some View {
         Menu {
             ForEach(ClinicalRichTextEditorBlock.EditableKind.allCases, id: \.self) { kind in
-                Button(Self.label(for: kind)) {
-                    document.setKind(id: block.id, kind: kind)
-                }
+                Button(Self.label(for: kind)) { document.setKind(id: block.id, kind: kind) }
             }
         } label: {
             Label(Self.label(for: currentKind), systemImage: "textformat")
-                .font(.caption2)
+                .font(.caption)
+                .frame(minWidth: 44, minHeight: 44)
         }
         .accessibilityIdentifier("\(accessibilityPrefix)-kind-\(block.id.uuidString)")
     }
 
-    private func styleToggle(systemImage: String, isOn: Bool, identifier: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: systemImage)
-                .foregroundStyle(isOn ? Color.accentColor : Color.secondary)
+    private func styleToggle(_ style: ClinicalInlineStyle, symbol: String, label: String, block: ClinicalRichTextEditorBlock) -> some View {
+        Button { inlineEditor.toggle(style) } label: {
+            Image(systemName: symbol)
+                .foregroundStyle(inlineEditor.styles.contains(style) ? Color.accentColor : .secondary)
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityIdentifier(identifier)
+        .accessibilityLabel(label)
+        .accessibilityValue(inlineEditor.styles.contains(style) ? "Attivo" : "Non uniforme o disattivo")
+        .accessibilityHint("Applica alla selezione o al testo che scriverai.")
+        .accessibilityIdentifier("\(accessibilityPrefix)-\(style.rawValue)-\(block.id.uuidString)")
     }
 
-    /// Six labelled buttons in a row, on a canvas that fits about three.
-    ///
-    /// Squeezed into the available width they did not truncate or wrap by word:
-    /// each label collapsed to a single column of letters, so the bar read
-    /// "P a r a g r a f o". A formatting bar is a strip of tools, and a strip of
-    /// tools that does not fit scrolls — which is what iOS does with its own.
-    /// `.fixedSize` on the row is what makes the buttons keep their real width
-    /// inside the scroll view instead of compressing again.
     private var addBlockToolbar: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 6) {
@@ -189,20 +152,17 @@ struct ClinicalRichTextEditorView: View {
                 addBlockButton(kind: .blockquote, label: "Citazione", systemImage: "quote.opening")
             }
             .fixedSize(horizontal: true, vertical: false)
-            // Room for the button's own focus ring and shadow, which a scroll
-            // view clips flush otherwise.
             .padding(.vertical, 2)
         }
-        .font(.caption2)
+        .font(.caption)
     }
 
     private func addBlockButton(kind: ClinicalRichTextEditorBlock.EditableKind, label: String, systemImage: String) -> some View {
-        Button {
-            document.appendNewBlock(kind: kind)
-        } label: {
+        Button { document.appendNewBlock(kind: kind) } label: {
             Label(label, systemImage: systemImage)
                 .lineLimit(1)
                 .fixedSize(horizontal: true, vertical: false)
+                .frame(minHeight: 44)
         }
         .buttonStyle(.bordered)
         .accessibilityIdentifier("\(accessibilityPrefix)-add-\(Self.identifierSuffix(for: kind))")
@@ -210,36 +170,24 @@ struct ClinicalRichTextEditorView: View {
 
     private static func label(for kind: ClinicalRichTextEditorBlock.EditableKind) -> String {
         switch kind {
-        case .paragraph: return "Paragrafo"
-        case .heading2: return "Titolo (H2)"
-        case .heading3: return "Sottotitolo (H3)"
-        case .bulletItem: return "Elenco puntato"
-        case .numberedItem: return "Elenco numerato"
-        case .blockquote: return "Citazione"
+        case .paragraph: "Paragrafo"
+        case .heading2: "Titolo (H2)"
+        case .heading3: "Sottotitolo (H3)"
+        case .bulletItem: "Elenco puntato"
+        case .numberedItem: "Elenco numerato"
+        case .blockquote: "Citazione"
         }
     }
 
     private static func identifierSuffix(for kind: ClinicalRichTextEditorBlock.EditableKind) -> String {
         switch kind {
-        case .paragraph: return "paragraph"
-        case .heading2: return "heading2"
-        case .heading3: return "heading3"
-        case .bulletItem: return "bullet-item"
-        case .numberedItem: return "numbered-item"
-        case .blockquote: return "blockquote"
+        case .paragraph: "paragraph"
+        case .heading2: "heading2"
+        case .heading3: "heading3"
+        case .bulletItem: "bullet-item"
+        case .numberedItem: "numbered-item"
+        case .blockquote: "blockquote"
         }
-    }
-
-    private func font(forKind kind: ClinicalRichTextEditorBlock.EditableKind, isBold: Bool, isItalic: Bool) -> Font {
-        var base: Font
-        switch kind {
-        case .heading2: base = .subheadline
-        case .heading3: base = .subheadline
-        default: base = .body
-        }
-        if isBold { base = base.weight(.bold) }
-        if isItalic { base = base.italic() }
-        return base
     }
 }
 

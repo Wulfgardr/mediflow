@@ -644,14 +644,17 @@
 .navGroupLabel {
     padding-inline: 0.35rem;
 }
+/* @Codex: center the full text block with symmetric spacing in every nav item. */
 .navItem {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 0.75rem;
-    border-radius: var(--lume-radius-control);
+    min-height: 44px;
+    line-height: 1.4;
+    gap: 8px;
+    border-radius: 12px;
     color: var(--lume-ink);
-    padding: 0.55rem 0.65rem;
+    padding: 8px 12px;
     text-decoration: none;
     transition: background-color 120ms ease-out;
 }
@@ -665,6 +668,39 @@
 .navItemCopy {
     min-width: 0;
 }
+/* @Codex WUL-676 candidate: neutral selection, readable density, no colour rail.
+   Originale/Proposta changes presentation only; links and aria-current stay owned
+   by SettingsNavSidebar and the canonical navigation registry. */
+:global(html[data-runtime-twin-design='proposal']) .navGroups { gap: 1.4rem; }
+:global(html[data-runtime-twin-design='proposal']) .navItem {
+    min-height: 44px;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border: 1px solid transparent;
+    border-radius: 12px;
+}
+:global(html[data-runtime-twin-design='proposal']) .navItemLabel { font-size: 0.875rem; line-height: 1.35; }
+:global(html[data-runtime-twin-design='proposal']) .navItemDescription { font-size: 0.75rem; line-height: 1.5; }
+:global(html[data-runtime-twin-design='proposal']) .navItemActive {
+    border-color: color-mix(in srgb, var(--lume-ink) 17%, transparent);
+    background: var(--lume-surface-focal);
+    box-shadow: 0 2px 4px color-mix(in srgb, var(--lume-surface-chrome) 60%, transparent);
+}
+:global(html[data-runtime-twin-design='proposal']) .navItemActive:hover { background: var(--lume-surface-focal); }
+:global(html[data-runtime-twin-design='proposal']) .navItem:focus-visible {
+    outline: 2px solid var(--lume-accent);
+    outline-offset: 2px;
+}
+:global(html[data-runtime-twin-design='proposal']) .currentLabel {
+    margin-top: 2px;
+    padding: 2px 5px;
+    border-radius: 4px;
+    background: var(--lume-surface-chrome);
+    color: var(--lume-ink);
+    font-size: 0.625rem;
+}
+:global(html[data-runtime-twin-design='proposal']) .searchButton { min-height: 42px; font-size: 0.75rem; }
 .navItemLabel,
 .navItemDescription {
     display: block;
@@ -768,3 +804,51 @@
         transition-duration: 0.01ms;
     }
 }
+
+/* @Codex WUL-676: the index is navigation, not a second stack of cards. */
+:global(html[data-runtime-twin-design='proposal']) .navItem { min-height: 44px; padding: 8px 12px; border: 0; border-radius: 12px; box-shadow: none; }
+:global(html[data-runtime-twin-design='proposal']) .navItemDescription { display: none; }
+:global(html[data-runtime-twin-design='proposal']) .navGroupLabel { font-family: var(--lume-font-sans); font-size: 11px; }
+:global(html[data-runtime-twin-design='proposal']) .navItemActive { background: var(--lume-ink); color: var(--lume-surface-focal); box-shadow: none; }
+:global(html[data-runtime-twin-design='proposal']) .navItemActive :is(strong, span, svg) { color: inherit; }
+:global(html[data-runtime-twin-design='proposal']) .currentLabel { display: none; }
+:global(html[data-runtime-twin-design='proposal']) .searchButton { background: var(--lume-surface-focal); font-size: 12px; }
+:global(html[data-runtime-twin-design='proposal']) .overviewFocus { padding: 0 0 28px; border: 0; border-bottom: 1px solid color-mix(in srgb, var(--lume-ink) 12%, transparent); border-radius: 0; box-shadow: none; }
+:global(html[data-runtime-twin-design='proposal']) .sectionLabel { display: none; }
+
+:global(html[data-runtime-twin-design='proposal']) .navItemActive:hover { background: var(--lume-ink); color: var(--lume-surface-focal); }
+/* @Codex: command text shares the same weight as the clinical actions. */
+:global(html[data-runtime-twin-design='proposal']) :is(.primaryAction, .secondaryAction) {
+    min-height: var(--lume-control-height);
+    padding: 10px 14px;
+    gap: var(--lume-control-gap);
+    font-size: 14px;
+    line-height: 22px;
+    font-weight: 600;
+}
+:global(html[data-runtime-twin-design='proposal']) .settingSurface { padding: 28px 0; border: 0; border-top: 1px solid color-mix(in srgb, var(--lume-ink) 12%, transparent); border-radius: 0; box-shadow: none; background: transparent; }
+:global(html[data-runtime-twin-design='proposal']) .settingSurface > div:first-child p:global(.section-kicker) { display: none; }
+:global(html[data-runtime-twin-design='proposal']) :is(.sectionIntro, .overviewFocus, .previewSection, .indexHeading) h2 { margin-top: 0; font-size: var(--twin-type-section); font-weight: var(--twin-heading-weight); line-height: var(--twin-heading-leading); letter-spacing: -0.02em; }
+:global(html[data-runtime-twin-design='proposal']) .sectionIntro p:last-child { font-size: var(--twin-type-body); line-height: var(--twin-body-leading); }
+
+/* @Codex: visible return on subroutes, including the collapsed mobile index. */
+.returnLink {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--lume-control-gap, 8px);
+    min-height: var(--lume-control-height, 44px);
+    max-width: 100%;
+    box-sizing: border-box;
+    padding: 10px 12px;
+    border-radius: var(--lume-control-radius, 12px);
+    color: var(--lume-ink);
+    font-size: .9375rem;
+    font-weight: 600;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+    text-decoration: underline;
+    text-underline-offset: 4px;
+}
+.returnLink svg { flex-shrink: 0; }
+.returnLink:hover { background: var(--lume-surface-field); }
+.returnLink:focus-visible { outline: 2px solid var(--lume-accent); outline-offset: 3px; }

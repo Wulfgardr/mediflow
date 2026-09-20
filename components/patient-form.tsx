@@ -6,6 +6,7 @@ import { useForm, useFieldArray, Control, Controller, FieldErrors, UseFormRegist
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Save, User, Phone, MapPin, HeartHandshake, FileText, Activity, Plus, Trash2, AlertTriangle, Calendar, Ticket, ChevronDown } from 'lucide-react';
 import ICDAutocomplete from '@/components/icd-autocomplete';
+import { WhoCodeCheck } from '@/components/who-code-check';
 /* @Codex */
 import ExemptionSelector from '@/components/exemption-selector';
 import { estimateBirthYearFromTaxCode, calculateAge } from '@/lib/utils';
@@ -13,6 +14,7 @@ import { estimateBirthYearFromTaxCode, calculateAge } from '@/lib/utils';
 import { patientSchema, PatientFormValues } from '@/lib/schemas';
 /* @Codex */
 import { patientFormDefaults, type PatientFormSeed } from '@/lib/patient-edit-session';
+import { useRuntimeTwinPendingForm } from '@/components/runtime-twin-design';
 
 interface PatientFormProps {
     defaultValues?: PatientFormSeed;
@@ -78,6 +80,7 @@ function DiagnosesFieldArray({ control, register, errors, setValue, watch }: { c
                                 <label className="mf-field-label">Codice</label>
                                 <input
                                     {...register(`diagnoses.${index}.code`)}
+                                    readOnly={!!watch(`diagnoses.${index}.canonicalUri`)}
                                     placeholder="Es. 8A80.0"
                                     className="mf-input mf-input-sm font-mono font-bold"
                                     aria-invalid={!!errors.diagnoses?.[index]?.code}
@@ -92,19 +95,38 @@ function DiagnosesFieldArray({ control, register, errors, setValue, watch }: { c
                                             code: watch(`diagnoses.${index}.code`) || "",
                                             description: watch(`diagnoses.${index}.description`) || "",
                                             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                            system: (watch(`diagnoses.${index}.system`) as any) || "ICD-11"
+                                            system: (watch(`diagnoses.${index}.system`) as any) || "ICD-11",
+                                            canonicalUri: watch(`diagnoses.${index}.canonicalUri`),
+                                            reference: watch(`diagnoses.${index}.reference`),
                                         }}
                                         onChange={(val) => {
-                                            setValue(`diagnoses.${index}.code`, val.code);
-                                            setValue(`diagnoses.${index}.description`, val.description);
+                                            // @Codex: user edits must update the unsaved-navigation guard.
+                                            setValue(`diagnoses.${index}.code`, val.code, { shouldDirty: true });
+                                            setValue(`diagnoses.${index}.description`, val.description, { shouldDirty: true });
                                             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                            setValue(`diagnoses.${index}.system`, val.system as any);
+                                            setValue(`diagnoses.${index}.system`, val.system as any, { shouldDirty: true });
+                                            // @Codex: replacement/free text also clears an old WHO association.
+                                            setValue(`diagnoses.${index}.canonicalUri`, val.canonicalUri, { shouldDirty: true });
+                                            setValue(`diagnoses.${index}.reference`, val.reference, { shouldDirty: true });
                                         }}
                                     />
                                     <input type="hidden" {...register(`diagnoses.${index}.description`)} />
                                 </div>
+                                {/* @Codex: persisted URI remains inspectable after a fresh read. */}
+                                {watch(`diagnoses.${index}.canonicalUri`) && <details className="mt-2 text-xs break-words">
+                                    <summary>Riferimento della selezione WHO</summary>
+                                    <p>{watch(`diagnoses.${index}.canonicalUri`)}</p>
+                                    <p>Per cambiare codice, sostituisci o cancella la selezione nella ricerca.</p>
+                                </details>}
                                 {errors.diagnoses?.[index]?.description && (
                                     <span className="mf-field-error block">Campo obbligatorio</span>
+                                )}
+                                {(watch(`diagnoses.${index}.system`) || 'ICD-11') === 'ICD-11' && Boolean(watch(`diagnoses.${index}.code`)) && (
+                                    <WhoCodeCheck
+                                        key={`${watch(`diagnoses.${index}.code`)}-${watch(`diagnoses.${index}.reference`)?.releaseId ?? '2026-01'}`}
+                                        code={watch(`diagnoses.${index}.code`) || ''}
+                                        release={watch(`diagnoses.${index}.reference`)?.releaseId ?? '2026-01'}
+                                    />
                                 )}
                             </div>
                         </div>
@@ -211,13 +233,14 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
     /* @Codex: useForm caches defaults; its comparison baseline must share that lifetime. */
     const [formattedDefaults] = useState(() => patientFormDefaults(defaultValues));
     const submittingRef = useRef(false);
-    const { register, control, handleSubmit, setValue, watch, formState: { errors, isSubmitting: formSubmitting } } = useForm<PatientFormValues>({
+    const { register, control, handleSubmit, setValue, watch, formState: { errors, isDirty, isSubmitting: formSubmitting } } = useForm<PatientFormValues>({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         resolver: zodResolver(patientSchema) as any,
         // HTML dates are strings; the existing resolver returns Date objects.
         defaultValues: formattedDefaults as unknown as DefaultValues<PatientFormValues>,
     });
     const submitting = isSubmitting || formSubmitting;
+    useRuntimeTwinPendingForm(isDirty);
     const submitOnce = async (data: PatientFormValues) => {
         if (disabled || submittingRef.current) return;
         submittingRef.current = true;
@@ -366,7 +389,8 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
             </div>
 
             {/* Pianificazione operativa */}
-            <div className={FORM_SECTION_CLASS}>
+            {/* @Codex WUL-678: stable anchor for the existing follow-up planner. */}
+            <div id="pianificazione" className={FORM_SECTION_CLASS}>
                 <div className="flex items-center gap-4 graphite-divider pb-5 mb-2">
                     <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: 'color-mix(in srgb, var(--lume-accent) 10%, var(--lume-surface-field))' }}>
                         <Calendar className="w-5 h-5" style={{ color: 'var(--lume-accent)' }} />

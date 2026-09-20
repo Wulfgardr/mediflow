@@ -1,40 +1,15 @@
 import Foundation
 
-/// S7 (Wave 5, D10/D11): a structural block editor model bound to the
-/// `ClinicalRichText` transcoder. This is the declared FALLBACK from D11: rather
-/// than binding a SwiftUI `TextEditor` directly to an `AttributedString` (whose
-/// bidirectional support for list/heading/blockquote paragraph structure is not
-/// reliable enough to trust for a clinical record without an interactive
-/// simulator to verify it), the toolbar operates on this typed model and the
-/// HTML the operator sees as a live preview is always
-/// `ClinicalRichText.render(document:)` of the SAME model that gets sealed.
-/// There is no code path that saves anything other than that render output:
-/// this is what satisfies the D11 sanitize-before-seal invariant.
-///
-/// Each editable block carries exactly one styled run (bold/italic/underline/
-/// strikethrough are toggled for the WHOLE block, not per character). This is
-/// a real, declared reduction from full inline mixed-style editing; content
-/// that cannot be represented this way (mixed inline styles inside a single
-/// paragraph, multi-paragraph list items, nested lists/blockquotes, heading
-/// level 1, or the transcoder's own lossless `sanitizedFragment`) is preserved
-/// verbatim as an opaque, non-editable block instead of being silently
-/// corrupted or dropped. That is the "degraded ma sicura" mode the spec asks
-/// for when opening existing entries.
+/* @Codex: Typed inline editing; persistence remains the existing transcoder render. */
 public struct ClinicalRichTextEditorBlock: Identifiable, Equatable, Sendable {
     public enum EditableKind: Equatable, Hashable, Sendable, CaseIterable {
-        case paragraph
-        case heading2
-        case heading3
-        case bulletItem
-        case numberedItem
-        case blockquote
+        case paragraph, heading2, heading3, bulletItem, numberedItem, blockquote
     }
 
     public enum Storage: Equatable, Sendable {
+        // Retained for existing callers creating a uniform paragraph.
         case editable(kind: EditableKind, span: ClinicalRichTextTextRun)
-        // Keeps the ORIGINAL parsed AST node so it can be written back to the
-        // outgoing document unchanged: no re-parsing, no re-rendering, no risk
-        // of drifting from what was actually stored.
+        case inline(kind: EditableKind, runs: [ClinicalRichTextTextRun])
         case preserved(ClinicalRichTextBlock)
     }
 
@@ -46,13 +21,34 @@ public struct ClinicalRichTextEditorBlock: Identifiable, Equatable, Sendable {
         self.storage = .editable(kind: kind, span: span)
     }
 
+    public init(id: UUID = UUID(), kind: EditableKind, runs: [ClinicalRichTextTextRun]) {
+        self.id = id
+        let runs = ClinicalInlineEditing.coalesced(runs)
+        self.storage = runs.count <= 1
+            ? .editable(kind: kind, span: runs.first ?? ClinicalRichTextTextRun(text: ""))
+            : .inline(kind: kind, runs: runs)
+    }
+
     public init(id: UUID = UUID(), preserving block: ClinicalRichTextBlock) {
         self.id = id
         self.storage = .preserved(block)
     }
 
-    /// A safe, honest, literal-text preview of a preserved block's content, for
-    /// display only (never re-parsed, never re-saved from this string).
+    public var editableKind: EditableKind? {
+        switch storage {
+        case .editable(let kind, _), .inline(let kind, _): kind
+        case .preserved: nil
+        }
+    }
+
+    public var runs: [ClinicalRichTextTextRun]? {
+        switch storage {
+        case .editable(_, let span): [span]
+        case .inline(_, let runs): runs
+        case .preserved: nil
+        }
+    }
+
     public var preservedPreviewText: String? {
         guard case .preserved(let block) = storage else { return nil }
         return ClinicalRichText.render(document: ClinicalRichTextDocument(blocks: [block]))
@@ -64,24 +60,22 @@ public struct ClinicalRichTextEditorBlock: Identifiable, Equatable, Sendable {
     }
 }
 
+/* @Codex */
 public struct ClinicalRichTextEditorDocument: Equatable, Sendable {
     public var blocks: [ClinicalRichTextEditorBlock]
+    // A no-op save (including a style change undone by the user) retains the
+    // original sanitized representation, including list/inline tag grouping.
+    private var originalDocument: ClinicalRichTextDocument?
+    private var originalBlocks: [ClinicalRichTextEditorBlock]?
 
     public init(blocks: [ClinicalRichTextEditorBlock] = []) {
         self.blocks = blocks
     }
 
-    /// Empty means: no blocks, or every editable block's text is blank and no
-    /// preserved (real, stored) content exists. A preserved block always counts
-    /// as content: it represents something a previous save actually persisted.
     public var isEffectivelyEmpty: Bool {
         blocks.allSatisfy { block in
-            switch block.storage {
-            case .editable(_, let span):
-                return span.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            case .preserved:
-                return false
-            }
+            guard let runs = block.runs else { return false }
+            return ClinicalInlineEditing.plainText(runs).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         }
     }
 
@@ -93,149 +87,163 @@ public struct ClinicalRichTextEditorDocument: Equatable, Sendable {
         blocks.removeAll { $0.id == id }
     }
 
+    // Compatibility for uniform callers. Rich native input uses updateRuns,
+    // never replaces a mixed paragraph through a plain-string binding.
     public mutating func updateText(id: UUID, text: String) {
+        guard let block = blocks.first(where: { $0.id == id }), let runs = block.runs else { return }
+        let before = ClinicalInlineEditing.plainText(runs)
+        guard text != before else { return }
+        // Keep attributes around the actual replacement, including when an
+        // existing retained plain-text binding observes a now-mixed block.
+        let old = Array(before), new = Array(text)
+        var prefix = 0
+        while prefix < min(old.count, new.count), old[prefix] == new[prefix] { prefix += 1 }
+        var suffix = 0
+        while suffix < min(old.count - prefix, new.count - prefix),
+              old[old.count - 1 - suffix] == new[new.count - 1 - suffix] { suffix += 1 }
+        let location = String(old.prefix(prefix)).utf16.count
+        let removed = String(old[prefix..<(old.count - suffix)]).utf16.count
+        var replacement = runs.first ?? ClinicalRichTextTextRun(text: "")
+        if location > 0 {
+            replacement = ClinicalInlineEditing.slice(runs, range: NSRange(location: location - 1, length: 1)).first ?? replacement
+        }
+        replacement.text = String(new[prefix..<(new.count - suffix)])
+        _ = replaceText(id: id, range: NSRange(location: location, length: removed), with: [replacement])
+    }
+
+    @discardableResult
+    public mutating func updateRuns(
+        id: UUID, runs: [ClinicalRichTextTextRun], expecting expected: [ClinicalRichTextTextRun]? = nil
+    ) -> Bool {
         guard let index = blocks.firstIndex(where: { $0.id == id }),
-              case .editable(let kind, let span) = blocks[index].storage else { return }
-        blocks[index].storage = .editable(kind: kind, span: ClinicalRichTextTextRun(
-            text: text,
-            isBold: span.isBold,
-            isItalic: span.isItalic,
-            isUnderlined: span.isUnderlined,
-            isStruckThrough: span.isStruckThrough
-        ))
+              let kind = blocks[index].editableKind, let current = blocks[index].runs,
+              expected == nil || ClinicalInlineEditing.coalesced(current) == ClinicalInlineEditing.coalesced(expected!) else { return false }
+        blocks[index] = ClinicalRichTextEditorBlock(id: id, kind: kind, runs: runs)
+        return true
+    }
+
+    @discardableResult
+    public mutating func replaceText(id: UUID, range: NSRange, with runs: [ClinicalRichTextTextRun]) -> Bool {
+        guard let current = blocks.first(where: { $0.id == id })?.runs,
+              let edited = ClinicalInlineEditing.replacing(current, range: range, with: runs) else { return false }
+        return updateRuns(id: id, runs: edited, expecting: current)
+    }
+
+    @discardableResult
+    public mutating func toggleStyle(id: UUID, style: ClinicalInlineStyle, range: NSRange) -> Bool {
+        guard let current = blocks.first(where: { $0.id == id })?.runs,
+              let edited = ClinicalInlineEditing.toggling(style, in: current, range: range) else { return false }
+        return updateRuns(id: id, runs: edited, expecting: current)
     }
 
     public mutating func setKind(id: UUID, kind: ClinicalRichTextEditorBlock.EditableKind) {
-        guard let index = blocks.firstIndex(where: { $0.id == id }),
-              case .editable(_, let span) = blocks[index].storage else { return }
-        blocks[index].storage = .editable(kind: kind, span: span)
+        guard let index = blocks.firstIndex(where: { $0.id == id }), let runs = blocks[index].runs else { return }
+        blocks[index] = ClinicalRichTextEditorBlock(id: id, kind: kind, runs: runs)
     }
 
-    public mutating func toggleBold(id: UUID) { toggle(id: id) { $0.isBold.toggle() } }
-    public mutating func toggleItalic(id: UUID) { toggle(id: id) { $0.isItalic.toggle() } }
-    public mutating func toggleUnderline(id: UUID) { toggle(id: id) { $0.isUnderlined.toggle() } }
-    public mutating func toggleStrikethrough(id: UUID) { toggle(id: id) { $0.isStruckThrough.toggle() } }
+    public mutating func toggleBold(id: UUID) { toggleWholeBlock(id: id, style: .bold) }
+    public mutating func toggleItalic(id: UUID) { toggleWholeBlock(id: id, style: .italic) }
+    public mutating func toggleUnderline(id: UUID) { toggleWholeBlock(id: id, style: .underline) }
+    public mutating func toggleStrikethrough(id: UUID) { toggleWholeBlock(id: id, style: .strikethrough) }
 
-    private mutating func toggle(id: UUID, _ apply: (inout ClinicalRichTextTextRun) -> Void) {
-        guard let index = blocks.firstIndex(where: { $0.id == id }),
-              case .editable(let kind, var span) = blocks[index].storage else { return }
-        apply(&span)
-        blocks[index].storage = .editable(kind: kind, span: span)
+    private mutating func toggleWholeBlock(id: UUID, style: ClinicalInlineStyle) {
+        guard let current = blocks.first(where: { $0.id == id })?.runs else { return }
+        let length = ClinicalInlineEditing.plainText(current).utf16.count
+        if length > 0 {
+            _ = toggleStyle(id: id, style: style, range: NSRange(location: 0, length: length))
+        } else {
+            var empty = current.first ?? ClinicalRichTextTextRun(text: "")
+            style.apply(!style.isApplied(to: empty), to: &empty)
+            guard let index = blocks.firstIndex(where: { $0.id == id }),
+                  let kind = blocks[index].editableKind else { return }
+            blocks[index] = ClinicalRichTextEditorBlock(id: id, kind: kind, span: empty)
+        }
     }
 
-    /// Builds the AST the transcoder renders. Consecutive `bulletItem`/
-    /// `numberedItem` blocks of the SAME orderedness collapse into one
-    /// `<ul>`/`<ol>`, matching how a list actually renders; everything else
-    /// passes through as its own top-level block. List items and a
-    /// blockquote's single child use `.fragment`/`.paragraph` exactly like the
-    /// canonical shapes already covered by the ClinicalRichText fixtures.
     public func toRichTextDocument() -> ClinicalRichTextDocument {
+        if blocks == originalBlocks, let originalDocument { return originalDocument }
         var result: [ClinicalRichTextBlock] = []
         var index = 0
         while index < blocks.count {
-            switch blocks[index].storage {
-            case .preserved(let original):
-                result.append(original)
+            let block = blocks[index]
+            guard let kind = block.editableKind, let runs = block.runs else {
+                if case .preserved(let original) = block.storage { result.append(original) }
                 index += 1
-
-            case .editable(let kind, let span):
-                switch kind {
-                case .paragraph:
-                    result.append(.paragraph(Self.inlines(from: span)))
+                continue
+            }
+            switch kind {
+            case .paragraph:
+                result.append(.paragraph(Self.inlines(from: runs)))
+                index += 1
+            case .heading2, .heading3:
+                result.append(.heading(level: kind == .heading2 ? .two : .three, content: Self.inlines(from: runs)))
+                index += 1
+            case .blockquote:
+                result.append(.blockquote([.paragraph(Self.inlines(from: runs))]))
+                index += 1
+            case .bulletItem, .numberedItem:
+                var items: [ClinicalRichTextListItem] = []
+                while index < blocks.count, blocks[index].editableKind == kind, let itemRuns = blocks[index].runs {
+                    items.append(ClinicalRichTextListItem(blocks: [.fragment(Self.inlines(from: itemRuns))]))
                     index += 1
-                case .heading2:
-                    result.append(.heading(level: .two, content: Self.inlines(from: span)))
-                    index += 1
-                case .heading3:
-                    result.append(.heading(level: .three, content: Self.inlines(from: span)))
-                    index += 1
-                case .blockquote:
-                    result.append(.blockquote([.paragraph(Self.inlines(from: span))]))
-                    index += 1
-                case .bulletItem, .numberedItem:
-                    var items: [ClinicalRichTextListItem] = []
-                    while index < blocks.count,
-                          case .editable(let innerKind, let innerSpan) = blocks[index].storage,
-                          innerKind == kind {
-                        items.append(ClinicalRichTextListItem(blocks: [.fragment(Self.inlines(from: innerSpan))]))
-                        index += 1
-                    }
-                    result.append(.list(ClinicalRichTextList(isOrdered: kind == .numberedItem, items: items)))
                 }
+                result.append(.list(ClinicalRichTextList(isOrdered: kind == .numberedItem, items: items)))
             }
         }
         return ClinicalRichTextDocument(blocks: result)
     }
 
-    /// The single, non-negotiable source of truth for what gets sealed: always
-    /// the transcoder's render of this document, never the raw operator input.
-    public var renderedHTML: String {
-        ClinicalRichText.render(document: toRichTextDocument())
-    }
+    public var renderedHTML: String { ClinicalRichText.render(document: toRichTextDocument()) }
 
     public static func load(html: String) -> ClinicalRichTextEditorDocument {
         load(document: ClinicalRichText.parse(html: html))
     }
 
-    /// Flattens a parsed document into editor blocks. A `.list` block expands
-    /// into one editor block PER item (when every item reduces to a single
-    /// uniformly-styled run) so multi-item lists stay individually editable;
-    /// everything else maps one-to-one, degrading to `.preserved` whenever the
-    /// content cannot be represented losslessly by this editor's simpler model.
     public static func load(document: ClinicalRichTextDocument) -> ClinicalRichTextEditorDocument {
-        ClinicalRichTextEditorDocument(blocks: document.blocks.flatMap(flatten))
+        var editor = ClinicalRichTextEditorDocument(blocks: document.blocks.flatMap { original in
+            if let projection = ClinicalRichText.inlineEditorProjection(original) {
+                let projected = projection.blocks.flatMap(flatten)
+                // Projection must not normalize an unsupported fragment when
+                // a different, editable block is changed later.
+                return projected.contains(where: \.isPreserved)
+                    ? [ClinicalRichTextEditorBlock(preserving: original)] : projected
+            }
+            return flatten(original)
+        })
+        editor.originalDocument = document
+        editor.originalBlocks = editor.blocks
+        return editor
     }
 
-    // MARK: - Flatten (parse -> editor), degrading safely to `.preserved`
-
     private static func flatten(_ block: ClinicalRichTextBlock) -> [ClinicalRichTextEditorBlock] {
+        func editable(_ kind: ClinicalRichTextEditorBlock.EditableKind, _ content: [ClinicalRichTextInline]) -> [ClinicalRichTextEditorBlock] {
+            guard let runs = ClinicalInlineEditing.decodedRuns(content) else {
+                return [ClinicalRichTextEditorBlock(preserving: block)]
+            }
+            return [ClinicalRichTextEditorBlock(kind: kind, runs: runs)]
+        }
         switch block {
         case .fragment(let content), .paragraph(let content):
-            if let run = mergedRun(from: content) {
-                return [ClinicalRichTextEditorBlock(kind: .paragraph, span: run)]
-            }
-            return [ClinicalRichTextEditorBlock(preserving: block)]
-
+            return editable(.paragraph, content)
         case .heading(let level, let content):
-            switch level {
-            case .two, .three:
-                if let run = mergedRun(from: content) {
-                    return [ClinicalRichTextEditorBlock(kind: level == .two ? .heading2 : .heading3, span: run)]
-                }
-                return [ClinicalRichTextEditorBlock(preserving: block)]
-            case .one:
-                // D11's toolbar only offers h2/h3: an existing h1 is preserved,
-                // not silently retyped as something the toolbar can create.
-                return [ClinicalRichTextEditorBlock(preserving: block)]
-            }
-
+            guard level != .one else { return [ClinicalRichTextEditorBlock(preserving: block)] }
+            return editable(level == .two ? .heading2 : .heading3, content)
         case .blockquote(let inner):
-            if inner.isEmpty {
-                return [ClinicalRichTextEditorBlock(kind: .blockquote, span: ClinicalRichTextTextRun(text: ""))]
-            }
-            if inner.count == 1, let content = singleChildInlines(inner[0]), let run = mergedRun(from: content) {
-                return [ClinicalRichTextEditorBlock(kind: .blockquote, span: run)]
-            }
+            if inner.isEmpty { return editable(.blockquote, []) }
+            if inner.count == 1, let content = singleChildInlines(inner[0]) { return editable(.blockquote, content) }
             return [ClinicalRichTextEditorBlock(preserving: block)]
-
         case .list(let list):
             guard !list.items.isEmpty else { return [ClinicalRichTextEditorBlock(preserving: block)] }
-            var runs: [ClinicalRichTextTextRun] = []
+            var items: [[ClinicalRichTextTextRun]] = []
             for item in list.items {
-                if item.blocks.isEmpty {
-                    runs.append(ClinicalRichTextTextRun(text: ""))
-                    continue
-                }
-                guard item.blocks.count == 1,
-                      let content = singleChildInlines(item.blocks[0]),
-                      let run = mergedRun(from: content) else {
+                if item.blocks.isEmpty { items.append([]); continue }
+                guard item.blocks.count == 1, let content = singleChildInlines(item.blocks[0]),
+                      let runs = ClinicalInlineEditing.decodedRuns(content) else {
                     return [ClinicalRichTextEditorBlock(preserving: block)]
                 }
-                runs.append(run)
+                items.append(runs)
             }
-            let kind: ClinicalRichTextEditorBlock.EditableKind = list.isOrdered ? .numberedItem : .bulletItem
-            return runs.map { ClinicalRichTextEditorBlock(kind: kind, span: $0) }
-
+            return items.map { ClinicalRichTextEditorBlock(kind: list.isOrdered ? .numberedItem : .bulletItem, runs: $0) }
         case .sanitizedFragment:
             return [ClinicalRichTextEditorBlock(preserving: block)]
         }
@@ -243,59 +251,21 @@ public struct ClinicalRichTextEditorDocument: Equatable, Sendable {
 
     private static func singleChildInlines(_ block: ClinicalRichTextBlock) -> [ClinicalRichTextInline]? {
         switch block {
-        case .fragment(let inlines), .paragraph(let inlines):
-            return inlines
-        default:
-            return nil
+        case .fragment(let inlines), .paragraph(let inlines): inlines
+        default: nil
         }
     }
 
-    /// Merges a run of inline content into ONE styled run if every `.text`
-    /// element shares identical style flags (line breaks become "\n" in the
-    /// merged text). Returns nil when styles differ, which is the signal to
-    /// preserve the containing block opaquely instead of losing or misapplying
-    /// style.
-    private static func mergedRun(from inlines: [ClinicalRichTextInline]) -> ClinicalRichTextTextRun? {
-        var combinedText = ""
-        var style: (bold: Bool, italic: Bool, underlined: Bool, struckThrough: Bool)?
-        for inline in inlines {
-            switch inline {
-            case .lineBreak:
-                combinedText += "\n"
-            case .text(let run):
-                let runStyle = (run.isBold, run.isItalic, run.isUnderlined, run.isStruckThrough)
-                if let style, style != runStyle { return nil }
-                style = runStyle
-                combinedText += run.text
-            }
-        }
-        let resolved = style ?? (false, false, false, false)
-        return ClinicalRichTextTextRun(
-            text: combinedText,
-            isBold: resolved.bold,
-            isItalic: resolved.italic,
-            isUnderlined: resolved.underlined,
-            isStruckThrough: resolved.struckThrough
-        )
-    }
-
-    /// Builds inline content from one styled run, splitting on "\n" into
-    /// `.lineBreak` inlines so multi-line block text (manual line breaks, or
-    /// visit-draft lines joined below) round-trips through the transcoder.
-    private static func inlines(from span: ClinicalRichTextTextRun) -> [ClinicalRichTextInline] {
-        guard !span.text.isEmpty else { return [] }
-        let lines = span.text.components(separatedBy: "\n")
+    private static func inlines(from runs: [ClinicalRichTextTextRun]) -> [ClinicalRichTextInline] {
         var result: [ClinicalRichTextInline] = []
-        for (index, line) in lines.enumerated() {
-            if index > 0 { result.append(.lineBreak) }
-            if !line.isEmpty {
-                result.append(.text(ClinicalRichTextTextRun(
-                    text: line,
-                    isBold: span.isBold,
-                    isItalic: span.isItalic,
-                    isUnderlined: span.isUnderlined,
-                    isStruckThrough: span.isStruckThrough
-                )))
+        for run in ClinicalInlineEditing.coalesced(runs) {
+            for (index, line) in run.text.components(separatedBy: "\n").enumerated() {
+                if index > 0 { result.append(.lineBreak) }
+                if !line.isEmpty {
+                    var escaped = run
+                    escaped.text = line.replacingOccurrences(of: "&", with: "&amp;")
+                    result.append(.text(escaped))
+                }
             }
         }
         return result

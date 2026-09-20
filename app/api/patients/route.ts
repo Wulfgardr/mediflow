@@ -11,6 +11,11 @@ import { activePatients } from '@/lib/patient-lifecycle';
 /* STREAM B: server-side list params (whitelisted, plaintext columns only). */
 import { parseListParams } from '@/lib/list-query-params';
 
+/* @Codex: opt-in fenced create; all legacy read/write contracts remain separate. */
+import * as patientCreateOwner from '@/lib/security/web-auth-lifecycle-owner-adapter';
+import { patientCreateContexts, readPatientCreateLane } from '@/lib/security/patient-create-context';
+import { createPatientAtPreviewDestination, PatientCreateFenceError } from '@/lib/patient-create-service';
+
 // address/phone/caregiver/notes etc are ENC:. firstName/lastName/taxCode/dates
 // are plaintext in the schema, so they are safe sort targets.
 const PATIENT_SORT_COLUMNS = {
@@ -123,18 +128,22 @@ export async function POST(request: Request) {
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
 
+    const lane = readPatientCreateLane(request.headers);
+    if (lane.kind === 'invalid') return NextResponse.json({ error: 'Invalid patient create precondition' }, { status: 400 });
+
     try {
         const body = await request.json() as Record<string, unknown>;
         const newId = body.id || uuidv4();
 
-        const cookieStore = await cookies();
-        let ambulatoryId = cookieStore.get('ambulatory_id')?.value;
-
-        // Fallback: Use default ambulatory if no cookie
-        if (!ambulatoryId) {
-            const defaultAmb = await dbServer.select().from(ambulatories).where(eq(ambulatories.isDefault, true)).limit(1);
-            if (defaultAmb.length > 0) {
-                ambulatoryId = defaultAmb[0].id;
+        // The fenced lane never reads selection cookies/defaults. Target is fixed in
+        // the server's preview entry and checked again in the synchronous transaction.
+        let ambulatoryId: string | undefined;
+        if (lane.kind === 'legacy') {
+            const cookieStore = await cookies();
+            ambulatoryId = cookieStore.get('ambulatory_id')?.value;
+            if (!ambulatoryId) {
+                const defaultAmb = await dbServer.select().from(ambulatories).where(eq(ambulatories.isDefault, true)).limit(1);
+                if (defaultAmb.length > 0) ambulatoryId = defaultAmb[0].id;
             }
         }
 
@@ -146,20 +155,33 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: normalized.error }, { status: 400 });
         }
 
-        // WUL-268 (STREAM A): the patient row and its ambulatory membership must be
-        // created atomically. better-sqlite3 transactions are synchronous, so no
-        // awaits inside; the async audit write stays outside (separate audit DB).
-        dbServer.transaction((tx) => {
-            tx.insert(patients).values(normalized.values).run();
+        if (lane.kind === 'fenced') {
+            createPatientAtPreviewDestination({
+                transaction: operation => dbServer.transaction(tx => operation({
+                    targetExists: id => Boolean(tx.select({ id: ambulatories.id }).from(ambulatories).where(eq(ambulatories.id, id)).get()),
+                    insertPatient: values => { tx.insert(patients).values(values).run(); },
+                    insertMembership: (patientId, targetId) => {
+                        tx.insert(patientsToAmbulatories).values({ patientId, ambulatoryId: targetId }).run();
+                    },
+                })),
+            }, patientCreateContexts(patientCreateOwner), session, lane.precondition, normalized.values);
+        } else {
+            // WUL-268 (STREAM A): the patient row and its ambulatory membership must be
+            // created atomically. better-sqlite3 transactions are synchronous, so no
+            // awaits inside; the async audit write stays outside (separate audit DB).
+            dbServer.transaction((tx) => {
+                tx.insert(patients).values(normalized.values).run();
 
-            /* @Codex */
-            if (normalized.values.ambulatoryId) {
-                tx.insert(patientsToAmbulatories)
-                    .values({ patientId: normalized.values.id, ambulatoryId: normalized.values.ambulatoryId })
-                    .onConflictDoNothing()
-                    .run();
-            }
-        });
+                /* @Codex */
+                if (normalized.values.ambulatoryId) {
+                    tx.insert(patientsToAmbulatories)
+                        .values({ patientId: normalized.values.id, ambulatoryId: normalized.values.ambulatoryId })
+                        .onConflictDoNothing()
+                        .run();
+                }
+            });
+
+        }
 
         /* @Codex */
         await recordPatientAuditEvent(request, session, 'patient.created', normalized.values.id, {
@@ -169,6 +191,12 @@ export async function POST(request: Request) {
 
         return NextResponse.json({ id: normalized.values.id }, { status: 201 });
     } catch (error) {
+        if (lane.kind === 'fenced') {
+            // Driver errors can contain bound data: no payload/nonce/error object in logs.
+            return NextResponse.json({ error: error instanceof PatientCreateFenceError
+                ? 'Patient create precondition denied; review again' : 'Failed to create patient' },
+                { status: error instanceof PatientCreateFenceError ? 409 : 500 });
+        }
         console.error("API POST /patients error:", error);
         return NextResponse.json({ error: "Failed to create patient" }, { status: 500 });
     }

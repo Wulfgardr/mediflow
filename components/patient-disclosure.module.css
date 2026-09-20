@@ -1,0 +1,73 @@
+/* @Codex WUL-678: one reading plane; disclosure belongs to the content it reveals. */
+.documents { display: grid; gap: 24px; color: var(--lume-ink); min-width: 0; }
+.upload { display: grid; grid-template-columns: 24px minmax(0, 1fr); align-items: center; gap: 6px 12px; padding: 16px; border: 1px dashed var(--lume-border-color); border-radius: var(--lume-radius-control, 12px); cursor: pointer; }
+.uploadIcon { grid-row: 1 / 3; color: var(--lume-ink-muted); }
+.upload .hint { grid-column: 2; }
+.hint { font-size: 0.875rem; line-height: 1.5; color: var(--lume-ink-muted); overflow-wrap: anywhere; }
+.empty { margin: 0 0 12px; font-size: 1rem; }
+.documentList { min-width: 0; }
+.documentRow { padding: 16px 0; border-bottom: 1px solid var(--lume-border-color); }
+.documentHead { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.documentTitle { font-size: 1rem; font-weight: 600; line-height: 1.5; overflow-wrap: anywhere; }
+.documentActions { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
+/* @Codex: named actions stay quiet until focus or interaction. */
+.documentAction { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; min-width: 44px; padding: 8px 10px; border: 0; border-radius: 12px; background: transparent; color: var(--lume-ink); font: inherit; font-size: .875rem; line-height: 1.5; cursor: pointer; }
+.documentAction svg { flex-shrink: 0; }
+.documentAction:hover:not(:disabled) { background: var(--lume-surface-field); }
+.documentAction:disabled { opacity: .5; cursor: not-allowed; }
+.removeAction { color: var(--lume-ink-muted); }
+.removeAction:hover:not(:disabled) { color: var(--lume-signal-critical); }
+.synthesis { min-width: 0; padding-block: 12px; font-size: .875rem; line-height: 1.6; overflow-wrap: anywhere; }
+.synthesisSection { padding-block: 16px; border-bottom: 1px solid var(--lume-border-color); }
+.citation { min-width: 0; padding: 4px 0 4px 16px; border-left: 2px solid var(--lume-border-color); }
+/* @Codex: archived titles and dates remain readable before opening the source. */
+.archive { min-width: 0; }
+.archiveToolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; padding-block: 8px 16px; }
+.archiveRow { min-width: 0; border-top: 1px solid var(--lume-border-color); }
+.archiveHead { display: flex; align-items: flex-start; gap: 4px; }
+.archiveHead > .documentAction { flex-shrink: 0; margin-top: 6px; }
+.archiveToggle { display: flex; flex: 1; align-items: flex-start; justify-content: space-between; gap: 12px; min-height: 44px; min-width: 0; padding: 16px 0; border: 0; background: transparent; color: var(--lume-ink); font: inherit; text-align: left; cursor: pointer; }
+.archiveToggle > svg { margin-top: 4px; }
+.archiveToggle:hover .documentTitle { text-decoration: underline; text-underline-offset: 4px; }
+.archiveToggle:focus-visible, .documentAction:focus-visible { outline: 2px solid var(--lume-accent); outline-offset: 3px; border-radius: 12px; }
+.archiveLabel { display: grid; gap: 4px; min-width: 0; }
+.archiveMetadata { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; }
+.archiveContent { display: grid; gap: 12px; padding-block: 0 20px; min-width: 0; overflow-wrap: anywhere; }
+.archiveContent .disclosure { margin-top: 4px; }
+.archivedSource { padding-block: 12px; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; font-size: .875rem; color: var(--lume-ink); }
+.archiveFooter { display: flex; align-items: flex-start; gap: 8px; padding-top: 16px; border-top: 1px solid var(--lume-border-color); color: var(--lume-ink-muted); font-size: .875rem; line-height: 1.6; }
+.archiveFooter svg { margin-top: 3px; }
+.summaries { min-width: 0; }
+.summaries > h3 { margin: 0 0 8px; font-size: 1.125rem; font-weight: 600; }
+.disclosure { min-width: 0; margin-top: 16px; border-top: 1px solid var(--lume-border-color); }
+.disclosure > summary { padding: 12px 0; min-height: 44px; cursor: pointer; font-size: 1rem; font-weight: 550; color: var(--lume-ink); overflow-wrap: anywhere; }
+.disclosure > summary:hover { text-decoration: underline; text-underline-offset: 4px; }
+.disclosure > summary:focus-visible, .upload:focus-visible, .documentActions > button:focus-visible { outline: 2px solid var(--lume-accent); outline-offset: 3px; border-radius: var(--lume-radius-control, 12px); }
+.identity { display: grid; gap: 24px; color: var(--lume-ink); }
+.identity > section { min-width: 0; padding-bottom: 24px; border-bottom: 1px solid var(--lume-border-color); }
+.identity h2 { display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px; font-size: 1.25rem; font-weight: 600; margin-bottom: 16px; }
+.identity h3 { font-size: 1rem; font-weight: 550; margin-bottom: 8px; }
+.identity p { color: var(--lume-ink-muted); font-size: 0.875rem; }
+.count { font: inherit; font-variant-numeric: tabular-nums; }
+.facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 24px; }
+.facts dt { font-size: 0.875rem; color: var(--lume-ink-muted); margin-bottom: 4px; }
+.facts dd { margin: 0; font-size: 1rem; overflow-wrap: anywhere; }
+.records { list-style: none; padding: 0; margin: 0; }
+.records li { display: flex; flex-direction: column; gap: 4px; padding: 12px 0; overflow-wrap: anywhere; }
+.records li + li { border-top: 1px solid var(--lume-border-color); }
+.records strong { font-size: 1rem; font-weight: 550; }
+.records span { font-size: 0.875rem; color: var(--lume-ink-muted); }
+@media (max-width: 600px) { .facts { grid-template-columns: minmax(0, 1fr); } .documentActions { flex-basis: 100%; } }
+
+/* @Codex WUL-678: spacing belongs to composition; AI card internals retain their owner. */
+.clinicalSupport { margin-top: 24px; min-width: 0; }
+/* @Codex WUL-678: readable domain headings in both themes, scoped to these destinations. */
+.domainSection > h3 :global(.text-ink) { color: var(--lume-ink); }
+
+/* @Codex: exact counters and full context, including narrow rails and text zoom. */
+.signals { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 9.375rem), 1fr)); gap: 12px; min-width: 0; margin: 0; }
+.signal { min-width: 0; overflow-wrap: anywhere; }
+.signalLabel { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--lume-ink-muted); font-size: .875rem; line-height: 1.5; font-weight: 500; }
+.signalLabel svg { flex-shrink: 0; }
+.signalValue { margin: 6px 0 0; font-size: 1.375rem; line-height: 1.3; font-weight: 600; font-variant-numeric: tabular-nums; }
+.signalHint { margin: 4px 0 0; color: var(--lume-ink-muted); font-size: .875rem; line-height: 1.5; }

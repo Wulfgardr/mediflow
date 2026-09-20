@@ -2,6 +2,8 @@
 import 'server-only';
 
 import { types } from 'node:util';
+import { ATHENA_R1_QWEN3_8B_MODEL_ID } from '../../athena-model-identity';
+import type { PortableEngineMetadata } from './treatment-reasoning-portable-runtime';
 
 import { TREATMENT_REASONING_SCHEMA_VERSION, type TreatmentReasoningEnvelope } from '../../treatment-reasoning-contract';
 
@@ -157,6 +159,32 @@ function attest(value: unknown): TreatmentReasoningAthenaV2Attestation | null {
     return Object.freeze({ schema: TREATMENT_REASONING_ATHENA_OUTPUT_V2_ATTESTATION_SCHEMA, readiness: 'available_unqualified', provider: 'athena_mlx', venue: 'local_process', egress: 'none', receiptRef, provenanceRef });
 }
 
+export type TreatmentReasoningPortableAttestation = PortableEngineMetadata & Readonly<{
+    schema: 'mediflow.ai.treatment-reasoning-engine-attestation.v2'; readiness: 'available_unqualified';
+    venue: 'local_process'; egress: 'none'; receiptRef: string; provenanceRef: string;
+}>;
+/** Distinct closed schema. The MLX v1 parser above is intentionally not broadened. */
+export function snapshotTreatmentReasoningPortableAttestation(value: unknown): TreatmentReasoningPortableAttestation | null {
+    const item = record(value, ['schema', 'readiness', 'provider', 'model', 'platform', 'artifactDigest', 'runtimeDigest',
+        'workerDigest', 'admissionRevision', 'venue', 'egress', 'receiptRef', 'provenanceRef']);
+    if (!item || item.schema !== 'mediflow.ai.treatment-reasoning-engine-attestation.v2'
+        || item.provider !== 'athena_transformers' || item.model !== ATHENA_R1_QWEN3_8B_MODEL_ID
+        || !['linux-x64', 'linux-arm64', 'win32-x64', 'win32-arm64'].includes(item.platform as string)
+        || !['artifactDigest', 'runtimeDigest', 'workerDigest'].every(k => typeof item[k] === 'string' && /^[0-9a-f]{64}$/u.test(item[k] as string))
+        || !Number.isSafeInteger(item.admissionRevision) || (item.admissionRevision as number) < 1
+        || item.readiness !== 'available_unqualified' || item.venue !== 'local_process' || item.egress !== 'none'
+        || !ref(item.receiptRef) || !ref(item.provenanceRef)) return null;
+    return Object.freeze(item) as TreatmentReasoningPortableAttestation;
+}
+export function createTreatmentReasoningPortableOutputContractV2(configuration: unknown) {
+    const config = record(configuration, ['allowedEvidenceRefs', 'attestation']);
+    const allowedRefs = config && refs(config.allowedEvidenceRefs);
+    const attestation = config && snapshotTreatmentReasoningPortableAttestation(config.attestation);
+    if (!allowedRefs?.length || !attestation) throw new Error('Treatment reasoning portable V2 configuration rejected');
+    return outputNormalizer(new Set(allowedRefs), attestation);
+}
+export type TreatmentReasoningPortableOutputResult = ReturnType<ReturnType<typeof createTreatmentReasoningPortableOutputContractV2>['normalize']>;
+
 /** Closed V2 parser: source-bound review output and host-minted provenance remain separate. */
 export function createTreatmentReasoningAthenaOutputContractV2(configuration: unknown): Readonly<{ normalize(value: unknown): TreatmentReasoningAthenaV2Result }> {
     const config = record(configuration, ['allowedEvidenceRefs', 'attestation']);
@@ -164,21 +192,59 @@ export function createTreatmentReasoningAthenaOutputContractV2(configuration: un
     const allowed = allowedRefs && new Set(allowedRefs);
     const attestation = config && attest(config.attestation);
     if (!config || !allowed || allowed.size === 0 || !attestation) throw new Error('Treatment reasoning ATHENA V2 configuration rejected');
-    return Object.freeze({ normalize(value: unknown): TreatmentReasoningAthenaV2Result {
-        const input = record(value, ['schemaVersion', 'task', 'summary', 'data', 'sourceBindings']);
-        const summary = input && text(input.summary, MAX.summary);
-        const data = input && record(input.data, ['recommendation', 'keyEvidence', 'reasoning', 'caveats', 'safetyFlags', 'suggestedActions', 'trace']);
-        const recommendation = data && text(data.recommendation, MAX.recommendation);
-        const keyEvidence = data && evidence(data.keyEvidence, allowed);
-        const reasoning = data && strings(data.reasoning, MAX.reasoning);
-        const caveats = data && strings(data.caveats, MAX.caveats);
-        const safetyFlags = data && flags(data.safetyFlags, allowed);
-        const suggestedActions = data && actions(data.suggestedActions, allowed);
-        const normalizedTrace = data && trace(data.trace);
-        const normalizedBindings = input && summary && recommendation && reasoning?.every(Boolean) && caveats?.every(Boolean)
-            ? bindings(input.sourceBindings, allowed, claims(summary, recommendation, reasoning, caveats)) : null;
-        if (!input || input.schemaVersion !== TREATMENT_REASONING_SCHEMA_VERSION || input.task !== 'treatment_reasoning' || !summary || !data || !recommendation || !keyEvidence || !reasoning || !caveats || !safetyFlags || !suggestedActions || !normalizedTrace || !normalizedBindings) return Object.freeze({ status: 'denied' as const, code: 'output_invalid' as const, value: null, sourceBindings: null, attestation: null, ...COMMON });
+    return outputNormalizer(allowed, attestation);
+}
+
+/** Shared clinical content validation; it does not parse or mint provenance. */
+function clinicalContent(value: unknown, allowed: ReadonlySet<string>) {
+    const input = record(value, ['schemaVersion', 'task', 'summary', 'data', 'sourceBindings']);
+    const summary = input && text(input.summary, MAX.summary);
+    const data = input && record(input.data, ['recommendation', 'keyEvidence', 'reasoning', 'caveats', 'safetyFlags', 'suggestedActions', 'trace']);
+    const recommendation = data && text(data.recommendation, MAX.recommendation);
+    const keyEvidence = data && evidence(data.keyEvidence, allowed);
+    const reasoning = data && strings(data.reasoning, MAX.reasoning);
+    const caveats = data && strings(data.caveats, MAX.caveats);
+    const safetyFlags = data && flags(data.safetyFlags, allowed);
+    const suggestedActions = data && actions(data.suggestedActions, allowed);
+    const sourceBindings = input && summary && recommendation && reasoning?.every(Boolean) && caveats?.every(Boolean)
+        ? bindings(input.sourceBindings, allowed, claims(summary, recommendation, reasoning, caveats)) : null;
+    if (!input || input.schemaVersion !== TREATMENT_REASONING_SCHEMA_VERSION || input.task !== 'treatment_reasoning'
+        || !summary || !data || !recommendation || !keyEvidence || !reasoning || !caveats || !safetyFlags || !suggestedActions || !sourceBindings) return null;
+    return { summary, recommendation, keyEvidence, reasoning, caveats, safetyFlags, suggestedActions, sourceBindings, rawTrace: data.trace };
+}
+
+/** Only the host metadata varies; every clinical and source-binding check is shared. */
+function outputNormalizer<A extends TreatmentReasoningAthenaV2Attestation | TreatmentReasoningPortableAttestation>(allowed: ReadonlySet<string>, attestation: A) {
+    return Object.freeze({ normalize(value: unknown) {
+        const content = clinicalContent(value, allowed);
+        const normalizedTrace = content && trace(content.rawTrace);
+        if (!content || !normalizedTrace) return Object.freeze({ status: 'denied' as const, code: 'output_invalid' as const, value: null, sourceBindings: null, attestation: null, ...COMMON });
+        const { summary, recommendation, keyEvidence, reasoning, caveats, safetyFlags, suggestedActions, sourceBindings } = content;
         const normalized = Object.freeze({ schemaVersion: TREATMENT_REASONING_SCHEMA_VERSION, task: 'treatment_reasoning' as const, summary, data: Object.freeze({ recommendation, keyEvidence, reasoning, caveats, safetyFlags, suggestedActions, trace: normalizedTrace }) });
-        return Object.freeze({ status: 'accepted' as const, code: null, resultSchema: TREATMENT_REASONING_ATHENA_OUTPUT_V2_RESULT_SCHEMA, value: normalized, sourceBindings: normalizedBindings, attestation, ...COMMON });
+        return Object.freeze({ status: 'accepted' as const, code: null, resultSchema: TREATMENT_REASONING_ATHENA_OUTPUT_V2_RESULT_SCHEMA, value: normalized, sourceBindings, attestation, ...COMMON });
     } });
 }
+
+/** Closed remote content variant. A parsed proposal is not an execution receipt. */
+export function createTreatmentReasoningChatGptOutputContract(configuration: unknown) {
+    const config = record(configuration, ['allowedEvidenceRefs']);
+    const allowedRefs = config && refs(config.allowedEvidenceRefs);
+    if (!allowedRefs?.length) throw new Error('Treatment reasoning ChatGPT configuration rejected');
+    const allowed = new Set(allowedRefs);
+    return Object.freeze({ normalize(value: unknown) {
+        const content = clinicalContent(value, allowed);
+        const inputTrace = content && record(content.rawTrace, ['mode', 'toolsUsed', 'limitations']);
+        const tools = inputTrace && array(inputTrace.toolsUsed, 0);
+        const limitations = inputTrace && strings(inputTrace.limitations, MAX.limitations, MAX.label);
+        if (!content || !inputTrace || inputTrace.mode !== 'chatgpt_subscription' || !tools || !limitations) {
+            return Object.freeze({ status: 'denied' as const, code: 'output_invalid' as const, value: null, sourceBindings: null, ...COMMON });
+        }
+        const { summary, recommendation, keyEvidence, reasoning, caveats, safetyFlags, suggestedActions, sourceBindings } = content;
+        const normalizedTrace = Object.freeze({ mode: 'chatgpt_subscription' as const, toolsUsed: Object.freeze([]) as readonly [], limitations });
+        const normalized = Object.freeze({ schemaVersion: TREATMENT_REASONING_SCHEMA_VERSION, task: 'treatment_reasoning' as const, summary,
+            data: Object.freeze({ recommendation, keyEvidence, reasoning, caveats, safetyFlags, suggestedActions, trace: normalizedTrace }) });
+        return Object.freeze({ status: 'accepted' as const, code: null, resultSchema: 'mediflow.ai.treatment-reasoning-chatgpt-content.v1' as const,
+            value: normalized, sourceBindings, ...COMMON });
+    } });
+}
+export type TreatmentReasoningChatGptContent = Extract<ReturnType<ReturnType<typeof createTreatmentReasoningChatGptOutputContract>['normalize']>, { status: 'accepted' }>;

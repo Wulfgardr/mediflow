@@ -95,13 +95,12 @@ test('settings shows rollout readiness lanes, missing artifacts and markdown pre
   await expect(page).toHaveURL(/\/settings\/ai\/governance$/);
 
   const panel = page.getByTestId('ai-rollout-readiness-panel');
-  // WUL-297: the panel heading is now Italian ("Stato rilascio AI locale").
-  await expect(panel.getByRole('heading', { name: 'Stato rilascio AI locale' })).toBeVisible();
+  await expect(panel.getByRole('heading', { name: 'Verifiche delle funzioni assistite' })).toBeVisible();
 
   await expect(page.getByTestId('ai-rollout-metric-ready')).toContainText('1');
   await expect(page.getByTestId('ai-rollout-metric-hold')).toContainText('1');
   await expect(page.getByTestId('ai-rollout-metric-missing')).toContainText('3');
-  await expect(page.getByTestId('ai-rollout-local-control-summary')).toContainText('2 disattivati su 4');
+  await expect(page.getByTestId('ai-rollout-local-control-summary')).toContainText('2 funzioni spente su 4');
   await expect(page.getByTestId('ai-rollout-local-control-patient_insight')).toContainText('disabled');
   await expect(page.getByTestId('ai-rollout-local-control-smart_import')).toContainText('enabled');
   await expect(page.getByTestId('ai-rollout-local-control-document_synthesis')).toContainText('disabled');
@@ -109,14 +108,13 @@ test('settings shows rollout readiness lanes, missing artifacts and markdown pre
   await expect(page.getByTestId('ai-rollout-local-control-ocr')).toHaveCount(0);
 
   const missingRedactionLane = page.getByTestId('ai-rollout-lane-redaction');
-  await expect(missingRedactionLane).toContainText('Redaction');
-  // WUL-297: the missing-artifact copy is now "Report locale mancante".
-  await expect(page.getByTestId('ai-rollout-missing-redaction')).toContainText('Report locale mancante');
+  await expect(missingRedactionLane).toContainText('Protezione dei dati identificativi');
+  await expect(page.getByTestId('ai-rollout-missing-redaction')).toContainText('Verifica salvata mancante per questa attività');
   await expect(page.getByTestId('ai-rollout-missing-redaction')).toContainText('--owner operatore-demo');
 
   const patientInsightLane = page.getByTestId('ai-rollout-lane-patient_insight');
   await expect(patientInsightLane).toContainText('qwen3.5:35b-a3b');
-  await expect(patientInsightLane).toContainText('Local control');
+  await expect(patientInsightLane).toContainText('Scelta nelle impostazioni');
   await expect(patientInsightLane).toContainText('disabled');
 
   const markdownPreview = page.getByTestId('ai-rollout-markdown-patient_insight');

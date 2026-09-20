@@ -1,7 +1,8 @@
 name: E2E (Playwright)
 
 # Playwright end-to-end smoke for the local-first web app. Boots a seeded, ephemeral
-# Next.js dev server against a throwaway SQLite DB and runs the e2e/*.spec.ts suite.
+# Next.js standalone production server against a throwaway SQLite DB and runs the e2e/*.spec.ts suite.
+# The destructive auth lifecycle test starts its own production process and empty DB.
 #
 # Node 24: npm ci rebuilds the native better-sqlite3 binding against the Node 24 ABI,
 # so the server can open the SQLite database. The web-core.yml gate also runs on Node 24.
@@ -49,17 +50,57 @@ jobs:
       - name: Install Playwright chromium
         run: npx playwright install --with-deps chromium
 
+      # @Codex: build once, then keep an immutable copy outside the dev dist directory.
+      # The reset test must never reset the suite's shared account or database.
+      - name: Prepare standalone bundle for isolated auth lifecycle
+        run: |
+          test -z "$(git status --porcelain)"
+          export MEDIFLOW_APP_REVISION="$(git rev-parse --short=12 HEAD)"
+          export MEDIFLOW_APP_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+          export MEDIFLOW_APP_WORKTREE_HASH=clean
+          unset MEDIFLOW_APP_SOURCE_FINGERPRINT MEDIFLOW_APP_FINGERPRINT
+          unset E2E_BASE_URL E2E_PIN MEDIFLOW_RUNTIME_TWIN NEXT_PUBLIC_MEDIFLOW_RUNTIME_TWIN
+          # Build-time storage is separate from both runtime fixtures and never reused.
+          E2E_BUILD_DATA="$(mktemp -d "${RUNNER_TEMP}/mediflow-build-data.XXXXXX")"
+          export MEDIFLOW_DATA_DIR="${E2E_BUILD_DATA}"
+          export MEDIFLOW_E2E_DATA_DIR="${E2E_BUILD_DATA}"
+          export MEDIFLOW_E2E_DISABLE_LEGACY_COPY=1 E2E_DISABLE_LEGACY_COPY=1
+          npm run build
+          E2E_AUTH_RUNTIME="$(mktemp -d "${RUNNER_TEMP}/mediflow-auth-runtime.XXXXXX")"
+          cp -R "${MEDIFLOW_NEXT_DIST_DIR}/standalone/." "${E2E_AUTH_RUNTIME}/"
+          mkdir -p "${E2E_AUTH_RUNTIME}/public" "${E2E_AUTH_RUNTIME}/${MEDIFLOW_NEXT_DIST_DIR}/static"
+          cp -R public/. "${E2E_AUTH_RUNTIME}/public/"
+          cp -R "${MEDIFLOW_NEXT_DIST_DIR}/static/." "${E2E_AUTH_RUNTIME}/${MEDIFLOW_NEXT_DIST_DIR}/static/"
+          {
+            printf 'E2E_ISOLATED_STANDALONE_DIR=%s\n' "${E2E_AUTH_RUNTIME}"
+            printf 'MEDIFLOW_APP_REVISION=%s\n' "${MEDIFLOW_APP_REVISION}"
+            printf 'MEDIFLOW_APP_BRANCH=%s\n' "${MEDIFLOW_APP_BRANCH}"
+            printf 'MEDIFLOW_APP_WORKTREE_HASH=%s\n' "${MEDIFLOW_APP_WORKTREE_HASH}"
+          } >> "$GITHUB_ENV"
+
       - name: Seed ephemeral e2e database
         run: |
-          E2E_DATA_DIR="$(mktemp -d "${RUNNER_TEMP}/mediflow-e2e.XXXXXX")"
-          echo "MEDIFLOW_DATA_DIR=${E2E_DATA_DIR}" >> "$GITHUB_ENV"
-          echo "MEDIFLOW_E2E_DATA_DIR=${E2E_DATA_DIR}" >> "$GITHUB_ENV"
-          MEDIFLOW_DATA_DIR="${E2E_DATA_DIR}" node scripts/prepare-e2e-db.mjs
+          # @Codex: satisfy the canonical synthetic-fixture preconditions before seeding.
+          E2E_DATA_DIR="$(node -e 'const fs = require("node:fs"), os = require("node:os"), path = require("node:path"); process.stdout.write(fs.mkdtempSync(path.join(os.tmpdir(), "mediflow-e2e-")))')"
+          export MEDIFLOW_DATA_DIR="${E2E_DATA_DIR}"
+          export MEDIFLOW_E2E_DATA_DIR="${E2E_DATA_DIR}"
+          export MEDIFLOW_E2E_DISABLE_LEGACY_COPY=1 E2E_DISABLE_LEGACY_COPY=1
+          printf '%s\n' 'Synthetic E2E fixture; WHO local sidecar transport is simulated.' > "${E2E_DATA_DIR}/SYNTHETIC_ONLY"
+          {
+            printf 'MEDIFLOW_DATA_DIR=%s\n' "${E2E_DATA_DIR}"
+            printf 'MEDIFLOW_E2E_DATA_DIR=%s\n' "${E2E_DATA_DIR}"
+            printf 'MEDIFLOW_E2E_DISABLE_LEGACY_COPY=1\n'
+            printf 'E2E_DISABLE_LEGACY_COPY=1\n'
+          } >> "$GITHUB_ENV"
+          node scripts/prepare-e2e-db.mjs
 
-      - name: Start Next.js dev server
+      # @Codex: run the same traced production bundle prepared above. The seeded
+      # synthetic directory and explicit feature guards remain inherited from GITHUB_ENV.
+      - name: Start Next.js standalone server
         run: |
-          npx next dev --hostname 127.0.0.1 --port 3123 > "${RUNNER_TEMP}/next-dev.log" 2>&1 &
-          echo "$!" > "${RUNNER_TEMP}/next-dev.pid"
+          cd "${E2E_ISOLATED_STANDALONE_DIR}"
+          NODE_ENV=production HOSTNAME=127.0.0.1 PORT=3123 node server.js > "${RUNNER_TEMP}/next-standalone.log" 2>&1 &
+          echo "$!" > "${RUNNER_TEMP}/next-standalone.pid"
 
       - name: Wait for server readiness
         run: |
@@ -69,22 +110,34 @@ jobs:
               echo "Server ready after ${i}s (auth/check -> ${code})."
               exit 0
             fi
-            if ! kill -0 "$(cat "${RUNNER_TEMP}/next-dev.pid")" 2>/dev/null; then
-              echo "Dev server exited before readiness."
-              cat "${RUNNER_TEMP}/next-dev.log"
+            if ! kill -0 "$(cat "${RUNNER_TEMP}/next-standalone.pid")" 2>/dev/null; then
+              echo "Standalone server exited before readiness."
+              cat "${RUNNER_TEMP}/next-standalone.log"
               exit 1
             fi
             sleep 1
           done
           echo "Server did not become ready in time."
-          tail -50 "${RUNNER_TEMP}/next-dev.log"
+          tail -50 "${RUNNER_TEMP}/next-standalone.log"
           exit 1
 
       - name: Run Playwright suite
         # @Codex: the preceding steps seed and start an isolated synthetic DB.
         env:
           MF085_SYNTHETIC_E2E: "1"
+          # @Codex: document-flow-real-route owns an empty standalone runtime and
+          # runs only when this explicit synthetic-fixture opt-in is present.
+          E2E_DOCUMENTS_SYNTHETIC_ONLY: "1"
         run: npx playwright test --workers=1
+
+      # This browser harness uses node:test and top-level await, so it is not
+      # collectable by Playwright. Keep it in its canonical runner with an
+      # independent marked synthetic directory.
+      - name: Run ChatGPT product browser harness
+        run: |
+          CHATGPT_PRODUCT_DATA_DIR="$(mktemp -d "${RUNNER_TEMP}/mediflow-chatgpt-product.XXXXXX")"
+          MEDIFLOW_DATA_DIR="${CHATGPT_PRODUCT_DATA_DIR}" \
+            node scripts/chatgpt-product-focused-tests.mjs --browser-only
 
       # Seconda fase di `npm run check:terminology-parity`, l'unica che non
       # girava da nessuna parte. Avvia un proprio Next dev su 127.0.0.1:3200 in
@@ -102,11 +155,11 @@ jobs:
           E2E_BASE_URL: http://127.0.0.1:3200
         run: npm run test:network:home-base-catalog-read
 
-      - name: Stop Next.js dev server
+      - name: Stop Next.js standalone server
         if: always()
         run: |
-          if [ -f "${RUNNER_TEMP}/next-dev.pid" ]; then
-            kill "$(cat "${RUNNER_TEMP}/next-dev.pid")" 2>/dev/null || true
+          if [ -f "${RUNNER_TEMP}/next-standalone.pid" ]; then
+            kill "$(cat "${RUNNER_TEMP}/next-standalone.pid")" 2>/dev/null || true
           fi
 
       - name: Upload Playwright report

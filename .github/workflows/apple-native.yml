@@ -186,6 +186,16 @@ jobs:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v5
+      # @Codex: native ciphertext tests exercise the repository TypeScript host
+      # through a Node 24 bridge; provision its locked dependencies before Swift.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install native source boundary test dependencies
+        run: npm ci
+      - name: Verify native source boundary test prerequisites
+        run: node -e 'if (Number(process.versions.node.split(".")[0]) !== 24) process.exit(1); console.log("Node", process.versions.node, "TypeScript", require("typescript").version)'
       - name: Select latest stable Xcode
         run: sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)"
       - name: Toolchain diagnostics

@@ -5,6 +5,9 @@ import { AlertTriangle, ShieldCheck } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 import { Kree8WorkspaceShell } from '@/components/kree8/kree8-workspace-shell';
+/* @Codex */
+import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
+import { RangeInput } from '@/components/range-input';
 import { db } from '@/lib/db';
 /* @Codex */
 import { buildAnalyticsStats, isAnalyticsPatient, normalizeAgeRange } from '@/lib/patient-analytics';
@@ -49,9 +52,11 @@ function ProgressLine({ label, value, total }: { label: string; value: number; t
 }
 
 function SectionHeading({ label, title, description }: { label: string; title: string; description: string }) {
+    /* @Codex: the title carries the meaning; presentation labels belong only to the comparison. */
+    const { proposal } = useRuntimeTwinDesign();
     return (
         <div className={styles.sectionHeading}>
-            <p className={styles.sectionLabel}>{label}</p>
+            {!proposal && <p className={styles.sectionLabel}>{label}</p>}
             <div>
                 <h2>{title}</h2>
                 <p>{description}</p>
@@ -62,6 +67,10 @@ function SectionHeading({ label, title, description }: { label: string; title: s
 
 export default function AnalyticsPage() {
     /* @Codex */
+    const { proposal } = useRuntimeTwinDesign();
+    const navItems = proposal
+        ? ANALYTICS_NAV_ITEMS.map(({ href, label }) => ({ href, label: href === '#domanda' ? 'Popolazione' : label }))
+        : ANALYTICS_NAV_ITEMS;
     const patients = useLiveQuery(async () => db.patients
         .filter(isAnalyticsPatient)
         .toArray(), [], undefined, ['patients', 'patients_to_ambulatories']);
@@ -114,13 +123,14 @@ export default function AnalyticsPage() {
     if (!patients || !stats) {
         return (
             <Kree8WorkspaceShell
+                variant="overview"
                 eyebrow="Analisi"
                 title="Cruscotto locale"
                 subtitle="Popolazione registrata e audit operativo, senza dati fuori dal dispositivo."
                 backHref="/?area=incarico"
                 backLabel="Torna ai pazienti"
                 statusLabel="Sto leggendo dal Mac..."
-                navItems={ANALYTICS_NAV_ITEMS}
+                navItems={navItems}
             >
                 <p className={styles.loadingState} role="status">Sto preparando l’analisi locale.</p>
             </Kree8WorkspaceShell>
@@ -129,13 +139,14 @@ export default function AnalyticsPage() {
 
     return (
         <Kree8WorkspaceShell
+            variant="overview"
             eyebrow="Analisi"
             title="Cruscotto locale"
             subtitle="Una domanda alla volta sui dati già registrati in questa postazione."
             backHref="/?area=incarico"
             backLabel="Torna ai pazienti"
             statusLabel={`${stats.totalInRange} schede tra ${normalizedAgeRange[0]} e ${normalizedAgeRange[1]} anni`}
-            navItems={ANALYTICS_NAV_ITEMS}
+            navItems={navItems}
         >
             <section
                 id="domanda"
@@ -144,8 +155,8 @@ export default function AnalyticsPage() {
                 data-lume-analytics-focus="true"
             >
                 <div className={styles.answer}>
-                    <p className={styles.sectionLabel}>Domanda operativa</p>
-                    <h2>Quante schede attive rientrano nella fascia d’età scelta?</h2>
+                    {!proposal && <p className={styles.sectionLabel}>Domanda operativa</p>}
+                    <h2>{proposal ? 'Schede attive nel filtro' : 'Quante schede attive rientrano nella fascia d’età scelta?'}</h2>
                     <p
                         className={`${styles.primaryValue} lume-registro`}
                         data-testid="analytics-primary-value"
@@ -161,15 +172,15 @@ export default function AnalyticsPage() {
                 </div>
 
                 <div className={styles.filterField} data-testid="analytics-filter-field">
-                    <p className={styles.sectionLabel}>Filtro quieto</p>
+                    {proposal ? <h2>Fascia d’età</h2> : <p className={styles.sectionLabel}>Filtro quieto</p>}
                     <label>
                         <span>Età minima</span>
                         <strong className="lume-registro">{ageRange[0]} anni</strong>
-                        <input
-                            type="range"
-                            min="0"
-                            max="120"
+                        <RangeInput
+                            min={0}
+                            max={120}
                             aria-label="Età minima"
+                            aria-valuetext={`${ageRange[0]} anni`}
                             value={ageRange[0]}
                             onChange={(event) => setAgeRange([Number(event.target.value), ageRange[1]])}
                         />
@@ -177,11 +188,11 @@ export default function AnalyticsPage() {
                     <label>
                         <span>Età massima</span>
                         <strong className="lume-registro">{ageRange[1]} anni</strong>
-                        <input
-                            type="range"
-                            min="0"
-                            max="120"
+                        <RangeInput
+                            min={0}
+                            max={120}
                             aria-label="Età massima"
+                            aria-valuetext={`${ageRange[1]} anni`}
                             value={ageRange[1]}
                             onChange={(event) => setAgeRange([ageRange[0], Number(event.target.value)])}
                         />
@@ -192,21 +203,21 @@ export default function AnalyticsPage() {
             <section id="indicatori" className={styles.layerSection} data-testid="analytics-layer-section">
                 <SectionHeading
                     label="Indicatori"
-                    title="Lettura della popolazione filtrata"
-                    description="Valori di contesto, subordinati alla risposta principale."
+                    title={proposal ? 'Profilo della popolazione' : 'Lettura della popolazione filtrata'}
+                    description={proposal ? 'Assistenza e diagnosi nelle schede selezionate.' : 'Valori di contesto, subordinati alla risposta principale.'}
                 />
                 <dl className={styles.factList}>
                     <div className={styles.factRow}>
                         <dt>Assistenza domiciliare integrata</dt>
-                        <dd><span className="lume-registro" data-lume-register-value="true">{stats.adiCount}</span> schede</dd>
+                        <dd><span className="lume-registro" data-lume-register-value="true">{stats.adiCount}</span> {proposal && stats.adiCount === 1 ? 'scheda' : 'schede'}</dd>
                     </div>
                     <div className={styles.factRow}>
                         <dt>Con almeno una diagnosi registrata</dt>
-                        <dd><span className="lume-registro" data-lume-register-value="true">{stats.withDiagnoses}</span> schede</dd>
+                        <dd><span className="lume-registro" data-lume-register-value="true">{stats.withDiagnoses}</span> {proposal && stats.withDiagnoses === 1 ? 'scheda' : 'schede'}</dd>
                     </div>
                     <div className={styles.factRow}>
                         <dt>Senza data di nascita, escluse dal filtro</dt>
-                        <dd><span className="lume-registro" data-lume-register-value="true">{stats.withoutBirthDate}</span> schede</dd>
+                        <dd><span className="lume-registro" data-lume-register-value="true">{stats.withoutBirthDate}</span> {proposal && stats.withoutBirthDate === 1 ? 'scheda' : 'schede'}</dd>
                     </div>
                 </dl>
             </section>
@@ -215,7 +226,7 @@ export default function AnalyticsPage() {
                 <SectionHeading
                     label="Grafico"
                     title="Distribuzione per fascia d’età"
-                    description="Ogni barra usa come base le schede comprese nel filtro."
+                    description={proposal ? 'Numero di schede attive per fascia d’età, nel filtro corrente.' : 'Ogni barra usa come base le schede comprese nel filtro.'}
                 />
                 <div className={styles.chart} aria-label="Distribuzione delle schede per fascia d’età">
                     {Object.entries(stats.ageDist).map(([range, count]) => (
@@ -234,7 +245,7 @@ export default function AnalyticsPage() {
                 <SectionHeading
                     label="Tabella"
                     title="Diagnosi più ricorrenti"
-                    description="Descrizione, sistema di codifica e numero di schede nel filtro corrente."
+                    description={proposal ? 'Le diagnosi presenti nelle schede selezionate.' : 'Descrizione, sistema di codifica e numero di schede nel filtro corrente.'}
                 />
                 <div
                     className={styles.tableScroller}
@@ -279,8 +290,8 @@ export default function AnalyticsPage() {
                         description="Eventi tecnici senza contenuti clinici."
                     />
                     <label className={styles.compactField}>
-                        <span>Finestra audit</span>
-                        <select aria-label="Finestra audit" value={auditDays} onChange={(event) => setAuditDays(Number(event.target.value))}>
+                        <span>{proposal ? 'Periodo' : 'Finestra audit'}</span>
+                        <select aria-label={proposal ? 'Periodo audit' : 'Finestra audit'} value={auditDays} onChange={(event) => setAuditDays(Number(event.target.value))}>
                             <option value={7}>Ultimi 7 giorni</option>
                             <option value={30}>Ultimi 30 giorni</option>
                             <option value={90}>Ultimi 90 giorni</option>

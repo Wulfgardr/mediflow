@@ -1,6 +1,6 @@
 {
   "name": "medical-record-app",
-  "version": "0.8.5",
+  "version": "0.8.6",
   "private": false,
   "engines": {
     "node": ">=24 <25"
@@ -18,7 +18,8 @@
     "prestart": "node scripts/node-runtime-contract.mjs verify",
     "start": "next start --hostname 127.0.0.1 --port 3000",
     "mini": "node scripts/run-strip-types.mjs packages/mini/src/cli.ts",
-    "test:mini-cli": "node scripts/run-strip-types.mjs --test packages/mini/src/cli.test.ts",
+    "mini:production": "node scripts/run-strip-types.mjs scripts/mediflow-headless-supervisor.mjs --mini",
+    "test:mini-cli": "node scripts/run-strip-types.mjs --test --test-concurrency=1 packages/mini/src/cli.test.ts packages/mini/src/session.test.ts packages/mini/src/protocol.test.ts",
     "mcp:intelligent-host": "node scripts/run-strip-types.mjs scripts/intelligent-host-mcp-stdio.mjs",
     "mcp:intelligent-host:production": "node scripts/run-strip-types.mjs scripts/mediflow-headless-supervisor.mjs",
     "smoke:intelligent-host:production": "node scripts/mediflow-headless-supervisor-standalone-smoke.mjs",
@@ -180,6 +181,9 @@
     "test:openmed-redaction": "bash scripts/openmed-redaction-test.sh",
     "test:pin-change": "bash scripts/pin-change-test.sh",
     "test:settings-navigation": "bash scripts/settings-navigation-test.sh",
+    "setup:local-provider": "node scripts/run-strip-types.mjs scripts/setup-local-provider.mjs",
+    "test:function-models": "node scripts/run-strip-types.mjs --test lib/ai-providers/fabric/function-model-preferences.test.ts lib/ai-providers/fabric/function-model-preferences-production.test.ts lib/function-status.test.ts",
+    "test:local-provider-setup": "node scripts/run-strip-types.mjs --test scripts/local-provider-setup.test.ts",
     "test:fabric-settings-view": "bash scripts/fabric-settings-view-test.sh",
     "test:server-auth-policy": "bash scripts/server-auth-policy-test.sh",
     "test:admin-auth-boundary": "node --test scripts/admin-route-auth-boundary.test.mjs",
@@ -208,6 +212,8 @@
     "e2e:fabric-settings": "E2E_SPECS='e2e/settings-fabric.spec.ts' E2E_BASE_URL='http://127.0.0.1:3189' bash scripts/e2e-smoke.sh",
     "e2e:smoke": "bash scripts/e2e-smoke.sh",
     "check:anydoc-local-only": "node scripts/check-anydoc-local-only.mjs",
+    "check:anydoc-desktop-ocr": "node scripts/run-strip-types.mjs scripts/check-anydoc-desktop-ocr.ts",
+    "test:anydoc-desktop-ocr": "node scripts/run-strip-types.mjs --test --test-concurrency=1 scripts/anydoc-desktop-ocr-real.test.ts",
     "test:anydoc-local-only": "node --test scripts/check-anydoc-local-only.test.mjs",
     "check:api-error-leak": "node scripts/check-api-error-leak.mjs",
     "test:api-error-leak": "node scripts/check-api-error-leak.mjs --self-test"
@@ -215,7 +221,7 @@
   "dependencies": {
     "@firecrawl/anydoc": "0.2.4",
     "@hookform/resolvers": "^5.2.2",
-    "@mediflow/web-auth-lifecycle-owner": "file:packages/web-auth-lifecycle-owner/artifacts/mediflow-web-auth-lifecycle-owner-0.8.6.tgz",
+    "@mediflow/web-auth-lifecycle-owner": "file:packages/web-auth-lifecycle-owner/artifacts/mediflow-web-auth-lifecycle-owner-0.8.9-local.3f2e6f2a.tgz",
     "@modelcontextprotocol/server": "2.0.0",
     "@tailwindcss/typography": "^0.5.19",
     "@tanstack/react-virtual": "^3.14.5",

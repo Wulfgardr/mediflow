@@ -29,16 +29,23 @@ async function openNewEntry(page: Page, patient: SyntheticPatient): Promise<void
   await page.goto(`/patients/${patient.id}/entries/new`);
   await expect(page.getByRole('heading', { name: 'Nuova voce clinica', exact: true })).toBeVisible();
   await expect(page.getByRole('form', { name: 'Nuova voce clinica', exact: true })).toBeVisible();
-  await expect(page.locator('#contesto').getByText(patient.expectedPatientName, { exact: true })).toBeVisible();
+  await expect(page.getByTestId('progressive-entry-composer').locator('header')
+    .getByText(patient.expectedPatientName, { exact: true })).toBeVisible();
 }
 
 async function forceSyntheticDraftError(page: Page): Promise<void> {
+  // @Codex: reach the optional tools through the ordinary disclosure.
+  const session = page.locator('details#sessione-visita');
+  if (await session.getAttribute('open') === null) {
+    await session.locator(':scope > summary').click();
+  }
+  await expect(session).toHaveAttribute('open', '');
   await page.route('**/api/visit-session/draft', (route) => route.fulfill({
     status: 503,
     contentType: 'application/json',
     body: JSON.stringify({ error: 'fixture-synthetic-failure' }),
   }));
-  await page.getByLabel('Bozza dettata o transcript').fill(
+  await page.getByRole('textbox', { name: 'Bozza o transcript', exact: true }).fill(
     `${SYNTHETIC_ENTRY} Testo esteso per verificare wrapping, leggibilità e stato di errore senza dati reali.`,
   );
   await page.getByRole('button', { name: 'Elabora bozza', exact: true }).click();
@@ -81,91 +88,53 @@ async function attachVisualProof(
   await editor.focus();
   await expect(editor).toBeFocused();
 
-  const overflowProof = await page.evaluate(() => {
-    const form = document.querySelector<HTMLElement>('form[aria-label="Nuova voce clinica"]');
-    const primarySurface = form?.closest<HTMLElement>('.patient-detail-section');
-    const workspaceGrid = primarySurface?.parentElement?.parentElement;
-    const workspaceBody = workspaceGrid?.parentElement;
-    const canvas = workspaceBody?.closest<HTMLElement>('main');
-    const sectionRail = canvas?.querySelector<HTMLElement>('nav[aria-label="Sezioni della vista"]');
-    const contextColumn = workspaceGrid?.querySelector<HTMLElement>(':scope > aside');
-    if (!form || !workspaceGrid || !workspaceBody || !canvas || !sectionRail || !contextColumn) {
-      throw new Error('Struttura della nuova voce Lume non trovata');
-    }
-
-    const canvasRect = canvas.getBoundingClientRect();
-    const canvasLeft = canvasRect.left + canvas.clientLeft;
-    const canvasRight = canvasLeft + canvas.clientWidth;
+  // @Codex: the ordinary composer has one sheet and inline disclosures;
+  // validate their actual geometry instead of the retired rail/aside grid.
+  const overflowProof = await page.getByTestId('progressive-entry-composer').evaluate((composer) => {
+    const form = composer.querySelector<HTMLElement>('form[aria-label="Nuova voce clinica"]');
+    const sheet = composer.querySelector<HTMLElement>('[data-testid="lume-editor-workflow"]');
+    if (!form || !sheet) throw new Error('Composer sheet/form missing');
     const targets: Array<[string, HTMLElement]> = [
-      ['workspace-body', workspaceBody],
-      ['workspace-grid', workspaceGrid],
-      ['entry-form', form],
-      ['context-column', contextColumn],
-      ...Array.from(workspaceGrid.querySelectorAll<HTMLElement>('.lume-panel, .patient-detail-side-section'))
-        .map((element, index): [string, HTMLElement] => [`clinical-surface-${element.id || index}`, element]),
-    ];
-
-    return {
-      viewportWidth: window.innerWidth,
-      canvas: { clientWidth: canvas.clientWidth, scrollWidth: canvas.scrollWidth },
-      sectionRail: {
-        display: getComputedStyle(sectionRail).display,
-        gridTemplateColumns: getComputedStyle(sectionRail).gridTemplateColumns,
-        overflowX: getComputedStyle(sectionRail).overflowX,
-      },
-      sectionLinks: Array.from(sectionRail.querySelectorAll<HTMLElement>('a')).map((element, index) => {
-        const rect = element.getBoundingClientRect();
-        return {
-          label: element.textContent?.trim() || `section-link-${index}`,
-          clientWidth: element.clientWidth,
-          clippedLeft: rect.left < canvasLeft - 1,
-          clippedRight: rect.right > canvasRight + 1,
-        };
+      ['composer', composer as HTMLElement],
+      ['sheet', sheet],
+      ['form', form],
+      ...['dati', 'resoconto', 'allegati', 'sessione-visita'].map((id): [string, HTMLElement] => {
+        const element = form.querySelector<HTMLElement>(`#${id}`);
+        if (!element) throw new Error(`Composer section missing: ${id}`);
+        return [id, element];
       }),
+      ...Array.from(form.querySelectorAll<HTMLDetailsElement>(':scope > details'))
+        .map((element, index): [string, HTMLElement] => [`disclosure-${index}`, element]),
+    ];
+    return {
+      document: { clientWidth: document.documentElement.clientWidth, scrollWidth: document.documentElement.scrollWidth },
       targets: targets.map(([label, element]) => {
         const rect = element.getBoundingClientRect();
         return {
           label,
           clientWidth: element.clientWidth,
           scrollWidth: element.scrollWidth,
-          clippedLeft: rect.left < canvasLeft - 1,
-          clippedRight: rect.right > canvasRight + 1,
+          clippedLeft: rect.left < -1,
+          clippedRight: rect.right > document.documentElement.clientWidth + 1,
         };
       }),
     };
   });
-  /* @Codex The reflow contract follows the actual CSS viewport, not the test name. */
-  if (overflowProof.viewportWidth <= 480) {
-    expect(overflowProof.sectionRail.display).toBe('grid');
-    const columns = overflowProof.sectionRail.gridTemplateColumns.split(/\s+/).filter(Boolean);
-    expect(columns).toHaveLength(2);
-    for (const column of columns) {
-      expect(Number.parseFloat(column), 'ogni colonna della rail deve avere larghezza non nulla').toBeGreaterThan(0);
-    }
-    expect(overflowProof.sectionRail.overflowX).toBe('visible');
-  } else {
-    expect(['auto', 'scroll']).toContain(overflowProof.sectionRail.overflowX);
-  }
-  expect(overflowProof.sectionLinks.length).toBeGreaterThan(0);
-  for (const sectionLink of overflowProof.sectionLinks) {
-    expect(sectionLink.clientWidth, `${sectionLink.label} deve avere larghezza non nulla`).toBeGreaterThan(0);
-    expect(sectionLink.clippedLeft, `${sectionLink.label} non deve essere tagliato a sinistra`).toBe(false);
-    expect(sectionLink.clippedRight, `${sectionLink.label} non deve essere tagliato a destra`).toBe(false);
-  }
   for (const target of overflowProof.targets) {
+    expect(target.clientWidth, `${target.label} deve avere larghezza non nulla`).toBeGreaterThan(0);
     expect(target.scrollWidth, `${target.label} non deve scorrere orizzontalmente`).toBeLessThanOrEqual(target.clientWidth + 1);
     expect(target.clippedLeft, `${target.label} non deve essere tagliato a sinistra`).toBe(false);
     expect(target.clippedRight, `${target.label} non deve essere tagliato a destra`).toBe(false);
   }
-  expect(overflowProof.canvas.scrollWidth).toBeLessThanOrEqual(overflowProof.canvas.clientWidth + 1);
+  expect(overflowProof.document.scrollWidth).toBeLessThanOrEqual(overflowProof.document.clientWidth + 1);
 
-  const clinicalSurfaces = await page.locator('.lume-panel, .patient-detail-side-section').evaluateAll((elements) =>
+  const clinicalSurfaces = await page.getByTestId('lume-editor-workflow').evaluateAll((elements) =>
     elements.map((element) => {
       const style = getComputedStyle(element);
       return { background: style.backgroundColor, backdropFilter: style.backdropFilter };
     }),
   );
-  expect(clinicalSurfaces.length).toBeGreaterThan(0);
+  expect(clinicalSurfaces).toHaveLength(1);
   for (const surface of clinicalSurfaces) {
     expect(surface.background).not.toBe('rgba(0, 0, 0, 0)');
     expect(surface.background).not.toBe('transparent');
@@ -227,7 +196,7 @@ test('nuova voce Lume espone stato, focus, errori e salvataggio senza affidarsi 
     await expect(editor).toHaveAttribute('aria-multiline', 'true');
     await expect(editor).toHaveAttribute('aria-required', 'true');
     await expect(editor).toHaveAccessibleDescription(
-      'Editor su più righe. Usa la barra degli strumenti per formattare il resoconto; Tab sposta il focus al controllo successivo.',
+      'Usa la barra per formattare il testo. Tab passa al controllo successivo.',
     );
     await expect(page.getByRole('group', { name: 'Strumenti del resoconto clinico', exact: true })).toMatchAriaSnapshot(`
       - group "Strumenti del resoconto clinico":
@@ -244,37 +213,28 @@ test('nuova voce Lume espone stato, focus, errori e salvataggio senza affidarsi 
         - button "Aumenta rientro"
     `);
 
-    const settingGroup = page.getByRole('group', { name: 'Luogo', exact: true });
-    await expect(settingGroup).toMatchAriaSnapshot(`
-      - group "Luogo":
-        - button "Ambulatorio" [pressed]
-        - button "Domicilio"
-    `);
-    const ambulatoryButton = settingGroup.getByRole('button', { name: 'Ambulatorio', exact: true });
-    const homeButton = settingGroup.getByRole('button', { name: 'Domicilio', exact: true });
-    await homeButton.click();
-    await expect(homeButton).toHaveAttribute('aria-pressed', 'true');
-    await expect(ambulatoryButton).toHaveAttribute('aria-pressed', 'false');
+    // @Codex: ordinary native selects preserve type/setting values and
+    // keyboard order; the previous segmented buttons are no longer rendered.
+    const entryType = page.getByRole('combobox', { name: 'Tipo di voce', exact: true });
+    const setting = page.getByRole('combobox', { name: 'Luogo della voce clinica', exact: true });
+    await expect(entryType).toHaveValue('visit');
+    await expect(entryType.locator('option')).toHaveText(['Visita', 'Remoto', 'Nota']);
+    await expect(setting).toHaveValue('ambulatory');
+    await expect(setting.locator('option')).toHaveText(['Ambulatorio', 'Domicilio']);
+    await setting.selectOption('home');
+    await expect(setting).toHaveValue('home');
 
-    const typeGroup = page.getByRole('group', { name: 'Tipo di voce', exact: true });
-    await expect(typeGroup).toMatchAriaSnapshot(`
-      - group "Tipo di voce":
-        - button "Visita In presenza, con esame obiettivo e piano." [pressed]
-        - button "Remoto Contatto a distanza, follow-up o riallineamento."
-        - button "Nota Nota breve, decisione o memo clinico."
-    `);
-
-    const formControls = page.getByRole('form', { name: 'Nuova voce clinica', exact: true }).locator(
-      'input:not([type="hidden"]):not([disabled]), button:not([disabled]), textarea:not([disabled]), [contenteditable="true"]',
-    );
-    await expect(formControls.nth(0)).toHaveAccessibleName('Data e ora della voce clinica');
-    await expect(formControls.nth(1)).toHaveAccessibleName('Ambulatorio');
-    await expect(formControls.nth(2)).toHaveAccessibleName('Domicilio');
-
-    await ambulatoryButton.focus();
-    await expect(ambulatoryButton).toBeFocused();
+    const metadataControls = page.locator('#dati').locator('select, input');
+    await expect(metadataControls).toHaveCount(3);
+    await expect(metadataControls.nth(0)).toHaveAccessibleName('Tipo di voce');
+    await expect(metadataControls.nth(1)).toHaveAccessibleName('Luogo della voce clinica');
+    await expect(metadataControls.nth(2)).toHaveAccessibleName('Data e ora della voce clinica');
+    await entryType.focus();
+    await expect(entryType).toBeFocused();
     await page.keyboard.press('Tab');
-    await expect(homeButton).toBeFocused();
+    await expect(setting).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(dateInput).toBeFocused();
 
     await page.getByRole('button', { name: 'Registra nel diario', exact: true }).click();
     const emptyEntryAlert = page.getByRole('alert').filter({ hasText: 'Resoconto clinico mancante' });
@@ -295,7 +255,12 @@ test('nuova voce Lume espone stato, focus, errori e salvataggio senza affidarsi 
     await expect(page).toHaveURL(new RegExp(`/patients/${patient.id}/modules$`), { timeout: 45_000 });
 
     await openNewEntry(page, patient);
-    await expect(page.getByText('Visita ambulatoriale', { exact: true })).toHaveCount(1);
+    const context = page.getByRole('form', { name: 'Nuova voce clinica', exact: true })
+      .locator(':scope > details').filter({ has: page.locator('summary').filter({ hasText: 'Consulta cartella' }) });
+    await context.locator(':scope > summary').click();
+    await expect(context).toHaveAttribute('open', '');
+    const recentEntries = context.getByRole('region', { name: 'Ultime voci registrate', exact: true });
+    await expect(recentEntries.locator('summary')).toHaveText(/ · Visita ambulatoriale$/);
   } finally {
     await setAiLaneKillSwitch(page, 'aiPatientInsightKillSwitch', 'enabled');
   }

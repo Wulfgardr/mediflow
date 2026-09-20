@@ -17,7 +17,7 @@ test('roots the production consumer only in the authenticated proposal-only Pati
     assert.match(component, /buildPatientInsightPreviewRequest|parsePatientInsightPreviewWireRoot/u);
     assert.match(component, /writesPerformed/u); assert.match(component, /reviewOnly/u);
     assert.match(route, /acquireAuthenticatedPatientInsightPreview|createPatientInsightPreviewHttpHandler/u);
-    assert.match(production, /acquireAuthenticatedWebSessionProjectionOwnerContext/u);
+    assert.match(production, /acquireOrdinaryApplicationContext/u);
     assert.match(production, /createHostProviderLifecycleService|createHostLocalProviderBindingService|observeClinical|routeHostResolvedCandidateCapability/u);
     assert.match(production, /AI_PATIENT_INSIGHT_KILL_SWITCH_KEY/u);
     assert.doesNotMatch(production, /update\(|insert\(|delete\(|aiSummary/u);

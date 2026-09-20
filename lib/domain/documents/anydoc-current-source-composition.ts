@@ -4,8 +4,8 @@ import 'server-only';
 import { types } from 'node:util';
 import type { ServerSession } from '../../security/server-session';
 import { bindAttachmentExtractionSelection } from './attachment-extraction-selection-binding';
-import { createAttachmentExtractionSourceAuthority } from './attachment-extraction-source-authority';
-import { continueAnyDocImageOrScanWithAppleVision } from './anydoc-apple-vision-ocr-composition';
+import { createAttachmentExtractionSourceAuthority, createNativeAttachmentExtractionSourceAuthority } from './attachment-extraction-source-authority';
+import { continueAnyDocImageOrScanWithLocalOcr } from './anydoc-apple-vision-ocr-composition';
 import {
     buildAnyDocLocalExtraction,
     type LocalAttachmentByteSource,
@@ -14,6 +14,12 @@ import {
     type LocalExtractionResult,
 } from './anydoc-local-extraction-contract';
 import { extractAnyDocLocalBytes } from './anydoc-local-extraction-runner';
+import { acquireAttachmentExtractionProjection, claimAttachmentExtractionProjection } from './attachment-extraction-projection-broker';
+import { readAttachmentExtractionProjectionBytes } from './attachment-extraction-projection-transport';
+import { ATTACHMENT_EXTRACTION_PROJECTION_SCHEMA } from './attachment-extraction-projection-protocol';
+
+import { getNativeOrdinaryApplicationContext } from '../../chatgpt-product/native-ordinary-composition';
+import { nativeOrdinaryDocumentRequiresProjection, consumeNativeOrdinaryDocumentProjection } from '../../security/server-session-clinical-context-native-sources';
 
 const create = Object.create;
 const defineProperty = Object.defineProperty;
@@ -93,8 +99,19 @@ function denied(): LocalExtractionResult { return publishFinalizedResult(buildAn
 export async function composeAnyDocCurrentSourceExtraction(session: ServerSession, selector: unknown): Promise<LocalExtractionResult> {
     const id = attachmentId(selector); if (!id) return denied();
     if (!bindAttachmentExtractionSelection(session, id)) return denied();
+    return extractSelectedSource(session, selector, id);
+}
+
+/** Uses the active canonical selection; missing or stale authority remains denied. */
+export async function composeAnyDocCurrentSelectionExtraction(session: ServerSession, selector: unknown): Promise<LocalExtractionResult> {
+    const id = attachmentId(selector); if (!id) return denied();
+    return extractSelectedSource(session, selector, id);
+}
+
+async function extractSelectedSource(session: ServerSession, selector: unknown, id: string): Promise<LocalExtractionResult> {
     let authority: ReturnType<typeof createAttachmentExtractionSourceAuthority>;
-    try { authority = createAttachmentExtractionSourceAuthority(session); }
+    try { authority = session.authChannel === 'native'
+        ? createNativeAttachmentExtractionSourceAuthority(session) : createAttachmentExtractionSourceAuthority(session); }
     catch { return denied(); }
     let operation: object | null = null;
     try {
@@ -103,9 +120,13 @@ export async function composeAnyDocCurrentSourceExtraction(session: ServerSessio
         operation = begun.operation;
         let result: LocalExtractionResult;
         try {
+            if (!authority.checkpoint(operation)) return denied();
             result = await extractAnyDocLocalBytes(id, begun.bytes);
-            if (result.status === 'review_required' && result.detail === 'image_or_scan')
-                result = await continueAnyDocImageOrScanWithAppleVision(id, begun.bytes, result);
+            if (!authority.checkpoint(operation)) return denied();
+            if (result.status === 'review_required' && result.detail === 'image_or_scan') {
+                result = await continueAnyDocImageOrScanWithLocalOcr(id, begun.bytes, result);
+                if (!authority.checkpoint(operation)) return denied();
+            }
         }
         catch { authority.abort(operation); operation = null; return denied(); }
         const final = authority.finalize(operation); operation = null;
@@ -114,4 +135,89 @@ export async function composeAnyDocCurrentSourceExtraction(session: ServerSessio
         if (operation) authority.abort(operation);
         return denied();
     } finally { authority.dispose(); }
+}
+
+
+/** HTTP publication is constructed synchronously after the last authority check; no await follows finalize. */
+export async function composeAnyDocClientProjectionExtraction(
+    session: ServerSession, selector: unknown, grantId: unknown, request: Request,
+): Promise<Response> {
+    const unavailable = () => Response.json({ error: 'Local extraction unavailable' },
+        { status: 409, headers: { 'Cache-Control': 'no-store' } });
+    const id = attachmentId(selector); if (!id || request.signal.aborted) return unavailable();
+    const use = claimAttachmentExtractionProjection(session, id, grantId); if (!use) return unavailable();
+    const cancel = () => use.cancel();
+    request.signal.addEventListener('abort', cancel, { once: true });
+    let bytes: Uint8Array | null = null;
+    try {
+        if (request.signal.aborted || !use.current()) return unavailable();
+        bytes = await readAttachmentExtractionProjectionBytes(request, use);
+        if (!bytes || request.signal.aborted || !use.current()) return unavailable();
+        const begun = use.consume(bytes);
+        bytes.fill(0); bytes = null;
+        if (!begun || request.signal.aborted || !use.current()) return unavailable();
+        let result = await extractAnyDocLocalBytes(id, begun.bytes);
+        if (request.signal.aborted || !use.current()) return unavailable();
+        if (result.status === 'review_required' && result.detail === 'image_or_scan') {
+            result = await continueAnyDocImageOrScanWithLocalOcr(id, begun.bytes, result);
+            if (request.signal.aborted || !use.current()) return unavailable();
+        }
+        if (result.status === 'denied' || request.signal.aborted || !use.finalize()) return unavailable();
+        return Response.json({
+            schemaVersion: ATTACHMENT_EXTRACTION_PROJECTION_SCHEMA,
+            grantId: use.grant.grantId,
+            acquisition: { origin: 'authenticated_client_decryption', ciphertextEquality: 'not_attested',
+                canonicalSource: use.grant.canonicalSource },
+            extraction: publishFinalizedResult(result),
+        }, { headers: { 'Cache-Control': 'no-store' } });
+    } catch { return unavailable(); }
+    finally { bytes?.fill(0); request.signal.removeEventListener('abort', cancel); use.dispose(); }
+}
+
+/**
+ * Keeps an encrypted browser attachment on the same authenticated source-authority
+ * path when the receiving operation already owns a one-use capture handle.
+ * The browser supplies bytes only; this composition mints and consumes the
+ * projection grant, then returns the finalized AnyDoc evidence to its server owner.
+ */
+export async function composeAnyDocCurrentSelectionClientProjectionExtraction(
+    session: ServerSession, selector: unknown, request: Request,
+): Promise<LocalExtractionResult> {
+    const id = attachmentId(selector); if (!id || request.signal.aborted) return denied();
+    // Native ingress uses the source captured BEFORE the client's fresh HTTP read.
+    // Never mint an attachment grant from the received body's metadata.
+    let use;
+    if (session.authChannel === 'native') {
+        const context = getNativeOrdinaryApplicationContext();
+        if (!context?.sources || context.request.functionId !== 'document_synthesis'
+            || context.request.input.attachmentId !== id || context.session.id !== session.id) return denied();
+        if (!nativeOrdinaryDocumentRequiresProjection(context.sources)) {
+            if (request.body !== null) return denied();
+            return composeAnyDocCurrentSelectionExtraction(session, selector);
+        }
+        use = consumeNativeOrdinaryDocumentProjection(context.sources, context.session, id);
+    } else {
+        const grant = acquireAttachmentExtractionProjection(session, id); if (!grant) return denied();
+        use = claimAttachmentExtractionProjection(session, id, grant.grantId);
+    }
+    if (!use) return denied();
+    const cancel = () => use.cancel();
+    request.signal.addEventListener('abort', cancel, { once: true });
+    let bytes: Uint8Array | null = null;
+    try {
+        if (request.signal.aborted || !use.current()) return denied();
+        bytes = await readAttachmentExtractionProjectionBytes(request, use);
+        if (!bytes || request.signal.aborted || !use.current()) return denied();
+        const begun = use.consume(bytes);
+        bytes.fill(0); bytes = null;
+        if (!begun || request.signal.aborted || !use.current()) return denied();
+        let result = await extractAnyDocLocalBytes(id, begun.bytes);
+        if (request.signal.aborted || !use.current()) return denied();
+        if (result.status === 'review_required' && result.detail === 'image_or_scan') {
+            result = await continueAnyDocImageOrScanWithLocalOcr(id, begun.bytes, result);
+            if (request.signal.aborted || !use.current()) return denied();
+        }
+        return result.status !== 'denied' && !request.signal.aborted && use.finalize() ? publishFinalizedResult(result) : denied();
+    } catch { return denied(); }
+    finally { bytes?.fill(0); request.signal.removeEventListener('abort', cancel); use.dispose(); }
 }

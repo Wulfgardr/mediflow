@@ -140,6 +140,30 @@ identificatore di allegato, ID paziente, revisione, freshness, provider o
 prompt. Cattura e preview sono due frontiere di authority distinte anche quando
 una composizione locale le richiama in sequenza.
 
+### Follow-up — ingest Web di allegati cifrati (19 settembre 2026)
+
+Per l'allegato Web ordinario persistito cifrato,
+`POST /api/ai/document-synthesis/ingest` non accetta JSON di projection o testo.
+Accetta soltanto `application/octet-stream` same-origin/loopback, con il capture
+handle opaco nel solo header `X-MediFlow-Document-Synthesis-Capture`. Il browser
+legge e decritta la facade corrente esclusivamente dopo la cattura; non invia
+`attachmentId`, paziente, source ref, revision, freshness, provider o prompt
+all'ingest.
+
+L'ingest risolve e brucia il capture handle nel medesimo owner. Poi emette e
+consuma internamente il grant di extraction per l'allegato gia catturato; il
+grant vincola `sourceRef`, revisione, freshness, selezione e sessione prima e
+dopo AnyDoc. L'host deriva la projection di sintesi soltanto dal risultato
+AnyDoc finalizzato e dalla sua receipt. La provenance della proiezione resta
+`authenticated_client_decryption` con `ciphertextEquality=not_attested`: non
+afferma uguaglianza tra ciphertext persistito e bytes decrittati, ne trasforma
+il client in authority di contenuto.
+
+L'handle e comunque bruciato prima del body e ogni errore, annullamento,
+reselezione, lock, logout o mismatch lascia l'operazione non pubblicabile. Il
+browser ricontrolla la generazione dopo lettura/decrittazione e prima del POST,
+scartando i bytes se un reset ha ritirato il flusso.
+
 `sourceSetAuthority=application_host` dichiara soltanto che l'host possiede il
 set catturato e ha validato lo scope del digest dell'input provider. Non
 dichiara plaintext, digest o provenienza dell'allegato originale, ne verita
@@ -438,3 +462,100 @@ Lo stato e `Accepted`. Un packet downstream delimitato richiede un gate
 precedente accettato e una base esatta; non richiede una nuova autorizzazione
 utente per ogni fase. Questa decisione non autorizza runtime, azioni remote,
 egress, persistenza o scritture cliniche.
+
+## Addendum 2026-09-07: citazione dichiarata e locator calcolato dall'host
+
+Stato dell'addendum: proposto per l'implementazione locale della 0.8.6, da
+verificare prima della pubblicazione. Il tentativo con il provider testuale
+ha evidenziato un contratto non autoesplicativo; inoltre un modello senza
+strumenti non deve calcolare SHA-256 o coordinate UTF-8. Si separano la scelta
+della citazione e il calcolo deterministico del suo locator.
+
+Il nuovo contratto interno è
+`mediflow.document-synthesis.provider-envelope.v2`. La root ha esattamente
+`schemaVersion`, `output`, `citations`, `claims`. Ogni citazione del provider
+ha esattamente `label` e `quote`. Versione assente o sconosciuta, vecchia root
+a tre campi e campi offset/hash aggiunti dal provider vengono rifiutati; non
+c'è rilevamento euristico del formato o fallback v1. Il prompt passa a
+`mediflow.document-synthesis.multi-source-prompt.v2` ed esplicita lo schema
+effettivo di output e claim. Non richiede hash o conteggi di byte al modello.
+
+La projection di input v1 resta limitata a etichetta e testo normalizzato
+della cattura autentica. Nessun riferimento canonico, digest o authority
+aggiuntivi vengono trasmessi. Output `mediflow.ai.extract.v1`, path dei claim,
+ordine numerico delle label, conteggio e ordine delle fonti restano invariati.
+
+Nel binding dell'envelope, dopo il resolve del token privato autentico,
+l'host deriva la projection dalla sola sourceSet trattenuta. Per ciascuna
+label cerca i byte esatti della quote nella sola fonte corrispondente. La
+quote deve essere non vuota, Unicode scalare valido e presente una sola volta,
+contando anche occorrenze sovrapposte. Non si applicano trim, normalizzazione
+aggiuntiva, correzioni, matching approssimato o ricerca in altre fonti.
+Assenza, ambiguità, label errata, duplicata o riordinata negano il risultato.
+
+Solo dopo tale verifica l'host calcola startByte/endByte half-open e
+quoteSha256 sugli esatti byte autentici. Il record canonico mantiene i cinque
+campi v1. Viene passato al binder esistente, che ricontrolla membership,
+unicità, offset e hash prima di validare output e claim. Non si costruisce
+direttamente una publication disponibile e non si riparano output o claim
+incompleti. Il parser JSON conserva limiti, chiavi duplicate/extra, scanner,
+snapshot inerte e token privati.
+
+Il calcolo è sincrono, prima di precompute/finalize, senza I/O, refresh di
+fonti o epoch, cambio di selezione, lease, revoca, deadline o consume-once.
+L'autenticità della sourceSet non sostituisce le verifiche di attualità.
+Validatore delle citazioni canoniche v1, codec U0 e digest, receipt,
+publication e wire HTTP mantengono i contratti precedenti.
+`provider_declared_host_membership_and_locator_validated` significa che il
+provider dichiara citazione e supporto, mentre il locator è derivato e
+validato dall'host. `modelCausality=not_established` resta invariato: non si
+attestano entailment o correttezza clinica.
+
+Il limite di 1400 token della risposta e la deadline restano invariati. Quote
+o claim troppo lunghi possono ancora rendere impossibile una risposta
+completa. Non si eliminano fonti, non si tronca una risposta e non si esegue
+un retry nascosto per dichiarare successo. Questo incremento corregge la
+responsabilità del calcolo, non garantisce ogni combinazione di 32 fonti.
+
+Verificare con fixture sintetiche accenti, emoji, LF e valori byte/hash
+indipendenti; quote assenti, ripetute, sovrapposte o alterate; vecchi formati,
+output vuoti e claim incompleti ancora negati. La composizione con owner Web
+autentico deve raggiungere parse/bind/prepare/finalize/serialize, mantenendo
+negazione su cambio selezione, lock, cancel e consumo ripetuto. Una prova
+reale del provider segue i test e non li sostituisce.
+
+
+### Generazione vincolata allo schema locale
+
+La diagnostica sintetica del 7 settembre ha osservato una risposta con root
+v2 e citazione valide, ma senza `output.schemaVersion`. Il diniego resta
+corretto: questo risultato non viene riparato dopo la generazione.
+
+Per Document Synthesis, il binding locale seleziona un formato interno fisso
+che passa a Ollama il JSON Schema dell'envelope v2, inclusi i campi obbligatori
+e le costanti dell'output `mediflow.ai.extract.v1`. È un suggerimento
+strutturale durante la generazione, secondo il [contratto ufficiale
+Ollama](https://docs.ollama.com/capabilities/structured-outputs), seguito dagli
+stessi validatori host. Lo schema è compilato nel prodotto e non contiene
+fonti, identificativi o metadati di autorità. Nessuno schema arbitrario può
+arrivare dalla UI, dalle API o dal documento.
+
+La selezione del formato è un valore interno enumerato; non aggiunge un
+provider, un endpoint o un fallback. JSON mode degli altri percorsi, prompt,
+modello, temperatura, limite di 1400 token, timeout, cancellazione, lease e
+consumo singolo restano invariati. Schema non rispettato, risposta troncata,
+quote non verificabile o claim incoerenti continuano a impedire la proposta.
+La presenza dello schema non prova correttezza clinica o supporto delle
+citazioni: questi limiti rimangono distinti dalla validità strutturale.
+
+Verifiche: payload reale con schema fisso e nessuna derivazione da input;
+regressione dell'output privo di versione ancora negata; contratti di
+citazioni e lifecycle invariati; poi una generazione sintetica ordinaria.
+Integrazione `3a762bb30f086ea2d7fb0189ad258b509f4f22c9`: 22 test mirati
+rieseguiti dal coordinatore e build standalone riusciti. Una generazione dal
+percorso ordinario, con documento fittizio e Ollama `qwen3.5:35b-a3b`, ha
+restituito una proposta disponibile con citazione in 29,67 secondi, senza
+retry. La receipt dichiara `reviewOnly`, zero scritture e nessun apply; la
+rilettura indipendente delle quattro tabelle cliniche presenti conferma
+conteggi e digest invariati. Questo esito riguarda quel caso su host macOS,
+non ogni documento, modello o sistema operativo.

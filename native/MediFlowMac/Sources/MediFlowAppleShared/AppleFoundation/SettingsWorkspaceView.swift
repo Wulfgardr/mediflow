@@ -7,7 +7,7 @@ final class SettingsAccessModel: ObservableObject {
     @Published private(set) var isWorking = false
 
     func isAvailable(using workspaceModel: PairedPatientsWorkspaceModel) -> Bool {
-        guard let connection = workspaceModel.clinicalWorkspaceConnection else { return false }
+        guard let connection = workspaceModel.nativeOperatorConnection else { return false }
         return connection.masterKey != nil
     }
 
@@ -426,6 +426,10 @@ struct SettingsWorkspaceView: View {
             Section("Profilo") { profileContent }
             Section("Ambulatori") { ambulatoryContent }
             Section("Funzioni AI") { aiFunctionsContent }
+            #if os(macOS)
+            // @Codex: ADR0135 uses only native pairing/session and an explicit host grant.
+            Section("Preferenze AI dell’host") { NativeAIConfigurationView(workspaceModel: workspaceModel) }
+            #endif
             Section("Aspetto") { appearanceContent }
             Section("Privacy") { privacyContent }
         }
@@ -488,13 +492,16 @@ struct SettingsWorkspaceView: View {
                 }
             }
             .disabled(accessModel.isWorking || currentPin.isEmpty || newPin.isEmpty || newPinConfirmation.isEmpty)
+            if let message = accessModel.message { settingsMessage(message) }
+        } else {
+            settingsMessage(accessModel.unavailableMessage(using: workspaceModel))
+        }
+        // @Codex: a native operator can lock even before a patient read or key unwrap.
+        if workspaceModel.nativeOperatorConnection != nil {
             Button("Blocca sessione adesso", role: .destructive) {
                 Task { await accessModel.lockSession(using: workspaceModel) }
             }
             .disabled(accessModel.isWorking)
-            if let message = accessModel.message { settingsMessage(message) }
-        } else {
-            settingsMessage(accessModel.unavailableMessage(using: workspaceModel))
         }
     }
 
@@ -559,7 +566,7 @@ struct SettingsWorkspaceView: View {
 
     @ViewBuilder
     private var aiFunctionsContent: some View {
-        Text("Sola lettura. Modifica sul nodo home base.")
+        Text("Stato dei servizi AI in sola lettura.")
             .font(.subheadline)
             .foregroundStyle(.secondary)
 

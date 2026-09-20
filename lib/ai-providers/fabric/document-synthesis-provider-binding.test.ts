@@ -103,6 +103,7 @@ test('does not accept forged, cloned, proxied, or cross-module token values', as
         assert.equal(claimDocumentSynthesisProviderBindingForExecution(token), null);
     }
     const replacements = [
+        ["'./function-model-dispatch'", `'${new URL('./function-model-dispatch.ts', import.meta.url).href}'`],
         ["import 'server-only';", ''],
         ["'drizzle-orm'", `'${import.meta.resolve('drizzle-orm')}'`],
         ["'@/lib/ai-model-selection'", `'${new URL('../../ai-model-selection.ts', import.meta.url).href}'`],

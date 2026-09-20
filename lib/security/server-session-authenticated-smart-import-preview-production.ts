@@ -12,7 +12,7 @@ import { createPatientSmartImportHostCapability } from '../domain/documents/pati
 import { createPatientSmartImportHostKillSwitch } from '../domain/documents/patient-smart-import-host-kill-switch';
 import { dbServer } from '../db-server';
 import { settings } from '../schema';
-import { acquireAuthenticatedWebSessionProjectionOwnerContext } from './server-auth';
+import { acquireOrdinaryApplicationContext } from './ordinary-application-context';
 import { createAuthenticatedSmartImportPreviewService } from './server-session-authenticated-smart-import-preview';
 
 const lifecycle = createHostProviderLifecycleService().service;
@@ -29,7 +29,7 @@ const killSwitch = createPatientSmartImportHostKillSwitch({
 });
 
 export const acquireAuthenticatedSmartImportPreview = createAuthenticatedSmartImportPreviewService({
-    acquireContext: acquireAuthenticatedWebSessionProjectionOwnerContext,
+    acquireContext: acquireOrdinaryApplicationContext,
     createCapability: (broker) => createPatientSmartImportHostCapability({
         killSwitch, broker, lifecycle,
         binding: createHostLocalProviderBindingService(), readiness, route: routeHostResolvedCandidateCapability,

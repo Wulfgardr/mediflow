@@ -22,8 +22,9 @@ test('production document surfaces leave automatic extraction to persisted-sourc
     for (const activeSource of [upload, importer, context]) {
         assert.doesNotMatch(activeSource, /extractPatientDataSmart|extractDocumentTextForSummary|extractTextFromPdf|\/api\/ocr\/extract/u);
     }
-    assert.match(upload, /requestAnyDocLocalExtractionPreview\(file\.id\)/u);
-    assert.match(upload, /db\.attachments\.add[\s\S]*requestAnyDocLocalExtractionPreview/u);
+    assert.match(upload, /requestAnyDocDecryptedLocalExtractionPreview\(file\.id,\s*async/u);
+    assert.match(upload, /db\.attachments\.add[\s\S]*requestAnyDocDecryptedLocalExtractionPreview/u);
+    assert.match(upload, /db\.attachments\.get\(file\.id,\s*\{\s*signal\s*\}\)/u);
 });
 
 test('system diagnostics do not expose a runnable OCR health check', () => {
@@ -39,7 +40,8 @@ test('current review surfaces do not advertise an available OCR workflow', () =>
 
     assert.doesNotMatch(reviewArea, /Anteprima OCR/u);
     assert.doesNotMatch(nativeDocuments, /OCR e sintesi restano|Stato coda OCR/u);
-    assert.match(nativeDocuments, /AnyDoc/u);
+    // @Codex: simplified UI preserves review duty without exposing the engine name.
+    assert.match(nativeDocuments, /Testo estratto, immagini e scansioni richiedono revisione\./u);
     assert.doesNotMatch(reviewQueue, /OCR o sintesi da completare/u);
 });
 
@@ -55,7 +57,8 @@ test('AI settings and model labels have no writable or selectable OCR model', ()
     }
     assert.doesNotMatch(modelSelector, /selectorId:[^;]*['"]ocr['"]/u);
     assert.doesNotMatch(functionsPage, /aiOcrKillSwitch|ocr-kill-switch-card|aria-label="OCR documentale locale"/u);
-    assert.match(functionsPage, /OCR non disponibile/u);
+    assert.match(functionsPage, /Apple Vision/u);
+    assert.doesNotMatch(functionsPage, /OCR non disponibile/u);
 });
 
 test('the active AI service task catalog cannot route OCR', () => {

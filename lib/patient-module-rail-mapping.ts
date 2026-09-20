@@ -14,7 +14,10 @@ const PATIENT_MODULE_RAIL_SPEC = [
         items: [
             { href: '#quadro', label: 'Quadro' },
             { href: '#attenzione', label: 'Attenzione' },
-            { href: '#identita', label: 'Identità' },
+            /* @Codex WUL-678: independent patient domains; historical identity hash remains valid. */
+            { href: '#identita', label: 'Anagrafica' },
+            { href: '#clinica', label: 'Diagnosi' },
+            { href: '#amministrazione', label: 'Amministrazione' },
             { href: '#parametri', label: 'Parametri' },
         ],
     },

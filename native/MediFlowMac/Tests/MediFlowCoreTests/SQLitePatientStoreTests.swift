@@ -127,6 +127,66 @@ final class SQLitePatientStoreTests: XCTestCase {
         return destination
     }
 
+    /* @Codex */
+    func testArchiveFieldsAreSealedReadBackAndPreservedByUnrelatedUpdate() throws {
+        let path = try writableFixtureCopy()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let store = SQLitePatientStore(path: path)
+        for (index, reason) in ["assigned_mmg", "deceased", "other"].enumerated() {
+            let version = index + 1
+            let sealed = try XCTUnwrap(CryptoService.encryptField(CryptoService.jsonEncode(reason)!, masterKey: masterKey))
+            XCTAssertEqual(try store.updatePatient(id: "fixture-1", scopeAmbulatoryId: "AMB-1",
+                payload: .init(version: version, isArchived: true, archiveReason: .value(sealed),
+                    archiveNote: .value("Motivo sintetico")), masterKey: masterKey), .updated(version: version + 1))
+            let raw = try XCTUnwrap(try store.loadRawPatientDetail(id: "fixture-1"))
+            XCTAssertEqual(raw.archiveReason, sealed, "valid ciphertext must not be encrypted twice")
+            XCTAssertTrue(raw.archiveNote?.hasPrefix(CryptoService.encPrefix) == true)
+            let reread = try XCTUnwrap(try store.loadPatientDetail(id: "fixture-1", masterKey: masterKey))
+            XCTAssertEqual(reread.archiveReason, reason)
+            XCTAssertEqual(reread.archiveNote, "Motivo sintetico")
+        }
+        let archived = try XCTUnwrap(try store.loadRawPatientDetail(id: "fixture-1"))
+        XCTAssertEqual(try store.updatePatient(id: "fixture-1", scopeAmbulatoryId: "AMB-1",
+            payload: .init(version: 4, firstName: "Test"), masterKey: masterKey), .updated(version: 5))
+        let preserved = try XCTUnwrap(try store.loadRawPatientDetail(id: "fixture-1"))
+        XCTAssertEqual(preserved.archiveReason, archived.archiveReason)
+        XCTAssertEqual(preserved.archiveNote, archived.archiveNote)
+        XCTAssertEqual(preserved.address, archived.address)
+    }
+
+    func testArchiveNullAndUnarchiveClearWithinTheSameVersionedUpdate() throws {
+        let path = try writableFixtureCopy()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let store = SQLitePatientStore(path: path)
+        _ = try store.updatePatient(id: "fixture-1", scopeAmbulatoryId: "AMB-1",
+            payload: .init(version: 1, isArchived: true, archiveReason: .value("assigned_mmg"), archiveNote: .value("Nota sintetica")), masterKey: masterKey)
+        XCTAssertEqual(try store.updatePatient(id: "fixture-1", scopeAmbulatoryId: "AMB-1",
+            payload: .init(version: 2, archiveNote: .null), masterKey: masterKey), .updated(version: 3))
+        let noteCleared = try XCTUnwrap(try store.loadPatientDetail(id: "fixture-1", masterKey: masterKey))
+        XCTAssertEqual(noteCleared.archiveReason, "assigned_mmg")
+        XCTAssertNil(noteCleared.archiveNote)
+        XCTAssertEqual(try store.updatePatient(id: "fixture-1", scopeAmbulatoryId: "AMB-1",
+            payload: .init(version: 3, isArchived: false, archiveReason: .value("other"), archiveNote: .value("Ignored on unarchive")), masterKey: masterKey), .updated(version: 4))
+        let active = try XCTUnwrap(try store.loadRawPatientDetail(id: "fixture-1"))
+        XCTAssertEqual(active.isArchived, false)
+        XCTAssertNil(active.archiveReason)
+        XCTAssertNil(active.archiveNote)
+    }
+
+    func testArchiveConflictAndScopeRejectionLeaveBothFieldsUntouched() throws {
+        let path = try writableFixtureCopy()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let store = SQLitePatientStore(path: path)
+        let patch = HomeBasePatientUpdatePayload(version: 1, isArchived: true, archiveReason: .value("other"), archiveNote: .value("Motivo sintetico"))
+        XCTAssertEqual(try store.updatePatient(id: "fixture-1", scopeAmbulatoryId: "AMB-1", payload: patch, masterKey: masterKey), .updated(version: 2))
+        let before = try store.loadRawPatientDetail(id: "fixture-1")
+        guard case .conflict = try store.updatePatient(id: "fixture-1", scopeAmbulatoryId: "AMB-1", payload: patch, masterKey: masterKey) else {
+            return XCTFail("stale archive must conflict")
+        }
+        XCTAssertEqual(try store.updatePatient(id: "fixture-1", scopeAmbulatoryId: "AMB-OTHER", payload: patch, masterKey: masterKey), .notFound)
+        XCTAssertEqual(try store.loadRawPatientDetail(id: "fixture-1"), before)
+    }
+
     func testUpdatePatientBumpsVersionSealsFieldsAndPersists() throws {
         let path = try writableFixtureCopy()
         defer { try? FileManager.default.removeItem(atPath: path) }

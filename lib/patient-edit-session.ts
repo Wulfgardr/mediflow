@@ -1,10 +1,12 @@
 /* @Codex */
+import type { WhoLocalReference } from './reference-data/icd11-who-local-contract';
 /** The editable projection is also the form's default-value source. No I/O. */
 type DateInput = Date | string;
 type CheckupStatus = 'pending' | 'completed' | 'cancelled';
 type CheckupSource = 'manual' | 'ai_suggestion';
 
-type DiagnosisInput = { code: string; description: string; system: string; date: DateInput };
+type DiagnosisInput = { code: string; description: string; system: string; date: DateInput;
+    canonicalUri?: string | null; reference?: WhoLocalReference | null };
 export type CheckupFormInput = {
     id?: string;
     patientId?: string;
@@ -53,13 +55,21 @@ function diagnosisFormValue(diagnosis: DiagnosisInput) {
         description: diagnosis.description,
         system: diagnosis.system,
         date: isoDate(diagnosis.date),
+        ...(diagnosis.canonicalUri != null ? { canonicalUri: diagnosis.canonicalUri } : {}),
+        ...(diagnosis.reference != null ? { reference: { releaseId: diagnosis.reference.releaseId,
+            language: diagnosis.reference.language, bindingId: diagnosis.reference.bindingId,
+            imageDigest: diagnosis.reference.imageDigest, datasetSnapshotId: diagnosis.reference.datasetSnapshotId } } : {}),
     };
 }
 
 /** Preserve opaque snapshot fields, never schema-stripped metadata from the draft. */
 function diagnosesForWrite(initial: DiagnosisInput[], next: ReturnType<typeof diagnosisFormValue>[]) {
     const byValue = new Map<string, DiagnosisInput[]>();
-    for (const row of initial) {
+    for (const original of initial) {
+        // Known optional nulls mean absence, not opaque metadata. Keep other fields.
+        const row = { ...original };
+        if (row.canonicalUri == null) delete row.canonicalUri;
+        if (row.reference == null) delete row.reference;
         const key = JSON.stringify(diagnosisFormValue(row));
         const rows = byValue.get(key) ?? [];
         rows.push(row);

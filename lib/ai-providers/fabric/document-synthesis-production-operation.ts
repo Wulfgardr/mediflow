@@ -1,5 +1,7 @@
 /* @Codex */
 import 'server-only';
+import { isOrdinaryFunctionSelected, bindOrdinaryApplicationContext } from '../../chatgpt-product/ordinary-flow';
+import { executeDocumentSynthesisChatGpt } from './document-synthesis-chatgpt-composition';
 
 import { createHash, randomBytes } from 'node:crypto';
 import { types } from 'node:util';
@@ -7,11 +9,12 @@ import { sql } from 'drizzle-orm';
 
 import { AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY, isAiDocumentSynthesisEnabledValue } from '@/lib/ai-document-synthesis-kill-switch';
 import { dbServer } from '@/lib/db-server';
-import { acquireAuthenticatedWebSessionProjectionOwnerContext, type AuthenticatedWebSessionProjectionOwnerContext } from '@/lib/security/server-auth';
+import type { AuthenticatedWebSessionProjectionOwnerContext } from '@/lib/security/server-auth';
+import { acquireOrdinaryApplicationContext } from '@/lib/security/ordinary-application-context';
 import { isServerSessionProjectionOwner } from '@/lib/security/server-session-projection-owner';
-import { registerServerSessionResource } from '@/lib/security/server-session';
+import { mintResourcePort, registerPrivateResource, unregisterPrivateResource, releaseResourcePort } from '@/lib/security/ordinary-session-authority';
 import type { ServerSession } from '@/lib/security/server-session';
-import { composeAnyDocCurrentSourceExtraction } from '@/lib/domain/documents/anydoc-current-source-composition';
+import { composeAnyDocCurrentSelectionClientProjectionExtraction } from '@/lib/domain/documents/anydoc-current-source-composition';
 import {
     ANYDOC_LOCAL_OCR_PROVENANCE_SCHEMA_VERSION,
     type LocalExtractionReceipt,
@@ -26,7 +29,7 @@ type Currentness = Readonly<{ documentSourceRef: string; documentRevision: numbe
 type Pair = Readonly<{ patientId: string; ambulatoryId: string }>;
 type Capture = Readonly<{ attachmentId: string; pair: Pair; currentness: Currentness; selectionEpoch: number; reviewContextEpoch: number }>;
 type Preview = Capture & Readonly<{ sourceText: string; sourceSetEpoch: bigint }>;
-type Broker = { captures: Map<string, Capture>; previews: Map<string, Preview>; handles: Set<string>; nextEpoch: bigint; dispose(): void };
+type Broker = { captures: Map<string, Capture>; previews: Map<string, Preview>; handles: Set<string>; discarded: Set<string>; nextEpoch: bigint; dispose(): void };
 
 type DenialCode = 'input_invalid' | 'operation_unavailable' | 'capture_consumed' | 'preview_consumed'
     | 'selection_changed' | 'currentness_mismatch' | 'lane_disabled' | 'unsupported_local_extraction';
@@ -38,7 +41,7 @@ type PreviewResult = Readonly<{ status: 'available'; code: null; publication: un
     | Readonly<{ status: 'denied'; code: DenialCode; publication: null }>;
 export type DocumentSynthesisProductionOperation = Readonly<{
     capture(input: unknown): Promise<CaptureResult>;
-    ingest(input: unknown): Promise<IngestResult>;
+    ingest(input: unknown, request?: Request): Promise<IngestResult>;
     preview(input: unknown): Promise<PreviewResult>;
 }>;
 
@@ -46,7 +49,7 @@ type Dependencies = Readonly<{
     acquireContext(): Promise<AuthenticatedWebSessionProjectionOwnerContext | null>;
     readCurrentness(attachmentId: string, patientId: string, ambulatoryId: string): unknown;
     readLaneEnabled(): unknown;
-    extract(session: ServerSession, attachmentId: string): Promise<LocalExtractionResult>;
+    extract(session: ServerSession, attachmentId: string, request: Request): Promise<LocalExtractionResult>;
     execute(configuration: unknown): Promise<unknown>;
     entropy(): unknown;
     registerResource(context: AuthenticatedWebSessionProjectionOwnerContext, dispose: () => void): (() => void) | null;
@@ -57,7 +60,9 @@ const SHA256 = /^[a-f0-9]{64}$/u;
 const MAX_U64 = BigInt('18446744073709551615');
 const MAX_SESSION_HANDLES = 256;
 const TEST_HARNESS = process.execArgv.some((argument) => argument === '--test' || argument.startsWith('--test=') || argument.startsWith('--test-'));
-const brokers = new WeakMap<object, WeakMap<object, Broker>>();
+// Authentic Web projections change per resolve; their canonical owner owns the lineage.
+const operationBrokers = new WeakMap<DocumentSynthesisProductionOperation, Broker>();
+const brokers = new WeakMap<AuthenticatedWebSessionProjectionOwnerContext['owner'], Broker>();
 
 function captureDenied(code: DenialCode): CaptureResult { return Object.freeze({ status: 'denied', code, captureHandle: null }); }
 function ingestDenied(code: DenialCode): IngestResult { return Object.freeze({ status: 'denied', code, previewHandle: null }); }
@@ -89,7 +94,8 @@ function extractionSourceKind(receipt: LocalExtractionReceipt): 'native_text' | 
         const schemaVersion = fields.schemaVersion!.value; const engine = fields.engine!.value;
         const scriptSha256 = fields.scriptSha256!.value; const receiptSetSha256 = fields.receiptSetSha256!.value;
         const pageCount = fields.pageCount!.value; const ocrPageCount = fields.ocrPageCount!.value;
-        return schemaVersion === ANYDOC_LOCAL_OCR_PROVENANCE_SCHEMA_VERSION && engine === 'apple_vision'
+        return schemaVersion === ANYDOC_LOCAL_OCR_PROVENANCE_SCHEMA_VERSION
+            && (engine === 'apple_vision' || engine === 'tesseract_wasm')
             && typeof scriptSha256 === 'string' && SHA256.test(scriptSha256)
             && typeof receiptSetSha256 === 'string' && SHA256.test(receiptSetSha256)
             && Number.isSafeInteger(pageCount) && pageCount >= 1 && pageCount <= 500
@@ -136,16 +142,15 @@ function mint(prefix: 'dsc_' | 'dsp_', value: unknown): string | null {
 }
 
 function brokerFor(context: AuthenticatedWebSessionProjectionOwnerContext, dependencies: Dependencies): Broker | null {
-    let sessions = brokers.get(context.owner); if (!sessions) { sessions = new WeakMap<object, Broker>(); brokers.set(context.owner, sessions); }
-    const existing = sessions.get(context.session); if (existing) return existing;
+    const existing = brokers.get(context.owner); if (existing) return existing;
+    let unregister: (() => void) | null = null;
     const broker: Broker = {
-        captures: new Map(), previews: new Map(), handles: new Set(), nextEpoch: BigInt(0),
-        dispose() { broker.captures.clear(); broker.previews.clear(); broker.handles.clear(); sessions!.delete(context.session); },
+        captures: new Map(), previews: new Map(), handles: new Set(), discarded: new Set(), nextEpoch: BigInt(0),
+        dispose() { broker.captures.clear(); broker.previews.clear(); broker.handles.clear(); broker.discarded.clear(); brokers.delete(context.owner); const release = unregister; unregister = null; release?.(); },
     };
-    let unregister: (() => void) | null;
     try { unregister = dependencies.registerResource(context, broker.dispose); } catch { return null; }
     if (!unregister) return null;
-    sessions.set(context.session, broker);
+    brokers.set(context.owner, broker);
     return broker;
 }
 
@@ -173,9 +178,10 @@ function createOperation(context: AuthenticatedWebSessionProjectionOwnerContext,
                 });
             } catch { return captureDenied('operation_unavailable'); }
         },
-        async ingest(input: unknown): Promise<IngestResult> {
+        /* @Codex — retire only retained host handles; no external route or writer. */
+        async ingest(input: unknown, request = new Request('http://localhost/api/ai/document-synthesis/ingest', { method: 'POST' })): Promise<IngestResult> {
             const parsed = exact(input, ['captureHandle']); const handle = parsed?.captureHandle;
-            if (typeof handle !== 'string' || !CAPTURE_HANDLE.test(handle)) return ingestDenied('input_invalid');
+            if (typeof handle !== 'string' || !CAPTURE_HANDLE.test(handle) || !(request instanceof Request)) return ingestDenied('input_invalid');
             const capture = broker.captures.get(handle); if (!capture) return ingestDenied('capture_consumed');
             broker.captures.delete(handle);
             if (dependencies.readLaneEnabled() !== true) return ingestDenied('lane_disabled');
@@ -188,8 +194,9 @@ function createOperation(context: AuthenticatedWebSessionProjectionOwnerContext,
             } catch { return ingestDenied('operation_unavailable'); }
             if (preflight) return ingestDenied(preflight);
             let extraction: LocalExtractionResult;
-            try { extraction = await dependencies.extract(context.session, capture.attachmentId); }
+            try { extraction = await dependencies.extract(context.session, capture.attachmentId, request); }
             catch { return ingestDenied('operation_unavailable'); }
+            if (broker.discarded.has(handle) || request.signal.aborted) return ingestDenied('capture_consumed');
             if (extraction.status === 'review_required' && extraction.reason === 'unsupported_local_extraction') return ingestDenied('unsupported_local_extraction');
             const projection = resolveDocumentSynthesisAnyDocProjection(extraction, capture.attachmentId);
             if (!projection) return ingestDenied('operation_unavailable');
@@ -197,6 +204,7 @@ function createOperation(context: AuthenticatedWebSessionProjectionOwnerContext,
                 return context.owner.withLeaseCriticalSection(context.session, (selection) => {
                     if (!selectionAgrees(context, capture, selection)) return ingestDenied('selection_changed');
                     if (!sameCurrentness(capture.currentness, read(capture))) return ingestDenied('currentness_mismatch');
+                    if (broker.discarded.has(handle) || request.signal.aborted) return ingestDenied('capture_consumed');
                     if (broker.nextEpoch >= MAX_U64 || broker.handles.size >= MAX_SESSION_HANDLES) return ingestDenied('operation_unavailable');
                     const previewHandle = mint('dsp_', dependencies.entropy());
                     if (!previewHandle || broker.handles.has(previewHandle)) return ingestDenied('operation_unavailable');
@@ -223,7 +231,14 @@ function createOperation(context: AuthenticatedWebSessionProjectionOwnerContext,
                 if (!sourceSet) return previewDenied('currentness_mismatch');
                 capsule = createDocumentSynthesisSourceSetCurrentnessOwner(Object.freeze({ owner: context.owner, session: context.session, sourceSet }));
                 const configuration = Object.freeze({ owner: context.owner, session: context.session, capsule });
-                const publication = await dependencies.execute(configuration);
+                const remote = isOrdinaryFunctionSelected('document_synthesis');
+                if (remote) await bindOrdinaryApplicationContext('document_synthesis', context.owner, context.session);
+                const stillCurrent = () => {
+                    try { return dependencies.readLaneEnabled() === true && context.owner.withLeaseCriticalSection(context.session,
+                        selection => selectionAgrees(context, preview, selection) && sameCurrentness(preview.currentness, read(preview))); }
+                    catch { return false; }
+                };
+                const publication = remote ? await executeDocumentSynthesisChatGpt(configuration, sourceSet, stillCurrent) : await dependencies.execute(configuration);
                 if (!publication) return previewDenied('operation_unavailable');
                 const current = context.owner.withLeaseCriticalSection(context.session, (selection) => selectionAgrees(context, preview, selection) && sameCurrentness(preview.currentness, read(preview)));
                 if (!current) return previewDenied('currentness_mismatch');
@@ -232,7 +247,17 @@ function createOperation(context: AuthenticatedWebSessionProjectionOwnerContext,
             finally { try { capsule?.dispose(); } catch { /* terminal cleanup is best effort */ } }
         },
     });
+    operationBrokers.set(operation, broker);
     return operation;
+}
+
+/** @Codex — revoke-only cleanup; a DTO or another operation cannot address this private broker. */
+export function discardDocumentSynthesisPreparation(operation: DocumentSynthesisProductionOperation, input: unknown): void {
+    const broker = operationBrokers.get(operation); if (!broker) return;
+    const parsed = exact(input, ['captureHandle']) ?? exact(input, ['previewHandle']);
+    const handle = parsed?.captureHandle ?? parsed?.previewHandle;
+    if (typeof handle !== 'string' || !broker.handles.has(handle)) return;
+    broker.discarded.add(handle); broker.captures.delete(handle); broker.previews.delete(handle);
 }
 
 function factory(dependencies: Dependencies) {
@@ -247,6 +272,29 @@ function factory(dependencies: Dependencies) {
     });
 }
 
+function registerProductionResource(context: AuthenticatedWebSessionProjectionOwnerContext, dispose: () => void): (() => void) | null {
+    const port = mintResourcePort(context.session);
+    if (!port) return null;
+    let registration;
+    let active = true;
+    try {
+        registration = registerPrivateResource(port, () => {
+            if (!active) return;
+            // Retirement owns port cleanup; local disposal must not re-enter that owner.
+            active = false;
+            dispose();
+        });
+    }
+    catch { releaseResourcePort(port); return null; }
+    if (!registration) { releaseResourcePort(port); return null; }
+    return () => {
+        if (!active) return;
+        active = false;
+        try { unregisterPrivateResource(port, registration); }
+        finally { releaseResourcePort(port); }
+    };
+}
+
 function readProductionCurrentness(attachmentId: string, patientId: string, ambulatoryId: string): unknown {
     return dbServer.get(sql`SELECT a.document_source_ref AS documentSourceRef, a.document_revision AS documentRevision, a.document_freshness_epoch AS documentFreshnessEpoch FROM attachments AS a INNER JOIN patients_to_ambulatories AS pta ON pta.patient_id = a.patient_id WHERE a.id = ${attachmentId} AND a.patient_id = ${patientId} AND pta.ambulatory_id = ${ambulatoryId} LIMIT 1`);
 }
@@ -255,18 +303,18 @@ function readProductionLaneEnabled(): boolean {
     return isAiDocumentSynthesisEnabledValue(row?.value);
 }
 const production = factory(Object.freeze({
-    acquireContext: acquireAuthenticatedWebSessionProjectionOwnerContext,
+    acquireContext: acquireOrdinaryApplicationContext,
     readCurrentness: readProductionCurrentness,
     readLaneEnabled: readProductionLaneEnabled,
-    extract: (session: ServerSession, attachmentId: string) => composeAnyDocCurrentSourceExtraction(session, { attachmentId }),
+    extract: (session: ServerSession, attachmentId: string, request: Request) => composeAnyDocCurrentSelectionClientProjectionExtraction(session, { attachmentId }, request),
     async execute(configuration: unknown) { return (await createDocumentSynthesisFabricProductionComposition(configuration)?.execute()) ?? null; },
     entropy: () => randomBytes(16),
-    registerResource: (context: AuthenticatedWebSessionProjectionOwnerContext, dispose: () => void) => registerServerSessionResource(context.session.id, dispose),
+    registerResource: registerProductionResource,
 }));
 
 export const acquireDocumentSynthesisProductionOperation = (): Promise<DocumentSynthesisProductionOperation | null> => production.acquire();
 
-export function createDocumentSynthesisProductionOperationForTest(dependencies: Dependencies) {
+export function createDocumentSynthesisProductionOperationForTest(dependencies: Omit<Dependencies, 'registerResource'> & Partial<Pick<Dependencies, 'registerResource'>>) {
     if (!TEST_HARNESS) return Object.freeze({ acquire: async () => null });
-    return factory(dependencies);
+    return factory({ ...dependencies, registerResource: dependencies.registerResource ?? registerProductionResource });
 }

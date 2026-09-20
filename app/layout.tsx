@@ -6,8 +6,13 @@ import './globals.css';
 // properties are the first design-token input available to the live cockpit.
 import './lume-tokens.css';
 import './lume-motion.css';
+/* @Codex */
+import './runtime-twin.css';
 import { getAppFingerprint } from '@/lib/app-revision';
 import { RootRuntimeShell } from '@/components/root-runtime-shell';
+/* @Codex */
+import { RuntimeTwinToolbar } from '@/components/runtime-twin-toolbar';
+import { RuntimeTwinDesignProvider } from '@/components/runtime-twin-design';
 import {
   UI_REDUCE_MOTION_STORAGE_KEY,
 } from '@/lib/ui-accessibility-preferences';
@@ -71,9 +76,11 @@ export default function RootLayout({
 }) {
   /* @Codex: expose a stable revision fingerprint so stale browser tabs can self-heal after branch/server changes */
   const appFingerprint = getAppFingerprint();
+  /* @Codex ADR 0123: the flag controls comparison chrome, not the official UI. */
+  const runtimeTwin = process.env.MEDIFLOW_RUNTIME_TWIN === '1';
 
   return (
-    <html lang="it" data-ui-style="redesign" data-lume="true" suppressHydrationWarning>
+    <html lang="it" data-ui-style="redesign" data-lume="true" data-runtime-twin={runtimeTwin ? 'true' : undefined} data-runtime-twin-design="proposal" data-twin-composition="stream" suppressHydrationWarning>
       {/* @Codex: keep layout fully local/offline by avoiding remote Google Font fetches */}
       <head>
         <meta name="mediflow-app-fingerprint" content={appFingerprint} />
@@ -85,9 +92,12 @@ export default function RootLayout({
         className={`${voce.variable} ${registro.variable} min-h-screen overflow-x-hidden antialiased`}
         suppressHydrationWarning
       >
-        <RootRuntimeShell fingerprint={appFingerprint}>
-          {children}
-        </RootRuntimeShell>
+        <RuntimeTwinDesignProvider comparisonEnabled={runtimeTwin}>
+          <RootRuntimeShell fingerprint={appFingerprint}>
+            {children}
+          </RootRuntimeShell>
+          {runtimeTwin ? <RuntimeTwinToolbar /> : null}
+        </RuntimeTwinDesignProvider>
       </body>
     </html>
   );

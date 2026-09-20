@@ -55,6 +55,22 @@ Adottiamo l'opzione 2 e rifiutiamo l'opzione 3.
 - Il re-wrap lazy v1 verso v2 resta solo lato web. Il client paired legge blob
   versionati ma non esegue un re-wrap silenzioso.
 
+## Emendamento 0.8.6: sessione native distinta
+
+Il login paired usa `/api/auth/native/login` e il logout
+`/api/auth/native/logout`. Quest'ultimo conferma `204` soltanto dopo il ritiro
+della sessione esatta; non passa dal terminale Web P3 e non modifica cookie.
+L'admission conserva soltanto i due header paired del trasporto Next.js e
+ricontrolla il pairing persistito prima dell'emissione. La sessione resta
+legata anche all'hash del token autenticato: una credenziale ruotata richiede
+un nuovo login. Profilo e PIN conservano gli URI account esistenti.
+
+Le route cliniche mantengono capability, ambulatorio e CAS correnti. Il
+resolver native e separato dal resolver Web P3 e rilegge l'utente corrente;
+un cookie native non apre le route Web riservate. Nessun DTO o grant della
+superficie `/api/v1/network/*` cambia (`no contract impact` su payload e
+capability).
+
 ## Conseguenze
 
 Il client paired puo chiudere cambio PIN e profilo usando il contratto auth

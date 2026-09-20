@@ -1,6 +1,38 @@
 import XCTest
 @testable import MediFlowAppleShared
 
+/* @Codex */
+final class PatientArchiveContractsTests: XCTestCase {
+    func testArchivePatchDistinguishesOmitNullAndSealedValue() throws {
+        let cases: [(HomeBasePatientUpdatePayload, Set<String>)] = [
+            (.init(version: 4), ["version"]),
+            (.init(version: 4, archiveReason: .null, archiveNote: .null), ["version", "archiveReason", "archiveNote"]),
+            (.init(version: 4, isArchived: true, archiveReason: .value("ENC:reason:sealed"),
+                   archiveNote: .value("ENC:note:sealed")), ["version", "isArchived", "archiveReason", "archiveNote"]),
+        ]
+        for (payload, expectedKeys) in cases {
+            let data = try JSONEncoder().encode(payload)
+            let object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+            XCTAssertEqual(Set(object.keys), expectedKeys)
+            switch payload.archiveReason {
+            case .omit: XCTAssertNil(object["archiveReason"])
+            case .null: XCTAssertTrue(object["archiveReason"] is NSNull); XCTAssertTrue(object["archiveNote"] is NSNull)
+            case .value: XCTAssertEqual(object["archiveReason"] as? String, "ENC:reason:sealed")
+                XCTAssertEqual(object["archiveNote"] as? String, "ENC:note:sealed")
+            }
+        }
+    }
+
+    func testArchiveDetailReadsBothFieldsAndAllowsLegacyMissingFields() throws {
+        for fields in ["", #", "archiveReason":"ENC:reason:sealed", "archiveNote":"ENC:note:sealed""#] {
+            let data = Data("{\"id\":\"p1\",\"firstName\":\"Test\",\"lastName\":\"Sintetico\",\"taxCode\":\"SYNTHETIC\",\"version\":1\(fields)}".utf8)
+            let detail = try JSONDecoder().decode(HomeBasePatientDetail.self, from: data)
+            XCTAssertEqual(detail.archiveReason, fields.isEmpty ? nil : "ENC:reason:sealed")
+            XCTAssertEqual(detail.archiveNote, fields.isEmpty ? nil : "ENC:note:sealed")
+        }
+    }
+}
+
 final class APIPatchValueTests: XCTestCase {
     private struct Patch: Encodable {
         let name: PatchValue<String>

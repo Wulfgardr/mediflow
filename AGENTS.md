@@ -66,6 +66,102 @@ La fonte canonica per questa decisione e
 - Prima del commit verificare branch corrente, scope del diff e stato del
   worktree.
 
+## Organizzazione del lavoro: pilota 0.8.6
+
+Il riferimento ordinario e **Astra Medium, senza Fast**, come coordinatore.
+Astra mantiene la visione del progetto, il goal di consegna, le priorita, i
+contratti, l'integrazione e l'accettazione finale. Delega l'esecuzione ordinaria;
+interviene direttamente su diagnosi difficili, conflitti tra contributi e scelte
+che richiedono comprensione trasversale. Questa e una strategia da misurare sul
+risultato accettato, non una garanzia di qualita equivalente o minor consumo.
+Rispettare modello, effort e modalita scelti esplicitamente dall'utente.
+
+- **Luna Medium Fast** e la prima scelta per incarichi chiari, circoscritti e
+  verificabili: estrazioni, confronti, controlli ripetibili e piccoli interventi
+  con contratto e accettazione espliciti. Usare `mediflow-luna`; il ruolo personale
+  `luna` puo avere impostazioni diverse. Preferire piu incarichi indipendenti
+  utili, senza spezzare artificialmente un problema accoppiato per affidarlo a Luna.
+- **Terra Medium** esegue interventi circoscritti che richiedono giudizio sul
+  codice, sugli errori e sui contratti oltre quanto gia risolto nel brief.
+  Usare `mediflow-terra` quando disponibile.
+- **Sol, al massimo Medium**, copre incarichi delimitati con ambiguita o
+  dipendenze maggiori, quando il coordinatore prevede che Luna o Terra
+  richiederebbero troppe correzioni. Non e un passaggio obbligatorio dopo Terra.
+  Un bisogno di ragionamento superiore torna ad Astra; non aumentare
+  automaticamente Sol a High, Extra High, Max o Ultra.
+- Luna, Terra e Sol sono esecutori finali: non coordinano altri agenti e non
+  delegano ulteriormente. Scegliere direttamente il profilo adeguato senza
+  attraversare ogni livello. Su fallimenti ripetuti, correggere brief o approccio
+  e riassegnare solo dopo aver identificato il limite; non consumare tentativi
+  per conservare a tutti i costi il modello meno costoso.
+- Prima della delega verificare modello, effort e modalita effettivi del ruolo
+  nella checkout usata. Non sostituire un profilo indisponibile di nascosto:
+  segnalare il limite e proseguire il lavoro compatibile nel coordinatore.
+  I profili locali vivono in `.codex/`, esclusa da Git; non presumere che seguano
+  ogni worktree. Le equivalenze tra effort, modelli e consumo vanno misurate.
+- **Astra Ultra** resta una modalita separata, scelta intenzionalmente
+  dall'utente. Non trasformare automaticamente una difficolta in Ultra o in
+  uno swarm di Astra. Per un nucleo difficile e indipendente, il coordinatore puo
+  scegliere un sub-agent Astra Light/Low se disponibile e utile rispetto a Sol
+  Medium, motivandolo nel checkpoint; non assumere equivalenze di costo o qualita.
+
+## Coordinamento e lane parallele
+
+Per MediFlow la delega e il percorso ordinario per l'esecuzione separabile;
+questa regola sostituisce il default globale "Work solo by default". Dopo una
+ricognizione sufficiente a fissare baseline e contratti, assegnare ai collaboratori
+il lavoro indipendente e tenere nel coordinatore il nucleo complesso. Lavorare da
+soli resta appropriato quando il compito e breve, strettamente accoppiato o il
+costo di preparazione e integrazione supererebbe quello dell'esecuzione diretta.
+Non applicare un tetto documentale fisso di tre collaboratori: rispettare la
+concorrenza realmente disponibile e il budget concordato. Aumentare le lane solo
+quando aggiungono risultati indipendenti; nessuna quota di agenti da riempire.
+
+- Il coordinatore mantiene un solo obiettivo di programma e decide quali lane
+  aprire, con una breve motivazione nel checkpoint esistente. Mantiene in
+  sequenza il lavoro accoppiato o con ownership in conflitto.
+- Prima di aprire una lane, definire scopo e fuori scope, contratto e dipendenze,
+  owner, file o contesto assegnati, autorita, output atteso, Definition of Done,
+  verifiche e condizione di arresto. Usare worktree separati per writer
+  concorrenti e rispettare modello, effort e modalita scelti dall'utente.
+- Fornire il contesto minimo completo: problema, file e dipendenze pertinenti,
+  contratti e prove attese. Chiedere risultati compatti con diff, evidenze e
+  limiti; non trasferire l'intera storia del programma per ogni incarico.
+  Durante le esecuzioni delegate proseguire su lavoro indipendente, evitando
+  sia l'attesa passiva sia la duplicazione dell'incarico.
+- Ogni lane segue un ciclo esplicito: apertura, esecuzione, consegna candidata,
+  verifica del coordinatore, chiusura. Il coordinatore controlla output e prove;
+  il resoconto del sub-agent, da solo, non attesta integrazione o completamento.
+- Alla chiusura registrare esito, artefatti, verifiche, limiti e destinazione del
+  risultato; poi chiudere il sub-agent. In caso di blocco o annullamento,
+  conservare il lavoro e indicare motivo e prossimo passo, senza dichiarare Done.
+  Nessuna lane resta aperta senza un incarico attivo e un responsabile.
+- La delega resta entro l'autorita del task e non autorizza altre deleghe,
+  azioni esterne o modifiche fuori scope. Le scelte prodotto riservate
+  all'utente restano al coordinatore per la decisione pertinente.
+
+## Consegna e consumi del pilota
+
+- Un fix o un intervento sulle prestazioni conserva comportamento e interfaccia
+  esistenti, salvo un cambiamento richiesto. Per modifiche alla UI, confrontare
+  il percorso prima/dopo sulla superficie corretta con dati sintetici; verificare
+  il risultato richiesto oltre ai controlli tecnici. Un test verde non autorizza
+  una riprogettazione e non dimostra da solo che il problema dell'utente sia risolto.
+- Valutare i commenti di review rispetto al problema e ai contratti: integrare
+  i difetti pertinenti, senza allargare il lavoro a miglioramenti laterali.
+  Se le iterazioni ripetono gli stessi errori senza nuove evidenze, rivedere
+  ipotesi, contesto e approccio prima di spendere altri tentativi o aumentare effort.
+- Astra esegue un riesame finale mirato del risultato integrato: controlla
+  contratti, conflitti e percorso dell'utente, correggendo i difetti pertinenti.
+  Non riscrive sistematicamente il lavoro delegato e non ripete prove ancora
+  valide senza una ragione concreta. Il riesame non abbassa l'accettazione delle
+  singole lane e non garantisce a posteriori una percentuale di qualita.
+- Nel checkpoint gia usato registrare per ciascun risultato significativo
+  modello/effort/modalita, collaboratori, esito verificato, tempo e correzioni
+  necessarie. Aggiungere consumi solo se disponibili e attribuibili; i limiti
+  dell'account sono condivisi e non misurano da soli il costo di questo task.
+  Confrontare consumo e tempo per risultato accettato, includendo il lavoro rifatto.
+
 ## Igiene documentale
 
 - Se un file Markdown viene aggiunto, rimosso o rinominato, aggiornare

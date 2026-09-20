@@ -5,6 +5,40 @@ This file collects MediFlow's relevant changes.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.6] - 2026-09-07
+
+The feature-complete decision at `c320694c3` remains historical. Independent
+addenda close the native PIN source-contract defect (`cefa5c78`) and verify
+the attachment-budget fix (`be923328`, integrated at `11a42f68`). No reportable
+finding remains in the reviewed source. This entry describes the source scope;
+the GitHub Release records the final CI, merge, tag and source-package identity.
+[Release verification](./docs/analysis/2026-09-07-086-release-verification.md)
+records exact sources, receipt hashes and limits. The final local unit run on
+`9be09c583` passed 3267 tests with one expected skip and no failures. Earlier
+failures and the separate 13/13 run remain historical evidence.
+Production signing/entitlements remain unverified. ThisDeviceOnly applies to
+new cache-key insertion, not the paired token. Operator-to-ambulatory RBAC is
+an explicit ADR 0036 non-goal, not an unfixed security finding.
+Targeted iPhone–Mac/Home Base UI interoperability remains a **DEFERRED VALIDATION
+ITEM / POST-RELEASE VERIFICATION GATE**; no fully validated cross-platform or
+production-signed installer claim is made.
+
+- The ordinary web UI uses top navigation by default and offers sidebar navigation in Appearance. Patient records open with one click; sections, clinical entry, typography and sliders use the refined layout.
+- Apple patient workspaces show one clinical section at a time, preserve drafts during document consultation and keep finalized Mac transcripts separate until explicitly reviewed. The rich-text editor supports selected inline styles and local undo; saves protect pending drafts, and conflicts require explicit review before another write.
+- Native lock and current-session expiry clear clinical presentation immediately and prevent stale reads from publishing into the next session. The encrypted offline cache remains limited to the patient list and last profile, with no offline write queue.
+- Native operator login and logout use their own session channel. Web access recovery waits for the lock receipt before accepting a new PIN; application lock remains immediate.
+- A first visit to an empty standalone runtime initializes storage and creates the default ambulatory through ordinary setup. Windows and Linux runtime, UI and headless evidence is recorded separately from Apple simulator and paired-client evidence.
+- WHO Search uses an opt-in local sidecar with bounded results, canonical URI provenance and audit receipts. Deployment artifacts and licensing remain to be configured; no live WHO installation is claimed.
+
+- Document extraction exposes AnyDoc/Apple Vision provenance and supports cancelling the wait, discarding late responses and retrying after errors.
+- Settings distinguish function configuration from observed execution, WHO live responses from cache, and configured Homebase from a probed connection.
+- A host-only Ollama command inspects, admits, recovers or revokes the provider after explicit confirmation. Local attestation additionally accepts the verified 0.33.3 release; other unqualified versions remain denied.
+- Work-profile onboarding offers a local recommendation, manual choice, persisted preview, resume and rollback; no AI host or external account is required.
+- Synthetic access checks cover login, application lock, logout and administrative recovery. Code and regulatory inventories record evidence and remaining decisions.
+- The simulator builder uses the existing Xcode project and installs only on explicit request; the paired smoke no longer calls a retired builder.
+- FHIR export retains the DTO generation timestamp. Coverage tests document existing FHIR/PDF exclusions without claiming a complete data-subject export.
+- [Integrated local closeout](./docs/analysis/2026-09-06-086-integrated-closeout.md) records checks, integration corrections and remaining WHO provisioning, regulatory and distribution boundaries.
+
 ## [0.8.5] - 2026-09-03
 
 > This entry describes the source scope of patch `0.8.5`. CI evidence,

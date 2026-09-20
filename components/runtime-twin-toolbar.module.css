@@ -1,0 +1,32 @@
+/* @Codex WUL-676: a reserved strip keeps the comparison outside product controls. */
+.toolbar {
+    position: fixed;
+    inset: 0 0 auto;
+    height: var(--runtime-twin-inset);
+    z-index: 1100;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 0 24px;
+    border-bottom: 1px solid color-mix(in srgb, var(--lume-ink) 13%, transparent);
+    background: var(--lume-surface-chrome);
+    color: var(--lume-ink);
+    font: 12px/1.3 var(--lume-font-sans);
+}
+.identity, .destinations { display: flex; align-items: center; gap: 16px; }
+.identity strong { font-weight: 650; }
+.identity span { color: var(--lume-ink-muted); }
+.destinations a { padding: 6px 0; color: var(--lume-ink-muted); text-decoration: none; }
+.destinations a:hover { color: var(--lume-ink); text-decoration: underline; text-underline-offset: 4px; }
+.comparison { display: flex; gap: 2px; padding: 3px; border-radius: 8px; background: var(--lume-surface-canvas); }
+.comparison button { padding: 4px 10px; border: 1px solid transparent; border-radius: 6px; color: var(--lume-ink-muted); cursor: pointer; }
+.comparison button[aria-pressed='true'] { border-color: color-mix(in srgb, var(--lume-ink) 12%, transparent); background: var(--lume-surface-focal); color: var(--lume-ink); }
+.toolbar :is(a, button):focus-visible { outline: 2px solid var(--lume-accent); outline-offset: 2px; }
+@media (max-width: 900px) { .destinations { display: none; } }
+@media (max-width: 540px) {
+    .toolbar { padding: 0 12px; gap: 8px; }
+    .identity { flex-direction: column; align-items: flex-start; gap: 3px; font-size: 11px; }
+    .comparison button { padding: 6px; font-size: 11px; }
+}
+@media (max-width: 540px) { .identity span { display: none; } .identity strong { font-size: 11px; white-space: nowrap; } .comparison { gap: 0; padding: 2px; } .comparison button { padding: 8px 6px; white-space: nowrap; } }

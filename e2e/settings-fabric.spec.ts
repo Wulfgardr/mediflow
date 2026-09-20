@@ -9,6 +9,10 @@ test('Fabric settings renders the read-only venue and capability registry', asyn
 
   const surface = page.getByTestId('settings-ai-fabric-section');
   await expect(surface).toBeVisible();
+  const functions = page.getByTestId('function-status-panel');
+  await expect(functions).toContainText('Configurazione letta il');
+  await expect(functions.getByTestId('function-state-document_ocr')).toContainText('Apple Vision');
+  await page.getByText('Dettagli tecnici: provider, connessioni e registro', { exact: true }).click();
   await expect(page.getByTestId('fabric-loading-state')).toHaveCount(0);
   await expect(page.getByTestId('fabric-error-state')).toHaveCount(0);
 
@@ -48,7 +52,7 @@ test('Fabric settings renders the read-only venue and capability registry', asyn
   await expect(page.getByTestId('fabric-availability-icd_lookup')).toContainText('Disponibile nell’app');
   await expect(page.getByTestId('fabric-availability-ocr')).toContainText('Non disponibile');
   await expect(page.getByTestId('fabric-capability-ocr')).toContainText('Nessuna sede: funzione non eseguibile');
-  await expect(page.getByTestId('fabric-capability-ocr')).toContainText('Stato terminale: nessun interruttore può riattivarla');
+  await expect(page.getByTestId('fabric-capability-ocr')).toContainText('percorso documentale separato');
 
   const registry = page.getByTestId('fabric-capability-registry');
   await expect(registry).not.toContainText('consumer_login');
@@ -56,7 +60,8 @@ test('Fabric settings renders the read-only venue and capability registry', asyn
   await expect(registry).not.toContainText('OAuth');
 
   await expect(surface.locator('form')).toHaveCount(0);
-  await expect(surface.locator('input, select, textarea, button, [role="switch"], [contenteditable="true"]')).toHaveCount(0);
+  await expect(surface.locator('input, select, textarea, [role="switch"], [contenteditable="true"]')).toHaveCount(0);
+  await expect(functions.getByRole('button', { name: 'Rileggi stato', exact: true })).toBeVisible();
 
   await page.screenshot({
     path: '/tmp/mediflow-settings-fabric.png',
@@ -79,8 +84,10 @@ test('Models settings scopes Ollama roles and keeps ATHENA on its separate lane'
 
   const surface = page.getByTestId('settings-ai-models-section');
   await expect(surface).toBeVisible();
-  await expect(surface).toContainText('Ollama per i ruoli generali');
-  await expect(surface).toContainText('Treatment Reasoning usa la lane locale ATHENA separata');
+  await expect(surface).toContainText('Sintesi e organizzazione');
+  await expect(surface).toContainText('Ragionamento testuale');
+  await expect(surface).toContainText('non configura la revisione terapeutica ATHENA');
+  await expect(surface).toContainText('La presenza in elenco non abilita le funzioni cliniche.');
   await expect(surface).not.toContainText('Ollama è l’unico provider supportato');
   await expect(surface).not.toContainText('Ollama è l\'unico provider supportato');
 });

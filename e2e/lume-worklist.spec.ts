@@ -1,10 +1,11 @@
 /* @Codex #96, #68 */
-import { expect, test, type Locator, type Page } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import {
   assertKeyboardFocusProgresses,
   assertNoHorizontalOverflow,
   assertNotClippedInViewport,
   bootstrapUnlockedSession,
+  openPatientSection,
   REFLOW_PROXY_VIEWPORTS,
   type ReflowProxyViewport,
 } from './utils';
@@ -14,6 +15,11 @@ type WorklistCase = {
   viewport: ReflowProxyViewport['viewport'] | 'compact-transition' | 'rail-boundary';
   width: number;
   height: number;
+};
+
+type WorklistFixture = {
+  marker: string;
+  patients: Array<{ id: string; name: string }>;
 };
 
 const WORKLIST_VIEWPORTS: Omit<WorklistCase, 'register'>[] = [
@@ -28,25 +34,62 @@ const WORKLIST_CASES: WorklistCase[] = (['giorno', 'grafite'] as const).flatMap(
 
 const MENU_COLLISION_VIEWPORTS: Omit<WorklistCase, 'register'>[] = [{ viewport: 'compact-transition', width: 640, height: 1024 }, { viewport: 'rail-boundary', width: 701, height: 900 }];
 async function setRegister(page: Page, register: WorklistCase['register']): Promise<void> {
-  await page.evaluate((nextRegister) => {
-    const theme = nextRegister === 'grafite' ? 'dark' : 'light';
-    localStorage.setItem('mediflow-theme', theme);
-    document.documentElement.classList.remove('light', 'dark');
-    document.documentElement.classList.add(theme);
-  }, register);
+  // @Codex: the ordinary control updates both the provider and its persisted preference.
+  const returnUrl = page.url();
+  const theme = register === 'grafite' ? 'dark' : 'light';
+  await page.getByRole('complementary', { name: 'MediFlow', exact: true })
+    .getByRole('link', { name: 'Impostazioni', exact: true }).click();
+  await expect(page).toHaveURL(new URL('/settings', returnUrl).href);
+  await page.getByRole('link', { name: 'Apri aspetto', exact: true }).click();
+  await expect(page).toHaveURL(new URL('/settings/aspetto', returnUrl).href);
+  await page.getByTestId('settings-appearance-section')
+    .getByRole('button', { name: register === 'grafite' ? 'Tema Scuro' : 'Tema Chiaro', exact: true }).click();
+  await expect(page.locator('html')).toHaveClass(theme === 'dark' ? /dark/ : /light/);
+  await expect(page.locator('html')).toHaveCSS('color-scheme', theme);
+  await page.goto(returnUrl);
+  await expect(page).toHaveURL(returnUrl);
+  await expect(page.locator('html')).toHaveClass(theme === 'dark' ? /dark/ : /light/);
+  await expect(page.locator('html')).toHaveCSS('color-scheme', theme);
 }
 
-async function openSyntheticWorklist(page: Page, worklistCase: WorklistCase): Promise<void> {
+async function openSyntheticWorklist(page: Page, worklistCase: WorklistCase): Promise<WorklistFixture> {
   await page.setViewportSize({ width: worklistCase.width, height: worklistCase.height });
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
-  await page.goto('/mockups/kree8');
+  const marker = `WL${Date.now().toString(36).slice(-4)}${Math.random().toString(36).slice(2, 6)}`;
+  // @Codex: exercise the ordinary directory with records created through its API.
+  const patients = await page.evaluate(async (fixtureMarker) => {
+    const created: Array<{ id: string; name: string }> = [];
+    for (let index = 0; index < 3; index += 1) {
+      // The worklist presents the ordinary directory name as surname then given name.
+      const name = `${fixtureMarker} Caso ${index + 1}`;
+      const response = await fetch('/api/patients', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ firstName: `Caso ${index + 1}`, lastName: fixtureMarker,
+          taxCode: `WL${fixtureMarker.slice(-10)}${index}`, birthDate: '1972-04-12T00:00:00.000Z',
+          diagnoses: [
+            { system: 'ICD-11', code: 'BA00', description: 'Ipertensione sintetica' },
+            { system: 'ICD-11', code: '5C80', description: 'Dislipidemia sintetica' },
+            { system: 'ICD-11', code: 'CA22', description: 'BPCO sintetica' },
+          ], notes: 'Voce dimostrativa della cartella. Nessun dato reale.',
+        }),
+      });
+      if (!response.ok) throw new Error(`Fixture worklist ${index}: HTTP ${response.status}`);
+      const payload = await response.json() as { id?: string };
+      if (typeof payload.id !== 'string') throw new Error(`Fixture worklist ${index}: patient id assente`);
+      created.push({ id: payload.id, name });
+    }
+    return created;
+  }, marker);
+  await page.goto('/?area=incarico');
   await page.waitForLoadState('domcontentloaded');
   await setRegister(page, worklistCase.register);
-  const patientsNav = page.getByRole('button', { name: /Pazienti/ });
-  await patientsNav.click();
+  const patientsNav = page.getByRole('navigation', { name: 'Navigazione principale' })
+    .getByRole('link', { name: 'Pazienti', exact: true });
   await expect(patientsNav).toHaveAttribute('aria-current', 'page');
   await expect(page.getByTestId('lume-worklist')).toBeVisible();
-  await expect(page.getByTestId('lume-patient-lens')).toBeVisible();
+  await page.getByRole('searchbox', { name: 'Cerca nella lista pazienti', exact: true }).fill(marker);
+  await expect(page.getByText('3 risultati', { exact: true })).toBeVisible();
+  return { marker, patients };
 }
 
 async function resolvedRegisterFamily(page: Page): Promise<string> {
@@ -60,58 +103,8 @@ async function resolvedRegisterFamily(page: Page): Promise<string> {
   });
 }
 
-async function resolvedFontFamily(locator: Locator): Promise<string> {
-  return locator.evaluate((element) => getComputedStyle(element).fontFamily);
-}
-
-/* @Codex WUL-560 L6A: the patient lens exposes one focal action while the
-   other four remain keyboard-reachable in a single disclosure menu. */
-async function assertLensActionContract(page: Page): Promise<void> {
-  const lens = page.getByTestId('lume-patient-lens');
-  const primary = lens.getByRole('link', { name: 'Apri scheda paziente', exact: true });
-  const trigger = lens.getByRole('button', { name: 'Altre azioni paziente', exact: true });
-
-  await expect(primary).toBeVisible();
-  await expect(lens.locator('[data-lume-action="primary"]')).toHaveCount(1);
-  await expect(trigger).toBeVisible();
-  await expect(trigger).toHaveAttribute('aria-haspopup', 'menu');
-  await expect(trigger).toHaveAttribute('aria-expanded', 'false');
-  await expect(page.getByRole('menu', { name: 'Azioni paziente' })).toHaveCount(0);
-
-  await trigger.focus();
-  await trigger.press('Enter');
-  const menu = page.getByRole('menu', { name: 'Azioni paziente' });
-  await expect(trigger).toHaveAttribute('aria-expanded', 'true');
-  await expect(menu).toBeVisible();
-
-  const items = menu.getByRole('menuitem');
-  await expect(items).toHaveCount(4);
-  await expect(items.nth(0)).toHaveText('Quadro');
-  await expect(items.nth(1)).toHaveText('Nuova voce');
-  await expect(items.nth(2)).toHaveText('Documenti');
-  await expect(items.nth(3)).toHaveText('Prepara SISS');
-  await expect(items.nth(0)).toBeFocused();
-
-  const menuGeometry = await menu.evaluate((element) => {
-    const box = element.getBoundingClientRect();
-    return { left: box.left, right: box.right, top: box.top, bottom: box.bottom };
-  });
-  expect(menuGeometry.left).toBeGreaterThanOrEqual(-1);
-  expect(menuGeometry.right).toBeLessThanOrEqual(await page.evaluate(() => innerWidth + 1));
-  expect(menuGeometry.top).toBeGreaterThanOrEqual(-1);
-  expect(menuGeometry.bottom).toBeLessThanOrEqual(await page.evaluate(() => innerHeight + 1));
-
-  await page.keyboard.press('End');
-  await expect(items.nth(3)).toBeFocused();
-  await page.keyboard.press('ArrowDown');
-  await expect(items.nth(0)).toBeFocused();
-  await page.keyboard.press('Escape');
-  await expect(menu).toHaveCount(0);
-  await expect(trigger).toBeFocused();
-  await expect(trigger).toHaveAttribute('aria-expanded', 'false');
-}
-
-async function assertWorklistContract(page: Page): Promise<void> {
+async function assertWorklistContract(page: Page, fixture: WorklistFixture): Promise<void> {
+  const { marker, patients } = fixture;
   const list = page.getByRole('listbox', { name: 'Elenco pazienti in carico', exact: true });
   const listItems = list.getByRole('option');
   const rows = list.getByTestId('lume-patient-row');
@@ -122,33 +115,47 @@ async function assertWorklistContract(page: Page): Promise<void> {
   const firstRow = rows.nth(0);
   const secondRow = rows.nth(1);
   await expect(firstRow).not.toHaveAttribute('aria-label');
-  await expect(firstRow).toHaveAccessibleName(/M\. R\..*Ipertensione.*08 mag/);
-  await expect(firstRow).toContainText('Ipertensione · Dislipidemia · BPCO lieve');
-  const rowDiagnosisText = rows.locator('[data-lume-row-diagnoses="text"]');
-  await expect(rowDiagnosisText).toHaveCount(3);
-  await expect(rowDiagnosisText.locator('*')).toHaveCount(0);
+  await expect(firstRow).toHaveAccessibleName(new RegExp(`${marker}.*Ipertensione sintetica`));
+  await expect(firstRow).toContainText('Dislipidemia sintetica');
+  await expect(firstRow).toContainText('BPCO sintetica');
+  await expect(firstRow).toHaveAccessibleName(new RegExp((await firstRow.getByTestId('lume-patient-when').innerText()).trim()));
   await expect(rows.locator('[class*="diagnosisPill"], [data-lume-diagnosis-list]')).toHaveCount(0);
 
   const registerFamily = await resolvedRegisterFamily(page);
-  const codeFamilies = await rows.getByTestId('lume-patient-code').evaluateAll(
-    (elements) => elements.map((element) => getComputedStyle(element).fontFamily),
-  );
   const whenFamilies = await rows.getByTestId('lume-patient-when').evaluateAll(
     (elements) => elements.map((element) => getComputedStyle(element).fontFamily),
   );
-  expect(new Set(codeFamilies)).toEqual(new Set([registerFamily]));
+  expect(whenFamilies).toHaveLength(3);
   expect(new Set(whenFamilies)).toEqual(new Set([registerFamily]));
 
   await expect(firstRow).toHaveAttribute('aria-selected', 'true');
   await expect(secondRow).toHaveAttribute('aria-selected', 'false');
-  await secondRow.click();
+  // Creation order is not a directory-order contract. Bind the rendered row
+  // identity to the synthetic fixture before keyboard selection changes it.
+  const selectedName = (await secondRow.locator('strong').innerText()).trim();
+  const selectedFixtures = patients.filter((patient) => patient.name === selectedName);
+  expect(selectedFixtures).toHaveLength(1);
+  const selectedPatientId = selectedFixtures[0]?.id;
+  expect(selectedPatientId).toEqual(expect.any(String));
+  // Single click now opens the record. ArrowDown still changes the selection.
+  // @Codex: compare keyboard selection without a retained pointer hover.
+  await page.mouse.move(0, 0);
+  expect(await firstRow.evaluate((element) => element.matches(':hover'))).toBe(false);
+  await firstRow.focus();
+  await firstRow.press('ArrowDown');
+  // Selection persists its real directory context in the query. Wait for that
+  // state before inspecting focus or layout, because Next may replace the URL.
+  await expect(page).toHaveURL((url) => (
+    url.pathname === '/' && url.searchParams.get('area') === 'incarico'
+    && url.searchParams.get('paziente') === selectedPatientId
+  ));
+  await expect(secondRow).toBeFocused();
   await expect(firstRow).toHaveAttribute('aria-selected', 'false');
   await expect(secondRow).toHaveAttribute('aria-selected', 'true');
 
   const rowSurfaces = await Promise.all([firstRow, secondRow].map((row) => row.evaluate((element) => {
     const style = getComputedStyle(element);
     return {
-      background: style.backgroundColor,
       boxShadow: style.boxShadow,
       borderLeftWidth: style.borderLeftWidth,
       borderTopWidth: style.borderTopWidth,
@@ -158,7 +165,13 @@ async function assertWorklistContract(page: Page): Promise<void> {
       borderTopStyle: style.borderTopStyle,
     };
   })));
-  expect(rowSurfaces[1].background).not.toBe(rowSurfaces[0].background);
+  // @Codex: selection attributes can update before the background transition.
+  await expect.poll(async () => {
+    const backgrounds = await Promise.all([firstRow, secondRow].map((row) =>
+      row.evaluate((element) => getComputedStyle(element).backgroundColor),
+    ));
+    return backgrounds[1] !== backgrounds[0];
+  }).toBe(true);
   expect(rowSurfaces[1].boxShadow).not.toBe(rowSurfaces[0].boxShadow);
   expect(rowSurfaces[1].borderLeftWidth).toBe(rowSurfaces[1].borderTopWidth);
   expect(rowSurfaces[1].borderLeftColor).toBe(rowSurfaces[1].borderTopColor);
@@ -168,7 +181,7 @@ async function assertWorklistContract(page: Page): Promise<void> {
     const when = element.querySelector<HTMLElement>('[data-lume-row-part="when"]');
     if (!when) return [`riga ${rowIndex}: data assente`];
     const dateBox = when.getBoundingClientRect();
-    const comparedParts = ['content', 'status', 'signal'].map((partName) => ({
+    const comparedParts = ['content', 'signal'].map((partName) => ({
       partName,
       part: element.querySelector<HTMLElement>(`[data-lume-row-part="${partName}"]`),
     }));
@@ -182,32 +195,37 @@ async function assertWorklistContract(page: Page): Promise<void> {
   }));
   expect(overlaps).toEqual([]);
 
-  const lens = page.getByTestId('lume-patient-lens');
-  expect(await resolvedFontFamily(lens.getByTestId('lume-patient-atoms'))).toBe(registerFamily);
-  await assertLensActionContract(page);
-
   const search = page.getByRole('searchbox', { name: 'Cerca nella lista pazienti', exact: true });
   await search.fill('nessun caso sintetico corrispondente');
-  await expect(page.getByTestId('lume-patient-lens-empty')).toHaveText(
-    'Nessun paziente corrisponde alla ricerca corrente.',
-  );
+  await expect(page.getByText('0 risultati', { exact: true })).toBeVisible();
+  await expect(listItems).toHaveCount(0);
   await page.getByRole('button', { name: 'Cancella', exact: true }).click();
-  await expect(page.getByTestId('lume-patient-lens-empty')).toHaveCount(0);
+  await expect(search).toHaveValue('');
+  await search.fill(marker);
+  await expect(listItems).toHaveCount(3);
+  await firstRow.focus();
+  await firstRow.press('ArrowDown');
 }
 
 /* @Codex The narrow worklist previously passed overflow checks while its
    navigation, heading, and rows still collapsed into an unusable composition. */
 async function assertCompactWorklistGeometry(page: Page, width: number): Promise<void> {
   if (width > 480) return;
+  // Scrolling after keyboard selection can leave the pointer over an old row.
+  // Measure the closed state only after its real disclosure has finished closing.
+  await page.mouse.move(0, 0);
+  for (const disclosure of await page.locator('[data-testid="lume-patient-row"][aria-selected="false"] [class*="recordDisclosure"]').all()) {
+    await expect(disclosure).toHaveCSS('grid-template-rows', '0px');
+  }
 
   const geometry = await page.evaluate(() => {
-    const rail = document.querySelector<HTMLElement>('[data-testid="lume-frame-rail"]');
+    const rail = document.querySelector<HTMLElement>('[data-twin-workspace] > aside');
     const worklist = document.querySelector<HTMLElement>('[data-testid="lume-worklist"]');
     const title = worklist?.querySelector<HTMLElement>('h2');
-    const count = worklist?.querySelector<HTMLElement>('.lume-registro');
+    const count = worklist?.querySelector<HTMLElement>('[class*="resultCount"]');
     const action = worklist?.querySelector<HTMLElement>('[data-lume-action="quiet"]');
     const rows = [...document.querySelectorAll<HTMLElement>('[data-testid="lume-patient-row"]')];
-    const navItems = [...document.querySelectorAll<HTMLElement>('[data-lume-frame-nav="true"]')];
+    const navItems = [...document.querySelectorAll<HTMLElement>('nav[aria-label="Navigazione principale"] a')];
 
     if (!rail || !worklist || !title || !count || !action || rows.length === 0 || navItems.length === 0) {
       return null;
@@ -231,8 +249,14 @@ async function assertCompactWorklistGeometry(page: Page, width: number): Promise
         (titleBox.top + titleBox.height / 2) - (countBox.top + countBox.height / 2),
       ) <= 2,
       actionFollowsHeading: actionBox.top >= Math.max(titleBox.bottom, countBox.bottom),
+      // @Codex: a 44px action aligns to the heading baseline, so the centers
+      // need not coincide; the boxes must still occupy one visible row.
+      actionBesideHeading: actionBox.left >= Math.max(titleBox.right, countBox.right)
+        && actionBox.top <= Math.max(titleBox.bottom, countBox.bottom)
+        && actionBox.bottom >= Math.min(titleBox.top, countBox.top),
       actionHeight: actionBox.height,
-      rowHeights: rows.map((row) => row.getBoundingClientRect().height),
+      // The selected row deliberately reveals notes; compact density applies to closed rows.
+      rowHeights: rows.filter(row => row.getAttribute('aria-selected') !== 'true').map(row => row.getBoundingClientRect().height),
     };
   });
 
@@ -240,12 +264,13 @@ async function assertCompactWorklistGeometry(page: Page, width: number): Promise
   expect(geometry?.railHeight).toBeLessThanOrEqual(150);
   expect(geometry?.navRowCount).toBeLessThanOrEqual(2);
   expect(geometry?.worklistInnerWidth).toBeGreaterThanOrEqual(240);
-  expect(geometry?.titleHeight).toBeLessThanOrEqual(27);
+  // @Codex: proposal CSS declares the worklist heading line box at 28px.
+  expect(geometry?.titleHeight).toBeLessThanOrEqual(28);
   expect(geometry?.titleAndCountShareLine).toBe(true);
-  expect(geometry?.actionFollowsHeading).toBe(true);
+  expect(width >= 360 ? geometry?.actionBesideHeading : geometry?.actionFollowsHeading).toBe(true);
   expect(geometry?.actionHeight).toBeGreaterThanOrEqual(44);
   for (const rowHeight of geometry?.rowHeights ?? []) {
-    expect(rowHeight).toBeLessThanOrEqual(100);
+    expect.soft(rowHeight, 'densità della riga chiusa').toBeLessThanOrEqual(100);
   }
 }
 
@@ -262,13 +287,13 @@ async function assertCompactAriaStable(page: Page, worklistCase: WorklistCase): 
 
 async function assertTopComposition(page: Page, width: number): Promise<void> {
   const composition = await page.evaluate(() => {
-    const rail = document.querySelector<HTMLElement>('[data-testid="lume-frame-rail"]');
+    const rail = document.querySelector<HTMLElement>('[data-twin-workspace] > aside');
     const title = document.querySelector<HTMLElement>('[data-testid="lume-worklist"] h2');
     const action = document.querySelector<HTMLElement>(
       '[data-testid="lume-worklist"] [data-lume-action="quiet"]',
     );
     const rows = [...document.querySelectorAll<HTMLElement>('[data-testid="lume-patient-row"]')];
-    const navItems = [...document.querySelectorAll<HTMLElement>('[data-lume-frame-nav="true"]')];
+    const navItems = [...document.querySelectorAll<HTMLElement>('nav[aria-label="Navigazione principale"] a')];
     if (!rail || !title || !action || rows.length === 0 || navItems.length === 0) return null;
 
     const railBox = rail.getBoundingClientRect();
@@ -305,59 +330,89 @@ async function assertTopComposition(page: Page, width: number): Promise<void> {
       expect(composition?.firstRowVisibleFraction).toBeGreaterThanOrEqual(0.6);
     }
   } else if (width === 390) {
-    expect(composition?.completeRowsVisible).toBeGreaterThanOrEqual(2);
+    // The selected second row exposes its contextual notes by contract; the
+    // first closed row must remain wholly available above that expansion.
+    expect(composition?.completeRowsVisible).toBeGreaterThanOrEqual(1);
+    expect(composition?.firstRowBottomMiss).toBe(0);
+    expect(composition?.firstRowVisibleFraction).toBe(1);
   }
 }
 
 for (const worklistCase of WORKLIST_CASES) {
   test(`worklist Lume ${worklistCase.register} ${worklistCase.viewport}`, async ({ page }) => {
-    await openSyntheticWorklist(page, worklistCase);
+    const fixture = await openSyntheticWorklist(page, worklistCase);
     await expect(page.locator('html')).toHaveClass(worklistCase.register === 'grafite' ? /dark/ : /light/);
-    await assertWorklistContract(page);
+    await assertWorklistContract(page, fixture);
     await assertCompactAriaStable(page, worklistCase);
     await assertCompactWorklistGeometry(page, worklistCase.width);
     await assertNoHorizontalOverflow(page, [
       { label: 'documento worklist', selector: 'document' },
       { label: 'worklist', selector: '[data-testid="lume-worklist"]' },
       { label: 'lista pazienti', selector: '[data-testid="lume-patient-list"]' },
-      { label: 'lente paziente', selector: '[data-testid="lume-patient-lens"]' },
     ]);
     const selectedRow = page.getByTestId('lume-patient-row').nth(1);
     await assertNotClippedInViewport(selectedRow, 'riga paziente selezionata');
-    await assertKeyboardFocusProgresses(page, selectedRow, 'riga paziente selezionata');
+    // The list is now the last control; the removed lens cannot receive Tab.
+    // Check entry from the preceding control, exit, and reverse return without a trap.
+    await assertKeyboardFocusProgresses(page, page.getByRole('link', { name: 'Nuova scheda', exact: true }), 'ingresso nella lista pazienti');
+    await expect(selectedRow).toBeFocused();
+    await selectedRow.press('Tab');
+    await expect(selectedRow).not.toBeFocused();
+    await page.keyboard.press('Shift+Tab');
+    await expect(selectedRow).toBeFocused();
     await page.evaluate(() => {
       window.scrollTo(0, 0);
       document.querySelector<HTMLElement>('[data-testid="lume-frame-canvas"]')?.scrollTo(0, 0);
     });
     await assertTopComposition(page, worklistCase.width);
     await page.screenshot({
-      path: `/tmp/lume-worklist-${worklistCase.register}-${worklistCase.viewport}-top.png`,
+      path: test.info().outputPath('worklist-top.png'),
       fullPage: false,
       animations: 'disabled',
     });
-    await page.getByTestId('lume-patient-lens').scrollIntoViewIfNeeded();
-    await page.screenshot({
-      path: `/tmp/lume-worklist-${worklistCase.register}-${worklistCase.viewport}.png`,
-      fullPage: true,
-      animations: 'disabled',
-    });
+    const row = page.getByRole('option').first();
+    const name = await row.locator('strong').innerText();
+    await row.click();
+    await expect(page).toHaveURL(/\/patients\/[^/]+\/modules$/);
+    await expect(page.getByTestId('lume-scheda-header').getByRole('heading', { name, exact: true })).toBeVisible();
   });
 }
 
-test('L6A mantiene quattro azioni nell’overflow mobile accessibile', async ({ page }) => {
+/* @Codex ADR 0123: the four lens destinations moved into the opened record.
+   Verify all four on the official UI; do not click the now-hidden review lens. */
+test('la riga mobile apre la Scheda con Quadro, Nuova voce, Documenti e SISS raggiungibili', async ({ page }) => {
   await openSyntheticWorklist(page, {
     register: 'giorno', viewport: 'phone', width: 390, height: 844,
   });
-  await assertLensActionContract(page);
+  const row = page.getByRole('option').first();
+  const name = await row.locator('strong').innerText();
+  await row.focus();
+  await row.press('Enter');
+  const header = page.getByTestId('lume-scheda-header');
+  await expect(header.getByRole('heading', { name, exact: true })).toBeVisible();
+  await page.getByRole('navigation', { name: 'Sezioni della vista' }).getByRole('link', { name: 'Riepilogo', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'Riepilogo clinico', exact: true })).toBeVisible();
+  for (const section of ['documenti', 'siss']) await openPatientSection(page, section);
+  const entry = header.getByRole('link', { name: 'Nuova voce', exact: true });
+  await expect(entry).toHaveAttribute('href', /\/patients\/[^/]+\/entries\/new$/);
+  await entry.focus();
+  await entry.press('Enter');
+  await expect(page.getByTestId('progressive-entry-composer').locator('header p')).toContainText(name);
 });
 for (const register of ['giorno', 'grafite'] as const) {
   for (const viewport of MENU_COLLISION_VIEWPORTS) {
-    test(`L6A contiene il menu senza scroll a ${viewport.width}px in registro ${register}`, async ({ page }) => {
+    test(`contiene Altre sezioni senza scroll a ${viewport.width}px in registro ${register}`, async ({ page }) => {
       await openSyntheticWorklist(page, { register, ...viewport });
+      await page.getByRole('option').first().click();
+      await expect(page.getByTestId('lume-scheda-header')).toBeVisible();
       expect(await page.evaluate(() => scrollY)).toBe(0);
-      const lens = page.getByTestId('lume-patient-lens'); const trigger = lens.getByRole('button', { name: 'Altre azioni paziente', exact: true });
-      await trigger.evaluate((element) => (element as HTMLElement).click());
-      const menu = page.getByRole('menu', { name: 'Azioni paziente', exact: true });
+      const nav = page.getByRole('navigation', { name: 'Sezioni della vista' });
+      const trigger = nav.locator('summary');
+      const details = nav.locator('details');
+      await trigger.focus();
+      await trigger.press('Enter');
+      await expect(details).toHaveAttribute('open', '');
+      const menu = details.locator(':scope > div');
       await expect(menu).toBeVisible();
       const fitsViewport = await menu.evaluate((element, size) => {
         const box = element.getBoundingClientRect();
@@ -365,6 +420,19 @@ for (const register of ['giorno', 'grafite'] as const) {
       }, viewport);
       expect(await page.evaluate(() => scrollY)).toBe(0);
       expect(fitsViewport).toBe(true);
+      const links = menu.getByRole('link');
+      expect(await links.count()).toBeGreaterThan(0);
+      for (const link of await links.all()) {
+        await page.keyboard.press('Tab');
+        await expect(link).toBeFocused();
+        await assertNotClippedInViewport(link, await link.innerText());
+      }
+      await page.keyboard.press('Escape');
+      await expect(details).not.toHaveAttribute('open');
+      await expect(trigger).toBeFocused();
+      await trigger.press('Space');
+      await expect(menu).toBeVisible();
+      await page.screenshot({ path: test.info().outputPath('sections-menu.png'), animations: 'disabled' });
     });
   }
 }
@@ -431,7 +499,7 @@ test('la worklist virtuale attraversa l’indice completo e apre la sola Scheda'
     { label: 'worklist virtuale', selector: '[data-testid="lume-worklist"]' },
     { label: 'lista virtuale', selector: '[data-testid="lume-patient-list"]' },
   ]);
-  await page.screenshot({ path: '/tmp/lume-worklist-k1-1440x900.png', animations: 'disabled' });
+  await page.screenshot({ path: test.info().outputPath('virtual-wide.png'), animations: 'disabled' });
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.locator(`[data-patient-index="${pageDownIndex}"]`)).toBeFocused();
   await assertNoHorizontalOverflow(page, [
@@ -439,7 +507,7 @@ test('la worklist virtuale attraversa l’indice completo e apre la sola Scheda'
     { label: 'worklist virtuale narrow', selector: '[data-testid="lume-worklist"]' },
     { label: 'lista virtuale narrow', selector: '[data-testid="lume-patient-list"]' },
   ]);
-  await page.screenshot({ path: '/tmp/lume-worklist-k1-390x844.png', animations: 'disabled' });
+  await page.screenshot({ path: test.info().outputPath('virtual-phone.png'), animations: 'disabled' });
   await page.keyboard.press('Enter');
   await expect(page.getByTestId('lume-scheda-header')).toBeVisible();
   expect(consoleErrors).toEqual([]);

@@ -1,8 +1,8 @@
 /* @Codex */
 import { expect, test } from '@playwright/test';
-import { bootstrapUnlockedSession, openAiFunzioniSettings, setAiLaneKillSwitch } from './utils';
+import { bootstrapUnlockedSession, openAiFunzioniSettings, openPatientSection, setAiLaneKillSwitch } from './utils';
 
-test('smart import kill switch disables analysis on patient detail', async ({ page }) => {
+test('[E2E fixture] smart import kill switch disables analysis on patient detail', async ({ page }) => {
   const pin = process.env.E2E_PIN || '1234';
   const suffix = `${Date.now()}`.slice(-4);
   const firstName = `Smart${suffix}`;
@@ -22,14 +22,38 @@ test('smart import kill switch disables analysis on patient detail', async ({ pa
     // values and would otherwise undo a click that landed too early.
     await openAiFunzioniSettings(page);
 
-    const killSwitch = page.getByRole('switch', { name: 'Smart Import locale' });
+    // @Codex: ordinary preferences require preview and a separate apply gesture.
+    const preferences = page.getByTestId('function-preferences');
+    const card = preferences.locator('article').filter({
+      has: page.getByRole('heading', { name: 'Importazione assistita', exact: true }),
+    });
+    const killSwitch = card.getByRole('switch', { name: 'Importazione assistita nella proposta', exact: true });
+    await expect(killSwitch).toHaveAttribute('aria-checked', 'true');
     await killSwitch.click();
     await expect(killSwitch).toHaveAttribute('aria-checked', 'false');
-    await expect(page.getByTestId('smart-import-kill-switch-card')).toContainText('Spento');
-    const saveButton = page.getByRole('button', { name: 'Salva Configurazione' });
-    await saveButton.click();
-    await expect(page.getByRole('button', { name: 'Salvataggio...' })).toHaveCount(0);
-    await expect(saveButton).toBeEnabled();
+    const previewResponse = page.waitForResponse(response =>
+      response.url().endsWith('/api/settings/ai/functions/preview') && response.request().method() === 'POST');
+    await card.getByRole('button', { name: 'Anteprima modifica', exact: true }).click();
+    const preview = await previewResponse;
+    expect(preview.status()).toBe(200);
+    expect(await preview.json()).toMatchObject({
+      writesPerformed: 0, command: { action: 'set_activation', functionId: 'smart_import', enabled: false },
+    });
+    const readEnabled = () => page.evaluate(async () => {
+      const response = await fetch('/api/settings/ai/functions', { cache: 'no-store' });
+      if (!response.ok) throw new Error(`Preferences read failed: ${response.status}`);
+      const value = await response.json() as { functions: { id: string; enabled: boolean }[] };
+      return value.functions.find(row => row.id === 'smart_import')?.enabled;
+    });
+    expect(await readEnabled()).toBe(true);
+    await preferences.getByRole('region', { name: 'Anteprima impostazioni', exact: true })
+      .getByRole('button', { name: 'Applica alle impostazioni', exact: true }).click();
+    await expect(preferences.getByRole('status').filter({
+      hasText: /^Impostazioni salvate e rilette\. Nessuna modifica clinica\.$/u,
+    })).toBeVisible();
+    await expect(killSwitch).toHaveAttribute('aria-checked', 'false');
+    await expect(card.getByText('Spento', { exact: true })).toBeVisible();
+    expect(await readEnabled()).toBe(false);
   };
 
   const restoreSmartImport = async () => {
@@ -70,18 +94,23 @@ test('smart import kill switch disables analysis on patient detail', async ({ pa
 
     await page.goto(`/patients/${patientId}/modules`);
     await expect(page).toHaveURL(new RegExp(`/patients/${patientId}/modules$`));
-    const documents = page.getByRole('button', { name: /Documenti Archivio documenti ed evidenze/u });
-    await expect(documents).toBeVisible({ timeout: 20_000 });
-    if (await documents.getAttribute('aria-expanded') !== 'true') await documents.click();
-    await expect(documents).toHaveAttribute('aria-expanded', 'true');
-
+    // @Codex: the blocked reason is disclosed in Riepilogo; the disabled
+    // generation control remains in the assisted summary disclosure.
+    const summaryLink = page.getByRole('navigation', { name: 'Sezioni della vista', exact: true })
+      .getByRole('link', { name: 'Riepilogo', exact: true });
+    await summaryLink.click();
+    await expect(summaryLink).toHaveAttribute('aria-current', 'location');
     const reviewRow = page.getByTestId('review-queue-row-smart-import');
+    await expect(reviewRow).toBeVisible();
     await expect(reviewRow).toContainText('Bloccato');
-    await expect(reviewRow).toContainText('Smart Import è disattivato localmente');
+    await reviewRow.locator('summary').click();
+    await expect(reviewRow.getByText('Smart Import è disattivato localmente', { exact: false })).toBeVisible();
 
+    await openPatientSection(page, 'quadro');
+    await page.getByText('Proposte dalle fonti cliniche · Smart Import', { exact: true }).click();
     const fabricCard = page.getByTestId('fabric-preview-card');
-    await expect(fabricCard).toContainText('Fabric · anteprima sola lettura');
-    await expect(fabricCard.getByRole('button', { name: 'Carica contesto' })).toBeDisabled();
+    await expect(fabricCard).toContainText('Raccogli dalle fonti della cartella');
+    await expect(fabricCard.getByRole('button', { name: 'Prepara proposta' })).toBeDisabled();
   } finally {
     await restoreSmartImport();
   }

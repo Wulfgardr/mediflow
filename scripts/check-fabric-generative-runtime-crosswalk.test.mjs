@@ -22,7 +22,7 @@ function repositorySources(overrides = {}) {
   };
 }
 
-test('accepts the integrated local 0.8.5 runtime crosswalk', () => {
+test('accepts the integrated local 0.8.6 runtime crosswalk', () => {
   const manifest = loadFabricGenerativeRuntimeCrosswalk();
   assert.doesNotThrow(() => validateFabricGenerativeRuntimeCrosswalk(manifest));
   assert.deepEqual(manifest.capabilities.map(({ id }) => id), [
@@ -76,6 +76,19 @@ test('rejects a missing route or caller request literal', () => {
   );
 });
 
+test('pins document synthesis to the authenticated client projection composition', () => {
+  const manifest = loadFabricGenerativeRuntimeCrosswalk();
+  const document = manifest.capabilities.find(({ id }) => id === 'document_synthesis');
+  const production = readFileSync(document.productionRoot, 'utf8').replaceAll(
+    'composeAnyDocCurrentSelectionClientProjectionExtraction',
+    'composeAnyDocCurrentSelectionExtraction',
+  );
+  assert.throws(
+    () => validateFabricGenerativeRuntimeCrosswalk(manifest, repositorySources({ [document.productionRoot]: production })),
+    /document_synthesis.*production root.*composeAnyDocCurrentSelectionClientProjectionExtraction/u,
+  );
+});
+
 test('rejects hidden receipt or provenance metadata in the live UI', () => {
   const manifest = loadFabricGenerativeRuntimeCrosswalk();
   const patient = manifest.capabilities.find(({ id }) => id === 'patient_insight');
@@ -96,9 +109,9 @@ test('pins the historical semantic receipt without relabeling it', () => {
   );
 });
 
-test('pins package release identity to 0.8.5', () => {
+test('pins package release identity to 0.8.6', () => {
   const manifest = loadFabricGenerativeRuntimeCrosswalk();
-  const stalePackage = readFileSync('package.json', 'utf8').replace('"version": "0.8.5"', '"version": "0.8.4"');
+  const stalePackage = readFileSync('package.json', 'utf8').replace('"version": "0.8.6"', '"version": "0.8.4"');
   assert.throws(
     () => validateFabricGenerativeRuntimeCrosswalk(manifest, repositorySources({ 'package.json': stalePackage })),
     /package version/u,
@@ -108,8 +121,44 @@ test('pins package release identity to 0.8.5', () => {
 test('manifest remains a new runtime artifact, separate from the historical receipt', () => {
   const manifest = JSON.parse(readFileSync(MANIFEST_PATH, 'utf8'));
   assert.equal(manifest.schema, 'mediflow.ai.fabric-generative-runtime-crosswalk.v1');
-  assert.equal(manifest.release, '0.8.5');
+  assert.equal(manifest.release, '0.8.6');
   assert.equal(manifest.integrationStatus, 'local_source_integrated');
   assert.equal(manifest.applyPolicy, 'none');
   assert.notEqual(MANIFEST_PATH, manifest.historicalArtifacts[0].path);
 });
+
+/* @Codex */
+test('requires opaque catalog choice and preserves CLI admission and proposal-only authority', () => {
+  const manifest = loadFabricGenerativeRuntimeCrosswalk();
+  for (const [key, value] of [['mode', 'free_model_id'], ['providerAdmission', 'ui_query'], ['apply', 'allowed']]) {
+    const changed = clone(manifest); changed.functionModelChoice[key] = value;
+    assert.throws(() => validateFabricGenerativeRuntimeCrosswalk(changed), /broadens authority/u);
+  }
+  const patient = manifest.capabilities[0];
+  const route = readFileSync(patient.descriptorEntryPoint, 'utf8').replace("withFunctionModelDispatch('patient_insight',", "unscopedDispatch(");
+  assert.throws(() => validateFabricGenerativeRuntimeCrosswalk(manifest, repositorySources({ [patient.descriptorEntryPoint]: route })), /sealed model dispatch/u);
+});
+
+import { TREATMENT_PORTABLE_RUNTIME_CROSSWALK, validateTreatmentReasoningPortableCrosswalk } from './check-fabric-generative-runtime-crosswalk.mjs';
+test('capability-local v2 map pins the untouched v1 crosswalk and keeps runtime qualification unobserved', () => {
+  const result = validateTreatmentReasoningPortableCrosswalk();
+  assert.equal(result.provider, 'athena_transformers'); assert.equal(result.runtimeQualification, 'not_observed'); assert.equal(result.applyPolicy, 'none');
+  assert.equal(TREATMENT_PORTABLE_RUNTIME_CROSSWALK.integrationStatus, 'proposed_not_integrated');
+});
+test('portable map rejects field drift, altered legacy manifest and any generic v1 provider widening', () => {
+  for (const [key, value] of [['provider', 'athena_mlx'], ['runtimeQualification', 'available'], ['applyPolicy', 'allowed'], ['unexpected', true]]) {
+    assert.throws(() => validateTreatmentReasoningPortableCrosswalk({ ...TREATMENT_PORTABLE_RUNTIME_CROSSWALK, [key]: value }), /portable v2 map/u);
+  }
+  assert.throws(() => validateTreatmentReasoningPortableCrosswalk(TREATMENT_PORTABLE_RUNTIME_CROSSWALK,
+    repositorySources({ [MANIFEST_PATH]: readFileSync(MANIFEST_PATH, 'utf8') + '\n' })), /legacy crosswalk drift/u);
+  const contract = 'lib/ai-providers/fabric/contract.ts';
+  assert.throws(() => validateTreatmentReasoningPortableCrosswalk(TREATMENT_PORTABLE_RUNTIME_CROSSWALK,
+    repositorySources({ [contract]: readFileSync(contract, 'utf8') + '\nathena_transformers\n' })), /widened generic v1/u);
+});
+for (const source of ['scripts/treatment-reasoning-portable-worker.py', 'scripts/treatment-reasoning-portable-setup.mjs',
+  'lib/ai-providers/fabric/treatment-reasoning-production-operation.ts', 'app/api/ai/fabric/status/route.ts',
+  'app/settings/ai/fabric/page.tsx', 'next.config.ts', 'lib/ai-providers/fabric/function-model-preferences-http.ts']) {
+  test(`portable v2 guard fails closed when integration source is missing: ${source}`, () => {
+    assert.throws(() => validateTreatmentReasoningPortableCrosswalk(TREATMENT_PORTABLE_RUNTIME_CROSSWALK, repositorySources({ [source]: null })), /portable v2 source/u);
+  });
+}

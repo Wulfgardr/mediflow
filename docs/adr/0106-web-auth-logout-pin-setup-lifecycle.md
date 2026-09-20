@@ -64,6 +64,23 @@ un'altra sessione.
 
 ### Modifica riuscita delle credenziali PIN
 
+Emendamento 0.8.6, 6 settembre 2026: il cambio PIN puo essere iniziato anche
+da una sessione paired native corrente. I due input autenticati restano una
+union esplicita: nessuna sessione native viene convertita in una projection
+Web. Dopo la verifica del PIN, l'owner native prepara un retirement legato
+all'esatto oggetto di sessione, utente e binding paired. Un ingresso separato
+dell'owner Web consuma una sola volta la prova di quella preparazione e ne
+deriva l'utente dal registro privato. Produce soltanto il normale ticket Web
+di retirement: non emette sessioni, control, cookie o grant Web.
+
+La claim della prova non consuma il ticket native necessario al commit/abort.
+Una copia, un ticket terminale, un ticket preparato soltanto per userId o una
+seconda claim negano. Le route account rileggono il pairing e la sessione
+prima della preparazione e prima del CAS; la rotazione del token paired non
+riassocia una sessione precedente. L'ordine prepare native, prepare Web, CAS,
+commit Web, commit native resta identico per entrambi i canali. Dopo un CAS
+riuscito non si esegue abort per nascondere una failure di finalizzazione.
+
 Dopo aver verificato il PIN corrente e prima di calcolare il nuovo hash o
 avviare il CAS, l'host prepara sia il retirement native sia una capability Web
 opaca, esatta e monouso. La capability Web lega l'owner e l'utente alla
@@ -112,6 +129,16 @@ fisso per recuperare il lifecycle.
 Il setup separa il commit DB dall'autenticazione Web. Il commit puo persistere
 account e impostazioni prima del CAS P3. Solo dopo un CAS riuscito e il flip
 P3 a `ACTIVE` la route puo emettere il cookie bearer.
+
+Emendamento 0.8.6, 6 settembre 2026: quando il setup raccoglie il nome
+dell'ambulatorio e non esiste ancora alcuna sede, la stessa transazione crea
+la prima sede predefinita con quel nome. Il primo utilizzo paired ha cosi un
+ambulatorio reale da selezionare. Sedi gia presenti non vengono rinominate,
+sostituite o promosse; il setup senza nome conserva il comportamento precedente.
+Un errore annulla insieme account, impostazioni e nuova sede. Un diniego P3
+dopo il commit conserva tutti e tre per il recupero tramite login ordinario,
+senza creare duplicati al retry. Nessuna rete, pairing o capability viene
+abilitata da questa inizializzazione.
 
 La risposta di setup riuscita contiene l'UUID gia persistito e una projection
 canonica minima. Non restituisce capability interna, session cell, owner,

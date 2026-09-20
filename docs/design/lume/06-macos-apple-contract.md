@@ -72,6 +72,27 @@ Matrice operativa:
 
 ## 3. Disposizione della finestra
 
+### Proposta macOS 0.8.6 del 6 settembre
+
+La revisione visiva precedente e stata giudicata ancora troppo simile alla
+struttura originaria. Il candidato successivo dispone le aree dell'app in una
+barra superiore compatta e conserva **una sola sidebar**, dedicata ai pazienti.
+La cartella occupa il resto della finestra: testata opaca continua, indice
+visibile delle sette sezioni, contenuto senza un involucro arrotondato uniforme.
+I controlli nativi e il menu delle aree secondarie mantengono tutte le funzioni
+raggiungibili. I titoli brevi della navigazione non sostituiscono i nomi completi
+delle sezioni o le etichette accessibili.
+
+Questa disposizione applica vicinanza, orientamento e profondita progressiva
+della [raccolta illustrata Breccia](../2026-09-06-breccia-apple-reference.md).
+E una nostra proposta per il Mac, non un layout prescritto dai video. Sostituisce
+nel candidato 0.8.6 la doppia colonna di navigazione descritta qui sotto; la
+descrizione generale rimane valida per ownership e componenti di sistema.
+Non cambia il modello per finestra, i writer, le capability, l'inspector
+status-only o il ciclo di vita della registrazione. La resa iOS/iPadOS conserva
+il proprio percorso. Compilazione e osservazione della nuova disposizione vanno
+documentate separatamente dalle prove funzionali del candidato precedente.
+
 La disposizione di destinazione e desktop-native:
 
 1. **Sidebar di sistema**: navigazione primaria e worklist, tramite

@@ -6,7 +6,7 @@ import { AlertCircle, Loader2, Unlock } from 'lucide-react';
 import styles from './kree8/kree8-lock-screen.module.css';
 
 export function LockScreen() {
-    const { isLocked, requiresSetup, authErrorMessage, login, setupPin } = useSecurity();
+    const { isLocked, requiresSetup, authErrorMessage, authRecoveryState, login, setupPin, lock } = useSecurity();
     const [pin, setPin] = useState('');
     const [confirmPin, setConfirmPin] = useState('');
     const [error, setError] = useState('');
@@ -14,21 +14,27 @@ export function LockScreen() {
     // WUL-55: ref + nonce to restore focus to the credential field after a failed login.
     const pinInputRef = useRef<HTMLInputElement>(null);
     const [failedAttempt, setFailedAttempt] = useState(0);
+    /* @Codex */
+    const previousRecoveryState = useRef(authRecoveryState);
 
     // A failed login re-enables and clears the input; deterministically restore focus so the
     // operator can retry at once. Guards: !loading = input already enabled; optional chaining =
     // safe across unmount, so a successful login (which unmounts this form) never focuses.
     useEffect(() => {
-        if (failedAttempt > 0 && !loading) {
+        if ((failedAttempt > 0 || previousRecoveryState.current === 'pending')
+            && !loading && authRecoveryState === 'ready') {
             pinInputRef.current?.focus();
         }
-    }, [failedAttempt, loading]);
+        previousRecoveryState.current = authRecoveryState;
+    }, [failedAttempt, loading, authRecoveryState]);
 
     // If not locked and setup is done, don't render anything
     if (!isLocked && !requiresSetup) return null;
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
+        /* @Codex: Enter cannot bypass a pending or unconfirmed recovery. */
+        if (authRecoveryState !== 'ready') return;
         setLoading(true);
         setError('');
 
@@ -69,7 +75,14 @@ export function LockScreen() {
         }
     };
 
-    const visibleError = error || authErrorMessage;
+    /* @Codex */
+    const recoveryPending = authRecoveryState === 'pending';
+    const credentialsDisabled = loading || authRecoveryState !== 'ready';
+    const visibleError = error || authErrorMessage || (authRecoveryState === 'failed'
+        ? 'Chiusura della sessione non confermata. Rinnova di nuovo l’accesso.' : '');
+    const recoveryMessage = authRecoveryState === 'required'
+        ? 'Una sessione è già attiva. Rinnova l’accesso per usare questa scheda.'
+        : recoveryPending ? 'Sto chiudendo la sessione precedente…' : null;
 
     return (
         // @Codex WUL-55 F2d-A: lock chrome uses the landed Lume identity without changing auth semantics.
@@ -88,7 +101,13 @@ export function LockScreen() {
                     </h1>
                 </div>
 
-                <form onSubmit={requiresSetup ? handleSetup : handleLogin} className={styles.form}>
+                <form onSubmit={requiresSetup ? handleSetup : handleLogin} className={styles.form}
+                    aria-busy={loading || recoveryPending}>
+                    {recoveryMessage && (
+                        <p id="mediflow-auth-recovery" role="status" className="px-2 text-center text-sm leading-6">
+                            {recoveryMessage}
+                        </p>
+                    )}
                     {/* @Codex WUL-55: keep the field name for assistive tech without repeating visible copy. */}
                     <label className="sr-only" htmlFor="mediflow-lock-pin">
                         {requiresSetup ? 'Nuovo PIN' : 'PIN operatore'}
@@ -101,12 +120,11 @@ export function LockScreen() {
                             value={pin}
                             onChange={(e) => setPin(e.target.value)}
                             className={styles.pinInput}
-                            inputMode="numeric"
-                            pattern="[0-9]*"
+                            inputMode="text"
                             autoComplete="off"
                             aria-invalid={Boolean(visibleError)}
-                            aria-describedby={visibleError ? 'mediflow-lock-error' : undefined}
-                            disabled={loading}
+                            aria-describedby={visibleError ? 'mediflow-lock-error' : recoveryMessage ? 'mediflow-auth-recovery' : undefined}
+                            disabled={credentialsDisabled}
                             autoFocus
                         />
                     </div>
@@ -123,12 +141,11 @@ export function LockScreen() {
                                 value={confirmPin}
                                 onChange={(e) => setConfirmPin(e.target.value)}
                                 className={styles.pinInput}
-                                inputMode="numeric"
-                                pattern="[0-9]*"
+                                inputMode="text"
                                 autoComplete="off"
                                 aria-invalid={Boolean(visibleError)}
                                 aria-describedby={visibleError ? 'mediflow-lock-error' : undefined}
-                                disabled={loading}
+                                disabled={credentialsDisabled}
                             />
                         </div>
                     )}
@@ -149,16 +166,16 @@ export function LockScreen() {
                     <button
                         type="submit"
                         disabled={
-                            loading
+                            credentialsDisabled
                             || pin.length < 4
                             || (requiresSetup && confirmPin.length < 4)
                         }
                         className={styles.primaryButton}
                     >
-                        {loading ? (
+                        {loading || recoveryPending ? (
                             <>
                                 <Loader2 className={styles.spinner} size={16} />
-                                {requiresSetup ? 'Sto configurando...' : 'Sto sbloccando...'}
+                                {recoveryPending ? 'Attendi la conferma…' : requiresSetup ? 'Sto configurando...' : 'Sto sbloccando...'}
                             </>
                         ) : requiresSetup ? (
                             'Imposta'
@@ -168,6 +185,23 @@ export function LockScreen() {
                             </>
                         )}
                     </button>
+                    {/* @Codex: renewal is explicit because the session may be shared with
+                        another tab. The next PIN submission waits for the lock receipt. */}
+                    {!requiresSetup && (visibleError || authRecoveryState !== 'ready') && (
+                        <div className="text-center text-sm">
+                            <button type="button" disabled={loading || recoveryPending}
+                                className="min-h-11 px-4 py-2 underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2"
+                                onClick={() => {
+                                    setPin('');
+                                    setError('');
+                                    lock();
+                                    setFailedAttempt((n) => n + 1);
+                                }}>
+                                Rinnova accesso
+                            </button>
+                            <p className="px-2 text-xs leading-5">Chiude la sessione condivisa con le altre schede. Poi inserisci di nuovo il PIN.</p>
+                        </div>
+                    )}
                 </form>
             </section>
         </div>

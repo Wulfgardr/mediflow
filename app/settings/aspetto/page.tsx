@@ -2,7 +2,9 @@
 
 // WUL-297 Aspetto: moved from the monolithic settings page.
 
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, PanelLeft, PanelTop } from 'lucide-react';
+/* @Codex */
+import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
 import { cn } from '@/lib/utils';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { useUIAccessibility } from '@/components/ui-accessibility-provider';
@@ -15,6 +17,8 @@ export default function SettingsAppearancePage() {
         setReduceMotion,
     } = useUIAccessibility();
     const { isPrivacyMode, togglePrivacyMode } = usePrivacy();
+    /* @Codex */
+    const { enabled, proposal, composition, setComposition, setProposal } = useRuntimeTwinDesign();
 
     return (
         <section data-testid="settings-appearance-section" className="space-y-4">
@@ -23,6 +27,37 @@ export default function SettingsAppearancePage() {
                 title="Aspetto"
                 description="Tema, movimento e accessibilità per una lettura adatta al lavoro clinico."
             />
+
+            {/* @Codex: the same presentation preference drives Settings and comparison. */}
+            {enabled && (
+                <fieldset className="mf-section min-w-0" data-testid="settings-navigation-layout">
+                    <legend className="px-2 text-base font-semibold">Navigazione</legend>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                        {([
+                            { value: 'stream', title: 'Barra superiore', detail: 'Diario come ingresso della cartella', Icon: PanelTop },
+                            { value: 'workbench', title: 'Barra laterale', detail: 'Riepilogo come ingresso della cartella', Icon: PanelLeft },
+                        ] as const).map(({ value, title, detail, Icon }) => (
+                            <label key={value} className={cn(
+                                'flex min-w-0 cursor-pointer items-center gap-4 rounded-xl border p-5',
+                                'has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-[var(--lume-accent)]',
+                                proposal && composition === value
+                                    ? 'border-[color:var(--lume-accent)] bg-[color:var(--lume-surface-focal)]'
+                                    : 'border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)]'
+                            )}>
+                                <Icon aria-hidden="true" className="h-6 w-6 shrink-0" />
+                                <span className="min-w-0 flex-1">
+                                    <span className="block text-sm font-semibold">{title}</span>
+                                    <span className="mt-1 block text-xs text-[color:var(--lume-ink-muted)]">{detail}</span>
+                                </span>
+                                <input type="radio" name="navigation-layout" value={value} aria-label={title}
+                                    checked={proposal && composition === value}
+                                    onChange={() => { setComposition(value); setProposal(true); }}
+                                    className="h-4 w-4 shrink-0 accent-[var(--lume-accent)]" />
+                            </label>
+                        ))}
+                    </div>
+                </fieldset>
+            )}
 
             <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_280px]">
                 <div className="mf-section lume-focal" data-testid="ui-accessibility-controls">
@@ -94,7 +129,7 @@ export default function SettingsAppearancePage() {
                 >
                     <p className="section-kicker">Spazio operativo</p>
                     <p className="mt-2 text-sm font-semibold" style={{ color: 'var(--lume-ink)' }}>
-                        Vista unica MediFlow
+                        {enabled ? 'Una cartella, due viste' : 'Vista unica MediFlow'}
                     </p>
                     <p className="mt-2 text-xs leading-5" style={{ color: 'var(--lume-ink-muted)' }}>
                         Schede, strumenti e impostazioni usano lo stesso spazio operativo.

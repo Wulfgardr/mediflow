@@ -1,8 +1,6 @@
-// A14/A3: decode the patient `diagnoses` field for display. The persisted shape
-// (lib/db.ts Diagnosis) is a JSON array of { code, description, system, date }.
-// This is READ-ONLY on purpose: writing diagnoses must round-trip every field
-// (including system/date) to avoid dropping clinical data, so the edit path is a
-// separate, round-trip-tested slice. Here we only parse for the detail view.
+/* @Codex */
+// Decode/encode the existing encrypted patient diagnoses JSON. Optional WHO
+// provenance is retained as data during native edits; this codec does no lookup.
 import Foundation
 
 public struct ClinicalDiagnosis: Equatable, Sendable {
@@ -13,12 +11,18 @@ public struct ClinicalDiagnosis: Equatable, Sendable {
     /// encode round-trip does not rewrite an existing diagnosis date. nil for a
     /// diagnosis added on-device (encode then stamps it with the default date).
     public let date: String?
+    /* @Codex: optional additions do not change the encoded shape of legacy rows. */
+    public let canonicalUri: String?
+    public let reference: HomeBaseJSONValue?
 
-    public init(code: String, description: String, system: String?, date: String? = nil) {
+    public init(code: String, description: String, system: String?, date: String? = nil,
+                canonicalUri: String? = nil, reference: HomeBaseJSONValue? = nil) {
         self.code = code
         self.description = description
         self.system = system
         self.date = date
+        self.canonicalUri = canonicalUri
+        self.reference = reference
     }
 
     /// "code - description", or whichever side is present.
@@ -38,6 +42,8 @@ public enum DiagnosesCodec {
         let description: String?
         let system: String?
         let date: String?
+        let canonicalUri: String?
+        let reference: HomeBaseJSONValue?
     }
 
     public static func decode(_ raw: String?) -> [ClinicalDiagnosis] {
@@ -51,12 +57,13 @@ public enum DiagnosesCodec {
             guard !code.isEmpty || !description.isEmpty else { return nil }
             return ClinicalDiagnosis(
                 code: code, description: description,
-                system: entry.system?.trimmedOrNil, date: entry.date?.trimmedOrNil
+                system: entry.system?.trimmedOrNil, date: entry.date?.trimmedOrNil,
+                canonicalUri: entry.canonicalUri, reference: entry.reference
             )
         }
     }
 
-    /// Re-encode the canonical {code, description, system, date} array. Existing
+    /// Re-encode the existing array, retaining optional URI/reference verbatim. Existing
     /// diagnoses keep their original date; ones added on-device (date == nil) are
     /// stamped with `defaultDate`. Returns nil for an empty list (clears the field).
     public static func encode(_ diagnoses: [ClinicalDiagnosis], defaultDate: String) -> String? {
@@ -67,7 +74,8 @@ public enum DiagnosesCodec {
                 code: diagnosis.code,
                 description: diagnosis.description,
                 system: diagnosis.system ?? "",
-                date: diagnosis.date ?? defaultDate
+                date: diagnosis.date ?? defaultDate,
+                canonicalUri: diagnosis.canonicalUri, reference: diagnosis.reference
             )
         }
         let encoder = JSONEncoder()

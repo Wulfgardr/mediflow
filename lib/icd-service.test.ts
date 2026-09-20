@@ -130,6 +130,6 @@ test('renders every governed readiness state without turning configuration into 
     assert.equal(icdReadinessMessage('offline'), 'Accesso di rete WHO ICD-11 disattivato.');
     assert.equal(icdReadinessMessage('configured'),
         'WHO ICD-11 configurato; disponibilità non ancora verificata.');
-    assert.equal(icdReadinessMessage('available'), 'WHO ICD-11 disponibile e verificato.');
+    assert.equal(icdReadinessMessage('available'), 'Ultima interrogazione WHO ICD-11 riuscita.');
     assert.equal(icdReadinessMessage('unavailable'), 'Servizio WHO ICD-11 non disponibile.');
 });

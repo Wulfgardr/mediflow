@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import { spawnSync } from 'node:child_process';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -27,6 +28,7 @@ const webAuthOwnerRoster = [
   'index.d.ts',
   'index.js',
   'internal/control-record.cjs',
+  'internal/native-session.cjs', // @Codex: canonical owner 0.8.7 roster
   'internal/owner.cjs',
   'internal/session-activation.cjs',
   'internal/session-cell.cjs',
@@ -37,6 +39,29 @@ const webAuthOwnerRoster = [
   'internal/support/value.cjs',
   'package.json',
 ];
+
+// fs.globSync emits host paths; preserve the exact suffix on Windows as well as POSIX.
+function hasSemverCoerceImplementation(candidates) {
+  return candidates.some((candidate) => candidate.split(path.sep).join('/').endsWith('/functions/coerce.js'));
+}
+
+test('standalone semver witness uses exact path segments from a native filesystem glob', (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-semver-witness-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  for (const relative of [
+    'semver/notfunctions/coerce.js', 'semver/functions/coerce.js.map', 'semver/functions/coerce.json',
+  ]) {
+    const target = path.join(directory, ...relative.split('/'));
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, '// synthetic test witness only\n');
+  }
+  assert.equal(hasSemverCoerceImplementation(fs.globSync('**/*', { cwd: directory })), false);
+  const target = path.join(directory, 'semver', 'functions', 'coerce.js');
+  fs.writeFileSync(target, '// synthetic exact witness only\n');
+  assert.equal(hasSemverCoerceImplementation(fs.globSync('**/*', { cwd: directory })), true);
+  fs.unlinkSync(target);
+  assert.equal(hasSemverCoerceImplementation(fs.globSync('**/*', { cwd: directory })), false);
+});
 
 function runSelfTest(argument) {
   return spawnSync(node, [checker, argument], {
@@ -92,6 +117,8 @@ test('digest-pinned text workers retain exact LF bytes on every checkout', () =>
   for (const worker of [
     'scripts/anydoc-local-extraction-worker.mjs',
     'scripts/anydoc-pdf-page-worker.mjs',
+    'scripts/anydoc-tesseract-artifacts.json', // @Codex
+    'scripts/anydoc-pdf-renderer-profiles.json', // @Codex
     'scripts/apple-vision-ocr.swift',
   ]) {
     assert.ok(
@@ -119,9 +146,13 @@ test('standalone checker proves web auth owner physical copy and restart denial'
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
 
   const source = fs.readFileSync(checker, 'utf8');
-  assert.match(source, /WEB_AUTH_OWNER_VERSION = '0\.8\.6'/);
+  assert.match(source, /WEB_AUTH_OWNER_VERSION = '0\.8\.9-local\.3f2e6f2a'/); // @Codex
   assert.match(source, /['"]withCurrentResourceBinding['"]/);
-  assert.match(source, /root is not the frozen exact 21-function API/);
+  assert.match(source, /root is not the frozen exact owner API with native session namespace/); // @Codex
+  // @Codex: the local 0.8.9 owner extends the native session surface without widening the root API.
+  const frozenApi = source.match(/const WEB_AUTH_OWNER_KEYS = Object\.freeze\(\[([\s\S]*?)\]\)/)?.[1];
+  assert.ok(frozenApi);
+  assert.equal([...frozenApi.matchAll(/'[^']+'/g)].length, 23);
   assert.match(source, /does not match the exact final file roster/);
   assert.match(source, /process A emitted data other than exact synthetic locators/);
   assert.match(source, /process B did not deny process A authority as absent/);
@@ -144,6 +175,8 @@ test('standalone config traces the isolated PDF worker dependency closure', () =
   assert.ok(externals, 'missing serverExternalPackages roster');
   for (const pattern of [
     anyDocPdfWorkerTracePattern,
+    "./scripts/anydoc-tesseract-artifacts.json", // @Codex
+    "./scripts/anydoc-pdf-renderer-profiles.json", // @Codex
     pdfLibTracePattern,
     pdfLibScopeTracePattern,
     pdfJsManifestTracePattern,
@@ -169,7 +202,7 @@ test('standalone config traces the installed semver layout for sharp', () => {
       || (npmSemver.length > 0 && includes.includes(`"${sharpTracePattern}"`)),
     'installed sharp semver layout is not traced for standalone',
   );
-  assert.ok([...pnpmSemver, ...npmSemver].some((candidate) => candidate.endsWith('/functions/coerce.js')),
+  assert.ok(hasSemverCoerceImplementation([...pnpmSemver, ...npmSemver]),
     'installed sharp semver does not provide functions/coerce.js');
 });
 
@@ -206,4 +239,17 @@ test('standalone config traces the pinned Apple Vision canvas runtime', () => {
   assert.equal(installedManifest.name, appleVisionCanvasPackage);
   assert.equal(installedManifest.version, '0.1.100');
   assert.equal(installedManifest.optionalDependencies?.['@napi-rs/canvas-darwin-arm64'], '0.1.100');
+});
+
+// Follow-up 1: isolated physical bundle fixtures, not a Next build or model run.
+test('Treatment portable bundle requires exact worker/CLI/TS closure and rejects data/runtime/secrets', () => {
+  const result = runSelfTest('--self-test=treatment-portable');
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  const evidence = JSON.parse(result.stdout.trim());
+  assert.equal(evidence.liveInference, false); assert.ok(evidence.cases >= 23);
+  const config = fs.readFileSync(path.join(root, 'next.config.ts'), 'utf8');
+  for (const relative of ["scripts/treatment-reasoning-portable-worker.py", "scripts/treatment-reasoning-portable-setup.mjs", "lib/ai-providers/fabric/treatment-reasoning-portable-provisioning.ts", "lib/athena-model-identity.ts", "scripts/node-runtime-contract.mjs", ".nvmrc"]) assert.ok(config.includes(`"./${relative}"`), `Trace missing ${relative}`);
+  const source = fs.readFileSync(checker, 'utf8');
+  assert.match(source, /bundledTreatmentPortableFailure\(standaloneDir, root\)/u);
+  assert.match(config, /\*\*\/\*\.safetensors/u);
 });

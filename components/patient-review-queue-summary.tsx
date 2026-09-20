@@ -5,6 +5,7 @@
    existing panel (or states explicitly why the panel is not visible) without
    duplicating panel content. */
 
+import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
 import { ListChecks } from 'lucide-react';
 
 import { Badge, type BadgeTone } from '@/components/ui/badge';
@@ -34,6 +35,16 @@ const STATE_TONE: Record<ReviewQueueRowState, BadgeTone> = {
 };
 
 function ReviewQueueRow({ row }: { row: PatientReviewQueueRow }) {
+    /* @Codex: one line per state; the full reason stays one disclosure away. */
+    const { proposal } = useRuntimeTwinDesign();
+    if (proposal) return <li className="border-b border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] py-2" data-testid={`review-queue-row-${row.id}`}>
+        <details>
+            <summary className="cursor-pointer py-2 text-sm"><span className="font-medium">{row.panelLabel}</span><span className="ml-3 text-xs text-[color:var(--lume-ink-muted)]">{row.stateLabel}</span></summary>
+            <div className="pb-3 pl-4 text-xs leading-6 text-[color:var(--lume-ink-muted)]"><p>{row.detail}</p>{row.blockedReason ? <p>{row.blockedReason}</p> : null}
+              {row.anchor ? <a className="underline underline-offset-4" href={row.anchor}>{row.actionLabel}</a> : <span>{row.actionLabel}</span>}
+            </div>
+        </details>
+    </li>;
     return (
         <li
             className="flex flex-col gap-2 rounded-[12px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] px-4 py-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4"

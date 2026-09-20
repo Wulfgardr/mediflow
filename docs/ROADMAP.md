@@ -15,6 +15,27 @@ read_when:
 
 > [!NOTE]
 
+## 0.8.6 — configurazione guidata e parità desktop
+
+Il 7 settembre l'utente ha esteso il requisito di consegna: impostazioni
+guidate, connessione ChatGPT ufficiale, scelta locale/online per funzione,
+WHO operativo, aggiornamento AIFA, import esenzioni/protesica e parità
+funzionale desktop con i canali Mini/headless nei rispettivi confini.
+Il [piano operativo](./analysis/2026-09-07-086-guided-configuration-plan.md)
+divide il lavoro in sei fasi con dipendenze e prove di accettazione. Lo sviluppo
+è in corso; iOS/iPadOS sono separati da questa nuova tranche. La precedente
+dichiarazione di sviluppo concluso non copre questi nuovi requisiti.
+
+### Preparazione storica
+
+La [mini roadmap 0.8.6](./roadmap-086-consolidamento.md) raccoglie OCR con fallback
+locale funzionante, ICD-11 WHO accessibile, impostazioni più semplici, revisione
+della scheda paziente localhost, onboarding assistito, deslop globale e filone
+GDPR/AI Act con applicabilità e prove. Include template di lavoro,
+criteri di accettazione, alternative visive e selezione preliminare dei branch
+locali da riesaminare. Stato al 5 settembre 2026: progetto Linear creato con
+20 issue e sei milestone; nessuna consegna runtime o conformità attestata.
+
 ## ✅ Fatto (v0.3.0)
 
 Le fondamenta sono solide e usabili in produzione locale.

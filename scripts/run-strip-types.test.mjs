@@ -17,6 +17,7 @@ test('run-strip-types executes TypeScript with extensionless relative imports', 
 
     const result = spawnSync(process.execPath, [runnerPath, path.join(tempDir, 'entry.ts')], {
       cwd: repoRoot,
+      env: { ...process.env, MEDIFLOW_DATA_DIR: path.join(tempDir, 'data'), MEDIFLOW_STRIP_TYPES_NODE: process.execPath },
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -44,6 +45,7 @@ test('run-strip-types erases type-only named imports during in-memory transpile'
 
     const result = spawnSync(process.execPath, [runnerPath, path.join(tempDir, 'entry.ts')], {
       cwd: repoRoot,
+      env: { ...process.env, MEDIFLOW_DATA_DIR: path.join(tempDir, 'data'), MEDIFLOW_STRIP_TYPES_NODE: process.execPath },
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -65,6 +67,7 @@ test('run-strip-types expands --glob into matching test files', () => {
     const relativePattern = `${path.relative(repoRoot, tempDir)}/**/*.test.ts`;
     const result = spawnSync(process.execPath, [runnerPath, '--test', '--glob', relativePattern], {
       cwd: repoRoot,
+      env: { ...process.env, MEDIFLOW_DATA_DIR: path.join(tempDir, 'data'), MEDIFLOW_STRIP_TYPES_NODE: process.execPath },
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -95,6 +98,7 @@ test('run-strip-types lowers import.meta.url for CommonJS test execution', () =>
 
     const result = spawnSync(process.execPath, [runnerPath, '--test', path.join(tempDir, 'entry.test.ts')], {
       cwd: repoRoot,
+      env: { ...process.env, MEDIFLOW_DATA_DIR: path.join(tempDir, 'data'), MEDIFLOW_STRIP_TYPES_NODE: process.execPath },
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -125,6 +129,7 @@ test('run-strip-types can exclude files from glob expansion', () => {
       ],
       {
         cwd: repoRoot,
+        env: { ...process.env, MEDIFLOW_DATA_DIR: path.join(tempDir, 'data'), MEDIFLOW_STRIP_TYPES_NODE: process.execPath },
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'pipe'],
       },
@@ -135,4 +140,107 @@ test('run-strip-types can exclude files from glob expansion', () => {
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
+});
+
+/* @Codex: every subprocess uses synthetic HOME and/or an explicit fixture. */
+function fixture(t) {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-runner-preflight-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  return directory;
+}
+
+function run(directory, args, env = {}) {
+  return spawnSync(process.execPath, [runnerPath, ...args], {
+    cwd: repoRoot,
+    env: { ...process.env, HOME: directory, USERPROFILE: directory,
+      MEDIFLOW_STRIP_TYPES_NODE: process.execPath, ...env },
+    encoding: 'utf8', timeout: 30_000,
+  });
+}
+
+for (const value of [undefined, '', '   ']) {
+  test(`preflight denies ${JSON.stringify(value)} before probe or target import`, (t) => {
+    const directory = fixture(t);
+    const target = path.join(directory, 'entry.test.ts');
+    const marker = path.join(directory, 'target-ran');
+    // The real module must never load; HOME is also synthetic as defense in depth.
+    fs.writeFileSync(target, `import '@/lib/db-server';
+import fs from 'node:fs'; fs.writeFileSync(${JSON.stringify(marker)}, 'unexpected');`);
+    const probe = path.join(directory, 'probe');
+    const probeMarker = path.join(directory, 'probe-ran');
+    fs.writeFileSync(probe, `#!${process.execPath}\nrequire('node:fs').writeFileSync(${JSON.stringify(probeMarker)}, 'unexpected');`);
+    fs.chmodSync(probe, 0o700);
+    const result = run(directory, ['--test', target], {
+      MEDIFLOW_DATA_DIR: value, MEDIFLOW_STRIP_TYPES_NODE: probe,
+    });
+    assert.equal(result.status, 2, result.stderr);
+    assert.match(result.stderr, /MEDIFLOW_TEST_DATA_DIR_REQUIRED/);
+    assert.equal(fs.existsSync(marker), false);
+    assert.equal(fs.existsSync(probeMarker), false);
+    assert.equal(fs.existsSync(path.join(directory, 'Library')), false);
+    assert.equal(fs.existsSync(path.join(directory, '.mediflow')), false);
+  });
+}
+
+test('explicit synthetic directory receives eager DB initialization; default stays absent', (t) => {
+  const directory = fixture(t);
+  const dataDir = path.join(directory, 'explicit data');
+  const target = path.join(directory, 'db.test.ts');
+  fs.writeFileSync(target, `import '@/lib/db-server';
+import test from 'node:test'; import assert from 'node:assert/strict';
+import { resolveDataPath } from '@/lib/data-dir';
+test('explicit target', () => assert.equal(resolveDataPath('medical.db'), ${JSON.stringify(path.join(dataDir, 'medical.db'))}));`);
+  const result = run(directory, ['--test', target], { MEDIFLOW_DATA_DIR: dataDir, NEXT_PHASE: '', NODE_ENV: 'test' });
+  assert.equal(result.status, 0, result.stderr + result.stdout);
+  assert.ok(fs.statSync(path.join(dataDir, 'medical.db')).size > 0);
+  assert.equal(fs.existsSync(path.join(directory, 'Library')), false);
+  assert.equal(fs.existsSync(path.join(directory, '.mediflow')), false);
+  // The runner must not delete caller-owned state after its child exits.
+  assert.equal(fs.existsSync(dataDir), true);
+});
+
+test('nested runner preserves explicit relative env and fixture cleanup', (t) => {
+  const directory = fixture(t);
+  const dataDir = path.relative(repoRoot, path.join(directory, 'explicit'));
+  fs.mkdirSync(path.resolve(repoRoot, dataDir));
+  const owned = path.join(directory, 'child-owned');
+  const marker = path.join(directory, 'nested-ran');
+  const child = path.join(directory, 'child.test.ts');
+  fs.writeFileSync(child, `import test from 'node:test'; import assert from 'node:assert/strict'; import fs from 'node:fs';
+test('inherited environment', () => {
+  assert.equal(process.env.MEDIFLOW_DATA_DIR, ${JSON.stringify(dataDir)});
+  assert.equal(process.env.MEDIFLOW_RUNNER_SENTINEL, 'synthetic');
+  fs.mkdirSync(${JSON.stringify(owned)});
+  fs.writeFileSync(${JSON.stringify(marker)}, 'ok');
+});
+test.after(() => fs.rmSync(${JSON.stringify(owned)}, { recursive: true, force: true }));`);
+  const outer = path.join(directory, 'outer.test.ts');
+  fs.writeFileSync(outer, `import test from 'node:test'; import assert from 'node:assert/strict'; import { spawnSync } from 'node:child_process';
+test('nested runner', () => {
+  const result = spawnSync(process.execPath, [${JSON.stringify(runnerPath)}, '--test', ${JSON.stringify(child)}], { env: process.env, encoding: 'utf8' });
+  assert.equal(result.status, 0, result.stderr + result.stdout);
+  assert.match(result.stdout, /tests 1/);
+});`);
+  const result = run(directory, ['--test', outer], { MEDIFLOW_DATA_DIR: dataDir, MEDIFLOW_RUNNER_SENTINEL: 'synthetic' });
+  assert.equal(result.status, 0, result.stderr + result.stdout);
+  assert.equal(fs.readFileSync(marker, 'utf8'), 'ok');
+  assert.equal(fs.existsSync(owned), false);
+  assert.equal(fs.existsSync(path.resolve(repoRoot, dataDir)), true);
+});
+
+test('failed target keeps exit status and runs fixture cleanup without deleting caller data', (t) => {
+  const directory = fixture(t);
+  const dataDir = path.join(directory, 'caller-owned');
+  fs.mkdirSync(dataDir);
+  const owned = path.join(directory, 'child-owned');
+  const target = path.join(directory, 'fail.test.ts');
+  fs.writeFileSync(target, `import test from 'node:test'; import fs from 'node:fs';
+fs.mkdirSync(${JSON.stringify(owned)});
+test.after(() => fs.rmSync(${JSON.stringify(owned)}, { recursive: true, force: true }));
+test('intentional fixture failure', () => { throw new Error('synthetic failure'); });`);
+  const result = run(directory, ['--test', target], { MEDIFLOW_DATA_DIR: dataDir });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(result.stdout, /synthetic failure/);
+  assert.equal(fs.existsSync(owned), false);
+  assert.equal(fs.existsSync(dataDir), true);
 });

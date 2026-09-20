@@ -16,7 +16,7 @@
       "path": "/api/v1/exemptions",
       "methods": ["GET", "POST", "DELETE"],
       "trackingIssue": "WUL-40",
-      "reason": "Exemption catalog operations are available to clients but not yet part of the current stable documented slice."
+      "reason": "Exemption catalog operations remain outside the stable documented slice. ADR 0127 / WUL-690: POST accepts a single manual record; arrays now return 400 EXEMPTION_IMPORT_PREVIEW_REQUIRED. Full imports require the authenticated web preview/commit protocol. GET and DELETE are unchanged."
     },
     {
       "path": "/api/v1/fse/validate-document",

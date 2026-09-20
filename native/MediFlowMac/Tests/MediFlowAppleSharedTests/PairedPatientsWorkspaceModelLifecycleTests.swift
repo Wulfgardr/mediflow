@@ -23,6 +23,112 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
         let vectors: Vectors
     }
 
+    /* @Codex: DOB is a nullable civil day, not an implicit default date. */
+    func testPatientBirthDateUntouchedOmitsAbsentAndExistingValues() async throws {
+        for original in [nil, ISO8601DateFormatter().date(from: "1980-02-29T16:30:00Z")] {
+            let patient = detail(id: "p1", archived: false, version: 4, birthDate: original)
+            let source = LifecycleMockDataSource(details: ["p1": patient])
+            let model = await makeModel(source: source)
+            await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: patient)
+            await model.startEditingPatient()
+            let editorDate = await model.editPatientBirthDate
+            XCTAssertEqual(editorDate, original)
+            await model.savePatient()
+            let update = await source.lastUpdate
+            let json = try encodedPatientUpdate(XCTUnwrap(update?.payload))
+            XCTAssertNil(json["birthDate"])
+            let reread = await model.selectedPatient?.birthDate
+            XCTAssertEqual(reread, original)
+        }
+    }
+
+    func testPatientBirthDateSetAndCorrectionEncodeUTCCivilDay() async throws {
+        // Equivalent picker instants expressed in opposite offsets must keep
+        // leap day; the control uses the same explicit Gregorian/UTC calendar.
+        for picked in ["2000-02-29T14:00:00+14:00", "2000-02-28T12:00:00-12:00"] {
+            let patient = detail(id: "p1", archived: false, version: 4)
+            let source = LifecycleMockDataSource(details: ["p1": patient])
+            let model = await makeModel(source: source)
+            await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: patient)
+            await model.startEditingPatient()
+            await MainActor.run {
+                model.editPatientBirthDate = ISO8601DateFormatter().date(from: picked)
+            }
+            await model.savePatient()
+            var update = await source.lastUpdate
+            var json = try encodedPatientUpdate(XCTUnwrap(update?.payload))
+            XCTAssertEqual(json["birthDate"] as? String, "2000-02-29T00:00:00Z")
+            await model.startEditingPatient()
+            await MainActor.run {
+                model.editPatientBirthDate = ISO8601DateFormatter().date(from: "2001-03-01T09:00:00Z")
+            }
+            await model.savePatient()
+            update = await source.lastUpdate
+            json = try encodedPatientUpdate(XCTUnwrap(update?.payload))
+            XCTAssertEqual(json["birthDate"] as? String, "2001-03-01T00:00:00Z")
+            XCTAssertEqual(json["version"] as? Int, 5)
+        }
+    }
+
+    func testPatientBirthDateExplicitRemovalEncodesNull() async throws {
+        let patient = detail(id: "p1", archived: false, version: 4,
+            birthDate: ISO8601DateFormatter().date(from: "1980-02-29T00:00:00Z"))
+        let source = LifecycleMockDataSource(details: ["p1": patient])
+        let model = await makeModel(source: source)
+        await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: patient)
+        await model.startEditingPatient()
+        await model.setPatientBirthDatePresent(false)
+        await model.savePatient()
+        let update = await source.lastUpdate
+        let json = try encodedPatientUpdate(XCTUnwrap(update?.payload))
+        XCTAssertTrue(json["birthDate"] is NSNull)
+        let reread = await model.selectedPatient?.birthDate
+        XCTAssertNil(reread)
+    }
+
+    func testPatientBirthDateFailureKeepsEditorAndOriginalVersion() async throws {
+        let patient = detail(id: "p1", archived: false, version: 4)
+        let conflict = await PairedPatientsWorkspaceModel.uiTestSeededConflict()
+        let source = LifecycleMockDataSource(details: ["p1": patient], updateError: .versionConflict(conflict))
+        let model = await makeModel(source: source)
+        await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: patient)
+        await model.startEditingPatient()
+        let picked = ISO8601DateFormatter().date(from: "2000-02-29T00:00:00Z")
+        await MainActor.run { model.editPatientBirthDate = picked }
+        await model.savePatient()
+        let state = await MainActor.run { (model.editPatientBirthDate, model.isEditingPatient, model.pendingConflict) }
+        XCTAssertEqual(state.0, picked)
+        XCTAssertTrue(state.1)
+        XCTAssertEqual(state.2, conflict)
+        let update = await source.lastUpdate
+        XCTAssertEqual(update?.payload.version, 4)
+    }
+
+    func testPatientBirthDateLockClearsEditorAndRejectsLateSave() async throws {
+        let patient = detail(id: "p1", archived: false, version: 4)
+        let gate = LifecycleLoadGate(["update"])
+        let source = LifecycleMockDataSource(details: ["p1": patient], loadGate: gate)
+        let model = await makeModel(source: source)
+        await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: patient)
+        await model.startEditingPatient()
+        await MainActor.run { model.editPatientBirthDate = ISO8601DateFormatter().date(from: "2000-02-29T00:00:00Z") }
+        let save = Task { await model.savePatient() }
+        await gate.wait(for: "update")
+        await model.lockSessionNow()
+        await gate.release("update")
+        await save.value
+        let state = await MainActor.run { (model.editPatientBirthDate, model.selectedPatient, model.isEditingPatient) }
+        XCTAssertNil(state.0)
+        XCTAssertNil(state.1)
+        XCTAssertFalse(state.2)
+    }
+
+    private func encodedPatientUpdate(_ payload: HomeBasePatientUpdatePayload) throws -> [String: Any] {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        return try XCTUnwrap(JSONSerialization.jsonObject(with: encoder.encode(payload)) as? [String: Any])
+    }
+
     /* @Codex */
     func testActiveListLoadRequestsAndDecryptsDiagnosisProjection() async throws {
         let raw = #"[{"code":"E11.9","description":"Diabete tipo 2"},{"code":"I10","description":"Ipertensione"}]"#
@@ -44,24 +150,181 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
         XCTAssertEqual(projectionRequests, [true])
     }
 
-    func testPatientArchiveUsesMinimalUpdatePayload() async throws {
+    /* @Codex */
+    func testPatientArchiveUsesOneSealedVersionedProfileUpdate() async throws {
+        for reason in ["assigned_mmg", "deceased", "other"] {
+            let active = detail(id: "p1", archived: false, version: 4)
+            let source = LifecycleMockDataSource(details: ["p1": active])
+            let model = await makeModel(source: source)
+            await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: active)
+            await MainActor.run {
+                model.startPatientArchive()
+                model.editPatientArchiveReason = reason
+                model.editPatientArchiveNote = reason == "other" ? "Trasferimento sintetico" : ""
+            }
+            let saved = await model.setSelectedPatientArchived(true)
+            XCTAssertTrue(saved)
+            let update = await source.lastUpdate
+            let json = try encodedPatientUpdate(XCTUnwrap(update?.payload))
+            XCTAssertEqual(Set(json.keys), reason == "other"
+                ? ["version", "isArchived", "archiveReason", "archiveNote"]
+                : ["version", "isArchived", "archiveReason"])
+            XCTAssertEqual(json["version"] as? Int, 4)
+            let sealedReason = try XCTUnwrap(json["archiveReason"] as? String)
+            XCTAssertTrue(sealedReason.hasPrefix(CryptoService.encPrefix))
+            XCTAssertEqual(PatientFieldCrypto.decryptStringField(sealedReason, masterKey: masterKey), reason)
+            let reread = await model.selectedPatient
+            XCTAssertEqual(reread?.isArchived, true)
+            XCTAssertEqual(reread?.archiveReason, reason)
+            XCTAssertEqual(reread?.archiveNote, reason == "other" ? "Trasferimento sintetico" : nil)
+            let projectionRequests = await source.includeDiagnosesRequests
+            XCTAssertEqual(projectionRequests, [true])
+        }
+    }
+
+    func testArchiveSheetAndPatientEditorShareRequiredReasonAndOtherNotePolicy() async throws {
+        for usesSheet in [true, false] {
+            let active = detail(id: "p1", archived: false, version: 4)
+            let source = LifecycleMockDataSource(details: ["p1": active])
+            let model = await makeModel(source: source)
+            await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: active)
+            await MainActor.run {
+                if usesSheet { model.startPatientArchive() } else {
+                    model.startEditingPatient()
+                    model.editPatientIsArchived = true
+                }
+            }
+            for reason in ["", "future_reason", "other"] {
+                await MainActor.run { model.editPatientArchiveReason = reason; model.editPatientArchiveNote = "  " }
+                if usesSheet { await model.setSelectedPatientArchived(true) } else { await model.savePatient() }
+                let update = await source.lastUpdate
+                XCTAssertNil(update, "missing/unknown reason or missing other note must not write")
+            }
+            await MainActor.run { model.editPatientArchiveNote = "Motivazione sintetica" }
+            if usesSheet { await model.setSelectedPatientArchived(true) } else { await model.savePatient() }
+            let update = await source.lastUpdate
+            XCTAssertEqual(update?.payload.isArchived, true)
+            let json = try encodedPatientUpdate(XCTUnwrap(update?.payload))
+            XCTAssertEqual(PatientFieldCrypto.decryptStringField(json["archiveNote"] as? String, masterKey: masterKey), "Motivazione sintetica")
+        }
+    }
+
+    func testUnchangedUnknownOrUnreadableArchiveFieldsAreOmittedDuringProfileEdit() async throws {
+        let locked = try XCTUnwrap(CryptoService.encryptField(CryptoService.jsonEncode("other")!,
+            masterKey: SymmetricKey(data: Data(repeating: 9, count: 32))))
+        for reason in ["future_reason", locked] {
+            let archived = detail(id: "p1", archived: true, version: 4, archiveReason: reason, archiveNote: reason)
+            let source = LifecycleMockDataSource(details: ["p1": archived])
+            let model = await makeModel(source: source)
+            await model.configurePairedOnlineForTests(masterKey: masterKey)
+            await model.loadPatient(summary(id: "p1", archived: true, version: 4))
+            await model.startEditingPatient()
+            let lockedFields = await model.lockedPatientFields
+            XCTAssertEqual(lockedFields.contains(.archiveReason), reason == locked)
+            XCTAssertEqual(lockedFields.contains(.archiveNote), reason == locked)
+            await model.savePatient()
+            let update = await source.lastUpdate
+            let json = try encodedPatientUpdate(XCTUnwrap(update?.payload))
+            XCTAssertNil(json["archiveReason"])
+            XCTAssertNil(json["archiveNote"])
+            XCTAssertNil(json["isArchived"], "unrelated edit must not replay the archive transition")
+            let raw = await source.storedDetail("p1")
+            XCTAssertEqual(raw?.archiveReason, reason)
+            XCTAssertEqual(raw?.archiveNote, reason)
+        }
+    }
+
+    func testArchiveReappearanceRetainsDraftAndBlocksAnIncomingNavigationIntent() async {
         let active = detail(id: "p1", archived: false, version: 4)
-        let source = LifecycleMockDataSource(details: ["p1": active])
-        let model = await makeModel(source: source)
-        await model.configurePairedOnlineForTests(selectedPatient: active)
+        let model = await makeModel(source: LifecycleMockDataSource(details: ["p1": active]))
+        await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: active)
+        await MainActor.run {
+            model.startPatientArchive()
+            model.editPatientArchiveReason = "other"
+            model.editPatientArchiveNote = "Bozza conservata alla riapertura"
+            model.startPatientArchive()
+            XCTAssertEqual(model.editPatientArchiveReason, "other")
+            XCTAssertEqual(model.editPatientArchiveNote, "Bozza conservata alla riapertura")
+            XCTAssertEqual(model.navigationAvailability, .busy)
+            model.cancelPatientArchive()
+            XCTAssertEqual(model.editPatientArchiveNote, "")
+            XCTAssertFalse(model.isEditingPatientArchive)
+        }
+    }
 
-        let canArchive = await model.canArchivePatient
-        XCTAssertTrue(canArchive)
-        await model.setSelectedPatientArchived(true)
+    func testArchiveConflictAndTransportFailureKeepSheetDraftOpen() async throws {
+        let conflict = await PairedPatientsWorkspaceModel.uiTestSeededConflict()
+        for error in [HomeBaseClientError.versionConflict(conflict), .httpStatus(500, "Synthetic failure")] {
+            let active = detail(id: "p1", archived: false, version: 4)
+            let source = LifecycleMockDataSource(details: ["p1": active], updateError: error)
+            let model = await makeModel(source: source)
+            await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: active)
+            await MainActor.run {
+                model.startPatientArchive()
+                model.editPatientArchiveReason = "other"
+                model.editPatientArchiveNote = "Conserva questo input"
+            }
+            let saved = await model.setSelectedPatientArchived(true)
+            XCTAssertFalse(saved)
+            let state = await MainActor.run {
+                (model.isEditingPatientArchive, model.editPatientArchiveReason, model.editPatientArchiveNote, model.selectedPatient?.version)
+            }
+            XCTAssertTrue(state.0)
+            XCTAssertEqual(state.1, "other")
+            XCTAssertEqual(state.2, "Conserva questo input")
+            XCTAssertEqual(state.3, 4)
+        }
+    }
 
-        let update = await source.lastUpdate
-        XCTAssertEqual(update?.patientId, "p1")
-        XCTAssertEqual(update?.payload.version, 4)
-        XCTAssertEqual(update?.payload.isArchived, true)
-        let isArchived = await model.selectedPatient?.isArchived
-        XCTAssertEqual(isArchived, true)
-        let projectionRequests = await source.includeDiagnosesRequests
-        XCTAssertEqual(projectionRequests, [true])
+    func testArchiveLockRejectsLateAcknowledgementAndRereadWithoutRestoringFields() async throws {
+        for suspension in ["update", "patient:1"] {
+            let active = detail(id: "p1", archived: false, version: 4)
+            let gate = LifecycleLoadGate([suspension])
+            let source = LifecycleMockDataSource(details: ["p1": active], loadGate: gate)
+            let model = await makeModel(source: source)
+            await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: active)
+            await MainActor.run {
+                model.startPatientArchive()
+                model.editPatientArchiveReason = "other"
+                model.editPatientArchiveNote = "Nota sintetica"
+            }
+            let save = Task { await model.setSelectedPatientArchived(true) }
+            await gate.wait(for: suspension)
+            await model.lockSessionNow()
+            await gate.release(suspension)
+            let saved = await save.value
+            XCTAssertFalse(saved)
+            let state = await MainActor.run {
+                (model.selectedPatient, model.editPatientArchiveReason, model.editPatientArchiveNote, model.isEditingPatientArchive)
+            }
+            XCTAssertNil(state.0)
+            XCTAssertEqual(state.1, "")
+            XCTAssertEqual(state.2, "")
+            XCTAssertFalse(state.3)
+        }
+    }
+
+    func testArchiveRevocationClearsTheDraftAndUnarchiveUsesExistingClearSemantics() async throws {
+        for revoked in [true, false] {
+            let archived = detail(id: "p1", archived: true, version: 4, archiveReason: "other", archiveNote: "Nota sintetica")
+            let source = LifecycleMockDataSource(details: ["p1": archived], updateError: revoked ? .httpStatus(401, "Unauthorized") : nil)
+            let model = await makeModel(source: source)
+            await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: archived)
+            await model.startPatientArchive()
+            let saved = await model.setSelectedPatientArchived(false)
+            XCTAssertEqual(saved, !revoked)
+            let state = await MainActor.run {
+                (model.selectedPatient, model.editPatientArchiveReason, model.editPatientArchiveNote, model.isEditingPatientArchive)
+            }
+            if revoked { XCTAssertNil(state.0) } else {
+                XCTAssertEqual(state.0?.isArchived, false)
+                XCTAssertNil(state.0?.archiveReason)
+                XCTAssertNil(state.0?.archiveNote)
+            }
+            XCTAssertEqual(state.1, "")
+            XCTAssertEqual(state.2, "")
+            XCTAssertFalse(state.3)
+        }
     }
 
     func testPatientUnarchiveGuardRequiresArchivedActivePatient() async {
@@ -119,6 +382,141 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
         XCTAssertEqual(patients.first?.deletionReason, "doppione")
     }
 
+    /* @Codex: non-cooperative completions at both create suspension points. */
+    func testCreatePatientRejectsLatePublicationAfterLifecycleChanges() async throws {
+        for stage in ["create", "create-list"] {
+            for transition in ["lock", "relogin", "cancel", "reopen", "dismiss", "task-cancel"] {
+                let gate = LifecycleLoadGate([stage])
+                let source = LifecycleMockDataSource(
+                    summaries: [summary(id: "stale-created", archived: false, version: 1)], loadGate: gate)
+                let model = await makeModel(source: source)
+                await model.configurePairedOnlineForTests(masterKey: masterKey)
+                await prepareCreateDraft(model)
+                let save = Task { await model.createPatient() }
+                await gate.wait(for: stage)
+                switch transition {
+                case "lock": await model.lockSessionNow()
+                case "relogin":
+                    await model.lockSessionNow()
+                    // Same credentials/cookie still constitute a new session epoch.
+                    await model.configurePairedOnlineForTests(masterKey: masterKey)
+                    await prepareCreateDraft(model)
+                case "cancel": await model.cancelCreatingPatient()
+                case "dismiss": await MainActor.run { model.isCreatingPatient = false }
+                case "reopen":
+                    await model.cancelCreatingPatient()
+                    await prepareCreateDraft(model)
+                default: save.cancel()
+                }
+                let before = await MainActor.run {
+                    (model.patients.map(\.id), model.isCreatingPatient,
+                     model.newPatientFirstName, model.statusMessage, model.errorMessage)
+                }
+                await gate.release(stage)
+                await save.value
+                let after = await MainActor.run {
+                    (model.patients.map(\.id), model.isCreatingPatient,
+                     model.newPatientFirstName, model.statusMessage, model.errorMessage)
+                }
+                let context = "\(stage): \(transition)"
+                XCTAssertEqual(after.0, before.0, context)
+                XCTAssertEqual(after.1, before.1, context)
+                XCTAssertEqual(after.2, before.2, context)
+                XCTAssertEqual(after.3, before.3, context)
+                XCTAssertEqual(after.4, before.4, context)
+                let reads = await source.includeDiagnosesRequests
+                XCTAssertEqual(reads.count, stage == "create" ? 0 : 1, context)
+            }
+        }
+    }
+
+    func testCreatePatientKeepsLaterManualDraftEditsAtBothSuspensions() async throws {
+        for stage in ["create", "create-list"] {
+            let gate = LifecycleLoadGate([stage])
+            let source = LifecycleMockDataSource(
+                summaries: [summary(id: "created", archived: false, version: 1)], loadGate: gate)
+            let model = await makeModel(source: source)
+            await model.configurePairedOnlineForTests(masterKey: masterKey)
+            await prepareCreateDraft(model)
+            let save = Task { await model.createPatient() }
+            await gate.wait(for: stage)
+            await MainActor.run { model.newPatientPhone = "Updated synthetic draft" }
+            await gate.release(stage)
+            await save.value
+            let state = await MainActor.run {
+                (model.isCreatingPatient, model.newPatientPhone, model.patients.map(\.id), model.statusMessage)
+            }
+            XCTAssertTrue(state.0)
+            XCTAssertEqual(state.1, "Updated synthetic draft")
+            XCTAssertEqual(state.2, ["created"])
+            let message = try XCTUnwrap(state.3)
+            XCTAssertTrue(message.contains("non sono state salvate"))
+            let payload = await source.lastCreate
+            XCTAssertNil(payload?.phone, "later edit must not alter the submitted snapshot")
+        }
+    }
+
+    func testCreatePatientLateFailureDoesNotOverwriteReopenedForm() async throws {
+        let gate = LifecycleLoadGate(["create"])
+        let source = LifecycleMockDataSource(createError: .httpStatus(500, "Synthetic failure"), loadGate: gate)
+        let model = await makeModel(source: source)
+        await model.configurePairedOnlineForTests(masterKey: masterKey)
+        await prepareCreateDraft(model)
+        let save = Task { await model.createPatient() }
+        await gate.wait(for: "create")
+        await model.cancelCreatingPatient()
+        await prepareCreateDraft(model)
+        let status = await model.statusMessage
+        await gate.release("create")
+        await save.value
+        let state = await MainActor.run { (model.isCreatingPatient, model.statusMessage, model.errorMessage) }
+        XCTAssertTrue(state.0)
+        XCTAssertEqual(state.1, status)
+        XCTAssertNil(state.2)
+    }
+
+    func testCreatePatientCurrentFailureRetainsManualDraft() async throws {
+        let source = LifecycleMockDataSource(createError: .httpStatus(500, "Synthetic failure"))
+        let model = await makeModel(source: source)
+        await model.configurePairedOnlineForTests(masterKey: masterKey)
+        await prepareCreateDraft(model)
+        await model.createPatient()
+        let state = await MainActor.run { (model.isCreatingPatient, model.newPatientFirstName, model.errorMessage) }
+        XCTAssertTrue(state.0)
+        XCTAssertEqual(state.1, "Synthetic")
+        XCTAssertNotNil(state.2)
+    }
+
+    /* @Codex */
+    func testCreatePatientRefreshFailureClosesOnlyTheSavedDraft() async throws {
+        for editDuringRefresh in [false, true] {
+            let gate = LifecycleLoadGate(["create-list"])
+            let source = LifecycleMockDataSource(createListError: .httpStatus(500, "Synthetic refresh failure"), loadGate: gate)
+            let model = await makeModel(source: source)
+            await model.configurePairedOnlineForTests(masterKey: masterKey)
+            await prepareCreateDraft(model)
+            let save = Task { await model.createPatient() }
+            await gate.wait(for: "create-list")
+            if editDuringRefresh {
+                await MainActor.run { model.newPatientPhone = "Later draft" }
+            }
+            await gate.release("create-list")
+            await save.value
+            let state = await MainActor.run { (model.isCreatingPatient, model.errorMessage, model.newPatientPhone) }
+            XCTAssertEqual(state.0, editDuringRefresh)
+            XCTAssertNotNil(state.1)
+            XCTAssertEqual(state.2, editDuringRefresh ? "Later draft" : "")
+        }
+    }
+
+    @MainActor
+    private func prepareCreateDraft(_ model: PairedPatientsWorkspaceModel) {
+        model.startCreatingPatient()
+        model.newPatientFirstName = "Synthetic"
+        model.newPatientLastName = "Create fixture"
+        model.newPatientTaxCode = "SYNTHETIC-CREATE"
+    }
+
     func testCreatePatientSealsSensitiveFieldsBeforeLeavingTheModel() async throws {
         // Regressione review Wave 2b: il boundary rifiuta con 400 i campi sensibili
         // non ENC:, quindi il model deve sigillarli prima di costruire il payload.
@@ -137,6 +535,10 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
 
         await model.createPatient()
 
+        let success = await MainActor.run { (model.isCreatingPatient, model.statusMessage, model.errorMessage) }
+        XCTAssertFalse(success.0)
+        XCTAssertEqual(success.1, "Paziente creato sull'home-base (id created).")
+        XCTAssertNil(success.2)
         let capturedCreate = await source.lastCreate
         let payload = try XCTUnwrap(capturedCreate)
         XCTAssertEqual(payload.firstName, "Ada")
@@ -267,6 +669,25 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
     }
 
     /* @Codex */
+    func testNativeConfigurationConnectionNeedsLoginButNotPatientReadAndClearsOnLock() async {
+        let source = LifecycleMockDataSource(loginResult: HomeBaseLoginResult(
+            sessionCookie: "mediflow_session=synthetic-native", encryptedMasterKey: nil, salt: nil, id: "synthetic-admin"))
+        let model = await makeModel(source: source)
+        await MainActor.run {
+            XCTAssertNil(model.nativeOperatorConnection)
+            model.password = String(repeating: "2", count: 4); model.pairedClientId = "synthetic-mac"; model.pairedClientToken = "synthetic-token"
+        }
+        await model.login()
+        await MainActor.run {
+            XCTAssertNotNil(model.nativeOperatorConnection)
+            XCTAssertNil(model.clinicalWorkspaceConnection, "Clinical writers retain their existing pairedOnline gate")
+            XCTAssertEqual(model.connectionState, .notLoaded)
+        }
+        await model.lockSessionNow()
+        await MainActor.run { XCTAssertNil(model.nativeOperatorConnection) }
+    }
+
+    /* @Codex */
     func testLateLoginAfterPairingClearCannotRestoreOperatorState() async {
         let gate = LifecycleLoadGate(["login:1"])
         let source = LifecycleMockDataSource(
@@ -368,8 +789,8 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
             await gate.wait(for: "login:1")
             await model.login()
             await gate.release("login:1"); await older.value
-            await model.changePin(currentPin: pin, newPin: "2222")
             let identity = await model.operatorIdentity?.userId
+            await model.changePin(currentPin: pin, newPin: "2222")
             let loginCalls = await source.loginCalls
             let logoutCalls = await source.logoutCalls
             let pinChangeCalls = await source.pinChangeCalls
@@ -554,6 +975,45 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
         try await assertGoldenFixtureUnlockAndRotation(version: 2)
     }
 
+    // @Codex: ADR 0106 retires local clinical authority after confirmed rotation.
+    func testChangePinSuccessClearsSessionPresentationAndRequiresExplicitLogin() async {
+        let source = LifecycleMockDataSource()
+        let patient = detail(id: "p1", archived: false, version: 4)
+        let model = await makeModel(source: source)
+        await model.configurePairedOnlineForTests(
+            operatorId: "synthetic-operator", masterKey: masterKey,
+            patients: [summary(id: "p1", archived: false, version: 4)], selectedPatient: patient)
+        await MainActor.run {
+            model.newEntryTitle = "Synthetic unsaved note"
+            model.newEntryVisitTranscript = "Synthetic transcript"
+            model.newTherapyDrugName = "Synthetic therapy"
+            model.password = String(repeating: "1", count: 4)
+        }
+        await model.changePin(currentPin: "1357", newPin: "2468")
+        await MainActor.run {
+            XCTAssertEqual(model.connectionState, .sessionExpired)
+            XCTAssertNil(model.clinicalWorkspaceConnection)
+            XCTAssertNil(model.operatorIdentity)
+            XCTAssertNil(model.selectedPatient)
+            XCTAssertTrue(model.patients.isEmpty)
+            XCTAssertTrue(model.newEntryTitle.isEmpty)
+            XCTAssertTrue(model.newEntryVisitTranscript.isEmpty)
+            XCTAssertTrue(model.newTherapyDrugName.isEmpty)
+            XCTAssertTrue(model.password.isEmpty)
+            XCTAssertEqual(model.statusMessage, "PIN aggiornato. Accedi di nuovo con il nuovo PIN.")
+            XCTAssertEqual(model.pairedClientId, "test-client")
+            XCTAssertEqual(model.pairedClientToken, "test-token")
+        }
+        // No implicit login/logout; the retired key cannot authorize another rotation.
+        await model.changePin(currentPin: "2468", newPin: "8642")
+        let calls = await source.pinChangeCalls
+        let logins = await source.loginCalls
+        let logouts = await source.logoutCalls
+        XCTAssertEqual(calls.count, 1)
+        XCTAssertEqual(logins, 0)
+        XCTAssertEqual(logouts, 0)
+    }
+
     func testChangePinFailsClosedWithoutMasterKey() async {
         let source = LifecycleMockDataSource()
         let model = await makeModel(source: source)
@@ -568,6 +1028,89 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
             errorMessage,
             "Cifratura non disponibile: riaccedi con il PIN operatore prima di cambiarlo."
         )
+    }
+
+    // @Codex: a 409 can follow the credential CAS when retirement is unconfirmed.
+    func testChangePinAmbiguousOutcomesClearSessionAndDraftsWithoutRetry() async {
+        let errors: [HomeBaseClientError] = [
+            .transport(.timeout), .transport(.unreachable), .contract,
+            .httpStatus(409, "Retirement unconfirmed"), .httpStatus(500, nil)
+        ]
+        for error in errors {
+            let source = LifecycleMockDataSource(pinChangeError: error)
+            let model = await makeModel(source: source)
+            await model.configurePairedOnlineForTests(
+                operatorId: "synthetic-operator", masterKey: masterKey,
+                selectedPatient: detail(id: "p1", archived: false, version: 4))
+            await MainActor.run { model.newEntryTitle = "Synthetic draft" }
+            await model.changePin(currentPin: "1357", newPin: "2468")
+            await MainActor.run {
+                XCTAssertEqual(model.connectionState, .sessionExpired, "\(error)")
+                XCTAssertNil(model.clinicalWorkspaceConnection)
+                XCTAssertNil(model.selectedPatient)
+                XCTAssertNil(model.operatorIdentity)
+                XCTAssertTrue(model.newEntryTitle.isEmpty)
+                XCTAssertEqual(model.statusMessage,
+                    "Esito del cambio PIN non confermato. Sessione bloccata: accedi di nuovo.")
+                XCTAssertNil(model.errorMessage)
+            }
+            await model.changePin(currentPin: "1357", newPin: "8642")
+            let calls = await source.pinChangeCalls
+            XCTAssertEqual(calls.count, 1)
+        }
+    }
+
+    func testChangePinCancellationAfterDispatchClearsLocalAuthority() async {
+        let source = LifecycleMockDataSource(pinChangeCancelled: true)
+        let model = await makeModel(source: source)
+        await model.configurePairedOnlineForTests(masterKey: masterKey)
+        await model.changePin(currentPin: "1357", newPin: "2468")
+        let state = await model.connectionState
+        let connection = await model.clinicalWorkspaceConnection
+        XCTAssertEqual(state, .sessionExpired)
+        XCTAssertNil(connection)
+    }
+
+    func testLatePinSuccessOrFailureCannotClearNewerSession() async {
+        for error: HomeBaseClientError? in [nil, .transport(.timeout), .httpStatus(401, "stale")] {
+            let gate = LifecycleLoadGate(["pin:1"])
+            let source = LifecycleMockDataSource(pinChangeError: error, loadGate: gate)
+            let model = await makeModel(source: source)
+            await model.configurePairedOnlineForTests(masterKey: masterKey)
+            let rotation = Task { await model.changePin(currentPin: "1357", newPin: "2468") }
+            await gate.wait(for: "pin:1")
+            await model.lockSessionNow()
+            await model.configurePairedOnlineForTests(
+                sessionCookie: "sid=new", operatorId: "new-operator", masterKey: masterKey,
+                selectedPatient: detail(id: "new-patient", archived: false, version: 1))
+            await MainActor.run { model.newEntryTitle = "New session draft" }
+            let newerSessionStatus = await model.statusMessage
+            await gate.release("pin:1")
+            await rotation.value
+            await MainActor.run {
+                XCTAssertEqual(model.connectionState, .pairedOnline)
+                XCTAssertNotNil(model.clinicalWorkspaceConnection)
+                XCTAssertEqual(model.operatorIdentity?.userId, "new-operator")
+                XCTAssertEqual(model.selectedPatient?.id, "new-patient")
+                XCTAssertEqual(model.newEntryTitle, "New session draft")
+                XCTAssertEqual(model.statusMessage, newerSessionStatus)
+                XCTAssertNil(model.errorMessage)
+            }
+        }
+    }
+
+    func testPinValidationBeforeDispatchPreservesSessionAndDraft() async {
+        let source = LifecycleMockDataSource()
+        let model = await makeModel(source: source)
+        await model.configurePairedOnlineForTests(masterKey: masterKey)
+        await MainActor.run { model.newEntryTitle = "Synthetic draft" }
+        await model.changePin(currentPin: "1357", newPin: "1357")
+        let calls = await source.pinChangeCalls
+        let connection = await model.clinicalWorkspaceConnection
+        let title = await model.newEntryTitle
+        XCTAssertTrue(calls.isEmpty)
+        XCTAssertNotNil(connection)
+        XCTAssertEqual(title, "Synthetic draft")
     }
 
     func testChangePinSurfacesDedicatedConflictWithoutReplacingMasterKey() async throws {
@@ -699,24 +1242,13 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
         XCTAssertEqual(rotatedSalt.count, 16)
         XCTAssertEqual(rotatedBytes, data(hex: fixture.inputs.rawMasterKeyHex))
 
-        if version == 1 {
-            // The first call returned success. A second rotation proves the model
-            // retained the same in-memory master key instead of re-deriving it.
-            await model.changePin(currentPin: "2468", newPin: "8642")
-            let callsAfterSuccess = await source.pinChangeCalls
-            let secondCall = try XCTUnwrap(callsAfterSuccess.last)
-            XCTAssertEqual(callsAfterSuccess.count, 2)
-            let secondSalt = try XCTUnwrap(Data(base64Encoded: secondCall.salt))
-            let secondMasterKey = try XCTUnwrap(CryptoService.unwrapMasterKeyVersioned(
-                blob: secondCall.encryptedMasterKey,
-                pin: secondCall.newPin,
-                salt: secondSalt
-            ))
-            XCTAssertEqual(
-                secondMasterKey.withUnsafeBytes { Data($0) },
-                data(hex: fixture.inputs.rawMasterKeyHex)
-            )
-        }
+        // @Codex: cryptographic bytes are preserved on the host; local access is
+        // retired and a second mutation requires a new explicit login (ADR 0106).
+        await model.changePin(currentPin: "2468", newPin: "8642")
+        let callsAfterSuccess = await source.pinChangeCalls
+        let connection = await model.clinicalWorkspaceConnection
+        XCTAssertEqual(callsAfterSuccess.count, 1)
+        XCTAssertNil(connection)
     }
 
     private func loadCryptoFixture(version: Int) throws -> CryptoFixture {
@@ -793,13 +1325,16 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
         archived: Bool,
         version: Int,
         deleted: Bool = false,
-        encryptedValue: String? = nil
+        encryptedValue: String? = nil,
+        birthDate: Date? = nil,
+        archiveReason: String? = nil,
+        archiveNote: String? = nil
     ) -> HomeBasePatientDetail {
         HomeBasePatientDetail(
             id: id,
             firstName: "Mario",
             lastName: "Rossi",
-            birthDate: nil,
+            birthDate: birthDate,
             taxCode: "RSSMRA80A01H501U",
             address: encryptedValue,
             phone: encryptedValue,
@@ -818,7 +1353,8 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
             createdAt: nil,
             updatedAt: Date(timeIntervalSince1970: 1_750_000_000),
             deletedAt: deleted ? Date(timeIntervalSince1970: 1_750_000_100) : nil,
-            deletionReason: deleted ? "web-delete" : nil
+            deletionReason: deleted ? "web-delete" : nil,
+            archiveReason: archiveReason, archiveNote: archiveNote
         )
     }
 
@@ -891,8 +1427,12 @@ private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
     private var revisionFetchCount = 0
     private let loginResults: [HomeBaseLoginResult]
     private let pinChangeError: HomeBaseClientError?
+    private let pinChangeCancelled: Bool // @Codex
     private let loginErrors: [HomeBaseClientError?]
     private let logoutError: HomeBaseClientError?
+    private let updateError: HomeBaseClientError? // @Codex
+    private let createError: HomeBaseClientError? // @Codex
+    private let createListError: HomeBaseClientError? // @Codex
     private(set) var lastUpdate: UpdateCall?
     private(set) var lastCreate: HomeBasePatientCreatePayload?
     private(set) var lastSoftDelete: DeleteCall?
@@ -911,7 +1451,11 @@ private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
         loginResults: [HomeBaseLoginResult] = [],
         loginErrors: [HomeBaseClientError?] = [],
         pinChangeError: HomeBaseClientError? = nil,
+        pinChangeCancelled: Bool = false, // @Codex
         logoutError: HomeBaseClientError? = nil,
+        updateError: HomeBaseClientError? = nil, // @Codex
+        createError: HomeBaseClientError? = nil, // @Codex
+        createListError: HomeBaseClientError? = nil, // @Codex
         loadGate: LifecycleLoadGate? = nil,
         entriesByPatient: [String: [HomeBaseEntrySummary]] = [:],
         entryErrorsByPatient: [String: HomeBaseClientError] = [:],
@@ -924,7 +1468,11 @@ private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
         self.loginResults = loginResults.isEmpty ? [loginResult] : loginResults
         self.loginErrors = loginErrors
         self.pinChangeError = pinChangeError
+        self.pinChangeCancelled = pinChangeCancelled // @Codex
         self.logoutError = logoutError
+        self.updateError = updateError // @Codex
+        self.createError = createError // @Codex
+        self.createListError = createListError // @Codex
         self.loadGate = loadGate
         self.entriesByPatient = entriesByPatient
         self.entryErrorsByPatient = entryErrorsByPatient
@@ -968,6 +1516,7 @@ private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
             salt: salt
         ))
         await loadGate?.pause("pin:\(pinChangeCalls.count)")
+        if pinChangeCancelled { throw CancellationError() } // @Codex
         if let pinChangeError { throw pinChangeError }
         return HomeBaseMutationAcknowledgement(success: true)
     }
@@ -1032,6 +1581,8 @@ private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
         includeDiagnoses: Bool
     ) async throws -> [HomeBasePatientSummary] {
         includeDiagnosesRequests.append(includeDiagnoses)
+        await loadGate?.pause("create-list") // @Codex
+        if let createListError { throw createListError } // @Codex
         return try await fetchPatients(
             credentials: credentials, sessionCookie: sessionCookie,
             ambulatoryId: ambulatoryId, includeDeleted: false)
@@ -1108,6 +1659,7 @@ private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
     }
 
     func setDetail(_ detail: HomeBasePatientDetail) { details[detail.id] = detail }
+    func storedDetail(_ id: String) -> HomeBasePatientDetail? { details[id] } // @Codex
 
     func updatePatient(
         patientId: String,
@@ -1117,12 +1669,27 @@ private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
         ambulatoryId: String?
     ) async throws -> HomeBaseMutationAcknowledgement {
         lastUpdate = UpdateCall(patientId: patientId, payload: payload)
+        await loadGate?.pause("update") // @Codex
+        if let updateError { throw updateError }
         guard let current = details[patientId] else { throw HomeBaseClientError.httpStatus(404, "Not found") }
+        let birthDate: Date? // @Codex
+        switch payload.birthDate {
+        case .omit: birthDate = current.birthDate
+        case .null: birthDate = nil
+        case .value(let value): birthDate = value
+        }
+        func applying(_ patch: PatchValue<String>, to original: String?) -> String? {
+            switch patch {
+            case .omit: return original
+            case .null: return nil
+            case .value(let value): return value
+            }
+        }
         let updated = HomeBasePatientDetail(
             id: current.id,
             firstName: current.firstName,
             lastName: current.lastName,
-            birthDate: current.birthDate,
+            birthDate: birthDate,
             taxCode: current.taxCode,
             address: current.address,
             phone: current.phone,
@@ -1141,7 +1708,9 @@ private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
             createdAt: current.createdAt,
             updatedAt: Date(timeIntervalSince1970: 1_750_000_200),
             deletedAt: current.deletedAt,
-            deletionReason: current.deletionReason
+            deletionReason: current.deletionReason,
+            archiveReason: payload.isArchived == false ? nil : applying(payload.archiveReason, to: current.archiveReason),
+            archiveNote: payload.isArchived == false ? nil : applying(payload.archiveNote, to: current.archiveNote)
         )
         details[patientId] = updated
         summaries = summaries.map { summary in
@@ -1171,6 +1740,8 @@ private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
         ambulatoryId: String?
     ) async throws -> HomeBaseCreatedResource {
         lastCreate = payload
+        await loadGate?.pause("create") // @Codex
+        if let createError { throw createError } // @Codex
         return HomeBaseCreatedResource(id: "created", version: 1)
     }
 

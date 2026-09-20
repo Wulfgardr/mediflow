@@ -67,7 +67,7 @@ export async function createWebAttachment(
                 documentFreshnessEpoch: currentness.freshnessEpoch,
             }).run();
             return 'created';
-        });
+        }, { behavior: 'immediate' });
         if (created === 'missing') return NextResponse.json({ error: 'Patient not found' }, { status: 404 });
         return NextResponse.json({ id }, { status: 201 });
     } catch {

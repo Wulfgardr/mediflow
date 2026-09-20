@@ -10,11 +10,13 @@
    lib/observation-range via la pagina). undefined = caricamento, [] / null =
    dato vero assente (stato onesto). */
 
+import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
 import { Minus, TrendingDown, TrendingUp } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import type { Diagnosis } from '@/lib/db';
 import styles from '@/components/kree8/kree8-workspace-shell.module.css';
+import reading from './twin-synoptic-sheet.module.css';
 
 export interface SynopticTherapyLine {
     id: string;
@@ -46,6 +48,9 @@ export interface SynopticSignal {
 }
 
 export interface PatientSynopticSheetProps {
+    /* @Codex WUL-678: clinical proposals live inside the actual summary destination. */
+    clinicalSupport?: ReactNode;
+    notes?: string;
     leadDiagnosis?: Diagnosis;
     otherProblemsCount: number;
     signals: SynopticSignal[];
@@ -60,7 +65,7 @@ export interface PatientSynopticSheetProps {
 
 const SIGNAL_TONE: Record<NonNullable<SynopticSignal['tone']>, string> = {
     neutral: 'text-[color:var(--lume-ink)]',
-    warning: 'text-[color:var(--lume-signal-warning)]',
+    warning: styles.synopticWarning,
     critical: 'text-[color:var(--lume-signal-critical)]',
 };
 
@@ -85,6 +90,8 @@ function MicroLabel({ children }: { children: ReactNode }) {
 }
 
 export function PatientSynopticSheet({
+    clinicalSupport,
+    notes,
     leadDiagnosis,
     otherProblemsCount,
     signals,
@@ -94,14 +101,47 @@ export function PatientSynopticSheet({
     nextCheckupLabel,
     nextCheckupTitle,
 }: PatientSynopticSheetProps) {
+    const { proposal, composition } = useRuntimeTwinDesign();
     const visibleTherapies = therapies ? therapies.slice(0, THERAPY_CAP) : [];
     const extraTherapies = therapiesTotal !== undefined ? therapiesTotal - visibleTherapies.length : 0;
+
+    /* @Codex: a selective reading surface uses only supplied records. Absent
+       secondary modules stay in navigation; no empty specialist cards. */
+    if (proposal) return (
+      <section id="quadro" aria-label="Riepilogo clinico" className={reading.sheet} data-layout={composition}>
+        <div className={reading.main}>
+          <div className={reading.problem}>
+            <div className={reading.sectionHead}><h2>Quadro clinico</h2><a href="#clinica">Diagnosi</a></div>
+            {leadDiagnosis ? <><p className={reading.diagnosis}>{leadDiagnosis.description || leadDiagnosis.code}</p><p className={reading.meta}>{[leadDiagnosis.code, leadDiagnosis.system, otherProblemsCount > 0 ? `altre ${otherProblemsCount} diagnosi` : null].filter(Boolean).join(' · ')}</p></>
+              : <p className={reading.muted}>Diagnosi non registrata. <a href="#clinica">Consulta le diagnosi</a></p>}
+            {notes?.trim() ? <div className={reading.notes}><h3>Note in cartella</h3><p>{notes.length > 320 ? `${notes.slice(0, 320).trimEnd()}…` : notes}</p>{notes.length > 320 ? <details><summary>Leggi la nota completa</summary><p>{notes}</p></details> : null}</div> : null}
+          </div>
+          {therapies === undefined || visibleTherapies.length > 0 ? <div className={reading.therapies}>
+            <div className={reading.sectionHead}><h2>Terapie attive <span className={reading.count}>{therapiesTotal ?? ''}</span></h2><a href="#terapie">Gestisci</a></div>
+            {therapies === undefined ? <SkeletonLines rows={2} /> : <ul>{visibleTherapies.map(therapy => <li key={therapy.id}><strong>{therapy.drugName}</strong><span>{therapy.dosage || 'Posologia non registrata'}</span></li>)}</ul>}
+            {extraTherapies > 0 ? <a href="#terapie" className={reading.more}>Vedi tutte le {therapiesTotal} terapie</a> : null}
+          </div> : null}
+          {clinicalSupport}
+        </div>
+        <aside className={reading.context} aria-label="Contesto della cartella">
+          {signals.filter(signal => Number(signal.value) !== 0 && signal.label !== 'Da rivedere').map(signal => <div className={reading.fact} key={signal.label}><span>{signal.label}</span>{signal.href ? <a href={signal.href} className={SIGNAL_TONE[signal.tone ?? 'neutral']}>{signal.value}</a> : <strong>{signal.value}</strong>}</div>)}
+          {latestMeasure ? <div className={reading.measure}>
+            <div className={reading.sectionHead}><h3>Ultima misura</h3><a href="#parametri">Apri</a></div>
+            <p>{latestMeasure.display}</p><strong className={latestMeasure.outOfRange ? 'text-[color:var(--lume-signal-critical)]' : undefined}>{latestMeasure.valueLabel}{latestMeasure.outOfRange ? ` · ${latestMeasure.outOfRange}` : ''}</strong>
+            <span>{latestMeasure.dateLabel}</span>
+            {latestMeasure.delta ? <small>{latestMeasure.delta.direction === 'up' ? 'In aumento' : latestMeasure.delta.direction === 'down' ? 'In calo' : 'Stabile'} · {latestMeasure.delta.label} {latestMeasure.delta.sinceLabel}</small> : null}
+          </div> : null}
+          {nextCheckupLabel ? <div className={reading.followup}><h3>Controllo pianificato</h3><a href="#follow-up">{nextCheckupLabel}</a>{nextCheckupTitle ? <p>{nextCheckupTitle}</p> : null}</div> : null}
+        </aside>
+      </section>
+    );
 
     return (
         <section id="quadro" aria-labelledby="synoptic-title" className={styles.synoptic}>
             <div className="mb-4">
                 <p className={styles.sectionLabel}>Quadro clinico</p>
-                <h2 id="synoptic-title" className={styles.sectionTitle}>Baseline e dati verificabili</h2>
+                <h2 id="synoptic-title" className={styles.sectionTitle}>{proposal ? 'Quadro clinico' : 'Baseline e dati verificabili'}</h2>
+                {proposal ? <div className={styles.synopticNotes}><strong>Note in cartella</strong><p>{notes?.trim() || 'Nessuna nota generale registrata.'}</p></div> : null}
             </div>
 
             {/* Problema guida (prima diagnosi di qualunque sistema) */}
@@ -227,7 +267,7 @@ export function PatientSynopticSheet({
                         </a>
                         {nextCheckupLabel ? (
                             <div className={styles.synopticMeasure}>
-                                <span className="lume-registro text-[13px] font-semibold text-[color:var(--lume-signal-warning)]" data-testid="lume-register-value">{nextCheckupLabel}</span>
+                                <span className={`lume-registro text-[13px] font-semibold ${styles.synopticWarning}`} data-testid="lume-register-value">{nextCheckupLabel}</span>
                                 {nextCheckupTitle ? <span className={styles.synopticDetailMeta}>{nextCheckupTitle}</span> : null}
                             </div>
                         ) : (
@@ -236,6 +276,7 @@ export function PatientSynopticSheet({
                     </div>
                 </div>
             </div>
+            {clinicalSupport}
         </section>
     );
 }

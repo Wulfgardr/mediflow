@@ -27,6 +27,33 @@
 .answer {
     min-width: 0;
 }
+/* @Codex WUL-676: one stable summary, with filters aligned to its first line. */
+:global(html[data-runtime-twin-design='proposal']) .focusSurface {
+    align-items: start;
+    grid-template-columns: minmax(0, 1.2fr) minmax(17rem, 0.8fr);
+    border-radius: 12px;
+    background: transparent;
+    padding: 24px;
+}
+:global(html[data-runtime-twin-design='proposal']) .filterField {
+    align-self: start;
+    border-left: 1px solid color-mix(in srgb, var(--lume-ink) 12%, transparent);
+    border-radius: 0;
+    background: transparent;
+    padding: 0 0 0 24px;
+}
+@media (max-width: 700px) {
+    :global(html[data-runtime-twin-design='proposal']) .focusSurface {
+        grid-template-columns: minmax(0, 1fr);
+        padding: 20px;
+        gap: 24px;
+    }
+    :global(html[data-runtime-twin-design='proposal']) .filterField {
+        border-left: 0;
+        border-top: 1px solid color-mix(in srgb, var(--lume-ink) 12%, transparent);
+        padding: 20px 0 0;
+    }
+}
 .answer h2 {
     max-width: 32ch;
     margin: 0.5rem 0 0;
@@ -296,4 +323,50 @@
     .progressFill {
         transition-duration: 0.01ms;
     }
+}
+
+/* @Codex WUL-676: every section starts on the same axis, including audit. */
+:global(html[data-runtime-twin-design='proposal']) .sectionHeading {
+    display: block;
+}
+:global(html[data-runtime-twin-design='proposal']) .sectionHeading h2,
+:global(html[data-runtime-twin-design='proposal']) .answer h2,
+:global(html[data-runtime-twin-design='proposal']) .filterField h2 {
+    margin: 0;
+    color: var(--lume-ink);
+    font-size: var(--twin-type-section);
+    font-weight: var(--twin-heading-weight);
+    line-height: var(--twin-heading-leading);
+    letter-spacing: -0.02em;
+    text-wrap: pretty;
+}
+:global(html[data-runtime-twin-design='proposal']) .sectionHeading div > p,
+:global(html[data-runtime-twin-design='proposal']) .mutedNote {
+    font-size: var(--twin-type-body);
+    line-height: var(--twin-body-leading);
+}
+:global(html[data-runtime-twin-design='proposal']) .primaryValue {
+    margin-top: 20px;
+    font-size: clamp(2.75rem, 5vw, 3.5rem);
+    line-height: 1.1;
+}
+:global(html[data-runtime-twin-design='proposal']) .filterField {
+    gap: 20px;
+}
+:global(html[data-runtime-twin-design='proposal']) .filterField label,
+:global(html[data-runtime-twin-design='proposal']) .filterField strong,
+:global(html[data-runtime-twin-design='proposal']) .compactField {
+    font-size: var(--twin-type-body);
+    line-height: var(--twin-body-leading);
+}
+:global(html[data-runtime-twin-design='proposal']) .filterField label {
+    font-weight: 500;
+}
+:global(html[data-runtime-twin-design='proposal']) .compactField select {
+    font-weight: 500;
+}
+:global(html[data-runtime-twin-design='proposal']) .dataTable th,
+:global(html[data-runtime-twin-design='proposal']) .chartDatum {
+    font-size: var(--twin-type-caption);
+    line-height: var(--twin-body-leading);
 }

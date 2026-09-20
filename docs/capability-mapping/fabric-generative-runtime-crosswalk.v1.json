@@ -1,6 +1,6 @@
 {
   "schema": "mediflow.ai.fabric-generative-runtime-crosswalk.v1",
-  "release": "0.8.5",
+  "release": "0.8.6",
   "integrationStatus": "local_source_integrated",
   "applyPolicy": "none",
   "claimCeiling": "local source runtime crosswalk for four review-only proposals; OCR unavailable; not release-ready, released, deployed, or authorized for clinical apply",
@@ -76,7 +76,7 @@
         "path": "components/patient-smart-import-fabric-preview-card.tsx",
         "requestBindingLiteral": "createSmartImportReviewBrowserController",
         "requiredLiterals": [
-          "Receipt",
+          "Modello usato:",
           "Provenienza",
           "preview.receipt",
           "preview.provenance"
@@ -90,7 +90,7 @@
       "productionRoot": "lib/ai-providers/fabric/document-synthesis-production-operation.ts",
       "productionRootLiterals": [
         "acquireDocumentSynthesisProductionOperation",
-        "composeAnyDocCurrentSourceExtraction",
+        "composeAnyDocCurrentSelectionClientProjectionExtraction",
         "createDocumentSynthesisFabricProductionComposition"
       ],
       "requestPath": {
@@ -110,7 +110,7 @@
       },
       "uiEvidence": {
         "path": "components/document-synthesis-fabric-review-card.tsx",
-        "requestBindingLiteral": "createDocumentSynthesisBrowserOrchestrator",
+        "requestBindingLiteral": "createDocumentSynthesisReviewBrowserController",
         "requiredLiterals": [
           "Receipt",
           "Provenienza",
@@ -163,5 +163,17 @@
         ]
       }
     }
-  ]
+  ],
+  "functionModelChoice": {
+    "contract": "docs/adr/0129-function-model-catalog-preferences.md",
+    "owner": "FunctionModelDispatch",
+    "mode": "sealed_catalog_option_only",
+    "requestHeader": "x-mediflow-function-model",
+    "requiredFields": [
+      "modelOptionId",
+      "expectedCatalogRevision"
+    ],
+    "providerAdmission": "host_cli_only",
+    "apply": "denied"
+  }
 }

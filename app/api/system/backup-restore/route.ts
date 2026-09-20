@@ -13,6 +13,9 @@ import {
     drugs,
     entries,
     exemptions,
+    exemptionImportReceipts,
+    prostheticsCatalogEntries,
+    prostheticsCatalogReceipts,
     headlessSoapActiveRoleAttestations,
     headlessSoapEntryCommits,
     messages,
@@ -85,6 +88,7 @@ function buildBackupDataset(): BackupDataset {
         const drugsRows = tx.select().from(drugs).all();
         const entriesRows = tx.select().from(entries).all();
         const exemptionsRows = tx.select().from(exemptions).all();
+        const exemptionImportReceiptRows = tx.select().from(exemptionImportReceipts).all();
         const messagesRows = tx.select().from(messages).all();
         const observationsRows = tx.select().from(observations).all();
         const patientsRows = tx.select().from(patients).all();
@@ -132,6 +136,9 @@ function buildBackupDataset(): BackupDataset {
             drugs: sortBackupRows(drugsRows),
             entries: sortBackupRows(filterRowsByReference(entriesRows, 'patientId', patientIds)),
             exemptions: sortBackupRows(exemptionsRows),
+            exemptionImportReceipts: exemptionImportReceiptRows,
+            prostheticsCatalogEntries: tx.select().from(prostheticsCatalogEntries).all(),
+            prostheticsCatalogReceipts: tx.select().from(prostheticsCatalogReceipts).all(),
             messages: sortBackupRows(filterRowsByReference(messagesRows, 'conversationId', conversationIds)),
             observations: sortBackupRows(filterRowsByReference(observationsRows, 'patientId', patientIds)),
             patients: sortBackupRows(enrichedPatients),

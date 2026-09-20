@@ -2,6 +2,7 @@
 
 /* @Codex */
 import { useEffect, useState } from 'react';
+import styles from './siss-workspace.module.css';
 /* @Codex */
 import { Accessibility, BadgePercent, ChevronDown, Copy, ExternalLink, FolderOpen, IdCard, ListChecks, LoaderCircle, Pill, RefreshCcw, Search, ShieldAlert, ShieldCheck, SquareMenu, Stethoscope } from 'lucide-react';
 /* @Codex */
@@ -516,10 +517,10 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode, emb
     );
 
     return (
-        <section className={embedded ? '' : 'patient-detail-section border p-5 md:p-6'}>
+        <section className={embedded ? styles.panel : `${styles.panel} patient-detail-section border p-5 md:p-6`}>
             {embedded ? (
                 <header className="mb-4 flex flex-wrap items-center justify-between gap-2">
-                    <p className="section-kicker">Apertura portali regionali</p>
+                    <p className={styles.caption}>L’atto regionale si svolge nel portale ufficiale.</p>
                     <div className="flex flex-wrap items-center gap-1.5">{contextChips}</div>
                 </header>
             ) : (
@@ -545,7 +546,69 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode, emb
                 </p>
             )}
 
-            <div className="mt-4 grid gap-3 lg:grid-cols-2">
+            <div className="mt-4">
+                <h3 className={styles.heading}>
+                    Apri un servizio
+                </h3>
+                <div className={styles.services}>
+                    {ACTIONS.map((item) => {
+                        const Icon = item.icon;
+                        const isLoading = activeAction === item.action;
+                        const state = summary.actionStates.find((actionState) => actionState.action === item.action);
+                        const disabled = Boolean(activeAction) || !state?.available;
+
+                        return (
+                            <button
+                                key={item.action}
+                                type="button"
+                                onClick={() => void startFlow(item.action)}
+                                disabled={disabled}
+                                className="siss-action-btn"
+                                title={item.caption}
+                            >
+                                {isLoading ? <LoaderCircle size={18} className="animate-spin" aria-hidden="true" /> : <Icon size={18} aria-hidden="true" />}
+                                <span>Apri {item.label}</span>
+                                <ExternalLink size={16} aria-hidden="true" />
+                            </button>
+                        );
+                    })}
+                </div>
+            </div>
+
+
+            {feedback && (
+                <div
+                    className={`mt-4 siss-feedback ${
+                        feedback.kind === 'success'
+                            ? 'siss-feedback-success'
+                            : feedback.kind === 'warning'
+                                ? 'siss-feedback-warning'
+                                : 'siss-feedback-error'
+                    }`}
+                    aria-live="polite"
+                >
+                    <div className="flex items-start gap-2">
+                        {feedback.kind === 'error' ? (
+                            <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
+                        ) : (
+                            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
+                        )}
+                        <div className="min-w-0 space-y-1">
+                            <p className="break-words">{feedback.message}</p>
+                            {feedback.correlationId && (
+                                <details className="text-[11px] opacity-70">
+                                    <summary className="cursor-pointer select-none">Dettagli tecnici</summary>
+                                    <p className="mt-1 break-all font-mono">Riferimento: {feedback.correlationId}</p>
+                                </details>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* @Codex: checks are separate from commands and exposed on warnings/errors. */}
+            <details className={styles.disclosure} open={Boolean(validation?.hasErrors || validation?.hasWarnings || fseReadiness.error) || undefined}>
+                <summary>Requisiti e controllo locale dei dati</summary>
+            <div className={styles.support}>
                 <div className="graphite-block">
                     <div className="flex items-center justify-between gap-2">
                         <h3 className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[color:var(--lume-ink-muted)]">
@@ -697,39 +760,9 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode, emb
                 </div>
             </div>
 
-            <div className="mt-4">
-                <h3 className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[color:var(--lume-ink-muted)]">
-                    Apri portale regionale
-                </h3>
-                <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-                    {ACTIONS.map((item) => {
-                        const Icon = item.icon;
-                        const isLoading = activeAction === item.action;
-                        const state = summary.actionStates.find((actionState) => actionState.action === item.action);
-                        const disabled = Boolean(activeAction) || !state?.available;
-
-                        return (
-                            <button
-                                key={item.action}
-                                type="button"
-                                onClick={() => void startFlow(item.action)}
-                                disabled={disabled}
-                                className="siss-action-btn"
-                                title={item.caption}
-                            >
-                                <div className="siss-action-btn-head">
-                                    {isLoading ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Icon className="h-4 w-4" />}
-                                    <span className="min-w-0 truncate">{item.label}</span>
-                                    <ExternalLink className="ml-auto h-3 w-3 text-[color:var(--lume-ink-muted)]" />
-                                </div>
-                                <p className="siss-action-btn-caption line-clamp-1">{item.caption}</p>
-                            </button>
-                        );
-                    })}
-                </div>
-            </div>
-
-            <div className="mt-4">
+            </details>
+            <details className={styles.disclosure}>
+                <summary>Dati da consultare o copiare nel portale</summary>
                 <h3 className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[color:var(--lume-ink-muted)]">
                     Contesto prescrittivo
                 </h3>
@@ -932,7 +965,7 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode, emb
                         )}
                     </div>
                 </div>
-            </div>
+            </details>
 
             <details className="group mt-4">
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-2 rounded-[10px] border border-[color:rgba(112,106,100,0.12)] bg-[color:rgba(255,252,247,0.78)] px-3 py-2 text-[12.5px] font-semibold text-[color:var(--lume-ink)] transition-colors hover:border-[color:color-mix(in_srgb,var(--lume-accent)_26%,transparent)] dark:border-[color:rgba(255,247,240,0.08)] dark:bg-white/4">
@@ -957,35 +990,7 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode, emb
                 </p>
             </details>
 
-            {feedback && (
-                <div
-                    className={`mt-4 siss-feedback ${
-                        feedback.kind === 'success'
-                            ? 'siss-feedback-success'
-                            : feedback.kind === 'warning'
-                                ? 'siss-feedback-warning'
-                                : 'siss-feedback-error'
-                    }`}
-                    aria-live="polite"
-                >
-                    <div className="flex items-start gap-2">
-                        {feedback.kind === 'error' ? (
-                            <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
-                        ) : (
-                            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
-                        )}
-                        <div className="min-w-0 space-y-1">
-                            <p className="break-words">{feedback.message}</p>
-                            {feedback.correlationId && (
-                                <details className="text-[11px] opacity-70">
-                                    <summary className="cursor-pointer select-none">Dettagli tecnici</summary>
-                                    <p className="mt-1 break-all font-mono">Riferimento: {feedback.correlationId}</p>
-                                </details>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            )}
+
         </section>
     );
 }

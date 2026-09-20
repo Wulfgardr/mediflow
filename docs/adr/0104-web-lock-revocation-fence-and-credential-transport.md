@@ -91,6 +91,21 @@ gia definita.
 
 ### Native e restart
 
+Emendamento 0.8.6, 6 settembre 2026: la route native adatta la richiesta
+Next.js in un `Request` standard contenente soltanto i due header paired.
+Il wrapper del framework non e una prova di authority: l'admission canonica
+continua ad autenticare il pairing persistito, emettere una capability opaca
+monouso e ricontrollare il pairing dopo la verifica del PIN. Nessun header di
+source surface o cookie Web seleziona l'autorita native.
+
+Le route paired risolvono la sessione native con un resolver dedicato: devono
+coincidere l'oggetto attivo del server, il pairing autenticato corrente e
+l'utente riletto dal database. `requireSession` resta esclusivamente Web P3;
+non accetta native, system o Web legacy. Il logout native ha un terminale
+distinto `/api/auth/native/logout`, che ritira solo quella sessione e non
+modifica cookie. Il profilo e il cambio PIN restano nella famiglia account
+condivisa, con risoluzione esplicita dei due canali senza sommarne le prove.
+
 P1 deve definire un routing/bootstrap native distinto. Durante una compatibilita
 transitoria, l'accettazione legacy puo accettare soltanto sessioni che il server
 ha gia marcato native e deve rifiutare sessioni Web legacy dopo il cutover.
@@ -100,6 +115,21 @@ Un restart globale revoca control, sessioni e idempotenza process-locali.
 Nessun record viene ricostruito, replicato o accettato da un altro processo.
 
 ### Addendum: owner fisico unico tra bundle Web
+
+Emendamento 0.8.6: anche l'implementazione delle sessioni native/system,
+inclusi tag, risorse, retirement e fence login, viene collocata nello stesso
+package CommonJS fisico, in una closure separata dall'owner Web P3. Gli
+export compatibili del precedente modulo server-only passano da un adapter
+senza stato alla namespace fissa `serverSessions` del solo root. Nessuna
+Map autorevole o fallback resta nell'adapter TypeScript; i vecchi percorsi
+Web P3 di quel modulo rimangono inerti come al cutover precedente. Non si
+introducono subpath pubblici o un secondo loader ESM.
+
+L'unico ponte fra i due owner e il retirement PIN descritto in ADR 0106:
+deriva l'utente da una preparazione native esatta e monouso. La namespace
+non modifica le ammissioni HTTP, le capability paired o le route Web
+riservate. Manifest, tarball immutabile, provenienza, lockfile e roster
+tracciato cambiano insieme; i tarball predecessori restano intatti.
 
 Il cutover di produzione deve collocare P2, P3, lifecycle guard, control store,
 session store, risorse e revoca in un solo modulo `server-only` caricato una
@@ -713,3 +743,24 @@ egress, push, PR, merge, tag o release.
 Claim ceiling: **decisione tecnica accettata, solo documentale, per un fence
 di revoca Web process-local e un trasporto bearer temporaneo; nessun runtime o
 integrazione native e consegnato.**
+
+
+### Successore 0.8.8: reclamazione delle risorse Web concluse
+
+Il successore locale `@mediflow/web-auth-lifecycle-owner@0.8.8` preserva API,
+proiezioni non canoniche, generazioni di autenticazione e semantica di revoca.
+Scollega dalle liste private i port rilasciati, gli use consumati e le
+registrazioni rimosse; il cleanup terminale elimina anche i riferimenti alle
+sessioni. Le risorse ancora attive restano collegate e revocabili. Non introduce
+una cache di proiezioni o autorita basata su ID pubblici.
+
+Il motivo concreto e il polling autenticato dei registry OpenAI: ogni richiesta
+risolve una nuova proiezione autentica e ne verifica la generazione con un port
+transitorio. Il servizio originale, il consenso e le scadenze restano associati
+alla stessa generazione. I record terminali non devono crescere con lo storico
+delle richieste.
+
+Si applica il packet atomico dell'addendum H6: predecessore 0.8.7 immutabile,
+doppio pack offline, provenienza dei byte, installazione fisica, pin e guard
+allineati. La versione del prodotto resta MediFlow 0.8.6. Questo aggiornamento
+non attesta una release o il collaudo della candidata Mac.

@@ -1,5 +1,6 @@
 /* @Codex */
 import assert from 'node:assert/strict';
+import profiles from '../../../scripts/anydoc-pdf-renderer-profiles.json' with { type: 'json' };
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
@@ -23,7 +24,8 @@ import {
 const sha256 = (bytes: Uint8Array | string) => createHash('sha256').update(bytes).digest('hex');
 const SOURCE_REF = 'a'.repeat(64);
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-const SUPPORTS_REAL_RENDERER = process.platform === 'darwin' && process.arch === 'arm64'
+const profile = profiles.find((entry) => entry.platform === process.platform && entry.arch === process.arch);
+const SUPPORTS_REAL_RENDERER = Boolean(profile)
     && process.versions.node.split('.')[0] === '24';
 const routing = (pageCount: number, pages: readonly number[]) => ({
     schemaVersion: 'mediflow.anydoc_page_routing.v1' as const, pages, pageCount,
@@ -110,7 +112,7 @@ test('renders only canonical needsOcr pages in stable order with bounded PHI-saf
         assert.equal(page.receipt.engine, 'pdfjs-dist'); assert.equal(page.receipt.engineVersion, '4.10.38');
         assert.equal(page.receipt.backend, '@napi-rs/canvas');
         assert.equal(page.receipt.backendVersion, '0.1.100');
-        assert.equal(page.receipt.backendProfile, '@napi-rs/canvas-darwin-arm64');
+        assert.equal(page.receipt.backendProfile, profile?.package);
         assert.ok(page.receipt.durationMs >= 0 && page.receipt.durationMs <= page.receipt.timeoutMs);
     }
     assert.equal(ANYDOC_PDF_PAGE_RENDERER_DPI, 144);
@@ -277,10 +279,16 @@ test('pins the isolated local engine graph and excludes direct engine imports fr
     assert.doesNotMatch(source, /import\(['"](?:pdfjs-dist|@napi-rs\/canvas)|from ['"](?:pdfjs-dist|@napi-rs\/canvas)/u);
     assert.doesNotMatch(source, /\b(?:url|workerSrc|GlobalWorkerOptions)\s*:|fetch\(|https?:|readFile|writeFile|child_process|spawn\(|exec\(|DeepSeek|Ollama|Apple Vision|@firecrawl\/anydoc|app\/api|dbServer|lib\/schema|markdown(?:Bytes|Text|\s*:)/iu);
     assert.equal(renderAnyDocNeedsOcrPages.length, 2);
-    assert.equal(ANYDOC_PDF_PAGE_RENDERER_RUNTIME_PROFILE_ID, 'mediflow.pdfjs_png.node24.darwin_arm64.v1');
+    assert.equal(ANYDOC_PDF_PAGE_RENDERER_RUNTIME_PROFILE_ID, `mediflow.pdfjs_png.node24.${process.platform}_${process.arch}.v1`);
     assert.equal(sha256(ANYDOC_PDF_PAGE_RENDERER_ENGINE_DESCRIPTOR), ANYDOC_PDF_PAGE_RENDERER_ENGINE_SHA256);
-    assert.equal(ANYDOC_PDF_PAGE_RENDERER_ENGINE_SHA256, '775704ed6d5f6b5f2b9600dcd0aecc1178de0839cbec65ef2f8a13b318932d7f');
+    if (process.platform === 'darwin' && process.arch === 'arm64')
+        assert.equal(ANYDOC_PDF_PAGE_RENDERER_ENGINE_SHA256, '268ca7b5631ca4fbf842a94638126021acdbad8a75c2283954fb13f301705fe8');
     assert.match(source, /1011b38553532d7078c59f26b15a471f8dae00f101b60e2add9b8511737a1ce0/u);
     assert.match(source, /ec7dc504d4ade7fd36846d16643e50eed5c914335f3a86b6a2a8d632391e5bfa/u);
-    assert.match(source, /c7c8dcb69aae6ddb58fe23e5f20d1c772a8065b077560f5a18336307779add91/u);
+    assert.equal(profiles.find((entry) => entry.platform === 'darwin')?.tarballSha256,
+        'c7c8dcb69aae6ddb58fe23e5f20d1c772a8065b077560f5a18336307779add91');
+    for (const entry of profiles) {
+        assert.equal(lock.packages[`node_modules/${entry.package}`]?.integrity, entry.integrity);
+        assert.match(entry.binarySha256, /^[a-f0-9]{64}$/);
+    }
 });

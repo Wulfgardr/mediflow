@@ -5,7 +5,7 @@ import SwiftUI
 @MainActor
 struct ClinicalWorkspaceNavigationAction {
     let section: ClinicalWorkspaceSection
-    let canCreatePatient: Bool
+    let canStartCreatingPatient: Bool
     let select: (ClinicalWorkspaceSection) -> Void
     let createPatient: () -> Void
 }
@@ -66,7 +66,6 @@ extension FocusedValues {
 @MainActor
 public final class MediFlowMacSceneModel: ObservableObject {
     @Published public var section: ClinicalWorkspaceSection = .patients
-    @Published public var columnVisibility: NavigationSplitViewVisibility = .all
 
     /// Built after the first frame, never during scene construction.
     ///
@@ -76,9 +75,28 @@ public final class MediFlowMacSceneModel: ObservableObject {
     /// has no window at all until the panel is answered: the user sees a Dock
     /// icon and nothing else, with no statement of what is being waited on.
     @Published private(set) var workspaceModel: PairedPatientsWorkspaceModel?
+    @Published private(set) var startupError: String?
     let capabilities = ClinicalWorkspaceCapabilitiesStore()
+    private let storageProvider: () throws -> MediFlowMacStoragePair
 
     public init() {
+        storageProvider = Self.processStores
+        configureLaunchOverrides()
+    }
+
+    init(storageFactory: MediFlowMacStorageFactory) {
+        storageProvider = storageFactory.makeStores
+        configureLaunchOverrides()
+    }
+
+    private static func processStores() throws -> MediFlowMacStoragePair {
+        struct ProcessStorage {
+            static let result = Result { try MediFlowMacStorageFactory().makeStores() }
+        }
+        return try ProcessStorage.result.get()
+    }
+
+    private func configureLaunchOverrides() {
         let overrides = AppleFoundationLaunchOverrides.load()
         if let initial = overrides.initialSection {
             section = ClinicalWorkspaceSection(legacy: initial)
@@ -86,23 +104,29 @@ public final class MediFlowMacSceneModel: ObservableObject {
         launchDynamicTypeSizeOverride = overrides.dynamicTypeSizeOverride
     }
 
-    let launchDynamicTypeSizeOverride: DynamicTypeSize?
+    private(set) var launchDynamicTypeSizeOverride: DynamicTypeSize?
 
     /// Called from the root view's `task`, so the window is on screen first.
     func prepareWorkspaceIfNeeded() {
-        guard workspaceModel == nil else { return }
-        workspaceModel = PairedPatientsWorkspaceModel()
+        guard workspaceModel == nil, startupError == nil else { return }
+        do {
+            let stores = try storageProvider()
+            workspaceModel = PairedPatientsWorkspaceModel(pairedStore: stores.pairedStore, cacheStore: stores.cacheStore)
+        } catch {
+            startupError = error.localizedDescription
+        }
     }
 
     /// Whether the current section can accept a new patient. The menu item stays
     /// visible but disabled elsewhere, so the shortcut never silently no-ops.
-    public var canCreatePatient: Bool {
+    public var canStartCreatingPatient: Bool {
         guard let workspaceModel, section == .patients else { return false }
-        return workspaceModel.canCreatePatient && !workspaceModel.isWorking
+        return workspaceModel.canStartCreatingPatient
     }
 
     public func createPatient() {
-        guard canCreatePatient else { return }
+        guard canStartCreatingPatient else { return }
+        navigationRouter.cancel() // @Codex
         workspaceModel?.startCreatingPatient()
     }
 
@@ -113,20 +137,24 @@ public final class MediFlowMacSceneModel: ObservableObject {
 
     public func refresh() {
         guard section == .patients, canRefresh, let workspaceModel else { return }
+        navigationRouter.cancel() // @Codex
         Task { await workspaceModel.loadPatients() }
     }
 
     public func select(_ section: ClinicalWorkspaceSection) {
+        navigationRouter.cancel() // @Codex
         self.section = section
     }
+
+    // @Codex: Each scene owns its URL intent; no broadcast or persisted routing.
+    let navigationRouter = ClinicalNavigationRouter()
 }
 
 /// Root scene content of the macOS app.
 ///
 /// This is a Mac window, not an iPad layout in a resizable frame: a
-/// `List(selection:)` sidebar with the system's own selection chrome, a detail
-/// column that carries the window title and the live connection state, and no
-/// custom background competing with the sidebar material.
+/// horizontal area selector, one patient sidebar with native selection, and a
+/// document pane. The window title and contextual toolbar follow the active area.
 public struct MediFlowMacRootView: View {
     private let snapshot: AppleFoundationSnapshot
     @ObservedObject private var scene: MediFlowMacSceneModel
@@ -145,29 +173,34 @@ public struct MediFlowMacRootView: View {
     }
 
     public var body: some View {
-        NavigationSplitView(columnVisibility: $scene.columnVisibility) {
-            sidebar
-        } detail: {
-            Group {
-                if let workspaceModel = scene.workspaceModel {
-                    // The chrome observes the workspace, so the window subtitle
-                    // tracks it. Read straight from this view the subtitle went
-                    // stale: this view observes the scene, not the workspace, so
-                    // twenty loaded patients still read "Non caricato".
-                    MacInspectorCommandBridge(
-                        workspaceModel: workspaceModel,
-                        section: scene.section,
-                        isPresented: $isInspectorPresented
-                    ) {
-                        MacDetailChrome(workspaceModel: workspaceModel, section: scene.section) {
-                            detailView(for: scene.section, workspaceModel: workspaceModel)
+        // @Codex: App destinations occupy one horizontal control layer. The
+        // patients workspace owns the only sidebar and its native selection.
+        NavigationStack {
+            VStack(spacing: 0) {
+                workspaceNavigation
+                Divider()
+                Group {
+                    if let workspaceModel = scene.workspaceModel {
+                        // The chrome observes the workspace, so the window subtitle
+                        // tracks it. Read straight from this view the subtitle went
+                        // stale: this view observes the scene, not the workspace, so
+                        // twenty loaded patients still read "Non caricato".
+                        MacInspectorCommandBridge(
+                            workspaceModel: workspaceModel,
+                            section: scene.section,
+                            isPresented: $isInspectorPresented
+                        ) {
+                            MacDetailChrome(workspaceModel: workspaceModel, section: scene.section) {
+                                detailView(for: scene.section, workspaceModel: workspaceModel)
+                            }
                         }
+                    } else {
+                        startupState
+                            .navigationTitle(scene.section.title)
+                            .navigationSubtitle("Avvio in corso")
                     }
-                } else {
-                    startupState
-                        .navigationTitle(scene.section.title)
-                        .navigationSubtitle("Avvio in corso")
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .modifier(MacPatientInspectorPresentationModifier(
@@ -175,6 +208,12 @@ public struct MediFlowMacRootView: View {
             isPresented: $isInspectorPresented
         ))
         .focusedSceneValue(\.clinicalWorkspaceNavigationAction, navigationAction)
+        .modifier(ClinicalNavigationReception(
+            router: scene.navigationRouter, platform: .macOS, workspace: scene.workspaceModel,
+            navigate: { area in
+                if let target = ClinicalWorkspaceSection(rawValue: area.rawValue) { scene.section = target }
+            }
+        ))
         .task {
             // Keeps the paired-snapshot read out of the scene initialiser, which
             // is the right place for it not to be: a scene initialiser should not
@@ -205,36 +244,51 @@ public struct MediFlowMacRootView: View {
     private var navigationAction: ClinicalWorkspaceNavigationAction {
         ClinicalWorkspaceNavigationAction(
             section: scene.section,
-            canCreatePatient: scene.canCreatePatient,
+            canStartCreatingPatient: scene.canStartCreatingPatient,
             select: scene.select,
             createPatient: scene.createPatient
         )
     }
 
-    // MARK: - Sidebar
+    // MARK: - Workspace navigation
 
-    private var sidebar: some View {
-        // `List(selection:)` with plain rows, not buttons: the system draws the
-        // selection, keyboard arrows move it, and VoiceOver reads it as a list.
-        // The previous plain-button rows rendered no visible label at all.
-        List(selection: $scene.section) {
-            Section("Clinica") {
-                ForEach(ClinicalWorkspaceSection.clinicalSections) { sidebarRow($0) }
+    /* @Codex */
+    private var workspaceNavigation: some View {
+        HStack(spacing: 20) {
+            Picker("Area di lavoro", selection: Binding(get: { scene.section }, set: scene.select)) {
+                ForEach(ClinicalWorkspaceSection.clinicalSections) { section in
+                    Text(section.title)
+                        .tag(section)
+                        .accessibilityIdentifier("clinical-workspace-section-\(section.rawValue)-button")
+                }
             }
-            Section("Consultazione") {
-                ForEach(MediFlowMacRootView.referenceSections) { sidebarRow($0) }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .fixedSize(horizontal: true, vertical: false)
+            .accessibilityIdentifier("clinical-workspace-navigation")
+
+            Spacer(minLength: 0)
+            Menu {
+                Section("Consultazione") {
+                    ForEach(Self.referenceSections) { destinationButton($0) }
+                }
+                Section("Sistema") {
+                    ForEach(Self.systemSections) { destinationButton($0) }
+                }
+                Section("Progetto") {
+                    ForEach(Self.projectSections) { destinationButton($0) }
+                }
+            } label: {
+                Label(
+                    ClinicalWorkspaceSection.clinicalSections.contains(scene.section) ? "Altre aree" : scene.section.title,
+                    systemImage: "square.grid.2x2"
+                )
             }
-            Section("Sistema") {
-                ForEach(MediFlowMacRootView.systemSections) { sidebarRow($0) }
-            }
-            Section("Progetto") {
-                ForEach(MediFlowMacRootView.projectSections) { sidebarRow($0) }
-            }
+            .fixedSize()
+            .accessibilityIdentifier("clinical-workspace-other-areas")
         }
-        .listStyle(.sidebar)
-        .navigationSplitViewColumnWidth(min: 196, ideal: 228, max: 320)
-        .navigationTitle("MediFlow")
-        .accessibilityIdentifier("clinical-workspace-project-sidebar")
+        .padding(.horizontal, 20)
+        .padding(.vertical, 10)
     }
 
     /// Runtime is the home-base status of this very Mac, so it belongs with the
@@ -244,10 +298,12 @@ public struct MediFlowMacRootView: View {
     static let systemSections: [ClinicalWorkspaceSection] = [.settings, .host, .runtime]
     static let projectSections: [ClinicalWorkspaceSection] = [.overview, .milestones]
 
-    private func sidebarRow(_ item: ClinicalWorkspaceSection) -> some View {
-        Label(item.title, systemImage: item.symbolName)
-            .tag(item)
-            .accessibilityIdentifier("clinical-workspace-section-\(item.rawValue)-button")
+    /* @Codex */
+    private func destinationButton(_ item: ClinicalWorkspaceSection) -> some View {
+        Button { scene.select(item) } label: {
+            Label(item.title, systemImage: item.symbolName)
+        }
+        .accessibilityIdentifier("clinical-workspace-section-\(item.rawValue)-button")
     }
 
     // MARK: - Detail
@@ -256,10 +312,10 @@ public struct MediFlowMacRootView: View {
     /// is happening, because the wait can include a system Keychain panel.
     private var startupState: some View {
         VStack(spacing: 10) {
-            ProgressView()
-            Text("Apertura dell'archivio locale")
+            if scene.startupError == nil { ProgressView() }
+            Text(scene.startupError == nil ? "Apertura dell'archivio locale" : "Archivio locale non disponibile")
                 .font(.headline)
-            Text("MediFlow sta leggendo le credenziali di collegamento dal portachiavi. Se macOS chiede l'autorizzazione, la finestra resta disponibile.")
+            Text(scene.startupError ?? "MediFlow sta leggendo le credenziali di collegamento dal portachiavi. Se macOS chiede l'autorizzazione, la finestra resta disponibile.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -382,7 +438,7 @@ public struct MediFlowMacCommands: Commands {
                 navigation?.createPatient()
             }
             .keyboardShortcut("n", modifiers: .command)
-            .disabled(navigation == nil || (navigation?.section == .patients && navigation?.canCreatePatient == false))
+            .disabled(navigation == nil || (navigation?.section == .patients && navigation?.canStartCreatingPatient == false))
         }
 
         CommandMenu("Vai") {

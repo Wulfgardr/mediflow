@@ -2,7 +2,7 @@
 
 import { CalendarClock, FileText, ScanText, Stethoscope } from 'lucide-react';
 
-/* @Codex */
+/* @Codex WUL-678: substrate rows share the node center with the chronological axis. */
 import { compactClinicalRichText } from '@/lib/clinical-rich-text';
 import type { Checkup, ClinicalEntry, DocumentInsight } from '@/lib/db';
 import { LumeFilo, LumeFiloNodo } from '@/components/ui/lume-filo';
@@ -128,7 +128,7 @@ export function ClinicalRiverTimeline({
 
     if (items.length === 0) {
         return (
-            <div className="rounded-[var(--lume-radius-card)] border border-[color:var(--lume-border-color)] px-5 py-8 text-sm text-[color:var(--lume-ink-muted)]">
+            <div className="py-4 text-sm text-[color:var(--lume-ink-muted)]">
                 Nessun evento recente: visite, documenti e controlli compariranno qui.
             </div>
         );
@@ -141,7 +141,7 @@ export function ClinicalRiverTimeline({
                     variant="spina"
                     nodeCount={items.length}
                     anchorSelector="[data-lume-river-node]"
-                    className="absolute left-[13.5px] w-px"
+                    className="absolute left-[15.5px] w-px" tone="muted"
                 />
                 {items.map((item, index) => {
                     const presentation = getItemPresentation(item.kind);
@@ -150,11 +150,11 @@ export function ClinicalRiverTimeline({
                     return (
                         <div key={item.id} className="grid grid-cols-[28px_minmax(0,1fr)] gap-4">
                             <div className="relative flex h-8 w-8 items-center justify-center">
-                                <LumeFiloNodo data-lume-river-node className="absolute inset-0 h-8 w-8" />
+                                <LumeFiloNodo tone="muted" data-lume-river-node className="absolute inset-0 h-8 w-8" />
                                 <Icon className={`relative z-10 h-4 w-4 ${presentation.tint}`} />
                             </div>
                             <article
-                                className="rounded-[var(--lume-radius-card)] bg-[color:var(--lume-surface-field)] p-4 outline-none focus-visible:bg-[color:var(--lume-surface-focal)] focus-visible:shadow-[var(--lume-focus-ring)]"
+                                className="border-b border-[color:var(--lume-border-color)] px-0 pb-4 pt-1 outline-none focus-visible:shadow-[var(--lume-focus-ring)]"
                                 aria-posinset={index + 1}
                                 aria-setsize={items.length}
                                 tabIndex={0}

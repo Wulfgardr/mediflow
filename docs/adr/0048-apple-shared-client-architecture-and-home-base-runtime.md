@@ -127,6 +127,94 @@ Decisioni operative:
   - questa ADR non promuove ancora comandi AI remoti su mobile
   - eventuale consultazione di output gia persistiti non cambia questo boundary
 
+## Cache derivata read-only: precisazione 0.8.6 (WUL-676, 2026-09-06)
+
+La cache Apple non e una replica snapshot/mirror di ADR 0035. Il precedente
+limite alla sola lista era il perimetro implementato, non un divieto di
+consultare un profilo derivato. Questa slice consente lista e **ultimo profilo
+paziente letto online**, alle seguenti condizioni:
+
+- Storage locale AES-GCM con la chiave Portachiavi esistente. Il payload resta
+  cifrato integralmente; i campi clinici conservano inoltre il formato ricevuto
+  dall'host e vengono aperti con la master key solo in memoria.
+- Provenienza esatta: URL HTTPS, pin TLS, device paired, digest del token,
+  operatore autenticato, digest della sessione e scope ambulatoriale. Token,
+  cookie, PIN operatore e master key non sono persistiti nella cache.
+- La consultazione richiede la stessa sessione gia autenticata e sbloccata in
+  memoria. Nessun login offline, ripristino prima del login o nuova autorita
+  mobile; gli snapshot v1 privi di questa provenienza non sono riutilizzabili.
+- Il fallback riguarda esclusivamente indisponibilita o timeout di rete.
+  Errori HTTP (inclusi 401/403), trust TLS e risposte non conformi non
+  autorizzano il fallback. Lock, cambio operatore/sessione, pairing, pin o scope
+  rimuovono la presentazione derivata; una lettura negata la invalida.
+- Il TTL massimo resta 24 ore dalla lettura, separato per lista e profilo.
+  Alla scadenza, o se l'orologio precede l'acquisizione, non si espongono righe
+  o campi paziente. Restano metadata cifrati e non identificativi: acquisizione,
+  scadenza, conteggio dell'ultima lista e motivo di inutilizzabilita. Il timer
+  e il ritorno in foreground rivalutano la scadenza; un refresh della lista
+  non prolunga il TTL del profilo.
+- Il profilo e ammesso solo se appartiene alla lista fresca nello stesso
+  contesto, con identita/versione/aggiornamento coincidenti. Un refresh che
+  rimuove, cancella o cambia il paziente invalida il profilo conservato.
+- Il profilo contiene anagrafica e campi manuali; esclude `aiSummary`,
+  `documentInsights`, diario, terapie, controlli, osservazioni, prescrizioni,
+  allegati e artifact. La UI dedicata dichiara questi limiti e non presenta
+  collezioni non acquisite come collezioni vuote. Non abilita editor o export.
+
+Restano esclusi write queue, write offline (anche per ADR 0056), sync,
+riconciliazione automatica, accesso SQLite, nuovi endpoint e nuovi grant.
+La revoca remota non puo essere verificata durante un'interruzione di rete:
+la cache resta una lettura storica entro il TTL, mai prova di autorita corrente.
+Questa precisazione non attesta parity completa ne verifica UI/device.
+
+## Isolamento persistente della candidata QA Mac (WUL-689, 2026-09-20)
+
+La copia QA Release deve esercitare lo stesso client e lo stesso Portachiavi
+senza leggere, sovrascrivere o cancellare credenziali e cache dell'installazione
+ordinaria. HOME, directory dati e bundle identifier differenti non isolano da
+soli i service Keychain fissi. Il caricamento pazienti persiste sia il pairing
+sia la cache: isolare soltanto il token paired e insufficiente.
+
+Il confezionamento canonico accetta esplicitamente
+`MEDIFLOW_MAC_QA_NAMESPACE`, composto da esattamente 32 caratteri esadecimali
+minuscoli. Un valore presente ma vuoto o malformato interrompe la build prima
+di mutazioni. Prima della firma, il builder inserisce il selettore non segreto
+`MediFlowQAStorageNamespace` in Info.plist e l'identita di copia
+`com.mediflow.qa.<namespace>`, con nome QA e senza handler URL dell'app ordinaria.
+La build ordinaria non inserisce il selettore e conserva il comportamento attuale.
+
+Il bootstrap Mac risolve una volta il selettore e inietta insieme entrambi gli
+store, prima di costruire qualsiasi workspace, in tutte le finestre:
+
+- Pairing: service `com.mediflow.home-base-paired.qa.<namespace>`, account
+  `paired-client-token` e dominio UserDefaults separato per lo stesso namespace.
+- Cache cifrata: service `com.mediflow.home-base-patient-cache.qa.<namespace>`,
+  account `cache-key-v1` e directory esplicita
+  `Application Support/MediFlow-QA/<namespace>`, distinta da `MediFlow`.
+
+Non si accettano service, account o percorsi arbitrari. Un selettore errato,
+incoerente con l'identita QA o uno store QA non costruibile impedisce la
+costruzione del workspace; non esiste fallback allo store ordinario. Una copia
+identificata come QA priva del selettore e parimenti rifiutata. Non si deriva il
+namespace da URL, credenziali, HOME o bundle identifier, ne si leggono o copiano
+i dati personali per inizializzarlo. La selezione persiste al riavvio della
+stessa copia; copie con namespace differenti non condividono gli store.
+
+Lettura, scrittura, token vuoto, clear e persistenza implicita usano sempre lo
+store selezionato. Le operazioni Security, cifratura AES-GCM, provenienza e TTL
+della cache restano reali e invariati. Nessun bypass Keychain in Release e
+nessuna modifica di login, TLS, sessioni, capability, API, supervisore o autorita
+clinica. I dialoghi di sistema del nuovo item QA restano possibili.
+
+Le prove distinguono selezione e instradamento con spy, round-trip di cache
+sintetiche separate, operazioni Keychain reali su soli item QA e percorso
+Release con backend sintetico. La ricevuta collega sorgenti, build, metadata
+pre-firma e copia eseguita. Non si legge il Portachiavi personale per confronti
+prima/dopo. Questo isolamento non sostituisce le quattro prove reali di
+ADR0134, i dinieghi del client o la revisione competente WUL-688.
+
+Impatto sui contratti API: nessuno (`no contract impact`).
+
 ## Conseguenze
 
 Positivo:

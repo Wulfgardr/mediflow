@@ -9,6 +9,8 @@ import {
 
 import { db, type ClinicalEntry } from '@/lib/db';
 import { useLiveQuery } from '@/lib/live-query';
+/* @Codex */
+import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
 import { LumeFilo, LumeFiloNodo } from '@/components/ui/lume-filo';
 import { PillBadge } from '../cockpit-shared';
 import type { AreaId, Kree8DiaryClientState, Kree8DiaryEntry } from '../cockpit-shared';
@@ -85,6 +87,7 @@ function DiarioArea({
   onOpenArea: (area: AreaId) => void;
   onSelectPatient: (patientId: string) => void;
 }) {
+  const { proposal } = useRuntimeTwinDesign();
   const isLoading = diaryState.status === 'loading' || diaryState.status === 'idle';
   const visibleEntries = diaryState.entries;
   const [activeEntryId, setActiveEntryId] = useState<string | null>(null);
@@ -111,7 +114,7 @@ function DiarioArea({
             Cronologia delle ultime 50 voci cliniche di tutti i pazienti.
           </p>
         </div>
-        <div className={styles.headerActions}>
+        {!proposal && <div className={styles.headerActions}>
           <button type="button" className={styles.ghostBtnSm} onClick={() => onOpenArea('incarico')}>
             <Inbox size={12} />
             Scegli paziente
@@ -122,17 +125,19 @@ function DiarioArea({
           </button>
           <PillBadge variant="neutral">{isLoading ? '…' : `${diaryState.activeCount} attive`}</PillBadge>
           <PillBadge variant="neutral">{isLoading ? '…' : `${diaryState.patientCount} pazienti`}</PillBadge>
-        </div>
+        </div>}
       </header>
 
       <section className={diaryStyles.timelineSection} aria-labelledby="diario-timeline-title">
         <header className={diaryStyles.sectionHeader}>
           <div>
             <h2 id="diario-timeline-title" className={diaryStyles.sectionTitle}>Timeline recente</h2>
-            <p className={diaryStyles.sectionSubtitle}>Un solo Filo connette le voci che appartengono alla sequenza temporale.</p>
+            {!proposal && <p className={diaryStyles.sectionSubtitle}>Un solo Filo connette le voci che appartengono alla sequenza temporale.</p>}
           </div>
-          <span className={`${diaryStyles.count} lume-registro`}>
-            {isLoading ? '…' : `${visibleEntries.length} voci · dati locali`}
+          <span className={proposal ? diaryStyles.count : `${diaryStyles.count} lume-registro`}>
+            {isLoading ? '…' : proposal
+              ? `${visibleEntries.length} ${visibleEntries.length === 1 ? 'voce' : 'voci'} · ${diaryState.patientCount} ${diaryState.patientCount === 1 ? 'paziente' : 'pazienti'}`
+              : `${visibleEntries.length} voci · dati locali`}
           </span>
         </header>
 
@@ -184,7 +189,7 @@ function DiarioArea({
                         <span className={diaryStyles.stateLabel}>{presentation.stateLabel}</span>
                         <h3 id={titleId} className={diaryStyles.entryTitle}>{entry.title}</h3>
                       </div>
-                      <span className={`${diaryStyles.date} lume-registro`} data-lume-entry-part="date">
+                      <span className={proposal ? diaryStyles.date : `${diaryStyles.date} lume-registro`} data-lume-entry-part="date">
                         {entry.dateLabel}
                       </span>
                     </div>

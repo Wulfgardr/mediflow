@@ -116,3 +116,33 @@ export function registerPrivateResource(
 export function unregisterPrivateResource(port: unknown, registration: unknown): boolean {
     return owner.unregisterPrivateResource(port, registration);
 }
+
+/* @Codex */
+export const serverSessions = owner.serverSessions;
+export type NativeSessionResourcePort = owner.serverSessions.NativeSessionResourcePort;
+export type NativeSessionResourceUse = owner.serverSessions.NativeSessionResourceUse;
+export type NativeSessionResourceRegistration = owner.serverSessions.NativeSessionResourceRegistration;
+export type NativeSessionResourceBinding = owner.serverSessions.NativeSessionResourceBinding;
+export type NativeAuthenticationGeneration = owner.serverSessions.NativeAuthenticationGeneration;
+export type ServerSessionDisposalReason = owner.serverSessions.ServerSessionDisposalReason;
+export type ServerSessionResourceDisposer = owner.serverSessions.ServerSessionResourceDisposer;
+export type ServerSessionCleanupOutcome = owner.serverSessions.ServerSessionCleanupOutcome;
+export type WebServerSessionRetirementReason = owner.serverSessions.WebServerSessionRetirementReason;
+export type WebServerSessionRetirementCleanupOutcome = owner.serverSessions.WebServerSessionRetirementCleanupOutcome;
+export type WebServerSessionRetirementCleanupReceipt = owner.serverSessions.WebServerSessionRetirementCleanupReceipt;
+export type ServerSession = owner.serverSessions.ServerSession;
+export type NativeServerSessionBinding = owner.serverSessions.NativeServerSessionBinding;
+export type NativeSystemAdminResetCapability = owner.serverSessions.NativeSystemAdminResetCapability;
+export type NativeLegacyUserRetirementCapability = owner.serverSessions.NativeLegacyUserRetirementCapability;
+export type NativeLoginSessionFence = owner.serverSessions.NativeLoginSessionFence;
+export type NativeSystemSessionOperationReceipt = owner.serverSessions.NativeSystemSessionOperationReceipt;
+export type StagedWebServerSession = owner.serverSessions.StagedWebServerSession;
+export type PreparedWebServerSession = owner.serverSessions.PreparedWebServerSession;
+export type ArmedWebServerSessionPort = owner.serverSessions.ArmedWebServerSessionPort;
+export type ActiveWebSessionResourcePort = owner.serverSessions.ActiveWebSessionResourcePort;
+export type ActiveWebSessionResourceUse = owner.serverSessions.ActiveWebSessionResourceUse;
+export type ActiveWebSessionPrivateResourceRegistration = owner.serverSessions.ActiveWebSessionPrivateResourceRegistration;
+export type ActiveWebSessionPrivateResourceDisposer = owner.serverSessions.ActiveWebSessionPrivateResourceDisposer;
+export function prepareNativeUserRetirement(capability: unknown): WebUserRetirementCapability | null {
+    return owner.prepareNativeUserRetirement(capability);
+}

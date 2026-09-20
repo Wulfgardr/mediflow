@@ -1,6 +1,7 @@
 'use client';
 
 /* @Codex */
+import { FunctionModelPicker, useFunctionModelPicker } from '@/components/function-models/function-model-picker';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
@@ -23,6 +24,11 @@ import {
     createTreatmentReasoningBrowserController,
     type TreatmentReasoningPublication,
 } from '@/lib/ai-providers/fabric/treatment-reasoning-browser-controller';
+import {
+    SmartImportContextProposalBrowserAdapterError,
+    type SmartImportAmbulatoryChoice,
+    type SmartImportContextProposal,
+} from '@/lib/security/smart-import-patient-context-browser-adapter';
 import { db, type Attachment, type ClinicalEntry, type Observation, type Patient, type Therapy } from '@/lib/db';
 import { useLiveQuery } from '@/lib/live-query';
 import { countTreatmentReasoningSources } from '@/lib/treatment-reasoning-context';
@@ -40,7 +46,9 @@ type SuggestedAction = TreatmentReasoningPublication['value']['data']['suggested
 type ScopedValue<T> = Readonly<{ contextRevision: string; value: T }>;
 
 const LOCAL_DISABLED_ERROR = 'Treatment Reasoning è disabilitato nel controllo locale. Riattivalo in Impostazioni AI per chiedere una nuova anteprima.';
-const PREVIEW_UNAVAILABLE_ERROR = 'Anteprima non disponibile. Verifica sessione, selezione e disponibilità di ATHENA locale, poi riprova.';
+const PREVIEW_UNAVAILABLE_ERROR = 'Anteprima non disponibile. Verifica sessione, selezione e il motore scelto; nessun fallback automatico.';
+const CONTEXT_UNAVAILABLE_ERROR = 'Impossibile leggere paziente e ambulatori. Controlla la sessione e riprova.';
+const AMBULATORY_MISSING_ERROR = 'Aggiungi un ambulatorio nelle impostazioni, poi riprova.';
 
 function severityClasses(severity: SafetySeverity): string {
     switch (severity) {
@@ -90,12 +98,19 @@ export default function TreatmentReasoningPanel({
     observations = [],
     attachments = [],
 }: TreatmentReasoningPanelProps) {
-    const [controller] = useState(() => createTreatmentReasoningBrowserController());
+    const picker = useFunctionModelPicker('treatment_reasoning', `${patient.id}:${patient.version}`);
+    const [controller] = useState(() => createTreatmentReasoningBrowserController({ fetch: picker.client.fetch }));
     const operation = useRef(0);
+    // @Codex: close same-render double activation before React can publish busy state.
+    const handler = useRef(false);
     const contextRevision = `${patient.id}:${patient.version ?? 'unversioned'}`;
     const [publicationState, setPublicationState] = useState<ScopedValue<TreatmentReasoningPublication> | null>(null);
     const [runningRevision, setRunningRevision] = useState<string | null>(null);
     const [errorState, setErrorState] = useState<ScopedValue<string> | null>(null);
+    const [proposal, setProposal] = useState<SmartImportContextProposal | null>(null);
+    const [ambulatory, setAmbulatory] = useState<SmartImportAmbulatoryChoice | null>(null);
+    const [confirmed, setConfirmed] = useState(false);
+    const [loadingProposal, setLoadingProposal] = useState(false);
     const treatmentReasoningKillSwitch = useLiveQuery(
         () => db.settings.get(AI_TREATMENT_REASONING_KILL_SWITCH_KEY),
         [],
@@ -107,9 +122,10 @@ export default function TreatmentReasoningPanel({
         () => countTreatmentReasoningSources({ patient, entries, therapies, observations, attachments }),
         [patient, entries, therapies, observations, attachments],
     );
-    const publication = publicationState?.contextRevision === contextRevision ? publicationState.value : null;
+    const publication = picker.active && publicationState?.contextRevision === contextRevision ? publicationState.value : null;
     const error = errorState?.contextRevision === contextRevision ? errorState.value : null;
     const isGenerating = runningRevision === contextRevision;
+    const isBusy = loadingProposal || isGenerating;
     const sourceSummaryItems = [
         ['Terapie', sourceSummary.activeTherapies],
         ['Diagnosi', sourceSummary.diagnoses],
@@ -117,36 +133,67 @@ export default function TreatmentReasoningPanel({
         ['Diario', sourceSummary.clinicalEntries],
         ['Evidenze', sourceSummary.documentInsights + sourceSummary.attachmentEvidence],
     ];
-    const canGenerate = treatmentReasoningEnabled && sourceSummary.total > 0 && !isGenerating;
+    const canPrepare = treatmentReasoningEnabled && sourceSummary.total > 0 && !isBusy && !proposal && picker.canGenerate;
 
     useEffect(() => {
         operation.current += 1;
         controller.reset();
+        handler.current = false;
+        setPublicationState(null); setRunningRevision(null); setErrorState(null);
+        setProposal(null); setAmbulatory(null); setConfirmed(false); setLoadingProposal(false);
         return () => {
             operation.current += 1;
             controller.reset();
         };
-    }, [controller, patient.id, patient.version]);
+    }, [controller, patient.id, patient.version, picker.active, picker.view.choice, picker.view.blocked, treatmentReasoningEnabled]);
 
     if (sourceSummary.total === 0) {
         return null;
     }
 
-    const generatePreview = async () => {
+    const loadProposal = async () => {
         if (!treatmentReasoningEnabled) {
             setErrorState({ contextRevision, value: LOCAL_DISABLED_ERROR });
             return;
         }
+        if (handler.current) return;
 
+        handler.current = true;
         const token = ++operation.current;
-        setRunningRevision(contextRevision);
+        setLoadingProposal(true);
         setErrorState(null);
 
         try {
-            const proposal = await controller.readProposal();
+            const nextProposal = await controller.readProposal(patient.id);
+            if (operation.current === token) {
+                setProposal(nextProposal); setAmbulatory(null); setConfirmed(false);
+            }
+        } catch (loadError) {
+            if (operation.current === token) {
+                const message = loadError instanceof SmartImportContextProposalBrowserAdapterError && loadError.code === 'context_missing'
+                    ? AMBULATORY_MISSING_ERROR : CONTEXT_UNAVAILABLE_ERROR;
+                setErrorState({ contextRevision, value: message });
+            }
+        } finally {
+            if (operation.current === token) {
+                handler.current = false;
+                setLoadingProposal(false);
+            }
+        }
+    };
+
+    const generatePreview = async () => {
+        if (!treatmentReasoningEnabled || !proposal || !ambulatory || !confirmed || isBusy || handler.current) return;
+        handler.current = true;
+        const token = ++operation.current; const currentProposal = proposal; const currentAmbulatory = ambulatory;
+        setRunningRevision(contextRevision); setErrorState(null);
+        try {
+            const modelToken = await picker.client.begin();
+            if (operation.current !== token || !picker.client.isCurrent(modelToken)) return;
             const nextPublication = await controller.run({
                 patientId: patient.id,
-                proposal,
+                proposal: currentProposal,
+                ambulatory: currentAmbulatory,
                 contextInput: {
                     patient,
                     entries,
@@ -155,8 +202,9 @@ export default function TreatmentReasoningPanel({
                     attachments,
                 },
             }, true);
-            if (operation.current === token) {
+            if (operation.current === token && picker.client.isCurrent(modelToken)) {
                 setPublicationState({ contextRevision, value: nextPublication });
+                setProposal(null); setAmbulatory(null); setConfirmed(false);
             }
         } catch {
             if (operation.current === token) {
@@ -164,9 +212,14 @@ export default function TreatmentReasoningPanel({
             }
         } finally {
             if (operation.current === token) {
+                handler.current = false;
                 setRunningRevision(null);
             }
         }
+    };
+
+    const cancelProposal = () => {
+        operation.current += 1; handler.current = false; controller.reset(); setProposal(null); setAmbulatory(null); setConfirmed(false); setLoadingProposal(false);
     };
 
     return (
@@ -184,24 +237,25 @@ export default function TreatmentReasoningPanel({
                                 <span className="apple-chip">{sourceSummary.total} fonti</span>
                                 <span className="apple-chip">review-only</span>
                                 <span className="text-[10px] font-semibold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
-                                    ATHENA MLX · locale
+                                    {picker.view.remote ? 'OpenAI · abbonamento ChatGPT · contesto redatto' : picker.selected?.provider === 'athena_mlx' ? 'ATHENA MLX · locale' : picker.selected?.provider === 'athena_transformers' ? 'ATHENA Transformers · CPU locale' : 'Motore locale da selezionare'}
                                 </span>
                             </div>
                         </div>
                     </div>
 
+                    <FunctionModelPicker picker={picker} />
                     <button
                         type="button"
-                        onClick={generatePreview}
-                        disabled={!canGenerate}
+                        onClick={loadProposal}
+                        disabled={!canPrepare}
                         aria-describedby="treatment-reasoning-boundary-note"
-                        className="inline-flex h-10 items-center justify-center gap-2 rounded-[12px] bg-[color:var(--lume-ink)] px-4 text-xs font-bold text-[color:var(--lume-surface-focal)] shadow-[var(--lume-shadow-focal)] transition-[background-color,opacity,transform] hover:bg-[color:var(--lume-accent)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[12px] bg-[color:var(--lume-ink)] px-4 text-xs font-bold text-[color:var(--lume-surface-focal)] shadow-[var(--lume-shadow-focal)] transition-[background-color,opacity,transform] hover:bg-[color:var(--lume-accent)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                        {isGenerating ? <RefreshCw className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Sparkles className="h-4 w-4" aria-hidden="true" />}
+                        {isBusy ? <RefreshCw className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Sparkles className="h-4 w-4" aria-hidden="true" />}
                         {publication ? 'Aggiorna bozza' : 'Genera bozza'}
                     </button>
                     <p id="treatment-reasoning-boundary-note" className="sr-only">
-                        Anteprima locale di sola revisione. Non scrive né applica modifiche alla scheda clinica.
+                        Anteprima di sola revisione. Non scrive né applica modifiche alla scheda clinica.
                     </p>
                 </div>
             </div>
@@ -227,6 +281,27 @@ export default function TreatmentReasoningPanel({
                     </div>
                 ) : null}
 
+                {proposal && !isGenerating ? (
+                    <div className="space-y-3 rounded-[var(--lume-radius-card)] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] p-4 text-sm">
+                        <p><PrivacyBlur>Paziente: {proposal.patientName}</PrivacyBlur></p>
+                        <label className="grid gap-2 font-medium">Ambulatorio per questa bozza
+                            <select className="min-h-11 min-w-0 w-full rounded-xl border px-3 py-2 bg-[color:var(--lume-surface-focal)]" value={ambulatory?.ambulatoryId ?? ''}
+                                onChange={(event) => { setAmbulatory(proposal.ambulatories.find((row) => row.ambulatoryId === event.target.value) ?? null); setConfirmed(false); }}>
+                                <option value="">Scegli l’ambulatorio</option>
+                                {proposal.ambulatories.map((row) => <option key={row.ambulatoryId} value={row.ambulatoryId}>{row.name}{row.address ? ` · ${row.address}` : ''}</option>)}
+                            </select>
+                        </label>
+                        <label className="flex min-h-11 items-start gap-3 py-2">
+                            <input className="mt-1 h-4 w-4" type="checkbox" disabled={!ambulatory} checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} />
+                            Confermo paziente e ambulatorio per una bozza da rivedere. La cartella resta invariata.
+                        </label>
+                        <div className="flex flex-wrap gap-3">
+                            <button type="button" className="ui-btn-primary" disabled={!treatmentReasoningEnabled || !ambulatory || !confirmed || !picker.canGenerate || isBusy} onClick={generatePreview}>Conferma e genera bozza</button>
+                            <button type="button" className="ui-btn-secondary" onClick={cancelProposal}>Annulla</button>
+                        </div>
+                    </div>
+                ) : null}
+
                 <div className="grid gap-2 sm:grid-cols-5">
                     {sourceSummaryItems.map(([label, value]) => (
                         <div key={label} className="rounded-[14px] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-focal)] px-3 py-2">
@@ -236,16 +311,16 @@ export default function TreatmentReasoningPanel({
                     ))}
                 </div>
 
-                {!publication && !isGenerating ? (
+                {!publication && !isBusy && !proposal ? (
                     <div className="rounded-[var(--lume-radius-card)] border border-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)] bg-[color:var(--lume-surface-field)] p-4 text-sm leading-6 text-[color:var(--lume-ink-muted)] transition-colors duration-[var(--lume-dur-firma)]">
-                        Anteprima manuale da ATHENA locale per verificare coerenza, rischi e prossime azioni. Non modifica la scheda e richiede sempre revisione clinica.
+                        Anteprima manuale dal motore selezionato per verificare coerenza, rischi e prossime azioni. Non modifica la scheda e richiede sempre revisione clinica.
                     </div>
                 ) : null}
 
                 {isGenerating ? (
                     <div role="status" aria-live="polite" className="space-y-3 py-8 text-center">
                         <RefreshCw className="mx-auto h-7 w-7 animate-spin text-[color:var(--lume-ink-muted)]" aria-hidden="true" />
-                        <p className="text-xs font-bold uppercase tracking-widest text-[color:var(--lume-ink-muted)]">Preparazione anteprima locale...</p>
+                        <p className="text-xs font-bold uppercase tracking-widest text-[color:var(--lume-ink-muted)]">Preparazione anteprima...</p>
                     </div>
                 ) : null}
 
@@ -266,7 +341,7 @@ export default function TreatmentReasoningPanel({
                             ) : null}
                             <div className="mt-3 flex items-start gap-2 border-t border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] pt-3 text-xs leading-5 text-[color:var(--lume-ink-muted)]">
                                 <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                                <p>Supporto locale alla revisione: non è una prescrizione, esegue 0 scritture e non applica modifiche.</p>
+                                <p>Supporto alla revisione: non è una prescrizione, esegue 0 scritture e non applica modifiche.</p>
                             </div>
                         </div>
 
@@ -309,7 +384,7 @@ export default function TreatmentReasoningPanel({
                                     <h4 className="text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--lume-ink-muted)]">Flag e cautele</h4>
                                 </div>
                                 {publication.value.data.safetyFlags.length === 0 ? (
-                                    <p className="rounded-[14px] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-focal)] p-3 text-xs text-[color:var(--lume-ink-muted)]">Nessun flag strutturato da ATHENA.</p>
+                                    <p className="rounded-[14px] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-focal)] p-3 text-xs text-[color:var(--lume-ink-muted)]">Nessun flag strutturato nella proposta.</p>
                                 ) : publication.value.data.safetyFlags.map((flag) => (
                                     <div key={flag.id} className={`rounded-[16px] border p-3 ${severityClasses(flag.severity)}`}>
                                         <p className="text-sm font-semibold"><PrivacyBlur intensity="sm">{flag.label}</PrivacyBlur></p>
@@ -379,12 +454,16 @@ export default function TreatmentReasoningPanel({
                             <dl className="grid gap-3 border-t border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] px-4 py-3 text-xs sm:grid-cols-2">
                                 <div>
                                     <dt className="font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">Provider attestato</dt>
-                                    <dd className="mt-1 text-[color:var(--lume-ink)]">{publication.attestation.provider === 'athena_mlx' ? 'ATHENA MLX · locale' : publication.attestation.provider}</dd>
+                                    <dd className="mt-1 text-[color:var(--lume-ink)]">{publication.attestation.provider === 'chatgpt_subscription' ? 'OpenAI · abbonamento ChatGPT · contesto redatto' : publication.attestation.provider === 'athena_mlx' ? 'ATHENA MLX · locale' : 'ATHENA Transformers · CPU locale'}</dd>
                                 </div>
                                 <div>
                                     <dt className="font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">Stato</dt>
-                                    <dd className="mt-1 text-[color:var(--lume-ink)]">{publication.attestation.readiness} · {publication.review} · {publication.writesPerformed} scritture</dd>
+                                    <dd className="mt-1 text-[color:var(--lume-ink)]">{publication.attestation.provider === 'chatgpt_subscription' ? 'Consenso sui byte redatti · nessuna ammissione clinica implicita' : publication.attestation.readiness} · {publication.review} · {publication.writesPerformed} scritture</dd>
                                 </div>
+                                {publication.schemaVersion === 'mediflow.ai.treatment-reasoning-publication.v2' && <div>
+                                    <dt className="font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">Motore e artefatto attestati</dt>
+                                    <dd className="mt-1 break-all text-[color:var(--lume-ink)]">{publication.attestation.model} · {publication.attestation.platform} · ammissione {publication.attestation.admissionRevision}<br />SHA-256 {publication.attestation.artifactDigest}</dd>
+                                </div>}
                                 <div>
                                     <dt className="font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">Currentness</dt>
                                     <dd className="mt-1 text-[color:var(--lume-ink)]">Acquisita {formatDateTime(publication.capturedAt)}</dd>
@@ -395,7 +474,7 @@ export default function TreatmentReasoningPanel({
                                 </div>
                                 <div>
                                     <dt className="font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">Receipt Fabric</dt>
-                                    <dd className="mt-1 break-all text-[color:var(--lume-ink)]">{publication.fabricReceipt.venue} · {publication.fabricReceipt.egressProfile.id}@{publication.fabricReceipt.egressProfile.version} · egress {publication.fabricReceipt.egressProfile.egress}</dd>
+                                    <dd className="mt-1 break-all text-[color:var(--lume-ink)]">{publication.fabricReceipt.provider === 'chatgpt_subscription' ? <>OpenAI · {publication.fabricReceipt.model} · {publication.fabricReceipt.effort} · testo redatto inviato con consenso</> : <>{publication.fabricReceipt.venue} · {publication.fabricReceipt.egressProfile.id}@{publication.fabricReceipt.egressProfile.version} · egress {publication.fabricReceipt.egressProfile.egress}</>}</dd>
                                 </div>
                                 <div>
                                     <dt className="font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">Provenienza</dt>
@@ -403,11 +482,11 @@ export default function TreatmentReasoningPanel({
                                 </div>
                                 <div>
                                     <dt className="font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">Attestazione receipt</dt>
-                                    <dd className="mt-1 break-all font-mono text-[10px] text-[color:var(--lume-ink)]">{publication.attestation.receiptRef}</dd>
+                                    <dd className="mt-1 break-all font-mono text-[10px] text-[color:var(--lume-ink)]">{publication.attestation.provider === 'chatgpt_subscription' ? publication.attestation.outputSha256 : publication.attestation.receiptRef}</dd>
                                 </div>
                                 <div>
                                     <dt className="font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">Attestazione provenienza</dt>
-                                    <dd className="mt-1 break-all font-mono text-[10px] text-[color:var(--lume-ink)]">{publication.attestation.provenanceRef}</dd>
+                                    <dd className="mt-1 break-all font-mono text-[10px] text-[color:var(--lume-ink)]">{publication.attestation.provider === 'chatgpt_subscription' ? publication.attestation.sourceSha256 : publication.attestation.provenanceRef}</dd>
                                 </div>
                             </dl>
                         </details>

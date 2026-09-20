@@ -3,13 +3,17 @@
 /* @Codex */
 
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { ArrowLeft, ChevronRight, FolderOpen, type LucideIcon } from 'lucide-react';
 
 // WUL-297: Privacy Mode is always reachable from the workspace header.
 import PrivacyBlur from '@/components/privacy-blur';
 import { PrivacyModeToggle } from '@/components/privacy-mode-toggle';
+import { RuntimeTwinFolderContext, useRuntimeTwinDesign } from '@/components/runtime-twin-design';
 import styles from './kree8-workspace-shell.module.css';
+import { RuntimeTwinPatientNavigation } from '@/components/runtime-twin-workspace';
+import twin from './twin-patient-shell.module.css';
 
 export type Kree8WorkspaceNavItem = {
   href: string;
@@ -35,7 +39,7 @@ export type Kree8WorkspaceNavGroups = readonly [
 ];
 
 type Kree8WorkspaceShellProps = {
-  variant?: 'default' | 'clinical';
+  variant?: 'default' | 'clinical' | 'overview';
   eyebrow: string;
   title: string;
   subtitle: string;
@@ -76,6 +80,9 @@ export function Kree8WorkspaceShell({
      aria-current stantio invece di ereditarlo. */
   const activeHrefRef = useRef<string | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+  const patientTitleRef = useRef<HTMLHeadingElement>(null);
+  const patientFocusPathRef = useRef<string | null>(null);
+  const pathname = usePathname();
   const railId = useId();
   const [openGroups, setOpenGroups] = useState<Partial<Record<Kree8ClinicalRailDefinition[number]['id'], boolean>>>({
     'quadro-decisioni': true,
@@ -83,6 +90,97 @@ export function Kree8WorkspaceShell({
   const renderedNavItems = navGroups ? navGroups.flatMap((group) => group.items) : navItems;
   const navKey = renderedNavItems.map((item) => item.href).join('|');
   const PrimaryActionIcon = primaryAction?.icon;
+  const { proposal, composition } = useRuntimeTwinDesign();
+  /* @Codex: analysis/catalog navigation tracks position without reshaping data. */
+  const overviewMode = variant === 'overview' && proposal;
+  const [folderSection, setFolderSection] = useState('quadro');
+  const [folderNavOpen, setFolderNavOpen] = useState(false);
+  const folderToggleRef = useRef<HTMLButtonElement>(null);
+  const folderMode = isClinical && proposal;
+
+  /* @Codex: a patient route may unmount the invoking control before the title
+     mounts. Treat only body or that detached control as unowned focus, once per
+     destination pathname; a connected control always retains the user's focus. */
+  useEffect(() => {
+    if (!isClinical || patientFocusPathRef.current === pathname) return;
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && active !== document.body && active.isConnected) {
+      patientFocusPathRef.current = pathname;
+      return;
+    }
+    const title = patientTitleRef.current;
+    if (!title) return;
+    patientFocusPathRef.current = pathname;
+    title.focus({ preventScroll: true });
+  }, [isClinical, pathname]);
+
+  /* @Codex WUL-678: resolve deep links within this patient, select their real
+     section, then reveal and focus the requested disclosure. Never run its action. */
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!isClinical || !root || !navKey) return;
+    const sections = navKey.split('|').filter(Boolean);
+    let frame = 0;
+    const select = (href: string) => {
+      cancelAnimationFrame(frame);
+      const target = href.startsWith('#') && href.length > 1 ? root.querySelector<HTMLElement>(`#${CSS.escape(href.slice(1))}`) : null;
+      const section = sections.includes(href) ? href.slice(1)
+        : target?.closest<HTMLElement>(sections.map((item) => `#${CSS.escape(item.slice(1))}`).join(','))?.id;
+      if (folderMode) {
+        setFolderSection(section ?? (composition === 'stream' ? 'diario' : 'quadro'));
+        setFolderNavOpen(false);
+      }
+      if (!target || !section) return;
+      const initiatingFocus = document.activeElement;
+      frame = requestAnimationFrame(() => {
+        if (!target.isConnected) return;
+        // In the original scrolling layout, a containing section may be folded.
+        const pane = target.closest<HTMLElement>('[data-folder-pane]');
+        const toggle = pane?.querySelector<HTMLButtonElement>(':scope > h3 > button[aria-expanded="false"]');
+        toggle?.click();
+        for (let node: HTMLElement | null = target; node && node !== root; node = node.parentElement) {
+          if (node instanceof HTMLDetailsElement) node.open = true;
+        }
+        frame = requestAnimationFrame(() => {
+          if (!target.isConnected) return;
+          // A later keyboard/pointer choice wins over this deferred focus pass.
+          const active = document.activeElement;
+          if (active !== initiatingFocus && active !== document.body) return;
+          // @Codex: a routed record has already placed its heading as the
+          // destination. Keep that one-time transfer while still revealing the
+          // requested section; later in-page hash navigation keeps its target focus.
+          if (patientFocusPathRef.current === pathname && active === patientTitleRef.current) {
+            target.scrollIntoView({ block: 'nearest' });
+            return;
+          }
+          const control = target instanceof HTMLDetailsElement
+            ? target.querySelector<HTMLElement>('button:not([disabled]), a[href], input:not([disabled])') ?? target.querySelector<HTMLElement>('summary')
+            : target.querySelector<HTMLElement>('h2, h3');
+          const focusTarget = control ?? target;
+          if (!focusTarget.matches('button, a, input, summary, [tabindex]')) focusTarget.tabIndex = -1;
+          focusTarget.focus({ preventScroll: true });
+          target.scrollIntoView({ block: 'nearest' });
+        });
+      });
+    };
+    const selectFromHash = () => select(window.location.hash);
+    // Reopening a closed disclosure must also work when the URL hash is unchanged.
+    const selectFromLink = (event: MouseEvent) => {
+      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      const link = event.target instanceof Element ? event.target.closest('a') : null;
+      if (!link || link.target === '_blank' || link.hasAttribute('download')) return;
+      const url = new URL(link.href, window.location.href);
+      if (url.origin === window.location.origin && url.pathname === window.location.pathname && url.search === window.location.search) select(url.hash);
+    };
+    selectFromHash();
+    window.addEventListener('hashchange', selectFromHash);
+    root.addEventListener('click', selectFromLink);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener('hashchange', selectFromHash);
+      root.removeEventListener('click', selectFromLink);
+    };
+  }, [isClinical, folderMode, navKey, composition, pathname]);
 
   /* Lume focal locus + scrollspy (WUL-55, F2c). Un solo effetto governa la vita
      dei bersagli: li scopre nel DOM dentro QUESTO guscio (querySelector sul ref,
@@ -115,7 +213,7 @@ export function Kree8WorkspaceShell({
       /* La Scheda possiede già una sola superficie focale che contiene tutte le
          sezioni. Lo scrollspy aggiorna soltanto la posizione nella rail e non
          solleva una seconda superficie interna. */
-      const nextFocusEl = isClinical ? null : el;
+      const nextFocusEl = isClinical || overviewMode ? null : el;
       if (nextFocusEl !== focusEl) {
         if (focusEl) {
           focusEl.removeAttribute('data-lume-focus');
@@ -143,7 +241,7 @@ export function Kree8WorkspaceShell({
         .filter((entry): entry is { href: string; el: HTMLElement } => entry !== null);
 
     const isInWorkspaceViewport = (el: HTMLElement) => {
-      const chromeBottom = root.querySelector('header')?.getBoundingClientRect().bottom ?? 0;
+      const chromeBottom = root.querySelector(overviewMode ? 'nav' : 'header')?.getBoundingClientRect().bottom ?? 0;
       const rect = el.getBoundingClientRect();
       return rect.bottom > chromeBottom && rect.top < window.innerHeight;
     };
@@ -230,23 +328,34 @@ export function Kree8WorkspaceShell({
         focusEl.classList.remove('lume-focal');
       }
     };
-  }, [isClinical, navKey]);
+  }, [isClinical, overviewMode, navKey]);
 
   return (
-    <div className={`${styles.shell} ${isClinical ? styles.clinicalShell : ''}`} ref={rootRef}>
-      <main className={`${styles.canvas} ${isClinical ? styles.clinicalCanvas : ''}`} data-testid={isClinical ? 'lume-scheda-scroll' : undefined}>
+    <RuntimeTwinFolderContext.Provider value={folderMode ? folderSection : null}>
+    <div className={folderMode ? twin.patientShell : `${styles.shell} ${isClinical ? styles.clinicalShell : ''} ${overviewMode ? styles.overviewShell : ''}`} ref={rootRef}>
+      <main className={folderMode ? twin.patientCanvas : `${styles.canvas} ${isClinical ? styles.clinicalCanvas : ''}`} data-folder-section={folderMode ? folderSection : undefined} data-testid={isClinical ? 'lume-scheda-scroll' : undefined}>
         <header
-          className={`${styles.chrome} ${isClinical ? styles.clinicalChrome : ''}`}
+          className={folderMode ? twin.patientHeader : `${styles.chrome} ${isClinical ? styles.clinicalChrome : ''}`}
           data-testid={isClinical ? 'lume-scheda-header' : undefined}
         >
-          <div className={styles.chromeTopRow}>
+          {folderMode ? <>
+            <div className={twin.identity}>
+              <h1 ref={patientTitleRef} tabIndex={-1}><PrivacyBlur>{title}</PrivacyBlur></h1>
+              <p>{patientAtoms.slice(0, 2).map((atom, index) => <span key={atom}>{index > 0 ? ' · ' : ''}<PrivacyBlur>{atom}</PrivacyBlur></span>)}</p>
+            </div>
+            <div className={twin.actions}>
+              {primaryAction && PrimaryActionIcon ? <Link href={primaryAction.href} className={twin.primary}><PrimaryActionIcon size={16} aria-hidden />{primaryAction.label}</Link> : null}
+              {headerActions}
+            </div>
+          </> : <>
+          {(!overviewMode || primaryAction || headerActions) && <div className={styles.chromeTopRow}>
             <Link href={backHref} className={styles.backButton} aria-label={backLabel} title={backLabel}>
               <ArrowLeft size={13} aria-hidden />
               <span className={styles.backButtonLabel}>{backLabel}</span>
             </Link>
             <div className={styles.headerActionCluster}>
               {/* WUL-297: persistent privacy affordance in the app header */}
-              <PrivacyModeToggle showLabel />
+              {!proposal ? <PrivacyModeToggle showLabel /> : null}
               {primaryAction && PrimaryActionIcon ? (
                 <Link href={primaryAction.href} className={styles.headerPrimaryAction}>
                   <PrimaryActionIcon size={14} aria-hidden="true" />
@@ -255,12 +364,12 @@ export function Kree8WorkspaceShell({
               ) : null}
               {headerActions}
             </div>
-          </div>
+          </div>}
 
           {isClinical ? (
             <div className={styles.clinicalIdentity}>
               <p className={styles.clinicalLabel}>{eyebrow}</p>
-              <h1 className={styles.clinicalName}><PrivacyBlur>{title}</PrivacyBlur></h1>
+              <h1 ref={patientTitleRef} tabIndex={-1} className={styles.clinicalName}><PrivacyBlur>{title}</PrivacyBlur></h1>
               <p className={`${styles.clinicalAtoms} lume-registro`} data-testid="lume-scheda-atoms">
                 {patientAtoms.map((atom, index) => (
                   <span key={`${atom}-${index}`} className={styles.clinicalAtomGroup}>
@@ -276,7 +385,7 @@ export function Kree8WorkspaceShell({
                 <FolderOpen size={12} />
               </span>
               <div className={styles.heroText}>
-                <p className={styles.eyebrow}>{eyebrow}</p>
+                {!proposal ? <p className={styles.eyebrow}>{eyebrow}</p> : null}
                 <h1 className={styles.title}>
                   <span className={styles.titleMain}>{title}</span>
                 </h1>
@@ -285,26 +394,41 @@ export function Kree8WorkspaceShell({
                     <PrivacyBlur>{patientLabel}</PrivacyBlur>
                   </p>
                 ) : null}
-                <p className={styles.subtitle}>{subtitle}</p>
-                {statusLabel ? <p className={styles.statusLine}>{statusLabel}</p> : null}
+                {!proposal ? <p className={styles.subtitle}>{subtitle}</p> : null}
+                {statusLabel && !proposal ? <p className={styles.statusLine}>{statusLabel}</p> : null}
               </div>
             </div>
           )}
+          </>}
         </header>
 
-        {renderedNavItems.length > 0 ? (
+        {folderMode ? <RuntimeTwinPatientNavigation items={renderedNavItems} active={folderSection} /> : renderedNavItems.length > 0 ? (
           <nav
+            id={`${railId}-nav`}
             className={`${styles.sectionRail} ${navGroups ? styles.groupedSectionRail : ''}`}
             aria-label="Sezioni della vista"
             data-rail-mode={navGroups ? 'grouped' : 'unmapped'}
+            data-folder-nav-open={folderNavOpen}
+            onClick={(event) => {
+              if (folderMode && folderNavOpen && (event.target as HTMLElement).closest('a')) {
+                setFolderNavOpen(false);
+                requestAnimationFrame(() => folderToggleRef.current?.focus());
+              }
+            }}
+            onKeyDown={(event) => {
+              if (folderMode && folderNavOpen && event.key === 'Escape') {
+                setFolderNavOpen(false);
+                requestAnimationFrame(() => folderToggleRef.current?.focus());
+              }
+            }}
           >
             {navGroups ? navGroups.map((group) => {
               const activeItem = group.items.find((item) => item.href === activeHref);
-              const expanded = openGroups[group.id] === true;
+              const expanded = folderMode || openGroups[group.id] === true;
               const panelId = `${railId}-${group.id}`;
               return (
                 <div className={styles.sectionGroup} key={group.id}>
-                  <button
+                  {folderMode ? <div className={styles.folderGroupLabel}>{group.label}</div> : <button
                     type="button"
                     className={styles.sectionGroupButton}
                     aria-controls={panelId}
@@ -313,14 +437,14 @@ export function Kree8WorkspaceShell({
                   >
                     <span>{group.label}</span>
                     <ChevronRight className={styles.sectionGroupChevron} size={14} aria-hidden="true" />
-                  </button>
+                  </button>}
                   <ul id={panelId} className={styles.sectionGroupItems} hidden={!expanded}>
                     {group.items.map((item) => (
                       <li key={item.href}>
                         <a
                           href={item.href}
                           className={styles.sectionLink}
-                          aria-current={expanded && item.href === activeHref ? 'location' : undefined}
+                          aria-current={expanded && item.href === (folderMode ? `#${folderSection}` : activeHref) ? 'location' : undefined}
                         >
                           <span>{item.label}</span>
                           {item.meta ? <small>{item.meta}</small> : null}
@@ -350,12 +474,12 @@ export function Kree8WorkspaceShell({
           </nav>
         ) : null}
 
-        <div className={`${styles.workspaceBody} ${isClinical ? styles.clinicalBody : ''}`}>
+        <div key="workspace-body" className={folderMode ? twin.patientBody : `${styles.workspaceBody} ${isClinical ? styles.clinicalBody : ''}`} data-folder-section={folderMode ? folderSection : undefined}>
           {isClinical ? (
             <article
-              className={styles.clinicalSurface}
+              className={folderMode ? twin.readingPane : styles.clinicalSurface}
               data-testid="lume-scheda-surface"
-              data-lume-elevation="focal"
+              data-lume-elevation={folderMode ? undefined : "focal"}
             >
               {children}
             </article>
@@ -363,5 +487,6 @@ export function Kree8WorkspaceShell({
         </div>
       </main>
     </div>
+    </RuntimeTwinFolderContext.Provider>
   );
 }

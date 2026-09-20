@@ -1,3 +1,4 @@
+import { parseOrdinaryRemoteReceipt, parseOrdinaryRemoteProvenance, type OrdinaryRemoteReceipt, type OrdinaryRemoteProvenance } from '../../chatgpt-product/ordinary-wire';
 /* @Codex */
 
 export const DOCUMENT_SYNTHESIS_PREVIEW_WIRE_SCHEMA_VERSION = 'mediflow.document-synthesis.preview-wire.v1' as const;
@@ -22,7 +23,7 @@ export type DocumentSynthesisPreviewWire = Readonly<{
         receipt: Readonly<{
             schemaVersion: 'mediflow.document-synthesis.publication-receipt.v1'; capability: 'document_synthesis';
             outputSha256: string; claimCitationsDigestSha256: readonly number[]; sourceSetDigestSha256: readonly number[];
-            providerBindingReceipt: ProviderReceipt; reviewOnly: true; applyPolicy: 'none'; writesPerformed: 0;
+            providerBindingReceipt: ProviderReceipt | OrdinaryRemoteReceipt; reviewOnly: true; applyPolicy: 'none'; writesPerformed: 0;
         }>;
         provenance: Readonly<{
             schemaVersion: 'mediflow.document-synthesis.publication-provenance.v1'; capability: 'document_synthesis';
@@ -31,7 +32,7 @@ export type DocumentSynthesisPreviewWire = Readonly<{
             fabricProvenance: Readonly<{
                 schemaVersion: 'mediflow.ai.fabric-provenance.v1'; capability: 'document_synthesis'; venue: 'local_process';
                 provider: 'ollama'; model: string; preprocessing: readonly ['context_minimization']; receipt: FabricReceipt;
-            }>;
+            }> | OrdinaryRemoteProvenance;
         }>;
     }>;
 }>;
@@ -87,7 +88,8 @@ function citations(value: unknown): readonly Citation[] | null {
     return Object.freeze(output);
 }
 
-function providerReceipt(value: unknown): ProviderReceipt | null {
+function providerReceipt(value: unknown): ProviderReceipt | OrdinaryRemoteReceipt | null {
+    const remote = parseOrdinaryRemoteReceipt(value, 'document_synthesis'); if (remote) return remote;
     const item = record(value, ['schemaVersion', 'capability', 'registryTask', 'provider', 'model', 'venue', 'egress', 'fallback', 'runtimeReadiness']);
     const model = item && text(item.model, 256);
     return item && item.schemaVersion === 'mediflow.document-synthesis.provider-binding.v1' && item.capability === 'document_synthesis'
@@ -126,6 +128,7 @@ function publication(value: unknown, source: boolean): DocumentSynthesisPreviewW
     const provenance = publication && record(publication.provenance, ['schemaVersion', 'capability', 'sourceSetAuthority', 'inputDigestScope', 'citationSupport', 'modelCausality', 'fabricProvenance']);
     const fabric = provenance && record(provenance.fabricProvenance, ['schemaVersion', 'capability', 'venue', 'provider', 'model', 'preprocessing', 'receipt']);
     const resolution = fabric && fabricReceipt(fabric.receipt); const fabricModel = fabric && text(fabric.model, 256);
+    const remote = provenance && provider?.provider === 'chatgpt_subscription' ? parseOrdinaryRemoteProvenance(provenance.fabricProvenance, provider) : null;
     if (!publication || (source && publication.schemaVersion !== 'mediflow.document-synthesis.publication.v1') || !output || !summary
         || output.schemaVersion !== 'mediflow.ai.extract.v1' || output.task !== 'document_synthesis'
         || !['green', 'yellow', 'red'].includes(qualityLevel as string) || !sourceCitations || !receipt || !provider || !claimDigest || !sourceDigest
@@ -134,14 +137,15 @@ function publication(value: unknown, source: boolean): DocumentSynthesisPreviewW
         || !provenance || provenance.schemaVersion !== 'mediflow.document-synthesis.publication-provenance.v1' || provenance.capability !== 'document_synthesis'
         || provenance.sourceSetAuthority !== 'application_host' || provenance.inputDigestScope !== 'ordered_normalized_provider_projection_set'
         || provenance.citationSupport !== 'provider_declared_host_membership_and_locator_validated' || provenance.modelCausality !== 'not_established'
-        || !fabric || fabric.schemaVersion !== 'mediflow.ai.fabric-provenance.v1' || fabric.capability !== 'document_synthesis'
+        || (provider.provider === 'chatgpt_subscription' && !remote)
+        || (!remote && (!fabric || fabric.schemaVersion !== 'mediflow.ai.fabric-provenance.v1' || fabric.capability !== 'document_synthesis'
         || fabric.venue !== 'local_process' || fabric.provider !== 'ollama' || !fabricModel || !Array.isArray(fabric.preprocessing)
-        || fabric.preprocessing.length !== 1 || fabric.preprocessing[0] !== 'context_minimization' || !resolution) return null;
+        || fabric.preprocessing.length !== 1 || fabric.preprocessing[0] !== 'context_minimization' || !resolution))) return null;
     const wirePublication = Object.freeze({
         output: Object.freeze({ schemaVersion: 'mediflow.ai.extract.v1' as const, task: 'document_synthesis' as const, summary, qualityLevel: qualityLevel as 'green' | 'yellow' | 'red' }),
         citations: sourceCitations,
         receipt: Object.freeze({ schemaVersion: receipt.schemaVersion, capability: receipt.capability, outputSha256: receipt.outputSha256, claimCitationsDigestSha256: claimDigest, sourceSetDigestSha256: sourceDigest, providerBindingReceipt: provider, reviewOnly: true as const, applyPolicy: 'none' as const, writesPerformed: 0 as const }),
-        provenance: Object.freeze({ schemaVersion: provenance.schemaVersion, capability: provenance.capability, sourceSetAuthority: provenance.sourceSetAuthority, inputDigestScope: provenance.inputDigestScope, citationSupport: provenance.citationSupport, modelCausality: provenance.modelCausality, fabricProvenance: Object.freeze({ schemaVersion: fabric.schemaVersion, capability: fabric.capability, venue: fabric.venue, provider: fabric.provider, model: fabricModel, preprocessing: Object.freeze(['context_minimization'] as const), receipt: resolution }) }),
+        provenance: Object.freeze({ schemaVersion: provenance.schemaVersion, capability: provenance.capability, sourceSetAuthority: provenance.sourceSetAuthority, inputDigestScope: provenance.inputDigestScope, citationSupport: provenance.citationSupport, modelCausality: provenance.modelCausality, fabricProvenance: remote ?? Object.freeze({ schemaVersion: fabric!.schemaVersion, capability: fabric!.capability, venue: fabric!.venue, provider: fabric!.provider, model: fabricModel, preprocessing: Object.freeze(['context_minimization'] as const), receipt: resolution }) }),
     });
     return wirePublication as DocumentSynthesisPreviewWire['publication'];
 }

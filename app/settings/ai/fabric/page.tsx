@@ -1,14 +1,22 @@
 'use client';
 
 /* @Codex */
+import { ChatGptAccountPanel } from '@/components/settings/chatgpt-account-panel';
+
+/* @Codex */
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import serviceStyles from '@/components/service-architecture-panel.module.css';
 import { FabricCapabilityRegistry } from '@/components/settings/fabric-capability-registry';
+import { FunctionStatusPanel } from '@/components/settings/function-status-panel';
+import functionStyles from '@/components/settings/function-status-panel.module.css';
 import { FabricEgressSection } from '@/components/settings/fabric-egress-section';
 import { FabricErrorState, FabricLoadingState } from '@/components/settings/fabric-load-state';
 import { FabricVenueSection } from '@/components/settings/fabric-venue-section';
 import styles from '@/components/settings/settings-lume.module.css';
-import { SETTINGS_CARD_CLASS, SettingsSectionIntro } from '@/components/settings/settings-ui';
+import { SETTINGS_CARD_CLASS, SETTINGS_SECONDARY_BUTTON_CLASS, SettingsSectionIntro } from '@/components/settings/settings-ui';
 import type { FabricObservabilitySnapshot } from '@/lib/ai-providers/fabric/routing-observability';
+import { FABRIC_STATUS_VERSION_HEADER, parsePortableFabricStatusEnvelope, portablePrerequisiteText, type TreatmentReasoningPortableDisclosure } from '@/lib/ai-providers/fabric/treatment-reasoning-portable-disclosure';
 import type { FabricStatusSnapshot } from '@/lib/ai-providers/fabric/status';
 import {
     describeProviderDisclosure,
@@ -23,6 +31,7 @@ type FabricPageState =
         kind: 'ready';
         status: FabricStatusSnapshot;
         observability: FabricObservabilitySnapshot;
+        portable: TreatmentReasoningPortableDisclosure | null;
     }>;
 
 class FabricFetchError extends Error {
@@ -106,6 +115,34 @@ function FabricProviderSection({ snapshot }: { snapshot: FabricStatusSnapshot })
     );
 }
 
+function PortableTreatmentSection({ disclosure }: { disclosure: TreatmentReasoningPortableDisclosure }) {
+    const hardware = disclosure.hardware;
+    const gib = (bytes: number) => (bytes / 1024 ** 3).toLocaleString('it-IT', { maximumFractionDigits: 1 });
+    return <section className={SETTINGS_CARD_CLASS} aria-labelledby="fabric-treatment-portable-title" data-testid="fabric-treatment-portable">
+        <header className={styles.fabricBlockHeader}>
+            <h3 id="fabric-treatment-portable-title">Ragionamento terapeutico · motore Windows/Linux</h3>
+            <p>{disclosure.label}</p>
+        </header>
+        <p><code>{disclosure.model}</code></p>
+        <p role="status">{disclosure.state === 'admitted' ? 'Configurazione ammessa, esecuzione non osservata.'
+            : disclosure.state === 'platform_unsupported' ? 'Percorso non ammesso su questa piattaforma. Sui Mac supportati rimane MLX.'
+                : 'Motore non attivabile finché i prerequisiti non sono soddisfatti.'}</p>
+        <p>Selezione host: {disclosure.selected ? 'presente' : 'assente'}. Stato: <code>{disclosure.state}</code>.</p>
+        <p>Locale su questa postazione, senza host Mac remoto e senza fallback. Ogni risultato richiede revisione; nessuna scrittura clinica.</p>
+        {disclosure.prerequisites.length > 0 && <p>Prerequisiti: {disclosure.prerequisites.map(portablePrerequisiteText).join(' · ')}.</p>}
+        <details><summary>Hardware e preparazione offline</summary>
+            {hardware ? <>
+                <p>Architettura macchina: {hardware.machineArchitecture}; processo Node: {hardware.nodeArchitecture}.</p>
+                <p>RAM osservata: {gib(hardware.totalMemoryBytes)} GiB. Politica prudenziale: almeno {gib(hardware.minimumHostMemoryBytes)} GiB sull’host,
+                    con {gib(hardware.processMemoryLimitBytes)} GiB di limite del processo e {hardware.threads} thread.</p>
+                <p>Questi valori sono criteri di ammissione, non prestazioni misurate né qualificazione del runtime.</p>
+            </> : <p>Hardware non verificabile.</p>}
+            <p>L’operatore prepara e inventaria un runtime offline completo e i pesi originali, verifica le licenze, importa il manifest e conferma separatamente l’ammissione.
+                Questa pagina non installa, non scarica e non attiva la funzione.</p>
+        </details>
+    </section>;
+}
+
 export default function SettingsAiFabricPage() {
     const [state, setState] = useState<FabricPageState>({ kind: 'loading' });
 
@@ -115,15 +152,17 @@ export default function SettingsAiFabricPage() {
         async function loadSnapshots() {
             try {
                 const [statusResponse, observabilityResponse] = await Promise.all([
-                    fetch('/api/ai/fabric/status', { cache: 'no-store', signal: controller.signal }),
+                    fetch('/api/ai/fabric/status', { headers: { [FABRIC_STATUS_VERSION_HEADER]: '2' }, cache: 'no-store', signal: controller.signal }),
                     fetch('/api/ai/fabric/observability', { cache: 'no-store', signal: controller.signal }),
                 ]);
                 const [statusValue, observabilityValue] = await Promise.all([
                     readFabricResponse(statusResponse),
                     readFabricResponse(observabilityResponse),
                 ]);
-                const snapshots = parseFabricSnapshotPair(statusValue, observabilityValue);
-                setState({ kind: 'ready', ...snapshots });
+                const envelope = parsePortableFabricStatusEnvelope(statusValue);
+                const snapshots = parseFabricSnapshotPair(envelope.legacy, observabilityValue);
+                if (controller.signal.aborted) return;
+                setState({ portable: envelope.treatmentReasoning, kind: 'ready', ...snapshots });
             } catch (error) {
                 if (controller.signal.aborted) return;
                 setState({
@@ -141,10 +180,30 @@ export default function SettingsAiFabricPage() {
     return (
         <section className="space-y-4" data-testid="settings-ai-fabric-section">
             <SettingsSectionIntro
-                kicker="Intelligenza locale"
-                title="Capacità e connessioni"
-                description="Registro in sola lettura delle funzioni intelligenti, della sede di calcolo e dell’eventuale uscita dei dati."
+                kicker="Funzioni intelligenti"
+                title="Intelligence Fabric"
+                description="Distingui configurazione locale, collegamento account esterno e disponibilità delle funzioni. Collegare un account non ammette un provider."
             />
+
+            <section className={SETTINGS_CARD_CLASS} aria-labelledby="fabric-local-title" data-testid="fabric-local-setup">
+                <header className={styles.fabricBlockHeader}>
+                    <h3 id="fabric-local-title">Modelli locali e funzioni</h3>
+                    <p>Ollama e ATHENA seguono la configurazione e l’ammissione locali. Le preferenze mostrano soltanto le opzioni del catalogo host; salvarle non prova che una funzione sia pronta.</p>
+                </header>
+                <nav aria-label="Configura Intelligence Fabric" className={serviceStyles.fabricActions}>
+                    <Link href="/settings/ai/modelli" className={SETTINGS_SECONDARY_BUTTON_CLASS}>Modelli e hardware</Link>
+                    <Link href="/settings/ai/funzioni" className={SETTINGS_SECONDARY_BUTTON_CLASS}>Funzioni cliniche</Link>
+                    <Link href="/settings/ai/governance" className={SETTINGS_SECONDARY_BUTTON_CLASS}>Governance e rollout</Link>
+                </nav>
+            </section>
+
+            {/* @Codex: external account metadata never feeds local preferences or readiness. */}
+            <ChatGptAccountPanel />
+            <FunctionStatusPanel />
+            {state.kind === 'ready' && state.portable && <PortableTreatmentSection disclosure={state.portable} />}
+
+            <details className={SETTINGS_CARD_CLASS}>
+            <summary className={functionStyles.advancedSummary}>Dettagli tecnici: provider, connessioni e registro</summary>
 
             {state.kind === 'loading' ? <FabricLoadingState /> : null}
             {state.kind === 'unauthorized' ? <FabricErrorState unauthorized /> : null}
@@ -157,6 +216,7 @@ export default function SettingsAiFabricPage() {
                     <FabricCapabilityRegistry snapshot={state.status} />
                 </div>
             ) : null}
+            </details>
         </section>
     );
 }

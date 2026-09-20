@@ -176,10 +176,16 @@ jobs:
       - name: H9 golden fixture drift check
         run: node scripts/run-strip-types.mjs scripts/generate-headless-soap-entry-contract-golden.ts --check
       - name: H9 TypeScript draft and receipt contract tests
-        run: >-
-          node scripts/run-strip-types.mjs --test
-          lib/headless/clinician-soap-write-contract.test.ts
-          lib/headless/clinician-soap-entry-commit-receipt.test.ts
+        run: |
+          data_dir="$(mktemp -d "${RUNNER_TEMP}/mediflow-h4-golden.XXXXXX")"
+          cleanup() { rm -rf -- "${data_dir}"; }
+          trap cleanup EXIT
+          export MEDIFLOW_DATA_DIR="${data_dir}"
+          NODE_BIN="$(command -v node)"
+          export MEDIFLOW_STRIP_TYPES_NODE="${NODE_BIN}"
+          "${NODE_BIN}" scripts/run-strip-types.mjs --test \
+            lib/headless/clinician-soap-write-contract.test.ts \
+            lib/headless/clinician-soap-entry-commit-receipt.test.ts
 
   windows:
     needs: changes

@@ -25,6 +25,7 @@ export function ThemeToggle() {
 
     return (
         <div
+            data-lume-control="theme"
             className="relative mx-auto flex w-fit rounded-full border p-0.5 shadow-inner"
             style={{
                 backgroundColor: 'var(--lume-surface-field)',
@@ -36,6 +37,7 @@ export function ThemeToggle() {
                 return (
                     <button
                         key={tab.id}
+                        data-lume-control="theme"
                         onClick={() => setTheme(tab.id)}
                         className={cn(
                             "relative z-10 flex h-11 w-11 items-center justify-center rounded-full border transition-[background-color,border-color,color] duration-[var(--lume-dur-fuoco)] ease-[var(--lume-ease)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--lume-accent)]",

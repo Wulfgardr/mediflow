@@ -1,7 +1,326 @@
-# ADR 0115: adapter ICD-11 WHO governato senza Docker
+# ADR 0115: Application Service ICD-11 WHO e sidecar locale opt-in
 
 Date: 2026-09-01
 Status: Accepted
+
+Amendment: 2026-09-06, WUL-672, candidato locale da `07725c7`.
+
+## Amendment WUL-673 — consultazione WHO paired nell'app Mac (2026-09-12)
+
+Run `e25d456b66df489786a4e27d63f1966b`, base
+`73442886cecb9b5c21446974819822c058d848d4`. Questo amendment additivo
+estende la superficie di consultazione, non cambia il production root locale.
+Precede l'implementazione ed è riflesso nella specifica OpenAPI v1.
+Le restrizioni storiche «nessun nuovo endpoint/Search nativa» sotto non si
+applicano ai soli tre endpoint qui autorizzati.
+
+- `GET /api/v1/network/terminology/who/readiness`: nessun parametro;
+  readiness v2 passiva, `200` solo per `available`, altrimenti `503` con la
+  medesima struttura. `configured` non è una prova di servizio disponibile.
+- `GET /api/v1/network/terminology/who/search?q=…`: un solo parametro `q`,
+  normalizzato dal binding (1–160 byte UTF-8), nessun limit/paging;
+  envelope Search v2 con `partial`, voci complete e receipt v2.
+- `GET /api/v1/network/terminology/who/code-check?code=…&release=2026-01`:
+  codice singolo/combinato nel linguaggio del parser canonico; risultato
+  code-check v1 `found|not_found`, entry opzionale e receipt esclusivamente
+  `live`. `not_found` è un risultato `200`, non indisponibilità o diagnosi.
+
+Tutte e tre usano `requireNetworkCapabilityContext` e la capability già
+esistente `network.catalogs.readonly`: token del dispositivo paired,
+operatore autenticato e ambulatorio effettivo. La sessione nativa resta nativa;
+nessuna conversione in WebSession, nuova capability o modifica auth/DB. La
+consultazione è globale ma resta legata all'identità e all'ambito iniziali.
+Si catturano valori immutabili di sessione/utente/ruolo/canale,
+dispositivo/piattaforma/tokenHash e ambulatorio, più l'identità dell'oggetto
+sessione. Si riautentica prima del lavoro e dopo ogni attesa del servizio;
+`peekSession` verifica sincronicamente la sessione originaria prima e dopo
+l'attesa di riautenticazione. Una nuova autorizzazione, anche valida, non
+convalida il risultato della precedente. Abort, revoca o cambio binding
+negano la consegna; nessun token o snapshot di autorità viene restituito.
+
+Il servizio resta `getIcd11WhoProductionRuntime`: nessun secondo runtime,
+audit parallelo, accesso WHO dal client o endpoint caller-supplied. I parser
+canonici validano anche la proiezione in uscita. Il limite upstream di 65.536
+byte è invariato; anche l'envelope paired e il decoder Swift hanno un limite
+massimo di 65.536 byte. Un risultato non consegnabile fallisce chiuso,
+non viene troncato a un envelope falsamente completo. Il server non espone
+errori vendor, query, credenziali o configurazione host. Risposte `no-store`.
+
+Il client Swift conserva schema, codice/titolo/URI, binding, release `2026-01`,
+lingua `en`, immagine/dataset, `partial`, fonte e tempi della receipt. Rifiuta
+schema/versione/binding incongruenti, codici malformati, URI estranei, conteggi
+incoerenti, enum sconosciuti e receipt non valide. Usa la stessa URLSession
+effimera e il delegate TLS pinning del client paired. Non usa un'altra sessione.
+Il datasource locale e gli altri conformer ereditano un errore WHO esplicito
+`unsupported`; nessun ripiego a ICD-10, altro dataset o WHO remoto.
+
+Repertori Mac sostituisce la ricerca ICD-10 non supportata con la scelta
+«ICD-11 WHO». Ricerca, controllo codice e verifica servizio richiedono intento
+esplicito, non partono digitando o su campo vuoto. La superficie mostra inglese,
+release, stato/provenienza, partial/vuoto, errori con retry manuale e annullamento.
+Generazione richiesta e identità corrente impediscono pubblicazione fuori
+ordine o dopo cambio query/catalogo/connessione/ambulatorio o chiusura. Nessun
+autoapply o scrittura paziente. Farmaci/Esenzioni e API ATC/LOINC/UCUM restano.
+
+Recupero: restringere una ricerca non consegnabile e/o verificare il servizio;
+non attribuire genericamente un `503` alla dimensione. Servizio non configurato
+richiede l'intervento esplicito del responsabile dell'host secondo il setup
+esistente, mai avvio/installazione/accettazione licenza automatica.
+
+**Claim ceiling:** contributo di codice e prove sintetiche eseguibili sul
+materiale allegato. Xcode/build Mac, pinning reale, WHO live/UI e qualifica
+exact-candidate Mac/localhost/Headless restano al parent/Astra (WUL-697).
+Questo contributo non chiude WUL-673 né dichiara parità delle altre piattaforme.
+
+## Decisione vigente per il candidato 0.8.6 — prima del codice
+
+L'utente ha scelto il **sidecar WHO locale** il 6 settembre, come registrato
+nel [packet WUL-672](../analysis/2026-09-05-086-who-decision.md#1-decisione-utente-catalogo-who-con-sidecar-locale).
+Questa revisione sostituisce il target online della decisione del 1 settembre
+per il production root del candidato. Le sezioni storiche sotto descrivono
+quel percorso precedente e i relativi packet, non autorizzano fallback online.
+Il vecchio container MediFlow, la porta 8888 e i suoi launcher restano ritirati.
+
+### Confine e contratto Search
+
+- La route autenticata `/api/icd/proxy` resta sottile: senza parametri legge
+  soltanto readiness, con il solo `q` esegue Search. Nessun nuovo endpoint,
+  lookup, cross-check, autocode o cambiamento alle altre API.
+- Un nuovo transport interno usa solo `http://127.0.0.1:8382` e il path
+  `/icd/release/11/2026-01/mms/search`. Il caller non sceglie URL, host, porta,
+  header, release, lingua o policy. Nessun redirect, proxy, OAuth, token,
+  risoluzione segreti o fallback remoto. Il listener deve essere confinato
+  al loopback in provisioning; questo non autentica altri processi dell'host.
+- Il production root seleziona esclusivamente il locale. I componenti online
+  precedenti possono restare come codice storico coperto da test, senza essere
+  composti nel percorso production. Non si simula una credenziale OAuth per
+  superare i vecchi gate.
+- Binding `v2 / 2026-01 / mms / en`; query massima 160 byte UTF-8, massimo 25
+  risultati, risposta upstream massima 64 KiB, deadline transport 5 secondi e
+  audit 1 secondo. Nessun retry o pubblicazione tardiva. La query contiene
+  soltanto termini, senza contesto paziente. Audit e receipt non includono
+  query, codice, titolo, URI, percorsi host o segreti.
+  L'audit persistito usa la whitelist esistente: `counts=resultCount` e flag
+  espliciti per schema, operazione, deployment, fonte, release, lingua, binding,
+  immagine, dataset, latenza e i tre timestamp della receipt validata. Le chiavi
+  `image` e `dataset` mantengono i digest SHA-256 interi entro gli 80 caratteri
+  per token del sanitizer; nessuna estensione dello schema audit generale.
+- Search locale pubblica un envelope `icd11-search-response.v2`, con voce
+  `code`, `description` (titolo WHO), `system` e `canonicalUri`, più `partial`
+  e receipt versionata. L'URI deve appartenere al namespace MMS/release fissato;
+  viene conservato come dato, mai dereferenziato. Il limite di 25 riguarda
+  l'output, non la cardinalita upstream: entro i 64 KiB si validano tutte le
+  voci a blocchi di 25 con il parser ufficiale esistente, si restituiscono le
+  prime 25 in ordine WHO e si imposta `partial=true` se altre sono omesse o WHO
+  dichiara `resultChopped`. Una voce malformata anche dopo la venticinquesima,
+  URI/codici duplicati o body oltre il limite negano la risposta. Nessuna
+  modifica al vecchio parser/trasporto online, paginazione remota o ordinamento.
+- Il client riconosce separatamente v1 e v2 a campi chiusi; non modifica
+  silenziosamente v1. Il risultato v2 conserva la provenienza nella ricerca
+  e nella selezione. La revisione parent del 6 settembre richiede che codice,
+  titolo e URI sopravvivano al salvataggio/rilettura effettivi del paziente,
+  coerentemente con il §1.2.3 dei termini WHO. Il campo JSON `diagnoses` gia
+  cifrato ammette i due campi opzionali `canonicalUri` e `reference` (binding,
+  lingua/release, immagine e dataset dichiarati da MediFlow, non WHO).
+  Modulo, schema client e proiezione della sessione di modifica li conservano;
+  nessuna nuova colonna, route o policy di cifratura. Record storici/manuali
+  senza metadati restano leggibili, senza ricostruire URI o certificare codici.
+  Il codice di una selezione WHO resta in sola lettura finche la selezione non
+  viene sostituita/cancellata; una nuova ricerca libera azzera codice e fonte.
+  La compatibilita del medesimo JSON include `MediFlowCore.DiagnosesCodec`:
+  `ClinicalDiagnosis` ed `Entry` conservano URI opzionale e `reference` come
+  valore JSON opaco nel decode/encode gia usato dall'editor nativo. Il codec
+  non interpreta o verifica la fonte, non ricostruisce URI e non avvia Search.
+  Campi assenti/null diventano opzionali nil e non aggiungono chiavi ai record
+  di forma precedente; sistemi sconosciuti e riferimenti JSON non WHO restano
+  leggibili. Solo codec Core e test di round-trip, nessuna modifica Shared/UI,
+  Search nativa, cifratura o FHIR.
+  Anche la proiezione del modulo web normalizza `canonicalUri/reference: null`
+  come assenza: apertura e salvataggio invariato non riscrivono diagnosi, e una
+  modifica effettiva omette tali chiavi vuote. I campi opachi estranei conservano
+  i vincoli esistenti contro la perdita o la riassociazione incerta dei metadati.
+  Export e migrazione dei record storici restano un gate separato: il candidato
+  non attesta conformita dell'intero ciclo di utilizzo ICD.
+
+### Compatibilita Search osservata il 7 settembre 2026 — WUL-673
+
+La prima prova locale reale della release WHO 2026-01 restituisce anche
+combinazioni di codici: `theCode` contiene i separatori ICD `&` o `/`, mentre
+`id` contiene i rispettivi URI MMS separati dallo stesso operatore. Non e un
+singolo URI. Rifiutare l'intera risposta per questo formato rende inutilizzabile
+anche una ricerca ordinaria come `cholera`.
+
+Per queste voci il lettore verifica ogni URI componente nel namespace fissato,
+numero e ordine dei separatori rispetto al codice ricevuto. Conserva codice e
+titolo WHO e usa come `canonicalUri` l'endpoint ufficiale
+`http://id.who.int/icd/release/11/2026-01/mms/codeinfo/<codice percent-encoded>`.
+E un riferimento formato secondo il contratto WHO, non l'URI di un solo
+componente: una chiamata locale di verifica ha confermato lo stesso `@id` per
+`1A00&XN8P1`. Non viene introdotta una chiamata CodeInfo per ogni risultato,
+ne dereferenziazione automatica, interpretazione o validazione clinica della
+combinazione. I riferimenti a entita singole e i record storici restano invariati.
+Il client verifica anche la corrispondenza tra codice e URI CodeInfo; la
+serializzazione percent-encoded deve essere canonica. Formati non riconosciuti
+continuano a negare l'intera risposta, senza scartare silenziosamente voci.
+
+Fonte: [WHO API v2, CodeInfo e combinazioni](https://icd.who.int/docs/icd-api/WhatsNewAPIVersion2/).
+Questa estensione del riferimento non abilita cross-check, autocode o export
+FHIR e non qualifica l'uso clinico della classificazione.
+
+### Verifica esplicita del codice — integrazione 0.8.6, WUL-673
+
+Search per termini e verifica del codice sono operazioni distinte. La nuova
+route autenticata `GET /api/icd/code-check?code=...&release=2026-01` usa soltanto
+il CodeInfo ufficiale sul medesimo sidecar e, per il codice trovato, legge il
+titolo dell'entita base indicata da WHO. La release richiesta e obbligatoria e
+deve coincidere con quella fissa; un'altra release viene rifiutata prima di
+contattare il servizio. Nessuna conversione a codici terminali o flexible mode.
+
+Il codice e ASCII maiuscolo, massimo 32 caratteri, con separatori `&` e `/`
+espliciti. Ogni path e costruito sul server: l'URI dell'entita base e prima
+validato nel namespace MMS/release fissati e non viene seguito come URL.
+Le due letture condividono il budget di 5 secondi, 64 KiB per risposta e la
+cancellazione; redirect, risposta incoerente e fallimento negano il risultato.
+Il 404 CodeInfo produce `not_found`, distinto da indisponibilita. Per una
+combinazione il titolo e dichiaratamente quello del codice base: non viene
+presentato come descrizione dell'intera combinazione.
+
+Il DTO conserva codice richiesto, esito, riferimento WHO, release, lingua e
+identita di immagine/dataset. La receipt dedicata riporta istante, latenza ed
+esito senza codice, titolo o query nell'audit. La verifica e sempre diretta:
+nessuna cache o validita futura implicita. Prima della risposta il server
+ricontrolla configurazione, generazione e autorita della sessione; disattivazione,
+lock o cambio binding non possono pubblicare un risultato tardivo.
+
+Il controllo non modifica la cartella, non attesta correttezza della diagnosi,
+eleggibilita o adeguatezza clinica, e non abilita automaticamente export/FHIR.
+I risultati con release storica non vengono riscritti. La nuova UI puo rendere
+visibile la verifica accanto al codice e offrire una scelta esplicita successiva.
+
+Contratto verificato su OpenAPI WHO `GetCodeInfo` e risposte locali del 7
+settembre 2026: codice singolo e combinazione 200, codice inesistente 404,
+entita base con titolo inglese. Le prove HTTP/UI integrate restano gate separati.
+
+### Attivazione del servizio
+
+- `MEDIFLOW_ICD_WHO_ENABLED=1` e opt-in server esplicito; senza di esso zero
+  richieste e nessuna lettura delle credenziali. Il trasporto locale non legge
+  `MEDIFLOW_ICD_WHO_NETWORK` o le variabili OAuth precedenti.
+- L'attivazione richiede anche `MEDIFLOW_ICD_WHO_LOCAL_IMAGE_DIGEST` e
+  `MEDIFLOW_ICD_WHO_LOCAL_DATASET_ID`, entrambi `sha256:<64 hex>`, forniti
+  dall'inventario di provisioning. Valori assenti o invalidi bloccano Search.
+  Sono identificatori dichiarati dall'host, non attestazioni ottenute dall'API.
+- Readiness v2 distingue `disabled`, `configuration_required`, `configured`,
+  `available` e `unavailable`; indica deployment locale, binding e ultimo
+  successo diretto distinto dall'ultima restituzione cache. Leggere readiness
+  non interroga WHO. `available` descrive un successo recente osservato, non
+  prova integrita del dataset, licenze, installabilita o disponibilita futura.
+- Cache soltanto RAM, massimo 256 chiavi/4 MiB, TTL assoluto massimo 24 ore
+  dall'acquisizione, senza rinnovo su hit. Chiave legata a query normalizzata,
+  binding e identita immagine/dataset. Receipt distingue `deployment=local`,
+  `source=live|cache`, `fetchedAt`, `expiresAt` e `completedAt`.
+- I gate precedono la cache. Disable, cambio identita/configurazione, dispose
+  o clock regressivo invalidano cache e risultati pendenti. Configurazione
+  riletta al confine di ogni operazione e prima della pubblicazione; nessuna
+  promessa di osservare istantaneamente cambi esterni fra due letture.
+
+### Setup guidato locale — WUL-673, 7 settembre 2026
+
+Il percorso guidato aggiunge una CLI locale a operazioni nominate e una guida
+interattiva nelle impostazioni. Non introduce API di provisioning, accesso Docker
+nel server Web, writer clinici o modifiche al contratto Search/CodeInfo.
+
+- `init` prepara un manifesto privato incompleto; non accetta termini o inventa
+  evidenze. `plan` valida le registrazioni senza rete. `status` legge soltanto
+  metadati selezionati del contesto Docker locale e del container nominato;
+  non legge variabili d'ambiente del container o credenziali. Il contesto deve
+  usare un socket Unix locale; nessun cambio del contesto globale o gestione VM.
+- `install` richiede manifesto valido per provisioning e conferma esatta
+  `install-who-2.6.0-2026-01_en`. Solo questa azione puo scaricare l'immagine
+  ufficiale al digest registrato e avviare un nuovo container a nome fisso.
+  Binding loopback 8382:80, piattaforma ARM64, release/lingua fissate,
+  `acceptLicense=true` dopo registrazione dell'accettazione, analytics,
+  DORIS e FHIR disabilitati, zero mount, restart automatico disabilitato.
+  Nessuna shell, argomenti Docker liberi, esecuzione da query Web, sostituzione,
+  arresto o rimozione di container esistenti. Il manifesto per una nuova
+  installazione non puo ereditare snapshot/prove di un altro deployment.
+  Un fallimento conserva gli
+  artefatti creati e indica la fase da recuperare manualmente.
+- `configure` richiede manifesto valido per attivazione, container nominato
+  in esecuzione con immagine e listener coerenti, e conferma esatta
+  `enable-who-2026-01_en`. Scrive esclusivamente le tre variabili del contratto
+  server in un nuovo file privato, senza sovrascrivere file o ambiente esistenti.
+  Non avvia/riavvia MediFlow; l'operatore carica il file nel successivo avvio
+  autorizzato. Configurazione generata non significa processo gia configurato.
+- Inventario, snapshot, prove offline/ripristino e consenso restano dichiarazioni
+  host-owned da verificare sul target, non attestazioni della CLI. Il percorso
+  di qualifica esistente resta obbligatorio; nessun download, VM o nuova prova
+  distruttiva sul deployment gia qualificato per verificare il wizard.
+- La UI mostra prerequisiti, termini/versione, comandi fissi, blocchi e recupero;
+  nessuna chiave OAuth per il deployment locale. La verifica finale riusa la
+  ricerca esplicita di esempio gia presente, distinguendo cache e risposta live.
+  Un checkbox nella guida non concede autorita al server o prova un'installazione.
+
+I test usano Docker fake e fixture sintetiche, con directory dati temporanea
+esplicita. Il read-only sul deployment qualificato e la fixture UI sono prove
+separate da un'installazione nuova end-to-end. Nessuna modifica `/api/v1`.
+
+### Revisione del percorso ordinario — WUL-673, prima del codice
+
+La prima guida CLI richiedeva editing JSON, hash e qualifica manuale: non
+soddisfa il percorso ordinario richiesto e non viene promossa a onboarding
+completo. La revisione conserva la CLI tecnica per il gestore e aggiunge
+`Setup_WHO.command`, solo host macOS ARM64, senza endpoint Web privilegiati.
+
+- Un release-lock distribuito contiene soltanto metadati pubblici del registry
+  ufficiale verificato il 7 settembre: immagine 2.6.0/ARM64, digest e hash delle
+  evidenze primarie. Non include licenza dell'operatore, identita dataset o prove
+  di un deployment. La procedura prepara automaticamente il manifesto privato.
+- Il gesto interattivo di licenza riguarda esattamente software/versione/dataset
+  mostrati; e registrato localmente con data e identificatore dell'installazione.
+  Prima di rete o mutazioni Docker l'utente autorizza installazione e qualifica
+  del nuovo servizio. Nessuna accettazione implicita da copia del comando.
+- Rilevamento e scelta del contesto Docker locale non modificano VM o contesto
+  globale. Host diversi da macOS ARM64, runtime assente o porta occupata hanno
+  uno stato leggibile e negano l'installazione. Windows/Linux restano un gap.
+- La procedura possiede soltanto container/network creati con ID e label della
+  propria installazione. Non adotta servizi altrui tramite un nome o manifesto.
+  Qualifica e recupero verificano ownership prima delle mutazioni; nessun input
+  Web, shell o argomento Docker arbitrario. `Config.Env` e segreti non si leggono.
+- `qualify` calcola davvero inventario e hash dei cinque file dataset osservati
+  per questa release, copiati dal proprio container fermo in una directory
+  privata. Non copia l'intera `/tmp`. Le prove richiedono nuova Search pubblica
+  dopo riavvio su network Docker interno senza default route, quindi ripristino
+  dello snapshot in un secondo container della stessa immagine e nuova Search
+  senza route esterna. Hash e metadati 0:0/0644 vengono confrontati sul ripristino.
+- Gli esiti legano installazione, container originale e di ripristino, immagine,
+  network, inventario, timestamp e risposta bounded. Solo entrambe le prove
+  riuscite consentono di scrivere i gate di attivazione. Checkbox o dichiarazioni
+  dell'utente non sostituiscono prove e non si ereditano receipt altrui.
+- Un fallimento conserva snapshot e receipt incompleta, nega la configurazione
+  e tenta il recupero del solo container originale posseduto. Nessuna rimozione
+  automatica. La qualifica documenta un network Docker interno senza route
+  esterna, non un isolamento generale dell'host. Le prove sintetiche della CLI
+  non sono qualifica live del nuovo installer.
+- A qualifica completa viene generata la configurazione privata e un avvio host
+  nominato carica le tre variabili esistenti nel launcher MediFlow, senza editing
+  di ambiente o JSON. L'avvio dell'app richiede una scelta separata dell'utente;
+  la procedura non interrompe il server attivo. La UI ordinaria espone tre passi
+  brevi e stato del servizio; l'ispezione tecnica rimane in disclosure dedicata.
+
+### Fonti primarie rilette il 2026-09-06
+
+- [WHO local deployment](https://icd.who.int/docs/icd-api/ICDAPI-LocalDeployment/):
+  API locale senza OAuth, path equivalenti, URI canonici WHO conservati.
+- [WHO Docker](https://icd.who.int/docs/icd-api/ICDAPI-DockerContainer/): supporto
+  ARM, provisioning iniziale con rete, `include`, consenso licenza e analytics.
+- [Release/lingue](https://icd.who.int/docs/icd-api/SupportedClassifications/):
+  MMS 2026-01 inglese disponibile; italiano non disponibile per questo binding.
+- [Termini WHO](https://icd.who.int/en/docs/icd11-license.pdf), §§1.2.3, 2:
+  codice/titolo/URI e licenza distinta del software. Nessuna accettazione o
+  certificazione legale e prodotta da questo ADR.
+
+## Decisione storica del 1 settembre — target online superato nel candidato
 
 Issue: [GitHub #306](https://github.com/Wulfgardr/mediflow/issues/306)
 

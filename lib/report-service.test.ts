@@ -130,7 +130,7 @@ test('generatePatientReport renders ICD, therapy, diary, observations and scales
         ],
     };
 
-    const entries = Array.from({ length: 30 }, (_, index) => ({
+    const entries = Array.from({ length: 31 }, (_, index) => ({
         id: `entry-${index}`,
         patientId: 'patient-1',
         date: new Date(`2025-03-${String((index % 9) + 10).padStart(2, '0')}T08:00:00Z`),
@@ -235,6 +235,18 @@ test('generatePatientReport renders ICD, therapy, diary, observations and scales
     assert.ok(doc.autoTableCalls[2].body.every((row) => row[1] !== 'SCALE'));
     assert.equal(doc.autoTableCalls[3].body[0][2], '8480-6');
     assert.equal(doc.autoTableCalls[4].body[0][1], 'MMSE');
+    // @Codex: P2 records the existing PDF subset, including the 30-entry cap.
+    assert.ok(doc.texts.includes(patient.taxCode));
+    assert.ok(doc.texts.includes(patient.address));
+    assert.ok(doc.texts.includes(patient.phone));
+    assert.ok(doc.texts.includes(patient.caregiver));
+    assert.ok(doc.texts.includes('Note Globali:'));
+    assert.deepEqual(doc.autoTableCalls[1].body[0],
+        ['Ramipril', 'Ramipril', '5 mg/die', 'Controllo pressorio']);
+    assert.deepEqual(doc.autoTableCalls[2].body.map((row) => row[2]),
+        entries.slice(0, 30).map((entry) => entry.content));
+    assert.equal(doc.autoTableCalls[3].body[0][4], '138');
+    assert.equal(doc.autoTableCalls[3].body[0][6], 'Controllo domiciliare');
 }
 );
 

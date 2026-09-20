@@ -44,8 +44,7 @@ auto-selects a full Xcode. Locally, export `DEVELOPER_DIR` if needed:
     # Build the apps
     xcodebuild -project native/MediFlowAppleApp/MediFlowAppleApp.xcodeproj \
       -scheme MediFlowMacApp   -destination 'platform=macOS' build CODE_SIGNING_ALLOWED=NO
-    xcodebuild -project native/MediFlowAppleApp/MediFlowAppleApp.xcodeproj \
-      -scheme MediFlowMobileApp -destination 'generic/platform=iOS Simulator' build CODE_SIGNING_ALLOWED=NO
+    bash scripts/build-mobile-sim-app.sh
 
     # XCUITest interaction tests (boots a simulator, drives the tab bar/sections)
     xcodebuild test -project native/MediFlowAppleApp/MediFlowAppleApp.xcodeproj \
@@ -55,6 +54,38 @@ CI runs the same in `.github/workflows/apple-native.yml` (path-filtered to
 `native/**`). The guards (`scripts/check-apple-structure.sh`,
 `scripts/check-apple-network-entitlements.sh`) fail if the retired executables or
 dead roots reappear, or if the Bonjour / local-network keys are missing.
+
+## Simulator build and optional install
+
+`scripts/build-mobile-sim-app.sh` builds the tracked Xcode project and the
+`MediFlowMobileApp` scheme in Debug with signing disabled. It uses the selected
+Xcode (`DEVELOPER_DIR` when set), requires the iOS Simulator SDK 26 or newer,
+and never regenerates the project. With Command Line Tools selected, set
+`DEVELOPER_DIR` to a full Xcode as shown above.
+
+The default output is `tmp-ios-sim-dd/Build/Products/Debug-iphonesimulator/MediFlow.app`.
+`MEDIFLOW_IOS_DERIVED_DATA` overrides the derived-data directory; relative paths
+resolve from the repository root. On success stdout contains only the absolute
+app path; build/install diagnostics go to stderr. The builder verifies the
+bundle identifier, simulator platform and executable before reporting success.
+`MEDIFLOW_IOS_BUNDLE_ID`, if supplied, asserts the expected identifier rather
+than changing the app's identity.
+
+Build alone needs no simulator, backend, PIN, database or pairing. Installation
+requires Node 24 on PATH, an explicit UDID and an available, already-booted iOS
+simulator:
+
+    MEDIFLOW_IOS_SIMULATOR_ID=<UDID> bash scripts/build-mobile-sim-app.sh --install
+
+The builder never boots, launches or erases a simulator. The paired smoke uses
+this same install contract before backend setup and temporary pairing changes;
+see [the mobile smoke runbook](../docs/mobile-home-base-smoke.md). A successful
+build or install does not attest login, pairing, UI behavior or distribution.
+
+Tooling regression tests use temporary synthetic fixtures and fake Apple/backend
+commands on macOS, without contacting a server or simulator:
+
+    node --test scripts/build-mobile-sim-app.test.mjs
 
 ## Runnable macOS app (with the home-base WebRuntime)
 

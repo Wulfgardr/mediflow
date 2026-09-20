@@ -27,6 +27,9 @@ export type SettingsKeyPolicy = {
 // Every key the app actually reads or writes today. Grep provenance is recorded
 // in the notes so the classification can be re-audited when a key moves.
 export const SETTINGS_WRITE_REGISTRY: Record<string, SettingsKeyPolicy> = {
+    /* @Codex: only the named preferences service owns revision CAS. */
+    'ai.fabric.chatgptOrdinary': { write: [], note: 'ADR 0077 named authenticated ordinary controller with revision CAS only' },
+    'ai.fabric.functionPreferences': { write: [], note: 'ADR 0129 dedicated authenticated preference service' },
     // --- AI model / provider / endpoint config (written from the web settings
     // controller only; treated as operator config because it steers where PHI is
     // sent for inference). ---
@@ -54,6 +57,8 @@ export const SETTINGS_WRITE_REGISTRY: Record<string, SettingsKeyPolicy> = {
     uiReduceMotion: { write: ['web-session'], note: 'accessibility pref (components/ui-accessibility-provider.tsx)' },
     uiReduceTransparency: { write: ['web-session'], note: 'accessibility pref (components/ui-accessibility-provider.tsx)' },
     uiStyleMode: { write: ['web-session'], note: 'appearance pref (lib/ui-style-mode.ts)' },
+    /* @Codex: the onboarding owner performs preview, revision CAS and rollback. */
+    'onboarding.workProfile': { write: [], note: 'server-managed work profile; dedicated authenticated Web route only (ADR 0120)' },
 
     // --- Terminology registry (web session). ---
     terminologyRegistry: { write: ['web-session'], note: 'terminology registry (lib/terminology-registry.ts)' },

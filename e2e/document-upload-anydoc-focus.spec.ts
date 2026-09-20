@@ -1,7 +1,7 @@
 /* @Codex */
 import { expect, test, type Page } from '@playwright/test';
 
-import { assertNoHorizontalOverflow, bootstrapUnlockedSession } from './utils';
+import { assertNoHorizontalOverflow, bootstrapUnlockedSession, openPatientSection } from './utils';
 
 const SYNTHETIC_ATTACHMENT_NAME = 'allegato-anydoc-focus-sintetico.pdf';
 const SYNTHETIC_RTF_TEXT = 'Synthetic AnyDoc browser route evidence.';
@@ -47,26 +47,19 @@ async function createSyntheticFixture(page: Page): Promise<string> {
 
 async function createExtractableRtf(page: Page, patientId: string): Promise<Readonly<{ id: string; name: string }>> {
   const suffix = `${Date.now()}`.slice(-8);
-  return page.evaluate(async ({ id, marker, expectedText }) => {
-    const attachmentId = `attachment-anydoc-route-${marker}`;
-    const name = `allegato-anydoc-route-${marker}.rtf`;
-    const source = `{\\rtf1\\ansi ${expectedText}}`;
-    const response = await fetch('/api/attachments', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        id: attachmentId,
-        patientId: id,
-        name,
-        type: 'application/rtf',
-        size: new TextEncoder().encode(source).byteLength,
-        path: `uploads/${name}`,
-        data: `data:application/rtf;base64,${btoa(source)}`,
-      }),
-    });
-    if (!response.ok) throw new Error(`Fixture RTF AnyDoc: HTTP ${response.status}`);
-    return { id: attachmentId, name };
-  }, { id: patientId, marker: suffix, expectedText: SYNTHETIC_RTF_TEXT });
+  const name = `allegato-anydoc-route-${suffix}.rtf`;
+  await openDocumentArchive(page, patientId);
+  const saved = page.waitForResponse((response) => response.request().method() === 'POST'
+    && new URL(response.url()).pathname === '/api/attachments');
+  await page.locator('#documenti input[type="file"]').setInputFiles({
+    name, mimeType: 'application/rtf', buffer: Buffer.from(`{\\rtf1\\ansi ${SYNTHETIC_RTF_TEXT}}`),
+  });
+  const response = await saved;
+  expect(response.ok()).toBe(true);
+  const uploaded = response.request().postDataJSON() as { id: string; patientId: string; data: string };
+  expect(uploaded.patientId).toBe(patientId);
+  expect(uploaded.data).toMatch(/^ENC:/u);
+  return { id: uploaded.id, name };
 }
 
 async function establishSyntheticSession(page: Page): Promise<void> {
@@ -76,12 +69,8 @@ async function establishSyntheticSession(page: Page): Promise<void> {
 
 async function openDocumentArchive(page: Page, patientId: string): Promise<void> {
   await page.goto(`/patients/${patientId}/modules`);
-  const toggle = page.getByRole('button', { name: /Archivio documenti ed evidenze/ });
-  await expect(toggle).toBeVisible();
-  await expect(async () => {
-    if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
-    expect(await toggle.getAttribute('aria-expanded')).toBe('true');
-  }).toPass();
+  await openPatientSection(page, 'documenti');
+  await expect(page.locator('#documenti').getByRole('heading', { name: /Archivio documenti ed evidenze/ })).toBeVisible();
 }
 
 test.describe.configure({ retries: 0 });
@@ -101,25 +90,46 @@ test('AnyDoc: le azioni allegato restano visibili al focus e sui viewport strett
   const patientId = await createSyntheticFixture(page);
   await openDocumentArchive(page, patientId);
 
+  // @Codex: one accessible chooser opens the native picker and Tab visits the viewer before local extraction.
+  const chooser = page.getByRole('button', { name: 'Carica documenti', exact: true });
+  await expect(chooser).toHaveCount(1);
+  await chooser.focus();
+  const nativeChooser = page.waitForEvent('filechooser');
+  await page.keyboard.press('Enter');
+  await (await nativeChooser).setFiles([]);
+  await chooser.focus();
+  await page.keyboard.press('Tab');
+
+  await expect(page.getByRole('button', { name: `Visualizza ${SYNTHETIC_ATTACHMENT_NAME}`, exact: true })).toBeFocused();
+  await page.keyboard.press('Tab');
+
   let extractButton = page.getByRole('button', { name: `Estrai testo localmente da ${SYNTHETIC_ATTACHMENT_NAME}` });
+  await expect(extractButton).toBeFocused();
   await expect(extractButton).toBeVisible();
   await expect(extractButton).toHaveAccessibleName(`Estrai testo localmente da ${SYNTHETIC_ATTACHMENT_NAME}`);
   let actionGroup = extractButton.locator('..');
   await page.mouse.move(0, 0);
-  await expect(actionGroup).toHaveCSS('opacity', '0');
+  // @Codex: named document actions remain visible before pointer or keyboard focus.
+  await expect(actionGroup).toHaveCSS('opacity', '1');
 
   await extractButton.focus();
   await page.keyboard.press('Tab');
+  await expect(page.getByRole('button', { name: `Prepara sintesi di ${SYNTHETIC_ATTACHMENT_NAME}`, exact: true })).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('button', { name: `Elimina ${SYNTHETIC_ATTACHMENT_NAME}`, exact: true })).toBeFocused();
+  await page.keyboard.press('Shift+Tab');
   await page.keyboard.press('Shift+Tab');
   await expect(extractButton).toBeFocused();
   await expect(actionGroup).toHaveCSS('opacity', '1');
   await assertNoHorizontalOverflow(page, [
     { label: 'documento AnyDoc desktop', selector: 'document' },
-    { label: 'card allegato AnyDoc desktop', selector: '.lume-card:has(button[aria-label^="Estrai testo localmente da"])' },
+    { label: 'card allegato AnyDoc desktop', selector: '[data-document-area="list"]' },
   ]);
 
   await page.setViewportSize({ width: 390, height: 844 });
-  await openDocumentArchive(page, patientId);
+  // @Codex: resize the same open document pane, as the user does; reloading
+  // would replace the UI whose responsive focus controls are being verified.
+  await openPatientSection(page, 'documenti');
   extractButton = page.getByRole('button', { name: `Estrai testo localmente da ${SYNTHETIC_ATTACHMENT_NAME}` });
   actionGroup = extractButton.locator('..');
   await page.mouse.move(0, 0);
@@ -127,7 +137,7 @@ test('AnyDoc: le azioni allegato restano visibili al focus e sui viewport strett
   await expect(extractButton).toHaveAccessibleName(`Estrai testo localmente da ${SYNTHETIC_ATTACHMENT_NAME}`);
   await assertNoHorizontalOverflow(page, [
     { label: 'documento AnyDoc mobile', selector: 'document' },
-    { label: 'card allegato AnyDoc mobile', selector: '.lume-card:has(button[aria-label^="Estrai testo localmente da"])' },
+    { label: 'card allegato AnyDoc mobile', selector: '[data-document-area="list"]' },
   ]);
   expect(consoleErrors).toEqual([]);
 });
@@ -140,32 +150,48 @@ test('AnyDoc: il browser usa la route autenticata e mostra solo l’anteprima lo
 
   const responsePromise = page.waitForResponse((response) => (
     response.request().method() === 'POST'
+    && response.request().headers()['x-mediflow-extraction-action'] === 'project'
     && response.url().endsWith(`/api/attachments/${attachment.id}/local-extraction`)
   ));
   await page.getByRole('button', { name: `Estrai testo localmente da ${attachment.name}` }).click();
 
   const response = await responsePromise;
   expect(response.status()).toBe(200);
-  const body = await response.json() as {
-    provenance?: { attachmentId?: string };
-    status?: string;
-    review?: string;
-    writes?: number;
-    apply?: string;
-    candidateUse?: string;
-  };
-  expect(body).toMatchObject({
-    provenance: { attachmentId: attachment.id },
-    status: 'extracted',
-    review: 'required',
-    writes: 0,
-    apply: 'none',
-    candidateUse: 'review_only',
-  });
+  expect(response.url().endsWith(`/api/attachments/${attachment.id}/local-extraction`)).toBe(true);
+  expect(response.request().headers()['x-mediflow-extraction-action']).toBe('project');
+  expect(response.headers()['content-type']).toContain('application/json');
 
   const preview = page.getByTestId('anydoc-local-extraction-preview');
   await expect(preview).toBeVisible();
-  await expect(preview).toContainText('Anteprima AnyDoc locale · sola lettura');
+  // @Codex: the receipt is reachable only after the client strictly validates the acquired grant,
+  // current canonical source, response provenance/digest and review-only contract (client lines 233-247).
+  // CDP response-body retrieval is unavailable in both CI and the packaged runtime.
+  await preview.locator('summary').click();
+  await expect(preview.locator('summary')).toHaveText('Testo estratto localmente · da rivedere');
+  await expect(preview.locator('pre')).toBeVisible();
   await expect(preview).toContainText(SYNTHETIC_RTF_TEXT);
   await expect(page.getByText('review_required · unsupported_local_extraction', { exact: false })).toHaveCount(0);
+});
+
+// @Codex: native options must conceal filenames while preserving source identity.
+test('Documenti: privacy nasconde i nomi nel selettore prima e dopo la scelta', async ({ page }) => {
+  await establishSyntheticSession(page);
+  const patientId = await createSyntheticFixture(page);
+  await openDocumentArchive(page, patientId);
+  const toggle = page.getByTestId('privacy-mode-header-toggle').first();
+  if (await toggle.getAttribute('aria-pressed') === 'true') await toggle.click();
+  const selector = page.getByLabel('Documento da sintetizzare');
+  const sourceId = await selector.locator('option').nth(1).getAttribute('value');
+  expect(sourceId).toBeTruthy();
+  await toggle.click();
+  await expect(selector.locator('option').nth(1)).toHaveText('Documento 1');
+  await selector.selectOption(sourceId!);
+  await expect(selector).toHaveValue(sourceId!);
+  await expect(selector.locator('option:checked')).toHaveText('Documento 1');
+  await toggle.click();
+  await expect(selector.locator('option:checked')).toHaveText(SYNTHETIC_ATTACHMENT_NAME);
+  await toggle.click();
+  await expect(selector.locator('option:checked')).toHaveText('Documento 1');
+  await expect(selector).toHaveValue(sourceId!);
+  await toggle.click();
 });

@@ -1,4 +1,5 @@
 /* @Codex */
+import rendererProfiles from '../../../scripts/anydoc-pdf-renderer-profiles.json' with { type: 'json' };
 import { createHash } from 'node:crypto';
 import { types } from 'node:util';
 import { ANYDOC_LOCAL_EXTRACTION_MAX_MARKDOWN_BYTES, ANYDOC_LOCAL_EXTRACTION_MAX_SOURCE_BYTES } from './anydoc-local-extraction-contract';
@@ -10,7 +11,8 @@ import { ANYDOC_PDF_CHILD_JOB_TIMEOUT_MS, ANYDOC_PDF_CHILD_MAX_OLD_SPACE_MB, ANY
 import { ANYDOC_PDF_PAGE_MATERIALIZER_MAX_OUTPUT_BYTES, ANYDOC_PDF_PAGE_MATERIALIZER_SCHEMA_VERSION,
     ANYDOC_PDF_PAGE_MATERIALIZER_SHA256 } from './anydoc-pdf-page-materializer';
 export const ANYDOC_PDF_PAGE_RENDERER_SCHEMA_VERSION = 'mediflow.anydoc_pdf_page_renderer.v1' as const;
-export const ANYDOC_PDF_PAGE_RENDERER_RUNTIME_PROFILE_ID = 'mediflow.pdfjs_png.node24.darwin_arm64.v1' as const;
+const hostProfile = rendererProfiles.find((entry) => entry.platform === process.platform && entry.arch === process.arch);
+export const ANYDOC_PDF_PAGE_RENDERER_RUNTIME_PROFILE_ID = `mediflow.pdfjs_png.node24.${process.platform}_${process.arch}.v1`;
 export const ANYDOC_PDF_PAGE_RENDERER_DPI = 144; export const ANYDOC_PDF_PAGE_RENDERER_MAX_PAGES = 16;
 export const ANYDOC_PDF_PAGE_RENDERER_MAX_DIMENSION_PIXELS = 4096;
 export const ANYDOC_PDF_PAGE_RENDERER_MAX_PIXELS = 12_000_000;
@@ -23,13 +25,13 @@ const PDFJS_TARBALL_SHA256 = '1011b38553532d7078c59f26b15a471f8dae00f101b60e2add
 const CANVAS_VERSION = '0.1.100';
 const CANVAS_TARBALL_SHA256 = 'ec7dc504d4ade7fd36846d16643e50eed5c914335f3a86b6a2a8d632391e5bfa';
 const BACKEND_ID = '@napi-rs/canvas';
-const BACKEND_PROFILE_ID = '@napi-rs/canvas-darwin-arm64';
-const BACKEND_PROFILE_TARBALL_SHA256 = 'c7c8dcb69aae6ddb58fe23e5f20d1c772a8065b077560f5a18336307779add91';
+const BACKEND_PROFILE_ID = hostProfile?.package ?? 'unsupported';
+const BACKEND_PROFILE_TARBALL_SHA256 = hostProfile?.tarballSha256 ?? '';
 export const ANYDOC_PDF_PAGE_RENDERER_ENGINE_DESCRIPTOR = [
     'engine=pdfjs-dist@4.10.38;integrity=sha512-/Y3fcFrXEAsMjJXeL9J8+ZG9U01LbuWaYypvDW2ycW1jL269L3js3DVBjDJ0Up9Np1uqDXsDrRihHANhZOlwdQ==;tarballSha256=1011b38553532d7078c59f26b15a471f8dae00f101b60e2add9b8511737a1ce0',
     'backend=@napi-rs/canvas@0.1.100;integrity=sha512-xglYA6q3XO5P3BNJYxVZ1IV7DLVjp1Py6nwag88YntrS+3vKHyYcMqXVS4ZztJmwz2uGvz1FWhI/4LgbR5uQDA==;tarballSha256=ec7dc504d4ade7fd36846d16643e50eed5c914335f3a86b6a2a8d632391e5bfa',
-    'backendProfile=@napi-rs/canvas-darwin-arm64@0.1.100;integrity=sha512-2PcswRaC7Ly645DGt88///zuFDhJxJYdKAs1uU3mfk1atYkXufgcgLfBpk6Tm12nCQBaNt1wpybuPZ4qOhTo8A==;tarballSha256=c7c8dcb69aae6ddb58fe23e5f20d1c772a8065b077560f5a18336307779add91',
-    `profile=${ANYDOC_PDF_PAGE_RENDERER_RUNTIME_PROFILE_ID};platform=darwin;arch=arm64;node=24`,
+    `backendProfile=${BACKEND_PROFILE_ID}@${CANVAS_VERSION};integrity=${hostProfile?.integrity ?? ''};tarballSha256=${BACKEND_PROFILE_TARBALL_SHA256}`,
+    `profile=${ANYDOC_PDF_PAGE_RENDERER_RUNTIME_PROFILE_ID};platform=${process.platform};arch=${process.arch};node=24`,
     `isolation=${ANYDOC_PDF_CHILD_PROTOCOL_SCHEMA_VERSION};workerSha256=${ANYDOC_PDF_CHILD_WORKER_SHA256};concurrency=1;queue=none;hardTimeout=${ANYDOC_PDF_CHILD_JOB_TIMEOUT_MS};termination=SIGKILL;maxOldSpaceMb=${ANYDOC_PDF_CHILD_MAX_OLD_SPACE_MB};permission=readOnlyPackageRoot,noWrite,noChild,noWorker;addons=renderOnly;networkGuard=closedImportsAndGlobals`,
     'options=disableWorker:true,isEvalSupported:false,useSystemFonts:false,useWorkerFetch:false,stopAtErrors:true,disableRange:true,disableStream:true,disableAutoFetch:true,durationMode:sharedDeadline,parentDigest:true,parentPngStructure:true',
     `limits=dpi:${ANYDOC_PDF_PAGE_RENDERER_DPI},pages:${ANYDOC_PDF_PAGE_RENDERER_MAX_PAGES},dimension:${ANYDOC_PDF_PAGE_RENDERER_MAX_DIMENSION_PIXELS},pixels:${ANYDOC_PDF_PAGE_RENDERER_MAX_PIXELS},raster:${ANYDOC_PDF_PAGE_RENDERER_MAX_RASTER_BYTES},totalRaster:${ANYDOC_PDF_PAGE_RENDERER_MAX_TOTAL_RASTER_BYTES},pageTimeout:${ANYDOC_PDF_PAGE_RENDERER_PAGE_TIMEOUT_MS},cleanupObservation:${ANYDOC_PDF_PAGE_RENDERER_CLEANUP_OBSERVATION_MS}`,

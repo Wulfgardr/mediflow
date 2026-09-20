@@ -63,12 +63,16 @@ export interface User {
     role: string;
 }
 
+/* @Codex: client availability only; the server still owns every session/fence. */
+type AuthRecoveryState = 'ready' | 'required' | 'pending' | 'failed';
+
 interface SecurityContextType {
     isAuthenticated: boolean;
     isLocked: boolean;
     requiresSetup: boolean;
     user: User | null;
     authErrorMessage: string | null;
+    authRecoveryState: AuthRecoveryState;
     login: (pin: string) => Promise<boolean>;
     setupPin: (pin: string) => Promise<void>;
     changePin: (currentPin: string, newPin: string) => Promise<{ ok: true } | { ok: false; message: string }>;
@@ -133,6 +137,14 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
     const [isLocked, setIsLocked] = useState(true);
     const [user, setUser] = useState<User | null>(null);
     const [authErrorMessage, setAuthErrorMessage] = useState<string | null>(null);
+    /* @Codex */
+    const [authRecoveryState, setAuthRecoveryState] = useState<AuthRecoveryState>('ready');
+    const authRecoveryStateRef = useRef<AuthRecoveryState>('ready');
+    const lockReceiptGenerationRef = useRef(0);
+    const updateAuthRecoveryState = (state: AuthRecoveryState) => {
+        authRecoveryStateRef.current = state;
+        setAuthRecoveryState(state);
+    };
     /* @Codex */
     const masterKeyRef = useRef<CryptoKey | null>(null);
     /* @Codex */
@@ -200,21 +212,24 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
     /* @Codex */
     const lock = () => {
         const attemptGeneration = ++authorityAttemptGenerationRef.current;
+        const receiptGeneration = ++lockReceiptGenerationRef.current;
+        updateAuthRecoveryState('pending');
         setAuthErrorMessage(null);
         clearClientAuthority();
 
+        const completeRecovery = (confirmed: boolean) => {
+            // A late receipt cannot reopen the form during a newer lock.
+            if (lockReceiptGenerationRef.current !== receiptGeneration) return;
+            updateAuthRecoveryState(confirmed ? 'ready' : 'failed');
+            if (!confirmed && authorityAttemptGenerationRef.current === attemptGeneration) {
+                setAuthErrorMessage('Chiusura della sessione non confermata. Rinnova di nuovo l’accesso.');
+            }
+        };
         // The revocation fence must overtake any in-flight or queued login/setup request.
+        // Only a later, explicit PIN gesture may start after this receipt settles.
         void requestApplicationLockConfirmation()
-            .then((confirmed) => {
-                if (!confirmed && authorityAttemptGenerationRef.current === attemptGeneration) {
-                    setAuthErrorMessage('Server lock not confirmed.');
-                }
-            })
-            .catch(() => {
-                if (authorityAttemptGenerationRef.current === attemptGeneration) {
-                    setAuthErrorMessage('Server lock not confirmed.');
-                }
-            });
+            .then(completeRecovery)
+            .catch(() => completeRecovery(false));
     };
 
     useInactivityLock({
@@ -236,7 +251,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         };
     }, []);
 
-    const checkAuthStatus = async (isSessionRestored?: boolean) => {
+    const checkAuthStatus = async () => {
         try {
             const { response: res, payload: data, controlState } = await checkAuthHealthRequest();
             /* @Codex */
@@ -298,8 +313,12 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                     lock();
                     return;
                 }
-                // If we didn't restore session, we remain unauthenticated (showing lock screen if set)
-                // If isSessionRestored is true, we are already authenticated via restoreSession
+                /* @Codex: a shared active cookie cannot restore this tab's key.
+                   Offer an explicit renewal; mounting a tab must not lock its peers. */
+                if (data.hasSession === true && masterKeyRef.current === null
+                    && authRecoveryStateRef.current !== 'pending') {
+                    updateAuthRecoveryState('required');
+                }
             }
         } catch (e) {
             console.error("Auth check failed", e);
@@ -353,13 +372,15 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
     // Initial check
     useEffect(() => {
         const init = async () => {
-            const restored = await restoreSession();
-            await checkAuthStatus(restored);
+            await restoreSession();
+            await checkAuthStatus();
         };
         void init();
     }, []);
 
     const login = async (pin: string): Promise<boolean> => {
+        /* @Codex: also guard direct/queued callers, before capturing the PIN request fence. */
+        if (authRecoveryStateRef.current !== 'ready') return false;
         const attemptGeneration = ++authorityAttemptGenerationRef.current;
         /* @Codex */
         let unacceptedServerAuthority = false;
@@ -675,6 +696,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                 requiresSetup: false,
                 user,
                 authErrorMessage,
+                authRecoveryState,
                 login,
                 setupPin,
                 changePin,
@@ -696,6 +718,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             requiresSetup: false,
             user,
             authErrorMessage,
+            authRecoveryState,
             login,
             setupPin,
             changePin,

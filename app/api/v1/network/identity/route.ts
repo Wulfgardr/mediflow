@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 /* @Codex */
-import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
+import { unauthorizedResponse } from '@/lib/security/server-auth';
+/* @Codex */
+import { requireAccountSession } from '@/lib/security/paired-native-session';
 /* @Codex */
 import { getNetworkIdentitySummary } from '@/lib/network-home-base-server';
 /* @Codex */
@@ -13,7 +15,7 @@ export async function GET(request: Request) {
     if (!auth.ok) return auth.response;
 
     try {
-        const session = await requireSession();
+        const session = await requireAccountSession(request);
         if (auth.context.authMode === 'paired-client' && !session) {
             return unauthorizedResponse();
         }

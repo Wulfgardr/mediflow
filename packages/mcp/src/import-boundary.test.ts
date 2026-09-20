@@ -13,6 +13,9 @@ const roots = [
 const allowedExternal = new Set(['zod', '@modelcontextprotocol/server', '@modelcontextprotocol/server/stdio',
   'node:process', 'node:util']);
 const allowedAip = new Set([resolve(root, 'packages/aip/src/child-ipc-contract.ts')]);
+const allowedMini = new Set([
+  resolve(root, 'packages/mini/src/protocol.ts'), resolve(root, 'packages/mini/src/session.ts'),
+]);
 
 test('keeps the exact MCP and Mini runtime graph on portable Application Service RPC only', async () => {
   const pending = [...roots]; const visited = new Set<string>(); let combined = '';
@@ -31,7 +34,7 @@ test('keeps the exact MCP and Mini runtime graph on portable Application Service
       const candidate = resolve(dirname(path), specifier);
       const target = extname(candidate) ? candidate : `${candidate}.ts`;
       const insideMcp = target.startsWith(resolve(root, 'packages/mcp/src/'));
-      assert.equal(insideMcp || allowedAip.has(target), true, `runtime boundary escape ${target}`);
+      assert.equal(insideMcp || allowedAip.has(target) || allowedMini.has(target), true, `runtime boundary escape ${target}`);
       pending.push(target);
     }
   }
@@ -42,6 +45,7 @@ test('keeps the exact MCP and Mini runtime graph on portable Application Service
     resolve(root, 'packages/aip/src/child-ipc-contract.ts'),
     resolve(root, 'packages/mcp/src/contracts.ts'), resolve(root, 'packages/mcp/src/operation-client.ts'),
     resolve(root, 'packages/mcp/src/server.ts'), resolve(root, 'packages/mini/src/cli.ts'),
+    ...allowedMini,
     resolve(root, 'scripts/intelligent-host-mcp-stdio.mjs'),
   ].sort());
 });

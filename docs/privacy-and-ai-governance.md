@@ -5,7 +5,7 @@ capacità. Questo favorisce il controllo delle informazioni. L’adeguatezza a u
 uso concreto richiede anche decisioni organizzative, tecniche e giuridiche.
 
 Questa guida orienta la lettura; non modifica i contratti di sicurezza e non
-attesta una certificazione. Stato editoriale: 5 settembre 2026.
+attesta una certificazione. Stato editoriale: 6 settembre 2026.
 
 ## Nel lavoro quotidiano
 
@@ -22,7 +22,7 @@ intelligente comprende configurazione, disponibilità e verifica del runtime.
 Finalità e base giuridica, condizioni per il trattamento di dati sanitari,
 ruoli, conservazione, misure di sicurezza e necessità di una valutazione
 d’impatto vanno valutati nel contesto d’impiego. Riferimenti: articoli 5, 6,
-9, 25, 28, 32 e 35 del [GDPR](https://eur-lex.europa.eu/eli/reg/2016/679/oj/eng).
+9, 25, 28, 32 e 35 del [GDPR consolidato](https://eur-lex.europa.eu/eli/reg/2016/679).
 
 La pseudonimizzazione separa gli identificativi dal contenuto usando
 informazioni aggiuntive. Non rende automaticamente anonimi i dati: se la
@@ -38,8 +38,13 @@ stessa qualificazione. La supervisione umana è un controllo importante del
 progetto, ma non dimostra da sola l’adempimento degli obblighi applicabili.
 
 L’eventuale qualificazione come dispositivo medico richiede una valutazione
-distinta. Riferimento: [AI Act, Regolamento UE 2024/1689](https://eur-lex.europa.eu/eli/reg/2024/1689/oj/eng),
+distinta. Riferimento: [AI Act, testo consolidato](https://eur-lex.europa.eu/eli/reg/2024/1689),
 in particolare articolo 6 e allegati I e III per la classificazione.
+
+La [matrice del 6 settembre 2026](./analysis/2026-09-06-086-regulatory-evidence.md)
+documenta le fonti correnti, le modifiche del 2026, le date applicabili e i
+quesiti ancora aperti. Resta un'analisi candidata, senza attribuzioni di ruoli
+o decisioni di classificazione.
 
 ## Provider e offuscamento: cosa è presente, cosa è previsto
 

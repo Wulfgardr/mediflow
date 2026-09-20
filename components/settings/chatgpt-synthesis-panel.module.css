@@ -1,0 +1,86 @@
+/* @Codex — shared Lume primitives, with readable page-local sizing. */
+.panel.panel {
+    display: grid;
+    gap: 1.5rem;
+    min-width: 0;
+    margin: 0;
+    padding: clamp(1rem, 3vw, 1.75rem);
+    border: 1px solid var(--lume-border-color, color-mix(in srgb, currentColor 14%, transparent));
+    border-radius: var(--lume-radius-card, 12px);
+    background: var(--lume-surface-focal, Canvas);
+    color: var(--lume-ink, CanvasText);
+    font-family: var(--lume-font-sans, system-ui, sans-serif);
+    font-size: 1rem;
+    line-height: 1.6;
+    overflow-wrap: anywhere;
+}
+.panel *, .panel *::before, .panel *::after { box-sizing: border-box; }
+.panel h2, .panel h3, .panel h4, .panel p, .panel dl { margin: 0; }
+.panel h2, .panel h3, .panel h4 { font-family: inherit; font-weight: 650; line-height: 1.4; }
+.panel h2 { font-size: 1.25rem; }
+.panel h3 { font-size: 1.125rem; }
+.panel h4 { font-size: 1rem; }
+.intro, .status, .source, .login, .result, .detailBody { display: grid; gap: .75rem; min-width: 0; }
+.status > strong { font-size: 1.125rem; font-weight: 650; }
+.status > p, .hint { color: var(--lume-ink-muted, CanvasText); }
+.panel .error { color: color-mix(in srgb, var(--lume-signal-critical, CanvasText) 60%, var(--lume-ink, CanvasText)); font-weight: 600; }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; }
+.panel button, .panel select, .panel a {
+    max-width: 100%;
+    min-width: 0;
+    min-height: max(44px, var(--lume-control-height, 44px));
+    border-radius: var(--lume-radius-control, 12px);
+    font-family: inherit;
+    font-size: 1rem;
+    line-height: 1.5;
+}
+.panel button, .panel a { justify-self: start; padding: .625rem 1rem; font-weight: 600; white-space: normal; text-align: center; }
+.panel button { cursor: pointer; }
+.panel button:disabled, .panel fieldset:disabled button { cursor: not-allowed; opacity: .55; }
+.panel select { width: 100%; padding: .625rem .875rem; color: var(--lume-ink, CanvasText); background: var(--lume-surface-field, Canvas); }
+.panel :focus-visible { outline: 2px solid var(--lume-accent, Highlight); outline-offset: 3px; }
+.panel fieldset { display: grid; gap: 1rem; min-width: 0; margin: 0; padding: 0; border: 0; }
+.step > legend { padding: 0 0 .75rem; font-size: 1.125rem; font-weight: 650; line-height: 1.4; }
+.step > label { font-weight: 600; }
+.panel .consent {
+    display: flex;
+    align-items: flex-start;
+    gap: .75rem;
+    min-height: max(44px, var(--lume-control-height, 44px));
+    padding: .625rem 0;
+    border-radius: var(--lume-radius-control, 12px);
+    font-weight: 400;
+    cursor: pointer;
+}
+.consent input[type=checkbox] { flex: 0 0 1.25rem; width: 1.25rem; height: 1.25rem; margin: .15rem 0 0; accent-color: var(--lume-accent, auto); }
+.consent:has(input:focus-visible) { outline: 2px solid var(--lume-accent, Highlight); outline-offset: 3px; }
+.panel fieldset:disabled .consent { cursor: not-allowed; }
+.disclosure, .login, .result { border-top: 1px solid var(--lume-border-color, color-mix(in srgb, currentColor 16%, transparent)); }
+.login, .result { padding-top: 1.5rem; }
+.disclosure { min-width: 0; }
+.disclosure > summary {
+    min-height: max(44px, var(--lume-control-height, 44px));
+    padding: .75rem 0;
+    border-radius: var(--lume-radius-control, 12px);
+    font-weight: 600;
+    cursor: pointer;
+}
+.detailBody { gap: 1rem; padding-top: .5rem; }
+.source + .source { border-top: 1px solid var(--lume-border-color, color-mix(in srgb, currentColor 16%, transparent)); padding-top: 1rem; }
+.source > p, .result > p, .result blockquote p { white-space: pre-wrap; }
+.panel dl { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: .75rem 1.5rem; }
+.panel dt { font-weight: 600; }
+.panel dd { min-width: 0; margin: 0; }
+.panel .digest { display: grid; grid-template-columns: subgrid; grid-column: 1 / -1; gap: inherit; }
+.panel ul { margin: .5rem 0 0; padding-left: 1.25rem; }
+.panel blockquote { display: grid; gap: .5rem; margin: 0; padding: .75rem 0; }
+.panel blockquote footer { color: var(--lume-ink-muted, CanvasText); }
+.panel code { font-size: .9375rem; white-space: normal; overflow-wrap: anywhere; }
+.hash { word-break: break-word; }
+@media (max-width: 560px) {
+    .panel dl, .panel .digest { grid-template-columns: minmax(0, 1fr); }
+    .panel dd { margin-bottom: .5rem; }
+    .actions { align-items: stretch; }
+    .actions > *, .panel button, .login > a { width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) { .panel button, .panel a, .panel select { transition: none; } }

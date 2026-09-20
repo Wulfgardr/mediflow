@@ -90,7 +90,10 @@ export function bindDocumentSynthesisClaimsToCitations(value: unknown): Document
         const input = record(value, ['sourceSet', 'output', 'citations', 'claims']); const validated = input && validateDocumentSynthesisProviderCitations({ sourceSet: input.sourceSet, citations: input.citations });
         if (!input || !validated || validated.status !== 'available') return denied('input_invalid');
         const normalized = normalizeDocumentSynthesisOutput(input.output); if (normalized.status !== 'available' || sourceIdentity(normalized.value)) return denied('output_invalid');
-        const expected = paths(normalized.value); const values = array(input.claims, expected.length, expected.length); if (!values) return denied('input_invalid');
+        const expected = paths(normalized.value);
+        // @Codex: the exact claim count must also respect the envelope/digest cap.
+        if (expected.length > 194) return denied('input_invalid');
+        const values = array(input.claims, expected.length, expected.length); if (!values) return denied('input_invalid');
         const claims: Claim[] = []; for (let index = 0; index < expected.length; index += 1) { const mapped = claim(values[index], expected[index]!, validated.citations); if (!mapped) return denied('input_invalid'); claims[index] = mapped; }
         const rawCitations = array(validated.citations, 1, 32); const citations: Citation[] = [];
         if (!rawCitations) return denied('input_invalid');

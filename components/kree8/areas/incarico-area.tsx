@@ -30,9 +30,11 @@ import type {
   Kree8PatientStatus,
 } from '../cockpit-shared';
 import type { InboxList, Kree8Patient } from '@/lib/patient-workspace';
+import { parseDiagnosisLabels } from '@/lib/patient-workspace';
 import { nextVirtualRowIndex, type VirtualListNavigationKey } from '@/lib/kree8-keyboard-navigation';
 import styles from '../kree8-clinical-cockpit-foundation.module.css';
 import patientStyles from '../kree8-clinical-cockpit-patient-inbox.module.css';
+import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
 
 
 /* ───────────────────────── Pazienti in carico ───────────────────────── */
@@ -52,6 +54,7 @@ function IncaricoArea({
   selectedPatientId,
   searchFocusSignal,
   onSelectPatient,
+  onAlignPatient,
   onOpenArea,
   onRetryPatients,
   isReview,
@@ -61,11 +64,13 @@ function IncaricoArea({
   selectedPatientId?: string;
   searchFocusSignal: number;
   onSelectPatient: (patientId: string) => void;
+  onAlignPatient: (patientId: string) => void;
   onOpenArea: (area: AreaId) => void;
   onRetryPatients?: () => void;
   isReview: boolean;
 }) {
   const router = useRouter();
+  const { proposal } = useRuntimeTwinDesign();
   const [scope, setScope] = useState<InboxScope>('ambulatorio');
   const [list, setList] = useState<InboxList>('attivi');
   const [query, setQuery] = useState('');
@@ -101,6 +106,13 @@ function IncaricoArea({
   );
 
   const selected = visible.find((p) => p.id === selectedPatientId) ?? visible[0] ?? null;
+
+  /* @Codex: a filtered directory can display its first visible record while
+     the cockpit still retains an archived/nonmatching patient. Keep actions
+     and the visible record aligned in the proposal. This changes view state. */
+  useEffect(() => {
+    if (proposal && selected && selected.id !== selectedPatientId) onAlignPatient(selected.id);
+  }, [proposal, selected, selectedPatientId, onAlignPatient]);
 
   /* @Codex WUL-560 L6A: the disclosure owns focus and closes when its patient
      context changes. The four existing actions keep their original handlers. */
@@ -179,13 +191,20 @@ function IncaricoArea({
   ] : [];
 
   const patientListParentRef = useRef<HTMLDivElement>(null);
+  const rowFocusRequest = useRef(0); // @Codex
+  const rowFocusFrame = useRef<number | null>(null); // @Codex
+  useEffect(() => () => {
+    rowFocusRequest.current += 1;
+    if (rowFocusFrame.current !== null) window.cancelAnimationFrame(rowFocusFrame.current);
+  }, []);
 
   const patientRowVirtualizer = useVirtualizer({
     count: visible.length,
     getScrollElement: () => patientListParentRef.current,
-    estimateSize: () => 52,
+    estimateSize: () => proposal ? 94 : 52,
     overscan: 8,
   });
+  useEffect(() => { patientRowVirtualizer.measure(); }, [proposal, patientRowVirtualizer]);
 
   /* @Codex: il focus segue l'indice completo, non il sottoinsieme DOM prodotto
      dalla virtualizzazione. Dopo lo scroll attende il nuovo render e porta il
@@ -195,10 +214,18 @@ function IncaricoArea({
     const index = Math.min(visible.length - 1, Math.max(0, requestedIndex));
     const patient = visible[index];
     if (!patient) return;
+    // @Codex: virtualisation may defer focus. A later key command, focus outside
+    // the list or unmount owns the destination before this frame can run.
+    const request = ++rowFocusRequest.current;
+    const origin = document.activeElement;
+    if (rowFocusFrame.current !== null) window.cancelAnimationFrame(rowFocusFrame.current);
     onSelectPatient(patient.id);
     patientRowVirtualizer.scrollToIndex(index, { align: 'auto' });
 
     const focusRenderedRow = (attempts: number) => {
+      rowFocusFrame.current = null;
+      const active = document.activeElement;
+      if (rowFocusRequest.current !== request || (active !== origin && active !== document.body)) return;
       const row = patientListParentRef.current?.querySelector<HTMLButtonElement>(
         `[data-patient-index="${index}"]`,
       );
@@ -206,9 +233,9 @@ function IncaricoArea({
         row.focus();
         return;
       }
-      if (attempts > 0) window.requestAnimationFrame(() => focusRenderedRow(attempts - 1));
+      if (attempts > 0) rowFocusFrame.current = window.requestAnimationFrame(() => focusRenderedRow(attempts - 1));
     };
-    window.requestAnimationFrame(() => focusRenderedRow(2));
+    rowFocusFrame.current = window.requestAnimationFrame(() => focusRenderedRow(2));
   }, [onSelectPatient, patientRowVirtualizer, visible]);
 
   const currentRowIndex = useCallback((target: EventTarget | null) => {
@@ -227,10 +254,10 @@ function IncaricoArea({
       key,
       currentIndex: currentRowIndex(target),
       rowCount: visible.length,
-      pageSize: Math.max(1, Math.floor(viewportHeight / 62)),
+      pageSize: Math.max(1, Math.floor(viewportHeight / (proposal ? 94 : 62))),
     });
     if (index !== null) focusRowAtIndex(index);
-  }, [currentRowIndex, focusRowAtIndex, visible.length]);
+  }, [currentRowIndex, focusRowAtIndex, proposal, visible.length]);
 
   const handleListKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     const navigationKeys: VirtualListNavigationKey[] = [
@@ -278,8 +305,8 @@ function IncaricoArea({
   }, [currentRowIndex, navigateRows, router, visible]);
 
   return (
-    <div className={styles.areaShell}>
-      <header className={styles.areaHeader}>
+    <div className={styles.areaShell} data-patient-directory={proposal ? 'proposal' : undefined}>
+      <header className={classNames(styles.areaHeader, patientStyles.directoryHeader)}>
         <div>
           <p className={styles.areaCaption}>Ambulatorio e rete locale</p>
           <h1 className={styles.areaTitle}>
@@ -387,9 +414,10 @@ function IncaricoArea({
 
           <header className={classNames(styles.panelHeader, patientStyles.worklistPanelHeader)}>
             <h2 className={styles.panelTitle}>
-              {list === 'attivi' ? 'Pazienti in carico' : 'Archivio pazienti'}
+              {/* @Codex: the page already names the patient directory. */}
+              {list === 'attivi' ? 'Elenco' : 'Archivio'}
             </h2>
-            <span className={classNames(patientStyles.resultCount, 'lume-registro')}>
+            <span className={patientStyles.resultCount}>
               {/* @Codex */}
               {visible.length} {visible.length === 1 ? 'risultato' : 'risultati'}
             </span>
@@ -444,6 +472,9 @@ function IncaricoArea({
                   {patientRowVirtualizer.getVirtualItems().map((virtualRow) => {
                     const p = visible[virtualRow.index];
                     const isSelected = p.id === selected?.id;
+                    const recordedDiagnoses = parseDiagnosisLabels(p.raw.diagnoses);
+                    const diagnosisParts = recordedDiagnoses[0]?.split(' · ') ?? [];
+                    const diagnosisDescription = diagnosisParts.length > 1 ? diagnosisParts.slice(1).join(' · ') : diagnosisParts[0];
                     return (
                       <div
                         key={p.id}
@@ -465,14 +496,30 @@ function IncaricoArea({
                             patientStyles.patientRow,
                             isSelected && patientStyles.patientRowSelected,
                           )}
-                          onClick={() => onSelectPatient(p.id)}
+                          onClick={() => { if (proposal) router.push(`/patients/${p.id}/modules`); else onSelectPatient(p.id); }}
                           role="option"
                           aria-selected={isSelected}
                           tabIndex={isSelected ? 0 : -1}
                           data-patient-index={virtualRow.index}
                           data-testid="lume-patient-row"
                         >
-                          <span className={patientStyles.patientRowContent} data-lume-row-part="content">
+                          {proposal ? <span className={patientStyles.recordContent} data-lume-row-part="content">
+                            <span className={patientStyles.recordIdentity}>
+                              <strong>{p.name}</strong>
+                              <span>{p.ageLabel} · {p.code}</span>
+                            </span>
+                            <span className={patientStyles.recordDiagnosis}>
+                              <span>{diagnosisDescription || 'Diagnosi non registrata'}</span>
+                              <small>{diagnosisParts.length > 1 ? diagnosisParts[0] : ''}{recordedDiagnoses.length > 1 ? ' · altre diagnosi in cartella' : ''}</small>
+                            </span>
+                            <span className={patientStyles.recordDisclosure}>
+                              <span>
+                                {recordedDiagnoses.length > 1 ? <span>{recordedDiagnoses.slice(1).join(' · ')}</span> : null}
+                                <span>{p.raw.notes || 'Nessuna nota generale registrata.'}</span>
+                                <span>{p.pathway} · {p.statusLabel}</span>
+                              </span>
+                            </span>
+                          </span> : <span className={patientStyles.patientRowContent} data-lume-row-part="content">
                             <span className={patientStyles.patientName}>{p.name}</span>
                             <span className={patientStyles.patientSubline}>
                               <span
@@ -493,7 +540,7 @@ function IncaricoArea({
                                 {p.statusLabel}
                               </span>
                             </span>
-                          </span>
+                          </span>}
                           <span className={patientStyles.patientSide}>
                             <span
                               className={classNames(patientStyles.patientSignal, PATIENT_SIGNAL_CLASSES[p.status])}

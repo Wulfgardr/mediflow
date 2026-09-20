@@ -5,6 +5,9 @@ read_when:
   - "Checking whether a feature, integration, or claim is shipped, directional, or out of bounds."
 ---
 
+<!-- reconciliation-20260912 -->
+> **Candidata riallineata il 20 settembre 2026, non release.** Il perimetro vigente della 0.8.6 è il runtime locale/headless sul Mac con interfaccia browser localhost. Gli agenti usano soltanto comandi MediFlow nominati, soggetti a capability, autenticazione, currentness, conferma delle scritture cliniche, audit e ricevute; non accedono direttamente a SQLite. I provider restano spenti per default e le funzioni AI sono opzionali e proposal-only. L'app nativa è un follow-up separato e non un gate della 0.8.6. Le prove storiche sotto conservano i propri SHA e non qualificano automaticamente questa ricostruzione. Il coordinamento resta [WUL-669](https://linear.app/wulfgardr/issue/WUL-669); proposte recuperate e servizi configurati non attestano funzionamento reale.
+
 # Stato del Sistema MediFlow
 
 > [!IMPORTANT]
@@ -18,15 +21,104 @@ read_when:
 > prevalgono [AGENTS.md](../AGENTS.md) e
 > [docs/repository-topology.md](./repository-topology.md).
 
-Ultimo aggiornamento: 2026-09-03 (contenuto sorgente v0.8.5)
+Ultimo aggiornamento: 2026-09-20 (v0.8.6: candidato locale verificato in parte, programma e rilascio aperti)
+
+La [verifica notturna dell'8 settembre](./analysis/2026-09-07-086-release-verification.md#verifica-notturna-dell8-settembre-programma-ancora-aperto)
+registra build produzione 11b9, suite aggregata 4c99 senza fallimenti con
+esclusioni esplicite, Linux standalone e Windows preview. Registrava come
+residui caricamento locale a freddo, nuovo percorso ChatGPT, installazione WHO
+pulita, accuratezza OCR completa, parità desktop/Mini e dossier finale. La
+parità nativa non è più un gate della 0.8.6. Le prove storiche seguenti
+mantengono il proprio SHA e non attestano questi risultati.
+
+Nota candidato 0.8.6: [ADR 0119](./adr/0119-anydoc-apple-vision-current-source.md)
+chiarisce la precedenza del percorso AnyDoc + Apple Vision descritto qui.
+Le osservazioni storiche 0.8.5 riportate sotto mantengono il proprio perimetro;
+non sono verifiche della release 0.8.6.
+
 
 > [!NOTE]
-> Questo documento descrive il contenuto sorgente della `0.8.5`. Check CI su
+> Questo documento distingue il candidato sorgente `0.8.6` dalle prove storiche.
+> Check CI su
 > exact SHA, artifact firmati, tag, GitHub Release e installazione esterna sono
 > evidenze di confine e non si deducono dal solo tree. Lo storico delle versioni
 > vive nel [CHANGELOG](../CHANGELOG.md).
 
 ---
+
+## Aggiornamento di candidatura: 6–7 settembre 2026
+
+La richiesta successiva del 7 settembre riapre lo sviluppo per impostazioni
+guidate, ChatGPT, scelta del modello per esperienza, cataloghi e parità
+desktop. Il [piano operativo](./analysis/2026-09-07-086-guided-configuration-plan.md)
+fissa fasi e prove; queste capacità non sono ancora tutte implementate.
+VM Windows/Linux e disco Xcode sono nuovamente disponibili secondo l'utente;
+il loro impiego richiede verifica della fonte e dell'ambiente al momento del
+test. Le indisponibilità descritte sotto appartengono alle prove precedenti.
+
+Il [verbale integrato 0.8.6](./analysis/2026-09-06-086-integrated-closeout.md)
+conserva le prove storiche e registra i controlli sul candidato corrente.
+La navigazione web e Apple, i form progressivi e la scelta web tra barra
+superiore e laterale sono integrati. La decisione di sviluppo concluso su
+`c320694c3` resta storica. Gli addenda indipendenti chiudono il contratto PIN
+su `cefa5c78` e verificano il fix allegati su `be923328`, integrati in `11a42f68`.
+Non restano finding reportabili nel perimetro sorgente revisionato.
+La [verifica di rilascio](./analysis/2026-09-07-086-release-verification.md)
+separa build `e7f8a555a`, smoke MCP, suite completa con un fallimento e prove
+focalizzate. Il pacchetto sorgente è autorizzato, in attesa di CI verde;
+CI finale, PR, merge e tag non sono ancora attestati.
+Firma ed entitlements di produzione restano non verificati. ThisDeviceOnly
+riguarda il nuovo inserimento della chiave cache, non il token paired.
+La membership operatore–ambulatorio è un non-goal ADR 0036, non un finding aperto.
+
+La verifica UI iPhone ↔ Mac/Home Base resta un follow-up nativo separato e non
+un gate della 0.8.6. Le prove Swift XCTest, firma e UI nativa conservate sotto
+sono evidenze storiche nel proprio perimetro; non attestano validazione completa
+multipiattaforma o installer firmati di produzione.
+
+Windows e Linux ora hanno prove locali su sistemi operativi reali: build del
+runtime Node, avvio da directory vuota, configurazione ordinaria e percorsi
+UI/headless. Runtime, TLS e database delle fixture risiedono nel rispettivo
+guest. Windows usa Node x64 emulato su ARM64 per il pacchetto AnyDoc disponibile;
+Apple Vision resta una funzione del Mac. Le suite complete descritte sotto
+non attestano parità funzionale universale.
+
+La suite Node completa su `52ae794ab` conta 3.206 PASS e uno skip previsto;
+anche il lint completo è PASS. La ricevuta più
+recente SwiftPM su `af139` conta 822 PASS e uno skip canonico su 823 test; la
+correzione del wrapper non ha rieseguito la suite. Le compilazioni generic macOS
+universale e iOS device sono PASS con `CODE_SIGNING_ALLOWED=NO`, senza avvio
+dell'app, Keychain o UI. Questi risultati e le dodici prove API HTTPS con
+pairing distinti non sostituiscono le sei combinazioni app mobile/home-base.
+Sul runtime `25e8f8708`, il full Windows conta 145 PASS, un FAIL e 12 skip;
+il FAIL di confronto colori è riprodotto e risolto nel test separando hover
+e selezione da tastiera. Il gruppo portable Windows conserva nove timeout
+su 248 casi, mentre MCP, Mini e Supervisor separati sono PASS. Un controllo
+Windows con i soli file di test eseguiti in sequenza completa gli stessi 248
+casi senza errori; `5c25d0968` adotta quella sola opzione nel runner canonico.
+Il controllo non identifica la causa dei timeout e il wrapper non ha acquisito
+il codice d'uscita del processo figlio: il risultato viene dal riepilogo Node
+completo, distinto dal precedente run canonico fallito. Una successiva
+esecuzione canonica di `npm run test:headless-portable` con il runner `5c25`
+supera tutti i 248 casi, senza skip o retry, e acquisisce il codice d'uscita
+nativo 0. L'app del guest resta compilata da `25e`. Linux completa
+145 casi ordinari distinti fra full e opt-in, con 42 esclusioni esplicite e
+tutti i controlli headless PASS. Il verbale distingue sorgenti, fixture,
+simulazioni e precedenti prove CRUD/export.
+
+Le due suite UI firmate normalmente per il simulatore su `dc1fc0522`
+(`5ced` più il solo fix demo `8fc`) hanno 71 PASS, 11 skip previsti e zero
+FAIL su 82 esecuzioni. Rotazione, accessibilità, bozza e archivio sono coperti
+con fixture sintetiche; le sei combinazioni di app e host reali sono ancora
+da verificare.
+La ripresa dopo lo sblocco del Mac ha prodotto una sola osservazione XCTest
+aggiuntiva: apertura del campo di configurazione e valore invariato PASS,
+menu di selezione non osservato. Il riempimento del campo e il percorso reale
+iPhone/Mac restano incompleti. Il limite d'uso del 20% è stato revocato;
+la prova resta differita per la decisione di closeout. I volumi Xcode e delle
+VM sono scollegati: le evidenze acquisite restano conservate e non vengono
+rieseguite per questa indisponibilità.
+Il candidato non è ancora stato pubblicato, unito a main o rilasciato.
 
 ## Aggiornamento di candidatura: 5 settembre 2026
 
@@ -40,14 +132,15 @@ sorgente e il canale binario Apple hanno condizioni di consegna diverse.
 
 MediFlow e una cartella clinica local-first per il lavoro territoriale quotidiano.
 Lo stato corrente non va letto come una semplice web app con AI aggiunta: e un
-sistema locale ibrido in cui il Mac resta il nodo autorevole, il database e
+sistema locale ibrido in cui la postazione home-base resta il nodo autorevole, il database e
 SQLite locale con campi clinici sensibili cifrati lato client, la web app e la
 superficie primaria, la family Apple/native cresce sopra contratti locali
 versionati e ogni integrazione esterna resta dentro boundary documentati.
 
 La fotografia corrente e questa:
 
-- **Superficie primaria**: web app Next.js locale, avviata sul Mac.
+- **Superficie primaria**: web app Next.js locale; il runtime Node è verificato
+  su Mac, Windows e Linux con i limiti di piattaforma riportati sopra.
 - **Principio prodotto**: serve l'informazione giusta nel momento giusto.
   MediFlow è information-first, question-first e convenience-first, non
   AI-first. Resta utile quando ogni provider AI è disabilitato.
@@ -67,9 +160,10 @@ La fotografia corrente e questa:
   artefatti sensibili restano fuori da Git.
 - **Contratto condiviso**: `/api/v1/*` per client native/locali; OpenAPI come
   riferimento anti-drift per la parte stabile.
-- **Home-base**: modalita opt-in in cui il Mac espone `/api/v1/network/*`
+- **Home-base**: modalita opt-in in cui la postazione espone `/api/v1/network/*`
   verso client paired su rete fidata: lettura pazienti e write versionati
-  limitati a profilo/status, diario, terapie, checkup e osservazioni. Quando la
+  limitati a profilo/status, diario, terapie, checkup, osservazioni e prescrizioni;
+  i documenti manuali seguono le classi dell'ADR 0076. Quando la
   modalita e disattivata i pairing restano salvati ma i token dei client paired
   diventano inerti: il data plane risponde `403 NETWORK_MODE_DISABLED` finche
   la modalita non viene riattivata.
@@ -77,8 +171,9 @@ La fotografia corrente e questa:
   apre la shell condivisa, mostra readiness runtime locale e puo gestire
   esplicitamente backend web production e proxy TLS con stop bounded/escalation.
   `MediFlowCore` concentra logica portabile, cifratura, contratti, filtri,
-  clinical scales e store SQLite locale; Linux e Windows oggi verificano la
-  portabilita del core in CI, non una parity applicativa completa.
+  clinical scales e store SQLite locale. Linux e Windows dispongono ora anche
+  delle prove runtime/UI/headless circoscritte nel verbale 0.8.6; non sono
+  front-end SwiftUI nativi né una dichiarazione di parità applicativa completa.
 - **Parity UI 0.8**: iPhone 2/2, iPad 7/7, build/probe macOS e localhost 82/82
   sono PASS della baseline storica `0843726fe`, non una prova implicita per una
   revisione successiva. La disponibilità di Xcode è un prerequisito operativo
@@ -128,8 +223,10 @@ La fotografia corrente e questa:
 - **Headless**: il Supervisor Node portabile avvia Web standalone e MCP
   `stdio` come figli distinti su IPC ereditato. MCP raggiunge catalogo,
   terminology search, Open Loops patient-scoped, proposta follow-up e query
-  semantica bounded read-only. Mini condivide catalogo e foundation CLI ma non
-  ha un binding production al Supervisor e fallisce chiuso senza parent AIP.
+  semantica bounded read-only. La lane WUL-696 aggiunge il callsite Supervisor Mini
+  con parità dei comandi CLI nella sessione NDJSON, attivazione Web e parent
+  AIP obbligatori. La prova production include ricerca terminologica con audit
+  su fixture sintetiche; il DoD end-to-end clinico resta un gate distinto.
   Contesto, lifecycle, revoca e audit restano host-owned; lo smoke standalone
   del tree finale è un gate separato.
 - **Write F10**: MCP produce soltanto la preview della transizione
@@ -137,7 +234,7 @@ La fotografia corrente e questa:
   ruolo medico attivo, step-up e gesto operation-specific; il commit Web usa
   CAS, idempotenza, audit e receipt atomici. Il proof non attraversa MCP.
 - **Planner candidato**: core, operazione read-only e adapter MCP/Mini sono
-  presenti; il binding production del Supervisor è soltanto MCP. Il piano usa
+  presenti; MCP e sessione Mini raggiungono lo stesso OperationClient governato. Il piano usa
   al massimo due operazioni allowlisted; SQL diretto e scritture restano
   vietati.
 - **Recording locale**: la shell macOS integra cattura e trascrizione italiana
@@ -306,10 +403,10 @@ Documenti/ADR principali:
 | ATHENA/MLX | Provider locale capability-specific | Solo Treatment Reasoning review-only | Nessuna prescrizione o apply clinico |
 | OpenAI / Anthropic | Adapter ufficiali `default OFF` | Probe amministrativa Document Synthesis review-only con policy e secret reference host-owned | Solo transport fake nel tree; nessuna credenziale, rete live o runtime readiness |
 | MCP | Superficie figlia locale | Catalogo, terminology search, Open Loops patient-scoped, proposta follow-up e query semantica bounded read-only | Usa il Supervisor locale della 0.8.5; nessuna authority caller-supplied |
-| Mini | Foundation CLI fail-closed | Catalogo e adapter tipizzati senza callsite production del Supervisor | Nessun grant senza parent AIP; nessun accesso SQLite diretto |
+| Mini | Lane WUL-696: callsite Supervisor | Parità dei comandi CLI su NDJSON; ricerca terminologica production su fixture | Attivazione Web e parent AIP obbligatori; stesso perimetro di capability, nessun apply |
 | Write checkup F10 | Integrata end-to-end | Preview MCP e commit Web con ruolo, step-up, gesto, CAS, idempotenza, audit e receipt | L'agente non riceve proof e non esegue il commit |
-| Semantic planner | Integrato, sola lettura | Core, validazione, esecutore e adapter MCP/Mini presenti; binding Supervisor production soltanto MCP | Massimo due operazioni allowlisted; nessun SQL libero o write |
-| ICD-11 WHO | Application Service server-only | Ricerca diagnosi/coding con output MediFlow data-only | Disattivato per default; egress e credenziali host-owned espliciti |
+| Semantic planner | Integrato, sola lettura | Core, validazione, esecutore e adapter MCP/Mini presenti; sessione Mini e MCP usano lo stesso adapter; DoD clinico end-to-end distinto | Massimo due operazioni allowlisted; nessun SQL libero o write |
+| ICD-11 WHO | Application Service server-only, sidecar locale | Search con output MediFlow data-only e URI canonico | Candidato 0.8.6 disattivato per default; provisioning manuale e prova sul target non eseguiti |
 | OpenMed | Shadow/benchmark | Redaction lane locale non client-facing | Non runtime clinico |
 
 ---
@@ -480,10 +577,14 @@ Il Supervisor Node portabile è il trusted parent del runtime locale: avvia
 Web standalone e MCP come processi figli distinti su IPC ereditato e possiede
 contesto, lease, revoca e audit. MCP `stdio` pubblica catalogo, terminology
 search, Open Loops patient-scoped, proposta follow-up `proposal_only` e query
-semantica bounded read-only. Mini condivide catalogo e foundation CLI ma non ha
-un callsite production del Supervisor e fallisce chiuso senza parent AIP. Gli
-adapter non importano SQLite, non accettano authority caller-supplied e non
-aprono listener.
+semantica bounded read-only. WUL-696 conserva una prova storica con un client
+agente nominato, authority Web genuina e ricerca terminologica con audit su
+fixture: non qualifica quel client per la 0.8.6 né dimostra compatibilità con
+altri agenti. Il contratto corrente è il layer MediFlow mediato con comandi
+nominati; richiede attivazione Web e fallisce chiuso senza parent AIP. Queste
+prove non attestano tutti i percorsi clinici end-to-end, login HTTP, server Next
+standalone o onboarding. Gli adapter non importano SQLite, non accettano
+authority caller-supplied e non aprono listener.
 
 F10 espone via MCP soltanto la preview `pending -> completed|cancelled`. La UI
 Web trusted ricontrolla la risorsa, richiede ruolo medico attivo, step-up e gesto

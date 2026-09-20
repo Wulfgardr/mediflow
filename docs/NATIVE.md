@@ -62,6 +62,54 @@ La base corrente va letta cosi:
 
 ---
 
+## Deep link locali di navigazione (row32)
+
+Il contratto locale, entro ADR 0048, usa lo schema `mediflow` e il solo
+destinatario `navigate`. Non e un ingresso API o di pairing. Forme ammesse:
+
+```text
+mediflow://navigate?area=agenda
+mediflow://navigate?area=patients&paziente=patient-synthetic-01&section=diary
+```
+
+`area` nomina una destinazione gia presente: `patients`, `agenda`, `diary`,
+`analytics`, `scales`, `settings`, `runtime`, `overview`, `milestones`; su macOS
+anche `host` e `repertori`. `paziente` e ammesso solo con `area=patients` e indica
+un ID opaco da risolvere con il reader ordinario nello scope della sessione
+corrente, mai un record fornito dal link. L'ID contiene solo lettere ASCII,
+cifre, trattino, underscore o punto (1–512 byte; esclusi `.` e `..`).
+`section` richiede `paziente`: `overview` (default), `diary`, `scales`,
+`therapies`, `clinical`, `prescriptions`, `documents`.
+
+Il parser rifiuta chiavi sconosciute o ripetute, URL oltre 2048 byte, path,
+fragment, porta o credenziali. Token, PIN, dati clinici, configurazione host e
+URL esterni non appartengono al contratto. Il client non persiste il link ne lo
+registra nei propri log. Il custom scheme non autentica chi lo apre: l'app resta bloccata
+senza sessione ordinaria sbloccata e non riprende il link dopo il login; occorre
+riaprirlo esplicitamente. Non esegue login, salvataggi, export, upload o altri
+comandi e non concede capability. I controlli delle viste rimangono attivi.
+
+La navigazione appartiene alla singola finestra. Un nuovo link o una navigazione
+manuale nell'area globale invalida il precedente intento in corso. Prima di
+cambiare paziente, il raccordo del workspace controlla sessione/scope correnti,
+selezione e bozze; un rifiuto della sola navigazione conserva la cartella e il
+testo presenti. Il blocco della sessione e invece un evento di privacy: rimuove
+subito presentazione clinica e bozze locali secondo il lifecycle della sessione.
+Una risposta tardiva non puo riaprire una destinazione superata. Solo il successo
+del reader e della selezione emette la presentazione del dettaglio compatto;
+nessuna ricostruzione dello split o sostituzione del modello e necessaria.
+
+Parser/router e integrazione OS sono verifiche distinte: i test con un reader
+sostituito non attestano pairing reale, apertura del link dal sistema operativo
+o interazione su iPhone/iPad. La row32 resta `partial` finche i relativi percorsi
+interattivi non sono verificati; il confine Mini resta `manual_only`.
+
+Verifica locale della slice (2026-09-06): 84 test SwiftPM passano, comprendendo
+parser/router, selezione con reader ordinario e transport sostituito, lifecycle
+e cache. Le build Debug Mac e iOS Simulator generica passano con Xcode 26.6
+(17F113), senza signing; entrambi i bundle contengono la registrazione dello
+schema `mediflow`. Queste prove non attestano apertura OS o pairing reale.
+
 ## Requisiti e setup rapido
 
 1. **Xcode corrente compatibile con Swift 5.9**; per i gate locali viene usato
@@ -79,6 +127,8 @@ La base corrente va letta cosi:
 ./scripts/Launch_MediFlowMac.command
 ```
 
+* inizializza il database soltanto in una cartella dati nuova o vuota, prima dei file TLS
+* conserva cartelle non vuote senza database: richiedono recupero esplicito
 * configura TLS locale
 * compila il client nativo
 * apre la app macOS
@@ -120,11 +170,15 @@ npm run test:parity:smoke
 ```
 
 Nel percorso mobile paired corrente, il target condiviso include anche una cache
-locale derivata della lista pazienti: lo snapshot e cifrato con chiave locale da
-Portachiavi, e valido solo per il medesimo `home-base` / ambulatorio entro una
-soglia breve. Quando il Mac non e raggiungibile, l'app mobile puo mostrare lo
-stato `offline degradato` in sola consultazione; non esistono ancora scritture
-offline o coda di merge mobile.
+locale derivata della lista pazienti. Il candidato WUL-676 (0.8.6, ADR 0048)
+usa AES-GCM/Portachiavi, stessa sessione operatore sbloccata, pairing, scope e
+pin TLS, senza ripristino prima del login. Il TTL massimo e 24 ore: una copia
+scaduta restituisce solo timestamp, scadenza, conteggio e motivo, mai dati
+paziente. Il modello conserva anche l'ultimo profilo manuale letto online,
+con TTL separato e renderer read-only dedicato nelle destinazioni compatta e affiancata.
+Sotto-risorse, artifact, export, scritture offline e coda di merge sono esclusi.
+Il fallback e limitato a indisponibilita/timeout di rete; 401/403 e problemi
+TLS non possono autorizzarlo.
 
 Le prime scritture mobile paired esposte nella shell condivisa coprono diario
 clinico, terapie, controlli e osservazioni. Dalla scheda paziente iPhone/iPad si
@@ -141,6 +195,24 @@ usano la `version` del record e mostrano il conflitto come richiesta di
 ricarica/confronto. Il client non gestisce un repertorio farmaci autonomo:
 interroga in sola lettura il catalogo dell'home-base. Non esistono prescrizione
 SISS nativa, AI/OCR paired, scritture offline o coda di merge.
+
+Durante il salvataggio Diario, i controlli che cambiano la voce restano
+disabilitati fino al termine dell'operazione. Il writer cattura titolo, tipo,
+documento e riferimenti: l'ACK azzera solo la bozza ancora identica a quella
+inviata e nello stesso contesto. Eventuali modifiche locali arrivate dopo lo
+snapshot non vengono perse o inviate automaticamente. Per un create confermato
+restano una nuova bozza non salvata; per un update restano nell'editor e
+richiedono confronto con la versione riletta, perche l'ACK non porta una nuova
+`version`. Un errore senza ACK conserva la bozza e, per create, il suo ID stabile.
+
+Un `409` sospende il successivo Save anche se si chiude il banner. La rilettura
+mostra la voce corrente senza sostituire testo, riferimenti o versione della
+bozza. Dopo confronto e revisione manuali, **Ho confrontato: mantieni la mia
+bozza** adotta la versione letta e conserva i contenuti locali. Solo un successivo
+**Salva modifiche** esegue il PUT ordinario con CAS; un ulteriore `409` richiede
+un nuovo confronto. Una voce assente dalla lettura, eliminata, non leggibile o
+letta in un contesto superato non autorizza la conferma. Nessun merge, retry o
+overwrite automatico.
 
 ---
 
@@ -210,6 +282,21 @@ distinti; il dettaglio normativo resta negli ADR auth/crypto.
 
 ### 2. Workspace clinico condiviso
 
+La scheda macOS distingue **Anagrafica**, **Clinica** e **Amministrazione**
+senza cambiare paziente o writer. Clinica e la vista iniziale: diagnosi,
+terapie attive caricate, follow-up, note e risultati da rivedere. Anagrafica
+raccoglie identita e contatti; Amministrazione raccoglie ambulatorio, stato,
+esenzioni e provenienza dell'archiviazione. Il cambio di area conserva
+l'editor esistente; il cambio paziente riparte da Clinica. I contatori delle
+terapie mantengono il limite della lista caricata; diagnosi ed esenzioni
+protette non diventano conteggi zero.
+
+Nei documenti, il conteggio compare dopo la lettura completata. Un archivio
+vuoto mostra direttamente i comandi di caricamento, soggetti ai permessi e
+alla sessione ordinari; non mostra una sezione di sintesi vuota. Dettagli,
+follow-up documentali e verifica FSE restano sui percorsi esistenti.
+Queste modifiche non introducono API, scoring, inferenza o writer nuovi.
+
 La shell SwiftUI espone lista e dettaglio paziente, diario rich text, terapie,
 checkup, osservazioni, prestazioni, protesica, documenti e report entro le
 capability concesse dall'home-base. Le superfici AI, OCR e document-derived
@@ -259,8 +346,8 @@ coprono esplicitamente iPhone light e iPad dark.
 
 Il pannello `mobile-paired-status` rende distinguibili caricamento, errore,
 online, cache locale, offline in sola lettura e sessione scaduta. La resa stale
-ha preview e test sintetici, ma non è ancora cablata a metadata live: la cache
-oltre il TTL viene scartata. L'azione primaria misura almeno 48 pt, espone label
+e collegata ai metadata live nel candidato WUL-676; oltre il TTL sono nascosti
+i dati paziente, mantenendo visibili acquisizione, scadenza e motivo. L'azione primaria misura almeno 48 pt, espone label
 VoiceOver e supporta `⌘R` e pointer su iPad.
 
 Questa superficie non concede capability. Il gate di consumo `WUL-557` usa il
@@ -276,7 +363,9 @@ Per la slice `WUL-556`, `patient search/show` (riga 1), `whoami` (riga 39) e
 `capabilities` (riga 63) sono disponibili in Mini, ma non colmano i residui
 nativi e non diventano grant. La cache offline (riga 45) resta `manual_only`
 con ragione `NOT_IN_MINI_PILOT`, mentre iPhone/iPadOS restano `partial` per
-metadata stale live, dettaglio offline e write queue assenti. Manifest, receipt,
+renderer profilo integrato; verifica UI/device ancora aperta.
+I metadata stale sono collegati nel candidato; write queue e sotto-risorse
+restano escluse dal contratto, non un difetto di parity. Manifest, receipt,
 stato paired e token locale non conferiscono autorità agentica. La parity resta
 incompleta fino alla verifica manager e a `WUL-564`.
 
@@ -312,6 +401,59 @@ graph LR
 
 ---
 
+
+### Headless MCP nel bundle — WUL-697 (candidato)
+
+<!-- @Codex -->
+Il builder aggiunge `Contents/Resources/mediflow-headless-supervisor.mjs` e
+`WebRuntime/HeadlessRuntime`: file sorgenti tracciati dal Supervisor/MCP esistente,
+non copie indiscriminate di `lib` o `packages`. Condivide il Web standalone e il
+loader SQLite già normalizzato; non aggiunge Mach-O, listener o installer.
+Il tracing usa Next/TypeScript già installati nel checkout completo e fallisce su
+file mancanti, risoluzioni non chiuse o dipendenze non fisiche. Il roster fissa
+SHA-256, byte e modi dopo la firma dei payload nativi, prima del sigillo esterno.
+Sidecar, revisione canonica e pin del helper restano invariati; i controlli dopo
+il sigillo sono in sola lettura.
+
+L'interprete non è incluso: occorre il **medesimo eseguibile fisico Node 24**
+attestato al packaging (hash, byte, modo, versione, ABI e architettura), già
+provisionato sull'host, senza alias o symlink negli antenati. Aggiornare Node
+richiede un nuovo packaging, non la riscrittura del roster nell'app sigillata.
+Anche app e directory dati devono avere percorsi fisici assoluti; la directory
+dati deve esistere ed essere esterna all'app. Invocazione esemplificativa, da
+adattare ai percorsi provisionati, con ambiente pulito:
+
+```sh
+/usr/bin/env -i MEDIFLOW_DATA_DIR='/percorso/fisico/dati' \
+  /percorso/fisico/node24 \
+  /percorso/fisico/MediFlow.app/Contents/Resources/mediflow-headless-supervisor.mjs
+```
+
+Nessun argomento oppure il solo `--mcp`. Mini (`--mini`), argomenti aggiuntivi,
+preload e variabili di ricerca Node sono rifiutati. Il launcher non cerca Node in
+PATH, non usa una shell e non conserva override di autorità del chiamante.
+Avvia nello stesso PID il Supervisor di produzione: authority, IPC ereditato,
+lease, revoca e cleanup restano nei contratti esistenti. stdout è riservato al
+protocollo. Roster e hook verificano i moduli caricati; non sono una sandbox
+contro sorgenti ostili già fidati o un interprete manomesso prima dell'avvio.
+La fiducia iniziale resta nell'app distribuita e nel Node provisionato: un
+launcher sostituibile insieme al proprio roster non è auto-autenticante.
+
+Lo smoke reale, con dati soltanto sintetici e porta esistente libera, usa:
+
+```sh
+/percorso/fisico/node24 scripts/mediflow-headless-supervisor-standalone-smoke.mjs \
+  --app /percorso/fisico/estratto/MediFlow.app
+```
+
+Il test avvia l'entrypoint estratto da cwd estraneo/PATH ostile, esegue il percorso
+Web autenticato già esistente, verifica stdout JSON-RPC, revoca/logout,
+EOF/SIGTERM, assenza di figli residui e invarianza dell'app. I test dei guard su
+layout sintetico e dei contratti IPC non lo sostituiscono. Questa slice è un
+candidato da qualificare sul checkout completo/macOS: non attesta smoke reale,
+firma, notarizzazione, release o chiusura complessiva WUL-697. Mini WUL-696 resta
+fuori da questo entrypoint.
+
 ## Come contribuire
 
 Se vuoi aggiungere una vista:
@@ -322,3 +464,23 @@ Se vuoi aggiungere una vista:
 3. Mantieni sigillo e decrittazione nel boundary client esistente: non creare
    scorciatoie dirette verso SQLite o nuove primitive crypto.
 4. Aggiorna matrice parity, capability manifest e test nello stesso slice.
+
+### Configurazione AI nativa — ADR0135 / WUL-694
+
+Su macOS, Impostazioni → Preferenze AI dell’host usa tre nuovi servizi
+`/api/v1/network/ai/functions` (GET/POST) e `/preview` (POST). Offre opzioni
+catalogate per le quattro esperienze e preset `host_defaults`/`all_off`, con
+anteprima, conferma e rilettura. Sono preferenze dell’intero host, non del
+paziente. CAS, catalogo e idempotenza sono del dominio parent 09ebe699b.
+
+Il pairing e la sessione PIN nativa esistenti sono necessari ma non sufficienti:
+serve il grant privato host per operatore admin e dispositivo descritto in
+[ADR0135](./adr/0135-native-ai-configuration-authority.md). Il file 0600 è
+indicato da `MEDIFLOW_NATIVE_AI_CONFIG_GRANTS_FILE`, ha scadenza e non viene
+mai creato da una sessione Web o dal Mac remoto. Revoca e lock invalidano le
+richieste; un esito ambiguo richiede rilettura, senza retry automatico.
+Non esiste ancora la UI host per concedere questo grant. Nessun account Web
+è proiettato nella sessione Mac: lo stato account resta esplicitamente non
+disponibile, in attesa di un owner distinto. Nessuna inferenza o data plane
+ADR0134 viene aggiunto. I test sintetici del servizio e del client non attestano
+parità totale, account live o una release distribuita.

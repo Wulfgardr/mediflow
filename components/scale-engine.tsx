@@ -1,7 +1,12 @@
 'use client';
 
-import { useState, useRef } from 'react';
-import { cn } from '@/lib/utils';
+/* @Codex: native exclusive choices preserve the canonical answer values. */
+import { useState, useRef, useEffect, useId } from 'react';
+import styles from '@/components/scales/scale-workspace.module.css';
+/* @Codex: keep answered scales within the prototype navigation guard. */
+import { useRuntimeTwinPendingForm } from '@/components/runtime-twin-design';
+/* @Codex: button-driven cancellation needs the same explicit draft decision as links. */
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 // @Codex MF085-003: neutral types keep validators executable without React.
 import { calculateScaleResult, isScaleAnswerValid, type ScaleDefinition } from '@/lib/scale-validation';
@@ -9,44 +14,49 @@ export type { ScaleQuestion, ScaleDefinition } from '@/lib/scale-validation';
 
 interface ScaleEngineProps {
     scale: ScaleDefinition;
+    showHeading?: boolean;
     onComplete: (result: { score: number; answers: Record<string, string | number>; interpretation: string }) => void | Promise<void>;
     onCancel: () => void;
 }
 
-function ProgressBar({ progress }: { progress: number }) {
-    return (
-        // @Codex WUL-229: progress meter uses MediFlow palette
-        <div
-            className="mt-6 h-1.5 rounded-full overflow-hidden"
-            style={{ background: 'color-mix(in srgb, var(--lume-ink) 18%, transparent)' }}
-        >
-            <div
-                className="h-full transition-[width] duration-[var(--lume-dur-firma)] ease-[var(--lume-ease)]"
-                style={{
-                    background: 'var(--lume-accent)',
-                    width: `${progress}%`,
-                }}
-            />
-        </div>
-    );
-}
-
-export default function ScaleEngine({ scale, onComplete, onCancel }: ScaleEngineProps) {
+export default function ScaleEngine({ scale, onComplete, onCancel, showHeading = true }: ScaleEngineProps) {
+    const confirm = useConfirm();
+    const answerGroupId = useId();
     const [answers, setAnswers] = useState<Record<string, string | number>>({});
+    useRuntimeTwinPendingForm(Object.keys(answers).length > 0);
     const [currentStep, setCurrentStep] = useState(0);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [validationError, setValidationError] = useState<string | null>(null);
     /* @Codex WUL-UIUX: il ref blocca anche il doppio click nello stesso tick,
        prima che lo stato isSubmitting si propaghi al disabled del bottone. */
     const submittingRef = useRef(false);
+    /* @Codex: orient keyboard users on each question without changing answers. */
+    const questionRef = useRef<HTMLHeadingElement>(null);
+    useEffect(() => { questionRef.current?.focus(); }, [currentStep]);
 
     const handleAnswer = (questionId: string, value: string | number) => {
+        if (submittingRef.current) return;
         setValidationError(null);
         setAnswers(prev => ({ ...prev, [questionId]: value }));
     };
 
+    /* @Codex: retaining a draft must leave answers, question and context mounted. */
+    const handleCancel = async () => {
+        if (submittingRef.current) return;
+        if (Object.keys(answers).length > 0) {
+            const result = await confirm({
+                title: 'Lasciare la compilazione?',
+                message: 'È aperta una compilazione. Le modifiche non salvate andranno perse.',
+                confirmLabel: 'Esci senza salvare',
+                cancelLabel: 'Continua a scrivere',
+            });
+            if (!result.confirmed) return;
+        }
+        if (!submittingRef.current) onCancel();
+    };
+
     const handleNext = () => {
-        if (isSubmitting || !currentAnswerValid) return;
+        if (submittingRef.current || isSubmitting || !currentAnswerValid) return;
         if (currentStep < scale.questions.length - 1) {
             setCurrentStep(prev => prev + 1);
         } else {
@@ -57,6 +67,7 @@ export default function ScaleEngine({ scale, onComplete, onCancel }: ScaleEngine
     const finish = async () => {
         if (submittingRef.current) return;
         submittingRef.current = true;
+        setValidationError(null);
         setIsSubmitting(true);
         try {
             const result = calculateScaleResult(scale, answers);
@@ -74,70 +85,52 @@ export default function ScaleEngine({ scale, onComplete, onCancel }: ScaleEngine
         currentQuestion, answers[currentQuestion.id],
         Object.prototype.hasOwnProperty.call(answers, currentQuestion.id),
     );
-    const progress = ((currentStep + 1) / scale.questions.length) * 100;
     if (!currentQuestion || scale.retired) return <p role="alert">Scala non disponibile per nuove valutazioni.</p>;
 
     return (
-        // @Codex WUL-273: scale engine can live inside the Kree8 workspace without the old page chrome.
-        <div className="patient-detail-section mx-auto flex min-h-[500px] w-full max-w-3xl flex-col overflow-hidden border !p-0">
-            <div className="border-b border-[color:rgba(112,106,100,0.12)] p-6">
-                <h2 className="text-2xl font-semibold tracking-tight text-[color:var(--lume-ink)]">{scale.title}</h2>
-                <p className="mt-1 text-sm text-[color:var(--lume-ink-muted)]">{scale.description}</p>
-
-                {validationError && <p role="alert">{validationError}</p>}
-                <ProgressBar progress={progress} />
-                <div className="mt-2 text-right text-xs text-[color:var(--lume-ink-muted)]">
-                    Domanda {currentStep + 1} di {scale.questions.length}
-                </div>
-            </div>
-
-            <div className="flex flex-1 flex-col justify-center p-6 md:p-8">
-                <h3 className="mb-8 text-xl font-medium leading-relaxed text-[color:var(--lume-ink)]">
-                    {currentQuestion.text}
-                </h3>
-
-                <div className="space-y-3">
-                    {currentQuestion.type === 'boolean' && (
-                        <div className="grid grid-cols-2 gap-4">
-                            <button
-                                onClick={() => handleAnswer(currentQuestion.id, 1)}
-                                className={cn(
-                                    'mf-option-card !p-6 text-lg font-medium justify-center text-center',
-                                    answers[currentQuestion.id] === 1 && 'is-active'
-                                )}
-                            >
-                                Sì / corretto
-                            </button>
-                            <button
-                                onClick={() => handleAnswer(currentQuestion.id, 0)}
-                                className={cn(
-                                    'mf-option-card !p-6 text-lg font-medium justify-center text-center',
-                                    answers[currentQuestion.id] === 0 && 'is-active'
-                                )}
-                                style={
-                                    answers[currentQuestion.id] === 0
-                                        ? {
-                                            borderColor: 'var(--lume-signal-critical)',
-                                            background: 'rgba(192, 57, 43, 0.08)',
-                                            color: 'var(--lume-signal-critical)'
-                                        }
-                                        : undefined
-                                }
-                            >
-                                No / non corretto
-                            </button>
-                        </div>
-                    )}
+        /* @Codex WUL-678: one readable question on the workspace plane. */
+        <div className={`${styles.workspace} ${styles.engine}`} aria-busy={isSubmitting}>
+            {showHeading && <header><h2>{scale.title}</h2><p>{scale.description}</p></header>}
+            {validationError && <p role="alert">{validationError}</p>}
+            <p className={styles.progress} aria-live="polite">Domanda {currentStep + 1} di {scale.questions.length}</p>
+            <fieldset className={styles.questionGroup} disabled={isSubmitting}>
+                <legend className={styles.legend}>
+                    <h3 ref={questionRef} tabIndex={-1} className={styles.question}>{currentQuestion.text}</h3>
+                </legend>
+                <div key={currentQuestion.id} className={styles.answers}>
+                    {/* @Codex: Tab enters the group; arrow keys select one exact answer. */}
+                    {(currentQuestion.type === 'choice' || currentQuestion.type === 'boolean') && (
+                        currentQuestion.type === 'boolean'
+                            ? [{ label: 'Sì / corretto', value: 1 }, { label: 'No / non corretto', value: 0 }]
+                            : currentQuestion.options ?? []
+                    ).map(option => (
+                        <label
+                            key={option.label}
+                            className={styles.choice}
+                            data-selected={answers[currentQuestion.id] === option.value}
+                        >
+                            <input
+                                type="radio"
+                                name={`${answerGroupId}-${currentQuestion.id}`}
+                                value={option.value}
+                                checked={answers[currentQuestion.id] === option.value}
+                                onChange={() => handleAnswer(currentQuestion.id, option.value)}
+                            />
+                            <span>{option.label}</span>
+                        </label>
+                    ))}
 
                     {/* @Codex: blank numeric fields remain unanswered; text is not coerced to points. */}
                     {(currentQuestion.type === 'number' || currentQuestion.type === 'text') && (
                         <input
+                            className={styles.input}
                             aria-label={currentQuestion.text}
                             type={currentQuestion.type === 'number' ? 'number' : 'text'}
                             min={currentQuestion.minScore}
                             max={currentQuestion.maxScore}
                             value={answers[currentQuestion.id] ?? ''}
                             onChange={event => {
+                                if (submittingRef.current) return;
                                 const value = event.currentTarget.value;
                                 if (currentQuestion.type === 'number' && value === '') {
                                     setAnswers(previous => {
@@ -151,43 +144,35 @@ export default function ScaleEngine({ scale, onComplete, onCancel }: ScaleEngine
                             }}
                         />
                     )}
-
-                    {currentQuestion.type === 'choice' && currentQuestion.options?.map(opt => (
-                        <button
-                            key={opt.label}
-                            onClick={() => handleAnswer(currentQuestion.id, opt.value)}
-                            className={cn(
-                                'mf-option-card w-full font-medium',
-                                answers[currentQuestion.id] === opt.value && 'is-active'
-                            )}
-                        >
-                            {opt.label}
-                        </button>
-                    ))}
                 </div>
-            </div>
+            </fieldset>
 
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[color:rgba(112,106,100,0.12)] p-5 md:p-6">
+            <div className={styles.actions}>
                 <button
-                    onClick={onCancel}
-                    className="mf-btn-secondary"
+                    type="button"
+                    disabled={isSubmitting}
+                    onClick={() => { void handleCancel(); }}
+                    className={styles.control}
                 >
                     Annulla
                 </button>
 
-                <div className="flex flex-wrap gap-3">
+                <div className={styles.navigation}>
                     {currentStep > 0 && (
                         <button
-                            onClick={() => setCurrentStep(prev => prev - 1)}
-                            className="mf-btn-secondary"
+                            type="button"
+                            disabled={isSubmitting}
+                            onClick={() => { if (!submittingRef.current) setCurrentStep(prev => prev - 1); }}
+                            className={styles.control}
                         >
                             Indietro
                         </button>
                     )}
                     <button
+                        type="button"
                         onClick={handleNext}
                         disabled={!currentAnswerValid || isSubmitting}
-                        className="ui-btn-primary px-8 py-2.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className={`${styles.control} ${styles.primary}`}
                     >
                         {currentStep === scale.questions.length - 1
                             ? isSubmitting

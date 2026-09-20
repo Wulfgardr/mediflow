@@ -32,6 +32,8 @@
 /tmp-api-v1-put-negative-routes
 /tmp-*
 /tmp/
+# WUL-676 isolated prototype builds; never source artifacts.
+/.next-twin-*/
 
 # next.js
 /.next/

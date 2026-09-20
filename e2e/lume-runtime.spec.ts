@@ -70,7 +70,7 @@ test('lume runtime tokens are the live default across theme changes, reload and 
   expect(await resolveActiveVar(page, '--lume-surface-canvas')).toBe(GRAFITE_CANVAS_RGB);
 });
 
-test('lume registered properties drive canvas light and SVG filo fill', async ({ page }) => {
+test('lume context tokens, focal light primitive and SVG filo retain their contracts', async ({ page }) => {
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
 
   const canvas = page.locator('[data-lume-context]').first();
@@ -95,7 +95,29 @@ test('lume registered properties drive canvas light and SVG filo fill', async ({
   expect(lightSamples.incarico.temperature).toBe('1.8%');
   expect(lightSamples.scheda.light).toBe('7%');
   expect(lightSamples.scheda.temperature).toBe('2.4%');
-  expect(lightSamples.scheda.background).not.toBe(lightSamples.incarico.background);
+  // ADR 0123 promotes the workspace whose canvas stays at the focal surface.
+  // Context tokens remain distinct; this canvas no longer animates their light.
+  const focalBackground = await resolveActiveVar(page, '--lume-surface-focal');
+  expect(lightSamples.incarico.background).toBe(focalBackground);
+  expect(lightSamples.scheda.background).toBe(focalBackground);
+
+  // Exercise the shared light primitive independently, as for the SVG below.
+  // A CSS probe proves property consumption, not live canvas animation.
+  const focalSamples = await page.evaluate(({ incarico, scheda }) => {
+    const probe = document.createElement('div');
+    probe.classList.add('lume-focal');
+    probe.style.transition = 'none';
+    document.body.appendChild(probe);
+    const read = (sample: typeof incarico) => {
+      probe.style.setProperty('--lume-surface-l', sample.light);
+      probe.style.setProperty('--lume-surface-temp', sample.temperature);
+      return getComputedStyle(probe).backgroundColor;
+    };
+    const result = { incarico: read(incarico), scheda: read(scheda) };
+    probe.remove();
+    return result;
+  }, lightSamples);
+  expect(focalSamples.scheda).not.toBe(focalSamples.incarico);
 
   const filoSamples = await page.evaluate(() => {
     const namespace = 'http://www.w3.org/2000/svg';
@@ -119,6 +141,9 @@ test('lume registered properties drive canvas light and SVG filo fill', async ({
 test('lume mobile theme and privacy controls retain 44px touch targets and state', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+  // ADR 0123: theme controls live in the ordinary appearance settings.
+  await page.goto('/settings/aspetto');
+  await expect(page.getByTestId('settings-appearance-section')).toBeVisible();
 
   const theme = page.getByRole('button', { name: 'Tema Scuro' });
   const themeTargets = page.locator('button[aria-label^="Tema "]');
@@ -129,15 +154,15 @@ test('lume mobile theme and privacy controls retain 44px touch targets and state
 
   const targets = await themeTargets.evaluateAll((elements) => elements.map((element) => {
     const { width, height } = element.getBoundingClientRect();
-    return { width, height };
+    return { label: element.getAttribute('aria-label'), width, height };
   }));
   targets.push(await privacy.evaluate((element) => {
     const { width, height } = element.getBoundingClientRect();
-    return { width, height };
+    return { label: element.getAttribute('aria-label'), width, height };
   }));
   for (const target of targets) {
-    expect(target.width).toBeGreaterThanOrEqual(44);
-    expect(target.height).toBeGreaterThanOrEqual(44);
+    expect(target.width, `${target.label}: touch target width`).toBeGreaterThanOrEqual(44);
+    expect(target.height, `${target.label}: touch target height`).toBeGreaterThanOrEqual(44);
   }
 
   await theme.focus();

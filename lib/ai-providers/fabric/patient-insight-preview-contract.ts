@@ -1,3 +1,4 @@
+import { parseOrdinaryRemoteReceipt, parseOrdinaryRemoteProvenance, type OrdinaryRemoteReceipt, type OrdinaryRemoteProvenance } from '../../chatgpt-product/ordinary-wire';
 /* @Codex */
 import type { PatientInsightCanonicalHostSources } from './patient-insight-host-projection';
 
@@ -31,7 +32,7 @@ export type PatientInsightReviewProposal = Readonly<{
     currentness: PatientInsightProposalCurrentness;
 }>;
 
-export type PatientInsightReceiptWire = Readonly<{
+type LocalPatientInsightReceiptWire = Readonly<{
     schemaVersion: 'mediflow.ai.fabric-resolution.v1';
     capability: 'patient_insight';
     venue: 'local_process';
@@ -40,7 +41,7 @@ export type PatientInsightReceiptWire = Readonly<{
     egress: 'none';
 }>;
 
-export type PatientInsightProvenanceWire = Readonly<{
+type LocalPatientInsightProvenanceWire = Readonly<{
     schemaVersion: 'mediflow.ai.fabric-provenance.v1';
     capability: 'patient_insight';
     venue: 'local_process';
@@ -48,6 +49,9 @@ export type PatientInsightProvenanceWire = Readonly<{
     model: string;
     preprocessing: readonly ['context_minimization', 'envelope_validation'];
 }>;
+
+export type PatientInsightReceiptWire = LocalPatientInsightReceiptWire | OrdinaryRemoteReceipt;
+export type PatientInsightProvenanceWire = LocalPatientInsightProvenanceWire | OrdinaryRemoteProvenance;
 
 export type PatientInsightDenialCode =
     | 'input_invalid' | 'kill_switch_disabled' | 'kill_switch_unavailable' | 'projection_unavailable'
@@ -231,6 +235,7 @@ function proposal(value: unknown): PatientInsightReviewProposal | null {
 }
 
 function receipt(value: unknown): PatientInsightReceiptWire | null {
+    const remote = parseOrdinaryRemoteReceipt(value, 'patient_insight'); if (remote) return remote;
     const input = exact(value, ['schemaVersion', 'capability', 'class', 'venue', 'egressProfile', 'provider', 'model', 'providerReceipt', 'fallbackCount']);
     const profile = input && exact(input.egressProfile, ['id', 'version', 'egress']);
     const providerReceipt = input && exact(input.providerReceipt, ['schemaVersion', 'authorityPlane', 'task', 'provider', 'model', 'execution', 'endpointClass', 'egress', 'runtimeReadiness', 'fallbackCount']);
@@ -246,6 +251,7 @@ function receipt(value: unknown): PatientInsightReceiptWire | null {
 }
 
 function receiptWire(value: unknown): PatientInsightReceiptWire | null {
+    const remote = parseOrdinaryRemoteReceipt(value, 'patient_insight'); if (remote) return remote;
     const input = exact(value, ['schemaVersion', 'capability', 'venue', 'provider', 'model', 'egress']);
     return !input || input.schemaVersion !== 'mediflow.ai.fabric-resolution.v1' || input.capability !== 'patient_insight'
         || input.venue !== 'local_process' || input.provider !== 'ollama' || typeof input.model !== 'string' || !MODEL.test(input.model)
@@ -254,6 +260,7 @@ function receiptWire(value: unknown): PatientInsightReceiptWire | null {
 }
 
 function provenance(value: unknown, expected: PatientInsightReceiptWire): PatientInsightProvenanceWire | null {
+    if (expected.provider === 'chatgpt_subscription') return parseOrdinaryRemoteProvenance(value, expected);
     const input = exact(value, ['schemaVersion', 'capability', 'venue', 'provider', 'model', 'preprocessing', 'receipt']);
     const labels = input && stringArray(input.preprocessing, 2);
     const nested = input && receipt(input.receipt);
@@ -265,6 +272,7 @@ function provenance(value: unknown, expected: PatientInsightReceiptWire): Patien
 }
 
 function provenanceWire(value: unknown, expected: PatientInsightReceiptWire): PatientInsightProvenanceWire | null {
+    if (expected.provider === 'chatgpt_subscription') return parseOrdinaryRemoteProvenance(value, expected);
     const input = exact(value, ['schemaVersion', 'capability', 'venue', 'provider', 'model', 'preprocessing']);
     const labels = input && stringArray(input.preprocessing, 2);
     return !input || !labels || labels[0] !== 'context_minimization' || labels[1] !== 'envelope_validation'

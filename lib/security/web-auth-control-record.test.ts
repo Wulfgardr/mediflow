@@ -83,6 +83,49 @@ const validateControlImports = (sources: Readonly<Record<string, string>>) => {
 };
 let repositorySourceCache: Record<string, string> | undefined;
 const repositoryTypeScript = () => repositorySourceCache ??= repositoryTypeScriptSources(ROOT);
+const sourceSha256 = (source: string) => crypto.createHash('sha256').update(source).digest('hex');
+// These fixtures resolve only their named physical/package owners. A source or diagnostic drift stays failing,
+// so an unresolvable path cannot gain the exception merely by sharing a diagnostic form.
+const REVIEWED_UNRELATED_LOADER_DIAGNOSTICS = new Map([
+    ['app/api/patients/route.test.ts', {
+        sha256: '8e1a325a1863bcb4d163ad9e52a4bb887e82b60966ac6dcfef660d115a3476ac',
+        diagnostics: ['reserved-loader-identity:*', 'protected-loader-unsupported:*'],
+    }],
+    ['e2e/chatgpt-synthesis-product.spec.ts', {
+        sha256: 'ebfe667372176f77403c8ddc0a1f611d2ee8313f89235ba1d206f465e1a2e37f',
+        diagnostics: ['reserved-loader-identity:*'],
+    }],
+    ['components/function-models/ordinary-ui.test.ts', {
+        sha256: 'cdb3aafd704c56734fdd3ad57929dabc2bd45547544bc7f70632385defd23cc4',
+        diagnostics: ['reserved-loader-identity:*'],
+    }],
+    ['lib/patient-create-service.test.ts', {
+        sha256: '850792b8632283c053ec2ced49dd060cbb437722f2f4210065a3d33f1f60e7c3',
+        diagnostics: ['protected-loader-unsupported:*', 'unsupported-expression:*'],
+    }],
+    ['lib/security/patient-create-context.test.ts', {
+        sha256: '77c0483e9b2408fc7a1a204eaa07f65775a30d7465ca4ce51ef10bf5eef1b98a',
+        diagnostics: ['protected-loader-unsupported:*', 'unsupported-expression:*'],
+    }],
+    ['components/settings/settings-presentation.test-support.ts', {
+        sha256: '24f3aa0bd5cbe3acc809c4000e9b1af7e97a23fd56cbffd6a633e745f5027454',
+        diagnostics: ['reserved-loader-identity:*'],
+    }],
+] as const);
+const repositoryControlImportErrors = (sources = repositoryTypeScript()) => {
+    const result = validateControlImports(sources); const eligible = new Set<string>();
+    for (const [file, reviewed] of REVIEWED_UNRELATED_LOADER_DIAGNOSTICS) {
+        const source = sources[file]; const expected = reviewed.diagnostics.map((diagnostic) => `${file}:${diagnostic}`);
+        const observed = result.errors.filter((error) => error.startsWith(`${file}:`));
+        if (source === undefined || sourceSha256(source) !== reviewed.sha256) {
+            result.errors.push(`${file}:reviewed-loader-source-drift:*`); continue;
+        }
+        const exact = observed.length === expected.length && expected.every((error) => observed.filter((item) => item === error).length === 1);
+        if (!exact) { result.errors.push(`${file}:reviewed-loader-diagnostic-drift:*`); continue; }
+        for (const error of expected) eligible.add(error);
+    }
+    return result.errors.filter((error) => !eligible.has(error));
+};
 
 const MAX = BigInt('18446744073709551615');
 function control(fence = 'f0', generation = BigInt(0)) {
@@ -694,7 +737,7 @@ test('keeps current-binding lookup read-only through captured intrinsic poison a
 });
 
 test('keeps the current-binding predicate inside the historical owner island and its exact test seam', () => {
-    assert.deepEqual(validateControlImports(repositoryTypeScript()).errors, []);
+    assert.deepEqual(repositoryControlImportErrors(), []);
     const positive = validateControlImports({
         'lib/security/web-auth-control-owner.ts': "import { abortPreparedAuthControlTicket, createWebAuthControlRecord, type AuthControlTicket } from './web-auth-control-record';",
         'lib/security/literal.ts': "// import control from './web-auth-control-record'; const value = 'createWebAuthControlRecord'; const regex = /commitAuthControlTicket/u;",
@@ -725,6 +768,14 @@ test('keeps the current-binding predicate inside the historical owner island and
     }
     const unresolvedRequire = ['req', 'uire(pick());'].join('');
     assert.ok(validateControlImports({ 'lib/security/extra.ts': unresolvedRequire }).errors.includes('lib/security/extra.ts:unsupported-expression:*'));
+    const sources = repositoryTypeScript();
+    const dynamicTarget = `${sources['lib/patient-create-service.test.ts']}\nconst suffix = pick(); const target = './security/web-auth-control-record' + suffix; void import(target);`;
+    const dynamicErrors = validateControlImports({ 'lib/patient-create-service.test.ts': dynamicTarget }).errors;
+    assert.ok(dynamicErrors.includes('lib/patient-create-service.test.ts:unsupported-expression:*'));
+    assert.notDeepEqual(repositoryControlImportErrors({ ...sources, 'lib/patient-create-service.test.ts': dynamicTarget }), []);
+    const ambiguousLoader = `${sources['app/api/patients/route.test.ts']}\nconst opaque = pick(); load.resolve(opaque);`;
+    assert.ok(validateControlImports({ 'app/api/patients/route.test.ts': ambiguousLoader }).errors.includes('app/api/patients/route.test.ts:protected-loader-unsupported:*'));
+    assert.notDeepEqual(repositoryControlImportErrors({ ...sources, 'app/api/patients/route.test.ts': ambiguousLoader }), []);
     const benchmark = repositoryTypeScript()['scripts/benchmark-redaction.ts']; assert.ok(benchmark);
     const errors = validateControlImports({
         'scripts/benchmark-redaction.ts': `${benchmark}\nconst suffix=pick();import('./web-auth-control-record'+suffix);`,
@@ -767,6 +818,12 @@ test('keeps the current-binding predicate inside the historical owner island and
     assert.notDeepEqual(validateControlImports({ 'lib/security/server-session.ts': "import { createWebAuthControlRecord } from './web-auth-control-record';" }).errors, []);
     assert.notDeepEqual(validateControlImports({ 'lib/security/extra.ts': "import { createWebAuthControlRecord } from './web-auth-control-record';" }).errors, []);
     assert.notDeepEqual(validateControlImports({ 'lib/security/extra.test.ts': "import { createWebAuthControlRecord } from './web-auth-control-record.ts';" }).errors, []);
+    assert.notDeepEqual(validateControlImports({ 'lib/security/evil.test-support.ts': "import { createWebAuthControlRecord } from './web-auth-control-record.ts';" }).errors, []);
+    const reviewedSupport = sources['components/settings/settings-presentation.test-support.ts']; assert.ok(reviewedSupport);
+    assert.notDeepEqual(repositoryControlImportErrors({
+        ...sources,
+        'components/settings/settings-presentation.test-support.ts': `${reviewedSupport}\n// scanner source drift`,
+    }), []);
     assert.notDeepEqual(validateControlImports({ 'lib/security/server-session.ts': "import type { prepareAuthControlActivation } from './web-auth-control-record';" }).errors, []);
     assert.notDeepEqual(validateControlImports({ 'lib/security/web-auth-control-owner.ts': "import { AuthControlTicket } from './web-auth-control-record';" }).errors, []);
     const source = readFileSync(fileURLToPath(new URL('./web-auth-control-record.ts', import.meta.url)), 'utf8');
@@ -933,7 +990,7 @@ test('denies stale, expired, wrapped, restarted, and hostile tickets without obs
 });
 
 test('keeps the ticket module private to its dormant historical owner and exact test seam', () => {
-    assert.deepEqual(validateControlImports(repositoryTypeScript()).errors, []);
+    assert.deepEqual(repositoryControlImportErrors(), []);
 });
 
 test('entropy collision and same-record reentry deny before ticket publication and permit a clean retry', async () => {

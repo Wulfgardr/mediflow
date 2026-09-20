@@ -5,8 +5,8 @@
 // Wave 0.8.1 — razionalizzazione dell'IA (WUL-522 fabric visibility):
 // - "Sicurezza e Dati" -> "Dati e sicurezza": l'accesso viene prima dei dati
 //   che protegge, e i Repertori restano qui perche' sono corpus locale.
-// - "Intelligenza Artificiale" -> "Intelligenza locale": il gruppo dichiara la
-//   promessa del prodotto invece della tecnologia.
+// @Codex: il nome Intelligence Fabric resta riconoscibile nella navigazione.
+// Il gruppo Funzioni intelligenti comprende stato, modelli e interruttori.
 // - Nuova voce `ai-fabric`: la Intelligence Fabric (ADR 0089/0090/0091) aveva
 //   contratto, status ed observability server-side ma nessuna superficie. E'
 //   la prima voce del gruppo perche' e' il registro che spiega tutte le altre.
@@ -37,6 +37,14 @@ export const SETTINGS_NAV_GROUPS: SettingsNavGroup[] = [
         id: 'generale',
         label: 'Generale',
         items: [
+            /* @Codex */
+            {
+                id: 'panoramica',
+                href: '/settings',
+                label: 'Panoramica',
+                description: 'Stato della postazione e accessi rapidi',
+                keywords: ['panoramica', 'postazione', 'stato locale', 'home-base'],
+            },
             {
                 id: 'profilo',
                 href: '/settings/profilo',
@@ -90,20 +98,20 @@ export const SETTINGS_NAV_GROUPS: SettingsNavGroup[] = [
                 id: 'repertori',
                 href: '/settings/repertori',
                 label: 'Repertori',
-                description: 'AIFA ed esenzioni',
-                keywords: ['farmaci', 'aifa', 'esenzioni', 'repertori', 'import csv', 'database farmaci'],
+                description: 'AIFA, esenzioni e WHO ICD-11',
+                keywords: ['farmaci', 'aifa', 'esenzioni', 'repertori', 'import csv', 'database farmaci', 'who', 'oms', 'icd', 'icd11', 'icd-11', 'terminologia', 'codifiche'],
             },
         ],
     },
     {
         id: 'ai',
-        label: 'Intelligenza locale',
+        label: 'Funzioni intelligenti',
         items: [
             {
                 id: 'ai-fabric',
                 href: '/settings/ai/fabric',
-                label: 'Capacità e connessioni',
-                description: 'Registro capability, dove gira il calcolo, egress',
+                label: 'Intelligence Fabric',
+                description: 'Stato delle funzioni, modelli e connessioni',
                 keywords: [
                     'fabric',
                     'intelligence fabric',
@@ -127,6 +135,14 @@ export const SETTINGS_NAV_GROUPS: SettingsNavGroup[] = [
                 label: 'Modelli e hardware',
                 description: 'Profilo hardware, modelli, Ollama',
                 keywords: ['modelli ai', 'ollama', 'profilo hardware', 'download modelli', 'url provider', 'docker', 'test connessione', 'ocr', 'reasoning'],
+            },
+            /* @Codex: account control and this explicit demo stay distinct. */
+            {
+                id: 'ai-chatgpt',
+                href: '/settings/ai/chatgpt',
+                label: 'OpenAI · ChatGPT',
+                description: 'Prova con dati demo e controllo account',
+                keywords: ['openai', 'chatgpt', 'account chatgpt', 'abbonamento chatgpt', 'sintesi demo', 'prova openai', 'accesso openai', 'consenso demo'],
             },
             {
                 id: 'ai-funzioni',
@@ -255,4 +271,9 @@ export function searchSettingsNav(query: string, limit = 8): SettingsSearchMatch
         matches.sort((a, b) => b.score - a.score || a.item.label.localeCompare(b.item.label));
     }
     return matches.slice(0, limit);
+}
+
+/* @Codex: aria-current identifies the exact page, including the overview. */
+export function isSettingsItemActive(item: SettingsNavItem, pathname: string): boolean {
+    return pathname === item.href;
 }

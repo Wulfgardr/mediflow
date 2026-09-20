@@ -7,14 +7,11 @@ import { ambulatories, patients, patientsToAmbulatories } from '../schema';
 import { activePatients } from '../patient-lifecycle';
 import type { ServerSession } from './server-session';
 import {
-    abortResourceUse,
-    beginResourceUse,
-    commitResourceUse,
-    mintResourcePort,
-    releaseResourcePort,
-    type WebResourcePort,
-    type WebResourceUse,
-} from './web-auth-lifecycle-owner-adapter';
+    type ResourcePort as WebResourcePort,
+    type ResourceUse as WebResourceUse,
+} from './ordinary-session-authority';
+import * as webLifetime from './web-auth-lifecycle-owner-adapter';
+import * as nativeLifetime from './native-inference-lifecycle';
 
 type ClinicalContextDatabase = Pick<typeof dbServer, 'select'>;
 
@@ -49,7 +46,9 @@ function parseRequest(input: unknown): Readonly<{ patientId: string; ambulatoryI
     return Object.freeze({ patientId: patient.value, ambulatoryId: ambulatory.value });
 }
 
-export function createCanonicalClinicalContextResolver(database: ClinicalContextDatabase) {
+function createClinicalContextResolver(database: ClinicalContextDatabase, native: boolean) {
+    const { abortResourceUse, beginResourceUse, commitResourceUse, mintResourcePort, releaseResourcePort }
+        = native ? nativeLifetime : webLifetime;
     return (session: ServerSession, input: unknown) => {
         const request = parseRequest(input);
         let port: WebResourcePort | null = null;
@@ -59,7 +58,7 @@ export function createCanonicalClinicalContextResolver(database: ClinicalContext
             port = mintResourcePort(session);
             if (!port) return fail('session_ineligible');
             use = beginResourceUse(port);
-            if (!use || session.authChannel !== 'web' || session.id === 'local-api') return fail('session_ineligible');
+            if (!use || session.authChannel !== (native ? 'native' : 'web') || session.id === 'local-api') return fail('session_ineligible');
             const patient = database.select({ id: patients.id, version: patients.version })
                 .from(patients).where(and(eq(patients.id, request.patientId), activePatients())).get();
             if (!patient) return fail('patient_missing');
@@ -82,4 +81,11 @@ export function createCanonicalClinicalContextResolver(database: ClinicalContext
             if (port) releaseResourcePort(port);
         }
     };
+}
+
+export function createCanonicalClinicalContextResolver(database: ClinicalContextDatabase) {
+    return createClinicalContextResolver(database, false);
+}
+export function createCanonicalNativeClinicalContextResolver(database: ClinicalContextDatabase) {
+    return createClinicalContextResolver(database, true);
 }

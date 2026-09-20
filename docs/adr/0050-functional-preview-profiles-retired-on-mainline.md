@@ -3,6 +3,10 @@
 Date: 2026-04-22  
 Status: Accepted
 
+> Aggiornamento 0.8.6: [ADR 0123](./0123-official-web-ui-navigation-compositions.md)
+> separa la UI ufficiale dal confronto locale del design. I profili di
+> anteprima non concedono capability o attivazioni funzionali.
+
 ## Problema
 
 Dopo `ADR 0047`, MediFlow ha una sola shell web ufficiale, ma su `main`

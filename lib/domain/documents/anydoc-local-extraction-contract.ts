@@ -22,7 +22,7 @@ export interface LocalAttachmentByteSource {
 }
 export interface LocalExtractionOcrProvenance {
     readonly schemaVersion: typeof ANYDOC_LOCAL_OCR_PROVENANCE_SCHEMA_VERSION;
-    readonly engine: 'apple_vision';
+    readonly engine: 'apple_vision' | 'tesseract_wasm';
     readonly scriptSha256: string;
     readonly pageCount: number;
     readonly ocrPageCount: number;
@@ -116,7 +116,7 @@ function canonicalOcrProvenance(value: unknown): LocalExtractionOcrProvenance | 
     const pageCount = descriptors.pageCount.value;
     const ocrPageCount = descriptors.ocrPageCount.value;
     const receiptSetSha256 = descriptors.receiptSetSha256.value;
-    if (schemaVersion !== ANYDOC_LOCAL_OCR_PROVENANCE_SCHEMA_VERSION || engine !== 'apple_vision'
+    if (schemaVersion !== ANYDOC_LOCAL_OCR_PROVENANCE_SCHEMA_VERSION || (engine !== 'apple_vision' && engine !== 'tesseract_wasm')
         || typeof scriptSha256 !== 'string' || !SHA256.test(scriptSha256)
         || !Number.isSafeInteger(pageCount) || pageCount < 1 || pageCount > 500
         || !Number.isSafeInteger(ocrPageCount) || ocrPageCount < 1 || ocrPageCount > pageCount

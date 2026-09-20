@@ -3,14 +3,19 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
+import { bundledTreatmentPortableFailure, treatmentPortablePrivateArtifact, runTreatmentPortableSelfTest } from './treatment-reasoning-portable-setup.mjs';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { assertNodeRuntime, readNodeContract, standaloneDirectory } from './node-runtime-contract.mjs';
+import { formatPdfSmokeFailure } from './anydoc-pdf-smoke-diagnostics.mjs';
+
+// @Codex: only safe, failure-only smoke diagnostics omit the CLI exception stack.
+class PdfPageWorkerSmokeError extends Error {}
 
 const ANYDOC_WORKER_FILE = 'anydoc-local-extraction-worker.mjs';
 const ANYDOC_WORKER_SHA256 = '5d6e2e60f1d71f3fd45065961258a7debe8a96e017abdcee92823986c8f08c67';
 const ANYDOC_PDF_PAGE_WORKER_FILE = 'anydoc-pdf-page-worker.mjs';
-const ANYDOC_PDF_PAGE_WORKER_SHA256 = 'b33e5363e25cfdb20a7cc6e852e38e2c331bdd54d86eed989a1d300fa92fc821';
+const ANYDOC_PDF_PAGE_WORKER_SHA256 = '31fce8c00c25edd20f7f4442edc9fe00d659599e436cc5166b4be4950f7f3a67';
 const ANYDOC_PDF_CHILD_SCHEMA_VERSION = 'mediflow.anydoc_pdf_child_protocol.v1';
 const ANYDOC_PDF_CHILD_MAX_OLD_SPACE_MB = 256;
 const ANYDOC_LOCAL_EXTRACTION_ROUTE_DIRECTORY = path.join(
@@ -33,27 +38,28 @@ const PDF_ROUTE_DIRECTORY = path.join('server', 'app', 'api', 'pdf-extract');
 const PDF_RUNTIME_REFERENCE = /(?:pdf-inspector-worker\.mjs|pdf-inspector-router|(?:node_modules[\\/])?@firecrawl[\\/]pdf-inspector(?:[-/]|$))/i;
 const SYNTHETIC_RTF = Buffer.from('{\\rtf1\\ansi Synthetic standalone note.}', 'utf8');
 const WEB_AUTH_OWNER_PACKAGE = '@mediflow/web-auth-lifecycle-owner';
-const WEB_AUTH_OWNER_VERSION = '0.8.6';
+const WEB_AUTH_OWNER_VERSION = '0.8.9-local.3f2e6f2a';
 const WEB_AUTH_OWNER_KEYS = Object.freeze([
   'abort', 'abortAdminReset', 'abortResourceUse', 'abortUserRetirement', 'begin', 'beginResourceUse',
   'bootstrapControl', 'commitAdminReset', 'commitResourceUse', 'commitUserRetirement', 'issue',
-  'mintResourcePort', 'prepareAdminReset', 'prepareUserRetirement', 'registerPrivateResource',
-  'releaseResourcePort', 'resolve', 'retire', 'retireForUser',
+  'mintResourcePort', 'prepareAdminReset', 'prepareNativeUserRetirement', 'prepareUserRetirement', 'registerPrivateResource',
+  'releaseResourcePort', 'resolve', 'retire', 'retireForUser', 'serverSessions',
   'unregisterPrivateResource', 'withCurrentResourceBinding',
 ]);
 const WEB_AUTH_OWNER_FILES = Object.freeze([
-  ['index.d.ts', '647385b9d57d2bd2309f70de08866d326736c200f2fce201e54857ec63da3987'],
+  ['index.d.ts', '5c773e27aaba97bac89227ef6fc5f147a9eff8c48c04ab5183fe8339baaabdfd'],
   ['index.js', '1abc52ee8abe9fd25b28046f1f00ecc2f09d699ba220c61e6222730c22ca44c5'],
   ['internal/control-record.cjs', '3d443096679799ffde96e744060de5be59c9a86ddb383bdd975de75c913b9aa4'],
-  ['internal/owner.cjs', 'f9d5e54e89a41788ecdf228841473a7210616fc054d9b3e3ded6316a91c94d2d'],
+  ['internal/native-session.cjs', '43ab1842cab49cf37619621313237beb3728925470bc683b465d5b3c6633dc26'],
+  ['internal/owner.cjs', 'fa76bdc81e46c5fc3f3de2d54ad7f2d64041e63974f9d7a3354b122d8b668a10'],
   ['internal/session-activation.cjs', '5ed4c9543f8bc15903c0915a8565b997d697d004e9ccfaaa54a3da6236a2aa96'],
   ['internal/session-cell.cjs', '4cd0c2e9f8b40b346d43a93de561e20e85c5662fc8a2f9a0a170403fc80c2e31'],
   ['internal/session-resolver.cjs', '75409d670b8411dbadcc95e4bd9bfebeff47d2f687bde0d638809bb9114b5fa0'],
-  ['internal/session-resource.cjs', '127de77dfb73f91f313e5318fd64e838f3f5e3147e801e19b492e0876127d876'],
+  ['internal/session-resource.cjs', 'b71c56ebb7f76db3e59e411e90daac8eb41f175eb20300b4ed6dc7ce9437012c'],
   ['internal/session-retirement.cjs', '8848c92cb88635c6c09baf685839e7c6f1aca40d667ea6580e84e275349f1516'],
   ['internal/support/successor-fence.cjs', '7e36178331d5f899d81d877603acb0100eef1436d1873287ad4b27ccc227e7ff'],
   ['internal/support/value.cjs', '9f0968a0290c6184c898f06de2c408540d4eda1ecd0e3e80ae013bb37a782be1'],
-  ['package.json', '06f785441953621ac6b2fd6f313471f8bbd33bd730d1e603de94b45da382f99d'],
+  ['package.json', 'ce1c7e461a95b8b939ff02317673a2c652b9ffcc5d2a7525a77134d1a99bb3d2'],
 ]);
 
 /* @Codex: P12 proves that the externalized final owner is a physical standalone copy
@@ -136,6 +142,15 @@ function bundledPdfPageWorkerFailure(standaloneDir) {
     if (createHash('sha256').update(fs.readFileSync(worker)).digest('hex') !== ANYDOC_PDF_PAGE_WORKER_SHA256) {
       return 'Standalone PDF page worker digest does not match the pinned child.';
     }
+    const profileManifestPath = path.join(root, 'scripts', 'anydoc-pdf-renderer-profiles.json');
+    if (!fs.lstatSync(profileManifestPath).isFile()
+        || createHash('sha256').update(fs.readFileSync(profileManifestPath)).digest('hex')
+          !== '41355c1e4360acdc293aa383a07ba2c8216a8a018b0a38ac2a9ec5cc0fe37e41') return 'Standalone renderer manifest digest does not match the pinned child.';
+    // @Codex: required even when the optional OCR model is not provisioned.
+    const manifestPath = path.join(root, 'scripts', 'anydoc-tesseract-artifacts.json');
+    if (!fs.lstatSync(manifestPath).isFile()
+        || createHash('sha256').update(fs.readFileSync(manifestPath)).digest('hex')
+          !== '0fb4ed952127bafe84e97f3f3cb43f6f53d5d60984117eed6a550d73508c6978') return 'Standalone OCR artifact manifest digest does not match the pinned child.';
   } catch {
     return 'Standalone runtime does not contain the PDF page worker.';
   }
@@ -226,6 +241,17 @@ function runPdfChild(workerPath, input, { allowAddons = false, args = [] } = {})
   });
 }
 
+/* @Codex: follow the pinned worker's desktop profiles and minimum glibc version.
+   A supported host must produce a valid PNG; unavailable engines are not a pass. */
+function supportsPdfRendering(profiles, platform, arch, glibcVersion) {
+  const profile = profiles.find((entry) => entry.platform === platform && entry.arch === arch);
+  if (!profile) return false;
+  if (profile.libc === null) return true;
+  if (profile.libc !== 'glibc') return false;
+  const [major, minor] = String(glibcVersion).split('.').map(Number);
+  return major > 2 || (major === 2 && minor >= 18);
+}
+
 function framedPdfPageWorkerSmokeFailure(workerPath) {
   const source = syntheticPdfPage();
   const materialize = runPdfChild(workerPath, encodePdfChildFrame({
@@ -236,7 +262,7 @@ function framedPdfPageWorkerSmokeFailure(workerPath) {
   }, [source]));
   if (materialize.error || materialize.status !== 0 || materialize.signal !== null
       || !Buffer.isBuffer(materialize.stderr) || materialize.stderr.byteLength !== 0) {
-    return 'Standalone PDF page worker did not complete the framed materialization smoke.';
+    return formatPdfSmokeFailure('materialize', 'transport', materialize);
   }
   const materialized = decodePdfChildFrame(materialize.stdout);
   const page = materialized?.header?.pages?.[0];
@@ -246,7 +272,7 @@ function framedPdfPageWorkerSmokeFailure(workerPath) {
       || !Array.isArray(materialized.header.pages) || materialized.header.pages.length !== 1
       || page?.page !== 1 || page?.byteLength !== materialized.body.byteLength
       || materialized.body.byteLength < 1) {
-    return 'Standalone PDF page worker emitted an invalid materialization frame.';
+    return formatPdfSmokeFailure('materialize', 'response', materialize);
   }
 
   const render = runPdfChild(workerPath, encodePdfChildFrame({
@@ -257,15 +283,17 @@ function framedPdfPageWorkerSmokeFailure(workerPath) {
   }, [materialized.body]), { allowAddons: true });
   if (render.error || render.status !== 0 || render.signal !== null
       || !Buffer.isBuffer(render.stderr) || render.stderr.byteLength !== 0) {
-    return 'Standalone PDF page worker did not complete the framed rendering smoke.';
+    return formatPdfSmokeFailure('render', 'transport', render);
   }
   const rendered = decodePdfChildFrame(render.stdout);
-  if (process.platform !== 'darwin' || process.arch !== 'arm64') {
+  const profiles = JSON.parse(fs.readFileSync(path.join(path.dirname(workerPath), 'anydoc-pdf-renderer-profiles.json'), 'utf8'));
+  const glibcVersion = process.platform === 'linux' ? process.report.getReport().header.glibcVersionRuntime : undefined;
+  if (!supportsPdfRendering(profiles, process.platform, process.arch, glibcVersion)) {
     return rendered?.header?.schemaVersion === ANYDOC_PDF_CHILD_SCHEMA_VERSION
       && rendered.header.status === 'error' && rendered.header.reason === 'engine_unavailable'
       && rendered.header.bodyByteLength === 0 && rendered.body.byteLength === 0
       ? null
-      : 'Standalone PDF page worker did not fail closed on an unsupported rendering host.';
+      : formatPdfSmokeFailure('render', 'unsupported_host', render);
   }
   const raster = rendered?.header?.pages?.[0];
   const pngSignature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
@@ -277,7 +305,7 @@ function framedPdfPageWorkerSmokeFailure(workerPath) {
       || raster?.width !== 144 || raster?.height !== 72
       || !Number.isSafeInteger(raster?.durationMs) || raster.durationMs < 0
       || !rendered.body.subarray(0, pngSignature.byteLength).equals(pngSignature)) {
-    return 'Standalone PDF page worker emitted an invalid rendering frame.';
+    return formatPdfSmokeFailure('render', 'response', render);
   }
   return null;
 }
@@ -581,9 +609,12 @@ function standaloneWebAuthOwnerInspection(standaloneDir, requireFromStandalone) 
     const keys = Reflect.ownKeys(owner).slice().sort();
     if (!Object.isFrozen(owner) || keys.length !== WEB_AUTH_OWNER_KEYS.length
         || keys.some((key, index) => key !== WEB_AUTH_OWNER_KEYS[index])
-        || WEB_AUTH_OWNER_KEYS.some((key) => typeof owner[key] !== 'function')
+        || WEB_AUTH_OWNER_KEYS.some((key) => typeof owner[key] !== (key === 'serverSessions' ? 'object' : 'function'))
+        || !Object.isFrozen(owner.serverSessions)
+        || Object.hasOwn(owner.serverSessions, 'claimPreparedNativePinRetirement')
+        || Object.hasOwn(owner.serverSessions, 'createServerSessionOwner')
         || Reflect.has(owner, 'createOwner')) {
-      return { failure: `Standalone runtime ${WEB_AUTH_OWNER_PACKAGE} root is not the frozen exact 21-function API.` };
+      return { failure: `Standalone runtime ${WEB_AUTH_OWNER_PACKAGE} root is not the frozen exact owner API with native session namespace.` };
     }
 
     return { failure: null, entryPath: expectedEntry };
@@ -717,15 +748,38 @@ function runPdfPageWorkerSelfTest() {
     fs.mkdirSync(routeDirectory, { recursive: true });
     fs.writeFileSync(routePath, "'use strict';\n");
     fs.copyFileSync(sourceWorker, workerPath);
+    // @Codex
+    fs.copyFileSync(path.join(process.cwd(), 'scripts', 'anydoc-pdf-renderer-profiles.json'), path.join(scriptsDir, 'anydoc-pdf-renderer-profiles.json'));
+    // @Codex: exercise supported and unsupported hosts without simulating a renderer result.
+    const profiles = JSON.parse(fs.readFileSync(path.join(scriptsDir, 'anydoc-pdf-renderer-profiles.json'), 'utf8'));
+    for (const [platform, arch, libc, expected] of [
+      ['darwin', 'arm64', undefined, true], ['win32', 'x64', undefined, true],
+      ['linux', 'arm64', '2.18', true], ['linux', 'x64', '2.36', true],
+      ['linux', 'x64', '3.0', true], ['linux', 'x64', '2.17', false],
+      ['linux', 'arm64', undefined, false], ['linux', 'x64', 'musl', false],
+      ['darwin', 'x64', undefined, false], ['win32', 'arm64', undefined, false],
+      ['freebsd', 'x64', undefined, false],
+    ]) {
+      if (supportsPdfRendering(profiles, platform, arch, libc) !== expected)
+        throw new Error(`incorrect PDF rendering host classification: ${platform}/${arch}/${libc}`);
+    }
+    const artifactManifestPath = path.join(scriptsDir, 'anydoc-tesseract-artifacts.json');
+    fs.copyFileSync(path.join(process.cwd(), 'scripts', 'anydoc-tesseract-artifacts.json'), artifactManifestPath);
     writeValidTrace();
     if (bundledPdfPageWorkerFailure(standaloneDir) !== null) {
       throw new Error('expected the pinned PDF page worker to pass');
     }
+    // @Codex
+    const artifactManifestBytes = fs.readFileSync(artifactManifestPath);
+    fs.appendFileSync(artifactManifestPath, ' ');
+    if (!bundledPdfPageWorkerFailure(standaloneDir)?.includes('manifest digest'))
+      throw new Error('tampered OCR artifact manifest passed');
+    fs.writeFileSync(artifactManifestPath, artifactManifestBytes);
     if (bundledPdfPageWorkerTraceFailure(standaloneDir) !== null) {
       throw new Error('expected the AnyDoc route trace to reference the PDF page worker');
     }
     const smokeFailure = framedPdfPageWorkerSmokeFailure(sourceWorker);
-    if (smokeFailure) throw new Error(smokeFailure);
+    if (smokeFailure) throw new PdfPageWorkerSmokeError(smokeFailure);
 
     fs.rmSync(workerPath);
     if (!bundledPdfPageWorkerFailure(standaloneDir)?.includes('does not contain')) {
@@ -873,6 +927,11 @@ function runPdfRetirementSelfTest() {
   }
 }
 
+
+if (process.argv[2] === '--self-test=treatment-portable') {
+  console.log(JSON.stringify(runTreatmentPortableSelfTest())); process.exit(0);
+}
+
 if (process.argv[2] === '--self-test') {
   runSelfTest();
   process.exit(0);
@@ -890,7 +949,13 @@ if (process.argv[2] === '--self-test=apple-vision-canvas') {
   process.exit(0);
 }
 if (process.argv[2] === '--self-test=pdf-page-worker') {
-  runPdfPageWorkerSelfTest();
+  try {
+    runPdfPageWorkerSelfTest();
+  } catch (error) {
+    if (!(error instanceof PdfPageWorkerSmokeError)) throw error;
+    console.error(error.message);
+    process.exit(1);
+  }
   process.exit(0);
 }
 
@@ -900,6 +965,7 @@ const serverPath = path.join(standaloneDir, 'server.js');
 const runtimeContractPath = path.join(standaloneDir, 'mediflow-runtime-contract.json');
 
 const forbiddenMatchers = [
+  treatmentPortablePrivateArtifact,
   (relativePath) => /^medical\.db$/i.test(relativePath),
   (relativePath) => /\.(db|sqlite|sqlite3)$/i.test(relativePath),
   (relativePath) => /^tmp[-_/]/.test(relativePath),
@@ -931,6 +997,9 @@ function fail(message) {
   console.error(message);
   process.exit(1);
 }
+
+const treatmentPortableFailure = bundledTreatmentPortableFailure(standaloneDir, root);
+if (treatmentPortableFailure) fail(treatmentPortableFailure);
 
 const retiredPdfFailure = retiredPdfRuntimeFailure(standaloneDir);
 if (retiredPdfFailure) fail(retiredPdfFailure);

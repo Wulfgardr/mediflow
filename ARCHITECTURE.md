@@ -46,7 +46,7 @@ MediFlow è un **sistema ibrido locale**:
   - ATHENA-R1-Qwen3-8B su MLX per Treatment Reasoning
   - AnyDoc come primo passaggio deterministico degli allegati, con fallback
     Apple Vision locale per le sole pagine PDF `needsOcr`
-  - Application Service ICD-11 WHO server-only, egress opt-in
+  - Application Service ICD-11 WHO server-only, sidecar locale opt-in (candidato 0.8.6)
   - sidecar locale OpenMed per redaction shadow/benchmark (localhost, non client-facing)
 - Strategia client Apple:
   - la web app sul Mac resta la superficie primaria di oggi
@@ -72,7 +72,7 @@ create documentale manuale per client trusted su LAN.
 | Ollama (AI generativa generale) | `http://127.0.0.1:11434` | opzionale; non esegue OCR nel percorso allegati 0.8.5 |
 | ATHENA su MLX | processo locale bounded | opzionale; solo Treatment Reasoning, con runner e modello locali configurati |
 | AnyDoc + Apple Vision | processi locali bounded | AnyDoc resta il primo passaggio; Apple Vision continua soltanto le pagine PDF `needsOcr`, senza rete |
-| ICD-11 WHO | HTTPS ufficiale, solo dal server | opzionale, egress opt-in |
+| ICD-11 WHO | Loopback fisso, solo dal server | sidecar locale opt-in, provisioning manuale non eseguito |
 | OpenMed redaction (shadow) | `http://127.0.0.1:18080` | opzionale, non client-facing |
 
 ---
@@ -310,6 +310,9 @@ flowchart TB
   corrente o il motore non è disponibile. DeepSeek-OCR 2/CUDA ha stato
   `OUT_OF_SCOPE_FOR_0.8.5_NON_BLOCKING`. Le route OCR legacy, dopo
   l'autenticazione, rispondono `410`.
+- Preferenze Fabric: [ADR 0129](./docs/adr/0129-function-model-catalog-preferences.md)
+  distingue default durevole e override di richiesta da catalogo host sigillato;
+  il servizio nominato non ammette provider e mantiene i binding fail-closed.
 - Boundary Fabric: le quattro capability generative restano
   `proposal_only`; receipt e provenienza non autorizzano apply.
 - Boundary Headless: nessun adapter accede direttamente a SQLite. MCP/Mini

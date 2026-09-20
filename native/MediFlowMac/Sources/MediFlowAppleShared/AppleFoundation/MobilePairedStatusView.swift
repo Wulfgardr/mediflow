@@ -22,11 +22,15 @@ struct MobilePairedStatusPresentation: Equatable {
         if isWorking {
             return Self(phase: .loading, title: "Aggiornamento in corso", detail: "Mantieni aperto MediFlow.", symbolName: "arrow.triangle.2.circlepath", actionTitle: nil)
         }
-        if errorMessage != nil {
-            return Self(phase: .error, title: "Aggiornamento non riuscito", detail: "I dati già visibili non vengono modificati.", symbolName: "exclamationmark.triangle.fill", actionTitle: "Riprova")
+        // @Codex: Session and expiry boundaries must remain visible even if the refresh failed.
+        if connectionState == .sessionExpired {
+            return Self(phase: .sessionExpired, title: "Sessione scaduta", detail: "Accedi di nuovo per leggere o modificare dati.", symbolName: "person.crop.circle.badge.exclamationmark", actionTitle: "Accedi")
         }
         if cacheIsStale {
-            return Self(phase: .stale, title: "Cache scaduta", detail: "Ricollega l'home-base prima di usare questi dati.", symbolName: "clock.badge.exclamationmark", actionTitle: "Ricollega")
+            return Self(phase: .stale, title: "Cache scaduta", detail: reconciliationLine, symbolName: "clock.badge.exclamationmark", actionTitle: "Ricollega")
+        }
+        if errorMessage != nil {
+            return Self(phase: .error, title: "Aggiornamento non riuscito", detail: "Verifica il collegamento e lo stato della sessione.", symbolName: "exclamationmark.triangle.fill", actionTitle: "Riprova")
         }
         switch connectionState {
         case .pairedOnline:
@@ -60,10 +64,12 @@ struct MobilePairedStatusView: View {
                 // assistive technologies. Keeping only the state symbol and its
                 // action on screen preserves the first patient row at AX sizes.
                 statusSymbol
+                    .accessibilityHidden(true) // @Codex: Complete state is announced by the container.
                 Spacer(minLength: 8)
                 primaryActionButton(compact: true)
             } else {
                 statusSymbol
+                    .accessibilityHidden(true) // @Codex: Complete state is announced by the container.
                 VStack(alignment: .leading, spacing: 4) {
                     Text(presentation.title)
                         .font(.headline)

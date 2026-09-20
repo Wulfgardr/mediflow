@@ -7,7 +7,9 @@ import { db, type ProstheticPrescription, type ProstheticPrescriptionCategory, t
 import { useLiveQuery } from '@/lib/live-query';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { DocumentReferenceChip } from '@/components/document-reference-chip';
+import { ProstheticsCatalogLookup } from '@/components/prosthetics-catalog-manager-lookup';
 import { Badge } from '@/components/ui/badge';
+import { useRuntimeTwinPendingForm } from '@/components/runtime-twin-design';
 import type { SemanticSignal } from '@/lib/ui-semantic-signal';
 
 type Props = {
@@ -52,7 +54,9 @@ const CATEGORY_OPTIONS: Array<{ value: ProstheticPrescriptionCategory; label: st
 ];
 
 function todayInputValue(): string {
-    return new Date().toISOString().slice(0, 10);
+    // @Codex: the form asks for the operator's calendar day, not the UTC day.
+    const today = new Date();
+    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 }
 
 function emptyForm(): FormState {
@@ -114,6 +118,9 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [form, setForm] = useState<FormState>(() => emptyForm());
+
+    /* @Codex: the conditional form's open state is the pending-form signal. */
+    useRuntimeTwinPendingForm(isFormOpen);
 
     /* @Codex */
     const prescriptions = useLiveQuery(
@@ -231,6 +238,17 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
                     </div>
                     <div className="flex flex-wrap gap-2">{headerActions}</div>
                 </div>
+            )}
+
+            {isFormOpen && (
+                <details className="mb-4 rounded-xl border border-[color:var(--lume-border-color)] px-4">
+                    <summary className="flex min-h-11 cursor-pointer items-center text-sm font-semibold">
+                        Cerca un ausilio nel repertorio
+                    </summary>
+                    <div className="pb-4">
+                        <ProstheticsCatalogLookup onCopyDescription={(description) => updateForm('description', description)} />
+                    </div>
+                </details>
             )}
 
             {isFormOpen && (

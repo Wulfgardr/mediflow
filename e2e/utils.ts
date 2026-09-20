@@ -15,6 +15,23 @@ export type ReflowProxyViewport = (typeof REFLOW_PROXY_VIEWPORTS)[number];
 
 type OverflowTarget = { label: string; selector: string };
 
+/* @Codex ADR 0123: reach a clinical pane through the ordinary section menu,
+   including sections disclosed under "Altre sezioni". */
+export async function openPatientSection(page: Page, id: string): Promise<void> {
+  const navigation = page.getByRole('navigation', { name: 'Sezioni della vista', exact: true });
+  const link = navigation.locator(`a[href="#${id}"]`);
+  await expect(navigation).toBeVisible();
+  await expect(link).toHaveCount(1);
+  if (!(await link.isVisible())) await navigation.locator('summary').click();
+  await expect(link).toBeVisible();
+  await link.click();
+  await expect(link).toHaveAttribute('aria-current', 'location');
+  // @Codex: ordinary sections use navigation state and visibility; the twin-only
+  // data-folder-active attribute is not part of their contract.
+  const pane = page.locator(`#${id}`);
+  await expect(pane).toBeVisible();
+}
+
 /* @Codex */
 export async function assertNoHorizontalOverflow(page: Page, targets: readonly OverflowTarget[]): Promise<void> {
   const evidence = await page.evaluate((requestedTargets) => requestedTargets.map(({ label, selector }) => {
@@ -79,8 +96,17 @@ async function hasSecurityOverlay(page: Page): Promise<boolean> {
 /* @Codex */
 async function hasStableUnlockedShell(page: Page): Promise<boolean> {
   if (await hasSecurityOverlay(page)) return false;
-  await page.waitForTimeout(750);
-  return !(await hasSecurityOverlay(page));
+
+  // The lock surface can be absent while SecurityProvider is still resolving
+  // the initial auth check. Wait for the authenticated application chrome, or
+  // for the authenticated work-profile flow rendered in place of that chrome.
+  const [navigationVisible, lockControlVisible, workProfileVisible] = await Promise.all([
+    isVisible(page.getByRole('navigation', { name: 'Navigazione principale', exact: true }), 750),
+    isVisible(page.getByRole('button', { name: 'Blocca', exact: true }), 750),
+    isVisible(page.getByTestId('work-profile-onboarding'), 750),
+  ]);
+
+  return (navigationVisible && lockControlVisible) || workProfileVisible;
 }
 
 /* @Codex */
@@ -92,15 +118,7 @@ export async function completeOnboardingIfNeeded(page: Page, pin: string): Promi
   await page.getByPlaceholder('es. Studio Medico Centrale').fill('Ambulatorio E2E');
   await page.getByRole('button', { name: 'Avanti' }).click();
 
-  await expect(page.getByRole('heading', { name: 'Ruolo' })).toBeVisible();
-  await page.getByRole('button', { name: 'Avanti' }).click();
-
-  await expect(page.getByRole('heading', { name: 'Credenziali di Accesso' })).toBeVisible();
-  await page.getByPlaceholder('es. operatore.demo').fill('admin');
-  await page.getByPlaceholder('Password sicura').fill('password');
-  await page.getByRole('button', { name: 'Avanti' }).click();
-
-  await expect(page.getByRole('heading', { name: 'Sicurezza Locale' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Sicurezza', exact: true })).toBeVisible();
   const pinInputs = page.locator('input[placeholder="••••••"]');
   await pinInputs.nth(0).fill(pin);
   await pinInputs.nth(1).fill(pin);
@@ -116,6 +134,11 @@ export async function unlockIfNeeded(page: Page, pin: string): Promise<void> {
   const pinInput = page.getByLabel('PIN operatore').first();
   const unlockButton = page.getByRole('button', { name: /Sblocca/ }).first();
 
+  /* @Codex: a tab without its local key first offers explicit session renewal.
+     Observe that real UI state and its receipt before entering the PIN. */
+  const renew = page.getByRole('button', { name: 'Rinnova accesso', exact: true });
+  if (await renew.isVisible() && await renew.isEnabled()) await renew.click();
+  await expect(pinInput).toBeEnabled();
   await pinInput.fill(pin);
   await expect(pinInput).toHaveValue(pin);
   await expect(unlockButton).toBeEnabled({ timeout: 5_000 });
@@ -150,15 +173,21 @@ export async function bootstrapUnlockedSession(page: Page, pin: string): Promise
   await page.waitForLoadState('domcontentloaded');
 
   for (let attempt = 0; attempt < 5; attempt += 1) {
-    if (await hasStableUnlockedShell(page)) return;
+    if (await hasStableUnlockedShell(page)) {
+      // @Codex: unrelated E2E flows use the always-available manual entry.
+      if (await isVisible(page.getByTestId('work-profile-onboarding'))) {
+        await page.getByRole('link', { name: 'Apri la cartella manualmente' }).click();
+      }
+      return;
+    }
 
     await completeOnboardingIfNeeded(page, pin);
     await setupPinLegacyIfNeeded(page, pin);
     await unlockIfNeeded(page, pin);
   }
 
-  if (await hasSecurityOverlay(page)) {
-    throw new Error('Security overlay is still visible after E2E bootstrap');
+  if (!(await hasStableUnlockedShell(page))) {
+    throw new Error('Authenticated application shell is unavailable after E2E bootstrap');
   }
 }
 

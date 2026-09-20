@@ -1,3 +1,6 @@
+<!-- reconciliation-20260912 -->
+> **Candidata riallineata il 20 settembre 2026, non release.** Il perimetro vigente della 0.8.6 è il runtime locale/headless sul Mac con interfaccia browser localhost. Gli agenti usano soltanto comandi MediFlow nominati, soggetti a capability, autenticazione, currentness, conferma delle scritture cliniche, audit e ricevute; non accedono direttamente a SQLite. I provider restano spenti per default e le funzioni AI sono opzionali e proposal-only. L'app nativa è un follow-up separato e non un gate della 0.8.6. Le prove storiche sotto conservano i propri SHA e non qualificano automaticamente questa ricostruzione. Il coordinamento resta [WUL-669](https://linear.app/wulfgardr/issue/WUL-669); proposte recuperate e servizi configurati non attestano funzionamento reale.
+
 <div align="center">
 <img src="./docs/design/lume/icona/mediflow-icon-giorno.svg" width="100" height="100" alt="MediFlow: il filo della storia clinica">
 
@@ -11,34 +14,40 @@ Informazioni, fonti e prossimi passi. Un po’ più facili da ritrovare.
 <a href="https://claude.com/claude-code"><img src="https://img.shields.io/badge/built%20with-Claude%20Code-D97757?style=flat&amp;logo=claudecode&amp;logoColor=white" alt="Built with Claude Code"></a>
 <a href="https://openai.com/codex"><img src="https://img.shields.io/badge/built%20with-Codex-1f2937?style=flat" alt="Built with Codex"></a>
 
-[![Versione sorgente](https://img.shields.io/badge/sorgente-0.8.5-33506b?style=flat)](./docs/release-085-readiness.md)
+[![Versione sorgente](https://img.shields.io/badge/sorgente-0.8.6-33506b?style=flat)](./docs/analysis/2026-09-07-086-release-verification.md)
 [![Release pubblica](https://img.shields.io/github/v/release/Wulfgardr/mediflow?label=release&style=flat)](https://github.com/Wulfgardr/mediflow/releases/latest)
 [![Licenza](https://img.shields.io/badge/license-MIT-2ea043?style=flat)](./LICENSE)
 [![Local-first](https://img.shields.io/badge/data-local--first-8957e5?style=flat)](#dove-stanno-i-dati)
-[![Swift core](https://img.shields.io/badge/Swift%20core-macOS%20%7C%20Linux%20%7C%20Windows-6e7681?style=flat)](./docs/NATIVE.md)
+[![Candidata 0.8.6](https://img.shields.io/badge/candidata-Headless%20%7C%20localhost-6e7681?style=flat)](./docs/analysis/2026-09-07-086-release-verification.md)
 
 [**Scopri Get MediFlow**](https://getmediflow.dev) · [Perché nasce](#perché-nasce) · [Cosa puoi fare](#cosa-puoi-fare) · [Provalo](#provalo) · [Per chi sviluppa](#per-chi-sviluppa) · [Documentazione](#documentazione)
 
 </div>
 
-![MediFlow: pazienti e anteprima della cartella](./docs/images/getmediflow-085/worklist.png)
+![MediFlow: elenco pazienti](./docs/images/getmediflow-086/worklist.png)
 
-*Schermata reale della candidatura 0.8.5, con soli dati sintetici.*
+*Interfaccia web 0.8.6 con soli dati sintetici; acquisizione del candidato `ddff0a929`.*
 
 <details>
-<summary><strong>Versione sorgente e stato della candidatura</strong></summary>
+<summary><strong>Versione sorgente, verifiche e distribuzione</strong></summary>
 
-> **Stato del ramo: 0.8.5 candidata.** I controlli locali della revisione sono
-> documentati; i gate Apple completi e di distribuzione restano aperti.
-> Una build riuscita non equivale a una release pubblicata.
-> [Verifiche e limiti della candidatura](./docs/release-085-readiness.md).
+> **0.8.6: candidata locale/headless sul Mac con browser localhost.**
+> Backend, Intelligence Fabric e Headless operano sul Mac locale. Gli agenti
+> possono usare solo comandi MediFlow nominati e mediati; l'app nativa resta un
+> follow-up separato. L’adapter
+> OpenAI è spento per default; se autorizzato, invia il contenuto preparato al
+> servizio esterno. Le immagini usano soltanto
+> dati sintetici. Gli altri sistemi operativi e i client nativi non sono
+> qualificati in questa candidata; ATHENA è opzionale. Una candidata, una build o una prova locale non equivalgono
+> a release pubblicata, validazione clinica o disponibilità su altri sistemi.
+> [Verifiche e limiti](./docs/analysis/2026-09-07-086-release-verification.md).
 
 </details>
 
 <details>
-<summary><strong>La scheda clinica, da vicino</strong></summary>
+<summary><strong>Le terapie, da vicino</strong></summary>
 
-![Scheda clinica: terapie con posologia, ultima misura e prossimo follow-up](./docs/images/getmediflow-085/record.png)
+![Terapie del paziente con dati sintetici](./docs/images/getmediflow-086/record.png)
 
 Schermata reale con dati interamente sintetici.
 
@@ -80,17 +89,17 @@ La parità FHIRv2 resta da verificare.
 | Ritrovare l'evidenza | Documenti collegati alla cartella e alle fonti | Estrazione locale dei formati supportati; errori espliciti. |
 | Preparare il seguito | Checkup, appuntamenti e attese aperte | Una proposta di follow-up non attesta che l'azione sia stata eseguita. |
 | Dare struttura alle parole | Ricerca terminologica e cataloghi | Il servizio WHO ICD-11 è opzionale e richiede configurazione esplicita. |
-| Registrare una misura | Scale Web/native con risposte esplicite | Zero e risposta mancante sono distinti; fonte e versione restano nello storico. |
+| Registrare una misura | Scale con risposte esplicite | Zero e risposta mancante sono distinti; fonte e versione restano nello storico. |
 | Rivedere informazioni complesse | Quattro percorsi Intelligence Fabric | Output da rivedere, senza scrittura clinica automatica. |
 | Usare capacità senza ogni schermata | Supervisor, AIP e MCP | Accessi delimitati; nessun accesso diretto al database per gli adapter. |
 
 <details>
 <summary><strong>Guarda la revisione documentale</strong></summary>
 
-![Documenti, provenienza e passaggi da rivedere](./docs/images/getmediflow-085/documents.png)
+![Documenti, provenienza e passaggi da rivedere](./docs/images/getmediflow-086/documents.png)
 
-Schermata reale con fixture sintetiche. Le sintesi mostrate sono contenuti
-preparati per la dimostrazione, non risultati di una generazione AI live.
+Interfaccia documentale con dati sintetici. La schermata non attesta
+un’esecuzione AI, un’estrazione AnyDoc o un passaggio OCR.
 
 </details>
 
@@ -105,11 +114,11 @@ limiti. La risposta del modello è una proposta da esaminare.
 - **Document Synthesis**: mettere in relazione il contenuto dei documenti.
 - **Treatment Reasoning**: supportare il riesame professionale con un percorso dedicato.
 
-Ollama può servire i primi tre percorsi; ATHENA/MLX è separata e destinata a
-Treatment Reasoning. Entrambi richiedono configurazione e verifica locali.
-Gli adapter OpenAI e Anthropic sono limitati a **prove controllate e spenti per default**. Non esiste un
-ripiego silenzioso sul cloud. La presenza dell'adapter non prova la disponibilità
-di un account, del servizio o di un uso con dati clinici reali.
+Ollama può servire i primi tre percorsi. ATHENA/MLX resta opzionale per
+Treatment Reasoning e richiede configurazione e verifica locali. L’adapter
+OpenAI è disponibile solo in prove controllate e spento per default: non esiste
+un ripiego silenzioso sul cloud. La sua presenza non prova la disponibilità di
+un account, del servizio o di un uso con dati clinici reali.
 
 <details>
 <summary><strong>Perché una proposta non è ancora una modifica</strong></summary>
@@ -152,21 +161,19 @@ la conformità; la presenza di supervisione umana non è una certificazione.
 
 ## Dove stanno i dati
 
-Il Mac home base è il riferimento autorevole del prodotto Apple: conserva
-SQLite e ospita servizi e API. Browser locale e app Mac offrono le interfacce.
-iPhone e iPad sono client paired in sviluppo, collegati esplicitamente al nodo.
+Il Mac è il nodo autorevole della candidata 0.8.6: conserva SQLite e ospita
+servizi e API. Il browser localhost è l'interfaccia di riferimento nel perimetro
+attuale; l'app Mac resta un follow-up separato.
 
 ```mermaid
 flowchart LR
     web[Browser locale] --> host[Host MediFlow: servizi e API]
-    mac[App Mac] --> host
-    paired[iPhone e iPad: pairing esplicito] --> host
     host --> db[(SQLite locale)]
     mcp[MCP: capacità delimitate] --> broker[AIP e policy host]
     broker --> host
 ```
 
-I client paired e gli adapter non aprono direttamente SQLite. La cifratura
+Gli adapter non aprono direttamente SQLite. La cifratura
 protegge campi clinici sensibili secondo il contratto documentato; non è un
 claim di cifratura integrale di ogni metadato o del file database.
 
@@ -191,12 +198,10 @@ il tuo gestore. `better-sqlite3` deve corrispondere all'ABI del Node attivo.
 | Ambiente Web locale | Avvio |
 | --- | --- |
 | macOS | `./Start_MediFlow.command` |
-| Windows | `powershell -ExecutionPolicy Bypass -File .\Start-MediFlow.ps1` |
-| Linux | `./scripts/start-mediflow.sh` |
 
 Apri `http://localhost:3000`. Il launcher verifica checkout e porta per evitare
-di aprire un'altra istanza. La portabilità del workspace Web e del core Swift
-non equivale a parità delle applicazioni Apple su ogni sistema.
+di aprire un'altra istanza. Gli altri sistemi operativi e i client nativi non
+fanno parte della candidata 0.8.6.
 
 I provider AI, il servizio WHO e gli altri connettori opzionali non si
 attivano con questi comandi. La clone segue il ramo predefinito pubblico:
@@ -206,13 +211,14 @@ non è un'istruzione per ottenere una candidatura non ancora pubblicata.
 <summary><strong>Apple: account gratuito, Xcode e distribuzione</strong></summary>
 
 Xcode completo serve per compilare e testare le applicazioni Apple; le sole
-Command Line Tools non coprono SwiftUI, XCTest e i relativi gate.
+Command Line Tools non coprono SwiftUI e XCTest. Queste prove riguardano il
+follow-up nativo e non sono un gate della candidata 0.8.6.
 Un Apple Account gratuito consente sviluppo e prove personali entro i limiti
 del Personal Team. Developer ID e notarizzazione Mac richiedono l'Apple
 Developer Program. Non sono prerequisiti per pubblicare il codice sorgente.
 
 [Guida nativa](./docs/NATIVE.md) ·
-[Canali e verifiche 0.8.5](./docs/release-085-readiness.md) ·
+[Verifiche e limiti della candidata 0.8.6](./docs/analysis/2026-09-07-086-release-verification.md) ·
 [Confronto ufficiale Apple](https://developer.apple.com/support/compare-memberships/)
 
 </details>
@@ -235,15 +241,16 @@ npm run build -- --webpack
 npm run mcp:intelligent-host:production
 ```
 
-Il Supervisor mantiene il runtime Web e MCP come processi figli separati.
-MCP usa stdio. Per una capacità riferita al paziente servono autenticazione,
-selezione e attivazione esplicita nell'interfaccia fidata. Revoca, logout,
-cambio di selezione o scadenza chiudono il grant.
+Nella candidata 0.8.6 il Supervisor mantiene il runtime Web e MCP come
+processi figli separati sul Mac. MCP usa stdio. Per una capacità riferita al
+paziente servono autenticazione, selezione e attivazione esplicita
+nell'interfaccia fidata. Revoca, logout, cambio di selezione o scadenza chiudono
+il grant.
 
-Mini condivide catalogo tipizzato e fondazione CLI; nella 0.8.5 non ha un
-binding Supervisor di produzione e richiede un canale AIP genitore.
-Questi comandi non concedono accesso generale al database né autorizzano
-scritture cliniche. Il planner semantico resta limitato a strumenti approvati.
+Headless non concede accesso generale al database né autorizza scritture
+cliniche fuori dai controlli applicabili. La candidata non richiede né qualifica
+un client agente specifico: l'integrazione usa soltanto i comandi MediFlow
+nominati. Il planner semantico resta limitato a strumenti approvati.
 
 </details>
 
@@ -252,7 +259,7 @@ scritture cliniche. Il planner semantico resta limitato a strumenti approvati.
 | Se vuoi… | Parti da… |
 | --- | --- |
 | Capire il progetto senza conoscere il codice | [Get MediFlow](https://getmediflow.dev) |
-| Vedere cosa è implementato e cosa resta da provare | [Stato del sistema](./docs/STATE_OF_THE_SYSTEM.md) e [readiness 0.8.5](./docs/release-085-readiness.md) |
+| Vedere cosa è implementato e cosa resta da provare | [Stato del sistema](./docs/STATE_OF_THE_SYSTEM.md) e [verifiche della candidata 0.8.6](./docs/analysis/2026-09-07-086-release-verification.md) |
 | Trovare la fonte autorevole di un tema | [Mappa della documentazione](./docs/README.md) |
 | Capire piattaforme e parità | [Guida nativa](./docs/NATIVE.md) e [matrice di parità](./docs/parity-matrix.md) |
 | Ricostruire una decisione tecnica | [ADR](./docs/adr/README.md) |

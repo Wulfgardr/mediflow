@@ -7,7 +7,12 @@ import { normalizeAifaSearchText } from '@/lib/aifa-catalog';
 import { ensureAuditSqliteSchema } from '@/lib/security/audit-db';
 import { resolveDataPath } from '@/lib/data-dir';
 import { copySqliteDatabaseSync, replaceSqliteDatabase } from '@/lib/sqlite-repair';
+import { bootstrapEmptySqliteDatabase } from '@/lib/sqlite-new-database-bootstrap';
 import { initSqlitePragmas } from '@/lib/sqlite-pragmas';
+/* @Codex */
+import { ensureExemptionImportSchema } from '@/lib/exemption-catalog-schema';
+/* @Codex */
+import { ensureProstheticsCatalogSchema } from '@/lib/reference-data/prosthetics-catalog-schema';
 
 // Ensure the data directory exists in production or use project root for dev
 /* @Codex */
@@ -676,6 +681,9 @@ function applySchemaGuards() {
     } catch (error) {
         console.warn('[MediFlow] Exemptions schema check skipped:', error);
     }
+    /* @Codex: fail closed on an unsupported import-receipt schema. */
+    ensureExemptionImportSchema(sqlite);
+    ensureProstheticsCatalogSchema(sqlite);
     /* @Codex */
     try {
         const therapyColumns = (sqlite.prepare("PRAGMA table_info(therapies)").all() as TableInfoRow[]).map((col) => col.name);
@@ -1028,6 +1036,7 @@ function applySchemaGuardsSerially(): void {
     // workers wait under busy_timeout, preventing concurrent check-then-ALTER
     // races and duplicate-column warnings.
     sqlite.transaction(() => {
+        bootstrapEmptySqliteDatabase(sqlite);
         applySchemaGuards();
         upgradeLegacyAttachmentCurrentness();
     }).immediate();

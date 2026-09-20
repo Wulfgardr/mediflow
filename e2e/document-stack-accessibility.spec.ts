@@ -1,6 +1,6 @@
 /* @Codex */
 import { expect, test, type Page } from '@playwright/test';
-import { assertKeyboardFocusProgresses, assertNoHorizontalOverflow, bootstrapUnlockedSession } from './utils';
+import { assertKeyboardFocusProgresses, assertNoHorizontalOverflow, bootstrapUnlockedSession, openPatientSection } from './utils';
 
 type SyntheticDocumentInsight = {
   id: string;
@@ -86,17 +86,8 @@ async function seedSyntheticInsights(page: Page, patientId: string, insights: Sy
 
 async function openDocumentSection(page: Page, patientId: string): Promise<void> {
   await page.goto(`/patients/${patientId}/modules`);
-  const toggle = page.getByRole('button', { name: /Archivio documenti ed evidenze/ });
-  await expect(toggle).toBeVisible();
-  await expect(toggle).toHaveAttribute('aria-expanded', /^(true|false)$/);
-  // Le fixture con insight auto-aprono la sezione quando le query kill switch
-  // completano: un read-then-click singolo puo' incrociare l'auto-apertura e
-  // richiudere la sezione (race TOCTOU). Il blocco ritentato converge in ogni
-  // ordine di scheduling e resta valido anche per fixture senza auto-apertura.
-  await expect(async () => {
-    if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
-    expect(await toggle.getAttribute('aria-expanded')).toBe('true');
-  }).toPass();
+  await openPatientSection(page, 'documenti');
+  await expect(page.locator('#documenti').getByRole('heading', { name: /Archivio documenti ed evidenze/ })).toBeVisible();
 }
 
 test.describe.configure({ retries: 0 });
@@ -109,21 +100,24 @@ test('Evidence Stack web: fixture popolata, curation, empty ed errore restano ve
   await seedSyntheticInsights(page, patientId, insights);
 
   await openDocumentSection(page, patientId);
-  const stack = page.getByText('Referti recenti', { exact: true }).locator('..');
+  const summaries = page.locator('#document-insights');
+  await summaries.locator('summary').click();
+  const stack = page.getByTestId('document-insights-archive');
   await expect(stack.getByText(insights[0].fileName, { exact: true })).toBeVisible();
   await expect(stack.getByText(insights[1].fileName, { exact: true })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Archivio Intelligente', exact: true })).toBeVisible();
+  await expect(stack).toBeVisible();
   await assertNoHorizontalOverflow(page, [
     { label: 'documento Evidence Stack popolato', selector: 'document' },
-    { label: 'Evidence Stack popolato', selector: '.evidence-stack-tile' },
+    { label: 'Sintesi archiviate', selector: '[data-testid="document-insights-archive"]' },
   ]);
 
-  const archive = page.locator('.patient-detail-side-section', {
-    has: page.getByRole('heading', { name: 'Archivio Intelligente', exact: true }),
-  });
-  const firstDocumentButton = archive.locator('button.flex-1').filter({ hasText: insights[0].fileName });
+  const archive = page.getByTestId('document-insights-archive');
+  const firstDocumentButton = archive.getByRole('button').filter({ hasText: insights[0].fileName });
   await firstDocumentButton.click();
-  await expect(archive).toContainText(insights[0].summary);
+  await expect(firstDocumentButton).toHaveAttribute('aria-expanded', 'true');
+  await expect(archive.getByText(insights[0].summary, { exact: true })).toBeVisible();
+  await archive.getByText('Testo sorgente archiviato', { exact: true }).click();
+  await expect(archive.getByText(insights[0].rawMarkdown, { exact: true })).toBeVisible();
   const removeFirst = archive.getByRole('button', { name: `Rimuovi ${insights[0].fileName} dall'archivio intelligente` });
   await assertKeyboardFocusProgresses(page, removeFirst, 'rimozione singolo documento Evidence Stack');
   await removeFirst.click();
@@ -134,8 +128,8 @@ test('Evidence Stack web: fixture popolata, curation, empty ed errore restano ve
   const clearArchive = archive.getByRole('button', { name: 'Svuota archivio', exact: true });
   await clearArchive.click();
   await page.getByRole('dialog').getByRole('button', { name: 'Svuota', exact: true }).click();
-  await expect(page.getByText('Nessuna evidenza documentale in primo piano.', { exact: true })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Archivio Intelligente', exact: true })).toHaveCount(0);
+  await expect(page.getByTestId('patient-documents').getByText('Nessun documento caricato. Aggiungi un file per consultarlo e, separatamente, richiedere una sintesi.', { exact: true })).toBeVisible();
+  await expect(page.getByTestId('document-insights-archive')).toHaveCount(0);
 
   const errorMarker = `${Date.now()}`.slice(-8);
   const errorPatientId = await createSyntheticPatient(page, errorMarker);
@@ -149,9 +143,8 @@ test('Evidence Stack web: fixture popolata, curation, empty ed errore restano ve
     }
     await route.continue();
   });
-  const errorArchive = page.locator('.patient-detail-side-section', {
-    has: page.getByRole('heading', { name: 'Archivio Intelligente', exact: true }),
-  });
+  await page.locator('#document-insights > summary').click();
+  const errorArchive = page.getByTestId('document-insights-archive');
   await errorArchive.getByRole('button', { name: `Rimuovi ${errorInsights[0].fileName} dall'archivio intelligente` }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Rimuovi', exact: true }).click();
   await expect(page.getByText('Aggiornamento non riuscito', { exact: true })).toBeVisible();
@@ -172,16 +165,8 @@ test('Evidence Stack web: loading ed empty hanno segnali distinti', async ({ pag
   await expect(page.getByText('Caricamento scheda paziente...', { exact: true })).toBeVisible();
   await navigation;
 
-  const toggle = page.getByRole('button', { name: /Archivio documenti ed evidenze/ });
-  await expect(toggle).toHaveAttribute('aria-expanded', /^(true|false)$/);
-  // Le fixture con insight auto-aprono la sezione quando le query kill switch
-  // completano: un read-then-click singolo puo' incrociare l'auto-apertura e
-  // richiudere la sezione (race TOCTOU). Il blocco ritentato converge in ogni
-  // ordine di scheduling e resta valido anche per fixture senza auto-apertura.
-  await expect(async () => {
-    if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
-    expect(await toggle.getAttribute('aria-expanded')).toBe('true');
-  }).toPass();
-  await expect(page.getByText('Nessuna evidenza documentale in primo piano.', { exact: true })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Archivio Intelligente', exact: true })).toHaveCount(0);
+  await openPatientSection(page, 'documenti');
+  await expect(page.locator('#documenti').getByRole('heading', { name: /Archivio documenti ed evidenze/ })).toBeVisible();
+  await expect(page.getByTestId('patient-documents').getByText('Nessun documento caricato. Aggiungi un file per consultarlo e, separatamente, richiedere una sintesi.', { exact: true })).toBeVisible();
+  await expect(page.getByTestId('document-insights-archive')).toHaveCount(0);
 });

@@ -1,0 +1,59 @@
+/* @Codex: keep the full catalog status clear of its detail action. */
+.row.row {
+    grid-template-columns: 24px minmax(0, 1fr) minmax(0, 0.5fr) minmax(0, 12rem) max-content;
+    gap: 0.75rem;
+}
+
+.row > * {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.row .status > span {
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+.row > button {
+    min-height: var(--lume-control-height, 44px);
+    border-radius: var(--lume-control-radius, 12px);
+    font-weight: 600;
+    white-space: nowrap;
+    overflow-wrap: normal;
+}
+
+.row > button svg {
+    flex-shrink: 0;
+}
+
+@media (max-width: 900px) {
+    .row.row {
+        grid-template-columns: 24px minmax(0, 1fr) max-content;
+    }
+
+    .row > :nth-child(3) {
+        grid-column: 2;
+    }
+
+    .row .status {
+        grid-column: 2;
+    }
+
+    .row > button {
+        grid-column: 3;
+        grid-row: 1 / 4;
+    }
+}
+
+@media (max-width: 480px) {
+    .row.row {
+        grid-template-columns: 24px minmax(0, 1fr);
+    }
+
+    .row > button {
+        grid-column: 2;
+        grid-row: auto;
+        justify-self: start;
+    }
+}

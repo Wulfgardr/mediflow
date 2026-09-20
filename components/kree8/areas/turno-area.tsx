@@ -20,6 +20,8 @@ import type {
 } from '../cockpit-shared';
 import type { PillVariant } from '@/lib/patient-workspace';
 import { agendaFilterMatches } from '@/lib/ui-semantic-signal';
+/* @Codex */
+import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
 import styles from '../kree8-clinical-cockpit-foundation.module.css';
 /* @Codex */
 const AI_QUEUE: Kree8DecisionCard[] = [
@@ -79,6 +81,7 @@ function TurnoArea({
   onSelectPatient: (patientId: string) => void;
   onOpenArea: (area: AreaId) => void;
 }) {
+  const { proposal } = useRuntimeTwinDesign();
   const agendaHeadingRef = useRef<HTMLHeadingElement>(null);
   const visibleAgenda = useMemo(() => {
     return agendaState.rows.filter((row) => agendaFilterMatches(filter, row.filterCategory));
@@ -233,7 +236,7 @@ function TurnoArea({
               className={styles.panelTitle}
               tabIndex={-1}
             >
-              Agenda di oggi
+              {proposal ? 'Appuntamenti' : 'Agenda di oggi'}
             </h2>
             <PillBadge variant="neutral">
               {formatCountLabel(visibleAgenda.length, 'evento', 'eventi')}

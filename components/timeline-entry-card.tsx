@@ -9,6 +9,9 @@ import { ClinicalRichTextContent } from '@/components/clinical-rich-text-content
 import PrivacyBlur from '@/components/privacy-blur';
 import { useLiveQuery } from '@/lib/live-query';
 import { LumeFilo, LumeFiloNodo } from '@/components/ui/lume-filo';
+/* @Codex: a reading-led diary presentation uses the same entry and actions. */
+import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
+import twin from './twin-diary.module.css';
 
 export type TimelineEntryData = ClinicalEntry & { patientName?: string };
 
@@ -122,13 +125,14 @@ export function TimelineEntryCard({
     onRestore,
     onViewAttachment,
 }: TimelineEntryCardProps) {
+    const { proposal } = useRuntimeTwinDesign();
     const isDeleted = !!entry.deletedAt;
     const Icon = TYPE_ICONS[entry.type] || FileText;
     const presentation = presentEntry(entry);
 
     return (
         <article
-            className={`group relative pl-8 outline-none ${isDeleted ? 'opacity-60 grayscale' : ''}`}
+            className={`group relative pl-8 outline-none ${proposal ? twin.entry : ''} ${isDeleted ? 'opacity-60 grayscale' : ''}`}
             data-active={active ? 'true' : 'false'}
             data-lume-entry-state={presentation.draft ? 'draft' : 'settled'}
             aria-current={active ? 'true' : undefined}
@@ -138,33 +142,33 @@ export function TimelineEntryCard({
             onClick={onActivate}
             onFocus={onActivate}
         >
-            <LumeFiloNodo
+            {!proposal && <LumeFiloNodo
                 data-lume-timeline-node
                 className="absolute -left-2 top-0 h-4 w-4"
                 fillTone={isDeleted ? 'critical' : 'field'}
                 tone={isDeleted ? 'critical' : 'accent'}
-            />
+            />}
 
             {/* Content */}
-            <div className={`rounded-[var(--lume-radius-card)] p-5 group-focus-visible:shadow-[var(--lume-focus-ring)] ${isDeleted ? 'border border-[color:var(--lume-signal-critical)] bg-[color:var(--lume-surface-field)]' : active ? 'lume-focal' : 'bg-[color:var(--lume-surface-field)]'}`}>
-                <div className="flex justify-between items-start mb-3">
+            <div className={`rounded-[var(--lume-radius-card)] p-5 group-focus-visible:shadow-[var(--lume-focus-ring)] ${isDeleted ? 'border border-[color:var(--lume-signal-critical)] bg-[color:var(--lume-surface-field)]' : active && !proposal ? 'lume-focal' : 'bg-[color:var(--lume-surface-field)]'}`}>
+                <div className={`flex justify-between items-start mb-3 ${proposal ? twin.header : ''}`}>
                     <div className="flex items-center gap-2">
-                        <div className={`mf-icon-disc h-8 w-8 !rounded-[12px] ${isDeleted ? '!text-[color:var(--lume-signal-critical)]' : ''}`}>
+                        {!proposal && <div className={`mf-icon-disc h-8 w-8 !rounded-[12px] ${isDeleted ? '!text-[color:var(--lume-signal-critical)]' : ''}`}>
                             <Icon className="w-4 h-4" />
-                        </div>
-                        <div>
+                        </div>}
+                        <div className={proposal ? twin.identity : undefined}>
                             <span className="block text-xs font-bold uppercase" style={{ color: isDeleted ? 'var(--lume-signal-critical)' : 'var(--lume-accent)' }}>
-                                {TYPE_LABELS[entry.type] || entry.type}
-                                {entry.patientName && <span className="ml-1 font-normal normal-case" style={{ color: 'var(--lume-ink-muted)' }}> - {entry.patientName}</span>}
+                                {TYPE_LABELS[entry.type] || (proposal && entry.type === 'phone' ? 'Telefonata' : entry.type)}
+                                {entry.patientName && <span className="ml-1 font-normal normal-case" style={{ color: 'var(--lume-ink-muted)' }}> - <PrivacyBlur>{entry.patientName}</PrivacyBlur></span>}
                             </span>
                             <div className="lume-registro mt-1 flex flex-wrap items-center gap-2 text-xs" style={{ color: 'var(--lume-ink-muted)' }}>
                                 <span className="rounded-md border border-[color:var(--lume-border-color)] px-1.5 py-0.5 font-semibold uppercase">
                                     {presentation.stateLabel}
                                 </span>
                                 <span className="lume-registro">{format(new Date(entry.date), 'dd MMMM yyyy HH:mm', { locale: it })}</span>
-                                <span>Fonte: {presentation.source}</span>
+                                <span>{proposal ? '' : 'Fonte: '}{presentation.source}</span>
                                 {presentation.author ? <span>Autore: {presentation.author}</span> : null}
-                                {entry.setting && (
+                                {!proposal && entry.setting && (
                                     <span className={`flex items-center gap-1 rounded-full border px-1.5 py-0.5 ${entry.setting === 'home' ? 'border-[color:var(--lume-signal-warning)] text-[color:var(--lume-signal-warning)]' : 'border-[color:var(--lume-signal-success)] text-[color:var(--lume-signal-success)]'}`}>
                                         {entry.setting === 'home' ? <Home className="w-3 h-3" /> : <Building2 className="w-3 h-3" />}
                                         {entry.setting === 'home' ? 'Dom' : 'Amb'}

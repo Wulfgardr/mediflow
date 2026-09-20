@@ -5,7 +5,15 @@ ufficiale del progetto, approvato il 5 settembre 2026 e ospitato su ChatGPT Site
 È il primo riferimento per conoscere il prodotto; GitHub conserva codice,
 contributi e contratti tecnici. Il sito non ospita la cartella e non riceve dati
 del runtime. L’accesso è pubblico: chi visita il sito personale può aprire la presentazione.
-Non è stato registrato un dominio autonomo.
+L’indirizzo pubblico corrente è `getmediflow.dev`.
+
+Per la candidata 0.8.6 la presentazione descrive il runtime locale/headless
+sul Mac, il browser localhost, il backend e Intelligence Fabric.
+Gli agenti usano soltanto comandi MediFlow nominati e mediati, senza accesso
+diretto a SQLite. L’adapter OpenAI è spento per default; le funzioni AI sono
+opzionali, proposal-only e soggette ai controlli del prodotto. L'app nativa è
+un follow-up separato. La presentazione non anticipa una release, validazione
+clinica o disponibilità multipiattaforma.
 
 ## Il filo del racconto
 
@@ -20,7 +28,7 @@ da ritrovare. Il prodotto deve essere visibile dall’apertura.
 | Il contesto | Informazioni distribuite tra referti, allegati e attività. |
 | Intelligence Fabric | Quattro percorsi selezionabili, con dettagli sulla revisione. |
 | Scelta dei runtime | Locale, provider esterni in prova e offuscamento in sviluppo. |
-| Aprire il cofano | Tre letture: generale, professionale e tecnica; anche Mini e headless. |
+| Aprire il cofano | Tre letture: generale, professionale e tecnica; Headless mediato sul Mac con i suoi limiti. |
 | Responsabilità | GDPR e AI Act con approfondimenti e fonti, senza claim di certificazione. |
 
 ## Forma e interazioni
@@ -32,8 +40,9 @@ verde acceso distingue Fabric. Nessun accento arancio decorativo.
 
 Le schermate reali provengono esclusivamente da un runtime con fixture
 sintetiche. Le ricostruzioni interattive sono dichiarate illustrative e non
-simulano un servizio AI live. Una cattura di Mini deve mostrare il comportamento
-reale del candidato, incluso un eventuale trasporto non collegato.
+simulano un servizio AI live. Se incluse, le schermate Headless devono mostrare
+solo comandi MediFlow realmente disponibili, i controlli applicati e i relativi
+limiti, senza promettere compatibilità con qualunque agente.
 
 Nessuna etichetta di capitolo superflua, contatore, firma Ordito/Concilio o
 freccia senza funzione. Gli approfondimenti rispondono a domande concrete.
@@ -43,7 +52,7 @@ Il movimento rispetta la preferenza di riduzione ed è disattivabile.
 
 Il README parte dal gestionale, presenta le capacità e porta a fonti e avvio.
 Mantiene i badge Codex, Claude Code, versione sorgente, release, licenza e
-piattaforme, distinguendo sorgente 0.8.5 e release pubblica.
+piattaforme, distinguendo candidata sorgente 0.8.6 e release pubblica.
 
 `start-here.md` accompagna il lettore dal prodotto al lavoro clinico e alla
 costruzione tecnica. Le topologie iniziano con una spiegazione accessibile,

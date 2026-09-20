@@ -1,6 +1,6 @@
 /* @Codex */
 import assert from 'node:assert/strict';
-import { randomUUID } from 'node:crypto';
+import crypto, { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
@@ -81,6 +81,7 @@ const NATIVE_CAPABILITY_IMPORTS = new Map<string, ReadonlySet<string>>([
     ])],
     ['lib/security/pin-change-service.ts', new Set([
         'abortNativeLegacyUserRetirement', 'commitNativeLegacyUserRetirement', 'prepareNativeLegacyUserRetirement',
+        'preparePairedNativePinRetirement',
     ])],
 ]);
 const NATIVE_CAPABILITY_SYMBOLS = new Set([...NATIVE_CAPABILITY_IMPORTS.values()].flatMap((symbols) => [...symbols]));
@@ -94,6 +95,32 @@ const DORMANT_WEB_OWNER_MODULE_IMPORTS = new Map<string, ReadonlyMap<string, Rea
 ]);
 
 const isTestSource = (file: string) => /(?:^|\/)[^/]+\.(?:test|spec)\.[cm]?[jt]sx?$/u.test(file);
+const sourceSha256 = (source: string) => crypto.createHash('sha256').update(source).digest('hex');
+// This isolated JSX harness uses an intentionally constrained createRequire double. Its path, source, and
+// only scanner diagnostics are pinned so any change returns to the fail-closed inventory.
+const REVIEWED_TEST_SUPPORT_DIAGNOSTICS = new Map([
+    ['components/settings/settings-presentation.test-support.ts', {
+        sha256: '24f3aa0bd5cbe3acc809c4000e9b1af7e97a23fd56cbffd6a633e745f5027454',
+        diagnostics: ['session-loader', 'historical-owner-reachable', 'historical-owner-reachable'],
+    }],
+] as const);
+const excludeReviewedTestSupportDiagnostics = (sources: Readonly<Record<string, string>>, errors: string[]) => {
+    const eligible = new Set<string>();
+    for (const [file, reviewed] of REVIEWED_TEST_SUPPORT_DIAGNOSTICS) {
+        if (!(file in sources)) continue;
+        const source = sources[file]; const expected = reviewed.diagnostics.map((diagnostic) => `${file}:${diagnostic}`);
+        const observed = errors.filter((error) => error.startsWith(`${file}:`));
+        if (sourceSha256(source) !== reviewed.sha256) {
+            errors.push(`${file}:reviewed-loader-source-drift`); continue;
+        }
+        const exact = observed.length === expected.length && [...new Set(expected)].every((error) => (
+            observed.filter((item) => item === error).length === expected.filter((item) => item === error).length
+        ));
+        if (!exact) { errors.push(`${file}:reviewed-loader-diagnostic-drift`); continue; }
+        for (const error of expected) eligible.add(error);
+    }
+    return errors.filter((error) => !eligible.has(error));
+};
 const inventory = (sources: Readonly<Record<string, string>>, target: string) => Object.entries(sources)
     .flatMap(([file, source]) => inventoryModuleImports({
         file, source, target, repositoryRoot: REPOSITORY_ROOT,
@@ -141,7 +168,7 @@ const validateO1CSessionImports = (sources: Readonly<Record<string, string>>) =>
             if (file in sources && !exactRuntimeSymbols(uses, file, symbols)) errors.push(`${file}:historical-owner-shape`);
         }
     }
-    return errors;
+    return excludeReviewedTestSupportDiagnostics(sources, errors);
 };
 const typescriptSources = () => repositoryTypeScriptSources(REPOSITORY_ROOT);
 
@@ -438,7 +465,7 @@ test('O1-C historical P2 prepare commit and abort bridges cannot activate or ret
         fence: 'f0', generation: BigInt(0), pending: true, active: false,
     });
 
-    const source = readFileSync(fileURLToPath(new URL('./server-session.ts', import.meta.url)), 'utf8');
+    const source = readFileSync(fileURLToPath(new URL('../../packages/web-auth-lifecycle-owner/internal/native-session.cjs', import.meta.url)), 'utf8');
     assert.doesNotMatch(source, /from ['"]\.\/web-auth-control-record['"]/u);
     assert.match(source, /function prepareAuthControlActivation[\s\S]*?return null;/u);
     assert.match(source, /function commitPreparedAuthControlActivation[\s\S]*?return 0;/u);
@@ -466,6 +493,16 @@ test('O1-C inventories historical Web authority as a dormant fail-closed island'
         'lib/security/unauthorized.ts': "const session = await import('./server-session');",
     });
     assert.ok(hiddenLoader.includes('lib/security/unauthorized.ts:session-loader'));
+
+    const evilTestSupport = validateO1CSessionImports({
+        'lib/security/evil.test-support.ts': "import { activateArmedWebServerSession } from './server-session';",
+    });
+    assert.ok(evilTestSupport.includes('lib/security/evil.test-support.ts:historical-web-authority'));
+    const reviewedSupport = sources['components/settings/settings-presentation.test-support.ts']; assert.ok(reviewedSupport);
+    assert.notDeepEqual(validateO1CSessionImports({
+        ...sources,
+        'components/settings/settings-presentation.test-support.ts': `${reviewedSupport}\n// scanner source drift`,
+    }), []);
 });
 
 test('O1-C binds native-system capabilities to reset and PIN change only', () => {
@@ -577,7 +614,7 @@ test('user retirement turn fences same-user issuance while preserving system and
 });
 
 test('publication rollback removes apply-then-throw authority and poisons the enclosing user turn', async (t) => {
-    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('./server-session.ts');
+    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('../../packages/web-auth-lifecycle-owner/internal/native-session.cjs');
     const cached = nodeRequire.cache[modulePath];
     const originals = {
         mapGet: Map.prototype.get, mapSet: Map.prototype.set,
@@ -615,7 +652,7 @@ test('publication rollback removes apply-then-throw authority and poisons the en
         return result;
     };
     let isolated: typeof import('./server-session');
-    try { delete nodeRequire.cache[modulePath]; isolated = nodeRequire(modulePath) as typeof import('./server-session'); }
+    try { delete nodeRequire.cache[modulePath]; isolated = nodeRequire(modulePath).createServerSessionOwner().api as typeof import('./server-session'); }
     finally {
         Map.prototype.get = originals.mapGet; Map.prototype.set = originals.mapSet;
         WeakMap.prototype.set = originals.weakSet; Set.prototype.add = originals.setAdd;
@@ -713,9 +750,9 @@ test('activation burns crossed, hostile, copied, and cross-module inputs without
         assert.equal(activateArmedWebServerSession(value, first.ticket), false);
     }
     assert.equal(activateArmedWebServerSession(second.port, first.ticket), false);
-    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('./server-session.ts'); const cached = nodeRequire.cache[modulePath];
+    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('../../packages/web-auth-lifecycle-owner/internal/native-session.cjs'); const cached = nodeRequire.cache[modulePath];
     try {
-        delete nodeRequire.cache[modulePath]; const restarted = nodeRequire(modulePath) as typeof import('./server-session');
+        delete nodeRequire.cache[modulePath]; const restarted = nodeRequire(modulePath).createServerSessionOwner().api as typeof import('./server-session');
         assert.equal(restarted.activateArmedWebServerSession(second.port, second.ticket), false);
         restarted.clearAllSessions();
     } finally { if (cached) nodeRequire.cache[modulePath] = cached; else delete nodeRequire.cache[modulePath]; }
@@ -725,7 +762,7 @@ test('activation burns crossed, hostile, copied, and cross-module inputs without
 
 
 test('activation tombstones lookup reentry and a captured WeakMap mutate-then-throw', async () => {
-    const nodeRequire = createRequire(import.meta.url); const sessionPath = nodeRequire.resolve('./server-session.ts');
+    const nodeRequire = createRequire(import.meta.url); const sessionPath = nodeRequire.resolve('../../packages/web-auth-lifecycle-owner/internal/native-session.cjs');
     const authPath = nodeRequire.resolve(AUTH_CONTROL_MODULE_PATH); const cachedSession = nodeRequire.cache[sessionPath]; const cachedAuth = nodeRequire.cache[authPath];
     const originalGet = WeakMap.prototype.get; let trigger = false; let failAfterApply = false; let nested: () => void = () => undefined;
     WeakMap.prototype.get = function (this: WeakMap<object, unknown>, key: object) {
@@ -735,7 +772,7 @@ test('activation tombstones lookup reentry and a captured WeakMap mutate-then-th
         return result;
     };
     delete nodeRequire.cache[sessionPath]; delete nodeRequire.cache[authPath];
-    const isolated = nodeRequire(sessionPath) as typeof import('./server-session');
+    const isolated = nodeRequire(sessionPath).createServerSessionOwner().api as typeof import('./server-session');
     try {
         const fixture = () => {
             const staged = isolated.stageWebServerSession({ id: 'lookup-user', username: SYNTHETIC_USERNAME, role: 'clinician' });
@@ -775,12 +812,12 @@ test('an armed Web session cell becomes a terminal tombstone on denial, logout, 
     clearAllSessions();
     assert.equal(getArmedWebServerSessionId(cleared), null);
 
-    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('./server-session.ts');
+    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('../../packages/web-auth-lifecycle-owner/internal/native-session.cjs');
     const cached = nodeRequire.cache[modulePath]; const ttl = process.env.MEDIFLOW_SESSION_TTL_MS; const originalNow = Date.now;
     let isolated: typeof import('./server-session') | undefined; let now = 1_000;
     try {
         process.env.MEDIFLOW_SESSION_TTL_MS = '1'; Date.now = () => now; delete nodeRequire.cache[modulePath];
-        isolated = nodeRequire(modulePath) as typeof import('./server-session');
+        isolated = nodeRequire(modulePath).createServerSessionOwner().api as typeof import('./server-session');
         const port = isolated.armPreparedWebServerSession(isolated.prepareStagedWebServerSession(
             isolated.stageWebServerSession({ id: 'armed-expired', username: SYNTHETIC_USERNAME, role: 'clinician' }),
         ));
@@ -794,7 +831,7 @@ test('an armed Web session cell becomes a terminal tombstone on denial, logout, 
     }
 });
 
-test('armed Web session ports reject hostile shapes and module copies without observation', async (t) => {
+test('armed Web session ports reject hostile shapes and owner copies without observation', async (t) => {
     const prepared = prepareStagedWebServerSession(stageWebServerSession({
         id: 'armed-hostile', username: SYNTHETIC_USERNAME, role: 'clinician',
     }));
@@ -817,9 +854,9 @@ test('armed Web session ports reject hostile shapes and module copies without ob
     } finally {
         if (thenDescriptor) Object.defineProperty(Object.prototype, 'then', thenDescriptor); else delete (Object.prototype as { then?: unknown }).then;
     }
-    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('./server-session.ts'); const cached = nodeRequire.cache[modulePath];
+    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('../../packages/web-auth-lifecycle-owner/internal/native-session.cjs'); const cached = nodeRequire.cache[modulePath];
     try {
-        delete nodeRequire.cache[modulePath]; const restarted = nodeRequire(modulePath) as typeof import('./server-session');
+        delete nodeRequire.cache[modulePath]; const restarted = nodeRequire(modulePath).createServerSessionOwner().api as typeof import('./server-session');
         assert.equal(restarted.getArmedWebServerSessionId(port), null);
         assert.equal(restarted.tombstoneArmedWebServerSession(port), false);
         restarted.clearAllSessions();
@@ -829,7 +866,7 @@ test('armed Web session ports reject hostile shapes and module copies without ob
 });
 
 test('the armed-cell lifecycle guard burns reentrant and apply-then-throw preparations without later drift', async () => {
-    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('./server-session.ts'); const cached = nodeRequire.cache[modulePath];
+    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('../../packages/web-auth-lifecycle-owner/internal/native-session.cjs'); const cached = nodeRequire.cache[modulePath];
     const weak = { get: WeakMap.prototype.get, set: WeakMap.prototype.set }; let target = ''; let failSet = false; let nested = () => undefined;
     const wrap = (name: string, original: (...args: never[]) => unknown) => function (this: unknown, ...args: never[]) {
         if (target === name) { target = ''; nested(); }
@@ -838,7 +875,7 @@ test('the armed-cell lifecycle guard burns reentrant and apply-then-throw prepar
     WeakMap.prototype.get = wrap('get', weak.get) as typeof weak.get;
     WeakMap.prototype.set = wrap('set', weak.set) as typeof weak.set;
     let isolated: typeof import('./server-session');
-    try { delete nodeRequire.cache[modulePath]; isolated = nodeRequire(modulePath) as typeof import('./server-session'); }
+    try { delete nodeRequire.cache[modulePath]; isolated = nodeRequire(modulePath).createServerSessionOwner().api as typeof import('./server-session'); }
     finally { WeakMap.prototype.get = weak.get; WeakMap.prototype.set = weak.set; }
     try {
         const first = isolated.prepareStagedWebServerSession(isolated.stageWebServerSession({ id: 'armed-first', username: SYNTHETIC_USERNAME, role: 'clinician' }));
@@ -875,13 +912,13 @@ test('the armed-cell lifecycle guard burns reentrant and apply-then-throw prepar
 });
 
 test('armed Web session ID lookup revalidates after hostile clock reentry', async (t) => {
-    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('./server-session.ts');
+    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('../../packages/web-auth-lifecycle-owner/internal/native-session.cjs');
     const cached = nodeRequire.cache[modulePath]; const originalNow = Date.now; let trigger = false; let nested = () => undefined;
     const unhandled: unknown[] = []; const onUnhandled = (reason: unknown) => { unhandled.push(reason); };
     process.on('unhandledRejection', onUnhandled); t.after(() => process.off('unhandledRejection', onUnhandled));
     Date.now = () => { if (trigger) { trigger = false; nested(); } return 1_000; };
     let isolated: typeof import('./server-session');
-    try { delete nodeRequire.cache[modulePath]; isolated = nodeRequire(modulePath) as typeof import('./server-session'); }
+    try { delete nodeRequire.cache[modulePath]; isolated = nodeRequire(modulePath).createServerSessionOwner().api as typeof import('./server-session'); }
     finally { Date.now = originalNow; }
     try {
         for (const operation of ['tombstone', 'delete', 'clear', 'arm'] as const) {
@@ -938,10 +975,10 @@ test('prepared Web session abort, deletion, user invalidation, clear, and hostil
 });
 
 test('a reservation denies colliding live, native, and direct staged publication without overwriting', () => {
-    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('./server-session.ts'); const cached = nodeRequire.cache[modulePath]; const cryptoModule = nodeRequire('node:crypto'); const randomBytes = cryptoModule.randomBytes;
+    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('../../packages/web-auth-lifecycle-owner/internal/native-session.cjs'); const cached = nodeRequire.cache[modulePath]; const cryptoModule = nodeRequire('node:crypto'); const randomBytes = cryptoModule.randomBytes;
     let isolated: typeof import('./server-session') | undefined;
     try {
-        cryptoModule.randomBytes = () => Buffer.alloc(32, 7); delete nodeRequire.cache[modulePath]; isolated = nodeRequire(modulePath) as typeof import('./server-session');
+        cryptoModule.randomBytes = () => Buffer.alloc(32, 7); delete nodeRequire.cache[modulePath]; isolated = nodeRequire(modulePath).createServerSessionOwner().api as typeof import('./server-session');
         const prepared = isolated.prepareStagedWebServerSession(isolated.stageWebServerSession({ id: 'reserved-user', username: SYNTHETIC_USERNAME, role: 'clinician' }));
         assert.ok(prepared); const sessionId = isolated.getPreparedWebServerSessionId(prepared); assert.ok(sessionId);
         assert.throws(() => isolated!.createSession({ id: 'live-user', username: SYNTHETIC_USERNAME, role: 'clinician' }), /unavailable/u);
@@ -953,12 +990,12 @@ test('a reservation denies colliding live, native, and direct staged publication
 });
 
 test('entropy reentry cannot resurrect or duplicate staged Web reservations', () => {
-    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('./server-session.ts'); const cached = nodeRequire.cache[modulePath]; const cryptoModule = nodeRequire('node:crypto'); const randomBytes = cryptoModule.randomBytes;
+    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('../../packages/web-auth-lifecycle-owner/internal/native-session.cjs'); const cached = nodeRequire.cache[modulePath]; const cryptoModule = nodeRequire('node:crypto'); const randomBytes = cryptoModule.randomBytes;
     let isolated: typeof import('./server-session') | undefined; let first: ReturnType<typeof stageWebServerSession> = null; let second: ReturnType<typeof stageWebServerSession> = null;
     try {
         let entered = false; let same: ReturnType<typeof prepareStagedWebServerSession> | undefined; let other: ReturnType<typeof prepareStagedWebServerSession> | undefined;
         cryptoModule.randomBytes = () => { if (!entered && isolated && first && second) { entered = true; same = isolated.prepareStagedWebServerSession(first); other = isolated.prepareStagedWebServerSession(second); } return Buffer.alloc(32, 9); };
-        delete nodeRequire.cache[modulePath]; isolated = nodeRequire(modulePath) as typeof import('./server-session');
+        delete nodeRequire.cache[modulePath]; isolated = nodeRequire(modulePath).createServerSessionOwner().api as typeof import('./server-session');
         first = isolated.stageWebServerSession({ id: 'reentry-first', username: SYNTHETIC_USERNAME, role: 'clinician' }); second = isolated.stageWebServerSession({ id: 'reentry-second', username: SYNTHETIC_USERNAME, role: 'clinician' }); assert.ok(first && second);
         assert.equal(isolated.prepareStagedWebServerSession(first), null);
         assert.equal(same, null); assert.equal(other, null);
@@ -968,12 +1005,12 @@ test('entropy reentry cannot resurrect or duplicate staged Web reservations', ()
     } finally { cryptoModule.randomBytes = randomBytes; isolated?.clearAllSessions(); if (cached) nodeRequire.cache[modulePath] = cached; else delete nodeRequire.cache[modulePath]; }
 });
 
-test('a prepared session survives unrelated creation and remains private across a module copy', () => {
+test('a prepared session survives unrelated creation and remains private across an isolated owner instance', () => {
     const prepared = prepareStagedWebServerSession(stageWebServerSession({ id: 'prepared-copy', username: SYNTHETIC_USERNAME, role: 'clinician' }));
     assert.ok(prepared); const sessionId = getPreparedWebServerSessionId(prepared); assert.ok(sessionId);
     const unrelated = syntheticSession(); assert.notEqual(unrelated.id, sessionId); assert.equal(getSession(sessionId), null);
-    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('./server-session.ts'); const cached = nodeRequire.cache[modulePath]; let restarted: typeof import('./server-session') | undefined;
-    try { delete nodeRequire.cache[modulePath]; restarted = nodeRequire(modulePath) as typeof import('./server-session'); assert.equal(restarted.getPreparedWebServerSessionId(prepared), null); assert.equal(restarted.commitPreparedWebServerSession(prepared), false); }
+    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('../../packages/web-auth-lifecycle-owner/internal/native-session.cjs'); const cached = nodeRequire.cache[modulePath]; let restarted: typeof import('./server-session') | undefined;
+    try { delete nodeRequire.cache[modulePath]; restarted = nodeRequire(modulePath).createServerSessionOwner().api as typeof import('./server-session'); assert.equal(restarted.getPreparedWebServerSessionId(prepared), null); assert.equal(restarted.commitPreparedWebServerSession(prepared), false); }
     finally { restarted?.clearAllSessions(); if (cached) nodeRequire.cache[modulePath] = cached; else delete nodeRequire.cache[modulePath]; }
     assert.equal(commitPreparedWebServerSession(prepared), true); assert.equal(getSession(sessionId)?.id, sessionId);
 });
@@ -1000,13 +1037,13 @@ test('staged Web sessions deny abort, user invalidation, clear, restart, and hos
     assert.equal(activateStagedWebServerSession(forged), null);
 
     const nodeRequire = createRequire(import.meta.url);
-    const modulePath = nodeRequire.resolve('./server-session.ts');
+    const modulePath = nodeRequire.resolve('../../packages/web-auth-lifecycle-owner/internal/native-session.cjs');
     const originalModule = nodeRequire.cache[modulePath];
     try {
         const restartCapsule = stageWebServerSession({ id: 'restart-user', username: SYNTHETIC_USERNAME, role: 'clinician' });
         assert.ok(restartCapsule);
         delete nodeRequire.cache[modulePath];
-        const restarted = nodeRequire(modulePath) as typeof import('./server-session');
+        const restarted = nodeRequire(modulePath).createServerSessionOwner().api as typeof import('./server-session');
         assert.equal(restarted.activateStagedWebServerSession(restartCapsule), null);
         restarted.clearAllSessions();
     } finally {
@@ -1033,17 +1070,17 @@ test('staging accepts only exact data values and never reads hostile accessors o
 });
 
 test('an expired prepared Web session releases its reservation before publication', () => {
-    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('./server-session.ts'); const cached = nodeRequire.cache[modulePath]; const ttl = process.env.MEDIFLOW_SESSION_TTL_MS;
+    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('../../packages/web-auth-lifecycle-owner/internal/native-session.cjs'); const cached = nodeRequire.cache[modulePath]; const ttl = process.env.MEDIFLOW_SESSION_TTL_MS;
     let isolated: typeof import('./server-session') | undefined;
     const originalNow = Date.now; let now = 1_000;
-    try { process.env.MEDIFLOW_SESSION_TTL_MS = '1'; Date.now = () => now; delete nodeRequire.cache[modulePath]; isolated = nodeRequire(modulePath) as typeof import('./server-session'); const prepared = isolated.prepareStagedWebServerSession(isolated.stageWebServerSession({ id: 'expired-user', username: SYNTHETIC_USERNAME, role: 'clinician' })); assert.ok(prepared); const sessionId = isolated.getPreparedWebServerSessionId(prepared); assert.ok(sessionId); now += 2; assert.equal(isolated.commitPreparedWebServerSession(prepared), false); assert.equal(isolated.getPreparedWebServerSessionId(prepared), null); assert.equal(isolated.getSession(sessionId), null); }
+    try { process.env.MEDIFLOW_SESSION_TTL_MS = '1'; Date.now = () => now; delete nodeRequire.cache[modulePath]; isolated = nodeRequire(modulePath).createServerSessionOwner().api as typeof import('./server-session'); const prepared = isolated.prepareStagedWebServerSession(isolated.stageWebServerSession({ id: 'expired-user', username: SYNTHETIC_USERNAME, role: 'clinician' })); assert.ok(prepared); const sessionId = isolated.getPreparedWebServerSessionId(prepared); assert.ok(sessionId); now += 2; assert.equal(isolated.commitPreparedWebServerSession(prepared), false); assert.equal(isolated.getPreparedWebServerSessionId(prepared), null); assert.equal(isolated.getSession(sessionId), null); }
     finally { Date.now = originalNow; isolated?.clearAllSessions(); if (ttl === undefined) delete process.env.MEDIFLOW_SESSION_TTL_MS; else process.env.MEDIFLOW_SESSION_TTL_MS = ttl; if (cached) nodeRequire.cache[modulePath] = cached; else delete nodeRequire.cache[modulePath]; }
 });
 
 test('an entropy collision burns the capsule without replacing the live session', () => {
-    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('./server-session.ts'); const cached = nodeRequire.cache[modulePath]; const cryptoModule = nodeRequire('node:crypto'); const randomBytes = cryptoModule.randomBytes;
+    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('../../packages/web-auth-lifecycle-owner/internal/native-session.cjs'); const cached = nodeRequire.cache[modulePath]; const cryptoModule = nodeRequire('node:crypto'); const randomBytes = cryptoModule.randomBytes;
     let isolated: typeof import('./server-session') | undefined;
-    try { cryptoModule.randomBytes = () => Buffer.alloc(32, 7); delete nodeRequire.cache[modulePath]; isolated = nodeRequire(modulePath) as typeof import('./server-session'); const live = isolated.createSession({ id: 'live-user', username: SYNTHETIC_USERNAME, role: 'clinician' }); const capsule = isolated.stageWebServerSession({ id: 'staged-user', username: SYNTHETIC_USERNAME, role: 'clinician' }); assert.ok(capsule); assert.equal(isolated.activateStagedWebServerSession(capsule), null); assert.equal(isolated.getSession(live.id), live); assert.equal(isolated.activateStagedWebServerSession(capsule), null); }
+    try { cryptoModule.randomBytes = () => Buffer.alloc(32, 7); delete nodeRequire.cache[modulePath]; isolated = nodeRequire(modulePath).createServerSessionOwner().api as typeof import('./server-session'); const live = isolated.createSession({ id: 'live-user', username: SYNTHETIC_USERNAME, role: 'clinician' }); const capsule = isolated.stageWebServerSession({ id: 'staged-user', username: SYNTHETIC_USERNAME, role: 'clinician' }); assert.ok(capsule); assert.equal(isolated.activateStagedWebServerSession(capsule), null); assert.equal(isolated.getSession(live.id), live); assert.equal(isolated.activateStagedWebServerSession(capsule), null); }
     finally { cryptoModule.randomBytes = randomBytes; isolated?.clearAllSessions(); if (cached) nodeRequire.cache[modulePath] = cached; else delete nodeRequire.cache[modulePath]; }
 });
 
@@ -1090,7 +1127,7 @@ test('staging and activation use captured intrinsics after ambient poisoning', (
     assert.equal(poisonedCalls, 0);
 });
 
-test('does not trust global registry pointers across module wrappers', () => {
+test('does not trust global registry pointers across isolated owner instances', () => {
     const sessionGlobals = globalThis as typeof globalThis & {
         __mediflowSessions?: Map<string, unknown>;
         __mediflowSessionResources?: Map<string, unknown>;
@@ -1100,7 +1137,7 @@ test('does not trust global registry pointers across module wrappers', () => {
     const forgedSessions = new Map<string, unknown>();
     const forgedResources = new Map<string, unknown>();
     const nodeRequire = createRequire(import.meta.url);
-    const modulePath = nodeRequire.resolve('./server-session.ts');
+    const modulePath = nodeRequire.resolve('../../packages/web-auth-lifecycle-owner/internal/native-session.cjs');
     const originalModule = nodeRequire.cache[modulePath];
     let secondary: typeof import('./server-session') | undefined;
 
@@ -1116,7 +1153,7 @@ test('does not trust global registry pointers across module wrappers', () => {
         assert.equal(getSession(primary.id), null);
 
         delete nodeRequire.cache[modulePath];
-        secondary = nodeRequire(modulePath) as typeof import('./server-session');
+        secondary = nodeRequire(modulePath).createServerSessionOwner().api as typeof import('./server-session');
         assert.equal(secondary.getSession(primary.id), null);
         const secondSession = secondary.createSession({ id: 'user-secondary', username: SYNTHETIC_USERNAME, role: 'clinician' });
         assert.equal(getSession(secondSession.id), null);

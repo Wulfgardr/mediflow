@@ -1,4 +1,6 @@
 /* @Codex */
+import { readNativeNetworkJson, jsonBodyTooLargeResponse } from '@/lib/native-network-json-body';
+/* @Codex */
 import { cookies } from 'next/headers';
 /* @Codex */
 import { NextResponse } from 'next/server';
@@ -16,7 +18,9 @@ import {
 import { listNetworkScopedPatients } from '@/lib/network-patient-read';
 import { getNetworkModeGateResponse, requireNetworkCapabilityContext } from '@/lib/network-write-context';
 /* @Codex */
-import { forbiddenResponse, requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
+import { forbiddenResponse, unauthorizedResponse } from '@/lib/security/server-auth';
+/* @Codex */
+import { requireAccountSession } from '@/lib/security/paired-native-session';
 
 /* @Codex */
 export async function GET(request: Request) {
@@ -37,7 +41,7 @@ export async function GET(request: Request) {
         return forbiddenResponse();
     }
 
-    const session = await requireSession();
+    const session = await requireAccountSession(request);
     if (!session) return unauthorizedResponse();
 
     try {
@@ -63,10 +67,13 @@ export async function POST(request: Request) {
         const resolved = await requireNetworkCapabilityContext(request, NETWORK_PATIENT_LIFECYCLE_CAPABILITY);
         if (!resolved.ok) return resolved.response;
 
-        const body = await request.json() as Record<string, unknown>;
+        const body = await readNativeNetworkJson(request) as Record<string, unknown>;
         const result = await createNetworkScopedPatient(resolved.context, body);
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
+        /* @Codex */
+        const sizeError = jsonBodyTooLargeResponse(error);
+        if (sizeError) return sizeError;
         console.error('API POST /api/v1/network/patients error:', error);
         return NextResponse.json({ error: 'Failed to create patient' }, { status: 500 });
     }

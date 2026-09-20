@@ -3,6 +3,10 @@
 Date: 2026-09-02
 Status: Accepted
 
+Aggiornamento 0.8.6: [ADR 0119](./0119-anydoc-apple-vision-current-source.md) prevale per il percorso documentale
+AnyDoc + Apple Vision già composto; preserva i confini non modificati qui.
+
+
 Controller: [GitHub #276](https://github.com/Wulfgardr/mediflow/issues/276)
 Delivery: [GitHub #281](https://github.com/Wulfgardr/mediflow/issues/281),
 [GitHub #285](https://github.com/Wulfgardr/mediflow/issues/285) e
@@ -314,6 +318,64 @@ Queste scelte chiudono il contratto late binding; non costituiscono da sole una
 prova di implementazione. Il gate production richiede test cross-process
 sintetici che dimostrino processi distinti, pre-attivazione `host_unbound`,
 attivazione utile, revoca, replay denial, stdout pulito e assenza di listener.
+
+### Addendum 0.8.6: callsite Supervisor per Mini (WUL-696)
+
+Decisione del 2026-09-07, precedente all'implementazione della lane. Il comando
+Supervisor ammette `--mini`: avvia il Web standalone e Mini come figli propri,
+al posto della coppia Web/MCP predefinita. Il target Mini è fisso nel tree,
+con `--session`, ambiente allowlisted e IPC privato ereditato. I due adapter
+non condividono stdin/stdout e non sono avviati insieme. Nessun server
+preesistente viene adottato; non si aggiungono listener o broker residenti.
+
+Mini registra il client AIP prima di leggere stdin e mantiene il processo
+per più richieste NDJSON bounded, in sequenza. Il primo incremento
+`703e3d49f` ammetteva soltanto `status` e `capabilities`: prova di composizione,
+non soddisfacimento della superficie minima utile di questa ADR.
+
+La revisione WUL-696 del 2026-09-07, prima del secondo incremento di codice,
+richiede parità con i comandi già contrattualizzati della CLI: `status`,
+`capabilities`, `terminology search`, `open-loops`, `follow-up-proposal` e
+`semantic-query`. CLI singola e sessione condividono schema strict, parsing,
+dispatch OperationClient e serializer isolato dai metodi `toJSON` ereditati.
+Solo lo status della sessione aggiunge la readiness osservata. Gli altri
+risultati mantengono gli stessi DTO; `open-loops` e proposta non ricevono scope
+dal caller, e il planner mantiene il contratto bounded esistente.
+
+La parità non aggiunge capability, servizi, SQL, policy o authority. Il catalogo
+host non trasferisce proof, commit o apply clinico. Ogni comando resta soggetto
+a binding Web, capability, purpose, lease, currentness e revoca esistenti;
+prima del binding viene negato, salvo lo status di connessione. Il gate del
+secondo incremento richiede una ricerca terminologica innocua attraverso
+l'Application Service production con fixture sintetiche, DTO identici alle
+operazioni già contrattualizzate e denial/revoca per gli altri comandi. Non
+riduce il DoD generale a status/catalogo o a un solo test terminologico.
+
+`status` separa trasporto connesso, autorizzazione non ancora sbloccata,
+capacità correntemente ammesse dal catalogo AIP e readiness. Prima del binding
+mostra `ready: false`, nessuna capacità e il passo richiesto: aprire il Web
+figlio, autenticarsi, selezionare il contesto e attivare Intelligent Host.
+L'assenza del parent restituisce un errore, mai successo o readiness fittizi.
+Dopo il binding, status e catalogo richiedono una risposta RPC corrente;
+errori o perdita del parent non riusano un catalogo memorizzato.
+
+Il bootstrap monouso, l'ACK Web dopo autenticazione, il mirror autoritativo,
+purpose, capability, lease, currentness e revoca riusano i contratti esistenti.
+Lock, logout, reselection, expiry o uscita di un figlio terminano la sessione;
+un nuovo contesto richiede un nuovo Supervisor. EOF chiude il figlio Mini e
+quindi la coppia posseduta. Stdout contiene solo risposte NDJSON; diagnostica
+Web e Supervisor resta su stderr.
+
+Il punto d'innesto UI è il controller Web patient-scoped già esistente
+`activateCurrentSelection`, con H1a genuino e capture owner; non un comando
+CLI che inventi sessione o selezione. UI e onboarding restano alla lane del
+coordinatore. Nessun cambiamento al contratto `/api/v1`.
+
+Il gate della lane richiede composizione production con Mini reale e authority
+Web genuina su fixture benigne, stato pre/post binding, catalogo governato e
+revoca, oltre alle regressioni Mini, Headless portable e MCP. Una fixture Web
+non è uno smoke del server Next standalone costruito né prova di onboarding,
+release o esecuzione live su Windows/Linux.
 
 ## Import e packaging guard
 

@@ -17,7 +17,9 @@ test('retired Docker ICD launch and raw-vendor benchmark entrypoints are absent'
 test('current setup documents the server-only WHO boundary and honest readiness', () => {
     const setup = source('docs/icd-who-setup.md');
     assert.match(setup, /MEDIFLOW_ICD_WHO_ENABLED/u);
-    assert.match(setup, /MEDIFLOW_ICD_WHO_CLIENT_SECRET/u);
+    assert.match(setup, /MEDIFLOW_ICD_WHO_LOCAL_IMAGE_DIGEST/u);
+    assert.match(setup, /MEDIFLOW_ICD_WHO_LOCAL_DATASET_ID/u);
+    assert.match(setup, /manifesto.*fallisce intenzionalmente/iu);
     assert.match(setup, /configured` non equivale a `available/u);
     assert.match(setup, /server-only/u);
     assert.match(setup, /Non esiste fallback a\s+ICD-9/iu);
