@@ -105,6 +105,32 @@ final class MediFlowQAStorageTests: XCTestCase {
         XCTAssertNotNil(invalid.startupError)
     }
 
+    func testFactoryUsesDedicatedPairedDefaultsDomainDistinctFromQAAppIdentity() throws {
+        var requestedSuite: String?
+        let bundleIdentifier = "com.mediflow.qa.\(namespaceA)"
+        let factory = MediFlowMacStorageFactory(
+            metadata: { [MediFlowQAStorageSelection.metadataKey: self.namespaceA] },
+            bundleIdentifier: { bundleIdentifier },
+            fileManager: .default,
+            applicationSupportDirectory: { self.temporaryDirectory },
+            userDefaultsBuilder: { suite in
+                requestedSuite = suite
+                return UserDefaults(suiteName: "MediFlowQAStorageTests.\(UUID())")
+            },
+            pairedStoreBuilder: { _, _ in self.makeStore() },
+            cacheStoreBuilder: { directory, _, _ in
+                HomeBasePatientCacheStore(cacheDirectory: directory, keyProvider: {
+                    SymmetricKey(data: Data(repeating: 5, count: 32))
+                })
+            }
+        )
+
+        _ = try factory.makeStores()
+
+        XCTAssertEqual(requestedSuite, "com.mediflow.home-base-paired.qa.\(namespaceA)")
+        XCTAssertNotEqual(requestedSuite, bundleIdentifier)
+    }
+
     func testFactoryRejectsQARootSymlinkToOrdinaryStorageBeforeCreatingNamespace() throws {
         let ordinary = temporaryDirectory.appendingPathComponent("MediFlow")
         let qaRoot = temporaryDirectory.appendingPathComponent("MediFlow-QA")

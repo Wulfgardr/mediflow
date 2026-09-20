@@ -66,6 +66,7 @@ struct MediFlowMacStorageFactory {
     private let bundleIdentifier: () -> String?
     private let fileManager: FileManager
     private let applicationSupportDirectory: () -> URL?
+    private let userDefaultsBuilder: (String) -> UserDefaults?
     private let pairedStoreBuilder: (UserDefaults, String) -> HomeBasePairedStore
     private let cacheStoreBuilder: (URL, String, String) -> HomeBasePatientCacheStore
 
@@ -76,6 +77,7 @@ struct MediFlowMacStorageFactory {
         applicationSupportDirectory: @escaping () -> URL? = {
             FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
         },
+        userDefaultsBuilder: @escaping (String) -> UserDefaults? = UserDefaults.init(suiteName:),
         pairedStoreBuilder: @escaping (UserDefaults, String) -> HomeBasePairedStore = MediFlowMacStorageFactory.productionPairedStore,
         cacheStoreBuilder: @escaping (URL, String, String) -> HomeBasePatientCacheStore = MediFlowMacStorageFactory.productionCacheStore
     ) {
@@ -83,6 +85,7 @@ struct MediFlowMacStorageFactory {
         self.bundleIdentifier = bundleIdentifier
         self.fileManager = fileManager
         self.applicationSupportDirectory = applicationSupportDirectory
+        self.userDefaultsBuilder = userDefaultsBuilder
         self.pairedStoreBuilder = pairedStoreBuilder
         self.cacheStoreBuilder = cacheStoreBuilder
     }
@@ -92,7 +95,7 @@ struct MediFlowMacStorageFactory {
         case .ordinary:
             return MediFlowMacStoragePair(pairedStore: .shared, cacheStore: .shared)
         case .qa(let namespace):
-            guard let defaults = UserDefaults(suiteName: "com.mediflow.qa.\(namespace)") else {
+            guard let defaults = userDefaultsBuilder("com.mediflow.home-base-paired.qa.\(namespace)") else {
                 throw MediFlowQAStorageError.userDefaultsUnavailable
             }
             let directory = try qaCacheDirectory(namespace: namespace)
