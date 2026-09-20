@@ -2,6 +2,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
 import { assertNoHorizontalOverflow, bootstrapUnlockedSession, openPatientSection } from './utils';
+import { chooserReady, installKeyboardChooserObservation, keyboardChooserDecision, type KeyboardChooserSnapshot } from './anydoc-keyboard-chooser';
 
 const SYNTHETIC_ATTACHMENT_NAME = 'allegato-anydoc-focus-sintetico.pdf';
 const SYNTHETIC_RTF_TEXT = 'Synthetic AnyDoc browser route evidence.';
@@ -75,7 +76,7 @@ async function openDocumentArchive(page: Page, patientId: string): Promise<void>
 
 test.describe.configure({ retries: 0 });
 
-test('AnyDoc: le azioni allegato restano visibili al focus e sui viewport stretti', async ({ page }) => {
+test('AnyDoc: le azioni allegato restano visibili al focus e sui viewport stretti', async ({ page }, testInfo) => {
   const consoleErrors: string[] = [];
   await page.setViewportSize({ width: 1440, height: 900 });
   await establishSyntheticSession(page);
@@ -93,10 +94,72 @@ test('AnyDoc: le azioni allegato restano visibili al focus e sui viewport strett
   // @Codex: one accessible chooser opens the native picker and Tab visits the viewer before local extraction.
   const chooser = page.getByRole('button', { name: 'Carica documenti', exact: true });
   await expect(chooser).toHaveCount(1);
+  await expect(chooser).toBeVisible();
+  await expect(chooser).toBeEnabled();
+  await expect(chooser).toHaveAttribute('aria-disabled', 'false');
+  await expect(chooser).toHaveAttribute('aria-busy', 'false');
+  await expect(chooser).toHaveAttribute('tabindex', '0');
+  const fileInput = chooser.locator('input[type="file"]');
+  await expect(fileInput).toHaveCount(1);
+  await expect(fileInput).toBeEnabled();
+  await expect(fileInput).toHaveAttribute('tabindex', '-1');
   await chooser.focus();
-  const nativeChooser = page.waitForEvent('filechooser');
-  await page.keyboard.press('Enter');
-  await (await nativeChooser).setFiles([]);
+  await expect(chooser).toBeFocused();
+
+  // No locator.press/refocus: a later focus loss must remain a failure. Observe
+  // the original root/input through the real Enter and the real native picker.
+  const observation = await chooser.evaluateHandle(installKeyboardChooserObservation);
+  let keyboardSnapshot: KeyboardChooserSnapshot | null = null;
+  let nativeEvent = false;
+  let nativeInputMatches: boolean | null = null;
+  let decision = 'OBSERVATION_NOT_READ';
+  const failures: unknown[] = [];
+  let gesture: Promise<void> | undefined;
+  try {
+    const initialSnapshot: KeyboardChooserSnapshot = await observation.evaluate((probe) => probe.snapshot());
+    keyboardSnapshot = initialSnapshot;
+    decision = !chooserReady(initialSnapshot.initial) ? 'PRECONDITION_NOT_READY'
+      : !initialSnapshot.initial.rootFocused ? 'PRECONDITION_FOCUS_MISSING' : 'READY_FOR_ENTER';
+    expect(chooserReady(initialSnapshot.initial), 'chooser readiness changed after focus').toBe(true);
+    expect(initialSnapshot.initial.rootFocused, 'focus changed before Enter').toBe(true);
+    const nativeWaiter = page.waitForEvent('filechooser').then((value) => { nativeEvent = true; return value; });
+    gesture = (async () => {
+      await page.keyboard.press('Enter');
+      const afterEnter: KeyboardChooserSnapshot = await observation.evaluate((probe) => probe.snapshot());
+      keyboardSnapshot = afterEnter;
+      decision = keyboardChooserDecision(afterEnter);
+      // Commit the discriminator before a native-event timeout can close the page.
+      await testInfo.attach('anydoc-keyboard-activation', {
+        body: Buffer.from(JSON.stringify({ decision, keyboardSnapshot })), contentType: 'application/json',
+      });
+      expect(decision, 'AnyDoc keyboard activation chain').toBe('AWAIT_NATIVE_CHOOSER');
+    })();
+    const [nativeChooser] = await Promise.all([nativeWaiter, gesture]);
+    nativeInputMatches = await observation.evaluate((probe, input) => probe.isOriginalInput(input), nativeChooser.element());
+    decision = nativeInputMatches ? 'NATIVE_INPUT_VERIFIED' : 'NATIVE_INPUT_MISMATCH';
+    expect(nativeInputMatches, 'native chooser must belong to the observed file input').toBe(true);
+    await nativeChooser.setFiles([]);
+    decision = 'NATIVE_CHOOSER_VERIFIED';
+  } catch (error) { failures.push(error); }
+  // Join the SAME gesture promise before removing its observation, including
+  // when the native waiter failed first. This never sends another key.
+  try { await gesture; } catch (error) { if (!failures.includes(error)) failures.push(error); }
+  // The test fixture owns the page. On a stage failure Promise.all observes
+  // both rejections; Playwright removes it on timeout/page teardown.
+  // Never replace a primary keyboard/chooser error with a cleanup/report error.
+  try {
+    if (!page.isClosed()) await observation.evaluate((probe) => probe.stop());
+  } catch (error) { failures.push(error); }
+  try { await observation.dispose(); } catch (error) { failures.push(error); }
+  try {
+    await testInfo.attach('anydoc-keyboard-chooser', {
+      body: Buffer.from(JSON.stringify({ decision, nativeEvent, nativeInputMatches, keyboardSnapshot })),
+      contentType: 'application/json',
+    });
+  } catch (error) { failures.push(error); }
+  if (failures.length === 1) throw failures[0];
+  if (failures.length > 1) throw new AggregateError(failures, 'AnyDoc keyboard/chooser and cleanup/report failures', { cause: failures[0] });
+
   await chooser.focus();
   await page.keyboard.press('Tab');
 
