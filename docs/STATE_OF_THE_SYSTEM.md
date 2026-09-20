@@ -6,7 +6,7 @@ read_when:
 ---
 
 <!-- reconciliation-20260912 -->
-> **Candidata ricostruita il 12 settembre 2026, non release.** Il perimetro vigente della 0.8.6 è Mac, localhost, backend, WHO/OpenAI e Headless sul Mac. Windows, Linux, Mini, iPhone e iPad sono rinviati alla 1.0; ATHENA è opzionale. Le prove storiche sotto conservano i propri SHA e non qualificano automaticamente questa ricostruzione. Il coordinamento resta [WUL-669](https://linear.app/wulfgardr/issue/WUL-669); proposte recuperate e servizi configurati non attestano funzionamento reale.
+> **Candidata riallineata il 20 settembre 2026, non release.** Il perimetro vigente della 0.8.6 è il runtime locale/headless sul Mac con interfaccia browser localhost. Gli agenti usano soltanto comandi MediFlow nominati, soggetti a capability, autenticazione, currentness, conferma delle scritture cliniche, audit e ricevute; non accedono direttamente a SQLite. I provider restano spenti per default e le funzioni AI sono opzionali e proposal-only. L'app nativa è un follow-up separato e non un gate della 0.8.6. Le prove storiche sotto conservano i propri SHA e non qualificano automaticamente questa ricostruzione. Il coordinamento resta [WUL-669](https://linear.app/wulfgardr/issue/WUL-669); proposte recuperate e servizi configurati non attestano funzionamento reale.
 
 # Stato del Sistema MediFlow
 
@@ -21,14 +21,15 @@ read_when:
 > prevalgono [AGENTS.md](../AGENTS.md) e
 > [docs/repository-topology.md](./repository-topology.md).
 
-Ultimo aggiornamento: 2026-09-08 (v0.8.6: candidato locale verificato in parte, programma e rilascio aperti)
+Ultimo aggiornamento: 2026-09-20 (v0.8.6: candidato locale verificato in parte, programma e rilascio aperti)
 
 La [verifica notturna dell'8 settembre](./analysis/2026-09-07-086-release-verification.md#verifica-notturna-dell8-settembre-programma-ancora-aperto)
 registra build produzione 11b9, suite aggregata 4c99 senza fallimenti con
-esclusioni esplicite, Linux standalone e Windows preview. Restano caricamento
-locale a freddo, nuovo percorso ChatGPT, installazione WHO pulita, accuratezza
-OCR completa, parità desktop/Mini e dossier finale da qualificare. Le prove
-storiche seguenti mantengono il proprio SHA e non attestano questi risultati.
+esclusioni esplicite, Linux standalone e Windows preview. Registrava come
+residui caricamento locale a freddo, nuovo percorso ChatGPT, installazione WHO
+pulita, accuratezza OCR completa, parità desktop/Mini e dossier finale. La
+parità nativa non è più un gate della 0.8.6. Le prove storiche seguenti
+mantengono il proprio SHA e non attestano questi risultati.
 
 Nota candidato 0.8.6: [ADR 0119](./adr/0119-anydoc-apple-vision-current-source.md)
 chiarisce la precedenza del percorso AnyDoc + Apple Vision descritto qui.
@@ -70,10 +71,10 @@ Firma ed entitlements di produzione restano non verificati. ThisDeviceOnly
 riguarda il nuovo inserimento della chiave cache, non il token paired.
 La membership operatore–ambulatorio è un non-goal ADR 0036, non un finding aperto.
 
-La verifica UI iPhone ↔ Mac/Home Base resta **DEFERRED VALIDATION ITEM /
-POST-RELEASE VERIFICATION GATE**. Volumi Xcode/VM indisponibili: nessuna nuova
-prova locale Swift XCTest, firma o UI nativa. Non sono attestati validazione
-completa multipiattaforma o installer firmati di produzione.
+La verifica UI iPhone ↔ Mac/Home Base resta un follow-up nativo separato e non
+un gate della 0.8.6. Le prove Swift XCTest, firma e UI nativa conservate sotto
+sono evidenze storiche nel proprio perimetro; non attestano validazione completa
+multipiattaforma o installer firmati di produzione.
 
 Windows e Linux ora hanno prove locali su sistemi operativi reali: build del
 runtime Node, avvio da directory vuota, configurazione ordinaria e percorsi
@@ -576,14 +577,14 @@ Il Supervisor Node portabile è il trusted parent del runtime locale: avvia
 Web standalone e MCP come processi figli distinti su IPC ereditato e possiede
 contesto, lease, revoca e audit. MCP `stdio` pubblica catalogo, terminology
 search, Open Loops patient-scoped, proposta follow-up `proposal_only` e query
-semantica bounded read-only. La lane 0.8.6 WUL-696 aggiunge una sessione Mini
-production con gli stessi comandi della CLI, Web e Mini figli posseduti.
-Richiede attivazione Web e fallisce chiuso senza parent AIP. Le prove usano
-Mini reale, authority Web genuina e ricerca terminologica con audit su fixture:
-non attestano tutti i percorsi clinici end-to-end, login HTTP,
-server Next standalone o onboarding. Gli adapter non importano SQLite,
-non accettano authority caller-supplied e non
-aprono listener.
+semantica bounded read-only. WUL-696 conserva una prova storica con un client
+agente nominato, authority Web genuina e ricerca terminologica con audit su
+fixture: non qualifica quel client per la 0.8.6 né dimostra compatibilità con
+altri agenti. Il contratto corrente è il layer MediFlow mediato con comandi
+nominati; richiede attivazione Web e fallisce chiuso senza parent AIP. Queste
+prove non attestano tutti i percorsi clinici end-to-end, login HTTP, server Next
+standalone o onboarding. Gli adapter non importano SQLite, non accettano
+authority caller-supplied e non aprono listener.
 
 F10 espone via MCP soltanto la preview `pending -> completed|cancelled`. La UI
 Web trusted ricontrolla la risorsa, richiede ruolo medico attivo, step-up e gesto

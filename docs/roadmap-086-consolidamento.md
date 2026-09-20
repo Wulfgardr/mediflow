@@ -1,5 +1,5 @@
 ---
-summary: "Roadmap 0.8.6: backend, configurazione intelligente, repertori, interfaccia progressiva e parità desktop; gate e prove distinti."
+summary: "Roadmap 0.8.6: runtime locale/headless sul Mac, localhost, configurazione intelligente e prove distinte."
 read_when:
   - "Pianificando il consolidamento 0.8.6 o valutando i residui dei branch hold."
   - "Proponendo alternative visive per impostazioni e scheda paziente localhost."
@@ -7,7 +7,7 @@ read_when:
 
 # MediFlow 0.8.6 — consolidamento funzionale e interfaccia
 
-Aggiornamento: 8 settembre 2026. Stato: **candidato locale integrato;
+Aggiornamento: 20 settembre 2026. Stato: **candidato locale integrato;
 Definition of Done complessiva non raggiunta**. La
 [verifica notturna](./analysis/2026-09-07-086-release-verification.md#verifica-notturna-dell8-settembre-programma-ancora-aperto)
 registra esiti, SHA, piattaforme e residui; nessuna delle 28 issue del
@@ -32,11 +32,11 @@ seguenti conservano requisiti e osservazioni preparatorie, non attestano issue
 chiuse. Le scelte B/A e sidecar locale sono recepite; provisioning WHO, revisione
 regolatoria e distribuzione restano confini distinti.
 
-La verifica UI mirata iPhone–Mac/Home Base è differita come
-**DEFERRED VALIDATION ITEM / POST-RELEASE VERIFICATION GATE**. Il suo mancato
-completamento non riapre lo sviluppo salvo un difetto reale nella prova futura.
-Le sezioni preparatorie sotto restano storiche; per l'accettazione corrente
-prevale la [decisione di closeout](./analysis/2026-09-06-086-integrated-closeout.md#decisione-di-closeout).
+Il perimetro corrente qualifica runtime locale/headless sul Mac e browser
+localhost. La verifica UI iPhone–Mac/Home Base e l'app nativa sono follow-up
+separati, non gate della 0.8.6. Le sezioni preparatorie sotto restano storiche;
+per l'accettazione corrente prevalgono il contratto Linear aggiornato e le prove
+Web/AI richieste sul candidato corrente.
 
 ## Risultato atteso
 
@@ -46,7 +46,7 @@ accessibile, impostazioni essenziali e informative, scheda paziente proporzionat
 e un miglioramento estetico concreto. La prima superficie è **localhost**.
 La successiva estensione Apple comprende navigazione della cartella, bozze e
 documenti su iPhone, iPad e Mac, guidata dai riferimenti illustrati richiesti.
-Non equivale a una riscrittura completa di tutte le superfici dei client.
+È un follow-up separato e non un criterio di accettazione della 0.8.6.
 
 La release non coincide con l'integrazione di tutti i branch rimasti. Recuperiamo
 soltanto contributi che risolvono un problema attuale e superano le verifiche
@@ -235,16 +235,16 @@ un sito per recuperare un buon principio di composizione.
 
 ## 5. Onboarding assistito e tailoring — essenziale
 
-Percorso AI consigliato con due/tre domande iniziali su attività, modalità di
-lavoro preferita e ambiente. La proposta orienta verso Interactive, Headless/Agent
-o una combinazione, spiega cosa configura e permette di cambiare scelta.
-La professione dichiarata non verifica identità né concede privilegi.
+Il percorso assistito può porre due o tre domande iniziali su attività e modalità
+di lavoro, spiega cosa configura e permette di cambiare scelta. La professione
+dichiarata non verifica identità né concede privilegi. Il percorso manuale deve
+portare a un'app utile e i provider restano spenti per default.
 
-La decisione tra agente esterno, guida integrata e soluzione ibrida resta da
-risolvere con un confronto di bootstrap, costi, privacy, distribuzione e recupero.
-Non imporre Codex o un account AI; il percorso manuale deve portare a un'app
-utile. Mac, Windows e Linux richiedono una matrice di entrypoint e artifact
-realmente disponibili e verificati, distinta dalla sola compatibilità web.
+Gli agenti operano esclusivamente tramite il layer MediFlow mediato e i suoi
+comandi nominati, con capability, autenticazione, currentness, conferma delle
+scritture cliniche, audit e ricevute. Non ricevono accesso diretto a SQLite e non
+si presume compatibilità universale con qualunque agente. Le funzioni AI restano
+opzionali e proposal-only; Codex o un account AI non sono prerequisiti.
 
 Accettazione: raccomandazione comprensibile e modificabile; anteprima e conferma
 delle azioni; configurazione idempotente; ripresa dopo interruzione; cambio
@@ -380,12 +380,13 @@ recuperabile, merge senza conflitti e test storici non equivalgono a consegna.
    currentness/sessione; stato dei servizi attendibile.
 4. **Implementazione UI:** nuova mappa impostazioni e scheda sulla direzione scelta,
    conservando contratti e comportamenti corretti del prodotto corrente.
-5. **Onboarding e deslop:** percorso assistito reversibile e matrice piattaforme;
-   censimento globale e semplificazioni utili.
+5. **Onboarding e deslop:** percorso assistito reversibile sul localhost;
+   censimento globale e semplificazioni utili. La matrice nativa resta follow-up.
 6. **GDPR/AI Act:** applicabilità e requisiti possono partire dopo la baseline;
    interventi e dossier recepiscono onboarding, UI, runtime e deslop finali.
-7. **Verifica 0.8.6:** scenari funzionali, accessibilità e regressioni dei flussi
-   toccati; prove sull'installazione target e note dei limiti. Poi separatamente
+7. **Verifica 0.8.6:** scenari Web/AI funzionali, accessibilità e regressioni dei
+   flussi toccati sul runtime locale/headless e localhost; prove sull'installazione
+   target Mac e note dei limiti. Poi separatamente
    eventuali commit, PR, CI remota, tag e release con l'autorità necessaria.
 
 La 0.8.6 è candidata alla consegna quando i sette filoni essenziali soddisfano

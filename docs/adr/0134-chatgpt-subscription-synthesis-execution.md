@@ -296,11 +296,14 @@ La decisione competente sul deployment e sui dati reali resta WUL-688.
 Finche i requisiti applicabili non sono soddisfatti non si dichiara conclusa
 l'esperienza OpenAI ordinaria; non si sostituisce il requisito con una DEMO.
 
-La verifica integrata richiede i quattro percorsi reali su dati sintetici
-nella stessa candidata, output e fonti specifici, preferenza/override/restart,
+La verifica integrata della 0.8.6 richiede i quattro percorsi reali su dati
+sintetici nel browser localhost, servito dal runtime locale della stessa
+candidata, output e fonti specifici, preferenza/override/restart,
 revoca e cambio contesto, modello rimosso e quota, chiusura e pubblicazione,
 assenza di fallback e regressione dei percorsi locali. Il ponte e i profili
 sono implementazioni candidate fino a queste verifiche, non prove di rilascio.
+La replica delle quattro esperienze nell'app nativa è un follow-up separato e
+non costituisce un gate della 0.8.6.
 
 ## Raccordo redatto dei profili — candidata 462f1652
 
@@ -357,7 +360,8 @@ Una firma esistente non valida o incompatibile con la distribuzione richiesta
 non autorizza una ri-firma del binario: occorrono nuova qualifica e approvazione
 fuori da questo intervento. Notarizzazione e distribuibilita non sono attestate
 da questo layout. Build native, verifica reale delle firme e smoke restano
-necessari sulla candidata integrata; test con fixture non li sostituiscono.
+necessari per qualificare il follow-up nativo; test con fixture non li
+sostituiscono e il loro esito non blocca la candidata 0.8.6 Web/headless.
 
 Lo staging e la normalizzazione rifiutano bundle gia sigillati. Una build
 incrementale firmata richiede una nuova destinazione DerivedData non firmata,

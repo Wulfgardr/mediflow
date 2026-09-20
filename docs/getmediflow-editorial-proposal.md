@@ -7,11 +7,13 @@ contributi e contratti tecnici. Il sito non ospita la cartella e non riceve dati
 del runtime. L’accesso è pubblico: chi visita il sito personale può aprire la presentazione.
 L’indirizzo pubblico corrente è `getmediflow.dev`.
 
-Per la candidata 0.8.6 la presentazione descrive Mac, browser localhost, backend,
-Intelligence Fabric e Headless sul Mac. L’adapter OpenAI è spento per default; se
-autorizzato, invia il contenuto preparato al servizio esterno. Windows, Linux, Mini,
-iPhone e iPad sono rinviati alla 1.0; ATHENA è opzionale. Non anticipa una
-release, validazione clinica o disponibilità multipiattaforma.
+Per la candidata 0.8.6 la presentazione descrive il runtime locale/headless
+sul Mac, il browser localhost, il backend e Intelligence Fabric.
+Gli agenti usano soltanto comandi MediFlow nominati e mediati, senza accesso
+diretto a SQLite. L’adapter OpenAI è spento per default; le funzioni AI sono
+opzionali, proposal-only e soggette ai controlli del prodotto. L'app nativa è
+un follow-up separato. La presentazione non anticipa una release, validazione
+clinica o disponibilità multipiattaforma.
 
 ## Il filo del racconto
 
@@ -26,7 +28,7 @@ da ritrovare. Il prodotto deve essere visibile dall’apertura.
 | Il contesto | Informazioni distribuite tra referti, allegati e attività. |
 | Intelligence Fabric | Quattro percorsi selezionabili, con dettagli sulla revisione. |
 | Scelta dei runtime | Locale, provider esterni in prova e offuscamento in sviluppo. |
-| Aprire il cofano | Tre letture: generale, professionale e tecnica; Headless sul Mac con i suoi limiti. |
+| Aprire il cofano | Tre letture: generale, professionale e tecnica; Headless mediato sul Mac con i suoi limiti. |
 | Responsabilità | GDPR e AI Act con approfondimenti e fonti, senza claim di certificazione. |
 
 ## Forma e interazioni
@@ -38,8 +40,9 @@ verde acceso distingue Fabric. Nessun accento arancio decorativo.
 
 Le schermate reali provengono esclusivamente da un runtime con fixture
 sintetiche. Le ricostruzioni interattive sono dichiarate illustrative e non
-simulano un servizio AI live. Se incluse, le schermate Headless devono mostrare solo
-il comportamento reale del candidato e i relativi limiti; Mini è rinviato alla 1.0.
+simulano un servizio AI live. Se incluse, le schermate Headless devono mostrare
+solo comandi MediFlow realmente disponibili, i controlli applicati e i relativi
+limiti, senza promettere compatibilità con qualunque agente.
 
 Nessuna etichetta di capitolo superflua, contatore, firma Ordito/Concilio o
 freccia senza funzione. Gli approfondimenti rispondono a domande concrete.
