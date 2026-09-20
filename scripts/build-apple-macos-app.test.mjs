@@ -63,7 +63,7 @@ switch (command) {
   case 'xcodebuild': {
     const fixture = appRoot(path.join(process.env.MEDIFLOW_MAC_DERIVED_DATA, 'Build/Products', process.env.MEDIFLOW_MAC_CONFIG));
     const plist = path.join(fixture.contents, 'Info.plist');
-    fs.writeFileSync(plist, fs.readFileSync(plist, 'utf8').replace('</dict></plist>', '<key>LSEnvironment</key><dict><key>EXISTING_NATIVE_ENV</key><string>preserve-me</string></dict></dict></plist>'));
+    fs.writeFileSync(plist, fs.readFileSync(plist, 'utf8').replace('</dict></plist>', '<key>CFBundleIdentifier</key><string>com.mediflow.mobile</string><key>CFBundleURLTypes</key><array><dict><key>CFBundleURLSchemes</key><array><string>mediflow</string></array></dict></array><key>LSEnvironment</key><dict><key>EXISTING_NATIVE_ENV</key><string>preserve-me</string></dict></dict></plist>'));
     if (process.env.MEDIFLOW_PACKAGING_TEST_MUTATE_CHECKOUT === '1') fs.appendFileSync(path.join(root, 'package.json'), '\n');
     console.log('SYNTHETIC Xcode stub, no compilation'); break;
   }
@@ -94,6 +94,7 @@ switch (command) {
     if (helper && process.env.MEDIFLOW_PACKAGING_TEST_BAD_SIGNATURE === '1') process.exit(86);
     if (args[0] === '--remove-signature' && base === 'mediflow-web-sharp.node') { state.linked = false; state.noRpath = false; save(); }
     if (args[0] === '--force' && target.endsWith('.app')) {
+      state.plistAtOuterSeal = fs.readFileSync(path.join(target, 'Contents/Info.plist'), 'utf8'); save();
       fs.mkdirSync(path.join(target, 'Contents/_CodeSignature'), { recursive: true });
       fs.writeFileSync(path.join(target, 'Contents/_CodeSignature/CodeResources'), 'SYNTHETIC SEAL NOT SIGNATURE');
       if (process.env.MEDIFLOW_PACKAGING_TEST_MUTATE_ON_SEAL === '1') {
@@ -145,6 +146,7 @@ exec "${process.execPath}" "$@"
     MEDIFLOW_PACKAGING_TEST_ROOT: root, MEDIFLOW_PACKAGING_TEST_PINS: 'synthetic-only', MEDIFLOW_CODESIGN_IDENTITY: '',
     MEDIFLOW_CHATGPT_EXECUTION_BINARY: input.binary, MEDIFLOW_CHATGPT_EXECUTION_NATIVE_SOURCE: input.nativeSource,
     MEDIFLOW_CHATGPT_EXECUTION_SCHEMA_DIRECTORY: input.schemaDirectory, MEDIFLOW_CHATGPT_EXECUTION_C1_RECEIPT: input.c1Receipt };
+  delete env.MEDIFLOW_MAC_QA_NAMESPACE; // @Codex: ordinary tests never inherit a QA build selection.
   write(path.join(root, '.gitignore'), '.next/\nderived/\nevents.jsonl\ntool-state.json\n');
   const gitInit = spawnSync('git', ['init', '--initial-branch=main'], { cwd: root, encoding: 'utf8' });
   assert.equal(gitInit.status, 0, gitInit.stderr);
@@ -194,6 +196,9 @@ for (const identity of ['', '-', 'Synthetic Developer ID']) {
     assert.equal(stagedIdentity.MEDIFLOW_APP_SOURCE_FINGERPRINT, `main@${stagedIdentity.MEDIFLOW_APP_REVISION}:clean`);
     assert.equal(stagedIdentity.MEDIFLOW_APP_FINGERPRINT, stagedIdentity.MEDIFLOW_APP_SOURCE_FINGERPRINT);
     const plist = path.join(input.app, 'Contents/Info.plist');
+    assert.equal(spawnSync('plutil', ['-extract', 'MediFlowQAStorageNamespace', 'raw', plist]).status, 1);
+    assert.equal(spawnSync('plutil', ['-extract', 'CFBundleIdentifier', 'raw', plist], { encoding: 'utf8' }).stdout.trim(), 'com.mediflow.mobile');
+    assert.equal(spawnSync('/usr/libexec/PlistBuddy', ['-c', 'Print :CFBundleURLTypes:0:CFBundleURLSchemes:0', plist], { encoding: 'utf8' }).stdout.trim(), 'mediflow');
     const environment = spawnSync('plutil', ['-extract', 'LSEnvironment', 'raw', '-o', '-', plist], { encoding: 'utf8' });
     assert.equal(environment.status, 0, environment.stderr);
     assert.match(environment.stdout, /EXISTING_NATIVE_ENV/u);
@@ -228,6 +233,29 @@ for (const identity of ['', '-', 'Synthetic Developer ID']) {
     } else assert.equal(seal, -1);
   });
 }
+/* @Codex: real metadata staging, synthetic Xcode/signing; no Keychain or runtime claim. */
+test('QA namespace is sealed with a separate bundle identity and no ordinary URL handler', t => {
+  const input = buildFixture(t), namespace = '0123456789abcdef0123456789abcdef';
+  pass(input.run({ MEDIFLOW_MAC_QA_NAMESPACE: namespace, MEDIFLOW_CODESIGN_IDENTITY: '-' }));
+  const plist = path.join(input.app, 'Contents/Info.plist');
+  const read = key => spawnSync('plutil', ['-extract', key, 'raw', plist], { encoding: 'utf8' });
+  assert.equal(read('MediFlowQAStorageNamespace').stdout.trim(), namespace);
+  assert.equal(read('CFBundleIdentifier').stdout.trim(), `com.mediflow.qa.${namespace}`);
+  assert.equal(read('CFBundleDisplayName').stdout.trim(), 'MediFlow QA');
+  assert.notEqual(read('CFBundleURLTypes').status, 0);
+  const state = JSON.parse(fs.readFileSync(path.join(input.root, 'tool-state.json'), 'utf8'));
+  assert.equal(state.plistAtOuterSeal, fs.readFileSync(plist, 'utf8'), 'QA metadata must exist at the outer seal and remain unchanged');
+});
+test('invalid explicit QA namespace fails before build or staging', t => {
+  const input = buildFixture(t);
+  for (const value of ['', 'a'.repeat(31), 'a'.repeat(33), 'A'.repeat(32), 'g'.repeat(32), '../qa', '0'.repeat(31) + '\n']) {
+    const result = input.run({ MEDIFLOW_MAC_QA_NAMESPACE: value });
+    deny(result);
+    assert.match(result.stderr, /MEDIFLOW_MAC_QA_NAMESPACE/u);
+    assert.deepEqual(input.events(), []);
+  }
+  assert.equal(fs.existsSync(input.app), false);
+});
 test('incomplete shared checkout identity fails before Xcode staging', t => {
   const input = buildFixture(t);
   write(path.join(input.bin, 'git'), '#!/bin/bash\nif [[ "$1" == "branch" && "$2" == "--show-current" ]]; then exit 0; fi\nexec /usr/bin/git "$@"\n', 0o755);
