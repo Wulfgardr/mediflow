@@ -39,7 +39,7 @@ Informazioni, fonti e prossimi passi. Un po’ più facili da ritrovare.
 
 > **0.8.6: codice sorgente per l’uso locale sul Mac, dal browser o tramite client autorizzati.**
 > La [release è pubblicata su GitHub](https://github.com/Wulfgardr/mediflow/releases/tag/v0.8.6).
-> I servizi esterni, compreso OpenAI, richiedono un’attivazione esplicita;
+> I servizi esterni, compresa l’integrazione con ChatGPT, richiedono un’attivazione esplicita;
 > le funzioni AI sono facoltative e i risultati vanno rivisti prima dell’uso.
 > Le immagini mostrano soltanto dati sintetici. Questa distribuzione non include
 > un installer dell’app nativa e non attesta la disponibilità su altri sistemi
@@ -120,7 +120,7 @@ limiti. La risposta del modello è una proposta da esaminare.
 
 Ollama può servire i primi tre percorsi. ATHENA/MLX resta opzionale per
 Treatment Reasoning e richiede configurazione e verifica locali. L’adapter
-OpenAI è disponibile solo in prove controllate e spento per default: non esiste
+L’integrazione con ChatGPT è disponibile solo in prove controllate e disattivata per impostazione predefinita: non esiste
 un ripiego silenzioso sul cloud. La sua presenza non prova la disponibilità di
 un account, del servizio o di un uso con dati clinici reali.
 
