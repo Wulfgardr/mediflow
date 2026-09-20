@@ -65,6 +65,7 @@ struct MediFlowMacStorageFactory {
     private let metadata: () -> [String: Any]
     private let bundleIdentifier: () -> String?
     private let fileManager: FileManager
+    private let applicationSupportDirectory: () -> URL?
     private let pairedStoreBuilder: (UserDefaults, String) -> HomeBasePairedStore
     private let cacheStoreBuilder: (URL, String, String) -> HomeBasePatientCacheStore
 
@@ -72,12 +73,16 @@ struct MediFlowMacStorageFactory {
         metadata: @escaping () -> [String: Any] = { Bundle.main.infoDictionary ?? [:] },
         bundleIdentifier: @escaping () -> String? = { Bundle.main.bundleIdentifier },
         fileManager: FileManager = .default,
+        applicationSupportDirectory: @escaping () -> URL? = {
+            FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+        },
         pairedStoreBuilder: @escaping (UserDefaults, String) -> HomeBasePairedStore = MediFlowMacStorageFactory.productionPairedStore,
         cacheStoreBuilder: @escaping (URL, String, String) -> HomeBasePatientCacheStore = MediFlowMacStorageFactory.productionCacheStore
     ) {
         self.metadata = metadata
         self.bundleIdentifier = bundleIdentifier
         self.fileManager = fileManager
+        self.applicationSupportDirectory = applicationSupportDirectory
         self.pairedStoreBuilder = pairedStoreBuilder
         self.cacheStoreBuilder = cacheStoreBuilder
     }
@@ -99,22 +104,59 @@ struct MediFlowMacStorageFactory {
     }
 
     private func qaCacheDirectory(namespace: String) throws -> URL {
-        guard let applicationSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+        guard let applicationSupport = applicationSupportDirectory() else {
             throw MediFlowQAStorageError.cacheDirectoryUnavailable
         }
         let root = applicationSupport.appendingPathComponent("MediFlow-QA", isDirectory: true)
         let directory = root.appendingPathComponent(namespace, isDirectory: true)
         do {
+            try rejectSymbolicLink(at: root)
+            try rejectSymbolicLink(at: directory)
+            try validateDerivedQAPath(root, within: applicationSupport)
+            try validateDerivedQAPath(directory, within: applicationSupport)
             try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
-            let resolvedRoot = root.resolvingSymlinksInPath().standardizedFileURL
-            let resolvedDirectory = directory.resolvingSymlinksInPath().standardizedFileURL
-            guard resolvedDirectory.path.hasPrefix(resolvedRoot.appendingPathComponent("", isDirectory: true).path) else {
-                throw MediFlowQAStorageError.cacheDirectoryUnavailable
-            }
+            try rejectSymbolicLink(at: root)
+            try rejectSymbolicLink(at: directory)
+            try validateContainedQAPath(root, within: applicationSupport)
+            try validateContainedQAPath(directory, within: applicationSupport)
             return directory
         } catch let error as MediFlowQAStorageError {
             throw error
         } catch {
+            throw MediFlowQAStorageError.cacheDirectoryUnavailable
+        }
+    }
+
+    private func rejectSymbolicLink(at url: URL) throws {
+        do {
+            let attributes = try fileManager.attributesOfItem(atPath: url.path)
+            guard attributes[.type] as? FileAttributeType != .typeSymbolicLink else {
+                throw MediFlowQAStorageError.cacheDirectoryUnavailable
+            }
+        } catch let error as MediFlowQAStorageError {
+            throw error
+        } catch let error as NSError where error.domain == NSCocoaErrorDomain && error.code == CocoaError.Code.fileReadNoSuchFile.rawValue {
+            return
+        } catch {
+            throw MediFlowQAStorageError.cacheDirectoryUnavailable
+        }
+    }
+
+    private func validateContainedQAPath(_ url: URL, within applicationSupport: URL) throws {
+        let resolvedBase = applicationSupport.resolvingSymlinksInPath().standardizedFileURL
+        let resolvedPath = url.resolvingSymlinksInPath().standardizedFileURL
+        try validatePath(resolvedPath, isDescendantOf: resolvedBase)
+    }
+
+    private func validateDerivedQAPath(_ url: URL, within applicationSupport: URL) throws {
+        try validatePath(url.standardizedFileURL, isDescendantOf: applicationSupport.standardizedFileURL)
+    }
+
+    private func validatePath(_ url: URL, isDescendantOf base: URL) throws {
+        let baseComponents = base.pathComponents
+        let pathComponents = url.pathComponents
+        guard pathComponents.count > baseComponents.count,
+              pathComponents.starts(with: baseComponents) else {
             throw MediFlowQAStorageError.cacheDirectoryUnavailable
         }
     }

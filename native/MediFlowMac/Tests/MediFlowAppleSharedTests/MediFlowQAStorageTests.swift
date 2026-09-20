@@ -86,6 +86,7 @@ final class MediFlowQAStorageTests: XCTestCase {
             metadata: { [MediFlowQAStorageSelection.metadataKey: self.namespaceA] },
             bundleIdentifier: { "com.mediflow.qa.\(self.namespaceA)" },
             fileManager: .default,
+            applicationSupportDirectory: { self.temporaryDirectory },
             pairedStoreBuilder: { _, _ in builders += 1; return self.makeStore() },
             cacheStoreBuilder: { _, _, _ in builders += 1; return HomeBasePatientCacheStore(cacheDirectory: self.temporaryDirectory, keyProvider: { SymmetricKey(data: Data(repeating: 4, count: 32)) }) }
         )
@@ -104,6 +105,36 @@ final class MediFlowQAStorageTests: XCTestCase {
         XCTAssertNotNil(invalid.startupError)
     }
 
+    func testFactoryRejectsQARootSymlinkToOrdinaryStorageBeforeCreatingNamespace() throws {
+        let ordinary = temporaryDirectory.appendingPathComponent("MediFlow")
+        let qaRoot = temporaryDirectory.appendingPathComponent("MediFlow-QA")
+        try FileManager.default.createDirectory(at: ordinary, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: qaRoot, withDestinationURL: ordinary)
+
+        XCTAssertThrowsError(try makeFactory(namespaceA).makeStores())
+        XCTAssertFalse(FileManager.default.fileExists(atPath: ordinary.appendingPathComponent(namespaceA).path))
+    }
+
+    func testFactoryRejectsNamespaceSymlinkToAnotherQANamespaceBeforeCreatingCache() throws {
+        let root = temporaryDirectory.appendingPathComponent("MediFlow-QA")
+        let target = root.appendingPathComponent(namespaceB)
+        let alias = root.appendingPathComponent(namespaceA)
+        try FileManager.default.createDirectory(at: target, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: alias, withDestinationURL: target)
+
+        XCTAssertThrowsError(try makeFactory(namespaceA).makeStores())
+        XCTAssertTrue(FileManager.default.fileExists(atPath: target.path))
+    }
+
+    func testFactoryRejectsDanglingQARootSymlinkBeforeCreatingCache() throws {
+        let alias = temporaryDirectory.appendingPathComponent("MediFlow-QA")
+        let missing = temporaryDirectory.appendingPathComponent("missing-target")
+        try FileManager.default.createSymbolicLink(at: alias, withDestinationURL: missing)
+
+        XCTAssertThrowsError(try makeFactory(namespaceA).makeStores())
+        XCTAssertFalse(FileManager.default.fileExists(atPath: missing.path))
+    }
+
     private func resolve(_ value: Any, bundleIdentifier: String) throws -> MediFlowQAStorageSelection {
         try MediFlowQAStorageSelection.resolve(metadata: [MediFlowQAStorageSelection.metadataKey: value], bundleIdentifier: bundleIdentifier)
     }
@@ -114,6 +145,25 @@ final class MediFlowQAStorageTests: XCTestCase {
             keychainReader: { _, _ in .success(nil) },
             keychainWriter: { _, _, _ in .success(()) },
             keychainDeleter: { _, _ in .success(()) }
+        )
+    }
+
+    private func makeFactory(_ namespace: String) -> MediFlowMacStorageFactory {
+        MediFlowMacStorageFactory(
+            metadata: { [MediFlowQAStorageSelection.metadataKey: namespace] },
+            bundleIdentifier: { "com.mediflow.qa.\(namespace)" },
+            fileManager: .default,
+            applicationSupportDirectory: { self.temporaryDirectory },
+            pairedStoreBuilder: { _, _ in
+                XCTFail("Lo store paired non deve essere costruito per un percorso QA non valido.")
+                return self.makeStore()
+            },
+            cacheStoreBuilder: { _, _, _ in
+                XCTFail("La cache non deve essere costruita per un percorso QA non valido.")
+                return HomeBasePatientCacheStore(cacheDirectory: self.temporaryDirectory, keyProvider: {
+                    SymmetricKey(data: Data(repeating: 9, count: 32))
+                })
+            }
         )
     }
 }
