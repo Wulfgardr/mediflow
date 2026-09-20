@@ -9,93 +9,102 @@ read_when:
 
 > [!NOTE]
 > **Stato documento: SECONDARY (sintesi rapida).**
-> La visione architetturale stabile resta [ARCHITECTURE.md](../ARCHITECTURE.md).
-> Il walkthrough operativo canonico resta [docs/walkthrough.md](./walkthrough.md).
+> Per la visione stabile prevale [ARCHITECTURE.md](../ARCHITECTURE.md).
+> Per il percorso operativo prevale [docs/walkthrough.md](./walkthrough.md).
 
-Panoramica tecnica rapida del contenuto sorgente `0.8.5`. Non sostituisce i
-receipt exact-SHA, di firma, tag o pubblicazione.
-Per la lettura completa e trasversale usa [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md).
-Per il dettaglio completo usa [docs/walkthrough.md](./walkthrough.md).
-Per la mappa documentale completa usa [docs/README.md](./README.md) e [docs/markdown-index.md](./markdown-index.md).
+Questa sintesi collega postazione, dati e servizi, distinguendo il contenuto
+sorgente `0.8.5` dalle correzioni di stato successive. La release sorgente 0.8.6
+è pubblicata per il runtime locale/headless sul Mac, con browser localhost;
+non distribuisce un installer nativo firmato o notarizzato e non qualifica
+app complete su altri sistemi.
+
+Le ricevute exact-SHA, di firma, tag e pubblicazione mantengono il proprio
+valore e non si sostituiscono con una panoramica. Per il quadro trasversale
+consulta [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md), per il flusso
+completo [docs/walkthrough.md](./walkthrough.md), per orientarti
+[docs/README.md](./README.md) e [docs/markdown-index.md](./markdown-index.md).
 
 ---
 
 ## 🧭 Snapshot corrente
 
-1. **Local-first di default**: lo storage autorevole resta sul nodo `home-base`;
-   client paired, cache locali ed export/backup espliciti completano il
-   perimetro. Nessun cloud entra nel runtime operativo per default.
-2. **Cifratura clinica per campo a riposo**: i campi configurati e gli artifact
-   documentali sensibili persistono cifrati lato client. Il file SQLite non è
-   cifrato integralmente.
-3. **Home-base opt-in**: esiste una slice `network-home-base` su
-   `/api/v1/network/*` con read pazienti, write versionati su
-   profilo/status, diario, terapie, checkup e osservazioni, mentre hard delete
-   remoto, replica, cataloghi remoti e sync restano governati e separati.
-4. **Document intelligence prudente**: `documentInsights` resta compat layer,
-   mentre gli allegati possono gia persistere un artifact `parse/evidence`
-   cifrato consumato in priorita da `AI Patient Insight`.
-5. **Root Kree8 live e una sola shell supportata**: la home web `/` apre
-   direttamente il cockpit Kree8 su `main` (ADR 0060), senza selector di shell;
-   AI, Smart Import e contesto paziente SISS/FSE vivono nella shell ufficiale e
-   non dipendono piu da preview profiles.
-6. **Direzione Apple piu chiara**: web app primaria oggi, shell macOS storica
-   congelata per rebuild e filone iPadOS/iOS ricondotto allo stesso boundary
-   `home-base + /api/v1`.
-7. **SISS/FSE documentale governato**: il corpus locale con sync/freshness
-   prepara integrazioni future senza dichiarare una catena regionale certificata.
-8. **Prestazioni separate dalle terapie**: prescrizioni di esami, visite,
-   imaging, riabilitazione e screening hanno un dominio locale dedicato, con
-   item figli e matching repertorio preparato ma sempre reviewable.
+Il lavoro ordinario comincia sul nodo `home-base`, che conserva lo storage
+autorevole. Client paired, cache ed esportazioni o backup espliciti completano
+il perimetro: nessun servizio cloud è necessario per default. La cifratura
+riguarda i campi clinici configurati e gli artifact documentali sensibili,
+non l’intero file SQLite.
+
+Attivare `network-home-base` permette di usare `/api/v1/network/*` dopo pairing
+e autenticazione dell’operatore. Sono previste letture dei pazienti e scritture
+versionate di profilo/status, diario, terapie, checkup e osservazioni; hard
+delete remoto, replica, cataloghi remoti e sincronizzazione restano separati
+e governati dai rispettivi contratti.
+
+La root `/` apre il cockpit Kree8 su `main` (ADR 0060). Non esiste un selettore
+di shell: AI, Smart Import e contesto paziente SISS/FSE appartengono alla UI
+ufficiale, non a preview profiles. La web app è la superficie primaria;
+la shell macOS storica conserva il proprio valore di snapshot e il seguito
+nativo usa lo stesso contratto `home-base + /api/v1` previsto per iPadOS/iOS.
+
+I documenti mantengono più del solo testo estratto. `documentInsights` è lo
+strato di compatibilità; gli allegati possono conservare artifact
+`parse/evidence` cifrati, letti in priorità da `AI Patient Insight`. Le
+prescrizioni di prestazione — esami, visite, imaging, riabilitazione e
+screening — hanno un dominio distinto dalle terapie farmacologiche, con item
+figli e confronto con il repertorio sempre da rivedere. Il corpus locale
+SISS/FSE, con sincronizzazione documentale e controlli di aggiornamento,
+prepara il lavoro futuro senza attestare una catena regionale certificata.
 
 ---
 
 ## 🧱 Componenti chiave
 
-| Componente | Stato attuale | Note |
+La tabella indica responsabilità e limiti. «Integrato» descrive un raccordo
+nel codice, non una qualifica clinica o la distribuzione di ogni superficie.
+
+| Componente | Stato e perimetro documentati | Note |
 | --- | --- | --- |
 | Web app Next.js | Superficie primaria | Root Kree8 live, UI clinica locale, `/api/*`, `/api/v1/*`, overview `home-base`, coordinamento AI locale |
 | SQLite + Drizzle | Storage autorevole | `medical.db`, schema in `lib/schema.ts` |
-| Ollama | Runtime generativo locale configurabile | Serve Patient Insight, Smart Import e Document Synthesis quando host e modello locali superano la readiness; non e un runtime OCR della 0.8.5 |
+| Ollama | Runtime generativo locale configurabile | Serve Patient Insight, Smart Import e Document Synthesis quando host e modello locali superano la readiness; non è un runtime OCR della 0.8.5 |
 | ATHENA/MLX | Runtime locale configurabile | Serve Treatment Reasoning solo con modello e runner `mlx_lm.generate` pre-provisionati; assenza o configurazione incompleta falliscono in modo chiuso |
 | AnyDoc + Apple Vision | Estrazione documentale locale | AnyDoc resta il primo passaggio; Apple Vision continua soltanto le pagine PDF `needsOcr` sul Mac, con provenienza, currentness e fail-closed |
 | Selector Fabric | Integrato | Discovery compatibile, smoke sintetico e binding atomico per cinque capability; nessuna qualifica runtime implicita |
 | OpenAI / Anthropic | Adapter ufficiali `default OFF` | Probe review-only con transport fake; nessuna credenziale o rete live nel tree |
 | MCP | Superficie figlia locale integrata | Supervisor locale, Web e MCP figli distinti, RPC AIP ereditato; nessun installer, onboarding o claim per host MCP esterni |
-| Mini | Foundation CLI fail-closed | Catalogo e adapter tipizzati presenti; nessun callsite production del Supervisor e nessun grant senza parent AIP |
+| Mini | Base CLI 0.8.5; raccordo Supervisor successivo WUL-696 | Il raccordo aggiunge sessione NDJSON e comandi CLI; parent AIP e attivazione Web restano obbligatori, con prova sintetica distinta dal completamento clinico end-to-end |
 | Write checkup F10 | Integrato end-to-end | Preview MCP e commit Web trusted con ruolo, step-up, gesto, CAS, idempotenza, audit e receipt; proof e commit non passano all'agente |
 | Semantic planner | Integrato, sola lettura | Collegato al Supervisor; massimo due operazioni allowlisted, nessun SQL libero o write |
-| Recording visita | Integrato sul Mac, review-first | API Apple on-device su macOS 26+; consenso esplicito, audio bounded in RAM e nessun writer clinico automatico |
+| Recording visita | Percorso Mac con revisione, non qualifica nativa 0.8.6 | API Apple on-device su macOS 26+; consenso esplicito, audio bounded in RAM e nessun writer clinico automatico |
 | ICD-11 WHO | Application Service server-only opzionale | Output MediFlow data-only, egress e credenziali espliciti |
 | OpenMed redaction | Sidecar shadow opzionale | Lane `redaction.v1` benchmark/shadow, non client-facing |
 | TLS proxy `:3443` | Trasporto locale fidato | Base di `/api/v1` per native e `home-base` |
+
 
 ---
 
 ## 🔒 Dati e cifratura
 
-I campi configurati come sensibili vengono cifrati lato client prima della
-persistenza. Il mapping corrente include:
-
-- campi paziente (`address`, `phone`, `notes`, `aiSummary`, `documentInsights`)
-- contenuti del diario clinico
-- note di controlli e motivazioni terapeutiche
-- allegati e snapshot documentali (`summarySnapshot`,
-  `parseEvidenceArtifactSnapshot`)
-
-Formato at-rest:
+La cifratura avviene nel client prima della persistenza. Il mapping comprende
+campi paziente (`address`, `phone`, `notes`, `aiSummary`, `documentInsights`),
+contenuti del diario clinico, note dei controlli, motivazioni terapeutiche,
+allegati e snapshot documentali (`summarySnapshot`,
+`parseEvidenceArtifactSnapshot`). Il formato a riposo è:
 
 ```text
 ENC:<iv_b64>:<cipher_b64>
 ```
 
-Il server non possiede la chiave in chiaro; la master key vive solo nella
-sessione attiva del browser/client. Identificativi e alcuni metadati restano
-fuori dal mapping: il PIN non equivale a zero-knowledge sull'intero database.
-Il soft-delete paziente (ADR 0066) scrive un
-tombstone reversibile (`deletedAt` / `deletionReason`) con version guard e non
-orfana i figli clinici; il dato cifrato non viene mai sovrascritto dal
-placeholder `[LOCKED DATA]`, che resta solo di presentazione.
+
+Il server non possiede la chiave in chiaro; la master key resta nella sessione
+attiva del browser o del client. Identificativi e alcuni metadati rimangono
+fuori dal mapping, perciò il PIN non equivale a zero-knowledge dell’intero
+database.
+
+Il soft-delete paziente di ADR 0066 scrive un tombstone reversibile
+(`deletedAt` / `deletionReason`) con controllo di versione, senza rendere orfani
+i figli clinici. `[LOCKED DATA]` è soltanto un segnaposto della UI: non deve
+mai sostituire il contenuto cifrato persistito.
 
 ---
 
@@ -103,104 +112,106 @@ placeholder `[LOCKED DATA]`, che resta solo di presentazione.
 
 | Surface | Auth | Scopo |
 | --- | --- | --- |
-| `/api/auth/*` | credenziali + session cookie | setup/login/logout |
-| `/api/*` | session cookie | CRUD web, proxy locali, overview shell |
-| `/api/v1/*` | bearer token locale | contratto condiviso native |
-| `/api/v1/network/*` | paired client credential + sessione operatore | `home-base` read-only-first + primi write limitati paziente/diario/terapie/checkup/osservazioni versionati |
+| `/api/auth/*` | credenziali + session cookie | Setup, login e logout. |
+| `/api/*` | session cookie | CRUD web, proxy locali e stato della shell. |
+| `/api/v1/*` | bearer token locale | Contratto condiviso dai client nativi. |
+| `/api/v1/network/*` | paired client credential + sessione operatore | `home-base` con lettura prioritaria e scritture limitate/versionate di paziente, diario, terapie, checkup e osservazioni. |
 
-Le sotto-risorse cliniche (diario, terapie, checkup, osservazioni) hanno un ciclo
-di vita unificato (WUL-308): version guard con `409` sulle scritture, soft delete
-su tutte le `DELETE`, liste che escludono i soft-deleted con opt-in
-`includeDeleted`, audit che distingue eliminazione da aggiornamento. Il limite
-default allegati e 25 MiB (`413` oltre soglia), con envelope cifrati lato client.
+Il ciclo di vita WUL-308 di diario, terapie, checkup e osservazioni usa controlli
+di versione e restituisce `409` sulle scritture in conflitto. Tutte le
+`DELETE` sono soft delete; le liste escludono i record rimossi salvo
+`includeDeleted` esplicito; l’audit distingue eliminazione e aggiornamento.
+Gli allegati hanno un limite predefinito di 25 MiB (`413` oltre soglia) e
+involucri cifrati lato client.
 
-Boundary importanti:
-
-- `local-only` resta il default
-- `network-home-base` si attiva esplicitamente in Settings, opt-in su LAN fidata
-- con `network-home-base` spenta i token paired non leggono ne scrivono
-  (`403 NETWORK_MODE_DISABLED`), ma i pairing restano
-- il pairing bootstrap e PHI-safe
-- esistono solo write remoti limitati/versionati sui moduli gia documentati;
-  sync record-level, multi-master e hard delete remoto restano fuori scope
+Il default resta `local-only`. `network-home-base` si attiva esplicitamente
+nelle impostazioni su LAN fidata; da spenta nega lettura e scrittura ai token
+paired con `403 NETWORK_MODE_DISABLED`, senza eliminare i pairing. Il bootstrap
+di associazione non espone PHI. Scritture remote, limitate e versionate, sono
+ammesse soltanto sui moduli documentati: sincronizzazione record-level,
+multi-master e cancellazione fisica remota restano escluse.
 
 > [!IMPORTANT]
-> Il ciclo di vita unificato WUL-308 e BREAKING per il client nativo macOS ed e
-> gated come blocker di release (WUL-333).
+> L’introduzione WUL-308 era BREAKING per il client nativo macOS e costituiva
+> un blocco della relativa release (WUL-333). Questa condizione storica non
+> attesta l’adeguamento di un client successivo e non va presentata come un
+> blocco ancora aperto alla pubblicazione sorgente 0.8.6, già avvenuta.
 
 ---
 
 ## 🤖 AI e document intelligence
 
-Pipeline corrente:
+Prima di chiedere una sintesi occorre sapere che cosa si sia letto. Il
+percorso documentale carica e valida il file localmente, usa AnyDoc sui formati
+con testo estraibile e registra provenienza, hash e validità della fonte.
+Per i PDF supportati classifica soltanto le pagine `needsOcr`, ne limita
+materializzazione e rendering, applica Apple Vision sul Mac e ricompone il
+risultato mantenendolo legato all’originale. DeepSeek-OCR 2/CUDA resta escluso
+e non bloccante nel perimetro 0.8.5.
 
-1. upload e validazione locale del documento
-2. estrazione AnyDoc per i formati con testo estraibile
-3. registrazione di provenienza, hash e currentness della fonte estratta
-4. classificazione delle sole pagine `needsOcr`, materializzazione e rendering
-   bounded, riconoscimento Apple Vision locale sul Mac e ricomposizione
-   source-bound; DeepSeek-OCR 2/CUDA resta fuori scope e non bloccante
-5. estrazione/sintesi review-first con runtime generativo locale configurato
-6. persistenza di:
-   - `summarySnapshot`
-   - artifact `parse/evidence` cifrato e tracciabile
-   - `documentInsights` come projection compatibile
-7. refresh dei consumer reviewable (`AI Patient Insight`, smart import, create
-   flow document-driven)
+Il runtime generativo locale, quando configurato, prepara estrazioni o sintesi
+da rivedere. La persistenza documentale conserva `summarySnapshot`, artifact
+`parse/evidence` cifrati e tracciabili e `documentInsights` come proiezione di
+compatibilità; si aggiornano quindi i consumer da riesaminare:
+`AI Patient Insight`, Smart Import e creazione da documento. Questo percorso non rende
+automatiche le scritture cliniche delle proposte AI.
 
-`Smart Import` resta reviewable e filtra il rumore da fonti senza novita clinica
-quando diagnosi/terapie sono gia presenti. L'estrazione identita e prudente
-(niente data di nascita da data arbitraria, codice fiscale con omocodie) e gli
-errori AI sono visibili e non attivano fallback impliciti.
+`Smart Import` filtra fonti senza novità cliniche quando diagnosi e terapie
+sono già presenti. La prudenza sull’identità esclude date di nascita tratte
+da date arbitrarie e considera le omocodie del codice fiscale. Gli errori AI
+restano visibili e non attivano alternative implicite.
 
-L'AI locale è il default review-first. OpenAI e Anthropic hanno adapter HTTPS
-ufficiali e probe review-only, ma restano `default OFF`. Ogni composizione
-richiede lifecycle, secret reference e policy egress/retention host-owned. I
-test usano transport fake: il tree non contiene credenziali o prove di rete
-live. Le lane comparator e OpenMed `redaction.v1` restano benchmark-only.
+La Fabric permette di usare questi strumenti per funzione, oppure di lasciarli
+spenti. Il modello non si sceglie liberamente per nome: ADR0129 conserva
+catalogo e autorità dell’host, con preferenze e override circoscritti. Gli
+adapter HTTPS ufficiali OpenAI/Anthropic e la loro prova amministrativa
+richiedono ciclo di vita, riferimento al segreto e politiche di uscita e
+conservazione; restano `default OFF`. I test di quel percorso usano trasporti
+simulati. L’integrazione ChatGPT è un canale distinto e non porta una nuova
+prova live consumer sul candidato finale. Comparator e OpenMed `redaction.v1`
+rimangono nei propri benchmark, senza promozioni implicite.
 
-Il Supervisor Node locale avvia Web standalone e MCP `stdio` come figli
-distinti su IPC ereditato. MCP espone terminology search, Open Loops
-patient-scoped, follow-up proposal e query semantica bounded read-only, senza
-accesso diretto a SQLite. Mini condivide catalogo e foundation CLI ma non è
-avviato dal Supervisor production e fallisce chiuso senza parent AIP. Contesto,
-lifecycle, revoca e audit restano
-host-owned. La 0.8.5 non dichiara installer, onboarding o compatibilità con
-host MCP esterni.
+Il Supervisor Node locale avvia Web standalone e MCP `stdio` come figli su
+IPC ereditato. MCP può cercare terminologia, leggere Open Loops nel paziente
+autorizzato, proporre follow-up e interrogare il planner in sola lettura, ma
+non accede a SQLite. Mini condivideva già catalogo e base CLI nella 0.8.5;
+il successivo raccordo WUL-696 aggiunge la sessione Supervisor, mantenendo
+parent AIP e attivazione Web obbligatori. Contesto, ciclo di vita, revoca e
+audit restano all’host. Non ne derivano installer o compatibilità con host
+MCP esterni.
 
-La transizione stato checkup F10 collega una preview MCP al commit nella UI Web
-trusted. Il Web rilegge la risorsa e richiede ruolo medico attivo, step-up e
-gesto operation-specific prima di CAS, idempotenza, audit e receipt atomici.
-Proof e commit non attraversano MCP.
+Per F10, MCP prepara la preview e la UI Web fidata rilegge la risorsa, richiede
+ruolo medico attivo, step-up e gesto specifico prima del commit. CAS,
+idempotenza, audit e ricevuta sono atomici; prova autorizzativa e commit non
+attraversano MCP. Il planner compone al massimo due operazioni ammesse,
+senza SQL libero o scritture.
 
-Il planner semantico è collegato al Supervisor e compone al massimo due
-operazioni allowlisted senza SQL libero o scritture. Su macOS 26 o successivo,
-la registrazione visita usa API Apple on-device, consenso esplicito, audio
-bounded solo in RAM e review del transcript. Non esegue writer clinici
-automatici; microfono reale e validazione clinica restano fuori dal claim.
+Su macOS 26 o successivo, la registrazione visita usa API Apple sul dispositivo,
+consenso esplicito, audio limitato alla RAM e revisione del testo. Non esegue
+scritture cliniche automatiche; microfono reale e validazione clinica restano
+fuori dalle prove dichiarate.
 
 > [!NOTE]
-> Il safety gate AI (WUL-358) espone un kill-switch per `patient-insight`,
-> `smart-import` e `document-synthesis`, con model governance delle decisioni
-> documentali. Nessuna scrittura clinica autonoma: le proposte restano sempre da
-> rivedere.
+> Il safety gate WUL-358 mantiene il kill-switch per `patient-insight`,
+> `smart-import` e `document-synthesis` e la governance dei modelli nelle
+> decisioni documentali. Le proposte devono essere riviste: nessuna scrittura
+> clinica autonoma.
 
 ---
 
 ## ⚠️ Guardrail operativi
 
-- `AppRevisionGuard` + `/api/system/revision` evitano tab stale dopo cambi di
-  branch/revision/worktree.
-- `Start_MediFlow.command` puo resettare `.next` quando cambia il fingerprint
-  della sorgente locale.
-- Il cockpit Kree8 e la root web live su `main`; nuove sperimentazioni non
-  vivono come selector persistito in Settings.
-- Il selector Fabric sceglie binding di capability, non shell web. Discovery e
-  smoke sintetico non dimostrano readiness.
-- I benchmark/shadow lane (`OpenMed`, comparator cloud, NER benchmark-only)
-  restano separati dal runtime clinico.
-- SISS/FSE resta `portal-handoff` / webapp-assisted: niente integrazione
-  regionale certificata nativa, niente generazione NRE, niente writeback FSE/SISS.
+`AppRevisionGuard` e `/api/system/revision` impediscono che una tab usi in modo
+silenzioso una revisione superata dopo un cambio di branch o worktree.
+`Start_MediFlow.command` può ricostruire `.next` quando cambia l’impronta dei
+sorgenti locali. Il cockpit Kree8 resta la root su `main`; nuove sperimentazioni
+non diventano selettori persistiti nelle impostazioni.
+
+Il selettore Fabric riguarda i binding delle funzioni, non la shell. Discovery
+e smoke sintetico non dimostrano disponibilità qualificata. `OpenMed`, comparator
+cloud e benchmark NER rimangono separati dal runtime clinico. SISS/FSE resta
+`portal-handoff` / webapp-assisted: nessuna integrazione regionale nativa
+certificata, generazione NRE o writeback FSE/SISS.
 
 ---
 
@@ -219,6 +230,9 @@ automatici; microfono reale e validazione clinica restano fuori dal claim.
 - [docs/adr/0050-functional-preview-profiles-retired-on-mainline.md](./adr/0050-functional-preview-profiles-retired-on-mainline.md)
 - [docs/adr/0049-siss-fse-document-corpus-and-local-mcp-layer.md](./adr/0049-siss-fse-document-corpus-and-local-mcp-layer.md)
 
+
 ---
 
-*Ultimo aggiornamento: 2026-09-03 - contenuto sorgente v0.8.5*
+*Fotografia tecnica originaria: 2026-09-03 - contenuto sorgente v0.8.5.
+Raccordo editoriale al quadro 0.8.6 del 2026-09-20, senza nuove attestazioni
+runtime o native.*

@@ -5,105 +5,137 @@ read_when:
   - "Updating documentation structure, canonical indices, or repository governance."
 ---
 
-<!-- reconciliation-20260912 -->
-> **Candidata ricostruita il 12 settembre 2026, non release.** Il perimetro vigente della 0.8.6 è Mac, localhost, backend, WHO/OpenAI e Headless sul Mac. Windows, Linux, Mini, iPhone e iPad sono rinviati alla 1.0; ATHENA è opzionale. Le prove storiche sotto conservano i propri SHA e non qualificano automaticamente questa ricostruzione. Il coordinamento resta [WUL-669](https://linear.app/wulfgardr/issue/WUL-669); proposte recuperate e servizi configurati non attestano funzionamento reale.
-
 # Documentazione MediFlow: Indice Canonico
 
-Questo file è il punto di ingresso unico: dove leggere, cosa aggiornare e quale documento prevale.
+Chi arriva dal prodotto cerca di capire a che cosa serva MediFlow; chi deve
+modificarlo deve anche sapere quali decisioni lo vincolino. Questo indice
+collega le due esigenze: orienta la lettura, indica il documento da aggiornare
+per ciascun tema e chiarisce quale riferimento prevalga in caso di divergenza.
+L’[indice completo](./markdown-index.md) serve invece a trovare i singoli file.
 
-Ultimo aggiornamento: 2026-09-08
+La mappa precedente era aggiornata al 2026-09-08. Questa revisione editoriale
+è del 2026-09-20; le date, le revisioni e gli esiti contenuti nei verbali
+restano quelli delle prove originarie.
 
-> [!NOTE]
-> Questa documentazione descrive il contenuto sorgente della `0.8.5`.
-> Check CI su exact SHA, artifact firmati, tag e GitHub Release sono evidenze
-> del confine di pubblicazione e non si deducono dal solo tree. Lo storico delle
-> versioni vive nel [CHANGELOG](../CHANGELOG.md).
+<!-- reconciliation-20260912 -->
+La candidatura ricostruita il 12 settembre 2026 non era ancora una release.
+In quel piano Windows, Linux, Mini, iPhone e iPad erano rinviati alla 1.0, con
+ATHENA opzionale: era l’indicazione di quella fase, non una nuova scadenza
+o una qualifica delle piattaforme.
+**Oggi la 0.8.6 è pubblicata come codice sorgente**, per runtime locale/headless
+sul Mac e browser localhost. Il percorso nativo è separato; gli archivi ZIP e
+TAR.GZ non attestano installer firmati o notarizzati né app complete su altri
+sistemi. Le prove storiche Windows/Linux e il raccordo Mini WUL-696 non sono
+cancellati da questa delimitazione, ma nemmeno diventano qualifiche generali.
+
+Le sezioni sulla `0.8.5` descrivono i propri sorgenti e le proprie prove.
+La pubblicazione corrente è ricostruita nello
+[stato del sistema](./STATE_OF_THE_SYSTEM.md) e lo storico delle versioni nel
+[CHANGELOG](../CHANGELOG.md). La valutazione del deployment clinico resta aperta in
+WUL-688 e il coordinamento generale in [WUL-669](https://linear.app/wulfgardr/issue/WUL-669): una release sorgente
+non chiude l’intero programma né qualifica servizi solo configurati.
 
 <!-- @Codex -->
 ## Percorsi di lettura
 
-- **Prima visita**: [Inizia qui](./start-here.md), poi [README del progetto](../README.md).
-- **Dati e responsabilità**: [privacy, GDPR e governance AI](./privacy-and-ai-governance.md), poi policy e contratti richiamati.
-- **Valutazione della 0.8.5**: [readiness e canali Apple](./release-085-readiness.md); i gate aperti restano espliciti.
-- **Contributi tecnici**: [topologia repository](./repository-topology.md), [architettura](../ARCHITECTURE.md), quindi il contratto del componente.
-- **Presentazione del prodotto**: [Get MediFlow e linea editoriale](./getmediflow-editorial-proposal.md), distinta dai contratti runtime.
-- **Studio UI 0.8.6**: [gemello web navigabile e confronto visuale](./design/2026-09-05-086-runtime-twin.md), prove sintetiche WUL-676 precedenti alla promozione.
+Per una prima visita, [Inizia qui](./start-here.md) e il [README del progetto](../README.md) spiegano
+il bisogno, il lavoro senza AI e le ragioni della modularità. Quando la
+domanda riguarda dati e responsabilità, partire da
+[privacy, GDPR e governance AI](./privacy-and-ai-governance.md) e proseguire nelle policy e nei contratti
+richiamati: l’introduzione non sostituisce quei vincoli.
+
+Per valutare la candidatura 0.8.5, [readiness e canali Apple](./release-085-readiness.md) conserva le
+prove e i gate aperti di quella revisione. Per contribuire ai sorgenti,
+servono [topologia repository](./repository-topology.md), [architettura](../ARCHITECTURE.md) e poi il contratto del
+componente. [Get MediFlow e linea editoriale](./getmediflow-editorial-proposal.md) riguarda il racconto
+pubblico, mentre il [gemello web navigabile e confronto visuale](./design/2026-09-05-086-runtime-twin.md) conserva
+le prove sintetiche WUL-676 precedenti alla promozione UI: nessuno dei due
+sostituisce il runtime.
 
 ## Preferenze modello per esperienza
 
-[ADR 0129](./adr/0129-function-model-catalog-preferences.md) è la fonte del
-contratto WUL-691: catalogo host, preferenze/preset CAS e override per preview.
-La lane backend non attesta integrazione del picker, inferenza remota o release.
+La scelta utile non è «quale AI per tutto», ma quale strumento ammesso usare
+per una funzione, oppure se lasciarla spenta. [ADR 0129](./adr/0129-function-model-catalog-preferences.md) definisce il
+contratto WUL-691: catalogo dell’host, preferenze e preset con controllo CAS,
+override per la singola preview. Il catalogo limita la scelta e l’host ne
+conserva l’autorità; una preferenza non abilita da sola un provider.
+
+Il contributo backend, il picker, una prova sintetica e un’inferenza remota
+sono risultati diversi. Il collegamento ChatGPT mantiene separati controllo
+account, tentativo di esecuzione, consenso e ammissione dei dati: né il
+catalogo informativo né il login attestano una funzione pronta.
 
 ## Consegna 0.8.6
 
-[Verifica di rilascio 0.8.6](./analysis/2026-09-07-086-release-verification.md): fonte corrente
-per SHA, ricevute, correzioni PIN/allegati, test e limiti. Nessun finding
-reportabile residuo nel perimetro sorgente; pacchetto sorgente autorizzato,
-CI verde e pubblicazione pendenti. Suite completa con un fallimento conservato.
+La pubblicazione sorgente del 20 settembre 2026 e la CI sul commit
+`46296266c0a8ff4d4ab19216af7e761cddec7d78` sono descritte nello Stato del
+sistema. Su main risultano sei workflow e sette controlli richiesti
+completati senza bypass o rerun dei workflow; Playwright conta 159 passati e
+51 skip previsti, senza flaky, fallimenti o retry. Nella PR353 due casi erano
+passati al retry automatico: l’assenza di retry su main non ne dimostra la
+causa risolta. L’harness ChatGPT conta 26 passati, compresi 10 casi di
+conformance, senza una nuova qualifica live consumer del candidato finale.
 
-[Verbale integrato](./analysis/2026-09-06-086-integrated-closeout.md):
-prove e decisioni storiche, con disposizione aggiornata.
-[Review Daybreak](./analysis/2026-09-07-086-daybreak-security-review.md):
-report inglese storico intatto e addenda sanitizzati; firma di produzione
-non attestata e RBAC per operatore esplicitamente fuori scope.
+La [Verifica di rilascio 0.8.6](./analysis/2026-09-07-086-release-verification.md) conserva SHA, ricevute, correzioni
+PIN/allegati, test e limiti delle candidature. Registrava assenza di finding
+reportabili residui nel perimetro sorgente, autorizzazione del pacchetto e
+attesa di CI e pubblicazione, insieme a una suite completa con un fallimento.
+Questa attesa è storica: non descrive più lo stato della release.
 
-[Promozione della UI web](./adr/0123-official-web-ui-navigation-compositions.md):
-contratto accettato per B predefinita e A selezionabile, con confronto sintetico
-separato. [Verifica della UI integrata](./analysis/2026-09-06-086-integrated-ui-verification.md):
-build standalone e percorsi browser senza flag, con prove reali/simulate e limiti distinti.
+Il [Verbale integrato](./analysis/2026-09-06-086-integrated-closeout.md) conserva prove e decisioni con le rispettive
+disposizioni. La [Review Daybreak](./analysis/2026-09-07-086-daybreak-security-review.md) mantiene il report inglese storico e
+gli addenda sanitizzati: firma di produzione non attestata e RBAC per
+operatore fuori scope non vanno reinterpretati come capacità consegnate.
 
-[Verifica della cartella Apple](./analysis/2026-09-06-086-apple-ui-verification.md):
-build locali, bozze, navigazione e limiti delle prove su Mac e simulatori.
+La [Promozione della UI web](./adr/0123-official-web-ui-navigation-compositions.md) stabilisce B predefinita e A selezionabile,
+separando il confronto sintetico. La [Verifica della UI integrata](./analysis/2026-09-06-086-integrated-ui-verification.md)
+riporta build standalone e percorsi browser senza flag, distinguendo prove
+reali, simulate e limiti. La [Verifica della cartella Apple](./analysis/2026-09-06-086-apple-ui-verification.md) documenta
+build locali, bozze e navigazione su Mac e simulatori; la
+[Nuova proposta macOS](./design/2026-09-06-086-macos-redesign.md) riguarda il successivo redesign con barra delle
+aree, una lista laterale e cartella documentale. L’accettazione estetica
+resta un giudizio distinto.
 
-[Nuova proposta macOS](./design/2026-09-06-086-macos-redesign.md):
-barra delle aree, una sola lista laterale, cartella documentale e prove del
-redesign successivo alla rifinitura Apple. Accettazione estetica distinta.
+Il [Candidato funzionale locale](./analysis/2026-09-06-086-functional-closeout.md) fotografa la base precedente alla
+promozione UI di ADR 0123, con prove e incidente conservati. Le integrazioni
+successive non riscrivono quella evidenza. [Stato funzioni](./adr/0121-function-status-projection.md) e
+[setup host Ollama](./adr/0122-local-provider-host-setup.md) distinguono configurazione, ammissione e singola
+esecuzione; [Inventario codice](./analysis/2026-09-06-086-code-inventory.md) e [matrice regolatoria](./analysis/2026-09-06-086-regulatory-evidence.md) raccolgono
+copertura, controlli e gap, senza certificare conformità o adozione
+organizzativa.
 
-[Candidato funzionale locale](./analysis/2026-09-06-086-functional-closeout.md):
-fotografia della base funzionale precedente alla promozione UI regolata da
-ADR 0123. Conserva le prove e l'incidente documentato; le successive integrazioni
-sono descritte nel verbale corrente, senza riscrivere le evidenze precedenti.
-[Stato funzioni](./adr/0121-function-status-projection.md) e
-[setup host Ollama](./adr/0122-local-provider-host-setup.md) distinguono
-configurazione, ammissione e singola esecuzione.
-[Inventario codice](./analysis/2026-09-06-086-code-inventory.md) e
-[matrice regolatoria](./analysis/2026-09-06-086-regulatory-evidence.md) raccolgono
-copertura, controlli e gap; non attestano conformità o adozione organizzativa.
+Per i documenti, [ADR 0119](./adr/0119-anydoc-apple-vision-current-source.md) separa AnyDoc e fallback PDF Apple Vision
+dal catalogo Fabric. [ADR 0128](./adr/0128-local-desktop-ocr.md) descrive il candidato Tesseract WASM e i
+profili renderer Windows/Linux; la qualifica dei target resta distinta.
+La [Prima verifica OCR](./analysis/2026-09-05-086-ocr-verification.md) conserva preview, matrice browser sintetica e
+gate allora aperti. Per WHO, la [Decisione WHO WUL-672](./analysis/2026-09-05-086-who-decision.md) registra la
+scelta del sidecar locale; [ADR 0115](./adr/0115-icd11-who-reference-data-adapter.md) e [setup](./icd-who-setup.md) governano Search
+locale opt-in, con provisioning e prova sul target non attestati dal solo
+contratto. Lookup e cross-check restano fuori dal candidato.
 
-Contratto estrazione documentale: [ADR 0119](./adr/0119-anydoc-apple-vision-current-source.md),
-AnyDoc e fallback PDF Apple Vision distinti dal catalogo Fabric.
-[ADR 0128](./adr/0128-local-desktop-ocr.md): adapter candidato OCR desktop
-Tesseract WASM e profili renderer Windows/Linux; qualifica target pendente.
-[Prima verifica OCR](./analysis/2026-09-05-086-ocr-verification.md): preview,
-matrice browser sintetica e gate ancora aperti.
-
-[Decisione WHO WUL-672](./analysis/2026-09-05-086-who-decision.md): sidecar locale
-scelto dall'utente. [ADR 0115](./adr/0115-icd11-who-reference-data-adapter.md) e
-[setup](./icd-who-setup.md) governano il candidato Search locale, opt-in e non
-provisionato; lookup/cross-check restano fuori dal candidato.
-
-[Baseline operativa WUL-670](./analysis/2026-09-05-mediflow-086-baseline.md):
-base corrente, prove sintetiche, recuperi prioritari e ordine di sviluppo.
-
-[Piano operativo configurazione e parità desktop](./analysis/2026-09-07-086-guided-configuration-plan.md):
-requisiti accolti il 7 settembre, sei fasi, contratti da completare e gate di
-consegna. È il dettaglio attuale della roadmap 0.8.6; non attesta completezza.
-
-[Mini roadmap di consolidamento](./roadmap-086-consolidamento.md): dettaglio
-preparatorio della roadmap prodotto per OCR, ICD-11, impostazioni e scheda
-paziente, onboarding assistito, deslop e GDPR/AI Act, con recupero selettivo
-dei branch locali, design arena e collegamenti al filone Linear creato.
-Non modifica i contratti runtime o il design attivo.
+La [Baseline operativa WUL-670](./analysis/2026-09-05-mediflow-086-baseline.md) conserva base, prove sintetiche, recuperi
+prioritari e ordine di sviluppo. Il
+[Piano operativo configurazione e parità desktop](./analysis/2026-09-07-086-guided-configuration-plan.md) articola in sei fasi
+la richiesta del 7 settembre e i contratti e gate da completare: è un piano,
+non una prova della consegna di ogni voce. La
+[Mini roadmap di consolidamento](./roadmap-086-consolidamento.md) raccoglie OCR, ICD-11, impostazioni,
+scheda paziente, onboarding assistito, deslop, GDPR/AI Act, recupero selettivo
+dei branch, design arena e collegamenti Linear. Non cambia i contratti del
+runtime o il design attivo.
 
 ## Candidato Web 0.8.5: editor e analytics
 
-[Snapshot/CAS del modulo, recupero dei salvataggi parziali e conteggio Schede](./web-patient-edit-and-analytics-085.md): contratto della lane `mf085-fix-a-web-20260904`, limiti e regressioni. Candidato sorgente, non evidenza di rilascio.
+[Snapshot/CAS del modulo, recupero dei salvataggi parziali e conteggio Schede](./web-patient-edit-and-analytics-085.md)
+conserva il contratto `mf085-fix-a-web-20260904`, le regressioni e i limiti di
+quella candidatura sorgente. Non è una ricevuta di rilascio.
 
 ## 📚 Policy di consultazione (agent)
 
-Per orientarti rapidamente:
+Per un agente, orientarsi significa anzitutto individuare chi governi il
+lavoro richiesto. La sequenza seguente collega presentazione, regole
+operative, stato, architettura, sicurezza e contributi. Le ADR vanno scelte
+per pertinenza, verificando stato e successione degli emendamenti: la data
+più recente, da sola, non rende una decisione applicabile a ogni tema.
 
 1. [README.md](../README.md)
 2. [AGENTS.md](../AGENTS.md)
@@ -113,9 +145,11 @@ Per orientarti rapidamente:
 6. [SECURITY.md](../SECURITY.md)
 7. [CONTRIBUTING.md](../CONTRIBUTING.md)
 8. [docs/repository-topology.md](./repository-topology.md)
-9. [docs/adr/](./adr/README.md) (partendo dai più recenti)
+9. [docs/adr/](./adr/README.md) (pertinenti al tema, con i successivi emendamenti)
 
-Approfondimenti utili:
+Gli approfondimenti seguenti mantengono nomi e riferimenti tecnici per
+rendere reperibili i contratti. «Proposto», «candidato» e «storico» qualificano
+il documento o la prova nominati, non l’intero prodotto.
 
 <!-- @Codex MF085-002/003 -->
 - Scale cliniche source-bound e invio completo: [ADR 0118](./adr/0118-tinetti-poma28-source-bound-submission.md) (candidato; storico preservato, nessuna classificazione automatica del rischio per la nuova Tinetti).
@@ -182,6 +216,10 @@ Approfondimenti utili:
 
 ## 🧭 Ordine di lettura consigliato
 
+Per una lettura completa, questo ordine porta dal motivo del progetto al
+suo funzionamento e infine all’inventario. Per un intervento circoscritto
+restano sufficienti i contratti pertinenti, secondo AGENTS.md.
+
 1. [README.md](../README.md)
 2. [AGENTS.md](../AGENTS.md)
 3. [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md)
@@ -189,37 +227,46 @@ Approfondimenti utili:
 5. [SECURITY.md](../SECURITY.md)
 6. [CONTRIBUTING.md](../CONTRIBUTING.md)
 7. [docs/repository-topology.md](./repository-topology.md)
-8. [docs/adr/](./adr/README.md) (partendo dai più recenti)
+8. [docs/adr/](./adr/README.md) (pertinenti al tema, con i successivi emendamenti)
 9. [docs/walkthrough.md](./walkthrough.md)
 10. [docs/markdown-index.md](./markdown-index.md)
 
 ## 🧱 Convenzione stato documenti
 
-- `CANONICAL`: fonte di verità da aggiornare quando cambia un tema.
-- `SECONDARY`: approfondimento o sintesi; utile, ma non prevale se in conflitto.
-- `LEGACY`: materiale storico/visuale; consultabile, non decisionale.
-- `CANDIDATE LOCAL`: stato integrato nel tree locale; non prova release, tag o promozione.
-- `RELEASE_SCOPE_EXCLUDED`: componente non pronto escluso dalla patch; non è una
-  feature, un gate implicito o un claim di roadmap consegnata.
+`CANONICAL` indica il documento di riferimento da aggiornare quando cambia
+il tema; `SECONDARY` un approfondimento utile che non prevale in caso di
+conflitto. `LEGACY` conserva storia o riferimenti visuali, non una decisione
+corrente. Lo stato del documento non certifica l’implementazione che descrive.
+
+`CANDIDATE LOCAL` significa integrato nei sorgenti locali, senza attestare
+release, tag o promozione. `RELEASE_SCOPE_EXCLUDED` identifica un componente
+non pronto escluso dalla patch: non è una funzione consegnata, un requisito
+implicito o una voce di roadmap già realizzata.
 
 ## 📚 Fonte autorevole per tema
 
+La tabella indica dove cercare una decisione e dove aggiornarla. Le voci
+riferite a una prima slice o a una versione precedente ne conservano
+l’ambito; prima di dedurne lo stato corrente occorre leggere gli emendamenti
+e le prove pertinenti. Né `CANONICAL` né `ACCEPTED` sono sinonimi di
+installato, clinicamente qualificato o pubblicato.
+
 | Tema | File canonico | Stato | Note |
 | --- | --- | --- | --- |
-| Onboarding progetto | [README.md](../README.md) | `CANONICAL` | Punto di ingresso generale. |
-| Contratto prodotto | [PRODUCT.md](../PRODUCT.md) | `CANONICAL` | Purpose, audience, task, ruoli piattaforma, confini, anti-goal e direzione post-0.8. |
+| Onboarding progetto | [README.md](../README.md) | `CANONICAL` | Presenta il lavoro ambulatoriale, l’uso senza AI e le scelte che tengono insieme dati, documenti e attività. |
+| Contratto prodotto | [PRODUCT.md](../PRODUCT.md) | `CANONICAL` | Definisce finalità, destinatari, compiti e ruoli delle piattaforme; separa limiti, anti-goal e direzione successiva alla 0.8. |
 | Contratto design | [DESIGN.md](../DESIGN.md) | `CANONICAL` | Principi Lume condivisi, adattamenti per piattaforma, stati, accessibilità ed eccezioni intenzionali. |
-| Regole operative per agent | [AGENTS.md](../AGENTS.md) | `CANONICAL` | Boot sequence, repository canonica, privacy, disciplina di branch/worktree e verifica. |
-| Governance e topologia repository | [docs/repository-topology.md](./repository-topology.md) | `CANONICAL` | Fissa la repository pubblica come unica fonte operativa e separa runtime, publication/site e artefatti locali fuori Git. |
-| Stato completo del sistema | [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md) | `CANONICAL` | Lettura unificata di prodotto, runtime, boundary, AI/document intelligence e Apple clients; distingue il candidato sorgente 0.8.6 dalle prove storiche e dai gate di promozione ancora aperti. Le evidenze di pubblicazione restano esterne al documento. |
-| Visione architetturale stabile | [ARCHITECTURE.md](../ARCHITECTURE.md) | `CANONICAL` | Confini e principi che cambiano raramente. |
-| Sicurezza e redazione dati | [SECURITY.md](../SECURITY.md) | `CANONICAL` | Policy di sicurezza, threat model, logging rules. |
+| Regole operative per agent | [AGENTS.md](../AGENTS.md) | `CANONICAL` | Stabilisce come iniziare il lavoro, scegliere repository e worktree, tutelare i dati e verificare la consegna. |
+| Governance e topologia repository | [docs/repository-topology.md](./repository-topology.md) | `CANONICAL` | Indica l’unica repository pubblica operativa e separa runtime, sito di presentazione e artefatti locali che devono restare fuori da Git. |
+| Stato completo del sistema | [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md) | `CANONICAL` | Distingue la release sorgente 0.8.6 pubblicata, i contratti implementativi e le prove storiche con i propri SHA; mantiene aperta la decisione sul deployment clinico. |
+| Visione architetturale stabile | [ARCHITECTURE.md](../ARCHITECTURE.md) | `CANONICAL` | Spiega perché dati, interfacce e funzioni intelligenti abbiano responsabilità separate, fissando i principi stabili. |
+| Sicurezza e oscuramento dei dati | [SECURITY.md](../SECURITY.md) | `CANONICAL` | Definisce minacce considerate, protezione dei dati, oscuramento degli identificativi e limiti di log e audit. |
 | Lifecycle Web P3 per logout, PIN e setup | [docs/adr/0106-web-auth-logout-pin-setup-lifecycle.md](./adr/0106-web-auth-logout-pin-setup-lifecycle.md) | `CANONICAL / ACCEPTED` | Prevale sul lifecycle P3 incompatibile: logout esatto senza mutare cookie, retirement user-scoped dopo CAS PIN e setup commit-last; non prova runtime o reset PIN. |
 | Piano canonico Headless read-only 0.8.5 | [docs/adr/0108-piano-canonico-headless-read-only-085.md](./adr/0108-piano-canonico-headless-read-only-085.md) | `CANONICAL / ACCEPTED` | Interpreta `66/66` come 66 esiti terminali fail-closed; i 32 GET network restano evidence candidate e non operation grant. |
 | Integrita del processo per l'auth web H1a | [docs/adr/0105-web-auth-process-integrity-assumption.md](./adr/0105-web-auth-process-integrity-assumption.md) | `CANONICAL / ACCEPTED` | Fissa l'assunzione process-global, il residuo di disponibilita e i gate H1b/security; non prova la catena auth completa. |
 | Intended purpose e claims guard clinico | [docs/adr/0065-intended-purpose-and-claims-guard.md](./adr/0065-intended-purpose-and-claims-guard.md) | `CANONICAL` | Fissa `WUL-279`: claim consentiti/esclusi su AI, SISS/FSE, cloud, diagnosi, triage, prescrizione e automazione, con guard `check:claims`. |
 | Voice visit capture Fluid-style | [docs/adr/0072-voice-visit-capture-fluid-boundary.md](./adr/0072-voice-visit-capture-fluid-boundary.md) | `CANONICAL / PROPOSED` | Conserva il boundary storico. Il percorso corrente è governato da ADR 0113 e integra Apple on-device review-first; microfono reale e validazione clinica restano fuori dal claim. |
-| Workflow di contribuzione | [CONTRIBUTING.md](../CONTRIBUTING.md) | `CANONICAL` | Definition of Done e routine verifica. |
+| Workflow di contribuzione | [CONTRIBUTING.md](../CONTRIBUTING.md) | `CANONICAL` | Definisce il lavoro contributivo, le verifiche richieste e la Definition of Done. |
 | Audit esterno V2: triage e residuo azionabile | [docs/analysis/2026-07-05-audit-esterno-v2-triage.md](./analysis/2026-07-05-audit-esterno-v2-triage.md) | `SECONDARY / REVIEW TRIAGE` | Dossier di supporto collegato a `WUL-470` e figlie `WUL-471`..`WUL-475`: separa obiezioni misframed da residui reali su PIN, FHIR, MDR, sync futuro e drift ADR. Non prevale su `SECURITY.md`, `ARCHITECTURE.md`, ADR o issue Linear. |
 | Decisioni architetturali | [docs/adr/*.md](./adr/README.md) | `CANONICAL` | Ogni scelta non banale deve vivere qui. |
 | Contratto API locale `/api/v1` | [docs/openapi/mediflow-v1.yaml](./openapi/mediflow-v1.yaml) | `CANONICAL` | Spec OpenAPI client-facing; processo/versioning governati da ADR 0010. |
@@ -233,11 +280,11 @@ Approfondimenti utili:
 | Recovery UI/parity 0.8 | [docs/analysis/2026-07-27-parity-0.8-recovery-run.md](./analysis/2026-07-27-parity-0.8-recovery-run.md) | `SECONDARY / RUN RECORD` | Registra recovery Claude, candidata locale, ownership, prove eseguite e blocker. Non sostituisce la matrice canonica. |
 | Provider intelligenti post-0.8 | [docs/analysis/2026-07-28-provider-program-post-0.8-run.md](./analysis/2026-07-28-provider-program-post-0.8-run.md) | `SECONDARY / RUN RECORD` | Registra stato reale, trust boundary, locality Ollama, auth provider, DAG e gate del programma separato dalla release 0.8. |
 | Intelligence Fabric post-0.8 | [docs/analysis/2026-07-29-intelligence-fabric-run.md](./analysis/2026-07-29-intelligence-fabric-run.md) | `SECONDARY / RUN RECORD` | Registra nucleo, giunture, prove, limiti, packet e stato del candidato locale WUL-522. |
-| Matrice runtime AI post-0.8 | [docs/ai-runtime-serving-matrix.md](./ai-runtime-serving-matrix.md) | `CANONICAL / POST-0.8 GOVERNANCE` | Separa fitting, benchmark, shadow e serving per task, modello e runtime. |
+| Matrice runtime AI post-0.8 | [docs/ai-runtime-serving-matrix.md](./ai-runtime-serving-matrix.md) | `CANONICAL / POST-0.8 GOVERNANCE` | Distingue compatibilità tecnica, benchmark, osservazione shadow e ammissione all’esecuzione per compito, modello e runtime. |
 | Limite digest-bound della readiness AI locale | [docs/adr/0092-limite-digest-bound-readiness-ai-locale.md](./adr/0092-limite-digest-bound-readiness-ai-locale.md) | `CANONICAL / ACCEPTED` | Mantiene bloccata la qualified readiness e classifica il bracket come detection best-effort. |
-| Contratto Intelligence Fabric | [docs/adr/0089-contratto-intelligence-fabric-e-venue-esecutive.md](./adr/0089-contratto-intelligence-fabric-e-venue-esecutive.md) | `CANONICAL / ACCEPTED` | Definisce capability, venue, profili egress, policy, ricevute e provenienza fail-closed. |
-| Onboarding Ollama esplicito | [ADR 0136](./adr/0136-explicit-web-local-provider-onboarding.md) | `CANONICAL / CANDIDATE` | Estende ADR 0122 con verifica e attivazione Web autenticata, receipt, CAS e revoca terminale. |
-| Giunture Intelligence Fabric | [docs/adr/0090-giunture-fabric-trust-onboarding-routing-interazione.md](./adr/0090-giunture-fabric-trust-onboarding-routing-interazione.md) | `CANONICAL / ACCEPTED` | Definisce trust paired, onboarding, routing osservabile e review clinica. |
+| Contratto Intelligence Fabric | [docs/adr/0089-contratto-intelligence-fabric-e-venue-esecutive.md](./adr/0089-contratto-intelligence-fabric-e-venue-esecutive.md) | `CANONICAL / ACCEPTED` | Definisce quali funzioni possa servire la Fabric, dove possano essere eseguite e con quali policy di uscita; ricevute e provenienza rendono osservabile la scelta senza concedere permessi. |
+| Onboarding Ollama esplicito | [ADR 0136](./adr/0136-explicit-web-local-provider-onboarding.md) | `CANONICAL / CANDIDATE` | Estende ADR 0122 con verifica e attivazione Ollama da comando Web autenticato, ricevuta, CAS e revoca terminale; non autorizza download, generazione o qualifica implicita. |
+| Giunture Intelligence Fabric | [docs/adr/0090-giunture-fabric-trust-onboarding-routing-interazione.md](./adr/0090-giunture-fabric-trust-onboarding-routing-interazione.md) | `CANONICAL / ACCEPTED` | Collega fiducia e revoca dei dispositivi paired, ammissione dei provider, decisioni di instradamento osservabili e review clinica. |
 | Candidato locale Intelligence Fabric | [docs/adr/0091-candidato-locale-fabric-admissione-continuita-status.md](./adr/0091-candidato-locale-fabric-admissione-continuita-status.md) | `CANONICAL / ACCEPTED` | Limita admissione, continuita, stato paired e harness locale senza AI paired, cloud o scritture cliniche. |
 | Crosswalk runtime Fabric 0.8.5 | [docs/capability-mapping/fabric-generative-runtime-crosswalk.v1.json](./capability-mapping/fabric-generative-runtime-crosswalk.v1.json) | `CANDIDATE LOCAL / MACHINE-READABLE` | Lega i quattro percorsi `proposal_only` a entrypoint, production root, route, receipt, provenienza e UI. `ocr=unavailable` riguarda la capability Fabric; il fallback Apple Vision vive nella composizione AnyDoc separata. Non prova release o apply. |
 | Receipt storica Fabric non integrata | [docs/capability-mapping/fabric-product-crosswalk-receipt.v1.json](./capability-mapping/fabric-product-crosswalk-receipt.v1.json) | `HISTORICAL EVIDENCE` | Resta immutabile con stato `candidate_not_integrated`. Non descrive e non sostituisce il crosswalk runtime corrente. |
@@ -252,8 +299,8 @@ Approfondimenti utili:
 | Recording visita e trascrizione locale Apple | [docs/adr/0113-recording-visita-trascrizione-locale-085.md](./adr/0113-recording-visita-trascrizione-locale-085.md) | `CANONICAL / ACCEPTED` | La 0.8.5 integra il percorso macOS 26+ con consenso esplicito, raw audio bounded solo in RAM e transcript review-first senza writer clinico. Microfono reale e validazione clinica non sono provati. |
 | Isolamento Intelligent Host, AIP e MCP | [docs/adr/0114-intelligent-host-aip-mcp-isolation.md](./adr/0114-intelligent-host-aip-mcp-isolation.md) | `CANONICAL / ACCEPTED` | Resta autorevole per isolamento, AIP, lease, revoca e hardening del trasporto. Il runtime corrente usa il Supervisor Node portabile di ADR 0117; il packet macOS #330 non è un requisito aperto della 0.8.5. |
 | Adapter ICD-11 WHO locale | [docs/adr/0115-icd11-who-reference-data-adapter.md](./adr/0115-icd11-who-reference-data-adapter.md) | `CANONICAL / ACCEPTED` | Emendamento 2026-09-06: candidato Search su sidecar loopback fisso, opt-in server, senza OAuth o fallback remoto; DTO versionato e cache legata al dataset. Provisioning manuale e prova sul target restano distinti dai test sintetici. |
-| Transizione agentica governata dello stato checkup | [docs/adr/0116-agentic-checkup-status-transition.md](./adr/0116-agentic-checkup-status-transition.md) | `CANONICAL / ACCEPTED` | Limita il write alla transizione `pending -> completed|cancelled`. La 0.8.5 collega preview solo MCP e commit Web trusted con rilettura, step-up, gesto, CAS, idempotenza, audit e receipt; l'agente non riceve proof né esegue il commit. |
-| Headless portabile agent-first e Fabric capability-first | [docs/adr/0117-headless-portable-agent-first-and-capability-first-fabric.md](./adr/0117-headless-portable-agent-first-and-capability-first-fabric.md) | `CANONICAL / ACCEPTED` | La 0.8.5 integra il Supervisor Node con Web standalone e MCP figli su IPC ereditato e il planner read-only. L’addendum 0.8.6 WUL-696 governa Mini come figlio con parità dei comandi CLI, senza nuove capability. Non dichiara installer, onboarding o compatibilità con host MCP esterni. |
+| Transizione agentica governata dello stato checkup | [docs/adr/0116-agentic-checkup-status-transition.md](./adr/0116-agentic-checkup-status-transition.md) | `CANONICAL / ACCEPTED` | Limita il write alla transizione `pending -> completed\|cancelled`. La 0.8.5 collega preview solo MCP e commit Web trusted con rilettura, step-up, gesto, CAS, idempotenza, audit e receipt; l'agente non riceve proof né esegue il commit. |
+| Headless portabile agent-first e Fabric capability-first | [docs/adr/0117-headless-portable-agent-first-and-capability-first-fabric.md](./adr/0117-headless-portable-agent-first-and-capability-first-fabric.md) | `CANONICAL / ACCEPTED` | Nella 0.8.5 collega Supervisor Node, Web standalone, MCP su IPC ereditato e planner in lettura. L’addendum 0.8.6 WUL-696 aggiunge Mini con gli stessi comandi CLI, non nuove capability; installer, onboarding e host MCP esterni richiedono prove distinte. |
 | Intelligence Fabric e controllo headless 0.8.5 | [docs/adr/0094-intelligence-fabric-headless-contract-085.md](./adr/0094-intelligence-fabric-headless-contract-085.md) | `CANONICAL / ACCEPTED` | Definisce Application Services, Fabric e AIP e registra la baseline Fabric `ocr=unavailable`. Il fallback Apple Vision appartiene alla composizione AnyDoc separata; nessuna fonte autorizza apply. |
 | Broker projection e servizi host per capability | [docs/adr/0095-broker-projection-e-servizi-host-per-capability.md](./adr/0095-broker-projection-e-servizi-host-per-capability.md) | `CANONICAL / ACCEPTED` | Fissa lifecycle post-onboarding, broker plaintext minimizzato e servizi capability-specific senza autorizzare runtime o apply. |
 | Owner di sessione, selezione e lifetime del broker | [docs/adr/0096-owner-sessione-selezione-e-lifetime-broker.md](./adr/0096-owner-sessione-selezione-e-lifetime-broker.md) | `CANONICAL / ACCEPTED` | Fissa una selezione canonica per sessione medica server, owner volatile e broker per lease senza autorizzare runtime. |
@@ -261,7 +308,7 @@ Approfondimenti utili:
 | Autorita della sorgente per Document Synthesis | [docs/adr/0102-document-synthesis-source-authority.md](./adr/0102-document-synthesis-source-authority.md) | `CANONICAL / ACCEPTED` | Fissa source-set host-owned, citazioni con locator validato e receipt finale review-only; non autorizza runtime o persistenza. |
 | Locator OCR e currentness della sorgente documentale | [docs/adr/0099-ocr-document-locator-and-source-currentness.md](./adr/0099-ocr-document-locator-and-source-currentness.md) | `CANONICAL / ACCEPTED` | Accetta `documentSourceRef`, revision ed epoch monotoni e il contratto di currentness riusato dalla nuova estrazione; non autorizza runtime OCR o apply. |
 | Estrazione locale unica degli allegati con AnyDoc | [docs/adr/0107-anydoc-local-attachment-extraction.md](./adr/0107-anydoc-local-attachment-extraction.md) | `CANONICAL / ACCEPTED` | Governa il primo passaggio deterministico locale. La 0.8.5 continua soltanto le pagine PDF `needsOcr` con Apple Vision locale, provenienza e fail-closed; `ocr=unavailable` resta lo stato della capability Fabric separata. |
-| FAQ pubbliche | [docs/FAQ.md](./FAQ.md) | `SECONDARY` | Sintesi rapida per capire cosa fa oggi MediFlow, quali sono i boundary dichiarati e come orientarsi nel progetto. |
+| FAQ pubbliche | [docs/FAQ.md](./FAQ.md) | `SECONDARY` | Risponde alle domande iniziali su prodotto, AI facoltativa, distribuzione e limiti senza sostituire i contratti. |
 | Roadmap terminologie/FSE | [docs/FSE2-terminology-roadmap.md](./FSE2-terminology-roadmap.md) | `CANONICAL` | Evoluzione codifiche cliniche e compliance documentale (coerente con ADR 0006). |
 | Matrice baseline ufficiale GTW/FSE | [docs/fse-gtw-baseline-alignment.md](./fse-gtw-baseline-alignment.md) | `CANONICAL` | Gap analysis versionata tra artifact ministeriali `it-fse-support` e stato reale MediFlow. |
 | Baseline SISS | [docs/siss-baseline.md](./siss-baseline.md) | `CANONICAL` | Stato attuale, fonti ufficiali, matrice del prototipo contestuale e sequenza `WUL-43` -> `WUL-45` -> `WUL-44` -> `WUL-178` -> `WUL-180` per l'integrazione SISS. |
@@ -275,17 +322,17 @@ Approfondimenti utili:
 | Integrazione ATHENA-style Treatment Reasoning | [docs/treatment-reasoning-athena-integration.md](./treatment-reasoning-athena-integration.md) | `SECONDARY / REVIEW-ONLY` | Mappa il percorso locale UI-controller-Fabric-ATHENA/MLX, il runner pre-provisioned, lo smoke sintetico registrato, receipt, provenienza, zero write e limiti di qualita/readiness. |
 | Parity operativa MLX benchmark-visible | [docs/mlx-operational-parity.md](./mlx-operational-parity.md) | `SECONDARY / HISTORICAL` | Conserva la baseline `WUL-165` per MLX generico. Nella 0.8.5 la sola eccezione runtime e ATHENA/MLX capability-specific per Treatment Reasoning, come registra il crosswalk corrente. |
 | Limitazioni note 0.8.5 | [docs/known-limitations.md](./known-limitations.md) | `CANONICAL` | Registra claim ceiling e residui: rete cloud live, host MCP esterni, microfono reale o validazione clinica. Distingue il fallback AnyDoc dal Fabric `ocr=unavailable` e le evidenze sorgente da quelle di pubblicazione. |
-| Walkthrough end-to-end | [docs/walkthrough.md](./walkthrough.md) | `CANONICAL` | Mappa operativa web + native + servizi locali, inclusi `home-base` read-only, document intelligence artifact-first e guard di revisione shell. |
+| Walkthrough end-to-end | [docs/walkthrough.md](./walkthrough.md) | `CANONICAL` | Segue web, native e servizi locali dal dato alla proposta: `home-base` read-only-first con scritture versionate circoscritte, artefatti documentali e guard di revisione shell. |
 | Topologia dati e flussi | [docs/topologia-dati-flussi.md](./topologia-dati-flussi.md) | `CANONICAL` | Percorsi dati digitali end-to-end (cifratura, API, storage, trust boundaries), inclusi artifact documentali cifrati e boundary `network-home-base`. |
-| Indice completo Markdown repo | [docs/markdown-index.md](./markdown-index.md) | `CANONICAL` | Elenco navigabile e descrittivo di tutti i `.md` tracciati nel repository. |
+| Indice completo Markdown repo | [docs/markdown-index.md](./markdown-index.md) | `CANONICAL` | Permette di trovare i `.md` tracciati per argomento e capire quando consultarli; non certifica il runtime. |
 | Testing app macOS | [docs/native-testing.md](./native-testing.md) | `CANONICAL` | Strategia e workflow ufficiale test native (XCTest/Xcode). |
 | Contratto design Lume macOS | [docs/design/lume/06-macos-apple-contract.md](./design/lume/06-macos-apple-contract.md) | `CANONICAL` | Contratto Lume per l'app macOS reale e la sua evoluzione in superficie nativa primaria: oggi la card clinica opaca e consegnata, mentre componenti interni e gate visuali restano parziali. La feature parity resta governata dai documenti dedicati. |
 | Verify loop e smoke paired mobile home-base | [docs/mobile-home-base-smoke.md](./mobile-home-base-smoke.md) | `SECONDARY` | Runbook operativo: gate headless sintetici obbligatori sul boundary di rete e smoke iPhone/iPad opzionale contro `home-base` reale. |
-| Deep dive tecnico architettura | [docs/ARCHITETTURA.md](./ARCHITETTURA.md) | `SECONDARY` | Approfondimento tecnico esteso. |
-| Sintesi operativa architettura | [docs/system_architecture.md](./system_architecture.md) | `SECONDARY` | Versione compatta/rapida del sistema reale su `main`, con overview su Clinical Workbench, home-base, document intelligence, SISS/FSE e guardrail locali. |
+| Deep dive tecnico architettura | [docs/ARCHITETTURA.md](./ARCHITETTURA.md) | `SECONDARY` | Approfondisce componenti, dipendenze e percorsi tecnici, senza prevalere sui contratti canonici. |
+| Sintesi operativa architettura | [docs/system_architecture.md](./system_architecture.md) | `SECONDARY` | Offre una sintesi di Clinical Workbench, home-base, documenti, SISS/FSE e presidi locali, separando fotografia 0.8.5 e quadro di pubblicazione 0.8.6. |
 | Setup client macOS, TLS locale e click-map | [docs/NATIVE.md](./NATIVE.md), [docs/native-testing.md](./native-testing.md), [docs/parity-click-map-macos.md](./parity-click-map-macos.md), [docs/native-setup.md](./native-setup.md), [docs/native-launch.md](./native-launch.md), [docs/local-api-tls.md](./local-api-tls.md) | `CANONICAL + RUNBOOK` | Materiale operativo nativo. PR #21/`WUL-401` hanno consegnato il tooling P6 di base; prerequisiti operativi e verbale manuale restano in `WUL-481`. |
-| Compliance/GDPR/FHIR | [docs/COMPLIANCE.md](./COMPLIANCE.md) | `CANONICAL` | Quadro compliance e interoperabilità. |
-| Manuale utente medico | [docs/MANUALE.md](./MANUALE.md) | `CANONICAL` | Uso prodotto lato clinico. |
+| Compliance/GDPR/FHIR | [docs/COMPLIANCE.md](./COMPLIANCE.md) | `CANONICAL` | Quadro documentale dei requisiti GDPR/FHIR e delle condizioni di scambio. |
+| Manuale utente medico | [docs/MANUALE.md](./MANUALE.md) | `CANONICAL` | Descrive l’uso dal punto di vista del medico, entro le condizioni di impiego del prodotto. |
 | ADR native token bootstrap secure-first | [docs/adr/0014-native-token-bootstrap-secure-first.md](./adr/0014-native-token-bootstrap-secure-first.md) | `CANONICAL` | Precedenza secure-first del token native (`Keychain -> config -> legacy`) e failure mode espliciti. |
 | ADR audit taxonomy minima | [docs/adr/0015-audit-taxonomy-minimum-catalog.md](./adr/0015-audit-taxonomy-minimum-catalog.md) | `CANONICAL` | Catalogo audit `audit.v1`, schema evento minimo e confini PHI-safe per log e audit record. |
 | ADR backup artifact v1 manifest/preflight | [docs/adr/0016-backup-artifact-v1-manifest-preflight.md](./adr/0016-backup-artifact-v1-manifest-preflight.md) | `CANONICAL` | Artifact backup JSON v1 con manifest, checksum e restore preflight server-side. |
@@ -308,8 +355,8 @@ Approfondimenti utili:
 | ADR intended purpose e claims guard clinico | [docs/adr/0065-intended-purpose-and-claims-guard.md](./adr/0065-intended-purpose-and-claims-guard.md) | `CANONICAL` | Fissa `WUL-279`: registra intended purpose, claim consentiti/esclusi e guard repo-local `check:claims` per prevenire overclaim su AI, SISS/FSE, cloud, diagnosi, triage, prescrizione e automazione. |
 | ADR voice visit capture Fluid-style | [docs/adr/0072-voice-visit-capture-fluid-boundary.md](./adr/0072-voice-visit-capture-fluid-boundary.md) | `CANONICAL / PROPOSED` | Conserva il confine storico local-first. La 0.8.5 usa l'implementazione Apple on-device review-first governata da ADR 0113, senza writer clinico automatico. |
 | ADR treatment reasoning ATHENA-style | [docs/adr/0073-treatment-reasoning-athena-boundary.md](./adr/0073-treatment-reasoning-athena-boundary.md) | `CANONICAL` | Fissa la lane `mediflow.treatment_reasoning.v1` separata da Smart Import: runtime locale ATHENA/MLX review-only con kill switch fail-closed, trace/report ATHENA-style e zero auto-write clinici. |
-| ADR astrazione provider AI e boundary egress | [docs/adr/0077-ai-provider-abstraction-and-egress-anonymization-boundary.md](./adr/0077-ai-provider-abstraction-and-egress-anonymization-boundary.md) | `CANONICAL` | Decisione accettata per adapter e boundary egress. La 0.8.5 integra adapter e probe amministrativa exact-intent OpenAI/Anthropic `default OFF`; usa transport fake e non prova credenziali, rete live o retention. |
-| ADR scaffold intelligente e automazione graduata | [docs/adr/0086-intelligent-scaffold-and-graded-automation-boundary.md](./adr/0086-intelligent-scaffold-and-graded-automation-boundary.md) | `CANONICAL` | Decisione `Accepted` per il programma post-0.8: separa pipeline locale, proposta, chiarimento, anteprima, autorizzazione e scrittura applicativa auditata. Non modifica il candidato 0.8; inbox conversazionale e automazione graduata restano roadmap. |
+| ADR astrazione provider AI e boundary egress | [docs/adr/0077-ai-provider-abstraction-and-egress-anonymization-boundary.md](./adr/0077-ai-provider-abstraction-and-egress-anonymization-boundary.md) | `CANONICAL` | Mantiene il confine tra provider e uscita dei dati. Nella 0.8.5 adapter e probe amministrativa exact-intent OpenAI/Anthropic sono `default OFF` e verificati con transport fake, senza prova di credenziali, rete live o retention. |
+| ADR scaffold intelligente e automazione graduata | [docs/adr/0086-intelligent-scaffold-and-graded-automation-boundary.md](./adr/0086-intelligent-scaffold-and-graded-automation-boundary.md) | `CANONICAL` | Decisione `Accepted` post-0.8: separa pipeline locale, proposta, chiarimento, anteprima, autorizzazione e scrittura applicativa registrata. Non modifica il candidato 0.8; inbox conversazionale e automazione graduata restano roadmap. |
 | ADR registro delle proposte diagnostiche documentali | [docs/adr/0087-registro-proposte-diagnostiche-documentali.md](./adr/0087-registro-proposte-diagnostiche-documentali.md) | `CANONICAL` | Decisione `Accepted`: schema, migrazione, bootstrap, backup/restore e purge includono la foundation locale separata dalle diagnosi cliniche. Writer, route, UI, transizioni e applicazione restano assenti. |
 | ADR router PDF deterministico per pagina | [docs/adr/0088-deterministic-pdf-page-router.md](./adr/0088-deterministic-pdf-page-router.md) | `CANONICAL / SUPERSEDED FOR ATTACHMENT EXTRACTION` | Conserva la decisione storica del router per pagina; ADR 0107 governa il percorso automatico incluso e non autorizza da solo un runtime OCR. |
 | ADR limite digest-bound della readiness AI locale | [docs/adr/0092-limite-digest-bound-readiness-ai-locale.md](./adr/0092-limite-digest-bound-readiness-ai-locale.md) | `CANONICAL / ACCEPTED` | Definisce un'annotazione di readiness distinta dallo stato `runtime`; il bracket resta detection best-effort. |
@@ -317,7 +364,7 @@ Approfondimenti utili:
 | ADR attese locali e collegamento prestazione-risultato | [docs/adr/0079-local-open-loops-and-result-link.md](./adr/0079-local-open-loops-and-result-link.md) | `CANONICAL` | Decisione accettata e prima slice web locale consegnata; il registro persistente resta una decisione distinta. |
 | ADR contratto export FHIR R4 v0 | [docs/adr/0081-fhir-r4-export-v0-contract.md](./adr/0081-fhir-r4-export-v0-contract.md) | `CANONICAL` | Decisione `Accepted`: fissa matrice di copertura, parità web/native e gate locale esterno per l'export-only v0. Non introduce claim FSE. |
 | ADR registro persistente delle attese v0 | [docs/adr/0082-persistent-expectations-register-v0.md](./adr/0082-persistent-expectations-register-v0.md) | `CANONICAL` | Decisione `Accepted`: definisce un registro host-only con provenienza univoca, matching fail-closed e chiusura confermata. Non dichiara runtime consegnato. |
-| Closeout evoluzione stack intelligente | [docs/analysis/2026-07-12-evoluzione-stack-intelligente-euristiche-scaffold-roadmap.md](./analysis/2026-07-12-evoluzione-stack-intelligente-euristiche-scaffold-roadmap.md) | `SECONDARY` | Riallinea provider scaffold, control-flow, attese locali e roadmap alla verita di `main`; non prevale sugli ADR. |
+| Closeout evoluzione stack intelligente | [docs/analysis/2026-07-12-evoluzione-stack-intelligente-euristiche-scaffold-roadmap.md](./analysis/2026-07-12-evoluzione-stack-intelligente-euristiche-scaffold-roadmap.md) | `SECONDARY` | Ricostruisce il consolidamento di scaffold, flusso di controllo, attese e roadmap rispetto a `main` alla data del verbale; non prevale sulle ADR o attesta revisioni successive. |
 | ADR ritiro preview profiles funzionali su `main` | [docs/adr/0050-functional-preview-profiles-retired-on-mainline.md](./adr/0050-functional-preview-profiles-retired-on-mainline.md) | `CANONICAL` | Fissa `WUL-199`: il workbench ufficiale non espone piu preview profiles runtime; AI e Smart Import restano live e il contesto paziente SISS diventa stabile nella scheda paziente. |
 | ADR architettura shared Apple client e runtime `home-base` packaged | [docs/adr/0048-apple-shared-client-architecture-and-home-base-runtime.md](./adr/0048-apple-shared-client-architecture-and-home-base-runtime.md) | `CANONICAL` | Governa `WUL-188`: core Apple condiviso, shell distinte per macOS/iPhone/iPad, Mac packaged come nodo `home-base` autorevole, client mobili paired senza accesso diretto a SQLite e parity non-AI estesa via `/api/v1/network/*`. |
 | ADR corpus documentale SISS/FSE locale | [docs/adr/0049-siss-fse-document-corpus-and-local-mcp-layer.md](./adr/0049-siss-fse-document-corpus-and-local-mcp-layer.md) | `CANONICAL` | Fissa `WUL-176`: prima corpus locale/versionato e fetch/sync controllato, poi eventuale MCP solo sopra un corpus approvato, non scraping live come sorgente primaria. |
@@ -334,25 +381,28 @@ Approfondimenti utili:
 
 ## 🗂️ File sovrapposti o secondari
 
-- [docs/product_roadmap.md](./product_roadmap.md): alias storico della roadmap prodotto, da considerare **deprecato**. La fonte attiva è [docs/ROADMAP.md](./ROADMAP.md).
-- `docs/index.html`: pagina visuale legacy utile per consultazione rapida, ma non fonte di verità per decisioni architetturali.
+[docs/product_roadmap.md](./product_roadmap.md) è l’alias storico, **deprecato**, della roadmap;
+il riferimento attivo è [docs/ROADMAP.md](./ROADMAP.md). `docs/index.html` rimane una
+pagina visuale legacy per consultazione rapida, non il documento su cui
+fondare decisioni architetturali.
 
 ## ⚙️ Regole rapide di mantenimento
 
-1. Una decisione duratura deve finire in ADR.
-3. Un cambio di direzione prodotto finisce in [docs/ROADMAP.md](./ROADMAP.md).
-4. Se un `.md` viene aggiunto/rimosso/rinominato, aggiorna [docs/markdown-index.md](./markdown-index.md).
-5. Se cambia la fonte autorevole di un tema, aggiorna questa mappa.
-6. Se due file dicono cose diverse, prevale la fonte canonica indicata sopra.
+Le decisioni durature appartengono alle ADR e i cambi di direzione prodotto
+alla [docs/ROADMAP.md](./ROADMAP.md). Quando un `.md` viene aggiunto, rimosso o
+rinominato, va aggiornato l’[docs/markdown-index.md](./markdown-index.md); se cambia il
+riferimento autorevole di un tema, va aggiornata questa mappa. In caso di
+contrasto prevale il documento canonico indicato, nel proprio ambito.
 
-- Controllo account ChatGPT, senza inferenza: [ADR 0126](./adr/0126-chatgpt-account-control-plane.md).
-- Esecuzione di sintesi con abbonamento ChatGPT, confine proposto e gate aperto:
-  [ADR 0134](./adr/0134-chatgpt-subscription-synthesis-execution.md).
-
-- Configurazione AI nativa e grant host: [ADR 0135](./adr/0135-native-ai-configuration-authority.md).
+Per ChatGPT, [ADR 0126](./adr/0126-chatgpt-account-control-plane.md) governa il controllo account senza inferenza e
+[ADR 0134](./adr/0134-chatgpt-subscription-synthesis-execution.md) il percorso di esecuzione distinto, con decisioni candidate
+e gate di ammissione: le sue prove vanno lette per data e revisione.
+[ADR 0135](./adr/0135-native-ai-configuration-authority.md) riguarda configurazione AI nativa e grant dell’host, non
+un’autorizzazione implicita derivata dall’account.
 
 ## Isolamento del launcher dei test Node
 
-[ADR 0130](./adr/0130-node-test-data-dir-preflight.md) definisce il preflight
-MEDIFLOW_DATA_DIR per scripts/run-strip-types.mjs --test e la proprietà del
-cleanup delle fixture.
+[ADR 0130](./adr/0130-node-test-data-dir-preflight.md) stabilisce il preflight MEDIFLOW_DATA_DIR per
+scripts/run-strip-types.mjs --test e attribuisce la responsabilità del
+cleanup delle fixture. La separazione del percorso di test evita di
+confondere i suoi dati con quelli dell’applicazione.
