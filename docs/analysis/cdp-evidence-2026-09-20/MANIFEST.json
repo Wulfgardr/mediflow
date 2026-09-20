@@ -1,0 +1,55 @@
+{
+  "schema": "mediflow.public-cdp-evidence-manifest.v1",
+  "classification": "synthetic minimized technical metadata; no raw CDP log or session state",
+  "files": [
+    {
+      "path": "capture-linux-01/metadata.jsonl",
+      "bytes": 250749,
+      "sha256": "fe1c9750b9b88ea52b17086d8318e047617aa426f9d7947cfd0d5c88acfcb87d",
+      "githubActionsRun": 35517771771,
+      "sourceCommit": "c5397d92e3c9c06d7ba66df960f21c4de8d4ca36"
+    },
+    {
+      "path": "capture-linux-01/status.json",
+      "bytes": 69,
+      "sha256": "73079f3c96ff710150c5dd6ee9bf9aec024721bd56cc5268890ae1639d4c3658",
+      "githubActionsRun": 35517771771,
+      "sourceCommit": "c5397d92e3c9c06d7ba66df960f21c4de8d4ca36"
+    },
+    {
+      "path": "capture-linux-02/metadata.jsonl",
+      "bytes": 241330,
+      "sha256": "95645e34e5b74579101e803640d55597f036f1819203f072f2497d45cc95f903",
+      "githubActionsRun": 35518628206,
+      "sourceCommit": "8ecf3c665b7d06af40c2c8b8f7436cb99065f61f"
+    },
+    {
+      "path": "capture-linux-02/status.json",
+      "bytes": 69,
+      "sha256": "e28db5d6bdb074d2d10eb28cc9c994b8e504d2b6fb40d14fd677769daee0194b",
+      "githubActionsRun": 35518628206,
+      "sourceCommit": "8ecf3c665b7d06af40c2c8b8f7436cb99065f61f"
+    },
+    {
+      "path": "capture-linux-03/decision.json",
+      "bytes": 4908,
+      "sha256": "c0b37d8af264f4ab5f7f419f3e6011d798bb3597087a6bed5a81dcfb92479e40",
+      "githubActionsRun": 35521466119,
+      "sourceCommit": "3dedd9c988040c4ff0d52df98725aa558ca7aa43"
+    },
+    {
+      "path": "capture-linux-03/metadata.jsonl",
+      "bytes": 635243,
+      "sha256": "345760968b384170b878b097b41083c824feebd9ef397159db44524553032c8f",
+      "githubActionsRun": 35521466119,
+      "sourceCommit": "3dedd9c988040c4ff0d52df98725aa558ca7aa43"
+    },
+    {
+      "path": "capture-linux-03/status.json",
+      "bytes": 69,
+      "sha256": "e28db5d6bdb074d2d10eb28cc9c994b8e504d2b6fb40d14fd677769daee0194b",
+      "githubActionsRun": 35521466119,
+      "sourceCommit": "3dedd9c988040c4ff0d52df98725aa558ca7aa43"
+    }
+  ]
+}

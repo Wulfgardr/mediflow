@@ -38,6 +38,10 @@ La lane backend non attesta integrazione del picker, inferenza remota o release.
 
 ## Consegna 0.8.6
 
+[Blocco diagnostico CDP](./analysis/2026-09-20-cdp-release-blocker.md): tre
+catture Linux sintetiche e metadati pubblici minimizzati. La causa resta
+irrisolta; la PR 352 è diagnostica, in bozza e non destinata al merge.
+
 [Verifica di rilascio 0.8.6](./analysis/2026-09-07-086-release-verification.md): fonte corrente
 per SHA, ricevute, correzioni PIN/allegati, test e limiti. Nessun finding
 reportabile residuo nel perimetro sorgente; pacchetto sorgente autorizzato,

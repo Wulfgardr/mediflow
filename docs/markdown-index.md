@@ -11,7 +11,7 @@ read_when:
 > GitHub mostra in alto solo alcuni file speciali (`README`, `CONTRIBUTING`, `SECURITY`, ecc.).
 > Questo file elenca invece **tutti** i `.md` tracciati nella repository con una sintesi rapida d'uso.
 
-Ultimo aggiornamento: 2026-09-08
+Ultimo aggiornamento: 2026-09-20
 
 ## Ingresso progressivo e candidatura
 
@@ -32,6 +32,10 @@ Ultimo aggiornamento: 2026-09-08
 
 <!-- @Codex -->
 ## Consegna 0.8.6
+
+[Blocco diagnostico CDP](./analysis/2026-09-20-cdp-release-blocker.md): tre
+catture Linux sintetiche con evidenza tecnica minimizzata; causa irrisolta,
+nessun fix produttivo e PR diagnostica non destinata al merge.
 
 [Piano operativo configurazione e parità desktop](./analysis/2026-09-07-086-guided-configuration-plan.md):
 sei fasi della richiesta del 7 settembre, impostazioni, ChatGPT, scelte per
