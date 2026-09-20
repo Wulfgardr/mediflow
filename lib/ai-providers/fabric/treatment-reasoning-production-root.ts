@@ -17,8 +17,17 @@ import {
 } from '../../athena-mlx-runtime';
 import { dbServer } from '../../db-server';
 import { activePatients } from '../../patient-lifecycle';
-import { acquireOrdinaryApplicationContext } from '../../security/ordinary-application-context';
-import { registerOrdinaryApplicationResource } from '../../security/ordinary-application-context';
+import {
+    acquireOrdinaryApplicationContext,
+    registerOrdinaryApplicationResource,
+} from '../../security/ordinary-application-context';
+import type { AuthenticatedWebSessionProjectionOwnerContext } from '../../security/server-auth';
+import {
+    mintResourcePort,
+    registerPrivateResource,
+    releaseResourcePort,
+    unregisterPrivateResource,
+} from '../../security/web-auth-lifecycle-owner-adapter';
 import { patients, patientsToAmbulatories, settings } from '../../schema';
 import { createHostProviderLifecycleService } from './provider-lifecycle-service';
 import { createTreatmentReasoningAuthenticatedProjectionBroker } from './treatment-reasoning-authenticated-projection';
@@ -27,6 +36,40 @@ import { createTreatmentReasoningPortableRuntime } from './treatment-reasoning-p
 import { createPortableProvisioning } from './treatment-reasoning-portable-provisioning';
 
 const lifecycle = createHostProviderLifecycleService({ provider: 'athena_mlx' }).service;
+
+/** @Codex: Web P3 resources follow the exact active cell; native keeps its existing owner path. */
+export function registerTreatmentReasoningProductionResource(
+    context: AuthenticatedWebSessionProjectionOwnerContext,
+    dispose: () => void,
+): (() => void) | null {
+    if (context.session.authChannel !== 'web') {
+        return registerOrdinaryApplicationResource(context.session.id, dispose);
+    }
+    const port = mintResourcePort(context.session);
+    if (!port) return null;
+    let registration;
+    let active = true;
+    try {
+        registration = registerPrivateResource(port, () => {
+            if (!active) return;
+            active = false;
+            dispose();
+        });
+    } catch {
+        releaseResourcePort(port);
+        return null;
+    }
+    if (!registration) {
+        releaseResourcePort(port);
+        return null;
+    }
+    return () => {
+        if (!active) return;
+        active = false;
+        try { unregisterPrivateResource(port, registration); }
+        finally { releaseResourcePort(port); }
+    };
+}
 
 const projectionBroker = createTreatmentReasoningAuthenticatedProjectionBroker({
     acquireContext: acquireOrdinaryApplicationContext,
@@ -42,7 +85,7 @@ const projectionBroker = createTreatmentReasoningAuthenticatedProjectionBroker({
             )).get();
         return Number.isSafeInteger(row?.version) ? row!.version : null;
     },
-    registerResource: (sessionId, dispose) => registerOrdinaryApplicationResource(sessionId, dispose),
+    registerResource: registerTreatmentReasoningProductionResource,
 });
 
 const killSwitch = Object.freeze({

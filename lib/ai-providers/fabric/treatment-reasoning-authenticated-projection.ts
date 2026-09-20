@@ -44,7 +44,7 @@ type Sources = Readonly<{
     clock(): string;
     entropy(): Uint8Array;
     readPatientVersion(patientId: string, ambulatoryId: string): number | null;
-    registerResource(sessionId: string, dispose: () => void): (() => void) | null;
+    registerResource(context: AuthenticatedWebSessionProjectionOwnerContext, dispose: () => void): (() => void) | null;
 }>;
 type State = Readonly<{
     projection: TreatmentReasoningProjectionAttachment;
@@ -127,7 +127,7 @@ function register(broker: Broker, context: AuthenticatedWebSessionProjectionOwne
     if (broker.disposed) fail('session_unavailable');
     if (broker.unregister) return;
     let unregister: (() => void) | null;
-    try { unregister = sources.registerResource(context.session.id, () => disposeBroker(broker)); }
+    try { unregister = sources.registerResource(context, () => disposeBroker(broker)); }
     catch { unregister = null; }
     if (!unregister) fail('session_unavailable');
     broker.unregister = unregister;
