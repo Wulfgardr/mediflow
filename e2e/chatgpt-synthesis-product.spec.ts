@@ -14,7 +14,9 @@ import { createServer as createHttpServer, request as httpRequest, type Incoming
 import { Transform, type Duplex } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { spawn, type ChildProcess } from 'node:child_process';
-import type { Browser, BrowserContext, Page, Response as BrowserResponse } from '@playwright/test';
+import type { Browser, BrowserContext, Page } from '@playwright/test';
+import { createBrowserResponseOracle, type BrowserResponseOracle, type SameResponseTicket } from './chatgpt-browser-response.ts';
+import { checkBrowserResponseContract } from './chatgpt-browser-response.contract.ts';
 import type { ProductOperation } from '../lib/chatgpt-product/product-contract';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const dataDir = process.env.MEDIFLOW_DATA_DIR;
@@ -371,6 +373,7 @@ export default function Page(){const [active,setActive]=useState(true);return <m
         await new Promise(done => setTimeout(done, 250));
     }
     const browser = await chromium.launch({ headless: true }); resources.browser = browser;
+    const oracles = new WeakMap<Page, BrowserResponseOracle>();
     async function scenario(name: string, run: (page: Page, f: ReturnType<typeof createProductFixture>) => Promise<void>, width = 1280, held = false) {
         const f = createProductFixture(); if (held) f.setQualification({ platform: 'test-unqualified', state: 'unqualified', revision: 'not-admitted', missing: ['fixture-held-test'] });
         const failures: string[] = [], expectedRootDenials = new Set<string>();
@@ -392,6 +395,7 @@ export default function Page(){const [active,setActive]=useState(true);return <m
         resources.gateways.add(gateway);
         const base = gateway.base;
         let context: BrowserContext | undefined, tearingDown = false;
+        let oracle: BrowserResponseOracle | undefined;
         await withCleanup(async () => {
             // No invented Fetch Metadata even in the negative probes. A Node HTTP
             // client sends neither Origin nor Sec-Fetch-Site: the ORIGINAL root
@@ -428,9 +432,10 @@ export default function Page(){const [active,setActive]=useState(true);return <m
                 assert.equal(f.created(), 0); assert.equal(f.transport.calls.length, 0);
             }, async () => { partial.destroy(); await within(partialClosed, WIRE_CLOSE_MS, 'PARTIAL_PROBE_CLOSE_UNCONFIRMED'); partial.removeAllListeners(); }, `${name}/partial-probe`);
             context = await browser.newContext({ viewport: { width, height: 900 }, serviceWorkers: 'block', acceptDownloads: false });
-            // This is only an egress deny-list. No local API interception/fulfill,
-            // header override, fetch replacement or Playwright metadata projection.
-            // Unmatched same-origin requests really cross the loopback HTTP wire.
+            // The callback only denies egress: no fulfillment or header override.
+            // Playwright may still enable protocol interception globally; excluding
+            // a URL from this predicate is not proof of no CDP interception.
+            // Same-origin requests really cross the owned loopback HTTP wire.
             await context.route(url => url.origin !== base, async route => {
                 if (!tearingDown) failures.push('unexpected-external-request'); await route.abort();
             });
@@ -441,6 +446,7 @@ export default function Page(){const [active,setActive]=useState(true);return <m
                 else { if (!tearingDown) failures.push('unexpected-websocket'); route.close(); }
             });
             const page = await context.newPage();
+            oracle = await createBrowserResponseOracle(page, base); oracles.set(page, oracle);
             page.on('pageerror', error => { if (!tearingDown) failures.push(error.message); });
             page.on('console', message => {
                 if (message.type() !== 'error' || tearingDown) return;
@@ -456,13 +462,13 @@ export default function Page(){const [active,setActive]=useState(true);return <m
             await expect(page.getByTestId('chatgpt-synthesis-panel')).toBeVisible();
             await expect(page.getByTestId('synthesis-state')).toContainText(held ? 'Prova sospesa' : 'In attesa del tuo consenso');
             assert.equal(f.created(), 0); assert.equal(f.transport.calls.length, 0);
-            await run(page, f); assert.deepEqual(failures, []);
+            await run(page, f); await oracle.check(); assert.deepEqual(failures, []);
             if (process.env.MEDIFLOW_UI_EVIDENCE_DIR) {
                 await mkdir(process.env.MEDIFLOW_UI_EVIDENCE_DIR, { recursive: true });
                 await page.screenshot({ path: join(process.env.MEDIFLOW_UI_EVIDENCE_DIR, `${name}.png`), fullPage: true });
             }
         }, async () => {
-            tearingDown = true;
+            tearingDown = true; oracle?.dispose();
             // Add a genuinely idle owned connection: server.close alone would not
             // prove that peers (including upgrades/partial requests) were drained.
             const idle = connectTcp({ host: '127.0.0.1', port: Number(new URL(base).port) });
@@ -500,20 +506,22 @@ export default function Page(){const [active,setActive]=useState(true);return <m
             }, `${name}/idle-probe`);
         }, `${name}/scenario`);
     }
-    function consentResponse(page: Page) {
-        const url = new URL(PRODUCT_NAMESPACE + 'consent', page.url()).href;
-        return page.waitForResponse(response => response.url() === url && response.request().method() === 'POST');
+    async function consentResponse(page: Page) {
+        const oracle = oracles.get(page); assert.ok(oracle, 'ORACLE_OWNER_MISSING');
+        return oracle.arm('consent');
     }
-    async function assertConsentResponse(pending: Promise<BrowserResponse>) {
-        const response = await pending;
+    async function assertConsentResponse(pending: SameResponseTicket) {
+        const response = await pending.response;
         assert.equal(response.status(), 200, 'Consent HTTP response must succeed BEFORE waiting for the login button');
         assert.equal(response.request().method(), 'POST');
         assert.equal(response.headers()['cache-control'], 'no-store');
-        const result = await response.json();
+        // The actual application's single read of this browser response, not a
+        // second request, reconstructed server body, or inspector-cache fallback.
+        const result = await pending.json() as { snapshot?: { state?: unknown; clinicalAdmission?: unknown } };
         assert.equal(result.snapshot?.state, 'consented'); assert.equal(result.snapshot?.clinicalAdmission, 'held');
     }
     async function consentAndLogin(page: Page, f: ReturnType<typeof createProductFixture>) {
-        const consent = consentResponse(page);
+        const consent = await consentResponse(page);
         await page.getByRole('checkbox').check(); await page.getByRole('button', { name: 'Autorizza prova DEMO' }).click();
         await assertConsentResponse(consent);
         await expect(page.getByTestId('synthesis-state')).toContainText('Consenso acquisito'); assert.equal(f.created(), 0);
@@ -531,7 +539,7 @@ export default function Page(){const [active,setActive]=useState(true);return <m
         assert.equal(f.transport.calls.filter(x => x.method === 'turn/start').length, 0);
     }
     for (const width of [1280, 390]) await t.test(`409 pending challenge survives local polls at ${width}px`, () => scenario(`login-pending-${width}`, async (page, f) => {
-        const consent = consentResponse(page);
+        const consent = await consentResponse(page);
         await page.getByRole('checkbox').check();
         await page.getByRole('button', { name: 'Autorizza prova DEMO' }).click();
         await assertConsentResponse(consent);
@@ -540,11 +548,12 @@ export default function Page(){const [active,setActive]=useState(true);return <m
         await expect(challenge).toBeVisible();
         const link = page.getByRole('link', { name: 'Apri accesso ufficiale OpenAI' });
         const originalUrl = await link.getAttribute('href'), originalCode = await challenge.locator('strong').textContent();
-        const pending = page.waitForResponse(response => response.url().endsWith(PRODUCT_NAMESPACE + 'login/complete'));
+        const oracle = oracles.get(page); assert.ok(oracle, 'ORACLE_OWNER_MISSING');
+        const pending = await oracle.arm('login/complete');
         await page.getByRole('button', { name: 'Verifica accesso' }).click();
-        assert.equal((await pending).status(), 409);
-        assert.equal((await pending).request().method(), 'POST');
-        assert.deepEqual(await (await pending).json(), { error: 'login_pending', clinicalAdmission: 'held' });
+        assert.equal((await pending.response).status(), 409);
+        assert.equal((await pending.response).request().method(), 'POST');
+        assert.deepEqual(await pending.json(), { error: 'login_pending', clinicalAdmission: 'held' });
         for (let index = 0; index < 3; index++) {
             const poll = page.waitForResponse(response => response.url().endsWith(PRODUCT_NAMESPACE + 'status'));
             await page.getByRole('button', { name: 'Rileggi stato locale' }).click(); await poll;
@@ -587,7 +596,7 @@ export default function Page(){const [active,setActive]=useState(true);return <m
         assert.equal(f.transport.calls.filter(x => x.method === 'turn/start').length, 1);
     }));
     await t.test('cancel official-login lifecycle without a catalog or turn', () => scenario('login-cancel', async (page, f) => {
-        const consent = consentResponse(page);
+        const consent = await consentResponse(page);
         await page.getByRole('checkbox').check(); await page.getByRole('button', { name: 'Autorizza prova DEMO' }).click();
         await assertConsentResponse(consent);
         await page.getByRole('button', { name: 'Avvia accesso per la prova' }).click(); await expect(page.getByTestId('execution-login')).toBeVisible();
@@ -595,7 +604,7 @@ export default function Page(){const [active,setActive]=useState(true);return <m
         assert.ok(f.transport.calls.some(x => x.method === 'account/login/cancel')); assert.equal(f.transport.calls.filter(x => x.method === 'model/list').length, 0);
     }));
     await t.test('actual owner retirement and UI lock erase metadata during login', () => scenario('owner-lock', async (page, f) => {
-        const consent = consentResponse(page);
+        const consent = await consentResponse(page);
         await page.getByRole('checkbox').check(); await page.getByRole('button', { name: 'Autorizza prova DEMO' }).click();
         await assertConsentResponse(consent);
         await page.getByRole('button', { name: 'Avvia accesso per la prova' }).click(); await expect(page.getByTestId('execution-login')).toBeVisible();
@@ -608,4 +617,6 @@ export default function Page(){const [active,setActive]=useState(true);return <m
         await expect(page.getByRole('checkbox')).toHaveCount(0);
         await expect(page.getByRole('button', { name: 'Autorizza prova DEMO' })).toHaveCount(0); assert.equal(f.created(), 0);
     }, 1280, true));
+    // Run oracle fault injection AFTER the real scenarios: it is not Next warm-up.
+    await checkBrowserResponseContract(browser, t);
 });
