@@ -8,144 +8,151 @@ read_when:
 
 # Matrice task × modello × runtime
 
-Stato al 1 settembre 2026. Issue di riferimento: `WUL-418`.
-
-Questo documento descrive il candidato sorgente locale 0.8.5. Non prova una
-release, un tag, un deploy o una verifica CI remota.
+**Fotografia del 1 settembre 2026**, riferita a `WUL-418` e al candidato
+sorgente locale 0.8.5. Le classificazioni qui conservate descrivono quel
+perimetro: non sono una prova di release, tag, deployment o CI remota.
+La pubblicazione sorgente 0.8.6 del 20 settembre 2026 non ricertifica
+retroattivamente queste righe e non ne rimuove le condizioni di promozione.
 
 ## 1. Regola principale
 
-Un modello che si carica è **fitting**. Un nuovo modello o provider è
-promuovibile in **serving** solo quando supera i gate del task reale.
+Un modello che riesce a caricarsi ha superato una prova di compatibilità con
+l’ambiente, il **fitting**. Per affidargli un compito nel percorso applicativo,
+il **serving**, occorre invece verificare proprio quel compito e le condizioni
+in cui verrà eseguito. La modularità serve a scegliere strumenti adeguati per
+funzione, non a trasferire a tutti la prova ottenuta da uno solo.
 
-Lo stato operativo corrente e la readiness WUL-418 sono due dimensioni
-distinte. `runtime` descrive un call path già presente sotto i boundary
-esistenti. Non prova da solo che la lane sia stata ricertificata contro tutti i
-gate nuovi di questo documento.
-
-Nessun task eredita provider, lifecycle, credenziali, consenso, fallback o
-grant di un altro task. Nessuna riga autorizza egress o scrittura clinica
-automatica.
+Lo stato operativo e la readiness WUL-418 sono dimensioni diverse. `runtime`
+indica un percorso già presente nei confini esistenti; non prova che sia stato
+ricertificato contro tutti i controlli di questa matrice. Nessun task eredita
+provider, ciclo di vita, credenziali, consenso, fallback o autorizzazioni di
+un altro. Nessuna riga autorizza invio di dati o scrittura clinica automatica.
 
 ### Limite della readiness locale
 
-ADR 0092 definisce l'annotazione `available_unqualified` per i percorsi Ollama
-correnti. L'annotazione riguarda readiness ed evidenza.
+Per Ollama, ADR 0092 usa l’annotazione `available_unqualified`: descrive il
+limite dell’evidenza, non un nuovo stato operativo. Non sostituisce `runtime`
+e non modifica gli stati ammessi.
 
-L'annotazione non è uno stato operativo. Non sostituisce `runtime` e non
-modifica la tabella degli stati ammessi.
+Nel comportamento documentato di Ollama 0.32.x il digest compare in `/api/tags`
+e `/api/ps`, non nella risposta di inferenza. Controllarlo prima e dopo rileva
+alcuni cambiamenti, ma non esclude uno scambio ABA `X → Y → X`. Un nuovo
+pacchetto di evidenze può quindi proporre `digest_bracketed_best_effort`;
+A3 resta `observed_not_causal` e la qualified readiness rimane `HOLD`.
 
-Ollama 0.32.x espone il digest in `/api/tags` e `/api/ps`, non nella risposta
-di inferenza. Il controllo pre/post rileva alcuni cambi, ma non impedisce lo
-swap ABA `X → Y → X`.
+Una ricevuta, il tipo, la località o l’identità del provider non autorizzano
+un consumer. [ADR 0092](./adr/0092-limite-digest-bound-readiness-ai-locale.md)
+conserva decisione e limite tecnico. Anche un endpoint loopback non dimostra
+`egress=none`: un futuro controllo local-only deve verificare modello locale,
+cloud disabilitato, strumenti, rete e processo.
 
-Un nuovo packet può proporre `digest_bracketed_best_effort`. A3 resta
-`observed_not_causal` e la qualified readiness resta `HOLD`.
-
-Nessuna receipt, tipo, località o identità del provider autorizza un consumer.
-[ADR 0092](./adr/0092-limite-digest-bound-readiness-ai-locale.md) documenta la
-decisione e il limite tecnico.
-
-Un endpoint loopback non dimostra `egress=none`. Un gate local-only futuro deve
-verificare modello locale, cloud disabilitato, strumenti, rete e processo.
-
-Lo stato mobile corrente non è un vincolo permanente. Capability Apple
-on-device e delega AI home-base richiedono un ADR separato.
+Il limite mobile osservato non è un divieto permanente. Funzioni Apple sul
+dispositivo o delega AI alla home-base richiedono una decisione separata.
 
 ### Rapporto con il contratto Intelligence Fabric
 
+La Fabric organizza l’accesso alle funzioni, ma non decide da sola se un
+modello abbia prove sufficienti per servirle.
 [ADR 0089](./adr/0089-contratto-intelligence-fabric-e-venue-esecutive.md)
-definisce capability, venue esplicite, profili egress versionati e ricevute di
-risoluzione. Questa matrice resta l'autorita sugli stati di serving dei
-modelli: una capability registrata nella fabric non promuove alcuna lane, non
-cambia gli stati ammessi e non sostituisce i gate di questo documento.
+definisce capability, sedi esplicite di esecuzione, profili di uscita versionati
+e ricevute. Questa matrice conserva l’autorità sugli stati di serving:
+registrare una capability non promuove alcun percorso e non sostituisce i
+controlli qui richiesti.
 
 [ADR 0090](./adr/0090-giunture-fabric-trust-onboarding-routing-interazione.md)
-definisce trust, onboarding, routing osservabile e review. [ADR
-0094](./adr/0094-intelligence-fabric-headless-contract-085.md) fissa i quattro
-smart path generativi. Nel Fabric generativo `ocr` resta `unavailable`; la
-composizione documentale separata continua le pagine PDF `needsOcr` con Apple
-Vision locale sul Mac. DeepSeek-OCR 2/CUDA conserva soltanto contratto e seam
-sintetiche con stato `OUT_OF_SCOPE_FOR_0.8.5_NON_BLOCKING`.
+regola fiducia, configurazione iniziale, scelta osservabile del percorso e
+revisione; [ADR 0094](./adr/0094-intelligence-fabric-headless-contract-085.md)
+individua i quattro percorsi generativi. La capability `ocr` della Fabric
+rimane `unavailable`; l’estrazione documentale separata continua soltanto le
+pagine PDF `needsOcr` con Apple Vision sul Mac. DeepSeek-OCR 2/CUDA conserva
+contratto e punti di raccordo sintetici, nello stato
+`OUT_OF_SCOPE_FOR_0.8.5_NON_BLOCKING`.
 
-Nel candidato sorgente locale 0.8.5, Patient Insight, Smart Import, Document
-Synthesis e Treatment Reasoning attraversano il Fabric end-to-end. Ogni
-production root host-owned risolve provider, modello, endpoint, venue, prompt e
-fallback. Il caller non può fornire o sovrascrivere questi valori e non può
-richiedere apply. Ogni preview espone receipt, provenienza e currentness.
+Nella 0.8.5 Patient Insight, Smart Import, Document Synthesis e Treatment
+Reasoning attraversano la Fabric end-to-end. Il production root dell’host
+risolve provider, modello, endpoint, sede, prompt e fallback: il chiamante
+non può fornirli o sovrascriverli liberamente e non può richiedere applicazione
+clinica. Ogni preview espone ricevuta, provenienza e attualità del contesto.
+Le successive preferenze ADR0129 introducono soltanto opzioni opache del
+catalogo corrente, non una scelta arbitraria né una promozione nella matrice.
 
-Quando configurati, Ollama serve le prime tre capability e ATHENA su MLX serve
-soltanto Treatment Reasoning. I lifecycle sono separati e non contengono
-segreti. I provider cloud restano disabilitati. Lo stato paired resta
-`status_only` e non concede invocazione AI ai client mobili.
+Ollama serve i primi tre percorsi quando configurato; ATHENA su MLX soltanto
+Treatment Reasoning. I cicli di vita restano separati e non contengono segreti.
+I provider esterni sono disabilitati per default. Il perimetro paired della
+matrice rimane `status_only`, senza invocazione AI dai client mobili.
 
-La lane ATHENA è inclusa soltanto con runner e modello locali configurati.
-`MEDIFLOW_ATHENA_MLX_GENERATE_BIN` può indicare un eseguibile assoluto
+ATHENA richiede runner e modello locali configurati.
+`MEDIFLOW_ATHENA_MLX_GENERATE_BIN` ammette solo un eseguibile assoluto
 `mlx_lm.generate`, senza argomenti o shell. Il launcher `uvx` predefinito resta
-offline e fallisce chiuso senza cache pre-provisioned. Nessuno dei due percorsi
-dimostra readiness universale o promuove il runtime MLX generico.
+offline e si blocca in assenza della cache già preparata. Nessuno dei percorsi
+attesta disponibilità universale o promuove MLX generico.
 
-Il modello provider v2 separa provider type, istanza, autenticazione, modello,
-capability, gruppi, binding e function allowlist. Distingue inoltre
-`local_model`, `api_key`, `provider_oauth` ufficiale e `host_subscription`.
-OpenAI e Anthropic hanno adapter HTTPS ufficiali e una probe Document Synthesis
-review-only, ma restano `default OFF`. I test usano transport fake: il tree non
-contiene credenziali, prove di rete live o readiness cloud. Login consumer e
-subscription non autorizzano inferenza.
+Provider v2 separa tipo, istanza, autenticazione, modello, capability, gruppi,
+binding e allowlist delle funzioni; distingue `local_model`, `api_key`,
+`provider_oauth` ufficiale e `host_subscription`. Gli adapter HTTPS ufficiali
+OpenAI/Anthropic e la prova Document Synthesis da rivedere restano `default OFF`.
+Le prove di questo perimetro usano trasporti simulati, non credenziali o rete
+live. Login consumer e abbonamento non autorizzano inferenza API. Il canale
+ChatGPT successivo mantiene condizioni proprie di consenso, catalogo e
+oscuramento dei dati identificativi: non modifica le righe storiche e non porta una nuova attestazione
+live consumer sul candidato finale 0.8.6.
 
-La modalità provider-in-MediFlow descrive le righe runtime di questa matrice.
-La modalità MediFlow-in-intelligent-host usa il Supervisor locale e MCP `stdio`
-sopra Application Services governati. Mini condivide catalogo e foundation CLI
-ma non ha un callsite production del Supervisor e fallisce chiuso senza parent
-AIP. La 0.8.5 non prova installer, onboarding, compatibilità con host MCP
-esterni o runtime Headless generale.
+Questa matrice descrive soprattutto **provider dentro MediFlow**. Nell’altra
+modalità, **MediFlow dentro un host intelligente**, Supervisor e MCP `stdio`
+raggiungono Application Services governati. Mini nella 0.8.5 condivideva
+catalogo e base CLI, ma non aveva un callsite di produzione del Supervisor e
+negava l’operazione senza parent AIP. Il raccordo successivo WUL-696 va letto
+nelle proprie evidenze: la 0.8.5 non provava installer, onboarding,
+compatibilità con host MCP esterni o un runtime headless generale.
 
 ## 2. Stati ammessi
 
 | Stato | Significato | Uso consentito |
 | --- | --- | --- |
-| `runtime` | Call path applicativo presente sotto i boundary esistenti | Output assistivo review-first; nessuna nuova promozione senza ricertificazione |
+| `runtime` | Percorso applicativo presente entro i confini esistenti | Risultati assistivi da rivedere; nessuna nuova promozione senza ricertificazione |
 | `shadow` | Esecuzione separata dal risultato clinico operativo | Confronto con dati sintetici o redatti |
 | `benchmark_only` | Harness o prova tecnica senza consumer clinico | Misura ripetibile |
-| `hold` | Capability proposta, incompleta o non attestata | Nessuna invocazione clinica |
-| `unavailable` | Capability classificata ma priva di runtime corrente | Nessuna invocazione finché un nuovo gate non produce contratto ed evidenza |
+| `hold` | Funzione proposta, incompleta o non attestata | Nessuna invocazione clinica |
+| `unavailable` | Funzione classificata ma senza runtime corrente | Nessuna invocazione finché un nuovo gate non produce contratto ed evidenza |
 
-Una UI, un ADR, un modello installato o un test isolato non cambiano lo stato.
+Un’interfaccia, un ADR, un modello installato o un test isolato non cambiano
+lo stato. Occorrono le condizioni previste per la transizione.
 
 ## 3. Matrice corrente
 
-`revalidation_required` significa che il call path può restare review-first, ma
-nessun cambio di modello, provider o claim è promuovibile prima di una nuova
-verifica completa.
+«Corrente» in questa tabella si riferisce alla fotografia 0.8.5 del
+1 settembre 2026, non a una nuova qualifica del 20 settembre.
+`revalidation_required` permette di conservare il percorso esistente da
+rivedere, ma impedisce di promuovere un cambio di modello, provider o
+un’affermazione più ampia prima di una verifica completa.
 
 | Task | Binding host-owned | Runtime | Stato | Disposition | Scope 0.8.5 | Readiness WUL-418 | Fallback | Limite |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `patient_insight` | `clinical` → Ollama → `qwen3.5:35b-a3b` | HTTP loopback | `runtime` | `proposal_only` | `INCLUDED` | `revalidation_required` | Nessuno | Nessuna verità o write clinica automatica |
-| `smart_import` | `clinical` → Ollama → `qwen3.5:35b-a3b` | HTTP loopback | `runtime` | `proposal_only` | `INCLUDED` | `revalidation_required` | Nessuno | Nessun import silenzioso; apply resta separato |
+| `patient_insight` | `clinical` → Ollama → `qwen3.5:35b-a3b` | HTTP loopback | `runtime` | `proposal_only` | `INCLUDED` | `revalidation_required` | Nessuno | Nessun risultato assunto come verità o scrittura clinica automatica |
+| `smart_import` | `clinical` → Ollama → `qwen3.5:35b-a3b` | HTTP loopback | `runtime` | `proposal_only` | `INCLUDED` | `revalidation_required` | Nessuno | Nessuna importazione silenziosa; l’applicazione resta separata |
 | `document_synthesis` | `reasoning` → Ollama → `qwen3.5:35b-a3b` | HTTP loopback | `runtime` | `proposal_only` | `INCLUDED` | `revalidation_required` | Nessuno | La sintesi non diventa un fatto clinico |
 | `treatment_reasoning` | ATHENA-R1-Qwen3-8B | processo MLX-LM locale su Apple Silicon | `runtime` | `proposal_only` | `INCLUDED` | `revalidation_required` | Nessuno | Nessuna prescrizione, terapia o modifica automatica |
 | `ocr` Fabric | Nessuno | Nessuna | `unavailable` | `unavailable` | `INCLUDED` come denial fail-closed/`410` autenticato | non applicabile | Nessuno attivo | Nessuna invocazione generativa nel runtime corrente |
-| Estrazione allegati | AnyDoc + Apple Vision su macOS | processi locali bounded | `runtime` deterministico | review-only | `INCLUDED` | non applicabile | Nessuno invisibile | Apple Vision riceve solo pagine PDF `needsOcr`; input non supportati falliscono chiusi |
+| Estrazione allegati | AnyDoc + Apple Vision su macOS | processi locali bounded | `runtime` deterministico | review-only | `INCLUDED` | non applicabile | Nessuno invisibile | Apple Vision riceve solo pagine PDF `needsOcr`; gli input non supportati vengono negati |
 | DeepSeek-OCR 2 selettivo | Nessun binding | seam sintetiche | `hold` | `synthetic_contract_only` | `OUT_OF_SCOPE_FOR_0.8.5_NON_BLOCKING` | `not_verified` | Nessuno | Nessun adapter runtime, E2E, benchmark italiano o soglia qualificata |
 | Redaction PII neurale | OpenMed / challenger NER | sidecar locale | `benchmark_only` | non client-facing | `INCLUDED` benchmark-only | `blocked` | Layer deterministico obbligatorio | Non abilita egress |
 | Apple Foundation Models | Nessun binding | Nessuna | `hold` | nessuna | `RELEASE_SCOPE_EXCLUDED` | `blocked` | Nessuno | Richiede decisione e gate per task |
 | MLX generico | Nessun binding applicativo | runtime MLX amministrativo/diagnostico | `benchmark_only` | non client-facing | `INCLUDED` benchmark-only | `blocked` | Nessuno | Non è la lane ATHENA e non sostituisce Ollama |
-| OpenAI / Anthropic | Profili provider v2 host-owned | adapter HTTPS ufficiali | `hold` | `probe_only / default_off` | `INCLUDED` | `not_verified` | Nessuno | Probe review-only con transport fake; nessuna credenziale, rete live o readiness cloud |
+| OpenAI / Anthropic | Profili provider v2 host-owned | adapter HTTPS ufficiali | `hold` | `probe_only / default_off` | `INCLUDED` | `not_verified` | Nessuno | Prova da rivedere con trasporti simulati; nessuna credenziale, rete live o disponibilità cloud attestata |
 
 ### Lettura della matrice
 
-- `runtime` indica un percorso review-first osservato, non autonomia clinica né
-  ricertificazione WUL-418 completa.
-- La capability Fabric `ocr` non ha un entrypoint eseguibile. La composizione
-  AnyDoc separata usa Apple Vision sul Mac solo per pagine PDF `needsOcr`.
-- DeepSeek-OCR 2 resta contrattuale e test-only; non è un fallback del percorso
-  Apple Vision e non blocca la 0.8.5.
-- Il percorso ATHENA MLX è una lane governata separata. Non eredita il registry
-  o il lifecycle Ollama.
-- Il runtime MLX generico resta benchmark-only e non dimostra readiness ATHENA.
-- `benchmark_only` e `hold` non sono opzioni selezionabili dal prodotto.
-- iPhone e iPad non invocano direttamente questi provider. I client paired
-  restano non-AI e non accedono a SQLite o al filesystem host.
+`runtime` indica un percorso osservato con revisione, non autonomia clinica o
+ricertificazione WUL-418 completa. La capability Fabric `ocr` non dispone di
+un ingresso eseguibile: AnyDoc e Apple Vision sono un percorso separato per
+le sole pagine PDF `needsOcr` supportate. DeepSeek-OCR 2 resta contrattuale e
+di test, non è un fallback di Apple Vision e non blocca la 0.8.5.
+
+ATHENA/MLX ha governo e ciclo di vita propri, senza ereditare il registry
+Ollama; MLX generico resta benchmark-only e non ne dimostra la readiness.
+`benchmark_only` e `hold` non sono scelte selezionabili dal prodotto. Nel
+perimetro paired qui registrato, iPhone e iPad non invocano direttamente i
+provider, non accedono a SQLite o al filesystem dell’host e restano non-AI.
 
 ## 4. Capability richieste per task
 
@@ -160,13 +167,15 @@ verifica completa.
 | DeepSeek-OCR 2 futuro | Vision locale per singola pagina | Adapter, E2E, benchmark sintetico italiano, soglie predefinite, provenance/hash/quality, ricomposizione e prova di località |
 | Redaction | rilevazione PII con leak proibiti a zero | Corpus governato e report ripetibile |
 
-Il manifest del provider descrive solo la capability di trasporto. La capability
-del modello deve essere attestata a runtime o da un artefatto firmato e
-verificabile. Il nome del modello non è una prova.
+Il manifest del provider descrive la capacità di trasporto, non quella del
+modello. Quest’ultima deve essere attestata durante l’esecuzione o da un
+artifact firmato e verificabile: il nome commerciale non costituisce una prova.
 
 ## 5. Serving gate minimo
 
-Ogni promozione deve produrre un packet con i gate seguenti.
+Prima di promuovere un modello o un provider occorre un pacchetto di evidenze
+che soddisfi tutti i controlli seguenti. Le condizioni di arresto restano
+vincolanti anche quando il risultato prodotto sembri plausibile.
 
 | Gate | Evidenza minima | Stop rule |
 | --- | --- | --- |
@@ -185,9 +194,9 @@ Ogni promozione deve produrre un packet con i gate seguenti.
 | Review | Output bozza con conferma umana | Auto-write o claim di verità clinica |
 | Superfici | Claim separato per localhost, macOS, iPhone e iPad | Parity dedotta da un solo host |
 
-Non esiste una soglia numerica universale per qualità, latenza o memoria. Ogni
-lane deve fissare il proprio budget prima del benchmark. Per la redaction il
-vincolo `forbiddenLeakRate = 0` resta non negoziabile.
+Non esiste una soglia universale di qualità, latenza o memoria. Ogni percorso
+deve dichiarare il proprio budget prima del benchmark; per l’oscuramento dei dati identificativi il
+vincolo `forbiddenLeakRate = 0` non è negoziabile.
 
 ## 6. Transizioni
 
@@ -195,19 +204,20 @@ vincolo `forbiddenLeakRate = 0` resta non negoziabile.
 hold → benchmark_only → shadow → runtime
 ```
 
-Una transizione richiede:
 
-1. evidenza del livello corrente;
-2. falsificatori eseguiti;
-3. review indipendente;
-4. rollback o fallback dichiarato;
-5. aggiornamento di questa matrice;
-6. nuova autorità se cambia egress, retention, schema o autonomia.
+Una transizione richiede evidenza del livello corrente, esecuzione delle prove
+capaci di smentirne l’idoneità, revisione indipendente, rollback o fallback
+dichiarato e aggiornamento di questa matrice. Se cambiano uscita dei dati,
+conservazione, schema o autonomia, occorre nuova autorità.
 
-Una regressione di località, qualità, privacy o kill switch riporta la lane a
-`hold`. Non esiste promozione automatica.
+Una regressione di località, qualità, privacy o kill-switch riporta il percorso
+a `hold`. Non esiste promozione automatica.
 
 ## 7. Mappa delle prove
+
+I percorsi seguenti individuano codice, contratti e registrazioni pertinenti
+alla matrice. Il riferimento a un file non ne estende l’evidenza oltre la
+revisione verificata.
 
 | Area | Fonte |
 | --- | --- |
@@ -236,33 +246,30 @@ Una regressione di località, qualità, privacy o kill switch riporta la lane a
 
 ## 8. Decisioni aperte
 
-- definire una prova causale adeguata prima di riesaminare la qualified
-  readiness in stato `HOLD`;
-- fissare benchmark e budget lane-specific aggiornati;
-- definire benchmark sintetico italiano e soglie prima di valutare un adapter
-  DeepSeek-OCR 2, mantenendo AnyDoc come primo passaggio e ogni dato nel
-  processo locale;
-- verificare Apple Foundation Models in WUL-417 senza promozione implicita;
-- qualificare separatamente credenziali, rete, account policy e retention prima
-  di abilitare un provider esterno;
-- ricertificare separatamente ogni modello o provider prima di cambiare il
-  binding host-owned;
-- mantenere il runtime MLX generico in `benchmark_only` senza usarlo come prova
-  della lane ATHENA.
+Prima di riesaminare la qualified readiness in `HOLD` occorre una prova causale
+adeguata, insieme a benchmark e budget aggiornati per ciascun percorso.
+Un adapter DeepSeek-OCR 2 richiede prima un benchmark sintetico italiano e
+soglie dichiarate, mantenendo AnyDoc come primo passaggio e ogni dato nel
+processo locale. Apple Foundation Models va verificato in WUL-417 senza
+promozioni implicite.
 
-Decisioni gia chiuse sulla linea post-0.8: le slice C0a-C0c di ADR 0092 sono
-state eseguite (WUL-502) e il contratto Intelligence Fabric e' definito in
+Provider esterni richiedono verifiche separate di credenziali, rete,
+politiche dell’account e conservazione. Ogni nuovo modello o provider deve
+essere ricertificato prima di modificare il binding dell’host; MLX generico
+resta `benchmark_only` e non può essere usato come prova per ATHENA.
+
+Sul percorso post-0.8 risultano invece chiuse le slice C0a-C0c di ADR 0092
+(WUL-502), e il contratto Fabric è definito in
 [ADR 0089](./adr/0089-contratto-intelligence-fabric-e-venue-esecutive.md).
-ADR 0090 e ADR 0091 chiudono il confine del candidato locale: paired solo
-status, fallback negato, nessun egress e nessuna scrittura clinica autonoma.
-ADR 0094 e il crosswalk 0.8.5 collegano i quattro smart path ai production root
-host-owned. ADR 0107 rende AnyDoc il primo passaggio documentale; il candidato
-continua le sole pagine PDF `needsOcr` con Apple Vision sul Mac. La capability
-Fabric `ocr` resta non eseguibile. DeepSeek-OCR 2/CUDA è
-`OUT_OF_SCOPE_FOR_0.8.5_NON_BLOCKING`: una direzione futura non modifica lo
-stato senza adapter, E2E, benchmark, soglie, ricomposizione e confini di egress
-verificati.
+ADR 0090 e ADR 0091 fissano il confine del candidato locale: paired solo
+stato, fallback negato, nessun invio e nessuna scrittura clinica autonoma.
+ADR 0094 e il crosswalk 0.8.5 collegano i quattro percorsi ai production root
+dell’host. ADR 0107 assegna ad AnyDoc il primo passaggio documentale; il
+candidato continua solo le pagine PDF `needsOcr` con Apple Vision sul Mac.
+`ocr` Fabric resta non eseguibile e DeepSeek-OCR 2/CUDA conserva
+`OUT_OF_SCOPE_FOR_0.8.5_NON_BLOCKING` finché manchino adapter, E2E, benchmark,
+soglie, ricomposizione e confini di uscita verificati.
 
-Queste decisioni non bloccano l'uso locale review-first già osservato come
-`runtime` sotto i boundary esistenti. Bloccano la ricertificazione WUL-418,
-nuovi modelli, nuovi provider e claim di parity.
+Queste decisioni non bloccano l’uso locale con revisione già osservato come
+`runtime` entro i confini esistenti. Bloccano la ricertificazione WUL-418,
+nuovi modelli, nuovi provider e affermazioni di parità non sostenute dalle prove.
