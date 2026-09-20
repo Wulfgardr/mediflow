@@ -10,8 +10,20 @@ type RequestEvent = { requestId: string; redirectResponse?: unknown;
   request: { url: string; method: string; headers: Headers } };
 type ResponseEvent = { requestId: string; response: { url: string; status: number } };
 type DataEvent = { requestId: string; dataLength: number; data?: string };
+type FailedEvent = { requestId: string; canceled?: boolean; errorText?: string; type?: string; blockedReason?: string };
 const header = (headers: Headers, name: string): string | undefined =>
   Object.entries(headers).find(([key]) => key.toLowerCase() === name)?.[1];
+const SAFE_RESOURCE_TYPES = new Set(['Document', 'Stylesheet', 'Image', 'Media', 'Font', 'Script', 'TextTrack', 'XHR', 'Fetch',
+  'Prefetch', 'EventSource', 'WebSocket', 'Manifest', 'SignedExchange', 'Ping', 'CSPViolationReport', 'Preflight', 'FedCM', 'Other']);
+const SAFE_BLOCKED_REASONS = new Set(['other', 'csp', 'mixed-content', 'origin', 'inspector', 'integrity', 'subresource-filter',
+  'content-type', 'coep-frame-resource-needs-coep-header', 'coop-sandboxed-iframe-cannot-navigate-to-coop-page',
+  'corp-not-same-origin', 'corp-not-same-origin-after-defaulted-to-same-origin-by-coep',
+  'corp-not-same-origin-after-defaulted-to-same-origin-by-dip',
+  'corp-not-same-origin-after-defaulted-to-same-origin-by-coep-and-dip', 'corp-not-same-site', 'sri-message-signature-mismatch']);
+const safeTerminalValue = (value: unknown, allowed: ReadonlySet<string>) =>
+  typeof value === 'string' && allowed.has(value) ? value : 'unknown';
+const safeNetworkError = (value: unknown) =>
+  typeof value === 'string' && /^net::ERR_[A-Z0-9_]{1,80}$/u.test(value) ? value : 'redacted_or_unknown';
 
 /**
  * Observe the one real project POST. Arm before clicking; no Fetch interception,
@@ -95,8 +107,14 @@ export async function observeAnyDocProjectResponse(page: Page, attachmentId: str
     if (finished) { fail('duplicate completion'); return; }
     finished = true; finish(); // May precede the stream command's Promise callback.
   };
-  const onFailed = (event: { requestId: string }) => {
-    if (!disposed && event.requestId === requestId) fail('project did not finish');
+  const onFailed = (event: FailedEvent) => {
+    if (!disposed && event.requestId === requestId) {
+      const canceled = event.canceled === undefined ? 'absent' : String(event.canceled);
+      const terminal = `status=${status ?? 'null'} received=${receivedBytes} streamed=${streamedBytes} prefix=${prefix?.length ?? 0}`
+        + ` finished=${finished} canceled=${canceled} error=${safeNetworkError(event.errorText)}`
+        + ` type=${safeTerminalValue(event.type, SAFE_RESOURCE_TYPES)} blocked=${safeTerminalValue(event.blockedReason, SAFE_BLOCKED_REASONS)}`;
+      fail(`project did not finish (${terminal})`);
+    }
   };
   const onClose = () => { if (!disposed) fail('page closed'); };
   session.on('Network.requestWillBeSent', onRequest);
