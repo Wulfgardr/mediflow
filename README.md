@@ -119,10 +119,11 @@ limiti. La risposta del modello è una proposta da esaminare.
 - **Treatment Reasoning**: supportare il riesame professionale con un percorso dedicato.
 
 Ollama può servire i primi tre percorsi. ATHENA/MLX resta opzionale per
-Treatment Reasoning e richiede configurazione e verifica locali. L’adapter
-L’integrazione con ChatGPT è disponibile solo in prove controllate e disattivata per impostazione predefinita: non esiste
-un ripiego silenzioso sul cloud. La sua presenza non prova la disponibilità di
-un account, del servizio o di un uso con dati clinici reali.
+Treatment Reasoning e richiede configurazione e verifica locali. L’integrazione
+con ChatGPT è disattivata per impostazione predefinita e disponibile solo in
+prove controllate. Il passaggio al cloud richiede sempre una scelta esplicita.
+La presenza dell’integrazione non dimostra che un account sia disponibile,
+che il servizio funzioni o che sia adatto all’uso con dati clinici reali.
 
 <details>
 <summary><strong>Perché una proposta non è ancora una modifica</strong></summary>
