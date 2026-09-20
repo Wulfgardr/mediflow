@@ -16,6 +16,7 @@ import { pipeline } from 'node:stream/promises';
 import { spawn, type ChildProcess } from 'node:child_process';
 import type { Browser, BrowserContext, Page, Response as BrowserResponse } from '@playwright/test';
 import type { ProductOperation } from '../lib/chatgpt-product/product-contract';
+import { createResponseLifetimeProbe, type ResponseLifetimeProbe } from './chatgpt-response-lifetime-probe.ts';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const dataDir = process.env.MEDIFLOW_DATA_DIR;
 assert.ok(dataDir && isAbsolute(dataDir), 'Absolute run-owned synthetic directory required');
@@ -132,7 +133,7 @@ async function replyBytes(response: Response): Promise<Buffer> {
     } catch (error) { await reader.cancel().catch(() => {}); throw error; }
     finally { reader.releaseLock(); }
 }
-async function startWireGateway(nextPort: number, f: ProductFixture, failures: string[],
+async function startWireGateway(nextPort: number, f: ProductFixture, failures: string[], probe: ResponseLifetimeProbe,
     observe: (operation: ProductOperation, url: string, response: Response, body: Buffer, headers: Headers) => void) {
     assert.ok(Number.isInteger(nextPort) && nextPort > 0 && nextPort <= 65535);
     const sockets = new Set<Duplex>(), socketClosures = new Set<Promise<void>>();
@@ -177,7 +178,11 @@ async function startWireGateway(nextPort: number, f: ProductFixture, failures: s
         const url = target(input);
         if (closing || !url || controllers.size >= WIRE_REQUEST_LIMIT) { output.writeHead(400); output.end(); return; }
         const abort = new AbortController(); controllers.add(abort);
-        const disconnect = () => { if (!abort.signal.aborted) { aborted++; abort.abort(); } };
+        let wire: number | undefined;
+        const disconnect = () => { if (!abort.signal.aborted) {
+            if (wire !== undefined) probe.wireEvent('abort', wire, output.writableFinished);
+            aborted++; abort.abort();
+        } };
         const responseClosed = () => { if (!output.writableFinished) disconnect(); };
         const deadline = setTimeout(() => { failure('WIRE_REQUEST_DEADLINE'); disconnect(); output.destroy(); }, WIRE_LIFETIME_MS);
         input.once('aborted', disconnect); input.on('error', disconnect); output.on('error', disconnect);
@@ -190,6 +195,9 @@ async function startWireGateway(nextPort: number, f: ProductFixture, failures: s
                 const operation = url.pathname.slice(PRODUCT_NAMESPACE.length);
                 if (!operations.has(operation)) { failure('WIRE_UNKNOWN_PRODUCT_ROUTE'); output.writeHead(404); output.end(); return; }
                 const observed = receivedHeaders(input);
+                wire = probe.wireRequest(operation, input.method!, observed, base);
+                const wireId = wire;
+                output.once('close', () => probe.wireEvent('close', wireId, output.writableFinished));
                 let body: Buffer | undefined;
                 if (input.method !== 'GET' && input.method !== 'HEAD') { bodyReads++; body = await requestBody(input, abort.signal); }
                 const request = new Request(url.href, { method: input.method, headers: observed, signal: abort.signal,
@@ -199,11 +207,12 @@ async function startWireGateway(nextPort: number, f: ProductFixture, failures: s
                 // call f.call/f.request/f.browser: those unit helpers add headers.
                 const response = await f.root.handle(request, operation as ProductOperation);
                 const bytes = await replyBytes(response); f.responses.push(response.status);
+                probe.wireReply(wireId, response, bytes);
                 observe(operation as ProductOperation, url.href, response, bytes, observed);
                 if (abort.signal.aborted) return;
                 // Preserve the genuine root status, headers and bytes (incl. 403/409).
                 await new Promise<void>((done, fail) => {
-                    const finish = () => { output.off('close', close); done(); };
+                    const finish = () => { probe.wireEvent('finish', wireId, output.writableFinished); output.off('close', close); done(); };
                     const close = () => { output.off('finish', finish); fail(new Error('WIRE_RESPONSE_CLOSED')); };
                     output.once('finish', finish); output.once('close', close);
                     output.writeHead(response.status, Object.fromEntries(response.headers)); output.end(bytes);
@@ -214,6 +223,7 @@ async function startWireGateway(nextPort: number, f: ProductFixture, failures: s
                 await proxy(input, output, abort.signal);
             } else { failure('WIRE_ROUTE_DENIED'); output.writeHead(404); output.end(); }
         } catch {
+            if (wire !== undefined) probe.wireEvent('error', wire, output.writableFinished);
             if (!abort.signal.aborted) failure('WIRE_REQUEST_FAILED');
             disconnect(); output.destroy(); input.destroy();
         } finally {
@@ -240,6 +250,7 @@ async function startWireGateway(nextPort: number, f: ProductFixture, failures: s
         // that pathname; input.url keeps the real query on the fixed upstream.
         // Next dev HMR is the sole upgrade. Both peers and byte-limited streams
         // belong to this gateway; even an idle upgrade is destroyed on close.
+        probe.hmrUpgrade();
         own(socket);
         const peer = connectTcp({ host: '127.0.0.1', port: nextPort }); own(peer);
         const outgoing = byteLimit(NEXT_REPLY_LIMIT), incoming = byteLimit(NEXT_REPLY_LIMIT);
@@ -371,11 +382,19 @@ export default function Page(){const [active,setActive]=useState(true);return <m
         await new Promise(done => setTimeout(done, 250));
     }
     const browser = await chromium.launch({ headless: true }); resources.browser = browser;
+    const responseProbes = new WeakMap<BrowserResponse, ResponseLifetimeProbe>();
+    const consentProbes = new WeakMap<Promise<BrowserResponse>, ResponseLifetimeProbe>();
+    const pageProbes = new WeakMap<Page, ResponseLifetimeProbe>();
+    async function observedJson(response: BrowserResponse) {
+        const probe = responseProbes.get(response); assert.ok(probe, 'RESPONSE_PROBE_OWNER_MISSING');
+        return probe.json(response);
+    }
     async function scenario(name: string, run: (page: Page, f: ReturnType<typeof createProductFixture>) => Promise<void>, width = 1280, held = false) {
         const f = createProductFixture(); if (held) f.setQualification({ platform: 'test-unqualified', state: 'unqualified', revision: 'not-admitted', missing: ['fixture-held-test'] });
         const failures: string[] = [], expectedRootDenials = new Set<string>();
+        const probe = createResponseLifetimeProbe(); probe.phase('scenario-start');
         let gateway: WireGateway;
-        try { gateway = await startWireGateway(port, f, failures, (operation, url, response, body, observedHeaders) => {
+        try { gateway = await startWireGateway(port, f, failures, probe, (operation, url, response, body, observedHeaders) => {
             if (operation === 'consent' && response.ok) {
                 assert.ok(observedHeaders.get('sec-fetch-site') === 'same-origin', 'Accepted consent lacks received browser same-origin metadata');
                 assert.ok(observedHeaders.get('origin') === gateway.base, 'Accepted consent lacks the exact received browser origin');
@@ -388,11 +407,11 @@ export default function Page(){const [active,setActive]=useState(true);return <m
             } else if (response.status === 401 && name === 'owner-lock' && ['cancel', 'status'].includes(operation)) {
                 expectedRootDenials.add(`${url}|${response.status}`);
             }
-        }); } catch (error) { f.dispose(); throw error; }
+        }); } catch (error) { probe.dispose(); f.dispose(); throw error; }
         resources.gateways.add(gateway);
         const base = gateway.base;
         let context: BrowserContext | undefined, tearingDown = false;
-        await withCleanup(async () => {
+        try { await withCleanup(async () => {
             // No invented Fetch Metadata even in the negative probes. A Node HTTP
             // client sends neither Origin nor Sec-Fetch-Site: the ORIGINAL root
             // must return its genuine 403, with no owner/process/protocol work.
@@ -441,6 +460,7 @@ export default function Page(){const [active,setActive]=useState(true);return <m
                 else { if (!tearingDown) failures.push('unexpected-websocket'); route.close(); }
             });
             const page = await context.newPage();
+            pageProbes.set(page, probe); probe.attach(page, base, response => responseProbes.set(response, probe));
             page.on('pageerror', error => { if (!tearingDown) failures.push(error.message); });
             page.on('console', message => {
                 if (message.type() !== 'error' || tearingDown) return;
@@ -456,12 +476,15 @@ export default function Page(){const [active,setActive]=useState(true);return <m
             await expect(page.getByTestId('chatgpt-synthesis-panel')).toBeVisible();
             await expect(page.getByTestId('synthesis-state')).toContainText(held ? 'Prova sospesa' : 'In attesa del tuo consenso');
             assert.equal(f.created(), 0); assert.equal(f.transport.calls.length, 0);
+            probe.phase('ui-ready');
             await run(page, f); assert.deepEqual(failures, []);
+            probe.phase('scenario-work-succeeded');
             if (process.env.MEDIFLOW_UI_EVIDENCE_DIR) {
                 await mkdir(process.env.MEDIFLOW_UI_EVIDENCE_DIR, { recursive: true });
                 await page.screenshot({ path: join(process.env.MEDIFLOW_UI_EVIDENCE_DIR, `${name}.png`), fullPage: true });
             }
         }, async () => {
+            probe.phase('scenario-cleanup-start');
             tearingDown = true;
             // Add a genuinely idle owned connection: server.close alone would not
             // prove that peers (including upgrades/partial requests) were drained.
@@ -476,8 +499,8 @@ export default function Page(){const [active,setActive]=useState(true);return <m
                 // Attempt both closes even if one throws synchronously. Collect all
                 // rejections without skipping idle-peer proof, disposal or wire checks.
                 const outcomes = await Promise.allSettled([
-                    Promise.resolve().then(() => context ? within(context.close(), WIRE_CLOSE_MS, 'UI_CONTEXT_EXIT_UNCONFIRMED') : undefined),
-                    Promise.resolve().then(() => gateway.close()),
+                    Promise.resolve().then(() => { probe.phase('context-close-start'); return context ? within(context.close(), WIRE_CLOSE_MS, 'UI_CONTEXT_EXIT_UNCONFIRMED') : undefined; }),
+                    Promise.resolve().then(() => { probe.phase('gateway-close-start'); return gateway.close(); }),
                 ]);
                 const cleanupFailures: StepFailure[] = outcomes.flatMap((outcome, index) => outcome.status === 'rejected'
                     ? [{ phase: `${name}/${index === 0 ? 'context-close' : 'gateway-close'}`, error: outcome.reason }] : []);
@@ -499,17 +522,29 @@ export default function Page(){const [active,setActive]=useState(true);return <m
                 throwStepFailures(cleanupFailures);
             }, `${name}/idle-probe`);
         }, `${name}/scenario`);
+            probe.phase('scenario-succeeded');
+        } catch (error) {
+            probe.phase('scenario-failed');
+            // Emit only technical metadata, AFTER bounded cleanup; keep the exact
+            // original error (including AggregateError/cause) as the test failure.
+            t.diagnostic(JSON.stringify({ scenario: name, ...probe.snapshot() }));
+            throw error;
+        } finally { probe.dispose(); }
     }
     function consentResponse(page: Page) {
         const url = new URL(PRODUCT_NAMESPACE + 'consent', page.url()).href;
-        return page.waitForResponse(response => response.url() === url && response.request().method() === 'POST');
+        const probe = pageProbes.get(page); assert.ok(probe, 'CONSENT_PROBE_OWNER_MISSING');
+        const pending = page.waitForResponse(response => response.url() === url && response.request().method() === 'POST');
+        consentProbes.set(pending, probe); probe.phase('consent-wait-armed');
+        return pending;
     }
     async function assertConsentResponse(pending: Promise<BrowserResponse>) {
         const response = await pending;
         assert.equal(response.status(), 200, 'Consent HTTP response must succeed BEFORE waiting for the login button');
         assert.equal(response.request().method(), 'POST');
         assert.equal(response.headers()['cache-control'], 'no-store');
-        const result = await response.json();
+        consentProbes.get(pending)?.phase('consent-http-asserted');
+        const result = await observedJson(response);
         assert.equal(result.snapshot?.state, 'consented'); assert.equal(result.snapshot?.clinicalAdmission, 'held');
     }
     async function consentAndLogin(page: Page, f: ReturnType<typeof createProductFixture>) {
@@ -544,7 +579,7 @@ export default function Page(){const [active,setActive]=useState(true);return <m
         await page.getByRole('button', { name: 'Verifica accesso' }).click();
         assert.equal((await pending).status(), 409);
         assert.equal((await pending).request().method(), 'POST');
-        assert.deepEqual(await (await pending).json(), { error: 'login_pending', clinicalAdmission: 'held' });
+        assert.deepEqual(await observedJson(await pending), { error: 'login_pending', clinicalAdmission: 'held' });
         for (let index = 0; index < 3; index++) {
             const poll = page.waitForResponse(response => response.url().endsWith(PRODUCT_NAMESPACE + 'status'));
             await page.getByRole('button', { name: 'Rileggi stato locale' }).click(); await poll;

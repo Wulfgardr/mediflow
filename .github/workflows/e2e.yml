@@ -135,9 +135,22 @@ jobs:
       # independent marked synthetic directory.
       - name: Run ChatGPT product browser harness
         run: |
-          CHATGPT_PRODUCT_DATA_DIR="$(mktemp -d "${RUNNER_TEMP}/mediflow-chatgpt-product.XXXXXX")"
-          MEDIFLOW_DATA_DIR="${CHATGPT_PRODUCT_DATA_DIR}" \
-            node scripts/chatgpt-product-focused-tests.mjs --browser-only
+          # @Codex: one diagnostic execution on the failing Linux environment.
+          # The wrapper runs the unchanged canonical command, retains its exit
+          # code, and persists only allowlisted synthetic protocol metadata.
+          bash scripts/chatgpt-cdp-diagnostic/run-capture.sh \
+            "$GITHUB_WORKSPACE" "${RUNNER_TEMP}/chatgpt-cdp-diagnostic"
+
+      - name: Upload synthetic CDP diagnostic metadata
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chatgpt-cdp-diagnostic
+          path: |
+            ${{ runner.temp }}/chatgpt-cdp-diagnostic/metadata.jsonl
+            ${{ runner.temp }}/chatgpt-cdp-diagnostic/status.json
+          if-no-files-found: ignore
+          retention-days: 7
 
       # Seconda fase di `npm run check:terminology-parity`, l'unica che non
       # girava da nessuna parte. Avvia un proprio Next dev su 127.0.0.1:3200 in
