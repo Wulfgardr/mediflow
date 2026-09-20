@@ -75,9 +75,28 @@ public final class MediFlowMacSceneModel: ObservableObject {
     /// has no window at all until the panel is answered: the user sees a Dock
     /// icon and nothing else, with no statement of what is being waited on.
     @Published private(set) var workspaceModel: PairedPatientsWorkspaceModel?
+    @Published private(set) var startupError: String?
     let capabilities = ClinicalWorkspaceCapabilitiesStore()
+    private let storageProvider: () throws -> MediFlowMacStoragePair
 
     public init() {
+        storageProvider = Self.processStores
+        configureLaunchOverrides()
+    }
+
+    init(storageFactory: MediFlowMacStorageFactory) {
+        storageProvider = storageFactory.makeStores
+        configureLaunchOverrides()
+    }
+
+    private static func processStores() throws -> MediFlowMacStoragePair {
+        struct ProcessStorage {
+            static let result = Result { try MediFlowMacStorageFactory().makeStores() }
+        }
+        return try ProcessStorage.result.get()
+    }
+
+    private func configureLaunchOverrides() {
         let overrides = AppleFoundationLaunchOverrides.load()
         if let initial = overrides.initialSection {
             section = ClinicalWorkspaceSection(legacy: initial)
@@ -85,12 +104,17 @@ public final class MediFlowMacSceneModel: ObservableObject {
         launchDynamicTypeSizeOverride = overrides.dynamicTypeSizeOverride
     }
 
-    let launchDynamicTypeSizeOverride: DynamicTypeSize?
+    private(set) var launchDynamicTypeSizeOverride: DynamicTypeSize?
 
     /// Called from the root view's `task`, so the window is on screen first.
     func prepareWorkspaceIfNeeded() {
-        guard workspaceModel == nil else { return }
-        workspaceModel = PairedPatientsWorkspaceModel()
+        guard workspaceModel == nil, startupError == nil else { return }
+        do {
+            let stores = try storageProvider()
+            workspaceModel = PairedPatientsWorkspaceModel(pairedStore: stores.pairedStore, cacheStore: stores.cacheStore)
+        } catch {
+            startupError = error.localizedDescription
+        }
     }
 
     /// Whether the current section can accept a new patient. The menu item stays
@@ -288,10 +312,10 @@ public struct MediFlowMacRootView: View {
     /// is happening, because the wait can include a system Keychain panel.
     private var startupState: some View {
         VStack(spacing: 10) {
-            ProgressView()
-            Text("Apertura dell'archivio locale")
+            if scene.startupError == nil { ProgressView() }
+            Text(scene.startupError == nil ? "Apertura dell'archivio locale" : "Archivio locale non disponibile")
                 .font(.headline)
-            Text("MediFlow sta leggendo le credenziali di collegamento dal portachiavi. Se macOS chiede l'autorizzazione, la finestra resta disponibile.")
+            Text(scene.startupError ?? "MediFlow sta leggendo le credenziali di collegamento dal portachiavi. Se macOS chiede l'autorizzazione, la finestra resta disponibile.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)

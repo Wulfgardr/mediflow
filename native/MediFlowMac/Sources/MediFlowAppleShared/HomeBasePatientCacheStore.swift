@@ -99,11 +99,14 @@ struct HomeBasePatientCacheStore {
     private let maxCacheAge: TimeInterval
 
     init(fileManager: FileManager = .default, cacheDirectory: URL? = nil,
-         keyProvider: @escaping () throws -> SymmetricKey = HomeBasePatientCacheStore.loadOrCreateCacheKey,
+         keyProvider: @escaping () throws -> SymmetricKey = { try HomeBasePatientCacheStore.loadOrCreateCacheKey() },
+         identityCacheLoader: ((String, String) throws -> SymmetricKey)? = nil,
+         cacheService: String = HomeBasePatientCacheStore.defaultService,
+         cacheAccount: String = HomeBasePatientCacheStore.defaultAccount,
          now: @escaping () -> Date = Date.init, maxCacheAge: TimeInterval = 24 * 60 * 60) {
         self.fileManager = fileManager
         self.cacheDirectory = cacheDirectory ?? Self.defaultCacheDirectory(fileManager: fileManager)
-        self.keyProvider = keyProvider
+        self.keyProvider = identityCacheLoader.map { loader in { try loader(cacheService, cacheAccount) } } ?? keyProvider
         self.now = now
         self.maxCacheAge = min(max(maxCacheAge, 0), 24 * 60 * 60)
     }
@@ -218,11 +221,14 @@ struct HomeBasePatientCacheStore {
         return fileManager.temporaryDirectory.appendingPathComponent("MediFlow", isDirectory: true)
     }
 
-    private static func loadOrCreateCacheKey() throws -> SymmetricKey {
+    static func loadOrCreateCacheKey(
+        service: String = HomeBasePatientCacheStore.defaultService,
+        account: String = HomeBasePatientCacheStore.defaultAccount
+    ) throws -> SymmetricKey {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: defaultService,
-            kSecAttrAccount as String: defaultAccount,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne
         ]
