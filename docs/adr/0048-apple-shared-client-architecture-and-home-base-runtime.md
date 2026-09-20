@@ -167,6 +167,54 @@ La revoca remota non puo essere verificata durante un'interruzione di rete:
 la cache resta una lettura storica entro il TTL, mai prova di autorita corrente.
 Questa precisazione non attesta parity completa ne verifica UI/device.
 
+## Isolamento persistente della candidata QA Mac (WUL-689, 2026-09-20)
+
+La copia QA Release deve esercitare lo stesso client e lo stesso Portachiavi
+senza leggere, sovrascrivere o cancellare credenziali e cache dell'installazione
+ordinaria. HOME, directory dati e bundle identifier differenti non isolano da
+soli i service Keychain fissi. Il caricamento pazienti persiste sia il pairing
+sia la cache: isolare soltanto il token paired e insufficiente.
+
+Il confezionamento canonico accetta esplicitamente
+`MEDIFLOW_MAC_QA_NAMESPACE`, composto da esattamente 32 caratteri esadecimali
+minuscoli. Un valore presente ma vuoto o malformato interrompe la build prima
+di mutazioni. Prima della firma, il builder inserisce il selettore non segreto
+`MediFlowQAStorageNamespace` in Info.plist e l'identita di copia
+`com.mediflow.qa.<namespace>`, con nome QA e senza handler URL dell'app ordinaria.
+La build ordinaria non inserisce il selettore e conserva il comportamento attuale.
+
+Il bootstrap Mac risolve una volta il selettore e inietta insieme entrambi gli
+store, prima di costruire qualsiasi workspace, in tutte le finestre:
+
+- Pairing: service `com.mediflow.home-base-paired.qa.<namespace>`, account
+  `paired-client-token` e dominio UserDefaults separato per lo stesso namespace.
+- Cache cifrata: service `com.mediflow.home-base-patient-cache.qa.<namespace>`,
+  account `cache-key-v1` e directory esplicita
+  `Application Support/MediFlow-QA/<namespace>`, distinta da `MediFlow`.
+
+Non si accettano service, account o percorsi arbitrari. Un selettore errato,
+incoerente con l'identita QA o uno store QA non costruibile impedisce la
+costruzione del workspace; non esiste fallback allo store ordinario. Una copia
+identificata come QA priva del selettore e parimenti rifiutata. Non si deriva il
+namespace da URL, credenziali, HOME o bundle identifier, ne si leggono o copiano
+i dati personali per inizializzarlo. La selezione persiste al riavvio della
+stessa copia; copie con namespace differenti non condividono gli store.
+
+Lettura, scrittura, token vuoto, clear e persistenza implicita usano sempre lo
+store selezionato. Le operazioni Security, cifratura AES-GCM, provenienza e TTL
+della cache restano reali e invariati. Nessun bypass Keychain in Release e
+nessuna modifica di login, TLS, sessioni, capability, API, supervisore o autorita
+clinica. I dialoghi di sistema del nuovo item QA restano possibili.
+
+Le prove distinguono selezione e instradamento con spy, round-trip di cache
+sintetiche separate, operazioni Keychain reali su soli item QA e percorso
+Release con backend sintetico. La ricevuta collega sorgenti, build, metadata
+pre-firma e copia eseguita. Non si legge il Portachiavi personale per confronti
+prima/dopo. Questo isolamento non sostituisce le quattro prove reali di
+ADR0134, i dinieghi del client o la revisione competente WUL-688.
+
+Impatto sui contratti API: nessuno (`no contract impact`).
+
 ## Conseguenze
 
 Positivo:
