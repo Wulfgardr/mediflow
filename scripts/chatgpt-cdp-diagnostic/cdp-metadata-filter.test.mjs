@@ -100,3 +100,31 @@ test('execution context reset, loader commits, cancellation and detach are obser
     assert.equal(out[0].main,true); assert.equal(out[2].failure,'aborted'); assert.equal(out[4].action,'reloadPage');
     assert.equal(out[5].detachedSession,out[0].session); assert.equal(JSON.stringify(out).includes('NEVER_LOG_ME'),false);
 });
+
+
+test('same-context armed/checkpoint sequences survive both protocol and scenario allowlists', () => {
+    const {out,p,send,recv}=fixture();
+    recv({sessionId:'s',method:'Runtime.executionContextCreated',params:{context:{id:3,auxData:{frameId:'f'}}}});
+    for (const [event,pageSequence] of [['probe/armed',1],['probe/checkpoint',19]]) {
+        recv({sessionId:'s',method:'Runtime.consoleAPICalled',params:{type:'debug',executionContextId:3,args:[{type:'string',value:
+            '[mediflow-response-lifetime]'+JSON.stringify({schema:'mediflow.synthetic-response-lifetime-page.v1',event,pageSequence,secret:'NEVER_LOG_ME'})}]}});
+    }
+    p.line('# '+JSON.stringify({schema:'mediflow.synthetic-response-lifetime.v1',complete:true,gatewayPort:4567,startedAtUnixMs:10,
+        events:[{event:'page/probe/armed',sequence:1,pageSequence:1},{event:'page/probe/checkpoint',sequence:2,pageSequence:19}]}));
+    send({sessionId:'s',id:1,method:'Network.getResponseBody',params:{requestId:'r'}});recv({sessionId:'s',id:1,result:{body:'x'}});
+    const summary=p.finish();
+    assert.equal(summary.pageProbeEvents,2); assert.equal(summary.pageProbeIncomplete,false);
+    const callers=out.filter(row=>row.kind==='page-probe');
+    assert.deepEqual(callers.map(row=>row.pageSequence),[1,19]);
+    assert.equal(callers[0].session,callers[1].session);assert.equal(callers[0].context,callers[1].context);assert.equal(callers[0].frame,callers[1].frame);
+    assert.deepEqual(out.filter(row=>row.kind==='scenario-event').map(row=>row.pageSequence),[1,19]);
+    assert.equal(JSON.stringify(out).includes('NEVER_LOG_ME'),false);
+});
+
+test('negative or nonintegral page sequences are not normalized into a complete prefix', () => {
+    const {out,p,recv}=fixture();
+    for (const pageSequence of [-1,1.5,'1']) recv({sessionId:'s',method:'Runtime.consoleAPICalled',params:{type:'debug',executionContextId:1,args:[{type:'string',value:
+        '[mediflow-response-lifetime]'+JSON.stringify({schema:'mediflow.synthetic-response-lifetime-page.v1',event:'probe/checkpoint',pageSequence})}]}});
+    p.finish(); assert.equal(out.filter(row=>row.kind==='page-probe').length,3);
+    assert.ok(out.filter(row=>row.kind==='page-probe').every(row=>!('pageSequence' in row)));
+});

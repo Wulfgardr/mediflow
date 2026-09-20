@@ -41,8 +41,8 @@ function failureClass(text: string | undefined): string {
 export function installPageResponseLifetimeProbe(realm: typeof globalThis = globalThis) {
     const PREFIX = '[mediflow-response-lifetime]';
     const marker = Symbol.for('mediflow.synthetic-response-lifetime-page.v1');
-    const owned = realm as typeof globalThis & { [marker]?: boolean };
-    if (owned[marker]) return; owned[marker] = true;
+    const owned = realm as typeof globalThis & { [marker]?: () => void };
+    if (owned[marker]) return;
     const NS = '/api/settings/ai/chatgpt/synthesis/';
     const OPS = new Set(['status', 'prepare', 'consent', 'login/start', 'login/complete', 'login/cancel', 'read', 'models', 'generate', 'cancel', 'logout']);
     const LIMIT = 256, statesByResponse = new WeakMap<Response, State>(), statesByStream = new WeakMap<ReadableStream, State>();
@@ -53,11 +53,11 @@ export function installPageResponseLifetimeProbe(realm: typeof globalThis = glob
         : stack.includes('setActive') ? 'setActive' : /(?:\bat |@)run\b/u.test(stack) ? 'run' : 'other'; };
     const emit = (event: string, state: State | null, fields: Record<string, string | number | boolean> = {}) => {
         if (emitted >= LIMIT) {
-            if (emitted++ === LIMIT) try { realm.console.debug(PREFIX + JSON.stringify({ schema: 'mediflow.synthetic-response-lifetime-page.v1', event: 'probe/overflow' })); } catch { /* diagnostic only */ }
+            if (emitted++ === LIMIT) try { realm.console.debug(PREFIX + JSON.stringify({ schema: 'mediflow.synthetic-response-lifetime-page.v1', event: 'probe/overflow', pageSequence: LIMIT + 1 })); } catch { /* diagnostic only */ }
             return;
         }
         emitted++;
-        try { realm.console.debug(PREFIX + JSON.stringify({ schema: 'mediflow.synthetic-response-lifetime-page.v1', event,
+        try { realm.console.debug(PREFIX + JSON.stringify({ schema: 'mediflow.synthetic-response-lifetime-page.v1', event, pageSequence: emitted,
             ...(state ? { operation: state.operation, counter: state.counter } : {}), ...fields })); } catch { /* diagnostic only */ }
     };
     const operation = (input: RequestInfo | URL): string | null => {
@@ -134,6 +134,10 @@ export function installPageResponseLifetimeProbe(realm: typeof globalThis = glob
             { doneSeen: state.doneSeen, bytesRead: state.bytesRead, callSite: site() });
         return abort.apply(this, args);
     };
+    // A same-context, pre-cleanup fence for the existing observer, not another
+    // read or a new observation layer. Sequence gaps prohibit negative inference.
+    owned[marker] = () => emit('probe/checkpoint', null);
+    emit('probe/armed', null);
 }
 
 export function createResponseLifetimeProbe() {
@@ -201,13 +205,13 @@ export function createResponseLifetimeProbe() {
                         if (value && typeof value === 'object' && 'schema' in value && value.schema === 'mediflow.synthetic-response-lifetime-page.v1'
                             && 'event' in value && typeof value.event === 'string') {
                             const scalars = value as Record<string, unknown>;
-                            const allowedEvents = new Set(['probe/overflow', 'fetch/call', 'fetch/resolved', 'fetch/rejected', 'response/body', 'stream/get-reader',
+                            const allowedEvents = new Set(['probe/overflow', 'probe/armed', 'probe/checkpoint', 'fetch/call', 'fetch/resolved', 'fetch/rejected', 'response/body', 'stream/get-reader',
                                 'stream/cancel-call', 'reader/read-call', 'reader/read-settled', 'reader/read-rejected', 'reader/cancel-call',
                                 'abort-controller/call', 'signal/abort']);
                             const operation = 'operation' in value && typeof value.operation === 'string' && operations.has(value.operation) ? value.operation : 'other';
                             const callSite = 'callSite' in value && ['readResponse', 'setActive', 'run', 'other'].includes(String(value.callSite)) ? String(value.callSite) : 'other';
                             if (allowedEvents.has(value.event)) { if (value.event === 'probe/overflow') pageProbeOverflow = true; record(`page/${value.event}`, { operation, callSite,
-                                ...(['counter', 'read', 'bytes', 'bytesRead'] as const).reduce<Fields>((fields, key) => {
+                                ...(['counter', 'read', 'bytes', 'bytesRead', 'pageSequence'] as const).reduce<Fields>((fields, key) => {
                                     const current = scalars[key]; if (typeof current === 'number' && Number.isSafeInteger(current) && current >= 0) fields[key] = current; return fields;
                                 }, {}), ...(['done', 'doneSeen', 'signal', 'signalAborted'] as const).reduce<Fields>((fields, key) => {
                                     const current = scalars[key]; if (typeof current === 'boolean') fields[key] = current; return fields;
@@ -256,6 +260,16 @@ export function createResponseLifetimeProbe() {
     }
     return {
         async arm(context: BrowserContext): Promise<void> { await context.addInitScript(installPageResponseLifetimeProbe as () => void); },
+        async checkpoint(context: BrowserContext): Promise<void> {
+            const pages = context.pages();
+            if (pages.length !== 1) throw new Error('CALLER_CHECKPOINT_PAGE_AMBIGUOUS');
+            await pages[0].evaluate(() => {
+                const marker = Symbol.for('mediflow.synthetic-response-lifetime-page.v1');
+                const checkpoint = (globalThis as typeof globalThis & { [marker]?: () => void })[marker];
+                if (typeof checkpoint !== 'function') throw new Error('CALLER_CHECKPOINT_NOT_ARMED');
+                checkpoint();
+            });
+        },
         attach,
         phase(phase: Phase) { record(phase); },
         wireRequest(operation: string, method: string, received: Headers, origin: string): number {

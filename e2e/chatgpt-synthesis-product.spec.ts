@@ -411,6 +411,7 @@ export default function Page(){const [active,setActive]=useState(true);return <m
         resources.gateways.add(gateway);
         const base = gateway.base;
         let context: BrowserContext | undefined, tearingDown = false;
+        const scenarioFailures: StepFailure[] = [];
         try { await withCleanup(async () => {
             // No invented Fetch Metadata even in the negative probes. A Node HTTP
             // client sends neither Origin nor Sec-Fetch-Site: the ORIGINAL root
@@ -484,6 +485,10 @@ export default function Page(){const [active,setActive]=useState(true);return <m
                 await mkdir(process.env.MEDIFLOW_UI_EVIDENCE_DIR, { recursive: true });
                 await page.screenshot({ path: join(process.env.MEDIFLOW_UI_EVIDENCE_DIR, `${name}.png`), fullPage: true });
             }
+        }, () => withCleanup(async () => {
+            // Diagnostic barrier only, after the ORIGINAL work/body read. Even a
+            // failed/timed-out checkpoint must proceed through every original close.
+            if (context) await within(probe.checkpoint(context), 5000, 'CALLER_CHECKPOINT_UNCONFIRMED');
         }, async () => {
             probe.phase('scenario-cleanup-start');
             tearingDown = true;
@@ -522,15 +527,19 @@ export default function Page(){const [active,setActive]=useState(true);return <m
                 catch (error) { cleanupFailures.push({ phase: `${name}/wire-observations`, error }); }
                 throwStepFailures(cleanupFailures);
             }, `${name}/idle-probe`);
-        }, `${name}/scenario`);
+        }, `${name}/caller-checkpoint`), `${name}/scenario`);
             probe.phase('scenario-succeeded');
         } catch (error) {
             probe.phase('scenario-failed');
-            // Emit only technical metadata, AFTER bounded cleanup; keep the exact
-            // original error (including AggregateError/cause) as the test failure.
-            t.diagnostic(JSON.stringify({ scenario: name, ...probe.snapshot() }));
-            throw error;
-        } finally { probe.dispose(); }
+            scenarioFailures.push({ phase: `${name}/scenario`, error });
+        } finally {
+            // Both outcomes need the wire-byte witness; a PASS is not a repair.
+            // Preserve original work/cleanup errors, and always retire listeners.
+            try { t.diagnostic(JSON.stringify({ scenario: name, ...probe.snapshot() })); }
+            catch (error) { scenarioFailures.push({ phase: `${name}/diagnostic`, error }); }
+            finally { probe.dispose(); }
+        }
+        throwStepFailures(scenarioFailures);
     }
     function consentResponse(page: Page) {
         const url = new URL(PRODUCT_NAMESPACE + 'consent', page.url()).href;

@@ -11,7 +11,7 @@ const METHODS = new Set(['Network.enable','Network.disable','Network.setCacheDis
     'Page.navigate','Target.closeTarget','Target.detachFromTarget','Browser.close']);
 const HMR = new Set(['sync','building','built','reloadPage','serverComponentChanges','serverOnlyChanges','serverError']);
 const PAGE_PREFIX = '[mediflow-response-lifetime]';
-const PAGE_EVENTS = new Set(['probe/overflow','fetch/call','fetch/resolved','fetch/rejected','response/body','stream/get-reader','stream/cancel-call',
+const PAGE_EVENTS = new Set(['probe/overflow','probe/armed','probe/checkpoint','fetch/call','fetch/resolved','fetch/rejected','response/body','stream/get-reader','stream/cancel-call',
     'reader/read-call','reader/read-settled','reader/read-rejected','reader/cancel-call','abort-controller/call','signal/abort']);
 function failure(text) {
     if (typeof text !== 'string') return 'other';
@@ -38,9 +38,9 @@ export function createReducer(emit, { recordLimit = 12000, mapLimit = 4096 } = {
     function output(value) { if (records++ < recordLimit) emit(value); else dropped++; }
     function pageProbe(p) {
         if (!p || p.schema !== 'mediflow.synthetic-response-lifetime-page.v1' || !PAGE_EVENTS.has(p.event)
-            || p.event !== 'probe/overflow' && !OPS.has(p.operation)) return null;
+            || !['probe/overflow','probe/armed','probe/checkpoint'].includes(p.event) && !OPS.has(p.operation)) return null;
         const value = { kind:'page-probe', event:p.event, ...(OPS.has(p.operation) ? {operation:p.operation} : {}) };
-        for (const k of ['counter','read','bytes','bytesRead']) if (Number.isSafeInteger(p[k]) && p[k] >= 0) value[k] = p[k];
+        for (const k of ['counter','read','bytes','bytesRead','pageSequence']) if (Number.isSafeInteger(p[k]) && p[k] >= 0) value[k] = p[k];
         for (const k of ['done','doneSeen','signal','signalAborted']) if (typeof p[k] === 'boolean') value[k] = p[k];
         if (['readResponse','setActive','run','other'].includes(p.callSite)) value.callSite = p.callSite;
         if (['abort','other'].includes(p.failure)) value.failure = p.failure;
@@ -74,8 +74,8 @@ export function createReducer(emit, { recordLimit = 12000, mapLimit = 4096 } = {
                 if (p.schema !== 'mediflow.synthetic-response-lifetime.v1' || !Array.isArray(p.events)) return;
                 if (p.complete !== true) originalProbeIncomplete = true;
                 output({ kind: 'scenario', startedAtUnixMs: Number(p.startedAtUnixMs), port: Number(p.gatewayPort), complete: p.complete === true });
-                const eventNames = /^(?:scenario-(?:start|work-succeeded|cleanup-start|succeeded|failed)|ui-ready|consent-(?:wait-armed|http-asserted)|(?:context|gateway)-close-start|body\/read-(?:start|succeeded|failed)|wire\/(?:request|root-body-ready|finish|close|abort|error|hmr-upgrade)|browser\/(?:request|response|requestfinished|requestfailed|main-frame-commit|frame-detached|page-closed|page-crashed|context-closed|disconnected|hmr-console|hmr-socket|hmr-frame|hmr-closed)|page\/(?:probe\/overflow|fetch\/(?:call|resolved|rejected)|response\/body|stream\/(?:get-reader|cancel-call)|reader\/(?:read-call|read-settled|read-rejected|cancel-call)|abort-controller\/call|signal\/abort))$/u;
-                const numbers = ['sequence','milliseconds','request','wire','status','bytes','document','counter','read','bytesRead'];
+                const eventNames = /^(?:scenario-(?:start|work-succeeded|cleanup-start|succeeded|failed)|ui-ready|consent-(?:wait-armed|http-asserted)|(?:context|gateway)-close-start|body\/read-(?:start|succeeded|failed)|wire\/(?:request|root-body-ready|finish|close|abort|error|hmr-upgrade)|browser\/(?:request|response|requestfinished|requestfailed|main-frame-commit|frame-detached|page-closed|page-crashed|context-closed|disconnected|hmr-console|hmr-socket|hmr-frame|hmr-closed)|page\/(?:probe\/(?:overflow|armed|checkpoint)|fetch\/(?:call|resolved|rejected)|response\/body|stream\/(?:get-reader|cancel-call)|reader\/(?:read-call|read-settled|read-rejected|cancel-call)|abort-controller\/call|signal\/abort))$/u;
+                const numbers = ['sequence','milliseconds','request','wire','status','bytes','document','counter','read','bytesRead','pageSequence'];
                 const bools = ['originMatches','fetchSameOrigin','json','finished','noStore','serviceWorker','navigation','redirected','main','reload','rebuilding','done','doneSeen','signal','signalAborted'];
                 const allowedStrings = new Set([...OPS,...HMR,'unknown','document','next-static','hmr','other-local','external','invalid-url','other','GET','POST','abort','aborted','failed','connection','incomplete-body','none','cdp-body-resource-missing','cdp-body-evicted','target-closed','cdp-body-other','invalid-json']);
                 for (const e of p.events.slice(0,512)) {

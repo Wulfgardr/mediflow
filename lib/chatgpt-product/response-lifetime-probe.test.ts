@@ -171,7 +171,15 @@ test('page probe forwards original fetch/read/cancel promises and objects exactl
     assert.strictEqual(setActive(), cancelPromise);
     function run() { new realm.AbortController().abort(); } run();
     assert.equal(cancelCalls, 1); assert.equal(abortCalls, 1);
+    const checkpoint = (realm as unknown as Record<symbol, () => void>)[Symbol.for('mediflow.synthetic-response-lifetime-page.v1')];
+    assert.equal(typeof checkpoint, 'function');
+    checkpoint();
+    isolatedInstall(realm as never); // Reinstall must not wrap or emit twice.
     const events = messages.map(line => JSON.parse(line.slice(line.indexOf('{'))));
+    assert.equal(events[0].event, 'probe/armed');
+    assert.equal(events.at(-1).event, 'probe/checkpoint');
+    assert.deepEqual(events.map(event => event.pageSequence), events.map((_, index) => index + 1));
+    assert.equal(fetchCalls, 1); assert.equal(readerCalls, 2); assert.equal(cancelCalls, 1); assert.equal(abortCalls, 1);
     assert.deepEqual(events.filter(event => event.event === 'reader/read-settled').map(event => ({ done: event.done, bytes: event.bytes })),
         [{ done: false, bytes: 3 }, { done: true, bytes: 0 }]);
     assert.deepEqual(events.filter(event => event.event === 'reader/cancel-call').map(event => ({ doneSeen: event.doneSeen, bytesRead: event.bytesRead })),
@@ -199,4 +207,41 @@ test('page probe returns the original rejected read promise and records only bou
     await assert.rejects(returned, error => error === original); await Promise.resolve();
     assert.equal(messages.some(line => line.includes('DO_NOT_LOG')), false);
     assert.equal(messages.some(line => line.includes('reader/read-rejected')), true);
+});
+
+
+test('checkpoint executes once in the original single page and does not read a body', async () => {
+    const probe = createResponseLifetimeProbe(); let checkpoints = 0, evaluates = 0;
+    const sandbox = { [Symbol.for('mediflow.synthetic-response-lifetime-page.v1')]: () => { checkpoints++; } };
+    const context = { pages: () => [{ evaluate: async (fn: () => void) => {
+        evaluates++; return runInNewContext(`(${fn.toString()})()`, sandbox);
+    } }] };
+    await probe.checkpoint(context as never);
+    assert.equal(checkpoints, 1); assert.equal(evaluates, 1);
+    assert.equal(probe.snapshot().events.length, 0); probe.dispose();
+});
+
+test('missing, multiple or unarmed pages cannot yield a caller checkpoint', async () => {
+    const probe = createResponseLifetimeProbe();
+    for (const pages of [[], [{}, {}]]) {
+        await assert.rejects(probe.checkpoint({ pages: () => pages } as never), /CALLER_CHECKPOINT_PAGE_AMBIGUOUS/u);
+    }
+    await assert.rejects(probe.checkpoint({ pages: () => [{ evaluate: async (fn: () => void) =>
+        runInNewContext(`(${fn.toString()})()`, {}) }] } as never), /CALLER_CHECKPOINT_NOT_ARMED/u);
+    probe.dispose();
+});
+
+test('checkpoint transport failure is rethrown unchanged; a complete prefix never hides overflow', async () => {
+    const probe = createResponseLifetimeProbe(), failure = new Error('synthetic checkpoint failure');
+    await assert.rejects(probe.checkpoint({ pages: () => [{ evaluate: async () => { throw failure; } }] } as never), error => error === failure);
+    const f = fixture(); probe.attach(f.typedPage, origin);
+    for (const [event, pageSequence] of [['probe/armed', 1], ['probe/overflow', 257]] as const) {
+        f.page.emit('console', { text: () => '[mediflow-response-lifetime]' + JSON.stringify({
+            schema: 'mediflow.synthetic-response-lifetime-page.v1', event, pageSequence, secret: 'DO_NOT_LOG',
+        }) });
+    }
+    const snapshot = probe.snapshot();
+    assert.equal(snapshot.complete, false); assert.equal(snapshot.pageProbeOverflow, true);
+    assert.equal(snapshot.events[0].pageSequence, 1); assert.equal(snapshot.events[1].pageSequence, 257);
+    assert.equal(JSON.stringify(snapshot).includes('DO_NOT_LOG'), false); probe.dispose();
 });
