@@ -124,5 +124,5 @@ test('canonical browser safeguards remain present and target visible translated 
     assert.match(spec, /held \? 'Prova sospesa' : 'In attesa del tuo consenso'/);
     assert.match(spec, /getByText\('Verifiche della postazione incomplete\.[^']+', \{ exact: true \}\)\)\.toBeVisible\(\)/);
     assert.match(spec, /getByTestId\('synthesis-state'\)\)\.toContainText\('In attesa dell’accesso OpenAI'\)/);
-    assert.match(spec, /assert\.equal\(\(await pending\)\.status\(\), 409\)/);
+    assert.match(spec, /assert\.equal\(\(await pending\.response\)\.status\(\), 409\)/);
 });
