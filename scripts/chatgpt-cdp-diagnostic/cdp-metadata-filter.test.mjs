@@ -56,6 +56,29 @@ test('page lifetime console diagnostics retain only allowlisted stream metadata'
     ]);
     assert.equal(JSON.stringify(out).includes('NEVER_LOG_ME'),false); assert.equal(p.finish().malformed,1);
 });
+test('extracts one prefixed Runtime console string with session/frame correlation and no raw console data', () => {
+    const {out,p,send,recv}=fixture();
+    recv({sessionId:'page-session',method:'Runtime.executionContextCreated',params:{context:{id:7,origin:'NEVER_LOG_ME',name:'NEVER_LOG_ME',auxData:{frameId:'raw-frame-secret'}}}});
+    recv({sessionId:'page-session',method:'Network.loadingFailed',params:{requestId:'r',canceled:true,errorText:'net::ERR_ABORTED'}});
+    const value='[mediflow-response-lifetime]'+JSON.stringify({schema:'mediflow.synthetic-response-lifetime-page.v1',event:'reader/cancel-call',operation:'consent',counter:4,doneSeen:true,bytesRead:31,callSite:'readResponse',secret:'NEVER_LOG_ME'});
+    recv({sessionId:'page-session',method:'Runtime.consoleAPICalled',params:{type:'debug',executionContextId:7,args:[{type:'string',value,description:'NEVER_LOG_ME'}],stackTrace:{description:'NEVER_LOG_ME'}}});
+    recv({sessionId:'page-session',method:'Runtime.consoleAPICalled',params:{type:'debug',executionContextId:7,args:[{type:'string',value},{type:'string',value:'NEVER_LOG_ME'}]}});
+    recv({sessionId:'page-session',method:'Runtime.consoleAPICalled',params:{type:'log',executionContextId:7,args:[{type:'string',value:'NEVER_LOG_ME'}]}});
+    send({sessionId:'page-session',id:9,method:'Network.getResponseBody',params:{requestId:'r'}}); recv({sessionId:'page-session',id:9,result:{body:'x'}});
+    const event=out.find(x=>x.kind==='page-probe'); const network=out.find(x=>x.method==='Network.loadingFailed');
+    assert.equal(event.session,network.session); assert.match(event.context,/^c\d+$/u); assert.match(event.frame,/^f\d+$/u);
+    assert.deepEqual({event:event.event,operation:event.operation,counter:event.counter,doneSeen:event.doneSeen,bytesRead:event.bytesRead,callSite:event.callSite},
+        {event:'reader/cancel-call',operation:'consent',counter:4,doneSeen:true,bytesRead:31,callSite:'readResponse'});
+    const summary=p.finish(); assert.equal(summary.pageProbeEvents,1); assert.equal(summary.complete,true);
+    assert.equal(JSON.stringify(out).includes('NEVER_LOG_ME'),false); assert.equal(JSON.stringify(out).includes('raw-frame-secret'),false);
+});
+test('Runtime page-probe overflow is retained and makes capture incomplete', () => {
+    const {out,p,send,recv}=fixture();
+    recv({sessionId:'s',method:'Runtime.consoleAPICalled',params:{type:'debug',executionContextId:1,args:[{type:'string',value:'[mediflow-response-lifetime]'+JSON.stringify({schema:'mediflow.synthetic-response-lifetime-page.v1',event:'probe/overflow'})}]}});
+    send({sessionId:'s',id:1,method:'Network.getResponseBody',params:{requestId:'r'}}); recv({sessionId:'s',id:1,result:{body:'x'}});
+    const summary=p.finish(); assert.equal(out.find(x=>x.kind==='page-probe').event,'probe/overflow');
+    assert.equal(summary.pageProbeIncomplete,true); assert.equal(summary.complete,false);
+});
 test('stream filter handles split UTF-8 and oversized lines without outputting raw text', async () => {
     const valid=format('SEND',{sessionId:'s',id:1,method:'Network.getResponseBody',params:{requestId:'r'}})+'\n';
     const reply=format('RECV',{sessionId:'s',id:1,result:{body:'é漢',base64Encoded:false}})+'\n';

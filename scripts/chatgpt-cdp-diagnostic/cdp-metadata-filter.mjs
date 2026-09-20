@@ -10,6 +10,9 @@ const METHODS = new Set(['Network.enable','Network.disable','Network.setCacheDis
     'Fetch.continueRequest','Fetch.fulfillRequest','Fetch.failRequest','Network.getResponseBody',
     'Page.navigate','Target.closeTarget','Target.detachFromTarget','Browser.close']);
 const HMR = new Set(['sync','building','built','reloadPage','serverComponentChanges','serverOnlyChanges','serverError']);
+const PAGE_PREFIX = '[mediflow-response-lifetime]';
+const PAGE_EVENTS = new Set(['probe/overflow','fetch/call','fetch/resolved','fetch/rejected','response/body','stream/get-reader','stream/cancel-call',
+    'reader/read-call','reader/read-settled','reader/read-rejected','reader/cancel-call','abort-controller/call','signal/abort']);
 function failure(text) {
     if (typeof text !== 'string') return 'other';
     if (text.includes('No data found for resource with given identifier')) return 'resource-missing';
@@ -20,9 +23,9 @@ function failure(text) {
     return 'other';
 }
 export function createReducer(emit, { recordLimit = 12000, mapLimit = 4096 } = {}) {
-    let records = 0, dropped = 0, malformed = 0, protocol = 0, bodyCommands = 0, bodyErrors = 0;
-    let overflow = false, inputIncomplete = false, originalProbeIncomplete = false;
-    const aliases = new Map(), pending = new Map(), websockets = new Set();
+    let records = 0, dropped = 0, malformed = 0, protocol = 0, bodyCommands = 0, bodyErrors = 0, pageProbeEvents = 0;
+    let overflow = false, inputIncomplete = false, originalProbeIncomplete = false, pageProbeIncomplete = false;
+    const aliases = new Map(), pending = new Map(), websockets = new Set(), executionFrames = new Map();
     function alias(kind, raw) {
         if (typeof raw !== 'string' && typeof raw !== 'number') return null;
         const key = `${kind}:${raw}`;
@@ -33,6 +36,17 @@ export function createReducer(emit, { recordLimit = 12000, mapLimit = 4096 } = {
         return aliases.get(key);
     }
     function output(value) { if (records++ < recordLimit) emit(value); else dropped++; }
+    function pageProbe(p) {
+        if (!p || p.schema !== 'mediflow.synthetic-response-lifetime-page.v1' || !PAGE_EVENTS.has(p.event)
+            || p.event !== 'probe/overflow' && !OPS.has(p.operation)) return null;
+        const value = { kind:'page-probe', event:p.event, ...(OPS.has(p.operation) ? {operation:p.operation} : {}) };
+        for (const k of ['counter','read','bytes','bytesRead']) if (Number.isSafeInteger(p[k]) && p[k] >= 0) value[k] = p[k];
+        for (const k of ['done','doneSeen','signal','signalAborted']) if (typeof p[k] === 'boolean') value[k] = p[k];
+        if (['readResponse','setActive','run','other'].includes(p.callSite)) value.callSite = p.callSite;
+        if (['abort','other'].includes(p.failure)) value.failure = p.failure;
+        pageProbeEvents++; if (p.event === 'probe/overflow') pageProbeIncomplete = true;
+        return value;
+    }
     function route(raw) {
         try {
             const u = new URL(raw);
@@ -54,14 +68,7 @@ export function createReducer(emit, { recordLimit = 12000, mapLimit = 4096 } = {
             try {
                 const p = JSON.parse(raw.slice(start));
                 if (p.schema === 'mediflow.synthetic-response-lifetime-page.v1') {
-                    const events = new Set(['probe/overflow','fetch/call','fetch/resolved','fetch/rejected','response/body','stream/get-reader','stream/cancel-call',
-                        'reader/read-call','reader/read-settled','reader/read-rejected','reader/cancel-call','abort-controller/call','signal/abort']);
-                    if (!events.has(p.event) || p.event !== 'probe/overflow' && !OPS.has(p.operation)) { malformed++; return; }
-                    const v = { kind:'page-probe', event:p.event, ...(OPS.has(p.operation) ? {operation:p.operation} : {}) };
-                    for (const k of ['counter','read','bytes','bytesRead']) if (Number.isSafeInteger(p[k]) && p[k] >= 0) v[k] = p[k];
-                    for (const k of ['done','doneSeen','signal','signalAborted']) if (typeof p[k] === 'boolean') v[k] = p[k];
-                    if (['readResponse','setActive','run','other'].includes(p.callSite)) v.callSite = p.callSite;
-                    if (['abort','other'].includes(p.failure)) v.failure = p.failure;
+                    const v = pageProbe(p); if (!v) { malformed++; return; }
                     output(v); return;
                 }
                 if (p.schema !== 'mediflow.synthetic-response-lifetime.v1' || !Array.isArray(p.events)) return;
@@ -73,6 +80,7 @@ export function createReducer(emit, { recordLimit = 12000, mapLimit = 4096 } = {
                 const allowedStrings = new Set([...OPS,...HMR,'unknown','document','next-static','hmr','other-local','external','invalid-url','other','GET','POST','abort','aborted','failed','connection','incomplete-body','none','cdp-body-resource-missing','cdp-body-evicted','target-closed','cdp-body-other','invalid-json']);
                 for (const e of p.events.slice(0,512)) {
                     if (!eventNames.test(e.event)) { malformed++; continue; }
+                    if (e.event === 'page/probe/overflow') pageProbeIncomplete = true;
                     const v = { kind: 'scenario-event', event: e.event, port: Number(p.gatewayPort), startedAtUnixMs: Number(p.startedAtUnixMs) };
                     for (const k of numbers) if (typeof e[k] === 'number' && Number.isFinite(e[k])) v[k] = e[k];
                     for (const k of bools) if (typeof e[k] === 'boolean') v[k] = e[k];
@@ -92,6 +100,7 @@ export function createReducer(emit, { recordLimit = 12000, mapLimit = 4096 } = {
         const session = alias('s', envelope.sessionId ?? 'browser'), key = `${envelope.sessionId ?? 'browser'}:${envelope.id}`;
         const prefix = { kind: 'cdp', at: raw.slice(0,marker).match(/\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z/u)?.[0] ?? null, session, direction };
         const p = envelope.params ?? {}, m = envelope.method;
+        const executionKey = `${envelope.sessionId ?? 'browser'}:${p.executionContextId ?? p.context?.id}`;
         const request = () => alias('r', p.requestId);
         if (direction === 'send') {
             if (!METHODS.has(m)) return;
@@ -127,6 +136,20 @@ export function createReducer(emit, { recordLimit = 12000, mapLimit = 4096 } = {
         }
         let v;
         switch (m) {
+            case 'Runtime.executionContextCreated': {
+                if (!Number.isSafeInteger(p.context?.id) || (typeof p.context?.auxData?.frameId !== 'string' && typeof p.context?.auxData?.frameId !== 'number')) return;
+                if (executionFrames.size >= mapLimit) { overflow = true; return; }
+                executionFrames.set(executionKey, alias('f',p.context.auxData.frameId)); return;
+            }
+            case 'Runtime.executionContextDestroyed': executionFrames.delete(executionKey); return;
+            case 'Runtime.consoleAPICalled': {
+                if (p.type !== 'debug' || !Array.isArray(p.args) || p.args.length !== 1 || p.args[0]?.type !== 'string'
+                    || typeof p.args[0].value !== 'string' || !p.args[0].value.startsWith(PAGE_PREFIX)) return;
+                let observed;
+                try { observed = JSON.parse(p.args[0].value.slice(PAGE_PREFIX.length)); } catch { malformed++; return; }
+                const safe = pageProbe(observed); if (!safe) { malformed++; return; }
+                v = { ...safe, context: alias('c',p.executionContextId), frame: executionFrames.get(executionKey) ?? null }; break;
+            }
             case 'Network.requestWillBeSent': v = { request: request(), ...route(p.request?.url), httpMethod: method(p.request?.method), frame: alias('f',p.frameId), loader: alias('l',p.loaderId), redirect: !!p.redirectResponse }; break;
             case 'Network.responseReceived': v = { request: request(), ...route(p.response?.url), status: p.response?.status, loader: alias('l',p.loaderId), frame: alias('f',p.frameId), serviceWorker: p.response?.fromServiceWorker === true }; break;
             case 'Network.loadingFinished': v = { request: request(), bytes: p.encodedDataLength }; break;
@@ -134,7 +157,11 @@ export function createReducer(emit, { recordLimit = 12000, mapLimit = 4096 } = {
             case 'Fetch.requestPaused': v = { fetchRequest: request(), networkRequest: alias('r',p.networkId), ...route(p.request?.url), httpMethod: method(p.request?.method), responseStage: p.responseStatusCode !== undefined }; break;
             case 'Page.frameNavigated': v = { frame: alias('f',p.frame?.id), loader: alias('l',p.frame?.loaderId), main: !p.frame?.parentId, ...route(p.frame?.url) }; break;
             case 'Page.frameDetached': v = { frame: alias('f',p.frameId), swap: p.reason === 'swap' }; break;
-            case 'Runtime.executionContextsCleared': v = {}; break;
+            case 'Runtime.executionContextsCleared': {
+                const prefix = `${envelope.sessionId ?? 'browser'}:`;
+                for (const key of executionFrames.keys()) if (key.startsWith(prefix)) executionFrames.delete(key);
+                v = {}; break;
+            }
             case 'Target.attachedToTarget': v = { attachedSession: alias('s',p.sessionId), target: alias('t',p.targetInfo?.targetId) }; break;
             case 'Target.detachedFromTarget': v = { detachedSession: alias('s',p.sessionId), target: alias('t',p.targetId) }; break;
             case 'Network.webSocketCreated': {
@@ -156,9 +183,9 @@ export function createReducer(emit, { recordLimit = 12000, mapLimit = 4096 } = {
     return { line, incomplete() { inputIncomplete = true; },
         finish() {
             const result = { kind: 'capture-summary', schema: 'mediflow.cdp-metadata.v1', protocol, bodyCommands, bodyErrors,
-                emitted: Math.min(records,recordLimit), dropped, malformed, overflow, inputIncomplete, originalProbeIncomplete,
+                emitted: Math.min(records,recordLimit), dropped, malformed, overflow, inputIncomplete, originalProbeIncomplete, pageProbeEvents, pageProbeIncomplete,
                 pendingBodyCommands: [...pending.values()].filter(x => x.method === 'Network.getResponseBody').length,
-                complete: protocol > 0 && bodyCommands > 0 && !dropped && !malformed && !overflow && !inputIncomplete && !originalProbeIncomplete };
+                complete: protocol > 0 && bodyCommands > 0 && !dropped && !malformed && !overflow && !inputIncomplete && !originalProbeIncomplete && !pageProbeIncomplete };
             emit(result); return result;
         } };
 }
