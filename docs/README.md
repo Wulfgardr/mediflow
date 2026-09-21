@@ -36,6 +36,15 @@ WUL-688 e il coordinamento generale in [WUL-669](https://linear.app/wulfgardr/is
 non chiude l’intero programma né qualifica servizi solo configurati.
 
 <!-- @Codex -->
+## Pianificazione corrente
+
+La [roadmap prodotto](./ROADMAP.md#roadmap-vigente--21-settembre-2026) riporta
+le tappe 0.9.0–1.0 definite nel
+[registro incrementale Linear](https://linear.app/wulfgardr/document/mediflow-incremental-release-ledger-090-to-10-ee0392f27b72).
+La 0.9.0 consolida il prodotto attuale; servizi condivisi, Rust,
+interoperabilità e distribuzione nativa hanno tappe successive distinte.
+I precedenti rinvii generici alla 1.0 restano storia, non il piano corrente.
+
 ## Percorsi di lettura
 
 Per una prima visita, [Inizia qui](./start-here.md) e il [README del progetto](../README.md) spiegano
