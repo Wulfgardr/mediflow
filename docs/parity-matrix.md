@@ -12,18 +12,21 @@ Ultimo aggiornamento: 2026-09-06 (riconciliazione testuale della sorgente Apple 
 
 ## Gate MediFlow 0.8
 
-La base congelata del packet parity è
+Per leggere la matrice occorre separare il contratto funzionale dalle prove
+eseguite sulle singole revisioni. Il pacchetto parity parte dalla base congelata
 `2355a46a4dde63b1956a2298d99ef0b5c4208222`, tree
-`c46d739b026e509a3e1fae2348372a420c9a17aa`. Il commit finale della candidata è
-registrato nel run record dopo la verifica post-commit.
+`c46d739b026e509a3e1fae2348372a420c9a17aa`; il commit finale della candidata
+viene registrato nel run record dopo la verifica successiva al commit.
 
-Il contratto funzionale resta `PARTIAL`: 13 capability sono parziali e 23 sono
-intenzionalmente host-only. Questo stato non blocca da solo una candidata
-sorgente, ma non sostituisce i gate di interazione e i receipt exact-SHA del
-closeout.
+Il contratto funzionale rimane `PARTIAL`: 13 funzionalità sono parziali e 23
+sono intenzionalmente riservate all'host. Questo stato non blocca da solo una
+candidata sorgente, ma nemmeno sostituisce le verifiche dell'interazione o le
+ricevute di chiusura sulla SHA esatta. La distribuzione sorgente 0.8.6 e il
+seguito nativo restano quindi distinti; pubblicare i sorgenti non promuove
+questa matrice a parità completa.
 
-Il gate di promozione resta `HOLD_PROMOTION`. Le prove automatiche e le
-interazioni reali registrate restano evidenza della rispettiva baseline. Sul
+La promozione rimane `HOLD_PROMOTION`, perché prove automatiche e interazioni
+reali valgono per la baseline su cui sono state eseguite. Sul
 runtime `29b2c94b6a044b1639137403a2228ff172ea3d0f`, tree
 `5706ade800d6a8caf2ab875882f61fe0881b3dd5`, la sessione web con VoiceOver è
 terminale `PASS_BOUNDED`: Chrome production era in primo piano, VoiceOver era
@@ -34,13 +37,13 @@ VoiceOver reale su iPhone e iPad non è provato perché l'API pubblica della bet
 Xcode 27 non raggiunge uno stato terminale nel simulatore: questa è una deroga
 esterna accettata, non un PASS, e non autorizza claim App Store o di conformità.
 
-Lume è il linguaggio comune. Liquid Glass è una declinazione nativa Apple e non
-viene copiata come identità CSS. La parity riguarda capacità, semantica,
-gerarchia, stati, sicurezza e riconoscibilità. Navigazione, densità, controlli e
-input restano specifici della piattaforma.
-
-Una differenza documentata di piattaforma non è un gap. Lo è una funzione
-necessaria che manca nel perimetro dichiarato.
+La parità serve a riconoscere e completare le stesse operazioni, non a
+riprodurre la stessa interfaccia. Lume fornisce il linguaggio comune; Liquid
+Glass è una declinazione nativa Apple, non un'identità da copiare in CSS.
+Capacità, significato, gerarchia, stati, sicurezza e riconoscibilità devono
+restare coerenti, mentre navigazione, densità, controlli e modalità di input
+seguono la piattaforma. Una differenza documentata non è quindi una mancanza;
+lo è una funzione necessaria ma assente dal perimetro dichiarato.
 
 ## Perimetro
 
@@ -50,11 +53,12 @@ Questa matrice confronta:
 - **macOS**: il bundle Apple/home-base con shell clinica condivisa;
 - **iPhone/iPad**: client paired sul boundary `/api/v1/network/*`.
 
-La fonte machine-readable è
+Il contratto leggibile dagli strumenti è
 [docs/apple-parity-matrix.json](./apple-parity-matrix.json). Il manifest
-[docs/apple-wide-qa-manifest.json](./apple-wide-qa-manifest.json) verifica invece
-24 acceptance record tecnici e i contratti di rete: una capability QA
-`covered` non equivale automaticamente a feature parity completa.
+[docs/apple-wide-qa-manifest.json](./apple-wide-qa-manifest.json) ha un compito
+diverso: verifica 24 record tecnici di accettazione e i contratti di rete.
+Per questo lo stato QA `covered` non dimostra automaticamente una parità
+funzionale completa.
 
 Riferimenti architetturali:
 
@@ -65,7 +69,9 @@ Riferimenti architetturali:
 
 ## Due assi distinti
 
-La feature parity e la interaction parity sono indipendenti.
+Una funzione può essere presente senza che il suo percorso d'uso sia stato
+verificato. La disponibilità funzionale (feature parity) e la possibilità di
+completare l'interazione (interaction parity) sono perciò due assi indipendenti.
 
 | Asse | Domanda | Limite |
 | --- | --- | --- |
@@ -81,10 +87,10 @@ Gli stati di prova sono:
 - `platform-specific-documented`: adattamento intenzionale e documentato;
 - `out-of-scope`: capability esclusa dal perimetro dichiarato.
 
-VoiceOver prova soltanto la superficie effettivamente esercitata: una sessione
-in Chrome production prova la web app, non l'app nativa macOS; una sessione
-nell'app macOS prova soltanto quella superficie. Né queste sessioni né gli audit
-XCTest dimostrano VoiceOver reale su iPhone o iPad.
+Anche una prova VoiceOver vale soltanto per la superficie effettivamente
+esercitata: in Chrome di produzione riguarda la web app, non l'app nativa
+macOS; dentro l'app macOS riguarda soltanto quest'ultima. Né queste sessioni
+né gli audit XCTest dimostrano un uso reale di VoiceOver su iPhone o iPad.
 
 ## Fotografia corrente
 
@@ -100,22 +106,22 @@ Escludendo le 23 righe intenzionalmente host-only, 30 capability su 43 sono
 `full-parity` (**70%**); 13 su 43 restano parziali (**30%**). Sul totale
 grezzo, le righe full sono 30/66 (**45%**).
 
-Questi numeri descrivono il contratto funzionale 30/13/23. Non sono il
-conteggio delle prove correnti e non autorizzano il claim “parity completa”.
+Il rapporto 30/13/23 descrive il contratto funzionale censito, non il numero
+delle prove valide sulla revisione corrente. Non permette quindi di dichiarare
+“parity completa”.
 
 La chiave `reconciliation` del JSON collega il contratto alle prove 0.8.
 Il manifest Apple-wide verifica 24 acceptance record tecnici separati.
 
 ## Evidenza registrata
 
-Le prove Apple basate su Xcode nella tabella seguente appartengono alla baseline
-storica `0843726fe`. Restano valide soltanto per quel tree e non costituiscono
-evidenza implicita per una revisione successiva. La disponibilità di Xcode è
-una precondizione operativa della macchina, non uno stato persistente di questa
-matrice; le prove exact-SHA appartengono ai receipt del closeout e non si
-deducono da questa matrice statica. La riconciliazione della sorgente integrata
-separa i claim source-present dalle prove SPM/UI/interop: non promuove score,
-celle UI o stato di release.
+Le prove Apple con Xcode riportate sotto appartengono alla baseline storica
+`0843726fe`: non si trasferiscono a un tree successivo. La disponibilità di
+Xcode deve essere verificata sulla macchina e gli esiti sulla SHA esatta devono
+risultare dalle ricevute di chiusura. La riconciliazione dei sorgenti integrati
+indica ciò che è presente nel codice, tenendolo distinto da prove SPM, UI e
+interoperabilità; non aggiorna per implicazione punteggi, celle UI o stato
+della release.
 
 | Classe | Superficie | Prova | Stato |
 | --- | --- | --- | --- |
@@ -160,34 +166,43 @@ celle UI o stato di release.
    Consegnata con [PR #16](https://github.com/Wulfgardr/mediflow/pull/16) e
    follow-up [PR #17](https://github.com/Wulfgardr/mediflow/pull/17).
 
-Wave 5 è una tranche consegnata, non la chiusura della parity complessiva.
+La consegna di Wave 5 copre quella tranche di lavoro; i residui riportati sotto
+impediscono di leggerla come chiusura della parità complessiva.
 
 ## Wave 6 / closeout residuo
 
 ### W6-A — convergenza UI macOS e click-map P6
 
-Il codice clipping e il probe AX corretto sono integrati. Le prove Xcode sul
-commit storico `0843726fe` restano valide soltanto per quel tree. W6-A non
-registra una prova nativa implicita sullo SHA corrente: disponibilità Xcode ed
-esito exact-SHA appartengono al receipt del closeout terminale.
+Sono integrati il codice di contenimento visivo, o clipping, e il probe AX
+corretto. Le prove Xcode sul commit storico `0843726fe` valgono però soltanto
+per quel tree. W6-A non attesta implicitamente il nativo sulla SHA corrente:
+servono disponibilità di Xcode ed esito sulla revisione esatta nella ricevuta
+di chiusura terminale.
 
 ### W6-B — offline degradato onesto
 
 Owner: `WUL-403`.
 
-Rende visibili età/TTL della cache, stato stale, read-only e assenza di write
-queue. Non introduce sync multi-master né scritture offline.
+Il lavoro rende visibili età e TTL della cache, eventuale obsolescenza, limite
+di sola lettura e assenza di una coda di scrittura. Serve a rendere comprensibile
+il degrado offline, non a introdurre sincronizzazione multi-master o scritture
+senza rete.
 
-La candidata locale `WUL-676` (0.8.6) collega al pannello `WUL-556` metadata
-reali di acquisizione, scadenza e motivo. Il TTL massimo resta 24 ore; alla
-scadenza sono restituiti solo metadata non identificativi, senza dati paziente.
-ADR 0048 vincola la lettura alla stessa sessione operatore sbloccata, pairing,
-ambulatorio e pin TLS; 401/403, errori TLS e risposte non conformi non
-attivano il fallback. Lo store e il modello conservano anche l'ultimo profilo
-manuale entro TTL, con renderer read-only dedicato nelle destinazioni compatta e affiancata. Questa è evidenza source/candidate del percorso delimitato;
-workflow offline ordinario, integrazione e verifica UI/device restano aperti, quindi la riga resta `partial`.
-Sotto-risorse, artifact AI/documentali, export e write queue sono esclusioni
-esplicite del contratto, non funzionalita mancanti da aggiungere implicitamente.
+La candidata locale `WUL-676` (0.8.6) collega al pannello `WUL-556` i metadata
+effettivi di acquisizione, scadenza e motivo. Il TTL massimo rimane 24 ore;
+oltre la scadenza vengono restituiti soltanto metadata non identificativi,
+senza dati paziente. La lettura resta vincolata da ADR 0048 alla stessa
+sessione operatore sbloccata, al pairing, all'ambulatorio e al pin TLS:
+401/403, errori TLS e risposte non conformi non attivano il ricorso alla cache.
+
+Store e modello conservano anche l'ultimo profilo manuale entro il TTL, con
+una presentazione dedicata in sola lettura nelle destinazioni compatta e
+affiancata. Questo prova la presenza del percorso circoscritto nel sorgente
+candidato, non il workflow offline ordinario né la verifica integrata su UI
+e dispositivo, che restano aperti. La riga rimane pertanto `partial`.
+Sotto-risorse, artifact AI/documentali, export e coda di scrittura sono invece
+esclusi espressamente dal contratto: non vanno aggiunti per colmare un presunto
+vuoto funzionale.
 
 Per decisione owner, Carta resta una grammatica del contenuto e non introduce
 una palette calda. Le superfici della slice usano canvas e field neutrali
@@ -226,12 +241,15 @@ del manifest; le 23 `HOST_AUTHORITY_ONLY` restano host-only nella matrice Apple.
 Dipendenze: `WUL-417` (OCR Apple on-device), `WUL-383` (degradazione OCR) e
 `WUL-409` (Smart Import review-first).
 
-Lo stack web popolato, la curation e gli stati loading/empty/error hanno prova
-E2E 2/2. I client Apple leggono insight, caricano documenti manuali e mostrano
-la review overview con conteggi persistiti N+ e stati loading/error onesti.
+Sul web, archivio popolato, revisione delle estrazioni e stati di caricamento,
+vuoto ed errore hanno una prova E2E 2/2. I client Apple leggono gli insight,
+caricano documenti manuali e mostrano il riepilogo da rivedere, con conteggi
+persistiti N+ e stati di caricamento o errore espliciti.
 
-OCR, curation e scritture document-derived restano sul nodo host per ADR 0076.
-Questa divisione è `platform-specific-documented`, non un gap implicito.
+ADR 0076 mantiene sull'host OCR, revisione delle estrazioni e scritture derivate
+dai documenti. La separazione è classificata
+`platform-specific-documented`: è una scelta di responsabilità, non una
+mancanza implicita del client.
 
 ### Fuori Wave 6
 
@@ -247,7 +265,8 @@ manuale sono già presenti; `WUL-476` è assorbita dallo stato corrente.
 
 ## Control-to-action map
 
-La mappa registra i controlli esercitati nel closeout.
+La mappa collega ciascun controllo all'azione esercitata e alla prova di
+chiusura registrata. Non estende l'esito a controlli o superfici non provati.
 
 | Superficie | Controllo | Identificatore | Azione | Evidenza |
 | --- | --- | --- | --- | --- |
@@ -266,9 +285,9 @@ La mappa registra i controlli esercitati nel closeout.
 
 ### AXPress
 
-Il probe non preme più il testo statico interno alla riga SwiftUI. Seleziona la
-riga nativa e verifica `AXSelectedRows`. Il vecchio finding `AXPress` è
-`corrected`, non un blocker corrente.
+Il probe seleziona la riga nativa e ne verifica `AXSelectedRows`, anziché
+premere il testo statico al suo interno in SwiftUI. Il precedente rilievo
+`AXPress` è quindi `corrected` e non costituisce un blocco corrente.
 
 ## Gate di uscita
 
@@ -283,11 +302,12 @@ Una capability può diventare `full-parity` solo con:
 7. nessuna violazione dei boundary local-first, cifratura dichiarata o
    review-first.
 
-Un gate assistivo resta non terminale finché la tecnologia assistiva richiesta
-non è stata usata sulla piattaforma dichiarata. L'unica limitazione esterna già
-accettata è VoiceOver mobile, registrata in
-[docs/known-limitations.md](./known-limitations.md); ogni altra prova non
-terminale conserva il `HOLD_PROMOTION`.
+La verifica assistiva resta non terminale finché la tecnologia richiesta non
+viene usata sulla piattaforma dichiarata. L'unica limitazione esterna già
+accettata è quella di VoiceOver mobile, registrata in
+[docs/known-limitations.md](./known-limitations.md). Ogni altra prova non
+terminale mantiene `HOLD_PROMOTION`: un test automatico diverso non può
+sostituirla.
 
 ## Verifica
 

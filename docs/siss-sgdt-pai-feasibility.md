@@ -1,14 +1,15 @@
-# SGDT/PAI per MMG/SSI: fattibilita scenario-specific
+<a id="sgdtpai-per-mmgssi-fattibilita-scenario-specific"></a>
+
+# SGDT/PAI per MMG/SSI: fattibilità scenario-specific
 
 > Stato documento: `CANONICAL`
 
-Questo documento restringe il filone `SGDT` ai soli casi emersi dalle fonti
-ufficiali come potenzialmente rilevanti per MediFlow:
-
-- cooperazione applicativa tra SGDT e Cartelle Elettroniche in uso ai
-  `MMG/PLS` per la gestione dei pazienti cronici e dei `PAI`
-- flusso `COT` / richieste di transizione registrate da `MMG/PLS`, oggi da
-  trattare come workflow organizzativo SGDT e non come runtime MediFlow
+Per valutare l’utilità di `SGDT` in MediFlow occorre partire dai casi
+documentati, non dall’idea di un modulo regionale generico. Questa nota
+considera soltanto la cooperazione con le Cartelle Elettroniche dei `MMG/PLS`
+per pazienti cronici e `PAI`, e il flusso `COT` delle richieste di transizione
+registrate dai `MMG/PLS`. Quest’ultimo resta un processo organizzativo SGDT,
+non una funzione runtime di MediFlow.
 
 Riferimenti canonici:
 - [ARCHITECTURE.md](../ARCHITECTURE.md)
@@ -21,39 +22,31 @@ Riferimenti canonici:
 - [docs/adr/0045-siss-native-integration-boundary-requires-qualified-ssi.md](./adr/0045-siss-native-integration-boundary-requires-qualified-ssi.md)
 - [docs/adr/0049-siss-fse-document-corpus-and-local-mcp-layer.md](./adr/0049-siss-fse-document-corpus-and-local-mcp-layer.md)
 
-## Executive summary
+<a id="executive-summary"></a>
+
+## Esito della ricognizione
 
 Stato della ricognizione: 2 maggio 2026.
 
-Le fonti ufficiali pubbliche supportano cinque conclusioni operative:
+`SGDT` è descritto come una soluzione regionale centralizzata per i processi
+sociosanitari territoriali, non come un modulo già richiamabile da MediFlow
+per il singolo paziente. Esiste però una fonte SISS specifica sulla
+cooperazione con le Cartelle Elettroniche `MMG/PLS` nel contesto
+`Presa in Carico (PIC)` dei pazienti cronici. La guida pubblica FHIR di Regione
+Lombardia comprende a sua volta lo scenario con `CE-MMG`, attraverso
+messaggistica FHIR.
 
-1. `SGDT` e una soluzione applicativa regionale centralizzata per processi
-   sociosanitari territoriali, non un modulo paziente-scoped gia richiamabile
-   da MediFlow
-2. esiste pero una fonte SISS scenario-specific per la cooperazione applicativa
-   con Cartelle Elettroniche `MMG/PLS` nel contesto `Presa in Carico (PIC)` dei
-   pazienti cronici
-3. il catalogo SISS indicizza anche manuali COT in cui le richieste di
-   transizione registrate dal `MMG/PLS` in SGDT vengono gestite tramite
-   Centrali Operative Territoriali
-4. la guida pubblica FHIR Regione Lombardia descrive SGDT come piattaforma che
-   supporta scenari di cooperazione applicativa, incluso lo scenario con
-   `CE-MMG` per pazienti cronici, tramite messaggistica FHIR
-5. questo rende SGDT/PAI potenzialmente utile per MediFlow solo se MediFlow
-   viene collocato in un perimetro `SSI-MMG` qualificato e se il caso d'uso PAI
-   cronici diventa una priorita esplicita
+Il catalogo SISS indicizza inoltre manuali COT che descrivono come le
+richieste di transizione inserite dal `MMG/PLS` in SGDT siano gestite dalle
+Centrali Operative Territoriali. Sono processi con attori e responsabilità
+organizzative, non semplici dati clinici da leggere o scrivere in cartella.
 
-Decisione:
-
-- `utile piu avanti`, non runtime immediato
-- nessun launcher SGDT generico da aggiungere ora
-- nessun accesso SGDT dal profilo paziente finche non esiste un path ufficiale
-  paziente-scoped verificato
-- il filone COT resta `defer`: descrive attivazione e coordinamento territoriale
-  dei soggetti erogatori, non un semplice dato clinico leggibile o scrivibile
-  da MediFlow
-- il primo eventuale thin slice deve essere documentale/contrattuale su PAI o
-  COT, non UI
+L’interesse per MediFlow resta quindi subordinato a un perimetro `SSI-MMG`
+qualificato e a una scelta esplicita di prodotto sul PAI dei pazienti cronici.
+L’esito è `utile piu avanti`, non runtime immediato: nessun launcher SGDT
+generico e nessun accesso dal profilo paziente finché non esista un percorso
+ufficiale verificato per quel contesto. Il filone COT resta `defer`. Il primo
+eventuale intervento deve riguardare documenti e contratti PAI o COT, non la UI.
 
 ## Fonti ufficiali rilevanti
 
@@ -67,33 +60,31 @@ Decisione:
 | [Programma pluriennale ARIA 2024-2026](https://www.trasparenza.ariaspa.it/wps/wcm/connect/687c8b76-c4b6-489d-837a-66d04988892d/ARIA%2BPPA_2024_2026.pdf?CACHEID=ROOTWORKSPACE-687c8b76-c4b6-489d-837a-66d04988892d-oOg.-9L&CONVERT_TO=URL&MOD=AJPERES) | `PPA2024_196` SGDT | Il piano descrive SGDT come applicativo regionale per processi sociosanitari, progetto individuale, monitoraggio e diario multidisciplinare, con integrazioni regionali come NAR, GP++ e FSE. |
 | [Modello Architetturale SISS](https://www.siss.regione.lombardia.it/wps/portal/site/siss/il-sistema-informativo-socio-sanitario/piattaforma-siss/Modello-architetturale) | pagina SISS | Il modello chiarisce che la cooperazione passa da infrastrutture/servizi SISS e canali aderenti, non da integrazioni libere del singolo gestionale. |
 
-## Matrice di fattibilita SGDT/PAI
+<a id="matrice-di-fattibilita-sgdtpai"></a>
+
+## Matrice di fattibilità SGDT/PAI
 
 | Obiettivo | Stato | Motivo |
 | --- | --- | --- |
 | Aprire SGDT come modulo generico dal profilo paziente | `Non disponibile` | Le fonti raccolte non dimostrano un launcher ufficiale paziente-scoped per MediFlow. |
 | Cooperazione applicativa `CE-MMG` per PAI cronici | `Documentata, ma non pronta per MediFlow` | Esiste `DC-COOP-FHIR_PIC#02`, ma richiede perimetro `SSI-MMG`, scenario, onboarding e contratto FHIR completo. |
-| Usare MediFlow come supporto locale alla redazione PAI | `Utile piu avanti` | Potrebbe avere senso se MediFlow diventa o affianca una `SSI-MMG` qualificata; oggi mancano contratto, qualifica e priorita prodotto. |
-| Importare o sincronizzare PAI SGDT in cartella locale | `Non disponibile` | Non c'e evidenza pubblica sufficiente per un feed PAI o per cache locale autorizzata dentro MediFlow. |
-| Mostrare solo stato/readiness PAI locale | `Possibile come studio futuro` | Una checklist locale senza invio dati sarebbe coerente, ma prima va definito se PAI cronici e davvero un target di prodotto. |
-| Richieste di transizione SGDT -> COT | `Defer` | Le fonti pubbliche confermano workflow e attori, ma non un contratto MediFlow ne un punto paziente-scoped riusabile senza documenti ufficiali completi. |
-| Attivazione soggetti erogatori tramite COT | `Fuori scope runtime` | E un flusso organizzativo territoriale gestito da `COT`; MediFlow non deve assumere il ruolo di sistema di dispatch o coordinamento. |
+| Usare MediFlow come supporto locale alla redazione PAI | `Utile piu avanti` | Potrebbe avere senso se MediFlow diventa o affianca una `SSI-MMG` qualificata; mancano ancora contratto, qualifica e priorità di prodotto. |
+| Importare o sincronizzare PAI SGDT in cartella locale | `Non disponibile` | Non c’è evidenza pubblica sufficiente per un feed PAI o per cache locale autorizzata dentro MediFlow. |
+| Mostrare solo stato/readiness PAI locale | `Possibile come studio futuro` | Una checklist locale senza invio dati sarebbe coerente, ma prima va definito se il PAI dei pazienti cronici sia davvero un obiettivo di prodotto. |
+| Richieste di transizione SGDT -> COT | `Defer` | Le fonti pubbliche confermano workflow e attori, ma non un contratto MediFlow né un punto paziente-scoped riusabile senza documenti ufficiali completi. |
+| Attivazione soggetti erogatori tramite COT | `Fuori scope runtime` | È un flusso organizzativo territoriale gestito da `COT`; MediFlow non deve assumere il ruolo di sistema di dispatch o coordinamento. |
 | Integrare SGDT cure domiciliari/EEPA | `Fuori scope` | La guida FHIR cita anche scenari EEPA/Cure Domiciliari, ma il filone corrente riguarda solo `MMG/SSI` e pazienti cronici. |
 
 ## Confini per MediFlow
 
-Per MediFlow, SGDT/PAI non va trattato come un altro bottone accanto a FSE o
-Prescrittivo. Il caso documentato e diverso:
+SGDT/PAI non va aggiunto come un altro pulsante accanto a FSE o Prescrittivo.
+Il caso documentato non è un `portal-handoff` già osservato, una UI regionale
+pronta al richiamo contestuale o un flusso di PAI consultabile per codice
+fiscale. È una cooperazione applicativa specifica con `SSI-MMG` e messaggistica
+FHIR; per `COT` riguarda invece transizione e attivazione territoriale, con
+attori propri.
 
-- non e un `portal-handoff` gia osservato
-- non e una UI regionale generica pronta al richiamo contestuale
-- non e un feed di PAI consultabile per codice fiscale
-- e una cooperazione applicativa scenario-specific con `SSI-MMG` e messaggistica
-  FHIR
-- per `COT`, e un workflow di transizione/attivazione territoriale con attori
-  organizzativi propri, non una semplice scheda paziente
-
-Quindi i vincoli minimi sono:
+Prima di procedere servono quindi almeno questi elementi:
 
 1. qualifica o integrazione con `SSI-MMG` compatibile con MediFlow
 2. accesso completo al documento `DC-COOP-FHIR_PIC#02` e alla guida FHIR
@@ -106,28 +97,26 @@ Quindi i vincoli minimi sono:
 6. dati sintetici per test; nessun PAI reale, richiesta COT reale o documento
    riservato in repo
 
-## Prima thin slice raccomandata
+<a id="prima-thin-slice-raccomandata"></a>
 
-Non aprire ora un runtime SGDT.
+## Primo intervento raccomandato
 
-La prima slice sensata, se il PAI cronici o il workflow COT diventano
-prioritari, dovrebbe essere:
+Non aprire ora un runtime SGDT. Se il PAI dei pazienti cronici o il flusso COT
+diventano prioritari, il primo intervento raccomandato riguarda requisiti e contratto:
 
 ### `PAI/COT readiness and contract review`
 
-Forma:
+Il lavoro parte dall’importazione locale autorizzata, fuori Git, di
+`DC-COOP-FHIR_PIC#02` e, se l’obiettivo riguarda le richieste di transizione,
+dei manuali COT/MMG. La lettura della guida FHIR di Regione Lombardia sui
+profili e messaggi `CE-MMG` deve consentire di confrontare i campi MediFlow
+con i requisiti PAI/COT, usando solo dati sintetici. Se emerge un ruolo
+concreto per MediFlow, serve un ADR dedicato.
 
-- import locale autorizzato fuori Git del documento `DC-COOP-FHIR_PIC#02`
-- import locale autorizzato fuori Git dei manuali COT/MMG se il target diventa
-  richieste di transizione
-- lettura della guida FHIR Regione Lombardia per profili e messaggi `CE-MMG`
-- matrice campi MediFlow -> requisiti PAI/COT, solo su dati sintetici
-- ADR dedicata se emerge un ruolo concreto per MediFlow
-
-Exit criteria prima di qualunque runtime:
+Prima di qualsiasi runtime devono essere soddisfatti questi criteri:
 
 1. contratto FHIR applicabile identificato
-2. ruoli `MMG/SSI` e responsabilita applicativa chiariti
+2. ruoli `MMG/SSI` e responsabilità applicativa chiariti
 3. attori COT, stati di transizione e soggetti erogatori chiariti se il caso
    d'uso riguarda le transizioni
 4. audit e retention definiti
@@ -137,18 +126,10 @@ Exit criteria prima di qualunque runtime:
 
 ## Decisione operativa
 
-Per MediFlow, oggi, il target SGDT corretto e:
+Il lavoro ammesso è `PAI/COT readiness and contract review`, solo se diventa
+prioritario. Non comprende `SGDT launcher`, `SGDT embedded UI`, `PAI feed`,
+`COT dispatch`, `sync locale di PAI` o `runtime SGDT` senza perimetro
+`SSI-MMG`.
 
-- `PAI/COT readiness and contract review`, solo se diventa prioritario
-
-e non:
-
-- `SGDT launcher`
-- `SGDT embedded UI`
-- `PAI feed`
-- `COT dispatch`
-- `sync locale di PAI`
-- `runtime SGDT` senza perimetro `SSI-MMG`
-
-Questa nota chiude quindi la verifica scenario-specific senza aprire una issue
-runtime automatica.
+La nota conclude la verifica dello scenario, senza aprire automaticamente
+una issue runtime.

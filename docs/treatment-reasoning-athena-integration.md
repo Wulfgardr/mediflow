@@ -9,11 +9,13 @@ Program boundary:
 
 ## Stato corrente
 
-Treatment Reasoning produce un'anteprima locale da rivedere. Il percorso
-corrente attraversa Intelligence Fabric e usa ATHENA-R1-Qwen3-8B tramite MLX
-quando modello e runner sono preprovisioned. Senza questa configurazione
-fallisce chiuso. Non usa il precedente endpoint di esecuzione scelto dal
-browser.
+Treatment Reasoning aiuta a rivedere un trattamento attraverso un'anteprima
+locale, senza assumere il ruolo di prescrittore. Nel percorso MLX del candidato
+0.8.5 descritto qui, Intelligence Fabric usa ATHENA-R1-Qwen3-8B solo quando
+modello e runner sono già predisposti sulla macchina. In loro assenza il
+percorso si arresta, senza usare il precedente endpoint di esecuzione scelto
+dal browser. La proposta portabile riportata in fondo è separata e non
+promossa.
 
 Il risultato massimo è una proposta:
 
@@ -23,12 +25,15 @@ Il risultato massimo è una proposta:
 - `applyPolicy=none`.
 
 La proposta non prescrive, non modifica terapie, non aggiorna diagnosi e non
-autorizza un form precompilato. Le azioni suggerite conservano soltanto le
-policy `no_write`, `review_only` o `form_prefill_only` definite dal contratto.
+autorizza un modulo precompilato. Anche quando suggeriscono un'azione, i
+risultati conservano soltanto le policy `no_write`, `review_only` o
+`form_prefill_only` definite dal contratto: descrivere un'azione non concede
+l'autorità per eseguirla.
 
-Questo stato è un'integrazione nel tree locale. Non prova disponibilità del
-modello sulla macchina di destinazione, qualità clinica, release readiness,
-deployment o release.
+L'integrazione nel tree locale non dimostra disponibilità del modello sulla
+macchina di destinazione, qualità clinica, prontezza al rilascio, deployment
+o release. La successiva pubblicazione sorgente 0.8.6 non trasferisce né amplia
+le prove storiche riportate in questa pagina.
 
 ## Percorso di produzione
 
@@ -48,9 +53,10 @@ components/treatment-reasoning-panel.tsx
 
 ### UI e controller
 
-Il pannello `components/treatment-reasoning-panel.tsx` raccoglie il contesto
-già disponibile nella scheda paziente: profilo, diario, terapie, osservazioni e
-allegati. L'utente avvia manualmente **Genera bozza**.
+Il pannello `components/treatment-reasoning-panel.tsx` parte dal contesto già
+disponibile nella scheda paziente, cioè profilo, diario, terapie, osservazioni
+e allegati. L'elaborazione non parte dalla sola presenza di quei dati:
+l'utente deve avviare manualmente **Genera bozza**.
 
 `lib/ai-providers/fabric/treatment-reasoning-browser-controller.ts`:
 
@@ -62,8 +68,10 @@ allegati. L'utente avvia manualmente **Genera bozza**.
 6. accetta soltanto una publication con la stessa revisione sorgente, lo stesso
    timestamp di cattura e riferimenti compresi nel set di evidenze ammesso.
 
-Il controller invalida l'operazione se cambia paziente, selezione o generazione
-del pannello. Non invia provider, modello, endpoint, prompt o flag di apply.
+Il controller invalida l'operazione quando cambiano paziente, selezione o
+generazione del pannello, così che una risposta tardiva non venga mostrata
+nel contesto sbagliato. Non invia provider, modello, endpoint, prompt o flag
+di applicazione.
 
 ### Ingest e preview autenticati
 
@@ -72,13 +80,15 @@ Le route correnti sono:
 - `app/api/ai/treatment-reasoning/ingest/route.ts`;
 - `app/api/ai/treatment-reasoning/preview/route.ts`.
 
-Entrambe acquisiscono l'autorità della sessione prima di leggere il body.
-L'ingest accetta una projection e un request ID; restituisce soltanto un handle
-opaco. La preview accetta l'handle e un nuovo request ID.
+Entrambe le route acquisiscono l'autorità della sessione prima di leggere il
+corpo della richiesta. L'ingest accetta la proiezione e un request ID, ma
+restituisce soltanto un handle opaco; per la preview servono quell'handle e
+un nuovo request ID.
 
-Il broker server-side verifica sessione, selezione, paziente attivo, versione e
-currentness. Replay, handle assente, cambio selezione, projection stantia o
-lease non corrente negano senza invocare il provider.
+Il broker sul server verifica sessione, selezione, paziente attivo, versione
+e validità del contesto. Riutilizzo della richiesta, handle assente, cambio
+di selezione, proiezione superata o lease non più valido interrompono il
+percorso prima di invocare il provider.
 
 ### Risoluzione Fabric e runtime ATHENA
 
@@ -101,36 +111,43 @@ lease non corrente negano senza invocare il provider.
 - stadio massimo `preview`;
 - zero scritture.
 
-Il runtime usa `lib/athena-mlx-runtime.ts`. Il modello atteso è
-`mims-harvard/ATHENA-R1-Qwen3-8B`, conservato fuori da Git. La disponibilità
-del file modello è un prerequisito locale; non costituisce qualified readiness.
+Il runtime passa da `lib/athena-mlx-runtime.ts` e attende il modello
+`mims-harvard/ATHENA-R1-Qwen3-8B`, conservato fuori da Git. Avere il file è un
+prerequisito locale, non una qualificazione del percorso: non dimostra da solo
+che il modello sia pronto all'uso previsto.
 
-Un'installazione inclusa deve preprovisionare sia il modello sia il runner
-locale. `MEDIFLOW_ATHENA_MLX_GENERATE_BIN` può indicare soltanto un path
-assoluto, eseguibile e host-owned denominato `mlx_lm.generate`. Il chiamante
-non può aggiungere argomenti, frammenti shell o risoluzione pacchetti. Se
-modello o runner non sono disponibili, il percorso nega in modo fail-closed.
+Un'installazione che includa il percorso deve predisporre in anticipo sia
+il modello sia il runner locale. `MEDIFLOW_ATHENA_MLX_GENERATE_BIN` può indicare
+soltanto un percorso assoluto a un eseguibile denominato `mlx_lm.generate`,
+sotto il controllo dell'host. Il chiamante non può aggiungere argomenti,
+frammenti shell o risoluzione di pacchetti. Se modello o runner mancano,
+il percorso nega l'esecuzione senza ripieghi.
 
-Il lifecycle ATHENA è distinto dal lifecycle Ollama. Patient Insight, Smart
-Import e Document Synthesis non ereditano stato, grant o fallback da ATHENA.
+ATHENA e Ollama hanno cicli di vita distinti. Il fatto che ATHENA sia disponibile
+non trasferisce stato, autorizzazioni o possibilità di ripiego a Patient
+Insight, Smart Import o Document Synthesis.
 
-### Evidenza operativa del tree corrente
+<a id="evidenza-operativa-del-tree-corrente"></a>
 
-Il checkpoint `2574cf5fc` registra il runner offline configurabile. Sullo
-stesso tree sono stati registrati:
+### Evidenza operativa della revisione descritta
+
+Il checkpoint `2574cf5fc` documenta il runner offline configurabile. Le prove
+seguenti appartengono a quello stesso tree:
 
 - 6/6 test mirati verdi;
 - typecheck ed ESLint verdi;
 - uno smoke del percorso di produzione con modello BF16 locale, prompt
   sintetico, 64 token, output di 211 caratteri e latenza di 10,6 secondi.
 
-Lo smoke non ha stampato l'output grezzo. Questa evidenza dimostra la seam
-locale sulla macchina verificata; non sostituisce gli E2E dei quattro percorsi,
-una prova prestazionale bounded sulla macchina di destinazione o una
-promozione di release. La configurazione di default senza modello e runner
-preprovisioned resta non disponibile e fallisce chiusa.
+Lo smoke non ha stampato l'output grezzo e dimostra il raccordo locale sulla
+macchina provata. Non sostituisce gli E2E dei quattro percorsi, una misura
+prestazionale circoscritta sulla macchina di destinazione o una promozione di
+release. Con la configurazione predefinita, se modello e runner non sono già
+predisposti, il percorso rimane non disponibile e si arresta.
 
-### Publication e revisione
+<a id="publication-e-revisione"></a>
+
+### Pubblicazione del risultato e revisione
 
 La publication `mediflow.ai.treatment-reasoning-publication.v1` include:
 
@@ -144,9 +161,10 @@ La publication `mediflow.ai.treatment-reasoning-publication.v1` include:
 - receipt Fabric e provenienza;
 - `sourceRevision`, `capturedAt`, `writesPerformed=0` e `applyPolicy=none`.
 
-Il parser browser rifiuta chiavi extra, riferimenti sconosciuti, receipt e
-provenienza divergenti, output con write o apply e publication non legate
-all'esatta projection corrente.
+Il parser del browser accetta il risultato solo entro la forma prevista:
+rifiuta chiavi aggiuntive, riferimenti sconosciuti, divergenze fra ricevuta e
+provenienza, output con scritture o applicazione dei dati e publication non
+legate all'esatta proiezione corrente.
 
 ## Route storica ritirata
 
@@ -155,12 +173,12 @@ terminale. La route verifica prima la sessione, poi restituisce
 `410 legacy_route_retired`.
 
 La route non legge prompt, provider, modello o budget dal chiamante e non
-invoca ATHENA. `lib/treatment-reasoning-service.ts` non è l'entrypoint del
-pannello corrente.
+invoca ATHENA; `lib/treatment-reasoning-service.ts` non è il punto di ingresso
+del pannello descritto sopra.
 
-Non esiste fallback Ollama per Treatment Reasoning nel percorso di produzione.
-Una lane ATHENA non disponibile, disabilitata, degradata o stantia nega in modo
-fail-closed.
+Il percorso di produzione Treatment Reasoning non prevede un ripiego su
+Ollama. Se ATHENA non è disponibile, è disabilitata, degradata o non più valida
+per l'operazione, l'esecuzione viene negata.
 
 ## Confini clinici e di sicurezza
 
@@ -194,20 +212,20 @@ fail-closed.
 
 ## Evidenza storica del 7 luglio 2026
 
-I risultati seguenti appartengono al checkpoint precedente del 7 luglio 2026.
-Restano utili come confronto, ma non sono una prova del tree 0.8.5 corrente,
-della sua integrazione Fabric o di release readiness.
+I risultati del 7 luglio 2026 appartengono a un checkpoint precedente.
+Permettono un confronto storico, ma non provano il tree 0.8.5 descritto sopra,
+la sua integrazione Fabric o la sua prontezza al rilascio.
 
 | Check storico | Artifact | Risultato registrato |
 | --- | --- | --- |
 | Runner MLX sintetico, 2 casi, 128 token | Q4 convertito | Media 2,49 s wall time, 75,7 token/s, picco 5,36 GB. |
-| Smoke DB redatto, 3 casi, 1600 token | Q4 convertito | Contratto 3/3, evidence ref 3/3, latenze 25,5 s, 31,0 s e 27,8 s. |
-| Smoke DB redatto, 1 caso, 1600 token | BF16 shard | Contratto 1/1, evidence ref 1/1, latenza 63,4 s. |
+| Smoke DB con identificativi oscurati, 3 casi, 1600 token | Q4 convertito | Contratto 3/3, evidence ref 3/3, latenze 25,5 s, 31,0 s e 27,8 s. |
+| Smoke DB con identificativi oscurati, 1 caso, 1600 token | BF16 shard | Contratto 1/1, evidence ref 1/1, latenza 63,4 s. |
 | Smoke dopo hardening pin/offline, 1 caso | Q4 convertito | Contratto 1/1, evidence ref 1/1, latenza 27,8 s. |
 
-Anche gli esperimenti con server MLX caldo, KV cache quantizzata e prompt cache
-restano storici e non promossi. Non costituiscono fallback o runtime alternativo
-del candidato.
+Anche gli esperimenti con server MLX già avviato, KV cache quantizzata e cache
+dei prompt restano osservazioni storiche non promosse. Non forniscono al
+candidato un runtime alternativo o una possibilità di ripiego.
 
 ## Fonti e attribuzione
 
@@ -219,35 +237,39 @@ Le fonti upstream registrate nel checkpoint storico sono:
 - [licenza Qwen3-8B](https://huggingface.co/Qwen/Qwen3-8B/blob/main/LICENSE);
 - [MLX-LM](https://github.com/ml-explore/mlx-lm).
 
-MediFlow usa il modello locale come componente di supporto alla revisione. Non
-dichiara ATHENA o Treatment Reasoning come dispositivo medico, prescrittore o
-decisore autonomo.
+MediFlow usa il modello locale per sostenere la revisione, non per sostituirla.
+Non dichiara ATHENA o Treatment Reasoning come dispositivo medico, prescrittore
+o decisore autonomo.
 
 ## Avvio tramite Supervisor portable (MF085-006)
 
 <!-- @Codex -->
-Il production root legge soltanto `MEDIFLOW_ATHENA_MLX_GENERATE_BIN`, lo valida
-con il resolver condiviso e lo passa come opzione tipizzata
-`athenaMlxGenerateBin` al costruttore dei figli. Il costruttore lo ricontrolla
-prima del primo spawn e aggiunge quella sola variabile all'ambiente Web.
-L'ambiente MCP resta la sua allowlist preesistente, senza configurazione ATHENA.
-Non vengono propagati `PATH`, `HOME`, `NODE_OPTIONS`, directory del modello,
-selettori di Python/package/uvx o altre variabili del parent.
+Il Supervisor deve ricevere soltanto la configurazione necessaria, non
+l'intero ambiente del chiamante. Il production root legge quindi solo
+`MEDIFLOW_ATHENA_MLX_GENERATE_BIN`, la valida con il resolver condiviso e la
+passa come opzione tipizzata `athenaMlxGenerateBin` al costruttore dei figli.
+Prima del primo avvio, il costruttore la controlla di nuovo e aggiunge quella
+sola variabile all'ambiente Web. MCP conserva l'allowlist preesistente, senza
+configurazione ATHENA. Non vengono propagati `PATH`, `HOME`, `NODE_OPTIONS`,
+directory del modello, selettori Python/package/uvx o altre variabili del parent.
 
-Il valore deve essere un singolo path assoluto senza padding o quoting, con
-basename `mlx_lm.generate`, file regolare ed eseguibile. Gli spazi interni al
-path sono ammessi; argomenti accodati non lo sono. Rimane la policy storica del
-runner: i link host-owned sono seguiti tramite `stat`, non vietati come i target
-deterministici Web/MCP. Il path e il target devono restare sotto il controllo
-dell'host trusted; non si verifica l'ownership del sistema operativo e non si
-fissa l'inode. Nessuna shell viene aggiunta.
+Il valore deve essere un unico percorso assoluto, senza spazi aggiunti alle
+estremità né virgolette di delimitazione, con basename `mlx_lm.generate`,
+verso un file regolare ed eseguibile. Gli spazi interni sono ammessi; gli
+argomenti accodati no. Resta la policy storica del runner: i collegamenti sotto
+il controllo dell'host vengono seguiti mediante `stat`, anziché essere vietati
+come nei target deterministici Web/MCP. Percorso e destinazione devono restare
+sotto il controllo dell'host fidato, ma questa verifica non accerta la
+proprietà del file nel sistema operativo e non vincola l'inode. Non viene
+aggiunta alcuna shell.
 
-Soltanto la variabile **assente** mantiene l'avvio opzionale del Supervisor e la
-selezione storica `uvx` del runtime ATHENA. Questo non prova che `uvx` sia
-risolvibile nell'ambiente minimo. Valori espliciti vuoti, blank o invalidi sono
-rifiutati: non degradano a `uvx`. Il costruttore restituisce l'errore redatto
-`ATHENA MLX direct runner configuration rejected.`; il comando production
-mantiene la policy di stderr generico già esistente e non stampa il path.
+Solo una variabile **assente** conserva l'avvio facoltativo del Supervisor e
+la selezione storica `uvx` del runtime ATHENA; ciò non dimostra che `uvx` sia
+risolvibile nell'ambiente minimo. Un valore esplicitamente vuoto, composto
+soltanto da spazi o invalido viene rifiutato, senza ripiegare su `uvx`.
+Il costruttore restituisce l'errore privo del percorso sensibile
+`ATHENA MLX direct runner configuration rejected.`; il comando di produzione
+mantiene lo stderr generico previsto e non stampa il percorso.
 
 Il runner va preprovisionato offline con il proprio interprete risolvibile senza
 il `PATH` del parent, per esempio con un interprete assoluto già presente nella
@@ -259,13 +281,14 @@ non viene provata eseguendo il runner all'avvio. I flag offline del runtime
 restano invariati; non equivalgono a un sandbox di rete per un eseguibile
 host-owned arbitrario.
 
-Il cleanup mantiene disconnect/terminate dei figli già creati quando lo spawn
-successivo fallisce, e copre anche errori successivi nella composizione dei
-port. Non cambia API, authority MCP, lease o permessi di scrittura.
+Se un avvio successivo fallisce, la pulizia disconnette e termina i figli già
+creati; copre anche gli errori che emergano dopo, durante la composizione dei
+port. Non cambia API, autorità MCP, lease o permessi di scrittura.
 
-I test di processo usano entrypoint sintetici senza listener, DB o inferenza:
-verificano la composizione reale e i veri ambienti OS, non il servizio Next
-completo, il protocollo MCP autenticato o un modello MLX.
+I test di processo verificano la composizione reale e gli ambienti effettivi
+del sistema operativo usando entrypoint sintetici, senza listener, database
+o inferenza. Non provano il servizio Next completo, il protocollo MCP
+autenticato o un modello MLX.
 
 ## Verifica mirata
 
@@ -285,11 +308,13 @@ npm run check:ai-clinical-writes
 npm run check:claims
 ```
 
-Il live DB smoke è un controllo separato e potenzialmente sensibile. Non è una
+Lo smoke su database in uso è separato e potenzialmente sensibile. Non è una
 verifica predefinita del candidato e non va eseguito con dati reali per
-produrre artifact, log o prove destinate a Git.
+produrre artefatti, log o prove destinati a Git.
 
-## Claim ceiling
+<a id="claim-ceiling"></a>
+
+## Limiti di ciò che si può dichiarare
 
 Il claim massimo è: **percorso Treatment Reasoning integrato nel candidato
 sorgente locale 0.8.5 attraverso UI, controller, ingest/preview autenticati,
@@ -302,20 +327,21 @@ certificazione o conformità legale.
 
 ## Proposta non promossa: motore locale portabile (run 542972899b0244b8b7c345bcb219f1f5)
 
-Il percorso MLX documentato sopra resta il contratto storico. Il candidato
-separato `proposals/TREATMENT-PORTABLE-ADR.md` propone `athena_transformers`
-CPU su Windows/Linux, senza host Mac, relay, cloud o fallback. Non è una
-attestazione di disponibilità: il pacchetto sorgente non contiene runtime,
-pesi, licenze o prove d'inferenza utilizzabili per ammettere il motore.
+La proposta portabile non sostituisce il contratto storico MLX descritto
+sopra. Il candidato separato `proposals/TREATMENT-PORTABLE-ADR.md` propone
+`athena_transformers` su CPU Windows/Linux, senza host Mac, relay, cloud o
+ripieghi. Non ne attesta la disponibilità: il pacchetto sorgente non contiene
+runtime, pesi, licenze o prove d'inferenza sufficienti ad ammettere il motore.
 
-Il ramo portabile è composto da moduli dedicati di provisioning e runtime,
-scelta opaca nel catalogo della funzione, processo locale bounded e pubblicazione
-`mediflow.ai.treatment-reasoning-publication.v2`. Mantiene l'envelope clinico
-`mediflow.treatment_reasoning.v1`, la stessa validazione delle fonti, il kill
-switch, l'anteprima da revisionare, `writesPerformed=0`, `applyPolicy=none`.
-Il conteggio riguarda le scritture cliniche; il provisioning scrive soltanto
-file tecnici nel proprio namespace. Il parser MLX v1 non accetta il motore
-portabile. I consumer generici di receipt v1 non sono stati ampliati.
+Il ramo candidato separa i moduli di predisposizione e runtime, la scelta
+opaca nel catalogo della funzione e il processo locale sottoposto a limiti.
+Usa la publication `mediflow.ai.treatment-reasoning-publication.v2`, ma conserva
+l'envelope clinico `mediflow.treatment_reasoning.v1`, la validazione delle
+fonti, il kill switch, l'anteprima da rivedere, `writesPerformed=0` e
+`applyPolicy=none`. Il conteggio riguarda le scritture cliniche: la
+predisposizione scrive solo file tecnici nel proprio namespace. Il parser
+MLX v1 non accetta il motore portabile e i consumer generici di receipt v1
+non sono stati ampliati.
 
 ### Preparazione esplicita, prima dell'inferenza
 
@@ -336,22 +362,26 @@ node scripts/treatment-reasoning-portable-setup.mjs revoke --consent-digest <ste
 node scripts/treatment-reasoning-portable-setup.mjs recover --confirm
 ```
 
-I segnaposto non sono valori accettabili. `import` verifica e promuove lo staging
-ma non seleziona il modello. `activate` verifica nuovamente e ammette l'artefatto,
-senza accendere il kill switch clinico. `revoke` è terminale per quel digest;
-`recover` non rimuove un lock di processo vivo e non promuove dati parziali.
-Una versione precedente ammessa resta selezionata se un nuovo import fallisce.
-Il browser mostra stato e prerequisiti, senza ricevere percorsi o comandi.
+I segnaposto devono essere sostituiti: non sono valori accettabili. I comandi
+mantengono responsabilità separate. `import` verifica e promuove l'area di
+preparazione, ma non seleziona il modello; `activate` verifica di nuovo e
+ammette l'artefatto senza accendere il kill switch clinico. `revoke` è terminale
+per quel digest, mentre `recover` non rimuove il lock di un processo vivo e
+non promuove dati parziali. Se un nuovo import fallisce, la versione precedente
+ammessa rimane selezionata. Il browser mostra soltanto stato e prerequisiti:
+non riceve percorsi o comandi.
 
 ### Limiti ed evidenza ancora necessaria
 
-L'adapter ha un solo lavoro in corso per istanza, senza coda o retry; limita
-l'intera preparazione/invocazione a 420 secondi, poi concede al massimo due
-secondi per osservare la chiusura del processo. Se la terminazione non è
-confermata, il canale resta bloccato fino all'effettiva chiusura. Non logga
-prompt, stdout clinico o stderr del worker. Le fonti entrano soltanto in stdin.
-La configurazione candidata usa CPU, 1–4 thread, budget memoria esplicito
-1–64 GiB, massimo 8192 token d'ingresso e 1600 nuovi token: sono limiti di
+L'adapter accetta un solo lavoro per istanza, senza coda né nuovi tentativi
+automatici. L'intera preparazione e invocazione ha un limite di 420 secondi;
+seguono al massimo due secondi per osservare la chiusura del processo. Se la
+terminazione non è confermata, il canale rimane bloccato fino alla chiusura
+effettiva. Prompt, stdout clinico e stderr del worker non vengono registrati;
+le fonti passano soltanto da stdin.
+
+La configurazione candidata usa CPU, 1–4 thread, budget di memoria esplicito
+1–64 GiB, massimo 8192 token d'ingresso e 1600 nuovi token. Sono limiti di
 policy, non requisiti o prestazioni misurati del modello.
 
 Servono una distribuzione runtime autocontenuta con versioni esatte, inventario
@@ -362,8 +392,9 @@ non sono una sandbox di rete del sistema operativo. Non si dichiarano supporto
 CPU BF16, memoria sufficiente, qualità clinica o portabilità dei binari senza
 queste prove. GGUF/llama.cpp e GPU restano esclusi.
 
-Il follow-up 1 include ora le connessioni allowlisted a status/disclosure,
-preferenze HTTP, pagina Fabric, `next.config.ts`, guard standalone e crosswalk.
+Il follow-up 1 del candidato comprende i collegamenti ammessi a stato e
+disclosure, preferenze HTTP, pagina Fabric, `next.config.ts`, controllo
+standalone e crosswalk.
 Il worker in `scripts/` usa il cwd applicativo posseduto dal launcher. La chiusura
 tracciata comprende worker, CLI, provisioning, identità modello, contratto Node,
 `.nvmrc` e `package.json`; il guard rifiuta file mancanti, contenuti alterati,
@@ -392,12 +423,13 @@ licenze approvate. `hardware` e `inventory --confirm` sono comandi host esplicit
 il secondo inventaria i byte reali e produce un manifest, senza importare o
 ammettere. La ricetta offline completa è nella consegna `OS-OFFLINE-RECIPE.md`.
 
-La policy prudenziale del BF16 originale richiede 36 GiB di budget processo e
-40 GiB host; non è una misura di prestazioni o del minimo fisico possibile.
-Le VM osservate dal parent (Linux ARM64 12 GiB, Windows ARM64 18 GiB) non passano
-questa policy. Il worker confronta anche ABI Python e architettura target:
-Node x64 emulato non qualifica Python/torch ARM64. Nessun cambio VM, modello,
-quantizzazione o fallback remoto è proposto per aggirare il blocco.
+Per il BF16 originale, la policy prudenziale richiede 36 GiB di budget del
+processo e 40 GiB sull'host. Non misura prestazioni né minimo fisico possibile.
+Le VM osservate dal parent, Linux ARM64 12 GiB e Windows ARM64 18 GiB, non
+soddisfano questa policy. Il worker verifica inoltre ABI Python e architettura
+di destinazione: Node x64 emulato non qualifica Python/torch ARM64. Il blocco
+non viene aggirato proponendo un cambio di VM, modello o quantizzazione,
+né un ripiego remoto.
 
 L'implementazione resta candidata PROPOSED: build completa, runtime offline
 verificato, licenze e prove reali Windows/Linux/macOS sono gate separati del

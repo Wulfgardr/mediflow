@@ -1,47 +1,49 @@
 # MediFlow 0.8.6: proposta macOS con una sola lista laterale
 
 Stato: candidato locale del 6 settembre 2026, successivo a `f1b023964`.
-L'utente ha giudicato la precedente rifinitura Apple ancora troppo simile
-all'interfaccia originaria. Questo intervento cambia la disposizione della
-finestra; l'accettazione estetica resta distinta da compilazione e test.
+La precedente rifinitura Apple era stata giudicata dall'utente ancora troppo
+vicina all'interfaccia originaria; questa proposta cambia quindi la disposizione
+della finestra. Compilazione e test ne verificano aspetti tecnici,
+non sostituiscono l'accettazione estetica.
 
 ## Disposizione e funzioni
 
-- Pazienti, Agenda, Diario, Analytics e Scale sono nella barra superiore.
-  Repertori, Impostazioni, Host, Runtime, Panoramica e Tappe rimangono nel
-  menu delle altre aree e nei comandi esistenti.
-- La cartella ha una sola lista laterale, con selezione nativa a un clic,
-  filtri di stato, ordine e conteggio dei risultati nell'elenco caricato.
-  Nuovo paziente rimane nella toolbar con il suo controllo di disponibilità.
-- Nome, riferimenti e sette sezioni restano sopra il contenuto scorrevole.
-  I titoli brevi della navigazione conservano etichette accessibili complete.
-- La superficie di lettura è continua. Identità, contatti e presa in carico
-  usano colonne adattive; esenzioni e valori possono andare a capo. Non ci
-  sono più sei riquadri numerici iniziali né l'indice duplicato prima dei dati.
-  Il prossimo follow-up conserva il filtro e il significato precedenti.
-- Il Mac usa campi di sistema e titoli di sezione più riconoscibili. I filtri
-  della worklist non hanno un ulteriore involucro in vetro. Il codice diagnostico
-  segue la riga nativa: il vecchio riquadro chiaro risultava illeggibile quando
-  selezionato nel tema scuro.
+- Pazienti, Agenda, Diario, Analytics e Scale occupano la barra superiore.
+  Repertori, Impostazioni, Host, Runtime, Panoramica e Tappe restano nel menu
+  delle altre aree e nei comandi esistenti.
+- Una sola lista laterale permette di selezionare il paziente con un clic
+  nativo, filtrare lo stato, ordinare e leggere il conteggio dei risultati
+  caricati. Nuovo paziente rimane nella toolbar, soggetto al proprio
+  controllo di disponibilità.
+- Nome, riferimenti e sette sezioni restano sopra il contenuto scorrevole;
+  i titoli brevi conservano le etichette accessibili complete.
+- La lettura avviene su una superficie continua: identità, contatti e presa
+  in carico usano colonne adattive, mentre esenzioni e valori possono andare
+  a capo. Sono rimossi i sei riquadri numerici iniziali e l'indice duplicato
+  prima dei dati. Filtro e significato del prossimo follow-up non cambiano.
+- Campi di sistema e titoli di sezione rendono riconoscibile il lavoro sul
+  Mac senza aggiungere vetro ai filtri della worklist. Il codice diagnostico
+  segue la riga nativa, perché il precedente riquadro chiaro diventava
+  illeggibile quando selezionato nel tema scuro.
 
-La proposta applica orientamento, vicinanza e profondità progressiva della
-[raccolta Breccia](./2026-09-06-breccia-apple-reference.md) e del
-[contratto macOS](./lume/06-macos-apple-contract.md). È una traduzione per
-MediFlow, non un layout prescritto dal designer. L'atlante con gli otto
-fotogrammi rimane nella raccolta locale; non si dichiara la visione di tutto
-il canale.
+Orientamento, vicinanza e approfondimento progressivo derivano dalla
+[raccolta Breccia](./2026-09-06-breccia-apple-reference.md) e dal
+[contratto macOS](./lume/06-macos-apple-contract.md). Il loro uso è una
+traduzione per MediFlow, non una disposizione prescritta dal designer.
+L'atlante degli otto fotogrammi resta nella raccolta locale e non rappresenta
+la visione dell'intero canale.
 
-Il modello per finestra, le selezioni, le bozze, i writer, le capability e
-il ciclo di vita della registrazione restano invariati. Il dettaglio allegato
-rimane nel suo sheet: non è stata implementata una nuova consultazione
-affiancata. L'inspector resta sola lettura, con lo sheet compatibile della
-sola major macOS 27. Non cambia il percorso iOS/iPadOS.
+Il cambiamento di disposizione conserva modello per finestra, selezioni,
+bozze, writer, capability e ciclo di vita della registrazione. Il dettaglio
+dell'allegato resta nel proprio sheet: non viene introdotta una consultazione
+affiancata. Anche l'inspector resta di sola lettura, con sheet compatibile
+limitato alla major macOS 27; il percorso iOS/iPadOS non cambia.
 
 ## Verifica locale
 
-Worktree `mediflow-086-macos-redesign`, branch `codex/WUL-676-086-macos-redesign`.
-Toolchain Xcode 26.6, SDK 26.5, host macOS 27.0. Il volume Xcode è montato;
-il selettore globale non è stato modificato.
+La verifica usa il worktree `mediflow-086-macos-redesign` e il branch
+`codex/WUL-676-086-macos-redesign`, con Xcode 26.6, SDK 26.5 e host macOS 27.0.
+Il volume Xcode è montato, senza modificare il selettore globale.
 
 | Prova | Esito e limite |
 | --- | --- |
@@ -55,15 +57,17 @@ il selettore globale non è stato modificato.
 | Navigazione e inspector | Menu delle altre aree, apertura Impostazioni, ritorno alla cartella; apertura dello sheet compatibile e chiusura da tastiera. |
 | Revisione indipendente Astra | Nessun P1/P2 concreto nel diff finale esaminato; review statica, non prova visiva indipendente. |
 
-Le prime build hanno esposto una sovrapposizione del materiale della toolbar
+Le prime build hanno mostrato che il materiale della toolbar si sovrapponeva
 alla testata nel `NavigationSplitView` annidato. La disposizione finale usa
-un solo `HSplitView` sotto la navigazione principale, con la testata fuori
-dal piano scorrevole. La correzione è stata osservata nella finestra reale.
-È stato rimosso un vecchio test che confrontava due campioni fittizi dello
-stesso sfondo: non provava la composizione della finestra. I restanti test
-dei colori conservano un perimetro esplicito e non sostituiscono gli screenshot.
+quindi un solo `HSplitView` sotto la navigazione principale e mantiene
+la testata fuori dal piano scorrevole; la correzione è stata osservata
+nella finestra reale. È stato rimosso il vecchio test che confrontava due
+campioni fittizi dello stesso sfondo, perché non provava la composizione
+della finestra. Gli altri test dei colori mantengono un perimetro esplicito
+e non sostituiscono gli screenshot.
 
-Log, screenshot sintetici e ricevuta con hash sono in `tmp-086-macos-redesign/`,
-escluso da Git. Restano da valutare esteticamente le viste e da qualificare
-dispositivi fisici, pairing, installazione, firma e distribuzione. Nessuna
-pubblicazione, PR o release è autorizzata da queste prove.
+Log, screenshot sintetici e ricevuta con hash restano fuori Git in
+`tmp-086-macos-redesign/`. Nel perimetro di questa verifica rimangono aperte
+la valutazione estetica delle viste e la qualifica di dispositivi fisici,
+pairing, installazione, firma e distribuzione. Le prove non autorizzano
+pubblicazione, PR o release.

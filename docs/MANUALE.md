@@ -1,11 +1,11 @@
 # Manuale Operativo MediFlow
 
-> Guida pratica per partire in pochi minuti.
+> Guida pratica all'avvio locale e alle prime operazioni.
 
-Riferimenti utili:
-- [README.md](../README.md) (onboarding rapido progetto)
-- [docs/COMPLIANCE.md](./COMPLIANCE.md) (quadro privacy/GDPR/FHIR)
-- [docs/ROADMAP.md](./ROADMAP.md) (direzione prodotto)
+Per orientarti prima dell'avvio o approfondire una scelta:
+- [README.md](../README.md) presenta il progetto e il primo accesso;
+- [docs/COMPLIANCE.md](./COMPLIANCE.md) raccoglie il quadro privacy/GDPR/FHIR;
+- [docs/ROADMAP.md](./ROADMAP.md) descrive la direzione del prodotto.
 
 ---
 
@@ -24,23 +24,27 @@ Riferimenti utili:
 4. Dopo l'avvio, apri:
     `http://localhost:3000`
 
-> La prima esecuzione può richiedere più tempo per il download dei modelli AI.
-> `Start_MediFlow.command` avvia la web app locale; l'eventuale client macOS segue un launcher separato.
+> Se scegli i modelli AI locali, il loro download può allungare la prima
+> esecuzione; non sono necessari per usare il gestionale.
+> `Start_MediFlow.command` avvia la web app locale, mentre l'eventuale client
+> macOS ha un launcher separato.
 
 ---
 
 ## 🔑 2. Sicurezza e PIN
 
-Al primo avvio ti chiederò di creare un **Profilo Medico** e un **PIN**.
+Al primo avvio MediFlow ti chiede di creare un **Profilo Medico** e un
+**PIN**, con cui proteggere l'accesso ai dati cifrati.
 
 ### Regola d'oro
 
-Il PIN è la chiave che protegge i dati.
+Il PIN protegge i dati attraverso la gestione locale della chiave: conservarlo
+è quindi essenziale per poterli riaprire.
 
 > [!WARNING]
 > **Se perdi il PIN, MediFlow non può aprire i campi clinici cifrati con quella chiave.** Non c'è "recupero password" via email, né un servizio centrale di recupero.
 
-Questo è un confine della gestione locale delle chiavi, non un claim di cifratura integrale del database.
+La protezione è a livello di campo, non di intero database: il limite di recupero riguarda le chiavi gestite localmente e i campi che esse proteggono.
 
 ---
 
@@ -48,29 +52,39 @@ Questo è un confine della gestione locale delle chiavi, non un claim di cifratu
 
 ### Ambulatori Multipli
 
-Puoi creare più ambulatori (es. "Studio Roma", "Guardia Medica").
+Puoi distinguere le sedi di lavoro creando più ambulatori, per esempio
+"Studio Roma" e "Guardia Medica".
 
-* Ogni ambulatorio ha un colore.
-* I pazienti possono essere assegnati in modo esplicito.
+* Ogni ambulatorio ha un colore che lo distingue.
+* L'assegnazione dei pazienti all'ambulatorio è esplicita.
 
 ### Scheda Paziente
 
-Dalla lista, **Apri scheda paziente** porta in un clic alla scheda; il **Quadro** apre la stessa vista dentro il cockpit, senza rimontare la rotta.
+Dalla lista, **Apri scheda paziente** porta direttamente alla scheda;
+il **Quadro** mostra la stessa vista dentro il cockpit, senza ricaricarne
+la rotta.
 
-* **Anagrafica**: A sinistra.
-* **Diario Clinico**: Al centro. Scrivi le note visita per visita. Le voci eliminate restano recuperabili con motivo tracciato e possono essere ripristinate; lo stesso vale per terapie, checkup e osservazioni.
-* **Storia**: A destra vedi i riassunti dei vecchi documenti.
+* **Anagrafica**: a sinistra, per mantenere riconoscibile il paziente.
+* **Diario Clinico**: al centro, dove scrivere le note visita per visita.
+  Le voci eliminate restano recuperabili e possono essere ripristinate, con
+  motivo tracciato; lo stesso vale per terapie, checkup e osservazioni.
+* **Storia**: a destra, con i riassunti dei documenti precedenti.
 
-Il pannello **Cosa rivedere adesso** raccoglie quello che l'AI locale ti mette davanti da approvare: nessuna voce viene scritta in cartella senza la tua conferma.
+Quando usi l'AI locale, il pannello **Cosa rivedere adesso** raccoglie le
+proposte da approvare. Vederle qui non equivale ad averle registrate:
+nessuna voce viene scritta in cartella senza la tua conferma.
 
-La lista pazienti mostra anche una piccola **agenda operativa** sui casi visibili:
-PRIAMO, valutazioni, visite e follow-up già pianificati nella sezione controlli.
+Per riprendere il lavoro sui casi visibili senza aprire ogni scheda,
+la lista pazienti mostra anche una piccola **agenda operativa**: PRIAMO,
+valutazioni, visite e follow-up già pianificati nella sezione controlli.
 
 ---
 
 ## 🤖 4. AI locale (senza internet)
 
-MediFlow può leggere documenti clinici e produrre sintesi direttamente in locale.
+Con le funzioni AI locali abilitate, MediFlow può aiutarti a leggere i
+documenti clinici e prepararne sintesi sul computer, senza richiedere
+internet per l'elaborazione.
 
 ### Caricare un documento
 
@@ -80,10 +94,15 @@ MediFlow può leggere documenti clinici e produrre sintesi direttamente in local
 
 ### Cosa succede?
 
-1. **OCR**: estrae testo da PDF o immagine. I documenti senza testo finiscono nella **Coda OCR**, con stato e motivo in italiano e riprocesso possibile; finché il testo non basta, l'AI non avanza proposte cliniche.
-2. **Sintesi clinica**: produce un riassunto strutturato, da rivedere prima di tenerlo. Eventuali errori restano visibili invece di sparire in silenzio.
-    * *Esempio*: Invece di leggere 10 pagine di referto ospedaliero, vedrai: *"Paziente dimesso dopo polmonite. Terapia: Augmentin per 5gg. Controllo RX tra 1 mese."*
-3. **Archiviazione**: documento e sintesi restano associati al paziente.
+1. **OCR**: estrae il testo da PDF o immagine. I documenti senza testo entrano
+   nella **Coda OCR**, che ne mostra stato e motivo in italiano e permette di
+   riprovare; finché il testo non basta, l'AI non avanza proposte cliniche.
+2. **Sintesi clinica**: prepara un riassunto strutturato che devi rivedere
+   prima di conservarlo. Gli eventuali errori restano visibili.
+    * *Esempio*: Un referto ospedaliero di 10 pagine può dare luogo a una sintesi
+      come: *"Paziente dimesso dopo polmonite. Terapia: Augmentin per 5gg. Controllo RX tra 1 mese."*
+3. **Archiviazione**: documento e sintesi restano associati al paziente,
+   così da poterli ritrovare nello stesso contesto.
 
 > [!NOTE]
 > L'elaborazione avviene sul tuo computer. Nessun dato paziente viene inviato a servizi cloud di default.
@@ -94,13 +113,14 @@ MediFlow può leggere documenti clinici e produrre sintesi direttamente in local
 
 ### Terapie
 
-Puoi aggiungere farmaci e mantenere una lista terapie aggiornata.
+Puoi aggiungere farmaci alla scheda e aggiornare la lista delle terapie
+per mantenerla allineata al lavoro sul paziente.
 
 ### Diagnosi e resolver ICD-11
 
-Il resolver OMS ICD-11 è opzionale: può proporre un codice strutturato, che
-resta da rivedere prima del salvataggio. I problemi clinici possono anche
-restare free-text.
+La diagnosi può restare un testo libero. Quando è utile affiancarle una
+codifica, il resolver OMS ICD-11 può proporre un codice strutturato: il servizio
+è opzionale e il suggerimento resta da rivedere prima del salvataggio.
 
 * Inserisci una diagnosi e, quando utile, richiedi un suggerimento codificato
   (es. `5A10`).
@@ -111,25 +131,37 @@ restare free-text.
 
 ## 🍎 6. App nativa (sperimentale)
 
-Se lavori su Mac, puoi usare anche il client nativo.
+Il client nativo Mac è un percorso sperimentale separato: la release 0.8.6
+è distribuita come sorgente e il seguito nativo non è necessario per usare
+il runtime locale attraverso il browser.
 
-* **Vantaggi**: avvio rapido, integrazione macOS, lock screen con PIN.
-* **Come si usa**: Avvia lo script `Launch_MediFlowMac.command` nella cartella principale, separatamente da `Start_MediFlow.command`.
-* **Nota**: il vecchio shell macOS resta uno snapshot alpha mentre il lavoro attivo prosegue sul backend/API `home-base`. In caso di problemi usa l'interfaccia web, che resta la superficie operativa primaria.
+* **Vantaggi**: avvio rapido, integrazione macOS e schermata di blocco con PIN.
+* **Come si usa**: avvia lo script `Launch_MediFlowMac.command` nella cartella
+  principale, separatamente da `Start_MediFlow.command`.
+* **Nota**: la vecchia shell macOS resta una fotografia alpha, mentre il
+  lavoro attivo prosegue sul backend/API `home-base`. In caso di problemi
+  usa l'interfaccia web, che resta la superficie operativa primaria.
 
 ---
 
 ## 📚 FAQ
 
 **Posso usarlo su iPad?**
-Stiamo lavorando ai client dedicati. Per ora il computer principale resta l'home base; iPadOS e iPhone sono in definizione sopra il contratto locale `/api/v1`, senza accesso diretto al database remoto.
+I client dedicati sono in sviluppo. Il computer principale resta la home-base:
+iPadOS e iPhone sono in definizione sul contratto locale `/api/v1`, senza
+accesso diretto al database remoto. Non sono app complete distribuite con
+la release sorgente.
 
 **Se mi si rompe il computer?**
-I dati sono nel file `medical.db`.
-Usa **Esporta Backup** regolarmente e conserva il file in una posizione sicura (es. disco esterno). In caso di guasto, reinstalli MediFlow e ripristini backup + PIN.
+I dati risiedono nel file `medical.db`: usa regolarmente **Esporta Backup**
+e conserva il file in un luogo sicuro, per esempio un disco esterno.
+In caso di guasto, il ripristino richiede di reinstallare MediFlow e recuperare
+backup e PIN.
 
 **È a norma GDPR?**
-MediFlow implementa misure tecniche forti (cifratura, local-first). La conformità legale completa dipende anche dalle tue misure organizzative e operative.
+Cifratura e gestione locale dei dati sono misure tecniche, non una garanzia
+complessiva di conformità. La conformità legale dipende anche dalle misure
+organizzative e operative con cui usi il sistema.
 
 ---
 Per supporto, apri una issue o consulta la documentazione tecnica.

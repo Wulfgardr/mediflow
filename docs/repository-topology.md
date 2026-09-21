@@ -9,31 +9,38 @@ read_when:
 
 Ultimo aggiornamento: 2026-09-05
 
-Mappa concisa delle aree top-level del repository, pensata per orientare agent e
-contributor: distingue il **runtime clinico** (codice che gira con dati paziente)
-dagli **artefatti di pubblicazione/sito** e dagli **strumenti di sviluppo**.
+Questa mappa aiuta agenti e contributori a collocare il lavoro senza confondere
+ambiti che hanno responsabilità diverse: il **runtime clinico**, cioè il codice
+che lavora con i dati paziente, gli **artefatti di pubblicazione e del sito** e
+gli **strumenti di sviluppo**.
 
 ## Orientarsi prima dei percorsi
 
-Il gestionale si costruisce qui. Per orientarsi, conviene distinguere tre aree: il prodotto che lavora sulla
-cartella, gli strumenti che lo costruiscono e verificano, e i documenti che lo
-spiegano. Il sito [Get MediFlow](https://getmediflow.dev) è il riferimento di presentazione del prodotto: non
-ospita la cartella, non importa i servizi clinici e non riceve dati del runtime.
+Il gestionale si costruisce in questa repository, insieme agli strumenti che
+lo verificano e ai documenti che lo spiegano. Il sito
+[Get MediFlow](https://getmediflow.dev) presenta invece il prodotto: non ospita
+la cartella, non importa i servizi clinici e non riceve dati del runtime.
+La separazione deve rimanere riconoscibile anche quando codice, documentazione
+e materiali pubblici sono vicini nello stesso albero.
 
-Per chi arriva al progetto: [Inizia qui](./start-here.md). Per la candidatura
-in esame: [readiness 0.8.5](./release-085-readiness.md). Per il sito e l'ordine della documentazione: [piano editoriale](./getmediflow-editorial-proposal.md).
+[Inizia qui](./start-here.md) introduce il progetto;
+[readiness 0.8.5](./release-085-readiness.md) conserva la valutazione di quella
+candidata; il [piano editoriale](./getmediflow-editorial-proposal.md) riguarda
+sito e organizzazione della documentazione. La release 0.8.6 distribuisce
+sorgenti: né questa mappa né la presenza del codice nativo attestano installer
+firmati, notarizzazione o ammissione a un deployment clinico.
 
 ## Repository operativa
 
-[`Wulfgardr/mediflow`](https://github.com/Wulfgardr/mediflow) e l'unica
-repository canonica per sviluppo, issue, branch, pull request, tag e release.
-La precedente repository privata `Wulfgardr/mediflow_private` e archiviata: non
-e una seconda mainline e non riceve piu lavoro operativo.
+[`Wulfgardr/mediflow`](https://github.com/Wulfgardr/mediflow) è l'unica
+repository operativa per sviluppo, issue, branch, pull request, tag e release.
+La precedente `Wulfgardr/mediflow_private` è archiviata: non costituisce una
+seconda linea principale e non riceve più lavoro.
 
-Non esiste un flusso di export private-to-OSS. Tutto cio che puo essere
-pubblicato nasce e viene revisionato qui; database, PHI/PII, credenziali,
-runtime artifact e fonti riservate restano fuori da Git secondo
-[`SECURITY.md`](../SECURITY.md).
+Non c'è quindi un flusso di esportazione dal privato all'OSS. Il materiale
+pubblicabile nasce e viene revisionato qui, mentre database, PHI/PII,
+credenziali, artefatti di esecuzione e fonti riservate rimangono fuori da Git,
+secondo [`SECURITY.md`](../SECURITY.md).
 
 > [!IMPORTANT]
 > Le directory di **publication/site** non vanno trattate come parte del runtime
@@ -48,7 +55,7 @@ runtime artifact e fonti riservate restano fuori da Git secondo
 | `components/` | runtime clinico | Componenti React condivisi. |
 | `lib/` | runtime clinico | Logica di dominio, accesso DB, servizi AI. |
 | `hooks/` | runtime clinico | Custom React hooks. |
-| `drizzle/` | runtime clinico | Schema e migrazioni database locale. |
+| `drizzle/` | schema del runtime clinico | Artefatti SQL storici; non sono migrazioni eseguite automaticamente all’avvio. L’allineamento effettivo spetta ai controlli del backend. |
 | `native/` | runtime clinico (client) | Client macOS/iOS/iPadOS. |
 | `e2e/` | qualità | Test end-to-end Playwright. |
 | `scripts/` | tooling | Script di build, test, benchmark, smoke. |
@@ -63,8 +70,10 @@ runtime artifact e fonti riservate restano fuori da Git secondo
 
 ## Confine Application Services, Fabric e integrazioni opzionali
 
-La topologia intelligente della 0.8.5 resta
-host-owned e locale:
+Le funzioni deterministiche devono poter funzionare senza provider AI. Nella
+topologia della 0.8.5, gli strumenti intelligenti rimangono perciò componenti
+facoltativi, governati localmente dall'host, con responsabilità distribuite
+tra queste aree:
 
 - `app/api/ai/{patient-insight,smart-import,document-synthesis,treatment-reasoning}/`
   contiene gli adapter HTTP autenticati dei quattro smart path generativi;
@@ -84,46 +93,52 @@ host-owned e locale:
   sicura in caso di errore (`fail-closed`) e un registro locale privo di
   contenuto clinico.
 
-ATHENA è inclusa soltanto con runner e modello locali configurati. L'override
-host-owned `MEDIFLOW_ATHENA_MLX_GENERATE_BIN` accetta un eseguibile assoluto
-`mlx_lm.generate`, senza argomenti o shell. Il launcher `uvx` predefinito opera
-offline e fallisce chiuso se la cache richiesta non è disponibile; non prova
-readiness universale.
+ATHENA è inclusa solo quando runner e modello locali sono configurati.
+L'override controllato dall'host `MEDIFLOW_ATHENA_MLX_GENERATE_BIN` accetta un
+percorso assoluto all'eseguibile `mlx_lm.generate`, senza argomenti o shell.
+Il launcher predefinito `uvx` opera offline e si arresta se la cache richiesta
+non è disponibile: la presenza del codice non dimostra che il percorso sia
+pronto su qualsiasi macchina.
 
-Il caller presenta input applicativo tipizzato. ADR 0129 consente soltanto la
-preferenza di un ID opaco presente nel catalogo host corrente, risolta dal
-servizio nominato FunctionModelDispatch. Non sceglie provider, modello libero,
-endpoint, venue, prompt, fallback o apply e non ammette provider. Ogni smart path restituisce
-una proposta review-only con receipt, provenienza e currentness; il production
-root host-owned resta l'unico punto di composizione.
+Il chiamante presenta input applicativo tipizzato. Può esprimere una preferenza,
+ma non costruire un percorso di esecuzione: ADR 0129 ammette soltanto un ID
+opaco del catalogo host corrente, risolto dal servizio FunctionModelDispatch.
+Non può scegliere provider, modello libero, endpoint, sede di esecuzione,
+prompt, ripiego o applicazione del risultato, né ammettere provider. Ogni
+percorso intelligente restituisce una proposta da rivedere, con ricevuta,
+provenienza e validità del contesto; soltanto il production root controllato
+dall'host ne compone l'esecuzione.
 
-AnyDoc resta il primo passaggio. Per i PDF supportati, il tree classifica,
-materializza e renderizza soltanto le pagine `needsOcr`, quindi usa Apple
-Vision localmente sul Mac e ricompone il risultato sotto currentness
-host-owned. Il percorso è review-only e fallisce chiuso. DeepSeek-OCR 2/CUDA
-resta `OUT_OF_SCOPE_FOR_0.8.5_NON_BLOCKING`; il tree ne conserva soltanto il
-contratto e seam sintetiche. Le route OCR legacy, dopo l'autenticazione,
-rispondono `410`.
+AnyDoc esegue il primo passaggio. Per i PDF supportati, il tree classifica,
+prepara e renderizza soltanto le pagine `needsOcr`; Apple Vision lavora poi
+localmente sul Mac e il risultato viene ricomposto con verifica host della
+validità del contesto. Il percorso serve soltanto alla revisione e si arresta
+se mancano i requisiti. DeepSeek-OCR 2/CUDA rimane
+`OUT_OF_SCOPE_FOR_0.8.5_NON_BLOCKING`: il tree ne conserva contratto e raccordi
+sintetici, non una nuova prova operativa. Dopo l'autenticazione, le route OCR
+legacy rispondono `410`.
 
-OpenAI e Anthropic hanno adapter HTTPS ufficiali e probe Document Synthesis
-review-only. Restano `default OFF` e richiedono lifecycle, secret reference e
-policy egress/retention host-owned. I test usano transport fake: il tree non
-contiene credenziali o prove di rete live. Login consumer e subscription non
-equivalgono a una credenziale di inferenza.
+Gli adapter HTTPS ufficiali OpenAI e Anthropic e le probe Document Synthesis
+sono limitati alla revisione. Restano `default OFF` e richiedono ciclo di vita,
+riferimento al segreto e policy di uscita e conservazione dei dati governati
+dall'host. I test qui descritti sostituiscono il trasporto: il tree non contiene
+credenziali né prove di rete live. Un login o un abbonamento consumer non
+fornisce per questo una credenziale di inferenza.
 
-Il selector Fabric opera sulle cinque capability nominate. La discovery mostra
-profili compatibili, lo smoke usa fixture sintetiche e l'attivazione del binding
-è atomica, versionata e reversibile. Non persiste segreti e non qualifica il
-runtime.
+Il selettore Fabric opera sulle cinque funzionalità nominate: mostra i profili
+compatibili, li verifica nello smoke con fixture sintetiche e attiva il
+collegamento in modo atomico, versionato e reversibile. Non conserva segreti
+e non qualifica il runtime; selezione e ammissione restano passaggi diversi.
 
-Un futuro plug-in non può accedere direttamente al database. Può ricevere solo
-il contenuto minimo dopo regole, attivazione esplicita, controlli verificati e
-registrazione. La redazione o pseudonimizzazione deve essere dimostrata per il
-flusso specifico. MediFlow non dichiara anonimizzazione garantita.
+Un futuro plug-in non può accedere direttamente al database. Può ricevere
+soltanto il contenuto minimo, dopo l'applicazione delle regole, l'attivazione
+esplicita, controlli verificati e registrazione. L'oscuramento dei dati
+identificativi o la pseudonimizzazione devono essere dimostrati per quel
+flusso specifico; MediFlow non dichiara un'anonimizzazione garantita.
 
-Le funzioni deterministiche restano disponibili senza provider. Receipt e
-provenienza descrivono l'esecuzione, ma non autorizzano un apply o una scrittura
-clinica.
+La disponibilità delle funzioni deterministiche non dipende dai provider.
+Ricevuta e provenienza descrivono l'esecuzione eventualmente richiesta, ma
+non autorizzano l'applicazione del risultato né una scrittura clinica.
 
 L'[ADR 0086](./adr/0086-intelligent-scaffold-and-graded-automation-boundary.md)
 propone la sequenza comune
@@ -133,24 +148,26 @@ conversazionale e l'automazione graduata restano roadmap.
 
 ## Confine Headless 0.8.5
 
-Un launcher trusted avvia un processo figlio autenticato con ambiente
-allowlisted e RPC AIP ereditato. MCP `stdio` espone catalogo, terminology
-search, Open Loops patient-scoped, proposta follow-up `proposal_only` e query
-semantica bounded read-only. Mini condivide catalogo e foundation CLI ma non ha
-un callsite production del Supervisor e fallisce chiuso senza parent AIP. Gli
-adapter non importano SQLite, non duplicano regole di dominio e non aprono
-listener.
+Un launcher fidato avvia un processo figlio autenticato, con un ambiente
+limitato alle variabili ammesse e RPC AIP ereditato. MCP `stdio` espone
+catalogo, ricerca terminologica, Open Loops nel perimetro del paziente,
+proposte di follow-up `proposal_only` e query semantiche limitate in sola
+lettura. Mini condivide catalogo e base CLI, ma nel perimetro 0.8.5 qui descritto
+non ha un punto di invocazione di produzione del Supervisor e si arresta senza
+parent AIP. Gli adapter non importano SQLite, non duplicano regole di dominio
+e non aprono listener.
 
-Authority, purpose, selezione, scope, lease, currentness e audit restano
-host-owned. Il Supervisor Node locale è il parent trusted e avvia Web
-standalone e MCP come figli distinti su IPC privato ereditato. Il percorso non
-usa broker residente o UDS. La 0.8.5 non dichiara installer, onboarding o
-compatibilità con host MCP esterni.
+L'host conserva autorità, finalità, selezione, scope, lease, verifica della
+validità del contesto e audit. Il Supervisor Node locale svolge il ruolo di
+parent fidato e avvia Web standalone e MCP come figli distinti su IPC privato
+ereditato, senza broker residente o UDS. La 0.8.5 non dichiara installer,
+configurazione iniziale o compatibilità con host MCP esterni.
 
-La transizione stato checkup F10 collega la preview MCP al commit nella UI Web
-trusted. MCP non riceve proof e non può eseguire il commit. Il Web rilegge la
-risorsa e richiede ruolo medico attivo, step-up e gesto operation-specific,
-quindi applica CAS, idempotenza, audit e receipt atomici.
+La transizione di stato del checkup F10 collega un'anteprima MCP a una
+conferma nella UI Web fidata. MCP non riceve proof e non può eseguire il
+commit: il Web deve rileggere la risorsa e richiedere ruolo medico attivo,
+step-up e gesto specifico per l'operazione. CAS, idempotenza, audit e ricevuta
+vengono poi applicati atomicamente.
 
 La topologia distingue due modalità e non le unisce:
 
@@ -181,7 +198,7 @@ e validazione clinica restano fuori dal claim della 0.8.5.
 - I path `tmp-*/` sono esclusi da `tsconfig.typecheck.json` (vedi `exclude`).
 - Non creare mirror operativi o pipeline di export verso la repository privata
   archiviata.
-- Un clone storico puo mantenere remote locali differenti, ma il remote usato
+- Un clone storico può mantenere remote locali differenti, ma il remote usato
   per branch, push e release deve puntare alla repository pubblica canonica.
 - Per la lista completa dei `.md` tracciati, vedi
   [docs/markdown-index.md](./markdown-index.md).
@@ -204,13 +221,14 @@ nell'issue o nel run record, e solo dopo si rimuove il ref:
 | `superseded-by <PR o SHA>` | il lavoro è arrivato su `main` per altra via, o è stato reimplementato | la destinazione verificabile |
 | `abandoned` | il lavoro non serve più | il motivo |
 
-Il motivo della regola. Il residuo `codex/WUL-362-contract-gates` non era un branch
-d'integrazione: era un branch di lavoro ordinario creato da `main` il 21 luglio, a cui
-il 6 agosto è stato aggiunto un commit `wip: igiene di sessione` — la stessa spazzata
-applicata in contemporanea ad altri quattro branch. Quel commit ha reso il branch
-indistinguibile da uno con lavoro residuo, e ogni triage successivo ha dovuto
-ridimostrare da zero che non contenesse nulla. La lease impedisce esattamente questo:
-un branch senza lease non può essere contaminato da una spazzata.
+La regola nasce da un problema concreto. Il residuo
+`codex/WUL-362-contract-gates` era un normale branch di lavoro creato da `main`
+il 21 luglio, non un branch d'integrazione. Il 6 agosto aveva ricevuto il
+commit `wip: igiene di sessione`, applicato contemporaneamente ad altri quattro
+branch. Quel passaggio lo aveva reso indistinguibile da un branch con lavoro
+residuo, costringendo ogni revisione successiva a dimostrare di nuovo che non
+contenesse nulla da promuovere. Il lease impedisce questa ambiguità: un branch
+che non ne dispone non può ricevere neppure una modifica generale di pulizia.
 
 Due avvertenze che il collegio ha ritenuto vincolanti:
 
@@ -221,24 +239,27 @@ Due avvertenze che il collegio ha ritenuto vincolanti:
 - **Il confronto blob-per-blob non lo sostituisce**: fallisce su rename, refactor e
   reimplementazioni semantiche.
 
-La lease governa il *ciclo di vita del ref*, non la *completezza del lavoro*: un branch
-può scadere correttamente portandosi via lavoro mai promosso e mai notato. La lease non
-se ne accorge, perché guarda il ref e non l'albero. La contromisura per quel fallimento
-è di natura diversa — un gate che verifica la coerenza dell'albero, come
-`npm run check:schema-writers`, che rende visibile in CI la differenza fra un'assenza
-decisa e un'assenza dimenticata: nello schema hanno lo stesso aspetto.
+Il lease governa però il *ciclo di vita del ref*, non la *completezza del
+lavoro*. Un branch può scadere correttamente anche se contiene lavoro mai
+promosso e mai riconosciuto: il controllo guarda il riferimento, non l'albero.
+Per accorgersi di questa perdita serve un controllo diverso, sulla coerenza
+dell'albero, come `npm run check:schema-writers`. La CI può così distinguere
+un'assenza decisa da un'assenza dimenticata, che nel solo schema avrebbero lo
+stesso aspetto.
 
 ## Gate del confine AI → scrittura clinica
 
-`npm run check:ai-clinical-writes` (`scripts/check-ai-clinical-write-gate.mjs`) è la
-traduzione eseguibile di [ADR 0084](./adr/0084-document-diagnoses-review-only.md) e
-[ADR 0086](./adr/0086-intelligent-scaffold-and-graded-automation-boundary.md), fino a
-oggi affidate alla sola disciplina.
+Il confine tra proposta AI e scrittura clinica non può dipendere soltanto
+dalla disciplina di chi modifica il codice.
+`npm run check:ai-clinical-writes` (`scripts/check-ai-clinical-write-gate.mjs`)
+rende eseguibili i controlli previsti da
+[ADR 0084](./adr/0084-document-diagnoses-review-only.md) e
+[ADR 0086](./adr/0086-intelligent-scaffold-and-graded-automation-boundary.md).
 
-Nella 0.8.5 i quattro smart path attraversano route autenticate. La
-route resta un adapter: il punto di enforcement è il **production root e il
-writer del servizio**. Un controllo limitato ai nomi delle route non dimostra
-la separazione tra proposta e scrittura.
+Nella 0.8.5 i quattro percorsi intelligenti attraversano route autenticate,
+ma la route rimane un adapter. I vincoli devono essere applicati nel
+**production root e nel writer del servizio**: controllare soltanto il nome
+della route non dimostra che proposta e scrittura siano separate.
 
 Il confine ha due lati e il gate controlla entrambi:
 

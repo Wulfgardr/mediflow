@@ -8,54 +8,56 @@ read_when:
 
 ## Contratto corrente
 
-La proposta del 21 agosto è sostituita, per il runtime descritto qui, da
+Per comprendere il runtime descritto qui occorre partire da
 [ADR 0117](../adr/0117-headless-portable-agent-first-and-capability-first-fabric.md)
 e dai confini di isolamento di
-[ADR 0114](../adr/0114-intelligent-host-aip-mcp-isolation.md).
-I manifest dei vecchi rami WUL-553/554/555 e i comandi proposti `grant`, `login`,
-`whoami`, `patient show` e `apply` non descrivono il runtime attuale.
-WUL-557 e i crosswalk referenziali restano evidenza del loro perimetro storico:
-i loro conteggi non misurano le operazioni della sessione production.
+[ADR 0114](../adr/0114-intelligent-host-aip-mcp-isolation.md), che sostituiscono
+la proposta del 21 agosto. I manifest dei vecchi rami WUL-553/554/555 e i
+comandi allora proposti — `grant`, `login`, `whoami`, `patient show` e `apply` —
+non descrivono il runtime attuale. WUL-557 e i confronti referenziali
+conservano il proprio valore storico: i loro conteggi non misurano le
+operazioni della sessione production.
 
-La lane WUL-696 aggiunge un callsite production esplicito: il Supervisor
-Node 24 avvia Web standalone e Mini come figli distinti, con IPC privato
-ereditato. Il comando MCP predefinito continua ad avviare Web e MCP.
-Ogni avvio possiede la propria coppia; non adotta Web già in esecuzione.
-Il primo incremento `703e3d49f` provava soltanto la composizione stato/catalogo.
-Il secondo collega alla sessione tutti i comandi esistenti della CLI: non
-abbassa il DoD di ADR0117 a status-only e non amplia le capability host.
+WUL-696 aggiunge un punto esplicito di avvio production: il Supervisor
+Node 24 avvia Web standalone e Mini come figli distinti, collegati da IPC
+privato ereditato. Il comando MCP predefinito continua invece ad avviare Web
+e MCP. Ogni avvio possiede la propria coppia e non adotta un Web già aperto.
+Il primo incremento `703e3d49f` provava soltanto la composizione stato/catalogo;
+il secondo collega alla sessione tutti i comandi esistenti della CLI,
+senza ridurre il DoD di ADR0117 al solo stato né ampliare le capability host.
 
 ## Avvio e autorizzazione
 
-Prerequisiti: dipendenze Node 24 e artifact Web standalone già costruito dal
-checkout pertinente. Per la sessione Mini:
+La sessione Mini richiede le dipendenze Node 24 e l'artefatto Web standalone
+già costruito dalla checkout pertinente. Per avviarla:
 
 ```sh
 npm run mini:production
 ```
 
-Equivale al launcher `scripts/mediflow-headless-supervisor.mjs --mini`.
-Il processo rimane aperto e riceve una richiesta JSON per riga, per esempio:
+Il comando equivale al launcher `scripts/mediflow-headless-supervisor.mjs --mini`.
+Il processo rimane aperto per ricevere una richiesta JSON per riga, per esempio:
 
 ```json
 {"command":"status","args":{}}
 {"command":"capabilities","args":{}}
 ```
 
-Prima dell'attivazione, status mostra `transport: connected`,
-`session: not_unlocked`, `ready: false`, capacità vuote e il passo
-`AUTHORIZE_IN_OWNED_WEB`. Catalogo e operazioni sono negati con
-`SESSION_NOT_UNLOCKED`.
-L'operatore deve aprire il Web figlio su localhost:3000, autenticarsi, selezionare
-il contesto e usare il controllo Intelligent Host. Un login da solo non attiva
-AIP. Mini non accetta cookie, PIN, identità o selezione come argomenti.
+Prima dell'attivazione, status distingue connessione e autorizzazione:
+mostra `transport: connected`, `session: not_unlocked`, `ready: false`,
+capacità vuote e il passo `AUTHORIZE_IN_OWNED_WEB`. Catalogo e operazioni
+sono negati con `SESSION_NOT_UNLOCKED`. L'operatore deve aprire su
+localhost:3000 il Web figlio, autenticarsi, selezionare il contesto e usare
+il controllo Intelligent Host: il solo login non attiva AIP. Cookie, PIN,
+identità e selezione non sono accettati da Mini come argomenti.
 
-Dopo l'ACK Web e il bootstrap AIP monouso, ogni richiesta interroga il catalogo
-host; il launcher rilegge il mirror autoritativo anche per le richieste di
-metadati. Status mostra `session: authorized` e `ready: true` soltanto con un
-catalogo corrente non vuoto. `capabilities` restituisce il catalogo host e gli
-stadi massimi: non è un grant di esecuzione. Le operazioni passano dagli stessi
-metodi OperationClient, Application Services e gate già usati dalla CLI.
+Dopo l'ACK Web e il bootstrap AIP monouso, ogni richiesta consulta il
+catalogo host; il launcher rilegge il mirror autorevole anche quando vengono
+chiesti soltanto metadati. Status può mostrare `session: authorized` e
+`ready: true` solo con un catalogo corrente non vuoto. `capabilities`
+restituisce quel catalogo e gli stadi massimi, senza concedere l'esecuzione.
+Le operazioni attraversano gli stessi metodi OperationClient, Application
+Services e controlli di accesso già usati dalla CLI.
 
 | Comando | Argomenti | Esito massimo |
 | --- | --- | --- |
@@ -72,65 +74,73 @@ Esempio innocuo dopo l'attivazione Web:
 {"command":"terminology search","args":{"system":"LOINC","query":"emoglobina","limit":2}}
 ```
 
-Scope, patient ID, authority, provider e SQL non sono opzioni dei comandi.
-Gli schemi strict rimangono quelli in `packages/mcp/src/contracts.ts`.
+I comandi non permettono di scegliere scope, patient ID, authority, provider
+o SQL. Gli schemi restano chiusi e definiti in `packages/mcp/src/contracts.ts`.
 
-La connessione IPC da sola non prova l'autorizzazione. Senza parent valido,
-Mini restituisce `TRANSPORT_UNBOUND`, `ok: false`, `ready: false` ed exit 69.
-Un errore operativo restituisce un errore tipizzato, senza riusare il catalogo.
+Essere collegati via IPC non basta a essere autorizzati. Se manca un parent
+valido, Mini restituisce `TRANSPORT_UNBOUND`, `ok: false`, `ready: false`
+ed exit 69; un errore operativo produce invece un errore tipizzato, senza
+riusare il catalogo.
 
 ## Output e limiti
 
-La sessione usa envelope `mediflow.mini.session.v1`: una risposta NDJSON per
-richiesta. `ok` indica l'esito della richiesta; per status occorre leggere anche
-`session` e `ready`. Nessun banner è scritto su stdout. La diagnostica Web e
-Supervisor va su stderr. CLI e sessione condividono parsing, dispatch e
-serializer in `packages/mini/src/protocol.ts`: i DTO operativi restano identici
-e il serializer non invoca `toJSON` ereditati su oggetti o array.
+La sessione risponde a ogni richiesta con una riga NDJSON nell'envelope
+`mediflow.mini.session.v1`. Il campo `ok` descrive l'esito della richiesta;
+per status occorre leggere anche `session` e `ready`. Stdout non contiene
+banner, mentre la diagnostica di Web e Supervisor va su stderr. CLI e
+sessione condividono parsing, dispatch e serializer in
+`packages/mini/src/protocol.ts`, mantenendo identici i DTO operativi;
+il serializer non invoca `toJSON` ereditati da oggetti o array.
 
-Limiti: 16 KiB per frame UTF-8, schemi di comando chiusi, massimo 64
-richieste sequenziali per processo. Ogni riga deve terminare con newline.
-Input invalido o budget esaurito termina con exit 2. Un errore operativo termina
-con exit 70 e scarta i comandi ancora in coda; perdita IPC o errore stream con exit 69. EOF ordinato termina con
-exit 0 dopo le risposte; chiude Mini e la coppia posseduta dal Supervisor.
-La terminazione imposta dal parent può essere osservata come segnale OS.
+Ogni frame UTF-8 ha un limite di 16 KiB e segue uno schema di comando chiuso;
+un processo ammette al massimo 64 richieste sequenziali, ciascuna terminata
+da newline. Input invalido o budget esaurito portano a exit 2. Un errore
+operativo porta a exit 70 e scarta i comandi in coda; perdita IPC o errore
+dello stream portano a exit 69. Con EOF ordinato, le risposte precedono
+exit 0, che chiude Mini e la coppia posseduta dal Supervisor. Una terminazione
+imposta dal parent può apparire come segnale OS.
 
-Lock, logout, reselection, expiry e perdita di Web o Mini revocano e chiudono
-il runtime. Non c'è rebind: serve un nuovo avvio e una nuova attivazione Web.
-Nessun broker residente, socket, listener Mini, accesso SQLite diretto,
-credenziale persistita o potere apply clinico viene aggiunto.
+Lock, logout, nuova selezione, scadenza e perdita di Web o Mini revocano
+e chiudono il runtime. Non è previsto rebind: per riprendere servono un nuovo
+avvio e una nuova attivazione Web. Il percorso non aggiunge broker residente,
+socket, listener Mini, accesso diretto a SQLite, credenziali persistenti
+o autorità per applicare modifiche cliniche.
 
 ## CLI a richiesta singola
 
-`npm run mini` conserva l'envelope `mediflow.mini.transport.v1` e una sola
-richiesta su stdin fino a EOF. Gli adapter esistenti comprendono status,
-capabilities, terminology search, open-loops, follow-up-proposal e semantic-query;
-richiedono comunque il parent AIP. La sessione riusa gli stessi adapter senza
-nuove autorizzazioni. Lo status storico della CLI singola non è lo status di
-readiness della sessione Supervisor.
+`npm run mini` conserva l'envelope `mediflow.mini.transport.v1` e legge
+una sola richiesta da stdin fino a EOF. Gli adapter esistenti — status,
+capabilities, terminology search, open-loops, follow-up-proposal e
+semantic-query — richiedono comunque il parent AIP. La sessione li riusa
+senza nuove autorizzazioni, ma il significato storico dello status della
+CLI singola non coincide con la disponibilità operativa della sessione
+Supervisor.
 
 ## Punto d'innesto e prove
 
-Il coordinatore può collegare onboarding/UI al controller Web esistente
-`activateCurrentSelection` in
-`lib/security/portable-supervisor-web-session-controller.ts`, preservando
-H1a, capture owner, selezione e ACK. Nessuna UI o wizard è modificata qui.
+Il coordinatore può collegare configurazione iniziale e UI al controller Web
+esistente `activateCurrentSelection` in
+`lib/security/portable-supervisor-web-session-controller.ts`, purché conservi
+H1a, capture owner, selezione e ACK. Questo intervento non modifica UI
+né wizard.
 
 `lib/security/portable-supervisor-mini-production.test.ts` compone il root
-production con Mini reale e una fixture Web benigna: usa projection autentiche
-del lifecycle owner, owner di selezione/capture, controller e bridge IPC reali.
-Il gesto browser e l'acquisizione H1a sono sorgenti di test; non prova il login
-HTTP o il server Next standalone costruito. Copre stato prima/dopo il binding,
-catalogo, lock, reselection, EOF e perdita Web. Dopo il binding esegue una
-ricerca terminologica tramite Application Service production, con receipt e
-audit persistito su database sintetico. Tutti i comandi sono negati prima del
-binding e dopo la revoca per drift della versione sintetica.
+production con Mini reale e una fixture Web benigna. Usa proiezioni autentiche
+del lifecycle owner, owner di selezione/capture, controller e bridge IPC reali,
+mentre gesto browser e acquisizione H1a provengono dal test: non prova quindi
+il login HTTP né il server Next standalone costruito. Copre stato prima e
+dopo il binding, catalogo, lock, nuova selezione, EOF e perdita Web. Dopo il
+binding esegue una ricerca terminologica attraverso l'Application Service
+production, con ricevuta e audit persistito su database sintetico. Tutti i
+comandi sono negati prima del binding e dopo la revoca dovuta al cambiamento
+della versione sintetica.
 
-La parità dei DTO e l'arresto della coda dopo denial per tutte le operazioni
-sono verificati anche via IPC con fixture di servizi in `cli.test.ts`.
-`protocol.test.ts` verifica la serializzazione isolata. La sola ricerca
-terminologica production non prova l'intero DoD clinico: letture Open Loops,
+La parità dei DTO e l'arresto della coda dopo un diniego sono verificati
+per tutte le operazioni anche via IPC, con fixture di servizi in `cli.test.ts`;
+`protocol.test.ts` verifica separatamente la serializzazione. La ricerca
+terminologica production non esaurisce il DoD clinico: letture Open Loops,
 proposte e planner su fonti cliniche production richiedono prove end-to-end
-separate per l'integrazione finale, senza ridurre quel gate.
-Le regressioni Mini/MCP/Headless sono gate separati. Smoke tri-OS, onboarding,
-integrazione nel candidato finale e release non sono attestati da queste prove.
+separate per l'integrazione finale, senza ridurre il criterio di accettazione.
+Le regressioni Mini/MCP/Headless restano controlli separati e queste prove
+non attestano smoke tri-OS, onboarding, integrazione nel candidato finale
+o release.
