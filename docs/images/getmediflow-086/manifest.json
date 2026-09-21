@@ -54,6 +54,26 @@
       "capturedAt": "2026-09-07T23:58:59.652Z"
     },
     {
+      "file": "athena-flow.png",
+      "sha256": "fa507d175f4f13d9af6af3bb9ab3efbc3387e31fe5e09e19c705797e87af6466",
+      "width": 1252,
+      "height": 741,
+      "title": "Flusso sintetico ATHENA review-only",
+      "sourceCommit": "97e5303e612d5ffa50da77ed21dca15bd5802727",
+      "capturedAt": "2026-09-21T11:33:54Z",
+      "status": "Illustrative Get MediFlow UI captured from invented data; not an active ATHENA session or clinical result."
+    },
+    {
+      "file": "headless-agent.png",
+      "sha256": "9a5a6e02c02fe2d1d03596496ee83d7779fa53d34081bbe6714db2d82cabf5f7",
+      "width": 1252,
+      "height": 730,
+      "title": "Demo sintetica Mini e Codex Astra Low",
+      "sourceCommit": "97e5303e612d5ffa50da77ed21dca15bd5802727",
+      "capturedAt": "2026-09-21T11:33:54Z",
+      "status": "Roadmap 1.0 illustration from Get MediFlow; not a connected Codex session or 0.8.6 availability claim."
+    },
+    {
       "file": "analytics.png",
       "sha256": "1e07d520def16bc7b36fb67e37b9be5606b555b90f04457f249ddc1273f3115a",
       "width": 2880,

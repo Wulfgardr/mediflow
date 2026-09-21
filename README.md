@@ -155,6 +155,15 @@ un’autorizzazione a scegliere liberamente provider, endpoint o modalità d’i
 
 Ollama può servire i primi tre percorsi, mentre ATHENA/MLX è opzionale e
 riservata a Treatment Reasoning, con configurazione e verifiche locali proprie.
+
+![Flusso sintetico ATHENA: contesto, motivi della proposta e bozza da rivedere](./docs/images/getmediflow-086/athena-flow.png)
+
+La simulazione mostra il percorso completo senza presentare un risultato
+clinico come reale: ATHENA raccoglie un contesto delimitato, espone le fonti e
+i motivi verificabili della proposta, quindi consegna una bozza `review-only`.
+Non prescrive, non modifica la terapia e non salva automaticamente nella
+cartella. I dati e la situazione rappresentata sono inventati.
+
 L’integrazione ChatGPT resta opzionale e spenta per impostazione predefinita.
 Il percorso esterno richiede configurazione, consenso e controlli pertinenti
 all’operazione; non viene dichiarata una nuova prova live di account/provider
@@ -305,6 +314,15 @@ Mac; MCP comunica tramite stdio. Per una funzione riferita al paziente servono
 autenticazione, selezione e attivazione esplicita nell’interfaccia fidata.
 Revoca, logout, cambio di selezione o scadenza chiudono l’autorizzazione, il
 *grant*, senza trasferirla all’agente.
+
+![Demo sintetica Mini e Codex Astra Low attraverso il Supervisor MediFlow](./docs/images/getmediflow-086/headless-agent.png)
+
+La schermata racconta il passaggio dall’interfaccia all’uso agentico: il client
+riceve soltanto il contesto autorizzato, consulta fonti nominate, rende visibili
+stato e motivi della proposta e rimanda il risultato alla revisione nel Web.
+È un’illustrazione animata della roadmap 1.0, acquisita da Get MediFlow con dati
+inventati: non è una sessione Codex collegata e non prova disponibilità nella
+release 0.8.6.
 
 Questo accesso non concede un diritto generale sul database o scritture
 cliniche fuori dai controlli applicabili. La 0.8.6 non richiede né qualifica
