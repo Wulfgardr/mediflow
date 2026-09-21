@@ -67,10 +67,12 @@ automaticamente alla 0.8.6.
 <details>
 <summary><strong>Le terapie, da vicino</strong></summary>
 
-![Terapie del paziente con dati sintetici](./docs/images/getmediflow-086/record.png)
+![Terapie di Elena Moretti, paziente fittizia, con Ramipril 5 mg e ATC C09AA05](./docs/images/getmediflow-086/record.png)
 
 Una schermata dell’interfaccia reale, con dati interamente sintetici, mostra
-come le terapie restino consultabili nel contesto della cartella.
+come le terapie restino consultabili nel contesto della cartella. Ramipril
+5 mg e il codice ATC C09AA05 sono coerenti; l’esempio non costituisce
+un’indicazione terapeutica.
 
 </details>
 
@@ -156,13 +158,13 @@ un’autorizzazione a scegliere liberamente provider, endpoint o modalità d’i
 Ollama può servire i primi tre percorsi, mentre ATHENA/MLX è opzionale e
 riservata a Treatment Reasoning, con configurazione e verifiche locali proprie.
 
-![Flusso sintetico ATHENA: contesto, motivi della proposta e bozza da rivedere](./docs/images/getmediflow-086/athena-flow.png)
+![Pannello reale Treatment Reasoning con risultato sintetico ATHENA da rivedere](./docs/images/getmediflow-086/athena-flow.png)
 
-La simulazione mostra il percorso completo senza presentare un risultato
-clinico come reale: ATHENA raccoglie un contesto delimitato, espone le fonti e
-i motivi verificabili della proposta, quindi consegna una bozza `review-only`.
-Non prescrive, non modifica la terapia e non salva automaticamente nella
-cartella. I dati e la situazione rappresentata sono inventati.
+La cattura proviene dal componente MediFlow effettivo nello stato riuscito e
+usa un risultato sintetico: ATHENA raccoglie un contesto delimitato, espone le
+fonti e i motivi verificabili della proposta, quindi consegna una bozza da
+rivedere. Non prescrive, non modifica la terapia e non salva automaticamente
+nella cartella. I dati e la situazione rappresentata sono inventati.
 
 L’integrazione ChatGPT resta opzionale e spenta per impostazione predefinita.
 Il percorso esterno richiede configurazione, consenso e controlli pertinenti
@@ -315,7 +317,7 @@ autenticazione, selezione e attivazione esplicita nell’interfaccia fidata.
 Revoca, logout, cambio di selezione o scadenza chiudono l’autorizzazione, il
 *grant*, senza trasferirla all’agente.
 
-![Demo sintetica Mini e Codex Astra Low attraverso il Supervisor MediFlow](./docs/images/getmediflow-086/headless-agent.png)
+![Demo sintetica dell’esperienza Codex con sidebar, chat e composer Astra Low](./docs/images/getmediflow-086/headless-agent.png)
 
 La schermata racconta il passaggio dall’interfaccia all’uso agentico: il client
 riceve soltanto il contesto autorizzato, consulta fonti nominate, rende visibili
@@ -356,9 +358,9 @@ la parità FHIRv2 resta da verificare.
 
 | Snapshot | Periodo dei log disponibili | Token di sessione | Ripartizione | Cache letta | Copertura storica |
 | :-- | :-- | --: | :-- | --: | :-- |
-| **21 settembre 2026** | 2026-02-01 → 2026-09-21 | **50.214.967.557** | Codex 44.177.414.802 · Claude Code 6.037.552.755 | 48.055.125.677 (95,7%) | Codex attestata · Claude Code attestata |
+| **21 settembre 2026** | 2026-02-01 → 2026-09-21 | **50.285.467.538** | Codex 44.247.914.783 · Claude Code 6.037.552.755 | 48.123.937.197 (95,7%) | Codex attestata · Claude Code attestata |
 
-<img src="./screenshots/token-models.svg" alt="Snapshot 21 settembre 2026: 50,21 Mld token di sessione, 44,18 Mld in Codex e 6,04 Mld in Claude Code; 48,06 Mld da cache letta." width="720" loading="lazy"/>
+<img src="./screenshots/token-models.svg" alt="Snapshot 21 settembre 2026: 50,29 Mld token di sessione, 44,25 Mld in Codex e 6,04 Mld in Claude Code; 48,12 Mld da cache letta." width="720" loading="lazy"/>
 
 La fonte è **CodexBar 0.60.3**, comando locale `cost --refresh`, con una finestra massima di 365 giorni. Il conteggio usa gli aggregati disponibili per Codex e Claude Code e non è filtrato per repository. CodexBar attribuisce ogni token al processo che lo registra. Un worker OpenAI avviato da Claude Code compare quindi nel totale Claude Code. Il grafico indica lo strumento che registra i token, non il fornitore del modello.
 

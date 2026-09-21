@@ -36,12 +36,12 @@
     {
       "file": "record.png",
       "sourceFile": "therapies.png",
-      "sha256": "1a9136ba0e250f3240a5ef7a8f1e15c8265256ea7a2290ad8f65b414d35807c1",
-      "width": 1440,
-      "height": 1000,
-      "title": "Terapie",
-      "sourceCommit": "ddff0a929fbe4d60f144b64c55269892ec2419f6",
-      "capturedAt": "2026-09-07T23:58:59.652Z"
+      "sha256": "98d3d6d551c7644cd164c823c9463f779fb71f268676e46ad83f22bb92565a00",
+      "width": 1920,
+      "height": 1200,
+      "title": "Terapie con Ramipril e ATC coerente",
+      "sourceCommit": "c7c741ccc65e9d5987e5f6dd720c1b21f544eeb2",
+      "capturedAt": "2026-09-21T12:40:13Z"
     },
     {
       "file": "access.png",
@@ -55,22 +55,22 @@
     },
     {
       "file": "athena-flow.png",
-      "sha256": "4bd0085f8655372a4e6e1a1a84187e72fca99f3218c7e7c193ba8ee0a4c8fabe",
-      "width": 1252,
-      "height": 741,
-      "title": "Flusso sintetico ATHENA review-only",
-      "sourceCommit": "6f7fd7384b016dfa6e6f90708549122df6ecf855",
-      "capturedAt": "2026-09-21T11:33:54Z",
-      "status": "Illustrative Get MediFlow UI captured from invented data; not an active ATHENA session or clinical result."
+      "sha256": "47cd8f5eba78a43e54e216cfb9b671df8bc8ecd1be3aea0e569c63cdc1548e42",
+      "width": 1920,
+      "height": 1200,
+      "title": "Treatment Reasoning nello stato riuscito",
+      "sourceCommit": "c7c741ccc65e9d5987e5f6dd720c1b21f544eeb2",
+      "capturedAt": "2026-09-21T12:40:13Z",
+      "status": "Actual MediFlow Treatment Reasoning component with invented data and synthetic output; not an active clinical result."
     },
     {
       "file": "headless-agent.png",
-      "sha256": "9a082ab518efbff496203573e00a8d2dfbd3e5845fb0c7d292ce0c478ae7a268",
-      "width": 1252,
-      "height": 730,
-      "title": "Demo sintetica Mini e Codex Astra Low",
-      "sourceCommit": "6f7fd7384b016dfa6e6f90708549122df6ecf855",
-      "capturedAt": "2026-09-21T11:33:54Z",
+      "sha256": "a88c1dc8b57f4a3788d092d96075133fefaef7623257c0eaed1887d919b9a1b1",
+      "width": 868,
+      "height": 651,
+      "title": "Demo Codex fedele con Astra Low",
+      "sourceCommit": "81c5eec4ac20eae66a3efff892d0c68c7d2a9dee",
+      "capturedAt": "2026-09-21T13:25:58Z",
       "status": "Roadmap 1.0 illustration from Get MediFlow; not a connected Codex session or 0.8.6 availability claim."
     },
     {
