@@ -113,7 +113,7 @@ I riferimenti seguenti provengono dal catalogo Personal Aesthetic Studio e sono 
 
 Il percorso assistito può iniziare da due o tre domande sull'attività e sul modo di lavorare, purché spieghi che cosa configuri e permetta di cambiare scelta. La professione dichiarata non verifica l'identità e non concede privilegi. Anche il percorso manuale deve portare a un'app utile, con provider spenti per default.
 
-Gli agenti operano esclusivamente attraverso il layer MediFlow mediato e i suoi comandi nominati: capacità autorizzate, autenticazione, currentness delle informazioni, conferma delle scritture cliniche, audit e ricevute restano condizioni del percorso. Non ricevono accesso diretto a SQLite e non si presume che qualsiasi agente sia compatibile. Le funzioni AI sono facoltative e producono soltanto proposte da rivedere; Codex o un account AI non sono prerequisiti.
+Gli agenti operano esclusivamente attraverso il layer MediFlow mediato e i suoi comandi nominati: capacità autorizzate, autenticazione, verifica della validità delle informazioni, conferma delle scritture cliniche, audit e ricevute restano condizioni del percorso. Non ricevono accesso diretto a SQLite e non si presume che qualsiasi agente sia compatibile. Le funzioni AI sono facoltative e producono soltanto proposte da rivedere; Codex o un account AI non sono prerequisiti.
 
 L'accettazione richiede raccomandazioni comprensibili e modificabili, anteprima e conferma delle azioni, configurazione idempotente, ripresa dopo interruzione, cambio di profilo e rollback. Non sono ammessi invii di dati all'esterno o privilegi impliciti, né dati clinici nelle domande. La design arena deve includere anche questi flussi.
 
@@ -180,7 +180,7 @@ La preparazione ha riletto sette head pertinenti e confrontato i percorsi modifi
 | `WUL-561-web-lume-mockup` / `697fdfbe6` | Scheda e confronto visivo | 40 percorsi differenti; materiale di studio, non base runtime da ripristinare |
 | `WUL-565-macos-inspector-strumento-carta` / `c08d5c9e3` | Ispirazione per pannello contestuale | Otto percorsi differenti; proposta nativa separata, non dipendenza del redesign localhost |
 
-**Altre famiglie del portafoglio.** Sessione, sintesi e currentness entrano nel recupero solo quando risolvano un difetto riprodotto nei percorsi della release. Patient Insight e Treatment Reasoning richiedono la verifica delle capacità esistenti, non l'integrazione di ogni vecchio binding; harness e release hygiene possono sostenerne le prove. Governance conserva le informazioni necessarie, rendendole leggibili nella UI. XPC, ampliamento dei provider cloud, nuove capacità headless e parità Apple estesa restano fuori dal nucleo 0.8.6 salvo nuova decisione.
+**Altre famiglie del portafoglio.** Sessione, sintesi e verifica della validità del contesto entrano nel recupero solo quando risolvano un difetto riprodotto nei percorsi della release. Patient Insight e Treatment Reasoning richiedono la verifica delle capacità esistenti, non l'integrazione di ogni vecchio binding; harness e release hygiene possono sostenerne le prove. Governance conserva le informazioni necessarie, rendendole leggibili nella UI. XPC, ampliamento dei provider cloud, nuove capacità headless e parità Apple estesa restano fuori dal nucleo 0.8.6 salvo nuova decisione.
 
 Secondo la ricognizione, WHO #322/#340 è già stato ricomposto in main: l'attività successiva deve renderlo utilizzabile e provarlo. Per tastiera e stati occorre consultare anche WUL-560/c/d e l'inventario WUL-562, evitando di duplicare verifiche. Gli altri rami sono soltanto mappati dal registro, non sottoposti ad audit funzionale.
 
@@ -190,7 +190,7 @@ Prima di recuperare un contributo, riprodurre il bisogno sulla base corrente, is
 
 1. **Inventario operativo e contratti:** costruire la mappa funzione → servizio → stato → azione, riprodurre i guasti con dati sintetici, decidere OCR/WHO e selezionare i residui utili.
 2. **Confronto UX:** confrontare tre candidati per impostazioni e paziente su contenuti equivalenti, scegliendo struttura e stile. Il lavoro può procedere insieme alla verifica OCR.
-3. **Consolidamento funzionale:** verificare OCR e WHO end-to-end, recuperare in modo mirato currentness/sessione e rendere attendibile lo stato dei servizi.
+3. **Consolidamento funzionale:** verificare OCR e WHO end-to-end, recuperare in modo mirato le verifiche sulla validità del contesto e la gestione della sessione e rendere attendibile lo stato dei servizi.
 4. **Implementazione UI:** realizzare la nuova mappa di impostazioni e scheda secondo la direzione scelta, conservando contratti e comportamenti corretti del prodotto.
 5. **Onboarding e deslop:** realizzare il percorso assistito reversibile su localhost, completare il censimento globale e applicare semplificazioni utili. La matrice nativa rimane un seguito separato.
 6. **GDPR/AI Act:** avviare l'esame di applicabilità e requisiti dopo la baseline; interventi e dossier devono recepire le versioni finali di onboarding, UI, runtime e deslop.

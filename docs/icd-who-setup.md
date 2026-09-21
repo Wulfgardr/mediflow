@@ -381,7 +381,7 @@ La diagnosi distingue stato corrente e precedente errore minimizzato, perché un
 | stesso processo ancora running, relay_deadline_unverified | prova del deadline non acquisita in quel tentativo | non considerare il trasporto qualificato dal solo fatto che il servizio è vivo; controllare le quattro prove F4 senza cambiare argv |
 | stesso processo running, connessione rifiutata/503/timeout | indisponibilità temporanea, non successo | polling solo per queste tre classi, massimo 60 prove e budget di 15 minuti; exit, drift o annullamento interrompono |
 | risposta reale ma file assente, metadati/hash diversi | non superato il gate dati/ripristino | conservare copia/ricevuta incompleta, non cambiare schema o generare digest |
-| owner/engine/epoch o rete cambiati | autorità/currentness persa | nessun retry, adozione, egress o cleanup su risorse non più autorizzate |
+| owner/engine/epoch o rete cambiati | autorità o validità del contesto venute meno | nessun retry, adozione, egress o cleanup su risorse non più autorizzate |
 
 Fonte WHO ufficiale consultata per il difetto descritto:
 https://icd.who.int/docs/icd-api/ICDAPI-DockerContainer/

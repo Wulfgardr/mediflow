@@ -71,7 +71,7 @@ I token sono proprietà custom dichiarate **dentro `.shell`**: la loro applicazi
 ### Contrasto e ritmo tipografico
 
 - Il letter-spacing negativo è stato eliminato: titoli, valori statistici e cifre degli stepper mantengono il tracking predefinito per la lettura clinica.
-- Il testo corrente e leggibile non usa più `#94a3b8`, ma `--ink-muted` (`#475569`) o `--ink-strong` (`#1e293b`). Il tono ardesia più chiaro, `--ink-faint`, rimane riservato a date tabellari e metadati numerici minuti.
+- Il testo destinato alla lettura non usa più `#94a3b8`, ma `--ink-muted` (`#475569`) o `--ink-strong` (`#1e293b`). Il tono ardesia più chiaro, `--ink-faint`, rimane riservato a date tabellari e metadati numerici minuti.
 - Tipografia, spaziature e ombre riprendono il ritmo Inter-Regular / SF Pro delle schermate Kree8, con interlinea più stretta per conservare la densità delle tabelle cliniche.
 
 <a id="motion-lab"></a>
