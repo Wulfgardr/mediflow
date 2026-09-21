@@ -55,13 +55,13 @@
     },
     {
       "file": "athena-flow.png",
-      "sha256": "fdb1ad5f83bb956835d5824a22e7126c66806a5e05a4ecfcc6cff8ee45b5a879",
-      "width": 1268,
-      "height": 594,
-      "title": "Treatment Reasoning interattivo nello stato di revisione",
-      "sourceCommit": "4cfd79a72d1c1494b59fd3a87106599fb91588e5",
-      "capturedAt": "2026-09-21T14:17:32Z",
-      "status": "Faithful Get MediFlow reproduction of the successful Treatment Reasoning panel with invented data; it does not run ATHENA or represent an active clinical result."
+      "sha256": "c002d9852882345ce3cc39a7ac2c888d0e913264b597e600f5b8d9fe12a40735",
+      "width": 1408,
+      "height": 1085,
+      "title": "Treatment Intelligence con terapie, ATC e percorsi proposti",
+      "sourceCommit": "bb89ad0479ee468aea959ac5c76113c7c04d335b",
+      "capturedAt": "2026-09-21T14:39:48Z",
+      "status": "Faithful Get MediFlow reproduction of the successful Treatment Reasoning panel using synthetic polypharmacy: ATHENA prepares a source-linked review draft with limitations, cautions and proposed review pathways while medication, pathways and the record remain unchanged. It does not run ATHENA or represent an active clinical result."
     },
     {
       "file": "headless-agent.png",
