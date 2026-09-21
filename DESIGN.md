@@ -5,198 +5,244 @@ read_when:
   - "Checking Lume, interaction parity, accessibility, or platform adaptation."
 ---
 
-# MediFlow Design
+<a id="mediflow-design"></a>
 
-## Design intent
+# Design di MediFlow
 
-MediFlow serves physicians who perform dense clinical work. The interface must
-feel calm, precise, trustworthy, and fast to scan.
+<a id="design-intent"></a>
 
-Information hierarchy outranks decoration. Materials, motion, and intelligence
-support the task. They do not become the task.
+## Intento progettuale
 
-## Plain language for physicians
+MediFlow si rivolge a medici impegnati in un lavoro clinico denso di
+informazioni. L'interfaccia deve renderlo leggibile senza aggiungere rumore:
+calma, precisione, affidabilità percepita e rapidità di consultazione sono
+qualità della stessa esperienza.
 
-Every MediFlow interface must be usable by a physician with no knowledge of
-code, infrastructure, artificial intelligence, or interface conventions. This
-is a product requirement across web/localhost, macOS, iPhone, and iPad,
-including settings, onboarding, field descriptions, buttons, tooltips,
-notifications, errors, confirmations, and accessibility labels.
+La gerarchia delle informazioni prevale sulla decorazione. Materiali,
+movimento e funzioni intelligenti devono aiutare a svolgere il compito,
+non diventare ciò di cui il medico debba occuparsi.
 
-- Every word must help the physician understand the task. Name fields by what
-  they contain and actions by what they do; explain the expected input and
-  consequences when they are not evident. Do not assume icon literacy.
-- Use familiar, precise language and consistent names for the same concept.
-  Preserve appropriate clinical terminology without requiring technical literacy.
-- Do not expose implementation vocabulary such as host, MCP, payload, receipt,
-  or gate as ordinary product labels. Explain necessary technical concepts in
-  everyday language. Optional diagnostic details belong in a separate support
-  view and must never be required to complete the ordinary task.
-- Describe settings by their practical effect. For data sharing, state what is
-  sent, to whom, and when in understandable terms; simplicity must not hide
-  consent, limits, risks, or the distinction between a proposal and an action
-  already performed.
-- Errors explain what happened and the next available action. A short label
-  must remain meaningful; a tooltip cannot rescue an unintelligible control.
+<a id="plain-language-for-physicians"></a>
 
-Acceptance requires reading the affected flow on the actual interface,
-including relevant secondary states, and answering: can a physician without
-technical knowledge understand what this means, what to enter or choose, and
-what will happen next, without a developer's explanation? Unexplained jargon
-or ambiguous actions fail this criterion even when automated tests pass.
-This rule applies to existing and future interfaces; documenting it does not
-certify that all current text already complies.
+## Un linguaggio comprensibile per i medici
 
-## Shared language
+Ogni interfaccia MediFlow deve essere utilizzabile da un medico che non
+conosca codice, infrastruttura, intelligenza artificiale o convenzioni delle
+interfacce. Il requisito riguarda web/localhost, macOS, iPhone e iPad e
+comprende impostazioni, configurazione iniziale, descrizioni dei campi,
+pulsanti, suggerimenti, notifiche, errori, conferme ed etichette di accessibilità.
 
-Lume is the active visual language. The web and Apple implementations share:
+- Ogni parola deve aiutare il medico a capire il compito. Nominare i campi
+  secondo il contenuto e le azioni secondo ciò che fanno, spiegando input
+  atteso e conseguenze quando non siano evidenti. Non dare per scontato che
+  un'icona sia compresa.
+- Usare una lingua familiare e precisa e lo stesso nome per lo stesso concetto.
+  Conservare la terminologia clinica appropriata senza richiedere competenze
+  tecniche.
+- Non esporre host, MCP, payload, receipt o gate come normali etichette di
+  prodotto. Spiegare nella lingua comune i concetti tecnici necessari;
+  i dettagli diagnostici opzionali appartengono a una vista di supporto
+  separata e non devono mai essere necessari per completare il lavoro ordinario.
+- Descrivere le impostazioni attraverso il loro effetto pratico. Quando si
+  condividono dati, dichiarare in termini comprensibili che cosa viene inviato,
+  a chi e quando: la semplicità non deve nascondere consenso, limiti, rischi
+  o distinzione fra proposta e azione già eseguita.
+- Gli errori spiegano che cosa è accaduto e quale azione sia ancora disponibile.
+  Anche un'etichetta breve deve avere senso; un suggerimento a comparsa non
+  rimedia a un comando incomprensibile.
 
-- clinical terminology and control meaning;
-- information hierarchy and typography rhythm;
-- semantic color roles;
-- spacing and grouping principles;
-- border and material hierarchy;
-- icon vocabulary;
-- loading, empty, offline, stale, conflict, denied, and error semantics;
-- stable accessibility identifiers for tested controls.
+L'accettazione richiede di leggere il percorso sull'interfaccia effettiva,
+compresi gli stati secondari pertinenti, e verificare che un medico senza
+conoscenze tecniche possa capire significato, dati da inserire o scelta da
+compiere e conseguenze, senza la spiegazione di uno sviluppatore. Gergo non
+spiegato e azioni ambigue impediscono l'accettazione anche con test automatici
+superati. Il requisito vale per interfacce esistenti e future; formularlo
+non certifica che tutti i testi correnti lo rispettino già.
 
-Shared language does not require identical navigation or density.
+<a id="shared-language"></a>
 
-## Hierarchy and typography
+## Una lingua condivisa
 
-Lume uses two functional registers:
+Lume è la lingua visiva attiva. Web e implementazioni Apple condividono
+il significato dei controlli, pur adattandone la forma alla piattaforma:
 
-- **Voce** identifies the current question, patient, task, or action.
-- **Registro** carries dense facts, provenance, status, and history.
+- terminologia clinica e significato dei controlli;
+- gerarchia informativa e ritmo tipografico;
+- ruoli semantici del colore;
+- principi di spaziatura e raggruppamento;
+- gerarchia di bordi e materiali;
+- vocabolario delle icone;
+- significato degli stati di caricamento, vuoto, offline, dato non più attuale,
+  conflitto, accesso negato ed errore;
+- identificatori di accessibilità stabili per i controlli sottoposti a test.
 
-Headings establish the current context. Labels stay close to the value or
-control they describe. Long clinical names and multiple coded facts must wrap
-without clipping or hiding the primary action.
+Condividere questa lingua non impone la stessa navigazione né la stessa
+densità di contenuti.
 
-## Color, borders, and materials
+<a id="hierarchy-and-typography"></a>
 
-Semantic color is reserved for clinical state, status, warning, selection, and
-focus. Color is not the only carrier of meaning.
+## Gerarchia e tipografia
 
-Clinical content uses stable, readable surfaces with clear grouping. Native
-Apple materials can use current system semantics when they clarify hierarchy or
-function. Translucency is limited to chrome and privacy surfaces. It is not
-stacked across clinical cards.
+La tipografia di Lume distingue due registri funzionali, così che orientamento
+e dettaglio possano convivere:
 
-Localhost uses a restrained material analogue. It does not copy decorative
-glass effects.
+- **Voce** identifica la domanda, il paziente, il compito o l'azione corrente.
+- **Registro** raccoglie dati densi, provenienza, stato e storia.
 
-### Nested frames
+I titoli stabiliscono il contesto; le etichette restano vicine al valore
+o al controllo che descrivono. Nomi clinici lunghi e dati con più codifiche
+devono andare a capo senza tagli e senza nascondere l'azione principale.
 
-Nested containers must use coordinated corner geometry. Avoid a square or
-nearly square enclosing frame around a strongly rounded inner frame when both
-frame the same content. For parallel inset outlines, coordinate the inner
-radius with the outer radius and inset so the spacing looks uniform.
+<a id="color-borders-and-materials"></a>
 
-Every frame must identify a meaningful group. Prefer one enclosing frame with
-spacing or subtle dividers over repeated boxes around the same content. This
-does not prohibit rounded controls inside a rectangular page; the constraint
-concerns redundant enclosing frames and conflicting container geometry.
+## Colore, bordi e materiali
 
-Review the affected surface at its supported sizes and appearances: nested
-corners must look coherent, spacing must remain uniform, and removing redundant
-frames must preserve understandable grouping, focus indicators, and behavior.
+Il colore semantico è riservato a condizione clinica, stato, avviso, selezione
+e focus. Deve accompagnarne il significato, non esserne l'unico veicolo.
 
-## Components and states
+I contenuti clinici richiedono superfici stabili, leggibili e chiaramente
+raggruppate. I materiali nativi Apple possono seguire la semantica corrente
+del sistema quando chiariscano gerarchia o funzione; la traslucenza resta
+limitata agli elementi di navigazione e comando e alle superfici di privacy,
+senza sovrapporsi fra schede cliniche.
 
-Every visible control maps to:
+Localhost riprende con misura questa distinzione dei materiali, senza
+imitare effetti di vetro decorativi.
+
+<a id="nested-frames"></a>
+
+### Cornici annidate
+
+I contenitori annidati devono avere angoli coordinati. Quando due cornici
+racchiudono lo stesso contenuto, evitare che una cornice esterna quadrata
+o quasi quadrata ne contenga una fortemente arrotondata. Nei bordi interni
+paralleli, coordinare raggio interno, raggio esterno e rientro affinché
+la distanza appaia uniforme.
+
+Ogni cornice deve identificare un gruppo significativo: preferire un unico
+contenitore con spaziatura o divisori discreti a più scatole intorno allo
+stesso contenuto. Il vincolo riguarda cornici ridondanti e geometrie in
+conflitto, non vieta controlli arrotondati dentro una pagina rettangolare.
+
+Riesaminare la superficie nelle dimensioni e negli aspetti supportati.
+Gli angoli annidati devono essere coerenti e le distanze uniformi; eliminare
+cornici ridondanti non deve compromettere raggruppamento comprensibile,
+indicatori di focus o comportamento.
+
+<a id="components-and-states"></a>
+
+## Componenti e stati
+
+Ogni controllo visibile deve corrispondere a questa sequenza:
 
 `surface → control → identifier → action/service → state mutation → outcome`
 
-The outcome includes success, error, empty, loading, offline, stale, conflict,
-and denied states when applicable.
+L'esito comprende, quando applicabili, successo, errore, vuoto, caricamento,
+offline, dato non più attuale, conflitto e accesso negato.
 
-State pills, capability gates, evidence cards, pending-work markers, and the
-Lume Filo connector carry defined meaning. Decorative buttons and undocumented
-divergent actions are not allowed.
+Indicatori di stato, condizioni di accesso alle funzioni, schede delle
+evidenze, segnali del lavoro in attesa e connettore Filo di Lume hanno un
+significato definito. Non sono ammessi pulsanti decorativi o azioni divergenti
+non documentate.
 
-Touch controls target at least 44 points or the platform-equivalent minimum.
-Keyboard and pointer targets keep a visible focus state.
+I controlli touch mirano ad almeno 44 punti o al minimo equivalente della
+piattaforma. Tastiera e puntatore mantengono uno stato di focus visibile.
 
-## Platform adaptations
+<a id="platform-adaptations"></a>
+
+## Adattamenti alle piattaforme
 
 ### iPhone
 
-- Prioritize rapid retrieval and capture.
-- Use compact navigation and one-handed reach where practical.
-- Keep the active patient and task clear during short interactions.
-- Collapse dense layouts before reducing legibility.
+- Dare priorità a consultazione e acquisizione rapide.
+- Usare navigazione compatta e, dove pratico, raggiungibile con una mano.
+- Mantenere chiari paziente e compito attivi anche nelle interazioni brevi.
+- Ridisporre le viste dense prima di ridurne la leggibilità.
 
 ### iPad
 
-- Use the larger canvas for list-detail work and structured clinical context.
-- Adapt to compact and regular widths, portrait and landscape, and continuous
-  resize.
-- Support touch, keyboard, and pointer without changing capability meaning.
+- Usare lo spazio più ampio per il lavoro elenco-dettaglio e per il contesto
+  clinico strutturato.
+- Adattarsi a larghezze compatte e regolari, orientamento verticale e orizzontale
+  e ridimensionamento continuo.
+- Supportare touch, tastiera e puntatore senza cambiare il significato delle
+  funzioni.
 
 ### macOS
 
-- Use native windows, sidebars, toolbars, menus, focus, keyboard commands, and
-  continuous resize.
-- Preserve desktop density without clipping or hiding state.
-- Keep the Mac role as authoritative home-base visible in administrative and
-  runtime surfaces.
+- Usare finestre, barre laterali, barre degli strumenti, menu, focus, comandi
+  da tastiera e ridimensionamento continuo nativi.
+- Conservare la densità desktop senza tagliare contenuti o nascondere stati.
+- Rendere visibile, nelle superfici amministrative e runtime, il ruolo del Mac
+  come home-base autorevole.
 
 ### Localhost
 
-- Use native HTML semantics and responsive web structure.
-- Support 320, 390, 768, and 1440 pixel viewports.
-- Preserve content and actions at 200% and 400% browser zoom.
-- Keep keyboard order, focus visibility, and screen-reader structure explicit.
+- Usare semantica HTML nativa e struttura web responsive.
+- Supportare viewport di 320, 390, 768 e 1440 pixel.
+- Conservare contenuti e azioni con zoom del browser al 200% e al 400%.
+- Rendere espliciti ordine da tastiera, visibilità del focus e struttura per
+  lettori di schermo.
 
-## Accessibility
+<a id="accessibility"></a>
 
-Accessibility is a product constraint, not a later polish pass.
+## Accessibilità
 
-- Support Dynamic Type through AX5 where declared.
-- Prefer a single readable column when accessibility sizes make split layouts
-  unsafe.
-- Preserve VoiceOver and screen-reader labels, values, traits, order, and
-  actions.
-- Keep stable identifiers under the `clinical-workspace-…` convention for
-  exercised Apple controls.
-- Respect reduced motion, reduced transparency, increased contrast, and system
-  appearance.
-- Do not claim assistive-technology support without a terminal run on the named
-  platform. The current mobile VoiceOver evidence boundary is documented in
+L'accessibilità vincola il prodotto fin dall'inizio: non è una rifinitura
+da demandare alla fine.
+
+- Supportare Dynamic Type fino ad AX5 dove dichiarato.
+- Preferire una sola colonna leggibile quando le dimensioni di accessibilità
+  rendano inadeguate le viste affiancate.
+- Conservare etichette, valori, caratteristiche, ordine e azioni di VoiceOver
+  e dei lettori di schermo.
+- Mantenere identificatori stabili secondo la convenzione
+  `clinical-workspace-…` per i controlli Apple esercitati.
+- Rispettare riduzione del movimento, riduzione della trasparenza, aumento
+  del contrasto e aspetto del sistema.
+- Non dichiarare supporto alle tecnologie assistive senza un'esecuzione
+  conclusa sulla piattaforma nominata. Il limite corrente delle prove
+  VoiceOver mobile è documentato in
   [`docs/known-limitations.md`](./docs/known-limitations.md).
 
-## Motion and privacy
+<a id="motion-and-privacy"></a>
 
-Motion communicates state, hierarchy, or continuity. It stops or simplifies
-when reduced motion is enabled.
+## Movimento e privacy
 
-Privacy shields and discreet display states can obscure sensitive content.
-They must not obscure the reason, the recovery action, or the current security
-state.
+Il movimento comunica stato, gerarchia o continuità; quando è attiva
+la riduzione del movimento, si ferma o si semplifica.
 
-## Intentional differences and exceptions
+Le schermature per la privacy e gli stati di visualizzazione discreta
+possono nascondere contenuti sensibili, ma non devono nascondere il motivo,
+l'azione per tornare al lavoro o lo stato corrente di sicurezza.
 
-An intentional platform difference must state:
+<a id="intentional-differences-and-exceptions"></a>
 
-- the platform role that requires it;
-- the shared capability and clinical meaning;
-- the reason for the different structure or input;
-- the test or review surface;
-- the owner and follow-up when the exception is temporary.
+## Differenze intenzionali ed eccezioni
 
-Literal color residue, incomplete secondary-state certification, new-patient
-gating equivalence, and form-marker cleanup remain post-0.8 work. They do not
-authorize an unbounded redesign of the 0.8 candidate.
+Una differenza intenzionale fra piattaforme deve dichiarare:
 
-## Evidence order
+- il ruolo della piattaforma che la richiede;
+- la funzione condivisa e il significato clinico;
+- la ragione della diversa struttura o modalità di input;
+- la superficie di test o revisione;
+- il responsabile e il seguito, se l'eccezione è temporanea.
 
-For native Apple decisions:
+Residui di colori letterali, certificazione incompleta degli stati secondari,
+equivalenza delle condizioni di accesso alla creazione del paziente e pulizia
+dei marcatori dei moduli restano lavoro post-0.8. Non autorizzano una
+riprogettazione senza limiti del candidato 0.8.
 
-1. current Apple platform guidance and API availability;
-2. repository architecture, Lume, and accepted ADRs;
-3. runtime evidence on the exact candidate;
-4. secondary craft guidance.
+<a id="evidence-order"></a>
 
-For public claims, the parity matrix and the exact run record outrank screenshots
-and visual impression.
+## Ordine delle evidenze
+
+Per le decisioni native Apple, l'ordine di riferimento è:
+
+1. indicazioni correnti della piattaforma Apple e disponibilità delle API;
+2. architettura della repository, Lume e ADR accettati;
+3. prove runtime sul candidato esatto;
+4. indicazioni secondarie di buona realizzazione.
+
+Per le affermazioni pubbliche prevalgono la matrice di parità e il verbale
+dell'esecuzione esatta: screenshot e impressione visiva non li sostituiscono.

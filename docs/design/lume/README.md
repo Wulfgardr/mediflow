@@ -7,9 +7,9 @@ read_when:
 
 # Lume: manifest degli artefatti visuali
 
-Lume è la lingua visiva attiva approvata in [ADR 0078](../../adr/0078-lume-lingua-di-design-di-destinazione.md). Il contratto DTCG e il mirror web sono attivi nella candidata locale v0.8. La parità estetica con il canone non è consegnata e la candidata non è una release.
+Lume è la lingua visiva approvata da [ADR 0078](../../adr/0078-lume-lingua-di-design-di-destinazione.md). Il manifest documenta il percorso avviato nella candidata locale v0.8, nella quale erano attivi contratto DTCG e mirror web, ma non era consegnata la parità estetica con il canone. Quella candidata non costituiva una release.
 
-Questo manifest distingue il riferimento da applicare, gli studi, le prove dello stato corrente e il materiale storico. Uno studio o una cattura non sostituiscono il canone.
+Per confrontare una superficie occorre scegliere il riferimento corretto: il canone indica la destinazione, gli studi esplorano possibilità e le catture documentano ciò che è stato osservato. Questo manifest li distingue dal materiale storico, evitando che uno studio o una schermata siano assunti come canone.
 
 ## Inventario
 
@@ -22,7 +22,7 @@ Questo manifest distingue il riferimento da applicare, gli studi, le prove dello
 
 ## TARGET: canone versionato
 
-Il canone sorgente è [lume-cockpit.template.html](./canon/lume-cockpit.template.html). Il template non contiene font esterni: il build inserisce le versioni base64 dei font locali. Il file HTML generato non è versionato.
+Il riferimento sorgente è [lume-cockpit.template.html](./canon/lume-cockpit.template.html). Il template non richiama font esterni: durante la build vengono inserite le versioni base64 dei font locali, mentre l'HTML generato non viene versionato.
 
 | Campo | Valore |
 | --- | --- |
@@ -33,7 +33,7 @@ Il canone sorgente è [lume-cockpit.template.html](./canon/lume-cockpit.template
 | SHA-256 template | `a540eafbe7c3b216f9b1324f5b9a7a66631ed68a01eb1da4c752c2acef0e6502` |
 | SHA-256 build atteso | `0c265db8c4174fd22d7b2e532e27669b6f76b8eed44da215432ee2cedcaab127` |
 
-Il build usa `app/fonts/Inter-Variable-Latin.woff2`, `app/fonts/IBM-Plex-Mono-400-Latin.woff2` e `app/fonts/IBM-Plex-Mono-500-Latin.woff2` per sostituire, nell'ordine, `__INTER__`, `__PLEX400__` e `__PLEX500__`.
+La build sostituisce nell'ordine `__INTER__`, `__PLEX400__` e `__PLEX500__` con `app/fonts/Inter-Variable-Latin.woff2`, `app/fonts/IBM-Plex-Mono-400-Latin.woff2` e `app/fonts/IBM-Plex-Mono-500-Latin.woff2`.
 
 Rigenerazione e verifica:
 
@@ -41,24 +41,24 @@ Rigenerazione e verifica:
 node scripts/build-lume-canon.mjs --verify
 ```
 
-Senza argomenti il build scrive un file temporaneo e stampa percorso e hash. Per scegliere la destinazione:
+Senza argomenti, la build produce un file temporaneo e ne stampa percorso e hash. Per indicare una destinazione si usa:
 
 ```bash
 node scripts/build-lume-canon.mjs /tmp/lume-cockpit.html
 ```
 
-Caratteristiche osservate del canone:
+Il canone osservato organizza il lavoro secondo queste caratteristiche:
 
-- telaio operativo con lista in penombra e superficie paziente focale;
-- nessuna striscia di selezione colorata;
-- Inter per la prosa clinica e IBM Plex Mono per codici, date, valori e dosi;
-- Filo continuo per la cronologia;
-- colore riservato alla semantica clinica;
-- varianti Giorno e Grafite.
+- Il telaio operativo lascia la lista in penombra e assegna il fuoco alla superficie paziente.
+- La selezione non è indicata da una striscia colorata.
+- La prosa clinica usa Inter; codici, date, valori e dosi usano IBM Plex Mono.
+- La cronologia è collegata da un Filo continuo.
+- Il colore rimane riservato alla semantica clinica.
+- Sono presenti le varianti Giorno e Grafite.
 
 ## STUDY: mock interattivi
 
-Gli studi in [mockups/](./mockups/) sono apribili nel browser e non hanno dipendenze. Servono a discutere ipotesi e comportamento, non a certificare il target.
+I file di [mockups/](./mockups/) si aprono nel browser senza dipendenze. Servono a discutere ipotesi e comportamenti, non a certificare il raggiungimento del target.
 
 | File | Oggetto dello studio |
 | --- | --- |
@@ -73,12 +73,9 @@ Gli studi in [mockups/](./mockups/) sono apribili nel browser e non hanno dipend
 
 ## CURRENT EVIDENCE: catture runtime
 
-Queste immagini sono evidenza dello stato acquisito. Non dichiarano il target
-Lume raggiunto né provano la candidata locale senza identità corrente di
-worktree, runtime e verifica associata.
+Le catture documentano lo stato nel quale sono state acquisite. Per usarle come prova di una candidata locale occorrono l'identità ancora valida di worktree e runtime e la verifica associata; da sole non dimostrano che il target Lume sia stato raggiunto.
 
-Snapshot web di produzione: 2026-07-17, registro Giorno, viewport 1440x900 a
-scala 2, fixture esclusivamente sintetiche. Si rigenera con:
+Gli snapshot web di produzione del 2026-07-17 usano il registro Giorno, viewport 1440x900 a scala 2 e fixture esclusivamente sintetiche. La rigenerazione avviene con:
 
 ```bash
 node scripts/build-screenshots.mjs
@@ -90,17 +87,14 @@ node scripts/build-screenshots.mjs
 - [04-review.png](../../../screenshots/04-review.png)
 - [05-security.png](../../../screenshots/05-security.png)
 
-La cattura
-[macos-clinical-workspace.png](../../../screenshots/0.8/macos-clinical-workspace.png)
-è evidenza nativa separata. Usa fixture sintetiche deterministiche e non
-appartiene alla pipeline web.
+[macos-clinical-workspace.png](../../../screenshots/0.8/macos-clinical-workspace.png) documenta invece una prova nativa separata: usa fixture sintetiche deterministiche e non appartiene alla pipeline web.
 
 ## LEGACY: riferimenti storici
 
 - [components/kree8/](../../../components/kree8/)
 - [app/mockups/kree8/](../../../app/mockups/kree8/)
 
-Questi materiali sono legacy. Non sono il canone Lume e non dimostrano la parità con il target.
+Kree8 resta un riferimento storico: questi materiali non definiscono il canone Lume e non provano la parità con esso.
 
 ## Documenti e contratti collegati
 

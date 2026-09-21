@@ -1,20 +1,22 @@
 # Contratti cross-platform del core nativo
 
-Questa cartella ospita gli ORACOLI neutri rispetto al linguaggio che ogni
-implementazione del core MediFlow (riferimento web TS, `MediFlowCore` Swift oggi,
-un eventuale core Rust domani) deve riprodurre byte-per-byte, su macOS,
-Windows-MSVC e Linux. Vedi [ADR 0071](../../docs/adr/0071-tri-os-reversed-flow-shared-core.md)
-(Fase 0: gate CI golden-vector come prima cosa).
+Implementazioni scritte in linguaggi diversi devono produrre gli stessi byte,
+non soltanto risultati che sembrino equivalenti. Questa cartella raccoglie perciò
+gli ORACOLI di riferimento che ogni core MediFlow deve riprodurre su macOS,
+Windows-MSVC e Linux: il riferimento web TS, `MediFlowCore` in Swift e un eventuale
+core Rust futuro. [ADR 0071](../../docs/adr/0071-tri-os-reversed-flow-shared-core.md)
+colloca questa verifica all'inizio del percorso, nella Fase 0, attraverso il
+gate CI golden-vector.
 
 ## Crittografia zero-knowledge per campo
 
 - `crypto-golden-vectors.v1.json`: vettori FROZEN, byte-exact, generati dalle
   primitive WebCrypto del riferimento web ([lib/security/security.ts](../../lib/security/security.ts)):
-  KEK = PBKDF2-HMAC-SHA256(PIN, salt, 100000); master key AES-256-GCM wrappata
-  `base64(iv12 || GCM(rawKey, KEK))`; campi `ENC:base64(iv12):base64(ct||tag)` con
-  plaintext = `JSON.stringify(value)`.
-- `generate-crypto-vectors.mjs`: rigenera il fixture in modo deterministico e si
-  auto-verifica (ogni vettore viene anche decifrato/unwrapped per controllo):
+  KEK = PBKDF2-HMAC-SHA256(PIN, salt, 100000); master key AES-256-GCM protetta nel
+  formato `base64(iv12 || GCM(rawKey, KEK))`; campi
+  `ENC:base64(iv12):base64(ct||tag)` con plaintext = `JSON.stringify(value)`.
+- `generate-crypto-vectors.mjs`: rigenera la fixture in modo deterministico e
+  ne verifica ogni vettore mediante decifratura e recupero della chiave:
   `node native/contracts/generate-crypto-vectors.mjs`.
 
 ### Chi deve passare l'oracolo
@@ -24,17 +26,19 @@ Windows-MSVC e Linux. Vedi [ADR 0071](../../docs/adr/0071-tri-os-reversed-flow-s
   fixture e verifica `deriveKEK`, `unwrapMasterKey`, `decryptField`.
   Esecuzione: `DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
   swift test --package-path native/MediFlowMac --filter CryptoGoldenVectorsTests`.
-- **Web (riferimento):** [lib/security/security.ts](../../lib/security/security.ts) e la sorgente da
-  cui i vettori sono derivati (verificato: `arrayBufferToBase64` produce gli stessi
-  base64).
-- **Windows-MSVC / Linux (prossimo):** stessi vettori, stesso test, una volta
-  estratto `MediFlowCore` con `swift-crypto` al posto di `CryptoKit`.
+- **Web (riferimento):** i vettori derivano da
+  [lib/security/security.ts](../../lib/security/security.ts); la verifica riportata
+  attesta che `arrayBufferToBase64` produce gli stessi base64.
+- **Windows-MSVC / Linux (passaggio previsto da questa sequenza):** gli stessi
+  vettori e lo stesso test devono essere usati dopo l'estrazione di
+  `MediFlowCore`, con `swift-crypto` al posto di `CryptoKit`.
 
 ### Regola di invarianza
 
-I vettori `v1` sono CONGELATI: cambiarli significa rompere il contratto crypto e
-potenzialmente corrompere PHII a riposo. Per nuovi casi si AGGIUNGONO vettori
-(o un file `v2`), non si mutano quelli esistenti.
+I vettori `v1` sono CONGELATI perché definiscono il contratto crittografico:
+modificarli potrebbe rompere la compatibilità e corrompere i dati a riposo
+indicati qui come PHII. Per coprire nuovi casi si AGGIUNGONO vettori, oppure un
+file `v2`; quelli esistenti non si modificano.
 
 ## Field set e seal SOAP H4
 
@@ -47,12 +51,14 @@ potenzialmente corrompere PHII a riposo. Per nuovi casi si AGGIUNGONO vettori
   `node scripts/generate-headless-soap-entry-h4-golden.mjs --check`.
 - `HeadlessSoapEntryH4GoldenTests` verifica materializzazione, decoder
   grammaticale, ciphertext, digest del seal, reopen e tamper mediante un
-  oracolo codec module-internal Swift. Lo stesso test e obbligatorio su Linux e
+  oracolo codec module-internal Swift. Lo stesso test è obbligatorio su Linux e
   Windows nel gate tri-OS.
 
-Il vettore dimostra parita byte-esatta dell'oracolo shared-core. Non dimostra un
-owner H4 runtime, fence key/generation, handoff H5, approvazione clinica,
-persistenza o write consegnato.
+Il risultato va letto entro ciò che il vettore misura: la parità byte per byte
+dell'oracolo del core condiviso. Non dimostra che esistano un owner H4 a runtime,
+controlli fence key/generation, un handoff H5, un'approvazione clinica, una
+persistenza o una scrittura consegnata. Questi passaggi non possono essere
+dedotti dalla sola compatibilità del codec.
 
 ## DTO draft e receipt SOAP H9
 
@@ -68,7 +74,8 @@ persistenza o write consegnato.
   esplicito e confronta entrambi i digest. Esecuzione locale:
   `swift test --package-path native/MediFlowMac --filter HeadlessSoapEntryContractGoldenTests`.
 
-Il codec H9 tratta draft e receipt soltanto come dati e non espone route,
-transport o authority di scrittura. La portabilita resta
-`HOLD_TRI_OS_CI_SAME_SHA` finche Linux, Windows e macOS non passano sulla stessa
-SHA candidata.
+Il codec H9 tratta draft e receipt soltanto come dati: non espone route né
+trasporto e non conferisce autorità di scrittura. Per questo la verifica del
+formato non basta a dichiarare la portabilità, che resta
+`HOLD_TRI_OS_CI_SAME_SHA` finché Linux, Windows e macOS non superano i controlli
+sulla stessa SHA candidata.

@@ -8,52 +8,34 @@ Riferimenti correlati:
 
 ## Avvio con doppio click (consigliato)
 
-1) Avvia la web app locale, se non è già attiva:
+1) Il client nativo e la web app hanno avvii distinti. Se la web app locale non è già attiva, avviala con:
 
 ```bash
 ./Start_MediFlow.command
 ```
 
-`Start_MediFlow.command` resta il launcher della superficie web e dei servizi locali opzionali; non apre il client Apple.
+`Start_MediFlow.command` avvia la superficie web e i servizi locali opzionali, non il client Apple.
 
-2) Avvia separatamente il client nativo:
+2) Per aprire il client nativo, esegui separatamente:
 
 ```
 ./scripts/Launch_MediFlowMac.command
 ```
 
-Questo script:
-- configura TLS e pin
-- avvia il proxy locale
-- compila il client nativo
-- apre l'app macOS
+Lo script prepara TLS e pin, avvia il proxy locale e compila il client nativo; al termine apre l'app macOS.
 
-Dentro l'app, il pannello `Runtime` puo avviare/arrestare esplicitamente il
-backend web production standalone e il proxy TLS inclusi nel bundle. I servizi
-opzionali Ollama e MLX sono mostrati come health diagnostico read-only, ma
-restano fuori dalla supervisione app-managed e continuano a richiedere gestione
-separata. ICD-11 WHO e verificato dalla diagnostica web tramite readiness
-autenticata, senza probe nativo o query clinica implicita.
-Gli stop di backend/proxy usano una finestra ordinata breve e poi escalation
-locale, cosi i PID stale non bloccano il ciclo successivo.
+Nell'app, il pannello `Runtime` consente di avviare e arrestare esplicitamente backend web production standalone e proxy TLS inclusi nel bundle. Ollama e MLX rimangono invece servizi opzionali gestiti separatamente: il pannello ne mostra soltanto lo stato diagnostico in lettura, senza assumerne la supervisione. Anche ICD-11 WHO segue un percorso distinto, verificato dalla diagnostica web attraverso readiness autenticata, senza probe nativo o query clinica implicita. Per backend e proxy, l'arresto concede una breve finestra ordinata prima dell'escalation locale, così che PID non più validi non blocchino il ciclo successivo.
 
-Prima di impacchettare il backend standalone nel bundle, eseguire:
+Prima di includere il backend standalone nel bundle, esegui la build e il controllo del suo contenuto:
 
 ```bash
 npm run build
 npm run check:standalone-runtime-bundle
 ```
 
-Il guard fallisce se `.next/standalone` contiene database locali, directory
-temporanee o documentazione privata/non-runtime. Verifica inoltre il manifest
-Node/ABI generato dalla build e carica davvero il `better-sqlite3` incluso.
-Il bundle non accetta un Node di sistema incompatibile: il supervisor cerca un
-Node 24.x con la stessa ABI registrata, oppure usa `MEDIFLOW_NODE_BINARY` solo
-se supera lo stesso controllo.
-Poiche `better-sqlite3` e nativo, ogni bundle prodotto e esplicitamente legato
-all'architettura del Node di build (`arm64` oppure `x86_64`), non universale.
+Il controllo blocca il pacchetto se `.next/standalone` contiene database locali, directory temporanee o documentazione privata o estranea al runtime. Verifica inoltre il manifest Node/ABI prodotto dalla build e carica effettivamente il `better-sqlite3` incluso. Il supervisor accetta soltanto Node 24.x con l'ABI registrata: anche `MEDIFLOW_NODE_BINARY` può essere usato solo dopo lo stesso controllo, senza ripiegare su un Node di sistema incompatibile. Poiché `better-sqlite3` è nativo, ogni bundle resta legato all'architettura del Node di build, `arm64` oppure `x86_64`, e non è universale.
 
-Firma e notarizzazione restano esplicite:
+La firma deve essere richiesta esplicitamente; la notarizzazione rimane un passaggio distinto:
 
 ```bash
 MEDIFLOW_CODESIGN_IDENTITY="-" bash scripts/build-apple-macos-app.sh
@@ -61,9 +43,7 @@ MEDIFLOW_CODESIGN_IDENTITY="Developer ID Application: ..." \
 bash scripts/build-apple-macos-app.sh
 ```
 
-Senza queste variabili lo script produce un bundle locale non firmato. La
-notarizzazione richiede una Developer ID reale e un passaggio di distribuzione
-separato; non viene eseguita automaticamente da questo script.
+In assenza di queste variabili, lo script produce un bundle locale non firmato. La notarizzazione richiede una Developer ID reale e un passaggio separato di distribuzione: lo script non la esegue automaticamente.
 
 ## Avvio manuale
 

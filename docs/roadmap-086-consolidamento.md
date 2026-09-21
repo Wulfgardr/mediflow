@@ -7,52 +7,19 @@ read_when:
 
 # MediFlow 0.8.6 — consolidamento funzionale e interfaccia
 
-Aggiornamento: 20 settembre 2026. Stato: **candidato locale integrato;
-Definition of Done complessiva non raggiunta**. La
-[verifica notturna](./analysis/2026-09-07-086-release-verification.md#verifica-notturna-dell8-settembre-programma-ancora-aperto)
-registra esiti, SHA, piattaforme e residui; nessuna delle 28 issue del
-programma è dichiarata Done. Il
-[piano operativo corrente](./analysis/2026-09-07-086-guided-configuration-plan.md)
-prevale sulle precedenti dichiarazioni di completezza, riferite alla base
-funzionale già congelata. La preparazione conserva la
-[baseline WUL-670](./analysis/2026-09-05-mediflow-086-baseline.md) su `main`
-`b72ac713b`; la preparazione usava `6a5463e8d`. Nessuna release 0.8.6 consegnata.
-La [roadmap generale](./ROADMAP.md) resta la fonte prodotto;
-questo documento conserva la preparazione del candidato 0.8.6.
+Aggiornamento: 20 settembre 2026. Stato: **release sorgente 0.8.6 pubblicata; programma complessivo e decisione sul deployment clinico ancora distinti dalla consegna sorgente**. Questa pagina conserva la preparazione del candidato, non un'attestazione di chiusura dell'intero programma. La [verifica notturna](./analysis/2026-09-07-086-release-verification.md#verifica-notturna-dell8-settembre-programma-ancora-aperto) registra esiti, SHA, piattaforme e residui della fase nella quale nessuna delle 28 issue era dichiarata Done e la Definition of Done complessiva non era raggiunta. Il [piano operativo corrente](./analysis/2026-09-07-086-guided-configuration-plan.md) prevale sulle dichiarazioni di completezza riferite alla sola base funzionale congelata. La preparazione conserva la [baseline WUL-670](./analysis/2026-09-05-mediflow-086-baseline.md) su `main` `b72ac713b`; nella fase di preparazione era usata `6a5463e8d`. La [roadmap generale](./ROADMAP.md) rimane il riferimento di prodotto.
 
-Il riallineamento serale comprende le issue WUL-669–696 e la nuova revisione
-di documenti, scale e gerarchia della cartella. Il
-[piano corrente](./analysis/2026-09-07-086-guided-configuration-plan.md#riallineamento-serale-requisiti-e-consegna)
-registra risultati aggiunti, contratti e Definition of Done comune. Il cambio
-di stato in Linear non chiude una funzione, una prova installata o la release.
+Il riallineamento serale estende il quadro alle issue WUL-669–696 e alla revisione di documenti, scale e gerarchia della cartella. Il [piano corrente](./analysis/2026-09-07-086-guided-configuration-plan.md#riallineamento-serale-requisiti-e-consegna) ne registra risultati aggiunti, contratti e Definition of Done comune: modificare uno stato in Linear non equivale a completare una funzione, una prova installata o la release.
 
-[Verbale corrente](./analysis/2026-09-06-086-integrated-closeout.md): integrazione
-della base funzionale, UI B/A, Search WHO locale e cartella Apple. Le sezioni
-seguenti conservano requisiti e osservazioni preparatorie, non attestano issue
-chiuse. Le scelte B/A e sidecar locale sono recepite; provisioning WHO, revisione
-regolatoria e distribuzione restano confini distinti.
+Il [verbale corrente](./analysis/2026-09-06-086-integrated-closeout.md) riguarda l'integrazione della base funzionale, delle composizioni UI B/A, di Search WHO locale e della cartella Apple. Le sezioni seguenti conservano i requisiti e le osservazioni preparatorie, senza dichiarare chiuse le issue. Le scelte B/A e sidecar locale sono recepite; provisioning WHO, revisione regolatoria e distribuzione devono restare verifiche distinte.
 
-Il perimetro corrente qualifica runtime locale/headless sul Mac e browser
-localhost. La verifica UI iPhone–Mac/Home Base e l'app nativa sono follow-up
-separati, non gate della 0.8.6. Le sezioni preparatorie sotto restano storiche;
-per l'accettazione corrente prevalgono il contratto Linear aggiornato e le prove
-Web/AI richieste sul candidato corrente.
+Il perimetro della 0.8.6 riguarda runtime locale/headless sul Mac e interfaccia browser localhost. Verifica UI iPhone–Mac/Home Base e client nativo sono sviluppi successivi separati, non gate della release sorgente; l'ammissione al deployment clinico rimane una decisione competente in WUL-688, con coordinamento WUL-669. Per l'accettazione prevalgono il contratto Linear aggiornato e le prove Web/AI richieste sul candidato pertinente, non gli stati preparatori conservati sotto.
 
 ## Risultato atteso
 
-Rendere affidabili le funzioni già promesse e semplice capire come usarle.
-Le priorità indicate dall'utente sono OCR con fallback funzionante, ICD-11 WHO
-accessibile, impostazioni essenziali e informative, scheda paziente proporzionata
-e un miglioramento estetico concreto. La prima superficie è **localhost**.
-La successiva estensione Apple comprende navigazione della cartella, bozze e
-documenti su iPhone, iPad e Mac, guidata dai riferimenti illustrati richiesti.
-È un follow-up separato e non un criterio di accettazione della 0.8.6.
+Il consolidamento parte da un'esigenza operativa: le funzioni già promesse devono funzionare in modo affidabile e rendere comprensibile il proprio uso. Le priorità indicate dall'utente sono fallback OCR effettivo, accesso a ICD-11 WHO, impostazioni essenziali ma informative, scheda paziente proporzionata e un miglioramento estetico concreto. La prima superficie è **localhost**; l'estensione Apple di navigazione della cartella, bozze e documenti su iPhone, iPad e Mac, guidata dai riferimenti illustrati richiesti, appartiene invece a un seguito separato e non all'accettazione 0.8.6.
 
-La release non coincide con l'integrazione di tutti i branch rimasti. Recuperiamo
-soltanto contributi che risolvono un problema attuale e superano le verifiche
-sulla nuova base. Lume può essere accantonato nel confronto delle proposte;
-la sua sostituzione nel prodotto richiede una scelta visiva e l'allineamento
-successivo di `DESIGN.md`.
+Questo obiettivo non richiede di integrare tutti i branch rimasti: si recuperano soltanto i contributi che risolvano un problema ancora presente e superino le verifiche sulla nuova base. Nel confronto fra proposte Lume può essere accantonato, ma sostituirlo nel prodotto richiede una decisione visiva e il conseguente allineamento di `DESIGN.md`.
 
 ## Template per ogni intervento
 
@@ -66,94 +33,43 @@ successivo di `DESIGN.md`.
 | Dipendenze / decisioni | Contratti, scelta prodotto, credenziali o piattaforme necessarie |
 | Consegna | Owner, issue reale, nuovo branch/worktree, SHA, verifiche ed esito |
 
-Le issue del programma sono elencate sotto; gli owner esecutivi sono da assegnare.
-Gli identificativi storici nei riferimenti branch individuano fonti da esaminare.
+L'elenco seguente identifica le issue del programma; l'assegnazione degli owner esecutivi rimane da completare nel quadro preparatorio. Gli identificativi storici dei branch servono invece a individuare le fonti da esaminare.
 
 ## 1. OCR e composizione dello stack intelligente — essenziale
 
-**Problema.** Le capacità visibili come inattive non permettono di capire se
-manca una configurazione, se c'è un errore o se il percorso è escluso. Il fallback
-OCR deve produrre un risultato effettivo sui documenti supportati.
+**Problema.** Un'indicazione generica di inattività non consente di distinguere una configurazione mancante da un errore o da un percorso escluso. Il fallback OCR deve invece portare a un risultato effettivo sui documenti supportati, rendendo comprensibile ogni impedimento.
 
-**Stato osservato.** AnyDoc è estrazione deterministica, non OCR. Nel codice
-`lib/domain/documents/anydoc-current-source-composition.ts` è presente la
-continuazione Apple Vision; lo stato del sistema descrive OCR selettivo locale,
-mentre la capacità Fabric `ocr` resta `unavailable`. Esistono anche formulazioni
-precedenti incompatibili negli ADR 0107/0111: occorre fissarne esplicitamente la
-precedenza. Nessuna prova OCR live è stata eseguita in questa preparazione.
+**Stato osservato nella preparazione.** AnyDoc estrae testo in modo deterministico, ma non esegue OCR. `lib/domain/documents/anydoc-current-source-composition.ts` contiene la continuazione Apple Vision e lo stato del sistema descrive OCR selettivo locale, mentre la capacità Fabric `ocr` risulta `unavailable`. Le formulazioni precedenti di ADR 0107/0111 non sono compatibili fra loro e richiedono una precedenza esplicita. In questa preparazione non è stata eseguita una prova OCR live.
 
-**Risultato.** Un documento con testo usa AnyDoc; una scansione supportata passa
-al motore OCR locale previsto. L'utente vede avanzamento, risultato, limite o
-azione di recupero. Le capacità sono organizzate per ciò che consentono di fare:
-leggere documenti, sintetizzare, importare, consultare terminologie.
+**Risultato.** Il documento testuale passa da AnyDoc; una scansione supportata raggiunge il motore OCR locale previsto. Chi lo usa deve vedere avanzamento, risultato, limite o azione di recupero. Anche l'organizzazione delle capacità deve partire dal lavoro consentito: leggere documenti, sintetizzare, importare e consultare terminologie.
 
-**Intervento.** Verificare prima il percorso AnyDoc → riconoscimento delle pagine
-→ Apple Vision → ricomposizione → revisione. Correggere i guasti dimostrati,
-definire il comportamento per immagini singole e PDF misti, e rendere esplicita
-la matrice delle piattaforme supportate. Valutare un secondo motore locale solo
-se serve a coprire un requisito scoperto; AnyDoc resta il primo passaggio.
-Per ogni funzione Fabric censire configurazione, provider, disponibilità
-osservata, ultimo tentativo e motivo dell'eventuale blocco. Non attivare capacità
-non qualificate soltanto per ottenere indicatori verdi.
+**Intervento.** Verificare anzitutto l'intero percorso AnyDoc → riconoscimento delle pagine → Apple Vision → ricomposizione → revisione. Su questa base vanno corretti i guasti riprodotti, definiti i comportamenti per immagini singole e PDF misti ed esplicitate le piattaforme supportate. Un secondo motore locale va valutato solo per un requisito rimasto scoperto, mantenendo AnyDoc come primo passaggio. Per ogni funzione Fabric occorre censire configurazione, provider, disponibilità osservata, ultimo tentativo e motivo di blocco: non si attivano capacità non qualificate soltanto per rendere verdi gli indicatori.
 
-**Accettazione.** Fixture sintetiche italiane: PDF testuale, scansione, PDF misto
-con scansione nell'ultima pagina, immagine singola con esito dichiarato, file
-protetto o corrotto. Controllare ordine delle pagine, testo atteso e provenienza;
-provare motore assente, errore, timeout e nuovo tentativo. Nessun successo con
-testo vuoto o risultato riferito a un allegato sostituito. Sul Mac supportato
-il fallback deve completare una scansione end-to-end dalla UI; un messaggio di
-indisponibilità, da solo, non soddisfa questo requisito. Per gli altri sistemi
-serve una decisione esplicita di supporto prima di promettere equivalenza.
+**Accettazione.** Usare fixture sintetiche italiane per PDF testuale, scansione, PDF misto con scansione nell'ultima pagina, immagine singola con esito dichiarato e file protetto o corrotto. Verificare ordine delle pagine, testo atteso e provenienza, oltre a motore assente, errore, timeout e nuovo tentativo. Testo vuoto o risultato riferito a un allegato sostituito non possono costituire successo. Sul Mac supportato, il fallback deve completare una scansione end-to-end dalla UI: dichiararne l'indisponibilità non soddisfa il requisito. Sugli altri sistemi occorre una decisione esplicita di supporto prima di promettere equivalenza.
 
-**Dipendenze.** Riallineamento del contratto OCR; selezione delle fixture e del
-profilo hardware. I risultati restano da rivedere prima dell'uso clinico.
+**Dipendenze.** Occorrono il riallineamento del contratto OCR e la scelta di fixture e profilo hardware; i risultati devono comunque essere rivisti prima dell'uso clinico.
 
 ## 2. ICD-11 WHO accessibile e verificabile — essenziale
 
-**Problema.** La ricerca e il cross-check terminologico devono essere utilizzabili
-senza una configurazione opaca del servizio indicato come “sidecar”.
+**Problema.** Ricerca e cross-check terminologico devono essere utilizzabili senza che il servizio locale di supporto, chiamato “sidecar”, imponga una configurazione opaca.
 
-**Stato aggiornato.** [Setup WHO](./icd-who-setup.md) e ADR 0115 descrivono
-Search tramite sidecar locale, disattivato per default, con endpoint fisso
-loopback e provenienza degli artifact. Il vecchio container su porta 8888 resta
-ritirato. Non è stato provisionato o verificato un catalogo WHO locale; digest,
-snapshot, licenza e prove di riavvio/ripristino restano da registrare.
+**Stato registrato nella preparazione.** [Setup WHO](./icd-who-setup.md) e ADR 0115 descrivono Search attraverso un sidecar locale spento per default, con endpoint loopback fisso e provenienza degli artifact. Il vecchio container su porta 8888 è ritirato. Questa fase non aveva provisionato né verificato un catalogo WHO locale: digest, snapshot, licenza e prove di riavvio/ripristino erano ancora da registrare.
 
-**Risultato.** Da Impostazioni l'utente comprende cosa manca, completa il setup
-e verifica una ricerca; dalla scheda ottiene risultati con codice, descrizione,
-release e lingua, utili alla conferma della codifica.
+**Risultato.** Dalle Impostazioni l'utente deve capire che cosa manchi, completare il setup e verificare una ricerca. Dalla scheda deve ottenere codice, descrizione, release e lingua, così da poter confermare la codifica.
 
-**Intervento.** Proposta iniziale: rendere operabile l'adapter già presente con
-setup guidato e controllo esplicito della connessione. Definire il cross-check
-come confronto codice/descrizione contro la fonte WHO; non confonderlo con una
-validazione della diagnosi. Verificare se il servizio attuale copre anche il
-lookup puntuale necessario. Confrontare API online e deployment locale WHO
-soltanto rispetto a requisiti concreti di offline, manutenzione e distribuzione.
-Il 6 settembre l'utente ha scelto il **sidecar locale**: la proposta iniziale
-online è superata. Aggiornare l'ADR e implementare il nuovo servizio; non è
-un semplice interruttore da riaccendere.
+**Intervento.** La proposta iniziale prevedeva di rendere utilizzabile l'adapter esistente con setup guidato e verifica esplicita della connessione. Il cross-check va inteso come confronto di codice e descrizione con la fonte WHO, non come validazione della diagnosi; occorre verificare anche la copertura del lookup puntuale. Il confronto fra API online e deployment locale deve riguardare requisiti concreti di offline, manutenzione e distribuzione. Il 6 settembre l'utente ha scelto il **sidecar locale**, superando la proposta online: servono quindi aggiornamento dell'ADR e implementazione del servizio, non la riattivazione di un interruttore.
 
-**Accettazione.** Setup da installazione pulita; ricerca sintetica riuscita;
-codice noto, query senza risultati, credenziali assenti/non valide, rete assente,
-timeout e recupero. Mostrare l'ultima verifica con data; distinguere servizio
-configurato, risposta live e cache. Credenziali solo sul server; nessun dato
-paziente nei test. Nessuna assegnazione diagnostica automatica. Release e lingua
-devono essere esplicite: il binding documentato è `2026-01`, MMS, inglese.
+**Accettazione.** Eseguire il setup da installazione pulita e provare ricerca sintetica riuscita, codice noto, query senza risultati, credenziali assenti o non valide, rete assente, timeout e recupero. Mostrare la data dell'ultima verifica e distinguere configurazione, risposta live e cache. Le credenziali restano solo sul server; i test non usano dati paziente e non è ammessa alcuna assegnazione diagnostica automatica. Release e lingua devono essere esplicite: il binding documentato è `2026-01`, MMS, inglese.
 
-**Dipendenze.** Scelta sidecar risolta; restano contratto, provisioning locale
-e prova finale. La [documentazione WHO](https://icd.who.int/docs/icd-api/), consultata
-il 5 settembre, è la fonte upstream da verificare per il binding scelto.
+**Dipendenze.** Risolta la scelta del sidecar, nella preparazione restano contratto, provisioning locale e prova finale. La [documentazione WHO](https://icd.who.int/docs/icd-api/), consultata il 5 settembre, è il riferimento upstream da verificare rispetto al binding scelto.
 
 ## 3. Impostazioni semplici, navigabili e utili — essenziale
 
-**Problema.** Troppe informazioni tecniche competono con le azioni necessarie.
-È difficile sapere se accesso e Intelligence Fabric funzionano.
+**Problema.** Quando le informazioni tecniche hanno lo stesso peso delle azioni necessarie, diventa difficile capire se l'accesso e le funzioni dell'Intelligence Fabric siano utilizzabili.
 
-**Stato osservato.** Esistono già sidebar, sotto-route e ricerca nelle
-impostazioni (`app/settings/layout.tsx`). La richiesta riguarda gerarchia,
-contenuto e utilità, quindi non si risolve aggiungendo un'altra sidebar.
+**Stato osservato.** Sidebar, sotto-route e ricerca sono già presenti nelle impostazioni in `app/settings/layout.tsx`. Poiché il problema riguarda gerarchia, contenuto e utilità, un'ulteriore sidebar non lo risolverebbe.
 
-**Risultato e intervento.** Proposta di cinque aree principali:
+**Risultato e intervento.** La proposta raccoglie il lavoro in cinque aree principali:
 
 | Area | Contenuto visibile subito |
 | --- | --- |
@@ -163,62 +79,27 @@ contenuto e utilità, quindi non si risolve aggiungendo un'altra sidebar.
 | Cataloghi e collegamenti | ICD-11 WHO, repertori e collegamenti disponibili |
 | Preferenze e dati | Aspetto, ambulatori, backup e manutenzione ordinaria |
 
-Ricerca sempre disponibile. Diagnostica tecnica raccolta in “Dettagli avanzati”
-nelle aree pertinenti; funzioni distruttive chiaramente separate. Ogni funzione
-mostra: **a cosa serve · stato · cosa fare**. Il timestamp della verifica è
-accessibile vicino allo stato; provider, log tecnici e identificativi sono
-approfondimenti. Esempio di copy proposto: “OCR: da configurare. Serve per leggere
-le scansioni. Configura il servizio”. Non è uno stato rilevato in questa sessione.
+La ricerca deve restare sempre disponibile; la diagnostica tecnica va nei “Dettagli avanzati” delle aree pertinenti e le funzioni distruttive devono essere separate. Ogni funzione presenta **a cosa serve · stato · cosa fare**, con timestamp della verifica raggiungibile accanto allo stato e provider, log e identificativi negli approfondimenti. “OCR: da configurare. Serve per leggere le scansioni. Configura il servizio” è un esempio del testo proposto, non uno stato osservato nella preparazione.
 
-**Accettazione.** Partendo da Impostazioni, trovare OCR, WHO e stato accesso entro
-due passaggi di navigazione ciascuno; capire il problema senza aprire dettagli
-tecnici. Provare caricamento, errore, non configurato e successo. Un controllo
-di connessione deve aggiornare lo stato dalla risposta effettiva. Accesso,
-blocco, sblocco e logout si verificano con un account sintetico, senza interrompere
-la sessione reale. Ricerca, tastiera e ritorno alla pagina funzionano; ogni voce
-attuale ha una destinazione nella nuova mappa.
+**Accettazione.** Da Impostazioni, OCR, WHO e stato dell'accesso devono essere raggiungibili ciascuno entro due passaggi, e il problema deve essere comprensibile senza aprire la diagnostica tecnica. Provare caricamento, errore, assenza di configurazione e successo; il controllo di connessione deve aggiornare lo stato dalla risposta reale. Accesso, blocco, sblocco e logout richiedono un account sintetico, senza interrompere la sessione reale. Ricerca, tastiera e ritorno alla pagina devono funzionare, e ogni voce esistente deve trovare una destinazione nella nuova mappa.
 
-**Dipendenze.** Vocabolario di stato condiviso con OCR/WHO/Fabric e inventario
-delle impostazioni. La semplificazione del testo non elimina controlli necessari.
+**Dipendenze.** Servono l'inventario delle impostazioni e un vocabolario di stato condiviso con OCR/WHO/Fabric. Rendere il testo più semplice non autorizza a eliminare controlli necessari.
 
 ## 4. Scheda paziente, sizing e direzione visiva — essenziale
 
-**Problema segnalato.** Intestazione larga con menu a tendina e scheda centrale
-ristretta producono una composizione “a T”. Terapie, SISS e altre sezioni sono
-poco armoniche. È una segnalazione dell'utente, non una misura da screenshot
-acquisita in questa sessione.
+**Problema segnalato.** L'utente descrive una composizione “a T”, nella quale l'intestazione larga con menu a tendina sovrasta una scheda centrale ristretta, mentre terapie, SISS e altre sezioni risultano poco armoniche. È una segnalazione, non una misura tratta da screenshot acquisiti nella preparazione.
 
-**Risultato.** Contesto paziente riconoscibile, navigazione stabile e area di
-lavoro proporzionata alla finestra. Dati e azioni prevalgono sul contenitore.
+**Risultato.** La finestra deve offrire uno spazio di lavoro proporzionato, nel quale identità del paziente e navigazione rimangano riconoscibili senza far prevalere il contenitore su dati e azioni.
 
-**Intervento proposto.** Un'unica griglia per intestazione e contenuto. Testata
-compatta con identità e azioni; indice delle sezioni a sinistra; contenuto
-flessibile; approfondimenti in pannello laterale su richiesta. Terapie, diario,
-documenti e collegamenti diventano destinazioni esplicite. Nessuna seconda barra
-di menu a tendina per la navigazione principale. Su finestre strette l'indice
-collassa, mantenendo visibili paziente e sezione attiva. Distinguere larghezza
-di lettura dei testi da spazio utile per tabelle e moduli.
+**Intervento proposto.** Usare una sola griglia per intestazione e contenuto: testata compatta con identità e azioni, indice delle sezioni a sinistra, contenuto flessibile e approfondimenti in un pannello laterale aperto su richiesta. Terapie, diario, documenti e collegamenti devono essere destinazioni esplicite, senza una seconda barra di menu a tendina per la navigazione principale. Nelle finestre strette l'indice collassa, ma paziente e sezione attiva restano visibili. La larghezza adatta a leggere un testo va distinta dallo spazio necessario a tabelle e moduli.
 
-**Accettazione.** Confronto a contenuti sintetici identici: paziente scarno e
-denso, nomi lunghi, molte terapie, errori e sezioni vuote. Verificare almeno
-1280×800, 1440×900, 1920×1080 e 768×1024, zoom 200%, tastiera e focus. Niente
-azioni tagliate o scorrimento orizzontale dell'intera pagina. Aprire una sezione
-e tornare indietro conserva il contesto; navigazione e modifiche non perdono
-dati. Approvazione visiva su impostazioni e paziente insieme, prima del redesign
-runtime esteso.
+**Accettazione.** Confrontare le proposte con contenuti sintetici identici: pazienti con pochi o molti dati, nomi lunghi, numerose terapie, errori e sezioni vuote. Provare almeno 1280×800, 1440×900, 1920×1080 e 768×1024, zoom 200%, tastiera e focus. Non sono ammesse azioni tagliate o scorrimento orizzontale dell'intera pagina; apertura di una sezione e ritorno devono conservare il contesto, senza perdere dati durante navigazione o modifica. Impostazioni e paziente richiedono approvazione visiva congiunta prima di estendere il redesign al runtime.
 
-Decisione del 6 settembre sul prototipo navigabile: **B con barra superiore
-predefinita, A con barra laterale selezionabile nelle Impostazioni**. Le lettere
-del prototipo indicano le due composizioni runtime, non le tre direzioni
-estetiche iniziali riportate sotto. La rifinitura delle Impostazioni continua.
+Il 6 settembre il prototipo navigabile è stato scelto nella composizione **B con barra superiore predefinita, A con barra laterale selezionabile nelle Impostazioni**. Queste lettere identificano le due composizioni runtime, non le tre direzioni estetiche iniziali riportate sotto. Nella preparazione rimaneva aperta la rifinitura delle Impostazioni.
 
 ### Tre direzioni da confrontare
 
-Fonti recuperate dal catalogo Personal Aesthetic Studio e consultate il
-5 settembre 2026. Sono riferimenti per candidati, non design già approvati.
-Le schede Refero descrivono siti e stili: non provano l'usabilità dei prodotti
-autenticati. La verifica visiva delle schermate sorgente e dei mockup resta
-parte del prossimo confronto.
+I riferimenti seguenti provengono dal catalogo Personal Aesthetic Studio e sono stati consultati il 5 settembre 2026 per costruire candidati, non per documentare design già approvati. Le schede Refero descrivono siti e stili, senza provare l'usabilità dei prodotti autenticati; la verifica visuale di schermate sorgente e mockup rimaneva parte del confronto da svolgere.
 
 | Candidato | Riferimenti | Traduzione proposta in MediFlow | Rischio da verificare |
 | --- | --- | --- | --- |
@@ -226,81 +107,37 @@ parte del prossimo confronto.
 | B — Chiarezza essenziale | [Apple via Refero](https://styles.refero.design/style/aecac5da-f397-4ddf-b71f-de1efc434cb8), [coss UI](https://coss.com/ui) | Poche gerarchie, controlli riconoscibili, spaziatura regolare; pannelli progressivi | Troppo spazio vuoto rispetto al lavoro clinico |
 | C — Studio operativo | Template `workspace.html` e registro sage operational di Personal Aesthetic Studio | Base carta/salvia, sans sobria, griglia rigorosa e dettagli progressivi | Colore/materiale che distrae o riduce il contrasto |
 
-**Proposta iniziale:** A con la leggibilità di B. Confrontarla con C e con il
-prodotto attuale usando gli stessi contenuti. Da Personal Aesthetic Studio si
-mantengono gerarchia, densità progressiva e sobrietà; A/B sperimentano una base
-neutra al posto della carta calda. È un'eccezione candidata, non una modifica
-della costituzione personale. Non serve adottare un'intera libreria o copiare
-un sito per recuperare un buon principio di composizione.
+**Proposta iniziale:** partire da A con la leggibilità di B, confrontandola con C e con il prodotto esistente sugli stessi contenuti. Da Personal Aesthetic Studio si conservano gerarchia, densità progressiva e sobrietà, mentre A/B sperimentano una base neutra al posto della carta calda. È un'eccezione candidata, non una modifica della costituzione personale: un principio di composizione può essere ripreso senza adottare un'intera libreria né copiare un sito.
 
 ## 5. Onboarding assistito e tailoring — essenziale
 
-Il percorso assistito può porre due o tre domande iniziali su attività e modalità
-di lavoro, spiega cosa configura e permette di cambiare scelta. La professione
-dichiarata non verifica identità né concede privilegi. Il percorso manuale deve
-portare a un'app utile e i provider restano spenti per default.
+Il percorso assistito può iniziare da due o tre domande sull'attività e sul modo di lavorare, purché spieghi che cosa configuri e permetta di cambiare scelta. La professione dichiarata non verifica l'identità e non concede privilegi. Anche il percorso manuale deve portare a un'app utile, con provider spenti per default.
 
-Gli agenti operano esclusivamente tramite il layer MediFlow mediato e i suoi
-comandi nominati, con capability, autenticazione, currentness, conferma delle
-scritture cliniche, audit e ricevute. Non ricevono accesso diretto a SQLite e non
-si presume compatibilità universale con qualunque agente. Le funzioni AI restano
-opzionali e proposal-only; Codex o un account AI non sono prerequisiti.
+Gli agenti operano esclusivamente attraverso il layer MediFlow mediato e i suoi comandi nominati: capacità autorizzate, autenticazione, verifica della validità delle informazioni, conferma delle scritture cliniche, audit e ricevute restano condizioni del percorso. Non ricevono accesso diretto a SQLite e non si presume che qualsiasi agente sia compatibile. Le funzioni AI sono facoltative e producono soltanto proposte da rivedere; Codex o un account AI non sono prerequisiti.
 
-Accettazione: raccomandazione comprensibile e modificabile; anteprima e conferma
-delle azioni; configurazione idempotente; ripresa dopo interruzione; cambio
-profilo e rollback; nessun egress o privilegio implicito. Nessun dato clinico
-nelle domande. La design arena comprende anche questi workflow.
+L'accettazione richiede raccomandazioni comprensibili e modificabili, anteprima e conferma delle azioni, configurazione idempotente, ripresa dopo interruzione, cambio di profilo e rollback. Non sono ammessi invii di dati all'esterno o privilegi impliciti, né dati clinici nelle domande. La design arena deve includere anche questi flussi.
 
 ## 6. Deslop globale del codice — essenziale
 
-Censire il codice first-party complessivo, inclusi web, librerie, packages,
-native, tooling e test: duplicazioni, percorsi morti, astrazioni inutili e
-incoerenze di naming/copy/documentazione. Non assumere che ogni complessità sia
-eliminabile. Generated, vendor, dati locali e archivi probatori sono esclusi
-da pulizia meccanica.
+Il censimento deve coprire il codice first-party di web, librerie, packages, native, tooling e test, cercando duplicazioni, percorsi morti, astrazioni inutili e incoerenze fra nomi, testi e documentazione. Non tutta la complessità è eliminabile: generated, vendor, dati locali e archivi probatori restano esclusi dalla pulizia meccanica.
 
-Ogni finding ha evidenza, impatto, proposta, rischio e verifica prevista.
-Classificare REMOVE/SIMPLIFY/CONSOLIDATE/KEEP/DEFER; applicare tranche tematiche
-reversibili, coordinate con le lane funzionali. Preservare controlli, migrazioni,
-compatibilità e test significativi. Nessuna quota di righe da cancellare.
+Ogni rilievo deve collegare evidenza, impatto, proposta, rischio e verifica prevista, con classificazione REMOVE/SIMPLIFY/CONSOLIDATE/KEEP/DEFER. Le modifiche procedono per tranche tematiche reversibili, coordinate con le lane funzionali, senza quote di righe da cancellare e preservando controlli, migrazioni, compatibilità e test significativi.
 
-Accettazione: inventario con copertura e limiti, tranche utili completate,
-comportamenti preservati e regressioni verificate, benefici concreti e debito
-residuo espliciti. Il solo censimento non equivale al deslop consegnato.
+L'accettazione richiede un inventario che dichiari copertura e limiti, ma anche tranche utili effettivamente completate, comportamenti preservati e regressioni verificate. Benefici concreti e debito residuo devono essere espliciti: il solo censimento non equivale alla consegna del deslop.
 
 ## 7. GDPR e AI Act — essenziale
 
-Obiettivo: soddisfare integralmente gli obblighi applicabili al perimetro d'uso,
-ai ruoli e alla versione dichiarati. Il codice locale, la supervisione umana
-o una checklist automatica non certificano conformità.
+L'obiettivo è soddisfare integralmente gli obblighi applicabili al perimetro d'uso, ai ruoli e alla versione dichiarati. Località del codice, supervisione umana e checklist automatica non costituiscono, da sole, una certificazione di conformità.
 
-Preparare matrice obbligo → fonte/versione/data di applicabilità → ruolo →
-controllo → evidenza → gap. Distinguere obblighi del prodotto da responsabilità
-organizzative e documenti adottati da semplici template. Esaminare finalità,
-dati sanitari, diritti, retention, sicurezza, fornitori e trasferimenti, DPIA
-quando richiesta; classificazione AI, literacy, trasparenza e ulteriori obblighi
-condizionali secondo sistema e ruolo. Valutare separatamente un eventuale
-confine dispositivo medico se emerge dall'intended purpose.
+Preparare una matrice obbligo → fonte/versione/data di applicabilità → ruolo → controllo → evidenza → gap. Occorre distinguere gli obblighi del prodotto dalle responsabilità organizzative e i documenti adottati dai semplici template. L'esame comprende finalità, dati sanitari, diritti, retention, sicurezza, fornitori e trasferimenti, con DPIA quando richiesta; per l'AI, classificazione, literacy, trasparenza e ulteriori obblighi condizionati al sistema e al ruolo. Se l'intended purpose fa emergere un possibile confine da dispositivo medico, valutarlo separatamente.
 
-Fonti ufficiali consultate il 5 settembre 2026:
-[GDPR](https://eur-lex.europa.eu/eli/reg/2016/679/oj/eng),
-[AI Act](https://eur-lex.europa.eu/eli/reg/2024/1689/oj/eng) e
-[Commissione europea](https://digital-strategy.ec.europa.eu/en/policies/regulatory-framework-ai).
-Rileggere testi consolidati, aggiornamenti e calendario vigente durante il lavoro.
+I riferimenti ufficiali consultati il 5 settembre 2026 sono [GDPR](https://eur-lex.europa.eu/eli/reg/2016/679/oj/eng), [AI Act](https://eur-lex.europa.eu/eli/reg/2024/1689/oj/eng) e [Commissione europea](https://digital-strategy.ec.europa.eu/en/policies/regulatory-framework-ai). Durante il lavoro devono essere riletti i testi consolidati, gli aggiornamenti e il calendario vigente.
 
-Accettazione: requisiti applicabili coperti da interventi e prove, dossier sul
-candidato esatto e revisione competente identificata e registrata. Se manca
-una decisione giuridico-regolatoria o un adempimento applicabile, il gate resta
-aperto. Nessuna firma, nomina, certificazione o esenzione presunta.
+L'accettazione richiede interventi e prove per i requisiti applicabili, un dossier riferito al candidato esatto e una revisione competente identificata e registrata. Il gate rimane aperto quando manchi una decisione giuridico-regolatoria o un adempimento applicabile: non si presumono firme, nomine, certificazioni o esenzioni.
 
 ## Filone operativo su Linear
 
-[Progetto 0.8.6](https://linear.app/wulfgardr/project/mediflow-086-consolidamento-funzionale-e-interfaccia-cb068ec8f3d4)
-· [Contratto operativo](https://linear.app/wulfgardr/document/mediflow-086-contratto-operativo-issue-e-definition-of-done-533669b0b37b).
-Creati 20 ticket: coordinamento e 19 attività, sei milestone e dipendenze
-esplicite. Linear governa il piano; gli ADR e i contratti repository governano
-l'implementazione. Non c'erano template Linear disponibili: ogni issue usa
-outcome, scope/contratti, DoD, limiti e fonti.
+Il [Progetto 0.8.6](https://linear.app/wulfgardr/project/mediflow-086-consolidamento-funzionale-e-interfaccia-cb068ec8f3d4) e il [Contratto operativo](https://linear.app/wulfgardr/document/mediflow-086-contratto-operativo-issue-e-definition-of-done-533669b0b37b) sono stati articolati inizialmente in 20 ticket, coordinamento e 19 attività, con sei milestone e dipendenze esplicite. Linear governa il piano, mentre ADR e contratti del repository governano l'implementazione. In assenza di template Linear disponibili, ogni issue è stata strutturata con outcome, scope/contratti, DoD, limiti e fonti.
 
 | Issue | Risultato |
 | --- | --- |
@@ -325,22 +162,13 @@ outcome, scope/contratti, DoD, limiti e fonti.
 | WUL-687 | AI Act: obblighi pertinenti e prove |
 | WUL-688 | Dossier conformità e decisione competente |
 
-Astra sceglie soluzioni, componenti, ordine dei sottopassi e suddivisione tecnica
-motivata. Le dipendenze sono gate di completamento, non divieti di preparare
-lavoro indipendente. Scelta estetica, nuovi costi/egress e cambi sostanziali di
-scope richiedono la decisione pertinente. Issue 0.8.5/1.0 preservate.
+Astra sceglie soluzioni, componenti, ordine dei sottopassi e suddivisione tecnica motivata. Le dipendenze condizionano il completamento, senza vietare la preparazione di lavoro indipendente; scelta estetica, nuovi costi o invii all'esterno e cambi sostanziali di perimetro richiedono invece la decisione pertinente. Le issue 0.8.5/1.0 sono preservate.
 
 ## Recupero selettivo dei branch locali
 
-Input: task `01a07256-8274-7263-813b-cdd0b099952e`, resoconto `REPORT.md` ed elenco
-`pending.md` della ricognizione del 5 settembre. Gli originali restano nel registro
-locale `.codex/state/mediflow-branch-closeout/2026-09-05` esterno al repository.
-Quella fotografia usava `5cbbf777e`; la base odierna è successiva. I suoi 74 hold,
-58 confronti conflittuali e 16 delta senza conflitti sono dati storici, non un
-nuovo audit di integrazione sulla base corrente.
+La selezione parte dal task `01a07256-8274-7263-813b-cdd0b099952e`, dal resoconto `REPORT.md` e dall'elenco `pending.md` della ricognizione del 5 settembre. Gli originali restano nel registro locale `.codex/state/mediflow-branch-closeout/2026-09-05`, esterno al repository. Quella fotografia usava `5cbbf777e`, precedente alla base della preparazione: 74 hold, 58 confronti conflittuali e 16 delta senza conflitti sono quindi dati storici, non l'esito di un nuovo audit sulla base corrente.
 
-Sette head pertinenti sono state rilette e confrontate per i percorsi modificati
-con `main 6a5463e8d`; nessuna è stata integrata. Prefisso comune: `codex/hold/`.
+La preparazione ha riletto sette head pertinenti e confrontato i percorsi modificati con `main 6a5463e8d`, senza integrarli. Il prefisso comune è `codex/hold/`.
 
 | Branch / SHA osservato | Destinazione 0.8.6 | Esito preparatorio |
 | --- | --- | --- |
@@ -352,52 +180,24 @@ con `main 6a5463e8d`; nessuna è stata integrata. Prefisso comune: `codex/hold/`
 | `WUL-561-web-lume-mockup` / `697fdfbe6` | Scheda e confronto visivo | 40 percorsi differenti; materiale di studio, non base runtime da ripristinare |
 | `WUL-565-macos-inspector-strumento-carta` / `c08d5c9e3` | Ispirazione per pannello contestuale | Otto percorsi differenti; proposta nativa separata, non dipendenza del redesign localhost |
 
-**Altre famiglie del portafoglio.** Sessione, sintesi e currentness entrano solo
-per un difetto riprodotto nei percorsi di questa release. Patient Insight e
-Treatment Reasoning rientrano nella verifica delle capacità esistenti, senza
-obbligo di integrare ogni vecchio binding. Harness e release hygiene possono
-supportare le verifiche. Governance conserva le informazioni necessarie, rese
-leggibili nella UI. XPC, ampliamento provider cloud, nuove capacità headless e
-parity Apple estesa restano fuori dal nucleo 0.8.6 salvo nuova decisione.
+**Altre famiglie del portafoglio.** Sessione, sintesi e verifica della validità del contesto entrano nel recupero solo quando risolvano un difetto riprodotto nei percorsi della release. Patient Insight e Treatment Reasoning richiedono la verifica delle capacità esistenti, non l'integrazione di ogni vecchio binding; harness e release hygiene possono sostenerne le prove. Governance conserva le informazioni necessarie, rendendole leggibili nella UI. XPC, ampliamento dei provider cloud, nuove capacità headless e parità Apple estesa restano fuori dal nucleo 0.8.6 salvo nuova decisione.
 
-WHO #322/#340 è materiale già ricomposto in main secondo la ricognizione:
-la nuova attività è renderlo utilizzabile e provarlo. Per tastiera e stati,
-consultare anche WUL-560/c/d e l'inventario WUL-562 prima di duplicare verifiche.
-Gli altri rami sono stati mappati dal registro, non sottoposti ad audit funzionale.
+Secondo la ricognizione, WHO #322/#340 è già stato ricomposto in main: l'attività successiva deve renderlo utilizzabile e provarlo. Per tastiera e stati occorre consultare anche WUL-560/c/d e l'inventario WUL-562, evitando di duplicare verifiche. Gli altri rami sono soltanto mappati dal registro, non sottoposti ad audit funzionale.
 
-Prima di recuperare un contributo: riprodurre il bisogno sulla base corrente,
-identificare la differenza utile, riallinearla al contratto e verificarla in un
-nuovo worktree dedicato. Preservare worktree dirty e task attivi. Branch
-recuperabile, merge senza conflitti e test storici non equivalgono a consegna.
+Prima di recuperare un contributo, riprodurre il bisogno sulla base corrente, isolare la differenza utile, riallinearla al contratto e verificarla in un nuovo worktree dedicato. Worktree con modifiche locali e task attivi devono essere preservati: la recuperabilità di un branch, un merge senza conflitti o test storici non equivalgono a una consegna.
 
 ## Sequenza e completamento
 
-1. **Inventario operativo e contratti:** mappa funzione → servizio → stato →
-   azione, riproduzione dei guasti sintetici, decisione OCR/WHO, selezione residui.
-2. **Confronto UX:** tre candidati per impostazioni e paziente con contenuti
-   equivalenti; scegliere struttura e stile. Può procedere mentre si verifica OCR.
-3. **Consolidamento funzionale:** OCR e WHO end-to-end; recuperi mirati su
-   currentness/sessione; stato dei servizi attendibile.
-4. **Implementazione UI:** nuova mappa impostazioni e scheda sulla direzione scelta,
-   conservando contratti e comportamenti corretti del prodotto corrente.
-5. **Onboarding e deslop:** percorso assistito reversibile sul localhost;
-   censimento globale e semplificazioni utili. La matrice nativa resta follow-up.
-6. **GDPR/AI Act:** applicabilità e requisiti possono partire dopo la baseline;
-   interventi e dossier recepiscono onboarding, UI, runtime e deslop finali.
-7. **Verifica 0.8.6:** scenari Web/AI funzionali, accessibilità e regressioni dei
-   flussi toccati sul runtime locale/headless e localhost; prove sull'installazione
-   target Mac e note dei limiti. Poi separatamente
-   eventuali commit, PR, CI remota, tag e release con l'autorità necessaria.
+1. **Inventario operativo e contratti:** costruire la mappa funzione → servizio → stato → azione, riprodurre i guasti con dati sintetici, decidere OCR/WHO e selezionare i residui utili.
+2. **Confronto UX:** confrontare tre candidati per impostazioni e paziente su contenuti equivalenti, scegliendo struttura e stile. Il lavoro può procedere insieme alla verifica OCR.
+3. **Consolidamento funzionale:** verificare OCR e WHO end-to-end, recuperare in modo mirato le verifiche sulla validità del contesto e la gestione della sessione e rendere attendibile lo stato dei servizi.
+4. **Implementazione UI:** realizzare la nuova mappa di impostazioni e scheda secondo la direzione scelta, conservando contratti e comportamenti corretti del prodotto.
+5. **Onboarding e deslop:** realizzare il percorso assistito reversibile su localhost, completare il censimento globale e applicare semplificazioni utili. La matrice nativa rimane un seguito separato.
+6. **GDPR/AI Act:** avviare l'esame di applicabilità e requisiti dopo la baseline; interventi e dossier devono recepire le versioni finali di onboarding, UI, runtime e deslop.
+7. **Verifica 0.8.6:** esercitare scenari Web/AI, accessibilità e regressioni dei flussi toccati su runtime locale/headless e localhost, con prove sull'installazione target Mac e limiti documentati. Eventuali commit, PR, CI remota, tag e release restano passaggi separati che richiedono la relativa autorità.
 
-La 0.8.6 è candidata alla consegna quando i sette filoni essenziali soddisfano
-le rispettive accettazioni. OCR supportato e WHO non vengono dichiarati operativi
-con soli test fake; una decisione aperta sul loro funzionamento blocca quel claim.
-Nessuna data promessa finché non sono noti guasti, scelta visiva e recuperi utili.
+Il criterio preparatorio di consegna della 0.8.6 richiede che i sette filoni essenziali soddisfino le rispettive accettazioni. Per OCR supportato e WHO, i soli test simulati non permettono di dichiarare il funzionamento reale: una decisione aperta su quel funzionamento blocca l'affermazione. La pianificazione non può promettere una data prima di conoscere guasti, scelta visiva e recuperi utili.
 
 ## Evidenza di questa preparazione
 
-Letti contratti, setup, roadmap, skill e catalogo estetico, task e artefatti della
-ricognizione. Ispezionati sorgenti pertinenti e sette head locali; approfonditi
-due diff UI. Non avviati server, OCR, WHO o test applicativi; nessuna osservazione
-dell'interfaccia autenticata né benchmark clinico. Questa consegna riguarda il
-piano e la selezione preliminare, non certifica le funzionalità o i branch.
+La preparazione ha esaminato contratti, setup, roadmap, skill e catalogo estetico, insieme al task e agli artefatti della ricognizione. Sono stati ispezionati i sorgenti pertinenti e sette head locali, approfondendo due diff UI. Non sono stati avviati server, OCR, WHO o test applicativi, né osservata l'interfaccia autenticata o eseguito un benchmark clinico. L'evidenza riguarda dunque piano e selezione preliminare, non la qualificazione delle funzionalità o dei branch.

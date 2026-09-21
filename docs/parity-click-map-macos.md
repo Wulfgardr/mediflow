@@ -9,10 +9,13 @@ read_when:
 
 Stato documento: `SECONDARY / VERIFICATION RUNBOOK`
 
-`WUL-401` e PR #21 hanno consegnato il tooling di base; `WUL-481` governa sia i
-prerequisiti operativi ancora bloccati sia il verbale manuale residuo. Il probe
-AX riduce l'ambiguita sugli identificatori, ma non certifica da solo usabilita,
-completezza dei campi o parity UI.
+La mappa descrive il percorso P6 costruito sugli strumenti di `WUL-401` e
+PR #21; `WUL-481` ne governa i prerequisiti operativi ancora bloccati e il
+verbale manuale residuo. Il probe AX aiuta a identificare i controlli, ma non
+può dimostrare da solo che siano usabili, che tutti i campi siano presenti o
+che vi sia parità di interfaccia. I blocchi riportati sotto appartengono alla
+fixture di questo percorso, non sono una nuova valutazione dell'intera
+famiglia Apple.
 
 ## Confini
 
@@ -36,8 +39,9 @@ open -n \
   "$APP"
 ```
 
-Questa procedura produce il bundle Debug packaged e verifica che il WebRuntime
-Next.js sia realmente incluso prima di avviare la fixture.
+La procedura costruisce il bundle Debug completo del runtime e, prima di
+avviare la fixture, controlla che il WebRuntime Next.js vi sia effettivamente
+incluso. In questo modo la verifica non si limita alla sola shell SwiftUI.
 
 Con accesso Accessibility concesso al terminale corrente, eseguire il probe
 preparatorio:
@@ -48,23 +52,26 @@ npm run test:native:clickmap:probe -- --app-path "$APP"
 
 ## Copertura effettiva della fixture
 
-La fixture consente di verificare navigazione, ricerca e filtri paziente,
-dettaglio sintetico, segnali cockpit, righe diario/terapie/checkup/osservazioni,
-trend e controlli del rich text senza salvare.
-
-Restano `BLOCKED` per costruzione, e non vanno promossi a `PASS`:
+La fixture permette di percorrere navigazione, ricerca e filtri paziente,
+dettaglio sintetico, segnali del cockpit, righe di diario, terapie, checkup e
+osservazioni, trend e controlli del testo formattato, senza salvare. Proprio
+perché non prepara un contesto autorizzato alla scrittura, alcune prove restano
+`BLOCKED` per costruzione e non vanno promosse a `PASS`:
 
 - mutazioni, conflitti e lifecycle: la fixture non crea sessione paired,
   credenziali, master key o capability di write;
 - allegati e tombstone: gli array sintetici sono vuoti;
 - Agenda, Diario globale e Analytics: le capability host non sono caricate;
-- deep-link URL: non esiste ancora un contratto `mediflow://`/`onOpenURL`.
+- deep-link URL: la baseline della fixture qui descritta non disponeva ancora
+  di un contratto `mediflow://`/`onOpenURL` verificato in questo percorso.
 
-Aprire un form senza salvarlo prova la superficie, non il CRUD end-to-end. Per
-chiudere quei gate serve un home-base temporaneo con database esclusivamente
-sintetico, credenziali effimere e cleanup automatico. Anche il deep-link deve
-ricevere un contratto verificabile o essere escluso esplicitamente dal perimetro
-prima che `WUL-481` possa produrre un verbale interamente verde.
+Aprire un modulo senza salvarlo dimostra che la superficie è raggiungibile,
+non che il CRUD funzioni dall'inizio alla fine. Per chiudere queste verifiche
+serve un home-base temporaneo con database esclusivamente sintetico,
+credenziali effimere e pulizia automatica. Anche il deep-link deve avere un
+contratto verificabile in questo percorso, oppure essere esplicitamente
+escluso dal perimetro, prima che `WUL-481` possa produrre un verbale interamente
+verde.
 
 ## Mappa manuale P6
 
@@ -73,13 +80,13 @@ contenuti clinici.
 
 | Area | Percorso da esercitare | Evidenza minima |
 | --- | --- | --- |
-| Shell / deep-link | Aprire tutte le sezioni della sidebar; tornare a Pazienti; verificare selezione, titolo finestra e assenza di shell concorrenti. Il deep-link resta `BLOCKED` finche un vero `open mediflow://...` non apre sezione e paziente dichiarati. | Ogni destinazione e raggiungibile; sidebar e deep-link ricevono esiti separati. |
+| Shell / deep-link | Aprire tutte le sezioni della sidebar; tornare a Pazienti; verificare selezione, titolo finestra e assenza di shell concorrenti. Il deep-link resta `BLOCKED` finché un vero `open mediflow://...` non apre sezione e paziente dichiarati. | Ogni destinazione è raggiungibile; sidebar e deep-link ricevono esiti separati. |
 | Pazienti | Cercare `Rossi`, alternare Attivi/Archiviati/Cestino, aprire la scheda sintetica e i form Modifica/Nuovo paziente senza salvare. | Lista, filtri, dettaglio e campi significativi sono leggibili e azionabili con pointer e tastiera. |
 | Diario base | Verificare filtro tipo, toggle eliminate, righe, allegati, Modifica e Nuova voce senza salvare. | CRUD reviewable e stati tombstone sono comprensibili; nessuna write queue offline e promessa. |
 | Editor rich text | Nel form Nuova voce inserire il template S/O/A/P, aggiungere/rimuovere blocchi e provare i controlli di formattazione senza salvare. | Il contenuto resta editabile, il markup non viene mostrato come testo grezzo e i controlli sono accessibili. |
 | Terapie | Alternare i filtri stato; aprire create/edit senza salvare; verificare lookup AIFA/manuale e collegamento diagnosi. | AIC/ATC/principio attivo, posologia, stato, date, motivazione e diagnosi sono rappresentabili. |
 | Checkup | Alternare i filtri stato e aprire create/edit senza salvare. | Titolo, data, note, stato/source e gestione conflitto sono comprensibili. |
-| Osservazioni | Verificare righe LOINC/UCUM, trend/sparkline e form create/edit senza salvare. | Codice, display, valore, unita, data e note sono rappresentabili senza estrazione automatica. |
+| Osservazioni | Verificare righe LOINC/UCUM, trend/sparkline e form create/edit senza salvare. | Codice, display, valore, unità, data e note sono rappresentabili senza estrazione automatica. |
 | Cockpit | Verificare segnali sintetici nella scheda e le viste Agenda, Diario globale e Analytics. | Conteggi capped sono dichiarati onestamente e ogni vista ha stato vuoto/loading/error leggibile. |
 
 ## Verbale di esecuzione
@@ -104,5 +111,6 @@ Cockpit:
 Blocker e follow-up:
 ```
 
-Una capability passa a `full-parity` solo quando il verbale manuale e verde e
-i gate automatici pertinenti restano verdi.
+Una funzionalità può passare a `full-parity` solo quando il verbale manuale è
+verde e rimangono verdi anche i controlli automatici pertinenti. Il probe, da
+solo, non sostituisce nessuna delle due condizioni.

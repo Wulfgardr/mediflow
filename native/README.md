@@ -1,39 +1,58 @@
-# MediFlow universal Apple app
+<a id="mediflow-universal-apple-app"></a>
 
-One universal SwiftUI app for iOS, iPadOS and macOS, sharing the home-base +
-`/api/v1` boundary with the web app. Lume is the active design language. Vetro
-Clinico is historical and transitional. Source content alone does not prove a
-signed, notarized, or published release.
-No long dash in this repo's text by convention.
+# App Apple universale di MediFlow
 
-## Layout
+La famiglia Apple di MediFlow condivide una base SwiftUI per iOS, iPadOS e
+macOS, mantenendo lo stesso rapporto con l'home-base e con il contratto
+`/api/v1` usato dall'applicazione web. Questa condivisione permette di sviluppare
+le superfici native senza introdurre un accesso separato ai dati. Lume è il
+linguaggio di design attivo; Vetro Clinico resta un riferimento storico e
+transitorio.
 
-- `MediFlowAppleApp/`: the single shippable artifact: an Xcode project generated
-  from `project.yml` (xcodegen). Two app targets, same bundle id
-  `com.mediflow.mobile` (universal purchase):
-  - `MediFlowMobileApp` (iOS/iPadOS, device family 1,2)
-  - `MediFlowMacApp` (native macOS)
-  Both mount `AppleFoundationMobileRootView` from the shared library.
-- `MediFlowMac/`: the SwiftPM package. Library + tests only (no app executables):
-  - `Sources/MediFlowAppleShared/`: the shared module: SwiftUI root + view models
-    (`AppleFoundation/`), home-base networking / Bonjour / pairing / cache, the
-    the `Lume` design kit, optional Liquid Glass chrome, and the `/api/v1` contract primitives
-    (`APIPatchValue`, `APIVersionConflict`).
-  - `Tests/MediFlowAppleSharedTests/`: XCTest suite.
+Qui sono descritti sorgenti e strumenti di sviluppo, non la disponibilità di
+una release firmata, notarizzata o pubblicata. La release 0.8.6 distribuisce i
+sorgenti; il seguito nativo rimane distinto. Per convenzione, i testi di questa
+repository non usano il trattino lungo.
 
-The two former SPM executables (`MediFlowMac`, `MediFlowMobile`) and ~12k lines of
-unmounted "rich Mac UI" were removed in Fase 0; see
+<a id="layout"></a>
 
-## Toolchain
+## Struttura
 
-The Liquid Glass code uses `.glassEffect` behind an `iOS 26 / macOS 26`
-availability guard, so building needs an Xcode with the 26 (or newer) SDK. The
-bare Command Line Tools toolchain lacks XCTest; `scripts/native-test.sh`
-auto-selects a full Xcode. Locally, export `DEVELOPER_DIR` if needed:
+- `MediFlowAppleApp/`: il progetto unico da cui costruire i bundle Apple,
+  generato in Xcode da `project.yml` tramite xcodegen. Comprende due target app
+  con lo stesso bundle id `com.mediflow.mobile` (universal purchase):
+  - `MediFlowMobileApp` (iOS/iPadOS, device family 1,2);
+  - `MediFlowMacApp` (macOS nativo).
+  Entrambi montano `AppleFoundationMobileRootView` dalla libreria condivisa.
+- `MediFlowMac/`: il package SwiftPM, che contiene libreria e test, non
+  eseguibili app:
+  - `Sources/MediFlowAppleShared/`: il modulo condiviso raccoglie radice SwiftUI
+    e modelli di vista (`AppleFoundation/`), rete verso l'home-base, Bonjour,
+    pairing, cache, componenti di design `Lume`, elementi di interfaccia Liquid
+    Glass facoltativi e primitive del contratto `/api/v1`
+    (`APIPatchValue`, `APIVersionConflict`);
+  - `Tests/MediFlowAppleSharedTests/`: la suite XCTest.
+
+Nella Fase 0 sono stati rimossi i due precedenti eseguibili SPM
+(`MediFlowMac`, `MediFlowMobile`) e ~12k righe della “rich Mac UI” non
+montata. La struttura da usare è quindi quella dei target e della libreria
+condivisa descritti sopra.
+
+<a id="toolchain"></a>
+
+## Strumenti di compilazione
+
+Il codice Liquid Glass usa `.glassEffect` dietro un controllo di disponibilità
+`iOS 26 / macOS 26`; per compilarlo serve quindi Xcode con SDK 26 o successivo.
+Le sole Command Line Tools non includono XCTest: `scripts/native-test.sh`
+seleziona automaticamente un'installazione completa di Xcode. Quando occorre
+indicarla esplicitamente in locale, esporta `DEVELOPER_DIR`:
 
     export DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer
 
-## Build and test
+<a id="build-and-test"></a>
+
+## Compilazione e test
 
     # SwiftPM library + tests
     scripts/native-test.sh                      # swift test (auto-selects Xcode)
@@ -50,67 +69,88 @@ auto-selects a full Xcode. Locally, export `DEVELOPER_DIR` if needed:
     xcodebuild test -project native/MediFlowAppleApp/MediFlowAppleApp.xcodeproj \
       -scheme MediFlowMobileApp -destination 'platform=iOS Simulator,name=iPhone 17 Pro' CODE_SIGNING_ALLOWED=NO
 
-CI runs the same in `.github/workflows/apple-native.yml` (path-filtered to
-`native/**`). The guards (`scripts/check-apple-structure.sh`,
-`scripts/check-apple-network-entitlements.sh`) fail if the retired executables or
-dead roots reappear, or if the Bonjour / local-network keys are missing.
+La CI esegue lo stesso percorso in `.github/workflows/apple-native.yml`, con
+filtro sui percorsi `native/**`. I controlli
+`scripts/check-apple-structure.sh` e
+`scripts/check-apple-network-entitlements.sh` falliscono se ricompaiono gli
+eseguibili ritirati o radici non usate, oppure se mancano le chiavi per Bonjour
+e per la rete locale.
 
-## Simulator build and optional install
+<a id="simulator-build-and-optional-install"></a>
 
-`scripts/build-mobile-sim-app.sh` builds the tracked Xcode project and the
-`MediFlowMobileApp` scheme in Debug with signing disabled. It uses the selected
-Xcode (`DEVELOPER_DIR` when set), requires the iOS Simulator SDK 26 or newer,
-and never regenerates the project. With Command Line Tools selected, set
-`DEVELOPER_DIR` to a full Xcode as shown above.
+## Compilazione per simulatore e installazione facoltativa
 
-The default output is `tmp-ios-sim-dd/Build/Products/Debug-iphonesimulator/MediFlow.app`.
-`MEDIFLOW_IOS_DERIVED_DATA` overrides the derived-data directory; relative paths
-resolve from the repository root. On success stdout contains only the absolute
-app path; build/install diagnostics go to stderr. The builder verifies the
-bundle identifier, simulator platform and executable before reporting success.
-`MEDIFLOW_IOS_BUNDLE_ID`, if supplied, asserts the expected identifier rather
-than changing the app's identity.
+`scripts/build-mobile-sim-app.sh` compila il progetto Xcode tracciato e lo
+scheme `MediFlowMobileApp` in Debug, con firma disabilitata. Usa Xcode selezionato
+tramite `DEVELOPER_DIR`, quando impostato, richiede SDK iOS Simulator 26 o
+successivo e non rigenera mai il progetto. Se sono selezionate le Command Line
+Tools, indica un Xcode completo con `DEVELOPER_DIR`, come mostrato sopra.
 
-Build alone needs no simulator, backend, PIN, database or pairing. Installation
-requires Node 24 on PATH, an explicit UDID and an available, already-booted iOS
-simulator:
+Il risultato predefinito è
+`tmp-ios-sim-dd/Build/Products/Debug-iphonesimulator/MediFlow.app`.
+`MEDIFLOW_IOS_DERIVED_DATA` permette di scegliere la directory dei dati di
+compilazione; i percorsi relativi sono risolti dalla radice della repository.
+Prima di dichiarare il successo, il builder verifica identificativo del bundle,
+piattaforma del simulatore ed eseguibile. Solo allora scrive su stdout il
+percorso assoluto dell'app; la diagnostica di compilazione e installazione va
+su stderr. Se fornito, `MEDIFLOW_IOS_BUNDLE_ID` verifica l'identificativo atteso:
+non cambia l'identità dell'app.
+
+Compilare non richiede simulatore, backend, PIN, database o pairing. Installare
+richiede invece Node 24 nel PATH, un UDID esplicito e un simulatore iOS
+disponibile e già avviato:
 
     MEDIFLOW_IOS_SIMULATOR_ID=<UDID> bash scripts/build-mobile-sim-app.sh --install
 
-The builder never boots, launches or erases a simulator. The paired smoke uses
-this same install contract before backend setup and temporary pairing changes;
-see [the mobile smoke runbook](../docs/mobile-home-base-smoke.md). A successful
-build or install does not attest login, pairing, UI behavior or distribution.
+Il builder non avvia, lancia o cancella mai un simulatore. Lo smoke paired usa
+questo stesso contratto di installazione prima del setup del backend e delle
+modifiche temporanee al pairing, come descritto nel
+[runbook dello smoke mobile](../docs/mobile-home-base-smoke.md). Compilazione e
+installazione riuscite non attestano login, pairing, comportamento della UI o
+distribuzione.
 
-Tooling regression tests use temporary synthetic fixtures and fake Apple/backend
-commands on macOS, without contacting a server or simulator:
+I test di regressione degli strumenti usano su macOS fixture sintetiche
+temporanee e sostituti dei comandi Apple e backend: non contattano server né
+simulatori.
 
     node --test scripts/build-mobile-sim-app.test.mjs
 
-## Runnable macOS app (with the home-base WebRuntime)
+<a id="runnable-macos-app-with-the-home-base-webruntime"></a>
 
-The macOS app *is* the home-base: it supervises a bundled Next.js standalone
-server (`HomeBaseRuntimeSupervisor`). Plain `xcodebuild` does not bundle it (CI
-stays fast and npm-free); the runnable / release app comes from:
+## App macOS eseguibile con WebRuntime home-base
+
+Nel percorso macOS l'app svolge il ruolo di home-base: supervisiona un server
+Next.js standalone incluso nel bundle tramite `HomeBaseRuntimeSupervisor`.
+Il solo `xcodebuild` non include questo server, così la CI rimane rapida e non
+dipende da npm. Per costruire l'app eseguibile con il proprio runtime, anche
+come base del successivo percorso di distribuzione, usa:
 
     scripts/build-apple-macos-app.sh            # next build + xcodebuild + inject WebRuntime
     MEDIFLOW_SKIP_WEB_BUILD=1 scripts/build-apple-macos-app.sh   # reuse existing .next/standalone
     MEDIFLOW_CODESIGN_IDENTITY=- scripts/build-apple-macos-app.sh # ad-hoc sign incl. the runtime
 
-It assembles `Contents/Resources/WebRuntime/` (`server.js` + `.next/static` +
-`public`) and `local-api-tls-proxy.mjs`, exactly what the supervisor launches.
-Node is NOT bundled. The WebRuntime carries a build-time Node/ABI manifest; the
-supervisor selects only a matching Node 24.x from system, Homebrew, nvm/fnm, or
-`MEDIFLOW_NODE_BINARY`, and fails closed when none is compatible.
-The build script emits an architecture-specific app (`arm64` or `x86_64`) that
-matches the native WebRuntime; it does not claim a universal macOS artifact.
+Lo script assembla `Contents/Resources/WebRuntime/`, con `server.js`,
+`.next/static` e `public`, insieme a `local-api-tls-proxy.mjs`: sono i componenti
+che il supervisore avvia. Node NON è incluso. Il WebRuntime contiene un
+manifest Node/ABI prodotto alla compilazione, rispetto al quale il supervisore
+accetta solo un Node 24.x compatibile, trovato nel sistema, in Homebrew,
+nvm/fnm o tramite `MEDIFLOW_NODE_BINARY`. Se non lo trova, si arresta senza
+ripiegare su un interprete incompatibile.
 
-## Known limitations (tracked follow-ups)
+Anche l'architettura deve coincidere: lo script produce un'app `arm64` oppure
+`x86_64`, coerente con il WebRuntime nativo. Non produce per questo un artefatto
+macOS universale.
 
-- Direct distribution outside the Mac App Store needs Developer ID Application
-  signing and Apple notarization. Mac App Store distribution instead uses the
-  App Store signing/upload path and requires a separate App Sandbox decision,
-  because the app spawns a Node child process and binds a local port.
-- The `/api/v1/network` live-contract wiring of `PatchValue` / `VersionConflict`
-  into `HomeBasePatientsClient` is Fase 1 work that needs the backend running to
-  verify round-trips.
+<a id="known-limitations-tracked-follow-ups"></a>
+
+## Limiti noti e attività successive
+
+- La distribuzione diretta fuori dal Mac App Store richiede firma Developer ID
+  Application e notarizzazione Apple. La distribuzione nel Mac App Store segue
+  invece il proprio percorso di firma e caricamento e richiede una decisione
+  distinta su App Sandbox, perché l'app avvia Node come processo figlio e apre
+  una porta locale.
+- Il raccordo del contratto reale `/api/v1/network` con `PatchValue` e
+  `VersionConflict` in `HomeBasePatientsClient` appartiene al lavoro di Fase 1
+  qui richiamato. Per verificarne gli scambi completi di richiesta e risposta
+  serve un backend in esecuzione; i soli test locali dei tipi non lo attestano.

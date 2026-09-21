@@ -1,144 +1,156 @@
 # Cosa mutuare: confronto critico con lo stato dell'arte
 
 Data: 2026-07-26
-Perimetro: ricerca esterna, confrontata con il codice MediFlow che ho letto oggi.
-Le fonti sono citate. Dove una cosa e' misurata lo dico, dove e' opinione di
-settore lo dico ugualmente.
+Perimetro: ricerca esterna confrontata con il codice MediFlow esaminato alla
+data della nota. Le fonti sono citate e restano distinti i risultati misurati
+dalle opinioni di settore.
 
-## 1. La cosa piu' utile che ho trovato, ed e' misurata
+<a id="1-la-cosa-piu-utile-che-ho-trovato-ed-e-misurata"></a>
 
-Uno studio su npj Digital Medicine separa due leve che nella pratica vengono
-confuse, e mostra che **tirano in direzioni opposte**:
+## 1. La distinzione più utile emersa dalla ricerca
+
+Uno studio su npj Digital Medicine distingue due leve che, nel discutere
+un'interfaccia, si tende a confondere: l'usabilità del sistema e quella del
+dato. Nei risultati riportati agiscono su carichi cognitivi diversi,
+**in direzioni opposte**:
 
 | leva | effetto | coefficiente |
 |---|---|---|
-| usabilita' di **sistema** | **riduce** il carico cognitivo *estraneo* | β = −0,642 (p < 0,001) |
-| usabilita' del **dato** | **aumenta** il carico cognitivo *germano* | β = +0,597 (p < 0,001) |
+| usabilità di **sistema** | **riduce** il carico cognitivo *estraneo* | β = −0,642 (p < 0,001) |
+| usabilità del **dato** | **aumenta** il carico cognitivo *germano* | β = +0,597 (p < 0,001) |
 
-Il carico estraneo e' lo sforzo speso per combattere l'interfaccia: navigare,
-cercare dove sta una cosa, ripetere passaggi. Va abbassato.
-Il carico germano e' lo sforzo speso a **ragionare sul caso**. Va alzato.
+Il carico estraneo è lo sforzo richiesto dall'interfaccia per navigare,
+ritrovare un'informazione o ripetere passaggi: va ridotto. Il carico germano
+riguarda invece il lavoro necessario a **ragionare sul caso**, ed è questo
+che occorre favorire.
 
-Questo cambia il modo di leggere una critica di interfaccia. "Semplifica" non e'
-un obiettivo: dipende da quale dei due carichi si sta togliendo. Togliere un
-passaggio di navigazione e' guadagno puro; togliere un dato clinico rilevante
-per fare pulizia e' una perdita travestita da miglioramento.
+La distinzione rende insufficiente la richiesta generica di "semplificare":
+bisogna capire quale sforzo si stia eliminando. Togliere un passaggio di
+navigazione libera attenzione; togliere un dato clinico rilevante per ottenere
+una schermata più pulita può invece impoverire la decisione.
 
-Nota di contesto che vale da sola: l'EHR piu' diffuso nel campione, Epic, ha un
-punteggio SUS medio di **45,9**, che sulla scala e' una bocciatura. La barra
-dell'industria in cui MediFlow si colloca e' bassa.
+Il contesto del confronto conta: Epic, l'EHR più diffuso nel campione,
+raggiunge un punteggio SUS medio di **45,9**, valutato negativamente sulla
+scala. Il confronto con l'industria parte quindi da un livello di usabilità
+basso, non da un riferimento già soddisfacente.
 
-Le raccomandazioni operative dello studio, tradotte:
+Lo studio traduce la distinzione in quattro raccomandazioni operative:
 
 1. **Consolidare i flussi** per ridurre i passaggi di navigazione.
-2. **Collocare in una sola vista** le informazioni diagnostiche chiave.
-3. **Solo avvisi ad alto segnale**, perche' un avviso che si ignora addestra a
-   ignorare gli avvisi.
-4. **Incorporare indicatori di affidabilita' del dato**, sopprimere i duplicati,
+2. **Riunire in una sola vista** le informazioni diagnostiche chiave.
+3. **Mostrare solo avvisi ad alto segnale**, perché l'abitudine a ignorarli
+   finisce per ridurne l'efficacia.
+4. **Rendere visibile l'affidabilità del dato**, sopprimere i duplicati e
    standardizzare le regole di completezza.
 
-Il punto 4 e' letteralmente il lavoro fatto oggi sugli stati onesti: "indicatore
-di affidabilita'" e' il nome accademico di "non dire vuoto quando vuoi dire non
-letto". E il punto 2 e' l'argomento a favore del Quadro contro il salto continuo
-fra moduli.
+Il punto 4 dà una ragione al lavoro sugli stati esaminato in questa nota:
+distinguere "non letto" da "vuoto" significa rendere leggibile l'affidabilità
+dell'informazione. Il punto 2 sostiene invece il Quadro, che riunisce ciò
+che serve al caso senza imporre continui passaggi fra moduli.
 
 ## 2. La regola che chiude una nostra questione aperta
 
-In `10-superficie-e-materiale.md` avevo lasciato aperta la domanda se le
-superfici Lume debbano diventare materiali. La risposta e' nella guida di Apple,
-e non e' un compromesso:
+In `10-superficie-e-materiale.md` era rimasta aperta la domanda se le
+superfici Lume dovessero diventare materiali. Le indicazioni Apple richiamate
+nelle fonti distinguono il contenuto dalla navigazione:
 
-> Liquid Glass appartiene **solo allo strato di navigazione** che galleggia sopra
-> il contenuto. Non va mai applicato al contenuto stesso: liste, schede, tabelle,
-> media.
+> Liquid Glass appartiene **solo allo strato di navigazione** che galleggia
+> sopra il contenuto. Non va mai applicato al contenuto stesso: liste, schede,
+> tabelle o media.
 
-E, tecnicamente:
+La stessa separazione ha un risvolto tecnico:
 
-> Il vetro non puo' campionare altro vetro. Piu' elementi di vetro vanno
+> Il vetro non può campionare altro vetro. Più elementi di vetro vanno
 > racchiusi in un contenitore.
 
-Due conseguenze per noi.
+Per MediFlow ne derivano due conseguenze.
 
-**Prima: la scelta che hai fatto era quella giusta, e ora ha una fonte.** Avevi
-detto contenuto in Lume e cromo di sistema. E' esattamente la ripartizione che
-Apple prescrive. Lume non deve diventare un materiale: Lume **e'** il linguaggio
-dello strato di contenuto, dove i valori opachi sono corretti e misurabili. Il
-vetro sta sopra, e non gli appartiene.
+**La distinzione già scelta fra contenuto Lume e comandi di sistema trova
+qui il proprio riferimento.** Lume non deve diventare un materiale: è la
+lingua dello strato di contenuto, nel quale i valori opachi restano corretti
+e misurabili. Il vetro appartiene allo strato sovrastante, non alle
+informazioni cliniche.
 
-**Seconda: il difetto trovato oggi sul cockpit e' un anti-pattern dichiarato.**
+**Il difetto rilevato nel cockpit non riguarda soltanto il gusto.**
 Le cinque cornici concentriche fra scheda e pagina, con due coppie di livelli
-dello stesso colore, sono vetro su vetro nello strato di contenuto. Non era una
-questione di gusto.
+dello stesso colore, sovrappongono vetro a vetro nello strato di contenuto:
+è il modello da evitare descritto dalle indicazioni citate.
 
 ## 3. Cosa fanno le applicazioni con la migliore reputazione di immediatezza
 
-Qui siamo nel campo dell'opinione di settore, non della misura. Le pratiche
-ricorrenti, e quali valgono per noi.
+Qui il confronto riguarda opinioni di settore, non misure. Le pratiche
+ricorrenti vanno quindi giudicate per ciò che possono offrire a MediFlow,
+non assunte come prova di efficacia.
 
 ### Vale, e molto: la divulgazione progressiva a tre stadi
 
-Linear mostra tre livelli sullo stesso oggetto: la riga in elenco, le azioni che
-appaiono al passaggio del puntatore, la vista di dettaglio completa. Ogni strato
-aggiunge senza anticipare complessita'.
+Linear distribuisce lo stesso oggetto in tre livelli: riga in elenco,
+azioni al passaggio del puntatore e dettaglio completo. Ogni livello aggiunge
+informazione o possibilità d'azione quando serve, senza anticipare tutta
+la complessità.
 
-Da noi la topologia c'e' gia' ma e' incompleta. La riga paziente della worklist
-mostra nome, eta', codice, diagnosi con pillola ICD: e' un primo stadio buono. Il
-Quadro e' il terzo. **Manca il secondo**: sulla riga non c'e' nessuna azione
-raggiungibile senza aprire. Su Mac e iPad, dove c'e' spazio e un puntatore, le
-azioni piu' frequenti (nuova voce, apri documenti) potrebbero stare li'.
+MediFlow ha già parte di questa struttura: la riga paziente mostra nome,
+età, codice e diagnosi con pillola ICD, mentre il Quadro offre il dettaglio.
+**Manca il secondo livello**, perché nella ricognizione la riga non consente
+azioni senza aprirla. Su Mac e iPad, dove spazio e puntatore lo permettono,
+nuova voce e apertura dei documenti potrebbero essere raggiungibili da lì.
 
 ### Vale: una tavolozza di comandi
 
-Il tasto unico che porta a qualunque azione in due battute, senza ricordare dove
-sta nei menu. Da noi il candidato naturale non e' generico: e' **cerca paziente e
-agisci**. Oggi la ricerca filtra la lista e si ferma li'. Una tavolozza che
-accetta "Rossi" e poi offre apri, nuova voce, esporta, sarebbe il collasso di
-tre passaggi in uno.
+Una tavolozza permette di raggiungere un'azione in due battute senza
+ricordarne la posizione nei menu. Per MediFlow l'uso più pertinente è
+**cercare il paziente e agire**: la ricerca esaminata filtra la lista ma
+non prosegue. Digitare "Rossi" e scegliere fra apri, nuova voce ed esporta
+ridurrebbe tre passaggi a uno.
 
-Attenzione a non copiare male: Linear puo' essere tutto-tastiera perche' il suo
-pubblico pensa per scorciatoie. Un medico no, e su iPad spesso non ha tastiera.
-Va aggiunta come **acceleratore**, mai come la strada principale.
+Non va però mutuato il presupposto di un pubblico abituato alle scorciatoie:
+un medico non necessariamente lo è e su iPad può non avere una tastiera.
+La tavolozza va aggiunta come **acceleratore**, mai come percorso principale.
 
 ### Vale con giudizio: l'interfaccia ottimista
 
-Linear mostra l'effetto subito e parla col server dopo. Su una lista di attivita'
-e' giusto. **Su un dato clinico non lo e'**: mostrare una prescrizione come
-salvata prima che l'archivio l'abbia accettata e' una bugia con conseguenze. La
-pratica si puo' mutuare solo dove l'operazione e' reversibile e non clinica:
-ordinamento, filtri, selezione, ambito ambulatorio.
+Linear anticipa a schermo l'effetto di un'azione e comunica con il server
+dopo. Questa scelta può funzionare per una lista di attività, **non per un
+dato clinico**: una prescrizione non può apparire salvata prima che l'archivio
+l'abbia accettata. La pratica è trasferibile soltanto a operazioni reversibili
+e non cliniche, come ordinamento, filtri, selezione e ambito ambulatorio.
 
-### Non vale: la densita' come valore in se'
+<a id="non-vale-la-densita-come-valore-in-se"></a>
 
-Molte applicazioni gestionali si vantano di quante righe stanno a schermo. Lo
-studio dice che il guadagno sta nel **collocare in una vista cio' che serve a
-decidere**, non nel massimizzare le righe. Sono cose diverse: la prima e'
-selezione, la seconda e' compressione.
+### Non vale: la densità come valore in sé
+
+Il numero di righe visibili non misura da solo l'utilità di un gestionale.
+Il beneficio indicato dallo studio sta nel **riunire ciò che serve a decidere**:
+selezionare informazioni pertinenti è diverso dal comprimere più contenuti
+nello stesso spazio.
 
 ## 4. Proposte concrete, in ordine di rapporto valore-rischio
 
-1. **Il secondo stadio sulla riga paziente.** Azioni al passaggio del puntatore
-   su Mac e iPad, con equivalente a pressione prolungata su iPhone. Riduce
-   passaggi di navigazione, cioe' carico estraneo, che e' la leva col
-   coefficiente piu' alto.
-2. **Un livello di superficie in meno nel cockpit.** La cornice `shell-canvas`
-   disegna un angolo da 20 e un bordo **sul colore stesso della pagina**: e' un
-   livello che non e' una superficie. Toglierlo e' sottrazione senza perdita.
-3. **La tavolozza cerca-e-agisci**, come acceleratore.
-4. **Indicatori di affidabilita' generalizzati.** Il modello onesto esiste ora in
-   tre viste. Le altre superfici cliniche non lo hanno ancora.
-5. **Gli avvisi ad alto segnale.** Da verificare quanti stati di avviso il
-   cockpit mostra contemporaneamente: se sono molti e sempre presenti, insegnano
-   a essere ignorati.
+1. **Aggiungere il secondo livello alla riga paziente.** Azioni al passaggio
+   del puntatore su Mac e iPad, con equivalente a pressione prolungata su
+   iPhone, riducono navigazione e carico estraneo, la leva con il coefficiente
+   più alto nel confronto.
+2. **Togliere un livello di superficie nel cockpit.** La cornice `shell-canvas`
+   disegna un angolo da 20 e un bordo **sullo stesso colore della pagina**:
+   eliminarla rimuove un livello che non distingue una superficie.
+3. **Introdurre la tavolozza cerca-e-agisci** come acceleratore.
+4. **Estendere gli indicatori di affidabilità.** Il modello degli stati onesti
+   è presente, alla data della nota, in tre viste, non ancora nelle altre
+   superfici cliniche.
+5. **Verificare gli avvisi ad alto segnale.** Occorre contare quanti stati di
+   avviso il cockpit mostri insieme: se numerosi e permanenti, abituano a
+   ignorarli.
 
-## 5. Quello che non propongo, e perche'
+<a id="5-quello-che-non-propongo-e-perche"></a>
 
-- **Non toccare la densita' della worklist.** Funziona, e lo studio non da'
-  ragioni per comprimerla.
-- **Non introdurre animazioni espressive nello strato di contenuto.** Il
-  carattere per iPhone e iPad va nello strato di navigazione e nei controlli, che
-  e' dove il vetro e il movimento appartengono. Una scheda clinica che rimbalza
-  non aggiunge fiducia.
-- **Non copiare il tutto-tastiera** come modo principale.
+## 5. Che cosa non viene proposto, e perché
+
+- **Non modificare la densità della worklist.** Funziona e lo studio non
+  offre ragioni per comprimerla.
+- **Non introdurre animazioni espressive nello strato di contenuto.**
+  Su iPhone e iPad il carattere appartiene a navigazione e controlli, insieme
+  a vetro e movimento; far rimbalzare una scheda clinica non aggiunge fiducia.
+- **Non fare della tastiera il percorso principale.**
 
 ## Fonti
 

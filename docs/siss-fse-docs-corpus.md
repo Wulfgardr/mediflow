@@ -2,9 +2,11 @@
 
 > Stato documento: `CANONICAL`
 
-Questa nota governa il primo thin slice `WUL-176`: catalogo sorgenti,
-fetch locale, import manuale controllato e preparazione del futuro MCP
-documentale.
+Per lavorare sulle integrazioni regionali serve una base documentale locale
+che sia consultabile e aggiornabile senza dipendere, a ogni ricerca, dal
+portale remoto. Questa nota governa il primo intervento `WUL-176`: catalogo
+delle fonti, acquisizione locale, importazione manuale controllata e
+preparazione del futuro MCP documentale.
 
 Riferimenti canonici:
 
@@ -15,8 +17,9 @@ Riferimenti canonici:
 
 ## Obiettivo
 
-Mettere MediFlow nelle condizioni di consultare e mantenere una base tecnica
-locale per:
+L’obiettivo è poter consultare e mantenere una base tecnica locale per i
+seguenti ambiti, senza confondere l’accesso ai documenti con l’abilitazione a
+usare i servizi descritti:
 
 - Menu SISS e moduli regionali
 - autenticazione/SSO/credenziali operatore
@@ -27,22 +30,23 @@ locale per:
 
 ## Principi
 
-1. Il repository contiene il catalogo delle fonti e il tooling, non il corpus
-   completo scaricato.
-2. Gli snapshot reali vengono scritti in `tmp/siss-docs-corpus/`, fuori Git.
-3. I documenti riservati o autenticati entrano solo come `manual-import`.
-4. Nessun dato paziente o payload clinico reale deve comparire nel corpus.
-5. Il futuro MCP legge il corpus locale; non sostituisce il corpus.
-6. La freschezza del corpus dipende da un motore di sync locale con change
-   detection, non dal solo layer MCP.
+La repository contiene il catalogo delle fonti e gli strumenti, non l’intero
+corpus scaricato. Le copie dei documenti vengono scritte in
+`tmp/siss-docs-corpus/`, fuori Git; quelle riservate o autenticate entrano
+solo come `manual-import`. Nel corpus non deve comparire alcun dato paziente
+o payload clinico reale.
+
+Il futuro MCP leggerà questa raccolta, senza sostituirla. A mantenerla
+aggiornata deve essere il motore locale di sincronizzazione e rilevamento
+delle modifiche: il solo livello MCP non ne garantisce la freschezza.
 
 ## Manifest sorgenti
 
-Il manifest iniziale e in:
+Il manifest iniziale si trova in:
 
 `scripts/siss-docs-corpus-sources.json`
 
-Ogni voce dichiara almeno:
+Ogni fonte deve essere descritta almeno dai seguenti campi:
 
 - `id`
 - `title`
@@ -54,30 +58,30 @@ Ogni voce dichiara almeno:
 
 Valori operativi:
 
-- `access = public`: sorgente fetchabile automaticamente
-- `access = auth-gated`: sorgente nota ma non fetchata senza credenziali
-- `access = manual-import`: placeholder per documenti da import locale guidato
+- `access = public`: fonte acquisibile automaticamente
+- `access = auth-gated`: fonte nota, non acquisita senza credenziali
+- `access = manual-import`: segnaposto per documenti da importare con procedura locale guidata
 
 - `captureStrategy = snapshot-html`: salva la risposta testuale/HTML
 - `captureStrategy = snapshot-github-html`: salva la pagina GitHub come snapshot
 - `captureStrategy = manual-placeholder`: registra solo metadati/placeholder
 - `refreshHours = N`: cadenza suggerita di refresh per la sorgente
 
-Per FSE regionale il manifest deve mantenere separati almeno tre placeholder
-scenario-specific:
+Gli scenari FSE regionali hanno prerequisiti diversi. Il manifest deve quindi
+mantenere separati almeno tre segnaposto specifici:
 
 - `DC-SCEN-REF#01`: gestione del Documento Clinico Elettronico presso Enti
   Erogatori e `MMG/PLS`
 - `DC-SCEN-ACCO#03`: consenso alla consultazione FSE
 - `DC-SEBC_FSE-SIAA#02`: SEB FSE Gestione Eventi
 
-La mappa decisionale di prodotto per questi documenti e in
+La mappa delle decisioni di prodotto per questi documenti è in
 [docs/siss-fse-consultation-consent.md](./siss-fse-consultation-consent.md).
 
-Per SGDT il manifest non mantiene un placeholder generico: il caso emerso dalle
-fonti pubbliche resta `DC-COOP-FHIR_PIC#02`, cioe cooperazione applicativa
-SGDT/PAI con Cartelle Elettroniche `MMG/PLS`, affiancato dai manuali COT/MMG
-per richieste di transizione e attivazione territoriale. La mappa decisionale e in
+Per SGDT non basta un segnaposto generico. Il caso emerso dalle fonti pubbliche
+è `DC-COOP-FHIR_PIC#02`, relativo alla cooperazione applicativa SGDT/PAI con le
+Cartelle Elettroniche `MMG/PLS`; lo affiancano i manuali COT/MMG per le richieste
+di transizione e attivazione territoriale. La mappa delle decisioni è in
 [docs/siss-sgdt-pai-feasibility.md](./siss-sgdt-pai-feasibility.md).
 
 Per i Certificati di malattia il manifest mantiene separati:
@@ -85,7 +89,7 @@ Per i Certificati di malattia il manifest mantiene separati:
 - FAQ SISS per integrazione applicativi medico/SISS e boundary `SAR`
 - Web Application Certificati di Malattia in sede di ricovero/dimissione
 
-La mappa decisionale e in
+La mappa delle decisioni è in
 [docs/siss-certificati-malattia-feasibility.md](./siss-certificati-malattia-feasibility.md).
 
 Per NAR / Anagrafe Regionale il manifest distingue:
@@ -94,7 +98,7 @@ Per NAR / Anagrafe Regionale il manifest distingue:
 - manuali Gaia / gestione anagrafe / iscrizione assistiti
 - manuali GAMS / gestione anagrafe medici specialisti
 
-La mappa decisionale read-only e in
+Il progetto di accesso in sola lettura è in
 [docs/siss-nar-anagrafe-readonly-blueprint.md](./siss-nar-anagrafe-readonly-blueprint.md).
 
 ## Comandi
@@ -105,13 +109,13 @@ Validazione del manifest:
 npm run docs:siss-corpus:validate
 ```
 
-Fetch del corpus pubblico nel path default ignorato da Git:
+Acquisizione del corpus pubblico nel percorso predefinito, ignorato da Git:
 
 ```bash
 npm run docs:siss-corpus:fetch
 ```
 
-Sync incrementale con memoria delle versioni viste:
+Sincronizzazione incrementale, conservando memoria delle versioni già viste:
 
 ```bash
 npm run docs:siss-corpus:sync
@@ -123,7 +127,7 @@ Report di freschezza del corpus sincronizzato:
 npm run docs:siss-corpus:report
 ```
 
-Fetch limitato a un sottoinsieme:
+Acquisizione limitata a un sottoinsieme di fonti:
 
 ```bash
 npm run docs:siss-corpus:fetch -- --only siss-modalita-accesso,fse-support-readme
@@ -137,17 +141,18 @@ npm run docs:siss-corpus:fetch -- --output-dir tmp/siss-docs-corpus-smoke
 
 ## Struttura output
 
-Per ogni sorgente fetchata il tool scrive:
+Per ogni fonte acquisita, lo strumento scrive:
 
 - `body.<ext>` con lo snapshot grezzo
-- `metadata.json` con URL finale, status, hash, content-type, dimensione e data
-  fetch
+- `metadata.json` con URL finale, stato, hash, content-type, dimensione e data
+  di acquisizione
 
 In radice scrive inoltre:
 
-- `index.json` con il riepilogo dell intero fetch
+- `index.json` con il riepilogo dell’intera acquisizione
 
-Nel caso di `sync`, l indice contiene anche:
+Nel caso di `sync`, l’indice registra anche lo stato delle modifiche e le
+date necessarie a ricostruirne la sequenza:
 
 - `changeState = new|updated|unchanged`
 - `firstFetchedAt`
@@ -157,35 +162,28 @@ Nel caso di `sync`, l indice contiene anche:
 
 ## Import manuale
 
-I documenti `auth-gated` o `manual-import` non vengono forzati via scraping.
-
-Flusso previsto:
-
-1. scarico umano da portale/area riservata autorizzata
-2. collocazione locale fuori Git
-3. arricchimento del placeholder con versione, owner, note di licenza/uso
-4. eventuale indicizzazione nel corpus locale successivo
+Per i documenti `auth-gated` o `manual-import`, lo scraping non deve aggirare
+le condizioni di accesso. Il percorso previsto parte dallo scaricamento umano
+dal portale o dall’area riservata autorizzata, prosegue con la collocazione
+locale fuori Git e con l’aggiunta al segnaposto di versione, responsabile e
+note di licenza o uso. Solo successivamente è prevista l’eventuale
+indicizzazione nel corpus locale.
 
 ## Relazione con il futuro MCP
 
-Il MCP locale (`WUL-177`) offre solo:
+Il MCP locale (`WUL-177`) ha un ambito limitato: ricerca nel manifest e nel
+corpus locale, recupero di documenti già acquisiti e navigazione per area,
+tag, fonte o versione. Non serve a rendere ogni consultazione dipendente da
+un’acquisizione in diretta dai portali regionali.
 
-- ricerca nel manifest/corpus locale
-- fetch di documenti gia acquisiti
-- navigazione per area/tag/fonte/versione
-
-Non e il meccanismo con cui si dipende da fetch live dei portali regionali.
-Il runbook operativo MCP e in
+Questa nota non indica il riferimento al runbook operativo MCP.
 
 ## Nota operativa su WUL-179
 
-Il thin slice `WUL-179` non introduce ancora un daemon sempre attivo o una
-schedulazione `launchd`. Introduce pero il nucleo che serve davvero:
+L’intervento `WUL-179` non introduce ancora un servizio sempre attivo né una
+schedulazione `launchd`. Costruisce invece la base necessaria: regole di
+aggiornamento per fonte, sincronizzazione incrementale, rilevamento delle
+modifiche e report locale di freschezza.
 
-- policy di refresh per sorgente
-- sync incrementale
-- change detection
-- report locale di freschezza
-
-La schedulazione periodica potra essere aggiunta sopra questo nucleo senza
-riscrivere la semantica del corpus.
+La schedulazione periodica potrà appoggiarsi a questa base senza cambiare il
+significato dei dati del corpus.

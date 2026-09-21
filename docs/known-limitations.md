@@ -13,11 +13,12 @@ Ultimo aggiornamento: 2026-09-04
 
 ## Stato ed evidenze
 
-Il tree `0.8.5` definisce il contenuto sorgente della versione. CI remota sulla
-stessa SHA, firma, tag, GitHub Release, distribuzione e installazione su un host
-esterno sono evidenze di confine: vanno lette nei check e nei receipt del
-closeout, non inferite da questo documento statico. Lo storico delle versioni
-vive nel [CHANGELOG](../CHANGELOG.md).
+Questa pagina conserva i limiti e le evidenze della versione `0.8.5`, secondo
+la data riportata sopra; non trasferisce quelle prove alle versioni successive.
+Il tree definisce il contenuto sorgente, ma non dimostra da solo CI remota sulla
+stessa SHA, firma, tag, GitHub Release, distribuzione o installazione su un host
+esterno. Per questi esiti occorrono i controlli e le ricevute di chiusura
+pertinenti. Lo storico delle versioni è nel [CHANGELOG](../CHANGELOG.md).
 
 ## VoiceOver su iPhone e iPad
 
@@ -27,16 +28,17 @@ Gli audit di accessibilità XCTest e i test UI della baseline storica
 - iPhone: 2/2;
 - iPad: 7/7.
 
-Queste prove valgono soltanto per quel tree e non equivalgono a un test
-VoiceOver reale. La disponibilità di Xcode è una precondizione della macchina,
-non una proprietà persistente del tree; i check Apple su una revisione exact-SHA
-appartengono ai receipt del closeout. Questo documento non dichiara una nuova
-prova VoiceOver mobile.
+L'esito vale soltanto per quel tree e non equivale a una prova reale di
+VoiceOver. Anche la disponibilità di Xcode va verificata sulla macchina: non
+rimane attestata dal solo contenuto del tree. I controlli Apple sulla revisione
+esatta appartengono alle relative ricevute di chiusura; questa pagina non
+aggiunge una nuova prova VoiceOver mobile.
 
-Nel simulatore iOS 27, con Xcode 27 beta build `27A5194q`, la chiamata pubblica
-`XCUIDevice.shared.voiceOverService.enable()` non ha raggiunto uno stato
-terminale. Il runtime ha riavviato in ciclo il servizio assistivo. Il test è
-stato interrotto e il risultato incompleto non è usato come prova positiva.
+La prova sul simulatore iOS 27, con Xcode 27 beta build `27A5194q`, non si è
+conclusa: la chiamata pubblica `XCUIDevice.shared.voiceOverService.enable()`
+non ha raggiunto uno stato terminale e il runtime ha continuato a riavviare il
+servizio assistivo. Il test è stato interrotto; un risultato incompleto non
+viene considerato positivo.
 
 Apple documenta il problema `173507341` nelle note di Xcode 27 beta. La deroga
 accettata riguardava la release sorgente GitHub `0.8.2`. La `0.8.5`
@@ -65,26 +67,33 @@ Il limite si chiude solo con uno dei seguenti esiti terminali:
    iPhone e iPad;
 2. test VoiceOver completati su due device fisici eleggibili.
 
-## Parity funzionale
+<a id="parity-funzionale"></a>
 
-La parity è clinico-semantica, non pixel-per-pixel. La baseline pubblicata
-registra:
+## Equivalenza funzionale
+
+La parità riguarda il significato clinico e le operazioni disponibili, non
+l'identità dei pixel. Nella baseline pubblicata a cui si riferisce questa
+pagina risultano:
 
 - 30 capability complete;
 - 13 capability parziali;
 - 23 capability intenzionalmente host-only.
 
-Le capability host-only non sono promesse mobile mancanti. Riflettono autorità,
-filesystem, runtime AI, sicurezza o policy del Mac home-base.
+Le funzionalità riservate all'host non rappresentano promesse mobile non
+mantenute: rimangono sul Mac home-base perché dipendono dalla sua autorità,
+dal filesystem, dal runtime AI, dalla sicurezza o dalle policy.
 
 ## Offline mobile
 
-La continuità offline mobile è parziale e read-only dove documentata. La
-visibilità completa di età, TTL e staleness della cache e la riconciliazione
-restano lavoro successivo. Non esiste una coda di scrittura offline o un sync
-multi-master.
+Nella baseline descritta, la continuità offline mobile è parziale e consente
+soltanto la lettura dove documentata. La piena visibilità dell'età della cache,
+del TTL e della sua eventuale obsolescenza, insieme alla riconciliazione,
+rimaneva lavoro successivo. Non sono presenti una coda di scrittura offline
+né una sincronizzazione multi-master.
 
-## Tooling di sviluppo
+<a id="tooling-di-sviluppo"></a>
+
+## Strumenti di sviluppo
 
 La fotografia del 29 luglio 2026, eseguita con Node `v24.18.0`, non rilevava
 vulnerabilità nelle sole dipendenze di produzione e rilevava 21 rilievi
@@ -95,10 +104,11 @@ nell'audit completo del tooling di sviluppo:
 - 15 high;
 - zero critical.
 
-Questi conteggi sono evidenza storica e non descrivono il grafo corrente. Il 4
-settembre 2026, un audit production-only con Node `v24.19.0` ha individuato
+I conteggi fotografano quell'audit, non il grafo delle dipendenze delle
+revisioni successive. Il 4 settembre 2026, un audit delle sole dipendenze di
+produzione con Node `v24.19.0` ha individuato
 `GHSA-px8p-9vwx-vf98` in `fflate@0.8.2`, dipendenza transitiva di
-`jspdf@4.2.1`. Il candidato ora risolve quell'unico edge a `fflate@0.8.3`,
+`jspdf@4.2.1`. Il candidato descritto risolve quella sola relazione di dipendenza a `fflate@0.8.3`,
 versione corretta dentro il range `^0.8.1` già dichiarato da jsPDF. Il lockfile,
 l'albero installato, la generazione PDF reale e una regressione ZIP64 bounded
 confermano la correzione; l'endpoint npm audit non ha restituito il rollup
@@ -109,7 +119,7 @@ Un candidato di aggiornamento portava l'audit a zero, ma forzava versioni
 transitive fuori dai range dichiarati e falliva l'installazione
 `strict-peer-deps`. La release 0.8 non assorbe quel workaround.
 
-Il debito più ampio resta tracciato in
+Il debito più ampio è tracciato in
 [issue #305](https://github.com/Wulfgardr/mediflow/issues/305). La sua chiusura
 richiede un packet dipendenze separato con:
 
@@ -127,24 +137,26 @@ La 0.8.5 collega quattro percorsi generativi al Fabric:
 - `document_synthesis`;
 - `treatment_reasoning`.
 
-Tutti hanno disposition `proposal_only`. Le preview rendono visibili receipt,
-provenienza e currentness, ma questi dati non sono grant. Nessun percorso
-applica diagnosi, terapie o altri dati clinici. Ollama e ATHENA/MLX restano
-provider locali capability-specific: non esiste un provider generico, un
-fallback silenzioso o una equivalenza tra disponibilità del processo e
-readiness clinica.
+Tutti producono proposte con disposition `proposal_only`. Le anteprime
+mostrano ricevuta, provenienza e validità del contesto al momento dell'uso,
+ma queste informazioni non concedono autorità. Nessuno dei percorsi applica
+diagnosi, terapie o altri dati clinici. Ollama e ATHENA/MLX sono provider locali
+assegnati a funzioni specifiche: non vi sono un provider generico o un ripiego
+silenzioso, e trovare un processo disponibile non equivale a dimostrarne la
+prontezza per l'uso clinico.
 
-Il crosswalk corrente è
+Il raccordo con il runtime è descritto in
 [`fabric-generative-runtime-crosswalk.v1.json`](./capability-mapping/fabric-generative-runtime-crosswalk.v1.json).
 La receipt storica `fabric-product-crosswalk-receipt.v1.json` resta immutabile
 con stato `candidate_not_integrated`; non prova lo stato del runtime corrente.
 
 ### Precondizione e prova locale ATHENA
 
-Treatment Reasoning può usare ATHENA solo quando il modello e il runner MLX
-offline sono già presenti sulla macchina. Il runner deve essere indicato con
-`MEDIFLOW_ATHENA_MLX_GENERATE_BIN` come percorso eseguibile assoluto host-owned;
-non viene scaricato o predisposto da MediFlow.
+La possibilità di usare ATHENA dipende dalla macchina, non dalla sola presenza
+del codice di Treatment Reasoning: modello e runner MLX offline devono essere
+già disponibili. Il runner deve essere indicato mediante
+`MEDIFLOW_ATHENA_MLX_GENERATE_BIN`, con un percorso eseguibile assoluto sotto
+il controllo dell'host; MediFlow non lo scarica né lo predispone.
 
 Il supporto del runner nel commit `2574cf5fc` ha superato TDD 6/6, typecheck ed
 ESLint. Un singolo smoke sintetico sul percorso di produzione con modello BF16
@@ -154,12 +166,12 @@ macchina, qualità clinica, stabilità, capacità o readiness universale.
 
 ## Estrazione allegati e OCR
 
-AnyDoc resta il primo passaggio automatico locale e non è un provider Fabric.
-Per i PDF supportati, il tree materializza e renderizza soltanto le pagine
-`needsOcr`, le passa ad Apple Vision locale senza rete e ricompone il risultato
-sotto currentness host-owned. Immagini dirette, documenti cifrati, formati
-ambigui o motore locale indisponibile falliscono chiusi; le route OCR legacy
-rispondono `410`.
+AnyDoc esegue il primo passaggio automatico locale e non è un provider Fabric.
+Per i PDF supportati, il tree prepara e renderizza soltanto le pagine
+`needsOcr`, le invia ad Apple Vision locale senza rete e ricompone il risultato
+sotto il controllo dell'host sulla validità del contesto. Immagini dirette,
+documenti cifrati, formati ambigui o assenza del motore locale interrompono il
+percorso senza ripieghi; le route OCR legacy rispondono `410`.
 
 DeepSeek-OCR 2/CUDA, benchmark E2E e readiness universale hanno stato
 `OUT_OF_SCOPE_FOR_0.8.5_NON_BLOCKING`. Il crosswalk Fabric conserva `ocr` come
@@ -173,14 +185,16 @@ non a una production root Fabric.
 | F6 — OCR selettivo | AnyDoc first-pass e fallback Apple Vision locale sulle sole pagine PDF `needsOcr` | Contratti bounded, fail-closed e percorso sintetico sul Mac eleggibile | DeepSeek-OCR 2/CUDA, benchmark di qualifica e readiness universale | Fallback locale integrato |
 | F7 — provider esterni | Provider v2, secret broker, adapter ufficiali e probe amministrativa review-only OpenAI/Anthropic `default OFF` | Transport fake, route admin-only e denial prima della rete | Credenziali, rete live, retention account e runtime readiness cloud | `INTEGRATED / DEFAULT_OFF` |
 
-Un account, login o abbonamento consumer OpenAI/Anthropic non fornisce accesso
-API. Registry, adapter e probe non autorizzano onboarding, esecuzione, invio di
-PHI o uscita dati.
+Un account, un login o un abbonamento consumer OpenAI/Anthropic non forniscono
+accesso alle API. Allo stesso modo, la presenza di registry, adapter e probe
+non autorizza configurazione iniziale, esecuzione, invio di PHI o uscita dei
+dati.
 
-Lo smoke ATHENA è una singola osservazione, non un benchmark di release. Non è
-registrato un benchmark per accuratezza OCR, qualità dei provider, latenza o
-throughput. I test locali dei contratti non costituiscono un claim di
-prestazione e non sostituiscono la suite finale del tree esatto.
+Lo smoke ATHENA misura una singola osservazione, non le prestazioni della
+release. Non è registrato un benchmark per accuratezza OCR, qualità dei
+provider, latenza o throughput. I test locali dei contratti non consentono
+quindi di dichiarare prestazioni e non sostituiscono la suite finale sulla
+revisione esatta.
 
 ## Headless, MCP e Mini
 
@@ -200,12 +214,14 @@ restano atomici. Proof e commit non attraversano MCP. Il planner è collegato al
 Supervisor ma resta read-only, con al massimo due operazioni allowlisted e
 senza SQL libero.
 
-Questa integrazione resta bounded al runtime locale. Il terminal smoke
-standalone e la prova exact-SHA sono receipt di closeout separati dal presente
-documento. Installer, onboarding, lifecycle supportato ed esercizio su host
-esterni non sono dichiarati consegnati.
+L'integrazione rimane delimitata al runtime locale. Lo smoke standalone
+concluso e la prova sulla SHA esatta devono risultare dalle ricevute di
+chiusura, non da questa pagina. Non sono dichiarati consegnati installer,
+configurazione iniziale, ciclo di vita supportato o esercizio su host esterni.
 
-## Funzioni fuori scope
+<a id="funzioni-fuori-scope"></a>
+
+## Funzioni escluse dal perimetro
 
 La `0.8.5` non consegna:
 

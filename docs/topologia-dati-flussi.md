@@ -10,17 +10,20 @@ read_when:
 > [!IMPORTANT]
 > **Stato documento: CANONICAL (topologia dati e percorsi digitali end-to-end).**
 > Per principi stabili e confini, prevale [ARCHITECTURE.md](../ARCHITECTURE.md).
-> Per policy di sicurezza e redazione, prevale [SECURITY.md](../SECURITY.md).
+> Per le policy di sicurezza e oscuramento dei dati identificativi, prevale [SECURITY.md](../SECURITY.md).
 
 ## Il percorso dei dati, in breve
 
-Una visita produce informazioni: alcune si prestano a una codifica, altre
-richiedono testo e documenti. MediFlow le organizza nella stessa cartella.
-La struttura aiuta a cercare e scambiare; la fonte permette di verificare.
+Le informazioni di una visita non hanno tutte la stessa forma: alcune possono
+essere codificate, altre richiedono un testo o un documento che ne conservi
+il contesto. MediFlow le raccoglie nella stessa cartella, mantenendo sia la
+struttura utile a cercarle e scambiarle sia la fonte necessaria a verificarle.
 
-L’host locale conserva il database e ospita i servizi. Le interfacce, i client
-collegati e le capacità headless passano da questi servizi. Fabric aggiunge
-percorsi di elaborazione senza attribuire al modello autorità sulla cartella.
+Il database e i servizi appartengono all'host locale. Interfacce, client
+collegati e percorsi headless passano da quei servizi, così che cambiare
+strumento di accesso non significhi cambiare autorità sui dati. Fabric aggiunge
+elaborazioni facoltative: il gestionale non richiede un modello per funzionare
+e il modello, quando usato, non acquisisce autorità sulla cartella.
 
 | Domanda | Dove approfondire |
 | --- | --- |
@@ -29,17 +32,17 @@ percorsi di elaborazione senza attribuire al modello autorità sulla cartella.
 | Come entrano documenti e cataloghi? | Percorsi AnyDoc, Fabric e AIFA, sezione 4. |
 | Chi può leggere o modificare? | API, fonti canoniche e invarianti, sezioni 5–7. |
 
-Per provider esterni e offuscamento, la disponibilità corrente è nella
-[matrice AI](./ai-runtime-serving-matrix.md). La guida a
-[privacy e governance](./privacy-and-ai-governance.md) spiega responsabilità
-e limiti; i diagrammi sottostanti descrivono i contratti tecnici.
+Per lo stato dei provider esterni e dell'oscuramento dei dati identificativi,
+il riferimento corrente è la [matrice AI](./ai-runtime-serving-matrix.md).
+La guida a [privacy e governance](./privacy-and-ai-governance.md) ne spiega
+responsabilità e limiti. I diagrammi sottostanti conservano i contratti e le
+sequenze del perimetro sorgente 0.8.5; dove una fase storica differisce dalla
+composizione documentale successiva, il testo ne precisa la portata.
 
-Questo documento mappa in modo operativo:
-
-- dove nasce il dato
-- dove viene cifrato/decifrato
-- dove viene persistito
-- quali controlli di sicurezza lo proteggono
+La mappa segue il dato dalla sua origine alla cifratura e decifratura, alla
+memorizzazione e ai controlli che ne proteggono ogni passaggio. Le sezioni
+permettono di ritrovare sia la responsabilità applicativa sia il confine che
+un nuovo percorso non deve oltrepassare.
 
 Riferimenti rapidi:
 - [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md)
@@ -111,11 +114,11 @@ flowchart TB
   NetworkAPI --> Settings
 ```
 
-Nota operativa: i client paired non accedono direttamente al database. Il nodo
-autorevole resta il Mac `home-base`, che espone solo superfici documentate e
-oggi ancora `read-only-first` nel disegno generale, con write online limitati e
-versionati su profilo/status paziente, diario clinico, terapie, checkup e
-osservazioni.
+I client associati non accedono direttamente al database: il Mac `home-base`
+rimane il nodo autorevole ed espone soltanto superfici documentate. Il disegno
+è `read-only-first`, con scritture online limitate e versionate su profilo e
+stato del paziente, diario clinico, terapie, checkup e osservazioni. La presenza
+di una connessione non amplia questo perimetro.
 
 ---
 
@@ -134,7 +137,10 @@ flowchart LR
   MK --> Encrypt
 ```
 
-Note operative: il PIN non viene salvato, la master key resta in RAM di sessione e i campi sensibili persistono cifrati.
+Il PIN non viene salvato; la master key resta nella RAM della sessione e i
+campi sensibili persistono cifrati secondo il contratto. Il file SQLite non è
+cifrato integralmente: lo schema relazionale sottostante va letto mantenendo
+questa distinzione.
 
 ---
 
@@ -233,17 +239,19 @@ erDiagram
     }
 ```
 
-Nota operativa: stati `network.mode`, pairing intents, paired client trusted,
-backup scheduler e alcuni guardrail AI vivono in `settings` JSON versionati.
+Non tutti gli stati operativi sono tabelle del dominio clinico. `network.mode`,
+intenti di pairing, client associati fidati, pianificazione dei backup e alcuni
+controlli AI sono conservati in `settings` JSON versionati.
 
-Nota soft-delete (ADR 0066, WUL-306): la cancellazione paziente scrive un
-tombstone reversibile (`deletedAt` / `deletionReason`) con version guard, non
-orfana i figli clinici e lascia il contratto API invariato. Le sotto-risorse
-cliniche (diario, terapie, checkup, osservazioni) seguono lo stesso ciclo
-soft-delete (WUL-308); le liste escludono i record soft-deleted salvo
-`includeDeleted`. L'erasure GDPR esplicita resta una azione admin separata
-(`purge-patient` con dry-run e audit `patient.purged`, `restore-patient` con
-audit `patient.restored`).
+Cancellare un paziente non deve separarlo dai propri record clinici. Per
+ADR 0066 e WUL-306, la cancellazione scrive quindi un tombstone reversibile
+(`deletedAt` / `deletionReason`) con controllo di versione, senza lasciare
+record figli orfani e senza cambiare il contratto API. Diario, terapie,
+checkup e osservazioni seguono lo stesso ciclo di cancellazione logica
+(WUL-308); le liste escludono questi record salvo richiesta `includeDeleted`.
+La cancellazione definitiva per erasure GDPR resta un'azione amministrativa
+esplicita e separata: `purge-patient` con dry-run e audit `patient.purged`;
+il ripristino usa `restore-patient`, con audit `patient.restored`.
 
 ---
 
@@ -345,19 +353,25 @@ sequenceDiagram
     end
 ```
 
-AnyDoc resta il primo passaggio automatico locale. Non esegue OCR e non
-persiste il risultato nel record clinico. Il tree include routing, manifest,
-materializzazione e rendering delle sole pagine `needsOcr`, oltre al preflight
-DeepSeek con fake seam. Questi componenti non sono composti in un production
-root OCR. La publication Document Synthesis dichiara `writesPerformed=0` e
-`applyPolicy=none`.
+AnyDoc è il primo passaggio automatico locale: estrae testo, non esegue OCR e
+non salva il risultato nel record clinico. Il diagramma conserva la fase in
+cui routing, manifest, preparazione e rendering delle sole pagine `needsOcr`
+e preflight DeepSeek con raccordo sintetico erano descritti come componenti
+separati. Non dimostra un production root OCR DeepSeek o Fabric.
 
-Le route legacy `/api/ocr/extract` e `/api/pdf-extract` acquisiscono prima la
-sessione e poi restituiscono `410`. Il runtime adapter DeepSeek-OCR 2 non è
-integrato: il tree non contiene un'esecuzione live, una prova E2E o un benchmark
-di promozione. Una futura promozione deve conservare provenienza, hash e qualità
-per pagina e superare un benchmark sintetico italiano con soglie fissate.
-Restano vietati cloud egress implicito e write.
+Per l'estrazione documentale, ADR 0119 chiarisce invece la composizione con
+Apple Vision locale sulle pagine PDF ammesse: la ricomposizione conserva
+ordine e provenienza ed è pubblicata soltanto con sorgente e sessione ancora
+valide. Apple Vision non diventa un provider Fabric. Questa distinzione non
+cambia il limite di Document Synthesis, la cui publication dichiara
+`writesPerformed=0` e `applyPolicy=none`.
+
+Le route legacy `/api/ocr/extract` e `/api/pdf-extract` acquisiscono la sessione
+prima di restituire `410`. Il runtime adapter DeepSeek-OCR 2 non è integrato:
+per quel percorso il tree non contiene esecuzioni live, prove E2E o benchmark
+di promozione. Un'eventuale promozione deve conservare provenienza, hash e
+qualità per pagina e superare un benchmark sintetico italiano con soglie
+fissate. Restano vietati uscita implicita verso il cloud e scritture.
 
 ### 4.5 Patient Insight -> preview Fabric
 
@@ -379,9 +393,10 @@ sequenceDiagram
     API-->>UI: Preview review-only, zero write
 ```
 
-Artifact e snapshot documentali cifrati possono contribuire alla projection,
-ma il provider non legge SQLite. La preview non aggiorna `aiSummary` o altre
-colonne e viene negata se la sorgente non e piu corrente.
+Artefatti e snapshot documentali cifrati possono contribuire alla proiezione
+preparata dall'host, senza dare al provider accesso a SQLite. L'anteprima non
+aggiorna `aiSummary` né altre colonne e viene negata quando la sorgente non
+è più valida per l'operazione.
 
 ### 4.6 Smart Import -> preview Fabric
 
@@ -405,10 +420,11 @@ sequenceDiagram
     Fabric-->>UI: Preview + receipt + provenienza, zero write
 ```
 
-La preview Smart Import non scrive diagnosi o terapie. Un eventuale apply e un
-Application Service separato, con conferma, authority, currentness, idempotenza
-e audit propri. Non eredita authority dalla receipt o dalla proposta. ADR 0084
-continua a vietare la scrittura diagnostica dalla sintesi documentale.
+L'anteprima Smart Import non scrive diagnosi o terapie. Un'eventuale
+applicazione appartiene a un Application Service separato, con propri
+requisiti di conferma, autorità, validità del contesto, idempotenza e audit:
+non eredita alcuna autorità dalla ricevuta o dalla proposta. ADR 0084 continua
+a vietare la scrittura diagnostica dalla sintesi documentale.
 
 ### 4.7 Treatment Reasoning -> preview Fabric ATHENA
 
@@ -434,9 +450,9 @@ sequenceDiagram
     Fabric-->>UI: Publication review-only + source binding
 ```
 
-La route storica `/api/system/treatment-reasoning/athena-mlx` e auth-first e
-termina con `410 legacy_route_retired`. Il percorso corrente non usa un
-fallback Ollama e non applica terapie o diagnosi.
+La route storica `/api/system/treatment-reasoning/athena-mlx` verifica prima
+l'autenticazione e termina con `410 legacy_route_retired`. Il percorso
+Treatment Reasoning non ripiega su Ollama e non applica terapie o diagnosi.
 
 ### 4.8 Matrice dei confini generativi
 
@@ -447,18 +463,20 @@ fallback Ollama e non applica terapie o diagnosi.
 | `document_synthesis` | Ollama / loopback | proposal | host | nessuno; `writesPerformed=0` |
 | `treatment_reasoning` | ATHENA / processo MLX locale | preview | host | nessuno; `writesPerformed=0` |
 
-Tutte le receipt sono PHI-safe e descrittive. Non sono grant. Il client paired
-espone solo stato e non invoca queste capability. OpenAI e Anthropic hanno
-adapter HTTPS ufficiali e probe review-only `default OFF`. I test usano
-transport fake; il tree non contiene credenziali o prove di rete live.
+Le ricevute descrivono l'esecuzione senza esporre PHI e non concedono permessi.
+Il client paired mostra soltanto lo stato e non invoca queste funzionalità.
+Gli adapter HTTPS ufficiali e le probe di revisione OpenAI e Anthropic restano
+`default OFF`; le prove sostituiscono il trasporto e non documentano credenziali
+o rete live nel tree.
 
 #### Selector Fabric guidato
 
-Il selector opera sui binding di capability, non sulla shell web. Rileva
-profili compatibili, esegue uno smoke sintetico e attiva il nuovo binding con
-CAS e persistenza atomica. Un fallimento mantiene o ripristina il binding
-precedente. Discovery e smoke non qualificano hardware, modello o runtime e il
-record persistito non contiene segreti.
+Il selettore agisce sul collegamento fra funzione e profilo di esecuzione,
+non sulla shell web. Individua profili compatibili, esegue uno smoke sintetico
+e attiva il nuovo collegamento con CAS e memorizzazione atomica; se fallisce,
+mantiene o ripristina quello precedente. Individuazione e smoke non
+qualificano hardware, modello o runtime, e il record persistito non contiene
+segreti.
 
 #### Intelligent Host candidato
 
@@ -474,19 +492,20 @@ Mini: foundation CLI separata, fail-closed senza parent AIP e non avviata dal
 Supervisor production della 0.8.5.
 ```
 
-Le operazioni candidate sono terminology search, lettura patient-scoped delle
-Open Loops, proposta follow-up e query semantica bounded read-only. Il processo
-figlio non apre listener, non importa SQLite e non accetta authority dal caller.
-Il Supervisor Node locale è il parent trusted e avvia Web standalone e MCP
-come figli distinti su IPC privato ereditato. Contesto, lifecycle, revoca e
-audit restano host-owned. La 0.8.5 non dichiara installer, onboarding o
-compatibilità con host MCP esterni; broker residente e UDS restano esclusi.
+Le operazioni candidate comprendono ricerca terminologica, lettura delle Open
+Loops nel perimetro del paziente, proposta di follow-up e query semantiche
+limitate in sola lettura. Il processo figlio non apre listener, non importa
+SQLite e non accetta autorità dal chiamante. Il Supervisor Node locale è il
+parent fidato: avvia Web standalone e MCP come figli distinti su IPC privato
+ereditato, conservando sull'host contesto, ciclo di vita, revoca e audit.
+La 0.8.5 non dichiara installer, configurazione iniziale o compatibilità con
+host MCP esterni; broker residente e UDS rimangono esclusi.
 
-F10 espone via MCP soltanto la preview della transizione
-`pending -> completed|cancelled`. La UI Web trusted rilegge la risorsa e
-richiede ruolo medico attivo, step-up e gesto operation-specific prima del
-commit con CAS, idempotenza, audit e receipt. Proof e commit non attraversano
-MCP.
+F10 espone via MCP soltanto l'anteprima della transizione
+`pending -> completed|cancelled`. Prima del commit, la UI Web fidata rilegge
+la risorsa e richiede ruolo medico attivo, step-up e gesto specifico per
+l'operazione; il commit mantiene CAS, idempotenza, audit e ricevuta. Proof e
+commit non attraversano MCP.
 
 Il planner semantico è collegato al Supervisor e resta read-only. Compone al
 massimo due operazioni allowlisted e non produce SQL libero o scritture. Su
@@ -512,12 +531,14 @@ sequenceDiagram
     DB-->>Client: Top N DrugSummary
 ```
 
-Il file sorgente resta locale e non viene aggiunto a Git. Il manifest salva la
-provenienza e l'hash dell'artifact importato. Il canale paired espone solo la
-lettura del catalogo tramite `network.catalogs.readonly`; non accetta dataset
-remoti e non trasferisce il catalogo completo.
+Il file sorgente rimane locale e fuori da Git; il manifest ne conserva
+provenienza e hash dopo l'importazione. Il client associato può consultare
+il catalogo tramite `network.catalogs.readonly`, ma quel canale non accetta
+dataset remoti né trasferisce l'intero catalogo.
 
-### 4.10 Modalita `network-home-base` -> paired client read/write limitato
+<a id="410-modalita-network-home-base---paired-client-readwrite-limitato"></a>
+
+### 4.10 Modalità `network-home-base` -> paired client read/write limitato
 
 ```mermaid
 sequenceDiagram
@@ -549,10 +570,12 @@ sequenceDiagram
     Observation-->>Client: success oppure 409 VERSION_CONFLICT
 ```
 
-Nota operativa (WUL-307): con `network-home-base` spenta i token paired non
-leggono ne scrivono e ricevono `403 NETWORK_MODE_DISABLED`, mentre i pairing gia
-registrati restano. Fuori scope su questo canale: hard delete remoto, sync
-completo, attachment remoti, cataloghi remoti, campi AI/documentali.
+WUL-307 separa il pairing già registrato dall'abilitazione della rete: quando
+`network-home-base` è spenta, i token paired non possono leggere o scrivere e
+ricevono `403 NETWORK_MODE_DISABLED`, senza cancellare le associazioni
+esistenti. Nel canale di questa sequenza restano fuori perimetro hard delete
+remoto, sincronizzazione completa, attachment remoti, cataloghi remoti e
+campi AI/documentali.
 
 ---
 
@@ -563,7 +586,7 @@ completo, attachment remoti, cataloghi remoti, campi AI/documentali.
 | `/api/auth/*` | Web UI e bootstrap client native | Credenziali + session cookie | HTTP localhost | Setup/login/check/logout |
 | `/api/*` | Web UI | Session cookie server | HTTP localhost | CRUD web + proxy locali |
 | `/api/v1/*` | Client nativo macOS | `Authorization: Bearer <token>` | HTTPS locale via TLS proxy | Contratto stabile native |
-| `/api/v1/network/*` | Client paired trusted | Paired client credential + sessione operatore | HTTPS trusted LAN via TLS proxy | Home-base read-only-first + write versionati su ciclo di vita paziente, diario, terapie, checkup, osservazioni, prestazioni e protesica, piu export FHIR lato client, validazione FSE, revisione e discovery; cataloghi in sola lettura |
+| `/api/v1/network/*` | Client paired trusted | Paired client credential + sessione operatore | HTTPS trusted LAN via TLS proxy | Home-base read-only-first + write versionati su ciclo di vita paziente, diario, terapie, checkup, osservazioni, prestazioni e protesica, più export FHIR lato client, validazione FSE, revisione e discovery; cataloghi in sola lettura |
 | `/api/proxy/ollama/*` | Web UI (solo runtime browser; lato server il provider parla direttamente al loopback) | Sessione web (`requireSession`) | HTTP localhost | Proxy verso il runtime Ollama locale (`chat` e `generate`) su loopback stretto, con attestazione del modello |
 | `/api/attachments/{id}/local-extraction` | Web UI | Sessione web | HTTP localhost | Estrazione AnyDoc dell'allegato host-owned corrente; preview locale con hash e provenienza, senza write |
 | `/api/ai/patient-insight/preview` | Web UI | Sessione web acquisita prima del payload | HTTP localhost | Preview Patient Insight host-owned con receipt e provenienza PHI-safe |
@@ -576,10 +599,11 @@ completo, attachment remoti, cataloghi remoti, campi AI/documentali.
 | MCP Intelligent Host | Harness locale | Binding RPC ereditato dal Supervisor | `stdio` | Terminology, Open Loops, proposta follow-up, query semantica bounded e preview F10 |
 | Mini | Foundation CLI locale | Nessun binding production al Supervisor; parent AIP richiesto | stdin/stdout JSON | Catalogo tipizzato, fail-closed senza parent; nessun claim di onboarding o host esterni |
 
-Nota auth: il token locale non porta privilegi admin web. Le route di sistema
-ad alto impatto richiedono una sessione admin web; le eccezioni token-aware fuori
-da `/api/v1/*` restano limitate a bootstrap/supporto locale e diagnostica
-read-only esplicitamente documentati in [SECURITY.md](../SECURITY.md).
+Il token locale non conferisce privilegi di amministrazione web. Le route di
+sistema ad alto impatto richiedono una sessione admin web; fuori da
+`/api/v1/*`, le eccezioni che accettano il token rimangono circoscritte a
+bootstrap, supporto locale e diagnostica in sola lettura esplicitamente
+documentati in [SECURITY.md](../SECURITY.md).
 
 ---
 
@@ -634,7 +658,8 @@ read-only esplicitamente documentati in [SECURITY.md](../SECURITY.md).
   (ADR 0066, WUL-306, WUL-308); la hard delete resta una erasure GDPR admin
   esplicita.
 
-Claim ceiling dei percorsi Fabric, AnyDoc e Headless: contenuto sorgente 0.8.5.
-Questa topologia non costituisce prova di firma, pubblicazione, certificazione,
-deployment cloud, AI paired, entrypoint MCP production o authority agentica
-generale.
+Il limite delle affermazioni sui percorsi Fabric, AnyDoc e Headless qui
+rappresentati è il contenuto sorgente 0.8.5, con la distinzione documentale
+precisata sopra. La topologia non è una prova di firma, pubblicazione,
+certificazione, deployment cloud, AI paired, qualifica dell'entrypoint MCP
+production o autorità agentica generale.

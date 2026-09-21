@@ -7,37 +7,20 @@ read_when:
 
 # Matrice delle viste Lume
 
-Questa matrice rileva il divario tra il canone Lume e le superfici realmente
-presenti nel repository. Non dichiara una migrazione completa e non sostituisce
-la verifica della singola slice. I dati clinici negli screenshot golden devono
-essere sempre sintetici.
+Per decidere quale parte di una vista debba essere rifatta, occorre distinguere il canone Lume da ciò che è stato osservato nelle superfici del repository. Questa matrice ne registra il divario, senza dichiarare completa la migrazione né sostituire la verifica di ciascuna slice. Gli screenshot golden devono contenere esclusivamente dati clinici sintetici.
 
 ## Fonti e perimetro
 
-Il riferimento visuale immediato è
-`docs/design/lume/mockups/lume-cockpit-vivo.html`: rail operativo, worklist in
-penombra, Quadro paziente in fuoco e coda dell'attenzione senza una seconda
-superficie concorrente. La specifica vincolante resta `docs/design/lume/01-lingua.md`,
-con la correzione di gesto, fuoco e Filo in
-`docs/design/lume/07-gesto-e-movimento.md`. I contratti nativi sono in
-`docs/design/lume/05-app-native.md` e
-`docs/design/lume/06-macos-apple-contract.md`.
+Il riferimento visuale immediato, `docs/design/lume/mockups/lume-cockpit-vivo.html`, dispone il rail operativo, la worklist in penombra e il Quadro paziente in fuoco, lasciando alla coda dell'attenzione un ruolo che non generi una seconda superficie concorrente. La specifica vincolante rimane `docs/design/lume/01-lingua.md`, corretta per gesto, fuoco e Filo da `docs/design/lume/07-gesto-e-movimento.md`; i contratti nativi sono in `docs/design/lume/05-app-native.md` e `docs/design/lume/06-macos-apple-contract.md`.
 
-Il sorgente definitivo del canone è
-`docs/design/lume/canon/lume-cockpit.template.html`. Il comando
-`node scripts/build-lume-canon.mjs /tmp/lume-cockpit.html` ne costruisce la
-versione completa per il confronto locale. La sua presenza non sostituisce la
-prova della vista reale.
+Il canone definitivo ha come sorgente `docs/design/lume/canon/lume-cockpit.template.html`. Per costruirne la versione completa e confrontarla localmente si usa `node scripts/build-lume-canon.mjs /tmp/lume-cockpit.html`: ottenere quel riferimento non equivale però a verificare la vista reale.
 
 Legenda stato:
 
-- `fedele`: la struttura osservata applica il contratto Lume della vista, senza
-  un gap noto rilevante in questa matrice.
-- `parziale`: sono presenti fondazioni Lume verificabili, ma la composizione o
-  uno dei contratti della vista resta aperto.
-- `legacy`: la vista esiste, ma la sua struttura principale conserva il modello
-  precedente.
-- `assente`: non esiste una controparte nella piattaforma indicata.
+- `fedele`: la struttura osservata applica il contratto Lume della vista e la matrice non registra un divario noto rilevante.
+- `parziale`: esistono fondazioni Lume verificabili, ma rimane aperta la composizione o almeno uno dei contratti della vista.
+- `legacy`: la vista è presente, ma conserva prevalentemente la struttura precedente.
+- `assente`: manca una controparte della vista sulla piattaforma indicata.
 
 ## Matrice vista per vista
 
@@ -58,11 +41,7 @@ Legenda stato:
 
 ## Criteri golden per vista
 
-Ogni golden usa fixture sintetiche, due registri attivi, Giorno e Grafite, e due
-geometrie di riferimento: wide 1440 x 960 e narrow 390 x 844. La cattura wide
-prova la gerarchia simultanea; la narrow prova il collasso strutturale, non una
-versione ridotta della stessa griglia. Guardia non è un tema utente e non fa
-parte della coppia minima di screenshot web.
+Ogni golden usa fixture sintetiche e i due registri attivi, Giorno e Grafite, nelle geometrie wide 1440 x 960 e narrow 390 x 844. La prima serve a verificare la gerarchia delle aree visibili insieme; la seconda deve mostrare come la struttura si ricomponga, non come si riduca la stessa griglia. Guardia non è un tema utente e resta fuori dalla coppia minima di screenshot web.
 
 | Vista | Giorno e Grafite, wide | Giorno e Grafite, narrow |
 | --- | --- | --- |
@@ -81,44 +60,22 @@ parte della coppia minima di screenshot web.
 
 ### Interazione e selezione
 
-- Il focus è visibile con indicatore non affidato al solo colore, rispettando il
-  pattern già coperto da `e2e/lume-new-entry.spec.ts` e il rail di navigazione
-  osservabile in `e2e/web-smoke.spec.ts`.
-- La selezione usa luce, elevazione corta e stato ARIA osservabile. Non usa una
-  striscia laterale colorata, un `border-left` semantico improprio o una pill
-  colorata come unico indicatore. Il Filo collega solo continuità temporale o
-  provenienza reale.
-- Editor, gruppi toggle e form devono conservare nome accessibile, descrizione,
-  errore e ordine tastiera. Il contratto di riferimento è la snapshot ARIA e il
-  test di tabulazione in `e2e/lume-new-entry.spec.ts`; testata e diagnosi hanno
-  la regressione osservabile in `e2e/patient-header.spec.ts`.
-- Lock e sicurezza mantengono heading, label del PIN e stato di sessione
-  osservabili come in `e2e/web-smoke.spec.ts`.
-- Per macOS si preservano gli `accessibilityIdentifier` già presenti nelle viste
-  Swift e si aggiunge la prova VoiceOver del percorso worklist, paziente,
-  sezione e inspector prima di dichiarare la vista fedele.
+- Il focus deve avere un indicatore visibile non affidato al solo colore, secondo il pattern coperto da `e2e/lume-new-entry.spec.ts` e il rail di navigazione osservabile in `e2e/web-smoke.spec.ts`.
+- La selezione usa luce, elevazione corta e stato ARIA osservabile. Non si usano strisce laterali colorate, `border-left` con semantica impropria o pill colorate come unico indicatore; il Filo collega solo continuità temporale o provenienza reale.
+- Editor, gruppi toggle e form devono conservare nome accessibile, descrizione, errore e ordine da tastiera. I riferimenti sono snapshot ARIA e test di tabulazione in `e2e/lume-new-entry.spec.ts`; per testata e diagnosi vale la regressione osservabile in `e2e/patient-header.spec.ts`.
+- Lock e sicurezza mantengono osservabili heading, label del PIN e stato di sessione, come in `e2e/web-smoke.spec.ts`.
+- Su macOS si conservano gli `accessibilityIdentifier` delle viste Swift. Prima di dichiarare fedele una vista deve essere aggiunta la prova VoiceOver lungo worklist, paziente, sezione e inspector.
 
 ### Motion, reduce motion e contrasto
 
-- Fuoco: cross-fade di luminanza e temperatura in 150-200 ms, ease-out. Filo:
-  disegno SVG o `Path`, non bordo animato. Pressione diretta: scala 0,97 circa
-  100 ms. I tempi e i portatori sono definiti in
-  `docs/design/lume/07-gesto-e-movimento.md`.
-- Non sono ammessi loop ambientali. Fuori da un gesto diretto, al massimo un
-  elemento è in moto nel viewport. `e2e/motion-budget.spec.ts` già verifica
-  assenza di loop e questo limite su cockpit, scheda e impostazioni.
-- Con Reduce Motion il contenuto resta già leggibile: Filo completo, stato
-  bozza o firmato espresso da tono ed etichetta, fuoco espresso da superficie.
-  Le durate si dimezzano o la transizione diventa istantanea senza morphing.
-- Le soglie misurate sono almeno 4,5:1 per testo normale e controlli testuali
-  sulle superfici dichiarate. `scripts/check-lume-tokens.mjs` è il controllo
-  autorevole: alla rilevazione misura 42 coppie, tutte sopra soglia. Non prova
-  da solo contrasto di focus, segnali, componenti o viste native.
+- Il fuoco usa un cross-fade di luminanza e temperatura di 150-200 ms, ease-out; il Filo si disegna come SVG o `Path`, non come bordo animato. La pressione diretta applica una scala 0,97 per circa 100 ms. Portatori e tempi sono definiti in `docs/design/lume/07-gesto-e-movimento.md`.
+- Non sono ammessi loop ambientali e, fuori da un gesto diretto, può muoversi al massimo un elemento nel viewport. `e2e/motion-budget.spec.ts` verifica già entrambi i vincoli su cockpit, scheda e impostazioni.
+- Con Reduce Motion il Filo appare completo, bozza e firmato rimangono riconoscibili da tono ed etichetta e il fuoco dalla superficie. Le durate si dimezzano oppure il passaggio diventa istantaneo, senza morphing.
+- Testo normale e controlli testuali devono raggiungere almeno 4,5:1 sulle superfici dichiarate. Il controllo di riferimento è `scripts/check-lume-tokens.mjs`, che alla rilevazione misura 42 coppie tutte sopra soglia. Il risultato non verifica da solo contrasto di focus, segnali, componenti o viste native.
 
 ## Ordine di rifacimento
 
-La sequenza è vincolante. Una slice non anticipa la successiva e non amplia il
-perimetro ai dati o ai contratti clinici.
+La sequenza seguente è vincolante: ciascuna slice deve precedere la successiva e non può estendere il proprio perimetro ai dati o ai contratti clinici.
 
 1. **Frame del cockpit.** Stabilizzare chrome, canvas, rail e una singola
    grammatica del fuoco. Perimetro previsto:
@@ -150,19 +107,11 @@ perimetro ai dati o ai contratti clinici.
    `components/settings/settings-nav-sidebar.tsx` e
    `components/settings/settings-ui.tsx`.
 
-Il macOS segue questo ordine concettuale dopo il frame web: prima le primitive
-in `native/MediFlowMac/Sources/MediFlowAppleShared/Lume.swift`, poi worklist e
-workspace in
-`native/MediFlowMac/Sources/MediFlowAppleShared/AppleFoundation/PairedPatientsWorklistView.swift`
-e
-`native/MediFlowMac/Sources/MediFlowAppleShared/AppleFoundation/PairedPatientsWorkspaceView.swift`.
-Le superfici di sistema conservano il materiale nativo; Lume resta opaco nelle
-superfici cliniche costruite dall'app.
+Dopo il frame web, macOS segue lo stesso ordine concettuale: prima le primitive in `native/MediFlowMac/Sources/MediFlowAppleShared/Lume.swift`, poi worklist e workspace in `native/MediFlowMac/Sources/MediFlowAppleShared/AppleFoundation/PairedPatientsWorklistView.swift` e `native/MediFlowMac/Sources/MediFlowAppleShared/AppleFoundation/PairedPatientsWorkspaceView.swift`. Il materiale delle superfici di sistema resta nativo; le superfici cliniche costruite dall'app restano opache.
 
 ## Verifica della matrice
 
-La verifica di massa considera tutti i percorsi locali con estensione citati in
-questo documento e fallisce alla prima mancanza:
+Il controllo seguente attraversa tutti i percorsi locali con estensione citati nella pagina e deve fallire alla prima assenza:
 
 ```zsh
 rg -o '`(app|components|native|docs|scripts|e2e)/[^` ]+\.(tsx|swift|md|html|json|mjs)`' docs/design/lume/08-matrice-viste.md \
@@ -173,27 +122,14 @@ rg -o '`(app|components|native|docs|scripts|e2e)/[^` ]+\.(tsx|swift|md|html|json
     done
 ```
 
-Esito da registrare al commit: percorsi locali verificati e corretti dopo
-verifica. Controllo editoriale obbligatorio: la ricerca del carattere em dash
-non produce righe.
+Al commit va registrato l'esito effettivo del controllo dei percorsi, con le eventuali correzioni verificate. È inoltre obbligatorio il controllo editoriale sul carattere em dash: la ricerca non deve restituire righe.
 
-## Ambiguita che richiedono giudizio umano
+<a id="ambiguita-che-richiedono-giudizio-umano"></a>
 
-- Il template canonico è disponibile e costruibile localmente. La
-  corrispondenza puntuale con Worklist, Quadro e Scheda resta una verifica di struttura
-  e comportamento, non un'equivalenza visuale automatica.
-- La matrice usa `fedele` per Worklist e carico pazienti, Quadro paziente,
-  Scheda clinica, Diario globale e Lock e sicurezza, sulla base della struttura
-  osservata e degli smoke disponibili. In nessuno dei cinque casi lo stato
-  sostituisce una prova visuale manuale Giorno e Grafite su display reale.
-- La slice 5 porta Nuova voce clinica, Editor clinico e Review documentale e
-  handoff a `fedele` sulla base del contratto strutturale, delle prove E2E nei
-  due registri e delle catture wide e narrow. Le catture automatizzate non
-  sostituiscono una verifica manuale di densità e ritmo su display reale.
-- La slice 6 porta Analytics e Impostazioni a `fedele` sulla base della domanda
-  operativa unica, della configurazione reversibile e delle prove E2E Giorno e
-  Grafite, wide e narrow. Le catture automatizzate restano una riserva
-  strutturale e non sostituiscono la verifica visuale manuale su display reale.
-- La controparte macOS di review, handoff e analytics è segnata assente per la
-  vista specifica, non come affermazione di assenza funzionale dell'intera app
-  Apple. La QA VoiceOver end-to-end macOS è ancora una decisione manuale.
+## Ambiguità che richiedono giudizio umano
+
+- Il template canonico è disponibile e costruibile localmente, ma il confronto con Worklist, Quadro e Scheda richiede di esaminare struttura e comportamento; non è un'equivalenza visuale automatica.
+- Worklist e carico pazienti, Quadro paziente, Scheda clinica, Diario globale e Lock e sicurezza sono classificati `fedele` in base a struttura osservata e smoke disponibili. In nessuno dei cinque casi questo stato sostituisce la prova visuale manuale Giorno e Grafite su display reale.
+- Per Nuova voce clinica, Editor clinico e Review documentale e handoff, la slice 5 assegna `fedele` sulla base del contratto strutturale, delle prove E2E nei due registri e delle catture wide e narrow. Densità e ritmo richiedono comunque una verifica manuale sul display reale.
+- Per Analytics e Impostazioni, la slice 6 assegna `fedele` in base alla domanda operativa unica, alla configurazione reversibile e alle prove E2E Giorno e Grafite, wide e narrow. Le catture automatizzate documentano la struttura, senza sostituire la verifica visuale manuale sul display reale.
+- L'assenza macOS indicata per review, handoff e analytics riguarda quelle specifiche viste, non l'intera funzionalità dell'app Apple. La QA VoiceOver end-to-end macOS rimane una verifica da decidere ed eseguire manualmente.

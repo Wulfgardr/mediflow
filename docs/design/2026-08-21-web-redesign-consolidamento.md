@@ -9,70 +9,81 @@ read_when:
 
 ## 0. Premessa e baseline
 
-Lume resta la lingua ([ADR 0078](../adr/0078-lume-lingua-di-design-di-destinazione.md)):
-questo programma **non cambia mondo**, cambia composizione, architettura
-informativa, stati e velocità. Baseline misurata: critique `app/patients`
-**23/40** (snapshot in `.impeccable/critique/2026-08-21T13-49-09Z__app-patients.md`),
-audit tecnico con 10 finding deterministici (7 file), contrasto token base AA
-tranne i segnali raw su grafite.
+Lume resta la lingua di riferimento
+([ADR 0078](../adr/0078-lume-lingua-di-design-di-destinazione.md)): il programma
+non sostituisce l'identità visiva, ma interviene su composizione, architettura
+informativa, stati e velocità. La baseline è la valutazione di `app/patients`,
+**23/40**, registrata in
+`.impeccable/critique/2026-08-21T13-49-09Z__app-patients.md`, insieme a un
+audit tecnico con 10 rilievi deterministici su 7 file. Il contrasto dei token
+base è AA, eccetto i segnali raw su grafite.
 
-Diagnosi in una riga: **la lingua è giusta e riconoscibile; l'architettura
-informativa la tradisce** — due superfici rispondono alla stessa domanda, gli
-stati non sanno agire, il medico esperto non ha vie rapide.
+Il problema non è riconoscere Lume, ma orientarsi nel lavoro: due superfici
+rispondono alla stessa domanda, gli stati non offrono un'azione e il medico
+esperto non dispone di percorsi rapidi. **La lingua è riconoscibile, ma
+l'architettura informativa ne indebolisce l'utilità.**
 
 ## 1. Cinque principi del redesign
 
-1. **Una domanda, una superficie.** «Chi è e cosa faccio ora» ha un solo luogo.
-2. **Delta prima dei conteggi.** «Cosa è cambiato dall'ultima volta» batte
-   «quante voci ci sono». Ogni metrica mostra la variazione o scompare.
-3. **Ogni stato ha un'azione.** Contratto PRODUCT.md: loading, errore, offline,
-   stale dichiarano cosa è successo e cosa si può fare adesso.
-4. **La tastiera è un cittadino, non un accessorio.** Chi apre 40 pazienti al
-   giorno non paga tassa per click.
-5. **Un solo dialetto CSS.** Le pill sono pill Lume; `.apple-*`, `.graphite-*`
-   e l'adattatore `!important` hanno una data di pensionamento.
+1. **Una domanda, una superficie.** «Chi è e cosa faccio ora» deve avere
+   un solo luogo in cui trovare risposta.
+2. **Variazioni prima dei conteggi.** «Che cosa è cambiato dall'ultima volta»
+   serve più di «quante voci ci sono»: ogni metrica mostra la variazione
+   oppure scompare.
+3. **Ogni stato ha un'azione.** Secondo il contratto PRODUCT.md, caricamento,
+   errore, offline e dato non più attuale devono dire che cosa è accaduto
+   e che cosa si possa fare adesso.
+4. **La tastiera è parte del percorso.** Chi apre 40 pazienti al giorno deve
+   poter evitare passaggi ripetitivi del puntatore.
+5. **Un solo dialetto CSS.** Le pill sono Lume; `.apple-*`, `.graphite-*`
+   e l'adattatore `!important` hanno una dismissione programmata.
 
 ## 2. Interventi per vista
 
 ### 2A. Incarico (`/` area pazienti)
 
-- **Case lens**: da 5 azioni simultanee a 1 primaria + menu overflow (≤4 opzioni
-  visibili per decisione). Oggi: `incarico-area.tsx:369-390`.
-- **Recenti**: fascia «visti di recente» sopra la lista — riconoscimento invece
-  di memoria; alimenta anche la palette comandi.
-- **Tastiera**: `/` focus ricerca, `↑/↓` naviga le righe virtualizzate, `Invio`
-  apre, `n` nuova voce. Il meccanismo esiste già
-  (`patientSearchFocusSignal`); manca il modello completo.
+- **Case lens**: passare da 5 azioni simultanee a 1 primaria con menu delle
+  altre azioni, mantenendo ≤4 opzioni visibili per decisione. Riferimento
+  della baseline: `incarico-area.tsx:369-390`.
+- **Recenti**: una fascia «visti di recente» sopra la lista permette di
+  riconoscere il paziente anziché ricordarlo e alimenta anche la palette comandi.
+- **Tastiera**: `/` porta alla ricerca, `↑/↓` scorre le righe virtualizzate,
+  `Invio` apre e `n` crea una nuova voce. Il meccanismo
+  `patientSearchFocusSignal` esiste già, ma manca il modello completo.
 
 ### 2B. Scheda (`/patients/[id]/modules`)
 
-- **Testata unica**: `PatientSynopticSheet` diventa l'unico header della vista;
-  il Quadro parallelo (`real-patient-area`) viene assorbito ed eliminato. I dati
-  duplicati (latestEntry in metrics e nextRows) collassano in una fonte.
-- **Rail raggruppata**: 13 sezioni → **4 gruppi clinici** (Quadro e decisioni ·
-  Terapie e prescrizioni · Documenti e prove · Diario e follow-up), espansione
-  progressiva, sezione attiva sempre visibile. Oggi: `modules/page.tsx:507-521`.
-- **Un solo diario**: la river clinica assorbe la lista Diario duplicata;
-  i filtri sostituiscono la doppia visualizzazione. Oggi:
+- **Testata unica**: `PatientSynopticSheet` diventa l'unica testata della vista,
+  assorbendo ed eliminando il Quadro parallelo (`real-patient-area`). I dati
+  duplicati, latestEntry in metrics e nextRows, confluiscono in un solo riferimento.
+- **Navigazione raggruppata**: dalle 13 sezioni si passa a **4 gruppi clinici**
+  — Quadro e decisioni, Terapie e prescrizioni, Documenti e prove, Diario e
+  follow-up — con espansione progressiva e sezione attiva sempre visibile.
+  Riferimento della baseline: `modules/page.tsx:507-521`.
+- **Un solo diario**: il flusso clinico assorbe la lista Diario duplicata e
+  i filtri sostituiscono la doppia visualizzazione. Riferimento:
   `modules/page.tsx:721-743`.
-- **Disclosure corretta**: `<h2><button aria-expanded>` al posto di `<span>`
-  dentro bottone (`collapsible-section.tsx:85-88`); `<h1>` sulla pagina.
+- **Espansione accessibile**: usare `<h2><button aria-expanded>` al posto
+  dello `<span>` nel pulsante (`collapsible-section.tsx:85-88`) e `<h1>`
+  sulla pagina.
 
 ### 2C. Stati
 
-- Skeleton ovunque: `SkeletonLines` già esistono
-  (`patient-synoptic-sheet.tsx:69-77`) e sostituiscono i tile testuali
-  «in attesa» (`real-patient-area.tsx:269-286`).
-- «Riprova» cablato al refetch su ogni errore fetch, primo di tutti l'errore
-  lista (`incarico-area.tsx:230-233`).
-- Badge stale/offline sui dati clinici: la freschezza è informazione clinica.
+- Mostrare strutture di caricamento in tutte le viste: `SkeletonLines`,
+  già presenti in `patient-synoptic-sheet.tsx:69-77`, sostituiscono i riquadri
+  testuali «in attesa» di `real-patient-area.tsx:269-286`.
+- Collegare «Riprova» a una nuova lettura per ogni errore di caricamento,
+  a partire dalla lista (`incarico-area.tsx:230-233`).
+- Segnalare sui dati clinici gli stati stale/offline, perché sapere se
+  l'informazione è attuale fa parte della sua lettura clinica.
 
 ### 2D. Impostazioni e rotte orfane
 
-- Una sola superficie impostazioni: l'area governance del cockpit rimanda a
-  `/settings/**` senza duplicare contenuti (`live-governance-area.tsx:31-79`).
-- `/analytics` e `/scales` entrano nella navigazione o vengono archiviate come
-  non raggiungibili: oggi esistono ma nessuna UI le linka.
+- Riunire le impostazioni in una sola superficie: l'area governance del
+  cockpit rimanda a `/settings/**` senza duplicarne i contenuti
+  (`live-governance-area.tsx:31-79`).
+- Portare `/analytics` e `/scales` nella navigazione oppure archiviarle
+  come non raggiungibili: nella baseline esistono, ma nessuna UI le collega.
 
 ## 3. Sistema trasversale
 
@@ -81,9 +92,9 @@ stati non sanno agire, il medico esperto non ha vie rapide.
 | Tastiera | Modello unico: `/` cerca, `⌘K` palette, `j/k` lista, `Esc` chiude, `?` aiuto contestuale |
 | Touch | `@media (pointer: coarse) { min-height: 44px }` su chip, quietAction, sub-tab, header/back button |
 | Focus | `:focus-visible` dedicato su `.catalogRow`, `.stageBtn`, `.launcherTile`; alpha accent focus da 40% a piena opacità sul ring |
-| Temi | Un solo ThemeToggle (oggi doppio render: `kree8-clinical-cockpit.tsx:435-471`) |
+| Temi | Un solo ThemeToggle (doppio render osservato: `kree8-clinical-cockpit.tsx:435-471`) |
 | CSS | Pensionamento programmato di `.apple-*`/`.graphite-*` verso pill Lume; `--lume-shadow-focal` al posto dei ~15 literal duplicati; budget per PR per smontare l'adattatore `!important` (`globals.css:1674-1784`) |
-| Icone | Vocabolario minimo condiviso (≈24 glifi, stroke coerente): oggi i pulsanti standard sono l'unico punto senza carattere |
+| Icone | Vocabolario minimo condiviso (≈24 glifi, stroke coerente): nella baseline i pulsanti standard sono l'unico punto senza carattere |
 | Messaggi | `patientNavMeta = '!'` sostituito da messaggio Voce onesto (`kree8-clinical-cockpit.tsx:407`) |
 
 ## 4. Fasi e verifica
@@ -94,13 +105,15 @@ stati non sanno agire, il medico esperto non ha vie rapide.
 | **P1** | Rail 4 gruppi; fusione Diario/Timeline; touch coarse 44pt; heading disclosure; focus gap | matrice viste aggiornata; detector pulito sulle viste toccate; contrasto AA |
 | **P2** | Debito CSS (dialetti, shadow literal, `!important`); settings unica; rotte orfane | nessun uso residuo di `.graphite-chip` nelle viste migrate; nav completa |
 
-Verifica obbligatoria su `scripts/e2e-smoke.sh` (`:3100`, DB sintetico — mai
-sul dev server personale `:3000`), detector impeccable sulle viste toccate,
-screenshot golden per registro × viewport (320/390/768/1440 + zoom 200%).
+La verifica è obbligatoria su `scripts/e2e-smoke.sh`, usando `:3100` e un
+DB sintetico, mai il dev server personale `:3000`. Si affiancano il detector
+impeccable sulle viste modificate e screenshot golden per registro ×
+viewport (320/390/768/1440 + zoom 200%).
 
 ## 5. Cosa non cambia
 
-Registri giorno/grafite/guardia; modello focale fuoco/penombra/buio operativo;
-il Filo; palette semantica desaturata riservata allo stato clinico; Inter +
-IBM Plex Mono; zero vetro strutturale; onestà degli stati come firma. Il canone
-(`docs/design/lume/canon/`) resta il riferimento.
+Il consolidamento conserva registri giorno/grafite/guardia, modello focale
+fuoco/penombra/buio operativo e Filo. Restano inoltre palette semantica
+desaturata riservata allo stato clinico, Inter + IBM Plex Mono, assenza di
+vetro strutturale e onestà degli stati. Il canone in `docs/design/lume/canon/`
+continua a governare queste scelte.

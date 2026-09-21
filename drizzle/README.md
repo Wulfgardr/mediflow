@@ -1,32 +1,40 @@
-# drizzle/ historical migration artifacts
+<a id="drizzle-historical-migration-artifacts"></a>
 
-The `*.sql` files in this folder are historical schema artifacts. They are NOT
-applied automatically at runtime. There is no migrator import in the app and no
-`db:migrate` script; nothing calls drizzle-kit's migrate at boot.
+# drizzle/: artefatti storici di migrazione
 
-The operative schema mechanism at runtime is `applySchemaGuards()` in
-`lib/db-server.ts`. It runs on every database open (boot and after a repair swap)
-and is idempotent: it adds missing columns, creates the tables it owns, and
-creates the secondary indices. The base (core) tables were created historically
-from `0000_*.sql` (and the later numbered files) via `drizzle-kit push`; from
-there the guards keep every existing database file in step with the current code.
+I file `*.sql` di questa cartella documentano la storia dello schema, ma NON
+vengono applicati automaticamente durante l'esecuzione. L'applicazione non
+importa un migrator, non ha uno script `db:migrate` e non invoca la migrazione
+di drizzle-kit all'avvio. Modificare questi file, da solo, non cambia quindi
+il database usato dall'applicazione.
 
-The `lib/schema.ts` drizzle model stays the single typed source of truth for the
-application code. To keep the guards, the SQL files, and the model from drifting
-apart, run:
+L'allineamento effettivo avviene in `applySchemaGuards()`, dentro
+`lib/db-server.ts`. La funzione viene eseguita a ogni apertura del database,
+sia all'avvio sia dopo la sostituzione del file durante una riparazione. È
+idempotente: aggiunge le colonne mancanti, crea le tabelle di propria competenza
+e gli indici secondari. Le tabelle di base derivano storicamente da
+`0000_*.sql` e dai successivi file numerati, tramite `drizzle-kit push`;
+i controlli a runtime mantengono poi i database esistenti allineati al codice.
+
+Il modello Drizzle in `lib/schema.ts` rimane l'unico riferimento tipizzato per
+il codice applicativo. Poiché modello, file SQL e controlli a runtime hanno
+ruoli distinti, la loro coerenza va verificata con:
 
     npm run check:schema-drift
 
-That command bootstraps a throwaway SQLite database through the real db-server
-path (drizzle SQL migrations followed by the runtime guards), introspects
-`sqlite_master`, and fails with a readable diff if any table, column, or index
-declared in `lib/schema.ts` is missing from the bootstrapped runtime schema.
+Il comando crea un database SQLite temporaneo attraverso il percorso reale
+di db-server: applica le migrazioni SQL Drizzle e poi i controlli a runtime.
+Interroga quindi `sqlite_master` e termina con un confronto leggibile se nello
+schema così ottenuto manca una tabella, una colonna o un indice dichiarato in
+`lib/schema.ts`.
 
-Practical rules:
+Da questa distinzione discendono tre regole operative:
 
-- Adding a column or index? Add it to `lib/schema.ts` AND to `applySchemaGuards()`
-  in `lib/db-server.ts` (guards are what actually runs). A new `*.sql` file here is
-  optional historical bookkeeping, not a runtime requirement.
-- Do not assume editing only a `*.sql` file changes anything at runtime. It does not.
-- Keep index names identical across `lib/schema.ts` and the guards so the drift
-  check can match them.
+- Quando aggiungi una colonna o un indice, aggiungilo a `lib/schema.ts` E a
+  `applySchemaGuards()` in `lib/db-server.ts`: sono questi controlli a essere
+  eseguiti. Un nuovo file `*.sql` può documentare il passaggio storico, ma non
+  è un requisito di esecuzione.
+- Non considerare sufficiente la modifica di un solo file `*.sql`: non ha
+  effetti a runtime.
+- Mantieni identici i nomi degli indici in `lib/schema.ts` e nei controlli,
+  perché la verifica delle divergenze possa riconoscerli.

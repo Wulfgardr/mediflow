@@ -1,10 +1,10 @@
 # Compliance e interoperabilità
 
-> GDPR, privacy e standard clinici in pratica.
+> Misure tecniche, evidenze disponibili e valutazioni che restano al contesto d’uso.
 
 Riferimenti correlati:
 
-- [SECURITY.md](../SECURITY.md) (policy sicurezza e redazione)
+- [SECURITY.md](../SECURITY.md) (sicurezza e oscuramento dei dati identificativi)
 - [ARCHITECTURE.md](../ARCHITECTURE.md) (confini architetturali stabili)
 - [docs/FSE2-terminology-roadmap.md](./FSE2-terminology-roadmap.md) (roadmap terminologie/FSE)
 - [docs/README.md](./README.md) e [docs/markdown-index.md](./markdown-index.md) (mappa documentale)
@@ -13,57 +13,61 @@ Riferimenti correlati:
 
 ## Inventario tecnico in-app
 
-La superficie **Impostazioni → Evidenze e conformità** rende consultabile un
+Per valutare un impiego di MediFlow occorre distinguere ciò che il sorgente
+mostra da ciò che va verificato nell’organizzazione che lo adotta. La superficie
+**Impostazioni → Evidenze e conformità** raccoglie il primo insieme in un
 inventario statico e versionato (`mediflow.compliance-evidence.v1`). Per ogni
-ambito mostra:
+ambito rende visibili:
 
-- evidenze verificabili nel repository;
-- limite del claim;
-- owner della verifica successiva;
+- evidenze verificabili nella repository;
+- limite di ciò che quelle evidenze permettono di affermare;
+- responsabile della verifica successiva;
 - stato `evidenza nel sorgente`, `evidenza con limite esplicito` oppure
   `valutazione esterna necessaria`.
 
-L'inventario non legge dati clinici, non esegue controlli sul deployment e non
-produce un verdetto legale. Le fonti ufficiali esterne — [GDPR, testo
-consolidato corrente](https://eur-lex.europa.eu/eli/reg/2016/679), in particolare
-articoli 25 e 32, e [AI Act, testo consolidato
-corrente](https://eur-lex.europa.eu/eli/reg/2024/1689) — sono
-input per la valutazione dell'organizzazione, del referente legale e del DPO;
-non classificano automaticamente MediFlow o il suo uso concreto.
+L’inventario non legge dati clinici e non controlla l’installazione in uso;
+non può quindi produrre un verdetto legale. Le fonti ufficiali esterne —
+[GDPR, testo consolidato corrente](https://eur-lex.europa.eu/eli/reg/2016/679),
+in particolare articoli 25 e 32, e
+[AI Act, testo consolidato corrente](https://eur-lex.europa.eu/eli/reg/2024/1689)
+— servono alla valutazione dell’organizzazione, del referente legale e del DPO,
+non classificano automaticamente MediFlow o il suo impiego concreto.
 
-Il claim ceiling dell'inventario è quindi **solo inventario di evidenze
-tecniche**. Configurazione, finalità, ruoli privacy, procedure, classificazione
-del sistema AI e adempimenti restano fuori dal suo perimetro.
+Il limite è dunque **solo inventario di evidenze tecniche**. Configurazione,
+finalità, ruoli privacy, procedure, classificazione del sistema AI e
+adempimenti devono essere valutati al di fuori di questa superficie.
 
 La [matrice regolatoria del 6 settembre 2026](./analysis/2026-09-06-086-regulatory-evidence.md)
-registra versioni, calendario aggiornato, evidenze statiche e gap per la 0.8.6.
-Include la modifica dell'AI Act introdotta dal Regolamento (UE) 2026/1744 e
-separa controlli tecnici, documenti adottati nel progetto e adempimenti del
-deployment. È un dossier candidato: la revisione competente resta aperta.
+registra, a quella data, versioni, calendario, evidenze statiche e lacune per
+la 0.8.6. Include la modifica dell’AI Act introdotta dal Regolamento (UE)
+2026/1744 e distingue i controlli tecnici dai documenti adottati nel progetto
+e dagli adempimenti dell’installazione concreta. Il dossier resta candidato:
+la revisione competente non è chiusa.
 
 ---
 
 ## ⚖️ 1. GDPR e privacy
 
-MediFlow applica misure tecniche coerenti con il principio **Privacy by
-Design**. Queste misure possono supportare la protezione dei dati, ma non
-certificano da sole la conformità GDPR.
+La protezione dei dati deve entrare nelle scelte progettuali: è il senso del
+principio **Privacy by Design** a cui si riferiscono le misure tecniche di
+MediFlow. Queste misure aiutano a proteggere le informazioni, ma non certificano
+da sole la conformità GDPR.
 
-Ruoli e obblighi dipendono da finalità, mezzi e contesto effettivi del singolo
-deployment. Il software non assegna automaticamente il ruolo di titolare o
-responsabile del trattamento: la valutazione resta in capo all'organizzazione
-che usa MediFlow.
+Per stabilire ruoli e obblighi occorre conoscere finalità, mezzi e contesto
+effettivi del singolo impiego. Il software non assegna automaticamente il ruolo
+di titolare o responsabile del trattamento; questa valutazione resta
+all’organizzazione che lo usa.
 
 ### Misure Tecniche di Sicurezza
 
-MediFlow mette a disposizione misure tecniche che possono concorrere alla
-protezione richiesta dal contesto operativo:
+Le misure disponibili rispondono a esigenze diverse e vanno lette con i loro
+limiti, perché la protezione richiesta dipende dal contesto operativo:
 
 1. **Cifratura clinica per campo (AES-256-GCM)**: i campi elencati in
    `ENCRYPTED_FIELDS` vengono cifrati lato client prima della persistenza. Il
    file SQLite non è cifrato integralmente: identificativi, alcuni metadati e
-   gli artefatti di backup non rientrano tutti nello stesso perimetro
-   whole-database verificato.
+   artefatti di backup non rientrano tutti in una protezione verificata
+   dell’intero database.
 2. **Chiavi e PIN**: il PIN non viene persistito e la master key viene aperta
    solo nella memoria del client durante la sessione. Questo non equivale a un
    claim zero-knowledge sull'intero database.
@@ -75,8 +79,9 @@ protezione richiesta dal contesto operativo:
 
 ### Strumenti per i Diritti dell'Interessato
 
-MediFlow offre strumenti che possono aiutare l'operatore a gestire richieste
-degli interessati:
+Gli strumenti applicativi possono aiutare a rispondere alle richieste degli
+interessati, purché non se ne confonda la disponibilità con l’adempimento
+completo della richiesta:
 
 * **Cancellazione ed erasure**: il DELETE operativo scrive un tombstone
   reversibile (`deletedAt` / `deletionReason`) con version guard. L'azione admin
@@ -92,8 +97,10 @@ degli interessati:
 
 ## 🔌 2. Export FHIR R4 (v0)
 
-Lo storage interno di MediFlow non è FHIR-native. L'export locale genera una
-mappatura **export-only v0** in un `Bundle` FHIR R4 di tipo `collection`.
+MediFlow conserva i dati nel proprio modello interno, non in un archivio
+FHIR-native. Per esportarli localmente dispone di una mappatura
+**export-only v0**, che genera un `Bundle` FHIR R4 di tipo `collection` con le
+risorse descritte di seguito.
 
 ### Export FHIR
 
@@ -105,21 +112,22 @@ mappatura **export-only v0** in un `Bundle` FHIR R4 di tipo `collection`.
 | `MedicationStatement` | Terapie, con farmaco rappresentato oggi come testo |
 | `Observation` | Scale con punteggio e osservazioni strutturate |
 
-I test correnti verificano il mapping su fixture sintetiche. Non attestano
-conformità completa alla base R4, a profili HL7 Italia/FSE, correttezza
-terminologica o ingestione da parte di sistemi terzi. L'export è una base di
-trasporto limitata ai record mappati, non una garanzia di interoperabilità o
+I test verificano la mappatura su dati sintetici. Questo permette di controllare
+come i record selezionati vengano trasformati, ma non attesta la conformità
+completa alla base R4 o ai profili HL7 Italia/FSE, la correttezza terminologica
+né l’acquisizione da parte di sistemi terzi. L’export offre quindi una base di
+trasporto per i soli record mappati, non una garanzia di interoperabilità o di
 portabilità completa.
 
 ---
 
 ## 🩺 3. Standard diagnostici (ICD-11)
 
-Un resolver locale ICD-11 opzionale può supportare ricerca e codifica tramite
-API OMS locale.
+La ricerca e la codifica possono avvalersi di un resolver ICD-11 locale e
+facoltativo, attraverso l’API OMS locale. Le diagnosi strutturate possono così
+includere un codice da rivedere, senza rendere obbligatoria la codifica di ogni
+problema: il testo libero resta ammesso e non è garantito come codificato o
+validato.
 
-* **Codifica reviewable**: le diagnosi strutturate possono includere un codice;
-  i problemi free-text restano ammessi e non sono garantiti come codificati o
-  validati.
-* **Direzione futura**: più dati strutturati possono ridurre ambiguità nei
-  flussi FSE, dopo profili e verifiche dedicate.
+Una maggiore strutturazione dei dati potrà ridurre le ambiguità nei flussi FSE,
+ma resta una direzione futura, subordinata a profili e verifiche dedicate.

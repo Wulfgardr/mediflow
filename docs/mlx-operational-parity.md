@@ -1,4 +1,6 @@
-# MLX operational parity
+<a id="mlx-operational-parity"></a>
+
+# Equivalenza operativa MLX
 
 > Stato documento: `SECONDARY`, slice `WUL-165`.
 > Le decisioni architetturali prevalenti restano ADR 0028, ADR 0029, ADR 0037,
@@ -6,21 +8,24 @@
 
 ## Decisione
 
-Per MediFlow, il runtime MLX generico resta **benchmark-visible** e verificabile
-nei benchmark, ma resta **non runtime clinico** del prodotto. La lane governata
-`ATHENA MLX` di Treatment Reasoning è un'eccezione esplicita e separata: produce
-solo anteprime locali, usa il proprio lifecycle e non promuove il server MLX
-generico a provider clinico.
+Nel perimetro WUL-165, la classificazione
+**`benchmark-visible`, non runtime clinico** indica che MLX generico può essere misurato nei benchmark senza
+essere ammesso alle funzioni cliniche del prodotto. Il percorso governato
+`ATHENA MLX` di Treatment Reasoning costituisce un'eccezione esplicita e
+separata: produce soltanto anteprime locali, con un proprio ciclo di vita, senza
+promuovere il server MLX generico a provider clinico. La matrice e il controllo
+seguenti descrivono questo confine, non il catalogo completo delle funzioni AI.
 
-Questo significa:
+La distinzione ha conseguenze operative precise:
 
 - `Ollama` resta il runtime operativo standard dell'app.
 - Il server `mlx_chat` generico resta confinato a benchmark, diagnostica e
   superfici esplicitamente etichettate come benchmark-only.
 - `ATHENA MLX` resta confinato a Treatment Reasoning, con esecuzione locale,
   lifecycle dedicato, receipt e output `proposal_only`.
-- OCR non disponibile nella 0.8.5: nessun task, modello o fallback OCR e
-  raggiungibile dal runtime prodotto.
+- **OCR non disponibile** nel runtime generativo qui confrontato: nel
+  perimetro ritirato per la 0.8.5 non sono raggiungibili task, modelli o
+  fallback OCR.
 - Nessun default modello o provider viene cambiato solo perché MLX è presente.
 - Qualunque promozione futura richiede ADR, benchmark lane-specific, stop-rule e
   governance rollout.
@@ -47,15 +52,17 @@ Il guard eseguibile è:
 npm run check:mlx-operational-parity
 ```
 
-Il guard non prova la qualità di un modello MLX. Verifica invece che il repository
-mantenga i confini operativi dichiarati:
+Il controllo non valuta la qualità di un modello MLX: verifica che il codice
+mantenga la separazione operativa dichiarata. Il suo esito va quindi letto
+rispetto a questi vincoli:
 
 - runtime applicativo generativo ancora Ollama-only;
 - adapter benchmark simmetrici `ollama_chat` / `mlx_chat`;
 - diagnostica home-base read-only per MLX già attivo;
 - fallback esplicito verso Ollama nel runtime bundled dell'app nativa
-  (`lib/ai-service.ts`; dalla Fase 0 non esiste piu un resolver Swift dedicato);
-- OCR resta terminalmente non disponibile e assente dal registro dei task;
+  (`lib/ai-service.ts`; dalla Fase 0 non esiste più un resolver Swift dedicato);
+- l'OCR di questo perimetro resta terminalmente non disponibile e assente dal
+  registro dei task;
 - la lane ATHENA di Treatment Reasoning resta distinta dal server MLX generico;
 - documentazione del boundary benchmark-only.
 
@@ -70,5 +77,6 @@ npm run benchmark:smart-import -- --iterations 1 --mlx-models mlx-community/medg
 npm run benchmark:mlx:runtime -- --model mlx-community/Llama-3.2-3B-Instruct-4bit --compare-kv-bits 4 --limit 1 --max-tokens 16
 ```
 
-Questi comandi producono evidenza di benchmark, non autorizzano promozione nel
-runtime clinico.
+I comandi producono misure di benchmark. Anche un esito positivo non autorizza
+la promozione nel runtime clinico, che resta soggetta alla decisione e alle
+condizioni indicate sopra.
