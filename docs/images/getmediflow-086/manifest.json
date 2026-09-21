@@ -36,12 +36,12 @@
     {
       "file": "record.png",
       "sourceFile": "therapies.png",
-      "sha256": "1a9136ba0e250f3240a5ef7a8f1e15c8265256ea7a2290ad8f65b414d35807c1",
-      "width": 1440,
-      "height": 1000,
-      "title": "Terapie",
-      "sourceCommit": "ddff0a929fbe4d60f144b64c55269892ec2419f6",
-      "capturedAt": "2026-09-07T23:58:59.652Z"
+      "sha256": "98d3d6d551c7644cd164c823c9463f779fb71f268676e46ad83f22bb92565a00",
+      "width": 1920,
+      "height": 1200,
+      "title": "Terapie con Ramipril e ATC coerente",
+      "sourceCommit": "c7c741ccc65e9d5987e5f6dd720c1b21f544eeb2",
+      "capturedAt": "2026-09-21T12:40:13Z"
     },
     {
       "file": "access.png",
@@ -52,6 +52,26 @@
       "title": "Panoramica impostazioni",
       "sourceCommit": "ddff0a929fbe4d60f144b64c55269892ec2419f6",
       "capturedAt": "2026-09-07T23:58:59.652Z"
+    },
+    {
+      "file": "athena-flow.png",
+      "sha256": "c002d9852882345ce3cc39a7ac2c888d0e913264b597e600f5b8d9fe12a40735",
+      "width": 1408,
+      "height": 1085,
+      "title": "Treatment Intelligence con terapie, ATC e percorsi proposti",
+      "sourceCommit": "bb89ad0479ee468aea959ac5c76113c7c04d335b",
+      "capturedAt": "2026-09-21T14:39:48Z",
+      "status": "Faithful Get MediFlow reproduction of the successful Treatment Reasoning panel using synthetic polypharmacy: ATHENA prepares a source-linked review draft with limitations, cautions and proposed review pathways while medication, pathways and the record remain unchanged. It does not run ATHENA or represent an active clinical result."
+    },
+    {
+      "file": "headless-agent.png",
+      "sha256": "30052c40e3528920cdcc8b98c34599fb58957501fb76ce1e43766d33659608bf",
+      "width": 1268,
+      "height": 789,
+      "title": "Demo Codex headless con worklist e polifarmacia",
+      "sourceCommit": "4cfd79a72d1c1494b59fd3a87106599fb91588e5",
+      "capturedAt": "2026-09-21T14:17:32Z",
+      "status": "Headless access illustration from Get MediFlow; Mini remains a separate CLI path, and this is not a connected Codex session or 0.8.6 availability claim."
     },
     {
       "file": "analytics.png",

@@ -33,14 +33,18 @@ non sono la condizione per usare il gestionale.
 cartella e il lavoro da seguire. La schermata è stata acquisita dal candidato
 `ddff0a929` e contiene esclusivamente dati sintetici.*
 
-<!-- reconciliation-20260912 -->
 > **MediFlow 0.8.6 è disponibile come [codice sorgente](https://github.com/Wulfgardr/mediflow/releases/tag/v0.8.6), pubblicato il 20 settembre 2026.**
-> Il perimetro di questa versione è il runtime locale sul Mac, usato dal browser
-> su localhost oppure senza interfaccia grafica da client e agenti autorizzati.
-> L’app nativa segue uno sviluppo separato e non è necessaria per questa consegna.
-> La pubblicazione del sorgente non autorizza l’impiego con dati clinici reali:
-> la valutazione del deployment resta aperta in WUL-688, nel coordinamento
-> [WUL-669](https://linear.app/wulfgardr/issue/WUL-669).
+>
+> Questa release distribuisce i sorgenti del runtime locale per Mac, utilizzabile
+> dal browser tramite `localhost` oppure senza interfaccia grafica da client e
+> agenti autorizzati. Non comprende un installer firmato o notarizzato
+> dell’applicazione nativa.
+>
+> La pubblicazione dei sorgenti non autorizza l’uso con dati clinici reali. Prima
+> di un impiego effettivo, il professionista o l’organizzazione responsabile deve
+> verificare finalità e base giuridica, informativa, ruoli e autorizzazioni,
+> misure di sicurezza e, quando previsto, consenso dell’interessato. La valutazione
+> del deployment resta aperta in [WUL-688](https://linear.app/wulfgardr/issue/WUL-688).
 
 <details>
 <summary><strong>Versione sorgente, verifiche e distribuzione</strong></summary>
@@ -63,10 +67,12 @@ automaticamente alla 0.8.6.
 <details>
 <summary><strong>Le terapie, da vicino</strong></summary>
 
-![Terapie del paziente con dati sintetici](./docs/images/getmediflow-086/record.png)
+![Terapie di Elena Moretti, paziente fittizia, con Ramipril 5 mg e ATC C09AA05](./docs/images/getmediflow-086/record.png)
 
 Una schermata dell’interfaccia reale, con dati interamente sintetici, mostra
-come le terapie restino consultabili nel contesto della cartella.
+come le terapie restino consultabili nel contesto della cartella. Ramipril
+5 mg e il codice ATC C09AA05 sono coerenti; l’esempio non costituisce
+un’indicazione terapeutica.
 
 </details>
 
@@ -151,6 +157,19 @@ un’autorizzazione a scegliere liberamente provider, endpoint o modalità d’i
 
 Ollama può servire i primi tre percorsi, mentre ATHENA/MLX è opzionale e
 riservata a Treatment Reasoning, con configurazione e verifiche locali proprie.
+
+![Pannello Treatment Reasoning con ATHENA MLX locale, fonti e bozza finale da rivedere](./docs/images/getmediflow-086/athena-flow.png)
+
+La riproduzione riprende il pannello MediFlow nello stato riuscito e usa un
+caso interamente sintetico con sei terapie e relativi codici ATC. Il percorso
+interattivo completo su [Get MediFlow](https://getmediflow.dev/#fabric)
+permette di fermarsi su modello, fonti, bozza, preparazione e revisione.
+Treatment Intelligence rende leggibili raccomandazione, dati mancanti,
+evidenze, cautele, provenienza e tre percorsi proposti: follow-up
+dell’ACE-inibitore, riconciliazione terapeutica e rivalutazione del sintomo.
+ATHENA prepara soltanto il testo della revisione; il medico può usarlo,
+correggerlo o scartarlo, mentre terapie, percorsi e cartella restano invariati.
+
 L’integrazione ChatGPT resta opzionale e spenta per impostazione predefinita.
 Il percorso esterno richiede configurazione, consenso e controlli pertinenti
 all’operazione; non viene dichiarata una nuova prova live di account/provider
@@ -289,6 +308,11 @@ fonti riservate e risultati clinici restano fuori da Git.
 <details>
 <summary><strong>Headless: cosa parte e cosa non autorizza</strong></summary>
 
+**Mini e accesso headless sono percorsi distinti.** Mini è la versione a riga
+di comando prevista nella roadmap 1.0. L’accesso headless è invece il contratto
+con cui un client agente autorizzato può usare capacità nominate di MediFlow;
+Codex è mostrato soltanto come uno dei client possibili.
+
 ```sh
 npm run build -- --webpack
 npm run mcp:intelligent-host:production
@@ -301,6 +325,17 @@ Mac; MCP comunica tramite stdio. Per una funzione riferita al paziente servono
 autenticazione, selezione e attivazione esplicita nell’interfaccia fidata.
 Revoca, logout, cambio di selezione o scadenza chiudono l’autorizzazione, il
 *grant*, senza trasferirla all’agente.
+
+![Demo Codex dell’accesso headless con worklist, polifarmacia, fonti nominate e composer Astra Low](./docs/images/getmediflow-086/headless-agent.png)
+
+La schermata racconta una richiesta che non si risolve consultando una singola
+pagina: il client verifica le capacità concesse, scandisce una worklist,
+incrocia polifarmacia, diario, misurazioni e documenti, quindi prepara una coda
+di revisione senza scrivere nella cartella. Su
+[Get MediFlow](https://getmediflow.dev/#cofano) l’animazione può essere messa in
+pausa, percorsa avanti e indietro o riavviata. È una dimostrazione con dati
+inventati: non è una sessione Codex collegata e non prova disponibilità nella
+release 0.8.6.
 
 Questo accesso non concede un diritto generale sul database o scritture
 cliniche fuori dai controlli applicabili. La 0.8.6 non richiede né qualifica
@@ -334,16 +369,11 @@ la parità FHIRv2 resta da verificare.
 
 | Snapshot | Periodo dei log disponibili | Token di sessione | Ripartizione | Cache letta | Copertura storica |
 | :-- | :-- | --: | :-- | --: | :-- |
-| **5 settembre 2026** | 2026-02-01 → 2026-09-05 | **50.810.826.389** | Codex 44.773.273.634 · Claude Code 6.037.552.755 | 48.607.240.570 (95,7%) | Codex UNKNOWN · Claude Code attestata |
+| **21 settembre 2026** | 2026-02-01 → 2026-09-21 | **50.285.467.538** | Codex 44.247.914.783 · Claude Code 6.037.552.755 | 48.123.937.197 (95,7%) | Codex attestata · Claude Code attestata |
 
-<img src="./screenshots/token-models.svg" alt="Snapshot 5 settembre 2026: 50,81 Mld token di sessione, 44,77 Mld in Codex e 6,04 Mld in Claude Code; 48,61 Mld da cache letta." width="720" loading="lazy"/>
+<img src="./screenshots/token-models.svg" alt="Snapshot 21 settembre 2026: 50,29 Mld token di sessione, 44,25 Mld in Codex e 6,04 Mld in Claude Code; 48,12 Mld da cache letta." width="720" loading="lazy"/>
 
-I numeri provengono da **CodexBar 0.56.4**, tramite il comando locale
-`cost --refresh`, entro una finestra massima di 365 giorni. Sono gli aggregati
-disponibili per Codex e Claude Code, non un conteggio filtrato su MediFlow.
-L’attribuzione segue il processo che registra il token: anche un worker OpenAI
-avviato da Claude Code rientra nel totale Claude Code. Il grafico distingue
-quindi gli strumenti di registrazione, non i fornitori dei modelli.
+La fonte è **CodexBar 0.60.3**, comando locale `cost --refresh`, con una finestra massima di 365 giorni. Il conteggio usa gli aggregati disponibili per Codex e Claude Code e non è filtrato per repository. CodexBar attribuisce ogni token al processo che lo registra. Un worker OpenAI avviato da Claude Code compare quindi nel totale Claude Code. Il grafico indica lo strumento che registra i token, non il fornitore del modello.
 
 **ATTESTATO:** i valori sono le somme esatte dei log disponibili nel periodo indicato. **STIMATO:** nessun valore. **UNKNOWN:** la completezza storica resta sconosciuta quando CodexBar non la attesta. L'attribuzione a MediFlow, a una release, a una PR o a un commit è sempre sconosciuta.
 
@@ -353,7 +383,7 @@ Le barre sono divise per modello e usano la stessa scala. La cache letta è una 
 
 Il dato misura contesto elaborato. Non misura righe di codice, costo o qualità.
 
-Gli strumenti aiutano nello sviluppo; la responsabilità del progetto resta mia.
+La responsabilità del progetto resta mia.
 
 <!-- usage-dashboard:end -->
 
