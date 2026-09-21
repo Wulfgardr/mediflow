@@ -123,7 +123,9 @@ scelti esplicitamente dall'utente.
   I profili locali risiedono in `.codex/`, esclusa da Git, quindi non presumere
   che seguano ogni worktree. Misurare le equivalenze tra effort, modelli e consumo.
 - **Astra Ultra** resta una modalità separata, scelta intenzionalmente
-  dall'utente. Una difficoltà non autorizza il passaggio automatico a Ultra
+  dall'utente, per problemi con parti indipendenti che beneficiano
+  dell'esplorazione parallela. Una catena causale strettamente seriale richiede
+  analisi concentrata, non più agenti. Una difficoltà non autorizza il passaggio automatico a Ultra
   o a uno swarm di Astra. Per un nucleo difficile e indipendente, il coordinatore
   può scegliere un sub-agent Astra Light/Low, se disponibile e utile rispetto
   a Sol Medium, motivandolo nel checkpoint; non assumere equivalenze di costo
