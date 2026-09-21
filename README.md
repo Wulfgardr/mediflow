@@ -338,16 +338,11 @@ la parità FHIRv2 resta da verificare.
 
 | Snapshot | Periodo dei log disponibili | Token di sessione | Ripartizione | Cache letta | Copertura storica |
 | :-- | :-- | --: | :-- | --: | :-- |
-| **5 settembre 2026** | 2026-02-01 → 2026-09-05 | **50.810.826.389** | Codex 44.773.273.634 · Claude Code 6.037.552.755 | 48.607.240.570 (95,7%) | Codex UNKNOWN · Claude Code attestata |
+| **21 settembre 2026** | 2026-02-01 → 2026-09-21 | **50.214.967.557** | Codex 44.177.414.802 · Claude Code 6.037.552.755 | 48.055.125.677 (95,7%) | Codex attestata · Claude Code attestata |
 
-<img src="./screenshots/token-models.svg" alt="Snapshot 5 settembre 2026: 50,81 Mld token di sessione, 44,77 Mld in Codex e 6,04 Mld in Claude Code; 48,61 Mld da cache letta." width="720" loading="lazy"/>
+<img src="./screenshots/token-models.svg" alt="Snapshot 21 settembre 2026: 50,21 Mld token di sessione, 44,18 Mld in Codex e 6,04 Mld in Claude Code; 48,06 Mld da cache letta." width="720" loading="lazy"/>
 
-I numeri provengono da **CodexBar 0.56.4**, tramite il comando locale
-`cost --refresh`, entro una finestra massima di 365 giorni. Sono gli aggregati
-disponibili per Codex e Claude Code, non un conteggio filtrato su MediFlow.
-L’attribuzione segue il processo che registra il token: anche un worker OpenAI
-avviato da Claude Code rientra nel totale Claude Code. Il grafico distingue
-quindi gli strumenti di registrazione, non i fornitori dei modelli.
+La fonte è **CodexBar 0.60.3**, comando locale `cost --refresh`, con una finestra massima di 365 giorni. Il conteggio usa gli aggregati disponibili per Codex e Claude Code e non è filtrato per repository. CodexBar attribuisce ogni token al processo che lo registra. Un worker OpenAI avviato da Claude Code compare quindi nel totale Claude Code. Il grafico indica lo strumento che registra i token, non il fornitore del modello.
 
 **ATTESTATO:** i valori sono le somme esatte dei log disponibili nel periodo indicato. **STIMATO:** nessun valore. **UNKNOWN:** la completezza storica resta sconosciuta quando CodexBar non la attesta. L'attribuzione a MediFlow, a una release, a una PR o a un commit è sempre sconosciuta.
 
@@ -357,7 +352,7 @@ Le barre sono divise per modello e usano la stessa scala. La cache letta è una 
 
 Il dato misura contesto elaborato. Non misura righe di codice, costo o qualità.
 
-Gli strumenti aiutano nello sviluppo; la responsabilità del progetto resta mia.
+La responsabilità del progetto resta mia.
 
 <!-- usage-dashboard:end -->
 
