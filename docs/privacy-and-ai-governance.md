@@ -1,65 +1,71 @@
 # Dati sanitari e intelligenza: scelte e responsabilità
 
-MediFlow conserva la cartella sul sistema locale e delimita l’accesso alle sue
-capacità. Questo favorisce il controllo delle informazioni. L’adeguatezza a un
-uso concreto richiede anche decisioni organizzative, tecniche e giuridiche.
+MediFlow conserva la cartella sul sistema locale e rende esplicito quali
+funzioni possano accedervi. La scelta favorisce il controllo delle informazioni,
+ma non basta a stabilire se un impiego sia adeguato: occorrono anche decisioni
+organizzative, tecniche e giuridiche riferite al contesto concreto.
 
-Questa guida orienta la lettura; non modifica i contratti di sicurezza e non
-attesta una certificazione. Stato editoriale: 6 settembre 2026.
+Questa guida aiuta a leggere tali distinzioni; non modifica i contratti di
+sicurezza e non attesta una certificazione. Data della guida: 6 settembre 2026.
 
 ## Nel lavoro quotidiano
 
-Il documento originale resta consultabile. Una proposta intelligente si
-confronta con le fonti e con il contesto attuale. Il professionista conserva
-il compito di valutare il risultato: un modello può omettere o interpretare
-male un’informazione.
+Il documento originale resta consultabile perché una proposta intelligente
+deve poter essere confrontata con le fonti e con il contesto attuale. Un modello
+può omettere un’informazione o interpretarla male: valutare il risultato resta
+quindi compito del professionista.
 
-I provider esterni sono disattivati per default. La scelta di una capacità
-intelligente comprende configurazione, disponibilità e verifica del runtime.
+L’AI è facoltativa e i provider esterni sono disattivati per impostazione
+predefinita. Scegliere una funzione intelligente richiede di configurarla,
+accertare che sia disponibile e verificare il runtime; non implica che ogni
+modello possa essere usato per qualunque funzione.
 
 ## GDPR: protezione tecnica e trattamento concreto
 
-Finalità e base giuridica, condizioni per il trattamento di dati sanitari,
-ruoli, conservazione, misure di sicurezza e necessità di una valutazione
-d’impatto vanno valutati nel contesto d’impiego. Riferimenti: articoli 5, 6,
-9, 25, 28, 32 e 35 del [GDPR consolidato](https://eur-lex.europa.eu/eli/reg/2016/679).
+La valutazione parte dal trattamento che si intende svolgere: finalità e base
+giuridica, condizioni per l’uso di dati sanitari, ruoli, conservazione, misure
+di sicurezza e necessità di una valutazione d’impatto dipendono dal contesto
+d’impiego. I riferimenti sono gli articoli 5, 6, 9, 25, 28, 32 e 35 del
+[GDPR consolidato](https://eur-lex.europa.eu/eli/reg/2016/679).
 
 La pseudonimizzazione separa gli identificativi dal contenuto usando
-informazioni aggiuntive. Non rende automaticamente anonimi i dati: se la
-persona resta identificabile, il GDPR continua ad applicarsi (articolo 4(5)
-e considerando 26). Il funzionamento locale non risolve da solo tutti gli
-obblighi del trattamento.
+informazioni aggiuntive, ma non rende automaticamente anonimi i dati. Se la
+persona resta identificabile, il GDPR continua ad applicarsi, come richiamano
+l’articolo 4(5) e il considerando 26. Anche per questo il funzionamento locale
+non risolve da solo tutti gli obblighi del trattamento.
 
 ## AI Act: finalità, funzione e ruolo
 
-Classificazione e obblighi dipendono dalla finalità prevista, dal sistema e
-dai ruoli degli operatori. Non ogni funzione AI in ambito sanitario ha la
-stessa qualificazione. La supervisione umana è un controllo importante del
-progetto, ma non dimostra da sola l’adempimento degli obblighi applicabili.
+L’ambito sanitario non attribuisce da solo la stessa qualificazione a ogni
+funzione AI. Classificazione e obblighi dipendono dalla finalità prevista,
+dal sistema e dai ruoli degli operatori. La supervisione umana è perciò un
+controllo importante del progetto, non una prova sufficiente di adempimento.
 
-L’eventuale qualificazione come dispositivo medico richiede una valutazione
-distinta. Riferimento: [AI Act, testo consolidato](https://eur-lex.europa.eu/eli/reg/2024/1689),
-in particolare articolo 6 e allegati I e III per la classificazione.
+L’eventuale qualificazione come dispositivo medico richiede inoltre una
+valutazione distinta. Il riferimento è l’[AI Act, testo consolidato](https://eur-lex.europa.eu/eli/reg/2024/1689),
+in particolare l’articolo 6 e gli allegati I e III per la classificazione.
 
 La [matrice del 6 settembre 2026](./analysis/2026-09-06-086-regulatory-evidence.md)
-documenta le fonti correnti, le modifiche del 2026, le date applicabili e i
-quesiti ancora aperti. Resta un'analisi candidata, senza attribuzioni di ruoli
-o decisioni di classificazione.
+documenta le fonti considerate a quella data, le modifiche del 2026, le date
+applicabili e i quesiti aperti. Resta un’analisi candidata: non attribuisce
+ruoli e non assume decisioni di classificazione.
 
 ## Provider e offuscamento: cosa è presente, cosa è previsto
 
-La [matrice dei runtime](./ai-runtime-serving-matrix.md) è la fonte corrente
-sulla disponibilità delle capacità. Nella candidatura 0.8.5, OpenAI e Anthropic
-hanno adapter e composizioni di prova controllata, spenti per default. Questo
-non attesta un servizio cloud clinico pronto all’uso.
+La [matrice dei runtime](./ai-runtime-serving-matrix.md) indica quali capacità
+siano disponibili e con quali limiti. Nella candidatura 0.8.5 qui descritta,
+OpenAI e Anthropic dispongono di adapter e composizioni per prove controllate,
+spenti per impostazione predefinita. La loro presenza non attesta un servizio
+cloud clinico pronto all’uso.
 
-L’[ADR 0077](./adr/0077-ai-provider-abstraction-and-egress-anonymization-boundary.md)
-prevede minimizzazione, sostituzione degli identificativi prima dell’invio e
-riconciliazione del risultato in locale. Il percorso è progressivo: lo strato
-deterministico non equivale al completamento del filtro sul testo narrativo.
-Il gate rifiuta l’uscita di testo narrativo clinico finché i prerequisiti di
-redazione richiesti non sono pronti. Nessuna promessa di anonimizzazione
-universale o assenza di errori.
+Per un invio ammesso, l’[ADR 0077](./adr/0077-ai-provider-abstraction-and-egress-anonymization-boundary.md)
+prevede che parta soltanto il contenuto necessario, che gli identificativi
+siano sostituiti prima dell’uscita e che il risultato venga riconciliato in
+locale. Il percorso procede per strati: la presenza del filtro deterministico
+non dimostra che sia completo anche quello sul testo narrativo. Il controllo
+di uscita rifiuta quindi il testo narrativo clinico finché non siano pronti
+i prerequisiti richiesti per l’oscuramento dei dati identificativi. Questo
+non comporta alcuna promessa di anonimizzazione universale o assenza di errori.
 
 ## Per approfondire
 
@@ -68,5 +74,6 @@ universale o assenza di errori.
 - [Limiti noti](./known-limitations.md): limitazioni del sistema.
 - [Readiness 0.8.5](./release-085-readiness.md): evidenze e gate della candidatura.
 
-In caso di differenze, prevalgono policy, contratti e matrice dei runtime per
-il rispettivo ambito. Questa pagina ne rende accessibile la lettura.
+Questa pagina rende accessibile la lettura dei documenti tecnici. In caso di
+differenze, prevalgono policy, contratti e matrice dei runtime, ciascuno nel
+proprio ambito.

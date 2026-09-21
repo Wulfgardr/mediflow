@@ -1,9 +1,6 @@
 # Setup rapido client nativo
 
-Questo script automatizza:
-- generazione certificato locale
-- avvio proxy TLS
-- creazione config per il client macOS
+Il client macOS richiede un certificato locale, un proxy TLS e la propria configurazione. Lo script prepara questi elementi insieme, generando il certificato, avviando il proxy e creando il file che il client leggerà.
 
 Riferimenti correlati:
 - [docs/NATIVE.md](./NATIVE.md)
@@ -17,31 +14,28 @@ Riferimenti correlati:
 ./scripts/native-setup.sh
 ```
 
-Il file di configurazione viene scritto in:
+La configurazione viene scritta nel percorso:
 
 ```
 ~/Library/Application Support/MediFlow/native-config.json
 ```
 
-Il client macOS lo legge automaticamente al primo avvio.
+Al primo avvio il client macOS legge automaticamente questo file.
 
-Lo script scrive anche:
+Lo script produce inoltre il file di stato:
 
 ```
 ~/Library/Application Support/MediFlow/runtime-status.json
 ```
 
-Il file contiene solo metadati PHI-free del runtime locale (`baseURL`, porta,
-modalita rete, fingerprint TLS e percorsi runtime). Il pannello `Runtime`
-dell'app lo usa per mostrare readiness e per avviare/arrestare il proxy TLS
-locale in modo esplicito.
+Questo secondo file contiene esclusivamente metadati PHI-free del runtime locale: `baseURL`, porta, modalità di rete, fingerprint TLS e percorsi runtime. Il pannello `Runtime` li usa per mostrare se il servizio sia pronto e per consentire l'avvio e l'arresto espliciti del proxy TLS locale.
 
 ## Variabili opzionali
 
-- `MEDIFLOW_LOCAL_API_TOKEN` (token per API locale)
-- `MEDIFLOW_ATTACHMENT_MAX_BYTES` (limite byte per payload allegato in `/api/attachments`, default 25 MiB)
-- `MEDIFLOW_OCR_GENERATION_TIMEOUT_MS` (timeout in millisecondi per la singola generazione OCR locale; default 120000, la richiesta viene abortita allo scadere)
-- `MEDIFLOW_OCR_TIMEOUT_MS` (alias di fallback: letto solo se `MEDIFLOW_OCR_GENERATION_TIMEOUT_MS` non e impostata)
-- `MEDIFLOW_TLS_CERT_DIR` / `MEDIFLOW_TLS_CERT_PATH` / `MEDIFLOW_TLS_KEY_PATH`
-- `MEDIFLOW_TLS_PORT` (default 3443)
-- `MEDIFLOW_HTTP_TARGET` (default http://127.0.0.1:3000)
+- `MEDIFLOW_LOCAL_API_TOKEN`: token per l'API locale.
+- `MEDIFLOW_ATTACHMENT_MAX_BYTES`: limite del payload allegato in `/api/attachments`, espresso in byte; valore predefinito 25 MiB.
+- `MEDIFLOW_OCR_GENERATION_TIMEOUT_MS`: tempo massimo, in millisecondi, per una singola generazione OCR locale; il valore predefinito è 120000 e allo scadere la richiesta viene abortita.
+- `MEDIFLOW_OCR_TIMEOUT_MS`: alias di ripiego, letto solo quando `MEDIFLOW_OCR_GENERATION_TIMEOUT_MS` non sia impostata.
+- `MEDIFLOW_TLS_CERT_DIR` / `MEDIFLOW_TLS_CERT_PATH` / `MEDIFLOW_TLS_KEY_PATH`: percorsi TLS.
+- `MEDIFLOW_TLS_PORT`: porta TLS, predefinita 3443.
+- `MEDIFLOW_HTTP_TARGET`: destinazione HTTP, predefinita http://127.0.0.1:3000.

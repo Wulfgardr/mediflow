@@ -2,9 +2,11 @@
 
 > Stato documento: `CANONICAL`
 
-Questo documento restringe il dominio `Certificati di malattia` alla domanda
-operativa rilevante per MediFlow: vera integrazione applicativa sopra SISS/SAR,
-oppure solo Web Application / handoff governato.
+Per i `Certificati di malattia`, la decisione è quale rapporto MediFlow possa
+avere con il percorso ufficiale: una vera integrazione applicativa attraverso
+SISS/SAR oppure il solo accompagnamento dell’operatore alla Web Application.
+Questa nota valuta il confine tra i due casi, senza assumere che la presenza
+di interfacce software renda già possibile un runtime dedicato.
 
 Riferimenti canonici:
 - [ARCHITECTURE.md](../ARCHITECTURE.md)
@@ -17,28 +19,26 @@ Riferimenti canonici:
 - [docs/adr/0045-siss-native-integration-boundary-requires-qualified-ssi.md](./adr/0045-siss-native-integration-boundary-requires-qualified-ssi.md)
 - [docs/adr/0049-siss-fse-document-corpus-and-local-mcp-layer.md](./adr/0049-siss-fse-document-corpus-and-local-mcp-layer.md)
 
-## Executive summary
+<a id="executive-summary"></a>
+
+## Esito della ricognizione
 
 Stato della ricognizione: 2 maggio 2026.
 
-Le fonti pubbliche mostrano tre fatti distinti:
+Le fonti pubbliche descrivono il certificato telematico di malattia come un
+flusso nazionale normato, ricevuto da INPS e collegato al `SAC`/MEF. In
+Lombardia il SISS è qualificato come `SAR`: il medico opera quindi con login
+SISS e Carta Operatore, non direttamente con credenziali INPS/SAC.
 
-1. il certificato telematico di malattia e un flusso normato nazionale, ricevuto
-   da INPS e collegato al `SAC`/MEF
-2. in Lombardia il SISS e qualificato come `SAR`, quindi il medico lombardo non
-   usa direttamente credenziali INPS/SAC, ma opera attraverso login SISS e
-   Carta Operatore
-3. le FAQ SISS affermano che esistono interfacce software per integrare gli
-   applicativi del medico con SISS, ma il materiale pubblico raccolto mostra
-   soprattutto FAQ, manualistica e Web Application, non un contratto backend
-   completo riusabile da MediFlow
+Le FAQ SISS dichiarano disponibili interfacce software per gli applicativi
+del medico, ma il materiale pubblico raccolto consiste soprattutto in FAQ,
+manuali e Web Application. Non fornisce un contratto backend completo che
+MediFlow possa già riusare.
 
-Esito:
-
-- `webapp-mediated` per un uso prudente oggi
-- `custom-ui-plausible` solo come ipotesi subordinata a specifiche complete,
-  qualificazione/provisioning e test ufficiali
-- `blocked` per runtime MediFlow immediato con UI proprietaria
+L’esito prudente è perciò `webapp-mediated`. Una UI dedicata resta
+`custom-ui-plausible` soltanto come ipotesi subordinata a specifiche complete,
+qualificazione/provisioning e test ufficiali; un runtime MediFlow immediato
+con UI proprietaria resta `blocked`.
 
 ## Fonti ufficiali rilevanti
 
@@ -50,20 +50,22 @@ Esito:
 | [INPS - Consultazione dei certificati di malattia telematici](https://www.inps.it/it/it/dettaglio-scheda.it.schede-servizio-strumento.schede-servizi.consultazione-dei-certificati-di-malattia-telematici.html) | INPS riceve i certificati telematici e li rende consultabili agli aventi titolo; il servizio cittadino usa protocollo univoco e credenziali. |
 | [INPS - Normativa certificazione telematica di malattia](https://www.inps.it/it/it/dettaglio-approfondimento.schede-informative.49909.normativa-di-riferimento-per-la-certificazione-telematica-di-malattia.html) | La normativa nazionale assegna al medico curante l'invio telematico all'INPS e richiama SAC, DPCM 26 marzo 2008 e decreto 18 aprile 2012 per certificazione/ricovero. |
 
-## Matrice di fattibilita
+<a id="matrice-di-fattibilita"></a>
+
+## Matrice di fattibilità
 
 | Obiettivo | Stato | Motivo |
 | --- | --- | --- |
 | Launcher contestuale verso Web Application ufficiale | `Possibile come futura slice` | Coerente con il boundary `webapp-mediated`, ma va prima verificato il path ufficiale corrente e va trattato come handoff, non come certificazione nativa. |
-| Preparazione locale dati paziente | `Possibile con cautela` | MediFlow puo preparare CF e contesto operativo, ma non deve inviare diagnosi/prognosi o assumere prefill supportato senza specifica. |
+| Preparazione locale dati paziente | `Possibile con cautela` | MediFlow può preparare CF e contesto operativo, ma non deve inviare diagnosi/prognosi o assumere prefill supportato senza specifica. |
 | Archivio locale dei certificati emessi | `Solo manuale/reviewable` | La FAQ SISS parla di salvataggio locale dei PDF generati; MediFlow non deve acquisire automaticamente certificati da INPS/SISS senza contratto. |
 | Integrazione backend con applicativo medico | `Plausibile ma bloccata` | Le FAQ dichiarano interfacce disponibili, ma manca nel corpus pubblico il contratto tecnico completo necessario a implementare e validare MediFlow. |
-| UI proprietaria MediFlow per redazione/invio certificato | `Blocked` | Richiede specifiche, qualifica, sicurezza, audit, gestione errori e responsabilita medico-legale non disponibili nella slice corrente. |
+| UI proprietaria MediFlow per redazione/invio certificato | `Blocked` | Richiede specifiche, qualifica, sicurezza, audit, gestione errori e responsabilità medico-legale non disponibili nella slice corrente. |
 | Gestione certificato in sede di ricovero/dimissione | `Webapp-mediated` | Il materiale pubblico raccolto rimanda alla Web Application e alla manualistica operativa SISS. |
 
 ## Blocker concreti
 
-Prima di qualunque runtime certificati servono:
+Il passaggio a qualsiasi runtime per i certificati richiede prima:
 
 1. import autorizzato fuori Git dei manuali/spec SISS applicabili
 2. conferma del canale: Web Application, interfacce software SSI, o entrambi
@@ -75,44 +77,38 @@ Prima di qualunque runtime certificati servono:
    finire in log o fixture
 6. ambiente di test o collaudo ufficiale prima di parlare di invio nativo
 
-## Prima thin slice raccomandata
+<a id="prima-thin-slice-raccomandata"></a>
 
-Non aprire ora una UI proprietaria per certificati di malattia.
+## Primo intervento raccomandato
 
-La prima slice utile, se il dominio diventa prioritario, e:
+Non aprire ora una UI proprietaria per i certificati di malattia. Se il
+dominio diventa prioritario, il primo intervento utile è accompagnare
+l’operatore alla Web Application ufficiale, entro i limiti seguenti:
 
 ### `Certificati official-webapp handoff guard`
 
-Forma:
+Occorre verificare il percorso corrente della Web Application e ammettere il
+passaggio esplicito dalla scheda paziente solo se il portale supporta un
+ingresso stabile. MediFlow copia o mostra soltanto i dati locali minimi
+utili all’operatore e registra un audit dell’apertura privo di PHI, senza
+diagnosi o prognosi. Non salva automaticamente il certificato né il PDF
+generato.
 
-- verifica del path ufficiale Web Application corrente
-- handoff esplicito dalla scheda paziente solo se il portale supporta un ingresso
-  stabile
-- copia/mostra solo dati minimi locali utili all'operatore
-- audit locale PHI-safe del launch, senza diagnosi/prognosi
-- nessun salvataggio automatico del certificato o del PDF generato
+Prima del runtime devono essere soddisfatti questi criteri:
 
-Exit criteria prima di runtime:
-
-1. path ufficiale verificato e documentato
-2. nessun reverse engineering della Web Application
-3. nessun prefill non dimostrato
-4. fallback operativo chiaro verso il portale SISS
-5. decisione separata prima di qualunque integrazione backend custom
+1. Percorso ufficiale verificato e documentato.
+2. Nessun reverse engineering della Web Application.
+3. Nessuna precompilazione non dimostrata.
+4. Percorso operativo alternativo chiaro verso il portale SISS.
+5. Decisione separata prima di qualsiasi integrazione backend personalizzata.
 
 ## Decisione operativa
 
-Per MediFlow, oggi, il target corretto e:
+Il percorso proposto è `official-webapp handoff guard`, solo dopo la verifica
+dell’accesso ufficiale. Non sono ammessi `custom certificate UI`,
+`backend-first certificate engine`, `sync certificati INPS/SISS` o
+`archivio automatico dei certificati emessi` nell’ambito qui definito.
 
-- `official-webapp handoff guard`, solo dopo verifica del path ufficiale
-
-e non:
-
-- `custom certificate UI`
-- `backend-first certificate engine`
-- `sync certificati INPS/SISS`
-- `archivio automatico dei certificati emessi`
-
-Questa nota chiude la valutazione pubblica del dominio: l'integrazione diretta
-resta possibile solo se verranno acquisiti contratto tecnico completo, percorso
-di qualifica e ambiente di test ufficiale.
+La valutazione pubblica del dominio si ferma a questo punto. Un’integrazione
+diretta resta possibile solo dopo l’acquisizione del contratto tecnico
+completo, del percorso di qualifica e di un ambiente di test ufficiale.

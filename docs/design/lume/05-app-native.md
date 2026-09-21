@@ -7,11 +7,11 @@ read_when:
 
 # Lume nelle app native
 
-Lume nasce multipiattaforma per costruzione, ma la delivery corrente e Apple-first e macOS-first. Questo documento traduce la lingua per le app: l'app Apple accoppiata, la grammatica compatta iPhone e, solo come nota prospettica, i client tri-OS futuri. Il contratto operativo macOS e in [06-macos-apple-contract.md](./06-macos-apple-contract.md). Feature parity e delivery Windows/Linux restano fuori da questo filone.
+La lingua di Lume è pensata per più piattaforme, ma il percorso di realizzazione parte da Apple e, in particolare, da macOS. Questa pagina distingue quindi la traduzione per il client Apple accoppiato, la grammatica compatta iPhone e le sole indicazioni prospettiche per i futuri client tri-OS. Il riferimento operativo per macOS è [06-macos-apple-contract.md](./06-macos-apple-contract.md); la parità funzionale e la distribuzione Windows/Linux restano fuori da questo filone.
 
 ## 1. Apple: mappa dei concetti
 
-> Riconciliato con [07-gesto-e-movimento.md](./07-gesto-e-movimento.md) il 2026-07-14: il tratteggio come stato e il filo come marcatore di fuoco sono superati.
+> Il raccordo con [07-gesto-e-movimento.md](./07-gesto-e-movimento.md), effettuato il 2026-07-14, supera il tratteggio come indicazione di stato e il filo come marcatore del fuoco.
 
 | Concetto Lume | SwiftUI |
 | --- | --- |
@@ -28,7 +28,7 @@ Lume nasce multipiattaforma per costruzione, ma la delivery corrente e Apple-fir
 
 ## 2. Apple: da VetroClinico.swift a LumeKit
 
-`VetroClinico.swift` evolve in `Lume.swift` (LumeKit), la libreria di primitive della lingua (regola "primitive prima dei dashboard", [04-perlustrazione.md](./04-perlustrazione.md)):
+Perché le viste possano condividere elementi componibili anziché replicare schermate, `VetroClinico.swift` evolve in `Lume.swift` (LumeKit), secondo la regola «primitive prima dei dashboard» di [04-perlustrazione.md](./04-perlustrazione.md):
 
 | Oggi | Domani | Nota |
 | --- | --- | --- |
@@ -43,24 +43,24 @@ Lume nasce multipiattaforma per costruzione, ma la delivery corrente e Apple-fir
 | (nuovo) | `CodaAttenzione` | Voce con perché/owner/scadenza, due binari (clinico/amministrativo) resi con tono, mai con lo stesso colore |
 | (nuovo) | `PannelloLaterale` | `.inspector()` su macOS/iPad per il drill-down senza perdere il punto (densità a strati) |
 
-Il commit semantics sul nativo segue l'inchiostro: una bozza (voce diario proposta, prescrizione in preparazione) usa `ink-muted` con una micro-etichetta onesta; un'azione esplicita "Firma" la consolida e l'inchiostro asciuga a contrasto pieno, come definito in [07-gesto-e-movimento.md](./07-gesto-e-movimento.md) par. 3. `confirmationDialog` con ruolo `.destructive` resta per le distruttive; un inserimento errato si marca, non si cancella (pattern Canvas, coerente con l'audit locale).
+Sul nativo, il consolidamento del contenuto segue la resa dell'inchiostro. Una voce di diario proposta o una prescrizione in preparazione rimangono bozze in `ink-muted`, accompagnate da una micro-etichetta esplicita; soltanto l'azione "Firma" le consolida e porta l'inchiostro a contrasto pieno, come definito nel par. 3 di [07-gesto-e-movimento.md](./07-gesto-e-movimento.md). Per le azioni distruttive resta `confirmationDialog` con ruolo `.destructive`, mentre un inserimento errato deve essere marcato, non cancellato: il pattern Canvas rimane così coerente con l'audit locale.
 
-La palette nativa è code-first nel package condiviso, senza asset catalog. I valori restano nella sorgente unica `tokens/lume.tokens.json`; i test XCTest risolvono quel file da `#filePath`, confrontano ogni token e attraversano ogni combinazione registro x `LumeTone`. Qualunque drift o nuovo tono senza mapping fallisce in modo chiuso e ne elenca il token atteso.
+La palette nativa viene definita in codice nel package condiviso, senza asset catalog, ma i valori di riferimento restano in `tokens/lume.tokens.json`. I test XCTest risolvono quel file da `#filePath`, confrontano ciascun token e attraversano tutte le combinazioni registro x `LumeTone`. Qualsiasi divergenza o tono nuovo privo di mapping determina un fallimento chiuso, con indicazione del token atteso.
 
 ## 3. La grammatica compatta (iPhone)
 
-Sulla fascia compatta il modello focale si semplifica, non si spegne:
+Lo spazio compatto richiede di semplificare il modello focale, non di rinunciarvi:
 
-- **Il fuoco è lo schermo corrente**: la penombra è lo stack di navigazione alle spalle; niente tre zone simultanee su 390pt.
-- **La coda dell'attenzione è la home**: la tab primaria del client accoppiato mostra la coda con i due binari come filtri; ogni voce porta perché e scadenza; le azioni delegabili sono swipe actions.
-- **La testata si comprime a barra** (nome e anno) e resta appuntata sopra il contenuto paziente; il tap la espande. Il glifo allergie compare solo se il modello espone il dato. Il modello paired corrente non lo espone, quindi la UI non lo inventa.
-- **Il Registro non si negozia**: le cifre tabellari servono proprio dove lo spazio è poco.
-- **Registro guardia**: sul telefono è il caso d'uso principe (reperibilità notturna); segue il dark di sistema con i token notte.
-- I target restano 44pt; la densità densa non esiste in compact.
+- **Il fuoco coincide con lo schermo corrente**; la penombra è nello stack di navigazione precedente, perché su 390pt non devono convivere tre zone simultanee.
+- **La coda dell'attenzione costituisce la home**: la tab primaria del client accoppiato presenta i due binari come filtri, espone motivo e scadenza di ogni voce e offre swipe actions per le azioni delegabili.
+- **La testata si comprime in una barra** con nome e anno, fissata sopra il contenuto paziente ed espandibile al tap. Il glifo allergie compare soltanto quando il modello esponga quel dato: il modello paired descritto non lo espone, quindi la UI non lo inventa.
+- **Il Registro rimane obbligatorio**, perché le cifre tabellari sono necessarie anche nello spazio ridotto.
+- **Il registro guardia** segue il dark di sistema con i token notte, in particolare per la reperibilità notturna.
+- I target restano 44pt; in compact non è ammessa la densità densa.
 
 ## 4. Tri-OS prospettico: Windows e Linux sotto Lume
 
-Questa sezione conserva una direzione e non apre una lane. Le guide di Vetro Clinico ([../vetro-clinico/07-piattaforme/windows.md](../vetro-clinico/07-piattaforme/windows.md), [linux.md](../vetro-clinico/07-piattaforme/linux.md)) restano note prospettiche; le tabelle seguenti non sono un piano di implementazione attivo:
+Le indicazioni per Windows e Linux conservano una direzione, senza autorizzare l'apertura di una lane. Anche le guide di Vetro Clinico ([../vetro-clinico/07-piattaforme/windows.md](../vetro-clinico/07-piattaforme/windows.md), [linux.md](../vetro-clinico/07-piattaforme/linux.md)) rimangono prospettiche: la tabella non costituisce un piano di implementazione attivo.
 
 | Concetto Lume | Windows (Fluent/WinUI) | Linux (GNOME/libadwaita) |
 | --- | --- | --- |
@@ -73,21 +73,21 @@ Questa sezione conserva una direzione e non apre una lane. Le guide di Vetro Cli
 | Overlay | Acrylic (suo dominio naturale) | Dialoghi piatti di sistema |
 | Segnali clinici | Token Lume invariati (mai l'accent utente sui significati clinici) | Idem |
 
-Il punto strategico: **Lume elimina il problema del degrado**. Con Vetro Clinico, Linux richiedeva una variante "piatta" e Windows una traduzione dei materiali; con Lume la lingua è già opaca e fondata su luce, filo e tipografia, che esistono identiche su tutti e tre gli OS. Nello scenario shell nativa + canvas web (pattern già descritto nelle guide tri-OS), il canvas Lume è lo stesso ovunque e solo il telaio cambia idioma.
+La scelta di superfici opache riduce il problema che Vetro Clinico poneva nel passaggio fra piattaforme: Linux richiedeva una variante piatta e Windows una traduzione dei materiali. Luce, filo e tipografia possono invece conservare la stessa funzione in Lume sui tre OS. Nello scenario già descritto dalle guide tri-OS, con shell nativa e canvas web, il canvas rimarrebbe comune e sarebbe il telaio a usare l'idioma della piattaforma.
 
 ## 5. Verifica nativa
 
-- Build + esercizio reale su simulatore iOS e run macOS (Xcode-beta via `DEVELOPER_DIR`, `docs/native-testing.md`).
-- Snapshot dei tre registri (giorno/grafite/guardia) sulle primitive LumeKit.
-- VoiceOver sui flussi principali; Dynamic Type AX5; Reduce Transparency (overlay) e Reduce Motion (crossfade e filo).
-- Parità dei contratti: le primitive LumeKit dovranno preservare gli `accessibilityIdentifier` già usati dai test UI iOS e dai probe macOS. Un target XCUITest macOS dedicato non esiste ancora e resta un gate separato.
+- Eseguire build ed esercizio reale su simulatore iOS e macOS, con Xcode-beta tramite `DEVELOPER_DIR` e riferimento a `docs/native-testing.md`.
+- Acquisire snapshot delle primitive LumeKit nei registri giorno/grafite/guardia.
+- Esercitare VoiceOver sui flussi principali, Dynamic Type AX5, Reduce Transparency sugli overlay e Reduce Motion su crossfade e filo.
+- Conservare nelle primitive LumeKit gli `accessibilityIdentifier` già usati dai test UI iOS e dai probe macOS. Il target XCUITest macOS dedicato, ancora assente nel quadro descritto, rimane un gate distinto.
 
 ## 6. Sequenza nativa
 
-Stato al 2026-07-15: oltre alla thin slice delle card cliniche opache, la Wave N2 consegna `LumePalette`, `LumeSurface`, `LumeCard`, `Filo`, `RigaLista`, `.registro()`, `.lumeInchiostro(bozza:)` e `lumeGlass`, con alias di compatibilità Vetro. Il branch `feat/lume-apple` consegna anche lo spacchettamento del workspace e l'adozione L2-L4 su worklist, Scheda, diario e impostazioni del client accoppiato. Coda dell'attenzione, trigger contestuale della guardia, parity completa e un target XCUITest macOS dedicato restano aperti.
+Lo stato del 2026-07-15 distingue quanto consegnato dalle parti ancora aperte. Alla thin slice delle card cliniche opache, Wave N2 aggiunge `LumePalette`, `LumeSurface`, `LumeCard`, `Filo`, `RigaLista`, `.registro()`, `.lumeInchiostro(bozza:)` e `lumeGlass`, mantenendo alias Vetro di compatibilità. Sul branch `feat/lume-apple` sono inoltre presenti lo spacchettamento del workspace e l'adozione L2-L4 in worklist, Scheda, diario e impostazioni del client accoppiato. Rimangono aperti coda dell'attenzione, trigger contestuale della guardia, parità completa e target XCUITest macOS dedicato.
 
-1. Con DS-2 (prerequisito): spacchettamento workspace e guardie di accessibilita consegnati sul branch nativo; struttura desktop completa ancora aperta.
-2. L1 nativa: `LumePalette` code-first con i tre registri e test di parità fail-closed. Consegnata in Wave N2.
-3. L2-L3 nativa: primitive e adozione su worklist, Scheda, diario e impostazioni consegnate sul branch nativo. La timeline usa una sola spina continua dietro le voci.
-4. L4 nativa: `.registro()` adottato sui valori, codici, date e contatori toccati dalla tranche; etichette e copy restano nella Voce. Il completamento sulle altre superfici resta progressivo.
-5. L5-L6: coda dell'attenzione come home compatta e trigger contestuale della guardia restano debito; tri-OS resta fermo finche una lane separata non viene autorizzata.
+1. Con DS-2 come prerequisito, il branch nativo consegna lo spacchettamento del workspace e le guardie di accessibilità, non ancora l'intera struttura desktop.
+2. L1 nativa: Wave N2 consegna `LumePalette` definita in codice, con i tre registri e test di parità fail-closed.
+3. L2-L3 nativa: il branch nativo consegna primitive e adozione su worklist, Scheda, diario e impostazioni; la timeline mantiene una sola spina continua dietro le voci.
+4. L4 nativa: `.registro()` viene applicato a valori, codici, date e contatori toccati dalla tranche. Etichette e testi restano nella Voce, mentre l'adozione sulle altre superfici procede separatamente.
+5. L5-L6: rimangono da realizzare la coda dell'attenzione come home compatta e il trigger contestuale della guardia. Il tri-OS resta fermo finché non sia autorizzata una lane separata.

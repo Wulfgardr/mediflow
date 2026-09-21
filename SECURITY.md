@@ -1,16 +1,22 @@
-# Security Policy: MediFlow
+<a id="security-policy-mediflow"></a>
 
-MediFlow processa **dati sanitari**. Sicurezza e privacy sono requisiti core.
+# Politica di sicurezza di MediFlow
 
-Questo documento definisce confini di sicurezza e aspettative minime per chi contribuisce.
+MediFlow tratta **dati sanitari**: la possibilità di lavorare in locale serve a
+mantenerne il controllo, ma non elimina i rischi legati all’accesso, alla
+conservazione o all’uso delle informazioni. Sicurezza e privacy orientano quindi
+le scelte del progetto, non sono funzioni da aggiungere a valle.
+
+Questo documento stabilisce quali confini non debbano essere superati e quali
+requisiti minimi debba rispettare chi contribuisce.
 
 ---
 
 ## 📚 Riferimenti correlati
 
 - [ARCHITECTURE.md](./ARCHITECTURE.md) (confini architetturali stabili)
-- [docs/STATE_OF_THE_SYSTEM.md](./docs/STATE_OF_THE_SYSTEM.md) (stato corrente completo e boundary operativi)
-- [docs/topologia-dati-flussi.md](./docs/topologia-dati-flussi.md) (percorsi dato e trust boundaries)
+- [docs/STATE_OF_THE_SYSTEM.md](./docs/STATE_OF_THE_SYSTEM.md) (stato del sistema e limiti operativi, con le rispettive date)
+- [docs/topologia-dati-flussi.md](./docs/topologia-dati-flussi.md) (percorsi dei dati e confini di fiducia)
 - [docs/walkthrough.md](./docs/walkthrough.md) (flussi operativi end-to-end)
 - [docs/adr/](./docs/adr/README.md) (decisioni con impatto sicurezza)
 - [docs/README.md](./docs/README.md) e [docs/markdown-index.md](./docs/markdown-index.md) (mappa e indice completo documentazione)
@@ -19,28 +25,34 @@ Questo documento definisce confini di sicurezza e aspettative minime per chi con
 
 ## 🔒 Principi di sicurezza fondamentali
 
-- **Local-first di default**: nessuna uscita cloud se non esplicitamente implementata e documentata.
-- **Cifratura a riposo prudente**: i campi clinici sensibili devono restare cifrati lato client; non presentare l'intero file SQLite come completamente zero-knowledge finché identificativi, metadati e backup non sono coperti dallo stesso perimetro documentato.
-- **Least privilege**: le API locali devono essere autenticate; il proxy deve essere allowlisted.
-- **No PHI/PII in repo**: mai committare dati reali di pazienti.
+Il punto di partenza è l’uso locale: nessuna uscita verso il cloud è ammessa se
+non sia stata implementata e documentata esplicitamente. Da questa scelta
+discendono quattro vincoli, che restano validi anche quando una funzione sia
+facoltativa o accessibile soltanto dalla macchina dell’operatore.
+
+- **Local-first di default**: i percorsi cloud non si attivano implicitamente.
+- **Cifratura a riposo**: i campi clinici sensibili devono restare cifrati lato client. Non presentare l’intero file SQLite come completamente zero-knowledge finché identificativi, metadati e backup non siano coperti dallo stesso perimetro documentato.
+- **Privilegio minimo**: le API locali devono essere autenticate e il proxy deve ammettere solo le destinazioni autorizzate.
+- **Nessun dato reale nella repository**: mai committare dati di pazienti, siano essi informazioni sanitarie o identificative (PHI/PII).
 
 ---
 
-## ⚠️ Threat model (alto livello)
+<a id="️-threat-model-alto-livello"></a>
+<a id="-threat-model-alto-livello"></a>
 
-Assumiamo che:
+## ⚠️ Minacce e limiti della protezione
 
-- Un attaccante possa ottenere il file SQLite (`medical.db`) tramite:
-  - furto del disco
-  - leak da backup
-  - accesso filesystem
-- Un attaccante possa leggere log, crash report o screenshot.
-- Il traffico localhost resti sensibile; per i client native evitare HTTP plain quando possibile.
+La protezione deve considerare non soltanto l’accesso dall’applicazione, ma anche
+ciò che potrebbe essere sottratto o letto al di fuori di essa. Assumiamo che un
+attaccante possa ottenere il file SQLite (`medical.db`) attraverso il furto del
+disco, una perdita di dati dai backup o l’accesso al filesystem; assumiamo inoltre
+che possa leggere log, crash report e screenshot.
 
-Non copriamo ancora:
-
-- host OS completamente compromesso (malware con keylogging + accesso memoria)
-- attacchi mirati su dispositivo fisico mentre app sbloccata
+Anche il traffico localhost resta sensibile: per i client nativi evitare HTTP
+in chiaro quando possibile. Non sono ancora coperti né un sistema operativo
+host completamente compromesso, per esempio da malware che registri i tasti e
+acceda alla memoria, né attacchi mirati al dispositivo fisico mentre
+l’applicazione è sbloccata.
 
 ---
 
@@ -48,11 +60,13 @@ Non copriamo ancora:
 
 ### Dati a riposo (SQLite)
 
-- Lo storage autorevole è un singolo file SQLite nella directory dati MediFlow.
-- I campi sensibili vengono cifrati **lato client** prima della scrittura.
-- Il claim pubblico corretto è "campi clinici sensibili cifrati lato client",
-  non "intero database illeggibile senza PIN", salvo ADR e verifica dedicata.
-- I valori cifrati usano il formato:
+Il dato autorevole risiede in un singolo file SQLite nella directory dati di
+MediFlow. Prima della scrittura, i campi sensibili vengono cifrati **lato
+client**: è questa la protezione che il progetto può dichiarare, non
+l’illeggibilità dell’intero database senza PIN. Una dichiarazione più ampia
+richiede un ADR e una verifica dedicata.
+
+I valori cifrati usano il formato:
 
 ```
 ENC:<iv_b64>:<cipher_b64>
@@ -60,29 +74,36 @@ ENC:<iv_b64>:<cipher_b64>
 
 ### Decifratura fallita e conservazione del ciphertext
 
-- Se un campo `ENC:` non si decifra (chiave assente, dato corrotto), la UI
-  mostra il placeholder `[LOCKED DATA]`.
-- Il placeholder è un artefatto di sola presentazione: non deve mai essere
-  persistito.
-- Il ciphertext originale viene conservato e riscritto invariato a ogni save:
-  un salvataggio successivo non deve mai sovrascrivere il dato clinico cifrato
-  con il placeholder o con una sua ri-cifratura.
+Se un campo `ENC:` non può essere decifrato, perché la chiave manca o il dato è
+corrotto, la UI mostra `[LOCKED DATA]`. Il segnaposto serve soltanto a rendere
+visibile il problema e non deve mai essere persistito.
 
-### Cancellazione paziente ed erasure
+Il testo cifrato originale, o ciphertext, viene conservato e riscritto invariato
+a ogni salvataggio. In questo modo un accesso senza chiave non diventa una
+perdita di dati: nessun salvataggio successivo deve sovrascrivere il dato
+clinico cifrato con il segnaposto, né con una sua nuova cifratura.
 
-- Il DELETE operativo di un paziente è un soft-delete reversibile (tombstone
-  version-guarded), non una cancellazione fisica.
-- L'erasure GDPR passa da una purge amministrata dedicata (dry-run + execute,
-  solo sessione admin web) con audit `patient.purged`; il restore esplicito
-  emette `patient.restored`.
-- I pazienti soft-deleted viaggiano nei backup: una richiesta di erasure deve
-  considerare anche gli artefatti già esportati, che la purge non raggiunge.
+<a id="cancellazione-paziente-ed-erasure"></a>
+
+### Cancellazione del paziente ed eliminazione dei dati
+
+Il DELETE operativo rende reversibile la rimozione del paziente: registra un
+contrassegno di cancellazione, o tombstone, controllando la versione, senza
+eliminare fisicamente i dati. L’erasure GDPR segue invece una procedura
+amministrata dedicata, con dry-run ed esecuzione, accessibile solo da una
+sessione admin web. Questa procedura registra `patient.purged`; il ripristino
+esplicito registra `patient.restored`.
+
+Poiché i pazienti rimossi logicamente restano nei backup, una richiesta di
+erasure deve comprendere anche gli artefatti già esportati. La purge non li
+raggiunge.
 
 ### Chiavi e PIN
 
-- Il PIN **non viene mai salvato**.
-- Una key-encryption key (KEK) viene derivata da PIN + salt.
-- La master key viene salvata cifrata e decifrata solo **in memoria** durante una sessione attiva.
+Il PIN **non viene mai salvato**. Da PIN e salt viene derivata la chiave che
+protegge la master key, chiamata key-encryption key (KEK). La master key è
+conservata cifrata e viene decifrata solo **in memoria**, durante una sessione
+attiva.
 
 > Se cambi il modello PIN / key derivation, devi scrivere prima un ADR.
 
@@ -90,13 +111,12 @@ ENC:<iv_b64>:<cipher_b64>
 
 ## 🔌 API locali
 
-MediFlow espone tre superfici API:
+Le API separano l’accesso della UI web da quello dei client nativi e dei
+dispositivi abbinati all’host. MediFlow espone tre superfici:
 
 - `/api/*` (web UI): protetta da sessione
 - `/api/v1/*` (client native): protetta da token, versionata
-- `/api/v1/network/*` (home-base opt-in): paired/read-only-first con write
-  limitati a profilo/status paziente, diario, terapie, checkup e osservazioni, protetta da
-  credenziale device + sessione operatore
+- `/api/v1/network/*` (home-base opt-in): richiede un dispositivo abbinato, o paired, e parte dalla sola lettura. Le scritture sono limitate a profilo/status paziente, diario, terapie, checkup e osservazioni; la protezione richiede credenziale del dispositivo e sessione dell’operatore
 
 Regole minime:
 - Mai esporre endpoint sensibili senza autenticazione.
@@ -106,26 +126,26 @@ Regole minime:
   admin web. In particolare audit, backup export/restore, backup scheduler,
   repair DB, purge e restore paziente e start/stop MLX non devono accettare
   solo il token locale.
-- Le eccezioni token-aware fuori da `/api/v1/*` restano superfici locali di
-  supporto/bootstrap, non privilegi admin generali: cataloghi locali,
-  settings/native bootstrap, proxy AI locale, health/redaction locali,
-  network overview e stato MLX read-only. Ogni nuova eccezione deve documentare
-  perche non richiede una sessione admin web.
+- Le eccezioni che riconoscono il token fuori da `/api/v1/*` servono soltanto al supporto e all’avvio locale: cataloghi locali, settings/native bootstrap, proxy AI locale, controlli locali di salute e oscuramento dei dati identificativi, panoramica di rete e stato MLX in sola lettura. Non conferiscono privilegi amministrativi generali. Ogni nuova eccezione deve documentare perché non richieda una sessione admin web.
 
 ### Trasporto
 
-- Web UI usa HTTP su localhost.
-- Client native usa proxy HTTPS locale (`:3443`) + certificate pinning (vedi [docs/local-api-tls.md](./docs/local-api-tls.md)).
+La UI web usa HTTP su localhost. Il client nativo usa invece il proxy HTTPS
+locale (`:3443`) e verifica il certificato atteso mediante certificate pinning
+(vedi [docs/local-api-tls.md](./docs/local-api-tls.md)).
 
-### Modalita network home-base
+<a id="modalita-network-home-base"></a>
 
-Quando il nodo passa a `network-home-base`:
+### Modalità network home-base
 
-- il default locale non cambia: la modalita rete resta un opt-in esplicito
-- disattivare la modalita non revoca i pairing salvati: ogni token paired
+Il passaggio a `network-home-base` rende disponibili percorsi di rete espliciti,
+non un accesso remoto generale. Restano valide le seguenti condizioni:
+
+- il funzionamento locale predefinito non cambia: la modalità di rete richiede una scelta esplicita
+- disattivare la modalità non revoca i pairing salvati: ogni token paired
   diventa inerte e le route del data plane rispondono
-  `403 NETWORK_MODE_DISABLED` finché la modalita non viene riattivata
-- `POST /api/v1/network/pairing-intents` e il bootstrap PHI-safe del device
+  `403 NETWORK_MODE_DISABLED` finché la modalità non viene riattivata
+- `POST /api/v1/network/pairing-intents` è il percorso di avvio privo di PHI del dispositivo
   paired
 - il primo data plane remoto (`/api/v1/network/patients*`) richiede sempre
   device paired + sessione operatore
@@ -143,8 +163,7 @@ Quando il nodo passa a `network-home-base`:
 - `/api/v1/network/patients/{id}/observations*` richiede capability osservazioni
   dedicate, sessione operatore e `observations.version`; abilita solo
   create/update/soft-delete delle osservazioni LOINC/UCUM
-- delete remoto hard, attachment/document write remoti, cataloghi, sync
-  record-level, campi AI/documentali e fallback automatico restano fuori scope
+- restano esclusi cancellazione fisica remota, scritture remote di allegati/documenti, cataloghi, sincronizzazione per record, campi AI/documentali e ripieghi automatici su percorsi alternativi
 
 ### Lockout autenticazione PIN
 
@@ -159,30 +178,36 @@ La policy canonica è definita in [docs/adr/0017-auth-lockout-policy.md](./docs/
   - `423 AUTH_LOCKED` quando il lockout è attivo, con header `Retry-After`
 - Il bearer token `/api/v1` già bootstrapato non introduce una policy separata: il controllo avviene sul PIN condiviso prima dell'emissione della sessione web o dell'unlock native.
 
-### Integrita del processo per l'acquisizione auth web H1a
+<a id="integrita-del-processo-per-lacquisizione-auth-web-h1a"></a>
 
-[ADR 0105](./docs/adr/0105-web-auth-process-integrity-assumption.md) limita
-l'acquisizione privata H1a a un processo server trusted: input di richiesta e
-adapter non possono modificare prototype globali o eseguire monkeypatch nello
-stesso processo. Poison presente all'ingresso o introdotto da un callout
-sincrono osservato deve negare senza pubblicare sessione o projection owner.
+### Integrità del processo di autenticazione web H1a
 
-Resta un rischio di disponibilita: una mutazione persistente e concorrente di
-`Object.prototype.then` durante il settlement della Promise nativa di
-`cookies()` puo negare l'acquisizione. Non deve produrre un contesto autenticato,
-authority recuperabile o lavoro post-denial. Il rischio va riprovato sul tree
-integrato H1b e nell'audit di sicurezza dell'exact release candidate.
+L’acquisizione privata H1a descritta in
+[ADR 0105](./docs/adr/0105-web-auth-process-integrity-assumption.md) presuppone un
+processo server fidato: né gli input della richiesta né gli adapter possono
+modificare i prototype globali o alterare a runtime il codice dello stesso
+processo. Se una contaminazione è già presente all’ingresso, o compare durante
+una chiamata sincrona osservata, l’acquisizione deve essere negata senza
+pubblicare la sessione né il titolare della proiezione, il projection owner.
 
-Questa assunzione non copre host compromesso, dipendenze malevole o plugin
-in-process non fidati e non dimostra la catena auth completa o la sicurezza
-generale del prodotto.
+Resta un rischio per la disponibilità. Una mutazione persistente e concorrente
+di `Object.prototype.then`, durante la risoluzione della Promise nativa di
+`cookies()`, può impedire l’acquisizione; non deve però produrre un contesto
+autenticato, un’autorità recuperabile o lavoro successivo al diniego. Il rischio
+va riprovato sul tree integrato H1b e nell’audit di sicurezza dell’esatto
+candidato di release.
+
+L’assunzione non copre un host compromesso, dipendenze malevole o plugin non
+fidati eseguiti nello stesso processo. Non dimostra né l’intera catena di
+autenticazione né la sicurezza generale del prodotto.
 
 ---
 
 ## 🧱 Proxy verso servizi locali (sicurezza SSRF)
 
-Alcuni endpoint inoltrano richieste a servizi locali (es. Ollama).
-Regole minime:
+Alcuni endpoint inoltrano richieste a servizi locali, per esempio Ollama. Perché
+questa funzione non diventi un accesso a destinazioni arbitrarie, il proxy deve
+rispettare tre regole minime:
 
 - Permettere solo target **localhost / 127.0.0.1**.
 - Permettere solo porte previste.
@@ -190,45 +215,48 @@ Regole minime:
 
 ## 🤖 Fabric locale e import clinico guidato
 
-I quattro smart path 0.8.5 sono Patient Insight, Smart Import, Document
-Synthesis e Treatment Reasoning. Quando leggono note paziente, diario clinico o
-documenti analizzati, devono rispettare queste regole aggiuntive:
+MediFlow deve poter essere usato anche senza AI. La Fabric organizza le funzioni
+intelligenti facoltative e i relativi controlli; non trasferisce al modello la
+responsabilità di modificare la cartella. I quattro percorsi della 0.8.5 sono
+Patient Insight, Smart Import, Document Synthesis e Treatment Reasoning. Quando
+leggono note del paziente, diario clinico o documenti analizzati, devono
+rispettare anche queste regole:
 
-- usare solo provider risolti dal production root host-owned; i provider
-  remoti richiedono lifecycle attivo e opt-in esplicito
+- usare solo provider risolti dal punto di composizione di produzione sotto il controllo dell’host, il production root; i provider remoti richiedono un ciclo di vita attivo e una scelta esplicita
 - trattare l'output del modello come **non fidato** finché un operatore non lo conferma
 - non eseguire import silenziosi da testo libero verso diagnosi o terapie
 - mantenere review esplicita prima di scrivere nuovi dati strutturati in scheda
 - trattare `summarySnapshot` e `parseEvidenceArtifactSnapshot` degli allegati
   come artifact clinici locali, non come payload innocui di debug
-- esporre receipt, provenienza e currentness senza prompt, output grezzo,
-  credenziali o testo clinico
+- rendere visibili ricevuta di esecuzione, provenienza e validità rispetto alle fonti correnti, senza esporre prompt, output grezzo, credenziali o testo clinico
 - rifiutare provider, modello, endpoint, venue, prompt, fallback o apply forniti
   dal caller
 
-Le diagnosi estratte da documenti restano review-only, anche quando il codice
-ICD e esplicito. Il payload automatico della sintesi non include
-`patients.diagnoses` (vedi ADR 0084).
+Anche quando un documento riporti un codice ICD esplicito, la diagnosi estratta
+resta una proposta da rivedere. Per questo il payload automatico della sintesi
+non include `patients.diagnoses` (vedi ADR 0084).
 
-Quando configurati, Ollama serve Patient Insight, Smart Import e Document
-Synthesis e ATHENA su MLX serve soltanto Treatment Reasoning. I due lifecycle
-sono host-owned e separati: stato, revoca, grant o fallback di un provider non
-valgono per l'altro. OpenAI e Anthropic restano `default OFF` e non sono
-fallback.
+Quando siano configurati, Ollama serve Patient Insight, Smart Import e Document
+Synthesis, mentre ATHENA su MLX serve soltanto Treatment Reasoning. L’host governa
+separatamente i due cicli di vita: stato, revoca, autorizzazioni o percorsi
+alternativi di un provider non valgono per l’altro. Gli adapter OpenAI e
+Anthropic restano `default OFF` e non intervengono come ripiego automatico.
 
-ATHENA richiede runner e artifact del modello locali. L'override host-owned
-`MEDIFLOW_ATHENA_MLX_GENERATE_BIN` accetta soltanto un percorso assoluto a
-`mlx_lm.generate`, senza argomenti, shell o risoluzione di pacchetti. Il
-launcher `uvx` predefinito forza la modalità offline e fallisce chiuso se la
-cache richiesta non è disponibile. La presenza del runner non è una prova di
-readiness universale.
+ATHENA richiede che runner e artefatto del modello siano locali. L’impostazione
+controllata dall’host `MEDIFLOW_ATHENA_MLX_GENERATE_BIN` accetta soltanto un
+percorso assoluto a `mlx_lm.generate`, senza argomenti, shell o risoluzione di
+pacchetti. Il launcher `uvx` predefinito forza la modalità offline: se la cache
+necessaria manca, interrompe l’operazione invece di cercare un’alternativa.
+Avere il runner non dimostra quindi che ATHENA sia pronta in ogni ambiente.
 
-AnyDoc resta il primo passaggio automatico locale degli allegati. Gira in un
-processo figlio bounded senza rete. Per i PDF supportati, il tree classifica e
-materializza le sole pagine `needsOcr`, le renderizza e usa Apple Vision locale
-con rete negata. La ricomposizione conserva ordine, provenienza e hash e
-pubblica il risultato soltanto se la sorgente è ancora corrente. Errori,
-formati ambigui, documenti cifrati e motore indisponibile falliscono chiusi.
+AnyDoc è il primo passaggio automatico locale degli allegati e lavora in un
+processo figlio con limiti di esecuzione e senza rete. Per i PDF supportati,
+vengono classificate e materializzate soltanto le pagine `needsOcr`, poi
+renderizzate e trattate da Apple Vision in locale, con rete negata. Il risultato
+viene ricomposto conservando ordine, provenienza e hash e pubblicato soltanto
+se la sorgente è ancora corrente. In presenza di errori, formati ambigui,
+documenti cifrati o motore indisponibile, il percorso si arresta senza aggirare
+i controlli.
 
 DeepSeek-OCR 2/CUDA, benchmark di qualifica e readiness universale hanno stato
 `OUT_OF_SCOPE_FOR_0.8.5_NON_BLOCKING`. Le route OCR legacy, dopo
@@ -236,108 +264,124 @@ l'autenticazione, rispondono `410`.
 
 ### Application Services e Headless
 
-Le route sottili e gli adapter Fabric/Headless del perimetro 0.8.5 non accedono
-direttamente al database. I relativi production root e Application Services
-host-owned risolvono currentness, authority, conflitti, transazioni e audit.
-Alcune route Web storiche importano ancora `dbServer` e non ereditano questo
-claim per analogia. Una receipt Fabric descrive un'esecuzione e non è un grant.
+Gli adapter Fabric/Headless e le route sottili del perimetro 0.8.5 non accedono
+direttamente al database: passano dai production root e dagli Application
+Services controllati dall’host. È qui che si verificano validità del contesto e
+autorizzazioni e si governano conflitti, transazioni e audit. Alcune route web
+storiche importano ancora `dbServer`: la separazione descritta non va estesa a
+esse per analogia. Anche la ricevuta Fabric ha un limite preciso: documenta
+un’esecuzione, ma non concede un’autorizzazione.
 
-Il Supervisor Node production locale avvia Web standalone e MCP come processi
-figli distinti e autenticati su IPC privato ereditato. Il Supervisor possiede
-contesto, purpose, scope, lease, revoca e audit. MCP `stdio` e Mini espongono
-soltanto catalogo, ricerca terminologica locale, lettura delle Open Loops del
-paziente selezionato, proposta follow-up `proposal_only` e query semantica
-bounded read-only. Nessun adapter importa il database, accetta authority dal
-caller o apre un listener proprio. Il candidato non autorizza sessioni
-agentiche generali e non dichiara installer, onboarding o compatibilità con
-host MCP esterni.
+Il Supervisor Node locale di produzione avvia Web standalone e MCP in processi
+figli distinti, autenticati attraverso il canale IPC privato ereditato. Governa
+contesto, finalità, ambito, durata dell’autorizzazione, revoca e audit. MCP
+`stdio` e Mini espongono soltanto catalogo, ricerca terminologica locale,
+lettura delle Open Loops del paziente selezionato, proposta di follow-up
+`proposal_only` e interrogazione semantica limitata alla sola lettura.
 
-F10 espone via MCP soltanto la preview `pending -> completed|cancelled`. La UI
-Web trusted rilegge la risorsa e richiede ruolo medico attivo, step-up e gesto
-operation-specific prima del commit con CAS, idempotenza, audit e receipt
-atomici. Proof e commit non attraversano MCP. Replay, revoca, logout o cambio
-selezione negano l'operazione.
+Gli agenti usano dunque comandi MediFlow mediati: nessun adapter importa il
+database, accetta autorità dal chiamante o apre un proprio listener. Il
+candidato non autorizza sessioni agentiche generali e non dichiara installer,
+onboarding o compatibilità con host MCP esterni.
 
-Il planner semantico è collegato al Supervisor e resta read-only. Accetta al
-massimo due operazioni allowlisted e closed-world su terminology search e Open
-Loops patient-scoped. Non produce SQL libero, non importa il database e non
-supera purpose, scope, budget o currentness host-owned.
+F10 espone via MCP soltanto l’anteprima `pending -> completed|cancelled`. Prima
+di confermare la scrittura, la UI web fidata rilegge la risorsa e richiede ruolo
+medico attivo, verifica aggiuntiva dell’identità e gesto riferito a quella
+specifica operazione. Il commit mantiene CAS, idempotenza, audit e ricevuta
+atomici. Né la prova autorizzativa né il commit attraversano MCP; replay,
+revoca, logout o cambio di selezione negano l’operazione.
 
-Su macOS 26 o successivo, il recording usa API Apple on-device con consenso e
-permessi espliciti. L'audio resta bounded solo in RAM e il transcript passa al
-draft soltanto dopo review. Non esiste un writer clinico automatico; smoke con
-microfono reale e validazione clinica restano fuori dal claim del candidato.
+Il planner semantico, collegato al Supervisor, resta in sola lettura. Può
+eseguire al massimo due operazioni scelte da un insieme chiuso e autorizzato:
+ricerca terminologica e Open Loops del paziente in contesto. Non produce SQL
+libero, non importa il database e non supera finalità, ambito, budget o validità
+del contesto stabiliti dall’host.
 
-Esistono due modalità architetturali distinte. Nel modello
-provider-in-MediFlow, il Fabric governa un provider per una capability
-applicativa. Nel modello MediFlow-in-intelligent-host, MCP/Mini raggiungono
-Application Services governati tramite RPC AIP ereditato. Questa seconda
-modalità resta candidata: non autorizza installer, onboarding, sessioni
-agentiche generali, listener o accesso diretto a SQLite.
+Su macOS 26 o successivo, la registrazione usa API Apple sul dispositivo, con
+consenso e permessi espliciti. L’audio resta entro limiti definiti e soltanto in
+RAM; la trascrizione entra nella bozza solo dopo la revisione. Non esiste una
+scrittura clinica automatica. Le verifiche con microfono reale e la validazione
+clinica restano fuori da quanto attestato dal candidato.
+
+Questa distinzione chiarisce anche i due modelli architetturali. In
+provider-in-MediFlow, la Fabric governa un provider al servizio di una funzione
+applicativa; in MediFlow-in-intelligent-host, MCP/Mini raggiungono gli
+Application Services governati attraverso RPC AIP ereditato. Il secondo modello
+resta candidato e non autorizza installer, onboarding, sessioni agentiche
+generali, listener o accesso diretto a SQLite.
 
 ### Modello provider F7
 
-Il modello provider v2 separa provider type, istanza, autenticazione, modello,
-capability, gruppi, binding e function allowlist. Le classi di credenziale
-restano distinte: `local_model`, `api_key`, `provider_oauth` ufficiale e
-`host_subscription`. Nessuna classe implica un'altra.
+Scegliere un provider non significa avergli già assegnato un modello, una
+credenziale e il permesso di svolgere ogni funzione. Il modello provider v2
+separa perciò tipo di provider, istanza, autenticazione, modello, capacità,
+gruppi, associazioni e insieme delle funzioni ammesse. Anche le classi di
+credenziale restano distinte: `local_model`, `api_key`, `provider_oauth`
+ufficiale e `host_subscription`. Nessuna implica le altre.
 
-Un login consumer o un abbonamento non è una credenziale di inferenza. Un
-flusso `provider_oauth` deve essere ufficiale, documentato dal provider e
-separato dalle sessioni consumer; non sono ammessi token estratti, OAuth
-privati o protocolli ricostruiti. Gli adapter HTTPS ufficiali e la probe
-amministrativa Document Synthesis review-only sono integrati. La route è
-admin-only, richiede l'intento esatto `run_synthetic_nonclinical_probe` e resta
-`default OFF`. Ogni uso richiede secret reference, lifecycle attivo e policy
-egress/retention host-owned. I test usano transport fake: nessuna credenziale o
-rete live è provata dal candidato.
+Un login consumer o un abbonamento non è, da solo, una credenziale di inferenza.
+Un flusso `provider_oauth` deve essere ufficiale, documentato dal provider e
+separato dalle sessioni consumer: token estratti, OAuth privati e protocolli
+ricostruiti non sono ammessi.
 
-### Readiness dei provider locali
+Sono integrati gli adapter HTTPS ufficiali e la prova amministrativa Document
+Synthesis, il cui risultato resta da rivedere. La route è riservata agli admin,
+richiede l’intento esatto `run_synthetic_nonclinical_probe` e resta
+`default OFF`. Ogni uso richiede un riferimento al segreto, un ciclo di vita
+attivo e regole di uscita e conservazione dei dati governate dall’host. I test
+simulano il trasporto: il candidato non prova credenziali né connessioni reali.
+
+<a id="readiness-dei-provider-locali"></a>
+
+### Disponibilità e verifica dei provider locali
 
 [ADR 0092](./docs/adr/0092-limite-digest-bound-readiness-ai-locale.md) definisce
 l'annotazione `available_unqualified` per i percorsi Ollama correnti.
 
-L'annotazione riguarda readiness ed evidenza. Non è uno stato operativo e non
-sostituisce `runtime`.
+L’annotazione descrive ciò che si sa sulla disponibilità e sulle relative
+prove; non è uno stato operativo e non sostituisce `runtime`. Il fatto che un
+modello sia locale, abbia un nome o presenti un determinato digest non dimostra
+che sappia svolgere una funzione. Il confronto del digest prima e dopo
+l’inferenza rileva alcune variazioni, ma non impedisce una sostituzione ABA,
+con ritorno al modello iniziale durante l’esecuzione.
 
-La località, il nome del modello e il digest non dimostrano una capability.
-
-Il digest pre/post è detection best-effort. Non impedisce lo swap ABA del
-modello durante l'inferenza.
-
-Nessuna receipt o dichiarazione di tipo autorizza un consumer. La qualified
-readiness resta bloccata. La lane ATHENA mantiene attestazione, kill switch e
-lifecycle propri; il runtime MLX generico di amministrazione e benchmark non è
-una prova di readiness ATHENA.
+Né una ricevuta né una dichiarazione di tipo autorizzano un componente
+consumatore. La qualificazione della disponibilità resta bloccata. ATHENA
+mantiene attestazione, interruttore di arresto e ciclo di vita propri: il
+runtime MLX generico usato per amministrazione e benchmark non ne prova la
+disponibilità qualificata.
 
 `clinical_application` e `engineering_operator` non condividono grant.
 
-Nello stato corrente, iPhone e iPad usano l'host paired e non invocano
-provider direttamente. Questo stato non vieta capability Apple on-device
-definite da un ADR successivo.
+Nello stato documentato, iPhone e iPad usano l’host abbinato e non invocano
+direttamente i provider. Un ADR successivo potrà definire capacità Apple sul
+dispositivo: la descrizione attuale non le vieta.
 
-Un endpoint loopback non dimostra `egress=none`. Un gate local-only futuro deve
-verificare modello locale, cloud disabilitato, strumenti, rete e processo.
-
-Le nuove API manterranno timeout e abort interni. Non accetteranno
-`AbortSignal` dal chiamante e scarteranno i completamenti tardivi.
+Allo stesso modo, un endpoint loopback non dimostra `egress=none`. Un futuro
+controllo di esecuzione esclusivamente locale deve verificare modello locale,
+cloud disabilitato, strumenti, rete e processo. Le nuove API manterranno timeout
+e annullamento interni, non accetteranno `AbortSignal` dal chiamante e
+scarteranno i completamenti tardivi.
 
 ADR 0092 non definisce il contratto Intelligence Fabric. ADR 0094 governa le
 capability 0.8.5, le venue, i production root e l'assenza di authority caller.
 
 > [!IMPORTANT]
-> I quattro flussi AI clinici sono dietro safety gate con kill-switch
-> (patient-insight, smart-import, document-synthesis e treatment-reasoning) e
-> model governance delle decisioni documentali. Restano AI locale
-> review-first: nessuna scrittura clinica autonoma.
+> I quattro flussi AI clinici (patient-insight, smart-import,
+> document-synthesis e treatment-reasoning) restano subordinati ai controlli
+> di sicurezza, all’interruttore di arresto e alla governance dei modelli per
+> le decisioni documentali. Nei percorsi AI locali la revisione viene prima
+> dell’uso: nessuna scrittura clinica autonoma.
 
 ## ⚠️ Provider remoti con opt-in obbligatorio
 
-OpenAI e Anthropic hanno adapter ufficiali e una probe amministrativa
-review-only. La route richiede sessione admin e intento esatto; provider ed
-egress restano OFF senza i due opt-in host. Quando è disabilitata, la factory
-non osserva credenziali. Il tree usa transport fake e non prova rete live,
-account, retention o idoneità a dati clinici; il default resta `local-first`.
+Gli adapter ufficiali OpenAI e Anthropic dispongono di una prova amministrativa
+con revisione del risultato. Per usarla servono sessione admin e intento
+esatto; provider e uscita dei dati restano OFF se l’host non abbia autorizzato
+esplicitamente entrambi. Quando è disabilitata, la factory non legge le
+credenziali. Il trasporto simulato dei test non prova connessioni reali,
+account, politiche di conservazione o idoneità al trattamento di dati clinici:
+il comportamento predefinito resta `local-first`.
 
 Regole minime:
 
@@ -349,20 +393,29 @@ Regole minime:
 
 ---
 
-## 🔒 Logging e redazione
+<a id="-logging-e-redazione"></a>
 
-I dati sanitari non devono trapelare dai log.
+## 🔒 Log e oscuramento dei dati identificativi
 
-La taxonomy audit canonica e definita in [docs/adr/0015-audit-taxonomy-minimum-catalog.md](./docs/adr/0015-audit-taxonomy-minimum-catalog.md).
+I log servono a capire che cosa sia accaduto, non a ricostruire il contenuto
+clinico: i dati sanitari non devono trapelare attraverso di essi. Gli
+identificativi vanno oscurati secondo il contesto d’uso.
 
-### Audit record vs log applicativi
+Il catalogo di riferimento per gli eventi di audit è definito in
+[docs/adr/0015-audit-taxonomy-minimum-catalog.md](./docs/adr/0015-audit-taxonomy-minimum-catalog.md).
 
-- Gli audit record sono strutturati, versionati e append-only.
-- I log applicativi restano piu poveri e devono limitarsi a dati tecnici
-  redatti.
-- Non usare log testuali liberi come sostituto del catalogo audit.
+<a id="audit-record-vs-log-applicativi"></a>
 
-### Non loggare
+### Distinzione tra audit e log applicativi
+
+Le registrazioni di audit sono strutturate, versionate e ammettono soltanto
+aggiunte, senza riscritture. I log applicativi devono contenere meno
+informazioni e limitarsi ai dati tecnici con identificativi oscurati. Un log
+testuale libero non deve sostituire il catalogo di audit.
+
+<a id="non-loggare"></a>
+
+### Dati da non registrare nei log
 - campi paziente decifrati
 - testo estratto dai documenti o contenuto OCR storico
 - testo note/diario usato nei prompt AI
@@ -370,13 +423,15 @@ La taxonomy audit canonica e definita in [docs/adr/0015-audit-taxonomy-minimum-c
 - allegati caricati (base64)
 - `summarySnapshot` o `parseEvidenceArtifactSnapshot` grezzi
 - token, PIN, chiavi o salt
-- prompt AI completi, risposte AI grezze e descrizioni cliniche non redatte
+- prompt AI completi, risposte AI grezze e descrizioni cliniche prive di oscuramento degli identificativi
 
-### Puoi loggare (preferibile)
+<a id="puoi-loggare-preferibile"></a>
+
+### Dati preferibili per i log
 - conteggi (es. numero record)
 - timing (latenza)
 - status code / classi di errore
-- identificatori redatti (es. prime 6 chars di un id)
+- identificatori oscurati (es. primi 6 caratteri di un id)
 - numeri di versione e flag booleane
 - nomi di superfici tecniche (`web`, `native`, `api`, `job`)
 
@@ -385,31 +440,30 @@ La taxonomy audit canonica e definita in [docs/adr/0015-audit-taxonomy-minimum-c
 Quando implementi o estendi il writer audit:
 
 - usa il catalogo `audit.v1` dell'ADR 0015
-- consenti solo `eventType`, `outcome`, `actorRef`, `subjectRef` redatto,
-  `sourceSurface`, timestamp e metadati strutturati
+- consenti solo `eventType`, `outcome`, `actorRef`, `subjectRef` con identificativi oscurati, `sourceSurface`, timestamp e metadati strutturati
 - mantieni fuori dal catalogo qualsiasi testo libero, payload clinico o
   informazione necessaria solo al rendering UI
-- se un valore puo identificare un paziente al di fuori del database locale,
-  redigilo o hashalo prima di loggare o esportare
+- se un valore può identificare un paziente al di fuori del database locale, oscuralo o calcolane l’hash prima di registrarlo nei log o esportarlo
 
-Se aggiungi log:
-- assumi che possano finire in crash report
-- mantienili minimi e azionabili
+Ogni nuovo log va scritto assumendo che possa finire in un crash report:
+deve contenere il minimo necessario per capire il problema e intervenire.
 
 ---
 
 ## 🔑 Gestione segreti
 
-- Non committare `.env` con valori reali.
-- Se introduci variabili ambiente:
-  - documentale nei file rilevanti (`docs/native-setup.md` o README/CONTRIBUTING)
-  - evita di richiedere segreti per l'uso locale di default
+Non committare `.env` con valori reali. Se introduci variabili d’ambiente,
+documentale nei file pertinenti (`docs/native-setup.md` o README/CONTRIBUTING)
+ed evita di richiedere segreti per l’uso locale predefinito.
 
 ---
 
-## 🧪 Dependency e security checks
+<a id="-dependency-e-security-checks"></a>
 
-Controlli consigliati prima di release o merge rilevanti:
+## 🧪 Controlli sulle dipendenze e sulla sicurezza
+
+Prima di una release o di un merge rilevante, si consigliano i seguenti
+controlli:
 
 ```bash
 npm run lint
@@ -427,15 +481,11 @@ Opzionali (se usati nella toolchain):
 
 ## ⚠️ Segnalazione vulnerabilità
 
-Se ritieni di aver trovato una vulnerabilità:
+Se ritieni di aver trovato una vulnerabilità, preferisci un canale riservato,
+come GitHub Security Advisories / Security tab, quando disponibile. Se non lo
+è, apri una issue **senza dettagli sensibili**: descrivi impatto e area
+coinvolta, fornisci i passi minimi per riprodurre il problema e non includere
+dati reali, token o payload decifrati.
 
-1. Preferisci un canale riservato (GitHub Security Advisories / Security tab), se disponibile.
-2. Se il canale riservato non è disponibile, apri una issue **senza dettagli sensibili**:
-   - descrivi impatto e area coinvolta
-   - fornisci passi minimi di riproduzione
-   - evita dati reali, token o payload decifrati
-
-Includi sempre:
-- versione/commit impattato
-- scenario d'attacco
-- comportamento atteso vs osservato
+La segnalazione deve sempre indicare versione o commit interessato, scenario
+d’attacco e differenza tra comportamento atteso e osservato.

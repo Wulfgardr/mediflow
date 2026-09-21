@@ -1,289 +1,188 @@
-# Kree8 → MediFlow visual translation
+<a id="kree8--mediflow-visual-translation"></a>
+
+# Da Kree8 a MediFlow: traduzione visiva
 
 | | |
 | --- | --- |
-| **Tracking** | WUL-271 (translation) · WUL-272 (live root) · WUL-273 (real-data slices) · WUL-274 (PIN continuity) |
-| **Status** | Live root entry on `/`; real-patient cockpit slices in progress under `WUL-273` |
-| **Review alias** | `/mockups/kree8` (synthetic data, design QA only) |
-| **Last visual pass** | 2026-06-11: meta-text purge, restrained semantic colour restoration, type/radius normalization, dark-token completion, one-click Scheda flow |
-| **Scope** | Full-surface visual reset promoted to the local web entrypoint as the new app interface direction; real clinical data wiring migrates in small verified slices |
-| **Attribution** | Kree8 is credited as the external visual inspiration and reference grammar; MediFlow keeps an original clinical implementation and product-specific interaction model. |
+| **Tracking** | WUL-271 (traduzione) · WUL-272 (ingresso live) · WUL-273 (slice con dati reali) · WUL-274 (continuità PIN) |
+| **Stato descritto** | Ingresso live su `/`; slice del cockpit su pazienti reali in corso in `WUL-273` |
+| **Alias di revisione** | `/mockups/kree8`, con dati sintetici, riservato alla QA di design |
+| **Ultimo passaggio visuale** | 2026-06-11: rimozione dei metatesti, ripristino misurato del colore semantico, normalizzazione di tipografia e raggi, completamento dei token dark, apertura della Scheda in un click |
+| **Perimetro** | Rinnovamento dell'intera superficie, promosso all'ingresso web locale come direzione dell'interfaccia; collegamento ai dati clinici reali per slice piccole e verificate |
+| **Attribuzione** | Kree8 è il riferimento esterno per ispirazione visiva e grammatica; l'implementazione clinica e il modello di interazione specifico di MediFlow rimangono originali. |
 
-## Why this doc exists
+<a id="why-this-doc-exists"></a>
 
-The supplied [Kree8](https://www.kree8.studio/) references redefine the whole
-visual line for MediFlow ("via il vecchio", per the brief on WUL-271). This is
-not an incremental Graphite refinement: it is a clean-room translation of
-Kree8's grammar onto a real clinical management surface.
+## Perché questa pagina
 
-Kree8 must remain credited wherever this visual direction is documented or
-presented externally. The attribution is stronger for the app/design system,
-where the visual grammar is a primary influence; for site/public copy it can be
-lighter, but should still acknowledge Kree8 as look-and-feel inspiration when
-the public page references the current MediFlow visual line.
+Il percorso WUL-271 nasceva dalla richiesta di sostituire la precedente linea visiva, non di rifinire incrementalmente Graphite: «via il vecchio», secondo il brief. Questa pagina documenta quindi la traduzione indipendente della grammatica dei riferimenti [Kree8](https://www.kree8.studio/) in una superficie reale di gestione clinica.
 
-The **v2 pass** sharpens the surface from "Kree8 with medical labels" into a
-"MediFlow-authored clinical cockpit": the area model now mirrors real MediFlow
-sections, the patient-list/inbox is first-class, the Quadro paziente is a
-composite, document review is review-first and surfaces blocked SISS writes,
-and Governance reads like the real settings page instead of a generic
-preferences panel.
+Kree8 deve rimanere accreditato ovunque questa direzione visiva sia documentata o presentata all'esterno. L'attribuzione deve essere più evidente nell'app e nel design system, nei quali la grammatica visiva è un'influenza primaria; sul sito e nei testi pubblici può essere più leggera, ma deve comunque riconoscerne l'ispirazione quando la pagina richiami questa linea di MediFlow.
 
-This page exists so reviewers can:
+Il **passaggio v2** porta il lavoro oltre l'applicazione di etichette mediche a Kree8: il cockpit viene organizzato secondo le sezioni reali di MediFlow, con lista/inbox pazienti autonoma e Quadro paziente composito. La revisione documentale richiede un controllo prima dell'applicazione e rende visibili le scritture SISS bloccate; Governance assume la struttura delle impostazioni effettive, anziché quella di un pannello generico di preferenze.
 
-- compare each Kree8 device against the chosen MediFlow analogue,
-- judge clinical fitness (density, scanability, status semantics),
-- track what was promoted to the root entry and what still needs a real-data
-  migration before the legacy Graphite surfaces can be fully retired.
+La pagina permette così a chi rivede il lavoro di:
 
-The follow-up migration tracker is
+- confrontare ciascun elemento Kree8 con l'analogo scelto per MediFlow;
+- valutarne l'adeguatezza al lavoro clinico in termini di densità, leggibilità a colpo d'occhio e significato degli stati;
+- distinguere ciò che è stato portato all'ingresso principale dalle parti che richiedono ancora una migrazione sui dati reali prima di ritirare del tutto le superfici Graphite.
 
-## Live entry contract
+Il seguito della migrazione sui dati reali è tracciato nelle slice WUL-273.
 
-| Concern | How it is enforced |
+<a id="live-entry-contract"></a>
+
+## Contratto dell’ingresso live
+
+| Aspetto | Come viene garantito |
 | --- | --- |
-| Root entry | `app/page.tsx` renders `Kree8ClinicalCockpit` in `live` mode, so `http://localhost:3000` shows the new line directly after `Start_MediFlow.command`. |
-| Runtime security retained | `RootRuntimeShell` treats `/` as a fullscreen live route: `SecurityProvider`, PIN/session, UI/accessibility/style/privacy providers remain active, but sidebar/mobile chrome and legacy main padding are not mounted around the cockpit. |
-| PIN gate continuity | `LockScreen` uses a scoped Kree8 lock module and remains the only mounted locked surface; it does not mount the cockpit or protected data providers behind the PIN gate. |
-| Review alias | `/mockups/kree8` still renders the same cockpit in `review` mode via the exact mockup allowlist and keeps the escape button for design QA. |
-| No persistent UI selector | No Graphite/Kree8 toggle, no preview profile, no persistent visual mode. This follows [ADR 0060](../adr/0060-kree8-cockpit-live-root-entry.md). |
-| Visual surface | `.shell` is `position: fixed; inset: 0; z-index: 1000;` so the cockpit owns the viewport. |
-| Reduced motion respected | A scoped `@media (prefers-reduced-motion: reduce)` block disables transitions and keyframe animations inside `.shell`. |
-| Data | `/` live reads real local patients and checkups only after PIN/session unlock; `/mockups/kree8` remains synthetic review data. No remote assets and no real patient screenshots in repo. |
-| Dependencies | No new npm packages. Existing `lucide-react` is used for iconography. |
+| Ingresso principale | `app/page.tsx` renderizza `Kree8ClinicalCockpit` in modalità `live`: dopo `Start_MediFlow.command`, `http://localhost:3000` presenta direttamente la nuova linea. |
+| Sicurezza del runtime | `RootRuntimeShell` tratta `/` come route live a pieno schermo: `SecurityProvider`, PIN/sessione e provider UI/accessibilità/stile/privacy restano attivi, mentre sidebar, chrome mobile e padding principale legacy non vengono montati attorno al cockpit. |
+| Continuità del gate PIN | `LockScreen` usa un modulo Kree8 circoscritto ed è l'unica superficie montata durante il blocco; né cockpit né provider di dati protetti vengono montati dietro il gate PIN. |
+| Alias di revisione | `/mockups/kree8` presenta lo stesso cockpit in modalità `review` attraverso l'allowlist esatta dei mockup e conserva il pulsante di uscita per la QA di design. |
+| Nessun selettore UI persistente | Non sono ammessi toggle Graphite/Kree8, profili di anteprima o modalità visive persistenti, secondo [ADR 0060](../adr/0060-kree8-cockpit-live-root-entry.md). |
+| Superficie visuale | `.shell` usa `position: fixed; inset: 0; z-index: 1000;`, assegnando il viewport al cockpit. |
+| Movimento ridotto | Il blocco circoscritto `@media (prefers-reduced-motion: reduce)` disabilita transizioni e animazioni keyframe dentro `.shell`. |
+| Dati | `/` live legge pazienti e checkup locali reali solo dopo lo sblocco PIN/sessione; `/mockups/kree8` mantiene dati sintetici di revisione. Sono vietati asset remoti e screenshot di pazienti reali nel repository. |
+| Dipendenze | Nessun nuovo pacchetto npm; per le icone si usa `lucide-react`, già presente. |
 
-## Token translation
+<a id="token-translation"></a>
 
-Tokens are declared **inside `.shell`** (scoped custom properties); nothing
-leaks into `:root` or other surfaces.
+## Traduzione dei token
 
-| Kree8 cue | MediFlow token | Notes |
+I token sono proprietà custom dichiarate **dentro `.shell`**: la loro applicazione rimane circoscritta, senza propagarsi a `:root` o alle altre superfici.
+
+| Riferimento Kree8 | Token MediFlow | Note |
 | --- | --- | --- |
-| Soft cool-gray canvas (~`#eef0f2`) | `--canvas` on `.shell` | Replaces beige Graphite (`#f6f0e7`) without polluting `:root`. |
-| True white canvas card | `--surface` | 28px radius, soft shadow + 1px inset border. |
-| Raised white nav pill | `.navSelected` | White fill, 13px radius, soft shadow, chevron affordance. |
-| Oversized rounded glass toolbar | `.toolbar` | 18px radius, inset highlight, inner search pill + chips. |
-| AI gradient capsule | `.aiButton` | Restrained ink → violet → plum gradient via `--accent-ai` (light and dark variants), sparkle icon, soft drop shadow. **Only AI entry point uses gradient.** |
-| Status pills (yellow/blue/green/coral/muted/violet/ink) | `--pill-*-bg` / `--pill-*-fg` | Tight 4×10 px padding, tabular text. Semantic hues are real but restrained (green/amber/blue/violet/coral) with matching dark-mode pairs; muted stays slate. |
-| Segmented toggle | `.segmented` + `.segItem`/`.segSelected` | Used for the AI / Source switch on the patient panel. |
-| Stepper minus/plus | `.stepper` + `.stepperBtn` | Disabled at the boundary; tabular number. |
-| Pricing-row gradient (green) | **dropped in v2** | Replaced by `.freshness` as a white control with a thin semantic left rail (`--rail-green/blue/yellow/coral`) so AIFA stops reading like a celebratory pricing card. |
-| Stage / category tabs | `.stageBtn`/`.stageBtnActive`/`.stageBtnDone` | Used for the SISS handoff staging, augmented with a subtle sweep keyframe on transition. |
-| PIN lock surface | `kree8-lock-screen.module.css` | Cool-gray canvas, raised white card, MF brand mark, slate focus ring, ink primary button, semantic local/zero-knowledge footer. No global token export. |
-| Sober blue accent (from WUL-232) | `--brand-dot-bg`, `--k8-accent` / `--k8-accent-soft` / `--k8-accent-line`, `--k8-focus` | Brand marks on cockpit, workspace and lock screen carry a restrained blue; the workspace uses the accent for focus rings, brand tint and hover hairlines only. Primary actions stay ink and the gradient stays AI-only. |
+| Canvas grigio freddo tenue (~`#eef0f2`) | `--canvas` su `.shell` | Sostituisce il beige Graphite (`#f6f0e7`) senza modificare `:root`. |
+| Card bianca piena | `--surface` | Raggio 28px, ombra morbida e bordo interno 1px. |
+| Pill bianca di navigazione sollevata | `.navSelected` | Fondo bianco, raggio 13px, ombra morbida e chevron per indicare l'interazione. |
+| Toolbar ampia, arrotondata e vitrea | `.toolbar` | Raggio 18px, luce interna, pill di ricerca e chip. |
+| Capsula AI a gradiente | `.aiButton` | Gradiente contenuto inchiostro → violetto → plum tramite `--accent-ai`, con varianti chiara e scura, icona sparkle e ombra morbida. **Il gradiente è riservato all'ingresso AI.** |
+| Pill di stato gialle/blu/verdi/corallo/attenuate/violette/inchiostro | `--pill-*-bg` / `--pill-*-fg` | Padding compatto 4×10 px e testo tabellare. I colori semantici verde/ambra/blu/violetto/corallo sono presenti ma contenuti, con coppie dark corrispondenti; il tono attenuato resta ardesia. |
+| Toggle segmentato | `.segmented` + `.segItem`/`.segSelected` | Commutazione AI / Source nel pannello paziente. |
+| Stepper meno/più | `.stepper` + `.stepperBtn` | Disabilitato ai limiti, con numero tabellare. |
+| Gradiente verde della riga prezzi | **rimosso in v2** | Sostituito da `.freshness`, controllo bianco con sottile linea semantica sinistra (`--rail-green/blue/yellow/coral`), per evitare che AIFA sembri una card promozionale. |
+| Tab di fase/categoria | `.stageBtn`/`.stageBtnActive`/`.stageBtnDone` | Fasi dell'handoff SISS, con un breve sweep keyframe al cambio di fase. |
+| Superficie di blocco PIN | `kree8-lock-screen.module.css` | Canvas grigio freddo, card bianca sollevata, marchio MF, focus ring ardesia, pulsante primario inchiostro e footer semantico locale/zero-knowledge. Nessuna esportazione globale dei token. |
+| Accento blu sobrio da WUL-232 | `--brand-dot-bg`, `--k8-accent` / `--k8-accent-soft` / `--k8-accent-line`, `--k8-focus` | Il blu contenuto identifica il marchio in cockpit, workspace e lock screen. Nel workspace serve solo per focus ring, tinta del marchio e hairline all'hover; le azioni primarie restano inchiostro e il gradiente resta esclusivo dell'AI. |
 
-### Contrast and type rhythm
+<a id="contrast-and-type-rhythm"></a>
 
-- All negative letter-spacing has been removed; titles, stat values and stepper
-  digits keep default tracking for clinical reading.
-- `#94a3b8` is no longer used for body or readable text; body now reads
-  against `--ink-muted` (`#475569`) or `--ink-strong` (`#1e293b`). The
-  faint slate (`--ink-faint`) is reserved for tabular dates and tiny
-  numeric metadata.
-- Type, spacing and shadows borrow the Inter-Regular / SF Pro rhythm shown in
-  the Kree8 screenshots, but stay narrower in line-height so clinical tables
-  still read dense.
+### Contrasto e ritmo tipografico
 
-### Motion lab
+- Il letter-spacing negativo è stato eliminato: titoli, valori statistici e cifre degli stepper mantengono il tracking predefinito per la lettura clinica.
+- Il testo destinato alla lettura non usa più `#94a3b8`, ma `--ink-muted` (`#475569`) o `--ink-strong` (`#1e293b`). Il tono ardesia più chiaro, `--ink-faint`, rimane riservato a date tabellari e metadati numerici minuti.
+- Tipografia, spaziature e ombre riprendono il ritmo Inter-Regular / SF Pro delle schermate Kree8, con interlinea più stretta per conservare la densità delle tabelle cliniche.
 
-working sprite sheet is kept out of Git at
-`tmp/wul-271-kree8-motion-study/kree8-mockup-motion-sprite.png`:
+<a id="motion-lab"></a>
 
-| Motion | CSS surface | Purpose |
+### Laboratorio del movimento
+
+Lo sprite sheet di lavoro rimane fuori da Git in `tmp/wul-271-kree8-motion-study/kree8-mockup-motion-sprite.png`:
+
+| Movimento | Superficie CSS | Funzione |
 | --- | --- | --- |
-| Surface entrance | `.areaShell` + `areaEnter` keyframes | Each area fades up 6px on mount so swaps don't snap. |
-| Case Lens slide | `.caseLens` + `lensSlide` keyframes | Patient selection preview animates in from the right. |
-| Physical press | `:active { transform: scale(0.97) }` on every actionable surface | Tactile feedback on buttons, chips, stage tiles. |
-| Decision commit pulse | `.pillCommit` + `commitPulse` keyframes | When a document field decision changes, the resulting status pill replays a small pop via a React `key`. |
-| Stage progression sweep | `.stageRowSweep` + `sweep` keyframes | A 720ms gradient brushes across the SISS stage row each time the active stage changes. |
-| Hover lift | `transform: translateY(-1px)` on chips/tiles/buttons | Restrained Kree8 hover, no shadow inflation. |
+| Ingresso della superficie | `.areaShell` + keyframe `areaEnter` | Ogni area entra al montaggio con dissolvenza e salita di 6px, evitando uno scambio brusco. |
+| Scorrimento Case Lens | `.caseLens` + keyframe `lensSlide` | L'anteprima del paziente selezionato entra da destra. |
+| Pressione fisica | `:active { transform: scale(0.97) }` su ogni superficie azionabile | Feedback su pulsanti, chip e riquadri delle fasi. |
+| Pulsazione di conferma della decisione | `.pillCommit` + keyframe `commitPulse` | Quando cambia la decisione su un campo documentale, la pill di stato ripete una breve pulsazione attraverso una `key` React. |
+| Sweep di progressione | `.stageRowSweep` + keyframe `sweep` | Un gradiente attraversa la riga SISS in 720ms a ogni cambio di fase attiva. |
+| Sollevamento all'hover | `transform: translateY(-1px)` su chip, riquadri e pulsanti | Risposta Kree8 contenuta, senza aumentare l'ombra. |
 
-All motion is gated by the scoped `@media (prefers-reduced-motion: reduce)`
-block.
+Tutti i movimenti sono subordinati al blocco circoscritto `@media (prefers-reduced-motion: reduce)`.
 
-## Surface map (root entry, seven areas)
+<a id="surface-map-root-entry-seven-areas"></a>
 
-The mockup keeps all major MediFlow surfaces inside the Kree8 frame, so the
-review covers the whole clinical journey, not just a hero page. The v2 pass
-splits the old "Paziente" area into a first-class list (`Pazienti in carico`)
-and a composite detail (`Quadro paziente`), and renames the rest to mirror the
-clinician-facing MediFlow nomenclature.
+## Mappa delle superfici (ingresso principale, sette aree)
 
-| Area pill | Demonstrates |
+Il mockup colloca nel telaio Kree8 tutte le principali superfici MediFlow, perché la revisione riguardi l'intero percorso clinico e non soltanto la schermata iniziale. Il passaggio v2 separa la precedente area "Paziente" nella lista autonoma `Pazienti in carico` e nel dettaglio composito `Quadro paziente`; le altre aree vengono rinominate secondo il lessico che MediFlow presenta al clinico.
+
+| Area | Che cosa mostra |
 | --- | --- |
-| Oggi | Stats strip, today's agenda (filterable by `urgent`/`AI`/`manual`), AI queue cards, and the `WUL-275` Zimbra/iCloud bridge preview for clinical/FBF candidates awaiting review. |
-| Pazienti in carico | Patient list with scope chips (Ambulatorio locale / Rete locale / Tutti), active/archive toggle, selectable patient rows with a per-row direct `Apri scheda` action, sticky `Anteprima caso` preview with primary `Apri scheda paziente` plus `Quadro` (in-cockpit), `Nuova voce`, `Documenti`, `Prepara SISS`. |
-| Quadro paziente | Identity dock with action shelf (`Nuova voce diario`, `Allega documento`, `Pianifica visita`, `Smart Import`, primary `Prepara SISS`), identity chips with `MediFlow Insight` / `Contesto SISS pronto` / `Protesica-RL` badges, AI ⇄ Source synthesis, Timeline del caso, Terapia attiva, Evidenze recenti, Smart Import preview with write/note/blocked counters, Prossimi passaggi. |
-| Documenti | Document review panel: counters for `campi aggiornabili` / `note da riconciliare` / `ignorati` / `non integrabile ora`, evidence snippets per field, blocked-capability cards for SISS writes, tri-state decisions (`Applica` / `Come nota` / `Ignora`), primary action renamed to `Porta nella scheda` (no more "timbra"). |
-| Cataloghi | Freshness as a white panel with a thin semantic left rail (fresh/ok/stale/broken), catalog list with status pills, and import actions routed to settings. |
-| Trasmissioni SISS | Launcher matrix (Modulo Prescrittivo, Protesica-RL, FSE · OpeFseIE, Anagrafe · Gaia, Menu SISS) + 4-step selector (Identità → Consenso → Portale ufficiale → Esito) where the outcome capsule explicitly says the result is **annotato manualmente**, with no certified return artifact. Non-integrable-now cards for `Prescrittivo nativo`, `FSE embedded`, `SGDT / PAI`, `Certificati di malattia`. |
-| Sistema | Account & PIN, AI local controls (`AI Patient Insight`, `Smart Import documento`, `Comparatore cloud`) + lane chips, Modalità di rete (`locale di default` + optional `Mac principale`), Backup & cataloghi (launchd notturno, retention keep-last-N), Diagnostica locale (Audit append-only, Riduci animazioni, **no external telemetry**), Aggiornamento & stato (`v0.6.4` + AI locale). |
+| Oggi | Fascia statistica, agenda del giorno filtrabile per `urgent`/`AI`/`manual`, card della coda AI e anteprima del ponte Zimbra/iCloud `WUL-275` per candidati clinici/FBF da rivedere. |
+| Pazienti in carico | Lista con chip di ambito Ambulatorio locale / Rete locale / Tutti, toggle attivi/archivio e righe selezionabili con azione diretta `Apri scheda`. L'`Anteprima caso` persistente offre la primaria `Apri scheda paziente`, `Quadro` interno al cockpit, `Nuova voce`, `Documenti` e `Prepara SISS`. |
+| Quadro paziente | Identità e azioni `Nuova voce diario`, `Allega documento`, `Pianifica visita`, `Smart Import`, con primaria `Prepara SISS`; chip con badge `MediFlow Insight`, `Contesto SISS pronto` e `Protesica-RL`; sintesi AI ⇄ Source, Timeline del caso, Terapia attiva, Evidenze recenti, anteprima Smart Import con conteggi di scritture/note/blocchi e Prossimi passaggi. |
+| Documenti | Pannello di revisione con conteggi `campi aggiornabili`, `note da riconciliare`, `ignorati` e `non integrabile ora`, frammenti di evidenza per campo e card delle capacità di scrittura SISS bloccate. Le decisioni sono `Applica` / `Come nota` / `Ignora`; la primaria diventa `Porta nella scheda`, non più "timbra". |
+| Cataloghi | Stato di aggiornamento su pannello bianco con sottile linea semantica sinistra fresh/ok/stale/broken, elenco dei cataloghi con pill di stato e importazione indirizzata alle impostazioni. |
+| Trasmissioni SISS | Matrice di avvio Modulo Prescrittivo, Protesica-RL, FSE · OpeFseIE, Anagrafe · Gaia e Menu SISS, più selettore di 4 passi Identità → Consenso → Portale ufficiale → Esito. La capsula di esito dichiara il risultato **annotato manualmente**, senza artefatto certificato di ritorno. Restano non integrabili ora `Prescrittivo nativo`, `FSE embedded`, `SGDT / PAI` e `Certificati di malattia`. |
+| Sistema | Account & PIN; controlli AI locali `AI Patient Insight`, `Smart Import documento`, `Comparatore cloud` e chip delle lane; Modalità di rete con `locale di default` e `Mac principale` opzionale; Backup & cataloghi con launchd notturno e retention keep-last-N; Diagnostica locale con Audit append-only, Riduci animazioni e **nessuna telemetria esterna**; Aggiornamento & stato con `v0.6.4` e AI locale. |
 
-## Interactivity demonstrated
+<a id="interactivity-demonstrated"></a>
 
-Most non-migrated panels still use local React state. Since `WUL-273`, the live
-root makes session-protected reads to `/api/patients` and `/api/checkups` after
-unlock, maps them into the Kree8 patient inbox, stat strip, local agenda and
-first Quadro paziente view, and shows an explicit error/empty state
-instead of falling back to review patients. Since `WUL-275`, the live root also
-reads `/api/clinical-agenda/candidates` for Zimbra/iCloud event-cache candidates.
-The review alias stays synthetic and does not fetch external or clinical data.
+## Interazioni dimostrate
 
-`/patients/[id]/modules` is now treated as the **Scheda paziente**: the Kree8
-fullscreen patient workspace that hosts the full set of `strumenti clinici`.
-The root navigates, the Scheda paziente decides, summarizes and executes the
-longer clinical work: therapies, observations, protesica, scales, document
-upload and diary review. Its inner tools still reuse the existing real
-components until each one receives its own Kree8-native internal pass.
+Nel quadro documentato, i pannelli non ancora migrati usano prevalentemente stato React locale. Da `WUL-273`, dopo lo sblocco, l'ingresso live effettua letture protette dalla sessione su `/api/patients` e `/api/checkups`, portandole nell'inbox pazienti Kree8, nella fascia statistica, nell'agenda locale e nella prima vista Quadro paziente. Se la lettura non riesce o non restituisce dati, mostra esplicitamente errore o vuoto: non ripiega sui pazienti di revisione. Da `WUL-275` legge anche `/api/clinical-agenda/candidates` per i candidati della cache eventi Zimbra/iCloud. L'alias di revisione rimane sintetico e non acquisisce dati esterni o clinici.
 
-`/patients/[id]/entries/new` now follows the same fullscreen workspace rule for
-the primary write action launched from the Scheda paziente. It keeps the
-existing rich-text editor, attachment upload, OCR/document synthesis and save
-flow, but the route-level language is Kree8-native: `Diario clinico`, `Nuova
-voce clinica`, `Luogo`, `Tipo di voce`, `Resoconto`, `Allegati`.
+`/patients/[id]/modules` viene trattata come **Scheda paziente**, il workspace Kree8 a pieno schermo che ospita l'insieme degli `strumenti clinici`. L'ingresso principale serve a navigare; la Scheda permette di decidere, sintetizzare e svolgere il lavoro più esteso su terapie, osservazioni, protesica, scale, caricamento documenti e revisione del diario. Gli strumenti interni continuano a usare i componenti reali esistenti finché ciascuno non riceva la propria revisione interna Kree8.
 
-`/patients/[id]/scales` and `/patients/[id]/scales/[scaleId]` now follow the
-same workspace rule for patient-bound assessments launched from the Scheda
-paziente. The picker uses the real local `SCALES` registry, while the runner
-keeps the existing scoring/save behavior and presents context, questions and
-diary save as one clinical flow.
+`/patients/[id]/entries/new` applica la stessa regola a pieno schermo all'azione primaria di scrittura avviata dalla Scheda paziente. Editor rich-text, upload allegati, OCR/sintesi documentale e salvataggio restano quelli esistenti; cambia il linguaggio della route, con `Diario clinico`, `Nuova
+voce clinica`, `Luogo`, `Tipo di voce`, `Resoconto` e `Allegati`.
 
-`/patients/[id]/edit` now follows the same workspace rule for patient record
-maintenance. The existing `PatientForm`, FSE/FHIR export validation, archive,
-restore and delete behavior remain unchanged, but the route-level frame is
-Kree8-native and returns to the Scheda paziente.
+Anche `/patients/[id]/scales` e `/patients/[id]/scales/[scaleId]` usano il workspace per le valutazioni riferite al paziente e avviate dalla Scheda. Il selettore legge il registro locale reale `SCALES`; il runner conserva scoring e salvataggio esistenti, presentando contesto, domande e registrazione nel diario come un solo flusso clinico.
 
-`/patients/new` now follows the same workspace rule for creating a record from
-the live cockpit. The PDF/image import, document-review gate, duplicate tax-code
-check, `PatientForm`, checkup persistence and therapy persistence remain the
-existing real flows; only the route-level frame and clinician-facing copy move
-to the Kree8 grammar.
+`/patients/[id]/edit` applica il workspace alla manutenzione dell'anagrafica. Restano invariati `PatientForm`, validazione dell'export FSE/FHIR, archiviazione, ripristino ed eliminazione; la cornice della route adotta Kree8 e ritorna alla Scheda paziente.
 
-`/scales` now follows the same workspace rule for the global scale catalog. The
-route no longer presents mock or coming-soon scale cards: it derives the visible
-catalog from the real local `SCALES` registry, then asks for a patient inline
-before launching the patient-bound runner.
+`/patients/new` adotta la stessa struttura per creare una scheda dal cockpit live. Importazione PDF/immagini, gate di revisione documentale, controllo del codice fiscale duplicato, `PatientForm` e persistenza di checkup e terapie rimangono i flussi reali esistenti. La traduzione Kree8 riguarda soltanto la cornice della route e i testi rivolti al clinico.
 
-`/analytics` now follows the same workspace rule for the local population
-cruscotto. The route reads real local patient counts, ADI flags, structured
-diagnoses and `/api/system/audit` summary data; it no longer shows legacy
-zero-value cards such as `Presa in Carico`, `Estemporanei` or `Top Patologia`,
-and avoids mock-style wording such as `Cruscotto Clinico`.
+`/scales` usa il workspace per il catalogo globale delle scale, derivando l'elenco visibile dal registro locale reale `SCALES` anziché mostrare card fittizie o di prossima disponibilità. Prima di avviare il runner riferito al paziente, ne richiede la scelta inline.
 
-`/settings` and `/settings/ambulatories` now use the Kree8 workspace shell as
-system surfaces instead of the legacy sidebar frame. The settings entry keeps
-theme and privacy controls available inside the page, while ambulatories uses
-the same shell to manage local clinical contexts without the old "root/test
-zone" wording.
+`/analytics` applica il workspace al cruscotto della popolazione locale. Legge conteggi reali dei pazienti, flag ADI, diagnosi strutturate e sintesi di `/api/system/audit`; non mostra più card legacy a zero come `Presa in Carico`, `Estemporanei` o `Top Patologia`, né usa espressioni da mockup come `Cruscotto Clinico`.
 
-- Area selection on the rail (`navItem`/`navSelected`), with a horizontal
-  scroll-snap rail at narrow widths so the surface remains usable on tablets.
-- PIN unlock is visually part of the same app line: scoped lock surface,
-  numeric PIN input, ink unlock action, error chip with a small commit pulse,
-  and local/zero-knowledge captions. Auth semantics stay in `SecurityProvider`.
-- Toolbar filter chips (single-select; rewires the Oggi agenda).
-- Zimbra/iCloud bridge preview distinguishes external clinical/FBF candidates
-  from confirmed agenda rows and keeps them in manual review state.
-- AI gradient action present in the toolbar (decorative; matches Kree8 cue).
-- Patient inbox scope (`Ambulatorio locale` / `Rete locale` / `Tutti`) and
-  list mode (`Attivi` / `Archivio`) drive the visible rows; in live mode the
-  rows come from `/api/patients`; selecting a row animates an `Anteprima caso`
-  preview. One word, one concept: `Scheda paziente` is the only route
-  destination (`/patients/[id]/modules`) and the primary action everywhere
-  (row-level direct action plus `Apri scheda paziente` in the preview), while
-  `Quadro` is the in-cockpit overview reached without a route change. The
-  preview also offers `Nuova voce` and `Documenti` so the three most frequent
-  tasks stay within two clicks; `/patients/[id]` remains a deep-link to the
-  cockpit Quadro for back-navigation.
-- Quadro paziente toggles `Sintesi AI` ⇄ `Fonti grezze`.
-- Document field decision tri-state per row with evidence snippet, kind label
-  (`campo aggiornabile` / `solo nota` / `non integrabile ora`), live counters,
-  commit-pulse on the resulting status pill, and a gated primary action
-  (`Porta nella scheda`) once all reviewable rows are processed.
-- Cataloghi list and status cards expose the local package state and route
-  import work back to settings.
-- Trasmissioni SISS selector walks through 4 steps with step-specific bodies;
-  the row sweep animation replays on step change.
-- Governance toggles flip an `aria-pressed` state across account/PIN, local AI,
-  network mode, backup, audit and update sections.
+`/settings` e `/settings/ambulatories` adottano la shell Kree8 come superfici di sistema, al posto della cornice legacy con sidebar. Le impostazioni mantengono disponibili nella pagina i controlli di tema e privacy; gli ambulatori usano la stessa shell per gestire i contesti clinici locali, senza la precedente dicitura "root/test zone".
 
-## Clinical readability guardrails
+- Le aree si selezionano nel rail tramite `navItem`/`navSelected`; nelle larghezze ridotte il rail diventa una striscia orizzontale scroll-snap, utilizzabile anche su tablet.
+- Lo sblocco PIN appartiene alla stessa linea visiva: superficie circoscritta, input numerico, azione inchiostro, chip di errore con breve commit pulse e didascalie locale/zero-knowledge. La semantica dell'autenticazione resta in `SecurityProvider`.
+- I chip della toolbar hanno selezione singola e filtrano l'agenda Oggi.
+- L'anteprima del ponte Zimbra/iCloud distingue i candidati clinici/FBF esterni dalle righe confermate dell'agenda, mantenendoli in revisione manuale.
+- L'azione AI a gradiente nella toolbar è decorativa e riprende il riferimento Kree8.
+- Ambito dell'inbox (`Ambulatorio locale` / `Rete locale` / `Tutti`) e modalità (`Attivi` / `Archivio`) determinano le righe visibili, lette da `/api/patients` in live. La selezione apre con un'animazione l'`Anteprima caso`. `Scheda paziente` è l'unica destinazione di route, `/patients/[id]/modules`, ed è la primaria sia nella riga sia nell'anteprima, con `Apri scheda paziente`; `Quadro` resta invece l'overview interna al cockpit, senza cambio di route. L'anteprima offre anche `Nuova voce` e `Documenti`, mantenendo le tre attività più frequenti entro due click. `/patients/[id]` rimane il deep-link al Quadro per la navigazione di ritorno.
+- Il Quadro paziente alterna `Sintesi AI` ⇄ `Fonti grezze`.
+- Ogni campo documentale presenta frammento di evidenza, tipo (`campo aggiornabile` / `solo nota` / `non integrabile ora`), decisione a tre stati e conteggi aggiornati. La pill risultante ripete il commit-pulse; `Porta nella scheda` si abilita solo dopo l'elaborazione di tutte le righe revisionabili.
+- Elenco e card dei Cataloghi mostrano lo stato del pacchetto locale e rinviano alle impostazioni per l'importazione.
+- Il selettore Trasmissioni SISS percorre 4 passi, ciascuno con il proprio contenuto; lo sweep della riga si ripete al cambio di fase.
+- I toggle Governance aggiornano `aria-pressed` nelle sezioni account/PIN, AI locale, rete, backup, audit e aggiornamento.
 
-- Bright neutral canvas, never beige. Old Graphite warm tones are absent.
-- Status colour is reserved for state semantics, not decoration.
-- Gradients only appear in: the AI button. The freshness panel and AIFA card
-  no longer use celebratory gradients; semantic colour is delivered through
-  a thin coloured left rail on a white surface.
-- No decorative orbs. The `FlowFieldBackground` still renders behind, but the
-  fixed overlay covers it.
-- Dense rows on agenda / catalog / patient tables; 11-13px type with 4-12px
-  gaps.
-- All readable text uses tokens at or above `--ink-muted` contrast; the very
-  light slate is reserved for tabular dates and tiny metadata only.
+<a id="clinical-readability-guardrails"></a>
 
-## What this live-entry slice explicitly does **not** do
+## Vincoli di leggibilità clinica
 
-- Does not migrate all real clinical routes into the Kree8 grammar.
-- Does not migrate all documents, therapies, diary or observations internals
-  into the Kree8 grammar yet; those actions continue through the existing real
-  patient components until their own slices. Patient creation, new diary entry,
-  global scale catalog, analytics, settings, ambulatories, patient scale
-  picker/runner, edit and the Scheda paziente workspace are already framed as
-  Kree8 surfaces.
-- Does not change PIN/auth/session semantics or mount cockpit data behind the
-  lock screen.
-- Does not introduce a new UI style key in `UIStyleProvider`.
-- Does not add a Graphite/Kree8 selector.
-- Does not load patient data before PIN/session unlock.
-- Does not claim a certified SISS return artifact: the Esito step records
-  the portal outcome as **manually annotated** and labels it `non
+- Il canvas resta neutro e chiaro, mai beige: i toni caldi Graphite non sono presenti.
+- Il colore di stato è riservato al significato, non alla decorazione.
+- Il gradiente compare soltanto nel pulsante AI. Pannello di aggiornamento e card AIFA usano invece una superficie bianca con sottile linea semantica colorata a sinistra.
+- Non sono ammessi elementi sferici decorativi. `FlowFieldBackground` continua a essere renderizzato sullo sfondo, ma l'overlay fisso lo copre.
+- Le tabelle di agenda, cataloghi e pazienti mantengono righe dense, caratteri 11-13px e spazi 4-12px.
+- Ogni testo leggibile usa token con contrasto almeno pari a `--ink-muted`; il tono ardesia molto chiaro è riservato a date tabellari e metadati minuti.
+
+<a id="what-this-live-entry-slice-explicitly-does-not-do"></a>
+
+## Che cosa questa slice dell’ingresso live **non** fa
+
+- La slice non migra tutte le route cliniche reali alla grammatica Kree8.
+- Non completa ancora la migrazione interna di documenti, terapie, diario e osservazioni, che continuano a usare i componenti paziente esistenti fino alle rispettive slice. Sono già in cornice Kree8 creazione paziente, nuova voce diario, catalogo globale delle scale, analytics, impostazioni, ambulatori, selettore/runner delle scale paziente, modifica anagrafica e workspace Scheda paziente.
+- Non cambia semantica di PIN, autenticazione e sessione, né monta dati del cockpit dietro la schermata di blocco.
+- Non introduce una nuova chiave di stile in `UIStyleProvider`.
+- Non aggiunge un selettore Graphite/Kree8.
+- Non carica dati paziente prima dello sblocco PIN/sessione.
+- Non attesta un artefatto certificato di ritorno SISS: il passo Esito conserva il risultato del portale come **annotazione manuale**, con etichetta `non
   certificato`.
 
-## Review checklist
+<a id="review-checklist"></a>
 
-- [ ] Navigate to `/`, exercise all seven area pills.
-- [ ] Load `/` while locked and confirm only the Kree8 PIN surface is mounted;
-      no cockpit copy or protected fetch storm appears before unlock.
-- [ ] Unlock with a valid PIN and confirm the lock surface unmounts directly
-      into the Kree8 cockpit.
-- [ ] On `/` live, confirm `/api/patients` and `/api/checkups` return local data
-      after unlock, the sidebar patient count is real, the Oggi stat strip
-      does not show synthetic `312` / `24` / `7 casi` counts, and the page text
-      does not contain review-only patient tokens such as `AB-2026-014`.
-- [ ] Navigate to `/mockups/kree8` and confirm it remains only a review alias.
-- [ ] On `Pazienti in carico`, switch scope between `Ambulatorio locale`,
-      `Rete locale` and `Tutti`; toggle `Attivi` ⇄ `Archivio`; select a
-      patient and confirm the `Anteprima caso` preview animates in; click
-      `Apri quadro` and confirm it jumps to `Quadro paziente`; click
-      `Apri scheda` and confirm it opens the patient workspace at
-      `/patients/[id]/modules`.
-- [ ] On `Quadro paziente`, exercise the identity dock action shelf and the
-      Sintesi AI ⇄ Fonti grezze segmented toggle; scan the Evidenze recenti panel,
-      Smart Import preview counters and Prossimi passaggi cards.
-- [ ] On `Documenti`, mark a mix of decisions and confirm the
-      counters update, the commit-pulse animation replays on each status
-      pill, and the primary `Porta nella scheda` only enables when all
-      reviewable rows are processed. Confirm the blocked SISS row cannot be
-      applied.
-- [ ] On `Cataloghi`, confirm the local package state, import actions and
-      semantic status pills stay legible. Confirm the panel stays white, with no
-      full gradient backgrounds.
-- [ ] On `Trasmissioni SISS`, walk through the 4 steps, confirm the row
-      sweep animation, the launcher matrix renders the 5 webapps and the
-      non-integrable-now cards show 4 blocked capabilities. Confirm the
-      Esito step explicitly labels the outcome as manually annotated.
-- [ ] On `Sistema`, confirm every section (Account & PIN, AI locale,
-      Modalità di rete, Backup & cataloghi, Diagnostica locale,
-      Aggiornamento & stato) reads like a real MediFlow setting block and
-      that no copy implies external telemetry.
-- [ ] On `/analytics`, confirm the route opens without the legacy sidebar,
-      the cards use only real local counts (schede, ADI, diagnosi and audit),
-      and no text still says `Cruscotto Clinico`, `Presa in Carico`,
-      `Estemporanei`, `Top Patologia` or `Prevalenza Patologie`.
-- [ ] Toggle the OS-level reduced motion preference and confirm the surface
-      stops animating (area entrance, Case Lens slide, sweep, commit-pulse,
-      press states all disabled).
-- [ ] Resize the viewport below 1024px and confirm the rail becomes a
-      horizontal scroll-snap strip.
-- [ ] Confirm `/` has no visible mockup copy and no escape button.
-- [ ] Confirm the review alias shows "Esci dalla review" in the bottom-right.
+## Checklist di revisione
+
+- [ ] Aprire `/` ed esercitare tutte le sette aree.
+- [ ] Caricare `/` in stato bloccato e verificare che sia montata soltanto la superficie PIN Kree8, senza testi del cockpit o richieste ripetute di dati protetti prima dello sblocco.
+- [ ] Sbloccare con un PIN valido e verificare che la superficie di blocco lasci direttamente posto al cockpit Kree8.
+- [ ] Su `/` live, verificare che `/api/patients` e `/api/checkups` restituiscano dati locali dopo lo sblocco, che il conteggio pazienti sia reale, che la fascia Oggi non mostri i conteggi sintetici `312` / `24` / `7 casi` e che la pagina non contenga token paziente riservati alla revisione, come `AB-2026-014`.
+- [ ] Aprire `/mockups/kree8` e verificare che rimanga soltanto un alias di revisione.
+- [ ] In `Pazienti in carico`, alternare `Ambulatorio locale`, `Rete locale` e `Tutti`, poi `Attivi` ⇄ `Archivio`. Selezionare un paziente e verificare l'ingresso animato di `Anteprima caso`; `Apri quadro` deve raggiungere `Quadro paziente`, mentre `Apri scheda` deve aprire `/patients/[id]/modules`.
+- [ ] In `Quadro paziente`, esercitare le azioni dell'identità e il toggle Sintesi AI ⇄ Fonti grezze; controllare Evidenze recenti, conteggi dell'anteprima Smart Import e Prossimi passaggi.
+- [ ] In `Documenti`, assegnare decisioni diverse e verificare l'aggiornamento dei conteggi e il commit-pulse di ogni pill. La primaria `Porta nella scheda` deve abilitarsi solo dopo l'elaborazione di tutte le righe revisionabili; la riga SISS bloccata non deve poter essere applicata.
+- [ ] In `Cataloghi`, verificare leggibilità di stato del pacchetto locale, importazione e pill semantiche. Il pannello deve restare bianco, senza gradienti a pieno fondo.
+- [ ] In `Trasmissioni SISS`, attraversare i 4 passi e verificare sweep della riga, 5 webapp nella matrice di avvio e 4 capacità bloccate nelle card non integrabili. L'Esito deve dichiarare esplicitamente che il risultato è annotato manualmente.
+- [ ] In `Sistema`, verificare che Account & PIN, AI locale, Modalità di rete, Backup & cataloghi, Diagnostica locale e Aggiornamento & stato corrispondano a sezioni reali delle impostazioni e che nessun testo suggerisca telemetria esterna.
+- [ ] Su `/analytics`, verificare l'assenza della sidebar legacy e l'uso esclusivo di conteggi locali reali per schede, ADI, diagnosi e audit. Non devono comparire `Cruscotto Clinico`, `Presa in Carico`, `Estemporanei`, `Top Patologia` o `Prevalenza Patologie`.
+- [ ] Attivare la preferenza di sistema per il movimento ridotto e verificare che si arrestino ingresso delle aree, scorrimento Case Lens, sweep, commit-pulse e stati di pressione.
+- [ ] Ridurre il viewport sotto 1024px e verificare che il rail diventi una striscia orizzontale scroll-snap.
+- [ ] Verificare che `/` non esponga testi da mockup né il pulsante di uscita.
+- [ ] Verificare che l'alias di revisione mostri "Esci dalla review" in basso a destra.

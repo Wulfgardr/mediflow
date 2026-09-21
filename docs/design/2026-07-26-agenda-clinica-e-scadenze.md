@@ -1,87 +1,92 @@
 # Agenda clinica: dai controlli alle scadenze terapeutiche
 
 Data: 2026-07-26
-Stato: **intento di prodotto**, dettato da Leonardo e trascritto qui. Non e'
-implementato. Le note tecniche sono mie e verificate sul codice attuale.
+Stato: **intento di prodotto**, dettato da Leonardo e trascritto in questa nota.
+Non è implementato. Le osservazioni tecniche derivano dalla lettura del codice
+alla data indicata.
 
 ## Da dove si parte
 
-L'agenda nasce legata a Zimbra ed e' destinata a essere rimossa o rimodellata.
-Il punto non e' sostituire un connettore con un altro: e' che una agenda
-appesa a un calendario aziendale risponde alla domanda sbagliata. Dice quando
-c'e' un appuntamento, non quando **una decisione clinica scade**.
+L'agenda nasce legata a Zimbra, ma rimuovere o rimodellare quel legame non
+significa soltanto cambiare connettore. Un calendario aziendale dice quando
+è previsto un appuntamento; il lavoro clinico richiede anche di sapere quando
+**una decisione clinica scade**. È questa seconda domanda a orientare la
+proposta.
 
 ## Cosa deve diventare
 
-Una vista omogenea che tiene insieme quattro famiglie di scadenze, oggi sparse
-o assenti:
+La vista proposta deve riunire quattro famiglie di scadenze che, nella
+ricognizione di partenza, risultano disperse o assenti:
 
-1. **Visite di controllo.** Gia' esistono come `checkups` e l'agenda le legge.
-2. **Rivalutazioni.** Il momento in cui un quadro va riguardato, che oggi non ha
-   una collocazione propria.
+1. **Visite di controllo.** Esistono già come `checkups` e sono lette dall'agenda.
+2. **Rivalutazioni.** Indicano quando occorra riesaminare un quadro, ma non
+   hanno ancora una collocazione propria.
 3. **Fine di una terapia.** Una copertura antibiotica prescritta il giorno X
-   finisce il giorno Y. Quel giorno Y oggi non esiste da nessuna parte se non
-   nella testa di chi ha prescritto.
-4. **Sospensione di un farmaco.** Un cardiotropo va sospeso prima di un
-   determinato esame. Serve il promemoria della sospensione **e** quello della
-   ripresa, perche' il rischio clinico sta in entrambi gli estremi.
+   finisce il giorno Y; quella scadenza, nella situazione esaminata, resta
+   affidata alla memoria di chi ha prescritto.
+4. **Sospensione di un farmaco.** Quando un cardiotropo va sospeso prima di
+   un esame, servono sia il promemoria della sospensione **sia** quello della
+   ripresa, perché il rischio clinico riguarda entrambi gli estremi.
 
-La frase che riassume l'intento, nelle parole di Leonardo: sapere **quando ho
-prescritto qualcosa e quando lo devo rimuovere.**
+Leonardo riassume così l'intento: sapere **quando ho prescritto qualcosa e
+quando lo devo rimuovere.**
 
-## Perche' non e' un calendario
+<a id="perche-non-e-un-calendario"></a>
 
-Un appuntamento e' un evento: ha una data e la si onora o si sposta. Una
-scadenza terapeutica e' la **conseguenza di una decisione gia' presa**, e non
-puo' essere spostata senza rivedere la decisione. Sono due oggetti diversi e
-vanno mostrati insieme ma non confusi: la vista e' una, la semantica no.
+## Perché non è un calendario
 
-Ne segue che la sorgente di verita' resta MediFlow. EventKit e' una
-**proiezione**: l'agenda puo' comparire nel calendario ordinario perche' e'
-comodo vederla accanto al resto, ma il calendario non e' il posto dove quelle
-scadenze vivono, e non deve poterle contraddire.
+Un appuntamento ha una data che si rispetta o si sposta. La scadenza
+terapeutica nasce invece da **una decisione già presa**: spostarla richiede
+di riesaminare quella decisione. La vista deve quindi mostrare insieme i due
+oggetti senza confonderli; condividere lo spazio non significa condividere
+la semantica.
+
+Le scadenze rimangono perciò in MediFlow. EventKit ne offre una
+**proiezione**, utile per vederle accanto agli altri impegni, ma il calendario
+ordinario non diventa il luogo che le governa e non deve poterle contraddire.
 
 ## Come atterra sul codice esistente
 
-Verificato leggendo il codice attuale.
+Le osservazioni seguenti si riferiscono al codice letto alla data della nota.
 
-- `AgendaWorkspaceModel` (`ClinicalWorkspaceViews.swift`) oggi legge solo
-  `fetchScopedCheckups` piu' i pazienti per risolvere i nomi. Le scadenze
-  terapeutiche non passano di li'.
-- Le terapie hanno gia' un proprio percorso, `fetchScopedTherapies` e la
-  sezione per paziente, ma nessuna nozione di **fine**: il modello porta stato,
-  dosaggio, motivazione, non una data di scadenza.
-- Quindi il primo passo non e' interfaccia: e' che una terapia possa dichiarare
-  quando finisce, e che una sospensione possa dichiarare quando comincia e
-  quando rientra.
-- La rotta `/api/v1/network/checkups` esiste e ha la sua capability
-  (`network.replica.readonly-agenda`). Una agenda che mostra anche terapie
-  attraversera' anche `network.replica.readonly-therapies`: il cancello
-  proattivo introdotto oggi va esteso di conseguenza, altrimenti la vista
-  supera il proprio gate e fallisce sulla seconda lettura. E' lo stesso difetto
-  gia' trovato su Agenda e Diario globale con `includeDeleted`.
+- `AgendaWorkspaceModel` (`ClinicalWorkspaceViews.swift`) legge soltanto
+  `fetchScopedCheckups` e i pazienti necessari a risolvere i nomi; non legge
+  le scadenze terapeutiche.
+- Le terapie hanno un percorso proprio, `fetchScopedTherapies`, e una sezione
+  per paziente, ma manca la nozione di **fine**: il modello contiene stato,
+  dosaggio e motivazione, non una data di scadenza.
+- Il primo cambiamento riguarda quindi il dato, prima dell'interfaccia:
+  una terapia deve poter dichiarare quando finisce e una sospensione quando
+  comincia e quando termina.
+- La rotta `/api/v1/network/checkups` esiste con la capability
+  `network.replica.readonly-agenda`. Per mostrare anche le terapie, l'agenda
+  dovrà attraversare `network.replica.readonly-therapies`: occorre estendere
+  il controllo preventivo introdotto nella ricognizione, altrimenti la vista
+  supera il proprio controllo di accesso e fallisce alla seconda lettura.
+  È lo stesso difetto già trovato su Agenda e Diario globale con `includeDeleted`.
 
 ## Vincoli che valgono comunque
 
-- **Nessuna scadenza clinica puo' essere inventata dall'interfaccia.** Se la
-  data di fine non e' stata dichiarata da chi prescrive, l'agenda dice che non
-  c'e', non la deduce dalla posologia.
-- **Uno stato non letto non e' uno stato vuoto.** Vale qui come nelle tre viste
-  corrette oggi: se l'archivio delle terapie non e' stato letto, l'agenda non
-  puo' dire che non ci sono scadenze.
-- **EventKit chiede un permesso.** L'agenda deve funzionare per intero senza
-  quel permesso, e la proiezione sul calendario deve essere una scelta
-  esplicita, non il modo in cui la funzione si accende.
-- **Niente PHI nel calendario di sistema senza una decisione esplicita.** Un
-  evento EventKit e' leggibile da altre app e puo' finire in sincronizzazioni
-  fuori dal controllo dell'archivio. Il titolo di default non deve contenere
-  nome del paziente ne' farmaco.
+- **Nessuna scadenza clinica può essere inventata dall'interfaccia.** Se chi
+  prescrive non ha dichiarato la data di fine, l'agenda ne segnala l'assenza:
+  non la deduce dalla posologia.
+- **Uno stato non letto non è uno stato vuoto.** Come nelle tre viste corrette
+  nella ricognizione, l'agenda non può dichiarare assenza di scadenze se non
+  ha letto l'archivio delle terapie.
+- **EventKit chiede un permesso.** L'agenda deve funzionare per intero anche
+  senza quel permesso; la proiezione sul calendario deve essere una scelta
+  esplicita, non il passaggio che abilita la funzione.
+- **Niente PHI nel calendario di sistema senza una decisione esplicita.**
+  Un evento EventKit è leggibile da altre app e può essere sincronizzato
+  fuori dal controllo dell'archivio. Il titolo predefinito non deve contenere
+  né il nome del paziente né il farmaco.
 
 ## Domande aperte, che sono di prodotto e non mie
 
-1. La rivalutazione e' un tipo di controllo o un oggetto a se'?
-2. La fine terapia e' un campo sulla terapia o un evento separato che la
-   referenzia? La seconda regge meglio le proroghe, la prima e' piu' semplice.
-3. La sospensione periprocedurale lega farmaco ed esame: l'esame e' un
-   `checkup` o una prestazione?
-4. La proiezione EventKit e' per singolo paziente, per ambulatorio, o unica?
+1. La rivalutazione è un tipo di controllo o un oggetto distinto?
+2. La fine della terapia è un campo della terapia o un evento separato che
+   la richiama? L'evento gestisce meglio le proroghe; il campo è più semplice.
+3. La sospensione periprocedurale lega farmaco ed esame: l'esame corrisponde
+   a un `checkup` o a una prestazione?
+4. La proiezione EventKit riguarda il singolo paziente, l'ambulatorio o
+   un'agenda unica?
