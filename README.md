@@ -161,13 +161,14 @@ riservata a Treatment Reasoning, con configurazione e verifiche locali proprie.
 ![Pannello Treatment Reasoning con ATHENA MLX locale, fonti e bozza finale da rivedere](./docs/images/getmediflow-086/athena-flow.png)
 
 La riproduzione riprende il pannello MediFlow nello stato riuscito e usa un
-caso interamente sintetico con polifarmacia. Il percorso interattivo completo
-su [Get MediFlow](https://getmediflow.dev/#fabric) permette di fermarsi su
-modello, fonti, bozza, preparazione e revisione. ATHENA mantiene allineati il
-modello della singola proposta, il predefinito locale e le azioni del pannello;
-la bozza finale espone limiti, evidenze, segnali di attenzione e provenienza.
-Non prescrive, non modifica la terapia e non salva automaticamente nella
-cartella.
+caso interamente sintetico con sei terapie e relativi codici ATC. Il percorso
+interattivo completo su [Get MediFlow](https://getmediflow.dev/#fabric)
+permette di fermarsi su modello, fonti, bozza, preparazione e revisione.
+Treatment Intelligence rende leggibili raccomandazione, dati mancanti,
+evidenze, cautele, provenienza e tre percorsi proposti: follow-up
+dell’ACE-inibitore, riconciliazione terapeutica e rivalutazione del sintomo.
+ATHENA prepara soltanto il testo della revisione; il medico può usarlo,
+correggerlo o scartarlo, mentre terapie, percorsi e cartella restano invariati.
 
 L’integrazione ChatGPT resta opzionale e spenta per impostazione predefinita.
 Il percorso esterno richiede configurazione, consenso e controlli pertinenti
