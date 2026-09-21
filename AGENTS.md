@@ -7,6 +7,19 @@ Gli agenti devono preservarne privacy, sicurezza, semplicità e verificabilità:
 per questo lavorano con diff piccoli, nei quali sia possibile riconoscere e
 riesaminare ogni cambiamento.
 
+## Linguaggio delle interfacce
+
+Tutti i testi delle interfacce MediFlow devono essere comprensibili a un medico
+senza conoscenze di codice, infrastruttura, intelligenza artificiale o convenzioni
+dei comandi. Usare parole semplici, precise e coerenti per spiegare significato,
+azione e conseguenze, anche nelle impostazioni, negli errori e nelle etichette
+accessibili. Non esporre gergo implementativo nel percorso ordinario e non
+nascondere informazioni necessarie su dati, consenso o limiti.
+Il contratto canonico e il criterio di accettazione per tutte le piattaforme sono
+in [DESIGN.md, Plain language for physicians](./DESIGN.md#plain-language-for-physicians).
+Applicarli a ogni modifica dell'interfaccia; i test tecnici da soli non dimostrano
+la comprensibilita dei testi.
+
 ## Orientamento proporzionato
 
 Leggere `AGENTS.md` e verificare branch e stato del worktree prima di
@@ -81,15 +94,19 @@ trasversale. La strategia va misurata sul risultato accettato: non garantisce
 qualità equivalente né minor consumo. Rispettare modello, effort e modalità
 scelti esplicitamente dall'utente.
 
-- **Luna Medium Fast** è la prima scelta per incarichi chiari, circoscritti e
-  verificabili: estrazioni, confronti, controlli ripetibili e piccoli interventi
-  con contratto e accettazione espliciti. Usare `mediflow-luna`, poiché il ruolo
-  personale `luna` può avere impostazioni diverse. Preferire più incarichi
-  indipendenti utili, senza dividere artificialmente un problema accoppiato
-  per affidarlo a Luna.
-- **Terra Medium** esegue interventi circoscritti nei quali occorra giudicare
-  codice, errori e contratti oltre quanto già risolto nel brief. Usare
-  `mediflow-terra` quando disponibile.
+- **Luna Medium Fast** raccoglie evidenze entro un perimetro esplicito ed esegue
+  estrazioni, confronti, controlli gia definiti e trasformazioni meccaniche.
+  Non interpreta evidenze ambigue, non definisce cosa costituisce PASS e non decide su
+  sicurezza, architettura e gate di rilascio. Se emerge una domanda interpretativa,
+  restituisce fonti e limiti lasciando la conclusione ad Astra.
+  Usare `mediflow-luna`; il ruolo personale
+  `luna` puo avere impostazioni diverse. Preferire piu incarichi indipendenti
+  utili, senza spezzare artificialmente un problema accoppiato per affidarlo a Luna.
+- **Terra Medium** implementa interventi circoscritti quando specifica, ownership,
+  invarianti e criteri di accettazione sono gia espliciti. Puo risolvere difetti
+  ordinari e aggiungere verifiche mirate entro il contratto; non ridefinisce
+  semantica, autorita o protezioni per far passare i test. Le ambiguita emerse
+  tornano ad Astra. Usare `mediflow-terra` quando disponibile.
 - **Sol, al massimo Medium**, copre incarichi delimitati con maggiori ambiguità
   o dipendenze, quando il coordinatore preveda che Luna o Terra richiederebbero
   troppe correzioni. Non è un passaggio obbligatorio dopo Terra. Se occorre
@@ -112,9 +129,42 @@ scelti esplicitamente dall'utente.
   a Sol Medium, motivandolo nel checkpoint; non assumere equivalenze di costo
   o qualità.
 
+## Criteri di assegnazione e responsabilita
+
+Delegare a un modello meno capace solo se Astra puo verificare il risultato con
+un lavoro sostanzialmente inferiore a quello necessario per produrlo direttamente.
+Se accettare una conclusione richiede di ricostruire quasi tutto il ragionamento
+del collaboratore, tenere l'analisi in Astra; delegare eventualmente la sola
+raccolta di evidenze. Un test superato dimostra il suo esito, non la sufficienza
+del test rispetto a un requisito di sicurezza o di rilascio.
+
+Prima di un incarico non banale, valutare insieme:
+
+- prova di correttezza disponibile: risultato atteso, schema, hash, test pertinente
+  o ispezione circoscritta della fonte;
+- interpretazione richiesta e dipendenze tra sottosistemi e contratti;
+- conseguenze di una conclusione erroneamente positiva e contenimento dell'errore;
+- costo di preparazione, verifica, integrazione ed eventuale rifacimento.
+
+Affidare l'esecuzione a Luna, Terra o Sol solo con perimetro e output espliciti,
+verifica economica, errore contenibile e nessuna necessita di ridefinire il
+significato del compito. Scegliere direttamente il livello adatto; non provare
+prima Luna per principio. Astra mantiene diagnosi causali ambigue, decisioni
+trasversali, significato dei confini di sicurezza e sufficienza delle prove per
+PASS/HOLD/FAIL, ferme le decisioni e autorizzazioni riservate all'utente.
+
+Nel brief/checkpoint esistente indicare in poche righe incarico, esecutore,
+responsabile della decisione, motivo della scelta, prova attesa e condizione di
+ritorno ad Astra. Non creare un documento o una nuova procedura per ogni delega.
+Se Astra deve correggere ripetutamente l'interpretazione per una classe di compiti,
+registrarlo nel checkpoint e assegnare quella classe a un livello adeguato o
+trattenerla direttamente; distinguere questa ricostruzione dalla normale verifica.
+Ridurre il parallelismo quando il lavoro residuo diventa seriale.
+
 ## Coordinamento e lane parallele
 
-In MediFlow la delega è il percorso ordinario per l'esecuzione separabile e
+In MediFlow la delega è il percorso ordinario per l'esecuzione separabile che
+soddisfa i criteri di assegnazione sopra e
 sostituisce il default globale "Work solo by default". Una volta ricostruiti
 baseline e contratti, assegnare ai collaboratori il lavoro indipendente e
 mantenere nel coordinatore il nucleo complesso. L'esecuzione diretta resta
