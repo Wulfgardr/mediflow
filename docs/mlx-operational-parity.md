@@ -8,9 +8,9 @@
 
 ## Decisione
 
-Poter misurare un runtime non significa averlo ammesso all'uso clinico del
-prodotto. Nel perimetro WUL-165, MLX generico è quindi **visibile e verificabile
-nei benchmark**, ma **non è un runtime clinico**. Il percorso governato
+Nel perimetro WUL-165, la classificazione
+**`benchmark-visible`, non runtime clinico** indica che MLX generico può essere misurato nei benchmark senza
+essere ammesso alle funzioni cliniche del prodotto. Il percorso governato
 `ATHENA MLX` di Treatment Reasoning costituisce un'eccezione esplicita e
 separata: produce soltanto anteprime locali, con un proprio ciclo di vita, senza
 promuovere il server MLX generico a provider clinico. La matrice e il controllo
@@ -23,8 +23,9 @@ La distinzione ha conseguenze operative precise:
   superfici esplicitamente etichettate come benchmark-only.
 - `ATHENA MLX` resta confinato a Treatment Reasoning, con esecuzione locale,
   lifecycle dedicato, receipt e output `proposal_only`.
-- Nel perimetro OCR ritirato per la 0.8.5 non sono raggiungibili task, modelli
-  o fallback OCR del runtime generativo qui confrontato.
+- **OCR non disponibile** nel runtime generativo qui confrontato: nel
+  perimetro ritirato per la 0.8.5 non sono raggiungibili task, modelli o
+  fallback OCR.
 - Nessun default modello o provider viene cambiato solo perché MLX è presente.
 - Qualunque promozione futura richiede ADR, benchmark lane-specific, stop-rule e
   governance rollout.
