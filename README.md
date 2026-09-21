@@ -158,13 +158,16 @@ un’autorizzazione a scegliere liberamente provider, endpoint o modalità d’i
 Ollama può servire i primi tre percorsi, mentre ATHENA/MLX è opzionale e
 riservata a Treatment Reasoning, con configurazione e verifiche locali proprie.
 
-![Pannello reale Treatment Reasoning con risultato sintetico ATHENA da rivedere](./docs/images/getmediflow-086/athena-flow.png)
+![Pannello Treatment Reasoning con ATHENA MLX locale, fonti e bozza finale da rivedere](./docs/images/getmediflow-086/athena-flow.png)
 
-La cattura proviene dal componente MediFlow effettivo nello stato riuscito e
-usa un risultato sintetico: ATHENA raccoglie un contesto delimitato, espone le
-fonti e i motivi verificabili della proposta, quindi consegna una bozza da
-rivedere. Non prescrive, non modifica la terapia e non salva automaticamente
-nella cartella. I dati e la situazione rappresentata sono inventati.
+La riproduzione riprende il pannello MediFlow nello stato riuscito e usa un
+caso interamente sintetico con polifarmacia. Il percorso interattivo completo
+su [Get MediFlow](https://getmediflow.dev/#fabric) permette di fermarsi su
+modello, fonti, bozza, preparazione e revisione. ATHENA mantiene allineati il
+modello della singola proposta, il predefinito locale e le azioni del pannello;
+la bozza finale espone limiti, evidenze, segnali di attenzione e provenienza.
+Non prescrive, non modifica la terapia e non salva automaticamente nella
+cartella.
 
 L’integrazione ChatGPT resta opzionale e spenta per impostazione predefinita.
 Il percorso esterno richiede configurazione, consenso e controlli pertinenti
@@ -304,6 +307,11 @@ fonti riservate e risultati clinici restano fuori da Git.
 <details>
 <summary><strong>Headless: cosa parte e cosa non autorizza</strong></summary>
 
+**Mini e accesso headless sono percorsi distinti.** Mini è la versione a riga
+di comando prevista nella roadmap 1.0. L’accesso headless è invece il contratto
+con cui un client agente autorizzato può usare capacità nominate di MediFlow;
+Codex è mostrato soltanto come uno dei client possibili.
+
 ```sh
 npm run build -- --webpack
 npm run mcp:intelligent-host:production
@@ -317,12 +325,14 @@ autenticazione, selezione e attivazione esplicita nell’interfaccia fidata.
 Revoca, logout, cambio di selezione o scadenza chiudono l’autorizzazione, il
 *grant*, senza trasferirla all’agente.
 
-![Demo sintetica dell’esperienza Codex con sidebar, chat e composer Astra Low](./docs/images/getmediflow-086/headless-agent.png)
+![Demo Codex dell’accesso headless con worklist, polifarmacia, fonti nominate e composer Astra Low](./docs/images/getmediflow-086/headless-agent.png)
 
-La schermata racconta il passaggio dall’interfaccia all’uso agentico: il client
-riceve soltanto il contesto autorizzato, consulta fonti nominate, rende visibili
-stato e motivi della proposta e rimanda il risultato alla revisione nel Web.
-È un’illustrazione animata della roadmap 1.0, acquisita da Get MediFlow con dati
+La schermata racconta una richiesta che non si risolve consultando una singola
+pagina: il client verifica le capacità concesse, scandisce una worklist,
+incrocia polifarmacia, diario, misurazioni e documenti, quindi prepara una coda
+di revisione senza scrivere nella cartella. Su
+[Get MediFlow](https://getmediflow.dev/#cofano) l’animazione può essere messa in
+pausa, percorsa avanti e indietro o riavviata. È una dimostrazione con dati
 inventati: non è una sessione Codex collegata e non prova disponibilità nella
 release 0.8.6.
 
