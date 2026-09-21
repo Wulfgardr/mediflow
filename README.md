@@ -33,14 +33,11 @@ non sono la condizione per usare il gestionale.
 cartella e il lavoro da seguire. La schermata è stata acquisita dal candidato
 `ddff0a929` e contiene esclusivamente dati sintetici.*
 
-<!-- reconciliation-20260912 -->
 > **MediFlow 0.8.6 è disponibile come [codice sorgente](https://github.com/Wulfgardr/mediflow/releases/tag/v0.8.6), pubblicato il 20 settembre 2026.**
-> Il perimetro di questa versione è il runtime locale sul Mac, usato dal browser
-> su localhost oppure senza interfaccia grafica da client e agenti autorizzati.
-> L’app nativa segue uno sviluppo separato e non è necessaria per questa consegna.
-> La pubblicazione del sorgente non autorizza l’impiego con dati clinici reali:
-> la valutazione del deployment resta aperta in WUL-688, nel coordinamento
-> [WUL-669](https://linear.app/wulfgardr/issue/WUL-669).
+>
+> Questa versione funziona localmente su Mac e può essere utilizzata dal browser tramite `localhost`, oppure senza interfaccia grafica da client e agenti autorizzati. L’applicazione nativa costituisce un filone di sviluppo separato, previsto per successive revisioni di MediFlow.
+>
+> Prima di utilizzare MediFlow con dati clinici reali, il professionista o l’organizzazione responsabile deve verificare che il trattamento sia conforme alle regole applicabili: finalità e base giuridica, informativa, ruoli e autorizzazioni, misure di sicurezza e, quando previsto, consenso dell’interessato.
 
 <details>
 <summary><strong>Versione sorgente, verifiche e distribuzione</strong></summary>
