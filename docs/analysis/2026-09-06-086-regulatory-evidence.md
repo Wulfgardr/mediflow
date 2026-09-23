@@ -11,6 +11,83 @@ La ricerca documenta requisiti, condizioni ed evidenze nel sorgente pubblico.
 Non attesta conformità, adeguatezza di un deployment, qualificazione del
 prodotto, adozione di procedure o completamento di WUL-686/687/688.
 
+### Raccordo del 23 settembre 2026: due contesti professionali sul Mac
+
+Il perimetro ora dichiarato comprende **uso professionale individuale sul Mac**,
+sia nell'attività autonoma sia per conto di una struttura, da mantenere separati.
+Include la valutazione esplicita dell'AI remota. Non sono stati letti o modificati
+archivi clinici, account dei provider o configurazioni della struttura.
+
+La sorgente `v0.8.6`, commit
+`46296266c0a8ff4d4ab19216af7e761cddec7d78`, è pubblicata. Le nuove prove usano
+quella sorgente in un runtime di produzione localhost con dati sintetici.
+La checkout documentale `f05b3847d863fcddf53c87be88ba4b884b938aca` aggiunge
+documenti e asset; non trasforma prove storiche in prove sul tag. La qualifica
+dell'app nativa storica e delle piattaforme successive resta fuori perimetro.
+Questa sezione prevale sui precedenti riferimenti a una release sorgente ancora
+da pubblicare o a Xcode come prerequisito del dossier.
+
+| Contesto | Trattamento da valutare | Decisione ancora necessaria |
+| --- | --- | --- |
+| Attività professionale autonoma | Cartella dei propri assistiti, documenti ricevuti, note, scale, consultazione dei repertori ed eventuali proposte AI | Finalità e presupposti per ciascun uso, informativa e registro adottati, conservazione e gestione delle richieste; ruolo effettivo del professionista secondo l'attività |
+| Attività per una struttura | Dati trattati nell'incarico conferito, su dispositivo individuale | Identificazione del titolare e delle istruzioni ricevute; autorizzazione a dispositivo, archivio, copie e fornitore AI. Il possesso del Mac non attribuisce tali poteri |
+
+La separazione richiesta deve comprendere archivi, documenti esportati, backup,
+sessioni e configurazioni dei provider. Un filtro «ambulatorio» nella stessa
+cartella non viene assunto come separazione tra titolari. La configurazione
+operativa candidata usa directory dati e sessioni distinte; destinazioni e
+procedure reali non sono ancora state configurate o collaudate. Non spostare
+automaticamente dati della struttura nell'archivio dell'attività autonoma.
+
+#### Applicabilità italiana circoscritta
+
+Il [provvedimento del Garante del 7 marzo 2019](https://www.garanteprivacy.it/home/docweb/-/docweb-display/docweb/9091942),
+riletto il 23 settembre, chiarisce che i trattamenti necessari alla cura svolti
+da un professionista vincolato al segreto non richiedono il consenso privacy
+del paziente come presupposto; usi ulteriori richiedono una valutazione distinta.
+Per il professionista sanitario che opera individualmente in libera professione
+non impone il DPO per questa sola attività, mentre resta il registro dei
+trattamenti. Queste indicazioni non qualificano automaticamente l'uso per una
+struttura né un invio al provider AI. Informativa, finalità, basi applicabili e
+responsabilità restano da registrare per ciascuno dei due contesti. La necessità
+di DPIA va motivata rispetto a trattamenti e rischi effettivi, comprendendo
+l'AI remota, senza dedurla soltanto dal numero di postazioni.
+
+La [pagina della Commissione sull'AI Act](https://digital-strategy.ec.europa.eu/en/policies/regulatory-framework-ai)
+è stata riletta: espone l'aggiornamento del 3 agosto 2026 e il calendario già
+registrato in §2. I tentativi di rilettura dei testi EUR-Lex in questa sessione
+hanno restituito una verifica automatica del browser: non sono conteggiati come
+nuova lettura degli atti. Il registro normativo del 6 settembre resta attribuito
+alla ricerca originaria; nessuna classificazione è dedotta dal solo calendario.
+
+#### Flussi, prove e decisioni del deployment
+
+| Flusso o controllo | Meccanismo e prova disponibile | Limite concreto e responsabile del seguito |
+| --- | --- | --- |
+| Accesso locale | Setup ordinario su archivio vuoto; quattro casi E2E sul tag per ciclo accesso/blocco/logout/reset e recupero tra schede | Le prove riguardano account sintetici. Le credenziali brevi hanno un rischio separato già assegnato a WUL-722; non dichiarare risolto quel rischio dai test di accesso |
+| Cartella senza AI | Primo paziente, nota cifrata e ADL; rilettura dopo riavvio su archivio sintetico. Bozza di onboarding ripresa e cambio profilo con rollback | La prima ricevuta apre nota/scala tramite URL UI. La prova successiva tramite clic ha riprodotto il ritorno alla guida dopo creazione: candidato di correzione WUL-732, non modifica retroattiva del tag |
+| Persistenza e copie | Cifratura per i campi dichiarati in SECURITY, directory dati esplicite, backup e ripristino secondo i contratti esistenti | Il file SQLite non è integralmente cifrato; export, metadati e copie hanno coperture differenti. Sul Mac di prova FileVault risulta attivo, ma non sono stati ispezionati gli archivi reali né la destinazione dei loro backup. WUL-721/730 conservano le correzioni pertinenti |
+| Diritti, conservazione e ripristino | Matrice P2 delle categorie esportate e test di restore già attribuiti alla rispettiva revisione; tombstone e purge distinti | PDF/FHIR non equivalgono a risposta completa a una richiesta. Occorrono procedura di ricerca delle copie, decisione di conservazione e riconciliazione dei record cancellati dopo il backup; WUL-686 con WUL-730 |
+| AI remota | ADR0134: quattro operazioni nominate, consenso al payload congelato, controlli su fonti/modello, proposte da rivedere e nessuna applicazione clinica automatica. CI del tag: harness browser sintetico e test dei quattro controller | Provider live finale non attestato. Prima di dati reali identificare canale, account, condizioni sul trattamento, retention, addestramento, destinatari e trasferimenti; documentare autorizzazione separata per i due contesti. WUL-687/688; nessuna credenziale è stata utilizzata |
+| Selezione dei modelli | 45 controlli mirati sul tag passati: default persistito, override, lettore del binding, revoca, conflitto e annullamento, con peer sintetici | Non qualificano ogni combinazione UI/modello/provider né un servizio remoto disponibile. WUL-691 conserva la matrice delle singole funzioni e WUL-726 i cambiamenti correnti |
+| Headless | Accesso mediato con comandi nominati, autorizzazioni, conferma delle scritture, audit e ricevute; evidenza preesistente raccordata in WUL-697 | Nessun permesso generale a leggere SQLite o a inviare dati a un agente esterno. Il provider eventualmente usato dall'agente va incluso nel flusso concreto; WUL-731 |
+
+Per l'AI, distinguere Patient Insight, Smart Import, Document Synthesis e
+Treatment Reasoning. Quest'ultimo mantiene la propria finalità di ragionamento
+clinico: non è riclassificato come semplice riassunto. Il giudizio applicabile
+deve riguardare funzione, impiego effettivo e influenza sulla decisione medica;
+il controllo umano e l'installazione locale sono elementi della valutazione,
+non un'esenzione generale.
+
+**Esito operativo del dossier: preparazione avanzata, ammissione clinica ancora
+aperta per entrambi i contesti e per l'AI remota.** Gli elementi mancanti sono
+la configurazione effettiva dei due archivi, le istruzioni della struttura,
+il servizio remoto e le sue condizioni, l'adozione delle procedure e la
+decisione motivata sulle funzioni incluse. La pubblicazione del sorgente resta
+un risultato distinto, già conseguito. Le prove private sintetiche sono nel
+registro di consolidamento del 23 settembre; nessun dato paziente, token o
+backup è incluso nel dossier pubblico.
+
 ### Raccordo tecnico del 12 settembre 2026
 
 Le sezioni successive conservano la fotografia del 6 settembre e le sue
