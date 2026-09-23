@@ -254,7 +254,9 @@ test('first use: manual entry creates the first synthetic patient without saving
         && new URL(item.url()).pathname === '/api/patients');
     await page.getByRole('button', { name: 'Crea scheda', exact: true }).click();
     expect((await response).status()).toBe(201);
-    await expect(page).toHaveURL(/\/$/u);
+    await expect(page).toHaveURL(/\?area=incarico$/u);
+    await expect(panel).toHaveCount(0);
+    await expect(page.getByRole('searchbox', { name: 'Cerca nella lista pazienti', exact: true })).toBeVisible();
     const persisted = await page.request.get('/api/patients');
     expect(persisted.status()).toBe(200);
     const rows = await persisted.json();
