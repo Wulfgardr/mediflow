@@ -510,3 +510,123 @@ Per identificare il commit del documento senza inserirvi uno SHA autoreferenzial
 ```bash
 git log -1 --format='%H %s' -- docs/analysis/2026-09-06-086-regulatory-evidence.md
 ```
+
+## Schede operative candidate per i due contesti
+
+Queste schede sono moduli di lavoro non adottati, da duplicare e compilare
+separatamente per **A — attività autonoma** e **B — incarico per una struttura**.
+Sono precompilati solo i fatti riportati nel raccordo del 23 settembre; i campi
+non documentati restano esplicitamente da definire/confermare. Nessuna scheda è
+un'informativa consegnabile, una decisione sulla necessità di DPIA o una prova
+di conformità. In particolare B resta da concordare con la struttura; i due
+contesti richiedono archivi, esportazioni, backup, sessioni e configurazioni
+provider separati. Fonte dei campi e dei limiti: §3–4, §6 P1–P4/P7 sopra.
+
+### 1. Registro operativo dei trattamenti — compilare A e B separatamente
+
+| Campo | A — professionista autonomo | B — struttura su Mac |
+| --- | --- | --- |
+| Contesto e titolarità | Attività autonoma; titolare/ruolo effettivo: **da definire/confermare per attività e finalità** | Incarico della struttura; titolare, ruoli e istruzioni: **da concordare con la struttura** |
+| Finalità e presupposti | **Da definire/confermare per ciascun uso**, compreso ogni uso AI | **Da concordare con il titolare** per ciascun uso; non ereditare le finalità di A |
+| Interessati e categorie di dati | Assistiti e categorie effettive: **da definire/confermare** | Interessati e categorie conferite: **da concordare/confermare** |
+| Destinatari e ruoli | Destinatari, responsabili e autorizzati: **da definire/confermare** | Struttura, autorizzati, responsabili/sub-responsabili: **da documentare secondo istruzioni** |
+| Mac, archivio e accessi | Mac dell’utente; directory, sessioni, accessi e configurazione reale: **da verificare** | Mac individuale; autorizzazione, archivio, accessi e istruzioni: **da concordare e verificare** |
+| Copie e trasferimenti | Elencare archivio, documenti, derivati, export, cache, sessioni, backup e destinatari/trasferimenti: **inventario da compilare** | Stesso inventario, separato da A; proprietario di ciascuna copia e autorizzazione: **da concordare** |
+| AI esterna e conservazione | Solo canale remoto indicato: **OpenAI via ChatGPT OAuth**; piano/workspace, termini, retention, uso dati, destinatari e trasferimenti: **non identificati/da verificare** | Stesso solo canale selezionato; uso per dati della struttura e relative istruzioni/autorizzazioni: **da concordare**; piano/workspace non identificato |
+| Durata e cancellazione | Durata clinica, criteri, eccezioni e cancellazione delle copie: **da definire/confermare**; `keep-last-N` è solo retention tecnica dei backup scheduler | Durate/istruzioni del titolare, eccezioni, copie e cancellazione: **da concordare**; nessun periodo dedotto dal backup scheduler |
+| Sicurezza e misure | Misure applicate a ogni copia, accesso e provider: **da verificare sul deployment** | Misure richieste dalla struttura e prova sul Mac/copie: **da concordare e verificare** |
+| Diritti e richieste | Procedura, referente, verifica proporzionata dell’identità e risposta tracciata: **da definire** | Canale, referente della struttura, escalation e risposta: **da concordare** |
+| Registro delle copie per diritti/retention | Per ogni copia: supporto/percorso, contenuto, owner, destinatari, backup/export, retention, cancellazione, restore e verifica: **compilare senza dati identificativi in questo dossier** | Stessi campi, compilati separatamente; owner/istruzioni della struttura e prova di riconciliazione dopo restore: **da concordare** |
+| Decisioni e approvazioni | Decisioni sulle finalità, misure e retention: **da registrare nel dossier autorizzato** | Istruzioni e autorizzazioni della struttura: **da acquisire nel dossier autorizzato** |
+
+Il Bundle FHIR e gli altri export sono supporti parziali, non una risposta completa
+a una richiesta. Un restore può reintrodurre record cancellati: documentare la
+riconciliazione prima dell'eventuale ripresa d'uso. Per ciascuna richiesta
+registrare riferimento non identificativo, data/canale, verifica identità,
+diritti richiesti, copie cercate, valutazione/limiti, decisione, responsabile,
+risposta e completamento: **procedura concreta da definire per A e concordare
+per B**.
+
+### 2. Scheda dati per predisporre l’informativa — due bozze non consegnabili
+
+**Stato per A e B: BOZZA — NON CONSEGNABILE finché i campi applicabili non sono
+risolti, verificati e approvati dal soggetto competente.** Duplicare la scheda;
+non copiare titolarità, contatti o basi da un contesto all’altro.
+
+| Campo da valorizzare | A — autonomo | B — struttura |
+| --- | --- | --- |
+| Titolare e ruolo effettivo | Da definire/confermare | Da concordare/confermare con la struttura |
+| Contatti del titolare e del referente | Da definire/confermare | Da concordare; canale/referente della struttura non forniti |
+| Finalità e base per ciascuna finalità | Da valutare e confermare per uso | Da concordare con il titolare; non preselezionare |
+| Categorie di dati e interessati | Da verificare rispetto al trattamento concreto | Da concordare rispetto all’incarico |
+| Destinatari, ruoli e trasferimenti | Da verificare; OpenAI via ChatGPT OAuth è l’unico provider esterno selezionato, condizioni non identificate | Da concordare; non attestare l’autorizzazione AI o trasferimenti |
+| Durata/criteri di conservazione e copie | Da definire, incluse copie ed eccezioni | Da concordare con la struttura, incluse copie ed eccezioni |
+| Diritti, modalità e limiti | Da completare per accesso, rettifica, limitazione, opposizione, cancellazione e portabilità; limiti da verificare | Da concordare canale, referente, limiti e gestione con il titolare |
+| Reclamo e autorità di controllo | Da verificare e completare | Da confermare nel contesto della struttura |
+| Conferimento dei dati e conseguenze | Da definire per ciascuna raccolta/finalità | Da concordare con la struttura per ciascun flusso |
+| Decisioni automatizzate/profilazione | Accertare il flusso concreto e valorizzare; non dedurre dal solo controllo umano | Accertare il flusso concreto autorizzato e valorizzare |
+| Fonte indiretta e modalità/tempi informativi | Da completare quando pertinenti | Da concordare quando pertinenti |
+| Prova di revisione, approvazione e consegna | Nessuna prova raccolta; compilare nel dossier autorizzato | Nessuna prova raccolta; approvazione/consegna da concordare |
+
+### 3. Screening DPIA — esito da decidere, nessuna risposta precompilata
+
+Compilare uno screening per ciascun contesto e configurazione concreta. Le
+risposte e l’esito restano **da valutare**; non precompilare “NO” né considerare
+il funzionamento locale o il numero di postazioni decisivo.
+
+| Domanda / elemento | A — autonomo | B — struttura |
+| --- | --- | --- |
+| Titolare, finalità, ruoli e configurazione valutata | Da definire/confermare | Da concordare/confermare |
+| Natura, categorie di dati e persone interessate/vulnerabili | Da valutare e motivare | Da valutare con il titolare e motivare |
+| Scala: soggetti, volume, frequenza, durata e ampiezza | Da raccogliere/verificare | Da raccogliere/verificare con la struttura |
+| Tecnologia e flussi, incluse copie, export e backup | Da mappare per la configurazione reale | Da mappare separatamente secondo istruzioni |
+| AI remota, payload, destinatari, account/condizioni e retention | OpenAI via ChatGPT OAuth selezionato; piano/condizioni ignoti; valutare se e come entra nel trattamento | Istruzioni/autorizzazione mancanti; valutazione sospesa sui fatti organizzativi |
+| Rischi per diritti e libertà, probabilità e gravità | Da identificare e motivare | Da identificare con il contesto della struttura |
+| Misure esistenti, lacune e mitigazioni proposte | Da documentare con evidenze deployment | Da concordare, attribuire e verificare |
+| Rischio residuo e accettazione/escalation | Da decidere e attribuire al ruolo competente | Da decidere dal ruolo competente della struttura |
+| Esito: DPIA necessaria? consultazione preventiva? | **Da decidere; nessun esito preselezionato** | **Da decidere; nessun esito preselezionato** |
+| Responsabile, revisore/DPO se designato, data e riesame | Da identificare; nessuna nomina presunta | Da concordare; nessuna nomina presunta |
+
+### 4. Procedura e registro incidenti; richieste, copie e restore
+
+**Procedura candidata da revisionare e adattare separatamente.** In caso di
+segnalazione: interrompere o contenere il flusso interessato senza cancellare
+prove; conservare evidenze controllate e minimizzate; avvisare il responsabile/
+titolare secondo i ruoli e le istruzioni; valutare il caso secondo GDPR artt.
+33/34 e registrare anche gli eventi non notificati; ripristinare il flusso solo
+dopo le verifiche e l’autorizzazione previste per quel contesto.
+
+La [guida del Garante sui data breach](https://www.garanteprivacy.it/data-breach),
+riletta il 23 settembre 2026, indica per il titolare la notifica senza ritardo
+ingiustificato e, ove possibile, entro 72 ore dalla conoscenza, salvo che sia
+improbabile un rischio per i diritti e le libertà. Documentare la valutazione e
+l’eventuale ritardo: le 72 ore non sono un tempo da attendere. Chi tratta per
+conto del titolare deve informarlo tempestivamente, secondo il ruolo effettivo
+e le istruzioni ricevute. Per il rischio elevato valutare anche la comunicazione
+agli interessati e le condizioni/eccezioni dell’art. 34. La
+[guida EDPB](https://www.edpb.europa.eu/sme/assess-the-risks/data-breaches_en)
+chiarisce che informazioni ancora incomplete possono essere integrate per fasi:
+la raccolta delle evidenze non giustifica un rinvio indiscriminato.
+Nel modulo registrare l’istante della conoscenza, il responsabile della
+valutazione, i destinatari e la motivazione di ogni decisione.
+
+Campi del registro (riferimento non identificativo; conservare i dettagli
+necessari solo nel dossier autorizzato): contesto A/B; data/ora rilevazione;
+segnalante e canale; descrizione minima; sistemi/copie/provider coinvolti;
+contenimento; evidenze e accessi; categorie e stima degli interessati/dati;
+valutazione del rischio e motivazione; persone avvisate e tempi; decisione
+artt. 33/34, motivazione e responsabile; notifiche/comunicazioni o ragione della
+mancata notifica; azioni correttive; verifica di restore/riconciliazione; criterio
+e autorizzazione alla ripresa; chiusura e riesame. Tutti i campi di evento reale
+sono **da compilare quando applicabili**; non inserire esempi o firme fittizie.
+
+Per diritti, cancellazione e restore, allegare al record dell’evento/request la
+mappa di **tutte** le copie e gli export/backup, con proprietario e prova di
+ricerca; tipo di richiesta e riferimento non identificativo; verifica
+proporzionata dell’identità; base e limiti da valutare; decisioni e istruzioni;
+risposta tracciata; copie cancellate o preservate e ragione; riconciliazione dei
+record cancellati dopo un restore; verifiche e autorizzazione prima di riprendere
+l’uso. Tempi, eccezioni e conservazione clinica restano da definire/confermare
+per A e da concordare con la struttura per B. Le segnalazioni di vulnerabilità
+in `SECURITY.md` non costituiscono questa procedura di violazione di dati
+personali.
