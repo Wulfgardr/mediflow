@@ -123,8 +123,23 @@ stato compilato da un albero pulito: bundle server SHA-256
 Sono passati 16 casi UI mirati, oltre a lint, typecheck, controlli di regressione
 e claim e test delle preferenze. Cinque casi UI usano esplicitamente un peer
 HTTP ChatGPT sintetico; non provano il servizio remoto. Queste correzioni sono
-locali e non pubblicate; il tag 0.8.6 resta immutato. Le prove dei binding locali
-AI sono ancora in corso e non vengono anticipate come concluse.
+locali e non pubblicate; il tag 0.8.6 resta immutato.
+
+Sul medesimo bundle sono state poi eseguite sei generazioni locali, da UI e con
+Ollama `qwen3.5:35b-a3b` già installato: due Patient Insight, tre Smart Import e
+una Document Synthesis. Patient Insight cita nota e terapia sintetiche; Smart
+Import propone diagnosi e terapia presenti in una nota sintetica acquisita,
+con identificativo della fonte osservato nella richiesta; la sintesi documentale
+riporta una citazione verificata sul documento RTF sintetico. I casi iniziali
+con fonti vuote o prive di elementi espliciti da importare sono conservati,
+senza trasformarli in prove positive di estrazione. Le ricevute dichiarano
+esecuzione locale, nessun fallback e nessuna applicazione clinica; conteggi e
+hash delle 12 tabelle cliniche osservate restano identici prima/dopo le proposte.
+Non è una cattura globale del traffico, una prova di assenza di scritture
+intermedie o una misura di accuratezza clinica. L'ammissione del modello dalla
+UI resta `available_unqualified`; l'applicazione delle proposte non è stata
+eseguita. Il processo Ollama preesistente è rimasto invariato; i server di
+collaudo sono stati chiusi.
 
 Per l'AI, distinguere Patient Insight, Smart Import, Document Synthesis e
 Treatment Reasoning. Quest'ultimo mantiene la propria finalità di ragionamento
