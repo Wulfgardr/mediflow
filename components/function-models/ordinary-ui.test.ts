@@ -72,3 +72,26 @@ test('explicit OpenAI configuration previews only the shared switch with unavail
     (button.props.onClick as () => void)();
     assert.deepEqual(command, { action: 'set_activation', functionId: 'treatment_reasoning', enabled: true });
 });
+
+test('a changed local default is saved even while its function is off', () => {
+    const modelOptionId = `model_option_${'a'.repeat(32)}`;
+    const component = loadComponent('./function-preferences-panel.tsx', 'PreferenceCard', ['local', false, modelOptionId]);
+    let command: unknown;
+    const tree = component({ row: { id: 'patient_insight', enabled: false, defaultSource: 'host_configuration', defaultModelOptionId: modelOptionId,
+        bindingState: 'current', options: [{ modelOptionId, label: 'Modello sintetico', provider: 'ollama', state: 'unavailable' }] },
+    activationSupported: true, disabled: false, account: null, preview: (value: unknown) => { command = value; } });
+    const button = nodes(tree).find(n => n.type === 'button' && n.props.children === 'Anteprima modifica')!;
+    (button.props.onClick as () => void)();
+    assert.deepEqual(command, { action: 'set', functionId: 'patient_insight', enabled: false, defaultModelOptionId: modelOptionId });
+});
+
+test('switching off without changing the model preserves the local binding', () => {
+    const modelOptionId = `model_option_${'b'.repeat(32)}`;
+    const component = loadComponent('./function-preferences-panel.tsx', 'PreferenceCard', ['local', false, modelOptionId]);
+    let command: unknown;
+    const tree = component({ row: { id: 'patient_insight', enabled: true, defaultSource: 'saved_preference', defaultModelOptionId: modelOptionId,
+        bindingState: 'stale', options: [] }, activationSupported: true, disabled: false, account: null, preview: (value: unknown) => { command = value; } });
+    const button = nodes(tree).find(n => n.type === 'button' && n.props.children === 'Anteprima modifica')!;
+    (button.props.onClick as () => void)();
+    assert.deepEqual(command, { action: 'set_activation', functionId: 'patient_insight', enabled: false });
+});

@@ -328,7 +328,7 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
                             <p>Impostazione di sintesi non disponibile. Nessuna generazione consentita.</p>
                             <button type="button" className={disclosure.documentAction} data-lume-action="quiet" onClick={refreshSetting}>Riprova impostazione</button>
                         </div> : !documentSynthesisEnabled ? <div className={cn('mt-3', semanticSignalSurfaceClass(sharedKillSwitchSignal(false)))} data-testid="document-upload-synthesis-disabled-note">
-                            La sintesi Fabric è disabilitata localmente. Upload, estrazione locale e revisione manuale restano disponibili.
+                            La sintesi dei documenti è disattivata. Puoi continuare a caricare i documenti, estrarne il testo sul computer e rivederli manualmente.
                         </div> : null}
                         {selectedAttachment && documentSynthesisEnabled && <DocumentSynthesisFabricReviewCard
                             patientId={patientId}
