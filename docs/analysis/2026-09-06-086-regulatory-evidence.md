@@ -141,6 +141,13 @@ UI resta `available_unqualified`; l'applicazione delle proposte non è stata
 eseguita. Il processo Ollama preesistente è rimasto invariato; i server di
 collaudo sono stati chiusi.
 
+Il candidato finale `017f93d7907c1035e14b8c9d0b88ebb0ccc439be` aggiunge a
+`1ceb69583` soltanto la frase comprensibile che segnala la sintesi disattivata.
+Build e controlli obbligatori passati; messaggio e spegnimento/riattivazione
+riletti nella UI, senza generare. Le 16 prove UI e le sei generazioni sopra
+restano attribuite a `1ceb69583`: non sono state ripetute per la sola frase.
+Anche il candidato finale resta locale e non pubblicato.
+
 Per l'AI, distinguere Patient Insight, Smart Import, Document Synthesis e
 Treatment Reasoning. Quest'ultimo mantiene la propria finalità di ragionamento
 clinico: non è riclassificato come semplice riassunto. Il giudizio applicabile
