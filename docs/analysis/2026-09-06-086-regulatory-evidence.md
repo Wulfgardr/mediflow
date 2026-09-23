@@ -11,6 +11,159 @@ La ricerca documenta requisiti, condizioni ed evidenze nel sorgente pubblico.
 Non attesta conformità, adeguatezza di un deployment, qualificazione del
 prodotto, adozione di procedure o completamento di WUL-686/687/688.
 
+### Raccordo del 23 settembre 2026: due contesti professionali sul Mac
+
+Il perimetro ora dichiarato comprende **uso professionale individuale sul Mac**,
+sia nell'attività autonoma sia per conto di una struttura, da mantenere separati.
+Include la valutazione esplicita dell'AI remota. Non sono stati letti o modificati
+archivi clinici, account dei provider o configurazioni della struttura.
+
+La sorgente `v0.8.6`, commit
+`46296266c0a8ff4d4ab19216af7e761cddec7d78`, è pubblicata. Le nuove prove usano
+quella sorgente in un runtime di produzione localhost con dati sintetici.
+La checkout documentale `f05b3847d863fcddf53c87be88ba4b884b938aca` aggiunge
+documenti e asset; non trasforma prove storiche in prove sul tag. La qualifica
+dell'app nativa storica e delle piattaforme successive resta fuori perimetro.
+Questa sezione prevale sui precedenti riferimenti a una release sorgente ancora
+da pubblicare o a Xcode come prerequisito del dossier.
+
+| Contesto | Trattamento da valutare | Decisione ancora necessaria |
+| --- | --- | --- |
+| Attività professionale autonoma | Cartella dei propri assistiti, documenti ricevuti, note, scale, consultazione dei repertori ed eventuali proposte AI | Finalità e presupposti per ciascun uso, informativa e registro adottati, conservazione e gestione delle richieste; ruolo effettivo del professionista secondo l'attività |
+| Attività per una struttura | Dati trattati nell'incarico conferito, su dispositivo individuale | Identificazione del titolare e delle istruzioni ricevute; autorizzazione a dispositivo, archivio, copie e fornitore AI. Il possesso del Mac non attribuisce tali poteri |
+
+La separazione richiesta deve comprendere archivi, documenti esportati, backup,
+sessioni e configurazioni dei provider. Un filtro «ambulatorio» nella stessa
+cartella non viene assunto come separazione tra titolari. La configurazione
+operativa candidata usa directory dati e sessioni distinte; destinazioni e
+procedure reali non sono ancora state configurate o collaudate. Non spostare
+automaticamente dati della struttura nell'archivio dell'attività autonoma.
+
+#### Canale remoto scelto e istruzioni della struttura
+
+Il 23 settembre l'utente ha circoscritto il provider esterno a **OpenAI tramite
+ChatGPT OAuth**; altri provider restano futuri. Le istruzioni della struttura
+per dati sul Mac, copie e AI sono **da concordare**. Non è quindi dimostrata
+l'autorità operativa per tale trattamento; non è un difetto risolvibile con un
+test del software. Il tipo di piano/workspace ChatGPT e le condizioni realmente
+applicabili non sono ancora attestati; OAuth identifica il metodo di accesso,
+non il contratto o il ruolo del fornitore.
+
+Fonti OpenAI rilette il 23 settembre:
+
+- [Codex con un piano ChatGPT](https://help.openai.com/en/articles/11369540-using-codex-with-your-chatgpt-plan):
+  l'accesso ChatGPT segue i termini e i controlli dati del piano. Per Plus/Pro
+  l'uso dei contenuti per migliorare i modelli dipende dalle impostazioni;
+  Business/Enterprise/Edu hanno condizioni differenti. Non sono state lette né
+  cambiate le impostazioni dell'account concreto.
+- [Termini europei per servizi individuali](https://openai.com/policies/eu-terms-of-use/),
+  aggiornati 16 gennaio 2026: richiedono diritti sugli input e verifica degli
+  output; limitano l'uso di output riferiti a persone per decisioni con effetti
+  materiali, incluse quelle mediche. È un vincolo concreto da risolvere per
+  Patient Insight e Treatment Reasoning, non superato dal solo pulsante di
+  conferma umana.
+- [Services Agreement](https://openai.com/policies/services-agreement/) e
+  [DPA](https://openai.com/policies/data-processing-addendum/), quest'ultimo
+  efficace dal 1 gennaio 2026: l'accordo professionale e il trattamento per
+  conto del cliente vanno collegati al servizio e all'account coperti. Non si
+  attribuisce quel DPA a un account individuale soltanto perché usa OAuth.
+  La clausola HIPAA riguarda la propria definizione statunitense di PHI: non
+  sostituisce la valutazione GDPR dei dati sanitari italiani.
+
+Non sono dedotti dall'opt-out dall'addestramento: assenza di conservazione,
+residenza esclusivamente UE, applicabilità del DPA, autorizzazione della
+struttura o idoneità clinica. Il flusso MediFlow usa il trasporto Codex descritto
+nell'ADR0134; le condizioni del canale effettivo devono coprire proprio quel
+flusso. Il DPA dedicato a ChatGPT Sites e le condizioni di ChatGPT Health non
+sono usati come copertura dell'integrazione MediFlow.
+
+La decisione candidata resta distinta per ciascun uso: collaudo sintetico
+locale ammesso nel task; uso per la struttura e invii di dati sanitari remoti
+non ammessi dal presente dossier. L'attività autonoma richiede ancora le
+procedure adottate e la valutazione delle funzioni realmente utilizzate.
+Questa è una proposta documentata di perimetro, non una firma o un'approvazione
+professionale già raccolta.
+
+#### Applicabilità italiana circoscritta
+
+Il [provvedimento del Garante del 7 marzo 2019](https://www.garanteprivacy.it/home/docweb/-/docweb-display/docweb/9091942),
+riletto il 23 settembre, chiarisce che i trattamenti necessari alla cura svolti
+da un professionista vincolato al segreto non richiedono il consenso privacy
+del paziente come presupposto; usi ulteriori richiedono una valutazione distinta.
+Per il professionista sanitario che opera individualmente in libera professione
+non impone il DPO per questa sola attività, mentre resta il registro dei
+trattamenti. Queste indicazioni non qualificano automaticamente l'uso per una
+struttura né un invio al provider AI. Informativa, finalità, basi applicabili e
+responsabilità restano da registrare per ciascuno dei due contesti. La necessità
+di DPIA va motivata rispetto a trattamenti e rischi effettivi, comprendendo
+l'AI remota, senza dedurla soltanto dal numero di postazioni.
+
+La [pagina della Commissione sull'AI Act](https://digital-strategy.ec.europa.eu/en/policies/regulatory-framework-ai)
+è stata riletta: espone l'aggiornamento del 3 agosto 2026 e il calendario già
+registrato in §2. I tentativi di rilettura dei testi EUR-Lex in questa sessione
+hanno restituito una verifica automatica del browser: non sono conteggiati come
+nuova lettura degli atti. Il registro normativo del 6 settembre resta attribuito
+alla ricerca originaria; nessuna classificazione è dedotta dal solo calendario.
+
+#### Flussi, prove e decisioni del deployment
+
+| Flusso o controllo | Meccanismo e prova disponibile | Limite concreto e responsabile del seguito |
+| --- | --- | --- |
+| Accesso locale | Setup ordinario su archivio vuoto; quattro casi E2E sul tag per ciclo accesso/blocco/logout/reset e recupero tra schede | Le prove riguardano account sintetici. Le credenziali brevi hanno un rischio separato già assegnato a WUL-722; non dichiarare risolto quel rischio dai test di accesso |
+| Cartella senza AI | Primo paziente, nota cifrata e ADL; rilettura dopo riavvio su archivio sintetico. Bozza di onboarding ripresa e cambio profilo con rollback | La prima ricevuta apre nota/scala tramite URL UI. La prova successiva tramite clic ha riprodotto il ritorno alla guida dopo creazione: correzione WUL-732 verificata nel candidato locale `1ceb695831147c8426ddc71c4b6342b005ce3bad`, non modifica retroattiva del tag |
+| Persistenza e copie | Cifratura per i campi dichiarati in SECURITY, directory dati esplicite, backup e ripristino secondo i contratti esistenti | Il file SQLite non è integralmente cifrato; export, metadati e copie hanno coperture differenti. Sul Mac di prova FileVault risulta attivo, ma non sono stati ispezionati gli archivi reali né la destinazione dei loro backup. WUL-721/730 conservano le correzioni pertinenti |
+| Diritti, conservazione e ripristino | Matrice P2 delle categorie esportate e test di restore già attribuiti alla rispettiva revisione; tombstone e purge distinti | PDF/FHIR non equivalgono a risposta completa a una richiesta. Occorrono procedura di ricerca delle copie, decisione di conservazione e riconciliazione dei record cancellati dopo il backup; WUL-686 con WUL-730 |
+| AI remota | ADR0134: quattro operazioni nominate, consenso al payload congelato, controlli su fonti/modello, proposte da rivedere e nessuna applicazione clinica automatica. CI del tag: harness browser sintetico e test dei quattro controller | Provider live finale non attestato. Prima di dati reali identificare canale, account, condizioni sul trattamento, retention, addestramento, destinatari e trasferimenti; documentare autorizzazione separata per i due contesti. WUL-687/688; nessuna credenziale è stata utilizzata |
+| Selezione dei modelli | 45 controlli mirati sul tag passati: default persistito, override, lettore del binding, revoca, conflitto e annullamento, con peer sintetici | Non qualificano ogni combinazione UI/modello/provider né un servizio remoto disponibile. Il candidato locale `1ceb69583114` corregge il salvataggio della scelta locale a funzione spenta, con prova UI e rilettura dopo vero riavvio. WUL-691 conserva la matrice delle singole funzioni e WUL-726 i cambiamenti correnti |
+| Headless | Smoke production sul tag `46296266`: Supervisor reale e cinque operazioni nominate; conferma autenticata della proposta, un solo aggiornamento/audit, replay idempotente, revoche e chiusura pulita verificati su dati sintetici | La conferma usa il trasporto HTTP della Web UI; non prova clic umani o un agente esterno reale. Nessun permesso generale a leggere SQLite o a inviare dati a un agente esterno. Il suo eventuale provider va incluso nel flusso concreto; WUL-731 |
+
+Il candidato runtime locale `1ceb695831147c8426ddc71c4b6342b005ce3bad` è
+stato compilato da un albero pulito: bundle server SHA-256
+`1878d11fd84a94600bf1bedf0803da14800390ff8e8c9b3d41183478665de0de`.
+Sono passati 16 casi UI mirati, oltre a lint, typecheck, controlli di regressione
+e claim e test delle preferenze. Cinque casi UI usano esplicitamente un peer
+HTTP ChatGPT sintetico; non provano il servizio remoto. Queste correzioni sono
+locali e non pubblicate; il tag 0.8.6 resta immutato.
+
+Sul medesimo bundle sono state poi eseguite sei generazioni locali, da UI e con
+Ollama `qwen3.5:35b-a3b` già installato: due Patient Insight, tre Smart Import e
+una Document Synthesis. Patient Insight cita nota e terapia sintetiche; Smart
+Import propone diagnosi e terapia presenti in una nota sintetica acquisita,
+con identificativo della fonte osservato nella richiesta; la sintesi documentale
+riporta una citazione verificata sul documento RTF sintetico. I casi iniziali
+con fonti vuote o prive di elementi espliciti da importare sono conservati,
+senza trasformarli in prove positive di estrazione. Le ricevute dichiarano
+esecuzione locale, nessun fallback e nessuna applicazione clinica; conteggi e
+hash delle 12 tabelle cliniche osservate restano identici prima/dopo le proposte.
+Non è una cattura globale del traffico, una prova di assenza di scritture
+intermedie o una misura di accuratezza clinica. L'ammissione del modello dalla
+UI resta `available_unqualified`; l'applicazione delle proposte non è stata
+eseguita. Il processo Ollama preesistente è rimasto invariato; i server di
+collaudo sono stati chiusi.
+
+Il candidato finale `017f93d7907c1035e14b8c9d0b88ebb0ccc439be` aggiunge a
+`1ceb69583` soltanto la frase comprensibile che segnala la sintesi disattivata.
+Build e controlli obbligatori passati; messaggio e spegnimento/riattivazione
+riletti nella UI, senza generare. Le 16 prove UI e le sei generazioni sopra
+restano attribuite a `1ceb69583`: non sono state ripetute per la sola frase.
+Anche il candidato finale resta locale e non pubblicato.
+
+Per l'AI, distinguere Patient Insight, Smart Import, Document Synthesis e
+Treatment Reasoning. Quest'ultimo mantiene la propria finalità di ragionamento
+clinico: non è riclassificato come semplice riassunto. Il giudizio applicabile
+deve riguardare funzione, impiego effettivo e influenza sulla decisione medica;
+il controllo umano e l'installazione locale sono elementi della valutazione,
+non un'esenzione generale.
+
+**Esito operativo del dossier: preparazione avanzata, ammissione clinica ancora
+aperta per entrambi i contesti e per l'AI remota.** Gli elementi mancanti sono
+la configurazione effettiva dei due archivi, le istruzioni della struttura,
+le condizioni dell’account ChatGPT OAuth scelto, l'adozione delle procedure e la
+decisione motivata sulle funzioni incluse. La pubblicazione del sorgente resta
+un risultato distinto, già conseguito. Le prove private sintetiche sono nel
+registro di consolidamento del 23 settembre; nessun dato paziente, token o
+backup è incluso nel dossier pubblico.
+
 ### Raccordo tecnico del 12 settembre 2026
 
 Le sezioni successive conservano la fotografia del 6 settembre e le sue
@@ -388,3 +541,123 @@ Per identificare il commit del documento senza inserirvi uno SHA autoreferenzial
 ```bash
 git log -1 --format='%H %s' -- docs/analysis/2026-09-06-086-regulatory-evidence.md
 ```
+
+## Schede operative candidate per i due contesti
+
+Queste schede sono moduli di lavoro non adottati, da duplicare e compilare
+separatamente per **A — attività autonoma** e **B — incarico per una struttura**.
+Sono precompilati solo i fatti riportati nel raccordo del 23 settembre; i campi
+non documentati restano esplicitamente da definire/confermare. Nessuna scheda è
+un'informativa consegnabile, una decisione sulla necessità di DPIA o una prova
+di conformità. In particolare B resta da concordare con la struttura; i due
+contesti richiedono archivi, esportazioni, backup, sessioni e configurazioni
+provider separati. Fonte dei campi e dei limiti: §3–4, §6 P1–P4/P7 sopra.
+
+### 1. Registro operativo dei trattamenti — compilare A e B separatamente
+
+| Campo | A — professionista autonomo | B — struttura su Mac |
+| --- | --- | --- |
+| Contesto e titolarità | Attività autonoma; titolare/ruolo effettivo: **da definire/confermare per attività e finalità** | Incarico della struttura; titolare, ruoli e istruzioni: **da concordare con la struttura** |
+| Finalità e presupposti | **Da definire/confermare per ciascun uso**, compreso ogni uso AI | **Da concordare con il titolare** per ciascun uso; non ereditare le finalità di A |
+| Interessati e categorie di dati | Assistiti e categorie effettive: **da definire/confermare** | Interessati e categorie conferite: **da concordare/confermare** |
+| Destinatari e ruoli | Destinatari, responsabili e autorizzati: **da definire/confermare** | Struttura, autorizzati, responsabili/sub-responsabili: **da documentare secondo istruzioni** |
+| Mac, archivio e accessi | Mac dell’utente; directory, sessioni, accessi e configurazione reale: **da verificare** | Mac individuale; autorizzazione, archivio, accessi e istruzioni: **da concordare e verificare** |
+| Copie e trasferimenti | Elencare archivio, documenti, derivati, export, cache, sessioni, backup e destinatari/trasferimenti: **inventario da compilare** | Stesso inventario, separato da A; proprietario di ciascuna copia e autorizzazione: **da concordare** |
+| AI esterna e conservazione | Solo canale remoto indicato: **OpenAI via ChatGPT OAuth**; piano/workspace, termini, retention, uso dati, destinatari e trasferimenti: **non identificati/da verificare** | Stesso solo canale selezionato; uso per dati della struttura e relative istruzioni/autorizzazioni: **da concordare**; piano/workspace non identificato |
+| Durata e cancellazione | Durata clinica, criteri, eccezioni e cancellazione delle copie: **da definire/confermare**; `keep-last-N` è solo retention tecnica dei backup scheduler | Durate/istruzioni del titolare, eccezioni, copie e cancellazione: **da concordare**; nessun periodo dedotto dal backup scheduler |
+| Sicurezza e misure | Misure applicate a ogni copia, accesso e provider: **da verificare sul deployment** | Misure richieste dalla struttura e prova sul Mac/copie: **da concordare e verificare** |
+| Diritti e richieste | Procedura, referente, verifica proporzionata dell’identità e risposta tracciata: **da definire** | Canale, referente della struttura, escalation e risposta: **da concordare** |
+| Registro delle copie per diritti/retention | Per ogni copia: supporto/percorso, contenuto, owner, destinatari, backup/export, retention, cancellazione, restore e verifica: **compilare senza dati identificativi in questo dossier** | Stessi campi, compilati separatamente; owner/istruzioni della struttura e prova di riconciliazione dopo restore: **da concordare** |
+| Decisioni e approvazioni | Decisioni sulle finalità, misure e retention: **da registrare nel dossier autorizzato** | Istruzioni e autorizzazioni della struttura: **da acquisire nel dossier autorizzato** |
+
+Il Bundle FHIR e gli altri export sono supporti parziali, non una risposta completa
+a una richiesta. Un restore può reintrodurre record cancellati: documentare la
+riconciliazione prima dell'eventuale ripresa d'uso. Per ciascuna richiesta
+registrare riferimento non identificativo, data/canale, verifica identità,
+diritti richiesti, copie cercate, valutazione/limiti, decisione, responsabile,
+risposta e completamento: **procedura concreta da definire per A e concordare
+per B**.
+
+### 2. Scheda dati per predisporre l’informativa — due bozze non consegnabili
+
+**Stato per A e B: BOZZA — NON CONSEGNABILE finché i campi applicabili non sono
+risolti, verificati e approvati dal soggetto competente.** Duplicare la scheda;
+non copiare titolarità, contatti o basi da un contesto all’altro.
+
+| Campo da valorizzare | A — autonomo | B — struttura |
+| --- | --- | --- |
+| Titolare e ruolo effettivo | Da definire/confermare | Da concordare/confermare con la struttura |
+| Contatti del titolare e del referente | Da definire/confermare | Da concordare; canale/referente della struttura non forniti |
+| Finalità e base per ciascuna finalità | Da valutare e confermare per uso | Da concordare con il titolare; non preselezionare |
+| Categorie di dati e interessati | Da verificare rispetto al trattamento concreto | Da concordare rispetto all’incarico |
+| Destinatari, ruoli e trasferimenti | Da verificare; OpenAI via ChatGPT OAuth è l’unico provider esterno selezionato, condizioni non identificate | Da concordare; non attestare l’autorizzazione AI o trasferimenti |
+| Durata/criteri di conservazione e copie | Da definire, incluse copie ed eccezioni | Da concordare con la struttura, incluse copie ed eccezioni |
+| Diritti, modalità e limiti | Da completare per accesso, rettifica, limitazione, opposizione, cancellazione e portabilità; limiti da verificare | Da concordare canale, referente, limiti e gestione con il titolare |
+| Reclamo e autorità di controllo | Da verificare e completare | Da confermare nel contesto della struttura |
+| Conferimento dei dati e conseguenze | Da definire per ciascuna raccolta/finalità | Da concordare con la struttura per ciascun flusso |
+| Decisioni automatizzate/profilazione | Accertare il flusso concreto e valorizzare; non dedurre dal solo controllo umano | Accertare il flusso concreto autorizzato e valorizzare |
+| Fonte indiretta e modalità/tempi informativi | Da completare quando pertinenti | Da concordare quando pertinenti |
+| Prova di revisione, approvazione e consegna | Nessuna prova raccolta; compilare nel dossier autorizzato | Nessuna prova raccolta; approvazione/consegna da concordare |
+
+### 3. Screening DPIA — esito da decidere, nessuna risposta precompilata
+
+Compilare uno screening per ciascun contesto e configurazione concreta. Le
+risposte e l’esito restano **da valutare**; non precompilare “NO” né considerare
+il funzionamento locale o il numero di postazioni decisivo.
+
+| Domanda / elemento | A — autonomo | B — struttura |
+| --- | --- | --- |
+| Titolare, finalità, ruoli e configurazione valutata | Da definire/confermare | Da concordare/confermare |
+| Natura, categorie di dati e persone interessate/vulnerabili | Da valutare e motivare | Da valutare con il titolare e motivare |
+| Scala: soggetti, volume, frequenza, durata e ampiezza | Da raccogliere/verificare | Da raccogliere/verificare con la struttura |
+| Tecnologia e flussi, incluse copie, export e backup | Da mappare per la configurazione reale | Da mappare separatamente secondo istruzioni |
+| AI remota, payload, destinatari, account/condizioni e retention | OpenAI via ChatGPT OAuth selezionato; piano/condizioni ignoti; valutare se e come entra nel trattamento | Istruzioni/autorizzazione mancanti; valutazione sospesa sui fatti organizzativi |
+| Rischi per diritti e libertà, probabilità e gravità | Da identificare e motivare | Da identificare con il contesto della struttura |
+| Misure esistenti, lacune e mitigazioni proposte | Da documentare con evidenze deployment | Da concordare, attribuire e verificare |
+| Rischio residuo e accettazione/escalation | Da decidere e attribuire al ruolo competente | Da decidere dal ruolo competente della struttura |
+| Esito: DPIA necessaria? consultazione preventiva? | **Da decidere; nessun esito preselezionato** | **Da decidere; nessun esito preselezionato** |
+| Responsabile, revisore/DPO se designato, data e riesame | Da identificare; nessuna nomina presunta | Da concordare; nessuna nomina presunta |
+
+### 4. Procedura e registro incidenti; richieste, copie e restore
+
+**Procedura candidata da revisionare e adattare separatamente.** In caso di
+segnalazione: interrompere o contenere il flusso interessato senza cancellare
+prove; conservare evidenze controllate e minimizzate; avvisare il responsabile/
+titolare secondo i ruoli e le istruzioni; valutare il caso secondo GDPR artt.
+33/34 e registrare anche gli eventi non notificati; ripristinare il flusso solo
+dopo le verifiche e l’autorizzazione previste per quel contesto.
+
+La [guida del Garante sui data breach](https://www.garanteprivacy.it/data-breach),
+riletta il 23 settembre 2026, indica per il titolare la notifica senza ritardo
+ingiustificato e, ove possibile, entro 72 ore dalla conoscenza, salvo che sia
+improbabile un rischio per i diritti e le libertà. Documentare la valutazione e
+l’eventuale ritardo: le 72 ore non sono un tempo da attendere. Chi tratta per
+conto del titolare deve informarlo tempestivamente, secondo il ruolo effettivo
+e le istruzioni ricevute. Per il rischio elevato valutare anche la comunicazione
+agli interessati e le condizioni/eccezioni dell’art. 34. La
+[guida EDPB](https://www.edpb.europa.eu/sme/assess-the-risks/data-breaches_en)
+chiarisce che informazioni ancora incomplete possono essere integrate per fasi:
+la raccolta delle evidenze non giustifica un rinvio indiscriminato.
+Nel modulo registrare l’istante della conoscenza, il responsabile della
+valutazione, i destinatari e la motivazione di ogni decisione.
+
+Campi del registro (riferimento non identificativo; conservare i dettagli
+necessari solo nel dossier autorizzato): contesto A/B; data/ora rilevazione;
+segnalante e canale; descrizione minima; sistemi/copie/provider coinvolti;
+contenimento; evidenze e accessi; categorie e stima degli interessati/dati;
+valutazione del rischio e motivazione; persone avvisate e tempi; decisione
+artt. 33/34, motivazione e responsabile; notifiche/comunicazioni o ragione della
+mancata notifica; azioni correttive; verifica di restore/riconciliazione; criterio
+e autorizzazione alla ripresa; chiusura e riesame. Tutti i campi di evento reale
+sono **da compilare quando applicabili**; non inserire esempi o firme fittizie.
+
+Per diritti, cancellazione e restore, allegare al record dell’evento/request la
+mappa di **tutte** le copie e gli export/backup, con proprietario e prova di
+ricerca; tipo di richiesta e riferimento non identificativo; verifica
+proporzionata dell’identità; base e limiti da valutare; decisioni e istruzioni;
+risposta tracciata; copie cancellate o preservate e ragione; riconciliazione dei
+record cancellati dopo un restore; verifiche e autorizzazione prima di riprendere
+l’uso. Tempi, eccezioni e conservazione clinica restano da definire/confermare
+per A e da concordare con la struttura per B. Le segnalazioni di vulnerabilità
+in `SECURITY.md` non costituiscono questa procedura di violazione di dati
+personali.
