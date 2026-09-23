@@ -131,7 +131,8 @@ test('WHO selection survives real encrypted patient create/update/read and unrel
     expect(written.diagnoses).toMatch(/^ENC:/u);
     expect(written.diagnoses).not.toContain(canonicalUri);
     const patientId = written.id as string;
-    await expect(page).toHaveURL(new URL('/', baseURL!).href);
+    // @Codex WUL-732: la scheda nuova apre la lista pazienti senza dipendere dal profilo.
+    await expect(page).toHaveURL(new URL('/?area=incarico', baseURL!).href);
     const assertReread = async () => {
         await page.goto(`/patients/${patientId}/edit`);
         await expect(page.locator('input[name="diagnoses.0.code"]')).toHaveValue(code);

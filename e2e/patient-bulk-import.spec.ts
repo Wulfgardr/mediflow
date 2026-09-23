@@ -81,7 +81,8 @@ async function createExistingFromUi(page: Page): Promise<WirePatient> {
     const saved = page.waitForResponse(item => isPatientCreate(item.request()));
     await page.getByRole('button', { name: 'Crea scheda', exact: true }).click();
     expect((await saved).status()).toBe(201);
-    await expect(page).toHaveURL(/\/$/u);
+    // @Codex WUL-732: la creazione torna esplicitamente alla lista pazienti.
+    await expect(page).toHaveURL(/\/\?area=incarico$/u);
     const rows = await list(page); expect(rows).toHaveLength(1);
     return rows[0];
 }

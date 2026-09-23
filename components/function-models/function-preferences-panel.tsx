@@ -19,6 +19,8 @@ function PreferenceCard({ row, disabled, account, activationSupported, preview }
     const remote = channel === 'chatgpt_subscription';
     const [enabled, setEnabled] = useState(row.enabled);
     const [model, setModel] = useState<string | null>(row.defaultSource === 'host_configuration' ? null : row.defaultModelOptionId);
+    // @Codex: a disabled function may still save an explicit local default.
+    const localModelChanged = model !== (row.defaultSource === 'host_configuration' ? null : row.defaultModelOptionId);
     const selected = model === null && row.defaultSource !== 'host_configuration' ? undefined : row.options.find(o => o.modelOptionId === (model ?? row.defaultModelOptionId));
     const computerDefault = row.defaultSource === 'host_configuration' ? row.options.find(o => o.modelOptionId === row.defaultModelOptionId) : undefined;
     const warning = model === null && row.defaultSource !== 'host_configuration' ? 'Il modello del computer sarà indicato nell’anteprima.' : row.bindingState === 'stale' ? 'Scelta salvata scaduta: serve una nuova decisione.' : row.bindingState === 'unsupported' ? 'Predefinito non disponibile.' : selected?.state === 'available_unqualified' ? '' : 'Provider locale non disponibile';
@@ -43,7 +45,7 @@ function PreferenceCard({ row, disabled, account, activationSupported, preview }
         {!remote && row.id === 'treatment_reasoning' && <TreatmentReasoningPortableSetup option={row.options.find(o => o.provider === 'athena_transformers')} />}
         {!remote && !selected && model !== null && <p>Nessun modello selezionabile</p>}
         <div className={styles.actions}><button type="button" role="switch" aria-checked={enabled} aria-label={`${names[row.id]} nella proposta`} className={`${SETTINGS_SECONDARY_BUTTON_CLASS} ${styles.switch}`} disabled={disabled} onClick={() => setEnabled(!enabled)}>{enabled ? 'Spegni' : 'Attiva'}</button>
-            <button type="button" className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={disabled} onClick={() => preview(activationSupported && (remote || !enabled)
+            <button type="button" className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={disabled} onClick={() => preview(activationSupported && (remote || (!enabled && !localModelChanged))
                 ? { action: 'set_activation', functionId: row.id, enabled }
                 : { action: 'set', functionId: row.id, enabled, defaultModelOptionId: model })}>Anteprima modifica</button></div>
         <details><summary>Stato e dettagli</summary><Description row={row} /><p className={styles.hint}>La configurazione non prova la disponibilità del modello: viene verificata alla richiesta.</p><p className={styles.hint}>OpenAI · ChatGPT {account?.state === 'connected' ? 'collegato' : account?.state === 'awaiting_login' || account?.state === 'verifying' ? 'accesso in corso' : account?.state === 'starting' ? 'avvio accesso' : account?.state === 'disconnected' ? 'non collegato' : account?.state === 'error' ? 'errore nel collegamento' : 'stato non disponibile'}. Il collegamento account non abilita la funzione, non concede consenso e non prova la disponibilità del modello.</p></details>
