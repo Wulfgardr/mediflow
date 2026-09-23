@@ -96,7 +96,7 @@ const REVIEWED_UNRELATED_LOADER_DIAGNOSTICS = new Map([
         diagnostics: ['reserved-loader-identity:*'],
     }],
     ['components/function-models/ordinary-ui.test.ts', {
-        sha256: 'cdb3aafd704c56734fdd3ad57929dabc2bd45547544bc7f70632385defd23cc4',
+        sha256: 'dcb891eacfe0c40f23bbcd1455f214efe93e5c1b5436c662d1e1a38af3b68be6',
         diagnostics: ['reserved-loader-identity:*'],
     }],
     ['lib/patient-create-service.test.ts', {
