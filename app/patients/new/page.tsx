@@ -208,7 +208,7 @@ export default function NewPatientPage() {
                 await db.servicePrescriptions.bulkPut(servicePrescriptionItems);
             }
 
-            router.push('/');
+            router.push('/?area=incarico'); // @Codex WUL-732: torna alla lista anche senza profilo confermato.
         } catch (error) {
             console.error("Failed to save patient", error);
             showToast({ tone: 'error', title: 'Errore durante il salvataggio', description: 'Controlla i dati e riprova.' });
