@@ -39,6 +39,51 @@ operativa candidata usa directory dati e sessioni distinte; destinazioni e
 procedure reali non sono ancora state configurate o collaudate. Non spostare
 automaticamente dati della struttura nell'archivio dell'attività autonoma.
 
+#### Canale remoto scelto e istruzioni della struttura
+
+Il 23 settembre l'utente ha circoscritto il provider esterno a **OpenAI tramite
+ChatGPT OAuth**; altri provider restano futuri. Le istruzioni della struttura
+per dati sul Mac, copie e AI sono **da concordare**. Non è quindi dimostrata
+l'autorità operativa per tale trattamento; non è un difetto risolvibile con un
+test del software. Il tipo di piano/workspace ChatGPT e le condizioni realmente
+applicabili non sono ancora attestati; OAuth identifica il metodo di accesso,
+non il contratto o il ruolo del fornitore.
+
+Fonti OpenAI rilette il 23 settembre:
+
+- [Codex con un piano ChatGPT](https://help.openai.com/en/articles/11369540-using-codex-with-your-chatgpt-plan):
+  l'accesso ChatGPT segue i termini e i controlli dati del piano. Per Plus/Pro
+  l'uso dei contenuti per migliorare i modelli dipende dalle impostazioni;
+  Business/Enterprise/Edu hanno condizioni differenti. Non sono state lette né
+  cambiate le impostazioni dell'account concreto.
+- [Termini europei per servizi individuali](https://openai.com/policies/eu-terms-of-use/),
+  aggiornati 16 gennaio 2026: richiedono diritti sugli input e verifica degli
+  output; limitano l'uso di output riferiti a persone per decisioni con effetti
+  materiali, incluse quelle mediche. È un vincolo concreto da risolvere per
+  Patient Insight e Treatment Reasoning, non superato dal solo pulsante di
+  conferma umana.
+- [Services Agreement](https://openai.com/policies/services-agreement/) e
+  [DPA](https://openai.com/policies/data-processing-addendum/), quest'ultimo
+  efficace dal 1 gennaio 2026: l'accordo professionale e il trattamento per
+  conto del cliente vanno collegati al servizio e all'account coperti. Non si
+  attribuisce quel DPA a un account individuale soltanto perché usa OAuth.
+  La clausola HIPAA riguarda la propria definizione statunitense di PHI: non
+  sostituisce la valutazione GDPR dei dati sanitari italiani.
+
+Non sono dedotti dall'opt-out dall'addestramento: assenza di conservazione,
+residenza esclusivamente UE, applicabilità del DPA, autorizzazione della
+struttura o idoneità clinica. Il flusso MediFlow usa il trasporto Codex descritto
+nell'ADR0134; le condizioni del canale effettivo devono coprire proprio quel
+flusso. Il DPA dedicato a ChatGPT Sites e le condizioni di ChatGPT Health non
+sono usati come copertura dell'integrazione MediFlow.
+
+La decisione candidata resta distinta per ciascun uso: collaudo sintetico
+locale ammesso nel task; uso per la struttura e invii di dati sanitari remoti
+non ammessi dal presente dossier. L'attività autonoma richiede ancora le
+procedure adottate e la valutazione delle funzioni realmente utilizzate.
+Questa è una proposta documentata di perimetro, non una firma o un'approvazione
+professionale già raccolta.
+
 #### Applicabilità italiana circoscritta
 
 Il [provvedimento del Garante del 7 marzo 2019](https://www.garanteprivacy.it/home/docweb/-/docweb-display/docweb/9091942),
@@ -82,7 +127,7 @@ non un'esenzione generale.
 **Esito operativo del dossier: preparazione avanzata, ammissione clinica ancora
 aperta per entrambi i contesti e per l'AI remota.** Gli elementi mancanti sono
 la configurazione effettiva dei due archivi, le istruzioni della struttura,
-il servizio remoto e le sue condizioni, l'adozione delle procedure e la
+le condizioni dell’account ChatGPT OAuth scelto, l'adozione delle procedure e la
 decisione motivata sulle funzioni incluse. La pubblicazione del sorgente resta
 un risultato distinto, già conseguito. Le prove private sintetiche sono nel
 registro di consolidamento del 23 settembre; nessun dato paziente, token o
