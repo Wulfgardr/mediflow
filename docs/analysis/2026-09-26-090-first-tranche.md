@@ -457,3 +457,26 @@ con questa distinzione nelle ricevute e nel passaggio al Chief of Staff.
 I fallimenti precedenti restano conservati; non si chiudono C14, C05 nel
 suo insieme, qualificazione clinica o rilascio. Le prove browser della
 milestone precedente non vengono ripetute: i tre file UI restano invariati.
+
+
+## Delta separato WUL-694 — percorsi del pianificatore backup
+
+Dopo il congelamento della creazione locale, il coordinatore integra i soli
+`backup-scheduler-adapter.ts` e `backup-scheduler.test.ts` accettati dal Chief
+nella lane parità. Gli hash coincidono con la consegna; tutti i file runtime
+delle coorti precedenti restano invariati.
+
+Il delta conserva letterali i caratteri speciali dei percorsi nei comandi
+Windows, nelle unità systemd e nelle righe cron; valida i valori prima di
+scrivere i file dei job. Non modifica runner, formato del backup, ripristino
+o database clinico. Nell'integrato passano 15 test mirati, lint dei due file,
+controllo tipi e build con Node 24.18.0/ABI 137. La suite completa non viene
+rieseguita per questo delta separato; resta dichiarato il suo esito precedente
+con concorrenza quattro e il debito dei timeout del comando standard.
+
+Sono conservate e riusate le ricevute sintetiche già verificate dal Chief
+su Windows 11 ARM64, Arch Linux ARM64 con systemd e macOS con launchd, ai
+medesimi byte del candidato. Cron è provato con parser modellato e shell
+reale, non con un daemon cron. Queste evidenze non qualificano Windows/Linux
+x64, parità completa o il percorso integrale di backup e ripristino. Audit
+e browser invariati non vengono ripetuti.

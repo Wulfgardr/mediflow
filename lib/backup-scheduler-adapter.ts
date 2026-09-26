@@ -74,7 +74,7 @@ function quoteCmdArg(value: string, label: string): string {
     if (value.includes('"')) {
         throw new Error(`${label} cannot contain double quotes.`);
     }
-    return `"${value}"`;
+    return `"${value.replaceAll('%', '%%')}"`;
 }
 
 function quoteCmdSetValue(value: string, label: string): string {
@@ -82,17 +82,34 @@ function quoteCmdSetValue(value: string, label: string): string {
     if (value.includes('"')) {
         throw new Error(`${label} cannot contain double quotes.`);
     }
-    return value;
+    return value.replaceAll('%', '%%');
 }
 
-function quoteSystemdValue(value: string, label: string): string {
+function quoteSystemdValue(value: string, label: string, execStart = false): string {
     assertNoControlChars(value, label);
-    return `"${value.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`;
+    const escaped = value.replaceAll('\\', '\\\\').replaceAll('"', '\\"').replaceAll('%', '%%');
+    return `"${execStart ? escaped.replaceAll('$', () => '$$') : escaped}"`;
+}
+
+function systemdWorkingDirectory(value: string): string {
+    assertNoControlChars(value, 'projectRoot');
+    if (/[ \t\v\f]$/.test(value) || value.endsWith('\\')) {
+        throw new Error('Il backup automatico non può usare questa cartella di MediFlow: il nome termina con spazi o con il carattere \\. Sposta MediFlow in una cartella con un nome diverso.');
+    }
+    // WorkingDirectory is a single path value, not an ExecStart argument list.
+    return value.replaceAll('%', '%%');
 }
 
 function quoteShellArg(value: string, label: string): string {
     assertNoControlChars(value, label);
     return `'${value.replaceAll("'", "'\\''")}'`;
+}
+
+// Cron removes the backslash immediately before %, then passes the result to
+// the shell. Split quoted chunks at % so a path's own backslash never becomes
+// that escape character (including a path containing \%).
+function quoteCronShellArg(value: string, label: string): string {
+    return value.split('%').map((part) => quoteShellArg(part, label)).join('\\%');
 }
 
 // ---------------------------------------------------------------------------
@@ -107,9 +124,11 @@ export function buildWindowsWrapperCmd(params: {
 }): string {
     return [
         '@echo off',
+        'setlocal DisableDelayedExpansion',
         `set "MEDIFLOW_DATA_DIR=${quoteCmdSetValue(params.dataDir, 'dataDir')}"`,
         `set "MEDIFLOW_BACKUP_DEST_DIR=${quoteCmdSetValue(params.destinationDir, 'destinationDir')}"`,
         `${quoteCmdArg(params.nodePath, 'nodePath')} ${quoteCmdArg(params.runnerPath, 'runnerPath')}`,
+        'endlocal & exit /b %errorlevel%',
         '',
     ].join('\r\n');
 }
@@ -141,10 +160,10 @@ Description=MediFlow nightly backup
 
 [Service]
 Type=oneshot
-WorkingDirectory=${quoteSystemdValue(params.projectRoot, 'projectRoot')}
+WorkingDirectory=${systemdWorkingDirectory(params.projectRoot)}
 Environment=${quoteSystemdValue(`MEDIFLOW_DATA_DIR=${params.dataDir}`, 'dataDir')}
 Environment=${quoteSystemdValue(`MEDIFLOW_BACKUP_DEST_DIR=${params.destinationDir}`, 'destinationDir')}
-ExecStart=${quoteSystemdValue(params.nodePath, 'nodePath')} ${quoteSystemdValue(params.runnerPath, 'runnerPath')}
+ExecStart=${quoteSystemdValue(params.nodePath, 'nodePath')} ${quoteSystemdValue(params.runnerPath, 'runnerPath', true)}
 `;
 }
 
@@ -170,8 +189,8 @@ export function buildCronLine(params: {
     hour: number;
     minute: number;
 }): string {
-    const env = `MEDIFLOW_DATA_DIR=${quoteShellArg(params.dataDir, 'dataDir')} MEDIFLOW_BACKUP_DEST_DIR=${quoteShellArg(params.destinationDir, 'destinationDir')}`;
-    const cmd = `cd ${quoteShellArg(params.projectRoot, 'projectRoot')} && ${env} ${quoteShellArg(params.nodePath, 'nodePath')} ${quoteShellArg(params.runnerPath, 'runnerPath')}`;
+    const env = `MEDIFLOW_DATA_DIR=${quoteCronShellArg(params.dataDir, 'dataDir')} MEDIFLOW_BACKUP_DEST_DIR=${quoteCronShellArg(params.destinationDir, 'destinationDir')}`;
+    const cmd = `cd ${quoteCronShellArg(params.projectRoot, 'projectRoot')} && ${env} ${quoteCronShellArg(params.nodePath, 'nodePath')} ${quoteCronShellArg(params.runnerPath, 'runnerPath')}`;
     return `${params.minute} ${params.hour} * * * ${cmd} ${CRON_MARKER}`;
 }
 
@@ -212,14 +231,15 @@ class WindowsScheduler implements SchedulerAdapter {
 
     install(state: BackupSchedulerState): SchedulerInstallResult {
         const dataDir = getDefaultDataDir();
-        fs.mkdirSync(dataDir, { recursive: true });
         const wrapperPath = this.wrapperPath();
-        fs.writeFileSync(wrapperPath, buildWindowsWrapperCmd({
+        const wrapper = buildWindowsWrapperCmd({
             nodePath: process.execPath,
             runnerPath: runnerPathFor(process.cwd()),
             dataDir,
             destinationDir: state.config.destinationDir,
-        }), 'utf8');
+        });
+        fs.mkdirSync(dataDir, { recursive: true });
+        fs.writeFileSync(wrapperPath, wrapper, 'utf8');
 
         const args = buildSchtasksCreateArgs({
             taskName: WINDOWS_TASK_NAME,
@@ -279,14 +299,15 @@ class LinuxScheduler implements SchedulerAdapter {
         const runnerPath = runnerPathFor(projectRoot);
 
         if (this.hasSystemd()) {
-            fs.mkdirSync(this.systemdDir(), { recursive: true });
-            fs.writeFileSync(this.servicePath(), buildSystemdServiceUnit({
+            const service = buildSystemdServiceUnit({
                 nodePath: process.execPath,
                 runnerPath,
                 projectRoot,
                 dataDir,
                 destinationDir: state.config.destinationDir,
-            }), 'utf8');
+            });
+            fs.mkdirSync(this.systemdDir(), { recursive: true });
+            fs.writeFileSync(this.servicePath(), service, 'utf8');
             fs.writeFileSync(this.timerPath(), buildSystemdTimerUnit({
                 hour: state.config.hour,
                 minute: state.config.minute,
