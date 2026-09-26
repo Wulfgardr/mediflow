@@ -3,6 +3,7 @@ import { and, desc, eq, gte } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 import { hasValidLocalApiToken } from './local-api-auth';
 import { auditEvents } from '../schema';
+import type { dbServer } from '../db-server';
 import type { ServerSession } from './server-session';
 
 /* @Codex */
@@ -104,6 +105,11 @@ type AuditWriteInput = {
     occurredAt?: Date;
     requestId?: string | null;
     redactedMetadata?: AuditRedactedMetadata | null;
+};
+
+/* @Codex: host-derived identity/correlation only; the patient core owns event and subject. */
+export type RequiredAuditContext = Pick<AuditWriteInput, 'actorType' | 'actorRef' | 'sourceSurface' | 'requestId'> & {
+    flags: string[];
 };
 
 /* @Codex */
@@ -318,13 +324,11 @@ export function classifyPatientMutationEvent(previousIsArchived: boolean | null,
 }
 
 /* @Codex */
-export async function writeAuditEvent(input: AuditWriteInput): Promise<string> {
-    const { dbServer } = await import('../db-server');
+function buildAuditEventRow(input: AuditWriteInput): typeof auditEvents.$inferInsert {
     const eventId = uuidv4();
     const occurredAt = input.occurredAt ?? new Date();
     const redactedMetadata = sanitizeAuditMetadata(input.redactedMetadata);
-
-    await dbServer.insert(auditEvents).values({
+    return {
         eventId,
         schemaVersion: AUDIT_SCHEMA_VERSION,
         eventType: input.eventType,
@@ -338,9 +342,28 @@ export async function writeAuditEvent(input: AuditWriteInput): Promise<string> {
         requestId: input.requestId ?? null,
         redactedMetadata: redactedMetadata ? JSON.stringify(redactedMetadata) : null,
         createdAt: new Date(),
-    });
+    };
+}
 
-    return eventId;
+/* @Codex: mandatory clinical audit insert on the caller's authoritative SQLite transaction. */
+export function writeAuditEventInTransaction(
+    tx: Parameters<Parameters<typeof dbServer.transaction>[0]>[0],
+    input: AuditWriteInput,
+): string {
+    const row = buildAuditEventRow(input);
+    const result = tx.insert(auditEvents).values(row).run();
+    if (result.changes !== 1) {
+        throw new Error('Required audit insert did not write exactly one event');
+    }
+    return row.eventId;
+}
+
+/* @Codex */
+export async function writeAuditEvent(input: AuditWriteInput): Promise<string> {
+    const { dbServer } = await import('../db-server');
+    const row = buildAuditEventRow(input);
+    await dbServer.insert(auditEvents).values(row);
+    return row.eventId;
 }
 
 /* @Codex */

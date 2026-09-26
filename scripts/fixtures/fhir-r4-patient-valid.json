@@ -1,0 +1,10 @@
+{
+  "resourceType": "Patient",
+  "id": "synthetic-validation-only",
+  "text": {
+    "status": "generated",
+    "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\">Paziente interamente sintetico per verifica tecnica.</div>"
+  },
+  "active": true,
+  "gender": "unknown"
+}

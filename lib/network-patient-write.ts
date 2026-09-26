@@ -1,5 +1,4 @@
 /* @Codex */
-import { and, eq } from 'drizzle-orm';
 /* @Codex */
 import {
     classifyPatientMutationEvent,
@@ -10,18 +9,14 @@ import {
     type AuditRedactedMetadata,
 } from './security/audit';
 /* @Codex */
-import { dbServer } from './db-server';
 import { isSealedValue } from './network-patient-lifecycle';
-
-import { upsertPrimaryAmbulatoryMembership } from './patient-ambulatory-membership';
 /* @Codex */
-import { buildPatientVersionConflictPayload, parseExpectedVersion } from './patient-concurrency';
-// WUL-306 (ADR 0066): network writes treat soft-deleted patients as missing
-import { activePatients } from './patient-lifecycle';
+import { parseExpectedVersion } from './patient-concurrency';
+/* @Codex */
+import { updatePatientOperation } from './patient-update-operation';
 /* @Codex */
 import { normalizePatientUpdateInput } from './patient-write-normalization';
 /* @Codex */
-import { patients, patientsToAmbulatories } from './schema';
 /* @Codex */
 import type { StoredNetworkPairedClient } from './network-pairing-model';
 /* @Codex */
@@ -50,23 +45,12 @@ type NetworkPatientMutationResponse =
     | { status: 200; value: { success: true } }
     | { status: 400 | 403 | 404 | 409; value: Record<string, unknown> };
 
-type NetworkPatientUpdateCommit =
-    | { status: 200; value: { success: true }; existing: typeof patients.$inferSelect }
-    | { status: 404 | 409; value: Record<string, unknown> };
-
 type NetworkPatientMutationContext = {
     request: Request;
     patientId: string;
     scopeAmbulatoryId: string;
     pairedClient: StoredNetworkPairedClient;
     session: ServerSession;
-};
-
-type PatientMutationSnapshot = {
-    id: string;
-    version: number;
-    updatedAt: Date | string | number | null;
-    isArchived: boolean | null;
 };
 
 function hasOwn(input: Record<string, unknown>, key: string): boolean {
@@ -108,24 +92,6 @@ function validateNetworkPatientMutationBoundary(
     }
 
     return null;
-}
-
-function selectPatientConflictSnapshot(
-    tx: Parameters<Parameters<typeof dbServer.transaction>[0]>[0],
-    patientId: string
-): PatientMutationSnapshot | null {
-    const current = tx
-        .select({
-            id: patients.id,
-            version: patients.version,
-            updatedAt: patients.updatedAt,
-            isArchived: patients.isArchived,
-        })
-        .from(patients)
-        .where(and(eq(patients.id, patientId), activePatients()))
-        .get();
-
-    return current ?? null;
 }
 
 /* @Codex */
@@ -177,61 +143,24 @@ export async function updateNetworkScopedPatient(
         return { status: 400, value: { error: normalized.error } };
     }
 
-    const commit = dbServer.transaction((tx): NetworkPatientUpdateCommit => {
-        const existing = tx
-            .select({ patient: patients })
-            .from(patients)
-            .innerJoin(patientsToAmbulatories, eq(patients.id, patientsToAmbulatories.patientId))
-            .where(and(
-                eq(patients.id, context.patientId),
-                eq(patientsToAmbulatories.ambulatoryId, context.scopeAmbulatoryId),
-                activePatients(),
-            ))
-            .get();
-
-        if (!existing) {
-            return { status: 404, value: { error: 'Not found' } };
-        }
-
-        const updateResult = tx
-            .update(patients)
-            .set(normalized.values)
-            .where(and(eq(patients.id, context.patientId), eq(patients.version, expectedVersion), activePatients()))
-            .run();
-
-        if (updateResult.changes === 0) {
-            return {
-                status: 409,
-                value: buildPatientVersionConflictPayload(
-                    expectedVersion,
-                    context.patientId,
-                    selectPatientConflictSnapshot(tx, context.patientId),
-                ),
-            };
-        }
-
-        if (hasOwn(body, 'ambulatoryId')) {
-            // WUL-309: set-primary semantics: upsert the scoped association only;
-            // a network client must never rewrite the patient's other memberships.
-            upsertPrimaryAmbulatoryMembership(tx, context.patientId, context.scopeAmbulatoryId);
-        }
-
-        return { status: 200, value: { success: true }, existing: existing.patient };
+    const commit = updatePatientOperation({
+        patientId: context.patientId,
+        expectedVersion,
+        values: normalized.values,
+        setPrimaryAmbulatory: hasOwn(body, 'ambulatoryId'),
+        scopeAmbulatoryId: context.scopeAmbulatoryId,
+        audit: {
+            actorType: 'user', actorRef: context.session.userId,
+            sourceSurface: 'native', requestId: requestIdFromRequest(context.request),
+            flags: [
+                'auth:paired-client',
+                `paired-client:${context.pairedClient.clientId}`,
+                'scope:ambulatory',
+            ],
+        },
     });
 
     if (commit.status !== 200) return commit;
-
-    await writeNetworkPatientAuditEvent({
-        context,
-        eventType: classifyPatientMutationEvent(
-            commit.existing.isArchived ?? null,
-            normalized.values.isArchived as boolean | undefined,
-        ),
-        metadata: {
-            changedFields: listChangedFields(body, ['version']),
-            resourceVersion: expectedVersion + 1,
-        },
-    });
 
     return { status: 200, value: { success: true } };
 }

@@ -61,3 +61,20 @@ Restano fuori:
 - [ADR 0048](./0048-apple-shared-client-architecture-and-home-base-runtime.md)
 - [ADR 0052](./0052-network-patient-profile-write-boundary.md)
 - [OpenAPI v1](../openapi/mediflow-v1.yaml)
+
+
+## Consolidamento C05 del 26 settembre 2026 (candidato locale)
+
+Le due mutazioni rete partecipano al confine ordinario del diario definito
+nell'[estensione di ADR 0015](./0015-audit-taxonomy-minimum-catalog.md#estensione-c05-del-26-settembre-2026--diario-clinico-ordinario).
+Ammissione del padre, scope M2M, versione, modifica e audit obbligatorio sono
+verificati nella stessa transazione. Un padre mancante o eliminato logicamente
+produce 404; la sola archiviazione non lo rende eliminato. PUT puo ripristinare
+la voce con deletedAt:null e CAS quando il padre e attivo, non il paziente.
+Questa precisazione colma un comportamento precedente non uniforme.
+
+L'ammissione corrente del padre/scope precede anche il replay di create:
+identificativo esplicito e payload identico mantengono 200 idempotente senza
+nuova scrittura o audit; payload diverso produce 409. Un errore audit annulla
+l'intera modifica invece di diventare un successo senza evidenza. Payload
+cifrati e vincoli paired restano invariati; nessun nuovo writer headless.

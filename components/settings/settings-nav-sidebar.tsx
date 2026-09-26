@@ -155,7 +155,8 @@ export function SettingsNavSidebar({ onSearchRequest }: { onSearchRequest?: () =
                         className={styles.searchButton}
                     >
                         <span><Search aria-hidden="true" /> Cerca impostazione</span>
-                        <kbd className="lume-registro">⌘K</kbd>
+                        {/* @Codex: mostra entrambi i modificatori già supportati. */}
+                        <kbd className="lume-registro whitespace-nowrap">⌘/Ctrl + K</kbd>
                     </button>
                 ) : null}
                 <NavGroups pathname={pathname} testIdPrefix="settings-nav-" />

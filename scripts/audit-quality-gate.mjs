@@ -42,29 +42,79 @@ const REQUIRED_ROUTE_AUDIT = [
     { route: 'app/api/settings/route.ts', events: ['settings.updated'], reason: 'bulk settings mutations must stay auditable' },
     { route: 'app/api/settings/[key]/route.ts', events: ['settings.updated'], reason: 'single-key settings mutations must stay auditable' },
     { route: 'app/api/patients/route.ts', events: ['patient.created'], reason: 'patient creation is a sensitive CRUD path' },
-    { route: 'app/api/patients/[id]/route.ts', events: ['patient.updated', 'patient.deleted'], reason: 'patient update/delete are sensitive CRUD paths' },
+    {
+        route: 'app/api/patients/[id]/route.ts', events: ['patient.updated'], reason: 'patient update requires one transactional audit owner',
+        writerContracts: [{ handler: 'PUT', serviceModule: '@/lib/patient-update-operation', serviceExport: 'updatePatientOperation',
+            ownerFile: 'lib/patient-update-operation.ts', ownerName: 'updatePatientOperation',
+            target: 'patient-update.web', eventType: 'patient.updated', transactionalPatientUpdate: true }],
+    },
+    {
+        route: 'app/api/patients/[id]/route.ts', events: ['patient.deleted'], reason: 'patient delete requires one transactional audit owner',
+        writerContracts: [{ handler: 'DELETE', serviceModule: '@/lib/patient-delete-operation', serviceExport: 'deletePatientOperation',
+            ownerFile: 'lib/patient-delete-operation.ts', ownerName: 'deletePatientOperation',
+            target: 'patient-delete.web', eventType: 'patient.deleted', deletionReason: 'web-delete', transactionalPatientDelete: true }],
+    },
     { route: 'app/api/v1/patients/route.ts', events: ['patient.created'], reason: 'native/shared patient creation must stay auditable' },
-    { route: 'app/api/v1/patients/[id]/route.ts', events: ['patient.updated', 'patient.deleted'], reason: 'native/shared patient update/delete must stay auditable' },
-    { route: 'app/api/entries/route.ts', events: ['entry.created'], reason: 'clinical entry creation is sensitive CRUD' },
-    { route: 'app/api/entries/[id]/route.ts', events: ['entry.updated', 'entry.deleted'], reason: 'clinical entry update/delete are sensitive CRUD' },
-    { route: 'app/api/v1/patients/[id]/entries/route.ts', events: ['entry.created'], reason: 'native/shared clinical entry creation is sensitive CRUD' },
-    { route: 'app/api/v1/patients/[id]/entries/[entryId]/route.ts', events: ['entry.updated', 'entry.deleted'], reason: 'native/shared clinical entry update/delete is sensitive CRUD' },
-    { route: 'lib/network-entry-write.ts', events: ['entry.created', 'entry.updated', 'entry.deleted'], reason: 'paired clinical diary writes must stay PHI-safe auditable' },
-    { route: 'app/api/therapies/route.ts', events: ['therapy.created'], reason: 'therapy creation is sensitive CRUD' },
-    { route: 'app/api/therapies/[id]/route.ts', events: ['therapy.updated', 'therapy.deleted'], reason: 'therapy update/delete are sensitive CRUD' },
-    { route: 'app/api/v1/patients/[id]/therapies/route.ts', events: ['therapy.created'], reason: 'native/shared therapy creation is sensitive CRUD' },
-    { route: 'app/api/v1/patients/[id]/therapies/[therapyId]/route.ts', events: ['therapy.updated', 'therapy.deleted'], reason: 'native/shared therapy update/delete are sensitive CRUD' },
-    { route: 'lib/network-therapy-write.ts', events: ['therapy.created', 'therapy.updated', 'therapy.deleted'], reason: 'paired therapy writes must stay PHI-safe auditable' },
-    { route: 'app/api/checkups/route.ts', events: ['checkup.created'], reason: 'checkup creation is sensitive CRUD' },
-    { route: 'app/api/checkups/[id]/route.ts', events: ['checkup.updated', 'checkup.deleted'], reason: 'checkup update/delete are sensitive CRUD' },
-    { route: 'app/api/v1/patients/[id]/checkups/route.ts', events: ['checkup.created'], reason: 'native/shared checkup creation is sensitive CRUD' },
-    { route: 'app/api/v1/patients/[id]/checkups/[checkupId]/route.ts', events: ['checkup.updated', 'checkup.deleted'], reason: 'native/shared checkup update/delete are sensitive CRUD' },
-    { route: 'lib/network-checkup-write.ts', events: ['checkup.created', 'checkup.updated', 'checkup.deleted'], reason: 'paired checkup writes must stay PHI-safe auditable' },
-    { route: 'app/api/observations/route.ts', events: ['observation.created'], reason: 'observation creation is sensitive CRUD' },
-    { route: 'app/api/observations/[id]/route.ts', events: ['observation.updated', 'observation.deleted'], reason: 'observation update/delete are sensitive CRUD' },
-    { route: 'app/api/v1/patients/[id]/observations/route.ts', events: ['observation.created'], reason: 'native/shared observation creation is sensitive CRUD' },
-    { route: 'app/api/v1/patients/[id]/observations/[observationId]/route.ts', events: ['observation.updated', 'observation.deleted'], reason: 'native/shared observation update/delete are sensitive CRUD' },
-    { route: 'lib/network-observation-write.ts', events: ['observation.created', 'observation.updated', 'observation.deleted'], reason: 'paired observation writes must stay PHI-safe auditable' },
+    {
+        route: 'app/api/v1/patients/[id]/route.ts', events: ['patient.updated'], reason: 'native patient update requires one transactional audit owner',
+        writerContracts: [{ handler: 'PUT', serviceModule: '@/lib/patient-update-operation', serviceExport: 'updatePatientOperation',
+            ownerFile: 'lib/patient-update-operation.ts', ownerName: 'updatePatientOperation',
+            target: 'patient-update.native', eventType: 'patient.updated', transactionalPatientUpdate: true }],
+    },
+    {
+        route: 'app/api/v1/patients/[id]/route.ts', events: ['patient.deleted'], reason: 'native patient delete requires one transactional audit owner',
+        writerContracts: [{ handler: 'DELETE', serviceModule: '@/lib/patient-delete-operation', serviceExport: 'deletePatientOperation',
+            ownerFile: 'lib/patient-delete-operation.ts', ownerName: 'deletePatientOperation',
+            target: 'patient-delete.native', eventType: 'patient.deleted', deletionReason: 'api-v1-delete', transactionalPatientDelete: true }],
+    },
+    { route: 'app/api/entries/route.ts', events: ['entry.created'],
+        writerContracts: [diaryAuditContract('POST', 'web', 'create')] },
+    { route: 'app/api/entries/[id]/route.ts', events: ['entry.updated', 'entry.deleted'],
+        writerContracts: [diaryAuditContract('PUT', 'web', 'update'), diaryAuditContract('DELETE', 'web', 'update')] },
+    { route: 'app/api/v1/patients/[id]/entries/route.ts', events: ['entry.created'],
+        writerContracts: [diaryAuditContract('POST', 'v1', 'create')] },
+    { route: 'app/api/v1/patients/[id]/entries/[entryId]/route.ts', events: ['entry.updated', 'entry.deleted'],
+        writerContracts: [diaryAuditContract('PUT', 'v1', 'update'), diaryAuditContract('DELETE', 'v1', 'update')] },
+    { route: 'app/api/v1/network/patients/[id]/entries/route.ts', events: ['entry.created'],
+        writerContracts: [diaryAuditContract('POST', 'network', 'create')] },
+    { route: 'app/api/v1/network/patients/[id]/entries/[entryId]/route.ts', events: ['entry.updated', 'entry.deleted'],
+        writerContracts: [diaryAuditContract('PUT', 'network', 'update')] },
+    { route: 'app/api/therapies/route.ts', events: ['therapy.created'], reason: 'therapy creation requires transactional audit',
+        writerContracts: [therapyAuditContract('POST', 'web', 'create')] },
+    { route: 'app/api/therapies/[id]/route.ts', events: ['therapy.updated', 'therapy.deleted'], reason: 'therapy update/delete require transactional audit',
+        writerContracts: [therapyAuditContract('PUT', 'web', 'update'), therapyAuditContract('DELETE', 'web', 'update')] },
+    { route: 'app/api/v1/patients/[id]/therapies/route.ts', events: ['therapy.created'], reason: 'local therapy creation requires transactional audit',
+        writerContracts: [therapyAuditContract('POST', 'v1', 'create')] },
+    { route: 'app/api/v1/patients/[id]/therapies/[therapyId]/route.ts', events: ['therapy.updated', 'therapy.deleted'], reason: 'local therapy update/delete require transactional audit',
+        writerContracts: [therapyAuditContract('PUT', 'v1', 'update'), therapyAuditContract('DELETE', 'v1', 'update')] },
+    { route: 'app/api/v1/network/patients/[id]/therapies/route.ts', events: ['therapy.created'], reason: 'paired therapy creation requires transactional audit',
+        writerContracts: [therapyAuditContract('POST', 'network', 'create')] },
+    { route: 'app/api/v1/network/patients/[id]/therapies/[therapyId]/route.ts', events: ['therapy.updated', 'therapy.deleted'], reason: 'paired therapy update requires transactional audit',
+        writerContracts: [therapyAuditContract('PUT', 'network', 'update')] },
+    { route: 'app/api/checkups/route.ts', events: ['checkup.created'],
+        writerContracts: [checkupAuditContract('POST', 'web', 'create')] },
+    { route: 'app/api/checkups/[id]/route.ts', events: ['checkup.updated', 'checkup.deleted'],
+        writerContracts: [checkupAuditContract('PUT', 'web', 'update'), checkupAuditContract('DELETE', 'web', 'update')] },
+    { route: 'app/api/v1/patients/[id]/checkups/route.ts', events: ['checkup.created'],
+        writerContracts: [checkupAuditContract('POST', 'v1', 'create')] },
+    { route: 'app/api/v1/patients/[id]/checkups/[checkupId]/route.ts', events: ['checkup.updated', 'checkup.deleted'],
+        writerContracts: [checkupAuditContract('PUT', 'v1', 'update'), checkupAuditContract('DELETE', 'v1', 'update')] },
+    { route: 'app/api/v1/network/patients/[id]/checkups/route.ts', events: ['checkup.created'],
+        writerContracts: [checkupAuditContract('POST', 'network', 'create')] },
+    { route: 'app/api/v1/network/patients/[id]/checkups/[checkupId]/route.ts', events: ['checkup.updated', 'checkup.deleted'],
+        writerContracts: [checkupAuditContract('PUT', 'network', 'update')] },
+    { route: 'app/api/observations/route.ts', events: ['observation.created'],
+        writerContracts: [observationAuditContract('POST', 'web', 'create')] },
+    { route: 'app/api/observations/[id]/route.ts', events: ['observation.updated', 'observation.deleted'],
+        writerContracts: [observationAuditContract('PUT', 'web', 'update'), observationAuditContract('DELETE', 'web', 'update')] },
+    { route: 'app/api/v1/patients/[id]/observations/route.ts', events: ['observation.created'],
+        writerContracts: [observationAuditContract('POST', 'v1', 'create')] },
+    { route: 'app/api/v1/patients/[id]/observations/[observationId]/route.ts', events: ['observation.updated', 'observation.deleted'],
+        writerContracts: [observationAuditContract('PUT', 'v1', 'update'), observationAuditContract('DELETE', 'v1', 'update')] },
+    { route: 'app/api/v1/network/patients/[id]/observations/route.ts', events: ['observation.created'],
+        writerContracts: [observationAuditContract('POST', 'network', 'create')] },
+    { route: 'app/api/v1/network/patients/[id]/observations/[observationId]/route.ts', events: ['observation.updated', 'observation.deleted'],
+        writerContracts: [observationAuditContract('PUT', 'network', 'update')] },
     {
         route: 'app/api/prosthetic-prescriptions/route.ts', events: ['prosthetic.prescription.created'], reason: 'prosthetic prescription creation is sensitive CRUD',
         writerContracts: [{
@@ -105,9 +155,48 @@ const REQUIRED_ROUTE_AUDIT = [
 ];
 
 const REQUIRED_EVENT_TYPES = new Set(REQUIRED_ROUTE_AUDIT.flatMap((entry) => entry.events));
-const EVENT_SOURCE_ALIASES = {
-    'patient.updated': ['classifyPatientMutationEvent('],
-};
+
+/* @Codex: explicit eight-handler roster; no exemption for delegated diary writes. */
+function diaryAuditContract(handler, mode, operation) {
+    return {
+        handler, mode, operation, transactionalDiary: true,
+        target: `entry-${operation}.${mode}.${handler.toLowerCase()}`,
+        ownerFile: 'lib/entry-write-operation.ts', ownerName: `${operation}EntryOperation`,
+        serviceModule: '@/lib/entry-write-operation', serviceExport: `${operation}EntryOperation`,
+        bridgeFile: 'lib/network-entry-write.ts',
+        bridgeExport: `${operation}NetworkScopedEntry`,
+    };
+}
+/* @Codex: therapy roster is explicit; runtime policy is not inherited from diary. */
+function therapyAuditContract(handler, mode, operation) {
+    return {
+        handler, mode, operation, transactionalTherapy: true,
+        target: `therapy-${operation}.${mode}.${handler.toLowerCase()}`,
+        ownerFile: 'lib/therapy-write-operation.ts', ownerName: `${operation}TherapyOperation`,
+        serviceModule: '@/lib/therapy-write-operation', serviceExport: `${operation}TherapyOperation`,
+        bridgeFile: 'lib/network-therapy-write.ts', bridgeExport: `${operation}NetworkScopedTherapy`,
+    };
+}
+/* @Codex: eight ordinary observation handlers, without extending link or input authority. */
+function observationAuditContract(handler, mode, operation) {
+    return {
+        handler, mode, operation, transactionalObservation: true,
+        target: `observation-${operation}.${mode}.${handler.toLowerCase()}`,
+        ownerFile: 'lib/observation-write-operation.ts', ownerName: `${operation}ObservationOperation`,
+        serviceModule: '@/lib/observation-write-operation', serviceExport: `${operation}ObservationOperation`,
+        bridgeFile: 'lib/network-observation-write.ts', bridgeExport: `${operation}NetworkScopedObservation`,
+    };
+}
+/* @Codex: eight ordinary checkup handlers, without transferring input or status policies. */
+function checkupAuditContract(handler, mode, operation) {
+    return {
+        handler, mode, operation, transactionalCheckup: true,
+        target: `checkup-${operation}.${mode}.${handler.toLowerCase()}`,
+        ownerFile: 'lib/checkup-write-operation.ts', ownerName: `${operation}CheckupOperation`,
+        serviceModule: '@/lib/checkup-write-operation', serviceExport: `${operation}CheckupOperation`,
+        bridgeFile: 'lib/network-checkup-write.ts', bridgeExport: `${operation}NetworkScopedCheckup`,
+    };
+}
 const METADATA_KEYS = ['changedFields', 'resourceVersion', 'counts', 'flags', 'reasonCode'];
 const FORBIDDEN_METADATA_KEYS = [
     'address',
@@ -594,6 +683,636 @@ export function validateDelegatedRouteAudit({ spec, routeSource, serviceSource }
         }
     } else if (serviceEntry && spec.ownerName !== spec.serviceExport) {
         problems.push('owner mismatch requires one configured hop');
+    }
+    return problems;
+}
+
+/* @Codex: bounded diary wiring/order guard, complementary to real SQLite rollback and scope tests.
+ * The required audit writer itself is checked by the patient contracts in the same gate.
+ * This does not claim to prove parent admission, CAS or cipher semantics statically. */
+export function validateRequiredDiaryAudit(input) {
+    return validateRequiredClinicalRowAudit(input, 'entry');
+}
+
+/* @Codex: reuse only the structural proof, not date/cap/idempotency policy. */
+export function validateRequiredTherapyAudit(input) {
+    return validateRequiredClinicalRowAudit(input, 'therapy');
+}
+
+/* @Codex: structural proof only; link/currentness/value semantics require real SQLite tests. */
+export function validateRequiredObservationAudit(input) {
+    return validateRequiredClinicalRowAudit(input, 'observation');
+}
+
+/* @Codex: structural proof only; parent/currentness/status semantics require real SQLite tests. */
+export function validateRequiredCheckupAudit(input) {
+    return validateRequiredClinicalRowAudit(input, 'checkup');
+}
+
+function validateRequiredClinicalRowAudit({ spec, routeSource, coreSource, bridgeSource = null }, resource) {
+    const problems = [];
+    const core = checkedSource(spec.ownerFile, coreSource);
+    const owner = namedFunction(core.sourceFile, spec.ownerName, true);
+    const delegateCall = (source, handlerName, moduleName, exportName) => {
+        const parsed = checkedSource(`${resource}-adapter.ts`, source);
+        const handler = namedFunction(parsed.sourceFile, handlerName, true);
+        const binding = importedBinding(parsed.sourceFile, parsed.checker, moduleName, exportName);
+        const calls = handler && binding ? bindingCalls(handler, parsed.checker, binding.symbol) : [];
+        if (parsed.sourceFile.parseDiagnostics.length || !handler || calls.length !== 1
+            || !isReachableCall(calls[0], handler)) {
+            problems.push(`${handlerName} must call exactly one reachable approved clinical-row delegate`);
+            return null;
+        }
+        return calls[0];
+    };
+    let call;
+    if (spec.mode === 'network') {
+        delegateCall(routeSource, spec.handler, `@/lib/network-${resource}-write`, spec.bridgeExport);
+        call = bridgeSource && delegateCall(bridgeSource, spec.bridgeExport,
+            `./${resource}-write-operation`, spec.ownerName);
+        if (!bridgeSource) problems.push('network clinical-row adapter is missing');
+    } else {
+        call = delegateCall(routeSource, spec.handler, spec.serviceModule, spec.serviceExport);
+    }
+    const argument = call?.arguments[0] && unwrap(call.arguments[0]);
+    const modeProperties = argument && ts.isObjectLiteralExpression(argument)
+        ? argument.properties.filter((property) => ts.isPropertyAssignment(property)
+            && ts.isIdentifier(property.name) && property.name.text === 'mode') : [];
+    if (!argument || !ts.isObjectLiteralExpression(argument)
+        || argument.properties.some((property) => ts.isSpreadAssignment(property)
+            || (property.name && ts.isComputedPropertyName(property.name)))
+        || modeProperties.length !== 1 || !ts.isStringLiteral(modeProperties[0].initializer)
+        || modeProperties[0].initializer.text !== spec.mode) problems.push('clinical-row adapter must select its exact admitted mode');
+
+    const db = importedBinding(core.sourceFile, core.checker, './db-server', 'dbServer');
+    const writer = importedBinding(core.sourceFile, core.checker, './security/audit', 'writeAuditEventInTransaction');
+    const table = importedBinding(core.sourceFile, core.checker, './schema', ({ entry: 'entries', therapy: 'therapies', observation: 'observations', checkup: 'checkups' })[resource]);
+    if (core.sourceFile.parseDiagnostics.length || !owner || !db || !writer || !table) {
+        problems.push('clinical-row core must import the approved database, resource table and required audit writer');
+        return problems;
+    }
+    const calls = [];
+    const visit = (node) => { if (ts.isCallExpression(node)) calls.push(node); ts.forEachChild(node, visit); };
+    visit(owner);
+    const transactions = calls.filter((node) => {
+        const callee = unwrap(node.expression);
+        return ts.isPropertyAccessExpression(callee) && !callee.questionDotToken && callee.name.text === 'transaction'
+            && ts.isIdentifier(callee.expression)
+            && resolvesToBinding(core.checker, core.checker.getSymbolAtLocation(callee.expression), db.symbol);
+    });
+    const transaction = transactions.length === 1 ? transactions[0] : null;
+    const callback = transaction?.arguments[0] && unwrap(transaction.arguments[0]);
+    const options = transaction?.arguments[1] && unwrap(transaction.arguments[1]);
+    const behavior = options && ts.isObjectLiteralExpression(options)
+        ? exactPropertyAssignments(options, ['behavior'])?.get('behavior')?.initializer : null;
+    if (!transaction || transaction.arguments.length !== 2 || !ts.isReturnStatement(transaction.parent)
+        || transaction.parent.parent !== owner.body || !isReachableCall(transaction, owner)
+        || !callback || !ts.isArrowFunction(callback) || !ts.isBlock(callback.body)
+        || callback.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.AsyncKeyword)
+        || callback.parameters.length !== 1 || !ts.isIdentifier(callback.parameters[0].name)
+        || localBindingExists(callback, callback.parameters[0].name.text, true)
+        || !behavior || !ts.isStringLiteral(behavior) || behavior.text !== 'immediate') {
+        problems.push('clinical-row owner must return one synchronous immediate transaction');
+        return problems;
+    }
+    const txName = callback.parameters[0].name.text;
+    const auditCalls = bindingCalls(owner, core.checker, writer.symbol);
+    const audit = auditCalls.length === 1 ? auditCalls[0] : null;
+    const auditStatement = audit?.parent;
+    const statements = [...callback.body.statements];
+    const auditIndex = statements.indexOf(auditStatement);
+    if (!audit || audit.arguments.length !== 2 || !ts.isIdentifier(unwrap(audit.arguments[0]))
+        || unwrap(audit.arguments[0]).text !== txName || auditIndex < 2
+        || !ts.isExpressionStatement(auditStatement) || !isReachableStandaloneCall(audit, callback)) {
+        problems.push('exactly one direct required clinical-row audit must execute on the same transaction');
+        return problems;
+    }
+    const compact = (node) => node?.getText(core.sourceFile).replace(/\s+/gu, '') ?? '';
+    const mutationStatement = statements[auditIndex - 2];
+    const declaration = ts.isVariableStatement(mutationStatement)
+        && mutationStatement.declarationList.declarations.length === 1
+        ? mutationStatement.declarationList.declarations[0] : null;
+    const mutation = declaration?.initializer;
+    const mutations = calls.filter((node) => {
+        const callee = unwrap(node.expression);
+        const target = node.arguments[0] && unwrap(node.arguments[0]);
+        return ts.isPropertyAccessExpression(callee) && callee.name.text === (spec.operation === 'create' ? 'insert' : 'update')
+            && ts.isIdentifier(callee.expression) && callee.expression.text === txName
+            && target && ts.isIdentifier(target)
+            && resolvesToBinding(core.checker, core.checker.getSymbolAtLocation(target), table.symbol);
+    });
+    const guard = statements[auditIndex - 1];
+    const throws = ts.isIfStatement(guard) && (ts.isBlock(guard.thenStatement)
+        ? [...guard.thenStatement.statements] : [guard.thenStatement]);
+    // @Codex: follow receivers, not source containment (a nested callback is not a write).
+    let receiver = mutation;
+    let directChain = true;
+    for (const [method, arity] of spec.operation === 'create'
+        ? [['run', 0], ['values', 1]] : [['run', 0], ['where', 1], ['set', 1]]) {
+        if (!receiver || !ts.isCallExpression(receiver) || receiver.questionDotToken
+            || receiver.arguments.length !== arity || !ts.isPropertyAccessExpression(receiver.expression)
+            || receiver.expression.questionDotToken || receiver.expression.name.text !== method) {
+            directChain = false;
+            break;
+        }
+        receiver = unwrap(receiver.expression.expression);
+    }
+    if (!declaration || !ts.isIdentifier(declaration.name) || !mutation || !ts.isCallExpression(mutation)
+        || !ts.isPropertyAccessExpression(mutation.expression) || mutation.expression.name.text !== 'run'
+        || !directChain || mutations.length !== 1 || receiver !== mutations[0]
+        || !ts.isIfStatement(guard) || guard.elseStatement
+        || compact(guard.expression) !== `${declaration.name.text}.changes!==1`
+        || throws.length !== 1 || !ts.isThrowStatement(throws[0])) {
+        problems.push('clinical-row mutation and exact-one-row throwing check must directly precede audit');
+    }
+    const input = audit.arguments[1] && unwrap(audit.arguments[1]);
+    const props = input && ts.isObjectLiteralExpression(input)
+        ? exactPropertyAssignments(input, ['eventType', 'outcome', 'actorType', 'actorRef',
+            'subjectType', 'subjectRef', 'sourceSurface', 'requestId', 'redactedMetadata']) : null;
+    const literal = (name, value) => {
+        const node = props?.get(name)?.initializer;
+        return node && ts.isStringLiteral(node) && node.text === value;
+    };
+    const event = props?.get('eventType')?.initializer;
+    const inputName = owner.parameters[0]?.name;
+    const name = inputName && ts.isIdentifier(inputName) ? inputName.text : null;
+    const eventValid = spec.operation === 'create' ? literal('eventType', `${resource}.created`)
+        : event && ts.isConditionalExpression(event) && compact(event.condition) === `${name}.values.deletedAt`
+            && ts.isStringLiteral(event.whenTrue) && event.whenTrue.text === `${resource}.deleted`
+            && ts.isStringLiteral(event.whenFalse) && event.whenFalse.text === `${resource}.updated`;
+    if (!name || !props || !eventValid || !literal('outcome', 'success') || !literal('subjectType', resource)
+        || compact(props.get('subjectRef')?.initializer) !== `${name}.${resource === 'entry' && spec.operation === 'create' ? 'id' : `${resource}Id`}`) {
+        problems.push('clinical-row audit event and subject must describe the applied resource mutation');
+    }
+    if (auditIndex !== statements.length - 2 || !ts.isReturnStatement(statements[auditIndex + 1])) {
+        problems.push('clinical-row success must return immediately after the required audit');
+    }
+    return problems;
+}
+
+/* @Codex: bounded C04 patient-update contract; this source guard complements the real transaction tests. */
+export function validateRequiredPatientUpdateAudit({ spec, routeSource, coreSource, auditSource }) {
+    const problems = validateDelegatedRouteAudit({ spec, routeSource, serviceSource: coreSource });
+    const core = checkedSource(spec.ownerFile, coreSource);
+    const owner = namedFunction(core.sourceFile, spec.ownerName, true);
+    const db = importedBinding(core.sourceFile, core.checker, './db-server', 'dbServer');
+    const membership = importedBinding(core.sourceFile, core.checker, './patient-ambulatory-membership', 'upsertPrimaryAmbulatoryMembership');
+    const writer = importedBinding(core.sourceFile, core.checker, './security/audit', 'writeAuditEventInTransaction');
+    const classifier = importedBinding(core.sourceFile, core.checker, './security/audit', 'classifyPatientMutationEvent');
+    const patientTable = importedBinding(core.sourceFile, core.checker, './schema', 'patients');
+    if (core.sourceFile.parseDiagnostics.length || !owner || !db || !membership || !writer || !classifier || !patientTable) {
+        problems.push('patient update core must import the approved transaction, membership, classifier, table and required writer');
+        return problems;
+    }
+    const calls = (root, predicate) => {
+        const found = [];
+        const visit = (node) => {
+            if (ts.isCallExpression(node) && predicate(node)) found.push(node);
+            ts.forEachChild(node, visit);
+        };
+        visit(root);
+        return found;
+    };
+    const importedObjectCall = (call, importBinding, name) => {
+        const callee = unwrap(call.expression);
+        return ts.isPropertyAccessExpression(callee) && !callee.questionDotToken && callee.name.text === name
+            && ts.isIdentifier(callee.expression)
+            && resolvesToBinding(core.checker, core.checker.getSymbolAtLocation(callee.expression), importBinding.symbol);
+    };
+    const transactionCalls = calls(owner.body, (call) => importedObjectCall(call, db, 'transaction'));
+    const transaction = transactionCalls.length === 1 ? transactionCalls[0] : null;
+    const returned = transaction && transaction.parent && ts.isReturnStatement(transaction.parent)
+        && transaction.parent.parent === owner.body;
+    const callback = transaction?.arguments[0] && unwrap(transaction.arguments[0]);
+    const txName = callback && ts.isArrowFunction(callback) && ts.isBlock(callback.body)
+        && callback.parameters.length === 1 && ts.isIdentifier(callback.parameters[0].name)
+        ? callback.parameters[0].name.text : null;
+    const options = transaction?.arguments[1] && unwrap(transaction.arguments[1]);
+    const optionProperties = options && ts.isObjectLiteralExpression(options)
+        ? exactPropertyAssignments(options, ['behavior']) : null;
+    const behavior = optionProperties?.get('behavior')?.initializer;
+    if (!returned || transaction.arguments.length !== 2 || !isReachableCall(transaction, owner)
+        || !txName || localBindingExists(callback, txName, true)
+        || !behavior || !ts.isStringLiteral(behavior) || behavior.text !== 'immediate') {
+        problems.push('patient update must return one immediate dbServer.transaction with an unshadowed tx callback');
+        return problems;
+    }
+    const txArgument = (call) => call.arguments.length > 0
+        && ts.isIdentifier(unwrap(call.arguments[0])) && unwrap(call.arguments[0]).text === txName;
+    const membershipCalls = bindingCalls(owner, core.checker, membership.symbol);
+    const writerCalls = bindingCalls(owner, core.checker, writer.symbol);
+    const member = membershipCalls.length === 1 ? membershipCalls[0] : null;
+    const audit = writerCalls.length === 1 ? writerCalls[0] : null;
+    const auditStatement = audit && directStatement(callback, audit);
+    if (!member || !audit || !txArgument(member) || !txArgument(audit)
+        || !isReachableCall(member, callback) || !isReachableStandaloneCall(audit, callback)
+        || !auditStatement || !ts.isExpressionStatement(auditStatement)
+        || member.pos >= audit.pos) {
+        problems.push('membership and exactly one required audit writer must use the same tx inside the callback, in order');
+        return problems;
+    }
+    const updates = calls(callback.body, (call) => {
+        const callee = unwrap(call.expression);
+        const table = call.arguments[0] && unwrap(call.arguments[0]);
+        return ts.isPropertyAccessExpression(callee) && callee.name.text === 'update'
+            && ts.isIdentifier(callee.expression) && callee.expression.text === txName
+            && ts.isIdentifier(table)
+            && resolvesToBinding(core.checker, core.checker.getSymbolAtLocation(table), patientTable.symbol);
+    });
+    if (updates.length !== 1 || !isReachableCall(updates[0], callback) || updates[0].pos >= member.pos) {
+        problems.push('patient update must use the transaction before membership and required audit');
+    }
+    const input = audit.arguments[1] && unwrap(audit.arguments[1]);
+    const props = input && ts.isObjectLiteralExpression(input)
+        ? exactPropertyAssignments(input, ['eventType', 'outcome', 'actorType', 'actorRef',
+            'subjectType', 'subjectRef', 'sourceSurface', 'requestId', 'redactedMetadata']) : null;
+    const event = props?.get('eventType')?.initializer;
+    const subject = props?.get('subjectType')?.initializer;
+    const subjectRef = props?.get('subjectRef')?.initializer;
+    const outcome = props?.get('outcome')?.initializer;
+    const ownerInput = owner.parameters[0]?.name;
+    const previousState = event && ts.isCallExpression(event) && event.arguments[0] && unwrap(event.arguments[0]);
+    const nextState = event && ts.isCallExpression(event) && event.arguments[1] && unwrap(event.arguments[1]);
+    const nextValues = nextState && ts.isPropertyAccessExpression(nextState) ? nextState.expression : null;
+    if (!event || !ts.isCallExpression(event) || !ts.isIdentifier(unwrap(event.expression))
+        || !resolvesToBinding(core.checker, core.checker.getSymbolAtLocation(unwrap(event.expression)), classifier.symbol)
+        || event.arguments.length !== 2
+        || !previousState || !ts.isBinaryExpression(previousState)
+        || previousState.operatorToken.kind !== ts.SyntaxKind.QuestionQuestionToken
+        || !ts.isPropertyAccessExpression(previousState.left)
+        || !ts.isIdentifier(previousState.left.expression)
+        || previousState.left.expression.text !== 'existing'
+        || previousState.left.name.text !== 'isArchived'
+        || previousState.right.kind !== ts.SyntaxKind.NullKeyword
+        || !nextState || !ts.isPropertyAccessExpression(nextState)
+        || nextState.name.text !== 'isArchived'
+        || !nextValues || !ts.isPropertyAccessExpression(nextValues)
+        || nextValues.name.text !== 'values'
+        || !ts.isIdentifier(nextValues.expression) || !ts.isIdentifier(ownerInput)
+        || !resolvesToBinding(core.checker, core.checker.getSymbolAtLocation(nextValues.expression),
+            core.checker.getSymbolAtLocation(ownerInput))
+        || !subject || !ts.isStringLiteral(subject) || subject.text !== 'patient'
+        || !subjectRef || !ts.isPropertyAccessExpression(subjectRef)
+        || !ts.isIdentifier(subjectRef.expression) || !ts.isIdentifier(ownerInput)
+        || !resolvesToBinding(core.checker, core.checker.getSymbolAtLocation(subjectRef.expression),
+            core.checker.getSymbolAtLocation(ownerInput)) || subjectRef.name.text !== 'patientId'
+        || !outcome || !ts.isStringLiteral(outcome) || outcome.text !== 'success') {
+        problems.push('required audit must classify the patient event and bind the same patient subject');
+    }
+
+    const auditFile = checkedSource('lib/security/audit.ts', auditSource);
+    const writerOwner = namedFunction(auditFile.sourceFile, 'writeAuditEventInTransaction', true);
+    const auditTable = importedBinding(auditFile.sourceFile, auditFile.checker, '../schema', 'auditEvents');
+    const writerTx = writerOwner?.parameters[0]?.name;
+    const inserts = writerOwner && auditTable ? calls(writerOwner.body, (call) => {
+        const run = unwrap(call.expression);
+        if (!writerTx || !ts.isIdentifier(writerTx) || !ts.isPropertyAccessExpression(run)
+            || run.name.text !== 'run') return false;
+        const valuesCall = unwrap(run.expression);
+        if (!ts.isCallExpression(valuesCall) || valuesCall.arguments.length !== 1
+            || !ts.isIdentifier(unwrap(valuesCall.arguments[0]))
+            || unwrap(valuesCall.arguments[0]).text !== 'row') return false;
+        const values = unwrap(valuesCall.expression);
+        if (!ts.isPropertyAccessExpression(values) || values.name.text !== 'values') return false;
+        const insertCall = unwrap(values.expression);
+        if (!ts.isCallExpression(insertCall)) return false;
+        const insert = unwrap(insertCall.expression);
+        const table = insertCall.arguments[0] && unwrap(insertCall.arguments[0]);
+        return ts.isPropertyAccessExpression(insert) && insert.name.text === 'insert'
+            && ts.isIdentifier(insert.expression) && insert.expression.text === writerTx.text
+            && table && ts.isIdentifier(table)
+            && resolvesToBinding(auditFile.checker, auditFile.checker.getSymbolAtLocation(table), auditTable.symbol);
+    }) : [];
+    const insertStatement = inserts.length === 1 && directStatement(writerOwner, inserts[0]);
+    const resultDeclaration = insertStatement && ts.isVariableStatement(insertStatement)
+        && insertStatement.declarationList.declarations.length === 1
+        ? insertStatement.declarationList.declarations[0] : null;
+    const resultName = resultDeclaration?.name;
+    const statementIndex = writerOwner?.body?.statements.indexOf(insertStatement) ?? -1;
+    const resultGuard = statementIndex >= 0 ? writerOwner.body.statements[statementIndex + 1] : null;
+    const guardCondition = resultGuard && ts.isIfStatement(resultGuard) ? unwrap(resultGuard.expression) : null;
+    const checkedResult = resultDeclaration?.initializer === inserts[0]
+        && resultName && ts.isIdentifier(resultName)
+        && guardCondition && ts.isBinaryExpression(guardCondition)
+        && guardCondition.operatorToken.kind === ts.SyntaxKind.ExclamationEqualsEqualsToken
+        && ts.isPropertyAccessExpression(guardCondition.left)
+        && ts.isIdentifier(guardCondition.left.expression)
+        && guardCondition.left.expression.text === resultName.text
+        && guardCondition.left.name.text === 'changes'
+        && ts.isNumericLiteral(guardCondition.right) && guardCondition.right.text === '1'
+        && !resultGuard.elseStatement
+        && ts.isBlock(resultGuard.thenStatement)
+        && resultGuard.thenStatement.statements.length === 1
+        && ts.isThrowStatement(resultGuard.thenStatement.statements[0]);
+    const rowDeclaration = writerOwner?.body?.statements.find((statement) => ts.isVariableStatement(statement)
+        && statement.declarationList.declarations.length === 1
+        && ts.isIdentifier(statement.declarationList.declarations[0].name)
+        && statement.declarationList.declarations[0].name.text === 'row');
+    const rowInitializer = rowDeclaration?.declarationList.declarations[0].initializer;
+    const writerInput = writerOwner?.parameters[1]?.name;
+    if (auditFile.sourceFile.parseDiagnostics.length || !writerOwner || !auditTable || inserts.length !== 1
+        || !isReachableCall(inserts[0], writerOwner) || !checkedResult
+        || !rowInitializer || !ts.isCallExpression(rowInitializer)
+        || !ts.isIdentifier(rowInitializer.expression) || rowInitializer.expression.text !== 'buildAuditEventRow'
+        || !writerInput || !ts.isIdentifier(writerInput) || rowInitializer.arguments.length !== 1
+        || !ts.isIdentifier(rowInitializer.arguments[0]) || rowInitializer.arguments[0].text !== writerInput.text) {
+        problems.push('required writer must execute one auditEvents insert on the supplied tx');
+    }
+    return problems;
+}
+
+/* @Codex: bounded C05 DELETE contract; runtime tests remain the authority for rollback behavior. */
+export function validateRequiredPatientDeleteAudit({ spec, routeSource, coreSource, auditSource }) {
+    const problems = validateDelegatedRouteAudit({ spec, routeSource, serviceSource: coreSource });
+    const core = checkedSource(spec.ownerFile, coreSource);
+    const owner = namedFunction(core.sourceFile, spec.ownerName, true);
+    const db = importedBinding(core.sourceFile, core.checker, './db-server', 'dbServer');
+    const patients = importedBinding(core.sourceFile, core.checker, './schema', 'patients');
+    const andBinding = importedBinding(core.sourceFile, core.checker, 'drizzle-orm', 'and');
+    const eqBinding = importedBinding(core.sourceFile, core.checker, 'drizzle-orm', 'eq');
+    const active = importedBinding(core.sourceFile, core.checker, './patient-lifecycle', 'activePatients');
+    const tombstone = importedBinding(core.sourceFile, core.checker, './patient-lifecycle', 'buildPatientTombstoneValues');
+    const conflict = importedBinding(core.sourceFile, core.checker, './patient-concurrency', 'buildPatientVersionConflictPayload');
+    const writer = importedBinding(core.sourceFile, core.checker, './security/audit', 'writeAuditEventInTransaction');
+    if (core.sourceFile.parseDiagnostics.length || !owner || !db || !patients || !andBinding || !eqBinding
+        || !active || !tombstone || !conflict || !writer) {
+        problems.push('delete core must import the approved transaction, patient table, lifecycle, conflict and required writer');
+        return problems;
+    }
+    const calls = (root, predicate) => {
+        const found = [];
+        const visit = (node) => { if (ts.isCallExpression(node) && predicate(node)) found.push(node); ts.forEachChild(node, visit); };
+        visit(root);
+        return found;
+    };
+    const route = checkedSource('route.ts', routeSource);
+    const routeHandler = namedFunction(route.sourceFile, 'DELETE', true);
+    const routeDelegate = importedBinding(route.sourceFile, route.checker, spec.serviceModule, spec.serviceExport);
+    const jsonParser = importedBinding(route.sourceFile, route.checker, '@/lib/patient-json-object', 'parsePatientJsonObject');
+    const versionParser = importedBinding(route.sourceFile, route.checker, '@/lib/patient-concurrency', 'parseExpectedVersion');
+    const contextExport = spec.deletionReason === 'web-delete' ? 'auditContextFromSession' : 'auditContextFromRequest';
+    const auditContext = importedBinding(route.sourceFile, route.checker, '@/lib/security/audit', contextExport);
+    const reasonOwner = namedFunction(route.sourceFile, 'parsePatientDeletionReason');
+    const reasonSymbol = reasonOwner?.name && route.checker.getSymbolAtLocation(reasonOwner.name);
+    const routeCalls = routeHandler && routeDelegate ? bindingCalls(routeHandler, route.checker, routeDelegate.symbol) : [];
+    const parserCalls = routeHandler && jsonParser ? bindingCalls(routeHandler, route.checker, jsonParser.symbol) : [];
+    const versionCalls = routeHandler && versionParser ? bindingCalls(routeHandler, route.checker, versionParser.symbol) : [];
+    const reasonCalls = routeHandler && reasonSymbol ? bindingCalls(routeHandler, route.checker, reasonSymbol) : [];
+    const contextCalls = routeHandler && auditContext ? bindingCalls(routeHandler, route.checker, auditContext.symbol) : [];
+    const routeCall = routeCalls.length === 1 ? routeCalls[0] : null;
+    const parserParent = parserCalls[0]?.parent;
+    const parserDeclaration = parserParent && ts.isAwaitExpression(parserParent) ? parserParent.parent : parserParent;
+    const parsedName = parserDeclaration && ts.isVariableDeclaration(parserDeclaration) ? parserDeclaration.name : null;
+    const tryBlock = routeHandler?.body?.statements.find((statement) => ts.isTryStatement(statement))?.tryBlock;
+    const parseGuard = tryBlock && parsedName && ts.isIdentifier(parsedName) && tryBlock.statements.find((statement) => {
+        const condition = ts.isIfStatement(statement) ? unwrap(statement.expression) : null;
+        const denied = condition && ts.isPrefixUnaryExpression(condition)
+            && condition.operator === ts.SyntaxKind.ExclamationToken && ts.isPropertyAccessExpression(condition.operand)
+            && ts.isIdentifier(condition.operand.expression) && condition.operand.expression.text === parsedName.text
+            && condition.operand.name.text === 'ok';
+        const response = ts.isIfStatement(statement) && ts.isReturnStatement(statement.thenStatement)
+            && statement.thenStatement.expression
+            ? unwrap(statement.thenStatement.expression) : null;
+        const callee = response && ts.isCallExpression(response) ? unwrap(response.expression) : null;
+        const responseOptions = response && ts.isCallExpression(response) && response.arguments[1]
+            ? unwrap(response.arguments[1]) : null;
+        const status = responseOptions && ts.isObjectLiteralExpression(responseOptions)
+            ? exactPropertyAssignments(responseOptions, ['status'])?.get('status')?.initializer : null;
+        return denied && statement.pos > parserCalls[0].pos && statement.pos < routeCall?.pos
+            && callee && ts.isPropertyAccessExpression(callee) && callee.name.text === 'json'
+            && ts.isIdentifier(callee.expression) && callee.expression.text === 'NextResponse'
+            && status && ts.isNumericLiteral(status) && status.text === '400';
+    });
+    const reasonFallback = reasonCalls[0]?.arguments[1];
+    if (route.sourceFile.parseDiagnostics.length || !routeHandler || !routeDelegate || !jsonParser
+        || !versionParser || !auditContext || !reasonSymbol || routeCalls.length !== 1
+        || parserCalls.length !== 1 || versionCalls.length !== 1 || reasonCalls.length !== 1
+        || contextCalls.length !== 1 || !parsedName || !parseGuard
+        || !ts.isStringLiteral(reasonFallback) || reasonFallback.text !== spec.deletionReason
+        || !isReachableCall(routeCall, routeHandler)
+        || !(parserCalls[0].pos < versionCalls[0].pos && versionCalls[0].pos < reasonCalls[0].pos
+            && reasonCalls[0].pos < contextCalls[0].pos && contextCalls[0].pos < routeCall.pos)) {
+        problems.push('DELETE route must parse an object, version and approved reason before host audit identity and delegation');
+    }
+    const inputName = owner.parameters[0]?.name;
+    const inputSymbol = inputName && ts.isIdentifier(inputName) ? core.checker.getSymbolAtLocation(inputName) : null;
+    const inputPath = (expression, names) => {
+        let node = expression && unwrap(expression);
+        for (let index = names.length - 1; index >= 0; index -= 1) {
+            if (!node || !ts.isPropertyAccessExpression(node) || node.name.text !== names[index]) return false;
+            node = unwrap(node.expression);
+        }
+        return Boolean(node && ts.isIdentifier(node) && inputSymbol
+            && resolvesToBinding(core.checker, core.checker.getSymbolAtLocation(node), inputSymbol));
+    };
+    const plusOne = (expression, field) => {
+        const node = expression && unwrap(expression);
+        return Boolean(node && ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.PlusToken
+            && inputPath(node.left, [field]) && ts.isNumericLiteral(node.right) && node.right.text === '1');
+    };
+    const importedCall = (call, binding) => ts.isIdentifier(unwrap(call.expression))
+        && resolvesToBinding(core.checker, core.checker.getSymbolAtLocation(unwrap(call.expression)), binding.symbol);
+    const transactionCalls = calls(owner.body, (call) => {
+        const callee = unwrap(call.expression);
+        return ts.isPropertyAccessExpression(callee) && callee.name.text === 'transaction'
+            && ts.isIdentifier(callee.expression)
+            && resolvesToBinding(core.checker, core.checker.getSymbolAtLocation(callee.expression), db.symbol);
+    });
+    const transaction = transactionCalls.length === 1 ? transactionCalls[0] : null;
+    const callback = transaction?.arguments[0] && unwrap(transaction.arguments[0]);
+    const txName = callback && ts.isArrowFunction(callback) && ts.isBlock(callback.body)
+        && callback.parameters.length === 1 && ts.isIdentifier(callback.parameters[0].name)
+        ? callback.parameters[0].name.text : null;
+    const options = transaction?.arguments[1] && unwrap(transaction.arguments[1]);
+    const behavior = options && ts.isObjectLiteralExpression(options)
+        ? exactPropertyAssignments(options, ['behavior'])?.get('behavior')?.initializer : null;
+    if (!transaction || transaction.arguments.length !== 2 || !ts.isReturnStatement(transaction.parent)
+        || transaction.parent.parent !== owner.body || !isReachableCall(transaction, owner)
+        || !txName || localBindingExists(callback, txName, true)
+        || !behavior || !ts.isStringLiteral(behavior) || behavior.text !== 'immediate') {
+        problems.push('delete core must return one immediate transaction with an unshadowed tx');
+        return problems;
+    }
+    const sameTx = (expression) => ts.isIdentifier(unwrap(expression)) && unwrap(expression).text === txName;
+    const writerCalls = bindingCalls(owner, core.checker, writer.symbol);
+    const audit = writerCalls.length === 1 ? writerCalls[0] : null;
+    const auditStatement = audit && directStatement(callback, audit);
+    if (!audit || audit.arguments.length !== 2 || !sameTx(audit.arguments[0])
+        || !isReachableStandaloneCall(audit, callback)
+        || !auditStatement || !ts.isExpressionStatement(auditStatement)) {
+        problems.push('delete core must call exactly one required audit writer directly inside the same tx');
+        return problems;
+    }
+    const auditInput = unwrap(audit.arguments[1]);
+    const props = ts.isObjectLiteralExpression(auditInput)
+        ? exactPropertyAssignments(auditInput, ['eventType', 'outcome', 'actorType', 'actorRef',
+            'subjectType', 'subjectRef', 'sourceSurface', 'requestId', 'redactedMetadata']) : null;
+    const event = props?.get('eventType')?.initializer;
+    const outcome = props?.get('outcome')?.initializer;
+    const subject = props?.get('subjectType')?.initializer;
+    const subjectRef = props?.get('subjectRef')?.initializer;
+    const metadata = props?.get('redactedMetadata')?.initializer;
+    const metadataProps = metadata && ts.isObjectLiteralExpression(metadata)
+        ? exactPropertyAssignments(metadata, ['resourceVersion', 'reasonCode', 'flags']) : null;
+    if (!event || !ts.isStringLiteral(event) || event.text !== 'patient.deleted'
+        || !outcome || !ts.isStringLiteral(outcome) || outcome.text !== 'success'
+        || !subject || !ts.isStringLiteral(subject) || subject.text !== 'patient'
+        || !inputPath(subjectRef, ['patientId'])
+        || !metadataProps || !plusOne(metadataProps.get('resourceVersion')?.initializer, 'expectedVersion')) {
+        problems.push('delete audit must bind patient.deleted, success, the patient subject and next resource version');
+    }
+    const builderCalls = bindingCalls(owner, core.checker, tombstone.symbol);
+    const builder = builderCalls.length === 1 ? builderCalls[0] : null;
+    const setCall = builder?.parent;
+    const setCallee = setCall && ts.isCallExpression(setCall) ? unwrap(setCall.expression) : null;
+    const updateCall = setCallee && ts.isPropertyAccessExpression(setCallee) && setCallee.name.text === 'set'
+        ? unwrap(setCallee.expression) : null;
+    const updateCallee = updateCall && ts.isCallExpression(updateCall) ? unwrap(updateCall.expression) : null;
+    const table = updateCall && ts.isCallExpression(updateCall) ? updateCall.arguments[0] : null;
+    const whereProperty = setCall?.parent;
+    const whereCall = whereProperty && ts.isPropertyAccessExpression(whereProperty)
+        && whereProperty.name.text === 'where' && ts.isCallExpression(whereProperty.parent) ? whereProperty.parent : null;
+    const runProperty = whereCall?.parent;
+    const runCall = runProperty && ts.isPropertyAccessExpression(runProperty)
+        && runProperty.name.text === 'run' && ts.isCallExpression(runProperty.parent) ? runProperty.parent : null;
+    const updateStatement = runCall && directStatement(callback, runCall);
+    const updateResult = updateStatement && ts.isVariableStatement(updateStatement)
+        && updateStatement.declarationList.declarations.length === 1
+        ? updateStatement.declarationList.declarations[0] : null;
+    const boundCall = (expression, binding, arity) => {
+        const call = expression && unwrap(expression);
+        return call && ts.isCallExpression(call) && call.arguments.length === arity && importedCall(call, binding)
+            ? call : null;
+    };
+    const column = (expression, name) => {
+        const node = expression && unwrap(expression);
+        return Boolean(node && ts.isPropertyAccessExpression(node) && node.name.text === name
+            && ts.isIdentifier(node.expression)
+            && resolvesToBinding(core.checker, core.checker.getSymbolAtLocation(node.expression), patients.symbol));
+    };
+    const predicate = whereCall?.arguments.length === 1 ? boundCall(whereCall.arguments[0], andBinding, 3) : null;
+    const idEq = predicate && boundCall(predicate.arguments[0], eqBinding, 2);
+    const versionEq = predicate && boundCall(predicate.arguments[1], eqBinding, 2);
+    const activeWhere = predicate && boundCall(predicate.arguments[2], active, 0);
+    if (!builder || builder.arguments.length !== 2
+        || !inputPath(builder.arguments[0], ['expectedVersion']) || !inputPath(builder.arguments[1], ['deletionReason'])
+        || !updateCallee || !ts.isPropertyAccessExpression(updateCallee) || updateCallee.name.text !== 'update'
+        || !ts.isIdentifier(updateCallee.expression) || updateCallee.expression.text !== txName
+        || !table || !ts.isIdentifier(table)
+        || !resolvesToBinding(core.checker, core.checker.getSymbolAtLocation(table), patients.symbol)
+        || !whereCall || !runCall || !updateResult || updateResult.initializer !== runCall
+        || !isReachableCall(runCall, callback) || runCall.pos >= audit.pos
+        || !idEq || !column(idEq.arguments[0], 'id') || !inputPath(idEq.arguments[1], ['patientId'])
+        || !versionEq || !column(versionEq.arguments[0], 'version')
+        || !inputPath(versionEq.arguments[1], ['expectedVersion']) || !activeWhere) {
+        problems.push('delete must run a version-and-active guarded tombstone update on the same tx before audit');
+    }
+    const resultName = updateResult?.name;
+    const casGuards = resultName && ts.isIdentifier(resultName) ? callback.body.statements.filter((statement) => {
+        if (!ts.isIfStatement(statement) || statement.elseStatement) return false;
+        const condition = unwrap(statement.expression);
+        return ts.isBinaryExpression(condition) && condition.operatorToken.kind === ts.SyntaxKind.EqualsEqualsEqualsToken
+            && ts.isPropertyAccessExpression(condition.left) && condition.left.name.text === 'changes'
+            && ts.isIdentifier(condition.left.expression) && condition.left.expression.text === resultName.text
+            && ts.isNumericLiteral(condition.right) && condition.right.text === '0';
+    }) : [];
+    const cas = casGuards?.length === 1 ? casGuards[0] : null;
+    const conflicts = cas && bindingCalls(cas.thenStatement, core.checker, conflict.symbol);
+    const conflictReturn = cas && calls(cas.thenStatement, (call) => importedCall(call, conflict))
+        .some((call) => call.arguments.length >= 2 && inputPath(call.arguments[0], ['expectedVersion'])
+            && inputPath(call.arguments[1], ['patientId']) && isReachableCall(call, cas.thenStatement));
+    const status409 = cas && ts.isBlock(cas.thenStatement) && cas.thenStatement.statements.find((statement) => {
+        if (!ts.isReturnStatement(statement) || !statement.expression) return false;
+        const value = unwrap(statement.expression);
+        const returnProps = ts.isObjectLiteralExpression(value) ? exactPropertyAssignments(value, ['status', 'value']) : null;
+        const status = returnProps?.get('status')?.initializer;
+        return status && ts.isNumericLiteral(status) && status.text === '409';
+    });
+    const casReturns = [];
+    if (cas) {
+        const visit = (node) => {
+            if (ts.isReturnStatement(node)) casReturns.push(node);
+            ts.forEachChild(node, visit);
+        };
+        visit(cas.thenStatement);
+    }
+    const updateIndex = callback.body.statements.indexOf(updateStatement);
+    const auditIndex = callback.body.statements.indexOf(auditStatement);
+    const onlyCasBeforeAudit = updateIndex >= 0 && auditIndex === updateIndex + 2
+        && callback.body.statements[updateIndex + 1] === cas;
+    const preAuditReturns = [];
+    if (auditIndex >= 0) {
+        const visit = (node) => {
+            if (ts.isReturnStatement(node)) preAuditReturns.push(node);
+            ts.forEachChild(node, visit);
+        };
+        callback.body.statements.slice(0, auditIndex).forEach(visit);
+    }
+    const notFound = updateIndex > 0 && callback.body.statements.slice(0, updateIndex)
+        .filter((statement) => ts.isIfStatement(statement) && !statement.elseStatement
+            && ts.isReturnStatement(statement.thenStatement))
+        .map((statement) => statement.thenStatement)
+        .find((statement) => {
+            const value = statement.expression && unwrap(statement.expression);
+            const props = value && ts.isObjectLiteralExpression(value)
+                ? exactPropertyAssignments(value, ['status', 'value']) : null;
+            const status = props?.get('status')?.initializer;
+            return status && ts.isNumericLiteral(status) && status.text === '404';
+        });
+    if (!cas || cas.pos <= (runCall?.pos ?? Infinity) || cas.pos >= audit.pos
+        || conflicts?.length !== 1 || !conflictReturn || !status409
+        || casReturns.length !== 1 || casReturns[0] !== status409 || !onlyCasBeforeAudit
+        || preAuditReturns.length !== 2 || !preAuditReturns.includes(notFound)
+        || !preAuditReturns.includes(status409)) {
+        problems.push('delete CAS miss must return the version conflict before audit');
+    }
+    const success = callback.body.statements.find((statement) => ts.isReturnStatement(statement)
+        && statement.pos > auditStatement.pos && statement.expression
+        && ts.isObjectLiteralExpression(unwrap(statement.expression))
+        && exactPropertyAssignments(unwrap(statement.expression), ['status', 'value'])?.get('status')?.initializer?.getText(core.sourceFile) === '200');
+    if (!success) problems.push('delete success must return after the required audit');
+    const auditFile = checkedSource('lib/security/audit.ts', auditSource);
+    const requiredWriter = namedFunction(auditFile.sourceFile, 'writeAuditEventInTransaction', true);
+    const auditTable = importedBinding(auditFile.sourceFile, auditFile.checker, '../schema', 'auditEvents');
+    const writerTx = requiredWriter?.parameters[0]?.name;
+    const inserts = requiredWriter && auditTable && writerTx && ts.isIdentifier(writerTx)
+        ? calls(requiredWriter.body, (call) => {
+            const run = unwrap(call.expression);
+            if (!ts.isPropertyAccessExpression(run) || run.name.text !== 'run') return false;
+            const valuesCall = unwrap(run.expression);
+            const values = ts.isCallExpression(valuesCall) ? unwrap(valuesCall.expression) : null;
+            const insertCall = values && ts.isPropertyAccessExpression(values) && values.name.text === 'values'
+                ? unwrap(values.expression) : null;
+            const insert = insertCall && ts.isCallExpression(insertCall) ? unwrap(insertCall.expression) : null;
+            const table = insertCall && ts.isCallExpression(insertCall) ? insertCall.arguments[0] : null;
+            return ts.isCallExpression(valuesCall) && valuesCall.arguments.length === 1
+                && ts.isIdentifier(unwrap(valuesCall.arguments[0])) && unwrap(valuesCall.arguments[0]).text === 'row'
+                && insertCall && ts.isCallExpression(insertCall) && insertCall.arguments.length === 1
+                && insert && ts.isPropertyAccessExpression(insert) && insert.name.text === 'insert'
+                && ts.isIdentifier(insert.expression) && insert.expression.text === writerTx.text
+                && table && ts.isIdentifier(table)
+                && resolvesToBinding(auditFile.checker, auditFile.checker.getSymbolAtLocation(table), auditTable.symbol);
+        }) : [];
+    const insertStatement = inserts.length === 1 && directStatement(requiredWriter, inserts[0]);
+    const insertResult = insertStatement && ts.isVariableStatement(insertStatement)
+        && insertStatement.declarationList.declarations.length === 1
+        ? insertStatement.declarationList.declarations[0] : null;
+    const insertResultName = insertResult?.name;
+    const insertIndex = requiredWriter?.body?.statements.indexOf(insertStatement) ?? -1;
+    const insertGuard = insertIndex >= 0 ? requiredWriter.body.statements[insertIndex + 1] : null;
+    const insertCondition = insertGuard && ts.isIfStatement(insertGuard) ? unwrap(insertGuard.expression) : null;
+    const checkedInsert = insertResult?.initializer === inserts[0] && insertResultName && ts.isIdentifier(insertResultName)
+        && insertCondition && ts.isBinaryExpression(insertCondition)
+        && insertCondition.operatorToken.kind === ts.SyntaxKind.ExclamationEqualsEqualsToken
+        && ts.isPropertyAccessExpression(insertCondition.left) && insertCondition.left.name.text === 'changes'
+        && ts.isIdentifier(insertCondition.left.expression) && insertCondition.left.expression.text === insertResultName.text
+        && ts.isNumericLiteral(insertCondition.right) && insertCondition.right.text === '1'
+        && !insertGuard.elseStatement && ts.isBlock(insertGuard.thenStatement)
+        && insertGuard.thenStatement.statements.length === 1
+        && ts.isThrowStatement(insertGuard.thenStatement.statements[0]);
+    if (auditFile.sourceFile.parseDiagnostics.length || !requiredWriter || !auditTable
+        || inserts.length !== 1 || !isReachableCall(inserts[0], requiredWriter) || !checkedInsert) {
+        problems.push('required audit primitive must check the exact insert result');
     }
     return problems;
 }
@@ -1334,7 +2053,10 @@ export function validateLogoutAuditModes({ spec, routeSource, serviceSource = nu
 
 function checkAuditWriterControlFlow(findings) {
     const contracts = REQUIRED_ROUTE_AUDIT.flatMap((entry) =>
-        (entry.writerContracts ?? []).filter((contract) => !contract.modes).map((contract) => ({ ...contract, route: entry.route })));
+        (entry.writerContracts ?? []).filter((contract) => !contract.modes
+            && !contract.transactionalPatientUpdate && !contract.transactionalPatientDelete
+            && !contract.transactionalDiary && !contract.transactionalTherapy && !contract.transactionalObservation && !contract.transactionalCheckup)
+            .map((contract) => ({ ...contract, route: entry.route })));
     const parsedFiles = new Map();
     for (const contract of contracts) {
         if (!parsedFiles.has(contract.ownerFile)) {
@@ -1400,6 +2122,12 @@ function checkRouteCoverage(findings) {
         const source = read(entry.route);
         if (entry.writerContracts) {
             for (const contract of entry.writerContracts) {
+                if (!contract.modes && !exists(contract.ownerFile)) {
+                    addFinding(findings, 'AUDIT_ROUTE_DELEGATION', `${entry.route}: required audit owner is missing`, {
+                        route: entry.route, target: contract.target, eventType: contract.eventType ?? entry.events[0],
+                    });
+                    continue;
+                }
                 const problems = contract.modes
                     ? validateLogoutAuditModes({
                         spec: contract,
@@ -1407,6 +2135,36 @@ function checkRouteCoverage(findings) {
                         serviceSource: exists(contract.modes.delegated.ownerFile)
                             ? read(contract.modes.delegated.ownerFile) : null,
                     })
+                    : contract.transactionalPatientUpdate
+                        ? validateRequiredPatientUpdateAudit({
+                            spec: contract, routeSource: source, coreSource: read(contract.ownerFile),
+                            auditSource: read('lib/security/audit.ts'),
+                        })
+                    : contract.transactionalPatientDelete
+                        ? validateRequiredPatientDeleteAudit({
+                            spec: contract, routeSource: source, coreSource: read(contract.ownerFile),
+                            auditSource: read('lib/security/audit.ts'),
+                        })
+                    : contract.transactionalDiary
+                        ? validateRequiredDiaryAudit({
+                            spec: contract, routeSource: source, coreSource: read(contract.ownerFile),
+                            bridgeSource: exists(contract.bridgeFile) ? read(contract.bridgeFile) : null,
+                        })
+                    : contract.transactionalTherapy
+                        ? validateRequiredTherapyAudit({
+                            spec: contract, routeSource: source, coreSource: read(contract.ownerFile),
+                            bridgeSource: exists(contract.bridgeFile) ? read(contract.bridgeFile) : null,
+                        })
+                    : contract.transactionalObservation
+                        ? validateRequiredObservationAudit({
+                            spec: contract, routeSource: source, coreSource: read(contract.ownerFile),
+                            bridgeSource: exists(contract.bridgeFile) ? read(contract.bridgeFile) : null,
+                        })
+                    : contract.transactionalCheckup
+                        ? validateRequiredCheckupAudit({
+                            spec: contract, routeSource: source, coreSource: read(contract.ownerFile),
+                            bridgeSource: exists(contract.bridgeFile) ? read(contract.bridgeFile) : null,
+                        })
                     : validateDelegatedRouteAudit({
                         spec: contract,
                         routeSource: source,
@@ -1439,13 +2197,14 @@ function checkRouteCoverage(findings) {
 }
 
 function sourceIncludesEvent(source, eventType) {
-    if (source.includes(`'${eventType}'`)) return true;
-    return (EVENT_SOURCE_ALIASES[eventType] ?? []).some((token) => source.includes(token));
+    return source.includes(`'${eventType}'`);
 }
 
 function checkPhiSafeMetadata(findings) {
     const targets = [
         'lib/security/audit.ts',
+        'lib/patient-update-operation.ts',
+        'lib/patient-delete-operation.ts',
         'lib/siss-audit.ts',
         ...REQUIRED_ROUTE_AUDIT.map((entry) => entry.route),
     ];

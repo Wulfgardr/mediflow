@@ -5,54 +5,25 @@ import { and, eq } from 'drizzle-orm';
 /* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 /* @Codex */
-import { buildPatientVersionConflictPayload, parseExpectedVersion } from '@/lib/patient-concurrency';
+import { parseExpectedVersion } from '@/lib/patient-concurrency';
 // WUL-306 (ADR 0066): soft-delete lifecycle helpers
-import { activePatients, buildPatientTombstoneValues } from '@/lib/patient-lifecycle';
+import { activePatients } from '@/lib/patient-lifecycle';
 /* @Codex */
 import { normalizePatientUpdateInput } from '@/lib/patient-write-normalization';
 /* @Codex */
-import { upsertPrimaryAmbulatoryMembership } from '@/lib/patient-ambulatory-membership';
+import { parsePatientJsonObject } from '@/lib/patient-json-object';
 /* @Codex */
-import {
-    auditContextFromSession,
-    classifyPatientMutationEvent,
-    listChangedFields,
-    requestIdFromRequest,
-    withAuditContextMetadata,
-    writeAuditEvent,
-} from '@/lib/security/audit';
+import { updatePatientOperation } from '@/lib/patient-update-operation';
+/* @Codex */
+import { deletePatientOperation } from '@/lib/patient-delete-operation';
+/* @Codex */
+import { auditContextFromSession, requestIdFromRequest } from '@/lib/security/audit';
 
 /* @Codex */
 function parsePatientDeletionReason(body: Record<string, unknown>, fallback: string): string | null {
     if (!Object.prototype.hasOwnProperty.call(body, 'deletionReason')) return fallback;
     if (typeof body.deletionReason !== 'string' || body.deletionReason.trim().length === 0) return null;
     return body.deletionReason;
-}
-
-/* @Codex */
-async function recordPatientAuditEvent(
-    request: Request,
-    session: Awaited<ReturnType<typeof requireSession>>,
-    eventType: Parameters<typeof writeAuditEvent>[0]['eventType'],
-    subjectRef: string,
-    redactedMetadata: Parameters<typeof writeAuditEvent>[0]['redactedMetadata']
-): Promise<void> {
-    try {
-        const context = auditContextFromSession(session);
-        await writeAuditEvent({
-            eventType,
-            outcome: 'success',
-            actorType: context.actorType,
-            actorRef: context.actorRef,
-            subjectType: 'patient',
-            subjectRef,
-            sourceSurface: context.sourceSurface,
-            requestId: requestIdFromRequest(request),
-            redactedMetadata: withAuditContextMetadata(context, redactedMetadata),
-        });
-    } catch (error) {
-        console.error('[MediFlow] Patient audit write failed:', error);
-    }
 }
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -77,7 +48,9 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
     try {
         const { id } = await params;
-        const body = await request.json() as Record<string, unknown>;
+        const parsed = await parsePatientJsonObject(() => request.json());
+        if (!parsed.ok) return NextResponse.json({ error: 'Richiesta non valida.' }, { status: 400 });
+        const body = parsed.body;
         /* @Codex */
         const expectedVersion = parseExpectedVersion(body.version);
         if (expectedVersion === null) {
@@ -97,47 +70,18 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
             return NextResponse.json({ error: normalized.error }, { status: 400 });
         }
 
-        /* @Codex */
-        const updateResult = await dbServer
-            .update(patients)
-            .set(normalized.values)
-            .where(and(eq(patients.id, id), eq(patients.version, expectedVersion), activePatients()))
-            .run();
-
-        if (updateResult.changes === 0) {
-            const current = await dbServer
-                .select({
-                    id: patients.id,
-                    version: patients.version,
-                    updatedAt: patients.updatedAt,
-                    isArchived: patients.isArchived
-                })
-                .from(patients)
-                .where(and(eq(patients.id, id), activePatients()))
-                .get();
-            return NextResponse.json(
-                buildPatientVersionConflictPayload(expectedVersion, id, current ?? null),
-                { status: 409 }
-            );
-        }
-
-        if (Object.prototype.hasOwnProperty.call(body, 'ambulatoryId')) {
-            // WUL-334: match WUL-309 set-primary semantics used by /api/v1 and
-            // network writes. A profile edit must not rewrite other memberships.
-            upsertPrimaryAmbulatoryMembership(dbServer, id, normalized.values.ambulatoryId);
-        }
-
-        /* @Codex */
-        await recordPatientAuditEvent(
-            request,
-            session,
-            classifyPatientMutationEvent(existing.isArchived ?? null, normalized.values.isArchived as boolean | undefined),
-            id,
-            {
-                changedFields: listChangedFields(body, ['version']),
-                resourceVersion: expectedVersion + 1,
-            }
-        );
+        /* @Codex: actor/correlation are resolved before the synchronous commit. */
+        const auditContext = auditContextFromSession(session);
+        const commit = updatePatientOperation({
+            patientId: id, expectedVersion, values: normalized.values,
+            setPrimaryAmbulatory: Object.prototype.hasOwnProperty.call(body, 'ambulatoryId'),
+            audit: {
+                actorType: auditContext.actorType, actorRef: auditContext.actorRef,
+                sourceSurface: auditContext.sourceSurface, requestId: requestIdFromRequest(request),
+                flags: [`auth:${auditContext.authContext}`],
+            },
+        });
+        if (commit.status !== 200) return NextResponse.json(commit.value, { status: commit.status });
 
         return NextResponse.json({ success: true });
     } catch {
@@ -153,7 +97,9 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     try {
         const { id } = await params;
         /* @Codex */
-        const body = await request.json().catch(() => ({})) as Record<string, unknown>;
+        const parsed = await parsePatientJsonObject(() => request.json());
+        if (!parsed.ok) return NextResponse.json({ error: 'Richiesta non valida.' }, { status: 400 });
+        const body = parsed.body;
         const expectedVersion = parseExpectedVersion(body.version);
         if (expectedVersion === null) {
             return NextResponse.json({ error: 'Version is required' }, { status: 400 });
@@ -163,40 +109,15 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
             return NextResponse.json({ error: 'Invalid deletionReason' }, { status: 400 });
         }
 
-        const existing = await dbServer.select({ id: patients.id }).from(patients).where(and(eq(patients.id, id), activePatients())).get();
-        if (!existing) {
-            return NextResponse.json({ error: 'Not found' }, { status: 404 });
-        }
-
-        // WUL-306: DELETE keeps the soft-delete tombstone (ADR 0066); clinical child rows
-        // stay linked for the audited admin purge. Wire contract unchanged.
-        const deleteResult = await dbServer
-            .update(patients)
-            .set(buildPatientTombstoneValues(expectedVersion, deletionReason))
-            .where(and(eq(patients.id, id), eq(patients.version, expectedVersion), activePatients()))
-            .run();
-
-        if (deleteResult.changes === 0) {
-            const current = await dbServer
-                .select({
-                    id: patients.id,
-                    version: patients.version,
-                    updatedAt: patients.updatedAt,
-                    isArchived: patients.isArchived
-                })
-                .from(patients)
-                .where(and(eq(patients.id, id), activePatients()))
-                .get();
-            return NextResponse.json(
-                buildPatientVersionConflictPayload(expectedVersion, id, current ?? null),
-                { status: 409 }
-            );
-        }
-
-        /* @Codex */
-        await recordPatientAuditEvent(request, session, 'patient.deleted', id, {
-            resourceVersion: expectedVersion,
+        /* @Codex: resolve host identity before the synchronous tombstone/audit commit. */
+        const auditContext = auditContextFromSession(session);
+        const result = deletePatientOperation({
+            patientId: id, expectedVersion, deletionReason,
+            audit: { actorType: auditContext.actorType, actorRef: auditContext.actorRef,
+                sourceSurface: auditContext.sourceSurface, requestId: requestIdFromRequest(request),
+                flags: [`auth:${auditContext.authContext}`] },
         });
+        if (result.status !== 200) return NextResponse.json(result.value, { status: result.status });
 
         return NextResponse.json({ success: true });
     } catch {

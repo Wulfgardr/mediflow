@@ -14,6 +14,8 @@ verifica dello stato successivo.
 
 ## Decisioni richiamate
 
+- [0137-rust-boundary-pilot-proposal.md](./0137-rust-boundary-pilot-proposal.md): proposta WUL-706 subordinata al pilota 0.9.1; confronto IPC/FFI, codec isolato e rollback, senza adozione runtime o cambio UI.
+
 - [0125-explicit-aifa-catalog-download.md](./0125-explicit-aifa-catalog-download.md): propone un aggiornamento AIFA richiesto esplicitamente e basato sulla fonte ufficiale.
 
 - [0123-official-web-ui-navigation-compositions.md](./0123-official-web-ui-navigation-compositions.md): definisce la promozione della UI web con B predefinita, A selezionabile e un confronto sintetico separato.

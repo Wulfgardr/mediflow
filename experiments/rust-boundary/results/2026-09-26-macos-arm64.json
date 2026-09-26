@@ -1,0 +1,354 @@
+{
+  "schema": "mediflow.rust-codec-experiment-evidence.v1",
+  "recordedAt": "2026-09-26T07:36:37.419195+00:00",
+  "baseCommit": "6c212221a98f9b8e45cc1d243226d0adb41770bd",
+  "scope": "Synthetic codec preparation only; no production integration or issue acceptance",
+  "sources": [
+    {
+      "path": "experiments/rust-boundary/Cargo.toml",
+      "sha256": "b35834bf3bbd66afff721f962f8f28761c312e4abd3b8040ef6c8884cf106941"
+    },
+    {
+      "path": "experiments/rust-boundary/Cargo.lock",
+      "sha256": "9136edefd360827613eee1c904848089f7e0fcf98359b32379dbd26bc0570f62"
+    },
+    {
+      "path": "experiments/rust-boundary/compare.mjs",
+      "sha256": "5ec283ff43ceaf55505ab75656b1b6a08b5b2b370c253296624613c7cf0a292d"
+    },
+    {
+      "path": "experiments/rust-boundary/src/lib.rs",
+      "sha256": "225c0441ce77e001680a98eaf35e560cb95aab15907c2e7a7cd83cfbb8fa112a"
+    },
+    {
+      "path": "experiments/rust-boundary/src/main.rs",
+      "sha256": "f8e82120354b19e1c1f3b79f894bd97c86dd1e9cc424789352941dbdcbf096c0"
+    },
+    {
+      "path": "packages/aip/src/portable-supervisor-web-ipc-contract.ts",
+      "sha256": "d056ce6dcd56862a5c300952a9e75fe744f374c8e34fe135dd1d026baeb1a8b9"
+    }
+  ],
+  "machine": {
+    "chip": "Apple M4 Max",
+    "memoryBytes": 38654705664,
+    "os": "macOS 27.2",
+    "osBuild": "26B5091g",
+    "arch": "arm64",
+    "backgroundLoadControlled": false
+  },
+  "toolchain": {
+    "node": "24.21.0",
+    "cargo": "1.98.1",
+    "rustc": "1.98.1",
+    "rustcCommit": "48a229ceaefd4985c50990b14116b6d856af0985",
+    "target": "aarch64-apple-darwin",
+    "llvm": "22.1.8",
+    "components": [
+      {
+        "name": "rustc",
+        "url": "https://static.rust-lang.org/dist/2026-09-03/rustc-1.98.1-aarch64-apple-darwin.tar.xz",
+        "sha256": "738e3f60114b20550fcf4f8a57c9cea0544239f214709f45594ff3fde327f577"
+      },
+      {
+        "name": "rust-std",
+        "url": "https://static.rust-lang.org/dist/2026-09-03/rust-std-1.98.1-aarch64-apple-darwin.tar.xz",
+        "sha256": "2de831ef563ce772519a4d18ba2659f0f7428d497ef66dad24b5a35e8f8cd177"
+      },
+      {
+        "name": "cargo",
+        "url": "https://static.rust-lang.org/dist/2026-09-03/cargo-1.98.1-aarch64-apple-darwin.tar.xz",
+        "sha256": "de51d4fade4f31ad8ec405261cc96bedc000d905f98980027610d6e288dbe21b"
+      }
+    ]
+  },
+  "validation": {
+    "rustTests": {
+      "passed": 3,
+      "failed": 0
+    },
+    "originalTypescriptTests": {
+      "passed": 7,
+      "failed": 0,
+      "skipped": 0
+    },
+    "testCommand": "cargo test --offline --locked --manifest-path experiments/rust-boundary/Cargo.toml",
+    "buildCommand": "cargo build --offline --locked --release --manifest-path experiments/rust-boundary/Cargo.toml",
+    "buildExitCode": 0,
+    "buildWarning": "rust-objcopy strip debug step failed: missing libLLVM.dylib; executable tested successfully; size is not packaged-release size",
+    "review": "Sol Medium static review of proposal and harness; final interpretation accepted by coordinator. No runtime security or clinical acceptance.",
+    "coordinatorCorrections": [
+      "Exit failure on top-level IO errors; forbid unsafe in experiment code only",
+      "Preserve leading BOM in UTF-8 oracle; add negative vector so original decoder decides validity"
+    ]
+  },
+  "runs": [
+    {
+      "schema": "mediflow.rust-codec-experiment.v1",
+      "at": "2026-09-26T07:33:33.423Z",
+      "platform": "darwin",
+      "arch": "arm64",
+      "osRelease": "27.2.0",
+      "node": "v24.21.0",
+      "syntheticOnly": true,
+      "source": {
+        "path": "packages/aip/src/portable-supervisor-web-ipc-contract.ts",
+        "sha256": "d056ce6dcd56862a5c300952a9e75fe744f374c8e34fe135dd1d026baeb1a8b9"
+      },
+      "rustBinary": {
+        "sha256": "c7ccdb0891b9b94b4872dce14c49a29d2fa694c986f8d311e8b6724f0291b2f8",
+        "bytes": 575296
+      },
+      "equivalence": {
+        "cases": 313,
+        "accepted": 41,
+        "rejected": 272,
+        "binaryFramingNegatives": 4,
+        "seed": 706
+      },
+      "workloadBytes": [
+        131,
+        598,
+        162,
+        249,
+        167,
+        147,
+        179
+      ],
+      "timings": {
+        "typescriptInProcess": {
+          "n": 5600,
+          "p50Ms": 0.0015420000000005984,
+          "p95Ms": 0.0037080000000031532,
+          "minMs": 0.0009579999999971278,
+          "maxMs": 0.11633400000000904,
+          "meanMs": 0.0020184044642857202,
+          "sdMs": 0.002970848580819736
+        },
+        "nodeWarmPipe": {
+          "n": 1000,
+          "p50Ms": 0.02795799999995552,
+          "p95Ms": 0.06533400000000711,
+          "minMs": 0.014999999999986358,
+          "maxMs": 0.37633299999998826,
+          "meanMs": 0.03412179400000008,
+          "sdMs": 0.028103242582797772
+        },
+        "rustWarmPipe": {
+          "n": 1000,
+          "p50Ms": 0.019875000000013188,
+          "p95Ms": 0.03712500000000318,
+          "minMs": 0.011375000000015234,
+          "maxMs": 0.23370800000000713,
+          "meanMs": 0.023173508000000623,
+          "sdMs": 0.016130161294728006
+        },
+        "nodeColdSpawnOneFrameExit": {
+          "n": 12,
+          "p50Ms": 84.35325000000012,
+          "p95Ms": 93.60066699999999,
+          "minMs": 81.68174999999997,
+          "maxMs": 93.60066699999999,
+          "meanMs": 85.18044108333332,
+          "sdMs": 3.077329399061204
+        },
+        "rustColdSpawnOneFrameExit": {
+          "n": 12,
+          "p50Ms": 2.0427499999999554,
+          "p95Ms": 2.388084000000049,
+          "minMs": 1.830167000000074,
+          "maxMs": 2.388084000000049,
+          "meanMs": 2.14442033333332,
+          "sdMs": 0.18031030059794625
+        }
+      },
+      "checksum": 1633000,
+      "limits": [
+        "wire decoder parity only; not JS object encoder traps or authorization",
+        "macOS development binaries, no installed app or Windows/Linux qualification",
+        "cold Node includes TS module transform; Rust optimized release; not application startup",
+        "RSS/CPU/FFI not measured",
+        "no workload C02 acceptance or product performance claim"
+      ],
+      "childClosures": "direct children exited code0; no child descendants created by these codecs"
+    },
+    {
+      "schema": "mediflow.rust-codec-experiment.v1",
+      "at": "2026-09-26T07:33:57.648Z",
+      "platform": "darwin",
+      "arch": "arm64",
+      "osRelease": "27.2.0",
+      "node": "v24.21.0",
+      "syntheticOnly": true,
+      "source": {
+        "path": "packages/aip/src/portable-supervisor-web-ipc-contract.ts",
+        "sha256": "d056ce6dcd56862a5c300952a9e75fe744f374c8e34fe135dd1d026baeb1a8b9"
+      },
+      "rustBinary": {
+        "sha256": "c7ccdb0891b9b94b4872dce14c49a29d2fa694c986f8d311e8b6724f0291b2f8",
+        "bytes": 575296
+      },
+      "equivalence": {
+        "cases": 313,
+        "accepted": 41,
+        "rejected": 272,
+        "binaryFramingNegatives": 4,
+        "seed": 706
+      },
+      "workloadBytes": [
+        131,
+        598,
+        162,
+        249,
+        167,
+        147,
+        179
+      ],
+      "timings": {
+        "typescriptInProcess": {
+          "n": 5600,
+          "p50Ms": 0.0015000000000071623,
+          "p95Ms": 0.0036669999999929814,
+          "minMs": 0.0009170000000011669,
+          "maxMs": 0.2772080000000017,
+          "meanMs": 0.0020385910714284528,
+          "sdMs": 0.004991570922664702
+        },
+        "nodeWarmPipe": {
+          "n": 1000,
+          "p50Ms": 0.023667000000017424,
+          "p95Ms": 0.03999999999999204,
+          "minMs": 0.012209000000012793,
+          "maxMs": 0.24970899999999574,
+          "meanMs": 0.025716302999999982,
+          "sdMs": 0.013647170831171928
+        },
+        "rustWarmPipe": {
+          "n": 1000,
+          "p50Ms": 0.016583999999994603,
+          "p95Ms": 0.02687500000001819,
+          "minMs": 0.012207999999986896,
+          "maxMs": 0.15562499999998636,
+          "meanMs": 0.018594985000000692,
+          "sdMs": 0.009156330226174765
+        },
+        "nodeColdSpawnOneFrameExit": {
+          "n": 12,
+          "p50Ms": 83.6377500000001,
+          "p95Ms": 86.8376669999999,
+          "minMs": 81.886708,
+          "maxMs": 86.8376669999999,
+          "meanMs": 83.79847216666664,
+          "sdMs": 1.3539015711147961
+        },
+        "rustColdSpawnOneFrameExit": {
+          "n": 12,
+          "p50Ms": 2.036041999999952,
+          "p95Ms": 2.2267080000000306,
+          "minMs": 1.6911249999999427,
+          "maxMs": 2.2267080000000306,
+          "meanMs": 2.0392431666666417,
+          "sdMs": 0.15905094614506707
+        }
+      },
+      "checksum": 1633000,
+      "limits": [
+        "wire decoder parity only; not JS object encoder traps or authorization",
+        "macOS development binaries, no installed app or Windows/Linux qualification",
+        "cold Node includes TS module transform; Rust optimized release; not application startup",
+        "RSS/CPU/FFI not measured",
+        "no workload C02 acceptance or product performance claim"
+      ],
+      "childClosures": "direct children exited code0; no child descendants created by these codecs"
+    },
+    {
+      "schema": "mediflow.rust-codec-experiment.v1",
+      "at": "2026-09-26T07:33:58.965Z",
+      "platform": "darwin",
+      "arch": "arm64",
+      "osRelease": "27.2.0",
+      "node": "v24.21.0",
+      "syntheticOnly": true,
+      "source": {
+        "path": "packages/aip/src/portable-supervisor-web-ipc-contract.ts",
+        "sha256": "d056ce6dcd56862a5c300952a9e75fe744f374c8e34fe135dd1d026baeb1a8b9"
+      },
+      "rustBinary": {
+        "sha256": "c7ccdb0891b9b94b4872dce14c49a29d2fa694c986f8d311e8b6724f0291b2f8",
+        "bytes": 575296
+      },
+      "equivalence": {
+        "cases": 313,
+        "accepted": 41,
+        "rejected": 272,
+        "binaryFramingNegatives": 4,
+        "seed": 706
+      },
+      "workloadBytes": [
+        131,
+        598,
+        162,
+        249,
+        167,
+        147,
+        179
+      ],
+      "timings": {
+        "typescriptInProcess": {
+          "n": 5600,
+          "p50Ms": 0.0015420000000005984,
+          "p95Ms": 0.0036249999999995453,
+          "minMs": 0.0009160000000036916,
+          "maxMs": 0.09354199999999935,
+          "meanMs": 0.0019267980357142507,
+          "sdMs": 0.0023812566681786396
+        },
+        "nodeWarmPipe": {
+          "n": 1000,
+          "p50Ms": 0.025208000000020547,
+          "p95Ms": 0.04504200000002356,
+          "minMs": 0.013291999999978543,
+          "maxMs": 0.12270900000001461,
+          "meanMs": 0.027146919000000453,
+          "sdMs": 0.012334383454329608
+        },
+        "rustWarmPipe": {
+          "n": 1000,
+          "p50Ms": 0.0176659999999913,
+          "p95Ms": 0.02975000000000705,
+          "minMs": 0.011833999999993239,
+          "maxMs": 0.13920799999999645,
+          "meanMs": 0.01965482600000013,
+          "sdMs": 0.009702353140745515
+        },
+        "nodeColdSpawnOneFrameExit": {
+          "n": 12,
+          "p50Ms": 83.458417,
+          "p95Ms": 85.36904200000001,
+          "minMs": 82.49070799999993,
+          "maxMs": 85.36904200000001,
+          "meanMs": 83.60613899999998,
+          "sdMs": 0.829235401381104
+        },
+        "rustColdSpawnOneFrameExit": {
+          "n": 12,
+          "p50Ms": 2.000415999999973,
+          "p95Ms": 2.412458000000015,
+          "minMs": 1.7377079999999978,
+          "maxMs": 2.412458000000015,
+          "meanMs": 2.0740623333333446,
+          "sdMs": 0.22079842802517713
+        }
+      },
+      "checksum": 1633000,
+      "limits": [
+        "wire decoder parity only; not JS object encoder traps or authorization",
+        "macOS development binaries, no installed app or Windows/Linux qualification",
+        "cold Node includes TS module transform; Rust optimized release; not application startup",
+        "RSS/CPU/FFI not measured",
+        "no workload C02 acceptance or product performance claim"
+      ],
+      "childClosures": "direct children exited code0; no child descendants created by these codecs"
+    }
+  ]
+}

@@ -1,22 +1,22 @@
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
-import { patients, therapies } from '@/lib/schema';
+import { therapies } from '@/lib/schema';
 import { and, asc, desc, eq, isNull, type SQL } from 'drizzle-orm';
-import { v4 as uuidv4 } from 'uuid';
 /* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 /* @Codex */
 import { normalizeTherapyStatus, parseTherapyStatus } from '@/lib/status-normalization';
 /* @Codex */
-import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/security/audit';
+import { auditContextFromSession, requestIdFromRequest } from '@/lib/security/audit';
 /* STREAM B: server-side list params (whitelisted, plaintext columns only). */
 import { parseListParams } from '@/lib/list-query-params';
 /* @Codex */
 import { therapyCreateSchema } from '@/lib/api-schemas/clinical-writes';
 /* @Codex */
 import { parseApiBody } from '@/lib/api-schemas/parse';
-import { activePatients } from '@/lib/patient-lifecycle';
 import { apiInternalError } from '@/lib/api-error-response';
+import { createTherapyOperation } from '@/lib/therapy-write-operation';
+import { readTherapyJsonObject, therapyCreateId, therapyChangedFields, validateTherapyInput } from '@/lib/therapy-write-input';
 
 // motivation is ENC:, so it is not sortable. Only plaintext columns here.
 const THERAPY_SORT_COLUMNS = {
@@ -67,83 +67,44 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-    /* @Codex */
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
 
     try {
-        const rawBody = await request.json();
-        const parsedBody = parseApiBody(therapyCreateSchema, rawBody);
+        const parsed = await readTherapyJsonObject(request, 'web', 'create');
+        if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: parsed.status });
+        const shape = validateTherapyInput(parsed.body, 'web', 'create');
+        if (shape) return NextResponse.json({ error: shape.error }, { status: shape.status });
+        const parsedBody = parseApiBody(therapyCreateSchema, parsed.body);
         if (!parsedBody.ok) return parsedBody.response;
         const body = parsedBody.data;
-        /* @Codex */
-        const auditBody = body as Record<string, unknown>;
-        /* @Codex */
         const normalizedStatus = body.status === undefined ? 'active' : parseTherapyStatus(body.status);
         if (body.status !== undefined && !normalizedStatus) {
             return NextResponse.json({ error: 'Invalid therapy status' }, { status: 400 });
         }
-
-        const newId = body.id || uuidv4(); // Consistent ID handling
+        const newId = therapyCreateId(parsed.body);
         const therapyValues = {
-            id: newId,
-            patientId: body.patientId,
-            drugName: body.drugName,
-            /* @Codex */
+            id: newId, patientId: body.patientId, drugName: body.drugName,
             aic: typeof body.aic === 'string' ? body.aic : null,
-            /* @Codex */
             atc: typeof body.atc === 'string' ? body.atc : null,
-            /* @Codex */
-            activePrinciple: body.activePrinciple ?? null,
-            dosage: body.dosage,
-            /* @Codex */
+            activePrinciple: body.activePrinciple ?? null, dosage: body.dosage,
             motivation: body.motivation ?? null,
-            /* @Codex */
-            diagnosisCode: body.diagnosisCode ?? null,
-            /* @Codex */
-            diagnosisName: body.diagnosisName ?? null,
-            status: normalizedStatus ?? 'active',
-            startDate: new Date(body.startDate),
+            diagnosisCode: body.diagnosisCode ?? null, diagnosisName: body.diagnosisName ?? null,
+            status: normalizedStatus ?? 'active', startDate: new Date(body.startDate),
             endDate: body.endDate ? new Date(body.endDate) : null,
-            version: 1,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-            deletedAt: null,
-            deletionReason: null,
+            version: 1, createdAt: new Date(), updatedAt: new Date(),
+            deletedAt: null, deletionReason: null,
         };
-        const created = dbServer.transaction((tx) => {
-            const patient = tx.select({ id: patients.id })
-                .from(patients)
-                .where(and(eq(patients.id, body.patientId), activePatients()))
-                .get();
-            if (!patient) return false;
-            tx.insert(therapies).values(therapyValues).run();
-            return true;
+        const context = auditContextFromSession(session);
+        const result = createTherapyOperation({
+            patientId: body.patientId, therapyId: newId, values: therapyValues,
+            changedFields: therapyChangedFields(therapyValues, parsed.body), mode: 'web',
+            audit: { actorType: context.actorType, actorRef: context.actorRef,
+                sourceSurface: context.sourceSurface, requestId: requestIdFromRequest(request),
+                flags: [`auth:${context.authContext}`] },
         });
-        if (!created) {
-            return NextResponse.json({ error: 'Patient not found' }, { status: 404 });
-        }
-
-        /* @Codex */
-        await safeWriteAuditEventFromRequest(
-            request,
-            session,
-            {
-                eventType: 'therapy.created',
-                subjectType: 'therapy',
-                subjectRef: String(newId),
-                redactedMetadata: {
-                    changedFields: listChangedFields(auditBody, ['id']),
-                    resourceVersion: 1,
-                },
-            },
-            '[MediFlow] Therapy audit write failed:',
-        );
-
-        return NextResponse.json({ id: newId, version: 1 }, { status: 201 });
+        return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
-        /* Il messaggio grezzo qui e' quello di drizzle/SQLite: nome di tabella,
-           vincolo violato, a volte il valore. Resta nei log. */
         return apiInternalError('POST /api/therapies', error);
     }
 }

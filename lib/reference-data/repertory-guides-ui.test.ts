@@ -4,12 +4,18 @@
  * Run with the repository's Node24 loader and locked esbuild/Playwright/React dependencies.
  */
 import assert from 'node:assert/strict';
+import { writeSync } from 'node:fs';
 import test from 'node:test';
 import { chromium, expect, type Page, type Route } from '@playwright/test';
 import { build } from 'esbuild';
 import type { AifaCatalogClientStatus, AifaImportClientResult } from '../aifa-importer';
 
 const ORIGIN = 'http://127.0.0.1:48974';
+/* @Codex: synchronous, payload-free stage markers survive a cancelled test. */
+const traceAifa = (phase: string, started: bigint) => {
+    const elapsedMs = Number(process.hrtime.bigint() - started) / 1_000_000;
+    writeSync(2, `[unit-stage:aifa] elapsed_ms=${elapsedMs.toFixed(1)} phase=${phase}\n`);
+};
 const status = (version = 'synthetic-old', count = 3): AifaImportClientResult => ({
     state: 'ready', count, rejectedRecords: 0, totalRecords: count,
     manifest: { format: 'mediflow.aifa-catalog-manifest.v1', source: 'Agenzia Italiana del Farmaco (AIFA)',
@@ -21,10 +27,15 @@ const status = (version = 'synthetic-old', count = 3): AifaImportClientResult =>
 const csv = { name: 'synthetic.csv', mimeType: 'text/csv', buffer: Buffer.from('CODICE_AIC;DENOMINAZIONE\n000000701;CONFEZIONE INVENTATA') };
 
 async function fixture(entry: string, width: number, api: (route: Route) => Promise<void>) {
+    const started = process.hrtime.bigint();
     assert.ok(process.env.MEDIFLOW_DATA_DIR?.trim(), 'dedicated synthetic directory required');
+    traceAifa('bundle-start', started);
     const bundle = await build({ stdin: { contents: entry, resolveDir: process.cwd(), loader: 'tsx' },
         bundle: true, write: false, outfile: 'fixture/bundle.js', platform: 'browser', format: 'iife', define: { 'process.env.NODE_ENV': '"production"' } });
+    traceAifa('bundle-done', started);
+    traceAifa('chromium-launch-start', started);
     const browser = await chromium.launch({ headless: true });
+    traceAifa('chromium-launch-done', started);
     try {
         const context = await browser.newContext({ viewport: { width, height: 844 }, permissions: ['clipboard-read', 'clipboard-write'] });
         const page = await context.newPage(); const errors: string[] = []; const external: string[] = [];
@@ -42,8 +53,18 @@ async function fixture(entry: string, width: number, api: (route: Route) => Prom
         });
         await page.goto(ORIGIN);
         assert.equal(await page.title(), 'Repertory guide fixture'); assert.equal(new URL(page.url()).origin, ORIGIN);
-        return { page, errors, external, close: () => browser.close() };
-    } catch (error) { await browser.close(); throw error; }
+        traceAifa('fixture-ready', started);
+        return { page, errors, external, close: async () => {
+            traceAifa('chromium-close-start', started);
+            await browser.close();
+            traceAifa('chromium-close-done', started);
+        } };
+    } catch (error) {
+        traceAifa('fixture-error-close-start', started);
+        await browser.close();
+        traceAifa('fixture-error-close-done', started);
+        throw error;
+    }
 }
 const aifaEntry = `import React from 'react'; import {createRoot} from 'react-dom/client';
 import Aifa from './components/settings/aifa-catalog-manager'; import {ConfirmProvider} from './components/ui/confirm-dialog';
@@ -55,6 +76,8 @@ async function viewCatalog(page: Page, version: string) {
 }
 
 test('AIFA UI: no write on mount, abort, explicit read recovery, successful update and no blind repeat after failed readback', { timeout: 30_000 }, async () => {
+    const started = process.hrtime.bigint();
+    traceAifa('scenario-start', started);
     let catalog: AifaCatalogClientStatus = status(); let updates = 0; let reads = 0; let mode: 'hold' | 'success' = 'hold';
     let readFailure = false; let release!: () => void;
     const hold = new Promise<void>(resolve => { release = resolve; });
@@ -68,22 +91,32 @@ test('AIFA UI: no write on mount, abort, explicit read recovery, successful upda
     try {
         const p = f.page; const update = p.getByRole('button', { name: 'Aggiorna da AIFA', exact: true });
         await viewCatalog(p, 'synthetic-old'); assert.equal(updates, 0); assert.equal(reads, 1);
+        traceAifa('initial-read-done', started);
+        traceAifa('held-update-click-start', started);
         await update.click(); await expect.poll(() => updates).toBe(1);
         await expect(update).toBeDisabled(); await viewCatalog(p, 'synthetic-old');
+        traceAifa('held-update-observed', started);
+        traceAifa('cancel-click-start', started);
         await p.getByRole('button', { name: 'Annulla', exact: true }).click();
         await expect(p.getByText(/L’esito sul server non è confermato/u)).toBeVisible(); release();
         await expect(update).toBeDisabled(); await viewCatalog(p, 'synthetic-old');
+        traceAifa('cancel-confirmed-and-released', started);
+        traceAifa('first-recovery-click-start', started);
         await p.getByRole('button', { name: 'Rileggi stato', exact: true }).click();
         await expect(update).toBeEnabled(); assert.equal(updates, 1);
-        mode = 'success'; await update.click();
+        traceAifa('first-recovery-done', started);
+        mode = 'success'; traceAifa('successful-update-click-start', started); await update.click();
         await expect(p.getByText(/Aggiornamento confermato: 4 confezioni/u)).toBeVisible(); await viewCatalog(p, 'synthetic-new');
-        readFailure = true; await update.click();
+        traceAifa('successful-update-done', started);
+        readFailure = true; traceAifa('failed-readback-update-click-start', started); await update.click();
         await expect(p.getByText(/Importazione confermata dal server; rilettura non riuscita/u)).toBeVisible();
         await expect(update).toBeDisabled(); assert.equal(updates, 3);
-        readFailure = false; await p.getByRole('button', { name: 'Rileggi stato', exact: true }).click();
+        traceAifa('failed-readback-observed', started);
+        readFailure = false; traceAifa('final-recovery-click-start', started); await p.getByRole('button', { name: 'Rileggi stato', exact: true }).click();
         await expect(update).toBeEnabled(); assert.equal(updates, 3);
         assert.deepEqual(f.errors, []); assert.deepEqual(f.external, []);
-    } finally { release(); await f.close(); }
+        traceAifa('scenario-assertions-done', started);
+    } finally { traceAifa('scenario-finally-start', started); release(); await f.close(); }
 });
 
 test('AIFA UI: manual CSV reselect after declined confirmation; failed clear preserves the observation', { timeout: 30_000 }, async () => {

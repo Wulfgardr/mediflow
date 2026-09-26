@@ -108,3 +108,33 @@ ordine admission/auth, 413 senza servizi downstream, richieste entro cap e
 compatibilita del fallback DELETE/login. Nessun server, DB reale, riproduzione
 di vulnerabilita, build Next o verifica del bundle distribuito e richiesta da
 questa lane. La receipt esterna identifica commit e check effettivamente eseguiti.
+
+
+## Raccordo C05 diario locale, 26 settembre 2026 (candidato locale)
+
+La decisione specifica nell'[estensione diario di ADR 0015](./0015-audit-taxonomy-minimum-catalog.md#estensione-c05-del-26-settembre-2026--diario-clinico-ordinario)
+introduce 4.194.304 byte per le sole sei mutazioni JSON Web/API locale del
+diario. E un nuovo tetto per ingressi prima non limitati, non un'estensione
+automatica di questa ADR a tutte le route locali. Le due mutazioni del diario
+rete conservano il limite gia previsto qui. Il reader canonico e riusato
+senza cambiarne semantica; nessun limite di durata/inflight e nessuna promessa
+di compatibilita con richieste locali storicamente di dimensione arbitraria.
+
+## Estensione locale terapie C05 (26 settembre 2026)
+
+ADR 0015 estende esplicitamente il reader canonico request-json alle sei
+mutazioni ordinarie terapia Web/v1 locale, con NUOVO massimo inclusivo di
+4.194.304 byte dopo i gate. E una restrizione nuova di questa famiglia,
+non un trasferimento implicito del limite diario o amministrativo. La rete
+terapie mantiene il tetto gia governato. Restano escluse promesse sulla
+compatibilita di tutti i client esterni, sulla memoria del trasporto o su
+nuovi limiti di durata/concorrenza; nessun dato viene troncato.
+
+## Estensione locale osservazioni C05 (26 settembre 2026)
+
+La sezione osservazioni di ADR 0015 introduce un NUOVO cap inclusivo di
+4.194.304 byte per le sei mutazioni ordinarie Web/v1. Il reader canonico
+request-json opera dopo i gate, conta i byte UTF-8 effettivi e rifiuta con
+413 senza effetti ne troncamento. La rete conserva il cap gia governato;
+non sono introdotti limiti di durata/inflight o promesse di compatibilita
+con ogni input locale storicamente non limitato.

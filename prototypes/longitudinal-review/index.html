@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Revisione longitudinale · prototipo MediFlow</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <a class="skip" href="#main">Vai al contenuto</a>
+  <header class="site-header"><div class="shell">
+    <p class="brand">MediFlow <span>· prototipo con dati inventati</span></p>
+    <p>Revisione delle terapie · nessuna modifica alla cartella</p>
+  </div></header>
+  <main id="main" class="shell" tabindex="-1">
+    <div class="intro"><p class="eyebrow">Confronto delle fonti</p><h1>Ricostruire prima di decidere</h1>
+      <p>Questa pagina mostra due situazioni inventate. Le informazioni discordanti restano visibili e la bozza non registra terapie.</p></div>
+    <nav aria-label="Scegli caso sintetico" id="cases" class="case-nav"></nav>
+    <section class="identity" aria-labelledby="case-title"><p class="eyebrow">1 · Contesto e domanda</p>
+      <h2 id="case-title"></h2><p id="case-context"></p><p id="case-question" class="question"></p>
+      <p id="follow-up" class="notice"></p>
+    </section>
+    <div class="columns">
+      <section aria-labelledby="sources-title"><p class="eyebrow">2 · Prove e incertezze</p><h2 id="sources-title">Fonti da confrontare</h2>
+        <p>Seleziona le fonti su cui basare la bozza. Data, versione e testo originale restano leggibili.</p>
+        <div id="sources" class="stack"></div>
+      </section>
+      <section aria-labelledby="comparison-title"><p class="eyebrow">3 · Confronto</p><h2 id="comparison-title">Terapie citate</h2>
+        <p>Le informazioni precedenti, quelle riferite e lo stato incerto sono distinti. Una terapia non citata non è considerata sospesa.</p>
+        <div id="medicines" class="stack"></div>
+      </section>
+    </div>
+    <section class="review" aria-labelledby="draft-title"><p class="eyebrow">4 · Bozza e verifica</p><h2 id="draft-title">Prepara una nota di revisione</h2>
+      <p id="draft-context" class="question"></p>
+      <p>Scrivi solo ciò che desideri riesaminare. I campi posologici possono restare vuoti quando il dato è ignoto.</p>
+      <form id="draft-form" novalidate>
+        <div class="form-grid">
+          <label>Farmaco da chiarire <input name="medicine" autocomplete="off" maxlength="300"></label>
+          <label>Dose riferita o verificata <input name="dose" autocomplete="off" maxlength="300" placeholder="Se ignota, lascia vuoto"></label>
+          <label>Unità <input name="unit" autocomplete="off" maxlength="300" placeholder="es. mg"></label>
+          <label>Frequenza <input name="frequency" autocomplete="off" maxlength="300" placeholder="Se ignota, lascia vuoto"></label>
+        </div>
+        <label class="wide">Che cosa resta da chiarire? <textarea name="note" rows="3" maxlength="300" required></textarea></label>
+        <div class="actions"><button class="primary" type="submit">Prepara il confronto</button>
+          <button id="check" type="button">Verifica la bozza</button>
+          <button id="cancel" type="button">Annulla bozza</button>
+          <button id="undo" type="button" hidden>Ripristina bozza</button></div>
+      </form>
+      <div id="status" class="status" role="status" aria-live="polite" tabindex="-1"></div>
+      <div class="demo-tools"><button id="change-source" type="button">Simula una fonte aggiornata</button>
+        <button id="acknowledge" type="button" hidden>Ho riletto la fonte aggiornata</button></div>
+      <p class="boundary">Nessun comando di registrazione clinica è disponibile in questo prototipo. La verifica mantiene soltanto una bozza in memoria, finché la pagina resta aperta.</p>
+    </section>
+  </main>
+  <script src="./cases.js"></script><script src="./model.js"></script><script src="./app.js"></script>
+</body>
+</html>

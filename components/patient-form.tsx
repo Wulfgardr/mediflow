@@ -264,7 +264,7 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
 
             {/* Personal Info Section */}
             <div className={FORM_SECTION_CLASS}>
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 graphite-divider pb-5 mb-2">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 graphite-divider pt-3 pb-5 mb-2">
                     <div className="flex items-center gap-4">
                         <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: 'color-mix(in srgb, var(--lume-accent) 10%, var(--lume-surface-field))' }}>
                             <User className="w-5 h-5" style={{ color: 'var(--lume-accent)' }} />
@@ -327,7 +327,7 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
 
             {/* Contact Info Section */}
             <div className={FORM_SECTION_CLASS}>
-                <div className="flex items-center gap-4 graphite-divider pb-5 mb-2">
+                <div className="flex items-center gap-4 graphite-divider pt-3 pb-5 mb-2">
                     <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(63, 122, 76, 0.12)' }}>
                         <MapPin className="w-5 h-5" style={{ color: 'var(--lume-signal-success)' }} />
                     </div>
@@ -375,7 +375,7 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
 
             {/* Diagnosi & Patologie */}
             <div className={`${FORM_SECTION_CLASS} diagnosis-section-card`}>
-                <div className="flex items-center gap-4 graphite-divider pb-5 mb-2">
+                <div className="flex items-center gap-4 graphite-divider pt-3 pb-5 mb-2">
                     <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(163, 58, 47, 0.1)' }}>
                         <Activity className="w-5 h-5" style={{ color: 'var(--lume-signal-critical)' }} />
                     </div>
@@ -391,7 +391,7 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
             {/* Pianificazione operativa */}
             {/* @Codex WUL-678: stable anchor for the existing follow-up planner. */}
             <div id="pianificazione" className={FORM_SECTION_CLASS}>
-                <div className="flex items-center gap-4 graphite-divider pb-5 mb-2">
+                <div className="flex items-center gap-4 graphite-divider pt-3 pb-5 mb-2">
                     <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: 'color-mix(in srgb, var(--lume-accent) 10%, var(--lume-surface-field))' }}>
                         <Calendar className="w-5 h-5" style={{ color: 'var(--lume-accent)' }} />
                     </div>
@@ -406,7 +406,7 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
 
             {/* @Codex */}
             <div className={FORM_SECTION_CLASS}>
-                <div className="flex items-center gap-4 graphite-divider pb-5 mb-2">
+                <div className="flex items-center gap-4 graphite-divider pt-3 pb-5 mb-2">
                     <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(197, 138, 47, 0.14)' }}>
                         <Ticket className="w-5 h-5" style={{ color: 'var(--lume-signal-warning)' }} />
                     </div>
@@ -438,7 +438,7 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
 
             {/* Clinical Profile Section */}
             <div className={FORM_SECTION_CLASS}>
-                <div className="flex items-center gap-4 graphite-divider pb-5 mb-2">
+                <div className="flex items-center gap-4 graphite-divider pt-3 pb-5 mb-2">
                     <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: 'color-mix(in srgb, var(--lume-accent) 10%, var(--lume-surface-field))' }}>
                         <FileText className="w-5 h-5" style={{ color: 'var(--lume-accent)' }} />
                     </div>

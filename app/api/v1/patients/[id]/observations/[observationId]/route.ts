@@ -7,11 +7,12 @@ import { requireLocalApiToken } from '@/lib/security/local-api-auth';
 import { requireLocalApiActorSession } from '@/lib/security/server-auth';
 import type { ObservationSummary } from '@/lib/api/v1/types';
 /* @Codex */
-import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/security/audit';
+import { auditContextFromRequest, requestIdFromRequest } from '@/lib/security/audit';
 /* @Codex */
 import { normalizeObservationUpdateInput } from '@/lib/api-v1-clinical-write-normalization';
-import { buildObservationVersionConflictPayload, parseObservationExpectedVersion } from '@/lib/observation-concurrency';
-import { parseClinicalDeleteBody } from '@/lib/api-v1-clinical-lifecycle';
+import { updateObservationOperation } from '@/lib/observation-write-operation';
+import { observationChangedFields, parseObservationDeleteInput, readObservationJsonObject,
+    safeObservationExpectedVersion, validateObservationInput } from '@/lib/observation-write-input';
 
 /* @Codex */
 function toIsoString(value: unknown): string | null {
@@ -83,164 +84,62 @@ export async function GET(
     }
 }
 
-export async function PUT(
-    request: Request,
-    { params }: { params: Promise<{ id: string; observationId: string }> },
-) {
+export async function PUT(request: Request,
+    { params }: { params: Promise<{ id: string; observationId: string }> }) {
     const authError = requireLocalApiToken(request);
     if (authError) return authError;
-
     try {
-        /* @Codex */
         const auditSession = await requireLocalApiActorSession(request);
         const { id, observationId } = await params;
-        const body = await request.json() as Record<string, unknown>;
-        // WUL-308: child PUTs require optimistic concurrency like the patient PUT.
-        const expectedVersion = parseObservationExpectedVersion(body.version);
-        if (expectedVersion === null) {
-            return NextResponse.json({ error: 'Version is required' }, { status: 400 });
-        }
-
-        const existing = await dbServer
-            .select({ id: observations.id })
-            .from(observations)
-            .where(and(eq(observations.id, observationId), eq(observations.patientId, id)))
-            .get();
-        if (!existing) {
-            return NextResponse.json({ error: 'Not found' }, { status: 404 });
-        }
-
-        const normalized = normalizeObservationUpdateInput(body);
-        if (!normalized.ok) {
-            return NextResponse.json({ error: normalized.error }, { status: 400 });
-        }
-
-        const updateResult = await dbServer
-            .update(observations)
-            .set({
-                ...normalized.values,
-                version: expectedVersion + 1,
-            })
-            .where(and(
-                eq(observations.id, observationId),
-                eq(observations.patientId, id),
-                eq(observations.version, expectedVersion),
-            ))
-            .run();
-
-        if (updateResult.changes === 0) {
-            return NextResponse.json(
-                buildObservationVersionConflictPayload(
-                    expectedVersion,
-                    observationId,
-                    await selectObservationConflictSnapshot(id, observationId),
-                ),
-                { status: 409 }
-            );
-        }
-
-        /* @Codex */
-        await safeWriteAuditEventFromRequest(
-            request,
-            auditSession,
-            {
-                // WUL-308: a soft-delete via PUT is audited as a deletion, not an update.
-                eventType: normalized.values.deletedAt ? 'observation.deleted' : 'observation.updated',
-                subjectType: 'observation',
-                subjectRef: observationId,
-                redactedMetadata: {
-                    changedFields: listChangedFields(body, ['version']),
-                    resourceVersion: expectedVersion + 1,
-                },
-            },
-            '[MediFlow] Observation audit write failed:',
-        );
-
-        return NextResponse.json({ success: true });
+        const parsed = await readObservationJsonObject(request);
+        if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: parsed.status });
+        const expectedVersion = safeObservationExpectedVersion(parsed.body.version);
+        if (expectedVersion === null) return NextResponse.json({ error: 'Version is required' }, { status: 400 });
+        // @Codex: preserve scoped 404-before-domain-validation; the operation rechecks under IMMEDIATE.
+        const existing = dbServer.select({ id: observations.id }).from(observations)
+            .where(and(eq(observations.id, observationId), eq(observations.patientId, id))).get();
+        if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+        const shape = validateObservationInput(parsed.body, 'v1', 'update');
+        if (shape) return NextResponse.json({ error: shape.error }, { status: shape.status });
+        const normalized = normalizeObservationUpdateInput(parsed.body);
+        if (!normalized.ok) return NextResponse.json({ error: normalized.error }, { status: 400 });
+        const context = auditContextFromRequest(request, auditSession);
+        const result = updateObservationOperation({
+            patientId: id, observationId, expectedVersion, values: normalized.values, mode: 'v1',
+            changedFields: observationChangedFields(normalized.values, parsed.body),
+            audit: { actorType: context.actorType, actorRef: context.actorRef,
+                sourceSurface: context.sourceSurface, requestId: requestIdFromRequest(request),
+                flags: [`auth:${context.authContext}`] },
+        });
+        return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
         console.error('API PUT /api/v1/patients/[id]/observations/[observationId] error:', error);
         return NextResponse.json({ error: 'Failed to update observation' }, { status: 500 });
     }
 }
 
-export async function DELETE(
-    request: Request,
-    { params }: { params: Promise<{ id: string; observationId: string }> },
-) {
+export async function DELETE(request: Request,
+    { params }: { params: Promise<{ id: string; observationId: string }> }) {
     const authError = requireLocalApiToken(request);
     if (authError) return authError;
-
     try {
-        /* @Codex */
         const auditSession = await requireLocalApiActorSession(request);
         const { id, observationId } = await params;
-        // WUL-308: DELETE writes a version-guarded soft-delete tombstone like entries.
-        const parsedBody = await parseClinicalDeleteBody(request);
-        if (!parsedBody.ok) {
-            return NextResponse.json({ error: parsedBody.error }, { status: 400 });
-        }
-        const expectedVersion = parseObservationExpectedVersion(parsedBody.values.version);
-        if (expectedVersion === null) {
-            return NextResponse.json({ error: 'Version is required' }, { status: 400 });
-        }
-        const normalized = normalizeObservationUpdateInput({
-            deletedAt: parsedBody.values.deletedAt,
-            deletionReason: parsedBody.values.deletionReason,
+        const parsed = await readObservationJsonObject(request);
+        if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: parsed.status });
+        const deletion = parseObservationDeleteInput(parsed.body, 'api-v1-delete');
+        if (!deletion.ok) return NextResponse.json({ error: deletion.error }, { status: deletion.status });
+        const normalized = normalizeObservationUpdateInput(deletion.body);
+        if (!normalized.ok) return NextResponse.json({ error: normalized.error }, { status: 400 });
+        const context = auditContextFromRequest(request, auditSession);
+        const result = updateObservationOperation({
+            patientId: id, observationId, expectedVersion: deletion.expectedVersion,
+            values: normalized.values, mode: 'v1', changedFields: ['deletedAt', 'deletionReason'],
+            audit: { actorType: context.actorType, actorRef: context.actorRef,
+                sourceSurface: context.sourceSurface, requestId: requestIdFromRequest(request),
+                flags: [`auth:${context.authContext}`] },
         });
-        if (!normalized.ok) {
-            return NextResponse.json({ error: normalized.error }, { status: 400 });
-        }
-
-        const existing = await dbServer
-            .select({ id: observations.id })
-            .from(observations)
-            .where(and(eq(observations.id, observationId), eq(observations.patientId, id)))
-            .get();
-        if (!existing) {
-            return NextResponse.json({ error: 'Not found' }, { status: 404 });
-        }
-
-        const updateResult = await dbServer
-            .update(observations)
-            .set({
-                ...normalized.values,
-                version: expectedVersion + 1,
-            })
-            .where(and(
-                eq(observations.id, observationId),
-                eq(observations.patientId, id),
-                eq(observations.version, expectedVersion),
-            ))
-            .run();
-
-        if (updateResult.changes === 0) {
-            return NextResponse.json(
-                buildObservationVersionConflictPayload(
-                    expectedVersion,
-                    observationId,
-                    await selectObservationConflictSnapshot(id, observationId),
-                ),
-                { status: 409 }
-            );
-        }
-
-        /* @Codex */
-        await safeWriteAuditEventFromRequest(
-            request,
-            auditSession,
-            {
-                eventType: 'observation.deleted',
-                subjectType: 'observation',
-                subjectRef: observationId,
-                redactedMetadata: {
-                    changedFields: ['deletedAt', 'deletionReason'],
-                    resourceVersion: expectedVersion + 1,
-                },
-            },
-            '[MediFlow] Observation audit write failed:',
-        );
-
-        return NextResponse.json({ success: true });
+        return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
         console.error('API DELETE /api/v1/patients/[id]/observations/[observationId] error:', error);
         return NextResponse.json({ error: 'Failed to delete observation' }, { status: 500 });
