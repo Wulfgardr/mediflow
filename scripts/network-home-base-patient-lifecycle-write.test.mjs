@@ -75,19 +75,29 @@ test('paired patient lifecycle create, tombstone, and restore preserves sealed s
     };
 
     try {
+        const readOnlyPatientId = crypto.randomUUID();
+        const beforeReadOnlyCreate = patientMutationSnapshot(readOnlyPatientId);
         const readOnlyCreate = await request('POST', '/api/v1/network/patients', {
             headers: {
                 ...pairedHeaders(readOnlyClient),
                 Cookie: cookieHeader,
             },
             body: {
-                id: crypto.randomUUID(),
+                id: readOnlyPatientId,
                 firstName: 'Readonly',
                 lastName: 'Lifecycle',
                 taxCode: `RDL${suffix}`,
             },
         });
         assert.equal(readOnlyCreate.response.status, 403);
+        assert.deepEqual(patientMutationSnapshot(readOnlyPatientId), beforeReadOnlyCreate);
+
+        const missingSessionCreate = await request('POST', '/api/v1/network/patients', {
+            headers: pairedHeaders(lifecycleClient),
+            body: { id: readOnlyPatientId, firstName: 'No', lastName: 'Session', taxCode: `NOS${suffix}` },
+        });
+        assert.equal(missingSessionCreate.response.status, 401);
+        assert.deepEqual(patientMutationSnapshot(readOnlyPatientId), beforeReadOnlyCreate);
 
         const readOnlyTrash = await request('GET', '/api/v1/network/patients?includeDeleted=true', {
             headers: {
@@ -153,6 +163,17 @@ test('paired patient lifecycle create, tombstone, and restore preserves sealed s
         });
         assert.equal(create.response.status, 201);
         assert.deepEqual(create.json, { id: patientId, version: 1 });
+        const afterCreate = patientMutationSnapshot(patientId);
+        assert.equal(afterCreate.patient.version, 1);
+        assert.equal(afterCreate.memberships.length, 1);
+        assertLifecycleAudit(afterCreate.audit, ['patient.created'], [1], lifecycleClient.pairedClientId, patientId);
+
+        const duplicateCreate = await request('POST', '/api/v1/network/patients', {
+            headers: { ...pairedHeaders(lifecycleClient), Cookie: cookieHeader },
+            body: { id: patientId, firstName: 'Lifecycle', lastName: 'Writer', taxCode: `LCW${suffix}` },
+        });
+        assert.equal(duplicateCreate.response.status, 500);
+        assert.deepEqual(patientMutationSnapshot(patientId), afterCreate);
 
         const detail = await request('GET', `/api/v1/network/patients/${patientId}`, {
             headers: {
@@ -179,6 +200,18 @@ test('paired patient lifecycle create, tombstone, and restore preserves sealed s
         assert.equal(staleDelete.response.status, 409);
         assert.equal(staleDelete.json?.code, 'VERSION_CONFLICT');
         assert.equal(staleDelete.json?.currentVersion, 1);
+        assert.deepEqual(patientMutationSnapshot(patientId), afterCreate);
+
+        const readOnlyDelete = await request('DELETE', `/api/v1/network/patients/${patientId}`, {
+            headers: { ...pairedHeaders(readOnlyClient), Cookie: cookieHeader },
+            body: { version: 1, deletionReason: sealed.deletionReason },
+        });
+        assert.equal(readOnlyDelete.response.status, 403);
+        const missingSessionDelete = await request('DELETE', `/api/v1/network/patients/${patientId}`, {
+            headers: pairedHeaders(lifecycleClient), body: { version: 1, deletionReason: sealed.deletionReason },
+        });
+        assert.equal(missingSessionDelete.response.status, 401);
+        assert.deepEqual(patientMutationSnapshot(patientId), afterCreate);
 
         const deletion = await request('DELETE', `/api/v1/network/patients/${patientId}`, {
             headers: {
@@ -192,6 +225,18 @@ test('paired patient lifecycle create, tombstone, and restore preserves sealed s
         });
         assert.equal(deletion.response.status, 200);
         assert.deepEqual(deletion.json, { id: patientId, version: 2 });
+        const afterDelete = patientMutationSnapshot(patientId);
+        assert.equal(afterDelete.patient.version, 2);
+        assert.ok(afterDelete.patient.deleted_at);
+        assert.equal(afterDelete.patient.deletion_reason, sealed.deletionReason);
+        assert.deepEqual(afterDelete.memberships, afterCreate.memberships);
+        assertLifecycleAudit(afterDelete.audit, ['patient.created', 'patient.deleted'], [1, 2], lifecycleClient.pairedClientId, patientId);
+        const repeatedDelete = await request('DELETE', `/api/v1/network/patients/${patientId}`, {
+            headers: { ...pairedHeaders(lifecycleClient), Cookie: cookieHeader },
+            body: { version: 1, deletionReason: sealed.deletionReason },
+        });
+        assert.equal(repeatedDelete.response.status, 404);
+        assert.deepEqual(patientMutationSnapshot(patientId), afterDelete);
 
         const deletedDetail = await request('GET', `/api/v1/network/patients/${patientId}`, {
             headers: {
@@ -200,6 +245,13 @@ test('paired patient lifecycle create, tombstone, and restore preserves sealed s
             },
         });
         assert.equal(deletedDetail.response.status, 404);
+
+        const deletedActiveList = await request('GET', '/api/v1/network/patients', {
+            headers: { ...pairedHeaders(lifecycleClient), Cookie: cookieHeader },
+        });
+        assert.equal(deletedActiveList.response.status, 200);
+        assert.ok(Array.isArray(deletedActiveList.json));
+        assert.equal(deletedActiveList.json.some((item) => item.id === patientId), false);
 
         const trashList = await request('GET', '/api/v1/network/patients?includeDeleted=true', {
             headers: {
@@ -228,6 +280,15 @@ test('paired patient lifecycle create, tombstone, and restore preserves sealed s
         assert.equal(staleRestore.response.status, 409);
         assert.equal(staleRestore.json?.code, 'VERSION_CONFLICT');
         assert.equal(staleRestore.json?.currentVersion, 2);
+        const readOnlyRestore = await request('POST', `/api/v1/network/patients/${patientId}/restore`, {
+            headers: { ...pairedHeaders(readOnlyClient), Cookie: cookieHeader }, body: { version: 2 },
+        });
+        assert.equal(readOnlyRestore.response.status, 403);
+        const missingSessionRestore = await request('POST', `/api/v1/network/patients/${patientId}/restore`, {
+            headers: pairedHeaders(lifecycleClient), body: { version: 2 },
+        });
+        assert.equal(missingSessionRestore.response.status, 401);
+        assert.deepEqual(patientMutationSnapshot(patientId), afterDelete);
 
         const restore = await request('POST', `/api/v1/network/patients/${patientId}/restore`, {
             headers: {
@@ -240,6 +301,17 @@ test('paired patient lifecycle create, tombstone, and restore preserves sealed s
         });
         assert.equal(restore.response.status, 200);
         assert.deepEqual(restore.json, { id: patientId, version: 3 });
+        const afterRestore = patientMutationSnapshot(patientId);
+        assert.equal(afterRestore.patient.version, 3);
+        assert.equal(afterRestore.patient.deleted_at, null);
+        assert.equal(afterRestore.patient.deletion_reason, null);
+        assert.deepEqual(afterRestore.memberships, afterCreate.memberships);
+        assertLifecycleAudit(afterRestore.audit, ['patient.created', 'patient.deleted', 'patient.restored'], [1, 2, 3], lifecycleClient.pairedClientId, patientId);
+        const repeatedRestore = await request('POST', `/api/v1/network/patients/${patientId}/restore`, {
+            headers: { ...pairedHeaders(lifecycleClient), Cookie: cookieHeader }, body: { version: 2 },
+        });
+        assert.equal(repeatedRestore.response.status, 404);
+        assert.deepEqual(patientMutationSnapshot(patientId), afterRestore);
 
         const activeList = await request('GET', '/api/v1/network/patients', {
             headers: {
@@ -278,6 +350,75 @@ test('paired patient lifecycle create, tombstone, and restore preserves sealed s
     } finally {
         await cleanupPatient(patientId);
     }
+});
+
+test('paired lifecycle rejects wrong-scope rows without patient or audit changes', async () => {
+    await assertServerReady();
+    const client = await pairClient([READ_CAPABILITY, LIFECYCLE_CAPABILITY], 'Desk iPad lifecycle wrong scope');
+    const login = await loginWithWebAuthControl(BASE_URL, { username: USERNAME, password: PIN });
+    assert.equal(login.response.status, 200);
+    const patientId = crypto.randomUUID();
+    const otherAmbulatoryId = crypto.randomUUID();
+    seedOutOfScopePatient(patientId, otherAmbulatoryId);
+    try {
+        const active = patientMutationSnapshot(patientId);
+        const deniedDelete = await request('DELETE', `/api/v1/network/patients/${patientId}`, {
+            headers: { ...pairedHeaders(client), Cookie: login.cookieHeader }, body: { version: 3 },
+        });
+        assert.equal(deniedDelete.response.status, 404);
+        assert.deepEqual(patientMutationSnapshot(patientId), active);
+        markSyntheticPatientDeleted(patientId);
+        const deleted = patientMutationSnapshot(patientId);
+        const deniedRestore = await request('POST', `/api/v1/network/patients/${patientId}/restore`, {
+            headers: { ...pairedHeaders(client), Cookie: login.cookieHeader }, body: { version: 3 },
+        });
+        assert.equal(deniedRestore.response.status, 404);
+        assert.deepEqual(patientMutationSnapshot(patientId), deleted);
+        scenarioResults.push({ name: 'wrong-scope lifecycle', deleteStatus: 404, restoreStatus: 404 });
+    } finally { removeOutOfScopeFixture(patientId, otherAmbulatoryId); }
+});
+
+test('concurrent HTTP deletes and restores have one winner and no replay audit', async () => {
+    await assertServerReady();
+    const client = await pairClient([READ_CAPABILITY, LIFECYCLE_CAPABILITY], 'Desk iPad lifecycle concurrency');
+    const login = await loginWithWebAuthControl(BASE_URL, { username: USERNAME, password: PIN });
+    assert.equal(login.response.status, 200);
+    const patientId = crypto.randomUUID();
+    const suffix = patientId.replace(/-/g, '').slice(0, 13).toUpperCase();
+    const headers = { ...pairedHeaders(client), Cookie: login.cookieHeader };
+    try {
+        const createBody = { id: patientId, firstName: 'Concurrency', lastName: 'Synthetic', taxCode: `CON${suffix}` };
+        const creates = await Promise.all([0, 1].map(() => request('POST', '/api/v1/network/patients', {
+            headers, body: createBody,
+        })));
+        assert.deepEqual(creates.map(item => item.response.status).sort(), [201, 500]);
+        const afterCreate = patientMutationSnapshot(patientId);
+        assert.equal(afterCreate.patient.version, 1);
+        assert.equal(afterCreate.memberships.length, 1);
+        assertLifecycleAudit(afterCreate.audit, ['patient.created'], [1], client.pairedClientId, patientId);
+        const deletes = await Promise.all([0, 1].map(() => request('DELETE', `/api/v1/network/patients/${patientId}`, {
+            headers, body: { version: 1 },
+        })));
+        assert.deepEqual(deletes.map(item => item.response.status).sort(), [200, 404]);
+        const afterDelete = patientMutationSnapshot(patientId);
+        assert.equal(afterDelete.patient.version, 2);
+        assertLifecycleAudit(afterDelete.audit, ['patient.created', 'patient.deleted'], [1, 2], client.pairedClientId, patientId);
+        const retryDelete = await request('DELETE', `/api/v1/network/patients/${patientId}`, { headers, body: { version: 1 } });
+        assert.equal(retryDelete.response.status, 404);
+        assert.deepEqual(patientMutationSnapshot(patientId), afterDelete);
+
+        const restores = await Promise.all([0, 1].map(() => request('POST', `/api/v1/network/patients/${patientId}/restore`, {
+            headers, body: { version: 2 },
+        })));
+        assert.deepEqual(restores.map(item => item.response.status).sort(), [200, 404]);
+        const afterRestore = patientMutationSnapshot(patientId);
+        assert.equal(afterRestore.patient.version, 3);
+        assertLifecycleAudit(afterRestore.audit, ['patient.created', 'patient.deleted', 'patient.restored'], [1, 2, 3], client.pairedClientId, patientId);
+        const retryRestore = await request('POST', `/api/v1/network/patients/${patientId}/restore`, { headers, body: { version: 2 } });
+        assert.equal(retryRestore.response.status, 404);
+        assert.deepEqual(patientMutationSnapshot(patientId), afterRestore);
+        scenarioResults.push({ name: 'concurrent HTTP lifecycle', createStatuses: [201, 500], deleteStatuses: [200, 404], restoreStatuses: [200, 404], auditEvents: 3 });
+    } finally { await cleanupPatient(patientId); }
 });
 
 async function assertServerReady() {
@@ -336,6 +477,67 @@ async function cleanupPatient(patientId) {
         body: { version: detail.json?.version },
     });
     assert.equal(deletion.response.status, 200);
+}
+
+/* @Codex: direct readback of the same synthetic DB used by the real HTTP server. */
+function patientMutationSnapshot(patientId) {
+    const dataDir = process.env.MEDIFLOW_DATA_DIR;
+    assert.ok(dataDir);
+    const db = new Database(path.join(dataDir, 'medical.db'), { readonly: true });
+    try {
+        return {
+            patient: db.prepare('SELECT * FROM patients WHERE id=?').get(patientId) ?? null,
+            memberships: db.prepare('SELECT * FROM patients_to_ambulatories WHERE patient_id=? ORDER BY ambulatory_id').all(patientId),
+            audit: db.prepare('SELECT * FROM audit_events WHERE subject_ref=? ORDER BY rowid').all(patientId),
+        };
+    } finally { db.close(); }
+}
+
+function withSyntheticDb(write) {
+    const dataDir = process.env.MEDIFLOW_DATA_DIR;
+    assert.ok(dataDir);
+    const db = new Database(path.join(dataDir, 'medical.db'));
+    try { return write(db); } finally { db.close(); }
+}
+
+function seedOutOfScopePatient(patientId, ambulatoryId) {
+    withSyntheticDb(db => db.transaction(() => {
+        db.prepare("INSERT INTO ambulatories (id, name, type, version) VALUES (?, 'Altro ambulatorio sintetico', 'live', 1)").run(ambulatoryId);
+        db.prepare("INSERT INTO patients (id, first_name, last_name, tax_code, version, ambulatory_id) VALUES (?, 'Fuori', 'Scope', ?, 3, ?)")
+            .run(patientId, `SCOPE${patientId.replaceAll('-', '').slice(0, 12)}`, ambulatoryId);
+        db.prepare('INSERT INTO patients_to_ambulatories (patient_id, ambulatory_id) VALUES (?, ?)').run(patientId, ambulatoryId);
+    })());
+}
+
+function markSyntheticPatientDeleted(patientId) {
+    withSyntheticDb(db => db.prepare('UPDATE patients SET deleted_at=?, deletion_reason=? WHERE id=?')
+        .run(Math.floor(Date.now() / 1000), 'synthetic-scope-test', patientId));
+}
+
+function removeOutOfScopeFixture(patientId, ambulatoryId) {
+    withSyntheticDb(db => db.transaction(() => {
+        db.prepare('DELETE FROM patients_to_ambulatories WHERE patient_id=?').run(patientId);
+        db.prepare('DELETE FROM patients WHERE id=?').run(patientId);
+        db.prepare('DELETE FROM ambulatories WHERE id=?').run(ambulatoryId);
+    })());
+}
+
+function assertLifecycleAudit(events, eventTypes, versions, pairedClientId, patientId) {
+    assert.deepEqual(events.map(event => event.event_type), eventTypes);
+    assert.equal(events.length, versions.length);
+    for (const [index, event] of events.entries()) {
+        assert.equal(event.outcome, 'success');
+        assert.equal(event.actor_type, 'user');
+        assert.ok(typeof event.actor_ref === 'string' && event.actor_ref.length > 0);
+        assert.equal(event.subject_type, 'patient');
+        assert.equal(event.subject_ref, patientId);
+        assert.equal(event.source_surface, 'native');
+        assert.deepEqual(JSON.parse(event.redacted_metadata), {
+            resourceVersion: versions[index],
+            flags: ['auth:paired-client', `paired-client:${pairedClientId}`, 'scope:ambulatory'],
+        });
+        assert.doesNotMatch(JSON.stringify(event), /Via Lifecycle|nota lifecycle|richiesta paziente test paired|ENC:/);
+    }
 }
 
 async function loadE2EMasterKey() {
