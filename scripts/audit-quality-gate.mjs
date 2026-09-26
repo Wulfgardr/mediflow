@@ -96,11 +96,18 @@ const REQUIRED_ROUTE_AUDIT = [
     { route: 'app/api/v1/patients/[id]/checkups/route.ts', events: ['checkup.created'], reason: 'native/shared checkup creation is sensitive CRUD' },
     { route: 'app/api/v1/patients/[id]/checkups/[checkupId]/route.ts', events: ['checkup.updated', 'checkup.deleted'], reason: 'native/shared checkup update/delete are sensitive CRUD' },
     { route: 'lib/network-checkup-write.ts', events: ['checkup.created', 'checkup.updated', 'checkup.deleted'], reason: 'paired checkup writes must stay PHI-safe auditable' },
-    { route: 'app/api/observations/route.ts', events: ['observation.created'], reason: 'observation creation is sensitive CRUD' },
-    { route: 'app/api/observations/[id]/route.ts', events: ['observation.updated', 'observation.deleted'], reason: 'observation update/delete are sensitive CRUD' },
-    { route: 'app/api/v1/patients/[id]/observations/route.ts', events: ['observation.created'], reason: 'native/shared observation creation is sensitive CRUD' },
-    { route: 'app/api/v1/patients/[id]/observations/[observationId]/route.ts', events: ['observation.updated', 'observation.deleted'], reason: 'native/shared observation update/delete are sensitive CRUD' },
-    { route: 'lib/network-observation-write.ts', events: ['observation.created', 'observation.updated', 'observation.deleted'], reason: 'paired observation writes must stay PHI-safe auditable' },
+    { route: 'app/api/observations/route.ts', events: ['observation.created'],
+        writerContracts: [observationAuditContract('POST', 'web', 'create')] },
+    { route: 'app/api/observations/[id]/route.ts', events: ['observation.updated', 'observation.deleted'],
+        writerContracts: [observationAuditContract('PUT', 'web', 'update'), observationAuditContract('DELETE', 'web', 'update')] },
+    { route: 'app/api/v1/patients/[id]/observations/route.ts', events: ['observation.created'],
+        writerContracts: [observationAuditContract('POST', 'v1', 'create')] },
+    { route: 'app/api/v1/patients/[id]/observations/[observationId]/route.ts', events: ['observation.updated', 'observation.deleted'],
+        writerContracts: [observationAuditContract('PUT', 'v1', 'update'), observationAuditContract('DELETE', 'v1', 'update')] },
+    { route: 'app/api/v1/network/patients/[id]/observations/route.ts', events: ['observation.created'],
+        writerContracts: [observationAuditContract('POST', 'network', 'create')] },
+    { route: 'app/api/v1/network/patients/[id]/observations/[observationId]/route.ts', events: ['observation.updated', 'observation.deleted'],
+        writerContracts: [observationAuditContract('PUT', 'network', 'update')] },
     {
         route: 'app/api/prosthetic-prescriptions/route.ts', events: ['prosthetic.prescription.created'], reason: 'prosthetic prescription creation is sensitive CRUD',
         writerContracts: [{
@@ -161,6 +168,16 @@ function therapyAuditContract(handler, mode, operation) {
         ownerFile: 'lib/therapy-write-operation.ts', ownerName: `${operation}TherapyOperation`,
         serviceModule: '@/lib/therapy-write-operation', serviceExport: `${operation}TherapyOperation`,
         bridgeFile: 'lib/network-therapy-write.ts', bridgeExport: `${operation}NetworkScopedTherapy`,
+    };
+}
+/* @Codex: eight ordinary observation handlers, without extending link or input authority. */
+function observationAuditContract(handler, mode, operation) {
+    return {
+        handler, mode, operation, transactionalObservation: true,
+        target: `observation-${operation}.${mode}.${handler.toLowerCase()}`,
+        ownerFile: 'lib/observation-write-operation.ts', ownerName: `${operation}ObservationOperation`,
+        serviceModule: '@/lib/observation-write-operation', serviceExport: `${operation}ObservationOperation`,
+        bridgeFile: 'lib/network-observation-write.ts', bridgeExport: `${operation}NetworkScopedObservation`,
     };
 }
 const METADATA_KEYS = ['changedFields', 'resourceVersion', 'counts', 'flags', 'reasonCode'];
@@ -665,6 +682,11 @@ export function validateRequiredTherapyAudit(input) {
     return validateRequiredClinicalRowAudit(input, 'therapy');
 }
 
+/* @Codex: structural proof only; link/currentness/value semantics require real SQLite tests. */
+export function validateRequiredObservationAudit(input) {
+    return validateRequiredClinicalRowAudit(input, 'observation');
+}
+
 function validateRequiredClinicalRowAudit({ spec, routeSource, coreSource, bridgeSource = null }, resource) {
     const problems = [];
     const core = checkedSource(spec.ownerFile, coreSource);
@@ -702,7 +724,7 @@ function validateRequiredClinicalRowAudit({ spec, routeSource, coreSource, bridg
 
     const db = importedBinding(core.sourceFile, core.checker, './db-server', 'dbServer');
     const writer = importedBinding(core.sourceFile, core.checker, './security/audit', 'writeAuditEventInTransaction');
-    const table = importedBinding(core.sourceFile, core.checker, './schema', resource === 'entry' ? 'entries' : 'therapies');
+    const table = importedBinding(core.sourceFile, core.checker, './schema', ({ entry: 'entries', therapy: 'therapies', observation: 'observations' })[resource]);
     if (core.sourceFile.parseDiagnostics.length || !owner || !db || !writer || !table) {
         problems.push('clinical-row core must import the approved database, resource table and required audit writer');
         return problems;
@@ -2011,7 +2033,7 @@ function checkAuditWriterControlFlow(findings) {
     const contracts = REQUIRED_ROUTE_AUDIT.flatMap((entry) =>
         (entry.writerContracts ?? []).filter((contract) => !contract.modes
             && !contract.transactionalPatientUpdate && !contract.transactionalPatientDelete
-            && !contract.transactionalDiary && !contract.transactionalTherapy)
+            && !contract.transactionalDiary && !contract.transactionalTherapy && !contract.transactionalObservation)
             .map((contract) => ({ ...contract, route: entry.route })));
     const parsedFiles = new Map();
     for (const contract of contracts) {
@@ -2108,6 +2130,11 @@ function checkRouteCoverage(findings) {
                         })
                     : contract.transactionalTherapy
                         ? validateRequiredTherapyAudit({
+                            spec: contract, routeSource: source, coreSource: read(contract.ownerFile),
+                            bridgeSource: exists(contract.bridgeFile) ? read(contract.bridgeFile) : null,
+                        })
+                    : contract.transactionalObservation
+                        ? validateRequiredObservationAudit({
                             spec: contract, routeSource: source, coreSource: read(contract.ownerFile),
                             bridgeSource: exists(contract.bridgeFile) ? read(contract.bridgeFile) : null,
                         })

@@ -129,9 +129,12 @@ Aggiorna la spec:
 
 ## Baseline attuale
 
-La versione del contratto è `1.28.0`. Il candidato terapie aggiunge il 409 di
-creazione per identificativo occupato, senza replay idempotente, e descrive
-l'audit obbligatorio atomico e l'inviluppo specifico. Non costituisce una
+La versione del contratto candidato è `1.29.0`: la coorte osservazioni aggiunge
+409 per identificativo occupato senza replay, audit atomico, padre non
+cancellato e inviluppo specifico. Il collegamento alle prestazioni resta solo
+Web e viene respinto su v1/rete anche se null. I sei ingressi locali hanno un
+nuovo cap di 4.194.304 byte; quello rete rimane invariato. La precedente 1.28.0
+identifica la tranche terapie con le proprie ricevute. Non costituisce una
 pubblicazione o una qualifica clinica. La precedente versione 1.27.0 del diario
 resta identificata dalle sue ricevute. L'incremento C05 documenta anche le
 risposte già esistenti `200` (replay) e `409` della creazione diario paired;
@@ -146,7 +149,7 @@ trasporto. Queste nuove restrizioni dimensionali non troncano i campi. Il login
 nativo, esterno al perimetro `/api/v1`, applica lo stesso contratto con un limite
 di 64 KiB, come documentato nell’ADR.
 
-Questa baseline pubblicata copre:
+La slice documentata nel candidato copre:
 
 - `GET /api/v1/patients`
 - `GET /api/v1/patients/{id}`

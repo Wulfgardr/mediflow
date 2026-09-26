@@ -1,17 +1,17 @@
 /* @Codex */
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
-import { observations, patients, servicePrescriptionItems } from '@/lib/schema';
+import { observations } from '@/lib/schema';
 import { and, asc, desc, eq, isNull, type SQL } from 'drizzle-orm';
-import { v4 as uuidv4 } from 'uuid';
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 /* @Codex */
-import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/security/audit';
+import { auditContextFromSession, requestIdFromRequest } from '@/lib/security/audit';
 /* @Codex */
 import { normalizeObservationCreateInput } from '@/lib/api-v1-clinical-write-normalization';
 /* STREAM B: server-side list params (whitelisted, plaintext columns only). */
 import { parseListParams } from '@/lib/list-query-params';
-import { activePatients } from '@/lib/patient-lifecycle';
+import { createObservationOperation } from '@/lib/observation-write-operation';
+import { observationChangedFields, observationCreateId, readObservationJsonObject, validateObservationInput } from '@/lib/observation-write-input';
 
 // notes is ENC:, not sortable. Only plaintext columns here.
 const OBSERVATION_SORT_COLUMNS = {
@@ -63,63 +63,27 @@ export async function POST(request: Request) {
     if (!session) return unauthorizedResponse();
 
     try {
-        const body = await request.json() as Record<string, unknown>;
-
+        const parsed = await readObservationJsonObject(request);
+        if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: parsed.status });
+        const shape = validateObservationInput(parsed.body, 'web', 'create');
+        if (shape) return NextResponse.json({ error: shape.error }, { status: shape.status });
+        const body = parsed.body;
         const patientId = typeof body.patientId === 'string' ? body.patientId : null;
-        if (!patientId) {
-            return NextResponse.json({ error: 'Missing required observation fields' }, { status: 400 });
-        }
-
-        const id = typeof body.id === 'string' ? body.id : uuidv4();
+        if (!patientId) return NextResponse.json({ error: 'Missing required observation fields' }, { status: 400 });
+        const observationId = observationCreateId(body);
         const normalized = normalizeObservationCreateInput(body, {
-            id,
-            patientId,
-            allowServicePrescriptionItemLink: true,
+            id: observationId, patientId, allowServicePrescriptionItemLink: true,
         });
-        if (!normalized.ok) {
-            return NextResponse.json({ error: normalized.error }, { status: 400 });
-        }
-
-        const created = dbServer.transaction((tx) => {
-            const patient = tx.select({ id: patients.id })
-                .from(patients)
-                .where(and(eq(patients.id, patientId), activePatients()))
-                .get();
-            if (!patient) return 'patient-not-found';
-            if (normalized.values.servicePrescriptionItemId) {
-                const item = tx.select({ patientId: servicePrescriptionItems.patientId })
-                    .from(servicePrescriptionItems)
-                    .where(eq(servicePrescriptionItems.id, normalized.values.servicePrescriptionItemId))
-                    .get();
-                if (!item || item.patientId !== patientId) return 'invalid-service-prescription-item';
-            }
-            tx.insert(observations).values(normalized.values).run();
-            return 'created';
+        if (!normalized.ok) return NextResponse.json({ error: normalized.error }, { status: 400 });
+        const context = auditContextFromSession(session);
+        const result = createObservationOperation({
+            patientId, observationId, values: normalized.values, mode: 'web',
+            changedFields: observationChangedFields(normalized.values, body),
+            audit: { actorType: context.actorType, actorRef: context.actorRef,
+                sourceSurface: context.sourceSurface, requestId: requestIdFromRequest(request),
+                flags: [`auth:${context.authContext}`] },
         });
-        if (created === 'patient-not-found') {
-            return NextResponse.json({ error: 'Patient not found' }, { status: 404 });
-        }
-        if (created === 'invalid-service-prescription-item') {
-            return NextResponse.json({ error: 'Service prescription item not found or does not belong to observation patient' }, { status: 422 });
-        }
-
-        /* @Codex */
-        await safeWriteAuditEventFromRequest(
-            request,
-            session,
-            {
-                eventType: 'observation.created',
-                subjectType: 'observation',
-                subjectRef: id,
-                redactedMetadata: {
-                    changedFields: listChangedFields(body, ['id']),
-                    resourceVersion: 1,
-                },
-            },
-            '[MediFlow] Observation audit write failed:',
-        );
-
-        return NextResponse.json({ id, version: 1 }, { status: 201 });
+        return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
         console.error('API POST /observations error:', error);
         return NextResponse.json({ error: 'Failed to create observation' }, { status: 500 });

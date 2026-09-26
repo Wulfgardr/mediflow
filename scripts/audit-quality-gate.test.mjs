@@ -9,7 +9,7 @@ import test from 'node:test';
 import ts from 'typescript';
 
 import { validateAuditWriterControlFlow, validateDelegatedRouteAudit, validateLogoutAuditModes,
-    validateRequiredPatientUpdateAudit, validateRequiredPatientDeleteAudit, validateRequiredDiaryAudit, validateRequiredTherapyAudit } from './audit-quality-gate.mjs';
+    validateRequiredPatientUpdateAudit, validateRequiredPatientDeleteAudit, validateRequiredDiaryAudit, validateRequiredTherapyAudit, validateRequiredObservationAudit } from './audit-quality-gate.mjs';
 
 const EVENT = 'record.changed';
 
@@ -132,6 +132,69 @@ test('therapy required-audit guard follows all eight handlers and rejects detach
             `${callee}(`, `unapprovedTherapyWrite(`) }), []);
         if (mode === 'network') assert.notDeepEqual(validate({ bridgeSource: change(bridgeSource,
             `${spec.ownerName}(`, 'unapprovedTherapyWrite(') }), []);
+    }
+});
+
+/* @Codex: each observation operation has independent wiring and negative assertions. */
+test('observation required-audit guard follows all eight handlers and rejects detached or bypassed audit', () => {
+    const read = (file) => fs.readFileSync(file, 'utf8');
+    const coreSource = read('lib/observation-write-operation.ts');
+    const bridgeSource = read('lib/network-observation-write.ts');
+    const rows = [
+        ['app/api/observations/route.ts', 'POST', 'web', 'create'],
+        ['app/api/observations/[id]/route.ts', 'PUT', 'web', 'update'],
+        ['app/api/observations/[id]/route.ts', 'DELETE', 'web', 'update'],
+        ['app/api/v1/patients/[id]/observations/route.ts', 'POST', 'v1', 'create'],
+        ['app/api/v1/patients/[id]/observations/[observationId]/route.ts', 'PUT', 'v1', 'update'],
+        ['app/api/v1/patients/[id]/observations/[observationId]/route.ts', 'DELETE', 'v1', 'update'],
+        ['app/api/v1/network/patients/[id]/observations/route.ts', 'POST', 'network', 'create'],
+        ['app/api/v1/network/patients/[id]/observations/[observationId]/route.ts', 'PUT', 'network', 'update'],
+    ];
+    for (const [file, handler, mode, operation] of rows) {
+        const spec = { handler, mode, operation, ownerFile: 'lib/observation-write-operation.ts',
+            ownerName: `${operation}ObservationOperation`, serviceExport: `${operation}ObservationOperation`,
+            serviceModule: '@/lib/observation-write-operation', bridgeExport: `${operation}NetworkScopedObservation` };
+        const original = { spec, routeSource: read(file), coreSource, bridgeSource };
+        const validate = (patch = {}) => validateRequiredObservationAudit({ ...original, ...patch });
+        assert.deepEqual(validate(), [], `${mode} ${handler}`);
+        const change = (source, before, after) => {
+            assert.ok(source.includes(before), before);
+            const mutated = source.replaceAll(before, after);
+            assert.equal(ts.createSourceFile('mutant.ts', mutated, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
+                .parseDiagnostics.length, 0);
+            return mutated;
+        };
+        for (const [before, after] of [
+            ["behavior: 'immediate'", "behavior: 'deferred'"],
+            ['transaction((tx)', 'transaction(async (tx)'],
+            ['writeAuditEventInTransaction(tx, {', 'writeAuditEventInTransaction(dbServer, {'],
+            ['writeAuditEventInTransaction(tx, {', 'if (input.audit.actorRef) writeAuditEventInTransaction(tx, {'],
+            ['writeAuditEventInTransaction(tx, {', 'return { status: 200, value: {} }; writeAuditEventInTransaction(tx, {'],
+            ['changes !== 1', 'changes < 0'],
+            ["subjectType: 'observation'", "subjectType: 'patient'"],
+            ["eventType: 'observation.created'", "eventType: 'observation.updated'"],
+            ["? 'observation.deleted' : 'observation.updated'", "? 'observation.updated' : 'observation.deleted'"],
+        ]) {
+            if ((before.includes('observation.created') && operation !== 'create')
+                || (before.startsWith('?') && operation !== 'update')) continue;
+            assert.notDeepEqual(validate({ coreSource: change(coreSource, before, after) }), [],
+                `${mode} ${handler}: ${before}`);
+        }
+        const sourceKey = mode === 'network' ? 'bridgeSource' : 'routeSource';
+        if (operation === 'create') {
+            /* @Codex: mutate the actual insert, including its authoritative identity overrides. */
+            const insert = coreSource.match(/const inserted = (tx\.insert\(observations\)[\s\S]*?\.run\(\));/);
+            assert.ok(insert, 'observation create must expose the real insert statement');
+            assert.notDeepEqual(validate({ coreSource: change(coreSource, insert[0],
+                `const inserted = ({ run: () => ({ changes: 1 }), pending: () => ${insert[1]} }).run();`) }), []);
+        }
+        const source = original[sourceKey];
+        assert.notDeepEqual(validate({ [sourceKey]: change(source, `mode: '${mode}'`, "mode: 'unadmitted'") }), []);
+        const callee = mode === 'network' ? spec.bridgeExport : spec.ownerName;
+        assert.notDeepEqual(validate({ routeSource: change(original.routeSource,
+            `${callee}(`, `unapprovedObservationWrite(`) }), []);
+        if (mode === 'network') assert.notDeepEqual(validate({ bridgeSource: change(bridgeSource,
+            `${spec.ownerName}(`, 'unapprovedObservationWrite(') }), []);
     }
 });
 
