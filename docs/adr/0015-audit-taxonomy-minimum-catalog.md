@@ -229,3 +229,46 @@ L'accettazione richiede baseline/candidato SQLite reali, guasti audit inclusi
 inserimenti ignorati, successo con un solo evento, assenza di effetti per
 dinieghi/conflitti, conservazione dei figli e associazioni, concorrenza e
 rilettura dopo riapertura, oltre alla review indipendente del coordinatore.
+
+
+## Estensione C05 del 26 settembre 2026 — ciclo di vita paziente in rete
+
+Contratto della prossima coorte, scritto prima del suo runtime. Le tre
+operazioni gia esistenti di creazione, cancellazione logica e ripristino del
+paziente nella rete associata sono una sola famiglia. Non si aggiungono
+endpoint, campi, permessi, capability o formati di risposta. Restano distinti
+il ripristino dal cestino e la riattivazione di un paziente archiviato.
+
+Ogni operazione usa la stessa transazione sincrona immediata per stato
+paziente, eventuale associazione ambulatoriale, incremento di versione ed
+evento obbligatorio (`patient.created`, `patient.deleted`, `patient.restored`).
+Il writer transazionale gia adottato dal pilota deve confermare esattamente
+un inserimento; errore o inserimento ignorato annullano tutti gli effetti.
+La risposta di successo puo uscire soltanto dopo il commit. Il precedente
+writer best-effort non e un fallback per queste tre operazioni.
+
+Autenticazione, sessione associata, capability, ambulatorio autorizzato,
+limite del corpo e controllo dei campi cifrati restano quelli esistenti.
+Il servizio non decifra i campi ne modifica i valori cifrati conservati.
+Attore utente, identificativo client e riferimento di richiesta derivano
+dal contesto host; soggetto ed evento derivano dall'operazione e versione
+dallo stato committato (1 per creazione, versione attesa + 1 per le altre).
+Metadati limitati a versione e flag strutturati di autenticazione, client e
+scope; nessuna motivazione o valore clinico, nessuna autorita dal body.
+
+Cancellazione e ripristino conservano figli, associazioni e stato di
+archiviazione secondo ADR 0066. Conflitto su stato disponibile resta 409;
+stato non disponibile o fuori scope resta 404. La creazione con ID gia
+presente conserva il comportamento esistente del vincolo, senza upsert.
+Una risposta persa non autorizza replay del successo: il client rilegge.
+Nessuna migrazione schema, outbox, secondo ledger o riscrittura degli eventi.
+
+L'accettazione richiede prove SQLite reali con riapertura: per ciascuna
+operazione errore e inserimento audit ignorato devono lasciare lo stato
+identico a prima; successo deve produrre un solo evento con versione e
+attore corretti. Verificare anche dinieghi, scope, conflitto, duplicati,
+conservazione di figli/associazioni/cifrati/archiviazione e assenza di
+seconda scrittura dopo risposta persa. La prova HTTP esistente della
+famiglia rete deve restare valida, con pairing, sessione e capability reali
+sintetici, oltre ai controlli del repository e alla review indipendente.
+Questo risultato non chiude C05 globale ne qualifica i client nativi.

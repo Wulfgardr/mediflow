@@ -178,7 +178,7 @@ della sorgente e riferimenti puntuali nel run locale.
 | Coorte | Classificazione e destinazione |
 | --- | --- |
 | Profilo paziente PUT Web/v1/rete | Evidenza clinica obbligatoria: pilota C04 nella stessa transazione. |
-| Creazione, eliminazione, ripristino paziente e manutenzione orfani | Evidenza clinica obbligatoria; migrazione C05, distinta dal solo PUT. |
+| Creazione, eliminazione, ripristino paziente e manutenzione orfani | Evidenza clinica obbligatoria. DELETE Web/v1 e famiglia create/delete/restore rete migrati nel candidato locale; creazione locale, ripristino amministrativo e manutenzione restano separati. |
 | Diario, terapie, osservazioni, checkup, allegati | Evidenza clinica obbligatoria; roster e prove di errore per ciascuna famiglia C05. |
 | Prescrizioni prestazioni, relativi item e prescrizioni protesiche | Evidenza clinica obbligatoria; migrazione C05 dei writer host e rete, non soltanto dei loro wrapper. |
 | Ambulatori, appartenenze e pulizia contenitori test | Evidenza obbligatoria degli effetti su pazienti/scope; C05. Il contenitore test non giustifica l'assenza di audit. |
@@ -351,3 +351,44 @@ Le ricevute locali sono in `.codex/090-start-20260926/browser-reread-fix/`;
 screenshot, trace, configurazione, ambiente e osservazioni del browser
 sono conservati fuori da Git nel dossier `mediflow-090-browser-milestone`.
 Il precedente snapshot della prima tranche è conservato immutato.
+
+
+## Milestone C05 — creazione, cancellazione e ripristino paziente in rete
+
+La famiglia rete usa ora l'audit obbligatorio nella stessa transazione
+immediata di paziente, associazione ambulatoriale e versione. La baseline
+su SQLite reale aveva dimostrato sei modifiche committate senza evento,
+una per ciascuna operazione e guasto audit (`FAIL` o `IGNORE`). Nel candidato
+tutti e sei i guasti annullano ogni effetto: una connessione indipendente
+rilegge righe complete di paziente, associazioni, figli e audit identiche
+a quelle iniziali. Tre prove positive verificano un solo evento, attore
+derivato dall'host, metadati minimizzati e versione committata; il retry
+della richiesta originaria non produce un altro effetto.
+
+La prova HTTP reale, con client associati e sessioni sintetiche, passa 3/3:
+creazione e rilettura, cancellazione con assenza dall'elenco ordinario e
+presenza nel cestino, ripristino e nuova rilettura; rifiuti per sessione,
+capability e ambulatorio errati; versioni obsolete; richieste concorrenti.
+Due POST simultanei sullo stesso ID danno un solo successo e una sola
+associazione/evento. La risposta 500 del duplicato resta quella preesistente
+del vincolo: questa coorte non ne cambia il contratto. DELETE e ripristino
+concorrenti producono un solo successo e un rifiuto 404, senza replay.
+I campi cifrati mantengono gli stessi byte e il ripristino dal cestino
+non cambia il significato dello stato di archiviazione.
+
+Passano 10 test SQLite, 3 scenari HTTP, 5 prove di concorrenza pazienti e
+i controlli lint, tipi, build, never-regress, claims e OpenAPI drift.
+Il coordinatore ha integrato i soli file della coorte e verificato
+l'equivalenza di 2.613 file non Markdown con il candidato dei controlli,
+inclusi i tre file UI gia accettati. La suite completa integrata conta
+4.863 test: 4.851 passati, zero fallimenti e 12 esclusi. Il gate audit non
+riporta finding. La review indipendente Astra Low non rileva blocchi nel
+delta; la prova browser precedente resta valida per i file UI invariati.
+
+Implementazione Sol Medium, accettazione del coordinatore; correzioni
+di verifica: confronto delle righe complete, retry con versione originale,
+assenza nell'elenco rete e concorrenza della creazione. Le ricevute sono in
+`.codex/090-start-20260926/c05-network-lifecycle/`, con snapshot distinto
+dalle milestone precedenti. Il risultato e locale: nessun commit o rilascio,
+nessuna qualificazione nativa o ammissione clinica, nessuna chiusura globale
+di WUL-720/C05. Restano da migrare gli altri writer classificati sopra.

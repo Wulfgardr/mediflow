@@ -19,8 +19,9 @@ import { patients, patientsToAmbulatories } from './schema';
 /* @Codex */
 import {
     NETWORK_FORBIDDEN_PATIENT_WRITE_FIELDS,
-    writeNetworkPatientAuditEvent,
 } from './network-patient-write';
+/* @Codex */
+import { requestIdFromRequest, writeAuditEventInTransaction } from './security/audit';
 /* @Codex */
 import type { NetworkWriteContext } from './network-write-context';
 
@@ -41,6 +42,34 @@ type PatientLifecycleSnapshot = {
     updatedAt: Date | string | number | null;
     isArchived: boolean | null;
 };
+
+/* @Codex: required lifecycle audit shares the authoritative SQLite transaction. */
+function writeNetworkLifecycleAudit(
+    tx: Parameters<Parameters<typeof dbServer.transaction>[0]>[0],
+    context: NetworkWriteContext,
+    patientId: string,
+    eventType: 'patient.created' | 'patient.deleted' | 'patient.restored',
+    resourceVersion: number,
+): void {
+    writeAuditEventInTransaction(tx, {
+        eventType,
+        outcome: 'success',
+        actorType: 'user',
+        actorRef: context.session.userId,
+        subjectType: 'patient',
+        subjectRef: patientId,
+        sourceSurface: 'native',
+        requestId: requestIdFromRequest(context.request),
+        redactedMetadata: {
+            resourceVersion,
+            flags: [
+                'auth:paired-client',
+                `paired-client:${context.pairedClient.clientId}`,
+                'scope:ambulatory',
+            ],
+        },
+    });
+}
 
 const NETWORK_CREATE_SENSITIVE_FIELDS = [
     'address',
@@ -212,18 +241,8 @@ export async function createNetworkScopedPatient(
             })
             .onConflictDoNothing()
             .run();
-    });
-
-    await writeNetworkPatientAuditEvent({
-        context: {
-            ...context,
-            patientId: normalized.values.id,
-        },
-        eventType: 'patient.created',
-        metadata: {
-            resourceVersion: 1,
-        },
-    });
+        writeNetworkLifecycleAudit(tx, context, normalized.values.id, 'patient.created', 1);
+    }, { behavior: 'immediate' });
 
     return { status: 201, value: { id: normalized.values.id, version: 1 } };
 }
@@ -277,18 +296,11 @@ export async function deleteNetworkScopedPatient(
             };
         }
 
+        writeNetworkLifecycleAudit(tx, context, context.patientId, 'patient.deleted', nextVersion);
         return { status: 200, value: { id: context.patientId, version: nextVersion } };
-    });
+    }, { behavior: 'immediate' });
 
     if (commit.status !== 200) return commit;
-
-    await writeNetworkPatientAuditEvent({
-        context,
-        eventType: 'patient.deleted',
-        metadata: {
-            resourceVersion: nextVersion,
-        },
-    });
 
     return commit;
 }
@@ -337,18 +349,11 @@ export async function restoreNetworkScopedPatient(
             };
         }
 
+        writeNetworkLifecycleAudit(tx, context, context.patientId, 'patient.restored', nextVersion);
         return { status: 200, value: { id: context.patientId, version: nextVersion } };
-    });
+    }, { behavior: 'immediate' });
 
     if (commit.status !== 200) return commit;
-
-    await writeNetworkPatientAuditEvent({
-        context,
-        eventType: 'patient.restored',
-        metadata: {
-            resourceVersion: nextVersion,
-        },
-    });
 
     return commit;
 }
