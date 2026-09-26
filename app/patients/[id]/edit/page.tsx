@@ -4,7 +4,7 @@ import { ApiConflictError, db } from '@/lib/db';
 import { useRouter, useParams } from 'next/navigation';
 import { Trash2, Archive, Download, ShieldAlert, RotateCcw } from 'lucide-react';
 /* @Codex */
-import PatientEditForm from '@/components/patient-edit-form';
+import PatientEditForm, { type PatientEditLoadedRecord } from '@/components/patient-edit-form';
 import { useLiveQuery } from '@/lib/live-query';
 import PatientActionModal, { ActionData } from '@/components/patient-action-modal';
 /* @Codex */
@@ -45,11 +45,17 @@ export default function EditPatientPage() {
        Keep the last available record for this route; writes still use the editor's
        original CAS tokens and the server remains authoritative for availability. */
     const [lastAvailablePatient, setLastAvailablePatient] = useState<typeof livePatient>(undefined);
+    const [reloadedPatient, setReloadedPatient] = useState<PatientEditLoadedRecord | null>(null);
     useEffect(() => {
         if (livePatient?.id === id) setLastAvailablePatient(livePatient);
     }, [livePatient, id]);
-    const patient = livePatient?.id === id ? livePatient
+    const availablePatient = livePatient?.id === id ? livePatient
         : lastAvailablePatient?.id === id ? lastAvailablePatient : null;
+    /* @Codex: a late live-query result cannot replace an explicitly validated reread. */
+    const patient = reloadedPatient?.id === id
+        && reloadedPatient.version !== undefined
+        && (availablePatient?.version ?? -1) <= reloadedPatient.version
+        ? reloadedPatient : availablePatient;
 
     const [isActionModalOpen, setIsActionModalOpen] = useState(false);
     const [actionType, setActionType] = useState<'delete' | 'archive' | 'export'>('archive');
@@ -228,6 +234,8 @@ export default function EditPatientPage() {
                         key={id}
                         initialRecord={patient}
                         onSaved={() => router.push(`/patients/${id}`)}
+                        onReloaded={(record) => setReloadedPatient(current => current?.id === id
+                            && (current.version ?? -1) > (record.version ?? -1) ? current : record)}
                     />
                 </div>
 
