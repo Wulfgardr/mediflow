@@ -178,7 +178,7 @@ della sorgente e riferimenti puntuali nel run locale.
 | Coorte | Classificazione e destinazione |
 | --- | --- |
 | Profilo paziente PUT Web/v1/rete | Evidenza clinica obbligatoria: pilota C04 nella stessa transazione. |
-| Creazione, eliminazione, ripristino paziente e manutenzione orfani | Evidenza clinica obbligatoria. DELETE Web/v1 e famiglia create/delete/restore rete migrati nel candidato locale; creazione locale, ripristino amministrativo e manutenzione restano separati. |
+| Creazione, eliminazione, ripristino paziente e manutenzione orfani | Evidenza clinica obbligatoria. DELETE Web/v1 e famiglia create/delete/restore rete migrati nel candidato locale; creazione locale aggiunta nella coorte successiva descritta sotto. Ripristino amministrativo e manutenzione restano separati. |
 | Diario, terapie, osservazioni, checkup, allegati | Evidenza clinica obbligatoria; roster e prove di errore per ciascuna famiglia C05. |
 | Prescrizioni prestazioni, relativi item e prescrizioni protesiche | Evidenza clinica obbligatoria; migrazione C05 dei writer host e rete, non soltanto dei loro wrapper. |
 | Ambulatori, appartenenze e pulizia contenitori test | Evidenza obbligatoria degli effetti su pazienti/scope; C05. Il contenitore test non giustifica l'assenza di audit. |
@@ -392,3 +392,68 @@ assenza nell'elenco rete e concorrenza della creazione. Le ricevute sono in
 dalle milestone precedenti. Il risultato e locale: nessun commit o rilascio,
 nessuna qualificazione nativa o ammissione clinica, nessuna chiusura globale
 di WUL-720/C05. Restano da migrare gli altri writer classificati sopra.
+
+
+## Creazione paziente locale — Web, anteprima vincolata e API-v1
+
+Il Chief of Staff ha concordato questa coorte dopo aver verificato la milestone
+rete. Un solo owner Sol Medium modifica i due POST; servizio di creazione,
+owner della sessione, registro delle anteprime e normalizzazione restano
+invariati. Il contratto è stato aggiunto ad ADR 0015 prima del runtime.
+
+La baseline osserva sei successi 201 con paziente e associazione persistiti
+ma audit assente: errore SQLite e inserimento ignorato su ciascuno dei tre
+percorsi. Nel candidato, una transazione immediata comprende paziente,
+associazione ed evento obbligatorio. Le stesse sei prove ora restituiscono
+500 senza alcuna scrittura persistita, verificata da una connessione
+indipendente. Identità, versione iniziale e metadati minimizzati sono derivati
+dall'host e dai campi normalizzati; le chiavi arbitrarie del corpo non entrano
+nell'evento.
+
+L'anteprima conserva il controllo finale della sessione dopo la callback.
+Una prova con il componente fisico reale provoca il veto dopo l'inserimento
+dell'audit: la risposta è 409 e tutte e tre le scritture vengono annullate.
+Sono coperti anche contesto scaduto, sessione ritirata e generazione diversa.
+La destinazione fissata non viene sostituita dal corpo o dalla selezione
+corrente. API-v1 conserva la possibilità preesistente di creare in archivio.
+
+Passano 15 prove SQLite/handler, 48 regressioni esistenti su servizio,
+normalizzazione, contesto e client, una suite HTTP reale sui tre percorsi e
+le cinque prove richieste di concorrenza pazienti. La suite HTTP verifica
+login reale, accessi rifiutati, attribuzione dell'evento, due richieste
+concorrenti con un solo vincitore e ripetizione manuale senza duplicati.
+Le richieste HTTP raggiungono un solo processo server: non sono una prova
+a due server. Il 500 su ID già esistente resta comportamento preesistente;
+non sono introdotti retry automatici o un nuovo contratto di replay.
+
+Lint, tipi, build, never-regress, claims, OpenAPI drift, gate audit e controllo
+del diff passano con Node 24.18.0. La review indipendente Astra Low non rileva
+regressioni nel delta runtime; il coordinatore verifica separatamente le
+prove del veto e gli hash. Il primo controllo never-regress aveva segnalato
+un literal della fixture: corretto soltanto il test, senza cambiare il guard.
+
+La prima suite integrata esegue 4.878 prove: 4.865 passate, zero fallite,
+una annullata per timeout di 30 secondi nella UI AIFA e 12 skip. Tutte le nuove
+prove passano, ma **la suite integrata non è ancora verde**. Il log è
+conservato e il timeout è in diagnosi separata, senza attribuirlo per sola
+vicinanza temporale alla nuova creazione o al carico concorrente.
+
+
+Il run diagnostico con traccia Playwright conserva le stesse sorgenti:
+AIFA passa in 29,68 secondi, ma falliscono per timeout la preparazione della
+fixture Treatment portable runtime e la build isolata del producer Next.
+L'esito è 4.864 passati, due falliti e 12 skip. Né questo esito né le prove
+mirate verdi identificano la causa dei timeout.
+
+Un solo esperimento con **lo stesso inventario e quattro processi test
+concorrenti** passa tutte le 4.878 prove: **4.866 successi, zero errori,
+zero annullamenti e 12 skip**, in 182,75 secondi. Il launcher diagnostico è
+conservato fuori da Git; non modifica sorgenti, selezione, timeout o guard.
+Questo è il risultato della configurazione esplicita, non un successo del
+comando standard né una correzione dimostrata dell'instabilità C14.
+
+Il coordinatore accetta il delta locale di creazione agli hash congelati,
+con questa distinzione nelle ricevute e nel passaggio al Chief of Staff.
+I fallimenti precedenti restano conservati; non si chiudono C14, C05 nel
+suo insieme, qualificazione clinica o rilascio. Le prove browser della
+milestone precedente non vengono ripetute: i tre file UI restano invariati.
