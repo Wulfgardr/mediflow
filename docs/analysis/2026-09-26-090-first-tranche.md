@@ -480,3 +480,74 @@ medesimi byte del candidato. Cron è provato con parser modellato e shell
 reale, non con un daemon cron. Queste evidenze non qualificano Windows/Linux
 x64, parità completa o il percorso integrale di backup e ripristino. Audit
 e browser invariati non vengono ripetuti.
+
+
+## Disposizione C14 del comando richiesto
+
+Dopo la parità, il Chief ha dato priorità a questo residuo prima di altri
+writer. La DoD WUL-729 è stata riletta dal tracker in sola lettura: stato
+Backlog invariato, nessuna chiusura o esclusione di test.
+
+L'inventario corrente del comando `test:unit` seleziona 564 file: 531 in
+`lib`, 25 in `components` e otto script espliciti. Lo stesso wrapper è
+richiamato da Web Core in CI. Non imposta la concorrenza: Node 24.18 usa
+`max(availableParallelism()-1, 1)`, pari a 13 worker di file test sul Mac
+osservato. La capacità effettiva del runner CI non è stata misurata. Cinque
+file selezionati avviano Chromium con esbuild, uno esegue packaging/installazione
+offline e uno una build Next. Non è una diagnosi causale dei timeout, e un
+limite ai worker non limita automaticamente i loro processi figli.
+
+### Correzione circoscritta della prova Treatment
+
+La mappatura della traccia attraverso il loader immutato individua il
+fallimento alla prima `runtime.prepare()`, prima dell'invocazione o del
+lancio del figlio. La fixture assegnava 100 ms reali anche alla verifica
+degli artefatti su disco: poteva quindi interrompersi prima di osservare
+la proprietà indicata dal suo nome.
+
+La sola prova della terminazione del figlio usa ora un timer controllato,
+con gli stessi 100 ms; la preparazione continua a verificare gli artefatti
+reali sintetici. Verifica assenza di kill a 99 ms, un solo kill a 100 ms,
+nessuna conclusione o liberazione dello slot prima dell'evento di chiusura,
+esito timeout e successiva acquisizione possibile. I test dei limiti reali
+della fase di acquisizione restano invariati, così come runtime, provisioning,
+loader, runner e workflow. Non è una misura delle prestazioni a tempo reale.
+
+Passano 13/13 prove del modulo, tipi e lint. Un controllo positivo passa;
+due mutazioni negative, mancato kill e conclusione anticipata, falliscono
+sulle asserzioni previste. I primi tentativi dei soli mutanti avevano un
+import relativo errato nell'harness: i log sono conservati e non sono stati
+contati come rifiuti validi. Nessuna ulteriore suite completa è stata avviata
+per cercare un verde.
+
+### Decisione operativa e HOLD residui
+
+**Il comando standard rimane invariato e in HOLD di affidabilità.** Il PASS
+con quattro worker resta un risultato diagnostico dichiarato, non il nuovo
+default e non una prova della causa. Una futura politica condivisa locale/CI
+può limitare i worker a `min(4, max(availableParallelism()-1, 1))`, registrando
+il valore effettivo. È una proposta di budget delle risorse, non applicata:
+richiede capacità CI osservata, identico inventario/bootstrap e una verifica
+limitata, definita in anticipo per un'ipotesi precisa. Non giustifica skip,
+retry automatici, timeout maggiori o una dichiarazione di stabilità.
+
+Il coordinatore core mantiene ownership dei tre HOLD:
+
+- **AIFA:** il primo timeout non ha una traccia dei passi. Nel successivo run
+  riuscito, 26,648 dei 29,677 secondi sono nell'avvio di Chromium. Lo sblocco
+  richiede identificare il punto del fallimento in una nuova esecuzione
+  motivata, con fasi di avvio/interazione/chiusura e relativa causa verificate;
+  non basta un altro successo.
+- **Producer Next:** la build isolata ha raggiunto 60 secondi nel run
+  diagnostico; altri run passano in 6,45 e 43,76 secondi. Causa aperta.
+  Lo sblocco richiede tempi delle fasi e prova della terminazione in una
+  verifica mirata della stessa build, legata a un'ipotesi concreta, senza
+  cambiare il limite o l'oracolo reale dei cookie.
+- **Comando locale/CI:** lo sblocco richiede una configurazione condivisa
+  dichiarata e verificata sui target effettivi, sullo snapshot identificato,
+  mantenendo separati gli eventuali difetti intermittenti. Non si sommano
+  successi di run diversi per produrre un unico PASS richiesto.
+
+La disposizione e le ricevute sono conservate in `c14-runner-disposition`
+nel run locale. Il censimento C14 completo e il precedente HOLD del selettore
+nativo AnyDoc restano aperti e distinti da questa correzione.
