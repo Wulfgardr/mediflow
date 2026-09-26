@@ -63,3 +63,26 @@ Restano fuori:
 - [ADR 0052](./0052-network-patient-profile-write-boundary.md)
 - [ADR 0053](./0053-network-diary-entry-write-boundary.md)
 - [OpenAPI v1](../openapi/mediflow-v1.yaml)
+
+## Consolidamento C05 del 26 settembre 2026
+
+Il candidato locale estende alle due mutazioni paired l'audit obbligatorio
+nella stessa transazione IMMEDIATE della scrittura e della verifica di
+scope/currentness (ADR 0015, sezione terapie). Audit fallito o ignorato e
+mutazione ignorata non producono successo. Nessun cambiamento di capability,
+ruolo, scope, cifratura, hard delete o autorita clinica.
+
+L'inviluppo rifiuta JSON non oggetto, malformato, campi estranei e identificativi
+espliciti invalidi con 400, prima degli effetti. Le versioni devono poter
+essere incrementate come interi sicuri. I divieti AI/document-derived,
+timestamp client e il requisito ENC di motivation/deletionReason restano.
+Un ID gia presente restituisce 409 senza effetti anche quando il payload e
+uguale: le terapie non acquisiscono l'idempotenza del diario. Le date, i
+clear espliciti e gli stati mantengono la normalizzazione terapia precedente;
+in particolare numeric zero non e ammesso da questi normalizzatori.
+
+Il risultato e un candidato di sviluppo, non una pubblicazione o una
+qualifica della distribuzione nativa. Il raccordo C05 richiede un padre attivo (mancante/tombstoned404, solo
+archived ammesso) nella stessa transazione, anche per restore e duplicate
+create. Nessun ripristino implicito del padre. Il nuovo cap locale distinto
+e la compatibilita sono registrati in ADR 0015; la rete conserva i 4 MiB.

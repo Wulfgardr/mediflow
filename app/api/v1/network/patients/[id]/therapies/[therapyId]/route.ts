@@ -1,5 +1,6 @@
 /* @Codex */
 import { readNativeNetworkJson, jsonBodyTooLargeResponse } from '@/lib/native-network-json-body';
+import { therapyJsonObject } from '@/lib/therapy-write-input';
 /* @Codex */
 import { NextResponse } from 'next/server';
 /* @Codex */
@@ -47,7 +48,14 @@ export async function PUT(
         const resolved = await requireNetworkWriteContext(request, NETWORK_THERAPY_WRITE_CAPABILITY);
         if (!resolved.ok) return resolved.response;
 
-        const body = await readNativeNetworkJson(request) as Record<string, unknown>;
+        let rawBody: unknown;
+        try { rawBody = await readNativeNetworkJson(request); }
+        catch (error) {
+            if (error instanceof SyntaxError) return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+            throw error;
+        }
+        const body = therapyJsonObject(rawBody);
+        if (!body) return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
         const result = await updateNetworkScopedTherapy(
             { ...resolved.context, patientId: id, therapyId },
             body,

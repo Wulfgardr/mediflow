@@ -9,7 +9,7 @@ import test from 'node:test';
 import ts from 'typescript';
 
 import { validateAuditWriterControlFlow, validateDelegatedRouteAudit, validateLogoutAuditModes,
-    validateRequiredPatientUpdateAudit, validateRequiredPatientDeleteAudit, validateRequiredDiaryAudit } from './audit-quality-gate.mjs';
+    validateRequiredPatientUpdateAudit, validateRequiredPatientDeleteAudit, validateRequiredDiaryAudit, validateRequiredTherapyAudit } from './audit-quality-gate.mjs';
 
 const EVENT = 'record.changed';
 
@@ -71,6 +71,67 @@ test('diary required-audit guard follows all eight handlers and rejects detached
             `${callee}(`, `unapprovedDiaryWrite(`) }), []);
         if (mode === 'network') assert.notDeepEqual(validate({ bridgeSource: change(bridgeSource,
             `${spec.ownerName}(`, 'unapprovedDiaryWrite(') }), []);
+    }
+});
+
+/* @Codex: each therapy operation has independent wiring and negative assertions. */
+test('therapy required-audit guard follows all eight handlers and rejects detached or bypassed audit', () => {
+    const read = (file) => fs.readFileSync(file, 'utf8');
+    const coreSource = read('lib/therapy-write-operation.ts');
+    const bridgeSource = read('lib/network-therapy-write.ts');
+    const rows = [
+        ['app/api/therapies/route.ts', 'POST', 'web', 'create'],
+        ['app/api/therapies/[id]/route.ts', 'PUT', 'web', 'update'],
+        ['app/api/therapies/[id]/route.ts', 'DELETE', 'web', 'update'],
+        ['app/api/v1/patients/[id]/therapies/route.ts', 'POST', 'v1', 'create'],
+        ['app/api/v1/patients/[id]/therapies/[therapyId]/route.ts', 'PUT', 'v1', 'update'],
+        ['app/api/v1/patients/[id]/therapies/[therapyId]/route.ts', 'DELETE', 'v1', 'update'],
+        ['app/api/v1/network/patients/[id]/therapies/route.ts', 'POST', 'network', 'create'],
+        ['app/api/v1/network/patients/[id]/therapies/[therapyId]/route.ts', 'PUT', 'network', 'update'],
+    ];
+    for (const [file, handler, mode, operation] of rows) {
+        const spec = { handler, mode, operation, ownerFile: 'lib/therapy-write-operation.ts',
+            ownerName: `${operation}TherapyOperation`, serviceExport: `${operation}TherapyOperation`,
+            serviceModule: '@/lib/therapy-write-operation', bridgeExport: `${operation}NetworkScopedTherapy` };
+        const original = { spec, routeSource: read(file), coreSource, bridgeSource };
+        const validate = (patch = {}) => validateRequiredTherapyAudit({ ...original, ...patch });
+        assert.deepEqual(validate(), [], `${mode} ${handler}`);
+        const change = (source, before, after) => {
+            assert.ok(source.includes(before), before);
+            const mutated = source.replaceAll(before, after);
+            assert.equal(ts.createSourceFile('mutant.ts', mutated, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
+                .parseDiagnostics.length, 0);
+            return mutated;
+        };
+        for (const [before, after] of [
+            ["behavior: 'immediate'", "behavior: 'deferred'"],
+            ['transaction((tx)', 'transaction(async (tx)'],
+            ['writeAuditEventInTransaction(tx, {', 'writeAuditEventInTransaction(dbServer, {'],
+            ['writeAuditEventInTransaction(tx, {', 'if (input.audit.actorRef) writeAuditEventInTransaction(tx, {'],
+            ['writeAuditEventInTransaction(tx, {', 'return { status: 200, value: {} }; writeAuditEventInTransaction(tx, {'],
+            ['changes !== 1', 'changes < 0'],
+            ["subjectType: 'therapy'", "subjectType: 'patient'"],
+            ["eventType: 'therapy.created'", "eventType: 'therapy.updated'"],
+            ["? 'therapy.deleted' : 'therapy.updated'", "? 'therapy.updated' : 'therapy.deleted'"],
+        ]) {
+            if ((before.includes('therapy.created') && operation !== 'create')
+                || (before.startsWith('?') && operation !== 'update')) continue;
+            assert.notDeepEqual(validate({ coreSource: change(coreSource, before, after) }), [],
+                `${mode} ${handler}: ${before}`);
+        }
+        const sourceKey = mode === 'network' ? 'bridgeSource' : 'routeSource';
+        if (operation === 'create') {
+            assert.notDeepEqual(validate({ coreSource: change(coreSource,
+                'const inserted = tx.insert(therapies).values(input.values).run();',
+                'const inserted = ({ run: () => ({ changes: 1 }), pending: () => tx.insert(therapies).values(input.values).run() }).run();') }), []);
+        }
+        const source = original[sourceKey];
+        assert.notDeepEqual(validate({ [sourceKey]: change(source, `mode: '${mode}'`, "mode: 'unadmitted'") }), []);
+        const callee = mode === 'network' ? spec.bridgeExport : spec.ownerName;
+        assert.notDeepEqual(validate({ routeSource: change(original.routeSource,
+            `${callee}(`, `unapprovedTherapyWrite(`) }), []);
+        if (mode === 'network') assert.notDeepEqual(validate({ bridgeSource: change(bridgeSource,
+            `${spec.ownerName}(`, 'unapprovedTherapyWrite(') }), []);
     }
 });
 

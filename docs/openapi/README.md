@@ -129,7 +129,11 @@ Aggiorna la spec:
 
 ## Baseline attuale
 
-La versione del contratto è `1.27.0`. L'incremento C05 documenta anche le
+La versione del contratto è `1.28.0`. Il candidato terapie aggiunge il 409 di
+creazione per identificativo occupato, senza replay idempotente, e descrive
+l'audit obbligatorio atomico e l'inviluppo specifico. Non costituisce una
+pubblicazione o una qualifica clinica. La precedente versione 1.27.0 del diario
+resta identificata dalle sue ricevute. L'incremento C05 documenta anche le
 risposte già esistenti `200` (replay) e `409` della creazione diario paired;
 non introduce un nuovo endpoint o una nuova forma di risposta nel runtime.
 
@@ -240,6 +244,14 @@ ad accedere ai suoi dati e a eseguire operazioni:
   `network.replica.write-therapies`, `therapies.version`, `409` PHI-safe e
   soft delete via `deletedAt`; hard delete remoto e campi AI/document-derived
   restano fuori boundary
+  Il candidato C05 raccoglie scope, padre attivo, versione, mutazione e audit
+  obbligatorio nella stessa transazione; padre mancante/tombstoned404, solo
+  archived ammesso. Create duplicato409, anche payload identico: nessuna
+  idempotenza nuova. Le sei mutazioni terapia Web/v1 introducono un cap locale
+  di 4 MiB dopo i gate; non e una garanzia di compatibilita di tutti i client
+  esterni. Date/timestamp, tombstone Web escluso e restore v1/rete sono distinti
+  in [ADR 0015](../adr/0015-audit-taxonomy-minimum-catalog.md).
+
 - `/api/v1/network/patients/{id}/checkups*` pubblica la slice checkup paired:
   capability `network.replica.readonly-checkups` /
   `network.replica.write-checkups`, `checkups.version`, `409` PHI-safe e

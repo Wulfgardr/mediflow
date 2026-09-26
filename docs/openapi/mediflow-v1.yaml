@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: MediFlow Local API v1
-  version: 1.27.0
+  version: 1.28.0
   summary: Stable patient contract plus executable home-base network slice with explicit pairing review, paired-client auth boundary, ambulatory scope options, scoped remote patient, cross-patient agenda and diary reads, therapy, checkup, observation, and catalog read boundaries, replica planning state, explicit identity summary, and declarative AI runtime summary for the local `/api/v1` surface.
   description: |
     OpenAPI contract for the client-facing local API defined by ADR 0010.
@@ -2552,7 +2552,14 @@ paths:
         client with `network.replica.write-therapies`, an active operator
         session, and the effective ambulatory scope resolved by the home-base
         node. AI/document-derived fields and client-controlled lifecycle fields
-        are excluded from this boundary.
+        are excluded from this boundary. The body must be a JSON object with
+        only the documented fields. Mutation and mandatory audit share one
+        synchronous transaction; audit failure or an ignored write cannot
+        return success. An explicit occupied id returns 409 without effects,
+        including identical payloads; therapy creation is not idempotent.
+        Scope and active-parent admission precede duplicate disclosure in the
+        same transaction. A missing or soft-deleted parent returns 404; an
+        archived-only parent remains admitted.
       security:
         - pairedClientId: []
           pairedClientToken: []
@@ -2592,6 +2599,12 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          description: The explicit therapy identifier is already occupied; no mutation or audit is added.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '413':
           $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
@@ -2650,7 +2663,13 @@ paths:
         active operator session, and the effective ambulatory scope resolved by
         the home-base node. Remote hard delete, AI fields, and
         document-derived writes are excluded; soft delete and restore use
-        `deletedAt` and `deletionReason`.
+        `deletedAt` and `deletionReason`. Mutation, current-version check,
+        effective scope and mandatory audit share one synchronous transaction.
+        Unknown body fields and non-object JSON are rejected before effects.
+        Audit failure rolls back the therapy change. Parent currentness is
+        checked in the same transaction: a missing or soft-deleted parent
+        returns 404; archived-only is allowed. Restoring a therapy never
+        restores its parent implicitly.
       security:
         - pairedClientId: []
           pairedClientToken: []
@@ -2683,7 +2702,7 @@ paths:
                 value:
                   version: 2
                   deletedAt: '2026-05-02T10:00:00.000Z'
-                  deletionReason: duplicate-therapy
+                  deletionReason: ENC:synthetic:duplicate-therapy
       responses:
         '200':
           description: Therapy updated through the paired boundary.
@@ -5994,7 +6013,10 @@ components:
         Therapy creation payload for paired clients. Server-controlled
         `patientId`, `createdAt`, `updatedAt`, `version`, `deletedAt`, and
         `deletionReason` are rejected. AI/document-derived writes remain outside
-        this boundary.
+        this boundary. Explicit ids must be nonblank strings; omission generates
+        an id. Motivation, when non-null, must be ENC-sealed.
+        Numeric finite dates accepted by the existing normalizer remain a
+        compatibility form; numeric zero is rejected.
       properties:
         id:
           type: string
@@ -6048,11 +6070,13 @@ components:
       description: |
         Partial therapy update payload. At least one field other than `version`
         must be provided. AI/document-derived writes and remote hard delete are
-        rejected by the paired boundary.
+        rejected by the paired boundary. Non-null motivation and deletionReason
+        must be ENC-sealed; client-controlled createdAt/updatedAt are rejected.
       properties:
         version:
           type: integer
           minimum: 1
+          maximum: 9007199254740990
         drugName:
           type: string
         aic:

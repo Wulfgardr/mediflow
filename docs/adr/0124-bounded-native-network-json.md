@@ -119,3 +119,13 @@ automatica di questa ADR a tutte le route locali. Le due mutazioni del diario
 rete conservano il limite gia previsto qui. Il reader canonico e riusato
 senza cambiarne semantica; nessun limite di durata/inflight e nessuna promessa
 di compatibilita con richieste locali storicamente di dimensione arbitraria.
+
+## Estensione locale terapie C05 (26 settembre 2026)
+
+ADR 0015 estende esplicitamente il reader canonico request-json alle sei
+mutazioni ordinarie terapia Web/v1 locale, con NUOVO massimo inclusivo di
+4.194.304 byte dopo i gate. E una restrizione nuova di questa famiglia,
+non un trasferimento implicito del limite diario o amministrativo. La rete
+terapie mantiene il tetto gia governato. Restano escluse promesse sulla
+compatibilita di tutti i client esterni, sulla memoria del trasporto o su
+nuovi limiti di durata/concorrenza; nessun dato viene troncato.
