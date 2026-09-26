@@ -1,0 +1,155 @@
+{
+  "schemaVersion": "mediflow.patient_rights_dry_run.fixture.v1",
+  "cases": [
+    {
+      "id": "access-export-review",
+      "input": {
+        "request": {
+          "kind": "access_export_review",
+          "patientRef": "synthetic-A",
+          "fields": [
+            "displayName",
+            "allergyDataStatus"
+          ],
+          "expectedVersion": 4,
+          "cancelled": false,
+          "expectedSourceVersions": {
+            "synthetic-form-1": 1,
+            "synthetic-note-1": 2
+          }
+        },
+        "actor": {
+          "patientRef": "synthetic-A",
+          "authority": "synthetic_access_reviewer"
+        },
+        "policy": {
+          "state": "defined_for_synthetic_fixture",
+          "reference": "synthetic-policy-example",
+          "allowedFields": [
+            "displayName",
+            "allergyDataStatus"
+          ]
+        },
+        "snapshot": {
+          "patientRef": "synthetic-A",
+          "version": 4,
+          "mixedSubject": false,
+          "fields": {
+            "displayName": {
+              "value": "Soggeto sintetico A",
+              "sourceRef": "synthetic-form-1",
+              "protectedThirdParty": false
+            },
+            "allergyDataStatus": {
+              "value": "Non raccolto",
+              "sourceRef": "synthetic-note-1",
+              "protectedThirdParty": false
+            },
+            "familyNote": {
+              "value": "Dato di un familiare sintetico",
+              "sourceRef": "synthetic-family-1",
+              "protectedThirdParty": true
+            }
+          },
+          "sources": {
+            "synthetic-form-1": {
+              "subjectRef": "synthetic-A",
+              "protectedThirdParty": false,
+              "version": 1,
+              "date": "2026-01-10"
+            },
+            "synthetic-note-1": {
+              "subjectRef": "synthetic-A",
+              "protectedThirdParty": false,
+              "version": 2,
+              "date": "2026-02-11"
+            },
+            "synthetic-family-1": {
+              "subjectRef": "synthetic-family-A",
+              "protectedThirdParty": true,
+              "version": 1,
+              "date": "2026-02-11"
+            },
+            "synthetic-correction-1": {
+              "subjectRef": "synthetic-A",
+              "protectedThirdParty": false,
+              "version": 1,
+              "date": "2026-03-12"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "correction-with-original-provenance",
+      "input": {
+        "request": {
+          "kind": "correction_proposal",
+          "patientRef": "synthetic-A",
+          "fields": [
+            "displayName"
+          ],
+          "expectedVersion": 4,
+          "cancelled": false,
+          "correction": {
+            "field": "displayName",
+            "proposedValue": "Soggetto sintetico A",
+            "evidenceRef": "synthetic-correction-1"
+          },
+          "expectedSourceVersions": {
+            "synthetic-form-1": 1,
+            "synthetic-correction-1": 1
+          }
+        },
+        "actor": {
+          "patientRef": "synthetic-A",
+          "authority": "synthetic_correction_reviewer"
+        },
+        "policy": {
+          "state": "defined_for_synthetic_fixture",
+          "reference": "synthetic-policy-example",
+          "allowedFields": [
+            "displayName"
+          ]
+        },
+        "snapshot": {
+          "patientRef": "synthetic-A",
+          "version": 4,
+          "mixedSubject": false,
+          "fields": {
+            "displayName": {
+              "value": "Soggeto sintetico A",
+              "sourceRef": "synthetic-form-1",
+              "protectedThirdParty": false
+            },
+            "allergyDataStatus": {
+              "value": "Non raccolto",
+              "sourceRef": "synthetic-note-1",
+              "protectedThirdParty": false
+            }
+          },
+          "sources": {
+            "synthetic-form-1": {
+              "subjectRef": "synthetic-A",
+              "protectedThirdParty": false,
+              "version": 1,
+              "date": "2026-01-10"
+            },
+            "synthetic-note-1": {
+              "subjectRef": "synthetic-A",
+              "protectedThirdParty": false,
+              "version": 2,
+              "date": "2026-02-11"
+            },
+            "synthetic-correction-1": {
+              "subjectRef": "synthetic-A",
+              "protectedThirdParty": false,
+              "version": 1,
+              "date": "2026-03-12"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

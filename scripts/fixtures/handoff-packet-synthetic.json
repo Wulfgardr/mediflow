@@ -1,0 +1,28 @@
+{
+  "syntheticOnly": true,
+  "patient": { "id": "synthetic-patient-a", "label": "Paziente sintetico A", "context": "Controllo territoriale programmato", "version": 4 },
+  "request": {
+    "patientId": "synthetic-patient-a",
+    "expectedPatientVersion": 4,
+    "recipient": { "id": "synthetic-recipient-a", "label": "Medico destinatario dimostrativo" },
+    "purpose": "Controllo sintetico programmato",
+    "asOfDate": "2026-09-20",
+    "selectedSourceIds": ["synthetic-source-problem", "synthetic-source-med-current", "synthetic-source-med-history", "synthetic-source-allergy", "synthetic-source-evidence", "synthetic-source-task"],
+    "expectedVersions": {
+      "synthetic-source-problem": 2,
+      "synthetic-source-med-current": 3,
+      "synthetic-source-med-history": 1,
+      "synthetic-source-allergy": 1,
+      "synthetic-source-evidence": 1,
+      "synthetic-source-task": 2
+    }
+  },
+  "sources": [
+    { "id": "synthetic-source-problem", "subjectId": "synthetic-patient-a", "category": "problem", "state": "current", "date": "2026-09-10", "version": 2, "reviewStatus": "reviewed", "exactQuote": "Ipertensione arteriosa in anamnesi; controllo territoriale previsto." },
+    { "id": "synthetic-source-med-current", "subjectId": "synthetic-patient-a", "category": "medication", "state": "current", "date": "2026-09-18", "version": 3, "reviewStatus": "reviewed", "exactQuote": "Terapia riferita e verificata nella visita: ramipril 5 mg ogni mattina." },
+    { "id": "synthetic-source-med-history", "subjectId": "synthetic-patient-a", "category": "medication", "state": "historical", "date": "2026-07-12", "version": 1, "reviewStatus": "reviewed", "exactQuote": "Elenco precedente: amlodipina 5 mg ogni mattina; stato attuale non attestato da questa fonte." },
+    { "id": "synthetic-source-allergy", "subjectId": "synthetic-patient-a", "category": "allergyInformation", "state": "unknown", "date": "2026-09-18", "version": 1, "reviewStatus": "reviewed", "exactQuote": "Allergie: informazione non disponibile nella revisione del 18 settembre." },
+    { "id": "synthetic-source-evidence", "subjectId": "synthetic-patient-a", "category": "recentEvidence", "state": "current", "date": "2026-09-18", "version": 1, "reviewStatus": "reviewed", "exactQuote": "Pressione arteriosa registrata nella visita: 132/82 mmHg." },
+    { "id": "synthetic-source-task", "subjectId": "synthetic-patient-a", "category": "outstandingTask", "state": "current", "date": "2026-09-19", "version": 2, "reviewStatus": "reviewed", "exactQuote": "Controllo pressorio programmato; esito non ancora documentato." }
+  ]
+}
