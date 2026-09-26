@@ -11,8 +11,9 @@ import { normalizeCheckupUpdateInput } from '@/lib/api-v1-clinical-write-normali
 /* @Codex */
 import { normalizeCheckupStatus } from '@/lib/status-normalization';
 /* @Codex */
-import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/security/audit';
-import { buildCheckupVersionConflictPayload, parseCheckupExpectedVersion } from '@/lib/checkup-concurrency';
+import { auditContextFromRequest, listChangedFields, requestIdFromRequest } from '@/lib/security/audit';
+import { updateCheckupOperation } from '@/lib/checkup-write-operation';
+import { parseCheckupExpectedVersion } from '@/lib/checkup-concurrency';
 import { parseClinicalDeleteBody } from '@/lib/api-v1-clinical-lifecycle';
 
 function toIsoString(value: unknown): string | null {
@@ -22,20 +23,6 @@ function toIsoString(value: unknown): string | null {
 }
 
 // WUL-308: PHI-safe snapshot for the 409 version-conflict payload.
-async function selectCheckupConflictSnapshot(patientId: string, checkupId: string) {
-    return await dbServer
-        .select({
-            id: checkups.id,
-            patientId: checkups.patientId,
-            version: checkups.version,
-            updatedAt: checkups.updatedAt,
-            deletedAt: checkups.deletedAt,
-        })
-        .from(checkups)
-        .where(and(eq(checkups.id, checkupId), eq(checkups.patientId, patientId)))
-        .get() ?? null;
-}
-
 export async function GET(
     request: Request,
     { params }: { params: Promise<{ id: string; checkupId: string }> }
@@ -106,47 +93,16 @@ export async function PUT(
             return NextResponse.json({ error: normalized.error }, { status: 400 });
         }
 
-        const updateResult = await dbServer.update(checkups)
-            .set({
-                ...normalized.values,
-                version: expectedVersion + 1,
-            })
-            .where(and(
-                eq(checkups.id, checkupId),
-                eq(checkups.patientId, id),
-                eq(checkups.version, expectedVersion),
-            ))
-            .run();
-
-        if (updateResult.changes === 0) {
-            return NextResponse.json(
-                buildCheckupVersionConflictPayload(
-                    expectedVersion,
-                    checkupId,
-                    await selectCheckupConflictSnapshot(id, checkupId),
-                ),
-                { status: 409 }
-            );
-        }
-
-        /* @Codex */
-        await safeWriteAuditEventFromRequest(
-            request,
-            auditSession,
-            {
-                // WUL-308: a soft-delete via PUT is audited as a deletion, not an update.
-                eventType: normalized.values.deletedAt ? 'checkup.deleted' : 'checkup.updated',
-                subjectType: 'checkup',
-                subjectRef: checkupId,
-                redactedMetadata: {
-                    changedFields: listChangedFields(body, ['version']),
-                    resourceVersion: expectedVersion + 1,
-                },
-            },
-            '[MediFlow] Checkup audit write failed:',
-        );
-
-        return NextResponse.json({ success: true });
+        // @Codex: host audit context is resolved before the synchronous IMMEDIATE mutation.
+        const context = auditContextFromRequest(request, auditSession);
+        const result = updateCheckupOperation({
+            patientId: id, checkupId: checkupId, expectedVersion, values: normalized.values, mode: 'v1',
+            changedFields: listChangedFields(body, ['version']),
+            audit: { actorType: context.actorType, actorRef: context.actorRef,
+                sourceSurface: context.sourceSurface, requestId: requestIdFromRequest(request),
+                flags: [`auth:${context.authContext}`] },
+        });
+        return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
         console.error('API PUT /api/v1/patients/[id]/checkups/[checkupId] error:', error);
         return NextResponse.json({ error: 'Failed to update checkup' }, { status: 500 });
@@ -189,46 +145,15 @@ export async function DELETE(
             return NextResponse.json({ error: 'Not found' }, { status: 404 });
         }
 
-        const updateResult = await dbServer.update(checkups)
-            .set({
-                ...normalized.values,
-                version: expectedVersion + 1,
-            })
-            .where(and(
-                eq(checkups.id, checkupId),
-                eq(checkups.patientId, id),
-                eq(checkups.version, expectedVersion),
-            ))
-            .run();
-
-        if (updateResult.changes === 0) {
-            return NextResponse.json(
-                buildCheckupVersionConflictPayload(
-                    expectedVersion,
-                    checkupId,
-                    await selectCheckupConflictSnapshot(id, checkupId),
-                ),
-                { status: 409 }
-            );
-        }
-
-        /* @Codex */
-        await safeWriteAuditEventFromRequest(
-            request,
-            auditSession,
-            {
-                eventType: 'checkup.deleted',
-                subjectType: 'checkup',
-                subjectRef: checkupId,
-                redactedMetadata: {
-                    changedFields: ['deletedAt', 'deletionReason'],
-                    resourceVersion: expectedVersion + 1,
-                },
-            },
-            '[MediFlow] Checkup audit write failed:',
-        );
-
-        return NextResponse.json({ success: true });
+        const context = auditContextFromRequest(request, auditSession);
+        const result = updateCheckupOperation({
+            patientId: id, checkupId: checkupId, expectedVersion, values: normalized.values, mode: 'v1',
+            changedFields: ['deletedAt', 'deletionReason'],
+            audit: { actorType: context.actorType, actorRef: context.actorRef,
+                sourceSurface: context.sourceSurface, requestId: requestIdFromRequest(request),
+                flags: [`auth:${context.authContext}`] },
+        });
+        return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
         console.error('API DELETE /api/v1/patients/[id]/checkups/[checkupId] error:', error);
         return NextResponse.json({ error: 'Failed to delete checkup' }, { status: 500 });

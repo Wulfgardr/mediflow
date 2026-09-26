@@ -91,11 +91,18 @@ const REQUIRED_ROUTE_AUDIT = [
         writerContracts: [therapyAuditContract('POST', 'network', 'create')] },
     { route: 'app/api/v1/network/patients/[id]/therapies/[therapyId]/route.ts', events: ['therapy.updated', 'therapy.deleted'], reason: 'paired therapy update requires transactional audit',
         writerContracts: [therapyAuditContract('PUT', 'network', 'update')] },
-    { route: 'app/api/checkups/route.ts', events: ['checkup.created'], reason: 'checkup creation is sensitive CRUD' },
-    { route: 'app/api/checkups/[id]/route.ts', events: ['checkup.updated', 'checkup.deleted'], reason: 'checkup update/delete are sensitive CRUD' },
-    { route: 'app/api/v1/patients/[id]/checkups/route.ts', events: ['checkup.created'], reason: 'native/shared checkup creation is sensitive CRUD' },
-    { route: 'app/api/v1/patients/[id]/checkups/[checkupId]/route.ts', events: ['checkup.updated', 'checkup.deleted'], reason: 'native/shared checkup update/delete are sensitive CRUD' },
-    { route: 'lib/network-checkup-write.ts', events: ['checkup.created', 'checkup.updated', 'checkup.deleted'], reason: 'paired checkup writes must stay PHI-safe auditable' },
+    { route: 'app/api/checkups/route.ts', events: ['checkup.created'],
+        writerContracts: [checkupAuditContract('POST', 'web', 'create')] },
+    { route: 'app/api/checkups/[id]/route.ts', events: ['checkup.updated', 'checkup.deleted'],
+        writerContracts: [checkupAuditContract('PUT', 'web', 'update'), checkupAuditContract('DELETE', 'web', 'update')] },
+    { route: 'app/api/v1/patients/[id]/checkups/route.ts', events: ['checkup.created'],
+        writerContracts: [checkupAuditContract('POST', 'v1', 'create')] },
+    { route: 'app/api/v1/patients/[id]/checkups/[checkupId]/route.ts', events: ['checkup.updated', 'checkup.deleted'],
+        writerContracts: [checkupAuditContract('PUT', 'v1', 'update'), checkupAuditContract('DELETE', 'v1', 'update')] },
+    { route: 'app/api/v1/network/patients/[id]/checkups/route.ts', events: ['checkup.created'],
+        writerContracts: [checkupAuditContract('POST', 'network', 'create')] },
+    { route: 'app/api/v1/network/patients/[id]/checkups/[checkupId]/route.ts', events: ['checkup.updated', 'checkup.deleted'],
+        writerContracts: [checkupAuditContract('PUT', 'network', 'update')] },
     { route: 'app/api/observations/route.ts', events: ['observation.created'],
         writerContracts: [observationAuditContract('POST', 'web', 'create')] },
     { route: 'app/api/observations/[id]/route.ts', events: ['observation.updated', 'observation.deleted'],
@@ -178,6 +185,16 @@ function observationAuditContract(handler, mode, operation) {
         ownerFile: 'lib/observation-write-operation.ts', ownerName: `${operation}ObservationOperation`,
         serviceModule: '@/lib/observation-write-operation', serviceExport: `${operation}ObservationOperation`,
         bridgeFile: 'lib/network-observation-write.ts', bridgeExport: `${operation}NetworkScopedObservation`,
+    };
+}
+/* @Codex: eight ordinary checkup handlers, without transferring input or status policies. */
+function checkupAuditContract(handler, mode, operation) {
+    return {
+        handler, mode, operation, transactionalCheckup: true,
+        target: `checkup-${operation}.${mode}.${handler.toLowerCase()}`,
+        ownerFile: 'lib/checkup-write-operation.ts', ownerName: `${operation}CheckupOperation`,
+        serviceModule: '@/lib/checkup-write-operation', serviceExport: `${operation}CheckupOperation`,
+        bridgeFile: 'lib/network-checkup-write.ts', bridgeExport: `${operation}NetworkScopedCheckup`,
     };
 }
 const METADATA_KEYS = ['changedFields', 'resourceVersion', 'counts', 'flags', 'reasonCode'];
@@ -687,6 +704,11 @@ export function validateRequiredObservationAudit(input) {
     return validateRequiredClinicalRowAudit(input, 'observation');
 }
 
+/* @Codex: structural proof only; parent/currentness/status semantics require real SQLite tests. */
+export function validateRequiredCheckupAudit(input) {
+    return validateRequiredClinicalRowAudit(input, 'checkup');
+}
+
 function validateRequiredClinicalRowAudit({ spec, routeSource, coreSource, bridgeSource = null }, resource) {
     const problems = [];
     const core = checkedSource(spec.ownerFile, coreSource);
@@ -724,7 +746,7 @@ function validateRequiredClinicalRowAudit({ spec, routeSource, coreSource, bridg
 
     const db = importedBinding(core.sourceFile, core.checker, './db-server', 'dbServer');
     const writer = importedBinding(core.sourceFile, core.checker, './security/audit', 'writeAuditEventInTransaction');
-    const table = importedBinding(core.sourceFile, core.checker, './schema', ({ entry: 'entries', therapy: 'therapies', observation: 'observations' })[resource]);
+    const table = importedBinding(core.sourceFile, core.checker, './schema', ({ entry: 'entries', therapy: 'therapies', observation: 'observations', checkup: 'checkups' })[resource]);
     if (core.sourceFile.parseDiagnostics.length || !owner || !db || !writer || !table) {
         problems.push('clinical-row core must import the approved database, resource table and required audit writer');
         return problems;
@@ -2033,7 +2055,7 @@ function checkAuditWriterControlFlow(findings) {
     const contracts = REQUIRED_ROUTE_AUDIT.flatMap((entry) =>
         (entry.writerContracts ?? []).filter((contract) => !contract.modes
             && !contract.transactionalPatientUpdate && !contract.transactionalPatientDelete
-            && !contract.transactionalDiary && !contract.transactionalTherapy && !contract.transactionalObservation)
+            && !contract.transactionalDiary && !contract.transactionalTherapy && !contract.transactionalObservation && !contract.transactionalCheckup)
             .map((contract) => ({ ...contract, route: entry.route })));
     const parsedFiles = new Map();
     for (const contract of contracts) {
@@ -2135,6 +2157,11 @@ function checkRouteCoverage(findings) {
                         })
                     : contract.transactionalObservation
                         ? validateRequiredObservationAudit({
+                            spec: contract, routeSource: source, coreSource: read(contract.ownerFile),
+                            bridgeSource: exists(contract.bridgeFile) ? read(contract.bridgeFile) : null,
+                        })
+                    : contract.transactionalCheckup
+                        ? validateRequiredCheckupAudit({
                             spec: contract, routeSource: source, coreSource: read(contract.ownerFile),
                             bridgeSource: exists(contract.bridgeFile) ? read(contract.bridgeFile) : null,
                         })

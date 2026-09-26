@@ -723,3 +723,46 @@ omissione, null e nuovo tombstone restano distinti. Nessun evento restored.
 
 Queste decisioni sono specifiche della coorte osservazioni e non dichiarano
 chiusura globale di C05, pubblicazione o accettazione clinica.
+
+
+## Coorte checkup ordinari: atomicita richiesta (26 settembre 2026)
+
+La baseline dedicata comprende otto mutazioni Web, API v1 locale e rete
+paired, 390 osservazioni sintetiche e tre processi isolati per gli ID blank.
+I sedici guasti audit FAIL/IGNORE lasciano oggi la mutazione riuscita senza
+evento; i tre INSERT IGNORE possono produrre successo e audit senza riga.
+La caratterizzazione non attesta autenticazione HTTP o accettazione clinica.
+
+Le otto mutazioni convergono su un owner specifico dei checkup. Una transazione
+sincrona IMMEDIATE contiene identita del record e del paziente, scope paired,
+padre attivo, versione corrente, scrittura di esattamente una riga e audit
+richiesto. Un audit fallito o ignorato, oppure una scrittura di dominio ignorata
+dopo l'ammissione, annulla dati, versione ed evento e non restituisce successo.
+Il conflitto di versione resta 409 con lo snapshot PHI-safe esistente.
+
+Paziente assente o cancellato produce 404 senza effetti; l'archiviazione da sola
+non blocca la scrittura. Il ripristino esplicito del checkup non ripristina il
+paziente. Web aveva gia un predicato SQL di padre attivo: il nuovo owner deve
+conservarne la protezione, non presentarla come nuova per questa superficie.
+L'attore Web viene dalla sessione ammessa, non da header aggiunti dal chiamante.
+Create produce checkup.created; update e restore checkup.updated; un deletedAt
+non nullo effettivamente applicato produce checkup.deleted, come gia previsto.
+Omissione, null esplicito e tombstone sono distinti.
+
+Questa tranche non introduce una migrazione degli input. Restano invariati i
+normalizzatori condivisi e le differenze osservate tra superfici: Web POST
+ammette date numerica zero e source testuale libera; v1/rete conservano le
+proprie regole. Restano gli alias di stato done/canceled, gli orari host della
+creazione locale, updatedAt locale in PUT, i gate ENC e di provenienza paired,
+la precedenza 404 locale prima della validazione dei campi e 400 di rete prima
+del lookup. Non si introducono cap locali, whitelist, nuove restrizioni ID,
+nuova risposta per duplicati, rifiuto di campi prima ignorati o modifiche al
+seeder. Le anomalie di input caratterizzate sono lavoro separato, non prova
+di compatibilita universale ne difetti dichiarati risolti da questa tranche.
+
+Sono richieste prove SQLite reali dei sedici rollback audit, delle otto
+mutazioni ignorate, dei successi e delle negazioni per padre/scope/versione;
+prove HTTP reali delle superfici e UI per le azioni effettivamente esposte.
+La guardia strutturale verifica delega e ordine mutazione/audit, non sostituisce
+le prove comportamentali. Restano esclusi writer document-derived, direct-native
+e headless, schema database, CRUD generico, pubblicazione e accettazione clinica.

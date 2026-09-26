@@ -9,7 +9,7 @@ import test from 'node:test';
 import ts from 'typescript';
 
 import { validateAuditWriterControlFlow, validateDelegatedRouteAudit, validateLogoutAuditModes,
-    validateRequiredPatientUpdateAudit, validateRequiredPatientDeleteAudit, validateRequiredDiaryAudit, validateRequiredTherapyAudit, validateRequiredObservationAudit } from './audit-quality-gate.mjs';
+    validateRequiredPatientUpdateAudit, validateRequiredPatientDeleteAudit, validateRequiredDiaryAudit, validateRequiredTherapyAudit, validateRequiredObservationAudit, validateRequiredCheckupAudit } from './audit-quality-gate.mjs';
 
 const EVENT = 'record.changed';
 
@@ -195,6 +195,67 @@ test('observation required-audit guard follows all eight handlers and rejects de
             `${callee}(`, `unapprovedObservationWrite(`) }), []);
         if (mode === 'network') assert.notDeepEqual(validate({ bridgeSource: change(bridgeSource,
             `${spec.ownerName}(`, 'unapprovedObservationWrite(') }), []);
+    }
+});
+test('checkup required-audit guard follows all eight handlers and rejects detached or bypassed audit', () => {
+    const read = (file) => fs.readFileSync(file, 'utf8');
+    const coreSource = read('lib/checkup-write-operation.ts');
+    const bridgeSource = read('lib/network-checkup-write.ts');
+    const rows = [
+        ['app/api/checkups/route.ts', 'POST', 'web', 'create'],
+        ['app/api/checkups/[id]/route.ts', 'PUT', 'web', 'update'],
+        ['app/api/checkups/[id]/route.ts', 'DELETE', 'web', 'update'],
+        ['app/api/v1/patients/[id]/checkups/route.ts', 'POST', 'v1', 'create'],
+        ['app/api/v1/patients/[id]/checkups/[checkupId]/route.ts', 'PUT', 'v1', 'update'],
+        ['app/api/v1/patients/[id]/checkups/[checkupId]/route.ts', 'DELETE', 'v1', 'update'],
+        ['app/api/v1/network/patients/[id]/checkups/route.ts', 'POST', 'network', 'create'],
+        ['app/api/v1/network/patients/[id]/checkups/[checkupId]/route.ts', 'PUT', 'network', 'update'],
+    ];
+    for (const [file, handler, mode, operation] of rows) {
+        const spec = { handler, mode, operation, ownerFile: 'lib/checkup-write-operation.ts',
+            ownerName: `${operation}CheckupOperation`, serviceExport: `${operation}CheckupOperation`,
+            serviceModule: '@/lib/checkup-write-operation', bridgeExport: `${operation}NetworkScopedCheckup` };
+        const original = { spec, routeSource: read(file), coreSource, bridgeSource };
+        const validate = (patch = {}) => validateRequiredCheckupAudit({ ...original, ...patch });
+        assert.deepEqual(validate(), [], `${mode} ${handler}`);
+        const change = (source, before, after) => {
+            assert.ok(source.includes(before), before);
+            const mutated = source.replaceAll(before, after);
+            assert.equal(ts.createSourceFile('mutant.ts', mutated, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
+                .parseDiagnostics.length, 0);
+            return mutated;
+        };
+        for (const [before, after] of [
+            ["behavior: 'immediate'", "behavior: 'deferred'"],
+            ['transaction((tx)', 'transaction(async (tx)'],
+            ['writeAuditEventInTransaction(tx, {', 'writeAuditEventInTransaction(dbServer, {'],
+            ['writeAuditEventInTransaction(tx, {', 'if (input.audit.actorRef) writeAuditEventInTransaction(tx, {'],
+            ['writeAuditEventInTransaction(tx, {', 'return { status: 200, value: {} }; writeAuditEventInTransaction(tx, {'],
+            ['changes !== 1', 'changes < 0'],
+            ["subjectType: 'checkup'", "subjectType: 'patient'"],
+            ["eventType: 'checkup.created'", "eventType: 'checkup.updated'"],
+            ["? 'checkup.deleted' : 'checkup.updated'", "? 'checkup.updated' : 'checkup.deleted'"],
+        ]) {
+            if ((before.includes('checkup.created') && operation !== 'create')
+                || (before.startsWith('?') && operation !== 'update')) continue;
+            assert.notDeepEqual(validate({ coreSource: change(coreSource, before, after) }), [],
+                `${mode} ${handler}: ${before}`);
+        }
+        const sourceKey = mode === 'network' ? 'bridgeSource' : 'routeSource';
+        if (operation === 'create') {
+            /* @Codex: mutate the actual insert, including its authoritative identity overrides. */
+            const insert = coreSource.match(/const inserted = (tx\.insert\(checkups\)[\s\S]*?\.run\(\));/);
+            assert.ok(insert, 'checkup create must expose the real insert statement');
+            assert.notDeepEqual(validate({ coreSource: change(coreSource, insert[0],
+                `const inserted = ({ run: () => ({ changes: 1 }), pending: () => ${insert[1]} }).run();`) }), []);
+        }
+        const source = original[sourceKey];
+        assert.notDeepEqual(validate({ [sourceKey]: change(source, `mode: '${mode}'`, "mode: 'unadmitted'") }), []);
+        const callee = mode === 'network' ? spec.bridgeExport : spec.ownerName;
+        assert.notDeepEqual(validate({ routeSource: change(original.routeSource,
+            `${callee}(`, `unapprovedCheckupWrite(`) }), []);
+        if (mode === 'network') assert.notDeepEqual(validate({ bridgeSource: change(bridgeSource,
+            `${spec.ownerName}(`, 'unapprovedCheckupWrite(') }), []);
     }
 });
 

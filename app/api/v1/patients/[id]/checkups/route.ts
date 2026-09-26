@@ -1,7 +1,7 @@
 // Codex: created 2026-02-01
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
-import { checkups, patients } from '@/lib/schema';
+import { checkups } from '@/lib/schema';
 import { and, desc, eq, gte, inArray, isNull, lte } from 'drizzle-orm';
 import { requireLocalApiToken } from '@/lib/security/local-api-auth';
 import { requireLocalApiActorSession } from '@/lib/security/server-auth';
@@ -15,8 +15,8 @@ import {
     normalizeCheckupStatus,
 } from '@/lib/status-normalization';
 /* @Codex */
-import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/security/audit';
-import { activePatients } from '@/lib/patient-lifecycle';
+import { auditContextFromRequest, listChangedFields, requestIdFromRequest } from '@/lib/security/audit';
+import { createCheckupOperation } from '@/lib/checkup-write-operation';
 
 function toIsoString(value: unknown): string | null {
     if (!value) return null;
@@ -112,36 +112,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
             return NextResponse.json({ error: normalized.error }, { status: 400 });
         }
 
-        const created = dbServer.transaction((tx) => {
-            const patient = tx.select({ id: patients.id })
-                .from(patients)
-                .where(and(eq(patients.id, id), activePatients()))
-                .get();
-            if (!patient) return false;
-            tx.insert(checkups).values(normalized.values).run();
-            return true;
+        // @Codex: preserve local-token actor selection outside the synchronous transaction.
+        const context = auditContextFromRequest(request, auditSession);
+        const result = createCheckupOperation({
+            patientId: id, checkupId: normalized.values.id, values: normalized.values, mode: 'v1',
+            changedFields: listChangedFields(auditBody, ['id']),
+            audit: { actorType: context.actorType, actorRef: context.actorRef,
+                sourceSurface: context.sourceSurface, requestId: requestIdFromRequest(request),
+                flags: [`auth:${context.authContext}`] },
         });
-        if (!created) {
-            return NextResponse.json({ error: 'Patient not found' }, { status: 404 });
-        }
-
-        /* @Codex */
-        await safeWriteAuditEventFromRequest(
-            request,
-            auditSession,
-            {
-                eventType: 'checkup.created',
-                subjectType: 'checkup',
-                subjectRef: normalized.values.id,
-                redactedMetadata: {
-                    changedFields: listChangedFields(auditBody, ['id']),
-                    resourceVersion: 1,
-                },
-            },
-            '[MediFlow] Checkup audit write failed:',
-        );
-
-        return NextResponse.json({ id: normalized.values.id, version: 1 }, { status: 201 });
+        return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
         console.error('API POST /api/v1/patients/[id]/checkups error:', error);
         return NextResponse.json({ error: 'Failed to create checkup' }, { status: 500 });

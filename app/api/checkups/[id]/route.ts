@@ -6,36 +6,23 @@ import { activePatients } from '@/lib/patient-lifecycle';
 /* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 /* @Codex */
-import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/security/audit';
+import { auditContextFromSession, listChangedFields, requestIdFromRequest } from '@/lib/security/audit';
+import { updateCheckupOperation } from '@/lib/checkup-write-operation';
 /* @Codex */
 import { normalizeCheckupUpdateInput } from '@/lib/api-v1-clinical-write-normalization';
 /* @Codex */
-import { buildCheckupVersionConflictPayload, parseCheckupExpectedVersion } from '@/lib/checkup-concurrency';
+import { parseCheckupExpectedVersion } from '@/lib/checkup-concurrency';
 /* @Codex */
 import { parseClinicalDeleteBody } from '@/lib/api-v1-clinical-lifecycle';
 
-/* @Codex MF085 combined review: a child CAS does not detect a patient tombstone.
-   Keep this correlated predicate in the UPDATE itself, not only the prior read. */
+/* @Codex: preserve the preflight 404-before-field-validation ordering; the
+   IMMEDIATE checkup operation rechecks the active parent before its UPDATE. */
 function activeCheckupParent() {
     return exists(dbServer.select({ id: patients.id }).from(patients)
         .where(and(eq(patients.id, checkups.patientId), activePatients())));
 }
 
 /* @Codex */
-async function selectCheckupConflictSnapshot(checkupId: string) {
-    return await dbServer
-        .select({
-            id: checkups.id,
-            patientId: checkups.patientId,
-            version: checkups.version,
-            updatedAt: checkups.updatedAt,
-            deletedAt: checkups.deletedAt,
-        })
-        .from(checkups)
-        .where(and(eq(checkups.id, checkupId), activeCheckupParent()))
-        .get() ?? null;
-}
-
 export async function PUT(
     request: Request,
     { params }: { params: Promise<{ id: string }> }
@@ -62,42 +49,16 @@ export async function PUT(
             return NextResponse.json({ error: normalized.error }, { status: 400 });
         }
 
-        const updateResult = await dbServer.update(checkups)
-            .set({
-                ...normalized.values,
-                version: expectedVersion + 1,
-            })
-            .where(and(eq(checkups.id, id), eq(checkups.version, expectedVersion), activeCheckupParent()))
-            .run();
-
-        if (updateResult.changes === 0) {
-            return NextResponse.json(
-                buildCheckupVersionConflictPayload(
-                    expectedVersion,
-                    id,
-                    await selectCheckupConflictSnapshot(id),
-                ),
-                { status: 409 },
-            );
-        }
-
-        /* @Codex */
-        await safeWriteAuditEventFromRequest(
-            request,
-            session,
-            {
-                eventType: normalized.values.deletedAt ? 'checkup.deleted' : 'checkup.updated',
-                subjectType: 'checkup',
-                subjectRef: id,
-                redactedMetadata: {
-                    changedFields: listChangedFields(body, ['version']),
-                    resourceVersion: expectedVersion + 1,
-                },
-            },
-            '[MediFlow] Checkup audit write failed:',
-        );
-
-        return NextResponse.json({ success: true });
+        // @Codex: host audit context is resolved before the synchronous IMMEDIATE mutation.
+        const context = auditContextFromSession(session);
+        const result = updateCheckupOperation({
+            checkupId: id, expectedVersion, values: normalized.values, mode: 'web',
+            changedFields: listChangedFields(body, ['version']),
+            audit: { actorType: context.actorType, actorRef: context.actorRef,
+                sourceSurface: context.sourceSurface, requestId: requestIdFromRequest(request),
+                flags: [`auth:${context.authContext}`] },
+        });
+        return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
         return NextResponse.json({ error: "Update Failed" }, { status: 500 });
     }
@@ -134,42 +95,15 @@ export async function DELETE(
             return NextResponse.json({ error: 'Not found' }, { status: 404 });
         }
 
-        const updateResult = await dbServer.update(checkups)
-            .set({
-                ...normalized.values,
-                version: expectedVersion + 1,
-            })
-            .where(and(eq(checkups.id, id), eq(checkups.version, expectedVersion), activeCheckupParent()))
-            .run();
-
-        if (updateResult.changes === 0) {
-            return NextResponse.json(
-                buildCheckupVersionConflictPayload(
-                    expectedVersion,
-                    id,
-                    await selectCheckupConflictSnapshot(id),
-                ),
-                { status: 409 },
-            );
-        }
-
-        /* @Codex */
-        await safeWriteAuditEventFromRequest(
-            request,
-            session,
-            {
-                eventType: 'checkup.deleted',
-                subjectType: 'checkup',
-                subjectRef: id,
-                redactedMetadata: {
-                    changedFields: ['deletedAt', 'deletionReason'],
-                    resourceVersion: expectedVersion + 1,
-                },
-            },
-            '[MediFlow] Checkup audit write failed:',
-        );
-
-        return NextResponse.json({ success: true });
+        const context = auditContextFromSession(session);
+        const result = updateCheckupOperation({
+            checkupId: id, expectedVersion, values: normalized.values, mode: 'web',
+            changedFields: ['deletedAt', 'deletionReason'],
+            audit: { actorType: context.actorType, actorRef: context.actorRef,
+                sourceSurface: context.sourceSurface, requestId: requestIdFromRequest(request),
+                flags: [`auth:${context.authContext}`] },
+        });
+        return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
         return NextResponse.json({ error: "Delete Failed" }, { status: 500 });
     }

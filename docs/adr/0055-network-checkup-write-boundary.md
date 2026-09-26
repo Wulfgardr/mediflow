@@ -64,3 +64,20 @@ Restano fuori:
 - [ADR 0053](./0053-network-diary-entry-write-boundary.md)
 - [ADR 0054](./0054-network-therapy-write-boundary.md)
 - [OpenAPI v1](../openapi/mediflow-v1.yaml)
+
+
+## Estensione atomica del 26 settembre 2026
+
+Per create/update paired, il controllo di scope, identita, padre attivo e
+versione corrente converge con la mutazione e l'audit richiesto nello stesso
+owner checkup sincrono IMMEDIATE descritto in ADR 0015. Nessun evento best-effort
+dopo il commit sostituisce l'audit transazionale. Una mutazione deve interessare
+esattamente una riga; IGNORE sul dominio o sull'audit annulla l'operazione.
+Paziente mancante o cancellato produce 404; paziente soltanto archiviato resta
+ammesso. Il restore del checkup non ripristina implicitamente il paziente.
+
+Capability, autenticazione, scope ambulatoriale, gate ENC/provenienza, payload
+e normalizzazione paired restano invariati. Il limite JSON di ADR 0124 rimane
+quello esistente: questa estensione non trasferisce ai checkup le nuove
+restrizioni di input introdotte per altre famiglie. Nessun hard delete, sync,
+writer documentale o accesso direct-native entra nel perimetro.

@@ -970,3 +970,90 @@ prove Web/HTTP; Luna Medium Fast il roster; Astra Low le review indipendenti.
 Il coordinatore mantiene contratti, integrazione e sufficienza delle prove.
 I consumi condivisi non misurano il costo di questa coorte. Nessun commit,
 push, PR, modifica tracker o pubblicazione; C05/WUL-720 e C14 restano aperti.
+
+
+## Follow-up C05 — checkup ordinari: baseline e perimetro
+
+Dopo l'accettazione delle osservazioni, il raccordo con il Chief of Staff
+limita la coorte successiva all'atomicita delle otto mutazioni checkup.
+La baseline congelata raccoglie 390 casi sintetici e tre prove ID blank in
+processi/database distinti. Il coordinatore ha verificato otto successi,
+sedici guasti audit con modifica riuscita ma nessun evento, 217 negazioni
+con stato osservato invariato e 22 hash delle fonti rispetto alla snapshot93.
+Le tre create INSERT IGNORE potevano rispondere successo senza riga e con
+evento; gli update/delete IGNORE restituivano 409 senza effetti.
+
+ADR 0015/0055 sono aggiornati prima del codice dipendente. La modifica riguarda
+solo transazione IMMEDIATE, identita/scope/padre attivo/versione, esattamente
+una riga e audit richiesto. Le differenze di input restano intenzionalmente
+separate: nessun nuovo cap locale, whitelist, rifiuto ID, 409 di duplicato,
+restrizione su timestamp o modifica del seeder. La data numerica zero e la
+source libera del POST Web non vengono uniformate agli altri ingressi.
+Restano da trattare separatamente anche i nomi di stato legati al prototipo
+che oggi producono 500 senza effetti e i campi legacy ignorati del seeder.
+Questa delimitazione non dichiara risolto tutto C05 o compatibile ogni client.
+
+### Correzione visiva separata
+
+Il thread di parita ha consegnato una patch di sole spaziature: margini interni
+alla riga di rilettura della scheda e distanza sopra sei intestazioni del
+modulo paziente. Il core ha importato esattamente sette hunk in due componenti
+sopra snapshot93, con hash prima/dopo coincidenti con la consegna, diff-check
+pulito e riesame visivo del confronto desktop e della riga a larghezza ridotta.
+Le prove browser di produzione del thread proprietario coprono 1440 e 390 px,
+assenza di overflow e conservazione della bozza quando si annulla la rilettura.
+Nessun testo, handler, CSS globale o API e cambiato. Le prove Windows gia
+consegnate restano riferite alla loro baseline e non qualificano questa patch.
+
+
+### Prove della tranche atomica checkup
+
+- Sette gruppi mirati PASS con 71 registrazioni SQLite reali; il coordinatore
+  verifica 50 negazioni con stato completo del perimetro identico prima/dopo.
+  Replay invariato dei 390 casi baseline: esattamente 32 differenze previste,
+  cioe 16 errori audit, otto scritture ignorate e otto casi di padre non attivo
+  prima ammessi o falliti diversamente. Tutte le 243 negazioni del replay
+  conservano lo stato osservato. Tre duplicati mantengono 500 e nessun secondo
+  effetto; non viene introdotto replay idempotente.
+- Il confronto indipendente di 355 casi non modificati conserva anche i
+  valori persistenti del dominio, escludendo ID generati e timestamp host
+  variabili tra esecuzioni. Non e una prova byte-per-byte di ogni risposta.
+  Normalizzatori e schema condivisi rimangono invariati.
+- HTTP con cookie Web, token locale e pairing reali: 70 registrazioni, otto
+  mutazioni e percorso Web tombstone/restore separato; 52 rifiuti con digest
+  identici delle letture live complete del perimetro. Sedici errori audit e
+  otto mutazioni IGNORE fanno rollback senza successo. Gli smoke preesistenti
+  non modificati passano 1/1 paired e 6/6 PUT negativi v1.
+- Chromium, form paziente reale: POST 201/versione1, PUT 200/versione2 e
+  DELETE 200/versione3; riletture HTTP e SQLite readonly confermano tombstone,
+  note/motivo cifrati e un evento created/updated/deleted ciascuno. Stato
+  pending osservato, non modificato dalla UI; nessun claim UI restore.
+  Il primo tentativo ha esposto un errore di sequenza dell'harness, che apriva
+  edit prima del redirect dopo il salvataggio. Il tentativo e conservato;
+  aggiunta soltanto l'attesa esplicita del redirect, secondo tentativo 1/1 PASS.
+- Due processi SQLite confermano gli ordini padre-prima (404 senza evento) e
+  checkup-prima (201 con evento prima della cancellazione del padre). Non
+  sono otto race HTTP. Gli otto hash runtime prima/dopo HTTP e browser
+  coincidono col freeze; tsconfig ripristinato byte-identico, server/listener
+  delle prove terminati e database sintetici conservati.
+
+La guardia strutturale collega gli otto handler: 18 gruppi PASS. Review
+indipendenti GPT-6 Astra Low su guard/ADR e runtime congelato senza finding
+nel perimetro; non sostituiscono gli esiti comportamentali. GPT-6 Sol Medium
+ha curato runtime/test, baseline e prove Web; Luna Medium Fast roster e
+trasformazione iniziale dell'harness HTTP. Il coordinatore mantiene la
+definizione dei contratti, il riesame e l'integrazione. Nessun nuovo schema
+di input o incremento OpenAPI deriva dalla sola correzione transazionale.
+
+
+Suite standard integrata: **5.098 PASS su 5.110, 12 skip, zero fallimenti**
+(86,73 secondi del comando); build PASS (16,32 secondi). Lint, typecheck,
+never-regress, claims, audit e OpenAPI PASS. La candidata contiene anche
+il piccolo delta visivo gia verificato, con ricevuta di integrazione distinta.
+Gli esiti attestano il perimetro locale, non rilascio binario, accettazione
+clinica, chiusura globale C05/WUL-720 o dei residui di parita.
+
+Dopo questa verifica, l'utente ha autorizzato tramite Chief of Staff il
+consolidamento su main, PR/GitHub, aggiornamento fedele di Linear e igiene
+dei branch integrati, riservando l'ultimo 3% della quota a questa fase.
+Gli stati di pubblicazione vanno verificati separatamente dai test locali.
