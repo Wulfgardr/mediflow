@@ -11,7 +11,7 @@ export function acquireTestDataDir(environment = process.env, prefix = 'mediflow
   }
 
   return {
-    dataDir: fs.mkdtempSync(path.join(os.tmpdir(), prefix)),
+    dataDir: fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), prefix))),
     owned: true,
   };
 }

@@ -1,17 +1,16 @@
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
-import { entries, patients } from '@/lib/schema';
+import { entries } from '@/lib/schema';
 import { and, asc, desc, eq, isNull, type SQL } from 'drizzle-orm';
-import { v4 as uuidv4 } from 'uuid';
 /* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 /* @Codex */
-import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/security/audit';
+import { auditContextFromSession, requestIdFromRequest } from '@/lib/security/audit';
 /* @Codex */
-import { normalizeEntryCreateInput } from '@/lib/api-v1-clinical-write-normalization';
+import { prepareEntryCreate, readEntryJsonObject } from '@/lib/entry-write-input';
+import { createEntryOperation } from '@/lib/entry-write-operation';
 /* STREAM B: server-side list params (whitelisted, plaintext columns only). */
 import { parseListParams } from '@/lib/list-query-params';
-import { activePatients } from '@/lib/patient-lifecycle';
 
 // Only plaintext columns are sortable server-side (ENC: columns are opaque).
 const ENTRY_SORT_COLUMNS = {
@@ -64,51 +63,18 @@ export async function POST(request: Request) {
     if (!session) return unauthorizedResponse();
 
     try {
-        const body = await request.json();
-        /* @Codex */
-        const auditBody = body as Record<string, unknown>;
-        const newId = typeof body.id === 'string' && body.id.trim().length > 0 ? body.id : uuidv4();
-        const patientId = typeof body.patientId === 'string' ? body.patientId.trim() : '';
-        const normalized = normalizeEntryCreateInput(body, {
-            id: newId,
-            patientId,
-        });
-        if (!patientId) {
-            return NextResponse.json({ error: 'Invalid patientId' }, { status: 400 });
-        }
-        if (!normalized.ok) {
-            return NextResponse.json({ error: normalized.error }, { status: 400 });
-        }
-
-        const created = dbServer.transaction((tx) => {
-            const patient = tx.select({ id: patients.id })
-                .from(patients)
-                .where(and(eq(patients.id, patientId), activePatients()))
-                .get();
-            if (!patient) return false;
-            tx.insert(entries).values(normalized.values).run();
-            return true;
-        });
-        if (!created) {
-            return NextResponse.json({ error: 'Patient not found' }, { status: 404 });
-        }
-
-        /* @Codex */
-        await safeWriteAuditEventFromRequest(
-            request,
-            session,
-            {
-                eventType: 'entry.created',
-                subjectType: 'entry',
-                subjectRef: String(newId),
-                redactedMetadata: {
-                    changedFields: listChangedFields(auditBody, ['id']),
-                },
-            },
-            '[MediFlow] Entry audit write failed:',
-        );
-
-        return NextResponse.json({ id: newId, version: 1 }, { status: 201 });
+        const parsed = await readEntryJsonObject(request);
+        if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: parsed.status });
+        const patientId = typeof parsed.body.patientId === 'string' ? parsed.body.patientId.trim() : '';
+        const prepared = prepareEntryCreate(parsed.body, 'web', patientId);
+        if (!prepared.ok) return NextResponse.json({ error: prepared.error }, { status: 400 });
+        const context = auditContextFromSession(session);
+        const result = createEntryOperation({ patientId, id: prepared.id, values: prepared.values,
+            changedFields: prepared.changedFields, mode: 'web', audit: {
+                actorType: context.actorType, actorRef: context.actorRef, sourceSurface: context.sourceSurface,
+                requestId: requestIdFromRequest(request), flags: [`auth:${context.authContext}`],
+            } });
+        return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
         console.error("API POST /entries error:", error);
         return NextResponse.json({ error: 'Create Failed' }, { status: 500 });

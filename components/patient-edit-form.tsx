@@ -28,6 +28,9 @@ type PatientEditorState = {
     error: string | null;
 };
 
+export type PatientEditLoadedRecord = NonNullable<Awaited<ReturnType<typeof db.patients.get>>>
+    & Pick<PatientEditRecord, 'checkups'>;
+
 function initialize(record: PatientEditRecord): PatientEditorState {
     try {
         return { session: new PatientEditSession(record), error: null };
@@ -37,9 +40,10 @@ function initialize(record: PatientEditRecord): PatientEditorState {
 }
 
 /** initialRecord is intentionally consumed once; live-query rerenders are not a rebase. */
-export default function PatientEditForm({ initialRecord, onSaved }: {
+export default function PatientEditForm({ initialRecord, onSaved, onReloaded }: {
     initialRecord: PatientEditRecord;
     onSaved: () => void;
+    onReloaded: (record: PatientEditLoadedRecord) => void;
 }) {
     const [editor, setEditor] = useState<PatientEditorState>(() => initialize(initialRecord));
     const [generation, setGeneration] = useState(0);
@@ -86,11 +90,13 @@ export default function PatientEditForm({ initialRecord, onSaved }: {
             const patient = await db.patients.get(patientId);
             if (!patient || patient.id !== patientId) throw new Error('Scheda non disponibile.');
             const checkups = await db.checkups.query({ patientId }).toArray();
-            const refreshed = initialize({ ...patient, checkups });
+            const record = { ...patient, checkups };
+            const refreshed = initialize(record);
             if (!refreshed.session) throw new Error(refreshed.error ?? 'Snapshot non valido.');
             setEditor(refreshed);
             setResult(null);
             setGeneration(previous => previous + 1);
+            onReloaded(record);
         } catch {
             // Keep the old draft/journal if the reread fails; never reset it first.
             setEditor(current => ({ ...current, error: 'Rilettura non riuscita. Il modulo e il tentativo precedente sono conservati; verifica la sessione e riprova.' }));
@@ -115,7 +121,7 @@ export default function PatientEditForm({ initialRecord, onSaved }: {
                     {!conflict && <button type="button" onClick={() => void save()} disabled={busy} className="mf-btn-secondary">Riprova operazioni residue</button>}
                 </section>
             )}
-            <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 md:px-6">
                 <p className="text-sm">Il modulo conserva i dati dell’apertura. La rilettura richiede una conferma.</p>
                 <button type="button" onClick={() => void reload()} disabled={busy} className="mf-btn-secondary">Rileggi i dati salvati</button>
             </div>

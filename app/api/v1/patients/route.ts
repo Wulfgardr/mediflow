@@ -17,34 +17,8 @@ import {
     listChangedFields,
     requestIdFromRequest,
     withAuditContextMetadata,
-    writeAuditEvent,
+    writeAuditEventInTransaction,
 } from '@/lib/security/audit';
-
-/* @Codex */
-async function recordPatientAuditEvent(
-    request: Request,
-    eventType: Parameters<typeof writeAuditEvent>[0]['eventType'],
-    subjectRef: string,
-    redactedMetadata: Parameters<typeof writeAuditEvent>[0]['redactedMetadata']
-): Promise<void> {
-    try {
-        const session = await requireLocalApiActorSession(request);
-        const context = auditContextFromRequest(request, session);
-        await writeAuditEvent({
-            eventType,
-            outcome: 'success',
-            actorType: context.actorType,
-            actorRef: context.actorRef,
-            subjectType: 'patient',
-            subjectRef,
-            sourceSurface: context.sourceSurface,
-            requestId: requestIdFromRequest(request),
-            redactedMetadata: withAuditContextMetadata(context, redactedMetadata),
-        });
-    } catch (error) {
-        console.error('[MediFlow] Patient audit write failed:', error);
-    }
-}
 
 function toIsoString(value: unknown): string | null {
     if (!value) return null;
@@ -110,6 +84,11 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: normalized.error }, { status: 400 });
         }
 
+        /* @Codex: resolve the host actor before entering the synchronous transaction. */
+        const actorSession = await requireLocalApiActorSession(request);
+        const auditContext = auditContextFromRequest(request, actorSession);
+        const requestId = requestIdFromRequest(request);
+
         dbServer.transaction((tx) => {
             tx.insert(patients).values(normalized.values).run();
 
@@ -120,13 +99,18 @@ export async function POST(request: Request) {
                     assignedAt: new Date(),
                 }).onConflictDoNothing().run();
             }
-        });
-
-        /* @Codex */
-        await recordPatientAuditEvent(request, 'patient.created', normalized.values.id, {
-            changedFields: listChangedFields(body, ['id', 'version']),
-            resourceVersion: 1,
-        });
+            writeAuditEventInTransaction(tx, {
+                eventType: 'patient.created', outcome: 'success',
+                actorType: auditContext.actorType, actorRef: auditContext.actorRef,
+                subjectType: 'patient', subjectRef: normalized.values.id,
+                sourceSurface: auditContext.sourceSurface, requestId,
+                redactedMetadata: withAuditContextMetadata(auditContext, {
+                    changedFields: listChangedFields(normalized.values as Record<string, unknown>,
+                        ['id', 'version', 'createdAt', 'updatedAt']),
+                    resourceVersion: 1,
+                }),
+            });
+        }, { behavior: 'immediate' });
 
         return NextResponse.json({ id: normalized.values.id }, { status: 201 });
     } catch (error) {

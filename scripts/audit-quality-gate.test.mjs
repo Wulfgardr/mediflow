@@ -3,13 +3,262 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import test from 'node:test';
 import ts from 'typescript';
 
-import { validateAuditWriterControlFlow, validateDelegatedRouteAudit, validateLogoutAuditModes } from './audit-quality-gate.mjs';
+import { validateAuditWriterControlFlow, validateDelegatedRouteAudit, validateLogoutAuditModes,
+    validateRequiredPatientUpdateAudit, validateRequiredPatientDeleteAudit, validateRequiredDiaryAudit, validateRequiredTherapyAudit, validateRequiredObservationAudit, validateRequiredCheckupAudit } from './audit-quality-gate.mjs';
 
 const EVENT = 'record.changed';
+
+/* @Codex: real eight-handler roster plus parse-valid negative wiring/order mutations. */
+test('diary required-audit guard follows all eight handlers and rejects detached or bypassed audit', () => {
+    const read = (file) => fs.readFileSync(file, 'utf8');
+    const coreSource = read('lib/entry-write-operation.ts');
+    const bridgeSource = read('lib/network-entry-write.ts');
+    const rows = [
+        ['app/api/entries/route.ts', 'POST', 'web', 'create'],
+        ['app/api/entries/[id]/route.ts', 'PUT', 'web', 'update'],
+        ['app/api/entries/[id]/route.ts', 'DELETE', 'web', 'update'],
+        ['app/api/v1/patients/[id]/entries/route.ts', 'POST', 'v1', 'create'],
+        ['app/api/v1/patients/[id]/entries/[entryId]/route.ts', 'PUT', 'v1', 'update'],
+        ['app/api/v1/patients/[id]/entries/[entryId]/route.ts', 'DELETE', 'v1', 'update'],
+        ['app/api/v1/network/patients/[id]/entries/route.ts', 'POST', 'network', 'create'],
+        ['app/api/v1/network/patients/[id]/entries/[entryId]/route.ts', 'PUT', 'network', 'update'],
+    ];
+    for (const [file, handler, mode, operation] of rows) {
+        const spec = { handler, mode, operation, ownerFile: 'lib/entry-write-operation.ts',
+            ownerName: `${operation}EntryOperation`, serviceExport: `${operation}EntryOperation`,
+            serviceModule: '@/lib/entry-write-operation', bridgeExport: `${operation}NetworkScopedEntry` };
+        const original = { spec, routeSource: read(file), coreSource, bridgeSource };
+        const validate = (patch = {}) => validateRequiredDiaryAudit({ ...original, ...patch });
+        assert.deepEqual(validate(), [], `${mode} ${handler}`);
+        const change = (source, before, after) => {
+            assert.ok(source.includes(before), before);
+            const mutated = source.replaceAll(before, after);
+            assert.equal(ts.createSourceFile('mutant.ts', mutated, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
+                .parseDiagnostics.length, 0);
+            return mutated;
+        };
+        for (const [before, after] of [
+            ["behavior: 'immediate'", "behavior: 'deferred'"],
+            ['transaction((tx)', 'transaction(async (tx)'],
+            ['writeAuditEventInTransaction(tx, {', 'writeAuditEventInTransaction(dbServer, {'],
+            ['writeAuditEventInTransaction(tx, {', 'if (input.audit.actorRef) writeAuditEventInTransaction(tx, {'],
+            ['writeAuditEventInTransaction(tx, {', 'return { status: 200, value: {} }; writeAuditEventInTransaction(tx, {'],
+            ['changes !== 1', 'changes < 0'],
+            ["subjectType: 'entry'", "subjectType: 'patient'"],
+            ["eventType: 'entry.created'", "eventType: 'entry.updated'"],
+            ["? 'entry.deleted' : 'entry.updated'", "? 'entry.updated' : 'entry.deleted'"],
+        ]) {
+            if ((before.includes('entry.created') && operation !== 'create')
+                || (before.startsWith('?') && operation !== 'update')) continue;
+            assert.notDeepEqual(validate({ coreSource: change(coreSource, before, after) }), [],
+                `${mode} ${handler}: ${before}`);
+        }
+        const sourceKey = mode === 'network' ? 'bridgeSource' : 'routeSource';
+        if (operation === 'create') {
+            assert.notDeepEqual(validate({ coreSource: change(coreSource,
+                'const inserted = tx.insert(entries).values(input.values).run();',
+                'const inserted = ({ run: () => ({ changes: 1 }), pending: () => tx.insert(entries).values(input.values).run() }).run();') }), []);
+        }
+        const source = original[sourceKey];
+        assert.notDeepEqual(validate({ [sourceKey]: change(source, `mode: '${mode}'`, "mode: 'unadmitted'") }), []);
+        const callee = mode === 'network' ? spec.bridgeExport : spec.ownerName;
+        assert.notDeepEqual(validate({ routeSource: change(original.routeSource,
+            `${callee}(`, `unapprovedDiaryWrite(`) }), []);
+        if (mode === 'network') assert.notDeepEqual(validate({ bridgeSource: change(bridgeSource,
+            `${spec.ownerName}(`, 'unapprovedDiaryWrite(') }), []);
+    }
+});
+
+/* @Codex: each therapy operation has independent wiring and negative assertions. */
+test('therapy required-audit guard follows all eight handlers and rejects detached or bypassed audit', () => {
+    const read = (file) => fs.readFileSync(file, 'utf8');
+    const coreSource = read('lib/therapy-write-operation.ts');
+    const bridgeSource = read('lib/network-therapy-write.ts');
+    const rows = [
+        ['app/api/therapies/route.ts', 'POST', 'web', 'create'],
+        ['app/api/therapies/[id]/route.ts', 'PUT', 'web', 'update'],
+        ['app/api/therapies/[id]/route.ts', 'DELETE', 'web', 'update'],
+        ['app/api/v1/patients/[id]/therapies/route.ts', 'POST', 'v1', 'create'],
+        ['app/api/v1/patients/[id]/therapies/[therapyId]/route.ts', 'PUT', 'v1', 'update'],
+        ['app/api/v1/patients/[id]/therapies/[therapyId]/route.ts', 'DELETE', 'v1', 'update'],
+        ['app/api/v1/network/patients/[id]/therapies/route.ts', 'POST', 'network', 'create'],
+        ['app/api/v1/network/patients/[id]/therapies/[therapyId]/route.ts', 'PUT', 'network', 'update'],
+    ];
+    for (const [file, handler, mode, operation] of rows) {
+        const spec = { handler, mode, operation, ownerFile: 'lib/therapy-write-operation.ts',
+            ownerName: `${operation}TherapyOperation`, serviceExport: `${operation}TherapyOperation`,
+            serviceModule: '@/lib/therapy-write-operation', bridgeExport: `${operation}NetworkScopedTherapy` };
+        const original = { spec, routeSource: read(file), coreSource, bridgeSource };
+        const validate = (patch = {}) => validateRequiredTherapyAudit({ ...original, ...patch });
+        assert.deepEqual(validate(), [], `${mode} ${handler}`);
+        const change = (source, before, after) => {
+            assert.ok(source.includes(before), before);
+            const mutated = source.replaceAll(before, after);
+            assert.equal(ts.createSourceFile('mutant.ts', mutated, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
+                .parseDiagnostics.length, 0);
+            return mutated;
+        };
+        for (const [before, after] of [
+            ["behavior: 'immediate'", "behavior: 'deferred'"],
+            ['transaction((tx)', 'transaction(async (tx)'],
+            ['writeAuditEventInTransaction(tx, {', 'writeAuditEventInTransaction(dbServer, {'],
+            ['writeAuditEventInTransaction(tx, {', 'if (input.audit.actorRef) writeAuditEventInTransaction(tx, {'],
+            ['writeAuditEventInTransaction(tx, {', 'return { status: 200, value: {} }; writeAuditEventInTransaction(tx, {'],
+            ['changes !== 1', 'changes < 0'],
+            ["subjectType: 'therapy'", "subjectType: 'patient'"],
+            ["eventType: 'therapy.created'", "eventType: 'therapy.updated'"],
+            ["? 'therapy.deleted' : 'therapy.updated'", "? 'therapy.updated' : 'therapy.deleted'"],
+        ]) {
+            if ((before.includes('therapy.created') && operation !== 'create')
+                || (before.startsWith('?') && operation !== 'update')) continue;
+            assert.notDeepEqual(validate({ coreSource: change(coreSource, before, after) }), [],
+                `${mode} ${handler}: ${before}`);
+        }
+        const sourceKey = mode === 'network' ? 'bridgeSource' : 'routeSource';
+        if (operation === 'create') {
+            assert.notDeepEqual(validate({ coreSource: change(coreSource,
+                'const inserted = tx.insert(therapies).values(input.values).run();',
+                'const inserted = ({ run: () => ({ changes: 1 }), pending: () => tx.insert(therapies).values(input.values).run() }).run();') }), []);
+        }
+        const source = original[sourceKey];
+        assert.notDeepEqual(validate({ [sourceKey]: change(source, `mode: '${mode}'`, "mode: 'unadmitted'") }), []);
+        const callee = mode === 'network' ? spec.bridgeExport : spec.ownerName;
+        assert.notDeepEqual(validate({ routeSource: change(original.routeSource,
+            `${callee}(`, `unapprovedTherapyWrite(`) }), []);
+        if (mode === 'network') assert.notDeepEqual(validate({ bridgeSource: change(bridgeSource,
+            `${spec.ownerName}(`, 'unapprovedTherapyWrite(') }), []);
+    }
+});
+
+/* @Codex: each observation operation has independent wiring and negative assertions. */
+test('observation required-audit guard follows all eight handlers and rejects detached or bypassed audit', () => {
+    const read = (file) => fs.readFileSync(file, 'utf8');
+    const coreSource = read('lib/observation-write-operation.ts');
+    const bridgeSource = read('lib/network-observation-write.ts');
+    const rows = [
+        ['app/api/observations/route.ts', 'POST', 'web', 'create'],
+        ['app/api/observations/[id]/route.ts', 'PUT', 'web', 'update'],
+        ['app/api/observations/[id]/route.ts', 'DELETE', 'web', 'update'],
+        ['app/api/v1/patients/[id]/observations/route.ts', 'POST', 'v1', 'create'],
+        ['app/api/v1/patients/[id]/observations/[observationId]/route.ts', 'PUT', 'v1', 'update'],
+        ['app/api/v1/patients/[id]/observations/[observationId]/route.ts', 'DELETE', 'v1', 'update'],
+        ['app/api/v1/network/patients/[id]/observations/route.ts', 'POST', 'network', 'create'],
+        ['app/api/v1/network/patients/[id]/observations/[observationId]/route.ts', 'PUT', 'network', 'update'],
+    ];
+    for (const [file, handler, mode, operation] of rows) {
+        const spec = { handler, mode, operation, ownerFile: 'lib/observation-write-operation.ts',
+            ownerName: `${operation}ObservationOperation`, serviceExport: `${operation}ObservationOperation`,
+            serviceModule: '@/lib/observation-write-operation', bridgeExport: `${operation}NetworkScopedObservation` };
+        const original = { spec, routeSource: read(file), coreSource, bridgeSource };
+        const validate = (patch = {}) => validateRequiredObservationAudit({ ...original, ...patch });
+        assert.deepEqual(validate(), [], `${mode} ${handler}`);
+        const change = (source, before, after) => {
+            assert.ok(source.includes(before), before);
+            const mutated = source.replaceAll(before, after);
+            assert.equal(ts.createSourceFile('mutant.ts', mutated, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
+                .parseDiagnostics.length, 0);
+            return mutated;
+        };
+        for (const [before, after] of [
+            ["behavior: 'immediate'", "behavior: 'deferred'"],
+            ['transaction((tx)', 'transaction(async (tx)'],
+            ['writeAuditEventInTransaction(tx, {', 'writeAuditEventInTransaction(dbServer, {'],
+            ['writeAuditEventInTransaction(tx, {', 'if (input.audit.actorRef) writeAuditEventInTransaction(tx, {'],
+            ['writeAuditEventInTransaction(tx, {', 'return { status: 200, value: {} }; writeAuditEventInTransaction(tx, {'],
+            ['changes !== 1', 'changes < 0'],
+            ["subjectType: 'observation'", "subjectType: 'patient'"],
+            ["eventType: 'observation.created'", "eventType: 'observation.updated'"],
+            ["? 'observation.deleted' : 'observation.updated'", "? 'observation.updated' : 'observation.deleted'"],
+        ]) {
+            if ((before.includes('observation.created') && operation !== 'create')
+                || (before.startsWith('?') && operation !== 'update')) continue;
+            assert.notDeepEqual(validate({ coreSource: change(coreSource, before, after) }), [],
+                `${mode} ${handler}: ${before}`);
+        }
+        const sourceKey = mode === 'network' ? 'bridgeSource' : 'routeSource';
+        if (operation === 'create') {
+            /* @Codex: mutate the actual insert, including its authoritative identity overrides. */
+            const insert = coreSource.match(/const inserted = (tx\.insert\(observations\)[\s\S]*?\.run\(\));/);
+            assert.ok(insert, 'observation create must expose the real insert statement');
+            assert.notDeepEqual(validate({ coreSource: change(coreSource, insert[0],
+                `const inserted = ({ run: () => ({ changes: 1 }), pending: () => ${insert[1]} }).run();`) }), []);
+        }
+        const source = original[sourceKey];
+        assert.notDeepEqual(validate({ [sourceKey]: change(source, `mode: '${mode}'`, "mode: 'unadmitted'") }), []);
+        const callee = mode === 'network' ? spec.bridgeExport : spec.ownerName;
+        assert.notDeepEqual(validate({ routeSource: change(original.routeSource,
+            `${callee}(`, `unapprovedObservationWrite(`) }), []);
+        if (mode === 'network') assert.notDeepEqual(validate({ bridgeSource: change(bridgeSource,
+            `${spec.ownerName}(`, 'unapprovedObservationWrite(') }), []);
+    }
+});
+test('checkup required-audit guard follows all eight handlers and rejects detached or bypassed audit', () => {
+    const read = (file) => fs.readFileSync(file, 'utf8');
+    const coreSource = read('lib/checkup-write-operation.ts');
+    const bridgeSource = read('lib/network-checkup-write.ts');
+    const rows = [
+        ['app/api/checkups/route.ts', 'POST', 'web', 'create'],
+        ['app/api/checkups/[id]/route.ts', 'PUT', 'web', 'update'],
+        ['app/api/checkups/[id]/route.ts', 'DELETE', 'web', 'update'],
+        ['app/api/v1/patients/[id]/checkups/route.ts', 'POST', 'v1', 'create'],
+        ['app/api/v1/patients/[id]/checkups/[checkupId]/route.ts', 'PUT', 'v1', 'update'],
+        ['app/api/v1/patients/[id]/checkups/[checkupId]/route.ts', 'DELETE', 'v1', 'update'],
+        ['app/api/v1/network/patients/[id]/checkups/route.ts', 'POST', 'network', 'create'],
+        ['app/api/v1/network/patients/[id]/checkups/[checkupId]/route.ts', 'PUT', 'network', 'update'],
+    ];
+    for (const [file, handler, mode, operation] of rows) {
+        const spec = { handler, mode, operation, ownerFile: 'lib/checkup-write-operation.ts',
+            ownerName: `${operation}CheckupOperation`, serviceExport: `${operation}CheckupOperation`,
+            serviceModule: '@/lib/checkup-write-operation', bridgeExport: `${operation}NetworkScopedCheckup` };
+        const original = { spec, routeSource: read(file), coreSource, bridgeSource };
+        const validate = (patch = {}) => validateRequiredCheckupAudit({ ...original, ...patch });
+        assert.deepEqual(validate(), [], `${mode} ${handler}`);
+        const change = (source, before, after) => {
+            assert.ok(source.includes(before), before);
+            const mutated = source.replaceAll(before, after);
+            assert.equal(ts.createSourceFile('mutant.ts', mutated, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
+                .parseDiagnostics.length, 0);
+            return mutated;
+        };
+        for (const [before, after] of [
+            ["behavior: 'immediate'", "behavior: 'deferred'"],
+            ['transaction((tx)', 'transaction(async (tx)'],
+            ['writeAuditEventInTransaction(tx, {', 'writeAuditEventInTransaction(dbServer, {'],
+            ['writeAuditEventInTransaction(tx, {', 'if (input.audit.actorRef) writeAuditEventInTransaction(tx, {'],
+            ['writeAuditEventInTransaction(tx, {', 'return { status: 200, value: {} }; writeAuditEventInTransaction(tx, {'],
+            ['changes !== 1', 'changes < 0'],
+            ["subjectType: 'checkup'", "subjectType: 'patient'"],
+            ["eventType: 'checkup.created'", "eventType: 'checkup.updated'"],
+            ["? 'checkup.deleted' : 'checkup.updated'", "? 'checkup.updated' : 'checkup.deleted'"],
+        ]) {
+            if ((before.includes('checkup.created') && operation !== 'create')
+                || (before.startsWith('?') && operation !== 'update')) continue;
+            assert.notDeepEqual(validate({ coreSource: change(coreSource, before, after) }), [],
+                `${mode} ${handler}: ${before}`);
+        }
+        const sourceKey = mode === 'network' ? 'bridgeSource' : 'routeSource';
+        if (operation === 'create') {
+            /* @Codex: mutate the actual insert, including its authoritative identity overrides. */
+            const insert = coreSource.match(/const inserted = (tx\.insert\(checkups\)[\s\S]*?\.run\(\));/);
+            assert.ok(insert, 'checkup create must expose the real insert statement');
+            assert.notDeepEqual(validate({ coreSource: change(coreSource, insert[0],
+                `const inserted = ({ run: () => ({ changes: 1 }), pending: () => ${insert[1]} }).run();`) }), []);
+        }
+        const source = original[sourceKey];
+        assert.notDeepEqual(validate({ [sourceKey]: change(source, `mode: '${mode}'`, "mode: 'unadmitted'") }), []);
+        const callee = mode === 'network' ? spec.bridgeExport : spec.ownerName;
+        assert.notDeepEqual(validate({ routeSource: change(original.routeSource,
+            `${callee}(`, `unapprovedCheckupWrite(`) }), []);
+        if (mode === 'network') assert.notDeepEqual(validate({ bridgeSource: change(bridgeSource,
+            `${spec.ownerName}(`, 'unapprovedCheckupWrite(') }), []);
+    }
+});
+
 const base = {
     fileName: 'synthetic-service.ts',
     ownerName: 'performWrite',
@@ -76,12 +325,13 @@ test('rejects parse-valid unreachable, nested, shadowed, duplicate, and wrong-ev
 
 test('main checks the four real writer contracts and rejects a mutated service', () => {
     const root = process.cwd();
-    const gatePath = path.join(root, 'scripts/audit-quality-gate.mjs');
+    const gatePath = fileURLToPath(new URL('./audit-quality-gate.mjs', import.meta.url));
     const gateSource = fs.readFileSync(gatePath, 'utf8');
     const fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-audit-wiring-'));
     const requiredFiles = [
         ...gateSource.matchAll(/\broute:\s*'([^']+)'/g).map((match) => match[1]),
         ...gateSource.matchAll(/\bownerFile:\s*'([^']+)'/g).map((match) => match[1]),
+        ...gateSource.matchAll(/\bbridgeFile:\s*'([^']+)'/g).map((match) => match[1]),
         'lib/security/audit-db.ts',
         'lib/security/audit.ts',
         'lib/siss-audit.ts',
@@ -784,4 +1034,152 @@ test('PIN guard accepts both canonical channels and rejects retirement/currentne
         assertParseClean('pin-change-service.ts', mutation);
         assert.notDeepEqual(validateAuditWriterControlFlow({ ...config, source: mutation }), [], name);
     }
+});
+
+/* @Codex: synthetic C04 transaction chain, independent of the runtime candidate checkout. */
+test('patient-update audit guard binds the PUT delegate, patient subject and required tx writer', () => {
+    const spec = {
+        handler: 'PUT', serviceModule: '@/lib/patient-update-operation', serviceExport: 'updatePatientOperation',
+        ownerFile: 'lib/patient-update-operation.ts', ownerName: 'updatePatientOperation',
+    };
+    const route = `import { updatePatientOperation } from '@/lib/patient-update-operation';
+        export async function PUT() { const commit = updatePatientOperation({ patientId: 'synthetic' }); return commit; }`;
+    const auditCall = `writeAuditEventInTransaction(tx, {
+            eventType: classifyPatientMutationEvent(existing.isArchived ?? null, input.values.isArchived), outcome: 'success',
+            actorType: input.audit.actorType, actorRef: input.audit.actorRef,
+            subjectType: 'patient', subjectRef: input.patientId,
+            sourceSurface: input.audit.sourceSurface, requestId: input.audit.requestId,
+            redactedMetadata: null,
+        });`;
+    const membership = 'if (input.setPrimaryAmbulatory) upsertPrimaryAmbulatoryMembership(tx, input.patientId);';
+    const core = `import { dbServer } from './db-server';
+        import { patients } from './schema';
+        import { upsertPrimaryAmbulatoryMembership } from './patient-ambulatory-membership';
+        import { classifyPatientMutationEvent, writeAuditEventInTransaction } from './security/audit';
+        export function updatePatientOperation(input) {
+            return dbServer.transaction((tx) => {
+                const existing = { isArchived: false };
+                tx.update(patients).set({}).run();
+                ${membership}
+                ${auditCall}
+                return { status: 200 };
+            }, { behavior: 'immediate' });
+        }`;
+    const audit = `import { auditEvents } from '../schema';
+        function buildAuditEventRow(input) { return input; }
+        export function writeAuditEventInTransaction(tx, input) {
+            const row = buildAuditEventRow(input);
+            const result = tx.insert(auditEvents).values(row).run();
+            if (result.changes !== 1) { throw new Error('synthetic insert failed'); }
+            return 'synthetic-event';
+        }`;
+    const validatePatient = (routeSource = route, coreSource = core, auditSource = audit) => {
+        for (const [file, source] of [['route.ts', routeSource], ['core.ts', coreSource], ['audit.ts', auditSource]]) {
+            assertParseClean(file, source);
+        }
+        return validateRequiredPatientUpdateAudit({ spec, routeSource, coreSource, auditSource });
+    };
+    assert.deepEqual(validatePatient(), []);
+    const mutations = [
+        ['route removes delegate', route.replace("updatePatientOperation({ patientId: 'synthetic' })", '{ status: 200 }'), core, audit],
+        ['route shadows imported delegate', route.replace('const commit =', 'const updatePatientOperation = () => ({ status: 200 }); const commit ='), core, audit],
+        ['core loses required writer', route, core.replace(auditCall, 'void input.audit;'), audit],
+        ['core moves writer outside transaction', route,
+            core.replace(auditCall, '').replace('return dbServer.transaction', `${auditCall.replaceAll('tx,', 'input.tx,')}\n            return dbServer.transaction`), audit],
+        ['core moves membership outside transaction', route,
+            core.replace(membership, '').replace('return dbServer.transaction',
+                `upsertPrimaryAmbulatoryMembership(input.tx, input.patientId); return dbServer.transaction`), audit],
+        ['core conditionally skips required writer', route, core.replace(auditCall, `if (false) { ${auditCall} }`), audit],
+        ['core changes subject', route, core.replace('subjectRef: input.patientId', 'subjectRef: input.otherId'), audit],
+        ['core replaces classifier with literal', route,
+            core.replace('classifyPatientMutationEvent(existing.isArchived ?? null, input.values.isArchived)', "'patient.updated'"), audit],
+        ['core classifies fabricated state', route,
+            core.replace('existing.isArchived ?? null, input.values.isArchived', 'null, false'), audit],
+        ['core imports fake writer', route, core.replace("from './security/audit'", "from './fake-audit'"), audit],
+        ['writer no longer executes insert', route, core, audit.replace('.values(row).run()', '.values(row)')],
+        ['writer ignores failed insert', route, core,
+            audit.replace("if (result.changes !== 1) { throw new Error('synthetic insert failed'); }", 'void result;')],
+    ];
+    for (const [name, routeSource, coreSource, auditSource] of mutations) {
+        assert.notDeepEqual(validatePatient(routeSource, coreSource, auditSource), [], name);
+    }
+});
+
+/* @Codex: C05 DELETE mutations use the frozen real source shape, without modifying runtime files. */
+test('patient-delete audit guard binds both DELETE routes to one tombstone and required tx writer', () => {
+    const core = fs.readFileSync(path.join(process.cwd(), 'lib/patient-delete-operation.ts'), 'utf8');
+    const audit = fs.readFileSync(path.join(process.cwd(), 'lib/security/audit.ts'), 'utf8');
+    const routes = [
+        'app/api/patients/[id]/route.ts',
+        'app/api/v1/patients/[id]/route.ts',
+    ];
+    const spec = {
+        handler: 'DELETE', serviceModule: '@/lib/patient-delete-operation', serviceExport: 'deletePatientOperation',
+        ownerFile: 'lib/patient-delete-operation.ts', ownerName: 'deletePatientOperation', deletionReason: 'web-delete',
+    };
+    const validate = (routeSource, coreSource = core, auditSource = audit, contract = spec) => {
+        for (const [fileName, source] of [['route.ts', routeSource], ['core.ts', coreSource], ['audit.ts', auditSource]]) {
+            assertParseClean(fileName, source);
+        }
+        return validateRequiredPatientDeleteAudit({ spec: contract, routeSource, coreSource, auditSource });
+    };
+    for (const routePath of routes) {
+        const route = fs.readFileSync(path.join(process.cwd(), routePath), 'utf8');
+        const contract = { ...spec, deletionReason: routePath.includes('/v1/') ? 'api-v1-delete' : 'web-delete' };
+        const deleteOffset = route.indexOf('export async function DELETE');
+        assert.notEqual(deleteOffset, -1);
+        const mutateDelete = (before, after) => route.slice(0, deleteOffset)
+            + replaceOnce(route.slice(deleteOffset), before, after);
+        assert.deepEqual(validate(route, core, audit, contract), [], routePath);
+        assert.notDeepEqual(validate(mutateDelete('deletePatientOperation({', 'missingDeleteOperation({'), core, audit, contract), [],
+            `${routePath}: missing delegate`);
+        assert.notDeepEqual(validate(mutateDelete(
+            "if (!parsed.ok) return NextResponse.json({ error: 'Richiesta non valida.' }, { status: 400 });",
+            "if (!parsed.ok) void NextResponse.json({ error: 'Richiesta non valida.' }, { status: 400 });"),
+        core, audit, contract), [], `${routePath}: body-class denial must return`);
+    }
+    const route = fs.readFileSync(path.join(process.cwd(), routes[0]), 'utf8');
+    const auditStart = '        writeAuditEventInTransaction(tx, {';
+    const mutations = [
+        ['missing writer', replaceOnce(core, auditStart, '        missingAuditWriter(tx, {')],
+        ['late writer', replaceOnce(core, auditStart,
+            '        return { status: 200, value: { success: true } };\n        writeAuditEventInTransaction(tx, {')],
+        ['nested writer', replaceOnce(replaceOnce(core, auditStart,
+            '        if (false) { writeAuditEventInTransaction(tx, {'),
+        '        });\n        return { status: 200', '        }); }\n        return { status: 200')],
+        ['wrong transaction', replaceOnce(core, auditStart, '        writeAuditEventInTransaction(input.tx, {')],
+        ['duplicate writer', replaceOnce(core, '        return { status: 200, value: { success: true } };',
+            "        writeAuditEventInTransaction(tx, { eventType: 'patient.deleted' });\n        return { status: 200, value: { success: true } };")],
+        ['wrong event', replaceOnce(core, "eventType: 'patient.deleted'", "eventType: 'patient.updated'")],
+        ['wrong subject', replaceOnce(core, 'subjectRef: input.patientId', 'subjectRef: input.otherId')],
+        ['wrong resource version', replaceOnce(core, 'resourceVersion: input.expectedVersion + 1',
+            'resourceVersion: input.expectedVersion')],
+        ['hard delete', replaceOnce(core, 'tx.update(patients)', 'tx.delete(patients)')],
+        ['wrong builder', replaceOnce(core, 'buildPatientTombstoneValues(input.expectedVersion, input.deletionReason)',
+            'fakeTombstone(input.expectedVersion, input.deletionReason)')],
+        ['CAS version lost', replaceOnce(core, 'eq(patients.version, input.expectedVersion), activePatients()))',
+            'eq(patients.version, input.expectedVersion + 1), activePatients()))')],
+        ['CAS active lost', replaceOnce(core, 'eq(patients.version, input.expectedVersion), activePatients()))',
+            'eq(patients.version, input.expectedVersion)))')],
+        ['CAS predicate OR', replaceOnce(core,
+            '.where(and(eq(patients.id, input.patientId), eq(patients.version, input.expectedVersion), activePatients()))',
+            '.where(or(eq(patients.id, input.patientId), eq(patients.version, input.expectedVersion), activePatients()))')],
+        ['CAS patient id lost', replaceOnce(core,
+            '.where(and(eq(patients.id, input.patientId), eq(patients.version, input.expectedVersion), activePatients()))',
+            '.where(and(eq(patients.version, input.expectedVersion), activePatients()))')],
+        ['CAS wrong patient id', replaceOnce(core,
+            '.where(and(eq(patients.id, input.patientId), eq(patients.version, input.expectedVersion), activePatients()))',
+            '.where(and(eq(patients.id, input.otherId), eq(patients.version, input.expectedVersion), activePatients()))')],
+        ['CAS shadowed and binding', replaceOnce(core,
+            '        const deleted = tx.update(patients)',
+            '        const and = (...conditions) => conditions[0];\n        const deleted = tx.update(patients)')],
+        ['early successful return before audit', replaceOnce(core, auditStart,
+            "        if (input.deletionReason === 'web-delete') return { status: 200, value: { success: true } };\n"
+            + auditStart)],
+        ['conflict builder lost', replaceOnce(core,
+            'buildPatientVersionConflictPayload(input.expectedVersion, input.patientId, current ?? null)', '{}')],
+    ];
+    for (const [name, mutated] of mutations) assert.notDeepEqual(validate(route, mutated), [], name);
+    assert.notDeepEqual(validate(route, core,
+        replaceOnce(audit, 'if (result.changes !== 1) {', 'if (false) {')), [], 'required insert result ignored');
 });

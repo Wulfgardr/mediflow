@@ -112,3 +112,74 @@ test('a checkup conflict leaves the draft visible and offers explicit reread, no
     expect(writes).toHaveLength(1);
     expect(writes[0].body.version).toBe(5);
 });
+
+test('confirmed reread updates page actions, but a later external change still rejects stale DELETE', async ({ page }) => {
+    await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+    const patient = {
+        id: PATIENT_ID, version: 2, firstName: 'Apertura', lastName: 'Editor',
+        taxCode: 'SYNTHETIC0000001', birthDate: '1980-01-01T00:00:00.000Z',
+        address: '', phone: '', monitoringProfile: 'taken_in_charge',
+        diagnoses: [], createdAt: DIAGNOSIS_DATE, updatedAt: DIAGNOSIS_DATE,
+    };
+    const reads: number[] = [];
+    const writes: Write[] = [];
+    await page.route(/\/api\/(patients|checkups)(\/|\?|$)/, async route => {
+        const request = route.request();
+        const path = new URL(request.url()).pathname;
+        const method = request.method();
+        if (method === 'GET') {
+            if (path === `/api/patients/${PATIENT_ID}`) {
+                reads.push(patient.version);
+                return route.fulfill({ json: { ...patient } });
+            }
+            if (path === '/api/patients') return route.fulfill({ json: [{ ...patient }] });
+            if (path === '/api/checkups') return route.fulfill({ json: [] });
+            return route.fulfill({ status: 404, json: { error: 'Synthetic fixture only' } });
+        }
+        const body = request.postDataJSON() as Record<string, unknown>;
+        writes.push({ path, method, body });
+        if (path !== `/api/patients/${PATIENT_ID}` || !['PUT', 'DELETE'].includes(method)) {
+            return route.fulfill({ status: 400, json: { error: 'Unexpected synthetic write' } });
+        }
+        if (body.version !== patient.version) return route.fulfill({ status: 409, json: {
+            code: 'VERSION_CONFLICT', entity: 'patient', recordId: PATIENT_ID,
+            expectedVersion: body.version, currentVersion: patient.version, message: 'Synthetic conflict',
+        } });
+        patient.version += 1;
+        return route.fulfill({ json: { success: true } });
+    });
+
+    await page.goto(`/patients/${PATIENT_ID}/edit`);
+    await expect(page.locator('input[name="firstName"]')).toHaveValue('Apertura');
+    await expect(page.getByTestId('lume-workspace-patient-label')).toContainText('Editor Apertura');
+    await page.locator('input[name="firstName"]').fill('Bozza non salvata');
+    patient.version = 3;
+    patient.firstName = 'Riletto'; // External write deliberately emits no client notification.
+    await page.getByRole('button', { name: 'Aggiorna scheda', exact: true }).click();
+    await expect(page.getByText('Un record è cambiato altrove.', { exact: false })).toBeVisible();
+    expect(writes.map(write => [write.method, write.body.version])).toEqual([['PUT', 2]]);
+    await expect(page.locator('input[name="firstName"]')).toHaveValue('Bozza non salvata');
+
+    const readsBeforeCancel = reads.length;
+    await page.getByRole('button', { name: 'Rileggi i dati salvati', exact: true }).click();
+    await page.getByRole('button', { name: 'Mantieni il modulo', exact: true }).click();
+    await expect(page.locator('input[name="firstName"]')).toHaveValue('Bozza non salvata');
+    expect(reads).toHaveLength(readsBeforeCancel);
+    expect(writes).toHaveLength(1);
+    await expect(page.getByTestId('lume-workspace-patient-label')).toContainText('Editor Apertura');
+
+    await page.getByRole('button', { name: 'Rileggi i dati salvati', exact: true }).click();
+    await page.getByRole('button', { name: 'Abbandona le modifiche residue e rileggi', exact: true }).click();
+    await expect(page.locator('input[name="firstName"]')).toHaveValue('Riletto');
+    await expect(page.getByTestId('lume-workspace-patient-label')).toContainText('Editor Riletto');
+    expect(reads.slice(readsBeforeCancel)).toEqual([3]);
+
+    await page.getByRole('button', { name: 'Elimina', exact: true }).click();
+    patient.version = 4; // A second external write must not be silently rebased or retried.
+    await page.getByRole('dialog', { name: 'Elimina scheda' }).getByRole('textbox').fill('Duplicato sintetico');
+    await page.getByRole('button', { name: 'Sposta nel cestino', exact: true }).click();
+    await expect(page.getByText('Eliminazione non riuscita')).toBeVisible();
+    expect(writes.map(write => [write.method, write.body.version])).toEqual([['PUT', 2], ['DELETE', 3]]);
+    expect(reads.slice(readsBeforeCancel)).toEqual([3]); // The action does not perform an implicit GET.
+    await expect(page).toHaveURL(new RegExp(`/patients/${PATIENT_ID}/edit$`));
+});

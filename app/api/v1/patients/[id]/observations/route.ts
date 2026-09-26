@@ -1,17 +1,17 @@
 /* @Codex */
 import { NextResponse } from 'next/server';
 import { and, desc, eq, gte, isNull, lte } from 'drizzle-orm';
-import { v4 as uuidv4 } from 'uuid';
 import { dbServer } from '@/lib/db-server';
-import { observations, patients } from '@/lib/schema';
+import { observations } from '@/lib/schema';
 import { requireLocalApiToken } from '@/lib/security/local-api-auth';
 import { requireLocalApiActorSession } from '@/lib/security/server-auth';
 import type { ObservationSummary } from '@/lib/api/v1/types';
 /* @Codex */
-import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/security/audit';
+import { auditContextFromRequest, requestIdFromRequest } from '@/lib/security/audit';
 /* @Codex */
 import { normalizeObservationCreateInput } from '@/lib/api-v1-clinical-write-normalization';
-import { activePatients } from '@/lib/patient-lifecycle';
+import { createObservationOperation } from '@/lib/observation-write-operation';
+import { observationChangedFields, observationCreateId, readObservationJsonObject, validateObservationInput } from '@/lib/observation-write-input';
 
 /* @Codex */
 function toIsoString(value: unknown): string | null {
@@ -96,52 +96,25 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
     const authError = requireLocalApiToken(request);
     if (authError) return authError;
-
     try {
-        /* @Codex */
         const auditSession = await requireLocalApiActorSession(request);
         const { id } = await params;
-        const body = await request.json() as Record<string, unknown>;
-
-        const newId = typeof body.id === 'string' ? body.id : uuidv4();
-        const normalized = normalizeObservationCreateInput(body, {
-            id: newId,
-            patientId: id,
+        const parsed = await readObservationJsonObject(request);
+        if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: parsed.status });
+        const shape = validateObservationInput(parsed.body, 'v1', 'create');
+        if (shape) return NextResponse.json({ error: shape.error }, { status: shape.status });
+        const observationId = observationCreateId(parsed.body);
+        const normalized = normalizeObservationCreateInput(parsed.body, { id: observationId, patientId: id });
+        if (!normalized.ok) return NextResponse.json({ error: normalized.error }, { status: 400 });
+        const context = auditContextFromRequest(request, auditSession);
+        const result = createObservationOperation({
+            patientId: id, observationId, values: normalized.values, mode: 'v1',
+            changedFields: observationChangedFields(normalized.values, parsed.body),
+            audit: { actorType: context.actorType, actorRef: context.actorRef,
+                sourceSurface: context.sourceSurface, requestId: requestIdFromRequest(request),
+                flags: [`auth:${context.authContext}`] },
         });
-        if (!normalized.ok) {
-            return NextResponse.json({ error: normalized.error }, { status: 400 });
-        }
-
-        const created = dbServer.transaction((tx) => {
-            const patient = tx.select({ id: patients.id })
-                .from(patients)
-                .where(and(eq(patients.id, id), activePatients()))
-                .get();
-            if (!patient) return false;
-            tx.insert(observations).values(normalized.values).run();
-            return true;
-        });
-        if (!created) {
-            return NextResponse.json({ error: 'Patient not found' }, { status: 404 });
-        }
-
-        /* @Codex */
-        await safeWriteAuditEventFromRequest(
-            request,
-            auditSession,
-            {
-                eventType: 'observation.created',
-                subjectType: 'observation',
-                subjectRef: newId,
-                redactedMetadata: {
-                    changedFields: listChangedFields(body, ['id']),
-                    resourceVersion: 1,
-                },
-            },
-            '[MediFlow] Observation audit write failed:',
-        );
-
-        return NextResponse.json({ id: newId, version: 1 }, { status: 201 });
+        return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
         console.error('API POST /api/v1/patients/[id]/observations error:', error);
         return NextResponse.json({ error: 'Failed to create observation' }, { status: 500 });

@@ -47,7 +47,14 @@ export async function PUT(
         const resolved = await requireNetworkWriteContext(request, NETWORK_OBSERVATION_WRITE_CAPABILITY);
         if (!resolved.ok) return resolved.response;
 
-        const body = await readNativeNetworkJson(request) as Record<string, unknown>;
+        let body: unknown;
+        try { body = await readNativeNetworkJson(request); }
+        catch (error) {
+            const sizeError = jsonBodyTooLargeResponse(error);
+            if (sizeError) return sizeError;
+            if (error instanceof SyntaxError) return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+            throw error;
+        }
         const result = await updateNetworkScopedObservation(
             { ...resolved.context, patientId: id, observationId },
             body,

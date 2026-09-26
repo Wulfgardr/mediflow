@@ -776,7 +776,7 @@ function Toolbar({
       >
         <CircleHelp size={13} aria-hidden="true" />
         Comandi
-        <kbd className={shellStyles.toolChipKbd}>⌘K</kbd>
+        <kbd className={shellStyles.toolChipKbd}>⌘/Ctrl + K</kbd>
       </button>
       <span className={shellStyles.avatarPill}>
         <span className={shellStyles.avatarDot}>{operatorInitials}</span>

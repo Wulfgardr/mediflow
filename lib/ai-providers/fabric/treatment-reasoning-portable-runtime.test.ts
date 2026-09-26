@@ -104,9 +104,41 @@ test('stderr is discarded and bounded; errors never include the raw process outp
     } });
     const ready = await runtime.prepare(); try { await assert.rejects(ready.invoke({ instruction, signal }), runtimeCode('provider_failed')); } finally { ready.close(); }
 });
-test('wall timeout kills the process and awaits close before releasing the slot', async t => {
-    const f = fixture(t); await f.admit(); const runtime = createTreatmentReasoningPortableRuntime({ provisioning: f.service, timeoutMs: 100, spawn: () => fakeChild(null) });
-    const ready = await runtime.prepare(); try { await assert.rejects(ready.invoke({ instruction, signal }), runtimeCode('execution_timeout')); } finally { ready.close(); }
+test('controlled execution deadline kills the child and awaits close before releasing the slot', async t => {
+    const f = fixture(t); await f.admit();
+    // @Codex: isolate the child-termination transition from real filesystem latency.
+    // Real provisioning still runs; separate tests retain real acquisition deadlines.
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    let kills = 0; let launched!: () => void;
+    const started = new Promise<void>(resolve => { launched = resolve; });
+    const child = fakeChild(null, false);
+    child.kill = () => { kills++; return true; };
+    child.stdin.once('finish', launched);
+    const runtime = createTreatmentReasoningPortableRuntime({
+        provisioning: f.service, timeoutMs: 100, spawn: () => child,
+    });
+    const ready = await runtime.prepare();
+    let settled = false;
+    const result = ready.invoke({ instruction, signal }).then(
+        value => { settled = true; return { ok: true as const, value }; },
+        failure => { settled = true; return { ok: false as const, failure }; },
+    );
+    try {
+        await started;
+        t.mock.timers.tick(99); assert.equal(kills, 0);
+        t.mock.timers.tick(1); assert.equal(kills, 1);
+        await new Promise<void>(resolve => setImmediate(resolve));
+        assert.equal(settled, false);
+        await assert.rejects(runtime.prepare(), runtimeCode('runtime_busy'));
+        child.emit('close', null, 'SIGKILL');
+        const outcome = await result;
+        assert.equal(outcome.ok, false);
+        if (!outcome.ok) assert.equal(runtimeCode('execution_timeout')(outcome.failure), true);
+    } finally {
+        child.emit('close', null, 'SIGKILL');
+        await result;
+        ready.close();
+    }
     const next = await runtime.prepare(); next.close();
 });
 test('request cancellation and revocation terminate pending local work', async t => {

@@ -67,3 +67,23 @@ Restano fuori:
 - [ADR 0054](./0054-network-therapy-write-boundary.md)
 - [ADR 0055](./0055-network-checkup-write-boundary.md)
 - [OpenAPI v1](../openapi/mediflow-v1.yaml)
+
+
+## Estensione C05 del 26 settembre 2026 — candidato locale
+
+La creazione e l'aggiornamento ordinari paired conservano capability,
+sessione, scope, cifratura, sistemi di codifica e restore esistenti. L'owner
+specifico include nella stessa transazione sincrona IMMEDIATE scope, paziente
+non cancellato, versione corrente, mutazione esattamente unitaria e audit
+obbligatorio. Il fallimento o l'inserimento ignorato dell'evento annulla la
+mutazione; non resta un audit best-effort successivo al commit.
+
+Il paziente solo archiviato resta ammesso; quello mancante o cancellato
+produce 404 dopo le guardie di ammissione. Non si ripristina implicitamente
+il padre. Il collegamento prestazione-risultato di ADR 0079 rimane solo Web,
+non una capability paired. Il registro di ADR 0082 resta fuori perimetro.
+Le chiavi non supportate, incluso servicePrescriptionItemId anche null,
+producono 400; duplicati ammessi allo scope producono 409 senza replay200.
+Il cap rete rimane invariato. Dettagli e prove sono nella sezione osservazioni di
+[ADR 0015](./0015-audit-taxonomy-minimum-catalog.md). Nessuna qualifica clinica
+o chiusura globale di C05 e dedotta da questo candidato.

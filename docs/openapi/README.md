@@ -129,7 +129,16 @@ Aggiorna la spec:
 
 ## Baseline attuale
 
-La baseline descritta è la versione `1.24.0` del contratto.
+La versione del contratto candidato è `1.29.0`: la coorte osservazioni aggiunge
+409 per identificativo occupato senza replay, audit atomico, padre non
+cancellato e inviluppo specifico. Il collegamento alle prestazioni resta solo
+Web e viene respinto su v1/rete anche se null. I sei ingressi locali hanno un
+nuovo cap di 4.194.304 byte; quello rete rimane invariato. La precedente 1.28.0
+identifica la tranche terapie con le proprie ricevute. Non costituisce una
+pubblicazione o una qualifica clinica. La precedente versione 1.27.0 del diario
+resta identificata dalle sue ricevute. L'incremento C05 documenta anche le
+risposte già esistenti `200` (replay) e `409` della creazione diario paired;
+non introduce un nuovo endpoint o una nuova forma di risposta nel runtime.
 
 Per evitare che il controllo della dimensione si traduca in un troncamento
 silenzioso dei campi, [ADR 0124](../adr/0124-bounded-native-network-json.md)
@@ -140,7 +149,7 @@ trasporto. Queste nuove restrizioni dimensionali non troncano i campi. Il login
 nativo, esterno al perimetro `/api/v1`, applica lo stesso contratto con un limite
 di 64 KiB, come documentato nell’ADR.
 
-Questa baseline pubblicata copre:
+La slice documentata nel candidato copre:
 
 - `GET /api/v1/patients`
 - `GET /api/v1/patients/{id}`
@@ -226,11 +235,26 @@ ad accedere ai suoi dati e a eseguire operazioni:
   `network.replica.write-clinical-diary`, `entries.version`, `409`
   PHI-safe e soft delete via `deletedAt`; hard delete, attachment e campi
   AI/document-derived restano fuori boundary
+  Nel candidato C05, padre attivo e scope sono verificati nella transazione
+  con versione, modifica e audit obbligatorio. Padre eliminato o mancante:
+  404; la sola archiviazione resta ammessa. Il replay create identico mantiene
+  200 idempotente soltanto dopo l'ammissione corrente, senza secondo audit.
+  Le sei mutazioni del diario Web/API locale adottano esplicitamente un nuovo
+  cap di 4 MiB, dopo auth; non e un limite globale delle API locali.
+  Contratto e compatibilita: [ADR 0015](../adr/0015-audit-taxonomy-minimum-catalog.md#estensione-c05-del-26-settembre-2026--diario-clinico-ordinario).
 - `/api/v1/network/patients/{id}/therapies*` pubblica la slice terapie paired:
   capability `network.replica.readonly-therapies` /
   `network.replica.write-therapies`, `therapies.version`, `409` PHI-safe e
   soft delete via `deletedAt`; hard delete remoto e campi AI/document-derived
   restano fuori boundary
+  Il candidato C05 raccoglie scope, padre attivo, versione, mutazione e audit
+  obbligatorio nella stessa transazione; padre mancante/tombstoned404, solo
+  archived ammesso. Create duplicato409, anche payload identico: nessuna
+  idempotenza nuova. Le sei mutazioni terapia Web/v1 introducono un cap locale
+  di 4 MiB dopo i gate; non e una garanzia di compatibilita di tutti i client
+  esterni. Date/timestamp, tombstone Web escluso e restore v1/rete sono distinti
+  in [ADR 0015](../adr/0015-audit-taxonomy-minimum-catalog.md).
+
 - `/api/v1/network/patients/{id}/checkups*` pubblica la slice checkup paired:
   capability `network.replica.readonly-checkups` /
   `network.replica.write-checkups`, `checkups.version`, `409` PHI-safe e

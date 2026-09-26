@@ -31,9 +31,11 @@ cancellati da questa delimitazione, ma nemmeno diventano qualifiche generali.
 Le sezioni sulla `0.8.5` descrivono i propri sorgenti e le proprie prove.
 La pubblicazione corrente è ricostruita nello
 [stato del sistema](./STATE_OF_THE_SYSTEM.md) e lo storico delle versioni nel
-[CHANGELOG](../CHANGELOG.md). La valutazione del deployment clinico resta aperta in
-WUL-688 e il coordinamento generale in [WUL-669](https://linear.app/wulfgardr/issue/WUL-669): una release sorgente
-non chiude l’intero programma né qualifica servizi solo configurati.
+[CHANGELOG](../CHANGELOG.md). La valutazione del deployment clinico resta aperta
+in WUL-685–688. Il coordinamento della consegna sorgente e del passaggio alla
+0.9.0 [WUL-669](https://linear.app/wulfgardr/issue/WUL-669) è concluso dal
+23 settembre, come riletto il 26 settembre 2026: questo non adotta le
+procedure organizzative né qualifica servizi solo configurati.
 
 <!-- @Codex -->
 ## Pianificazione corrente
@@ -41,9 +43,17 @@ non chiude l’intero programma né qualifica servizi solo configurati.
 La [roadmap prodotto](./ROADMAP.md#roadmap-vigente--21-settembre-2026) riporta
 le tappe 0.9.0–1.0 definite nel
 [registro incrementale Linear](https://linear.app/wulfgardr/document/mediflow-incremental-release-ledger-090-to-10-ee0392f27b72).
+La [prima tranche locale del 26 settembre](./analysis/2026-09-26-090-first-tranche.md)
+distingue inventario, correzioni pazienti, audit pilota e prove dal rilascio.
+
 La 0.9.0 consolida il prodotto attuale; servizi condivisi, Rust,
 interoperabilità e distribuzione nativa hanno tappe successive distinte.
 I precedenti rinvii generici alla 1.0 restano storia, non il piano corrente.
+
+La [preparazione Rust/GPUI del 26 settembre](./analysis/2026-09-26-rust-boundary-evaluation.md)
+separa il codec sperimentale dalla futura verticale clinica e dalla scelta
+della shell. [ADR 0137](./adr/0137-rust-boundary-pilot-proposal.md) resta Proposed;
+non sostituisce i prerequisiti 0.9.0/0.9.1 né autorizza una migrazione runtime.
 
 ## Percorsi di lettura
 

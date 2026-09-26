@@ -1,5 +1,6 @@
 /* @Codex */
 import { readNativeNetworkJson, jsonBodyTooLargeResponse } from '@/lib/native-network-json-body';
+import { entryJsonObject } from '@/lib/entry-write-input';
 /* @Codex */
 import { NextResponse } from 'next/server';
 /* @Codex */
@@ -47,7 +48,8 @@ export async function PUT(
         const resolved = await requireNetworkWriteContext(request, NETWORK_ENTRY_WRITE_CAPABILITY);
         if (!resolved.ok) return resolved.response;
 
-        const body = await readNativeNetworkJson(request) as Record<string, unknown>;
+        const body = entryJsonObject(await readNativeNetworkJson(request));
+        if (!body) return NextResponse.json({ error: 'Richiesta non valida.' }, { status: 400 });
         const result = await updateNetworkScopedEntry(
             { ...resolved.context, patientId: id, entryId },
             body,
@@ -57,6 +59,7 @@ export async function PUT(
         /* @Codex */
         const sizeError = jsonBodyTooLargeResponse(error);
         if (sizeError) return sizeError;
+        if (error instanceof SyntaxError) return NextResponse.json({ error: 'Richiesta non valida.' }, { status: 400 });
         console.error('API PUT /api/v1/network/patients/[id]/entries/[entryId] error:', error);
         return NextResponse.json({ error: 'Failed to update entry' }, { status: 500 });
     }

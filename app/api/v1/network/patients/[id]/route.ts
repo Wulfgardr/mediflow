@@ -1,6 +1,8 @@
 /* @Codex */
 import { readNativeNetworkJson, jsonBodyTooLargeResponse } from '@/lib/native-network-json-body';
 /* @Codex */
+import { parsePatientJsonObject } from '@/lib/patient-json-object';
+/* @Codex */
 import { cookies } from 'next/headers';
 /* @Codex */
 import { NextResponse } from 'next/server';
@@ -119,7 +121,9 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         const resolved = await requireNetworkPatientWriteContext(request, id);
         if (!resolved.ok) return resolved.response;
 
-        const body = await readNativeNetworkJson(request) as Record<string, unknown>;
+        const parsed = await parsePatientJsonObject(() => readNativeNetworkJson(request));
+        if (!parsed.ok) return NextResponse.json({ error: 'Richiesta non valida.' }, { status: 400 });
+        const body = parsed.body;
         const result = await updateNetworkScopedPatient(resolved.context, body);
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {

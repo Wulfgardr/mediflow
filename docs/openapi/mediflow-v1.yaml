@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: MediFlow Local API v1
-  version: 1.26.0
+  version: 1.29.0
   summary: Stable patient contract plus executable home-base network slice with explicit pairing review, paired-client auth boundary, ambulatory scope options, scoped remote patient, cross-patient agenda and diary reads, therapy, checkup, observation, and catalog read boundaries, replica planning state, explicit identity summary, and declarative AI runtime summary for the local `/api/v1` surface.
   description: |
     OpenAPI contract for the client-facing local API defined by ADR 0010.
@@ -2289,7 +2289,12 @@ paths:
         a paired client with `network.replica.write-clinical-diary`, an active
         operator session, and the effective ambulatory scope resolved by the
         home-base node. Remote attachment/document-derived writes and AI fields
-        are excluded from this boundary.
+        are excluded from this boundary. Patient admission (not soft-deleted),
+        ambulatory scope, mutation and mandatory audit share one transaction;
+        an audit failure rolls back the entry. An archived-only patient remains
+        eligible. A repeated explicit entry ID with identical content returns
+        200 without a new mutation or audit, after current patient/scope admission;
+        different content returns 409. A missing or soft-deleted parent returns 404.
       security:
         - pairedClientId: []
           pairedClientToken: []
@@ -2311,11 +2316,28 @@ paths:
               createNetworkEntry:
                 value:
                   type: note
-                  title: Diario clinico
+                  title: ENC:dGl0bGVpdg==:dGl0bGVjaXBoZXI=
                   date: '2026-05-02T09:00:00.000Z'
-                  content: Nota preparata dal client paired
+                  content: ENC:Y29udGVudGl2:Y29udGVudGNpcGhlcg==
                   setting: ambulatory
       responses:
+        '200':
+          description: Identical explicit-ID create replay; current admission required and no second audit.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [id, version, idempotent]
+                properties:
+                  id:
+                    type: string
+                  version:
+                    type: integer
+                    minimum: 1
+                  idempotent:
+                    type: boolean
+                    const: true
         '201':
           description: Entry created through the paired boundary.
           content:
@@ -2330,6 +2352,16 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          description: Explicit entry ID conflicts with existing content or identity; no effects.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [error]
+                properties:
+                  error:
+                    type: string
         '413':
           $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
@@ -2389,7 +2421,11 @@ paths:
         the effective ambulatory scope resolved by the home-base node. Hard
         delete, remote attachment/document writes, and AI/document-derived
         fields are excluded; soft delete and restore use `deletedAt` and
-        `deletionReason`.
+        `deletionReason`. Parent admission (not soft-deleted), scope, version,
+        mutation and mandatory audit share one transaction. Missing or soft-deleted
+        parents return 404; archived-only parents remain eligible. Restoring an
+        entry with deletedAt:null does not restore its parent. Audit failure rolls
+        back all entry changes and the version increment.
       security:
         - pairedClientId: []
           pairedClientToken: []
@@ -2417,12 +2453,12 @@ paths:
               updateNetworkEntry:
                 value:
                   version: 2
-                  content: Nota aggiornata dal client paired
+                  content: ENC:dXBkYXRlaXY=:dXBkYXRlY2lwaGVy
               softDeleteNetworkEntry:
                 value:
                   version: 2
                   deletedAt: '2026-05-02T10:00:00.000Z'
-                  deletionReason: duplicate-entry
+                  deletionReason: ENC:ZGVsZXRlaXY=:ZGVsZXRlY2lwaGVy
       responses:
         '200':
           description: Entry updated through the paired boundary.
@@ -2516,7 +2552,14 @@ paths:
         client with `network.replica.write-therapies`, an active operator
         session, and the effective ambulatory scope resolved by the home-base
         node. AI/document-derived fields and client-controlled lifecycle fields
-        are excluded from this boundary.
+        are excluded from this boundary. The body must be a JSON object with
+        only the documented fields. Mutation and mandatory audit share one
+        synchronous transaction; audit failure or an ignored write cannot
+        return success. An explicit occupied id returns 409 without effects,
+        including identical payloads; therapy creation is not idempotent.
+        Scope and active-parent admission precede duplicate disclosure in the
+        same transaction. A missing or soft-deleted parent returns 404; an
+        archived-only parent remains admitted.
       security:
         - pairedClientId: []
           pairedClientToken: []
@@ -2556,6 +2599,12 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          description: The explicit therapy identifier is already occupied; no mutation or audit is added.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '413':
           $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
@@ -2614,7 +2663,13 @@ paths:
         active operator session, and the effective ambulatory scope resolved by
         the home-base node. Remote hard delete, AI fields, and
         document-derived writes are excluded; soft delete and restore use
-        `deletedAt` and `deletionReason`.
+        `deletedAt` and `deletionReason`. Mutation, current-version check,
+        effective scope and mandatory audit share one synchronous transaction.
+        Unknown body fields and non-object JSON are rejected before effects.
+        Audit failure rolls back the therapy change. Parent currentness is
+        checked in the same transaction: a missing or soft-deleted parent
+        returns 404; archived-only is allowed. Restoring a therapy never
+        restores its parent implicitly.
       security:
         - pairedClientId: []
           pairedClientToken: []
@@ -2647,7 +2702,7 @@ paths:
                 value:
                   version: 2
                   deletedAt: '2026-05-02T10:00:00.000Z'
-                  deletionReason: duplicate-therapy
+                  deletionReason: ENC:synthetic:duplicate-therapy
       responses:
         '200':
           description: Therapy updated through the paired boundary.
@@ -2966,7 +3021,11 @@ paths:
         paired client with `network.replica.write-observations`, an active
         operator session, and the effective ambulatory scope resolved by the
         home-base node. AI/document-derived fields and client-controlled
-        lifecycle fields are excluded from this boundary.
+        lifecycle fields are excluded from this boundary. Parent admission,
+        scope, duplicate detection, mutation and mandatory audit share one
+        transaction. Missing or soft-deleted parents return 404; archived-only
+        parents remain eligible. An occupied identifier returns 409 only after
+        admission; no replay200 is introduced. Audit failure rolls back the row.
       security:
         - pairedClientId: []
           pairedClientToken: []
@@ -2994,7 +3053,7 @@ paths:
                   unitCode: 'mm[Hg]'
                   value: 128
                   observedAt: '2026-05-02T09:00:00.000Z'
-                  notes: 'smoke-test'
+                  notes: 'ENC:c3ludGhldGljLWl2:c3ludGhldGljLWNpcGhlcg=='
                   source: 'manual'
       responses:
         '201':
@@ -3011,6 +3070,12 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          description: The observation identifier is already occupied; no mutation or audit is added.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '413':
           $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
@@ -3069,7 +3134,11 @@ paths:
         `network.replica.write-observations`, an active operator session, and
         the effective ambulatory scope resolved by the home-base node. Remote
         hard delete, AI fields, and document-derived writes are excluded; soft
-        delete and restore use `deletedAt` and `deletionReason`.
+        delete and restore use `deletedAt` and `deletionReason`. Parent
+        admission, scope, current version, mutation and mandatory audit share
+        one transaction. Missing or soft-deleted parents return 404; archived-only
+        parents remain eligible. Restoring the observation does not restore its
+        parent. Audit failure rolls back the row and version increment.
       security:
         - pairedClientId: []
           pairedClientToken: []
@@ -3102,7 +3171,7 @@ paths:
                 value:
                   version: 2
                   deletedAt: '2026-05-02T10:00:00.000Z'
-                  deletionReason: duplicate-observation
+                  deletionReason: 'ENC:c3ludGhldGljLWl2:c3ludGhldGljLWNpcGhlcg=='
       responses:
         '200':
           description: Observation updated through the paired boundary.
@@ -5958,7 +6027,10 @@ components:
         Therapy creation payload for paired clients. Server-controlled
         `patientId`, `createdAt`, `updatedAt`, `version`, `deletedAt`, and
         `deletionReason` are rejected. AI/document-derived writes remain outside
-        this boundary.
+        this boundary. Explicit ids must be nonblank strings; omission generates
+        an id. Motivation, when non-null, must be ENC-sealed.
+        Numeric finite dates accepted by the existing normalizer remain a
+        compatibility form; numeric zero is rejected.
       properties:
         id:
           type: string
@@ -6012,11 +6084,13 @@ components:
       description: |
         Partial therapy update payload. At least one field other than `version`
         must be provided. AI/document-derived writes and remote hard delete are
-        rejected by the paired boundary.
+        rejected by the paired boundary. Non-null motivation and deletionReason
+        must be ENC-sealed; client-controlled createdAt/updatedAt are rejected.
       properties:
         version:
           type: integer
           minimum: 1
+          maximum: 9007199254740990
         drugName:
           type: string
         aic:
@@ -6332,7 +6406,11 @@ components:
         `patientId`, `createdAt`, `updatedAt`, `version`, `deletedAt`, and
         `deletionReason` are rejected. AI/document-derived writes remain outside
         this boundary. Observation codes are limited to LOINC and units to UCUM
-        for this first paired slice.
+        for this first paired slice. Unsupported properties are rejected,
+        including the Web-only servicePrescriptionItemId even when null.
+        An explicit id must be a nonblank string; omission generates an id.
+        Non-null notes must be ENC-sealed. Finite numeric dates accepted by
+        the existing normalizer remain a compatibility form; zero is rejected.
       properties:
         id:
           type: string
@@ -6369,8 +6447,15 @@ components:
             - string
             - 'null'
         observedAt:
-          type: string
-          format: date-time
+          description: Date-time string or retained numeric Unix-millisecond compatibility form; zero is invalid.
+          oneOf:
+            - type: string
+              format: date-time
+            - type: number
+              minimum: -8640000000000000
+              maximum: 8640000000000000
+              not:
+                const: 0
         source:
           type:
             - string
@@ -6387,11 +6472,16 @@ components:
       description: |
         Partial observation update payload. At least one field other than
         `version` must be provided. AI/document-derived writes and remote hard
-        delete are rejected by the paired boundary.
+        delete are rejected by the paired boundary. Unsupported properties,
+        including servicePrescriptionItemId and client-controlled timestamps,
+        are rejected. Non-null notes and deletionReason must be ENC-sealed.
+        Applied non-null deletedAt emits observation.deleted; omission and
+        explicit null restore emit observation.updated.
       properties:
         version:
           type: integer
           minimum: 1
+          maximum: 9007199254740990
         codeSystem:
           type: string
           const: LOINC
@@ -6425,8 +6515,15 @@ components:
             - string
             - 'null'
         observedAt:
-          type: string
-          format: date-time
+          description: Date-time string or retained numeric Unix-millisecond compatibility form; zero is invalid.
+          oneOf:
+            - type: string
+              format: date-time
+            - type: number
+              minimum: -8640000000000000
+              maximum: 8640000000000000
+              not:
+                const: 0
         source:
           type:
             - string
@@ -6436,10 +6533,19 @@ components:
             - ai_suggestion
             - null
         deletedAt:
-          type:
-            - string
-            - 'null'
-          format: date-time
+          description: Null or empty string restores; a valid nonzero timestamp applies a tombstone.
+          oneOf:
+            - type: string
+              format: date-time
+              minLength: 1
+            - type: string
+              const: ''
+            - type: 'null'
+            - type: number
+              minimum: -8640000000000000
+              maximum: 8640000000000000
+              not:
+                const: 0
         deletionReason:
           type:
             - string

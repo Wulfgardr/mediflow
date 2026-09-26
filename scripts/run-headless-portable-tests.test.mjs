@@ -1,7 +1,7 @@
 /* @Codex */
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, realpathSync } from 'node:fs';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -52,7 +52,7 @@ test('launches the child with an absolute Node path and an owned synthetic data-
     assert.equal(calls[0].command, process.execPath);
     assert.equal(path.isAbsolute(calls[0].command), true);
     assert.equal(calls[0].options.env.MEDIFLOW_STRIP_TYPES_NODE, process.execPath);
-    assert.equal(calls[0].options.env.MEDIFLOW_DATA_DIR.startsWith(path.join(os.tmpdir(), 'mediflow-headless-portable-')), true);
+    assert.equal(calls[0].options.env.MEDIFLOW_DATA_DIR.startsWith(path.join(realpathSync(os.tmpdir()), 'mediflow-headless-portable-')), true);
     assert.equal(existsSync(calls[0].options.env.MEDIFLOW_DATA_DIR), false);
     assert.equal(calls[0].args[1], '--test');
 });

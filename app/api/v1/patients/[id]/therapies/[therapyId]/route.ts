@@ -11,29 +11,14 @@ import { normalizeTherapyUpdateInput } from '@/lib/api-v1-clinical-write-normali
 /* @Codex */
 import { normalizeTherapyStatus } from '@/lib/status-normalization';
 /* @Codex */
-import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/security/audit';
-import { buildTherapyVersionConflictPayload, parseTherapyExpectedVersion } from '@/lib/therapy-concurrency';
-import { parseClinicalDeleteBody } from '@/lib/api-v1-clinical-lifecycle';
+import { auditContextFromSession, requestIdFromRequest } from '@/lib/security/audit';
+import { updateTherapyOperation } from '@/lib/therapy-write-operation';
+import { parseTherapyDeleteInput, readTherapyJsonObject, safeTherapyExpectedVersion, therapyChangedFields, validateTherapyInput } from '@/lib/therapy-write-input';
 
 function toIsoString(value: unknown): string | null {
     if (!value) return null;
     const date = value instanceof Date ? value : new Date(value as string | number);
     return Number.isNaN(date.getTime()) ? null : date.toISOString();
-}
-
-// WUL-308: PHI-safe snapshot for the 409 version-conflict payload.
-async function selectTherapyConflictSnapshot(patientId: string, therapyId: string) {
-    return await dbServer
-        .select({
-            id: therapies.id,
-            patientId: therapies.patientId,
-            version: therapies.version,
-            updatedAt: therapies.updatedAt,
-            deletedAt: therapies.deletedAt,
-        })
-        .from(therapies)
-        .where(and(eq(therapies.id, therapyId), eq(therapies.patientId, patientId)))
-        .get() ?? null;
 }
 
 export async function GET(
@@ -90,71 +75,30 @@ export async function PUT(
 ) {
     const authError = requireLocalApiToken(request);
     if (authError) return authError;
-
     try {
-        /* @Codex */
         const auditSession = await requireLocalApiActorSession(request);
         const { id, therapyId } = await params;
-        const body = await request.json() as Record<string, unknown>;
-        // WUL-308: child PUTs require optimistic concurrency like the patient PUT.
-        const expectedVersion = parseTherapyExpectedVersion(body.version);
-        if (expectedVersion === null) {
-            return NextResponse.json({ error: 'Version is required' }, { status: 400 });
-        }
-
-        const existing = await dbServer.select({ id: therapies.id }).from(therapies)
-            .where(and(eq(therapies.id, therapyId), eq(therapies.patientId, id)))
-            .get();
-        if (!existing) {
-            return NextResponse.json({ error: 'Not found' }, { status: 404 });
-        }
-
-        const normalized = normalizeTherapyUpdateInput(body);
-        if (!normalized.ok) {
-            return NextResponse.json({ error: normalized.error }, { status: 400 });
-        }
-
-        const updateResult = await dbServer.update(therapies)
-            .set({
-                ...normalized.values,
-                version: expectedVersion + 1,
-            })
-            .where(and(
-                eq(therapies.id, therapyId),
-                eq(therapies.patientId, id),
-                eq(therapies.version, expectedVersion),
-            ))
-            .run();
-
-        if (updateResult.changes === 0) {
-            return NextResponse.json(
-                buildTherapyVersionConflictPayload(
-                    expectedVersion,
-                    therapyId,
-                    await selectTherapyConflictSnapshot(id, therapyId),
-                ),
-                { status: 409 }
-            );
-        }
-
-        /* @Codex */
-        await safeWriteAuditEventFromRequest(
-            request,
-            auditSession,
-            {
-                // WUL-308: a soft-delete via PUT is audited as a deletion, not an update.
-                eventType: normalized.values.deletedAt ? 'therapy.deleted' : 'therapy.updated',
-                subjectType: 'therapy',
-                subjectRef: therapyId,
-                redactedMetadata: {
-                    changedFields: listChangedFields(body, ['version']),
-                    resourceVersion: expectedVersion + 1,
-                },
-            },
-            '[MediFlow] Therapy audit write failed:',
-        );
-
-        return NextResponse.json({ success: true });
+        const parsed = await readTherapyJsonObject(request, 'v1', 'update');
+        if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: parsed.status });
+        const expectedVersion = safeTherapyExpectedVersion(parsed.body.version);
+        if (expectedVersion === null) return NextResponse.json({ error: 'Version is required' }, { status: 400 });
+        /* @Codex: retain v1's 404-before-field-validation wire precedence; the IMMEDIATE core rechecks identity. */
+        const exists = dbServer.select({ id: therapies.id }).from(therapies)
+            .where(and(eq(therapies.id, therapyId), eq(therapies.patientId, id))).get();
+        if (!exists) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+        const shape = validateTherapyInput(parsed.body, 'v1', 'update');
+        if (shape) return NextResponse.json({ error: shape.error }, { status: shape.status });
+        const normalized = normalizeTherapyUpdateInput(parsed.body);
+        if (!normalized.ok) return NextResponse.json({ error: normalized.error }, { status: 400 });
+        const context = auditContextFromSession(auditSession);
+        const result = updateTherapyOperation({
+            patientId: id, therapyId, expectedVersion, values: normalized.values,
+            changedFields: therapyChangedFields(normalized.values, parsed.body), mode: 'v1',
+            audit: { actorType: context.actorType, actorRef: context.actorRef,
+                sourceSurface: context.sourceSurface, requestId: requestIdFromRequest(request),
+                flags: [`auth:${context.authContext}`] },
+        });
+        return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
         console.error('API PUT /api/v1/patients/[id]/therapies/[therapyId] error:', error);
         return NextResponse.json({ error: 'Failed to update therapy' }, { status: 500 });
@@ -168,75 +112,24 @@ export async function DELETE(
 ) {
     const authError = requireLocalApiToken(request);
     if (authError) return authError;
-
     try {
-        /* @Codex */
         const auditSession = await requireLocalApiActorSession(request);
         const { id, therapyId } = await params;
-        // WUL-308: DELETE writes a version-guarded soft-delete tombstone like entries.
-        const parsedBody = await parseClinicalDeleteBody(request);
-        if (!parsedBody.ok) {
-            return NextResponse.json({ error: parsedBody.error }, { status: 400 });
-        }
-        const expectedVersion = parseTherapyExpectedVersion(parsedBody.values.version);
-        if (expectedVersion === null) {
-            return NextResponse.json({ error: 'Version is required' }, { status: 400 });
-        }
-        const normalized = normalizeTherapyUpdateInput({
-            deletedAt: parsedBody.values.deletedAt,
-            deletionReason: parsedBody.values.deletionReason,
+        const parsed = await readTherapyJsonObject(request, 'v1', 'delete');
+        if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: parsed.status });
+        const parsedBody = parseTherapyDeleteInput(parsed.body, 'api-v1-delete');
+        if (!parsedBody.ok) return NextResponse.json({ error: parsedBody.error }, { status: parsedBody.status });
+        const normalized = normalizeTherapyUpdateInput(parsedBody.body);
+        if (!normalized.ok) return NextResponse.json({ error: normalized.error }, { status: 400 });
+        const context = auditContextFromSession(auditSession);
+        const result = updateTherapyOperation({
+            patientId: id, therapyId, expectedVersion: parsedBody.expectedVersion,
+            values: normalized.values, changedFields: ['deletedAt', 'deletionReason'], mode: 'v1',
+            audit: { actorType: context.actorType, actorRef: context.actorRef,
+                sourceSurface: context.sourceSurface, requestId: requestIdFromRequest(request),
+                flags: [`auth:${context.authContext}`] },
         });
-        if (!normalized.ok) {
-            return NextResponse.json({ error: normalized.error }, { status: 400 });
-        }
-
-        const existing = await dbServer.select({ id: therapies.id }).from(therapies)
-            .where(and(eq(therapies.id, therapyId), eq(therapies.patientId, id)))
-            .get();
-        if (!existing) {
-            return NextResponse.json({ error: 'Not found' }, { status: 404 });
-        }
-
-        const updateResult = await dbServer.update(therapies)
-            .set({
-                ...normalized.values,
-                version: expectedVersion + 1,
-            })
-            .where(and(
-                eq(therapies.id, therapyId),
-                eq(therapies.patientId, id),
-                eq(therapies.version, expectedVersion),
-            ))
-            .run();
-
-        if (updateResult.changes === 0) {
-            return NextResponse.json(
-                buildTherapyVersionConflictPayload(
-                    expectedVersion,
-                    therapyId,
-                    await selectTherapyConflictSnapshot(id, therapyId),
-                ),
-                { status: 409 }
-            );
-        }
-
-        /* @Codex */
-        await safeWriteAuditEventFromRequest(
-            request,
-            auditSession,
-            {
-                eventType: 'therapy.deleted',
-                subjectType: 'therapy',
-                subjectRef: therapyId,
-                redactedMetadata: {
-                    changedFields: ['deletedAt', 'deletionReason'],
-                    resourceVersion: expectedVersion + 1,
-                },
-            },
-            '[MediFlow] Therapy audit write failed:',
-        );
-
-        return NextResponse.json({ success: true });
+        return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
         console.error('API DELETE /api/v1/patients/[id]/therapies/[therapyId] error:', error);
         return NextResponse.json({ error: 'Failed to delete therapy' }, { status: 500 });

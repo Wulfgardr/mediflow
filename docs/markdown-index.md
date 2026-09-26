@@ -15,8 +15,15 @@ soltanto alcuni degli ingressi; qui sono censiti i `.md` tracciati, con una
 breve indicazione d’uso.
 
 La mappa precedente era aggiornata al 2026-09-08. Revisione editoriale:
-2026-09-20. Le voci storiche conservano date, conteggi, revisioni e limiti:
+2026-09-26. Le voci storiche conservano date, conteggi, revisioni e limiti:
 la data di questo indice non rinnova le prove cui rimandano.
+
+## Preparazione indipendente delle future 0.9.x
+
+| File | Scopo | Quando consultarlo |
+| --- | --- | --- |
+| [Tranche indipendente 0.9.x](./analysis/2026-09-26-09x-independent-development.md) | Codice sintetico, demo, prove e prerequisiti delle patch successive. | Per riprodurre e riesaminare i candidati senza confonderli con il core 0.9.0. |
+| [Delta regolatorio futuro](./analysis/2026-09-26-09x-regulatory-delta.md) | Matrice candidata, fonti datate e responsabilità aperte WUL-738. | Prima di ampliare finalità, distribuzione o trattamento; non qualifica un deployment. |
 
 ## Ingresso progressivo e candidatura
 
@@ -26,12 +33,15 @@ versione o risalire alla provenienza di un’interfaccia.
 
 | File | Scopo | Quando consultarlo |
 | --- | --- | --- |
+| [analysis/2026-09-26-rust-boundary-evaluation.md](./analysis/2026-09-26-rust-boundary-evaluation.md) | Preparazione WUL-706, prerequisiti, esperimento codec e confronto GPUI/Tauri/SwiftUI. | Prima della decisione Rust 0.9.2 o della valutazione shell 0.9.6. |
+| [adr/0137-rust-boundary-pilot-proposal.md](./adr/0137-rust-boundary-pilot-proposal.md) | ADR Proposed: confine Rust condizionato, IPC/FFI, protocollo e rollback. | Per riesaminare la proposta, senza inferire accettazione o runtime. |
 | [start-here.md](./start-here.md) | Esigenza ambulatoriale, uso senza AI e tre livelli di approfondimento. | Primo accesso al progetto. |
 | [release-085-readiness.md](./release-085-readiness.md) | Evidenze runtime, gate aperti, account Apple e promozione. | Prima di presentare o distribuire la 0.8.5. |
 | [getmediflow-editorial-proposal.md](./getmediflow-editorial-proposal.md) | Ragioni del racconto pubblico e rapporto tra sito, documentazione e runtime. | Revisione del racconto pubblico. |
 | [design/2026-09-05-086-runtime-twin.md](./design/2026-09-05-086-runtime-twin.md) | Gemello web sintetico 0.8.6, copertura, confronto visuale e launcher locale. | Esplorazione e verifica del candidato WUL-676. |
 | [design/2026-09-06-breccia-apple-reference.md](./design/2026-09-06-breccia-apple-reference.md) | Criteri ricavati da testo e fotogrammi Breccia, fonti e adattamenti Apple. | Prima di progettare o rifinire le app iPhone, iPad e Mac. |
 | [design/2026-09-06-086-macos-redesign.md](./design/2026-09-06-086-macos-redesign.md) | Proposta Mac con una sola lista laterale, gerarchia documentale e prove locali. | Revisione del redesign successivo alla prima rifinitura Apple 0.8.6. |
+| [analysis/2026-09-26-090-first-tranche.md](./analysis/2026-09-26-090-first-tranche.md) | Prima tranche locale 0.9.0: inventario, aggiornamento paziente atomico, audit pilota e riparazioni dei test. | Per distinguere candidati verificati, limiti e lavoro ancora aperto dalla release. |
 
 ## 📚 Come usare questo indice
 
@@ -185,6 +195,7 @@ contratti e nella valutazione competente del deployment.
 | File | Scopo | Quando consultarlo |
 | --- | --- | --- |
 | [docs/ROADMAP.md](./ROADMAP.md) | Roadmap prodotto canonica. | Per direzione prodotto/release narrative. |
+| [docs/analysis/2026-09-26-09x-preparation.md](./analysis/2026-09-26-09x-preparation.md) | Preparazione secondaria 0.9.1–0.9.7: raccordo con il consolidamento, sequenza del pilota e casi sintetici da verificare. | Per preparare le tappe successive senza duplicare la 0.9.0 o anticiparne i gate. |
 | [docs/product_roadmap.md](./product_roadmap.md) | Roadmap storica (deprecata). | Solo per contesto storico. |
 | [docs/FAQ.md](./FAQ.md) | FAQ sintetiche pubbliche: stato attuale del prodotto, boundary dichiarati e orientamento rapido. | Per onboarding rapido o lettura pubblica del progetto. |
 | [docs/COMPLIANCE.md](./COMPLIANCE.md) | Quadro compliance GDPR/FHIR e interoperabilità. | Per requisiti normativi e policy operative. |

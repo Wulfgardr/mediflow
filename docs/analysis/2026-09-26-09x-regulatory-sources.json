@@ -1,0 +1,81 @@
+{
+  "schemaVersion": "mediflow.regulatory-delta-sources.v1",
+  "issue": "WUL-738",
+  "retrievedAt": "2026-09-26T06:23:31Z",
+  "status": "RESEARCH_PENDING_COMPETENT_REVIEW",
+  "sources": [
+    {
+      "key": "ai_act",
+      "title": "Regulation (EU) 2024/1689 (Artificial Intelligence Act)",
+      "kind": "Binding regulation",
+      "version": "02024R1689-20260727",
+      "urls": [
+        "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02024R1689-20260727",
+        "https://eur-lex.europa.eu/legal-content/EN/TXT/PDF/?uri=CELEX:32026R1744"
+      ],
+      "retrievedAt": "2026-09-26",
+      "limitations": "EUR-Lex states consolidated text is a documentation tool without legal effect; the Official Journal version is authentic."
+    },
+    {
+      "key": "gdpr",
+      "title": "Regulation (EU) 2016/679 (General Data Protection Regulation)",
+      "kind": "Binding regulation",
+      "version": "02016R0679-20160504",
+      "urls": [
+        "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02016R0679-20160504",
+        "https://eur-lex.europa.eu/legal-content/EN/ALL/?uri=LEGISSUM:310401_2",
+        "https://eur-lex.europa.eu/legal-content/EN/TXT/PDF/?uri=CELEX:32025R2518"
+      ],
+      "retrievedAt": "2026-09-26",
+      "limitations": "EUR-Lex search exposes consolidated CELEX 02016R0679-20160504 and the 2018 corrigendum. EUR-Lex GDPR summary, updated 2026-03-24, says successive amendments have been incorporated and that the consolidated text is documentary only. No later-dated consolidated GDPR CELEX version was found in this readback; exact consolidation coverage remains to reconcile."
+    },
+    {
+      "key": "ehds",
+      "title": "Regulation (EU) 2025/327 on the European Health Data Space",
+      "kind": "Binding regulation",
+      "version": "2025-03-05",
+      "urls": [
+        "https://eur-lex.europa.eu/legal-content/EN/ALL/?uri=CELEX:32025R0327",
+        "https://eur-lex.europa.eu/legal-content/EN/LSU/?uri=OJ:L_202500327"
+      ],
+      "retrievedAt": "2026-09-26",
+      "limitations": "No separate consolidated version was listed in the EUR-Lex record read during this retrieval."
+    },
+    {
+      "key": "cra",
+      "title": "Regulation (EU) 2024/2847 (Cyber Resilience Act)",
+      "kind": "Binding regulation",
+      "version": "02024R2847-20241120",
+      "urls": [
+        "https://eur-lex.europa.eu/legal-content/EN/TXT/PDF/?uri=OJ:L_202402847",
+        "https://eur-lex.europa.eu/eli/reg/2024/2847/corrigendum/2025-07-02/oj/eng",
+        "https://eur-lex.europa.eu/eli/reg/2024/2847/corrigendum/2025-10-17/oj/eng"
+      ],
+      "retrievedAt": "2026-09-26",
+      "limitations": "Applicability and competent review not performed."
+    },
+    {
+      "key": "mdcg_2019_11_rev1",
+      "title": "MDCG 2019-11 rev.1 — Guidance on Qualification and Classification of Software under MDR and IVDR",
+      "kind": "Non-binding regulator-endorsed guidance; not a binding legal act and not the European Commission's official position",
+      "version": "2025-06",
+      "urls": [
+        "https://health.ec.europa.eu/document/download/b45335c5-1679-4c71-a91c-fc7a4d37f12b_en?filename=mdcg_2019_11_en.pdf",
+        "https://health.ec.europa.eu/latest-updates/update-mdcg-2019-11-rev1-qualification-and-classification-software-regulation-eu-2017745-and-2025-06-17_en",
+        "https://health.ec.europa.eu/medical-devices-sector/new-regulations/guidance-mdcg-endorsed-documents-and-other-guidance_en"
+      ],
+      "retrievedAt": "2026-09-26",
+      "limitations": "Applicability and competent review not performed."
+    }
+  ],
+  "openReconciliation": [
+    "GDPR consolidation coverage after 2018 corrigendum",
+    "CRA consolidation, 2025 corrigenda and EHDS amendment at provision level",
+    "No module classification or institutional mandate established"
+  ],
+  "coordinatorChecks": [
+    "AI Act current consolidation 2026-07-27, amending act2026/1744, Articles4/113 read",
+    "MDCG2019-11rev1 officialPDF retrieved",
+    "Direct GDPR/CRA consolidated read returned browser verification; do not convert source collection into full legal review"
+  ]
+}
