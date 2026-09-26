@@ -313,3 +313,41 @@ sono conservati localmente nel run `090-start-20260926`, fuori da Git. I limiti
 dell'account sono condivisi e non misurano il consumo di questa tranche.
 Il checkpoint concordato è alle 09:00 locali; l'orario del reset odierno non
 è noto e non è stato dedotto dal solo reset settimanale esposto dal tool.
+
+
+## Milestone browser del 26 settembre, dopo il checkpoint delle 09:00
+
+Verificato il percorso Web con Chromium 1440×960, Node 24.18.0, Next Webpack,
+route HTTP e SQLite reali su una directory sintetica dedicata. Il percorso
+apre la scheda, modifica e salva, rilegge il dato persistito, simula una
+modifica concorrente e verifica il rifiuto con bozza conservata. Dopo
+rilettura esplicitamente confermata, elimina la scheda, torna alla lista
+e ne verifica l'assenza dal percorso ordinario. La riga rimane nel database
+con versione incrementata e un solo evento di eliminazione.
+
+La prova ha trovato e corretto un difetto UI: la rilettura aggiornava il
+modulo, ma non il record usato dalle azioni della pagina. La correzione
+trasmette alla pagina lo stesso record validato; non introduce una nuova
+lettura nelle azioni, un retry con versione fresca o un aggiornamento
+automatico della bozza. Resta invariato il comportamento per cui una
+notifica live con un record più recente aggiorna intestazione e azioni,
+mentre la bozza conserva il proprio snapshot.
+
+Prove locali: percorso reale 1/1; regressioni browser del modulo 4/4,
+comprese conferma annullata e seconda modifica esterna non notificata
+che mantiene DELETE obsoleto e rifiutato; lint, typecheck, build,
+never-regress e claims superati. Review indipendente Astra Low sul delta
+UI, implementazione Sol Medium. Le prove precedenti delle transazioni
+e dell'audit restano valide: i relativi file runtime non sono cambiati.
+
+I tentativi precedenti restano conservati: correzioni di selettori e
+harness distinte dal difetto reale. Le risposte 409 del conflitto e le
+letture 404 successive all'eliminazione sono riconciliate con le richieste
+e lo stato del database; nessun errore JavaScript della pagina né
+richiesta esterna osservati. Il controllo è sul Web locale, non sui client
+nativi o sull'ammissione clinica, e non chiude globalmente C03/C04/C05.
+
+Le ricevute locali sono in `.codex/090-start-20260926/browser-reread-fix/`;
+screenshot, trace, configurazione, ambiente e osservazioni del browser
+sono conservati fuori da Git nel dossier `mediflow-090-browser-milestone`.
+Il precedente snapshot della prima tranche è conservato immutato.
