@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "mediflow.synthetic_followup.fixture.v1",
+  "workflow": "exam_report_review",
+  "patientRef": "synthetic-patient-A",
+  "now": "2026-03-29T04:30:00+02:00",
+  "dueAt": "2026-03-29T03:30:00+02:00",
+  "reminderDismissed": true,
+  "cancelled": false,
+  "ownership": { "ownerRef": "synthetic-clinician-A", "acknowledgedBy": "synthetic-clinician-A", "handoff": null },
+  "expectedSourceVersions": {
+    "synthetic-request": 1,
+    "synthetic-booking": 1,
+    "synthetic-performance": 1,
+    "synthetic-report": 2
+  },
+  "events": [
+    { "eventId": "synthetic-event-planned", "stage": "planned", "occurredAt": "2026-03-27T09:00:00+01:00", "ownerRef": "synthetic-clinician-A", "source": { "ref": "synthetic-request", "subjectRef": "synthetic-patient-A", "date": "2026-03-27T09:00:00+01:00", "version": 1 } },
+    { "eventId": "synthetic-event-scheduled", "stage": "scheduled", "occurredAt": "2026-03-27T10:00:00+01:00", "ownerRef": "synthetic-clinician-A", "source": { "ref": "synthetic-booking", "subjectRef": "synthetic-patient-A", "date": "2026-03-27T10:00:00+01:00", "version": 1 } },
+    { "eventId": "synthetic-event-performed", "stage": "performed", "occurredAt": "2026-03-29T01:30:00+01:00", "ownerRef": "synthetic-clinician-A", "source": { "ref": "synthetic-performance", "subjectRef": "synthetic-patient-A", "date": "2026-03-29T01:30:00+01:00", "version": 1 } },
+    { "eventId": "synthetic-event-result", "stage": "result_received", "occurredAt": "2026-03-29T03:10:00+02:00", "ownerRef": "synthetic-clinician-A", "source": { "ref": "synthetic-report", "subjectRef": "synthetic-patient-A", "date": "2026-03-29T03:10:00+02:00", "version": 2 } }
+  ]
+}

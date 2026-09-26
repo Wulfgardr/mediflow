@@ -18,6 +18,13 @@ La mappa precedente era aggiornata al 2026-09-08. Revisione editoriale:
 2026-09-26. Le voci storiche conservano date, conteggi, revisioni e limiti:
 la data di questo indice non rinnova le prove cui rimandano.
 
+## Preparazione indipendente delle future 0.9.x
+
+| File | Scopo | Quando consultarlo |
+| --- | --- | --- |
+| [Tranche indipendente 0.9.x](./analysis/2026-09-26-09x-independent-development.md) | Codice sintetico, demo, prove e prerequisiti delle patch successive. | Per riprodurre e riesaminare i candidati senza confonderli con il core 0.9.0. |
+| [Delta regolatorio futuro](./analysis/2026-09-26-09x-regulatory-delta.md) | Matrice candidata, fonti datate e responsabilità aperte WUL-738. | Prima di ampliare finalità, distribuzione o trattamento; non qualifica un deployment. |
+
 ## Ingresso progressivo e candidatura
 
 Il primo percorso spiega il lavoro senza AI e le ragioni delle scelte.

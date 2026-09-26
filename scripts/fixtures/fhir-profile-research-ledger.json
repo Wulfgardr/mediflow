@@ -1,0 +1,202 @@
+{
+  "schemaVersion": "mediflow.fhir-profile-research.v1",
+  "issue": "WUL-744",
+  "retrievedOn": "2026-09-26",
+  "baselineCommit": "6c212221a98f9b8e45cc1d243226d0adb41770bd",
+  "purpose": "Public-source research; not a production interoperability contract or conformance assertion",
+  "sources": [
+    {
+      "id": "fhir-r4",
+      "url": "https://hl7.org/fhir/R4/",
+      "retrievedAt": "2026-09-26T06:09:00.398780+00:00",
+      "resolvedUrl": "https://hl7.org/fhir/R4/",
+      "status": 200,
+      "bytes": 19815,
+      "sha256": "e6e6c88cce751664da1f53d0e17972d4224800749ab3d7f80473bc998a9b1b88"
+    },
+    {
+      "id": "italia-portal",
+      "url": "https://www.hl7.it/fhir/",
+      "retrievedAt": "2026-09-26T06:09:00.888476+00:00",
+      "resolvedUrl": "https://www.hl7.it/fhir/",
+      "status": 200,
+      "bytes": 58299,
+      "sha256": "f575b237422e3dc4c60083ed361dbf8c492e570d1412e96c02f8c10007e18053"
+    },
+    {
+      "id": "itcore-0.2.0",
+      "url": "https://www.hl7.it/fhir/core/0.2.0/",
+      "retrievedAt": "2026-09-26T06:09:00.976398+00:00",
+      "resolvedUrl": "https://www.hl7.it/fhir/core/0.2.0/",
+      "status": 200,
+      "bytes": 38912,
+      "sha256": "aca910e30e07ef78c76f63055e09c70ac2a2e7e6a9df2d2576c91ccb37475fbe"
+    },
+    {
+      "id": "fse-retirement",
+      "url": "https://raw.githubusercontent.com/ministero-salute/it-fse-accreditamento/main/README.md",
+      "retrievedAt": "2026-09-26T06:09:01.339882+00:00",
+      "resolvedUrl": "https://raw.githubusercontent.com/ministero-salute/it-fse-accreditamento/main/README.md",
+      "status": 200,
+      "bytes": 10495,
+      "sha256": "4c7413b6713982b9663d836029c32d0c043890adf224a8306e440207d0ef0352"
+    },
+    {
+      "id": "smart-current",
+      "url": "https://hl7.org/fhir/smart-app-launch/",
+      "retrievedAt": "2026-09-26T06:09:59.879469+00:00",
+      "resolvedUrl": "https://hl7.org/fhir/smart-app-launch/",
+      "status": 200,
+      "bytes": 40410,
+      "sha256": "74f0778857be28b11dc7ae139bc1b429668b1519b1374913fbd8ed04b15475a2"
+    },
+    {
+      "id": "smart-history",
+      "url": "https://hl7.org/fhir/smart-app-launch/package-list.json",
+      "retrievedAt": "2026-09-26T06:10:00.233647+00:00",
+      "resolvedUrl": "https://hl7.org/fhir/smart-app-launch/package-list.json",
+      "status": 200,
+      "bytes": 6332,
+      "sha256": "af48b829c85137b4230f96d23575f0791aad6fe7a499cc165ebc4916ff36336e"
+    },
+    {
+      "id": "itcore-guide",
+      "url": "https://www.hl7.it/fhir/core/0.2.0/ImplementationGuide-hl7.fhir.it.core.json",
+      "retrievedAt": "2026-09-26T06:10:00.380419+00:00",
+      "resolvedUrl": "https://www.hl7.it/fhir/core/0.2.0/ImplementationGuide-hl7.fhir.it.core.json",
+      "status": 200,
+      "bytes": 56987,
+      "sha256": "1ab0c6fe0381dc54e8c8e9bfba1537e13b7a0a13d720e62db81d513e008e5e4a"
+    },
+    {
+      "id": "smart-permanent",
+      "url": "https://hl7.org/fhir/smart-app-launch/STU2.2/",
+      "retrievedAt": "2026-09-26T06:18:21.143117+00:00",
+      "bytes": 40424,
+      "sha256": "11bd4b6f704067cea443fea401b1dda505ff966bdaebd4e0a80f66b342023e90"
+    },
+    {
+      "id": "ips-history",
+      "url": "https://hl7.org/fhir/uv/ips/package-list.json",
+      "retrievedAt": "2026-09-26T06:18:21.508913+00:00",
+      "bytes": 5889,
+      "sha256": "2ca01838239a89f9688ea6e202c694e8b2eefbdd39cfe9c9faa7b53903e9f3b2"
+    },
+    {
+      "id": "ips-current",
+      "url": "https://hl7.org/fhir/uv/ips/",
+      "retrievedAt": "2026-09-26T06:18:21.860658+00:00",
+      "bytes": 787,
+      "sha256": "81c391eaa9d41ef4d6936e536d4d4c07d2d976b30b6e8d832d569d627c2c37d0"
+    }
+  ],
+  "candidates": [
+    {
+      "id": "fhir-r4",
+      "version": "4.0.1",
+      "url": "https://hl7.org/fhir/R4/",
+      "state": "EXISTING_BASE_CONTRACT",
+      "scope": "Generic R4 only; reuse ADR 0081 and original validator lock"
+    },
+    {
+      "id": "smart-app-launch",
+      "version": "2.2.0",
+      "url": "https://hl7.org/fhir/smart-app-launch/STU2.2/",
+      "publicationDate": "2024-04-30",
+      "state": "PUBLISHED_SOURCE_IDENTIFIED",
+      "scope": "Authentication, launch context and scopes remain unimplemented/unqualified by this research; package dependencies not added to the R4 lock"
+    },
+    {
+      "id": "ips",
+      "version": "2.0.1",
+      "url": "https://hl7.org/fhir/uv/ips/2.0.1/",
+      "publicationDate": "2026-06-19",
+      "state": "PUBLISHED_SOURCE_IDENTIFIED",
+      "scope": "International Patient Summary candidate only; distinct from Italian patient summary and FSE submission"
+    },
+    {
+      "id": "itcore",
+      "version": "0.2.0",
+      "url": "https://www.hl7.it/fhir/core/0.2.0/",
+      "canonical": "http://hl7.it/fhir/itcore/ImplementationGuide/hl7.fhir.it.core",
+      "state": "HOLD_PUBLICATION_STATUS_CONFLICT",
+      "portalDate": "2026-05-20",
+      "artifactStatus": "draft",
+      "artifactDate": "2026-07-30T12:46:13+02:00",
+      "scope": "Portal lists a publication; versioned guide and ImplementationGuide declare draft/local development. A competent interoperability owner must reconcile the intended release before freezing an Italian overlay"
+    },
+    {
+      "id": "fse-accreditamento",
+      "url": "https://github.com/ministero-salute/it-fse-accreditamento/blob/main/README.md",
+      "state": "HOLD_REPLACEMENT_PROCESS_UNRESOLVED",
+      "observedNoticeDate": "2026-07-14",
+      "scope": "Old repository announces retirement and a replacement; no endpoint, credential, accreditation or institutional access established here"
+    }
+  ],
+  "artifactEvidence": {
+    "lockPath": "contracts/fhir/validator-lock.v1.json",
+    "lockSha256": "1ec60d7a13f7f8b50c8a074705577b5689fd072df850fdb9d8812cd18be77973",
+    "result": "ARTIFACT_BYTES_VERIFIED",
+    "matchingArtifacts": 11,
+    "artifactExecution": "EXECUTED_TWO_SYNTHETIC_R4_PATIENT_CONTROLS",
+    "javaObserved": "Temurin17.0.20.1+1 arm64 isolated task cache; existing system25unchanged",
+    "javaRequiredByLock": 17,
+    "limit": "Byte identity of11lockedartifacts and2Patient controls checked. Valid:0error/0warning; invalidgender:2errors. Exported Bundle v2, IPS, Italian profiles and target ingestion NOT_RUN. Validator reports attempted latest-package discovery and uses locked local cache; process networking denied.",
+    "java17Receipt": {
+      "version": "jdk-17.0.20.1+1",
+      "retrievedAt": "2026-09-26T06:41:13.329829+00:00",
+      "url": "https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.20.1%2B1/OpenJDK17U-jdk_aarch64_mac_hotspot_17.0.20.1_1.tar.gz",
+      "checksumUrl": "https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.20.1%2B1/OpenJDK17U-jdk_aarch64_mac_hotspot_17.0.20.1_1.tar.gz.sha256.txt",
+      "sha256": "196d13ba5f10414bef7f6a05a9b3f00edacb18ebacef2b99485db9e2ee18f0e8",
+      "bytes": 185851019,
+      "scope": "isolated task cache; no system or shell configuration changed"
+    },
+    "networkDenial": "sandbox-exec deny network*; same loopback probe CONNECTED outside and errno1 inside",
+    "smokeResults": {
+      "valid": {
+        "resourceType": "OperationOutcome",
+        "severities": [
+          "information"
+        ],
+        "inputSha256": "65ead56f921bccca32ed720acaeec101dfa5ab6cf5074722079d2a09528c8301",
+        "outcomeSha256": "3fa428f7a43439983554ac96752d1204dcf293a378bd5099b653b25960b73523"
+      },
+      "invalid": {
+        "resourceType": "OperationOutcome",
+        "severities": [
+          "error",
+          "error"
+        ],
+        "inputSha256": "cf522987cd24676409b595a1e1a4224364bb23407907e82d6c7189a07f53e1ae",
+        "outcomeSha256": "d7e0e913f32dbae15c6495bb8d9e5471b5a9d7a2c0229431ecedf90e5978e97f"
+      }
+    }
+  },
+  "nextEvidence": [
+    {
+      "topic": "terminology",
+      "required": "Exact code-system/value-set version, binding strength, membership/units and license/redistribution evidence per exported field",
+      "state": "HOLD_MAPPING_AND_REVIEW"
+    },
+    {
+      "topic": "generic R4 conformance",
+      "required": "Accepted source-faithful export contract and exported synthetic Bundle on same candidate; smoke only proves validator accepts/rejects the two standalone Patient controls",
+      "state": "NOT_RUN_EXPORTED_BUNDLE"
+    },
+    {
+      "topic": "SMART",
+      "required": "Named server/scope profile, token custody and negative authorization cases after accepted service boundary",
+      "state": "NOT_RUN"
+    },
+    {
+      "topic": "Italian overlay/FSE",
+      "required": "Resolved publication, use-case and institutional admission with named competent owner",
+      "state": "HOLD"
+    },
+    {
+      "topic": "EHDS",
+      "required": "Separate scenario-specific assessment in WUL-738; generic FHIR is not an EHDS compliance claim",
+      "state": "NOT_ASSESSED"
+    }
+  ]
+}
