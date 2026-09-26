@@ -108,7 +108,7 @@
         "POST"
       ],
       "trackingIssue": "WUL-40",
-      "reason": "Observation collection endpoints are still gated by the clinical parity track and are not part of the current stable slice. WUL-308: GET hides soft-deleted rows by default and accepts includeDeleted."
+      "reason": "Observation collection endpoints are still gated by the clinical parity track and are not part of the current stable slice. WUL-308: GET hides soft-deleted rows by default and accepts includeDeleted. WUL-720 C05: new local 4194304-byte JSON cap (413), operation-specific own-key whitelist (400), same-transaction active-parent admission, currentness, exactly-one mutation and required audit. Missing/tombstoned parents return404; archived parents remain eligible. The service-item link remains Web-only and is rejected here even if null. Duplicate creates return409 without replay; restore does not restore the parent. Per-surface timestamps and compatibility changes are explicit in ADR0015."
     },
     {
       "path": "/api/v1/patients/{id}/observations/{observationId}",
@@ -118,7 +118,7 @@
         "DELETE"
       ],
       "trackingIssue": "WUL-40",
-      "reason": "Observation detail mutations remain undocumented until the parity track publishes their stable contract. WUL-308: PUT and DELETE require version and return 409 VERSION_CONFLICT on stale versions; DELETE soft-deletes via deletedAt/deletionReason instead of hard-deleting."
+      "reason": "Observation detail mutations remain undocumented until the parity track publishes their stable contract. WUL-308: PUT and DELETE require version and return 409 VERSION_CONFLICT on stale versions; DELETE soft-deletes via deletedAt/deletionReason instead of hard-deleting. WUL-720 C05: new local 4194304-byte JSON cap (413), operation-specific own-key whitelist (400), same-transaction active-parent admission, currentness, exactly-one mutation and required audit. Missing/tombstoned parents return404; archived parents remain eligible. The service-item link remains Web-only and is rejected here even if null. Duplicate creates return409 without replay; restore does not restore the parent. Per-surface timestamps and compatibility changes are explicit in ADR0015."
     },
     {
       "path": "/api/v1/terminology/systems",
@@ -214,7 +214,7 @@
     {
       "change": "POST /api/v1/network/patients/{id}/observations request changed",
       "trackingIssue": "WUL-40",
-      "reason": "Additive optional reference-range fields accepted on observation create (S6): existing payloads remain valid."
+      "reason": "Additive optional reference-range fields accepted on observation create (S6): existing payloads remain valid. WUL-720 C05 separately documents new strict unsupported-property and safe-version restrictions approved for this cohort (ADR0015), not universal backwards compatibility. The numeric nonzero date compatibility form and nullable/empty tombstone clear are now represented in the schema without new runtime semantics."
     },
     {
       "change": "GET /api/v1/network/patients/{id}/observations/{observationId} response 200 changed",
@@ -224,7 +224,7 @@
     {
       "change": "PUT /api/v1/network/patients/{id}/observations/{observationId} request changed",
       "trackingIssue": "WUL-40",
-      "reason": "Additive optional reference-range fields accepted on observation update (S6): existing payloads remain valid."
+      "reason": "Additive optional reference-range fields accepted on observation update (S6): existing payloads remain valid. WUL-720 C05 separately documents new strict unsupported-property and safe-version restrictions approved for this cohort (ADR0015), not universal backwards compatibility. The numeric nonzero date compatibility form and nullable/empty tombstone clear are now represented in the schema without new runtime semantics."
     },
     {
       "change": "DELETE /api/v1/patients/{id} request changed",
@@ -250,6 +250,21 @@
       "change": "PUT /api/v1/network/patients/{id}/entries/{entryId} request changed",
       "trackingIssue": "WUL-194",
       "reason": "Wave 5 adds an optional sealed attachments field. Existing payloads remain valid, while non-empty values must use the pre-existing ENC transport format."
+    },
+    {
+      "change": "POST /api/v1/network/patients/{id}/observations request.observedAt changed",
+      "trackingIssue": "WUL-720",
+      "reason": "C05 observation contract alignment (ADR0015): represent the existing nonzero numeric date compatibility form within the JavaScript Date range, plus null/empty tombstone clear where applicable. Existing date-time string form remains valid; no new runtime date semantics. Structural schema changes are detected as breaking by the guard."
+    },
+    {
+      "change": "PUT /api/v1/network/patients/{id}/observations/{observationId} request.observedAt changed",
+      "trackingIssue": "WUL-720",
+      "reason": "C05 observation contract alignment (ADR0015): represent the existing nonzero numeric date compatibility form within the JavaScript Date range, plus null/empty tombstone clear where applicable. Existing date-time string form remains valid; no new runtime date semantics. Structural schema changes are detected as breaking by the guard."
+    },
+    {
+      "change": "PUT /api/v1/network/patients/{id}/observations/{observationId} request.deletedAt changed",
+      "trackingIssue": "WUL-720",
+      "reason": "C05 observation contract alignment (ADR0015): represent the existing nonzero numeric date compatibility form within the JavaScript Date range, plus null/empty tombstone clear where applicable. Existing date-time string form remains valid; no new runtime date semantics. Structural schema changes are detected as breaking by the guard."
     }
   ]
 }

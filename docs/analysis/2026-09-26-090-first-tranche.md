@@ -897,3 +897,76 @@ statica: entrambe le evidenze e le correzioni restano nel dossier. I consumi
 condivisi dell'account non sono attribuiti al costo di questa coorte.
 Nessun commit, push, PR, aggiornamento tracker, pubblicazione o rilascio
 clinico. Non si dichiarano conclusi C05/WUL-720, C14 o la parity nativa.
+
+
+## Milestone C05 — osservazioni ordinarie
+
+Dopo l'accettazione locale delle terapie da parte del Chief of Staff, la
+coorte osservazioni copre otto mutazioni: POST/PUT/DELETE Web e v1 locale,
+POST/PUT paired. Baseline conservata: 273 osservazioni sintetiche, con 16
+successi privi di audit dopo FAIL/IGNORE del sink; appendice separata di 19
+misure in tre database isolati. L'appendice corregge una lettura iniziale:
+il 500 di un ID blank v1 era una collisione con il precedente caso Web,
+non una diversa regola del client. Entrambe le create locali accettavano
+l'ID blank; il nuovo rifiuto esplicito non viene presentato come preesistente.
+
+Il Chief ha concordato le modifiche contrattuali prima del codice dipendente;
+ADR 0015/0056/0124 e OpenAPI candidato 1.29.0 le descrivono. Nuovo cap locale
+4.194.304 byte dopo i gate, whitelist per operazione/superficie, 400 per chiavi
+non supportate e per id/patientId/createdAt presenti nei PUT locali, ID
+esplicito nonblank e versione ancora incrementabile. I timestamp validi della
+creazione locale restano ignorati a favore dell'host; validarli e una nuova
+restrizione. UpdatedAt locale PUT resta applicato; la rete rifiuta timestamp
+client. Non sono promesse compatibilita universale o nuove capacita paired.
+
+Il core specifico racchiude nella stessa transazione IMMEDIATE identita,
+scope, padre non cancellato, versione, eventuale link Web, modifica exactly-one
+e audit obbligatorio. Errori audit e mutazioni ignorate annullano anche dati
+e versione. Il padre solo archiviato resta ammesso; restore dell'osservazione
+non ripristina il paziente. Duplicati di creazione producono 409 dopo corretta
+ammissione, senza replay. Il link prestazione-risultato resta solo Web:
+controllo same-patient nella transazione e 422 per item mancante o estraneo;
+null/blank svuotano, omissione conserva. Su v1/rete il campo e 400 anche null.
+Web PUT conserva il restore gia esistente: tombstone applicato emette deleted,
+null o omissione updated. Nessun registro ADR 0082 o normalizzatore condiviso
+riscritto; dodici sorgenti condivise sono rimaste byte-identiche.
+
+### Prove e perimetro
+
+- Test mirati: **15 gruppi PASS**, 242 registrazioni (239 before/after e tre
+  duplicati before/after-first/after-second). Il coordinatore verifica 16
+  rollback audit, otto mutazioni IGNORE, otto successi con evento unico e 180
+  rifiuti senza variazioni dello stato osservato. Autenticazione con seam
+  dichiarati, SQLite reale sintetico; non un dump dell'intero database.
+- HTTP con autenticazione, token e pairing reali: **104 registrazioni**, otto
+  mutazioni e un percorso separato Web tombstone/restore. Sono verificati
+  live snapshot completi del perimetro; il report conserva digest e conteggi.
+  Ottantatre rifiuti hanno digest identici prima/dopo. Il caso PUT/DELETE di
+  risorsa assente non viene chiamato prova di un padre orfano: questa e nel
+  test SQLite. Gli smoke preesistenti invariati passano **8/8 gruppi**.
+- Chromium: **1/1 PASS**, CTA Inserisci risultati, creazione collegata 201,
+  rilettura versione1, cancellazione 200 e tombstone versione2; audit create1
+  e delete1, note e motivo ENC. Paziente/prescrizione/item sono seed API,
+  non una prova della UI prescrittiva. Nessun claim UI PUT/restore/v1/rete.
+- Due processi SQLite provano gli ordini padre-prima e osservazione-prima;
+  non sono otto race HTTP. I nove hash runtime sono conservati e uguali
+  prima/dopo HTTP e browser; non attestano memoria del processo o tutte le
+  dipendenze transitive. Database sintetici e fallimenti preparatori restano
+  conservati. I server delle prove sono terminati e le porte risultano libere.
+
+Il riesame del coordinatore ha escluso dall'audit i timestamp create ignorati,
+con assert dedicati. La review indipendente ha corretto una discrepanza OpenAPI:
+le date numeriche compatibili erano descritte ma non rappresentate nello schema.
+La guardia strutturale collega tutti gli otto handler al core; il primo test
+negativo cercava la vecchia forma dell'insert. E stata corretta soltanto la
+fixture per mutare l'insert effettivo con identita imposta dal core, senza
+allentare il guard. Nessun finding runtime aperto nella review circoscritta.
+
+Suite standard integrata: **5.090 PASS su 5.102, 12 skip, zero fallimenti**
+(93,52 secondi del comando); build PASS (17,06 secondi). Lint, typecheck,
+never-regress, claims, audit e OpenAPI PASS sull'integrato. Le prove mirate non
+sostituiscono la decisione di rilascio. Sol Medium ha curato runtime/test e
+prove Web/HTTP; Luna Medium Fast il roster; Astra Low le review indipendenti.
+Il coordinatore mantiene contratti, integrazione e sufficienza delle prove.
+I consumi condivisi non misurano il costo di questa coorte. Nessun commit,
+push, PR, modifica tracker o pubblicazione; C05/WUL-720 e C14 restano aperti.

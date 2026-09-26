@@ -630,3 +630,96 @@ startDate numerico zero e ammesso; endDate zero crea null nel POST e l'epoca
 nel PUT, come prima. V1/rete rifiutano gli zero con Invalid startDate/endDate;
 null e forma vuota di endDate mantengono il clear. Queste differenze non
 vengono eliminate per facilitare il riuso del diario.
+
+
+## Estensione C05 — osservazioni ordinarie (26 settembre 2026, candidato locale)
+
+La baseline sui sei handler Web/API-v1 e sui due handler paired osserva
+sedici risposte di successo con modifica persistita e nessun evento quando
+il sink audit fallisce o ignora l'inserimento. Otto controlli normali producono
+la modifica e un evento. Le fixture sono sintetiche; i gate di autenticazione
+nella baseline sono sostituiti esplicitamente e non attestano l'ammissione HTTP.
+
+### Confine transazionale e collegamento locale
+
+Le otto operazioni ordinarie convergono su un owner specifico delle
+osservazioni. La transazione sincrona IMMEDIATE comprende identita del
+paziente e dell'osservazione, scope paired, versione corrente, eventuale
+collegamento esplicito, mutazione con esattamente una riga e audit richiesto.
+Un errore o un inserimento audit ignorato annulla anche dati e versione.
+Nessuna risposta di successo precede il commit e nessun secondo writer
+best-effort sostituisce quello transazionale. L'attore Web proviene dalla
+sessione ammessa, non da bearer o header aggiunti dal chiamante.
+
+Un paziente mancante o cancellato produce 404 senza effetti; un paziente
+solo archiviato resta ammesso. La regola vale per tutte le otto mutazioni,
+conservando autenticazione e scope prima di rivelare esistenza o conflitto.
+Il ripristino esplicito di una osservazione non ripristina il paziente.
+Il conflitto di versione conserva lo snapshot PHI-safe esistente.
+
+Il collegamento servicePrescriptionItemId di ADR 0079 resta esclusivo delle
+route Web. Se applicato, esistenza dell'item e identita del paziente vengono
+rivalidate nella stessa transazione; item assente o di un altro paziente
+mantiene 422. Null o stringa vuota espliciti rimuovono il collegamento,
+l'omissione lo conserva. Nessuna modifica al registro futuro di ADR 0082,
+allo schema o ai writer document-derived/direct-native.
+
+### Semantica conservata e prova richiesta
+
+I normalizzatori condivisi non cambiano: value ammette numero finito o testo
+non vuoto, anche qualitativo; LOINC e UCUM restano i sistemi previsti, senza
+nuova interpretazione clinica o validazione dei cataloghi. refLow, refHigh e
+refText conservano stringhe nullable. Source conserva manual/ai_suggestion:
+create assente/null/vuoto usa manual, update null/vuoto cancella il valore.
+Le route Web PUT mantengono soft-delete e restore gia presenti, diversamente
+dalle terapie Web. CreatedAt/updatedAt della creazione locale usano l'orario
+host; updatedAt locale in PUT resta applicabile; la rete rifiuta timestamp
+client. Note e motivo della cancellazione paired restano cifrati ENC.
+
+Sono richieste prove SQLite reali di rollback audit e mutazione ignorata,
+versione/scope/padre/collegamento e compatibilita degli input, seguite da
+ammissione HTTP reale sulle superfici interessate. La guardia strutturale
+attesta il collegamento dei delegate e l'ordine mutazione/audit, non sostituisce
+queste prove. La UI Web espone soltanto creazione e cancellazione: PUT e restore
+vanno provati tramite la superficie che li offre, senza inventare controlli UI.
+
+### Decisioni contrattuali concordate prima dell'implementazione
+
+Il raccordo con il Chief of Staff approva un NUOVO cap locale di **4.194.304
+byte** sulle sei mutazioni Web/v1. Il reader canonico request-json opera dopo
+l'ammissione: il tetto inclusivo conta i byte UTF-8 effettivi e risponde 413
+senza effetti oltre soglia. La rete conserva il limite esistente di ADR 0124.
+Nessuna troncatura, promessa di compatibilita universale o limite aggiuntivo
+di durata/inflight deriva da questa decisione.
+
+Il payload deve essere un oggetto JSON con sole proprieta proprie supportate
+per operazione e superficie. Le proprieta sconosciute o non supportate sono
+400, incluso servicePrescriptionItemId su v1/rete anche se null: prima il
+campo veniva ignorato, quindi il rifiuto e un cambiamento esplicito. L'ID di
+creazione omesso puo essere generato; se presente deve essere una stringa non
+blank, senza rigenerazione silenziosa o obbligo UUID per gli ID opachi validi.
+La versione deve essere un intero sicuro positivo ancora incrementabile.
+Booleani, array e oggetti non sono date valide; non vengono ampliate altre
+semantiche valide. CreatedAt/updatedAt locali di creazione sono validati ma
+ignorati: la baseline accettava anche valori invalidi, quindi la validazione
+e una nuova restrizione. UpdatedAt locale PUT rimane applicabile; i timestamp
+client rete restano respinti. L'appendice isolata conferma che le chiavi
+id/patientId/createdAt locali in PUT venivano ignorate anche se invalide.
+Il raccordo conclusivo approva 400 quando una di queste chiavi e presente
+nel PUT Web/v1: e una nuova restrizione, non una regola storica. Nessuna chiave
+del body cambia identita o autorita risolta dal percorso e dall'host.
+La precedenza 404 per PUT locale di osservazione assente, prima della
+validazione dei campi del dominio, resta conservata; un preflight non
+sostituisce il riesame della stessa identita nella transazione.
+
+Un ID di creazione gia occupato produce 409 sulle tre superfici, anziche il
+500 osservato. Il controllo segue ammissione, scope e padre corretti; non
+anticipa informazioni su un ID fuori scope, non scrive dati/audit e non
+introduce replay200. Per Web PUT che applica un deletedAt nonnull l'evento
+e observation.deleted, anziche il precedente observation.updated. Restore
+esplicito null rimane observation.updated. La scelta dipende dal campo
+normalizzato effettivamente applicato, non dal tombstone gia persistito:
+omissione, null e nuovo tombstone restano distinti. Nessun evento restored.
+
+Queste decisioni sono specifiche della coorte osservazioni e non dichiarano
+chiusura globale di C05, pubblicazione o accettazione clinica.

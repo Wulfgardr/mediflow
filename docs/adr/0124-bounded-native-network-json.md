@@ -129,3 +129,12 @@ non un trasferimento implicito del limite diario o amministrativo. La rete
 terapie mantiene il tetto gia governato. Restano escluse promesse sulla
 compatibilita di tutti i client esterni, sulla memoria del trasporto o su
 nuovi limiti di durata/concorrenza; nessun dato viene troncato.
+
+## Estensione locale osservazioni C05 (26 settembre 2026)
+
+La sezione osservazioni di ADR 0015 introduce un NUOVO cap inclusivo di
+4.194.304 byte per le sei mutazioni ordinarie Web/v1. Il reader canonico
+request-json opera dopo i gate, conta i byte UTF-8 effettivi e rifiuta con
+413 senza effetti ne troncamento. La rete conserva il cap gia governato;
+non sono introdotti limiti di durata/inflight o promesse di compatibilita
+con ogni input locale storicamente non limitato.
