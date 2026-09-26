@@ -26,7 +26,7 @@ prepare_workspace() {
   rm -rf "$WORKSPACE_DIR"
   mkdir -p "$WORKSPACE_DIR"
 
-  for entry in app components lib public drizzle; do
+  for entry in app components lib public drizzle packages; do
     if [[ -e "$ROOT_DIR/$entry" ]]; then
       cp -R "$ROOT_DIR/$entry" "$WORKSPACE_DIR/$entry"
     fi
@@ -37,6 +37,13 @@ prepare_workspace() {
       cp "$ROOT_DIR/$entry" "$WORKSPACE_DIR/$entry"
     fi
   done
+
+  # @Codex: reuse the clean install pinned by the checkout; Next must not install into this copy.
+  if [[ ! -d "$ROOT_DIR/node_modules/next" || ! -d "$ROOT_DIR/node_modules/typescript" || ! -d "$ROOT_DIR/node_modules/@types/react" || ! -d "$ROOT_DIR/node_modules/@types/node" ]]; then
+    echo "Install the checkout dependencies with npm ci before the network smoke." >&2
+    exit 1
+  fi
+  ln -s "$ROOT_DIR/node_modules" "$WORKSPACE_DIR/node_modules"
 
   cat >"$WORKSPACE_DIR/next.config.ts" <<'EOF'
 import type { NextConfig } from "next";
@@ -76,7 +83,7 @@ cleanup() {
 trap cleanup EXIT
 
 echo "Starting Next.js dev server for network home-base smoke..."
-npx next dev "$WORKSPACE_DIR" --webpack --hostname "$HOST" --port "$PORT" >"$DEV_LOG" 2>&1 &
+node "$ROOT_DIR/node_modules/next/dist/bin/next" dev "$WORKSPACE_DIR" --webpack --hostname "$HOST" --port "$PORT" >"$DEV_LOG" 2>&1 &
 DEV_PID=$!
 
 echo "Waiting for $BASE_URL/api/v1/ambulatories ..."

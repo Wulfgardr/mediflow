@@ -185,16 +185,20 @@ test('network-scoped upsert inside a transaction leaves other memberships untouc
     assert.deepEqual(listMemberships(db), ['amb-1', 'amb-2']);
 });
 
-test('legacy patient PUT route uses set-primary semantics instead of delete-all membership replacement', () => {
-    const source = fs.readFileSync(path.join(process.cwd(), 'app/api/patients/[id]/route.ts'), 'utf8');
-    assert.match(
-        source,
-        /upsertPrimaryAmbulatoryMembership\(dbServer,\s*id,\s*normalized\.values\.ambulatoryId\)/,
-        'legacy route should share the same set-primary helper as the v1 route'
-    );
-    assert.doesNotMatch(
-        source,
-        /delete\(patientsToAmbulatories\)\.where\(eq\(patientsToAmbulatories\.patientId,\s*id\)\)/,
-        'legacy route must not delete all ambulatory memberships on profile PUT'
-    );
+test('all patient PUT adapters wire one transactional set-primary operation without delete-all', () => {
+    // The old literal route-local upsert pattern is obsolete: the real-SQLite
+    // operation test verifies rollback and membership preservation on each path.
+    for (const file of [
+        'app/api/patients/[id]/route.ts',
+        'app/api/v1/patients/[id]/route.ts',
+        'lib/network-patient-write.ts',
+    ]) {
+        const source = fs.readFileSync(path.join(process.cwd(), file), 'utf8');
+        assert.match(source, /updatePatientOperation\(/, `${file} must use the shared operation`);
+        assert.doesNotMatch(source, /delete\(patientsToAmbulatories\)/, `${file} must not replace memberships`);
+    }
+    const operation = fs.readFileSync(path.join(process.cwd(), 'lib/patient-update-operation.ts'), 'utf8');
+    assert.match(operation, /dbServer\.transaction\(/);
+    assert.match(operation, /upsertPrimaryAmbulatoryMembership\(tx,/);
+    assert.doesNotMatch(operation, /delete\(patientsToAmbulatories\)/);
 });

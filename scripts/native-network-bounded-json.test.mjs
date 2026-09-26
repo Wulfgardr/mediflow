@@ -70,7 +70,7 @@ function harness(route, { deny = 0, cap, stage = null } = {}) {
     ]);
     function load(relative) {
         if (cache.has(relative)) return cache.get(relative);
-        assert.ok([`app/api/${route}/route.ts`, 'lib/native-network-json-body.ts', 'lib/bounded-request-body.ts', 'lib/attachment-payload.ts'].includes(relative), `unexpected production import ${relative}`);
+        assert.ok([`app/api/${route}/route.ts`, 'lib/native-network-json-body.ts', 'lib/bounded-request-body.ts', 'lib/attachment-payload.ts', 'lib/patient-json-object.ts'].includes(relative), `unexpected production import ${relative}`);
         const source = fs.readFileSync(path.join(root, relative), 'utf8');
         const exports = {};
         cache.set(relative, exports);
@@ -85,6 +85,9 @@ function harness(route, { deny = 0, cap, stage = null } = {}) {
             }
             if (name === '@/lib/native-network-json-body') {
                 return load('lib/native-network-json-body.ts');
+            }
+            if (name === '@/lib/patient-json-object') {
+                return load('lib/patient-json-object.ts');
             }
             if (relative.startsWith('lib/') && name.startsWith('./')) return load(`lib/${name.slice(2)}.ts`);
             return new Proxy({}, { get(_target, key) {
@@ -194,17 +197,68 @@ test('malformed login and ambulatory DELETE keep existing fallback, not size rej
     }
 });
 
+function boundedReaderInventory(source, filename) {
+    const file = ts.createSourceFile(filename, source, ts.ScriptTarget.ES2022, true, ts.ScriptKind.TS);
+    const named = (node, name) => ts.isIdentifier(node) && node.text === name;
+    const callNamed = (node, name) => ts.isCallExpression(node) && named(node.expression, name);
+    const boundedAwait = (node) => callNamed(node, 'readNativeNetworkJson') || callNamed(node, 'withNetworkAttachmentJson')
+        || (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)
+            && node.expression.name.text === 'catch' && callNamed(node.expression.expression, 'readNativeNetworkJson')
+            && node.arguments.length === 1 && named(node.arguments[0], 'emptyJsonUnlessTooLarge'));
+    let readers = 0;
+    let wrappers = 0;
+    function visit(node) {
+        if (ts.isCallExpression(node)) {
+            const target = node.expression;
+            const method = ts.isPropertyAccessExpression(target) && named(target.expression, 'request') ? target.name.text
+                : ts.isElementAccessExpression(target) && named(target.expression, 'request') && ts.isStringLiteral(target.argumentExpression) ? target.argumentExpression.text
+                    : null;
+            assert.ok(!['json', 'text', 'arrayBuffer', 'blob'].includes(method), `${filename}: unbounded request body reader`);
+        }
+        if (ts.isAwaitExpression(node)) {
+            const expression = node.expression;
+            if (boundedAwait(expression)) readers++;
+            if (callNamed(expression, 'parsePatientJsonObject')) {
+                const reader = expression.arguments[0];
+                assert.ok(expression.arguments.length === 1 && ts.isArrowFunction(reader) && reader.parameters.length === 0
+                    && callNamed(reader.body, 'readNativeNetworkJson') && reader.body.arguments.length === 1
+                    && named(reader.body.arguments[0], 'request'), `${filename}: patient JSON wrapper must pass through the bounded reader`);
+                readers++;
+                wrappers++;
+            }
+        }
+        ts.forEachChild(node, visit);
+    }
+    visit(file);
+    if (wrappers) {
+        assert.match(source, /import\s*\{\s*parsePatientJsonObject\s*\}\s*from\s*['"]@\/lib\/patient-json-object['"]/u);
+        const helper = fs.readFileSync(path.join(root, 'lib/patient-json-object.ts'), 'utf8');
+        assert.match(helper, /export async function parsePatientJsonObject\(read\s*:/u);
+        assert.match(helper, /value\s*=\s*await read\(\)/u);
+        assert.doesNotMatch(helper, /request\s*(?:\.\s*(?:json|text|arrayBuffer|blob)|\[\s*['"](?:json|text|arrayBuffer|blob)['"]\s*\])\s*\(/u);
+    }
+    return readers;
+}
+
 test('JSON route inventory stays bounded and has no alternate unbounded body reader', () => {
     const network = fs.readdirSync(path.join(root, 'app/api/v1/network'), { recursive: true }).filter(p => p.endsWith('route.ts'));
     const inventory = new Set(operations.map(([route]) => route));
     let readers = 0;
     for (const relative of network) {
         const source = fs.readFileSync(path.join(root, 'app/api/v1/network', relative), 'utf8');
-        assert.doesNotMatch(source, /request\.(?:json|text|arrayBuffer|blob)\s*\(/);
-        if (/await (?:readNativeNetworkJson|withNetworkAttachmentJson)\(/.test(source)) {
+        const count = boundedReaderInventory(source, relative);
+        if (count) {
             assert.ok(inventory.has(`v1/network/${relative.replace(/\/route\.ts$/, '')}`));
-            readers += (source.match(/await (?:readNativeNetworkJson|withNetworkAttachmentJson)\(/g) ?? []).length;
+            readers += count;
         }
     }
     assert.equal(readers, operations.reduce((sum, [, ...methods]) => sum + methods.length, 0) - 1);
+});
+
+test('patient JSON wrapper inventory rejects hidden alternate request readers', () => {
+    const prefix = "import { parsePatientJsonObject } from '@/lib/patient-json-object';\n";
+    assert.equal(boundedReaderInventory(`${prefix}async function PUT(request) { return await parsePatientJsonObject(() => readNativeNetworkJson(request)); }`, 'valid.ts'), 1);
+    for (const reader of ['request.json()', "request['json']()", 'readNativeNetworkJson(request) || request.json()']) {
+        assert.throws(() => boundedReaderInventory(`${prefix}async function PUT(request) { return await parsePatientJsonObject(() => ${reader}); }`, 'unbounded.ts'));
+    }
 });

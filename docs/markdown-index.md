@@ -15,7 +15,7 @@ soltanto alcuni degli ingressi; qui sono censiti i `.md` tracciati, con una
 breve indicazione d’uso.
 
 La mappa precedente era aggiornata al 2026-09-08. Revisione editoriale:
-2026-09-20. Le voci storiche conservano date, conteggi, revisioni e limiti:
+2026-09-26. Le voci storiche conservano date, conteggi, revisioni e limiti:
 la data di questo indice non rinnova le prove cui rimandano.
 
 ## Ingresso progressivo e candidatura
@@ -32,6 +32,7 @@ versione o risalire alla provenienza di un’interfaccia.
 | [design/2026-09-05-086-runtime-twin.md](./design/2026-09-05-086-runtime-twin.md) | Gemello web sintetico 0.8.6, copertura, confronto visuale e launcher locale. | Esplorazione e verifica del candidato WUL-676. |
 | [design/2026-09-06-breccia-apple-reference.md](./design/2026-09-06-breccia-apple-reference.md) | Criteri ricavati da testo e fotogrammi Breccia, fonti e adattamenti Apple. | Prima di progettare o rifinire le app iPhone, iPad e Mac. |
 | [design/2026-09-06-086-macos-redesign.md](./design/2026-09-06-086-macos-redesign.md) | Proposta Mac con una sola lista laterale, gerarchia documentale e prove locali. | Revisione del redesign successivo alla prima rifinitura Apple 0.8.6. |
+| [analysis/2026-09-26-090-first-tranche.md](./analysis/2026-09-26-090-first-tranche.md) | Prima tranche locale 0.9.0: inventario, aggiornamento paziente atomico, audit pilota e riparazioni dei test. | Per distinguere candidati verificati, limiti e lavoro ancora aperto dalla release. |
 
 ## 📚 Come usare questo indice
 
@@ -185,6 +186,7 @@ contratti e nella valutazione competente del deployment.
 | File | Scopo | Quando consultarlo |
 | --- | --- | --- |
 | [docs/ROADMAP.md](./ROADMAP.md) | Roadmap prodotto canonica. | Per direzione prodotto/release narrative. |
+| [docs/analysis/2026-09-26-09x-preparation.md](./analysis/2026-09-26-09x-preparation.md) | Preparazione secondaria 0.9.1–0.9.7: raccordo con il consolidamento, sequenza del pilota e casi sintetici da verificare. | Per preparare le tappe successive senza duplicare la 0.9.0 o anticiparne i gate. |
 | [docs/product_roadmap.md](./product_roadmap.md) | Roadmap storica (deprecata). | Solo per contesto storico. |
 | [docs/FAQ.md](./FAQ.md) | FAQ sintetiche pubbliche: stato attuale del prodotto, boundary dichiarati e orientamento rapido. | Per onboarding rapido o lettura pubblica del progetto. |
 | [docs/COMPLIANCE.md](./COMPLIANCE.md) | Quadro compliance GDPR/FHIR e interoperabilità. | Per requisiti normativi e policy operative. |

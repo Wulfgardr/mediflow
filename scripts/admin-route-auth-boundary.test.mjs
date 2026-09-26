@@ -68,7 +68,8 @@ test('backup restore rejects cross-port and text/plain transport before prefligh
                 'durableReviewOperations', 'durableReviewPatientLinks', 'durableReviewRecords', 'drugs', 'entries',
                 'exemptions', 'exemptionImportReceipts', 'headlessSoapActiveRoleAttestations', 'headlessSoapEntryCommits', 'messages',
                 'observations', 'patients', 'patientsToAmbulatories', 'physicianReviewAttestations',
-                'prostheticPrescriptions', 'serviceCatalogEntries', 'servicePrescriptionItems',
+                'prostheticPrescriptions', 'prostheticsCatalogEntries', 'prostheticsCatalogReceipts',
+                'serviceCatalogEntries', 'servicePrescriptionItems',
                 'servicePrescriptions', 'sissHandoffEvents', 'therapies',
             ].map((name) => `${name} = Object.freeze({})`).join(', ')};`))}],
             ['@/lib/security/server-auth', ${JSON.stringify(toDataModule("export async function requireSession() { globalThis.sessionCalls = (globalThis.sessionCalls ?? 0) + 1; return Object.freeze({ id: 'session.synthetic.restore', userId: 'user.synthetic.restore', role: 'admin' }); } export function unauthorizedResponse() { return new Response(null, { status: 401 }); } export function forbiddenResponse() { return new Response(null, { status: 403 }); }"))}],
@@ -90,6 +91,7 @@ test('backup restore rejects cross-port and text/plain transport before prefligh
         const { POST } = await import(routeUrl);
         const cases = [
             { origin: 'http://127.0.0.1:4000', 'sec-fetch-site': 'same-site', 'content-type': 'application/json' },
+            { origin: 'http://127.0.0.1:4000', 'sec-fetch-site': 'same-origin', 'content-type': 'application/json' },
             { origin: 'http://127.0.0.1:3000', 'sec-fetch-site': 'same-origin', 'content-type': 'text/plain' },
         ];
         for (const headers of cases) {
@@ -106,7 +108,7 @@ test('backup restore rejects cross-port and text/plain transport before prefligh
         const counters = { sessionCalls: globalThis.sessionCalls ?? 0, adminCalls: globalThis.adminCalls ?? 0,
             preflightCalls: globalThis.preflightCalls ?? 0, restoreCalls: globalThis.restoreCalls ?? 0,
             fenceCalls: globalThis.fenceCalls ?? 0, dbCalls: globalThis.dbCalls ?? 0 };
-        const expectedCounters = { sessionCalls: 2, adminCalls: 2, preflightCalls: 0,
+        const expectedCounters = { sessionCalls: 3, adminCalls: 3, preflightCalls: 0,
             restoreCalls: 0, fenceCalls: 0, dbCalls: 0 };
         if (JSON.stringify(counters) !== JSON.stringify(expectedCounters)) throw new Error(JSON.stringify(counters));
     `;

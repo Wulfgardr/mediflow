@@ -1,10 +1,12 @@
 /* @Codex */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
-import { spawnSync } from 'node:child_process';
+import { copyFileSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { spawn, spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import {
     extractAnyDocLocalBytes,
@@ -195,24 +197,109 @@ test('ignores hostile caller cwd when locating the owned worker', async () => {
 });
 
 test('fails closed with sanitized io_failure for missing, symlinked, and tampered workers', async () => {
-    const backupPath = `${WORKER_PATH}.runner-test-backup`;
+    /* @Codex: this test must never mutate the shared checkout worker while other test files execute. */
+    const packageRoot = path.resolve(path.dirname(WORKER_PATH), '..');
+    const fixtureRoot = realpathSync(mkdtempSync(path.join(os.tmpdir(), 'mediflow-anydoc-worker-fixture-')));
+    const relativeWorker = 'scripts/anydoc-local-extraction-worker.mjs';
+    const fixtureWorker = path.join(fixtureRoot, relativeWorker);
     const original = readFileSync(WORKER_PATH);
+    const originalDigest = createHash('sha256').update(original).digest('hex');
     const outsideDir = mkdtempSync(path.join(os.tmpdir(), 'mediflow-anydoc-worker-outside-'));
     const outsideWorker = path.join(outsideDir, 'worker.mjs');
     try {
-        renameSync(WORKER_PATH, backupPath);
-        assertIoFailure(await extractAnyDocLocalBytes('synthetic-attachment-worker-missing', SYNTHETIC_RTF));
+        for (const relativePath of [
+            'package.json',
+            'lib/domain/documents/anydoc-local-extraction-runner.ts',
+            'lib/domain/documents/anydoc-local-extraction-contract.ts',
+            relativeWorker,
+        ]) {
+            const destination = path.join(fixtureRoot, relativePath);
+            mkdirSync(path.dirname(destination), { recursive: true });
+            copyFileSync(path.join(packageRoot, relativePath), destination);
+            assert.deepEqual(readFileSync(destination), readFileSync(path.join(packageRoot, relativePath)));
+        }
+        symlinkSync(path.join(packageRoot, 'node_modules'), path.join(fixtureRoot, 'node_modules'), 'dir');
+        /* @Codex: a literal import in a synthetic child driver keeps the privacy import guard inspectable. */
+        const fixtureDriver = path.join(fixtureRoot, 'driver.mjs');
+        writeFileSync(fixtureDriver, `import { extractAnyDocLocalBytes } from './lib/domain/documents/anydoc-local-extraction-runner.ts';
+const chunks = [];
+for await (const chunk of process.stdin) chunks.push(chunk);
+const result = await extractAnyDocLocalBytes(process.argv[2], Buffer.concat(chunks));
+process.stdout.write(JSON.stringify(result));
+`);
+        const loaderPath = fileURLToPath(new URL('../../../scripts/register-strip-types-loader.mjs', import.meta.url));
+        const extractFromFixture = (attachmentId: string) => new Promise<Awaited<ReturnType<typeof extractAnyDocLocalBytes>>>((resolve, reject) => {
+            const child = spawn(process.execPath, ['--experimental-strip-types', '--import', loaderPath, fixtureDriver, attachmentId], {
+                cwd: fixtureRoot,
+                env: { NODE_ENV: 'test', MEDIFLOW_DATA_DIR: process.env.MEDIFLOW_DATA_DIR ?? fixtureRoot },
+                stdio: ['pipe', 'pipe', 'pipe'],
+                timeout: 20_000,
+            });
+            let stdout = '';
+            let stderr = '';
+            let childError: Error | undefined;
+            let stdinError: Error | undefined;
+            child.stdout.setEncoding('utf8').on('data', (chunk: string) => {
+                stdout += chunk;
+                if (stdout.length > 65_536) child.kill('SIGKILL');
+            });
+            child.stderr.setEncoding('utf8').on('data', (chunk: string) => {
+                stderr += chunk;
+                if (stderr.length > 16_384) child.kill('SIGKILL');
+            });
+            child.once('error', (error: Error) => { childError = error; });
+            child.stdin.on('error', (error: Error) => { stdinError = error; });
+            child.once('close', (code) => {
+                if (childError) return reject(childError);
+                if (stdinError) return reject(stdinError);
+                if (code !== 0) return reject(new Error(`Fixture driver failed: ${stderr.slice(0, 512)}`));
+                try { resolve(JSON.parse(stdout) as Awaited<ReturnType<typeof extractAnyDocLocalBytes>>); }
+                catch (error) { reject(error); }
+            });
+            try { child.stdin.end(SYNTHETIC_RTF); }
+            catch (error) {
+                stdinError = error instanceof Error ? error : new Error('Fixture stdin failed');
+                child.kill('SIGKILL');
+            }
+        });
+        const assertFixtureExtracted = async () => {
+            const result = await extractFromFixture('synthetic-attachment-fixture-control');
+            assert.equal(result.status, 'extracted');
+            if (result.status === 'extracted') assert.equal(result.markdown, 'Synthetic discharge note.');
+        };
+        const assertOriginalAvailable = async () => {
+            assert.equal(lstatSync(WORKER_PATH).isFile(), true);
+            assert.equal(createHash('sha256').update(readFileSync(WORKER_PATH)).digest('hex'), originalDigest);
+            const result = await extractAnyDocLocalBytes('synthetic-attachment-owned-worker-control', SYNTHETIC_RTF);
+            assert.equal(result.status, 'extracted');
+            if (result.status === 'extracted') assert.equal(result.markdown, 'Synthetic discharge note.');
+        };
+        const assertFixtureFailureWhileOriginalWorks = async (attachmentId: string) => {
+            const [fixtureOutcome, originalOutcome] = await Promise.allSettled([
+                extractFromFixture(attachmentId),
+                assertOriginalAvailable(),
+            ]);
+            if (fixtureOutcome.status === 'rejected') throw fixtureOutcome.reason;
+            if (originalOutcome.status === 'rejected') throw originalOutcome.reason;
+            assertIoFailure(fixtureOutcome.value);
+        };
+
+        await assertFixtureExtracted();
+        renameSync(fixtureWorker, `${fixtureWorker}.backup`);
+        await assertFixtureFailureWhileOriginalWorks('synthetic-attachment-worker-missing');
 
         writeFileSync(outsideWorker, original);
-        symlinkSync(outsideWorker, WORKER_PATH);
-        assertIoFailure(await extractAnyDocLocalBytes('synthetic-attachment-worker-symlink', SYNTHETIC_RTF));
-        rmSync(WORKER_PATH);
+        symlinkSync(outsideWorker, fixtureWorker);
+        await assertFixtureFailureWhileOriginalWorks('synthetic-attachment-worker-symlink');
+        rmSync(fixtureWorker);
 
-        writeFileSync(WORKER_PATH, Buffer.concat([original, Buffer.from('\n// synthetic tamper\n')]));
-        assertIoFailure(await extractAnyDocLocalBytes('synthetic-attachment-worker-tamper', SYNTHETIC_RTF));
+        writeFileSync(fixtureWorker, Buffer.concat([original, Buffer.from('\n// synthetic tamper\n')]));
+        await assertFixtureFailureWhileOriginalWorks('synthetic-attachment-worker-tamper');
+        writeFileSync(fixtureWorker, original);
+        await assertFixtureExtracted();
+        assert.equal(createHash('sha256').update(readFileSync(WORKER_PATH)).digest('hex'), originalDigest);
     } finally {
-        rmSync(WORKER_PATH, { force: true });
-        renameSync(backupPath, WORKER_PATH);
+        rmSync(fixtureRoot, { recursive: true, force: true });
         rmSync(outsideDir, { recursive: true, force: true });
     }
 });
