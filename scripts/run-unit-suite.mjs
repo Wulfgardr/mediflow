@@ -7,7 +7,7 @@ import { acquireTestDataDir, cleanupTestDataDir } from './test-data-dir.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const node = process.execPath;
-const unitArgs = ['scripts/run-strip-types.mjs', '--test', '--glob', 'lib/**/*.test.ts', '--glob', 'components/**/*.test.ts', 'scripts/check-schema-drift.test.ts', 'scripts/run-native-probe.test.mjs', 'scripts/audit-quality-gate.test.mjs', 'scripts/prepare-e2e-db.test.mjs', 'scripts/native-network-bounded-json.test.mjs', 'scripts/native-network-attachment-budget.test.mjs'];
+const unitArgs = ['scripts/run-strip-types.mjs', '--test', '--glob', 'lib/**/*.test.ts', '--glob', 'components/**/*.test.ts', 'scripts/admin-route-auth-boundary.test.mjs', 'scripts/test-data-dir.test.mjs', 'scripts/check-schema-drift.test.ts', 'scripts/run-native-probe.test.mjs', 'scripts/audit-quality-gate.test.mjs', 'scripts/prepare-e2e-db.test.mjs', 'scripts/native-network-bounded-json.test.mjs', 'scripts/native-network-attachment-budget.test.mjs'];
 
 function run(args, env) {
   const result = spawnSync(node, args, { cwd: root, env, stdio: 'inherit' });

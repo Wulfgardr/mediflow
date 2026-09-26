@@ -3,11 +3,13 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import test from 'node:test';
 import ts from 'typescript';
 
-import { validateAuditWriterControlFlow, validateDelegatedRouteAudit, validateLogoutAuditModes } from './audit-quality-gate.mjs';
+import { validateAuditWriterControlFlow, validateDelegatedRouteAudit, validateLogoutAuditModes,
+    validateRequiredPatientUpdateAudit, validateRequiredPatientDeleteAudit } from './audit-quality-gate.mjs';
 
 const EVENT = 'record.changed';
 const base = {
@@ -76,7 +78,7 @@ test('rejects parse-valid unreachable, nested, shadowed, duplicate, and wrong-ev
 
 test('main checks the four real writer contracts and rejects a mutated service', () => {
     const root = process.cwd();
-    const gatePath = path.join(root, 'scripts/audit-quality-gate.mjs');
+    const gatePath = fileURLToPath(new URL('./audit-quality-gate.mjs', import.meta.url));
     const gateSource = fs.readFileSync(gatePath, 'utf8');
     const fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-audit-wiring-'));
     const requiredFiles = [
@@ -784,4 +786,152 @@ test('PIN guard accepts both canonical channels and rejects retirement/currentne
         assertParseClean('pin-change-service.ts', mutation);
         assert.notDeepEqual(validateAuditWriterControlFlow({ ...config, source: mutation }), [], name);
     }
+});
+
+/* @Codex: synthetic C04 transaction chain, independent of the runtime candidate checkout. */
+test('patient-update audit guard binds the PUT delegate, patient subject and required tx writer', () => {
+    const spec = {
+        handler: 'PUT', serviceModule: '@/lib/patient-update-operation', serviceExport: 'updatePatientOperation',
+        ownerFile: 'lib/patient-update-operation.ts', ownerName: 'updatePatientOperation',
+    };
+    const route = `import { updatePatientOperation } from '@/lib/patient-update-operation';
+        export async function PUT() { const commit = updatePatientOperation({ patientId: 'synthetic' }); return commit; }`;
+    const auditCall = `writeAuditEventInTransaction(tx, {
+            eventType: classifyPatientMutationEvent(existing.isArchived ?? null, input.values.isArchived), outcome: 'success',
+            actorType: input.audit.actorType, actorRef: input.audit.actorRef,
+            subjectType: 'patient', subjectRef: input.patientId,
+            sourceSurface: input.audit.sourceSurface, requestId: input.audit.requestId,
+            redactedMetadata: null,
+        });`;
+    const membership = 'if (input.setPrimaryAmbulatory) upsertPrimaryAmbulatoryMembership(tx, input.patientId);';
+    const core = `import { dbServer } from './db-server';
+        import { patients } from './schema';
+        import { upsertPrimaryAmbulatoryMembership } from './patient-ambulatory-membership';
+        import { classifyPatientMutationEvent, writeAuditEventInTransaction } from './security/audit';
+        export function updatePatientOperation(input) {
+            return dbServer.transaction((tx) => {
+                const existing = { isArchived: false };
+                tx.update(patients).set({}).run();
+                ${membership}
+                ${auditCall}
+                return { status: 200 };
+            }, { behavior: 'immediate' });
+        }`;
+    const audit = `import { auditEvents } from '../schema';
+        function buildAuditEventRow(input) { return input; }
+        export function writeAuditEventInTransaction(tx, input) {
+            const row = buildAuditEventRow(input);
+            const result = tx.insert(auditEvents).values(row).run();
+            if (result.changes !== 1) { throw new Error('synthetic insert failed'); }
+            return 'synthetic-event';
+        }`;
+    const validatePatient = (routeSource = route, coreSource = core, auditSource = audit) => {
+        for (const [file, source] of [['route.ts', routeSource], ['core.ts', coreSource], ['audit.ts', auditSource]]) {
+            assertParseClean(file, source);
+        }
+        return validateRequiredPatientUpdateAudit({ spec, routeSource, coreSource, auditSource });
+    };
+    assert.deepEqual(validatePatient(), []);
+    const mutations = [
+        ['route removes delegate', route.replace("updatePatientOperation({ patientId: 'synthetic' })", '{ status: 200 }'), core, audit],
+        ['route shadows imported delegate', route.replace('const commit =', 'const updatePatientOperation = () => ({ status: 200 }); const commit ='), core, audit],
+        ['core loses required writer', route, core.replace(auditCall, 'void input.audit;'), audit],
+        ['core moves writer outside transaction', route,
+            core.replace(auditCall, '').replace('return dbServer.transaction', `${auditCall.replaceAll('tx,', 'input.tx,')}\n            return dbServer.transaction`), audit],
+        ['core moves membership outside transaction', route,
+            core.replace(membership, '').replace('return dbServer.transaction',
+                `upsertPrimaryAmbulatoryMembership(input.tx, input.patientId); return dbServer.transaction`), audit],
+        ['core conditionally skips required writer', route, core.replace(auditCall, `if (false) { ${auditCall} }`), audit],
+        ['core changes subject', route, core.replace('subjectRef: input.patientId', 'subjectRef: input.otherId'), audit],
+        ['core replaces classifier with literal', route,
+            core.replace('classifyPatientMutationEvent(existing.isArchived ?? null, input.values.isArchived)', "'patient.updated'"), audit],
+        ['core classifies fabricated state', route,
+            core.replace('existing.isArchived ?? null, input.values.isArchived', 'null, false'), audit],
+        ['core imports fake writer', route, core.replace("from './security/audit'", "from './fake-audit'"), audit],
+        ['writer no longer executes insert', route, core, audit.replace('.values(row).run()', '.values(row)')],
+        ['writer ignores failed insert', route, core,
+            audit.replace("if (result.changes !== 1) { throw new Error('synthetic insert failed'); }", 'void result;')],
+    ];
+    for (const [name, routeSource, coreSource, auditSource] of mutations) {
+        assert.notDeepEqual(validatePatient(routeSource, coreSource, auditSource), [], name);
+    }
+});
+
+/* @Codex: C05 DELETE mutations use the frozen real source shape, without modifying runtime files. */
+test('patient-delete audit guard binds both DELETE routes to one tombstone and required tx writer', () => {
+    const core = fs.readFileSync(path.join(process.cwd(), 'lib/patient-delete-operation.ts'), 'utf8');
+    const audit = fs.readFileSync(path.join(process.cwd(), 'lib/security/audit.ts'), 'utf8');
+    const routes = [
+        'app/api/patients/[id]/route.ts',
+        'app/api/v1/patients/[id]/route.ts',
+    ];
+    const spec = {
+        handler: 'DELETE', serviceModule: '@/lib/patient-delete-operation', serviceExport: 'deletePatientOperation',
+        ownerFile: 'lib/patient-delete-operation.ts', ownerName: 'deletePatientOperation', deletionReason: 'web-delete',
+    };
+    const validate = (routeSource, coreSource = core, auditSource = audit, contract = spec) => {
+        for (const [fileName, source] of [['route.ts', routeSource], ['core.ts', coreSource], ['audit.ts', auditSource]]) {
+            assertParseClean(fileName, source);
+        }
+        return validateRequiredPatientDeleteAudit({ spec: contract, routeSource, coreSource, auditSource });
+    };
+    for (const routePath of routes) {
+        const route = fs.readFileSync(path.join(process.cwd(), routePath), 'utf8');
+        const contract = { ...spec, deletionReason: routePath.includes('/v1/') ? 'api-v1-delete' : 'web-delete' };
+        const deleteOffset = route.indexOf('export async function DELETE');
+        assert.notEqual(deleteOffset, -1);
+        const mutateDelete = (before, after) => route.slice(0, deleteOffset)
+            + replaceOnce(route.slice(deleteOffset), before, after);
+        assert.deepEqual(validate(route, core, audit, contract), [], routePath);
+        assert.notDeepEqual(validate(mutateDelete('deletePatientOperation({', 'missingDeleteOperation({'), core, audit, contract), [],
+            `${routePath}: missing delegate`);
+        assert.notDeepEqual(validate(mutateDelete(
+            "if (!parsed.ok) return NextResponse.json({ error: 'Richiesta non valida.' }, { status: 400 });",
+            "if (!parsed.ok) void NextResponse.json({ error: 'Richiesta non valida.' }, { status: 400 });"),
+        core, audit, contract), [], `${routePath}: body-class denial must return`);
+    }
+    const route = fs.readFileSync(path.join(process.cwd(), routes[0]), 'utf8');
+    const auditStart = '        writeAuditEventInTransaction(tx, {';
+    const mutations = [
+        ['missing writer', replaceOnce(core, auditStart, '        missingAuditWriter(tx, {')],
+        ['late writer', replaceOnce(core, auditStart,
+            '        return { status: 200, value: { success: true } };\n        writeAuditEventInTransaction(tx, {')],
+        ['nested writer', replaceOnce(replaceOnce(core, auditStart,
+            '        if (false) { writeAuditEventInTransaction(tx, {'),
+        '        });\n        return { status: 200', '        }); }\n        return { status: 200')],
+        ['wrong transaction', replaceOnce(core, auditStart, '        writeAuditEventInTransaction(input.tx, {')],
+        ['duplicate writer', replaceOnce(core, '        return { status: 200, value: { success: true } };',
+            "        writeAuditEventInTransaction(tx, { eventType: 'patient.deleted' });\n        return { status: 200, value: { success: true } };")],
+        ['wrong event', replaceOnce(core, "eventType: 'patient.deleted'", "eventType: 'patient.updated'")],
+        ['wrong subject', replaceOnce(core, 'subjectRef: input.patientId', 'subjectRef: input.otherId')],
+        ['wrong resource version', replaceOnce(core, 'resourceVersion: input.expectedVersion + 1',
+            'resourceVersion: input.expectedVersion')],
+        ['hard delete', replaceOnce(core, 'tx.update(patients)', 'tx.delete(patients)')],
+        ['wrong builder', replaceOnce(core, 'buildPatientTombstoneValues(input.expectedVersion, input.deletionReason)',
+            'fakeTombstone(input.expectedVersion, input.deletionReason)')],
+        ['CAS version lost', replaceOnce(core, 'eq(patients.version, input.expectedVersion), activePatients()))',
+            'eq(patients.version, input.expectedVersion + 1), activePatients()))')],
+        ['CAS active lost', replaceOnce(core, 'eq(patients.version, input.expectedVersion), activePatients()))',
+            'eq(patients.version, input.expectedVersion)))')],
+        ['CAS predicate OR', replaceOnce(core,
+            '.where(and(eq(patients.id, input.patientId), eq(patients.version, input.expectedVersion), activePatients()))',
+            '.where(or(eq(patients.id, input.patientId), eq(patients.version, input.expectedVersion), activePatients()))')],
+        ['CAS patient id lost', replaceOnce(core,
+            '.where(and(eq(patients.id, input.patientId), eq(patients.version, input.expectedVersion), activePatients()))',
+            '.where(and(eq(patients.version, input.expectedVersion), activePatients()))')],
+        ['CAS wrong patient id', replaceOnce(core,
+            '.where(and(eq(patients.id, input.patientId), eq(patients.version, input.expectedVersion), activePatients()))',
+            '.where(and(eq(patients.id, input.otherId), eq(patients.version, input.expectedVersion), activePatients()))')],
+        ['CAS shadowed and binding', replaceOnce(core,
+            '        const deleted = tx.update(patients)',
+            '        const and = (...conditions) => conditions[0];\n        const deleted = tx.update(patients)')],
+        ['early successful return before audit', replaceOnce(core, auditStart,
+            "        if (input.deletionReason === 'web-delete') return { status: 200, value: { success: true } };\n"
+            + auditStart)],
+        ['conflict builder lost', replaceOnce(core,
+            'buildPatientVersionConflictPayload(input.expectedVersion, input.patientId, current ?? null)', '{}')],
+    ];
+    for (const [name, mutated] of mutations) assert.notDeepEqual(validate(route, mutated), [], name);
+    assert.notDeepEqual(validate(route, core,
+        replaceOnce(audit, 'if (result.changes !== 1) {', 'if (false) {')), [], 'required insert result ignored');
 });

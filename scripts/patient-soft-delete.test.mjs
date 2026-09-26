@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
+import { validateRequiredPatientDeleteAudit } from './audit-quality-gate.mjs';
 
 const ROOT_DIR = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
 
@@ -25,18 +26,20 @@ function handlerSource(source, handlerName) {
     return source.slice(start, next === -1 ? source.length : next);
 }
 
-test('patient DELETE routes write a version-guarded tombstone instead of a hard delete', () => {
+test('patient DELETE routes delegate one version-guarded tombstone and required audit transaction', () => {
+    const coreSource = read('lib/patient-delete-operation.ts');
+    const auditSource = read('lib/security/audit.ts');
     for (const route of PATIENT_DELETE_ROUTES) {
         const source = read(route.file);
         assert.doesNotMatch(source, /\.delete\(patients\)/, `${route.file} must not hard-delete patients`);
-
-        const deleteBlock = handlerSource(source, 'DELETE');
-        assert.match(deleteBlock, new RegExp(`const deletionReason = parsePatientDeletionReason\\(body, '${route.deletionReason}'\\)`), `${route.file} DELETE must parse the optional delete reason with default ${route.deletionReason}`);
-        assert.match(deleteBlock, /buildPatientTombstoneValues\(expectedVersion, deletionReason\)/, `${route.file} DELETE must tombstone with the parsed reason`);
-        assert.match(deleteBlock, /eq\(patients\.version, expectedVersion\)/, `${route.file} DELETE must stay version-guarded`);
-        assert.match(deleteBlock, /activePatients\(\)/, `${route.file} DELETE must not re-delete tombstones`);
-        assert.match(deleteBlock, /buildPatientVersionConflictPayload\(/, `${route.file} DELETE must keep the 409 payload`);
-        assert.match(deleteBlock, /'patient\.deleted'/, `${route.file} DELETE must keep the patient.deleted audit event`);
+        assert.deepEqual(validateRequiredPatientDeleteAudit({
+            spec: {
+                handler: 'DELETE', serviceModule: '@/lib/patient-delete-operation', serviceExport: 'deletePatientOperation',
+                ownerFile: 'lib/patient-delete-operation.ts', ownerName: 'deletePatientOperation',
+                deletionReason: route.deletionReason,
+            },
+            routeSource: source, coreSource, auditSource,
+        }), [], route.file);
     }
 });
 
@@ -161,9 +164,48 @@ function isActivePatientsPredicate(node) {
         && node.arguments.some(isActivePatientsPredicate);
 }
 
+/* @Codex: follow only a local const used exclusively as a direct where argument. */
+function isLocalConstantActivePredicate(node) {
+    if (!ts.isIdentifier(node)) return false;
+    let block = node.parent;
+    while (block && !ts.isBlock(block)) block = block.parent;
+    if (!block) return false;
+    const declarations = block.statements
+        .filter(ts.isVariableStatement)
+        .filter((statement) => (statement.declarationList.flags & ts.NodeFlags.Const) !== 0)
+        .flatMap((statement) => [...statement.declarationList.declarations])
+        .filter((declaration) => ts.isIdentifier(declaration.name) && declaration.name.text === node.text);
+    if (declarations.length !== 1) return false;
+    const declaration = declarations[0];
+    if (!declaration.initializer || declaration.end >= node.pos
+        || !isActivePatientsPredicate(declaration.initializer)) return false;
+    const isPatientWhere = (call) => {
+        if (!ts.isCallExpression(call) || propertyName(call) !== 'where') return false;
+        let receiver = call.expression.expression;
+        while (ts.isCallExpression(receiver)) {
+            if (isFromPatients(receiver)) return true;
+            if (!ts.isPropertyAccessExpression(receiver.expression)) return false;
+            receiver = receiver.expression.expression;
+        }
+        return false;
+    };
+    let safe = true;
+    const visit = (current) => {
+        if (ts.isIdentifier(current) && current.text === node.text && current !== declaration.name) {
+            const call = current.parent;
+            if (current.pos < declaration.end || !isPatientWhere(call) || call.arguments.length !== 1
+                || call.arguments[0] !== current) safe = false;
+        }
+        ts.forEachChild(current, visit);
+    };
+    visit(block);
+    return safe;
+}
+
 function patientReadIsFiltered(fromCall) {
     for (let call = fromCall; call; call = directReceiverCall(call)) {
-        if (propertyName(call) === 'where' && call.arguments.some(isActivePatientsPredicate)) return true;
+        if (propertyName(call) === 'where' && call.arguments.some((argument) =>
+            isActivePatientsPredicate(argument) || isLocalConstantActivePredicate(argument))) return true;
     }
     return false;
 }
@@ -232,6 +274,28 @@ test('AST allowlist consumes fingerprints and rejects stale, substituted, or dup
     assert.doesNotThrow(() => assertAllowlistedPatientReads(baseline, allowlist));
     assert.throws(() => assertAllowlistedPatientReads(unfilteredPatientReads(path, 'db.select({ id: patients.id }).from(patients).get();'), allowlist));
     assert.throws(() => assertAllowlistedPatientReads(unfilteredPatientReads(path, 'db.select().from(patients).get(); db.select().from(patients).get();'), allowlist));
+});
+
+/* @Codex */
+test('AST guard follows a local immutable predicate without accepting aliases, mutation, or shadowing', () => {
+    const query = 'db.select().from(patients).where(condition).get();';
+    const active = 'const condition = and(eq(patients.id, id), activePatients());';
+    assert.deepEqual(unfilteredPatientReads('synthetic.ts', `function read() { ${active} ${query} ${query} }`), []);
+    for (const source of [
+        `function read() { let condition = activePatients(); ${query} }`,
+        `function read() { const condition = eq(patients.id, id); ${query} }`,
+        `function read() { const condition = or(activePatients(), eq(patients.id, id)); ${query} }`,
+        `function read() { ${active} condition.append(sql); ${query} }`,
+        `function read() { ${active} mutate(condition); ${query} }`,
+        `function read() { ${active} unrelated.where(condition); ${query} }`,
+        `function read() { ${active} const alias = condition; ${query} }`,
+        `function read() { ${active} condition = replacement; ${query} }`,
+        `function read() { ${query} ${active} }`,
+        `${active} function read() { ${query} }`,
+        `function read() { ${active} function other(condition) { ${query} } ${query} }`,
+    ]) {
+        assert.ok(unfilteredPatientReads('synthetic.ts', source).length > 0, source);
+    }
 });
 
 test('patients table access stays behind activePatients() outside the allowlist', () => {

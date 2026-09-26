@@ -16,7 +16,8 @@ read_when:
 > repository è definita da [AGENTS.md](../AGENTS.md) e
 > [docs/repository-topology.md](./repository-topology.md).
 
-Ultimo aggiornamento: 2026-09-20 (v0.8.6: release sorgente pubblicata; decisione sul deployment clinico ancora aperta)
+Ultimo aggiornamento del raccordo di consegna: 2026-09-26. Le prove della release
+del 20 settembre e delle candidature precedenti conservano data e revisione.
 
 <!-- reconciliation-20260912 -->
 **La `0.8.6` è stata pubblicata come [codice sorgente](https://github.com/Wulfgardr/mediflow/releases/tag/v0.8.6)
@@ -49,10 +50,34 @@ editoriale. Lo storico delle versioni resta nel [CHANGELOG](../CHANGELOG.md).
 
 Pubblicare i sorgenti e superare prove sintetiche non equivale ad ammettere
 un deployment clinico. Tale valutazione resta aperta in WUL-688 e spetta al
-referente competente; il coordinamento generale [WUL-669](https://linear.app/wulfgardr/issue/WUL-669)
-non è perciò concluso. Non viene dichiarata una nuova prova live di account o
+referente competente. Il coordinamento della consegna sorgente e del passaggio
+alla 0.9.0 [WUL-669](https://linear.app/wulfgardr/issue/WUL-669) è invece
+concluso dal 23 settembre. Non viene dichiarata una nuova prova live di account o
 provider consumer sul candidato finale. Integrazione ChatGPT, login,
 configurazione, prova sintetica ed esecuzione reale rimangono fatti distinti.
+
+### Seguito della consegna — 23 settembre, riletto il 26 settembre 2026
+
+Le [correzioni funzionali PR 358](https://github.com/Wulfgardr/mediflow/pull/358)
+e il [dossier PR 359](https://github.com/Wulfgardr/mediflow/pull/359) sono
+integrati in `main`, riletto a `6c212221a98f9b8e45cc1d243226d0adb41770bd`.
+Comprendono il ritorno alla lista dopo il primo paziente, la conservazione
+della preferenza del modello con funzione spenta e il messaggio della sintesi
+disattivata. Non modificano retroattivamente il tag o gli archivi `v0.8.6`.
+
+Il progetto 0.8.6 conta 21 issue concluse, quattro in revisione e due tracker
+superati: WUL-683/684 trasferiscono requisiti a WUL-705/728/732, senza
+dichiarare eseguito tutto il censimento o la semplificazione. WUL-685–688
+conservano applicabilità, ruoli, adozione delle procedure e decisione sul
+deployment concreto. Il loro stato non è un difetto software da chiudere
+automaticamente.
+
+WUL-729 conserva separatamente il timeout intermittente del selettore nativo
+AnyDoc osservato nella CI della PR 358: il tentativo successivo superato non
+ne dimostra la causa o la risoluzione. Il primo lavoro 0.9.0 parte dal
+censimento WUL-705 e dalle verifiche richieste, secondo la
+[roadmap](./ROADMAP.md#roadmap-vigente--21-settembre-2026), senza riaprire le
+accettazioni 0.8.6 già documentate né qualificare piattaforme differite.
 
 MediFlow si può usare senza AI. Le funzioni intelligenti sono facoltative e
 producono proposte da rivedere; i fornitori esterni sono spenti per

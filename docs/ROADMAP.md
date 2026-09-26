@@ -41,6 +41,11 @@ prerequisiti del consolidamento. Le direzioni di ricerca accettate dall'utente
 restano soggette a prove e decisioni sul loro perimetro. Backlog, codice
 conservato e pianificazione non attestano implementazione o qualifica.
 
+La [preparazione operativa del 26 settembre](./analysis/2026-09-26-09x-preparation.md)
+collega il consolidamento alle tappe successive: riuso delle prove 0.9.0,
+sequenza del pilota 0.9.1, casi sintetici e decisioni ancora da verificare.
+È materiale preparatorio; non anticipa l'accettazione delle issue o il rilascio.
+
 ### Raccordo dei branch storici
 
 I contributi già entrati in main non richiedono un secondo merge. I residui
