@@ -7,31 +7,15 @@ import { requireLocalApiToken } from '@/lib/security/local-api-auth';
 import { requireLocalApiActorSession } from '@/lib/security/server-auth';
 import type { EntrySummary } from '@/lib/api/v1/types';
 /* @Codex */
-import { normalizeEntryUpdateInput } from '@/lib/api-v1-clinical-write-normalization';
+import { parseEntryDeleteInput, prepareEntryUpdate, readEntryJsonObject } from '@/lib/entry-write-input';
+import { updateEntryOperation } from '@/lib/entry-write-operation';
 /* @Codex */
-import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/security/audit';
-import { buildEntryVersionConflictPayload, parseEntryExpectedVersion } from '@/lib/entry-concurrency';
-import { parseClinicalDeleteBody } from '@/lib/api-v1-clinical-lifecycle';
+import { auditContextFromSession, requestIdFromRequest } from '@/lib/security/audit';
 
 function toIsoString(value: unknown): string | null {
     if (!value) return null;
     const date = value instanceof Date ? value : new Date(value as string | number);
     return Number.isNaN(date.getTime()) ? null : date.toISOString();
-}
-
-// WUL-308: PHI-safe snapshot for the 409 version-conflict payload.
-async function selectEntryConflictSnapshot(patientId: string, entryId: string) {
-    return await dbServer
-        .select({
-            id: entries.id,
-            patientId: entries.patientId,
-            version: entries.version,
-            updatedAt: entries.updatedAt,
-            deletedAt: entries.deletedAt,
-        })
-        .from(entries)
-        .where(and(eq(entries.id, entryId), eq(entries.patientId, patientId)))
-        .get() ?? null;
 }
 
 export async function GET(
@@ -87,65 +71,17 @@ export async function PUT(
         /* @Codex */
         const auditSession = await requireLocalApiActorSession(request);
         const { id, entryId } = await params;
-        const body = await request.json() as Record<string, unknown>;
-        // WUL-308: child PUTs require optimistic concurrency like the patient PUT.
-        const expectedVersion = parseEntryExpectedVersion(body.version);
-        if (expectedVersion === null) {
-            return NextResponse.json({ error: 'Version is required' }, { status: 400 });
-        }
-
-        const existing = await dbServer.select({ id: entries.id }).from(entries)
-            .where(and(eq(entries.id, entryId), eq(entries.patientId, id)))
-            .get();
-        if (!existing) {
-            return NextResponse.json({ error: 'Not found' }, { status: 404 });
-        }
-
-        const normalized = normalizeEntryUpdateInput(body);
-        if (!normalized.ok) {
-            return NextResponse.json({ error: normalized.error }, { status: 400 });
-        }
-
-        const updateResult = await dbServer.update(entries)
-            .set({
-                ...normalized.values,
-                version: expectedVersion + 1,
-            })
-            .where(and(
-                eq(entries.id, entryId),
-                eq(entries.patientId, id),
-                eq(entries.version, expectedVersion),
-            ))
-            .run();
-
-        if (updateResult.changes === 0) {
-            return NextResponse.json(
-                buildEntryVersionConflictPayload(
-                    expectedVersion,
-                    entryId,
-                    await selectEntryConflictSnapshot(id, entryId),
-                ),
-                { status: 409 }
-            );
-        }
-
-        /* @Codex */
-        await safeWriteAuditEventFromRequest(
-            request,
-            auditSession,
-            {
-                eventType: normalized.values.deletedAt ? 'entry.deleted' : 'entry.updated',
-                subjectType: 'entry',
-                subjectRef: entryId,
-                redactedMetadata: {
-                    changedFields: listChangedFields(body, ['version']),
-                    resourceVersion: expectedVersion + 1,
-                },
-            },
-            '[MediFlow] Entry audit write failed:',
-        );
-
-        return NextResponse.json({ success: true });
+        const parsed = await readEntryJsonObject(request);
+        if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: parsed.status });
+        const prepared = prepareEntryUpdate(parsed.body, 'v1');
+        if (!prepared.ok) return NextResponse.json({ error: prepared.error }, { status: prepared.status });
+        const context = auditContextFromSession(auditSession);
+        const result = updateEntryOperation({ patientId: id, entryId, expectedVersion: prepared.expectedVersion,
+            values: prepared.values, changedFields: prepared.changedFields, mode: 'v1', audit: {
+                actorType: context.actorType, actorRef: context.actorRef, sourceSurface: context.sourceSurface,
+                requestId: requestIdFromRequest(request), flags: [`auth:${context.authContext}`],
+            } });
+        return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
         console.error('API PUT /api/v1/patients/[id]/entries/[entryId] error:', error);
         return NextResponse.json({ error: 'Failed to update entry' }, { status: 500 });
@@ -165,69 +101,19 @@ export async function DELETE(
         const auditSession = await requireLocalApiActorSession(request);
         const { id, entryId } = await params;
         // WUL-308: DELETE keeps the soft-delete tombstone and gains the version guard.
-        const parsedBody = await parseClinicalDeleteBody(request);
+        const parsedBody = await parseEntryDeleteInput(request, 'api-v1-delete');
         if (!parsedBody.ok) {
-            return NextResponse.json({ error: parsedBody.error }, { status: 400 });
+            return NextResponse.json({ error: parsedBody.error }, { status: parsedBody.status });
         }
-        const expectedVersion = parseEntryExpectedVersion(parsedBody.values.version);
-        if (expectedVersion === null) {
-            return NextResponse.json({ error: 'Version is required' }, { status: 400 });
-        }
-        const normalized = normalizeEntryUpdateInput({
-            deletedAt: parsedBody.values.deletedAt,
-            deletionReason: parsedBody.values.deletionReason,
-        });
-        if (!normalized.ok) {
-            return NextResponse.json({ error: normalized.error }, { status: 400 });
-        }
-
-        const existing = await dbServer.select({ id: entries.id }).from(entries)
-            .where(and(eq(entries.id, entryId), eq(entries.patientId, id)))
-            .get();
-        if (!existing) {
-            return NextResponse.json({ error: 'Not found' }, { status: 404 });
-        }
-
-        const updateResult = await dbServer.update(entries)
-            .set({
-                ...normalized.values,
-                version: expectedVersion + 1,
-            })
-            .where(and(
-                eq(entries.id, entryId),
-                eq(entries.patientId, id),
-                eq(entries.version, expectedVersion),
-            ))
-            .run();
-
-        if (updateResult.changes === 0) {
-            return NextResponse.json(
-                buildEntryVersionConflictPayload(
-                    expectedVersion,
-                    entryId,
-                    await selectEntryConflictSnapshot(id, entryId),
-                ),
-                { status: 409 }
-            );
-        }
-
-        /* @Codex */
-        await safeWriteAuditEventFromRequest(
-            request,
-            auditSession,
-            {
-                eventType: 'entry.deleted',
-                subjectType: 'entry',
-                subjectRef: entryId,
-                redactedMetadata: {
-                    changedFields: ['deletedAt', 'deletionReason'],
-                    resourceVersion: expectedVersion + 1,
-                },
-            },
-            '[MediFlow] Entry audit write failed:',
-        );
-
-        return NextResponse.json({ success: true });
+        const prepared = prepareEntryUpdate(parsedBody.body, 'v1', true);
+        if (!prepared.ok) return NextResponse.json({ error: prepared.error }, { status: prepared.status });
+        const context = auditContextFromSession(auditSession);
+        const result = updateEntryOperation({ patientId: id, entryId, expectedVersion: prepared.expectedVersion,
+            values: prepared.values, changedFields: prepared.changedFields, mode: 'v1', audit: {
+                actorType: context.actorType, actorRef: context.actorRef, sourceSurface: context.sourceSurface,
+                requestId: requestIdFromRequest(request), flags: [`auth:${context.authContext}`],
+            } });
+        return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
         console.error('API DELETE /api/v1/patients/[id]/entries/[entryId] error:', error);
         return NextResponse.json({ error: 'Failed to delete entry' }, { status: 500 });

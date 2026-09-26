@@ -34,13 +34,13 @@
       "path": "/api/v1/patients/{id}/entries",
       "methods": ["GET", "POST"],
       "trackingIssue": "WUL-40",
-      "reason": "Clinical entry operations are implemented but await a later contract publication pass after the patient thin slice. WUL-308: GET hides soft-deleted rows by default and accepts includeDeleted."
+      "reason": "Clinical entry operations are implemented but await a later contract publication pass after the patient thin slice. WUL-308: GET hides soft-deleted rows by default and accepts includeDeleted. WUL-720 C05: POST has a new 4194304-byte local JSON cap (413), strict operation fields (400), parent admission and mandatory audit in one transaction; duplicate explicit ID returns 409. See ADR0015."
     },
     {
       "path": "/api/v1/patients/{id}/entries/{entryId}",
       "methods": ["GET", "PUT", "DELETE"],
       "trackingIssue": "WUL-40",
-      "reason": "Clinical entry detail mutations remain implementation-only until their payloads are stabilized for broader client use. WUL-308: PUT and DELETE require version and return 409 VERSION_CONFLICT on stale versions; DELETE writes a soft-delete tombstone (deletedAt/deletionReason)."
+      "reason": "Clinical entry detail mutations remain implementation-only until their payloads are stabilized for broader client use. WUL-308: PUT and DELETE require version and return 409 VERSION_CONFLICT on stale versions; DELETE writes a soft-delete tombstone (deletedAt/deletionReason). WUL-720 C05: both mutations have a new 4194304-byte local JSON cap (413), strict operation fields (400), parent-not-deleted admission (404), currentness and required audit in one transaction. Archived parents remain eligible; entry restore does not restore the parent. See ADR0015."
     },
     {
       "path": "/api/v1/patients/{id}/checkups",

@@ -709,3 +709,88 @@ immutati. Il coordinatore conserva integrazione e accettazione; il seguito
 viene raccordato con il Chief alla consegna. Nessuna modifica esterna,
 pubblicazione o qualifica clinica. Tempi nei log; consumo d'account condiviso
 non attribuito alla coorte. Gli HOLD storici C14 restano separati e aperti.
+
+### Diario clinico ordinario: otto mutazioni, una sola autorita di scrittura
+
+Il raccordo successivo con il Chief ha assegnato a C05 la famiglia diario:
+POST/PUT/DELETE Web, POST/PUT/DELETE API v1 locale, POST/PUT paired network.
+Roster e hash delle sette sorgenti iniziali congelati prima del codice;
+normalizzatori condivisi e percorsi headless piu forti restano fuori scope.
+Nella baseline 77 casi piu nove supplementari, tutti i 16 guasti audit
+FAIL/IGNORE restituivano successo con voce modificata e nessun audit.
+Questa e una caratterizzazione del difetto, non un risultato accettato.
+
+ADR 0015 aggiornato prima dell'implementazione. Il Chief ha concordato due
+decisioni esplicite: padre mancante/eliminato restituisce 404 su tutte le
+otto mutazioni; le sei mutazioni locali introducono un limite JSON di
+4.194.304 byte. Sono restrizioni dichiarate, non proprieta retroattivamente
+attribuite a tutti gli handler, e non derivano da un censimento dei client.
+Il padre solo archiviato rimane ammesso. Ripristinare una voce non ripristina
+il paziente. Ruoli e scope continuano a precedere l'accesso non autorizzato;
+la rete conserva il proprio limite e le esclusioni AI/documenti gia previste.
+
+Due operazioni condivise racchiudono ammissione del padre, appartenenza di
+rete, identita, currentness/CAS, modifica e un solo audit obbligatorio nella
+medesima transazione IMMEDIATE. Un inserimento audit fallito o ignorato fa
+rollback; anche un UPDATE ignorato dopo il match della versione e un errore,
+non un falso successo. Il create locale duplicato restituisce 409; il replay
+rete identico conserva 200 senza doppio audit, ma solo dopo ammissione
+corrente del padre e dello scope. Gli identificativi validi restano opachi.
+
+Il controllo input e specifico del diario: JSON/forma/campi invalidi sono
+400, eccesso dichiarato o effettivo e 413 dopo autenticazione e prima degli
+effetti. Non introduce timeout o limiti di operazioni simultanee. Versioni
+intere sicure, date numeriche finite storiche, cifratura e formati strutturati
+sono preservati. I timestamp inviati dagli attuali form locali restano
+compatibili; createdAt memorizzato rimane dell'host. L'audit Web non assume
+l'identita native in presenza di bearer o header aggiuntivi.
+
+Le prove del candidato comprendono **151/151** casi SQLite con riapertura
+readonly, **22/22** reader canonico e versioni, **1/1** suite HTTP locale
+cookie/token e **1/1** suite paired reale. L'ordinazione padre/voce e stata
+verificata in due processi e connessioni SQLite: padre prima significa 404
+senza voce/audit; voce prima significa voce e audit persistenti anche dopo
+il tombstone del padre. Sono prove dell'operazione condivisa con gate
+sintetico SQLite, non un test HTTP di tutte le otto gare o una misura del
+tempo di blocco del database.
+
+Il form Web reale ha superato **1/1** caso Chromium: create, reload,
+cancellazione motivata, ripristino e nuova rilettura. Il probe separato
+readonly conferma versione 3 attiva, contenuto ENC, appartenenza conservata
+e un solo evento per create/delete/update. Nessuna modifica dell'interfaccia.
+La prima lettura finale era stata fermata dal prefisso di sicurezza del
+probe, non aggiornato dal coordinatore insieme alla root temporanea breve:
+corretto il solo harness e ripetuto il solo probe, non il browser gia passato.
+
+Le suite HTTP legacy invariate hanno rilevato una regressione del messaggio
+di errore DELETE: `Invalid date` al posto di `Invalid deletedAt`. Corretto
+il solo literal e aggiunti **2/2** casi Web/v1 con payload esatto e no-effects;
+poi le sette prove legacy/v1 sul collector integrato passano **7/7**.
+Il primo 6/7 e le tre correzioni iniziali del harness del writer restano
+conservati. Nessun test preesistente e stato modificato per ottenere il verde.
+
+Sol Medium e stato l'unico writer runtime/test; un secondo Sol ha preparato
+la prova UI e raccolto il roster. Astra Low ha eseguito review indipendente
+dei confini e del candidato. Il coordinatore mantiene contratto, integrazione
+e accettazione. La review ha individuato anche un falso positivo del nuovo
+guard statico (mutazione solo in callback non eseguita): corretto seguendo
+la catena diretta fino a run(), con controprova dedicata. Il guard collega
+ora le otto route al writer transazionale, senza pretendere di dimostrare
+staticamente scope/CAS o cifratura. Nessun difetto runtime bloccante emerso
+nella review; il successivo delta del messaggio e stato verificato per hash
+dal coordinatore. Le prove con dati sintetici non qualificano l'uso clinico.
+
+Passano lint, tipi, never-regress, claims, audit gate e build del candidato;
+OpenAPI 1.27.0 allinea le risposte gia presenti e documenta il contratto.
+La prima suite standard integrata conta 5.069 casi: 5.055 passati, due
+falliti e 12 skip. I soli due positivi delle route diario rete incontravano
+lo stub di dipendenza del test invece del nuovo helper entryJsonObject.
+Adattato il caricamento alle tre sorgenti reali esplicite, senza cambiare
+roster, cap, asserzioni o runtime; la suite mirata passa **31/31**. Il primo
+risultato resta conservato. La ripetizione completa segue questa correzione
+concreta, non un tentativo su sorgenti immutate per cercare un verde.
+La verifica standard finale conta **5.069 casi: 5.057 passati, zero errori o
+cancellazioni, 12 skip**. Non cambia concorrenza o soglie e non risolve per
+inferenza gli HOLD storici. La build finale del collector e registrata
+nella ricevuta finale di questa coorte. I precedenti snapshot 47/52 e gli
+HOLD C14 restano immutati. Nessun commit, pubblicazione o mutazione tracker.
