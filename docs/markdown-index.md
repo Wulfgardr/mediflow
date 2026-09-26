@@ -26,6 +26,8 @@ versione o risalire alla provenienza di un’interfaccia.
 
 | File | Scopo | Quando consultarlo |
 | --- | --- | --- |
+| [analysis/2026-09-26-rust-boundary-evaluation.md](./analysis/2026-09-26-rust-boundary-evaluation.md) | Preparazione WUL-706, prerequisiti, esperimento codec e confronto GPUI/Tauri/SwiftUI. | Prima della decisione Rust 0.9.2 o della valutazione shell 0.9.6. |
+| [adr/0137-rust-boundary-pilot-proposal.md](./adr/0137-rust-boundary-pilot-proposal.md) | ADR Proposed: confine Rust condizionato, IPC/FFI, protocollo e rollback. | Per riesaminare la proposta, senza inferire accettazione o runtime. |
 | [start-here.md](./start-here.md) | Esigenza ambulatoriale, uso senza AI e tre livelli di approfondimento. | Primo accesso al progetto. |
 | [release-085-readiness.md](./release-085-readiness.md) | Evidenze runtime, gate aperti, account Apple e promozione. | Prima di presentare o distribuire la 0.8.5. |
 | [getmediflow-editorial-proposal.md](./getmediflow-editorial-proposal.md) | Ragioni del racconto pubblico e rapporto tra sito, documentazione e runtime. | Revisione del racconto pubblico. |
