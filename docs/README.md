@@ -50,6 +50,11 @@ La 0.9.0 consolida il prodotto attuale; servizi condivisi, Rust,
 interoperabilità e distribuzione nativa hanno tappe successive distinte.
 I precedenti rinvii generici alla 1.0 restano storia, non il piano corrente.
 
+La [preparazione Rust/GPUI del 26 settembre](./analysis/2026-09-26-rust-boundary-evaluation.md)
+separa il codec sperimentale dalla futura verticale clinica e dalla scelta
+della shell. [ADR 0137](./adr/0137-rust-boundary-pilot-proposal.md) resta Proposed;
+non sostituisce i prerequisiti 0.9.0/0.9.1 né autorizza una migrazione runtime.
+
 ## Percorsi di lettura
 
 Per una prima visita, [Inizia qui](./start-here.md) e il [README del progetto](../README.md) spiegano
