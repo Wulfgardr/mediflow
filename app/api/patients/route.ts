@@ -33,34 +33,8 @@ import {
     listChangedFields,
     requestIdFromRequest,
     withAuditContextMetadata,
-    writeAuditEvent,
+    writeAuditEventInTransaction,
 } from '@/lib/security/audit';
-
-/* @Codex */
-async function recordPatientAuditEvent(
-    request: Request,
-    session: Awaited<ReturnType<typeof requireSession>>,
-    eventType: Parameters<typeof writeAuditEvent>[0]['eventType'],
-    subjectRef: string,
-    redactedMetadata: Parameters<typeof writeAuditEvent>[0]['redactedMetadata']
-): Promise<void> {
-    try {
-        const context = auditContextFromSession(session);
-        await writeAuditEvent({
-            eventType,
-            outcome: 'success',
-            actorType: context.actorType,
-            actorRef: context.actorRef,
-            subjectType: 'patient',
-            subjectRef,
-            sourceSurface: context.sourceSurface,
-            requestId: requestIdFromRequest(request),
-            redactedMetadata: withAuditContextMetadata(context, redactedMetadata),
-        });
-    } catch (error) {
-        console.error('[MediFlow] Patient audit write failed:', error);
-    }
-}
 
 export async function GET(request: Request) {
     /* @Codex */
@@ -155,6 +129,24 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: normalized.error }, { status: 400 });
         }
 
+        /* @Codex: host-derived audit identity is resolved before synchronous SQLite work. */
+        const auditContext = auditContextFromSession(session);
+        const requestId = requestIdFromRequest(request);
+        const writeCreateAudit = (tx: Parameters<Parameters<typeof dbServer.transaction>[0]>[0],
+            values: typeof normalized.values) => {
+            writeAuditEventInTransaction(tx, {
+                eventType: 'patient.created', outcome: 'success',
+                actorType: auditContext.actorType, actorRef: auditContext.actorRef,
+                subjectType: 'patient', subjectRef: values.id,
+                sourceSurface: auditContext.sourceSurface, requestId,
+                redactedMetadata: withAuditContextMetadata(auditContext, {
+                    changedFields: listChangedFields(values as Record<string, unknown>,
+                        ['id', 'version', 'createdAt', 'updatedAt']),
+                    resourceVersion: 1,
+                }),
+            });
+        };
+
         if (lane.kind === 'fenced') {
             createPatientAtPreviewDestination({
                 transaction: operation => dbServer.transaction(tx => operation({
@@ -162,13 +154,12 @@ export async function POST(request: Request) {
                     insertPatient: values => { tx.insert(patients).values(values).run(); },
                     insertMembership: (patientId, targetId) => {
                         tx.insert(patientsToAmbulatories).values({ patientId, ambulatoryId: targetId }).run();
+                        writeCreateAudit(tx, { ...normalized.values, ambulatoryId: targetId });
                     },
-                })),
+                }), { behavior: 'immediate' }),
             }, patientCreateContexts(patientCreateOwner), session, lane.precondition, normalized.values);
         } else {
-            // WUL-268 (STREAM A): the patient row and its ambulatory membership must be
-            // created atomically. better-sqlite3 transactions are synchronous, so no
-            // awaits inside; the async audit write stays outside (separate audit DB).
+            // WUL-268 (STREAM A): patient, membership, and required audit commit together.
             dbServer.transaction((tx) => {
                 tx.insert(patients).values(normalized.values).run();
 
@@ -179,15 +170,10 @@ export async function POST(request: Request) {
                         .onConflictDoNothing()
                         .run();
                 }
-            });
+                writeCreateAudit(tx, normalized.values);
+            }, { behavior: 'immediate' });
 
         }
-
-        /* @Codex */
-        await recordPatientAuditEvent(request, session, 'patient.created', normalized.values.id, {
-            changedFields: listChangedFields(body, ['id', 'version']),
-            resourceVersion: 1,
-        });
 
         return NextResponse.json({ id: normalized.values.id }, { status: 201 });
     } catch (error) {

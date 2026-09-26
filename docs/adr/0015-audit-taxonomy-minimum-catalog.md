@@ -272,3 +272,48 @@ seconda scrittura dopo risposta persa. La prova HTTP esistente della
 famiglia rete deve restare valida, con pairing, sessione e capability reali
 sintetici, oltre ai controlli del repository e alla review indipendente.
 Questo risultato non chiude C05 globale ne qualifica i client nativi.
+
+
+## Estensione C05 del 26 settembre 2026 — creazione paziente locale
+
+Contratto scritto prima del codice della coorte. Sono compresi i tre
+percorsi esistenti: POST Web legacy, POST Web `fixed-preview-v1` e POST
+API-v1 locale. Tutti devono salvare paziente, eventuale appartenenza
+ambulatoriale e un solo `patient.created` nella medesima transazione
+sincrona immediata. Il writer obbligatorio deve inserire esattamente un
+evento; errore o inserimento ignorato annullano tutti gli effetti. Il
+successo e restituito solo dopo il commit. Nessun fallback best-effort.
+
+Il percorso con anteprima conserva il suo contratto piu forte: ambulatorio
+fissato nella preview dell'host, generazione/sessione correnti, verifica
+preliminare e veto finale dell'owner dopo la callback. Se quel veto arriva
+dopo gli INSERT, la transazione deve annullare paziente, appartenenza e
+qualsiasi audit gia inserito; nessun successo deve precedere il controllo
+finale. Non si sostituisce `createPatientAtPreviewDestination` con CRUD
+generico e non si modifica l'owner fisico o il registro dei contesti.
+
+Per legacy e v1 restano i rispettivi criteri di scelta dell'ambulatorio,
+permessi, sessioni e token. Identita dell'attore, superficie e flag derivano
+dal contesto host, risolto prima della transazione senza attese al suo
+interno. Soggetto, `patient.created`, esito e versione iniziale 1 derivano
+dall'operazione. I metadati possono contenere solo nomi dei campi normalizzati
+e persistiti, versione e flag previsti: non nomi arbitrari o autorita
+proposti dal body, valori clinici, ciphertext o nonce dell'anteprima.
+Il riferimento di richiesta rimane correlazione, non identita.
+
+Validazione, normalizzazione, dati cifrati, stato di archiviazione ammesso
+alla creazione v1 e formato della risposta restano invariati. La creazione
+e create-only, non upsert: ID duplicati non sostituiscono dati o generano
+un secondo evento. Una risposta persa richiede rilettura e revisione; non
+introduce retry automatici ne replay garantito del successo. Nessuna nuova
+UI, capability, migrazione, outbox o riscrittura della storia.
+
+L'accettazione richiede baseline prima del runtime e i sei fault audit
+FAIL/IGNORE sui tre percorsi con confronto di stato completo da connessione
+indipendente. Servono successi con evento unico e attribuzione verificata;
+veto fisico dell'owner dopo gli INSERT con rollback anche dell'audit;
+precondizioni non valide, scadute o di altra generazione senza effetti;
+ID duplicato, concorrenza e retry della stessa richiesta senza duplicazioni.
+La prova HTTP dei percorsi ammessi e rifiutati e separata dalle prove con
+seam di autenticazione. Si riusano le evidenze UI e dei servizi invariati,
+con review del delta e controlli pertinenti, senza chiusura globale C05.
