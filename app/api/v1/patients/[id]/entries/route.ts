@@ -1,17 +1,16 @@
 // Codex: created 2026-02-01
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
-import { entries, patients } from '@/lib/schema';
+import { entries } from '@/lib/schema';
 import { and, desc, eq, gte, isNull, lte } from 'drizzle-orm';
 import { requireLocalApiToken } from '@/lib/security/local-api-auth';
 import { requireLocalApiActorSession } from '@/lib/security/server-auth';
 import type { EntrySummary } from '@/lib/api/v1/types';
-import { v4 as uuidv4 } from 'uuid';
 /* @Codex */
-import { normalizeEntryCreateInput } from '@/lib/api-v1-clinical-write-normalization';
-import { activePatients } from '@/lib/patient-lifecycle';
+import { prepareEntryCreate, readEntryJsonObject } from '@/lib/entry-write-input';
+import { createEntryOperation } from '@/lib/entry-write-operation';
 /* @Codex */
-import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/security/audit';
+import { auditContextFromSession, requestIdFromRequest } from '@/lib/security/audit';
 
 function toIsoString(value: unknown): string | null {
     if (!value) return null;
@@ -94,47 +93,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         /* @Codex */
         const auditSession = await requireLocalApiActorSession(request);
         const { id } = await params;
-        const body = await request.json() as Record<string, unknown>;
-        /* @Codex */
-        const auditBody = body;
-        const newId = typeof body.id === 'string' && body.id.trim().length > 0 ? body.id : uuidv4();
-        const normalized = normalizeEntryCreateInput(body, {
-            id: newId,
-            patientId: id,
-        });
-        if (!normalized.ok) {
-            return NextResponse.json({ error: normalized.error }, { status: 400 });
-        }
-
-        const created = dbServer.transaction((tx) => {
-            const patient = tx.select({ id: patients.id })
-                .from(patients)
-                .where(and(eq(patients.id, id), activePatients()))
-                .get();
-            if (!patient) return false;
-            tx.insert(entries).values(normalized.values).run();
-            return true;
-        });
-        if (!created) {
-            return NextResponse.json({ error: 'Patient not found' }, { status: 404 });
-        }
-
-        /* @Codex */
-        await safeWriteAuditEventFromRequest(
-            request,
-            auditSession,
-            {
-                eventType: 'entry.created',
-                subjectType: 'entry',
-                subjectRef: normalized.values.id,
-                redactedMetadata: {
-                    changedFields: listChangedFields(auditBody, ['id']),
-                },
-            },
-            '[MediFlow] Entry audit write failed:',
-        );
-
-        return NextResponse.json({ id: normalized.values.id }, { status: 201 });
+        const parsed = await readEntryJsonObject(request);
+        if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: parsed.status });
+        const prepared = prepareEntryCreate(parsed.body, 'v1', id);
+        if (!prepared.ok) return NextResponse.json({ error: prepared.error }, { status: prepared.status });
+        const context = auditContextFromSession(auditSession);
+        const result = createEntryOperation({ patientId: id, id: prepared.id, values: prepared.values,
+            changedFields: prepared.changedFields, mode: 'v1', audit: {
+                actorType: context.actorType, actorRef: context.actorRef, sourceSurface: context.sourceSurface,
+                requestId: requestIdFromRequest(request), flags: [`auth:${context.authContext}`],
+            } });
+        return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
         console.error('API POST /api/v1/patients/[id]/entries error:', error);
         return NextResponse.json({ error: 'Failed to create entry' }, { status: 500 });

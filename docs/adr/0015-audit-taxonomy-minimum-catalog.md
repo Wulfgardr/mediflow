@@ -421,3 +421,123 @@ rifiutato prima della prima lettura, auth-prima-accesso/lettura, stato SQLite
 completo invariato sui rifiuti e HTTP 413 con positivo ammesso. Riutilizzare
 suite e semantiche del reader canonico, transazione/audit e altre superfici
 immutate; nessun normalizzatore generico o ampliamento ad altri writer.
+
+
+## Estensione C05 del 26 settembre 2026 — diario clinico ordinario
+
+Roster congelato prima del runtime: POST `/api/entries`, PUT/DELETE
+`/api/entries/{id}`, POST `/api/v1/patients/{id}/entries`, PUT/DELETE
+`/api/v1/patients/{id}/entries/{entryId}`, POST e PUT dei corrispondenti
+percorsi `/api/v1/network/patients/{id}/entries*`. Sono otto mutazioni,
+non dieci: i due export di `network-entry-write` sono writer delle due
+route rete, non ulteriori operazioni. GET, altre famiglie cliniche e il
+writer SOAP headless con grant/receipt piu forti restano fuori da questa
+coorte. Non vengono aggiunti DELETE rete, hard delete, nuove capability
+headless o autorita di scrittura per agenti.
+
+La baseline reale su SQLite ha riprodotto tutte le sedici combinazioni
+operazione/superficie con fault audit FAIL e IGNORE: successo HTTP del
+handler e modifica persistita senza evento. Ha inoltre osservato JSON null
+o malformato convertiti in 500, proprieta estranee accettate, date booleane
+convertite in timestamp e tipo numerico ignorato durante una modifica
+altrimenti valida. Queste sono osservazioni precedenti alla correzione,
+non accettazione del comportamento. Auth e capability nella baseline sono
+seam dichiarati; le prove HTTP restano un passaggio distinto.
+
+### Decisione del confine ordinario
+
+Creazione e aggiornamento del diario convergono su una sola operazione
+ordinaria condivisa per ciascuna semantica, non su un framework CRUD.
+Gli adapter conservano ammissione Web, token locale e capability/sessione/
+scope del paired client. Nella stessa transazione sincrona IMMEDIATE
+vengono risolti identita e appartenenza della voce, currentness, scrittura
+con esattamente una riga interessata ed evento audit obbligatorio tramite
+la primitiva C04. Nessun await o connessione audit distinta nel callback.
+Un inserimento audit fallito o ignorato, oppure una scrittura ignorata dopo
+il controllo della versione, non produce successo: rollback di tutti gli
+effetti. La risposta positiva viene costruita dopo il commit.
+
+Il contesto audit deriva esclusivamente dall'ammissione host. Nelle route
+Web un bearer aggiunto alla sessione non cambia l'attore/superficie ammessi;
+API locale e rete conservano la propria attribuzione e i flag governati.
+Soggetto, tipo evento e resourceVersion derivano dall'operazione e dallo
+stato. changedFields deriva solo dai nomi dei valori effettivamente
+normalizzati/applicati, mai da chiavi estranee o contenuti clinici.
+
+Le differenze di contratto restano esplicite: Web e API locale non ricevono
+le autorizzazioni della rete o viceversa; la rete mantiene i propri vincoli
+ENC, i campi AI/document-derived esclusi e i timestamp controllati dall'host.
+Metadata, riferimenti allegati e ciphertext restano opachi e conservano la
+rappresentazione ammessa. Nessuna decifratura o reinterpretazione clinica.
+Gli esiti e i payload 409 di concorrenza restano quelli della voce diario.
+
+Il replay di create con identificativo esplicito e payload esattamente uguale
+resta idempotente soltanto in rete, con 200 e nessun secondo evento; payload
+diverso e conflitto. Nei create locali l'identificativo gia occupato produce
+409 senza effetti invece del precedente 500 di vincolo, senza introdurre
+la garanzia idempotente della rete. La ripetizione di una modifica con la
+vecchia versione restituisce 409 e non registra un secondo successo.
+
+### Ingressi della stessa famiglia
+
+Un controllo specifico per il diario precede i normalizzatori esistenti,
+senza cambiare quelli di terapie, osservazioni o checkup. JSON null, array,
+primitivi, malformato, proprieta proprie non ammesse, identificativi espliciti
+non stringa/vuoti e valori invalidi producono errori client prima degli
+effetti. Identificativi opachi validi non sono trasformati in UUID; un UUID
+viene generato soltanto quando l'identificativo di create e omesso.
+Le versioni devono essere interi positivi rappresentabili esattamente, con
+incremento sicuro. Date numeriche finite gia ammesse restano compatibili;
+booleani, oggetti e valori non validi non sono date. In un update, type e
+content presenti devono essere stringhe, non ignorati se di tipo diverso.
+
+Compatibilita locale esplicita: i chiamanti Web correnti inviano createdAt e
+updatedAt. createdAt viene validato ma l'istante memorizzato resta dell'host;
+updatedAt mantiene la normalizzazione storica. Questo adapter puo essere
+ritirato solo dopo migrazione dei DTO di creazione e dei chiamanti che
+inviano createdAt, non facendo fallire silenziosamente i client esistenti.
+La rete continua a rifiutare questi campi client, come da ADR 0053.
+
+La voce conserva il proprio tombstone reversibile. Omissione di deletedAt
+non e cancellazione, null esplicito ripristina tramite PUT e CAS; la forma
+vuota storicamente ammessa dal normalizzatore resta compatibilita di clear.
+DELETE locale resta soft-delete, con motivo/timestamp predefiniti della
+superficie e nessuna cancellazione fisica. Il vocabolario non cambia:
+ripristinare una voce resta entry.updated, non un evento inventato.
+
+### Decisioni su stato del padre e budget del corpo
+
+Il raccordo con il Chief del 26 settembre rende esplicito, prima del codice
+dipendente, il rifiuto 404 per padre mancante o tombstoned su tutte le otto
+mutazioni. E una decisione di consolidamento motivata da ADR 0066, non la
+pretesa che tutti gli handler precedenti gia la applicassero. L'ammissione
+avviene nella stessa transazione di scope, currentness, modifica e audit.
+Le guardie di ruolo/scope precedenti restano prima della lettura del body e
+non rivelano nuova informazione di esistenza al chiamante non ammesso.
+
+Un padre solo isArchived resta ammesso. PUT deletedAt:null con CAS puo
+ripristinare la voce quando il padre e attivo: non ripristina implicitamente
+il paziente. Anche l'idempotenza del create rete segue prima l'ammissione
+corrente del padre e lo scope; il replay identico di una voce non concede
+accesso a un padre ora eliminato e non ripete effetti o audit. Le prove
+baseline/candidato mostrano espressamente questa variazione e le ordinazioni
+fra tombstone del padre e scrittura del diario, senza equiparare un singolo
+processo HTTP a tutte le forme di concorrenza del database.
+
+La rete conserva il tetto gia governato di 4 MiB (ADR 0124). Le sei mutazioni
+locali introducono un NUOVO limite specifico di **4.194.304 byte (4 MiB)**,
+scelto per questa famiglia di payload clinici nello stesso ordine di grandezza
+della rete, non ereditato dal ripristino amministrativo di 64 KiB.
+In precedenza gli inviluppi locali non avevano un massimo governato; richieste
+superiori prima ammesse ora ricevono 413. Non e stato svolto un censimento
+dei client reali. Payload cifrati entro il tetto sono preservati senza tagli
+o normalizzazioni del lettore.
+
+Il reader canonico in modalita request-json interviene dopo i gate pertinenti.
+413 su eccesso dichiarato o effettivo prima degli effetti; 400 su forma/JSON/
+proprieta non ammesse, conservando gli altri errori contrattuali della
+superficie. Nessun nuovo limite temporale o di operazioni simultanee.
+Le prove coprono confine esatto, UTF-8/chunk, Content-Length assente o
+fuorviante, rifiuti senza effetti e compatibilita dei campi temporali del
+client, riusando le prove valide del reader. Timestamp invalidi non vengono
+accettati tramite l'adapter locale e createdAt non diventa autorita client.

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: MediFlow Local API v1
-  version: 1.26.0
+  version: 1.27.0
   summary: Stable patient contract plus executable home-base network slice with explicit pairing review, paired-client auth boundary, ambulatory scope options, scoped remote patient, cross-patient agenda and diary reads, therapy, checkup, observation, and catalog read boundaries, replica planning state, explicit identity summary, and declarative AI runtime summary for the local `/api/v1` surface.
   description: |
     OpenAPI contract for the client-facing local API defined by ADR 0010.
@@ -2289,7 +2289,12 @@ paths:
         a paired client with `network.replica.write-clinical-diary`, an active
         operator session, and the effective ambulatory scope resolved by the
         home-base node. Remote attachment/document-derived writes and AI fields
-        are excluded from this boundary.
+        are excluded from this boundary. Patient admission (not soft-deleted),
+        ambulatory scope, mutation and mandatory audit share one transaction;
+        an audit failure rolls back the entry. An archived-only patient remains
+        eligible. A repeated explicit entry ID with identical content returns
+        200 without a new mutation or audit, after current patient/scope admission;
+        different content returns 409. A missing or soft-deleted parent returns 404.
       security:
         - pairedClientId: []
           pairedClientToken: []
@@ -2311,11 +2316,28 @@ paths:
               createNetworkEntry:
                 value:
                   type: note
-                  title: Diario clinico
+                  title: ENC:dGl0bGVpdg==:dGl0bGVjaXBoZXI=
                   date: '2026-05-02T09:00:00.000Z'
-                  content: Nota preparata dal client paired
+                  content: ENC:Y29udGVudGl2:Y29udGVudGNpcGhlcg==
                   setting: ambulatory
       responses:
+        '200':
+          description: Identical explicit-ID create replay; current admission required and no second audit.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [id, version, idempotent]
+                properties:
+                  id:
+                    type: string
+                  version:
+                    type: integer
+                    minimum: 1
+                  idempotent:
+                    type: boolean
+                    const: true
         '201':
           description: Entry created through the paired boundary.
           content:
@@ -2330,6 +2352,16 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          description: Explicit entry ID conflicts with existing content or identity; no effects.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [error]
+                properties:
+                  error:
+                    type: string
         '413':
           $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
@@ -2389,7 +2421,11 @@ paths:
         the effective ambulatory scope resolved by the home-base node. Hard
         delete, remote attachment/document writes, and AI/document-derived
         fields are excluded; soft delete and restore use `deletedAt` and
-        `deletionReason`.
+        `deletionReason`. Parent admission (not soft-deleted), scope, version,
+        mutation and mandatory audit share one transaction. Missing or soft-deleted
+        parents return 404; archived-only parents remain eligible. Restoring an
+        entry with deletedAt:null does not restore its parent. Audit failure rolls
+        back all entry changes and the version increment.
       security:
         - pairedClientId: []
           pairedClientToken: []
@@ -2417,12 +2453,12 @@ paths:
               updateNetworkEntry:
                 value:
                   version: 2
-                  content: Nota aggiornata dal client paired
+                  content: ENC:dXBkYXRlaXY=:dXBkYXRlY2lwaGVy
               softDeleteNetworkEntry:
                 value:
                   version: 2
                   deletedAt: '2026-05-02T10:00:00.000Z'
-                  deletionReason: duplicate-entry
+                  deletionReason: ENC:ZGVsZXRlaXY=:ZGVsZXRlY2lwaGVy
       responses:
         '200':
           description: Entry updated through the paired boundary.

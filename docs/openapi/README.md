@@ -129,7 +129,9 @@ Aggiorna la spec:
 
 ## Baseline attuale
 
-La baseline descritta è la versione `1.24.0` del contratto.
+La versione del contratto è `1.27.0`. L'incremento C05 documenta anche le
+risposte già esistenti `200` (replay) e `409` della creazione diario paired;
+non introduce un nuovo endpoint o una nuova forma di risposta nel runtime.
 
 Per evitare che il controllo della dimensione si traduca in un troncamento
 silenzioso dei campi, [ADR 0124](../adr/0124-bounded-native-network-json.md)
@@ -226,6 +228,13 @@ ad accedere ai suoi dati e a eseguire operazioni:
   `network.replica.write-clinical-diary`, `entries.version`, `409`
   PHI-safe e soft delete via `deletedAt`; hard delete, attachment e campi
   AI/document-derived restano fuori boundary
+  Nel candidato C05, padre attivo e scope sono verificati nella transazione
+  con versione, modifica e audit obbligatorio. Padre eliminato o mancante:
+  404; la sola archiviazione resta ammessa. Il replay create identico mantiene
+  200 idempotente soltanto dopo l'ammissione corrente, senza secondo audit.
+  Le sei mutazioni del diario Web/API locale adottano esplicitamente un nuovo
+  cap di 4 MiB, dopo auth; non e un limite globale delle API locali.
+  Contratto e compatibilita: [ADR 0015](../adr/0015-audit-taxonomy-minimum-catalog.md#estensione-c05-del-26-settembre-2026--diario-clinico-ordinario).
 - `/api/v1/network/patients/{id}/therapies*` pubblica la slice terapie paired:
   capability `network.replica.readonly-therapies` /
   `network.replica.write-therapies`, `therapies.version`, `409` PHI-safe e

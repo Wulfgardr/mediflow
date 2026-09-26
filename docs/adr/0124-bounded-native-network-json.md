@@ -108,3 +108,14 @@ ordine admission/auth, 413 senza servizi downstream, richieste entro cap e
 compatibilita del fallback DELETE/login. Nessun server, DB reale, riproduzione
 di vulnerabilita, build Next o verifica del bundle distribuito e richiesta da
 questa lane. La receipt esterna identifica commit e check effettivamente eseguiti.
+
+
+## Raccordo C05 diario locale, 26 settembre 2026 (candidato locale)
+
+La decisione specifica nell'[estensione diario di ADR 0015](./0015-audit-taxonomy-minimum-catalog.md#estensione-c05-del-26-settembre-2026--diario-clinico-ordinario)
+introduce 4.194.304 byte per le sole sei mutazioni JSON Web/API locale del
+diario. E un nuovo tetto per ingressi prima non limitati, non un'estensione
+automatica di questa ADR a tutte le route locali. Le due mutazioni del diario
+rete conservano il limite gia previsto qui. Il reader canonico e riusato
+senza cambiarne semantica; nessun limite di durata/inflight e nessuna promessa
+di compatibilita con richieste locali storicamente di dimensione arbitraria.
