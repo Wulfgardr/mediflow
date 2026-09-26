@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { spawnSync } from 'node:child_process';
 import {
     applyBackupRetention,
     applyRetentionResultToState,
@@ -194,6 +195,20 @@ test('builds Windows wrapper cmd carrying the backup env vars', () => {
     assert.doesNotMatch(cmd, /--experimental-strip-types/);
 });
 
+test('Windows wrapper preserves literal percent and exclamation paths with a runner exit code', () => {
+    const cmd = buildWindowsWrapperCmd({
+        nodePath: 'C:\\Program Files\\node%LOCALAPPDATA%!\\node.exe',
+        runnerPath: 'C:\\app %PATH%!\\runner.mjs',
+        dataDir: 'C:\\data %USERNAME%!\\folder',
+        destinationDir: 'C:\\backup %TEMP%!\\folder',
+    });
+    assert.match(cmd, /^@echo off\r\nsetlocal DisableDelayedExpansion\r\n/);
+    assert.match(cmd, /set "MEDIFLOW_DATA_DIR=C:\\data %%USERNAME%%!\\folder"/);
+    assert.match(cmd, /set "MEDIFLOW_BACKUP_DEST_DIR=C:\\backup %%TEMP%%!\\folder"/);
+    assert.match(cmd, /"C:\\Program Files\\node%%LOCALAPPDATA%%!\\node\.exe" "C:\\app %%PATH%%!\\runner\.mjs"/);
+    assert.match(cmd, /\r\nendlocal & exit \/b %errorlevel%\r\n$/);
+});
+
 test('builds systemd service and timer units with OnCalendar', () => {
     const service = buildSystemdServiceUnit({ nodePath: '/usr/bin/node', runnerPath: '/app/runner.mjs', projectRoot: '/app', dataDir: '/home/u/.mediflow', destinationDir: '/backups with spaces' });
     assert.match(service, /Type=oneshot/);
@@ -205,6 +220,43 @@ test('builds systemd service and timer units with OnCalendar', () => {
     assert.match(timer, /WantedBy=timers\.target/);
 });
 
+test('systemd doubles specifiers in every path and dollars only in ExecStart arguments', () => {
+    const service = buildSystemdServiceUnit({
+        nodePath: '/opt/node %n/${NODE}/node',
+        runnerPath: '/app %i/$HOME/runner.mjs',
+        projectRoot: '/app %n/$HOME',
+        dataDir: '/data %u/${DATA}',
+        destinationDir: '/backup %t/$HOME/with "quote" and \\slash',
+    });
+    assert.match(service, /WorkingDirectory=\/app %%n\/\$HOME\n/);
+    assert.match(service, /Environment="MEDIFLOW_DATA_DIR=\/data %%u\/\$\{DATA\}"/);
+    assert.match(service, /Environment="MEDIFLOW_BACKUP_DEST_DIR=\/backup %%t\/\$HOME\/with \\"quote\\" and \\\\slash"/);
+    assert.match(service, /ExecStart="\/opt\/node %%n\/\$\{NODE\}\/node" "\/app %%i\/\$\$HOME\/runner\.mjs"/);
+});
+
+test('systemd rejects WorkingDirectory suffixes that would change the path', () => {
+    for (const suffix of [' ', '\t', '\\']) {
+        assert.throws(
+            () => buildSystemdServiceUnit({
+                nodePath: '/usr/bin/node',
+                runnerPath: '/app/runner.mjs',
+                projectRoot: `/app/project${suffix}`,
+                dataDir: '/data',
+                destinationDir: '/backup',
+            }),
+            /Il backup automatico non può usare questa cartella/,
+        );
+    }
+    const service = buildSystemdServiceUnit({
+        nodePath: '/usr/bin/node',
+        runnerPath: '/app/runner.mjs',
+        projectRoot: '/app/with "quote" and \\segment',
+        dataDir: '/data',
+        destinationDir: '/backup',
+    });
+    assert.match(service, /WorkingDirectory=\/app\/with "quote" and \\segment\n/);
+});
+
 test('builds cron line with marker and env', () => {
     const line = buildCronLine({ nodePath: '/usr/bin/node', runnerPath: '/app/runner.mjs', projectRoot: '/app root', dataDir: '/d', destinationDir: "/b's", hour: 2, minute: 0 });
     assert.match(line, /^0 2 \* \* \* /);
@@ -212,6 +264,37 @@ test('builds cron line with marker and env', () => {
     assert.match(line, /MEDIFLOW_BACKUP_DEST_DIR='\/b'\\''s'/);
     assert.doesNotMatch(line, /--experimental-strip-types/);
     assert.match(line, /# dev\.wulfgardr\.mediflow\.backup$/);
+});
+
+test('cron passes literal percent, backslash, quote and dollar paths to the shell', async (t) => {
+    if (process.platform === 'win32') return t.skip('requires a POSIX shell');
+    const tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'mediflow-cron-paths-'));
+    try {
+        const projectRoot = path.join(tempDir, "project % ' $HOME");
+        const nodePath = path.join(tempDir, 'node \\% $HOME');
+        const runnerPath = path.join(projectRoot, 'runner % file.mjs');
+        const dataDir = path.join(tempDir, "data \\% ' $HOME");
+        const destinationDir = path.join(tempDir, 'output % \\ $.json');
+        await fs.promises.mkdir(projectRoot);
+        await fs.promises.symlink(process.execPath, nodePath);
+        await fs.promises.writeFile(runnerPath, "import fs from 'node:fs'; fs.writeFileSync(process.env.MEDIFLOW_BACKUP_DEST_DIR, JSON.stringify({cwd: process.cwd(), dataDir: process.env.MEDIFLOW_DATA_DIR, runner: process.argv[1]}));");
+        const line = buildCronLine({ nodePath, runnerPath, projectRoot, dataDir, destinationDir, hour: 2, minute: 0 });
+        const cronCommand = line.replace(/^0 2 \* \* \* /, '').replace(/ # dev\.wulfgardr\.mediflow\.backup$/, '');
+        // Cronie removes the slash before each escaped %, leaving other slashes intact.
+        let shellCommand = '';
+        let escaped = false;
+        for (const char of cronCommand) {
+            if (escaped && char === '%') shellCommand = shellCommand.slice(0, -1);
+            else if (!escaped && char === '%') assert.fail('unescaped cron percent');
+            shellCommand += char;
+            escaped = !escaped && char === '\\';
+        }
+        const result = spawnSync('/bin/sh', ['-c', shellCommand], { encoding: 'utf8' });
+        assert.equal(result.status, 0, result.stderr);
+        assert.deepEqual(JSON.parse(await fs.promises.readFile(destinationDir, 'utf8')), { cwd: await fs.promises.realpath(projectRoot), dataDir, runner: runnerPath });
+    } finally {
+        await fs.promises.rm(tempDir, { recursive: true, force: true });
+    }
 });
 
 test('rejects unsafe scheduler command values before writing OS job files', () => {
