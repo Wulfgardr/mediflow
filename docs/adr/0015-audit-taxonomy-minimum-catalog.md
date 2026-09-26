@@ -317,3 +317,107 @@ ID duplicato, concorrenza e retry della stessa richiesta senza duplicazioni.
 La prova HTTP dei percorsi ammessi e rifiutati e separata dalle prove con
 seam di autenticazione. Si riusano le evidenze UI e dei servizi invariati,
 con review del delta e controlli pertinenti, senza chiusura globale C05.
+
+
+## Estensione C05 del 26 settembre 2026 — ripristino amministrativo paziente
+
+Contratto scritto prima del runtime della coorte, dopo il roster delle
+operazioni. Il perimetro e il POST esistente `/api/system/restore-patient`;
+il GET amministrativo resta di sola lettura. Entrambi richiedono una
+sessione Web admin: un token locale, una sessione nativa o il ruolo medico
+non conferiscono questa autorita. Restano separati ripristino di rete,
+riattivazione dall'archivio, eliminazione definitiva e recupero da backup.
+
+Il POST continua ad accettare `patientId`, senza introdurre versione
+attesa del client, grant, receipt o replay garantito. L'host acquisisce una
+transazione SQLite sincrona immediata prima di leggere stato e versione
+correnti. Paziente assente resta 404; paziente non cancellato logicamente,
+compresa una richiesta ripetuta dopo il successo, resta 409. Il ripristino
+cancella soltanto i due campi del tombstone, aggiorna `updatedAt` e incrementa
+la versione corrente di uno. Conserva archiviazione, ciphertext, associazioni
+ambulatoriali e figli. L'UPDATE verifica ID, versione letta e tombstone;
+deve modificare esattamente una riga, altrimenti la transazione fallisce.
+
+Il medesimo commit deve contenere un solo evento `patient.restored`, scritto
+con il writer audit transazionale obbligatorio gia adottato. Errore o INSERT
+ignorato annullano tutti gli effetti. Solo dopo il commit puo uscire la
+risposta esistente `{success:true, patientId, version}`. Le richieste
+concorrenti osservano la decisione serializzata dell'host; una seconda
+richiesta non restituisce il successo precedente e non genera un altro
+evento. La rilettura autorevole dello stato resta necessaria dopo un esito
+incerto, senza retry automatici.
+
+Attore, superficie Web e flag di sessione derivano dalla sessione admin
+ammessa, non da body, header di superficie o un bearer aggiuntivo. Il
+riferimento di richiesta e solo correlazione. Metadati limitati ai due nomi
+di campo del tombstone, versione risultante e flag di autenticazione:
+nessun motivo di cancellazione, contenuto clinico o valore cifrato.
+
+Il corpo ammesso contiene soltanto `patientId`, stringa non vuota dopo trim.
+Il raccordo C05 seguente introduce esplicitamente un massimo di 65.536 byte
+per questo POST: 413 per eccesso dichiarato o osservato, 400 per JSON
+malformato, null, array, primitivo o proprieta non supportate, prima di
+qualunque scrittura. Nessuna nuova semantica di versione del client. Questa
+coorte non completa la normalizzazione generale degli input C05.
+
+L'accettazione distingue baseline e candidato: SQLite reale con audit FAIL
+ed IGNORE, UPDATE ignorato, confronto completo da connessione riaperta,
+conservazione di figli e associazioni, evento unico e attribuzione host.
+Servono rifiuti di autenticazione/ruolo senza effetti, JSON non valido,
+404/409, contesa e riproposizione dopo successo. Le prove HTTP con cookie
+reali sono separate dalle seam dei test di handler; il token solo non deve
+autorizzare il ripristino. Si riusano primitive e prove non modificate e si
+riesamina il delta indipendentemente, senza dichiarare chiusi C05 o C14.
+
+
+### Raccordo C05 successivo alla prima consegna amministrativa
+
+La prima consegna ha dimostrato atomicita e attribuzione dell'audit, ma la
+review del requisito WUL-720 ha rilevato un residuo: le proprieta estranee
+venivano ignorate, compresi `version` ed `expectedVersion`. La precedente
+scelta di non introdurre una allowlist non soddisfa il requisito sui campi
+non supportati; questo raccordo la sostituisce per il solo POST di ripristino
+amministrativo, prima del relativo nuovo delta runtime. Lo snapshot della
+prima consegna e le sue prove restano immutati, con accettazione circoscritta
+all'atomicita/audit e non a tutto il contratto di input.
+
+Il body ammesso contiene soltanto `patientId`, stringa non vuota dopo trim.
+Ogni altra proprieta deve produrre 400 prima di scritture o audit, anche se
+porta nomi di attore, superficie o controllo versione. Non si introduce CAS
+del client: un campo versione non appartiene a questa operazione e non deve
+sembrare accettato. Il successo viene provato con il solo campo ammesso;
+header aggiuntivi non autorevoli restano una prova distinta sull'identita
+host, non una giustificazione per accettare proprieta estranee nel body.
+Autenticazione e ruolo Web admin precedono qualsiasi lettura del corpo.
+
+Il budget del corpo e un requisito distinto dalla forma JSON-object e dalla
+allowlist. La ricerca delimitata non ha trovato un massimo gia governato
+per questo POST. Il raccordo del 26 settembre, concordato con il Chief of
+Staff nel mandato C05, introduce quindi una NUOVA restrizione esplicita:
+massimo 65.536 byte (64 KiB) per il solo inviluppo amministrativo di questa
+operazione. Non e un limite ereditato da native/network, allegati, AI o Next.
+La busta contiene un solo identificativo opaco, non dati clinici o ciphertext.
+
+Dopo autenticazione e ruolo Web admin, leggere il corpo con la primitiva
+canonica `readBoundedJsonBody` in modalita `request-json`, usando una costante
+locale alla route. Il massimo riguarda sia la dimensione dichiarata sia i
+byte effettivi, prima di decodifica/parse: 413 se uno supera il tetto, senza
+troncature e senza transazione/audit. Il confine esatto e ammesso quando
+forma e campo sono validi; UTF-8 e contato in byte, anche tra chunk.
+Restano 400 per errori di lettura/JSON, forma o proprieta non supportate.
+Non introdurre nuovi limiti di durata o operazioni simultanee e non
+presentare questo vincolo byte come garanzia sul tempo totale di lettura.
+
+Compatibilita: in precedenza identificativi opachi e whitespace non avevano
+un massimo documentato per questo ingresso. Inviluppi storicamente ammessi
+ma superiori al nuovo tetto ora ricevono 413. Questa e una restrizione
+intenzionale del contratto, non l'esito di un censimento dei client reali;
+nessun dato clinico reale e stato consultato. I vecchi snapshot conservano
+contratto e prove storici, senza riscriverne l'accettazione.
+
+Accettazione del delta: confine esatto e superamento di un byte, UTF-8
+multibyte, chunked e Content-Length assente o fuorviante, eccesso dichiarato
+rifiutato prima della prima lettura, auth-prima-accesso/lettura, stato SQLite
+completo invariato sui rifiuti e HTTP 413 con positivo ammesso. Riutilizzare
+suite e semantiche del reader canonico, transazione/audit e altre superfici
+immutate; nessun normalizzatore generico o ampliamento ad altri writer.

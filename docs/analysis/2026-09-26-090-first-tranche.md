@@ -551,3 +551,161 @@ Il coordinatore core mantiene ownership dei tre HOLD:
 La disposizione e le ricevute sono conservate in `c14-runner-disposition`
 nel run locale. Il censimento C14 completo e il precedente HOLD del selettore
 nativo AnyDoc restano aperti e distinti da questa correzione.
+
+
+## Milestone — ripristino amministrativo e tracce C14, 26 settembre 2026
+
+Dopo l'accettazione della milestone C14, il Chief of Staff ha indicato la
+coorte amministrativa C05/WUL-720. Roster congelato prima del codice: GET
+elenco e POST `/api/system/restore-patient`, solo sessione Web admin. Nessun
+chiamante UI corrente trovato nelle sorgenti tracciate; questo non prova
+che la route non sia usata. Ripristino rete, riattivazione dall'archivio,
+eliminazione definitiva e recupero da backup restano distinti e invariati.
+
+La baseline SQLite reale ha rilevato due guasti audit (FAIL e IGNORE) con
+risposta 200 e tombstone rimosso senza evento. Ha inoltre mostrato che un
+bearer locale aggiunto alla sessione Web cambiava erroneamente la superficie
+audit in `native`; JSON null produceva 500 senza effetti. Tutte le prove
+precedenti sono conservate negli artefatti locali ignorati da Git.
+
+Il candidato preserva il body con il solo `patientId`: nessuna nuova versione
+attesa del client, receipt o autorizzazione. Nella stessa transazione
+sincrona IMMEDIATE l'host legge stato/versione, verifica la riga, ripristina
+il tombstone e scrive un solo audit obbligatorio. Fallimento o inserimento
+ignorato annullano l'intera operazione; un UPDATE ignorato non diventa un
+successo. Assente resta 404, attivo o richiesta ripetuta resta 409. Restano
+identici figli, appartenenze, ciphertext e archiviazione. L'audit deriva
+dalla sessione Web ammessa; JSON malformato/null/array/primitivo riceve 400.
+ADR 0015 aggiornato prima del runtime; riusate le primitive esistenti.
+
+Prove accettate: **23/23** handler/SQLite con rilettura da nuova connessione,
+**1/1** scenario HTTP con cookie reale, GET prima/dopo, token-only rifiutato,
+contesa `[200,409]` e riproposizione senza secondo evento; **5/5** confine
+autorizzativo e **31/31** soft-delete. Il fingerprint della medesima lettura
+amministrativa e stato spostato da `dbServer` a `tx`, mantenendo percorso,
+query e molteplicità: nessuna nuova eccezione alla guardia. Il suo FAIL
+iniziale e conservato. La prova HTTP riguarda un solo processo server;
+i dinieghi dei diversi ruoli sono verificati nei test con seam di sessione.
+
+Verifica integrata: lint, tipi, never-regress, claims, audit gate, build
+Node 24.18.0/ABI 137 e **5/5** test di concorrenza pazienti passano. La prima
+build ha rifiutato il percorso sintetico scelto dal coordinatore perché
+superava il limite socket PM2 di 103 byte; ripetuta la sola build con root
+fisica breve, senza modifiche al prodotto. Log originale e correzione
+conservati. Suite completa **standard**: **4.905 test, 4.893 pass, 0 fail,
+0 cancellati, 12 skip**, 80.554 ms. Inventario 565 file, incluso il nuovo
+test amministrativo; runner, bootstrap, parallelismo predefinito e timeout
+non sono stati allentati.
+
+Le sole tracce test-only AIFA/Next, verificate prima su **4/4** test, sono
+state integrate prima della suite richiesta. In questo run: primo Chromium
+avviato in 578,7 ms, interazioni e chiusura osservate; Next producer build
+3.827,8 ms, figlio diretto status 0, risposta cookie reale verificata,
+chiusure HTTP/applicazione e rimozione fixture osservate. Non e una prova
+sull'intero albero dei processi né un confronto controllato del carico.
+**Questo PASS standard non dimostra la causa o la risoluzione dei timeout
+precedenti.** Restano aperti i HOLD AIFA/Next, affidabilita locale/CI e
+chooser nativo storico; cap4 resta una proposta non adottata. Nessuna nuova
+full suite invariata e prevista per cercare ulteriori PASS.
+
+Assegnazione: Sol Medium, unico writer amministrativo; Sol Medium in una
+checkout distinta per le due tracce di test; Astra Low per review indipendente
+read-only del delta e ADR. Il coordinatore ha deciso il contratto, verificato
+hash/prove e integrato i risultati. Nessun difetto concreto nel runtime
+riesaminato; rework circoscritto al fingerprint e al percorso della fixture
+di build. Tempi per comando nelle ricevute; limiti d'account condivisi non
+attribuibili alla coorte. Nessuna pubblicazione o chiusura globale C05/C14.
+
+Raccordo parity: verificati direttamente **19/19** sorgenti OCR identici al
+manifest consegnato dall'owner, senza importare altro codice. Le prove guest
+e la loro accettazione restano di parity/Chief; il risultato riferito 5/6 e
+il HOLD memoria Windows non sono una qualifica complessiva del prodotto.
+
+
+### Raccordo della milestone amministrativa — proprieta del body
+
+Il Chief ha verificato e accettato i 52 path della consegna precedente come
+risultato locale di atomicita/audit, rilevando pero un requisito C05 non
+soddisfatto: i test positivi accettavano proprieta estranee, inclusi `version`
+e `expectedVersion`. La precedente scelta del coordinatore di conservare
+questo comportamento non soddisfaceva la DoD sui campi non supportati.
+L'accettazione precedente non diventa per questo una chiusura dell'input.
+
+Stessa coorte, stesso writer Sol Medium e nessun altro servizio modificato:
+il solo body ammesso contiene `patientId`; ogni altra proprieta propria
+restituisce 400 prima di transazione o audit. Nessun CAS client introdotto.
+Positivi con solo identificativo, anche con spazi da normalizzare, distinti
+dalla prova degli header non autorevoli. Il contratto ADR e stato corretto
+prima del codice, preservando il vecchio snapshot e le prove originali.
+
+**29/29** test SQLite passano, inclusi sei campi propri vietati (anche il nome
+`__proto__` in JSON), stato completo invariato da connessione riaperta e
+sessioni negate prima di leggere il corpo. **1/1** scenario HTTP reale passa:
+cinque proprieta vietate ricevono 400 senza effetti, poi il body ammesso
+riesce conservando l'attribuzione Web anche con header aggiuntivi.
+Lint specifico, tipi, never-regress, claims, audit gate e build Node24.18
+passano. Il coordinatore ha verificato che il solo nuovo blocco runtime di
+quattro righe precede la transazione: rimuovendolo si recupera esattamente
+la route accettata nello snapshot52. Riutilizzate le prove immutate di
+atomicita, guardie, concorrenza e altre superfici; nessuna nuova full suite.
+Il PASS standard 4.893/4.905 resta attribuito allo snapshot precedente.
+
+**Residuo byte budget al congelamento di questa sottofase:** la ricerca
+delimitata non aveva trovato
+un massimo governato per questo POST. `request.json()` e il parser di forma
+non limitano i byte; il reader canonico `readBoundedJsonBody` esiste ma
+richiede un massimo esplicito. I budget native/network, allegati, AI e il
+buffering proxy Next non sono un contratto di rifiuto di questa route.
+Proposta trasmessa al Chief, non implementata: tetto specifico di 65.536 byte,
+reader condiviso in modalita `request-json` dopo l'ammissione Web admin,
+413 prima di ogni scrittura per dimensione dichiarata o osservata eccedente,
+prove di confine/chunk/multibyte/no-effects. E una nuova restrizione da
+rendere esplicita, non una proprieta gia esistente; non stabilisce un limite
+temporale di lettura. L'ingresso non e quindi dichiarato completamente
+bounded e non viene chiusa C05. Snapshot47 della parity e snapshot52 della
+prima consegna amministrativa restano immutati.
+
+
+### Completamento del limite del body amministrativo
+
+Il Chief ha concordato il massimo proposto di **65.536 byte (64 KiB)** come
+nuova restrizione esplicita del solo POST `/api/system/restore-patient`.
+ADR 0015 aggiornato prima del runtime, con compatibilita storica dichiarata:
+non si attesta un censimento dei client reali. Stesso writer Sol Medium,
+stessa coorte e nessun nuovo branch o servizio.
+
+Il lettore canonico `readBoundedJsonBody` e usato in modalita `request-json`
+dopo autenticazione e ruolo Web admin, con costante locale non esportata.
+Il tetto vale per Content-Length dichiarato e byte effettivi; l'eccesso
+produce 413, senza troncatura, transazione o audit. Forma JSON e proprieta
+non ammesse restano 400. Il coordinatore ha confrontato direttamente le
+sorgenti: GET, ammissione del POST e tutto il blocco dalla allowlist alla
+transazione/audit sono identici alla sottofase precedente. Il reader
+condiviso non e modificato. Nessun limite di durata o operazioni simultanee.
+
+**33/33** test della route con SQLite reale e **20/20** del reader canonico
+passano. Il confine esatto di 65.536 byte contiene un carattere UTF-8 diviso
+tra chunk ed e ammesso. A 65.537 byte, con Content-Length assente o inferiore
+al reale, la lettura si interrompe e il corpo viene cancellato al chunk che
+supera il tetto. Un eccesso dichiarato e rifiutato senza prima lettura.
+Le sessioni negate non accedono nemmeno ai getter headers/body della fixture;
+i rifiuti conservano l'intero stato paziente, figli, appartenenze e audit,
+riletto con una nuova connessione SQLite. **1/1** scenario HTTP con cookie
+reale prova 413 senza effetti e il successivo ripristino ammesso con un solo
+audit. Il caso HTTP usa un solo processo server; i ruoli negati usano seam
+nei test della route.
+
+Passano lint completo, typecheck, never-regress, claims, audit gate e build
+Node 24.18.0. La build usa una root sintetica fisica breve, rimossa solo alla
+fine del comando. Nessun rework del candidato consegnato. Prove di
+atomicita/concorrenza gia accettate riusate; la suite completa standard non
+e ripetuta su questo delta e il precedente 4.893/4.905 resta attribuito al
+suo snapshot. La coorte amministrativa ora ha un tetto in byte verificato,
+non un limite temporale, ne una chiusura globale C05/C14.
+
+Nuovo snapshot separato di 52 path, con ricevute di ultimo writer e controllo
+inverso della patch; i precedenti 47/52 path e le prove fallite rimangono
+immutati. Il coordinatore conserva integrazione e accettazione; il seguito
+viene raccordato con il Chief alla consegna. Nessuna modifica esterna,
+pubblicazione o qualifica clinica. Tempi nei log; consumo d'account condiviso
+non attribuito alla coorte. Gli HOLD storici C14 restano separati e aperti.
