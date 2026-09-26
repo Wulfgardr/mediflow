@@ -1,7 +1,7 @@
 /* @Codex */
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, writeSync } from 'node:fs';
 import { createServer } from 'node:http';
 import path from 'node:path';
 import test from 'node:test';
@@ -14,6 +14,18 @@ const EXPECTED_NODE_ABI = '137';
 const EXPECTED_NEXT = '16.3.4';
 const SESSION_ID = 'a'.repeat(64);
 const CONTROL_ID = 'c'.repeat(64);
+/* @Codex: synchronous stage-only diagnostics; never print request cookies or response data. */
+const traceProducer = (phase: string, started: bigint, detail = '') => {
+    const elapsedMs = Number(process.hrtime.bigint() - started) / 1_000_000;
+    writeSync(2, `[unit-stage:next-producer] elapsed_ms=${elapsedMs.toFixed(1)} phase=${phase}${detail ? ` ${detail}` : ''}\n`);
+};
+const buildOutputStages = (output: string) => [
+    ['compiling', /Creating an optimized production build|Compiling/u],
+    ['compiled', /Compiled successfully|Compiled in/u],
+    ['collecting', /Collecting page data/u],
+    ['generating', /Generating static pages/u],
+    ['finalizing', /Finalizing page optimization|Finalizing/u],
+].filter(([, pattern]) => (pattern as RegExp).test(output)).map(([name]) => name).join(',') || 'none';
 
 type ProducerEvidence = {
     node: string;
@@ -106,6 +118,8 @@ function expectedCookie(name: string, value: string) {
 }
 
 test(`pins the real Next App Route cookies producer on Node ${EXPECTED_NODE}`, { timeout: 120_000 }, async () => {
+    const started = process.hrtime.bigint();
+    traceProducer('scenario-start', started, `parent_pid=${process.pid}`);
     assert.equal(Number.parseInt(EXPECTED_NODE, 10), EXPECTED_NODE_MAJOR);
     assert.equal(process.versions.modules, EXPECTED_NODE_ABI);
     const installedNext = JSON.parse(readFileSync(path.join(ROOT, 'node_modules/next/package.json'), 'utf8')) as {
@@ -114,6 +128,7 @@ test(`pins the real Next App Route cookies producer on Node ${EXPECTED_NODE}`, {
     assert.equal(installedNext.version, EXPECTED_NEXT);
 
     const fixture = mkdtempSync(path.join(ROOT, '.mediflow-next-cookie-producer-'));
+    traceProducer('fixture-created', started);
     const nextFactory = (await import('next')).default;
     let application: ReturnType<typeof nextFactory> | null = null;
     let server: ReturnType<typeof createServer> | null = null;
@@ -124,6 +139,8 @@ test(`pins the real Next App Route cookies producer on Node ${EXPECTED_NODE}`, {
         writeFileSync(path.join(fixture, 'next.config.mjs'), 'export default {};\n');
         writeFileSync(path.join(routeDirectory, 'route.js'), ROUTE);
 
+        const buildStarted = process.hrtime.bigint();
+        traceProducer('build-start', started, `parent_pid=${process.pid}`);
         const built = spawnSync(process.execPath, [path.join(ROOT, 'node_modules/next/dist/bin/next'), 'build', fixture], {
             cwd: ROOT,
             encoding: 'utf8',
@@ -131,11 +148,16 @@ test(`pins the real Next App Route cookies producer on Node ${EXPECTED_NODE}`, {
             timeout: 60_000,
             killSignal: 'SIGTERM',
         });
+        const buildMs = Number(process.hrtime.bigint() - buildStarted) / 1_000_000;
+        traceProducer('build-end', started, `duration_ms=${buildMs.toFixed(1)} child_pid=${built.pid ?? 'unknown'} status=${built.status ?? 'null'} signal=${built.signal ?? 'none'} error_code=${(built.error as NodeJS.ErrnoException | undefined)?.code ?? 'none'} stdout_stages=${buildOutputStages(built.stdout ?? '')} stderr_kind=${/error/iu.test(built.stderr ?? '') ? 'error' : /warn/iu.test(built.stderr ?? '') ? 'warning' : 'none'}`);
         assert.equal(built.status, 0, `${built.error?.message ?? ''}\n${built.stdout}\n${built.stderr}`);
         application = nextFactory({ dev: false, dir: fixture });
         server = createServer((request, response) => application!.getRequestHandler()(request, response));
+        traceProducer('prepare-start', started);
         await bounded(application.prepare(), 30_000, 'Next prepare');
+        traceProducer('prepare-done', started);
         const port = await listen(server);
+        traceProducer('request-start', started);
         const response = await fetch(`http://127.0.0.1:${port}/api/cookie-evidence`, {
             signal: AbortSignal.timeout(30_000),
             headers: {
@@ -143,6 +165,7 @@ test(`pins the real Next App Route cookies producer on Node ${EXPECTED_NODE}`, {
             },
         });
         const body = await response.text();
+        traceProducer('request-done', started, `status=${response.status}`);
         assert.equal(response.status, 200, body);
         const evidence = JSON.parse(body) as ProducerEvidence;
         assert.deepEqual(evidence, {
@@ -155,18 +178,27 @@ test(`pins the real Next App Route cookies producer on Node ${EXPECTED_NODE}`, {
                 expectedCookie('mediflow_auth_control', CONTROL_ID),
             ],
         });
+        traceProducer('evidence-validated', started);
     } finally {
         try {
             try {
                 if (server) {
+                    traceProducer('http-close-start', started);
                     server.closeIdleConnections();
                     await bounded(new Promise<void>((resolve) => server!.close(() => resolve())), 5_000, 'HTTP close');
+                    traceProducer('http-close-done', started);
                 }
             } finally {
-                if (application) await bounded(application.close(), 5_000, 'Next close');
+                if (application) {
+                    traceProducer('next-close-start', started);
+                    await bounded(application.close(), 5_000, 'Next close');
+                    traceProducer('next-close-done', started);
+                }
             }
         } finally {
+            traceProducer('fixture-cleanup-start', started);
             rmSync(fixture, { recursive: true, force: true });
+            traceProducer('fixture-cleanup-done', started);
         }
     }
 });
