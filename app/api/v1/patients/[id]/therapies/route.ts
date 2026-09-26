@@ -1,12 +1,11 @@
 // Codex: created 2026-02-01
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
-import { patients, therapies } from '@/lib/schema';
+import { therapies } from '@/lib/schema';
 import { and, desc, eq, gte, inArray, isNull, lte } from 'drizzle-orm';
 import { requireLocalApiToken } from '@/lib/security/local-api-auth';
 import { requireLocalApiActorSession } from '@/lib/security/server-auth';
 import type { TherapySummary } from '@/lib/api/v1/types';
-import { v4 as uuidv4 } from 'uuid';
 /* @Codex */
 import { normalizeTherapyCreateInput } from '@/lib/api-v1-clinical-write-normalization';
 /* @Codex */
@@ -15,8 +14,9 @@ import {
     therapyStatusFilterValues,
 } from '@/lib/status-normalization';
 /* @Codex */
-import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/security/audit';
-import { activePatients } from '@/lib/patient-lifecycle';
+import { auditContextFromSession, requestIdFromRequest } from '@/lib/security/audit';
+import { createTherapyOperation } from '@/lib/therapy-write-operation';
+import { readTherapyJsonObject, therapyChangedFields, therapyCreateId, validateTherapyInput } from '@/lib/therapy-write-input';
 
 function toIsoString(value: unknown): string | null {
     if (!value) return null;
@@ -105,51 +105,24 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (authError) return authError;
 
     try {
-        /* @Codex */
         const auditSession = await requireLocalApiActorSession(request);
         const { id } = await params;
-        const body = await request.json() as Record<string, unknown>;
-        /* @Codex */
-        const auditBody = body;
-        const newId = typeof body.id === 'string' && body.id.trim().length > 0 ? body.id : uuidv4();
-        const normalized = normalizeTherapyCreateInput(body, {
-            id: newId,
-            patientId: id,
+        const parsed = await readTherapyJsonObject(request, 'v1', 'create');
+        if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: parsed.status });
+        const shape = validateTherapyInput(parsed.body, 'v1', 'create');
+        if (shape) return NextResponse.json({ error: shape.error }, { status: shape.status });
+        const newId = therapyCreateId(parsed.body);
+        const normalized = normalizeTherapyCreateInput(parsed.body, { id: newId, patientId: id });
+        if (!normalized.ok) return NextResponse.json({ error: normalized.error }, { status: 400 });
+        const context = auditContextFromSession(auditSession);
+        const result = createTherapyOperation({
+            patientId: id, therapyId: newId, values: normalized.values,
+            changedFields: therapyChangedFields(normalized.values, parsed.body), mode: 'v1',
+            audit: { actorType: context.actorType, actorRef: context.actorRef,
+                sourceSurface: context.sourceSurface, requestId: requestIdFromRequest(request),
+                flags: [`auth:${context.authContext}`] },
         });
-        if (!normalized.ok) {
-            return NextResponse.json({ error: normalized.error }, { status: 400 });
-        }
-
-        const created = dbServer.transaction((tx) => {
-            const patient = tx.select({ id: patients.id })
-                .from(patients)
-                .where(and(eq(patients.id, id), activePatients()))
-                .get();
-            if (!patient) return false;
-            tx.insert(therapies).values(normalized.values).run();
-            return true;
-        });
-        if (!created) {
-            return NextResponse.json({ error: 'Patient not found' }, { status: 404 });
-        }
-
-        /* @Codex */
-        await safeWriteAuditEventFromRequest(
-            request,
-            auditSession,
-            {
-                eventType: 'therapy.created',
-                subjectType: 'therapy',
-                subjectRef: normalized.values.id,
-                redactedMetadata: {
-                    changedFields: listChangedFields(auditBody, ['id']),
-                    resourceVersion: 1,
-                },
-            },
-            '[MediFlow] Therapy audit write failed:',
-        );
-
-        return NextResponse.json({ id: normalized.values.id, version: 1 }, { status: 201 });
+        return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
         console.error('API POST /api/v1/patients/[id]/therapies error:', error);
         return NextResponse.json({ error: 'Failed to create therapy' }, { status: 500 });

@@ -71,7 +71,7 @@ function harness(route, { deny = 0, cap, stage = null } = {}) {
     function load(relative) {
         if (cache.has(relative)) return cache.get(relative);
         assert.ok([`app/api/${route}/route.ts`, 'lib/native-network-json-body.ts', 'lib/bounded-request-body.ts', 'lib/attachment-payload.ts', 'lib/patient-json-object.ts',
-            'lib/entry-write-input.ts', 'lib/api-v1-clinical-write-normalization.ts', 'lib/status-normalization.ts'].includes(relative), `unexpected production import ${relative}`);
+            'lib/entry-write-input.ts', 'lib/therapy-write-input.ts', 'lib/api-v1-clinical-write-normalization.ts', 'lib/status-normalization.ts'].includes(relative), `unexpected production import ${relative}`);
         const source = fs.readFileSync(path.join(root, relative), 'utf8');
         const exports = {};
         cache.set(relative, exports);
@@ -93,6 +93,10 @@ function harness(route, { deny = 0, cap, stage = null } = {}) {
             // @Codex: exercise the actual diary object check, not the fallback dependency stub.
             if (name === '@/lib/entry-write-input') {
                 return load('lib/entry-write-input.ts');
+            }
+            // @Codex: preserve the real therapy envelope check when exercising admitted network bodies.
+            if (name === '@/lib/therapy-write-input') {
+                return load('lib/therapy-write-input.ts');
             }
             if (relative.startsWith('lib/') && name.startsWith('./')) return load(`lib/${name.slice(2)}.ts`);
             return new Proxy({}, { get(_target, key) {

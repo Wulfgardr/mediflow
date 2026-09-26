@@ -808,3 +808,92 @@ Due POST impostazioni con JSON vuoto nel log Linux vicino a reload/shutdown
 rimangono un limite osservato a causa non stabilita; questa prova non qualifica
 la persistenza delle impostazioni. Il nuovo snapshot conserva separatamente
 il precedente congelamento del diario e le ricevute dei due file.
+
+## Milestone C05 — terapie ordinarie
+
+La coorte successiva, concordata con il Chief dopo il diario, copre otto
+mutazioni terapia: POST/PUT/DELETE Web, POST/PUT/DELETE v1 locale e POST/PUT
+paired. Il roster di sette sorgenti e l'atlante dei client sono stati congelati
+prima del codice. Baseline: 160 osservazioni sintetiche; tutti i 16 guasti audit
+FAIL/IGNORE salvavano la modifica senza evento. Un addendum di 36 casi ha
+caratterizzato le differenze di data e timestamp delle tre superfici.
+
+Il candidato porta identita/scope, padre, versione, modifica esattamente di
+una riga e audit richiesto in due operazioni terapia sincrone IMMEDIATE. Non
+introduce un framework CRUD ne cambia i normalizzatori condivisi. Fallimento
+o IGNORE di audit o mutazione causano rollback. L'attore/superficie Web deriva
+solo dalla sessione; un bearer o header aggiunto non lo cambia.
+
+Le decisioni nuove sono state concordate e scritte in ADR 0015/0054/0124 prima
+del codice dipendente: padre mancante/tombstoned404 su tutte le otto mutazioni,
+solo archived ammesso, nessun restore implicito; nuovo cap locale terapia di
+4.194.304 byte dopo i gate, con reader canonico e 413 prima degli effetti.
+Non e una promessa di compatibilita con tutti i client esterni. Identificativo
+occupato409 su tutte le superfici: nessun replay200 o nuova idempotenza rete.
+Web PUT non acquisisce restore/tombstone. V1/rete li conservano con CAS.
+
+Restano distinte anche le date: Web startDate numerico zero ammesso, endDate
+zero POST salvato come null e PUT come epoca; v1/rete continuano a rifiutare
+gli zero. I timestamp client validi Web sono ammessi ma ignorati in favore
+dell'host, v1 PUT conserva updatedAt applicato, la rete rifiuta timestamp
+client. Rifiutare timestamp invalidi prima ignorati e una restrizione nuova
+esplicita. Nessuna interpretazione di dosi, stati o ciphertext.
+
+### Prove e correzioni
+
+Il candidato finale passa 16 gruppi mirati, con 190 osservazioni registrate:
+187 hanno snapshot completi prima/dopo; i tre casi di create duplicato
+asseriscono il readback invariato nel test, ma il JSON conserva soltanto lo
+stato dopo il primo create. La matrice del coordinatore mantiene questa
+limitazione. Sono coperti 16 guasti audit, 8 mutazioni IGNORE, 24 casi di stato
+del padre, forme/campi/date/versioni invalidi, scope, ENC, cap locale ai confini
+e autorita temporale. L'autenticazione di queste prove usa seam dichiarati.
+
+Due prove HTTP separate usano invece cookie/token e pairing reali su database
+sintetici: Web/v1 (1 PASS), paired (1 PASS, con il precedente test Web/v1
+intenzionalmente saltato). Verificano attribuzione, errori e rollback audit.
+Il browser Chromium esegue il flusso Web create, modifica, conclusione,
+riattivazione dello stato e cancellazione: 1 PASS, riga finale versione5
+soft-deleted, motivation/deletionReason ENC e audit create1/update3/delete1.
+Non e un test di restore del tombstone. Il primo tentativo browser si era
+fermato prima dei test per doppia installazione Playwright risolta dal proof
+esterno alla checkout; corretto solo il loader, log originali conservati.
+
+Due processi e connessioni SQLite distinti provano gli ordini padre-prima e
+terapia-prima tramite gate sintetici: nel primo nessuna terapia/audit, nel
+secondo create e audit completati prima del tombstone del padre. Non sono
+otto race HTTP ne una misura del tempo di blocco.
+
+Gli smoke storici invariati hanno trovato due regressioni dopo il primo
+freeze: changedFields di create rete includeva default tombstone e cambiava
+ordine; PUT v1 rispondeva400 anziche404 per riga mancante con campo invalido.
+Corretti due soli sorgenti: nomi dei campi applicati nell'ordine del body e
+preflight identity scoped prima della validazione, mantenendo il controllo
+autorevole dentro la transazione. Secondo freeze: tutti i 9 smoke invariati
+PASS. Review indipendente del delta e hash degli altri sette runtime invariati.
+UI e HTTP mirati restano espressamente riferiti al primo freeze: il riuso e
+limitato dal delta, non presentato come una nuova esecuzione. Il core e i gate
+HTTP sono immutati; il delta v1 e verificato dagli smoke del secondo freeze.
+
+Il guard strutturale copre gli otto handler terapia, riusando la sola prova
+AST del diario, non le sue politiche. Review indipendente, 47 test guard/reader
+PASS e gate integrato PASS. Il test bounded rete continua a esercitare il
+vero controllo oggetto terapia, non un sostituto. OpenAPI 1.28.0 descrive il
+409 di create, atomicita, ingressi e ammissione del padre.
+
+Controlli finali sull'integrato: suite standard 5.086 test, **5.074 PASS,
+12 skip, zero fallimenti** (76,84 s del comando); build PASS (15,34 s);
+lint, never-regress, claims, audit e OpenAPI PASS. Il primo lint, avviato in
+parallelo alla suite, aveva letto tipi Next generati dalla fixture temporanea
+del test cookie-producer; dopo la cleanup del test e stato ripetuto soltanto
+il lint, senza modificare sorgenti/configurazione o ripetere la suite.
+Typecheck della checkout candidata riusato con identita dei sorgenti TypeScript.
+
+Esecuzione circoscritta: GPT-6 Sol Medium per baseline, runtime/test e proof UI;
+GPT-6 Astra Low per review indipendenti guard/runtime e delta; coordinatore
+responsabile di contratti, guard, integrazione e sufficienza delle prove.
+Le due regressioni sono state individuate dagli smoke, non dalla sola review
+statica: entrambe le evidenze e le correzioni restano nel dossier. I consumi
+condivisi dell'account non sono attribuiti al costo di questa coorte.
+Nessun commit, push, PR, aggiornamento tracker, pubblicazione o rilascio
+clinico. Non si dichiarano conclusi C05/WUL-720, C14 o la parity nativa.

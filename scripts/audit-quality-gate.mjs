@@ -79,11 +79,18 @@ const REQUIRED_ROUTE_AUDIT = [
         writerContracts: [diaryAuditContract('POST', 'network', 'create')] },
     { route: 'app/api/v1/network/patients/[id]/entries/[entryId]/route.ts', events: ['entry.updated', 'entry.deleted'],
         writerContracts: [diaryAuditContract('PUT', 'network', 'update')] },
-    { route: 'app/api/therapies/route.ts', events: ['therapy.created'], reason: 'therapy creation is sensitive CRUD' },
-    { route: 'app/api/therapies/[id]/route.ts', events: ['therapy.updated', 'therapy.deleted'], reason: 'therapy update/delete are sensitive CRUD' },
-    { route: 'app/api/v1/patients/[id]/therapies/route.ts', events: ['therapy.created'], reason: 'native/shared therapy creation is sensitive CRUD' },
-    { route: 'app/api/v1/patients/[id]/therapies/[therapyId]/route.ts', events: ['therapy.updated', 'therapy.deleted'], reason: 'native/shared therapy update/delete are sensitive CRUD' },
-    { route: 'lib/network-therapy-write.ts', events: ['therapy.created', 'therapy.updated', 'therapy.deleted'], reason: 'paired therapy writes must stay PHI-safe auditable' },
+    { route: 'app/api/therapies/route.ts', events: ['therapy.created'], reason: 'therapy creation requires transactional audit',
+        writerContracts: [therapyAuditContract('POST', 'web', 'create')] },
+    { route: 'app/api/therapies/[id]/route.ts', events: ['therapy.updated', 'therapy.deleted'], reason: 'therapy update/delete require transactional audit',
+        writerContracts: [therapyAuditContract('PUT', 'web', 'update'), therapyAuditContract('DELETE', 'web', 'update')] },
+    { route: 'app/api/v1/patients/[id]/therapies/route.ts', events: ['therapy.created'], reason: 'local therapy creation requires transactional audit',
+        writerContracts: [therapyAuditContract('POST', 'v1', 'create')] },
+    { route: 'app/api/v1/patients/[id]/therapies/[therapyId]/route.ts', events: ['therapy.updated', 'therapy.deleted'], reason: 'local therapy update/delete require transactional audit',
+        writerContracts: [therapyAuditContract('PUT', 'v1', 'update'), therapyAuditContract('DELETE', 'v1', 'update')] },
+    { route: 'app/api/v1/network/patients/[id]/therapies/route.ts', events: ['therapy.created'], reason: 'paired therapy creation requires transactional audit',
+        writerContracts: [therapyAuditContract('POST', 'network', 'create')] },
+    { route: 'app/api/v1/network/patients/[id]/therapies/[therapyId]/route.ts', events: ['therapy.updated', 'therapy.deleted'], reason: 'paired therapy update requires transactional audit',
+        writerContracts: [therapyAuditContract('PUT', 'network', 'update')] },
     { route: 'app/api/checkups/route.ts', events: ['checkup.created'], reason: 'checkup creation is sensitive CRUD' },
     { route: 'app/api/checkups/[id]/route.ts', events: ['checkup.updated', 'checkup.deleted'], reason: 'checkup update/delete are sensitive CRUD' },
     { route: 'app/api/v1/patients/[id]/checkups/route.ts', events: ['checkup.created'], reason: 'native/shared checkup creation is sensitive CRUD' },
@@ -144,6 +151,16 @@ function diaryAuditContract(handler, mode, operation) {
         serviceModule: '@/lib/entry-write-operation', serviceExport: `${operation}EntryOperation`,
         bridgeFile: 'lib/network-entry-write.ts',
         bridgeExport: `${operation}NetworkScopedEntry`,
+    };
+}
+/* @Codex: therapy roster is explicit; runtime policy is not inherited from diary. */
+function therapyAuditContract(handler, mode, operation) {
+    return {
+        handler, mode, operation, transactionalTherapy: true,
+        target: `therapy-${operation}.${mode}.${handler.toLowerCase()}`,
+        ownerFile: 'lib/therapy-write-operation.ts', ownerName: `${operation}TherapyOperation`,
+        serviceModule: '@/lib/therapy-write-operation', serviceExport: `${operation}TherapyOperation`,
+        bridgeFile: 'lib/network-therapy-write.ts', bridgeExport: `${operation}NetworkScopedTherapy`,
     };
 }
 const METADATA_KEYS = ['changedFields', 'resourceVersion', 'counts', 'flags', 'reasonCode'];
@@ -639,28 +656,37 @@ export function validateDelegatedRouteAudit({ spec, routeSource, serviceSource }
 /* @Codex: bounded diary wiring/order guard, complementary to real SQLite rollback and scope tests.
  * The required audit writer itself is checked by the patient contracts in the same gate.
  * This does not claim to prove parent admission, CAS or cipher semantics statically. */
-export function validateRequiredDiaryAudit({ spec, routeSource, coreSource, bridgeSource = null }) {
+export function validateRequiredDiaryAudit(input) {
+    return validateRequiredClinicalRowAudit(input, 'entry');
+}
+
+/* @Codex: reuse only the structural proof, not date/cap/idempotency policy. */
+export function validateRequiredTherapyAudit(input) {
+    return validateRequiredClinicalRowAudit(input, 'therapy');
+}
+
+function validateRequiredClinicalRowAudit({ spec, routeSource, coreSource, bridgeSource = null }, resource) {
     const problems = [];
     const core = checkedSource(spec.ownerFile, coreSource);
     const owner = namedFunction(core.sourceFile, spec.ownerName, true);
     const delegateCall = (source, handlerName, moduleName, exportName) => {
-        const parsed = checkedSource('diary-adapter.ts', source);
+        const parsed = checkedSource(`${resource}-adapter.ts`, source);
         const handler = namedFunction(parsed.sourceFile, handlerName, true);
         const binding = importedBinding(parsed.sourceFile, parsed.checker, moduleName, exportName);
         const calls = handler && binding ? bindingCalls(handler, parsed.checker, binding.symbol) : [];
         if (parsed.sourceFile.parseDiagnostics.length || !handler || calls.length !== 1
             || !isReachableCall(calls[0], handler)) {
-            problems.push(`${handlerName} must call exactly one reachable approved diary delegate`);
+            problems.push(`${handlerName} must call exactly one reachable approved clinical-row delegate`);
             return null;
         }
         return calls[0];
     };
     let call;
     if (spec.mode === 'network') {
-        delegateCall(routeSource, spec.handler, '@/lib/network-entry-write', spec.bridgeExport);
+        delegateCall(routeSource, spec.handler, `@/lib/network-${resource}-write`, spec.bridgeExport);
         call = bridgeSource && delegateCall(bridgeSource, spec.bridgeExport,
-            './entry-write-operation', spec.ownerName);
-        if (!bridgeSource) problems.push('network diary adapter is missing');
+            `./${resource}-write-operation`, spec.ownerName);
+        if (!bridgeSource) problems.push('network clinical-row adapter is missing');
     } else {
         call = delegateCall(routeSource, spec.handler, spec.serviceModule, spec.serviceExport);
     }
@@ -672,13 +698,13 @@ export function validateRequiredDiaryAudit({ spec, routeSource, coreSource, brid
         || argument.properties.some((property) => ts.isSpreadAssignment(property)
             || (property.name && ts.isComputedPropertyName(property.name)))
         || modeProperties.length !== 1 || !ts.isStringLiteral(modeProperties[0].initializer)
-        || modeProperties[0].initializer.text !== spec.mode) problems.push('diary adapter must select its exact admitted mode');
+        || modeProperties[0].initializer.text !== spec.mode) problems.push('clinical-row adapter must select its exact admitted mode');
 
     const db = importedBinding(core.sourceFile, core.checker, './db-server', 'dbServer');
     const writer = importedBinding(core.sourceFile, core.checker, './security/audit', 'writeAuditEventInTransaction');
-    const table = importedBinding(core.sourceFile, core.checker, './schema', 'entries');
+    const table = importedBinding(core.sourceFile, core.checker, './schema', resource === 'entry' ? 'entries' : 'therapies');
     if (core.sourceFile.parseDiagnostics.length || !owner || !db || !writer || !table) {
-        problems.push('diary core must import the approved database, entry table and required audit writer');
+        problems.push('clinical-row core must import the approved database, resource table and required audit writer');
         return problems;
     }
     const calls = [];
@@ -702,7 +728,7 @@ export function validateRequiredDiaryAudit({ spec, routeSource, coreSource, brid
         || callback.parameters.length !== 1 || !ts.isIdentifier(callback.parameters[0].name)
         || localBindingExists(callback, callback.parameters[0].name.text, true)
         || !behavior || !ts.isStringLiteral(behavior) || behavior.text !== 'immediate') {
-        problems.push('diary owner must return one synchronous immediate transaction');
+        problems.push('clinical-row owner must return one synchronous immediate transaction');
         return problems;
     }
     const txName = callback.parameters[0].name.text;
@@ -714,7 +740,7 @@ export function validateRequiredDiaryAudit({ spec, routeSource, coreSource, brid
     if (!audit || audit.arguments.length !== 2 || !ts.isIdentifier(unwrap(audit.arguments[0]))
         || unwrap(audit.arguments[0]).text !== txName || auditIndex < 2
         || !ts.isExpressionStatement(auditStatement) || !isReachableStandaloneCall(audit, callback)) {
-        problems.push('exactly one direct required diary audit must execute on the same transaction');
+        problems.push('exactly one direct required clinical-row audit must execute on the same transaction');
         return problems;
     }
     const compact = (node) => node?.getText(core.sourceFile).replace(/\s+/gu, '') ?? '';
@@ -753,7 +779,7 @@ export function validateRequiredDiaryAudit({ spec, routeSource, coreSource, brid
         || !ts.isIfStatement(guard) || guard.elseStatement
         || compact(guard.expression) !== `${declaration.name.text}.changes!==1`
         || throws.length !== 1 || !ts.isThrowStatement(throws[0])) {
-        problems.push('diary mutation and exact-one-row throwing check must directly precede audit');
+        problems.push('clinical-row mutation and exact-one-row throwing check must directly precede audit');
     }
     const input = audit.arguments[1] && unwrap(audit.arguments[1]);
     const props = input && ts.isObjectLiteralExpression(input)
@@ -766,16 +792,16 @@ export function validateRequiredDiaryAudit({ spec, routeSource, coreSource, brid
     const event = props?.get('eventType')?.initializer;
     const inputName = owner.parameters[0]?.name;
     const name = inputName && ts.isIdentifier(inputName) ? inputName.text : null;
-    const eventValid = spec.operation === 'create' ? literal('eventType', 'entry.created')
+    const eventValid = spec.operation === 'create' ? literal('eventType', `${resource}.created`)
         : event && ts.isConditionalExpression(event) && compact(event.condition) === `${name}.values.deletedAt`
-            && ts.isStringLiteral(event.whenTrue) && event.whenTrue.text === 'entry.deleted'
-            && ts.isStringLiteral(event.whenFalse) && event.whenFalse.text === 'entry.updated';
-    if (!name || !props || !eventValid || !literal('outcome', 'success') || !literal('subjectType', 'entry')
-        || compact(props.get('subjectRef')?.initializer) !== `${name}.${spec.operation === 'create' ? 'id' : 'entryId'}`) {
-        problems.push('diary audit event and subject must describe the applied entry mutation');
+            && ts.isStringLiteral(event.whenTrue) && event.whenTrue.text === `${resource}.deleted`
+            && ts.isStringLiteral(event.whenFalse) && event.whenFalse.text === `${resource}.updated`;
+    if (!name || !props || !eventValid || !literal('outcome', 'success') || !literal('subjectType', resource)
+        || compact(props.get('subjectRef')?.initializer) !== `${name}.${resource === 'entry' && spec.operation === 'create' ? 'id' : `${resource}Id`}`) {
+        problems.push('clinical-row audit event and subject must describe the applied resource mutation');
     }
     if (auditIndex !== statements.length - 2 || !ts.isReturnStatement(statements[auditIndex + 1])) {
-        problems.push('diary success must return immediately after the required audit');
+        problems.push('clinical-row success must return immediately after the required audit');
     }
     return problems;
 }
@@ -1984,7 +2010,8 @@ export function validateLogoutAuditModes({ spec, routeSource, serviceSource = nu
 function checkAuditWriterControlFlow(findings) {
     const contracts = REQUIRED_ROUTE_AUDIT.flatMap((entry) =>
         (entry.writerContracts ?? []).filter((contract) => !contract.modes
-            && !contract.transactionalPatientUpdate && !contract.transactionalPatientDelete && !contract.transactionalDiary)
+            && !contract.transactionalPatientUpdate && !contract.transactionalPatientDelete
+            && !contract.transactionalDiary && !contract.transactionalTherapy)
             .map((contract) => ({ ...contract, route: entry.route })));
     const parsedFiles = new Map();
     for (const contract of contracts) {
@@ -2076,6 +2103,11 @@ function checkRouteCoverage(findings) {
                         })
                     : contract.transactionalDiary
                         ? validateRequiredDiaryAudit({
+                            spec: contract, routeSource: source, coreSource: read(contract.ownerFile),
+                            bridgeSource: exists(contract.bridgeFile) ? read(contract.bridgeFile) : null,
+                        })
+                    : contract.transactionalTherapy
+                        ? validateRequiredTherapyAudit({
                             spec: contract, routeSource: source, coreSource: read(contract.ownerFile),
                             bridgeSource: exists(contract.bridgeFile) ? read(contract.bridgeFile) : null,
                         })

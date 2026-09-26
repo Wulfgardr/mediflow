@@ -541,3 +541,92 @@ Le prove coprono confine esatto, UTF-8/chunk, Content-Length assente o
 fuorviante, rifiuti senza effetti e compatibilita dei campi temporali del
 client, riusando le prove valide del reader. Timestamp invalidi non vengono
 accettati tramite l'adapter locale e createdAt non diventa autorita client.
+
+## Estensione C05: terapie ordinarie (26 settembre 2026)
+
+### Baseline e perimetro
+
+La baseline su snapshot locale a 70 percorsi osserva otto mutazioni: POST,
+PUT e DELETE Web; POST, PUT e DELETE v1 locale; POST e PUT paired. Nei
+16 casi di audit INSERT FAIL/IGNORE la modifica riesce senza evento; gli
+otto casi ordinari hanno un evento. Sono 160 osservazioni sintetiche sugli
+handler reali e SQLite, con seam di autenticazione dichiarati: non sono una
+prova HTTP di ammissione ne una qualifica clinica.
+
+Questa estensione riguarda soltanto le terapie ordinarie. Smart import,
+writer documentali governati, SQLite nativo diretto, osservazioni e checkup
+restano fuori. Non estende alle terapie l'idempotenza del diario.
+
+### Decisione atomica e compatibilita
+
+Due operazioni specifiche per create e update raccolgono nella stessa
+transazione sincrona IMMEDIATE identita/scope, versione corrente, modifica
+con esattamente una riga interessata e audit obbligatorio. Nessun await,
+connessione audit separata o successo anticipato. Audit fallito/ignorato e
+mutazione ignorata dopo il controllo corrente causano rollback. Gli adapter
+mantengono sessione Web, token locale e capability/sessione/scope paired.
+L'attore e la superficie audit Web derivano dalla sessione ammessa: un
+bearer o un header aggiunto non cambiano l'attribuzione.
+
+Le versioni sono interi positivi sicuri con incremento sicuro. Il conflitto
+mantiene lo snapshot PHI-safe della terapia. Identificativo esplicito non
+stringa o vuoto: 400; identificativo opaco valido preservato, generazione
+solo se omesso. Identificativo gia occupato: 409 senza effetti su tutte le
+superfici, anche con payload identico; non si introduce un replay 200.
+changedFields contiene soltanto nomi di valori normalizzati e applicati,
+mai contenuti clinici o proprieta estranee.
+
+Un inviluppo specifico rifiuta JSON null, array, primitivi, malformato e
+proprieta proprie non ammesse prima degli effetti. I normalizzatori condivisi
+con altre famiglie non vengono cambiati. Testi, dosaggi, codici, status e
+ciphertext conservano la rappresentazione ammessa; nessuna interpretazione
+clinica. Rete: restano i divieti AI/document-derived e timestamp client, e
+il requisito ENC solo per motivation e deletionReason. Un errore di forma
+non deve aggirare questi divieti.
+
+La compatibilita temporale e distinta: Web POST/PUT mantengono l'orario host;
+le chiavi createdAt/updatedAt del create e updatedAt dell'update inviate dai
+client correnti sono ammesse e validate, ma non applicate. V1 create usa
+l'orario host, mentre v1 update conserva updatedAt client gia previsto.
+Date numeriche finite restano soggette al normalizzatore della superficie,
+non vengono uniformate arbitrariamente; booleani, oggetti e date non valide
+sono rifiutati. Null/forma vuota per endDate conserva il clear esistente.
+
+PUT v1/paired conserva soft-delete e restore con CAS; null/forma vuota
+esplicita di deletedAt segue il clear gia previsto. PUT Web NON acquisisce
+queste capacita e rifiuta i campi tombstone estranei. DELETE Web/v1 resta
+soft-delete, con i motivi predefiniti e gli errori contrattuali della
+superficie. Un restore resta therapy.updated, non un nuovo tipo di evento.
+
+### Decisioni concordate sul padre e sul corpo
+
+Il Chief ha concordato il 26 settembre, prima del codice dipendente, il 404
+per padre mancante o tombstoned su tutte le otto mutazioni. La baseline mostra
+che non era una regola uniforme: create Web/v1 gia rifiutavano il padre
+cancellato, mentre rete e update/delete locali potevano scrivere. Il controllo
+avviene nella stessa transazione di scope, currentness, mutazione e audit.
+Le guardie di ammissione precedono il body e restano prima di ogni rivelazione
+di esistenza o conflitto. Un padre solo archived e ammesso; restore della
+terapia non ripristina il paziente. Duplicate create409 segue l'ammissione
+pertinente anche quando l'identificativo esiste fuori scope.
+
+E concordato un NUOVO cap locale specifico terapia di **4.194.304 byte**
+(4 MiB) sulle sei mutazioni Web/v1. Non era un limite locale gia governato:
+inviluppi maggiori prima non limitati ora ricevono 413. La rete conserva il
+tetto gia previsto da ADR 0124. L'atlante dei client correnti non e un censimento
+dei consumatori esterni e non prova compatibilita universale.
+
+Si usa il reader canonico request-json dopo i gate. Il cap e inclusivo, in
+byte UTF-8; eccesso dichiarato o effettivo produce 413 prima degli effetti.
+Header assente o fuorviante non evita il conteggio effettivo. Nessuna troncatura,
+nuovo limite di durata o numero di operazioni simultanee. JSON/shape/campi
+non ammessi sono 400, mantenendo gli errori contrattuali pertinenti. I campi
+timestamp client gia ignorati erano accettati anche se invalidi: validarli e
+una nuova restrizione esplicita, non una garanzia storica, e non trasferisce
+al client il controllo dell'orologio Web o della creazione locale.
+
+Le 36 osservazioni aggiuntive sulle date conservano la distinzione: Web
+startDate numerico zero e ammesso; endDate zero crea null nel POST e l'epoca
+nel PUT, come prima. V1/rete rifiutano gli zero con Invalid startDate/endDate;
+null e forma vuota di endDate mantengono il clear. Queste differenze non
+vengono eliminate per facilitare il riuso del diario.
