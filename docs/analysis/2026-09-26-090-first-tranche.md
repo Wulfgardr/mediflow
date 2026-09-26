@@ -794,3 +794,17 @@ cancellazioni, 12 skip**. Non cambia concorrenza o soglie e non risolve per
 inferenza gli HOLD storici. La build finale del collector e registrata
 nella ricevuta finale di questa coorte. I precedenti snapshot 47/52 e gli
 HOLD C14 restano immutati. Nessun commit, pubblicazione o mutazione tracker.
+
+### Delta separato delle etichette delle scorciatoie
+
+Dopo il congelamento del diario, il Chief ha accettato e il coordinatore ha
+integrato soltanto due file della lane parity: indicazione `⌘/Ctrl + K` nei
+comandi e nella ricerca impostazioni, con testo su una riga. Handler invariati.
+Riutilizzate le prove reali Mac e Linux, un caso per target: apertura singola
+da scorciatoia/click, focus ed Escape. I controlli della checkout isolata
+sono conservati; nessuna ripetizione del CRUD o della suite completa per
+questo delta testuale. Windows resta separato e non qualificato qui.
+Due POST impostazioni con JSON vuoto nel log Linux vicino a reload/shutdown
+rimangono un limite osservato a causa non stabilita; questa prova non qualifica
+la persistenza delle impostazioni. Il nuovo snapshot conserva separatamente
+il precedente congelamento del diario e le ricevute dei due file.
