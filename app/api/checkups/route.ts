@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
-import { checkups, patients } from '@/lib/schema';
+import { checkups } from '@/lib/schema';
 import { and, asc, desc, eq, isNull, type SQL } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 /* @Codex */
@@ -8,14 +8,14 @@ import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth
 /* @Codex */
 import { normalizeCheckupStatus, parseCheckupStatus } from '@/lib/status-normalization';
 /* @Codex */
-import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/security/audit';
+import { auditContextFromSession, listChangedFields, requestIdFromRequest } from '@/lib/security/audit';
+import { createCheckupOperation } from '@/lib/checkup-write-operation';
 /* STREAM B: server-side list params (whitelisted, plaintext columns only). */
 import { parseListParams } from '@/lib/list-query-params';
 /* @Codex */
 import { checkupCreateSchema } from '@/lib/api-schemas/clinical-writes';
 /* @Codex */
 import { parseApiBody } from '@/lib/api-schemas/parse';
-import { activePatients } from '@/lib/patient-lifecycle';
 
 // Only plaintext columns are sortable server-side (notes is ENC:, not sortable).
 const CHECKUP_SORT_COLUMNS = {
@@ -129,36 +129,16 @@ export async function POST(request: Request) {
             deletedAt: null,
             deletionReason: null,
         };
-        const created = dbServer.transaction((tx) => {
-            const patient = tx.select({ id: patients.id })
-                .from(patients)
-                .where(and(eq(patients.id, body.patientId), activePatients()))
-                .get();
-            if (!patient) return false;
-            tx.insert(checkups).values(checkupValues).run();
-            return true;
+        // @Codex: admission, row insert and required audit share one IMMEDIATE transaction.
+        const context = auditContextFromSession(session);
+        const result = createCheckupOperation({
+            patientId: body.patientId, checkupId: String(newId), values: checkupValues, mode: 'web',
+            changedFields: listChangedFields(auditBody, ['id']),
+            audit: { actorType: context.actorType, actorRef: context.actorRef,
+                sourceSurface: context.sourceSurface, requestId: requestIdFromRequest(request),
+                flags: [`auth:${context.authContext}`] },
         });
-        if (!created) {
-            return NextResponse.json({ error: 'Patient not found' }, { status: 404 });
-        }
-
-        /* @Codex */
-        await safeWriteAuditEventFromRequest(
-            request,
-            session,
-            {
-                eventType: 'checkup.created',
-                subjectType: 'checkup',
-                subjectRef: String(newId),
-                redactedMetadata: {
-                    changedFields: listChangedFields(auditBody, ['id']),
-                    resourceVersion: 1,
-                },
-            },
-            '[MediFlow] Checkup audit write failed:',
-        );
-
-        return NextResponse.json({ id: newId, version: 1 }, { status: 201 });
+        return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
         console.error("Checkup create error", error);
         return NextResponse.json({ error: "Create Failed" }, { status: 500 });

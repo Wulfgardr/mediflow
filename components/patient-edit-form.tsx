@@ -121,7 +121,7 @@ export default function PatientEditForm({ initialRecord, onSaved, onReloaded }: 
                     {!conflict && <button type="button" onClick={() => void save()} disabled={busy} className="mf-btn-secondary">Riprova operazioni residue</button>}
                 </section>
             )}
-            <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 md:px-6">
                 <p className="text-sm">Il modulo conserva i dati dell’apertura. La rilettura richiede una conferma.</p>
                 <button type="button" onClick={() => void reload()} disabled={busy} className="mf-btn-secondary">Rileggi i dati salvati</button>
             </div>
