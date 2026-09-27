@@ -155,9 +155,8 @@ allargare zone, tool scope, retention, egress o autonomia.
 
 ## Revisione indipendente
 
-La chat embedded richiesta dall'utente ha restituito `FINDINGS`. Il connettore
-non espone l'identità del modello, quindi la richiesta di GPT-5.6 Pro non è
-verificabile.
+La revisione automatizzata ha restituito `FINDINGS`. Il connettore non espone
+l’identità del modello: questo limite della provenienza resta non verificato.
 
 Il revisore non ha rilevato P0 o P1. Ha rilevato cinque P2 documentali:
 

@@ -165,11 +165,9 @@ Un eventuale riepilogo esplicativo è distinto dalle citazioni verificabili.
 Anche una sintesi può omettere o introdurre informazioni: resta una proposta
 da rileggere, senza salvataggio clinico automatico.
 
-Il Personal Aesthetics Studio è una biblioteca di riferimenti per questo
-progetto. La richiesta privilegia l'organizzazione delle impostazioni Codex:
-indice stabile, gruppi chiari, controlli accanto alla loro funzione. Non
-importiamo palette, font o proporzioni di un sito promozionale nel prodotto.
-I token Lume e il raggio di sistema restano la base del confronto.
+Le impostazioni richiedono un indice stabile, gruppi chiari e controlli vicini
+alla funzione che governano. I token Lume e il raggio di sistema restano la
+base del confronto visivo.
 
 ## Contratti da completare prima dei nuovi writer
 

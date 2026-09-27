@@ -144,8 +144,6 @@ production-signed installer claim is made.
 
 - The gallery uses a real capture of the current macOS app with synthetic
   fixtures and does not present the previous Apple shell as the current state.
-- The token dashboard states the period and environment of local CodexBar
-  aggregates.
 - Apple demo mode treats the synthetic dataset as a UI fixture. Document
   upload no longer shows a false paired-session error.
 
@@ -189,12 +187,10 @@ production-signed installer claim is made.
 
 ### Provenienza e verifica
 
-- Le PR 163-175 includono almeno un commit con attribuzione Claude.
-- Codex ha corretto i due finding finali sui guard WUL-547 e WUL-544.
-- Codex ha corretto e verificato il selettore simulatori nella PR 176.
-- DeepSeek V4 Flash ha restituito una review JSON valida e pulita sui due
-  commit finali.
-- Codex Sol ha verificato il codice reale e i test focalizzati.
+- Corretti i due finding finali sui guard WUL-547 e WUL-544.
+- Corretto e verificato il selettore simulatori nella PR 176.
+- La revisione automatizzata dei due commit finali ha restituito un report
+  JSON valido senza finding; sono stati verificati codice e test focalizzati.
 
 ### Migrazioni
 
@@ -408,35 +404,6 @@ production-signed installer claim is made.
   gate assistivi restano le fonti per i limiti delle superfici.
 - Intelligence Fabric è una direzione post-0.8. Provider esterni, routing tra
   venue e automazione graduata non sono funzioni complete della release.
-
-### Sviluppo assistito
-
-Il perimetro comprende il lavoro che ha portato alle PR #138 e #139 e il
-relativo consolidamento. Non comprende la verifica UI, le prove di capacità o
-altri filoni senza modifiche promosse.
-
-| Fornitore (provider) e modello | Flusso (lane) | Ruolo o operazione | Token misurati | Fonte del conteggio |
-| --- | --- | --- | --- | --- |
-| OpenAI `gpt-5.6-terra/high` | Responsabile del programma | Inventario, controlli e consolidamento iniziale | 51.253.005 | `token_count`, record Codex del programma |
-| OpenAI `gpt-5.6-sol/max` | Responsabile del programma | Decisioni, integrazione, promozione e documentazione | 37.508.514 | `token_count`, record Codex del programma |
-| OpenAI `gpt-5.6-sol/max` | Verifiche indipendenti | Casi avversari, modifiche e controlli di confine | 112.514.880 | `token_count`, 11 sessioni figlie |
-| OpenAI `gpt-5.6-sol` (modalità Ultra; livello non registrato) | Revisione in sola lettura | Contratti AI, Codex Operator e selezione dei candidati | 19.106.786 | `token_count`, 3 sessioni figlie |
-| OpenAI `gpt-5.6-terra/high` | Verifica ordinaria | Controlli deterministici e supporto alla candidata | 3.340.670 | `token_count`, 1 sessione figlia |
-| Anthropic `claude-fable-5` | Coordinamento precedente | Strategia, impronta del candidato e acquisizione dei report A e B | 3.687.032 | Artefatto di provenienza del 22 luglio |
-| Anthropic `claude-opus-4-8` | Sintesi precedente | Sintesi dopo il ripiego automatico del fornitore | 319.743 | Artefatto di provenienza del 22 luglio |
-| OpenAI `gpt-5.6-terra/high` | Report A | Analisi dei flussi | 217.090 | Artefatto di provenienza del 22 luglio |
-| OpenAI `gpt-5.6-sol/high` | Report B | Analisi del nucleo contrattuale | 299.822 | Artefatto di provenienza del 22 luglio |
-| OpenAI `gpt-5.6-sol/high` | Report C | Analisi delle integrazioni e dell'esecuzione | 579.240 | Artefatto di provenienza del 22 luglio |
-| Anthropic `claude-opus-4-8/max` | Revisione a riga di comando | Critica avversaria dei contratti AI in sola lettura | 68.978 | Campo `usage` del risultato CLI |
-
-Il record Codex comprende 16 sessioni collegate. La fotografia è stata acquisita
-il 24 luglio 2026 alle 12:00 CEST e misura 223.723.855 token totali. Il contatore
-include ingresso e uscita; i token letti dalla memoria cache sono una parte
-dell'ingresso.
-
-L'artefatto del 22 luglio riporta i cinque valori indicati, ma non documenta la
-formula di somma o l'esclusività contabile. Per questo motivo tali valori non
-formano un totale aggregato.
 
 ## [0.7.3] - 2026-07-13
 

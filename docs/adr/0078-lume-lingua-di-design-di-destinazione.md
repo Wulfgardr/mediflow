@@ -25,8 +25,8 @@ l'intensita nel ciclo successivo.
   `docs/design-review-vetro-clinico`:
   `docs/design/vetro-clinico/` (canone consolidato dello stato attuale) e
   `docs/design/lume/` (lingua nuova proposta, con dimostratore).
-- Lume deriva da ricerca di mercato su tre lane GPT-5.6 con fonti
-  (`docs/design/lume/02-derivazione.md`) e sintesi progettuale Fable.
+- Lume deriva da ricerca documentale in tre ambiti con fonti
+  (`docs/design/lume/02-derivazione.md`) e sintesi progettuale.
 - Vincoli invarianti: ADR 0047 (nessun selettore di stile UI persistito),
   ADR 0060 (cockpit alla root), ADR 0065 (claims guard), regole redazionali
   (niente trattino lungo, niente meta-testo, stati vuoti onesti), contratto
@@ -86,7 +86,7 @@ Si adotta l'opzione 2:
   font della Voce e del Registro (candidati open con licenza OFL; su Apple
   restano SF Pro e SF Mono).
 - La perlustrazione dei gestionali GP e degli applicativi provider USA
-  (lane GPT-5.6, 2026-07-12) alimenta il raffinamento della grammatica
+  (ricerca documentale del 2026-07-12) alimenta il raffinamento della grammatica
   dell'attenzione prima della fase L2.
 
 ## Condizione di uscita dalla convivenza `data-lume`

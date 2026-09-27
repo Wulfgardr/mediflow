@@ -1,7 +1,6 @@
 # Handover — interfaccia Apple universale
 
 Data: 2026-07-26
-Sessione: Claude Opus 5, worktree `.codex/worktrees/404d/medical-record-app`
 Perimetro: **solo interfaccia** nativa + mappatura Apple Intelligence.
 Fuori perimetro (per istruzione): backend, schema, API, web. **Niente push.**
 

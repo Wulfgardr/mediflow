@@ -82,8 +82,12 @@ scripts/__pycache__/
 *.db
 *.db-journal
 
-# local workflow-monitor check declarations (HEAD-bound machine state, committing would invalidate them)
+# Local workspace configuration
 /.codex/
+/.agents/
+AGENTS.md
+AGENTS.override.md
+CLAUDE.md
 
 # logs
 .pm2/
