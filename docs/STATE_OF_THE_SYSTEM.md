@@ -13,7 +13,7 @@ read_when:
 > le prove che ne documentano lo sviluppo. Per i principi stabili prevalgono
 > [ARCHITECTURE.md](../ARCHITECTURE.md) e [SECURITY.md](../SECURITY.md); per i
 > flussi operativi, [docs/walkthrough.md](./walkthrough.md). La governance della
-> repository è definita da [AGENTS.md](../AGENTS.md) e
+> repository è definita da [CONTRIBUTING.md](../CONTRIBUTING.md) e
 > [docs/repository-topology.md](./repository-topology.md).
 
 Ultimo aggiornamento del raccordo di consegna: 2026-09-26. Le prove della release
@@ -665,7 +665,7 @@ permette di partire dal prodotto e arrivare ai contratti senza scambiare una
 sintesi o una prova storica per una nuova decisione.
 
 1. [README.md](../README.md): ingresso prodotto.
-2. [AGENTS.md](../AGENTS.md): regole operative e repository canonica.
+2. [CONTRIBUTING.md](../CONTRIBUTING.md): regole operative e repository canonica.
 3. [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md): quadro corrente e ricostruzione
    delle prove storiche.
 4. [ARCHITECTURE.md](../ARCHITECTURE.md): principi stabili.
@@ -844,7 +844,7 @@ OpenAPI se riguarda `/api/v1` e dichiarazione esplicita delle esclusioni.
 Non basta aggiornare la descrizione della funzione dopo averla implementata.
 
 Se cambia la topologia della repository, vanno aggiornati
-[AGENTS.md](../AGENTS.md) e la [guida dedicata](./repository-topology.md).
+[CONTRIBUTING.md](../CONTRIBUTING.md) e la [guida dedicata](./repository-topology.md).
 Remote, branch, PR, tag e release devono riferirsi alla repository pubblica
 canonica; database, artefatti runtime, credenziali e materiali riservati
 restano fuori da Git.

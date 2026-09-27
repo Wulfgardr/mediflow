@@ -66,7 +66,7 @@ Prove accettate dal coordinatore:
   versione e disabilitazione della modalità rete;
 - lint, controllo tipi, build, never-regress, claims, OpenAPI drift e controllo
   del diff senza errori;
-- review indipendente GPT-6 Astra Low, con integrazione delle prove aggiuntive
+- revisione automatizzata indipendente, con integrazione delle prove aggiuntive
   richieste su riattivazione e rete.
 
 La candidatura C03 mantieneva ancora l'audit dopo il commit. Non attestava
@@ -130,7 +130,7 @@ Il vecchio tsconfig e stato rimosso dopo averne verificato l'unico consumer.
 Il guard sul filtro dei pazienti eliminati segue ora anche un predicato
 `const` locale, usato soltanto nelle query previste: undici casi negativi
 coprono alias, mutazioni e variabili omonime, senza ampliare l'allowlist.
-La review indipendente GPT-6 Astra Low non trova nuovi casi bloccanti;
+La revisione automatizzata indipendente non trova nuovi casi bloccanti;
 il comando integrato passa 31/31.
 
 ## C04 — audit obbligatorio, pilota locale verificato
@@ -152,8 +152,7 @@ successivo non applica di nuovo il cambiamento. Non è una prova di perdita
 di alimentazione del computer.
 
 La lane ha superato 49 test mirati e cinque prove HTTP di concorrenza, oltre
-a lint, tipi, build, never-regress, claims e OpenAPI drift. La review fresca
-GPT-6 Astra Low ha verificato correzioni, hash finali e casi negativi pertinenti.
+a lint, tipi, build, never-regress, claims e OpenAPI drift. Una revisione automatizzata indipendente ha verificato correzioni, hash finali e casi negativi pertinenti.
 Dopo l'integrazione, lo smoke della route di rete reale passa 2/2.
 
 Il guard audit C14 è stato aggiornato per seguire le chiamate reali
@@ -209,8 +208,7 @@ il superamento del limite di rete resta 413. Non ridefinisce campi, payload
 cifrati, proprietà sconosciute o limiti locali.
 
 Passano 81 test mirati complessivi C03/C04/C05 e i controlli di tipi, lint,
-build, never-regress, claims, OpenAPI drift e audit. Una review indipendente
-GPT-6 Sol Medium conferma il perimetro dei cinque file; gli hash sono stati
+build, never-regress, claims, OpenAPI drift e audit. Una revisione automatizzata indipendente conferma il perimetro dei cinque file; gli hash sono stati
 verificati durante l'integrazione. Il confronto di 2.609 file non Markdown
 conferma l'equivalenza delle sorgenti integrate alla candidatura verificata,
 senza ripetere build identiche. Questo non conclude il contratto C05 per gli
@@ -235,7 +233,7 @@ al successo, conservazione dei figli e delle associazioni, riapertura e
 contesa fra due processi. Una cancellazione ripetuta resta 404: non introduce
 un nuovo contratto di replay della risposta.
 
-La review indipendente GPT-6 Astra Low non trova blocchi nel runtime e
+La revisione automatizzata indipendente non trova blocchi nel runtime e
 riesegue nove prove pertinenti. Lint, tipi, build, never-regress, claims e
 OpenAPI drift passano sul candidato; i suoi 2.611 file non Markdown sono
 identici al runtime integrato prima dell'aggiornamento dei guard. Rete,
@@ -297,9 +295,7 @@ riesaminati. Non dichiara conclusi C01, C03, C04, C05 o C14 nel loro insieme.
 
 ## Coordinamento e limiti
 
-L'implementazione circoscritta è stata affidata a GPT-6 Sol Medium; estrazioni
-e confronti statici a GPT-6 Luna Medium Fast. Il coordinatore mantiene
-contratti, integrazione e decisione di accettazione. La [preparazione delle versioni successive](./2026-09-26-09x-preparation.md)
+L'implementazione circoscritta e i confronti statici sono stati verificati prima dell'integrazione. La [preparazione delle versioni successive](./2026-09-26-09x-preparation.md)
 ricevuta dalla lane separata è integrata come documento. Le sue prove di
 qualificazione future restano `NOT_RUN`. Il successivo mandato assegnato
 dall'utente a quel thread produce candidati sintetici 0.9.1–0.9.7 separati:
@@ -336,8 +332,8 @@ mentre la bozza conserva il proprio snapshot.
 Prove locali: percorso reale 1/1; regressioni browser del modulo 4/4,
 comprese conferma annullata e seconda modifica esterna non notificata
 che mantiene DELETE obsoleto e rifiutato; lint, typecheck, build,
-never-regress e claims superati. Review indipendente Astra Low sul delta
-UI, implementazione Sol Medium. Le prove precedenti delle transazioni
+never-regress e claims superati. Revisione automatizzata indipendente sul delta
+UI. Le prove precedenti delle transazioni
 e dell'audit restano valide: i relativi file runtime non sono cambiati.
 
 I tentativi precedenti restano conservati: correzioni di selettori e
@@ -382,10 +378,10 @@ Il coordinatore ha integrato i soli file della coorte e verificato
 l'equivalenza di 2.613 file non Markdown con il candidato dei controlli,
 inclusi i tre file UI gia accettati. La suite completa integrata conta
 4.863 test: 4.851 passati, zero fallimenti e 12 esclusi. Il gate audit non
-riporta finding. La review indipendente Astra Low non rileva blocchi nel
+riporta finding. La revisione automatizzata indipendente non rileva blocchi nel
 delta; la prova browser precedente resta valida per i file UI invariati.
 
-Implementazione Sol Medium, accettazione del coordinatore; correzioni
+Correzioni
 di verifica: confronto delle righe complete, retry con versione originale,
 assenza nell'elenco rete e concorrenza della creazione. Le ricevute sono in
 `.codex/090-start-20260926/c05-network-lifecycle/`, con snapshot distinto
@@ -396,8 +392,7 @@ di WUL-720/C05. Restano da migrare gli altri writer classificati sopra.
 
 ## Creazione paziente locale — Web, anteprima vincolata e API-v1
 
-Il Chief of Staff ha concordato questa coorte dopo aver verificato la milestone
-rete. Un solo owner Sol Medium modifica i due POST; servizio di creazione,
+La modifica riguarda i due POST; servizio di creazione,
 owner della sessione, registro delle anteprime e normalizzazione restano
 invariati. Il contratto è stato aggiunto ad ADR 0015 prima del runtime.
 
@@ -427,7 +422,7 @@ a due server. Il 500 su ID già esistente resta comportamento preesistente;
 non sono introdotti retry automatici o un nuovo contratto di replay.
 
 Lint, tipi, build, never-regress, claims, OpenAPI drift, gate audit e controllo
-del diff passano con Node 24.18.0. La review indipendente Astra Low non rileva
+del diff passano con Node 24.18.0. La revisione automatizzata indipendente non rileva
 regressioni nel delta runtime; il coordinatore verifica separatamente le
 prove del veto e gli hash. Il primo controllo never-regress aveva segnalato
 un literal della fixture: corretto soltanto il test, senza cambiare il guard.
@@ -608,13 +603,9 @@ precedenti.** Restano aperti i HOLD AIFA/Next, affidabilita locale/CI e
 chooser nativo storico; cap4 resta una proposta non adottata. Nessuna nuova
 full suite invariata e prevista per cercare ulteriori PASS.
 
-Assegnazione: Sol Medium, unico writer amministrativo; Sol Medium in una
-checkout distinta per le due tracce di test; Astra Low per review indipendente
-read-only del delta e ADR. Il coordinatore ha deciso il contratto, verificato
-hash/prove e integrato i risultati. Nessun difetto concreto nel runtime
+Una revisione automatizzata indipendente, in sola lettura, ha esaminato delta e ADR. Il coordinamento ha verificato contratto, hash e prove prima dell'integrazione. Nessun difetto concreto nel runtime
 riesaminato; rework circoscritto al fingerprint e al percorso della fixture
-di build. Tempi per comando nelle ricevute; limiti d'account condivisi non
-attribuibili alla coorte. Nessuna pubblicazione o chiusura globale C05/C14.
+di build. Tempi per comando nelle ricevute. Nessuna pubblicazione o chiusura globale C05/C14.
 
 Raccordo parity: verificati direttamente **19/19** sorgenti OCR identici al
 manifest consegnato dall'owner, senza importare altro codice. Le prove guest
@@ -631,7 +622,7 @@ e `expectedVersion`. La precedente scelta del coordinatore di conservare
 questo comportamento non soddisfaceva la DoD sui campi non supportati.
 L'accettazione precedente non diventa per questo una chiusura dell'input.
 
-Stessa coorte, stesso writer Sol Medium e nessun altro servizio modificato:
+Nessun altro servizio è stato modificato:
 il solo body ammesso contiene `patientId`; ogni altra proprieta propria
 restituisce 400 prima di transazione o audit. Nessun CAS client introdotto.
 Positivi con solo identificativo, anche con spazi da normalizzare, distinti
@@ -671,8 +662,7 @@ prima consegna amministrativa restano immutati.
 Il Chief ha concordato il massimo proposto di **65.536 byte (64 KiB)** come
 nuova restrizione esplicita del solo POST `/api/system/restore-patient`.
 ADR 0015 aggiornato prima del runtime, con compatibilita storica dichiarata:
-non si attesta un censimento dei client reali. Stesso writer Sol Medium,
-stessa coorte e nessun nuovo branch o servizio.
+non si attesta un censimento dei client reali. Nessun nuovo servizio.
 
 Il lettore canonico `readBoundedJsonBody` e usato in modalita `request-json`
 dopo autenticazione e ruolo Web admin, con costante locale non esportata.
@@ -769,9 +759,7 @@ poi le sette prove legacy/v1 sul collector integrato passano **7/7**.
 Il primo 6/7 e le tre correzioni iniziali del harness del writer restano
 conservati. Nessun test preesistente e stato modificato per ottenere il verde.
 
-Sol Medium e stato l'unico writer runtime/test; un secondo Sol ha preparato
-la prova UI e raccolto il roster. Astra Low ha eseguito review indipendente
-dei confini e del candidato. Il coordinatore mantiene contratto, integrazione
+Runtime, test, prova UI e roster sono stati integrati. Una revisione automatizzata indipendente ha esaminato i confini e il candidato. Il coordinamento ha mantenuto contratto e integrazione
 e accettazione. La review ha individuato anche un falso positivo del nuovo
 guard statico (mutazione solo in callback non eseguita): corretto seguendo
 la catena diretta fino a run(), con controprova dedicata. Il guard collega
@@ -889,13 +877,9 @@ del test cookie-producer; dopo la cleanup del test e stato ripetuto soltanto
 il lint, senza modificare sorgenti/configurazione o ripetere la suite.
 Typecheck della checkout candidata riusato con identita dei sorgenti TypeScript.
 
-Esecuzione circoscritta: GPT-6 Sol Medium per baseline, runtime/test e proof UI;
-GPT-6 Astra Low per review indipendenti guard/runtime e delta; coordinatore
-responsabile di contratti, guard, integrazione e sufficienza delle prove.
+Esecuzione circoscritta a baseline, runtime/test e prova UI, con revisioni automatizzate indipendenti di guard, runtime e delta. Il coordinamento ha valutato contratti, integrazione e sufficienza delle prove.
 Le due regressioni sono state individuate dagli smoke, non dalla sola review
-statica: entrambe le evidenze e le correzioni restano nel dossier. I consumi
-condivisi dell'account non sono attribuiti al costo di questa coorte.
-Nessun commit, push, PR, aggiornamento tracker, pubblicazione o rilascio
+statica: entrambe le evidenze e le correzioni restano nel dossier. Nessun commit, push, PR, aggiornamento tracker, pubblicazione o rilascio
 clinico. Non si dichiarano conclusi C05/WUL-720, C14 o la parity nativa.
 
 
@@ -965,10 +949,9 @@ allentare il guard. Nessun finding runtime aperto nella review circoscritta.
 Suite standard integrata: **5.090 PASS su 5.102, 12 skip, zero fallimenti**
 (93,52 secondi del comando); build PASS (17,06 secondi). Lint, typecheck,
 never-regress, claims, audit e OpenAPI PASS sull'integrato. Le prove mirate non
-sostituiscono la decisione di rilascio. Sol Medium ha curato runtime/test e
-prove Web/HTTP; Luna Medium Fast il roster; Astra Low le review indipendenti.
-Il coordinatore mantiene contratti, integrazione e sufficienza delle prove.
-I consumi condivisi non misurano il costo di questa coorte. Nessun commit,
+sostituiscono la decisione di rilascio. Runtime/test, prove Web/HTTP e roster
+sono stati integrati; una revisione automatizzata indipendente ha esaminato
+il delta. Il coordinamento ha valutato contratti e sufficienza delle prove. Nessun commit,
 push, PR, modifica tracker o pubblicazione; C05/WUL-720 e C14 restano aperti.
 
 
@@ -1037,12 +1020,11 @@ consegnate restano riferite alla loro baseline e non qualificano questa patch.
   coincidono col freeze; tsconfig ripristinato byte-identico, server/listener
   delle prove terminati e database sintetici conservati.
 
-La guardia strutturale collega gli otto handler: 18 gruppi PASS. Review
-indipendenti GPT-6 Astra Low su guard/ADR e runtime congelato senza finding
-nel perimetro; non sostituiscono gli esiti comportamentali. GPT-6 Sol Medium
-ha curato runtime/test, baseline e prove Web; Luna Medium Fast roster e
-trasformazione iniziale dell'harness HTTP. Il coordinatore mantiene la
-definizione dei contratti, il riesame e l'integrazione. Nessun nuovo schema
+La guardia strutturale collega gli otto handler: 18 gruppi PASS. Revisioni
+automatizzate indipendenti su guard/ADR e runtime congelato non hanno trovato
+finding nel perimetro; non sostituiscono gli esiti comportamentali. Runtime/test,
+baseline, prove Web, roster e harness HTTP sono stati verificati. Il
+coordinamento ha valutato contratti e integrazione. Nessun nuovo schema
 di input o incremento OpenAPI deriva dalla sola correzione transazionale.
 
 

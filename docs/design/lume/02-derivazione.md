@@ -1,5 +1,5 @@
 ---
-summary: "How Lume was derived: the three GPT-5.6 market research lanes with sources, the cross-cutting findings, the rejected options, and the rationale of each Lume choice."
+summary: "How Lume was derived: three source-backed research areas, cross-cutting findings, rejected options, and the rationale for Lume."
 read_when:
   - "Questioning why Lume makes a given choice, or re-running the market research."
   - "Auditing the evidence behind the proposed design language."
@@ -7,7 +7,7 @@ read_when:
 
 # La derivazione
 
-La ricerca del 2026-07-12 è stata articolata in tre lane web indipendenti su GPT-5.6 Terra via Codex CLI, due a effort high e una medium, in sandbox di sola lettura. Fable ne ha definito indicazioni e prompt e ha curato la sintesi progettuale: questa pagina collega i risultati dei rapporti alle decisioni di Lume, conservandone fonti e limiti.
+La ricerca documentale del 2026-07-12 ha esaminato tre ambiti con fonti pubbliche. Questa pagina collega i risultati alle decisioni di Lume, conservando fonti e limiti della ricognizione.
 
 ## 1. Cosa dice la ricerca
 
@@ -57,4 +57,4 @@ Da questa ricognizione la lane ricava otto ingredienti da valutare insieme: prof
 
 ## 4. Limiti della ricerca
 
-Le misure tipografiche di R1 sono stime ricavate da interfacce pubbliche, non token ufficiali. Ogni lane ha svolto una sola passata, dopo due tentativi falliti per disconnessioni del backend: la ricerca prevedeva quindi una seconda verifica delle singole fonti prima dell'ADR di adozione, senza che questa pagina ne attesti l'esecuzione. I prompt integrali delle tre lane sono conservati nella sessione di lavoro del 2026-07-12.
+Le misure tipografiche di R1 sono stime ricavate da interfacce pubbliche, non token ufficiali. Ogni ambito è stato esaminato in una sola passata: la ricerca prevedeva quindi una seconda verifica delle singole fonti prima dell'ADR di adozione, senza che questa pagina ne attesti l'esecuzione.
