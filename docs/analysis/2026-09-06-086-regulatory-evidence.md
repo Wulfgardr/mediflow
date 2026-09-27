@@ -25,6 +25,10 @@ La consegna sorgente `v0.8.6` resta distinta dal seguito del 23 settembre:
 le correzioni runtime PR 358 e il dossier PR 359 sono stati integrati in `main`.
 I paragrafi sottostanti che descrivono quei candidati come locali conservano
 la fotografia della preparazione, non lo stato successivo della pubblicazione.
+La dichiarazione di autonomia organizzativa acquisita il 27 settembre aggiorna
+anche le precedenti indicazioni «istruzioni da concordare». Restano da documentare
+la configurazione adottata e le procedure effettive: i campi storici delle schede
+non annullano il chiarimento e non costituiscono documenti adottati.
 Nessuna nuova qualifica runtime è stata eseguita in questo riesame documentale.
 
 #### Cosa distingue i piani e le garanzie sui dati
@@ -105,7 +109,9 @@ Controllo locale del 27 settembre, ore 10:07 UTC: nella directory predefinita
 macOS `MediFlow/ai/rollout-readiness/redaction` non risultano la directory,
 `runtime.json`, `latest.json` o `latest.md`. Sono state controllate soltanto
 esistenza e metadati dei percorsi ricavati dal sorgente, senza aprire database
-o impostazioni. Su tale percorso manca quindi la prova di installazione e
+o impostazioni. `latest.md` è un resoconto facoltativo; i controlli di ammissione
+leggono il descrittore e la prova JSON, non la sua presentazione Markdown.
+Su tale percorso manca quindi la prova di installazione e
 readiness richiesta dal gate; non è un collaudo del blocco durante l'esecuzione
 né una ricerca in eventuali directory dati alternative. Prima di qualificare
 il deployment occorre identificare il runtime scelto e produrre le prove sul
