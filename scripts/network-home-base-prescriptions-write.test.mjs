@@ -83,6 +83,23 @@ test('paired prescriptions and prosthetics write smoke covers capability, scope,
         });
         assert.equal(outsideScopeServiceCreate.response.status, 404);
 
+        // @Codex: observe rollback through the real admitted paired HTTP adapter.
+        const faultDb = openTestDb();
+        const snapshotService = () => ({
+            prescriptions: faultDb.prepare('SELECT * FROM service_prescriptions WHERE patient_id=?').all(patientId),
+            items: faultDb.prepare('SELECT * FROM service_prescription_items WHERE patient_id=?').all(patientId),
+            audit: faultDb.prepare("SELECT * FROM audit_events WHERE event_type LIKE 'service.prescription%' ORDER BY rowid").all(),
+        });
+        try {
+            const beforeFault = snapshotService();
+            faultDb.exec("CREATE TRIGGER synthetic_paired_service_audit BEFORE INSERT ON audit_events WHEN NEW.event_type='service.prescription.created' BEGIN SELECT RAISE(IGNORE); END");
+            const failedCreate = await request('POST', '/api/v1/network/service-prescriptions', {
+                headers: { ...pairedHeaders(writerClient), Cookie: cookieHeader }, body: servicePrescriptionPayload(patientId),
+            });
+            assert.equal(failedCreate.response.status, 500);
+            assert.deepEqual(snapshotService(), beforeFault);
+        } finally { faultDb.exec('DROP TRIGGER IF EXISTS synthetic_paired_service_audit'); faultDb.close(); }
+
         const serviceCreate = await request('POST', '/api/v1/network/service-prescriptions', {
             headers: {
                 ...pairedHeaders(writerClient),
@@ -169,6 +186,45 @@ test('paired prescriptions and prosthetics write smoke covers capability, scope,
         assert.equal(staleServiceUpdate.json?.code, 'VERSION_CONFLICT');
         assert.equal(staleServiceUpdate.json?.entity, 'service_prescription');
         assert.equal(staleServiceUpdate.json?.currentVersion, 2);
+
+        // @Codex: the paired item PUT has its own CAS, mandatory event and rollback.
+        const itemId = itemA.json.id;
+        const itemDb = openTestDb();
+        const itemState = () => ({
+            row: itemDb.prepare('SELECT * FROM service_prescription_items WHERE id=?').get(itemId),
+            events: itemDb.prepare('SELECT event_type, actor_ref, source_surface, redacted_metadata FROM audit_events WHERE subject_ref=? ORDER BY rowid').all(itemId),
+        });
+        try {
+            const beforeItem = itemState();
+            itemDb.exec("CREATE TRIGGER synthetic_paired_item_audit BEFORE INSERT ON audit_events WHEN NEW.event_type='service.prescription_item.updated' BEGIN SELECT RAISE(FAIL, 'synthetic audit fault'); END");
+            const failedUpdate = await request('PUT', `/api/v1/network/service-prescription-items/${itemId}`, {
+                headers: { ...pairedHeaders(writerClient), Cookie: cookieHeader }, body: { version: 1, status: 'performed' },
+            });
+            assert.equal(failedUpdate.response.status, 500); assert.deepEqual(itemState(), beforeItem);
+            itemDb.exec('DROP TRIGGER synthetic_paired_item_audit');
+            const itemUpdate = await request('PUT', `/api/v1/network/service-prescription-items/${itemId}`, {
+                headers: { ...pairedHeaders(writerClient), Cookie: cookieHeader }, body: { version: 1, status: 'performed' },
+            });
+            assert.equal(itemUpdate.response.status, 200);
+            const afterItem = itemState();
+            assert.equal(afterItem.row.version, 2); assert.equal(afterItem.row.status, 'performed');
+            assert.equal(afterItem.events.length, beforeItem.events.length + 1);
+            assert.equal(afterItem.events.at(-1).event_type, 'service.prescription_item.updated');
+            assert.equal(afterItem.events.at(-1).source_surface, 'native');
+            assert.equal(JSON.parse(afterItem.events.at(-1).redacted_metadata).resourceVersion, 2);
+            const repeated = await request('PUT', `/api/v1/network/service-prescription-items/${itemId}`, {
+                headers: { ...pairedHeaders(writerClient), Cookie: cookieHeader }, body: { version: 1, status: 'performed' },
+            });
+            assert.equal(repeated.response.status, 409); assert.deepEqual(itemState(), afterItem);
+            const reread = await request('GET', `/api/v1/network/service-prescription-items?prescriptionId=${encodeURIComponent(servicePrescriptionId)}`, {
+                headers: { ...pairedHeaders(writerClient), Cookie: cookieHeader },
+            });
+            assert.equal(reread.response.status, 200);
+            assert.equal(reread.json.find(item => item.id === itemId).version, 2);
+            const events = itemDb.prepare('SELECT event_type, redacted_metadata FROM audit_events WHERE subject_ref=? ORDER BY rowid').all(servicePrescriptionId);
+            assert.deepEqual(events.map(event => event.event_type), ['service.prescription.created', 'service.prescription.updated']);
+            assert.deepEqual(events.map(event => JSON.parse(event.redacted_metadata).resourceVersion), [1, 2]);
+        } finally { itemDb.exec('DROP TRIGGER IF EXISTS synthetic_paired_item_audit'); itemDb.close(); }
 
         const serviceCatalog = await request('GET', '/api/v1/network/service-catalog?q=emocromo&limit=10', {
             headers: {
