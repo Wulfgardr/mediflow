@@ -11,6 +11,49 @@ La ricerca documenta requisiti, condizioni ed evidenze nel sorgente pubblico.
 Non attesta conformità, adeguatezza di un deployment, qualificazione del
 prodotto, adozione di procedure o completamento di WUL-686/687/688.
 
+### Prove tecniche aggiuntive del 27 settembre 2026
+
+Sul sorgente `aaa18f5ab05a3392da13879f0fa0a0392f52dd64` sono state eseguite
+nuove prove locali. Gli undici file esaminati del percorso di preparazione,
+consenso, governance, esecuzione, runner e misura non presentano differenze
+rispetto al tag `v0.8.6`. Il modello, il worker e l'interprete recuperati dalla
+precedente installazione di collaudo corrispondono ai pin correnti. Questo
+recupero aggiorna la precedente ricerca incompleta degli artifact; non cambia
+l'osservazione di assenza della configurazione nel percorso operativo standard.
+
+- **Modello reale:** `benchmark-redaction-runtime.ts measure` supera i corpus
+  base di 9 casi e email di 6 casi, con `shadowReady:true`, nessun fallimento,
+  recall critico e integrità degli offset pari a 1 e leak vietati pari a 0.
+  Il corpus base conserva una organizzazione non critica non riconosciuta;
+  questi risultati non dimostrano anonimizzazione o copertura universale.
+- **Quattro funzioni:** preparazione dei profili sintetici Patient Insight,
+  Smart Import, Document Synthesis e Treatment Reasoning con il runner reale;
+  identificativo sintetico rimosso dal payload, hash e dimensione coerenti,
+  risposta simulata riconciliata localmente e sessione invalidata alla chiusura.
+  Nessun trasporto verso un provider è stato eseguito.
+- **Confini e rifiuti:** 98 test superati, senza skip, nei file
+  `ordinary-integration.test.ts`, `ordinary-preparation.test.ts` e
+  `ai-redaction-evidence.test.ts`. Questi test usano sostituti per NER e peer
+  e, nei casi positivi dichiarati, per il controllo di uscita: il loro esito
+  non qualifica il provider o l'installazione operativa.
+
+Le prove finali usano una directory nuova e il bootstrap canonico con
+`MEDIFLOW_E2E_DISABLE_LEGACY_COPY=1`. I primi tentativi, invalidati da una copia
+legacy automatica e dal rifiuto dello schema, restano evidenze diagnostiche
+private: non sono considerati collaudi isolati riusciti. Nessuna migrazione
+del database originario è stata eseguita da questo lavoro.
+
+SHA-256 dei report sintetici: base
+`fa43ab730bfa745394608bfb01ac59d83f14cbb4b4a0a5d7ac48fcf364c0cd59`;
+email `9ec516dd656eaac9691750bca7f6605ad7087c08c2bf6cf9ba9f5c9119900257`;
+quattro funzioni
+`1c583fdc72de1949bb18c269b5bfe46255c0509c732be2f60c0f4f5847f6febd`.
+Le ricevute rimangono separate dai dati operativi e conservano il perimetro
+sintetico della prova. Non è stato scritto un nuovo record di ammissione
+`latest.json` nella configurazione operativa. Installazione effettiva,
+condizioni del servizio, procedure adottate e revisione competente restano
+criteri aperti di WUL-685–688.
+
 ### Riesame del 27 settembre 2026: piani ChatGPT e decisione per contesto
 
 Il riesame comprende sia attività autonoma sia lavoro per una struttura. La
