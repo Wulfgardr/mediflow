@@ -2,9 +2,10 @@
 
 MediFlow è sviluppato con l’assistenza di modelli AI. Codex e Claude Code
 hanno contribuito a progettazione, scrittura, revisione e verifica dei sorgenti.
-Le scelte, l’accettazione delle modifiche e la responsabilità del progetto
-restano umane. L’uso di questi strumenti durante lo sviluppo non attiva servizi
-AI nel gestionale e non dimostra qualità o validazione clinica.
+Direzione e responsabilità del progetto rimangono dell’autore. I controlli
+automatizzati non equivalgono a una revisione umana di ogni modifica. L’uso di
+questi strumenti durante lo sviluppo non attiva servizi AI nel gestionale e
+non dimostra qualità o validazione clinica.
 
 Questa pagina rende pubblici gli aggregati disponibili e il modo in cui sono
 letti. Le istruzioni personali usate dagli assistenti per sviluppare restano

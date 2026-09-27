@@ -361,8 +361,8 @@ la parità FHIRv2 resta da verificare.
 ## Sviluppo assistito
 
 MediFlow è sviluppato con l’assistenza di **Codex e Claude Code** per
-progettazione, implementazione, revisione e verifica. Le decisioni e la
-responsabilità del progetto restano umane.
+progettazione, implementazione, revisione e verifica. Direzione e
+responsabilità del progetto rimangono dell’autore.
 
 <details>
 <summary><strong>Disclosure e storico dei token per provider, modello ed effort</strong></summary>
