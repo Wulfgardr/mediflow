@@ -186,9 +186,6 @@ per `stdio` e HTTP si applica il relativo
 
 `F6`, `F7-C`, `MCP` e `VC` possono partire in parallelo dopo `P0`.
 `F7-O` e `F7-A` possono partire in parallelo dopo il contratto comune.
-Ogni packet usa un issue, branch `codex/<issue>-<slug>`, worktree dedicato e
-un solo owner dei file; supera circa 300 LOC o un secondo boundary soltanto
-dopo ulteriore split.
 
 ## Gate di pubblicazione
 

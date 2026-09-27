@@ -13,10 +13,6 @@ Run ID: `MFP-AI-COS-20260728-01`
 
 Data: 2026-07-28
 
-Modalità: `worktree / solo-verify`
-
-Controller: `CoS Open Minis style`, GPT-5.6 Sol high
-
 Verdetto primo ciclo: `PARTIAL`
 
 Raccomandazione: `GO` per il successivo packet locale WUL-502;
@@ -36,11 +32,6 @@ Questo run è solo post-0.8. Non modifica, promuove o pubblica il candidato 0.8.
 | Dati | Solo fixture sintetiche, metadati pubblici e prove senza prompt clinici |
 | Esclusioni | PHI/PII, database reale, credenziali, push, PR, merge, tag, release e mutazioni Linear |
 | Promotion rule | Un output locale è candidato. Servono diff, test e verifica indipendente sullo stesso HEAD |
-
-RepoPrompt è stato usato per lookup, lettura e review del diff. Non sono stati
-avviati subagent, swarm o Sol Ultra. GPT-5.6 Pro nella finestra incorporata è
-stato usato solo per due decisioni ad alto rischio: gate iniziale e review
-egress/privacy terminale.
 
 ## 2. Fonti e tracker recuperati
 
@@ -193,7 +184,7 @@ Gate terminali:
 - `check:never-regress` verde;
 - attestazione live senza prompt su Ollama 0.32.5;
 - chat live con sola fixture sintetica;
-- GPT-5.6 Pro: primo `HOLD_FIX`, poi `GO`;
+- Revisione automatizzata indipendente: primo `HOLD_FIX`, poi `GO`;
 - candidato 0.8 ancora pulito sulla baseline.
 
 ## 9. Decision audit
@@ -267,9 +258,7 @@ un altro piano.
 | Base | `b09b538d8647760f1d5bfa94de8d84b19497712d` |
 | Commit contratto | `4e2bb68f5` |
 | Commit integrazione | `ac0322e43` |
-| Controller | GPT-5.6 Sol High |
-| Verificatore | RepoPrompt GPT-5.6 Sol XHigh, contesto fresco |
-| GPT-5.6 Pro | Non usato: nessuna decisione oltre il livello Fable-class |
+| Verifica | Riesame automatizzato indipendente, in sola lettura |
 
 ### 14.2 Esito
 
@@ -332,9 +321,7 @@ consenso, capability specifiche del modello e UX multipiattaforma.
 | Branch | `codex/WUL-418-post-0.8-runtime-matrix` |
 | Base | `18088c008` |
 | Commit matrice | `cc6c036cd` |
-| Controller | GPT-5.6 Sol High |
-| Verificatore | RepoPrompt GPT-5.6 Sol XHigh, contesto fresco |
-| GPT-5.6 Pro | Non usato: riconciliazione documentale verificabile |
+| Verifica | Riesame automatizzato indipendente, in sola lettura |
 
 ### 15.2 Esito
 

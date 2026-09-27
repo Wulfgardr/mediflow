@@ -34,6 +34,38 @@ sensibili restano fuori da Git, secondo
 
 ---
 
+## Orientamento e perimetro del contributo
+
+Verifica branch e stato del worktree prima di modificare file. Usa una issue
+pertinente e un branch dedicato; conserva le modifiche altrui e separa i lavori
+concorrenti. Mantieni ogni commit coerente e riesaminabile, senza refactor
+laterali. Suddividi per risultati verificabili, non per numero di file.
+
+La [mappa canonica](./docs/README.md) individua i contratti del prodotto.
+Consulta stato del sistema, architettura, sicurezza e ADR pertinenti al
+componente: le fotografie storiche attestano soltanto la revisione indicata.
+Linear conserva risultato, criteri di accettazione, sequenza e dipendenze.
+Le prove tecniche restano associate alla revisione verificata; una modifica
+che cambia il contratto richiede di riesaminare le prove interessate.
+
+Una funzione è consegnata quando il percorso previsto funziona nella
+destinazione dichiarata, compresi avvio, configurazione e collegamenti
+necessari. Distingui codice verificato, integrato, pubblicato e operativo;
+la consegna tecnica non autorizza da sola l’uso clinico o di dati reali.
+
+Per modifiche solo documentali, verifica almeno:
+
+```bash
+git diff --check
+rg --files -g '*.md' | sort
+```
+
+Restano applicabili i controlli richiesti dalla CI e le verifiche pertinenti
+alla modifica. Per interfacce, dati e comportamenti valgono i criteri della
+Definition of Done qui sotto.
+
+---
+
 ## ⚙️ Prerequisiti
 
 - Node.js **24.x**, come fissato da `.nvmrc` e `package.json`
@@ -156,42 +188,6 @@ a un solo dispositivo e codifica ICD obbligatoria. Per eseguirlo:
 ```bash
 npm run check:claims
 ```
-
-### Monitor del workflow
-
-Il monitor legge i metadati Git e le verifiche dichiarate per il branch
-corrente, così che gli esiti restino associati al lavoro cui si riferiscono.
-
-```bash
-npm run workflow-monitor -- --check=focused=pass --persist-checks
-npm run workflow-monitor
-npm run workflow-monitor -- clear-checks
-```
-
-Il primo comando salva le verifiche per il branch e lo SHA esatti in un
-file di supporto esterno a Git:
-`~/.codex/state/mediflow-workflow-monitor/checks.json`.
-
-Il file viene riusato solo con worktree pulito e branch e SHA invariati.
-Per ignorare gli esiti salvati, usa `--no-persisted-checks`.
-
-Poiché registra gli esiti dichiarati senza eseguire i controlli, il monitor
-non sostituisce la prova: conserva separatamente gli output dei controlli.
-La decisione `continue` riguarda soltanto questi metadati, non l'accettazione
-del risultato né un'autorizzazione a promuoverlo. Per coorti con più fasi,
-il contratto e la disposizione dei contributi seguono
-[AGENTS.md, Contratto e unità di consegna](./AGENTS.md#contratto-e-unità-di-consegna)
-e la skill locale `issue-delivery-manager`; i controlli obbligatori sotto
-restano applicabili.
-
-Il monitor non stampa il diff né i percorsi modificati; quando il diff
-contiene un percorso protetto, restituisce `blocked`.
-
-Il conteggio di arretramento dipende dai riferimenti locali, perché il
-monitor non esegue `git fetch`. Aggiorna quindi `origin/main` prima di usare
-`behind` come evidenza corrente.
-
-L'autorità sul merge resta alla CI e al controller.
 
 ### Test concorrenza pazienti
 
