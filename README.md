@@ -358,6 +358,28 @@ I percorsi SISS/FSE restano passaggi assistiti verso i canali ufficiali,
 indicati come handoff o `webapp-assisted`. L’export FHIR segue ADR0081;
 la parità FHIRv2 resta da verificare.
 
+## Sviluppo assistito
+
+MediFlow è sviluppato con l’assistenza di **Codex e Claude Code** per
+progettazione, implementazione, revisione e verifica. Le decisioni e la
+responsabilità del progetto restano umane.
+
+<details>
+<summary><strong>Disclosure e storico dei token per provider, modello ed effort</strong></summary>
+
+![Storico dei token di tutti i progetti locali, per provider e modello; effort su una serie Codex distinta e parziale](./screenshots/token-models.svg)
+
+Lo storico mostra il contesto elaborato nei log locali, **cache inclusa**;
+non misura il consumo esclusivo di MediFlow, il costo o la qualità del codice.
+Il provider è dedotto dall’identificatore del modello e resta distinto
+dall’ambiente che registra l’uso. L’effort compare solo dove è registrato,
+in una serie con copertura propria che non si somma ai totali storici.
+
+[Fonti, copertura, tabelle complete e dati riproducibili](./docs/development-usage.md)
+· [Crediti degli strumenti](./CREDITS.md#sviluppo-assistito).
+
+</details>
+
 ## Licenza e contributi
 
 Il codice è pubblicato sotto [licenza MIT](./LICENSE), perché sia possibile
