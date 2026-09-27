@@ -6,10 +6,14 @@ import { mapAnyDocLocalFailure } from '../lib/domain/documents/anydoc-local-extr
 import type { AttachmentExtractionProjectionGrant } from '../lib/domain/documents/attachment-extraction-projection-protocol';
 import { bootstrapUnlockedSession, openPatientSection } from './utils';
 import { observeAnyDocProjectResponse } from './anydoc-project-response';
+import { attachAnyDocLifecycleProbe, installAnyDocLifecycleProbe } from './anydoc-lifecycle-probe';
 
 const TEXT = 'DOCUMENTO SINTETICO PER RECUPERO';
 const RTF = Buffer.from(`{\\rtf1\\ansi ${TEXT}}`);
 test.describe.configure({ retries: 0 });
+// Optional diagnostic-only instrumentation; ordinary qualification leaves the page untouched.
+test.beforeEach(async ({ page }, info) => { await installAnyDocLifecycleProbe(page, info); });
+test.afterEach(async ({ page }, info) => { await attachAnyDocLifecycleProbe(page, info); });
 
 async function fixture(page: Page, bytes = RTF, extension = 'rtf') {
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
@@ -152,6 +156,8 @@ test('OCR recovery UI: interrupt waiting, ignore late result and recover with a 
     await expect(page.getByTestId('anydoc-local-extraction-preview')).toContainText(TEXT);
     await expect(extract).toBeEnabled();
     expect(calls).toBe(2);
+    // Preserve the negative-control trace before this deliberate navigation.
+    await attachAnyDocLifecycleProbe(page, testInfo);
     await openArchive(page, file.url);
     await expect(page.getByTestId('anydoc-local-extraction-preview')).toHaveCount(0);
     await page.getByRole('button', { name: `Estrai testo localmente da ${file.name}` }).click();
