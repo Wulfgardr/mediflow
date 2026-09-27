@@ -12,6 +12,8 @@ import {
 /* @Codex */
 import { dbServer } from './db-server';
 /* @Codex */
+import { activePatients } from './patient-lifecycle';
+/* @Codex */
 import type { NetworkWriteContext } from './network-write-context';
 /* @Codex */
 import { buildPrescriptionVersionConflictPayload, parsePrescriptionExpectedVersion } from './prescription-concurrency';
@@ -27,13 +29,14 @@ import {
     parsePrescriptionDate,
 } from './prescription-domain';
 /* @Codex */
-import { patientsToAmbulatories, prostheticPrescriptions } from './schema';
+import { patients, patientsToAmbulatories, prostheticPrescriptions } from './schema';
 /* @Codex */
 import {
     listChangedFields,
+    auditContextFromSession,
     requestIdFromRequest,
-    safeWriteAuditEventFromRequest,
-    writeAuditEvent,
+    withAuditContextMetadata,
+    writeAuditEventInTransaction,
     type AuditEventType,
     type AuditRedactedMetadata,
 } from './security/audit';
@@ -69,6 +72,13 @@ function hasOwn(input: Record<string, unknown>, key: string): boolean {
 
 function badRequest(error: string): MutationResponse {
     return { status: 400, value: { error } };
+}
+
+type Tx = Parameters<Parameters<typeof dbServer.transaction>[0]>[0];
+
+function activeParentExists(tx: Tx, patientId: string): boolean {
+    return Boolean(tx.select({ id: patients.id }).from(patients)
+        .where(and(eq(patients.id, patientId), activePatients())).get());
 }
 
 function patientIsInScope(
@@ -175,35 +185,29 @@ function selectConflictSnapshot(tx: Parameters<Parameters<typeof dbServer.transa
     }).from(prostheticPrescriptions).where(eq(prostheticPrescriptions.id, id)).get() ?? null;
 }
 
-async function writeNetworkProstheticAuditEvent(input: {
-    context: NetworkWriteContext;
-    eventType: AuditEventType;
-    subjectRef: string;
-    metadata?: AuditRedactedMetadata | null;
-}): Promise<void> {
-    try {
-        await writeAuditEvent({
-            eventType: input.eventType,
-            outcome: 'success',
-            actorType: 'user',
-            actorRef: input.context.session.userId,
-            subjectType: 'prosthetic_prescription',
-            subjectRef: input.subjectRef,
-            sourceSurface: 'native',
-            requestId: requestIdFromRequest(input.context.request),
-            redactedMetadata: {
-                ...(input.metadata ?? {}),
-                flags: [
-                    ...(input.metadata?.flags ?? []),
-                    'auth:paired-client',
-                    `paired-client:${input.context.pairedClient.clientId}`,
-                    'scope:ambulatory',
-                ],
-            },
-        });
-    } catch (error) {
-        console.error('[MediFlow] Network prosthetic prescription audit write failed:', error);
-    }
+/* @Codex: audit actor and surface derive from admitted context, never request headers. */
+function prostheticAuditInput(
+    context: HostContext | NetworkWriteContext,
+    surface: 'host' | 'network',
+    eventType: AuditEventType,
+    subjectRef: string,
+    metadata?: AuditRedactedMetadata | null,
+) {
+    const actor = auditContextFromSession(context.session);
+    const flags = surface === 'network'
+        ? [...(metadata?.flags ?? []), 'auth:paired-client', `paired-client:${(context as NetworkWriteContext).pairedClient.clientId}`, 'scope:ambulatory']
+        : metadata?.flags;
+    return {
+        eventType, outcome: 'success' as const,
+        actorType: surface === 'network' ? 'user' as const : actor.actorType,
+        actorRef: surface === 'network' ? context.session.userId : actor.actorRef,
+        subjectType: 'prosthetic_prescription' as const, subjectRef,
+        sourceSurface: surface === 'network' ? 'native' as const : actor.sourceSurface,
+        requestId: requestIdFromRequest(context.request),
+        redactedMetadata: surface === 'network'
+            ? { ...(metadata ?? {}), flags }
+            : withAuditContextMetadata(actor, metadata),
+    };
 }
 
 /* @Codex */
@@ -233,18 +237,17 @@ export async function createHostProstheticPrescription(context: HostContext, raw
     const normalized = normalizeCreate(parsed.data);
     if (!normalized.ok) return badRequest(normalized.error);
 
-    await dbServer.insert(prostheticPrescriptions).values(normalized.values);
-    await safeWriteAuditEventFromRequest(context.request, context.session, {
-        eventType: 'prosthetic.prescription.created',
-        subjectType: 'prosthetic_prescription',
-        subjectRef: normalized.values.id,
-        redactedMetadata: {
+    return dbServer.transaction((tx): MutationResponse => {
+        if (!activeParentExists(tx, normalized.values.patientId)) return { status: 404, value: { error: 'Patient not found' } };
+        const inserted = tx.insert(prostheticPrescriptions).values(normalized.values).run();
+        if (inserted.changes !== 1) throw new Error('Prosthetic prescription create did not write exactly one row');
+        writeAuditEventInTransaction(tx, prostheticAuditInput(context, 'host', 'prosthetic.prescription.created', normalized.values.id, {
             changedFields: listChangedFields(rawBody, ['id']),
             flags: [`source:${normalized.values.source}`, `status:${normalized.values.status}`, `category:${normalized.values.category}`],
             resourceVersion: 1,
-        },
-    }, '[MediFlow] Prosthetic prescription audit write failed:');
-    return { status: 201, value: { id: normalized.values.id, version: 1 } };
+        }));
+        return { status: 201, value: { id: normalized.values.id, version: 1 } };
+    }, { behavior: 'immediate' });
 }
 
 /* @Codex */
@@ -265,51 +268,27 @@ async function updateProstheticPrescription(
     if (!normalized.ok) return badRequest(normalized.error);
 
     const commit = dbServer.transaction((tx): MutationResponse => {
-        const existing = tx.select({ item: prostheticPrescriptions }).from(prostheticPrescriptions).where(eq(prostheticPrescriptions.id, context.id)).get();
+        const existing = surface === 'network'
+            ? tx.select({ item: prostheticPrescriptions }).from(prostheticPrescriptions)
+                .innerJoin(patientsToAmbulatories, eq(prostheticPrescriptions.patientId, patientsToAmbulatories.patientId))
+                .where(and(eq(prostheticPrescriptions.id, context.id), eq(patientsToAmbulatories.ambulatoryId, (context as NetworkWriteContext).scopeAmbulatoryId))).get()?.item
+            : tx.select().from(prostheticPrescriptions).where(eq(prostheticPrescriptions.id, context.id)).get();
         if (!existing) return { status: 404, value: { error: surface === 'host' ? 'Prosthetic prescription not found' : 'Not found' } };
+        if (!activeParentExists(tx, existing.patientId)) return { status: 404, value: { error: 'Not found' } };
+        if (existing.version !== expectedVersion) return { status: 409, value: buildPrescriptionVersionConflictPayload(
+            'prosthetic_prescription', expectedVersion, context.id, selectConflictSnapshot(tx, context.id)) };
 
         const updateResult = tx.update(prostheticPrescriptions)
             .set({ ...normalized.values, version: expectedVersion + 1 })
             .where(and(eq(prostheticPrescriptions.id, context.id), eq(prostheticPrescriptions.version, expectedVersion)))
             .run();
-        if (updateResult.changes === 0) {
-            return {
-                status: 409,
-                value: buildPrescriptionVersionConflictPayload(
-                    'prosthetic_prescription',
-                    expectedVersion,
-                    context.id,
-                    selectConflictSnapshot(tx, context.id),
-                ),
-            };
-        }
+        if (updateResult.changes !== 1) throw new Error('Prosthetic prescription update did not write exactly one row');
+        writeAuditEventInTransaction(tx, prostheticAuditInput(context, surface, 'prosthetic.prescription.updated', context.id, {
+            changedFields: listChangedFields(body as Record<string, unknown>, ['version']),
+            resourceVersion: expectedVersion + 1,
+        }));
         return { status: 200, value: { success: true } };
-    });
-
-    if (commit.status !== 200) return commit;
-
-    if (surface === 'host') {
-        await safeWriteAuditEventFromRequest(context.request, (context as HostContext).session, {
-            eventType: 'prosthetic.prescription.updated',
-            subjectType: 'prosthetic_prescription',
-            subjectRef: context.id,
-            redactedMetadata: {
-                changedFields: listChangedFields(body as Record<string, unknown>, ['version']),
-                resourceVersion: expectedVersion + 1,
-            },
-        }, '[MediFlow] Prosthetic prescription audit write failed:');
-    } else {
-        await writeNetworkProstheticAuditEvent({
-            context: context as NetworkWriteContext,
-            eventType: 'prosthetic.prescription.updated',
-            subjectRef: context.id,
-            metadata: {
-                changedFields: listChangedFields(body as Record<string, unknown>, ['version']),
-                resourceVersion: expectedVersion + 1,
-            },
-        });
-    }
-
+    }, { behavior: 'immediate' });
     return commit;
 }
 
@@ -318,26 +297,17 @@ export async function deleteHostProstheticPrescription(context: HostContext & { 
     const commit = dbServer.transaction((tx): MutationResponse => {
         const existing = selectConflictSnapshot(tx, context.id);
         if (!existing) return { status: 404, value: { error: 'Prosthetic prescription not found' } };
+        if (!activeParentExists(tx, existing.patientId)) return { status: 404, value: { error: 'Not found' } };
+        if (existing.version !== expectedVersion) return { status: 409, value: buildPrescriptionVersionConflictPayload('prosthetic_prescription', expectedVersion, context.id, existing) };
 
         const deleteResult = tx.delete(prostheticPrescriptions)
             .where(and(eq(prostheticPrescriptions.id, context.id), eq(prostheticPrescriptions.version, expectedVersion)))
             .run();
-        if (deleteResult.changes === 0) {
-            return {
-                status: 409,
-                value: buildPrescriptionVersionConflictPayload('prosthetic_prescription', expectedVersion, context.id, existing),
-            };
-        }
+        if (deleteResult.changes !== 1) throw new Error('Prosthetic prescription delete did not remove exactly one row');
+        writeAuditEventInTransaction(tx, prostheticAuditInput(context, 'host', 'prosthetic.prescription.deleted', context.id,
+            { resourceVersion: expectedVersion }));
         return { status: 200, value: { success: true } };
-    });
-    if (commit.status !== 200) return commit;
-
-    await safeWriteAuditEventFromRequest(context.request, context.session, {
-        eventType: 'prosthetic.prescription.deleted',
-        subjectType: 'prosthetic_prescription',
-        subjectRef: context.id,
-        redactedMetadata: { resourceVersion: expectedVersion },
-    }, '[MediFlow] Prosthetic prescription audit write failed:');
+    }, { behavior: 'immediate' });
     return commit;
 }
 
@@ -349,17 +319,13 @@ export async function createNetworkScopedProstheticPrescription(context: Network
     if (!normalized.ok) return badRequest(normalized.error);
 
     const commit = dbServer.transaction((tx): MutationResponse => {
-        if (!patientIsInScope(tx, context.patientId, context.scopeAmbulatoryId)) return { status: 404, value: { error: 'Not found' } };
-        tx.insert(prostheticPrescriptions).values(normalized.values).run();
+        if (!activeParentExists(tx, context.patientId) || !patientIsInScope(tx, context.patientId, context.scopeAmbulatoryId)) return { status: 404, value: { error: 'Not found' } };
+        const inserted = tx.insert(prostheticPrescriptions).values(normalized.values).run();
+        if (inserted.changes !== 1) throw new Error('Prosthetic prescription create did not write exactly one row');
+        writeAuditEventInTransaction(tx, prostheticAuditInput(context, 'network', 'prosthetic.prescription.created', normalized.values.id,
+            { changedFields: listChangedFields(rawBody, ['id']), resourceVersion: 1 }));
         return { status: 201, value: { id: normalized.values.id, version: 1 } };
-    });
-    if (commit.status !== 201) return commit;
-    await writeNetworkProstheticAuditEvent({
-        context,
-        eventType: 'prosthetic.prescription.created',
-        subjectRef: commit.value.id,
-        metadata: { changedFields: listChangedFields(rawBody, ['id']), resourceVersion: 1 },
-    });
+    }, { behavior: 'immediate' });
     return commit;
 }
 
@@ -367,11 +333,5 @@ export async function createNetworkScopedProstheticPrescription(context: Network
 export async function updateNetworkScopedProstheticPrescription(context: NetworkPrescriptionContext, rawBody: Record<string, unknown>): Promise<MutationResponse> {
     const parsed = prostheticPrescriptionUpdateSchema.safeParse(rawBody);
     if (!parsed.success) return badRequest('Payload non valido');
-    const scoped = await dbServer.select({ id: prostheticPrescriptions.id })
-        .from(prostheticPrescriptions)
-        .innerJoin(patientsToAmbulatories, eq(prostheticPrescriptions.patientId, patientsToAmbulatories.patientId))
-        .where(and(eq(prostheticPrescriptions.id, context.prescriptionId), eq(patientsToAmbulatories.ambulatoryId, context.scopeAmbulatoryId)))
-        .get();
-    if (!scoped) return { status: 404, value: { error: 'Not found' } };
     return updateProstheticPrescription({ ...context, id: context.prescriptionId }, parsed.data, 'network');
 }

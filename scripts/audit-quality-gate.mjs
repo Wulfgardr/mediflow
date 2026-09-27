@@ -115,39 +115,14 @@ const REQUIRED_ROUTE_AUDIT = [
         writerContracts: [observationAuditContract('POST', 'network', 'create')] },
     { route: 'app/api/v1/network/patients/[id]/observations/[observationId]/route.ts', events: ['observation.updated', 'observation.deleted'],
         writerContracts: [observationAuditContract('PUT', 'network', 'update')] },
-    {
-        route: 'app/api/prosthetic-prescriptions/route.ts', events: ['prosthetic.prescription.created'], reason: 'prosthetic prescription creation is sensitive CRUD',
-        writerContracts: [{
-            handler: 'POST', serviceModule: '@/lib/prosthetic-prescription-write',
-            serviceExport: 'createHostProstheticPrescription',
-            target: 'prosthetic-prescription.create', ownerFile: 'lib/prosthetic-prescription-write.ts',
-            ownerName: 'createHostProstheticPrescription', writerModule: './security/audit',
-            writerExport: 'safeWriteAuditEventFromRequest', writerArgumentIndex: 2,
-            eventType: 'prosthetic.prescription.created',
-        }],
-    },
-    {
-        route: 'app/api/prosthetic-prescriptions/[id]/route.ts', events: ['prosthetic.prescription.updated', 'prosthetic.prescription.deleted'], reason: 'prosthetic prescription update/delete are sensitive CRUD',
-        writerContracts: [
-            {
-                handler: 'PUT', serviceModule: '@/lib/prosthetic-prescription-write',
-                serviceExport: 'updateHostProstheticPrescription',
-                hop: { target: 'updateProstheticPrescription', argumentIndex: 2, literal: 'host' },
-                target: 'prosthetic-prescription.update', ownerFile: 'lib/prosthetic-prescription-write.ts',
-                ownerName: 'updateProstheticPrescription', writerModule: './security/audit',
-                writerExport: 'safeWriteAuditEventFromRequest', writerArgumentIndex: 2,
-                eventType: 'prosthetic.prescription.updated',
-            },
-            {
-                handler: 'DELETE', serviceModule: '@/lib/prosthetic-prescription-write',
-                serviceExport: 'deleteHostProstheticPrescription',
-                target: 'prosthetic-prescription.delete', ownerFile: 'lib/prosthetic-prescription-write.ts',
-                ownerName: 'deleteHostProstheticPrescription', writerModule: './security/audit',
-                writerExport: 'safeWriteAuditEventFromRequest', writerArgumentIndex: 2,
-                eventType: 'prosthetic.prescription.deleted',
-            },
-        ],
-    },
+    { route: 'app/api/prosthetic-prescriptions/route.ts', events: ['prosthetic.prescription.created'],
+        writerContracts: [prostheticAuditContract('POST', 'host', 'create')] },
+    { route: 'app/api/prosthetic-prescriptions/[id]/route.ts', events: ['prosthetic.prescription.updated', 'prosthetic.prescription.deleted'],
+        writerContracts: [prostheticAuditContract('PUT', 'host', 'update'), prostheticAuditContract('DELETE', 'host', 'delete')] },
+    { route: 'app/api/v1/network/prosthetic-prescriptions/route.ts', events: ['prosthetic.prescription.created'],
+        writerContracts: [prostheticAuditContract('POST', 'network', 'create')] },
+    { route: 'app/api/v1/network/prosthetic-prescriptions/[id]/route.ts', events: ['prosthetic.prescription.updated'],
+        writerContracts: [prostheticAuditContract('PUT', 'network', 'update')] },
     { route: 'app/api/siss-handoffs/route.ts', events: ['siss.handoff.created'], reason: 'SISS handoff creation must stay PHI-safe auditable' },
     { route: 'app/api/siss-handoffs/[id]/route.ts', events: ['siss.handoff.updated', 'siss.handoff.deleted'], reason: 'SISS handoff update/delete must stay PHI-safe auditable' },
     { route: 'app/api/siss/context/route.ts', events: ['patient.siss.prescription.launch'], reason: 'prescription handoff launch must stay PHI-safe auditable' },
@@ -684,6 +659,131 @@ export function validateDelegatedRouteAudit({ spec, routeSource, serviceSource }
     } else if (serviceEntry && spec.ownerName !== spec.serviceExport) {
         problems.push('owner mismatch requires one configured hop');
     }
+    return problems;
+}
+
+/* @Codex: the five existing ordinary prosthetic mutations; no paired DELETE. */
+export function prostheticAuditContract(handler, mode, operation) {
+    const serviceExport = `${operation}${mode === 'host' ? 'Host' : 'NetworkScoped'}ProstheticPrescription`;
+    return {
+        handler, serviceModule: '@/lib/prosthetic-prescription-write', serviceExport,
+        ownerFile: 'lib/prosthetic-prescription-write.ts',
+        ownerName: operation === 'update' ? 'updateProstheticPrescription' : serviceExport,
+        ...(operation === 'update' ? { hop: { target: 'updateProstheticPrescription', argumentIndex: 2, literal: mode } } : {}),
+        target: `prosthetic-prescription.${mode}.${operation}`, operation, transactionalProsthetic: true,
+        eventType: `prosthetic.prescription.${operation}d`,
+    };
+}
+
+/* @Codex: bounded wiring and transaction-order guard. Real SQLite tests decide
+ * identity, scope, parent, CAS and persisted-value correctness. */
+export function validateRequiredProstheticAudit({ spec, routeSource, coreSource }) {
+    const problems = validateDelegatedRouteAudit({ spec, routeSource, serviceSource: coreSource });
+    const core = checkedSource(spec.ownerFile, coreSource);
+    const owner = namedFunction(core.sourceFile, spec.ownerName);
+    const db = importedBinding(core.sourceFile, core.checker, './db-server', 'dbServer');
+    const writer = importedBinding(core.sourceFile, core.checker, './security/audit', 'writeAuditEventInTransaction');
+    const table = importedBinding(core.sourceFile, core.checker, './schema', 'prostheticPrescriptions');
+    if (!owner || !db || !writer || !table) return [...problems, 'prosthetic owner/imports missing'];
+    const calls = [];
+    const visit = (node) => { if (ts.isCallExpression(node)) calls.push(node); ts.forEachChild(node, visit); };
+    visit(owner);
+    const transactions = calls.filter((node) => {
+        const callee = unwrap(node.expression);
+        return ts.isPropertyAccessExpression(callee) && callee.name.text === 'transaction'
+            && ts.isIdentifier(callee.expression)
+            && resolvesToBinding(core.checker, core.checker.getSymbolAtLocation(callee.expression), db.symbol);
+    });
+    const transaction = transactions.length === 1 ? transactions[0] : null;
+    const callback = transaction?.arguments[0] && unwrap(transaction.arguments[0]);
+    const options = transaction?.arguments[1] && unwrap(transaction.arguments[1]);
+    const behavior = options && ts.isObjectLiteralExpression(options)
+        ? exactPropertyAssignments(options, ['behavior'])?.get('behavior')?.initializer : null;
+    const transactionStatement = transaction && directStatement(owner, transaction);
+    const transactionDeclaration = transaction && ts.isVariableDeclaration(transaction.parent) ? transaction.parent : null;
+    const ownerStatements = [...owner.body.statements];
+    const assignedReturn = transactionDeclaration && ts.isIdentifier(transactionDeclaration.name)
+        && ts.isVariableStatement(transactionStatement)
+        && Boolean(transactionStatement.declarationList.flags & ts.NodeFlags.Const)
+        && transactionStatement.declarationList.declarations.length === 1
+        && ownerStatements.at(-2) === transactionStatement
+        && ts.isReturnStatement(ownerStatements.at(-1))
+        && unwrap(ownerStatements.at(-1).expression)?.getText(core.sourceFile) === transactionDeclaration.name.text;
+    const directReturn = transaction && ts.isReturnStatement(transaction.parent) && transaction.parent.parent === owner.body;
+    if (!transaction || transaction.arguments.length !== 2 || (!directReturn && !assignedReturn)
+        || !isReachableCall(transaction, owner)
+        || !callback || !ts.isArrowFunction(callback) || !ts.isBlock(callback.body)
+        || callback.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.AsyncKeyword)
+        || callback.parameters.length !== 1 || !ts.isIdentifier(callback.parameters[0].name)
+        || localBindingExists(callback, callback.parameters[0].name.text, true)
+        || !behavior || !ts.isStringLiteral(behavior) || behavior.text !== 'immediate') {
+        return [...problems, 'prosthetic owner must return one synchronous immediate transaction'];
+    }
+    const txName = callback.parameters[0].name.text;
+    const auditCalls = bindingCalls(owner, core.checker, writer.symbol);
+    const audit = auditCalls.length === 1 ? auditCalls[0] : null;
+    const statements = [...callback.body.statements];
+    const auditIndex = statements.indexOf(audit?.parent);
+    if (!audit || audit.arguments.length !== 2 || !ts.isIdentifier(unwrap(audit.arguments[0]))
+        || unwrap(audit.arguments[0]).text !== txName || auditIndex < 2
+        || !ts.isExpressionStatement(audit.parent) || !isReachableStandaloneCall(audit, callback)) {
+        return [...problems, 'prosthetic audit must be direct, exactly once, on the same transaction'];
+    }
+    const input = unwrap(audit.arguments[1]);
+    const helper = namedFunction(core.sourceFile, 'prostheticAuditInput');
+    const helperSymbol = helper?.name && core.checker.getSymbolAtLocation(helper.name);
+    const helperReturns = helper ? directReturnStatements(helper) : [];
+    const returnedInput = helperReturns.length === 1 && helperReturns[0].expression && unwrap(helperReturns[0].expression);
+    const eventProperties = returnedInput && ts.isObjectLiteralExpression(returnedInput)
+        ? returnedInput.properties.filter((p) => p.name && ts.isIdentifier(p.name) && p.name.text === 'eventType') : [];
+    const eventParameter = helper?.parameters[2]?.name;
+    const eventReferences = [];
+    if (helper) {
+        const collect = (node) => { if (ts.isIdentifier(node) && node.text === 'eventType') eventReferences.push(node); ts.forEachChild(node, collect); };
+        collect(helper);
+    }
+    if (eventReferences.length !== 2 || !eventReferences.includes(eventParameter)
+        || !eventReferences.includes(eventProperties[0]?.name)) problems.push('prosthetic event parameter must be forwarded without mutation or aliasing');
+    if (!ts.isCallExpression(input) || !ts.isIdentifier(input.expression)
+        || !resolvesToBinding(core.checker, core.checker.getSymbolAtLocation(input.expression), helperSymbol)
+        || input.arguments.length !== 5 || !ts.isStringLiteral(input.arguments[2]) || input.arguments[2].text !== spec.eventType
+        || !eventParameter || !ts.isIdentifier(eventParameter) || eventParameter.text !== 'eventType'
+        || localBindingExists(helper, 'eventType', true) || !returnedInput || !ts.isObjectLiteralExpression(returnedInput)
+        || returnedInput.properties.some((p) => ts.isSpreadAssignment(p) || (p.name && ts.isComputedPropertyName(p.name)))
+        || eventProperties.length !== 1 || !ts.isShorthandPropertyAssignment(eventProperties[0])) {
+        problems.push('prosthetic audit must pass the exact event through the approved input helper');
+    }
+    const mutationStatement = statements[auditIndex - 2];
+    const declaration = ts.isVariableStatement(mutationStatement) && mutationStatement.declarationList.declarations.length === 1
+        ? mutationStatement.declarationList.declarations[0] : null;
+    const mutation = declaration?.initializer;
+    const dml = calls.filter((node) => {
+        const callee = unwrap(node.expression);
+        const target = node.arguments[0] && unwrap(node.arguments[0]);
+        return ts.isPropertyAccessExpression(callee) && callee.name.text === ({ create: 'insert', update: 'update', delete: 'delete' })[spec.operation]
+            && ts.isIdentifier(callee.expression) && callee.expression.text === txName
+            && target && ts.isIdentifier(target) && resolvesToBinding(core.checker, core.checker.getSymbolAtLocation(target), table.symbol);
+    });
+    if (!declaration || !ts.isIdentifier(declaration.name) || !mutation || !ts.isCallExpression(mutation)
+        || !ts.isPropertyAccessExpression(mutation.expression) || mutation.expression.name.text !== 'run'
+        || dml.length !== 1 || !((node, target) => { let found = false; const walk = (child) => { if (child === target) found = true; ts.forEachChild(child, walk); }; walk(node); return found; })(mutation, dml[0])) problems.push('prosthetic mutation must run once directly before its cardinality check and audit');
+    const guard = statements[auditIndex - 1];
+    const compact = (node) => node?.getText(core.sourceFile).replace(/\s+/gu, '') ?? '';
+    const expectedGuard = `${declaration?.name?.getText(core.sourceFile)}.changes!==1`;
+    const thrown = ts.isIfStatement(guard) && (ts.isBlock(guard.thenStatement)
+        ? guard.thenStatement.statements.length === 1 && ts.isThrowStatement(guard.thenStatement.statements[0]) : ts.isThrowStatement(guard.thenStatement));
+    if (!thrown || guard.elseStatement || compact(guard.expression) !== expectedGuard) problems.push('prosthetic DML must throw unless exactly one row changed');
+    const allDomainWrites = calls.filter((node) => {
+        const callee = unwrap(node.expression); const target = node.arguments[0] && unwrap(node.arguments[0]);
+        return ts.isPropertyAccessExpression(callee) && ['insert', 'update', 'delete'].includes(callee.name.text)
+            && target && ts.isIdentifier(target) && resolvesToBinding(core.checker, core.checker.getSymbolAtLocation(target), table.symbol);
+    });
+    if (allDomainWrites.length !== 1 || allDomainWrites[0] !== dml[0]) problems.push('prosthetic owner cannot mutate outside its audited transaction');
+    if (directReturnStatements(owner).some((node) => node.expression && ts.isObjectLiteralExpression(unwrap(node.expression)) && /status\s*:\s*20[01]\b/u.test(node.getText(core.sourceFile)))) problems.push('prosthetic owner cannot bypass the transaction with a success');
+    for (const statement of statements.slice(0, auditIndex)) {
+        if (directReturnStatements({ body: statement }).some((node) => /status\s*:\s*20[01]\b/u.test(node.getText(core.sourceFile)))) problems.push('prosthetic success cannot precede mandatory audit');
+    }
+    if (statements.length !== auditIndex + 2 || !ts.isReturnStatement(statements[auditIndex + 1])) problems.push('prosthetic success must directly follow audit');
     return problems;
 }
 
@@ -2055,7 +2155,7 @@ function checkAuditWriterControlFlow(findings) {
     const contracts = REQUIRED_ROUTE_AUDIT.flatMap((entry) =>
         (entry.writerContracts ?? []).filter((contract) => !contract.modes
             && !contract.transactionalPatientUpdate && !contract.transactionalPatientDelete
-            && !contract.transactionalDiary && !contract.transactionalTherapy && !contract.transactionalObservation && !contract.transactionalCheckup)
+            && !contract.transactionalDiary && !contract.transactionalTherapy && !contract.transactionalObservation && !contract.transactionalCheckup && !contract.transactionalProsthetic)
             .map((contract) => ({ ...contract, route: entry.route })));
     const parsedFiles = new Map();
     for (const contract of contracts) {
@@ -2165,6 +2265,8 @@ function checkRouteCoverage(findings) {
                             spec: contract, routeSource: source, coreSource: read(contract.ownerFile),
                             bridgeSource: exists(contract.bridgeFile) ? read(contract.bridgeFile) : null,
                         })
+                    : contract.transactionalProsthetic
+                        ? validateRequiredProstheticAudit({ spec: contract, routeSource: source, coreSource: read(contract.ownerFile) })
                     : validateDelegatedRouteAudit({
                         spec: contract,
                         routeSource: source,
