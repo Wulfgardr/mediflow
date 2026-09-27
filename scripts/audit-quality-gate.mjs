@@ -123,6 +123,23 @@ const REQUIRED_ROUTE_AUDIT = [
         writerContracts: [prostheticAuditContract('POST', 'network', 'create')] },
     { route: 'app/api/v1/network/prosthetic-prescriptions/[id]/route.ts', events: ['prosthetic.prescription.updated'],
         writerContracts: [prostheticAuditContract('PUT', 'network', 'update')] },
+    /* @Codex: ten existing ordinary service parent/item writers. */
+    { route: 'app/api/service-prescriptions/route.ts', events: ['service.prescription.created'],
+        writerContracts: [serviceAuditContract('POST', 'host', 'create', 'parent')] },
+    { route: 'app/api/service-prescriptions/[id]/route.ts', events: ['service.prescription.updated', 'service.prescription.deleted'],
+        writerContracts: [serviceAuditContract('PUT', 'host', 'update', 'parent'), serviceAuditContract('DELETE', 'host', 'delete', 'parent')] },
+    { route: 'app/api/service-prescription-items/route.ts', events: ['service.prescription_item.created'],
+        writerContracts: [serviceAuditContract('POST', 'host', 'create', 'item')] },
+    { route: 'app/api/service-prescription-items/[id]/route.ts', events: ['service.prescription_item.updated', 'service.prescription_item.deleted'],
+        writerContracts: [serviceAuditContract('PUT', 'host', 'update', 'item'), serviceAuditContract('DELETE', 'host', 'delete', 'item')] },
+    { route: 'app/api/v1/network/service-prescriptions/route.ts', events: ['service.prescription.created'],
+        writerContracts: [serviceAuditContract('POST', 'network', 'create', 'parent')] },
+    { route: 'app/api/v1/network/service-prescriptions/[id]/route.ts', events: ['service.prescription.updated'],
+        writerContracts: [serviceAuditContract('PUT', 'network', 'update', 'parent')] },
+    { route: 'app/api/v1/network/service-prescription-items/route.ts', events: ['service.prescription_item.created'],
+        writerContracts: [serviceAuditContract('POST', 'network', 'create', 'item')] },
+    { route: 'app/api/v1/network/service-prescription-items/[id]/route.ts', events: ['service.prescription_item.updated'],
+        writerContracts: [serviceAuditContract('PUT', 'network', 'update', 'item')] },
     { route: 'app/api/siss-handoffs/route.ts', events: ['siss.handoff.created'], reason: 'SISS handoff creation must stay PHI-safe auditable' },
     { route: 'app/api/siss-handoffs/[id]/route.ts', events: ['siss.handoff.updated', 'siss.handoff.deleted'], reason: 'SISS handoff update/delete must stay PHI-safe auditable' },
     { route: 'app/api/siss/context/route.ts', events: ['patient.siss.prescription.launch'], reason: 'prescription handoff launch must stay PHI-safe auditable' },
@@ -659,6 +676,84 @@ export function validateDelegatedRouteAudit({ spec, routeSource, serviceSource }
     } else if (serviceEntry && spec.ownerName !== spec.serviceExport) {
         problems.push('owner mismatch requires one configured hop');
     }
+    return problems;
+}
+
+/* @Codex: owner and adapter names for the ten ordinary service mutations. */
+export function serviceAuditContract(handler, mode, operation, resource) {
+    const suffix = resource === 'item' ? 'ServicePrescriptionItem' : 'ServicePrescription';
+    const serviceExport = `${operation}${mode === 'host' ? 'Host' : 'NetworkScoped'}${suffix}`;
+    const ownerName = operation === 'update' ? (resource === 'item' ? 'updateServicePrescriptionItem' : 'updateServicePrescription')
+        : operation === 'create' && resource === 'item' ? 'createServicePrescriptionItem' : serviceExport;
+    return {
+        handler, serviceModule: '@/lib/service-prescription-write', serviceExport,
+        ownerFile: 'lib/service-prescription-write.ts', ownerName,
+        ...(ownerName !== serviceExport ? { hop: { target: ownerName, argumentIndex: operation === 'create' ? 2 : 2, literal: mode } } : {}),
+        target: `service-${resource}.${mode}.${operation}`, operation, resource, transactionalService: true,
+        eventType: `service.${resource === 'item' ? 'prescription_item' : 'prescription'}.${operation}d`,
+    };
+}
+
+/* @Codex: structural wiring and DML/audit order; SQLite tests establish behavior. */
+export function validateRequiredServiceAudit({ spec, routeSource, coreSource }) {
+    const problems = validateDelegatedRouteAudit({ spec, routeSource, serviceSource: coreSource });
+    const core = checkedSource(spec.ownerFile, coreSource);
+    const owner = namedFunction(core.sourceFile, spec.ownerName);
+    const db = importedBinding(core.sourceFile, core.checker, './db-server', 'dbServer');
+    const writer = importedBinding(core.sourceFile, core.checker, './security/audit', 'writeAuditEventInTransaction');
+    const table = importedBinding(core.sourceFile, core.checker, './schema', spec.resource === 'item' ? 'servicePrescriptionItems' : 'servicePrescriptions');
+    if (!owner || !db || !writer || !table) return [...problems, 'service owner/imports missing'];
+    const calls = []; const visit = (node) => { if (ts.isCallExpression(node)) calls.push(node); ts.forEachChild(node, visit); }; visit(owner);
+    const transactions = calls.filter((node) => {
+        const callee = unwrap(node.expression);
+        return ts.isPropertyAccessExpression(callee) && callee.name.text === 'transaction'
+            && ts.isIdentifier(callee.expression) && resolvesToBinding(core.checker, core.checker.getSymbolAtLocation(callee.expression), db.symbol);
+    });
+    const transaction = transactions.length === 1 ? transactions[0] : null;
+    const callback = transaction?.arguments[0] && unwrap(transaction.arguments[0]);
+    const options = transaction?.arguments[1] && unwrap(transaction.arguments[1]);
+    const behavior = options && ts.isObjectLiteralExpression(options) ? exactPropertyAssignments(options, ['behavior'])?.get('behavior')?.initializer : null;
+    if (!transaction || transaction.arguments.length !== 2 || !ts.isReturnStatement(transaction.parent)
+        || transaction.parent.parent !== owner.body || !isReachableCall(transaction, owner)
+        || !callback || !ts.isArrowFunction(callback) || !ts.isBlock(callback.body)
+        || callback.parameters.length !== 1 || !ts.isIdentifier(callback.parameters[0].name)
+        || !behavior || !ts.isStringLiteral(behavior) || behavior.text !== 'immediate') {
+        return [...problems, 'service owner must directly return one synchronous immediate transaction'];
+    }
+    const txName = callback.parameters[0].name.text;
+    const auditCalls = bindingCalls(owner, core.checker, writer.symbol);
+    const audit = auditCalls.length === 1 ? auditCalls[0] : null;
+    const statements = [...callback.body.statements]; const auditIndex = statements.indexOf(audit?.parent);
+    if (!audit || audit.arguments.length !== 2 || !ts.isIdentifier(unwrap(audit.arguments[0]))
+        || unwrap(audit.arguments[0]).text !== txName || auditIndex < 2
+        || !ts.isExpressionStatement(audit.parent) || !isReachableStandaloneCall(audit, callback)) {
+        return [...problems, 'service audit must be direct, exactly once, on the same transaction'];
+    }
+    const input = unwrap(audit.arguments[1]);
+    if (!ts.isCallExpression(input) || !ts.isIdentifier(input.expression) || input.expression.text !== 'serviceAuditInput'
+        || input.arguments.length !== 6 || !ts.isStringLiteral(input.arguments[2]) || input.arguments[2].text !== spec.eventType
+        || !ts.isStringLiteral(input.arguments[3]) || input.arguments[3].text !== (spec.resource === 'item' ? 'service_prescription_item' : 'service_prescription')) {
+        problems.push('service audit event and subject must use the approved input helper');
+    }
+    const dml = calls.filter((node) => {
+        const callee = unwrap(node.expression); const target = node.arguments[0] && unwrap(node.arguments[0]);
+        return ts.isPropertyAccessExpression(callee) && ['insert', 'update', 'delete'].includes(callee.name.text)
+            && ts.isIdentifier(callee.expression) && callee.expression.text === txName
+            && target && ts.isIdentifier(target) && resolvesToBinding(core.checker, core.checker.getSymbolAtLocation(target), table.symbol);
+    });
+    const expected = spec.resource === 'parent' && spec.operation === 'delete' ? 2 : 1;
+    const allDomainWrites = calls.filter((node) => {
+        const callee = unwrap(node.expression); const target = node.arguments[0] && unwrap(node.arguments[0]);
+        return ts.isPropertyAccessExpression(callee) && ['insert', 'update', 'delete'].includes(callee.name.text)
+            && target && ts.isIdentifier(target) && ['servicePrescriptions', 'servicePrescriptionItems'].includes(target.text);
+    });
+    if (dml.length !== 1 || allDomainWrites.length !== expected || !allDomainWrites.every((node) => node.pos > callback.body.pos && node.end < audit.pos))
+        problems.push('service DML must run once inside the transaction before audit');
+    const between = statements.slice(0, auditIndex).map((node) => node.getText(core.sourceFile)).join(' ');
+    if (!/\.changes\s*!==\s*1/u.test(between) || (expected === 2 && !/children\.changes\s*!==\s*childCount/u.test(between)))
+        problems.push('service DML cardinality must be checked before audit');
+    if (statements.length !== auditIndex + 2 || !ts.isReturnStatement(statements[auditIndex + 1]))
+        problems.push('service success must directly follow mandatory audit');
     return problems;
 }
 
@@ -2155,7 +2250,7 @@ function checkAuditWriterControlFlow(findings) {
     const contracts = REQUIRED_ROUTE_AUDIT.flatMap((entry) =>
         (entry.writerContracts ?? []).filter((contract) => !contract.modes
             && !contract.transactionalPatientUpdate && !contract.transactionalPatientDelete
-            && !contract.transactionalDiary && !contract.transactionalTherapy && !contract.transactionalObservation && !contract.transactionalCheckup && !contract.transactionalProsthetic)
+            && !contract.transactionalDiary && !contract.transactionalTherapy && !contract.transactionalObservation && !contract.transactionalCheckup && !contract.transactionalProsthetic && !contract.transactionalService)
             .map((contract) => ({ ...contract, route: entry.route })));
     const parsedFiles = new Map();
     for (const contract of contracts) {
@@ -2265,6 +2360,8 @@ function checkRouteCoverage(findings) {
                             spec: contract, routeSource: source, coreSource: read(contract.ownerFile),
                             bridgeSource: exists(contract.bridgeFile) ? read(contract.bridgeFile) : null,
                         })
+                    : contract.transactionalService
+                        ? validateRequiredServiceAudit({ spec: contract, routeSource: source, coreSource: read(contract.ownerFile) })
                     : contract.transactionalProsthetic
                         ? validateRequiredProstheticAudit({ spec: contract, routeSource: source, coreSource: read(contract.ownerFile) })
                     : validateDelegatedRouteAudit({
